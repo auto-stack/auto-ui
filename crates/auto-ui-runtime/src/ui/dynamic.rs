@@ -406,11 +406,9 @@ impl fmt::Debug for DynamicComponent {
 pub(crate) fn r1_instance_obj(dc: &DynamicComponent, widget: &str) -> u64 {
     let identity = dc
         .bridge()
-        .child_instance_identities()
+        .child_instance_identities_of_type(widget)
         .into_iter()
-        .find(|id| {
-            id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget)
-        })
+        .next()
         .unwrap_or_else(|| panic!("no live instance of {widget}"));
     dc.bridge()
         .child_instance_state_id(&identity)
@@ -1680,15 +1678,9 @@ impl DynamicComponent {
     ) -> Result<(), String> {
         // PLAN-041 T-02: 与 on_with_input_for 同款单实例名字路由——该件名恰
         // 有一个存活实例时派发到实例（验收通道真实意图；根上已无子件态）。
-        let live = self
-            .bridge
-            .child_instance_identities()
-            .into_iter()
-            .filter(|id| {
-                let tail = id.rsplit('/').next().unwrap_or(id);
-                tail.split('#').next() == Some(widget)
-            })
-            .collect::<Vec<_>>();
+        // PLAN-069 F3: 按注册类型名精确匹配（身份里含 outlet 路由装饰，后缀
+        // 拆解在 `/book/7/chapter/1` 形态下取到路由尾段而非类型名）。
+        let live = self.bridge.child_instance_identities_of_type(widget);
         if let [only] = live.as_slice() {
             if let Some(sid) = self.bridge.child_instance_state_id(only) {
                 return self
@@ -2597,7 +2589,9 @@ impl DynamicComponent {
         let old_identities = old_bridge.child_instance_identities();
         let new_schema = candidate.last_schema.clone();
         for identity in &old_identities {
-            let widget_type = instance_widget_type(identity);
+            // PLAN-069 F3: 类型取注册记录（身份含 outlet 路由装饰，字符串后缀
+            // 拆解在 `@/book/7/chapter/1` 形态下会取到路由尾段）。
+            let widget_type = old_bridge.child_instance_widget_name(identity).unwrap_or_default();
             let fields = old_bridge
                 .read_instance_state_all(identity)
                 .map_err(|e| format!("instance `{identity}`: {e}"))?;
@@ -2694,8 +2688,13 @@ impl DynamicComponent {
 }
 
 /// PLAN-056: 从实例身份串解析 widget 类型（`<父>/<Widget>#<key|序号>`）。
+/// PLAN-069 F3: **仅作无注册记录时的兜底**——outlet 页身份带路由装饰
+/// （`<Page>@/book/7/chapter/1`），此时类型名在 '@' 之前，最后一个 '/' 段
+/// 是路由尾段。注册表内一律用 `VmBridge::child_instance_widget_name`。
+#[allow(dead_code)]
 fn instance_widget_type(identity: &str) -> String {
-    let after_slash = identity.rsplit('/').next().unwrap_or(identity);
+    let head = identity.split('@').next().unwrap_or(identity);
+    let after_slash = head.rsplit('/').next().unwrap_or(head);
     match after_slash.split_once('#') {
         Some((w, _)) => w.to_string(),
         None => after_slash.to_string(),
@@ -3152,14 +3151,11 @@ impl DynamicComponent {
         // the one a name-synthesized interaction targets when a gallery hosts
         // several same-type demos (matches the legacy shared-state semantics
         // where the last-seeded site owned the visible field).
+        // PLAN-069 F3: 类型精确匹配（见 child_instance_identities_of_type）。
         let identity = self
             .bridge
-            .child_instance_identities()
+            .child_instance_identities_of_type(widget_type)
             .into_iter()
-            .filter(|id| {
-                let tail = id.rsplit('/').next().unwrap_or(id);
-                tail.split('#').next() == Some(widget_type)
-            })
             .last();
         match identity {
             Some(id) => {
@@ -3276,15 +3272,9 @@ impl DynamicComponent {
         let mut instance: Option<&str> = match instance {
             Some(i) => Some(i),
             None => {
-                let live = self
-                    .bridge
-                    .child_instance_identities()
-                    .into_iter()
-                    .filter(|id| {
-                        let tail = id.rsplit('/').next().unwrap_or(id);
-                        tail.split('#').next() == Some(widget_name)
-                    })
-                    .collect::<Vec<_>>();
+                // PLAN-069 F3: 类型精确匹配（身份含 outlet 路由装饰时旧后缀
+                // 拆解取到路由尾段 → 页实例恒 miss → 落根态）。
+                let live = self.bridge.child_instance_identities_of_type(widget_name);
                 match live.as_slice() {
                     [only] => {
                         name_only_instance = only.clone();
@@ -3324,15 +3314,9 @@ impl DynamicComponent {
                 Some(id) => Some(id),
                 None => {
                     let tombstoned = self.bridge.child_instance_was_released(identity);
-                    let live: Vec<String> = self
-                        .bridge
-                        .child_instance_identities()
-                        .into_iter()
-                        .filter(|id| {
-                            let tail = id.rsplit('/').next().unwrap_or(id);
-                            tail.split('#').next() == Some(widget_name)
-                        })
-                        .collect();
+                    // PLAN-069 F3: 重定向候选同样按注册类型精确匹配。
+                    let live: Vec<String> =
+                        self.bridge.child_instance_identities_of_type(widget_name);
                     match (tombstoned, live.as_slice()) {
                         (true, _) => {
                             late_event = true;

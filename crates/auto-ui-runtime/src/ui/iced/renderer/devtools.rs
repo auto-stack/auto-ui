@@ -4593,8 +4593,8 @@ pub(crate) fn input_cache_key(component: &DynamicComponent, widget: &str, event:
     let Some((widget, identity)) = widget.split_once('\u{1}') else { return Some(event.to_string()); };
     let receiver = component.bridge().child_instance_state_id(identity).or_else(|| {
         if component.bridge().child_instance_was_released(identity) { return None; }
-        let candidates = component.bridge().child_instance_identities().into_iter()
-            .filter(|id| id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget)).collect::<Vec<_>>();
+        // PLAN-069 F3: 类型按注册记录精确匹配（身份含 outlet 路由装饰）。
+        let candidates = component.bridge().child_instance_identities_of_type(widget);
         match candidates.as_slice() { [only] => component.bridge().child_instance_state_id(only), _ => None }
     })?;
     Some(format!("{receiver}\u{1}{event}"))

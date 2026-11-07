@@ -232,6 +232,8 @@ mod plan749_read_semantics_tests;
 #[cfg(test)]
 mod plan069_synthetic_input_tests;
 #[cfg(test)]
+mod plan069_route_dispatch_tests;
+#[cfg(test)]
 mod plan712_route_param_tests;
 #[cfg(test)]
 mod plan499_engine_float_to_int_tests;

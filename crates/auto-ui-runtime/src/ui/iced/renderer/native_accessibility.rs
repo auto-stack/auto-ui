@@ -355,6 +355,9 @@ struct Build {
     root: u64,
     root_widget: String,
     owners: HashMap<String, u64>,
+    /// PLAN-069 F3: identity → widget TYPE (registered name). Identity strings
+    /// embed outlet routes, so suffix parsing cannot recover the type.
+    owner_types: HashMap<String, String>,
     stack: Vec<u64>,
     nodes: BTreeMap<u64, Entry>,
     keys: HashMap<Key, u64>,
@@ -388,11 +391,23 @@ pub(super) fn with_scope<R>(
                 .map(|state| (id, state))
         })
         .collect();
+    let owner_types = component
+        .bridge()
+        .child_instance_identities()
+        .into_iter()
+        .filter_map(|id| {
+            component
+                .bridge()
+                .child_instance_widget_name(&id)
+                .map(|ty| (id, ty))
+        })
+        .collect();
     let build = Build {
         state,
         root: component.bridge().state_obj_id(),
         root_widget: component.widget_name().to_string(),
         owners,
+        owner_types,
         stack: vec![],
         nodes: BTreeMap::new(),
         keys: HashMap::new(),
@@ -439,9 +454,10 @@ fn bind(build: &Build, message: Option<&IcedMessage>) -> (Owner, Option<IcedMess
             if identity.is_some() {
                 return None;
             }
-            let mut matches = build.owners.iter().filter(|(id, _)| {
-                id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget)
-            });
+            let mut matches = build
+                .owners
+                .iter()
+                .filter(|(id, _)| build.owner_types.get(*id).map(String::as_str) == Some(widget));
             let only = matches.next()?;
             if matches.next().is_some() {
                 None

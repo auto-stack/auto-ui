@@ -138,6 +138,12 @@ pub struct ChildInstanceRecord {
     /// instance release; the root is permanently staked so the retained
     /// count is bookkeeping, not lifetime).
     parent_state_id: u64,
+    /// PLAN-069 F3: widget TYPE name recorded at registration. Identity
+    /// strings embed the outlet route (`<Page>@/book/7/chapter/1`) and
+    /// nested site keys (`<parent>/<Child>#<key>`), so deriving the type by
+    /// string suffix is ambiguous (a route tail like "1" is not a type).
+    /// Name-based dispatch resolution uses this field instead.
+    widget_name: String,
 }
 
 
@@ -2193,9 +2199,33 @@ impl VmBridge {
                 state_obj_id: obj_id,
                 generation: 0,
                 parent_state_id,
+                widget_name: widget_name.to_string(),
             },
         );
         obj_id
+    }
+
+    /// PLAN-069 F3: live identities of one widget TYPE — type-exact, immune
+    /// to route decoration (`Widget@/book/7/chapter/1`) and nested site keys
+    /// (`<parent>/<Widget>#<key>`). Deterministic (sorted) order.
+    pub fn child_instance_identities_of_type(&self, widget_name: &str) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .child_instances
+            .borrow()
+            .iter()
+            .filter(|(_, rec)| rec.widget_name == widget_name)
+            .map(|(id, _)| id.clone())
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    /// PLAN-069 F3: registered widget type for an instance identity.
+    pub fn child_instance_widget_name(&self, identity: &str) -> Option<String> {
+        self.child_instances
+            .borrow()
+            .get(identity)
+            .map(|rec| rec.widget_name.clone())
     }
 
     /// PLAN-041 T-02: current state object id for an instance identity.
@@ -2377,12 +2407,12 @@ impl VmBridge {
                 state_obj_id: obj_id,
                 generation: 0,
                 parent_state_id,
+                widget_name: widget_name.to_string(),
             },
         );
         // Seen-now so the commit→first-render frame transition treats it as
         // mounted; identities the new view never re-registers get released +
-        // tombstoned by the normal frame sweep (删实例只撤销其 owner).
-        self.instance_seen_cur.borrow_mut().insert(identity.to_string());
+        // tombstoned by the normal frame sweep (删实例只撤销其 owner).        self.instance_seen_cur.borrow_mut().insert(identity.to_string());
         self.init_demand_records.borrow_mut().insert(
             identity.to_string(),
             InitDemandRecord {
