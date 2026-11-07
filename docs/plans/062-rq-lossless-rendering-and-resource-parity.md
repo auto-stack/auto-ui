@@ -271,6 +271,17 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 与 061 合同的边界：本页记录 062 增量，不覆盖 `rq-fidelity-contract.md` 的 v2 现状与冻结能力 ID；新增能力 `fidelity/pathfill/1`、`fidelity/glyphrun/1` 复用其语义。
 - 校验：文档命令 `git diff --check` 与链接可解析；实现侧断言由 `rq_*` 测试族复跑（见 §9 各轮）。
 
+### 2026-11-07 独立复审（interim，非最终 T-06）与修复
+
+- stage: review（interim，独立上下文 fork）/ plan_id: auto-ui/PLAN-062 / plan_revision: r3 / reviewed_commit: `c22cb50c` / **outcome: needs_fix**；T-06/T-07 未动，不得 merge。完整记录：`D:/autostack/plan-artifacts/plan-062/auto-ui/review/REVIEW-2026-11-07.md`。
+- 复现：reviewer 自行重跑 `rq_`（28 passed）与 `ui::desktop_protocol::`（分支 255/4，base `3d64877d` 246/同 4 红）——§9 的数字与“4 红是基线”成立；`autocenter…` 单独跑在 base 通过属既有顺序依赖，非本轮引入。
+- **A/B（reviewer 补测，同 harness/阈值 2/255）**：text_cjk 字符串面 0.0938% → glyph run 0.7979%；gradient_border_shadow 0.0625%（scrim）→ 0.5244%（glyph run）→ **1.3740%（贴片）**；scroll_clip 0.0000% → 0.3298%。即：**阴影贴片相对 scrim 是退步**，§9 前文“此前为单层 scrim 近似”不该读作改进声明——已按 A/B 改正口径。
+- **阻塞项（reviewer 认定）**：B1 每字形每帧新建 image handle（P-02/GPU 复用）；B2 能力协商在线上是惰性的（host 恒 `all_optional`、Hello 的 caps 无人解析、Welcome 无能力尾）；B3 矩阵恒开 glyph run，§9/spec 的读数描述的是**非默认** producer 且无像素阈值门；B4 半径逻辑单位对设备几何（圆角只有一半）；B5 无 release/无 Host 上限（`handle_cache`/`glyph_cache` 无界、`bitmap_cache_put` 无 generation 校验、`CacheControl` 不携带 bitmap src）。
+- **AC 判定**：AC-01 partial、AC-02 fail、AC-03 partial/fail、AC-04 fail、AC-07 fail；AC-05/AC-06 未开始。
+- **本轮修复（`24d44d08`）**：B1 已修（`CachedGlyph` 持 iced 句柄，按 CacheKey 复用）；B4 已修（Quad 半径与阴影 SDF 半径按 `scale` 放大）；N1/N3 已修。附带把字体内容身份改成进程级按 fontdb ID 缓存、阴影贴片按参数缓存——produce 从 12.5/24.1/13.6/1.49ms 降到 **0.18/0.28/0.33/0.28ms**（仅 svg_icon 33.9ms 仍超 061 冻结的 ≤10ms，属记录路径每帧新建 renderer 的既有问题）。回归仍 **255 passed / 4 failed**（基线同组）。
+- **未修的阻塞项**：B2（能力协商上真线）、B3（矩阵双模式 + 阈值门）、B5（Host 上限/release/generation）。在它们关闭前维持 needs_fix，不签 AC-02/AC-04/AC-07，不 merge。
+
+
 
 
 
