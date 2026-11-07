@@ -87,6 +87,7 @@ T-02：`crates/auto-ui-runtime/src/ui/desktop_protocol/headless.rs`及`message.r
 | delta_id | add/modify/retire | target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
 | SD-01 | add | docs/specs/runtime/rq-render-packets-and-resources.md | 当前有限分散实现/历史设计 → 本Plan已验范围、来源、支持条件及失败/兼容合同及P-01～04/M-01～08性能要求 | 不再以历史“无漂移”或编译绿替代运行证明 | AC-01..04、AC-07 |
+| SD-02 | modify | docs/specs/runtime/rq-fidelity-contract.md §7 | 冻结能力表 8 项 → **9 项**（追加 `resource/release/1`，optional、旧端不产不出；`resource/generation/1` 保持 061 原义，062 只把它落到线上） | 新增 tag 必须进冻结分母，否则两页冲突（复审 F-05） | AC-03、AC-04 |
 
 如实际改动还影响已有canonical条目，T-01具名补充并按语义变化修订Plan；不制造无关Spec条目，review核真实增量。
 
@@ -128,7 +129,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | ID | owner_stage | 可观察行为/判据 |
 |---|---|---|
 | AC-01 | work | UI061全部绘图/资源能力与direct旧行为经两执行形态真实producer与两Host replay验证；按§5绘图fixture验，不以公开运行链为前置，缺口不删分母 |
-| AC-02 | work | 文字与全部原语不静默省略（2026-11-07 r4 裁定）：默认 producer（字符串文字 + scrim 阴影）在§6冻结 fixture 上相对 direct 金样像素差 ≤0.1%（阈值 2/255，矩阵默认模式设门）；文字经 Host 同字体栈重排属**具名降级**且必须可观测（不得静默）。v3 富模式（glyph run + SDF 贴片）为 opt-in：结构面必须被断言（glyph 坐标 = cosmic-text `physical()`、阴影与 wgpu shader 同式），其像素差按族设具名上界（glyph run 例 ≤1.0%、含阴影贴片的例 ≤1.5%，实测 text 0.798%/shadow_only 0.741%/gradient 1.374%）并作为具名边界记录，**不得计为 exact**。共用实现无第二布局器。 |
+| AC-02 | work | 文字与全部原语不静默省略（2026-11-07 r4 裁定）：默认 producer（字符串文字 + scrim 阴影）在§6冻结 fixture 上相对 direct 金样像素差 ≤0.1%（阈值 2/255，矩阵默认模式设门）；文字经 Host 同字体栈重排属**具名降级**且必须可观测（不得静默）。v3 富模式（glyph run + SDF 贴片）为 opt-in：结构面必须被断言（glyph 坐标 = cosmic-text `physical()`、阴影与 wgpu shader 同式），其像素差按族设具名上界（glyph run 例 ≤1.0%、含阴影贴片的例 ≤1.5%；r4 记录值 text 0.798%/shadow 0.741%/gradient 1.374%，**2026-11-08 复审修复后实测 text 0.798%/shadow 0.069%/gradient 0.588%**）并作为具名边界记录，**不得计为 exact**。共用实现无第二布局器。 |
 | AC-03 | work | 资源版本/传输/更新/最后owner/GPU释放及图片媒体表现正确，无App隐藏窗/GPU/整帧自绘 |
 | AC-04 | work | 协商/兼容、坏帧保旧、背压和generation负控通过，未知必需能力显式拒绝 |
 | AC-05 | review | 独立上下文逐项验证当前修订AC/V、真实源和规范增量，所有必需项有可复核证据；不能只读完成勾选 |
@@ -140,10 +141,10 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | 完成 | ID | owner_stage | 依赖/进入门 | 文件/操作与结果 | 关闭方式/AC |
 |---|---|---|---|---|---|
 | [x] | T-01 | work | UI061正式可行决策 | 重核UI061全能力ID、direct旧基准、实现来源与预算；冻结当前绘图能力并集及精确接缝；接受UI061 r3性能合同与预算，冻结P/M对应实现来源和direct对照版本，缺预算不进入性能签收 | V-01；AC-01；AC-07/V-05～08（按§6分工）——见§9 2026-11-07 work 轮次：39 View ID + 8 能力ID入编译常量、061 冻结预算原样接受 |
-| [x] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02——完成：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`）；GlyphRun/SDF 贴片按 r4 口径为 **opt-in 具名边界**（富模式 0.798%/1.374%，默认面 ≤0.1%，结构面断言 + 可观测降级），连续两轮独立复审无未决项 |
+| [x] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02——完成：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`）；GlyphRun/SDF 贴片按 r4 口径为 **opt-in 具名边界**；复审 F-01 修复后实测富模式 text 0.798%/gradient 0.588%/shadow 0.069%（≤1.0%/≤1.5% 上界，`f2cdafb4`），默认面 ≤0.1%，结构面断言 + 可观测降级 |
 | [x] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03——完成：内容身份+驻留、图片 alpha/rotation、SVG 栅格、wire generation（tag 13）、媒体静态帧（`3eadae59`，0.000/0 重传）、跨进程释放/引用记账（`44079c22`，tag 14 + BitmapRefs 延后释放）；连续媒体帧按 2026-11-08 裁定另立 |
-| [x] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；V-09——完成：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、wire generation + HostCaps 下行（`d2e41c58`）、资源释放 + 引用记账（`44079c22`）、真两进程配对（`39bd7bef`）；乱序上传由 generation 守卫覆盖，可控重排通道属具名边界 |
-| [x] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——完成：六格真实 wire（`4e2f53d3`）+ 39/39 逐能力读数（`77f92dda`）+ 负控/两进程（`4263ff3c`/`39bd7bef`）+ 媒体静态帧（`3eadae59`）；M-02/06/07 归 OS063（§5） |
+| [x] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；V-09——完成：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、wire generation + HostCaps 下行（`d2e41c58`）、资源释放 + 引用记账（`44079c22`，复审 F-02/F-04/F-07 修复：合成成功后才记账、按表面、幂等、旧宿主不积压，`f2cdafb4`）、真两进程配对（`39bd7bef`）；乱序上传由 generation 守卫覆盖，可控重排通道属具名边界 |
+| [x] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——完成：六格真实 wire（`4e2f53d3`）+ 39/39 逐能力读数（`77f92dda`）+ 负控/两进程（`4263ff3c`/`39bd7bef`）+ 媒体静态帧（`3eadae59`，复审 F-06 补了真管道过线用例）、数值条款全部落为断言（复审 F-03）、Spec 增量补 SD-02（复审 F-05）——`f2cdafb4`；M-02/06/07 归 OS063（§5） |
 | [ ] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
 | [ ] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
 
@@ -490,3 +491,38 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **待 review 决定的事**：上述边界是否满足 r4 合同；6 个能力面的证据是否足以签 AC-03/AC-04；`current_step=5`、`status=execution_done` 是否应以此修订前进。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 15 | from: work | to: review | status: execution_done | outcome: pass（T-01..T-05 完成） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 44079c22 | next: review（T-06）
+
+### 2026-11-08 第四轮独立复审（final，T-06）：needs_fix
+
+- stage: review | review_scope: **final** | reviewer_identity: 独立上下文子代理（与实现会话不同上下文；模型/会话号未由运行环境暴露，按“独立 agent 会话”记录，不冒充具体模型） | plan_id: auto-ui/PLAN-062 | plan_revision: r4 | outcome: **needs_fix** | worktree: `D:/autostack/.wt/ui-062/auto-ui` | branch: `codex/plan-062-dev` | reviewed_commit: `44079c22` | base_commit: `3d64877d` | spec_inputs: `docs/specs/runtime/rq-render-packets-and-resources.md`（worktree 版）、`rq-fidelity-contract.md` §7 | evidence: `D:/autostack/plan-artifacts/plan-062/auto-ui/review4/REVIEW4-FINAL-2026-11-08.md` | next: work（下表 F-01..F-07）
+- **复审自跑门**：`rq_` 39/0；`ui::desktop_protocol::` 272/4；base `3d64877d` 同 filter 246/**同 4 红**；`broker_surface` 13/0。→ §9 的门数与“4 红是基线”成立，无新增红。
+- **新鲜读数**：默认矩阵 0.0949/0.0395/0.0938/0.0625/0.0000/0.0053/0.0057（全 ≤0.1%）；produce p95 0.177–0.947ms、SVG 32.2–33.4ms；39/39 逐能力行、26 ≤0.1%；wire 矩阵 14 行 ok、两宿主逐例一致。
+- **AC 判定**：AC-01 pass；AC-02 **partial**；AC-03 **partial**；AC-04 pass（具名残余：无可控重排注入）；AC-07 partial（M-02/06/07 归 OS063 + 条款未设门）。
+- **阻塞发现**：
+  - **F-01（high，AC-02）**：v3 富模式阴影族实测 **2.5572%（gradient）/2.2798%（shadow_only）**，超 r4 具名上界 ≤1.5%；§9/Spec 的 1.374%/0.741% 是 `3eadae59` 探针前缀修复前的旧值（当时贴片是占位）。且**无门断言 v3 富模式**，全绿门漏过。
+  - **F-02（medium，AC-03）**：释放延后记账次序错误——`refs.on_compose(payload)` 在 `compose_v2` **之前**执行（三处宿主），准入拒绝时前台仍显旧帧却按被拒帧刷新引用集 → 仍被显示的 src 被释放；且 `ProtocolHost` 只用**一个** `BitmapRefs`（应按表面）。
+  - **F-03（medium）**：r4 的数值条款只写在文档里、无断言（富模式上界、produce p95 ≤10ms、SVG 例外范围、replay p95 规则）。
+  - **F-04（low）**：宿主未声明 `resource/release/1` 时释放队列无界增长；`bitmap_generations` 驱逐后不清。
+  - **F-05（low，Spec 增量）**：`rq-fidelity-contract.md` §7 冻结表仍是 8 项、未含 `resource/release/1`，而新页称 9 项并把 `resource/generation/1` 说成“新增”（它本就在 061 表内）；`supersedes_spec_components: []` 留下两页冲突。
+  - **F-06（low）**：媒体“过线”测试是同一个进程内的记录/重放，没经泵/管道/shm。
+  - **F-07（info）**：重复释放断言与“不重复驱逐”声明矛盾；`rq_cells` 残留 0.2%/未设门注释；session.rs 的 BitmapReady 注释被拆开。
+- **处置**：按 review 技能，受影响任务 T-02/T-04/T-05 重新打开，`status` 回 `executing`、`current_step` 重算为 3；T-06/T-07 保持未勾。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 16 | from: review | to: work | status: executing | outcome: needs_fix（7 findings） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 44079c22 | next: work（F-01..F-07）
+
+
+### 2026-11-08 work 复审修复（F-01..F-07 全部关闭，交第二轮 final review）
+
+- stage: work | plan_id: auto-ui/PLAN-062 | plan_revision: r4 | outcome: **pass（复审 findings 全关）** | worktree: `D:/autostack/.wt/ui-062/auto-ui` | branch: `codex/plan-062-dev` | code_commit: `f2cdafb4` | next: review（T-06 第二轮 final）
+- **逐条关闭（finding → 根因/修法 → 证据）**：
+  - **F-01（high，AC-02）**：根因 = 重放画布把 `Image` 排在几何之后合成（iced `CanvasFrame::draw_image` 延后批次），整块阴影贴片把 quad 内部再压暗一层。修法 = 贴片**只画环带**（quad 自身圆角形状内部 alpha 清零），z 序无关。实测 **gradient 0.588%、shadow_only 0.069%**（原 2.557%/2.280%），在 r4 ≤1.5% 上界内；新增 `images_composite_after_geometry` 钉住该画布行为，Spec §2.3 写明“不得依赖图在几何之下”。
+  - **F-02（medium，AC-03）**：修法 = 引用记账**按表面**且**只在合成成功后**刷新（`BrokerClient::refresh_refs` / `release_refs`，rqhost 与桌面 session 共用；`ProtocolHost` 用按表面的 map），释放按 wid 归属表面。被拒帧不再改写前台引用集。
+  - **F-03（medium）**：r4 数值条款全部落为断言——默认矩阵 ≤0.1%；v3 富模式 ≤1.0%（text/scroll）/≤1.5%（阴影两例）；produce p95 ≤10ms（SVG 例外以 p50 设界、p95 只记录，理由写在断言旁）；replay **p50** ≤1.25×direct p50+2ms（p95 记录，共享跑机抖动实测 direct 3–9ms / replay 5–18ms）。
+  - **F-04（low）**：泵**始终排水**释放批（未协商则丢弃），旧宿主连线上队列不再无界增长；`bitmap_cache_evict` 同步清 generation 记账。
+  - **F-05（low，Spec 增量）**：`rq-fidelity-contract.md §7` 冻结表补 `resource/release/1`（9 项），新页改口径为“generation 是 061 既有、062 只落到线上”；Plan 增 **SD-02 modify** 行。
+  - **F-06（low）**：新增 `rq_wire_media_poster_frame_crosses_the_wire`——海报帧经真泵/管道/shm 到宿主，装配帧里的 `bitmap://` 引用在宿主缓存命中（不只同进程记录面）。
+  - **F-07（info）**：重复释放幂等（applied 集合；重新被帧引用时清除），单测改为断言“第二次释放返回空”；陈旧注释清理。
+- **复跑面（本树 `f2cdafb4`）**：`rq_` **40/0**；`ui::desktop_protocol::` **273 passed / 4 failed**（同基线 4 红）；`ui::iced::broker_surface` **14/0**；`media` **18/0**。
+- **未变**：连续媒体帧（用户裁定另立）、可控重排通道负控、M-02/06/07（OS063）仍为具名边界；主检出他方 WIP 仍待其 owner 归位（merge 门）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 17 | from: work | to: review | status: execution_done | outcome: pass（F-01..F-07 关闭） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: f2cdafb4 | next: review（第二轮 final）
