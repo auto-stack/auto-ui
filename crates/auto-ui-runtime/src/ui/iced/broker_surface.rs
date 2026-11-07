@@ -201,6 +201,49 @@ pub(crate) fn bitmap_cache_evict(src: &str) {
     handle_cache().lock().unwrap().remove(src);
 }
 
+/// PLAN-062（AC-03）：每个资源 id 最后已应用的 generation（只有协商
+/// [`CAP_RESOURCE_GENERATION`] 的连线才会写入——旧端零成本）。
+fn bitmap_generations() -> &'static std::sync::Mutex<std::collections::HashMap<String, u64>> {
+    static GENS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, u64>>> =
+        std::sync::OnceLock::new();
+    GENS.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// 带显式 generation 的位图入缓存（`BitmapReadyGen` 三消费面共用）。
+///
+/// 语义：同一 `src` 只接受**严格更新**的序号；相等（重复投递）或更小
+/// （迟到/乱序）一律丢弃并保留已应用内容，同时留具名观测。返回是否应用。
+/// 槽归还由调用方无条件执行（丢弃也要 `BitmapAck`，否则产者槽永久占用）。
+pub(crate) fn bitmap_cache_put_gen(
+    src: &str,
+    generation: u64,
+    w: u32,
+    h: u32,
+    stride: u32,
+    rgba: Vec<u8>,
+) -> bool {
+    let applied = {
+        let mut gens = bitmap_generations().lock().unwrap();
+        match gens.get(src) {
+            Some(last) if generation <= *last => {
+                let last = *last;
+                observe(&format!(
+                    "位图迟到上传丢弃: {src} gen={generation} ≤ 已应用 {last}（保旧内容）"
+                ));
+                return false;
+            }
+            _ => {
+                gens.insert(src.to_string(), generation);
+                true
+            }
+        }
+    };
+    if applied {
+        bitmap_cache_put(src, w, h, stride, rgba);
+    }
+    applied
+}
+
 /// DrawOp::Image src 解析总入口（D2 词汇表；paint 路径调用——禁阻塞）。
 /// pub(crate)：p028_image_arm e2e 宿主侧解析/降级腿与度量直接驱动。
 /// PLAN-029 T-07（D5）：签名扩 `(w, h)`——lucide: 栅格化目标尺寸/缓存
@@ -1654,6 +1697,51 @@ mod tests {
             resolve_drawlist_image("bitmap://test-p034-short", 48, 24).is_none(),
             "失配守卫 = 占位"
         );
+    }
+
+    /// PLAN-062（AC-03）：显式 generation 的位图上传只接受**严格更新**的序号；
+    /// 迟到/重复上传被丢弃并保旧内容；旧 tag（无序号）保持即时翻新语义。
+    #[test]
+    fn p062_bitmap_generation_rejects_late_and_duplicate_uploads() {
+        let src = "bitmap://test-p062-gen";
+        let (w, h) = (2u32, 2u32);
+        let px = |seed: u8| vec![seed; (w * h * 4) as usize];
+
+        assert!(
+            bitmap_cache_put_gen(src, 5, w, h, w * 4, px(5)),
+            "首次上传（gen=5）接受"
+        );
+        let (_, _, applied) = handle_rgba(&resolve_drawlist_image(src, 8, 8).expect("命中"));
+        assert_eq!(applied, px(5));
+
+        // 迟到（更小序号）：丢弃，内容保持 gen=5。
+        assert!(
+            !bitmap_cache_put_gen(src, 3, w, h, w * 4, px(3)),
+            "迟到上传（gen=3）必须被拒"
+        );
+        let (_, _, kept) = handle_rgba(&resolve_drawlist_image(src, 8, 8).expect("仍命中"));
+        assert_eq!(kept, px(5), "拒绝不得覆盖已应用内容");
+
+        // 重复投递（相等序号）：同样丢弃（幂等重放不翻新）。
+        assert!(
+            !bitmap_cache_put_gen(src, 5, w, h, w * 4, px(9)),
+            "重复上传（gen=5）必须被拒"
+        );
+        let (_, _, still) = handle_rgba(&resolve_drawlist_image(src, 8, 8).expect("仍命中"));
+        assert_eq!(still, px(5));
+
+        // 更新序号：接受并翻新。
+        assert!(
+            bitmap_cache_put_gen(src, 6, w, h, w * 4, px(6)),
+            "更新序号（gen=6）接受"
+        );
+        let (_, _, fresh) = handle_rgba(&resolve_drawlist_image(src, 8, 8).expect("命中"));
+        assert_eq!(fresh, px(6), "更新序号必须翻新内容");
+
+        // 旧 tag（无序号）语义不变：直接覆盖（旧端/未协商连线）。
+        bitmap_cache_put(src, w, h, w * 4, px(7));
+        let (_, _, legacy) = handle_rgba(&resolve_drawlist_image(src, 8, 8).expect("命中"));
+        assert_eq!(legacy, px(7), "旧 tag 保持即时翻新");
     }
 
     /// Handle → (w, h, rgba)（iced Handle 数据面读取——ink/tint 断言口）。

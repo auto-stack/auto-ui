@@ -235,6 +235,9 @@ pub struct AppEndpoint<S: FrameSource> {
     /// PLAN-062 T-04：位图在途槽与已用槽（同帧槽纪律）。
     bm_in_flight: std::collections::BTreeSet<u8>,
     bm_used_slots: std::collections::BTreeSet<u8>,
+    /// PLAN-062（AC-03）：位图上传的会话内单调 generation（协商
+    /// `resource/generation/1` 时随帧过线；旧宿主不产该 tag）。
+    bitmap_generation: u64,
 }
 
 impl<S: FrameSource> AppEndpoint<S> {
@@ -266,6 +269,7 @@ impl<S: FrameSource> AppEndpoint<S> {
             used_slots: std::collections::BTreeSet::new(),
             bm_in_flight: std::collections::BTreeSet::new(),
             bm_used_slots: std::collections::BTreeSet::new(),
+            bitmap_generation: 0,
         }
     }
 
@@ -509,14 +513,34 @@ impl<S: FrameSource> AppEndpoint<S> {
         let slot = self.take_bitmap_slot()?;
 
         shm.write_slot(slot, &up.rgba).map_err(ProtocolError::Shm)?;
-        Ok(ProtocolMsg::Frame(super::message::FrameMsg::BitmapReady {
-            wid: self.wid.expect("Active 即有 wid"),
-            id: up.id.clone(),
-            slot,
-            w: up.w,
-            h: up.h,
-            stride: up.stride,
-            len: up.rgba.len() as u32,
+        // PLAN-062（AC-03）：宿主声明 `resource/generation/1` 时随上传带显式
+        // generation（会话内单调）；未声明 = 旧宿主，仍发 tag 10 字节不变。
+        self.bitmap_generation += 1;
+        let generation = self.bitmap_generation;
+        Ok(ProtocolMsg::Frame(if self
+            .peer_caps
+            .supports(super::message::CAP_RESOURCE_GENERATION)
+        {
+            super::message::FrameMsg::BitmapReadyGen {
+                wid: self.wid.expect("Active 即有 wid"),
+                id: up.id.clone(),
+                slot,
+                w: up.w,
+                h: up.h,
+                stride: up.stride,
+                len: up.rgba.len() as u32,
+                generation,
+            }
+        } else {
+            super::message::FrameMsg::BitmapReady {
+                wid: self.wid.expect("Active 即有 wid"),
+                id: up.id.clone(),
+                slot,
+                w: up.w,
+                h: up.h,
+                stride: up.stride,
+                len: up.rgba.len() as u32,
+            }
         }))
     }
 
@@ -796,6 +820,8 @@ pub enum HostAction {
     ReclaimWindow { wid: u64 },
     /// PLAN-034 T-05（D3）：app 位图就绪——适配层从位图段读 RGBA 入宿主
     /// 图像缓存（`bitmap://{id}` 键）后回 `BitmapAck` 归还槽。
+    /// PLAN-062（AC-03）：`generation` = 线上显式序号（`BitmapReadyGen` 才有；
+    /// 旧 tag 为 None = 不校验，语义同既往“同 id 重上传即翻新”）。
     BitmapReady {
         surface: u64,
         wid: u64,
@@ -805,6 +831,7 @@ pub enum HostAction {
         stride: u32,
         slot: u8,
         len: u32,
+        generation: Option<u64>,
     },
     /// app→host 命令上行（v1.11 落地）：`record` = `DesktopCommand` 单记录
     /// 编码串（`verb␟arg`）——适配层 parse_records 单点解析执行；归因按
@@ -1052,6 +1079,35 @@ impl HostEndpoint {
                     stride,
                     slot,
                     len,
+                    generation: None,
+                }])
+            }
+            // PLAN-062（AC-03）：带显式 generation 的位图就绪（旧宿主永不
+            // 收到该 tag；协商线才有）。
+            (
+                HostState::Active,
+                ProtocolMsg::Frame(super::message::FrameMsg::BitmapReadyGen {
+                    wid,
+                    id,
+                    slot,
+                    w,
+                    h,
+                    stride,
+                    len,
+                    generation,
+                }),
+            ) => {
+                let surface = self.surface_for(wid).expect("Active 即有 surface");
+                Ok(vec![HostAction::BitmapReady {
+                    surface,
+                    wid,
+                    id,
+                    w,
+                    h,
+                    stride,
+                    slot,
+                    len,
+                    generation: Some(generation),
                 }])
             }
             // 握手确认（app 的 Ready）：Active 后的例行收尾，无动作。
@@ -1265,6 +1321,7 @@ fn msg_name(msg: &ProtocolMsg) -> &'static str {
             super::message::FrameMsg::HitTable { .. } => "Frame::HitTable",
             super::message::FrameMsg::BitmapReady { .. } => "Frame::BitmapReady",
             super::message::FrameMsg::BitmapAck { .. } => "Frame::BitmapAck",
+            super::message::FrameMsg::BitmapReadyGen { .. } => "Frame::BitmapReadyGen",
             super::message::FrameMsg::FrameReadyV2 { .. } => "Frame::FrameReadyV2",
         },
         ProtocolMsg::Input(_) => "Input",
@@ -1639,6 +1696,62 @@ mod tests {
         let f2 = app.produce_frame(None).unwrap();
         assert_eq!(slot_of(&f2), slot0, "归还槽优先复用");
         assert_eq!(app.frames_in_flight(), 2);
+    }
+
+    /// PLAN-062（AC-03）：位图 generation 只在宿主声明
+    /// `resource/generation/1` 时随上传过线；未声明 = 旧 tag（字节不变）。
+    #[test]
+    fn bitmap_generation_only_on_negotiated_lines() {
+        use super::super::message::{CapabilitySet, CAP_RESOURCE_GENERATION};
+
+        let mut app = AppEndpoint::new(StubSource::new(), "img", "i", 480.0, 320.0);
+        let mut host = HostEndpoint::listen();
+        let _ = activate_pair(&mut app, &mut host);
+        let shm = super::super::shm::SharedFrameBuffer::create(
+            &format!("autodesk-shm-062-gen-{}", std::process::id()),
+            2,
+            4096,
+        )
+        .expect("bm shm");
+        let up = BitmapUpload {
+            id: "rq-img-1-aa".into(),
+            w: 2,
+            h: 2,
+            stride: 8,
+            rgba: vec![7u8; 16],
+        };
+
+        // ① 未协商：旧 tag 10（旧宿主字节流不变）。
+        app.peer_caps = CapabilitySet::default();
+        let legacy = app.produce_bitmap(&shm, &up).expect("legacy upload");
+        match &legacy {
+            ProtocolMsg::Frame(FrameMsg::BitmapReady { .. }) => {}
+            other => panic!("未协商时必须发旧 tag，实得 {other:?}"),
+        }
+        let ProtocolMsg::Frame(FrameMsg::BitmapReady { slot, .. }) = legacy else {
+            unreachable!()
+        };
+        app.on_message(ProtocolMsg::Frame(FrameMsg::BitmapAck { wid: 3, slot }))
+            .expect("ack");
+
+        // ② 协商后：新 tag 13，generation 单调递增。
+        app.peer_caps = CapabilitySet::parse(&[format!("optional:{CAP_RESOURCE_GENERATION}")]);
+        let mut gens = Vec::new();
+        for _ in 0..2 {
+            let msg = app.produce_bitmap(&shm, &up).expect("gen upload");
+            match &msg {
+                ProtocolMsg::Frame(FrameMsg::BitmapReadyGen { generation, .. }) => {
+                    gens.push(*generation)
+                }
+                other => panic!("协商后必须发 gen tag，实得 {other:?}"),
+            }
+            let ProtocolMsg::Frame(FrameMsg::BitmapReadyGen { slot, .. }) = msg else {
+                unreachable!()
+            };
+            app.on_message(ProtocolMsg::Frame(FrameMsg::BitmapAck { wid: 3, slot }))
+                .expect("ack");
+        }
+        assert_eq!(gens, vec![2, 3], "generation 会话内单调（旧 tag 那次也计数）");
     }
 
     #[test]

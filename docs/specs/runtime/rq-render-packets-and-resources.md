@@ -73,6 +73,15 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 - 身份 = 内容键 `blake3(w,h,bytes)`；局部 id = `rq-img-<seq>-<hash8>`，序号单调
   （等价 generation 语义）。内容未变的重复帧**零 payload 重传**，帧只引用同一
   `bitmap://` src；Host 侧按 src 复用已驻留纹理。
+- **线上 generation（AC-03，已交付）**：宿主在 `HostCaps` 里声明
+  `resource/generation/1` 时，producer 把位图上传换成 `BitmapReadyGen`
+  （tag 13，字段序同 tag 10 + 尾追 `generation: u64`，会话内单调）。宿主按
+  `id` 记最后已应用序号：**严格更小的序号（迟到/乱序）与相等序号（重复投递）
+  一律丢弃并保旧内容**，但仍回 `BitmapAck` 归还槽（槽不得泄漏）。未声明该能力
+  的旧宿主永远收不到 tag 13（字节流不变），保持“同 id 重上传 = 即时翻新”语义。
+  三处宿主消费（`rqhost`、`host::ProtocolHost`、桌面 `session`）共用同一守卫；
+  `HostCaps` 下行在三个宿主都已接线（此前只有 `host::ProtocolHost` 有，独立
+  RQ 宿主与桌面 broker 的协商在线上是死的）。
 - 驻留上限 256 MiB/App（最早键驱逐）；驱逐后的重引用会重传一次，计数可解释。
 - **释放（未实现，具名）**：跨进程释放/引用记账**尚未交付**——曾实现的
   `ResourceRelease` 因“未协商的 tag 会让旧宿主解流失败”且“Host 立即驱逐会
@@ -218,9 +227,10 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
 6. v2↔v3 双读已覆盖 tag 语义、拒绝路径与**同进程真实管道**配对（`rq_wire`：
    两种产者 × 两宿主）；仍缺**真两进程**（独立 exe）配对、慢 Host/乱序资源/
    旧 ACK 负控。跨进程换载与物理上屏归 OS063。
-7. wire 无显式 generation 字段：`src` 已含内容哈希+单调序号，本地做不了有意义的
-   “旧代号拒绝”；同 id 重上传按既有语义视为刷新（last-write-wins，由 ACK/槽纪律
-   约束），跨进程乱序保护仍需 wire 字段。
+7. ~~wire 无显式 generation 字段~~ **已交付（AC-03）**：`BitmapReadyGen`（tag 13）
+   + `resource/generation/1` 协商，宿主按 `id` 拒迟到/重复上传（见 §3）。未覆盖
+   的相邻项：**乱序资源负控**（BitmapReady 早于引用帧 / 帧引用尚未到达的 src）
+   仍缺——需要可控的消息重排通道，当前管道是 FIFO。
 8. Host 侧没有跨进程释放/引用记账（见 §3）：producer 驱逐不会通知 Host，
    泵的 FIFO 与“驱逐不下当前帧资源”的守卫）。
 9. 逐能力面 39 个 ID 中 **13 个族 >0.1%**（§5.2）：managed_scroll_content 1.56%、

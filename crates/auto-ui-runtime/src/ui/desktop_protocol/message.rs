@@ -1631,6 +1631,21 @@ pub enum FrameMsg {
     /// 空闲池（FrameAck 同纪律——app 复用槽必在 Ack 后 = 宿主已读完旧
     /// 载荷，同 id 覆盖时序由此钉死）。
     BitmapAck { wid: u64, slot: u8 },
+    /// app→host。**位图就绪（带显式 generation）**（PLAN-062 tag 13，AC-03）：
+    /// 字段序与 tag 10 同构，尾追 `generation`（产者会话内单调上传计数）。
+    /// 仅在宿主声明 [`CAP_RESOURCE_GENERATION`] 时发送——旧宿主永远收不到该
+    /// tag，字节流不变。宿主按 `id` 记最后已应用序号，**序号更小的上传直接
+    /// 丢弃**（乱序/迟到资源不得覆盖新内容），丢弃仍回 `BitmapAck` 归还槽。
+    BitmapReadyGen {
+        wid: u64,
+        id: String,
+        slot: u8,
+        w: u32,
+        h: u32,
+        stride: u32,
+        len: u32,
+        generation: u64,
+    },
     /// app→host。**帧就绪 v2**（PLAN-683 tag 12，DisplayList v2 载荷——
     /// 方案 2 远程 Renderer 的 remote 模式帧）：字段序 FrameReady 同构，
     /// 载荷换 `DisplayList`（原语超集；追加式变体——旧端不产不出，
@@ -1683,6 +1698,9 @@ impl FrameMsg {
     const BITMAP_READY: u8 = 10;
     const BITMAP_ACK: u8 = 11;
     const FRAME_READY_V2: u8 = 12;
+    /// PLAN-062（AC-03）：位图就绪 + 显式 generation（协商标记
+    /// [`CAP_RESOURCE_GENERATION`]；旧端不产不出）。
+    const BITMAP_READY_GEN: u8 = 13;
 
     pub fn encode(&self, out: &mut Vec<u8>) {
         match self {
@@ -1851,6 +1869,26 @@ impl FrameMsg {
                 put_u8(out, Self::BITMAP_ACK);
                 put_u64(out, *wid);
                 put_u8(out, *slot);
+            }
+            Self::BitmapReadyGen {
+                wid,
+                id,
+                slot,
+                w,
+                h,
+                stride,
+                len,
+                generation,
+            } => {
+                put_u8(out, Self::BITMAP_READY_GEN);
+                put_u64(out, *wid);
+                put_string(out, id);
+                put_u8(out, *slot);
+                put_u32(out, *w);
+                put_u32(out, *h);
+                put_u32(out, *stride);
+                put_u32(out, *len);
+                put_u64(out, *generation);
             }
             Self::FrameReadyV2 {
                 wid,
@@ -2035,6 +2073,26 @@ impl FrameMsg {
                 let wid = r.u64()?;
                 let slot = r.u8()?;
                 Self::BitmapAck { wid, slot }
+            }
+            Self::BITMAP_READY_GEN => {
+                let wid = r.u64()?;
+                let id = r.string()?;
+                let slot = r.u8()?;
+                let w = r.u32()?;
+                let h = r.u32()?;
+                let stride = r.u32()?;
+                let len = r.u32()?;
+                let generation = r.u64()?;
+                Self::BitmapReadyGen {
+                    wid,
+                    id,
+                    slot,
+                    w,
+                    h,
+                    stride,
+                    len,
+                    generation,
+                }
             }
             Self::FRAME_READY_V2 => {
                 let wid = r.u64()?;
@@ -3181,6 +3239,49 @@ mod tests {
             stride: 2240,
             len: 806400,
         }));
+        // PLAN-062（AC-03）：显式 generation 变体（tag 13）——编码/解码保真，
+        // 且首个 tag 字节必须与旧 BitmapReady（10）不同（旧宿主不会误读）。
+        round_trip(ProtocolMsg::Frame(FrameMsg::BitmapReadyGen {
+            wid: 7,
+            id: "rq-img-9-deadbeef".into(),
+            slot: 0,
+            w: 16,
+            h: 16,
+            stride: 64,
+            len: 1024,
+            generation: 42,
+        }));
+        {
+            let mut old = Vec::new();
+            FrameMsg::BitmapReady {
+                wid: 1,
+                id: "x".into(),
+                slot: 0,
+                w: 1,
+                h: 1,
+                stride: 4,
+                len: 4,
+            }
+            .encode(&mut old);
+            let mut gen_bytes = Vec::new();
+            FrameMsg::BitmapReadyGen {
+                wid: 1,
+                id: "x".into(),
+                slot: 0,
+                w: 1,
+                h: 1,
+                stride: 4,
+                len: 4,
+                generation: 1,
+            }
+            .encode(&mut gen_bytes);
+            // 旧宿主按首字节分派：新旧 tag 必须可区分（旧端命中 UnknownTag 拒绝，
+            // 而不是按旧布局误读多出的 8 字节）。
+            assert_ne!(old[0], gen_bytes[0], "新旧位图 tag 必须可区分");
+            assert_eq!(old[0], 10, "旧 tag 保持 10（字节不变）");
+            assert_eq!(gen_bytes[0], 13, "新 tag = 13");
+            assert_eq!(gen_bytes.len(), old.len() + 8, "只多 generation u64");
+        }
         round_trip(ProtocolMsg::Frame(FrameMsg::BitmapReady {
             wid: 1,
             id: "a".into(),

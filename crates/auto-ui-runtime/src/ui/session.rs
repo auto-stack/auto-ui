@@ -5604,6 +5604,21 @@ impl DesktopSession {
                     ) {
                         Ok(welcome) => {
                             to_app.push(welcome);
+                            // PLAN-062 T-04（同 host::ProtocolHost）：App 声明
+                            // `welcome-caps/1` 时下发宿主能力声明——桌面 broker
+                            // 此前缺这条下行，产者无法得知 generation 等可选面
+                            // （协商在真桌面上不生效）。旧端不声明 → 永不发送。
+                            if client
+                                .endpoint
+                                .app_caps
+                                .supports(crate::ui::desktop_protocol::message::CAP_WELCOME_CAPS)
+                            {
+                                to_app.push(ProtocolMsg::Handshake(
+                                    crate::ui::desktop_protocol::message::HandshakeMsg::HostCaps {
+                                        caps: client.endpoint.supported.to_wire(),
+                                    },
+                                ));
+                            }
                             to_app.push(ProtocolMsg::Frame(FrameMsg::BufferAlloc {
                                 surface,
                                 slots: 2,
@@ -5784,6 +5799,7 @@ impl DesktopSession {
                     stride,
                     slot,
                     len: _,
+                    generation,
                 } => {
                     let key = format!("bitmap://{id}");
                     let rgba = client
@@ -5791,7 +5807,20 @@ impl DesktopSession {
                         .get(&surface)
                         .and_then(|seg| seg.read_slot(slot).ok());
                     if let Some(rgba) = rgba {
-                        crate::ui::iced::broker_surface::bitmap_cache_put(&key, w, h, stride, rgba);
+                        // PLAN-062 AC-03：协商连线带显式 generation——迟到/重复
+                        // 上传被丢弃并保旧内容；旧 tag（None）保持即时翻新语义。
+                        match generation {
+                            Some(gen) => {
+                                crate::ui::iced::broker_surface::bitmap_cache_put_gen(
+                                    &key, gen, w, h, stride, rgba,
+                                );
+                            }
+                            None => {
+                                crate::ui::iced::broker_surface::bitmap_cache_put(
+                                    &key, w, h, stride, rgba,
+                                );
+                            }
+                        }
                         client.bitmap_keys.entry(surface).or_default().push(key);
                     }
                     to_app.push(ProtocolMsg::Frame(FrameMsg::BitmapAck { wid, slot }));
@@ -11532,16 +11561,3 @@ mod live_input_tests {
         assert!(!session.route_live_input(&LiveInput::Chars { text: "y".into() }));
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

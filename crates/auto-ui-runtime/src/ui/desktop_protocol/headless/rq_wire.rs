@@ -881,3 +881,62 @@ fn rq_wire_old_host_rejects_v3_frames_and_recovers_on_v2() {
         })
     );
 }
+
+/// **generation 协商在真线上生效**（AC-03）：宿主 `HostCaps` 声明
+/// `resource/generation/1` → 产者据此把位图上传换成带序号的 tag；宿主按序号
+/// 应用（迟到/重复丢弃）。这里断言协商结果 + 资源真的经该路径落到合成面。
+#[test]
+fn rq_wire_generation_capability_is_negotiated_and_applied() {
+    use crate::ui::desktop_protocol::message::CAP_RESOURCE_GENERATION;
+
+    let mut cell = WireCell::start(
+        "generation",
+        WireSource::Rust(HeadlessFrameSource::new(
+            StaticView {
+                view: View::image("lucide:bell"),
+            },
+            W,
+            H,
+        )),
+    )
+    .expect("generation cell");
+    // HostCaps 与 Welcome 一起排队，产者要吃下一拍才更新 peer_caps——等它落地。
+    let caps_deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < caps_deadline
+        && !cell.pump.peer_caps().supports(CAP_RESOURCE_GENERATION)
+    {
+        cell.pump_both();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        cell.pump.peer_caps().supports(CAP_RESOURCE_GENERATION),
+        "宿主必须在 HostCaps 里声明 generation 能力（线上协商，不是本地开关）"
+    );
+
+    let deadline = Instant::now() + Duration::from_secs(4);
+    let mut composed = None;
+    while Instant::now() < deadline {
+        cell.pump_both();
+        if let Some(list) = cell.composed() {
+            if list
+                .ops
+                .iter()
+                .any(|op| matches!(op, DisplayOp::Image { .. }))
+            {
+                composed = Some(list.clone());
+                break;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    // cell 是 mut 借用底下的只读访问：这里用可变绑定重新取一次更直观。
+    let _ = &cell;
+    let list = composed.expect("带 generation 协商的连线上必须合成出图像帧");
+    println!(
+        "[RQNEG] {}",
+        serde_json::json!({
+            "tag": "generation", "peer_caps": cell.pump.peer_caps().to_wire(),
+            "image_ops": list.ops.iter().filter(|op| matches!(op, DisplayOp::Image { .. })).count(),
+        })
+    );
+}

@@ -523,6 +523,22 @@ fn apply_actions(
                 ) {
                     Ok(welcome) => {
                         to_app.push(welcome);
+                        // PLAN-062 T-04（同 `host::ProtocolHost`）：App 声明
+                        // `welcome-caps/1` 时下发宿主能力声明——独立 RQ 宿主
+                        // 此前缺这条下行，产者永远不知道宿主支持 generation 等
+                        // 可选面（协商在线上是死的）。旧端不声明 → 永不发送。
+                        if client
+                            .inner
+                            .endpoint
+                            .app_caps
+                            .supports(super::message::CAP_WELCOME_CAPS)
+                        {
+                            to_app.push(ProtocolMsg::Handshake(
+                                super::message::HandshakeMsg::HostCaps {
+                                    caps: client.inner.endpoint.supported.to_wire(),
+                                },
+                            ));
+                        }
                         to_app.push(ProtocolMsg::Frame(FrameMsg::BufferAlloc {
                             surface,
                             slots: 2,
@@ -680,6 +696,7 @@ fn apply_actions(
                 stride,
                 slot,
                 len: _,
+                generation,
             } => {
                 let key = format!("bitmap://{id}");
                 let rgba = client
@@ -689,7 +706,19 @@ fn apply_actions(
                     .and_then(|seg| seg.read_slot(slot).ok());
                 let cached = rgba.is_some();
                 if let Some(rgba) = rgba {
-                    crate::ui::iced::broker_surface::bitmap_cache_put(&key, w, h, stride, rgba);
+                    // PLAN-062 AC-03：显式 generation 时拒迟到/重复上传（保旧内容）。
+                    match generation {
+                        Some(gen) => {
+                            crate::ui::iced::broker_surface::bitmap_cache_put_gen(
+                                &key, gen, w, h, stride, rgba,
+                            );
+                        }
+                        None => {
+                            crate::ui::iced::broker_surface::bitmap_cache_put(
+                                &key, w, h, stride, rgba,
+                            );
+                        }
+                    }
                     client
                         .inner
                         .bitmap_keys

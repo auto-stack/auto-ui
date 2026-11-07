@@ -482,6 +482,7 @@ impl<'a> ProtocolHost<'a> {
                     stride,
                     slot,
                     len: _,
+                    generation,
                 } => {
                     let key = format!("bitmap://{id}");
                     let rgba = self
@@ -489,7 +490,19 @@ impl<'a> ProtocolHost<'a> {
                         .get(&surface)
                         .and_then(|seg| seg.read_slot(slot).ok());
                     if let Some(rgba) = rgba {
-                        crate::ui::iced::broker_surface::bitmap_cache_put(&key, w, h, stride, rgba);
+                        // PLAN-062 AC-03：显式 generation 时拒迟到/重复上传。
+                        match generation {
+                            Some(gen) => {
+                                crate::ui::iced::broker_surface::bitmap_cache_put_gen(
+                                    &key, gen, w, h, stride, rgba,
+                                );
+                            }
+                            None => {
+                                crate::ui::iced::broker_surface::bitmap_cache_put(
+                                    &key, w, h, stride, rgba,
+                                );
+                            }
+                        }
                         self.bitmap_keys.entry(surface).or_default().push(key);
                     }
                     self.to_app
@@ -852,4 +865,3 @@ mod tests {
         assert_eq!(host.observe_inbox.len(), 1);
     }
 }
-

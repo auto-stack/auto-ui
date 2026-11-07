@@ -523,6 +523,15 @@ impl<S: FrameSource> ClientPump<S> {
         self.frame_pending
     }
 
+    /// PLAN-062（AC-03/AC-04）：宿主经 `HostCaps` 声明的能力集（未收到 = 空）。
+    /// 负控用它断言“协商真的发生在线上”，而不是只在本地开关里。
+    pub fn peer_caps(&self) -> crate::ui::desktop_protocol::message::CapabilitySet {
+        self.endpoint
+            .as_ref()
+            .map(|app| app.peer_caps.clone())
+            .unwrap_or_default()
+    }
+
     /// 以给定 projector 建端点并发 Hello（首连 / 重连共用）。
     fn attach(&mut self, projector: S) {
         let mut app = AppEndpoint::new(
