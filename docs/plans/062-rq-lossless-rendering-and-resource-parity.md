@@ -141,7 +141,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 |---|---|---|---|---|---|
 | [x] | T-01 | work | UI061正式可行决策 | 重核UI061全能力ID、direct旧基准、实现来源与预算；冻结当前绘图能力并集及精确接缝；接受UI061 r3性能合同与预算，冻结P/M对应实现来源和direct对照版本，缺预算不进入性能签收 | V-01；AC-01；AC-07/V-05～08（按§6分工）——见§9 2026-11-07 work 轮次：39 View ID + 8 能力ID入编译常量、061 冻结预算原样接受 |
 | [ ] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02；AC-07/V-05～08（按§6分工）——进行中：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`，mesh 重放 0.0%、SVG 0.333%）；GlyphRun wire、blur/SDF、几何渐变仍具名缺口（§9） |
-| [ ] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03；AC-07/V-05～08（按§6分工）——进行中：内容身份+驻留缓存（稳定帧 0 重传、驱逐可解释）、图片 alpha/rotation、SVG 栅格资源已交付；媒体族与 wire generation 字段待补（§9） |
+| [ ] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03；AC-07/V-05～08（按§6分工）——进行中：内容身份+驻留、图片 alpha/rotation、SVG 栅格、wire generation（tag 13）、媒体静态帧（`3eadae59`，0.000/0 重传）已交付；**跨进程释放/引用记账**（最后 owner）仍缺（§9） |
 | [ ] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——进行中：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、wire generation（tag 13 + HostCaps 下行补到两宿主，`d2e41c58`）已交付；乱序资源负控待补（§9） |
 | [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——进行中：六格真实 wire（`4e2f53d3`）+ 39/39 逐能力读数（`77f92dda`）+ AC-04 负控与真两进程配对（`4263ff3c`/`39bd7bef`）；仅剩媒体资源族（待裁定）与 M-02/06/07 |
 | [ ] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
@@ -471,3 +471,4 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 仍缺（不签 T-03/T-05）：**跨进程资源释放/引用记账**（“最后 owner 释放”仍是被撤回后具名的边界，Spec §3/§6 第 8 条）；连续媒体帧（已裁定另立）。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 13 | from: work | to: work | status: executing | outcome: pass（静态媒体帧 + 探针键修正） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eadae59 | next: work（资源释放/引用记账）
+
