@@ -1107,19 +1107,21 @@ fn rq_probe_t01_direct_and_rq_baseline() {
                 // 裁决——061 的 W-A/W-B/W-C 是逐 workload 冻结的，全语料里含宿主
                 // 依赖面（如 window_thumbnail 每次产帧重取快照，实测 p95 ≈44ms），
                 // 不属于那套预算。这里只记录。
-                // replay/direct 稳态（p50）门：共享跑机上也稳定（实测 replay 的
-                // p50 不劣于 direct）。
-                assert!(
-                    r.replay_frame_ms.p50 <= frame.p50 * 1.25 + 2.0,
-                    "{} replay p50 {:.2}ms 超 1.25×direct({:.2}ms)+2ms",
-                    case.id,
-                    r.replay_frame_ms.p50,
-                    frame.p50
-                );
+                // 计时门只在隔离窗口断言（Plan §6）；共享窗口只记录——跑机负载会把
+                // replay 的 p50 从 ~4ms 放大到 ~18ms（复审 N-02 实测），判红即假红。
+                let isolated = std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated");
+                if isolated {
+                    assert!(
+                        r.replay_frame_ms.p50 <= frame.p50 * 1.25 + 2.0,
+                        "{} replay p50 {:.2}ms 超 1.25×direct({:.2}ms)+2ms",
+                        case.id,
+                        r.replay_frame_ms.p50,
+                        frame.p50
+                    );
+                }
                 // p95 尾部条款只在**隔离窗口**成立（Plan §6：性能测量不得与其它
                 // 会话争用 GPU；20 样本下 p95 ≈ 次大值，共享跑机的抖动会把它顶穿）。
                 // 共享跑机记录 + 标 skipped_shared_window；隔离窗口以 env 开启断言。
-                let isolated = std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated");
                 if isolated {
                     assert!(
                         r.replay_frame_ms.p95 <= frame.p95 * 1.25 + 2.0,

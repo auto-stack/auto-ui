@@ -404,8 +404,14 @@ fn rq_cells_t05_six_cell_matrix() {
                             let direct_p95 = reading.inventory["direct_frame_p95_ms"]
                                 .as_f64()
                                 .unwrap_or(f64::NAN);
-                            let quiet = direct_p95.is_finite() && direct_p95 <= 8.0;
-                            if quiet {
+                            // Plan §6：性能测量只在**隔离窗口**有效（不与其他会话
+                            // 争用 GPU）。共享窗口一律只记录：跑机负载会把 produce/
+                            // replay 的尾部放大到数倍（实测 SVG produce p50 32→76ms、
+                            // replay p50 5→18ms），据此判红是假红（复审 N-02）。
+                            let isolated_window = std::env::var("AUTO_RQ_TIMING_WINDOW")
+                                .as_deref()
+                                == Ok("isolated");
+                            if isolated_window {
                                 // produce p95 ≤10ms；SVG 例是**唯一具名例外**
                                 // （记录路径每帧新建 iced renderer），按 p50 设界
                                 // （p95 在负载下可到 90ms，属同一成本类别）。
@@ -444,7 +450,7 @@ fn rq_cells_t05_six_cell_matrix() {
                                     "hits": reading.hits,
                                     "resident_bytes": reading.resident_bytes, "raster_hits": reading.raster_hits,
                                     "pixel_diff_vs_direct": reading.diff_ratio,
-                                    "timing_gate": if direct_p95.is_finite() && direct_p95 <= 8.0 { "pass" } else { "skipped_loaded" },
+                                    "timing_gate": if std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated") { "asserted" } else { "skipped_shared_window" },
                                 })
                             );
                             cases.push(serde_json::json!({
@@ -465,7 +471,7 @@ fn rq_cells_t05_six_cell_matrix() {
                                     "resident_bytes": reading.resident_bytes, "raster_hits": reading.raster_hits,
                                 },
                                 "pixel_diff_vs_direct": reading.diff_ratio,
-                                "timing_gate": if direct_p95.is_finite() && direct_p95 <= 8.0 { "pass" } else { "skipped_loaded" },
+                                "timing_gate": if std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated") { "asserted" } else { "skipped_shared_window" },
                             }));
                         }
                         Err(err) => {
