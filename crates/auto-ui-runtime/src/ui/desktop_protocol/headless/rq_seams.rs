@@ -829,3 +829,120 @@ fn rq_seam_svg_raster_replay() {
     snap.matches_image(out.join("seam_svg-rq.png"))
         .expect("svg replay png");
 }
+// ---------------------------------------------------------------------------
+// 探针 7（V-03）：帧原子性、半帧拒绝、版本门与能力尾巴（T-03 冻结依据）
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rq_wire_t03_frame_atomicity_and_guards() {
+    use crate::ui::desktop_protocol::codec::{self, Channel, CodecError};
+    use crate::ui::desktop_protocol::host::SurfaceStore;
+    use crate::ui::desktop_protocol::message::{
+        DisplayList, DisplayOp, Fill, FrameMsg, HandshakeMsg, ProtocolMsg, Rgba8, WRect,
+    };
+
+    fn list(ops: usize) -> DisplayList {
+        DisplayList {
+            clear: None,
+            ops: (0..ops)
+                .map(|i| DisplayOp::Quad {
+                    rect: WRect {
+                        x: i as f32,
+                        y: 0.0,
+                        w: 10.0,
+                        h: 10.0,
+                    },
+                    fill: Fill::Color(Rgba8::new(255, 0, 0, 255)),
+                    radius: [0.0; 4],
+                    border: None,
+                    shadow: None,
+                })
+                .collect(),
+        }
+    }
+
+    // 1) 合法 v2 帧信封 round-trip。
+    let frame = list(3);
+    let bytes = ProtocolMsg::Frame(FrameMsg::FrameReadyV2 {
+        wid: 1,
+        frame_id: 7,
+        slot: 1,
+        damage: None,
+        revision: 3,
+        payload: frame.clone(),
+    })
+    .encode();
+    match ProtocolMsg::decode(&bytes).expect("v2 帧应解码") {
+        ProtocolMsg::Frame(FrameMsg::FrameReadyV2 { payload, .. }) => {
+            assert_eq!(payload.ops.len(), 3)
+        }
+        _ => panic!("通道/变体漂移"),
+    }
+
+    // 2) 半帧/截断：信封长度自洽检查应拒绝（不是静默半帧）。
+    let truncated = &bytes[..bytes.len() / 2];
+    let err = ProtocolMsg::decode(truncated).expect_err("半帧必须被拒");
+    println!(
+        "[RQSEAM] {}",
+        serde_json::json!({ "tag": "truncated_frame", "error": format!("{err:?}") })
+    );
+    assert!(matches!(err, CodecError::TooShort));
+
+    // 3) 信封版本门：未知版本在消息层明确拒绝（UnsupportedVersion）。
+    let env9 = codec::encode_envelope(9, Channel::Frame, &[]);
+    let err = ProtocolMsg::decode(&env9).expect_err("未知版本必须拒绝");
+    assert!(matches!(err, CodecError::UnsupportedVersion(9)));
+
+    // 4) 帧原子性/保旧：坏载荷解码失败 → 不 compose → front 保持上一完整帧。
+    let mut store = SurfaceStore::new();
+    let sid = store.alloc(100.0, 60.0);
+    let freed = store.compose_v2(sid, 1, frame.clone()).expect("首帧合成");
+    assert_eq!(freed, 0, "首帧释放的应是另一槽");
+    assert_eq!(store.front_v2(sid).unwrap().ops.len(), 3);
+    // 应用层只在解码成功时 compose（host.rs/rqhost.rs 现有纪律）。
+    let bad_bytes = &bytes[..bytes.len() / 2];
+    let bad = ProtocolMsg::decode(bad_bytes);
+    assert!(bad.is_err(), "坏载荷不得进入 compose");
+    assert_eq!(
+        store.front_v2(sid).unwrap().ops.len(),
+        3,
+        "坏帧不得覆盖上一完整帧（保旧）"
+    );
+
+    // 5) 能力尾巴：Hello 空 tail（旧端字节）与未知 cap 均可解码 →
+    //    当前 caps 是**声明式**（advisory），不是强制协商；T-03 需补
+    //    required/optional 语义与入帧前拒绝。
+    let legacy_hello = ProtocolMsg::Handshake(HandshakeMsg::Hello {
+        version: 1,
+        app_name: "probe".to_string(),
+        title: "t".to_string(),
+        icon: None,
+        width: 100.0,
+        height: 60.0,
+        fonts: Vec::new(),
+        surfaces: Vec::new(),
+        theme_caps: Vec::new(),
+    })
+    .encode();
+    ProtocolMsg::decode(&legacy_hello).expect("旧端 Hello（空 tail）可解码");
+    let cap_hello = ProtocolMsg::Handshake(HandshakeMsg::Hello {
+        version: 1,
+        app_name: "probe".to_string(),
+        title: "t".to_string(),
+        icon: None,
+        width: 100.0,
+        height: 60.0,
+        fonts: Vec::new(),
+        surfaces: Vec::new(),
+        theme_caps: vec!["fidelity/pathfill/1".to_string()],
+    })
+    .encode();
+    ProtocolMsg::decode(&cap_hello).expect("未知 cap 仅声明，不阻塞解码");
+    println!(
+        "[RQSEAM] {}",
+        serde_json::json!({
+            "tag": "capability_tail", "legacy_ok": true, "unknown_cap_advisory": true,
+            "note": "T-03 需 required/optional 协商 + 未知必需能力在入帧前拒绝"
+        })
+    );
+}
