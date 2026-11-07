@@ -220,6 +220,16 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r3 | round: 3 | from: work | to: work | status: executing | outcome: pass（T-04 上传预算收口） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 0e614935 | next: user（§10 三项裁定）
 
+### 2026-11-07 用户裁定（r3 范围内新增两项实现，一项维持代理）
+
+- 用户对 §10 三项作出裁定（本会话交互确认）：
+  1. **GlyphRun**：**在 062 内新增 Host 字形图集**（不回退成“字符串+重排”）。即 wire 携 glyph id/位置/字体内容身份，Host 用 FontBlob 与 swash 生成字形位图并按 wire 位置合成；AC-02 的“Host 不重排文字”按精确重放把关。
+  2. **shadow blur/SDF**：**在 062 内实现 Host SDF/blur 原语**，不允许保留单层垫层近似作为通过口径。
+  3. **per-App CPU 预算**：**本轮只做代理测量**，真实 1/4/8 App 规模与公平策略归 UI063/OS063（与 §5/§6 既有分工一致）。
+- 影响：T-02 行新增 glyph atlas 与 SDF blur 两个实现面，SD-01 的规范增量须包含“glyph run wire 结构 + 字体内容身份 + SDF/blur 支持边界”；工程量与风险显著上升，后续轮次以增量提交（wire → Host 图集 → 像素对拍）推进，未收敛前不签 T-02。
+- 记录：裁定只改变实现路径，不改变 AC/范围/仓库集合，无需 r4 修订；若实现中发现 canvas 重放面无法精确表达 blur（例如需要自定义 shader），按 §2 具名阻塞并回到用户裁定，不静默降级。
+
+
 
 
 
