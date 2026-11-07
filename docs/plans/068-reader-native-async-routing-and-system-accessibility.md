@@ -1,13 +1,13 @@
 ---
 plan_id: auto-ui/PLAN-068
-status: archived
+status: executing
 feature_name: Reader 原生异步路由状态、结果投影与系统无障碍收口
 author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-07
-plan_revision: 2
+plan_revision: 3
 current_step: 8
-total_steps: 8
+total_steps: 9
 base_branch: master
 base_commit: 7ac0455bf4cd743248749e4bc4eb9d0aed657266
 depends_on: [PLAN-988]
@@ -101,6 +101,7 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | AC05 | work | V05受影响合法/失败/恢复控制通过，Spec增量按实证，未变接口/阈值/公共支持承诺 |
 | AC06 | review | 独立上下文对精确revision/commit/cohort核AC01～05与V01～04，全部通过才reviewed |
 | AC07 | merge | 冻结受影响并集、精确主干交付/canonical/归档与计数正确；不纳入他人WIP |
+| AC09 | work | VM-mode应用（Reader书库搜索框为真实消费反例）经MCP type_text输入后状态真实更新（值写臂修复+永久反例红→绿+009 W-04 UI门warm-query转绿） |
 | AC08 | merge | 009已收到可消费pin/工具/耐久交接，guard后清自有树/branch/scope，保Reader原始证据与活动会话 |
 
 ## 8. 执行步骤
@@ -114,7 +115,8 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 | T04 [x] | work | T01/T03 | 新tool从独立树实际构建，固定Reader消费V04及受影响V05；源/依赖前后不漂移，补Spec提案，work-owned全通过才execution_done | AC01～05 |
 | T05 | review | T04 | 同树独立终审，重放高风险原红/合法控制、真实产品与系统树；绑定reviewed_commit/当前revision | AC06 |
 | T06 [x] | merge | T05 pass | 精确落地、冻结受影响并集与canonical核验、归档导航/计数；需要Lang变更则同门成对交付 | AC07 |
-| T07 [x] | merge | T06 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
+| T07 [x] | merge | T06 |
+| T08 | work | 用户2026-11-07裁定：009诊断发现VM-mode MCP type_text值写臂静默未执行（handler解析ok但值不达VM状态，无CALL_HANDLER；press类正常）——修复值写臂+永久反例+消费门重跑 | AC09 | Reader009更新只读消费pin/工具并记录可用交接；原证据不动，guard clean后清本树/分支/自有scope，最终8/8 | AC08 |
 
 当前3/8，T00/T01/T02已闭，T03进行中。T01真实View carrier红绿闭环已补：14路由/9系统机制/11旧路径均通过，旧读回与真实系统选区证据保留。批注对话须用新二进制继续，T03/04仍未完整通过，尚未终审/交付。
 
@@ -269,6 +271,10 @@ Rust AutoUI runtime/dialect/handler codegen、VM实例及parked续体、iced/win
 - **archived**：主检出`git mv`→docs/plans/archived/068-reader-native-async-routing-and-system-accessibility.md，status: archived、8/8（T00～T07全[x]）；提交cbeb65c5后归档路径在版本控制内（git status确认tracked）。
 - **cleaned**：wt-guard对ui-068组五树（auto-ui/auto-lang/auto-man/auto-down/auto-web）全clean（无reparse point）后逐一`git worktree remove`；分支codex/plan-068-dev删除（was 0b3ee62d）；组目录D:/autostack/.wt/ui-068已删。耐久证据已折叠于本文件各receipt（含hash）；plan-artifacts/plan-068整scope按2026-10-31 delete-at-merge删除，无未决issue保留；registry policy.json该条改deleted_at_merge并注明009 handoff去向。**Landing≠部署观察**：已安装共享auto-ui-tool非本计划更新物（按pin消费原则），009后继原生腿使用plan-009/t02/ui-068-handoff/reader-ui-tool-0b3ee62d.exe（18194b40，交付源+配对lang构建）；master侧spec/codes已为最新交付态。
 - stage: merge | key: PLAN-068:r2 | outcome: **pass** | delivery_commit: 0b3ee62d32153bcdaefd71bd59f6abe55a082efc（master，ff-only） | paired_dependency: auto-lang 92bbf298 | spec_paths+hashes: 见canonical_verified | archive_path: docs/plans/archived/068-reader-native-async-routing-and-system-accessibility.md | cleanup: 五树+分支+组目录+scope全清，registry已刷新 | next: 009消费pin（T02～05）。
+
+### 2026-11-07 phase T08接入（用户裁定路由）：VM-mode MCP type_text值写臂修复
+
+- stage: new | plan_id: auto-ui/PLAN-068 | plan_revision: r3 | outcome: pass（phase接入） | 路由: 用户2026-11-07裁定"在reader 009用过的对应计划上直接加新phase修复"（对应本计划：缺陷域=本计划交付的runtime） | 变更: 重开archived→executing、r2→r3、新增T08/AC09（total 9步） | 缺陷包: READER-009 §9 2026-11-07 T-03单元3/诊断轮（VM-mode MCP type_text解析handler ok但值写静默不达VM状态；press类正常；四假设已排除——时序/缓存/runtime版本/Reader侧绑定） | next: work T08（新worktree于master tip，修复+永久反例+消费门重跑+phase评审→落地→009消费）。
 
 ## 10. 待澄清事项
 
