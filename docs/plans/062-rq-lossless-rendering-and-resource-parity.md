@@ -5,7 +5,7 @@ feature_name: RQ无损原语、文字图形与资源重放
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-07
-plan_revision: 3
+plan_revision: 4
 current_step: 1
 total_steps: 7
 depends_on: [auto-ui/PLAN-061]
@@ -97,7 +97,8 @@ T-02：`crates/auto-ui-runtime/src/ui/desktop_protocol/headless.rs`及`message.r
 | Case | AC | 输入/真实入口与负控 | 可观察oracle/关闭条件 | 责任任务/边界 |
 |---|---|---|---|---|
 | V-01 | AC-01 | UI061能力表、原direct金样、同source VM/Rust绘图fixture六格（§5） | 每个绘图ID有真实输出，结构/资源与像素对拍；旧direct未退化；必要平台未测明确阻塞 | T-01/T-05；全部现有绘图能力 |
-| V-02 | AC-02 | mesh+SVG+raw text、RTL/连字/中文回退、rotation/shear、blur/clip叠层；删除命令/替换font反控 | 布局/glyph/命令及固定GPU客户区一致；无省略日志冒PASS，原反控必红 | T-02/T-05；字体与原语 |
+| V-02 | AC-02 | mesh+SVG+raw text、RTL/连字/中文回退、rotation/shear、blur/clip叠层；删除命令/替换font反控 | 默认模式：布局/命令/资源结构一致 + 客户区像素差 ≤0.1%（矩阵设门，梯度/阴影例同样受门）；v3 富模式：glyph 坐标对 `physical()` 全等、阴影与 shader 同式，像素差 ≤1.0% 具名记录；原反控必红；无省略日志冒PASS | T-02/T-05；字体与原语 |
+| V-07 | AC-07 | 生产双进程慢Host、突发帧与媒体资源更新、原direct对照 | 队列帧/字节峰值在预算内；只合并过期画面而保资源/输入依赖，M-01～06/M-08按触面通过；默认 produce p95 ≤10ms（SVG 例外具名、单列不抵扣） | T-04/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
 | V-03 | AC-03 | 图片更新/视频帧/thumbnail、重用ID不同generation、释放后重建、缺资源与健康对照 | 资源只在正确surface生效、尺寸/alpha/采样一致、失败保旧、GPU在用时不早释；最后owner释放 | T-03/T-05；所有资源族 |
 | V-04 | AC-04 | 双进程坏长度/乘积溢出/NaN/栈错配、未知required capability、慢Host/旧ACK/乱序资源 | 入帧前明确拒绝、旧完整帧保持，队列有界，资源与传输槽回收不混淆；旧合法协议控制仍可用 | T-04/T-05；协议事务与生命周期 |
 | V-05 | AC-07 | 批量帧、延迟ACK、槽满与旧ACK；逐图元同步反控 | 稳态无逐图元往返/强制逐帧呈现屏障，按信用有界流水与背压；M-04消息/等待证据 | T-02/T-04/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
@@ -127,12 +128,12 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | ID | owner_stage | 可观察行为/判据 |
 |---|---|---|
 | AC-01 | work | UI061全部绘图/资源能力与direct旧行为经两执行形态真实producer与两Host replay验证；按§5绘图fixture验，不以公开运行链为前置，缺口不删分母 |
-| AC-02 | work | 文字与全部原语无静默省略或近似，producer→wire→Replay精确；共用实现无第二布局器 |
+| AC-02 | work | 文字与全部原语不静默省略（2026-11-07 r4 裁定）：默认 producer（字符串文字 + scrim 阴影）在§6冻结 fixture 上相对 direct 金样像素差 ≤0.1%（阈值 2/255，矩阵默认模式设门）；文字经 Host 同字体栈重排属**具名降级**且必须可观测（不得静默）。v3 富模式（glyph run + SDF 贴片）为 opt-in：结构面必须被断言（glyph 坐标 = cosmic-text `physical()`、阴影与 wgpu shader 同式），其像素差 ≤1.0% 并作为具名边界记录，**不得计为 exact**。共用实现无第二布局器。 |
 | AC-03 | work | 资源版本/传输/更新/最后owner/GPU释放及图片媒体表现正确，无App隐藏窗/GPU/整帧自绘 |
 | AC-04 | work | 协商/兼容、坏帧保旧、背压和generation负控通过，未知必需能力显式拒绝 |
 | AC-05 | review | 独立上下文逐项验证当前修订AC/V、真实源和规范增量，所有必需项有可复核证据；不能只读完成勾选 |
 | AC-06 | merge | 通过后按依赖顺序合入、canonical读回、路线回填，归档/guard/材料清理与恢复摘要完整；交付边界如实记录 |
-| AC-07 | work | 真实producer/协议/Replay满足P-01/P-02及P-03队列、P-04资源/工作隔离；V-05～08证明驻留不重复上传、慢Host不覆盖/无界增长、混合负载有进展；本职责M指标满足UI061冻结预算，端到端不得借单测冒通过 |
+| AC-07 | work | 真实producer/协议/Replay满足P-01/P-02及P-03队列、P-04资源/工作隔离；V-05～08证明驻留不重复上传、慢Host不覆盖/无界增长、混合负载有进展；默认 producer 的 produce p95 满足 061 冻结的 W-C ≤10ms；**唯一具名例外** = SVG 例（≈32.5ms，根因是记录路径每帧新建 iced renderer，需独立任务修复），该例外不得冲抵其它 workload，也不得据此宣称性能 PASS；本职责M指标满足UI061冻结预算，端到端不得借单测冒通过（2026-11-07 r4 裁定）。 |
 
 ## 8. 执行步骤
 
@@ -338,3 +339,14 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
   5. Spec 修正：表头不再写“默认 = glyph run 开”，§2.2 补默认关caveat，§3 记 Host 上限与 bitmap 豁免，§5 性能刷新（默认 produce 0.17–0.24ms、svg ~32.5ms、replay 5.2–6.5ms 含一次 10.09ms 离群），§6 补三条遗留（Welcome 无能力尾、Host 无显式释放、wire 无 generation）。
 - 复跑：`rq_` 28/0；`ui::desktop_protocol::` 256/4（基线同组）。
 - **待裁定**：两轮独立复审一致认定，按现行 AC-02/AC-07 文字 062 **不能签**（AC-02 要求“无近似/不重排”，而默认面恰是 Host 重排、v3 富模式又非 exact；AC-07 的 svg produce 32.5ms 超冻结 ≤10ms 预算）。要收口必须由用户选择：**(a)** r4 修订 AC-02/AC-07，把“具名窄容差 + 具名降级”写成验收口径；**(b)** 继续做 Host 同源文本合成与 renderer 生命周期改造（工作量大，062 顺延）；**(c)** 以当前能力集收口 062，精确重放另立 Plan。
+### 2026-11-07 r4 合同修订（用户裁定：AC-02/AC-07 写具名容差与具名降级）
+
+- stage: new / plan_id: auto-ui/PLAN-062 / revision: r4 / outcome: pass（合同修订，不是实现验收） / next: work（按新口径整理证据与剩余任务）
+- 授权来源：用户 2026-11-07 对三轮提问的选择（glyph atlas 内做、SDF 内做、CPU 预算只代理），以及本轮对“按现行 AC 无法签字”的裁定：**选择 r4 修订 AC-02/AC-07，把具名窄容差与具名降级写成验收口径**。
+- 修订内容（只改验收措辞与对应 V 行，不改目标/范围/仓库集合/任务集）：
+  1. **AC-02**：默认 producer（字符串文字 + scrim 阴影）相对 direct 金样 ≤0.1%（阈值 2/255，矩阵默认模式设门）；Host 同字体栈重排为**具名且可观测**的降级；v3 富模式（glyph run + SDF 贴片）为 opt-in，须断言结构等价（glyph 坐标 = physical()、阴影与 shader 同式）且像素差 ≤1.0%，**不得计为 exact**。
+  2. **AC-07**：默认 producer 的 produce p95 满足 061 冻结 W-C ≤10ms；**唯一具名例外** SVG 例（≈32.5ms，根因=记录路径每帧新建 iced renderer），单列记账、不得抵扣其它 workload、不得据此宣称性能 PASS。
+  3. **V-02/V-07** 同步为新口径（默认模式设门 + v3 富模式具名边界 + SVG 例外单列）。
+- 依据（实测，§9 前文）：默认模式 path_mesh 0.095%、svg 0.100%、text_cjk 0.094%、gradient 0.0625%、scroll 0.000%、shadow_only 0.005%、progress 0.006%；v3 富模式 text 0.798%、gradient 1.374%、scroll 0.330%、shadow_only 0.741%；默认 produce 0.17–0.24ms（SVG ≈32.5ms）。
+- 保留：r1/r2/r3 历史与全部 §9 收据；status 仍 xecuting（本修订未完成 T-02/T-03/T-04 的收尾与 T-05 全量复核）。SD-01 目标文件不变，正文已按实测更新（表头/开关 caveat/Host 上限/遗留清单）。
+- 未做：本轮未改实现、未重跑全量、未做独立 final review；AC-05/T-06 与 AC-06/T-07 仍待办。
