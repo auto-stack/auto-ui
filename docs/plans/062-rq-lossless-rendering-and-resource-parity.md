@@ -243,6 +243,17 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r3 | round: 4 | from: work | to: work | status: executing | outcome: pass（glyph run 能力与重放落地；对齐未收敛） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 0696129b | next: work（混合对齐 → SDF blur）
 
+### 2026-11-07 work glyph 混合对齐诊断（首轮，未收敛）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r3 / outcome: 进行中 / code_commit: `ba4a24e6`
+- 诊断结论（有证据，非猜测）：
+  1. **位置公式正确**：新增 `rq_glyph_positions_match_physical_formula` 把 wire 的 `x`（= 送入 `CacheKey::new` 的物理坐标）与 cosmic-text `physical()` 逐字形对拍，CJK 样例在 scale=2 下为 0/32/64/96 全等——重放的坐标漂移假设排除。
+  2. **合成语义修正**：字形位图原先按 straight RGBA 上传，画布图像管线按**预乘**合成 → 半透明边缘被加亮，整段文字偏粗。改为覆盖率乘进 RGB 后，text_cjk 重放差 **0.92% → 0.80%**。
+  3. **残差仍在字形边缘覆盖/AA**：差异分布在整段（各 32px 列桶都有 400–880 px），峰值为覆盖率而非位置；尚未达到字符串面 0.094% 的水平。
+- 状态：glyph run 仍为 opt-in（`set_glyph_runs`），AC-02 不签。下一步要么把 Host 合成换成与 direct 文本管线同源的路径，要么量化证明残差只来自 AA 并在 Spec 里具名窄容差（需 review 同意，不能自定阈值）。
+- 回归面：`cargo test -p auto-ui-runtime --lib "ui::desktop_protocol::" -- --test-threads=1` → **255 passed / 4 failed**（基线同组 4 红）。
+
+
 
 
 
