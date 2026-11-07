@@ -98,6 +98,7 @@ fn v04_eight_hosts_and_twenty_rounds_keep_the_owner_ledger_flat() {
     big_stack(|| {
         let dir = write_project();
         let mut hosts = Vec::new();
+        let mut baselines = Vec::new();
         for host_index in 0..HOSTS {
             let (doc, registry, code, _) =
                 Storage::load_project(&dir.join("scene.agscene"), &Registry::new())
@@ -107,6 +108,18 @@ fn v04_eight_hosts_and_twenty_rounds_keep_the_owner_ledger_flat() {
                 h.frame(None).expect("warm frame");
             }
             let base = ledger(&h);
+            // F-066-R2-04: assert (not just print) that every host starts from
+            // the identical pre-run owner baseline. The host-level owners
+            // (surfaces + warm store) are released with the host; the observable
+            // proxy for "released at final drop" is that the next host — and the
+            // tail host created after every drop — begins at this same ledger.
+            if let Some(first) = baselines.first().copied() {
+                assert_eq!(
+                    base, first,
+                    "host {host_index}: pre-run baseline must equal the first host's (cross-host accumulation)"
+                );
+            }
+            baselines.push(base);
             let mut peak = base;
             for round in 0..ROUNDS {
                 h.start_selected_play()
@@ -163,8 +176,21 @@ fn v04_eight_hosts_and_twenty_rounds_keep_the_owner_ledger_flat() {
         tail.stop_play();
         let tail_ledger = ledger(&tail);
         drop(tail);
+        assert_eq!(
+            baselines.len(),
+            HOSTS,
+            "every host contributed one pre-run baseline"
+        );
+        assert!(
+            baselines.iter().all(|b| *b == baselines[0]),
+            "all {HOSTS} pre-run baselines must be identical: {baselines:?}"
+        );
+        assert_eq!(
+            tail_ledger, baselines[0],
+            "the post-drop tail host must start from the same owner baseline"
+        );
         eprintln!(
-            "T05_LEDGER {{\"hosts\":[{}],\"tail\":{tail_ledger:?}}}",
+            "T05_LEDGER {{\"hosts\":[{}],\"tail\":{tail_ledger:?},\"baselines_equal\":true}}",
             hosts.join(",")
         );
     });

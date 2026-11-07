@@ -133,12 +133,15 @@ player.glb、mob.glb；godotengine/godot-demo-projects@b761b4cd，
   次；没有公开入口把一个 Session 复用于另一文档，所以旧 `_ag_char3_solids`
   注册不能写入其他文档；新 Run 初态由 20 轮 SaveAs/重开与同进程寿命门复验。
 - 同进程寿命（V-04）：一个进程顺序创建/使用/退出 8 个 Host、各 20 轮
-  Start/Stop；每轮 Stop 后 Run 级 target（4 slots / 7,584,000 B）回到
-  pre-run 基线，共享 store（7 meshes / 136,952 B）与峰值均不增长；9 个 host
-  的基线逐个相同，最后的 tail host 仍可 Run，进程 exit0 无 AV（
+  Start/Stop；每次 Stop 后账目回到该 host 的 pre-run 基线——4 个 target /
+  7,584,000 B 与 7 meshes / 136,952 B 是 **host 级常驻 owner**，一个 Run 不
+  新增也未泄漏 target/mesh owner，峰值与基线相同；9 个 host 的 pre-run 基线
+  被逐一断言相同（不是只打印），最后一个 host 在所有先前 host drop 后仍可
+  Run，进程 exit0 无 AV（
   `tests/host_lifetime_flow.rs::v04_eight_hosts_and_twenty_rounds_keep_the_owner_ledger_flat`，
-  driver `--test-threads=1`）。不把进程 RSS 平稳当释放证明，也不要求驱动
-  进程内存逐轮回到启动值。
+  driver `--test-threads=1`）。Host drop 后无可查询的 device 计数器，因此
+  “host 级 owner 随 host 释放”的观察面＝后续 host 从同一基线开始；不把进程
+  RSS 平稳当释放证明，也不要求驱动进程内存逐轮回到启动值。
 - 未证边界：真实 OS SendInput/焦点捕获/DPI 真切换仍是手动门（当前机器唯一
   1920×1280 虚拟显示、单一 scale）；不改 043 可见行语义、不提升注册容量、
   不声称多窗口/任意状态迁移/全物理。

@@ -51,9 +51,14 @@ fail-closed（挂载知识由消费者注册表声明）。**原生窗口**
 后命中 +1）、p1 跨挂卸 x=12→24、挂载代次 3→7（未卸载区域代次不变）、真实
 窗 resize 逻辑 480×560→400×420 且区域保持活跃、**resize 后控件命中按新布
 局**（posted 物理坐标＝逻辑×scale）、空闲零 Tick、scale_factor 2.0，exit 0。
-PLAN-066 起焦点面收口：`Tab` 才取得键盘焦点（未 Tab 的 Enter 不激活任何按
-钮）；真实 `Focused(false)`/`CursorLeft` 经宿主入口取消在途捕获并清焦点，
-旧焦点按钮不得在下一次 Enter 被激活（永久回归在
+探针按状态门推进（隐藏/布局跟随/逻辑尺寸各有时限与具名失败），真实
+`Focused(false)` 后由自适应 Tab 重新取得焦点而不是靠固定 700ms 节奏；同一
+入口连续三次 `--probe` 均 exit 0 且 count=202（回归在案）。
+PLAN-066 起焦点/尺寸面收口：`Tab` 才取得键盘焦点（未 Tab 的 Enter 不激活
+任何按钮）；真实 `Focused(false)` 取消在途捕获并清键盘焦点，旧焦点按钮不
+得在下一次 Enter 被激活；`CursorLeft` 只取消在途捕获/按下（不清键盘焦
+点）。0×0（最小化）与亚像素逻辑尺寸（如 1px@scale2=0.5）被宿主具名拒绝并
+保留上一可用尺寸/布局，下一次真实 resize 恢复（永久回归
 `tests/mixed_regions_lifecycle_flow.rs`）。真实 native SendInput/焦点捕获/
 DPI 真切换仍为手动门：`mixed_regions_window --manual` 是可执行记录器（关窗
 写 `manual-native-gate.json`，`auto_pass:false`，记录真实 OS 键/点击/失焦/
@@ -126,9 +131,10 @@ pilot 16 例；v1 夹具再生字节同一）；文字越界与文本槽预算�
   次区域事件在 drain 派发前具名拒绝（未挂载与重挂后都拒绝）；陈旧 Run
   代次沿 049 面；重绘/layout/挂载刷新永不代 Tick（空闲零回调实测）。
 - 键盘焦点（PLAN-066）：`Tab` 取得焦点并循环，`Enter` 只在取得后激活当前
-  按钮（与鼠标同队列同派发器）；真实窗口失焦（`Focused(false)`）或指针离
-  窗（`CursorLeft`）清焦点/取消在途捕获，旧焦点按钮不跨失焦泄漏；无 Tab
-  的 Enter 不激活任何按钮。
+  按钮（与鼠标同队列同派发器）；真实窗口失焦（`Focused(false)`）清键盘焦
+  点，指针离窗（`CursorLeft`）取消在途按下/捕获但不改键盘焦点；旧焦点按钮
+  不跨失焦泄漏，无 Tab 的 Enter 不激活任何按钮。0×0/亚像素逻辑尺寸被
+  `resize` 具名拒绝并保留上一可用布局（最小化不产生半像素表面）。
 - 故障域：Session 故障 → 相关域停止（队列清空、最后可用呈现保留、具名
   错误）；激活资源失败（surface/view/portal）具名记账且应用保持可用；
   非法区域（越界/坏 dim/集外元素）生成与消费双侧具名拒绝。

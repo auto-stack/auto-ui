@@ -1018,6 +1018,11 @@ impl NodeUiApp {
             .map(|e| e.key.as_str())
     }
 
+    /// 平台键盘焦点是否已被 Tab 取得（失焦后为 false；Enter 只在 true 时生效）。
+    pub fn focus_active(&self) -> bool {
+        self.focus_active
+    }
+
     /// 生成层文字 ABI：i = def 内实例下标（row.def_idx）。
     fn read_text(&mut self, row: &InstanceRow, slot: usize) -> Option<String> {
         let pfx = self.artifact.defs[&row.def].prefix.clone();

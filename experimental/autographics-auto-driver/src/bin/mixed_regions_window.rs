@@ -41,6 +41,7 @@ const RESIZED: [f32; 2] = [400.0, 420.0];
 const P1: &str = "Dash/p1#arc";
 const STRIP: &str = "Dash#strip";
 const BUMP: &str = "Dash#bump";
+const TOGGLE: &str = "Dash#toggle";
 const VK_TAB: u32 = 0x09;
 const VK_RETURN: u32 = 0x0D;
 
@@ -59,6 +60,10 @@ struct App {
     frames: u64,
     started: Instant,
     phase: usize,
+    /// PLAN-066 T-03: per-phase clock; state gates decide transitions instead of
+    /// fixed global timestamps (a real Focused(false)/0×0 event must not shift
+    /// the whole schedule into a race).
+    phase_started: Instant,
     passed: bool,
     posted_clicks: u32,
     posted_keys: u32,
@@ -69,6 +74,15 @@ struct App {
     epochs_after_remount: [Option<u64>; 2],
     marks: Vec<(String, u64)>,
     manual_seen: ManualSeen,
+    /// Keyboard target of the current adaptive Tab job (None = no job).
+    kb_target: Option<String>,
+    kb_posted: u32,
+    /// Zero-size Resized events (minimize) are ignored, not applied.
+    zero_resizes: u64,
+    /// Strip bounds before the first toggle (layout-follow gate).
+    strip_before: Option<[f32; 4]>,
+    /// Named failure reason; makes `passed` false and is reported.
+    failure: Option<String>,
 }
 
 /// Real OS-channel observations for the manual gate (never auto-passed).
@@ -104,6 +118,7 @@ impl App {
             frames: 0,
             started: Instant::now(),
             phase: 0,
+            phase_started: Instant::now(),
             passed: false,
             posted_clicks: 0,
             posted_keys: 0,
@@ -114,6 +129,11 @@ impl App {
             epochs_after_remount: [None; 2],
             marks: Vec::new(),
             manual_seen: ManualSeen::default(),
+            kb_target: None,
+            kb_posted: 0,
+            zero_resizes: 0,
+            strip_before: None,
+            failure: None,
         }
     }
 
@@ -143,6 +163,75 @@ impl App {
             }
         };
         (qx("Dash/p1"), qx("Dash/p2"), qx("Dash/m3"))
+    }
+
+    fn goto(&mut self, phase: usize) {
+        self.phase = phase;
+        self.phase_started = Instant::now();
+    }
+
+    fn held(&self, ms: u128) -> bool {
+        self.phase_started.elapsed().as_millis() >= ms
+    }
+
+    fn active(&mut self) -> usize {
+        self.host.as_mut().map_or(0, |h| h.active_count())
+    }
+
+    fn fail(&mut self, why: impl Into<String>) {
+        if self.failure.is_none() {
+            self.failure = Some(why.into());
+        }
+    }
+
+    fn bounds4(&mut self, key: &str) -> Option<[f32; 4]> {
+        self.host
+            .as_mut()
+            .and_then(|h| h.widget_bounds(key))
+            .map(|r| [r.x, r.y, r.w, r.h])
+    }
+
+    /// Adaptive real-keyboard job: post Tab until the requested ring entry is
+    /// focused (a real Focused(false) clears the focus, so the first Tab after
+    /// it re-acquires), then Enter. One posted key per frame, bounded attempts;
+    /// a timeout becomes a named failure instead of a silent count mismatch.
+    fn kb_start(&mut self, target: &str) {
+        self.kb_target = Some(target.to_string());
+        self.kb_posted = 0;
+    }
+
+    fn kb_step(&mut self) -> bool {
+        let Some(target) = self.kb_target.clone() else {
+            return true;
+        };
+        if self.kb_posted > 12 {
+            self.fail(format!("keyboard focus timeout for '{target}'"));
+            self.kb_target = None;
+            return true;
+        }
+        let active = self
+            .host
+            .as_ref()
+            .is_some_and(|h| h.keyboard_focus_active());
+        let focused = self
+            .host
+            .as_ref()
+            .and_then(|h| h.focused_key().map(str::to_string));
+        // Always route at least one Tab per round so the real Tab/Enter channel
+        // is exercised even when the ring already sits on the target.
+        if self.kb_posted > 0 && active && focused.as_deref() == Some(target.as_str()) {
+            if probe::os_key_client_once(TITLE, VK_RETURN) {
+                self.posted_keys += 1;
+            }
+            self.kb_target = None;
+            self.kb_posted = 0;
+            return true;
+        }
+        if probe::os_key_client_once(TITLE, VK_TAB) {
+            self.posted_keys += 1;
+        }
+        self.kb_posted += 1;
+        false
     }
 
     fn verify_and_finish(&mut self, e: &ActiveEventLoop) {
@@ -198,7 +287,8 @@ impl App {
                 let toggled = self.epochs_before_toggle != self.epochs_after_remount
                     && self.epochs_after_remount.iter().all(|e| e.is_some());
                 self.passed = !self.probe
-                    || (count == "202"
+                    || (self.failure.is_none()
+                        && count == "202"
                         && p1x == 24.0
                         && p2x == 0.0
                         && m3tx >= 0.0
@@ -228,6 +318,10 @@ impl App {
                     "callback_marks": self.marks,
                     "callbacks_total": callbacks,
                     "idle_no_tick": idle_ok,
+                    "focus_lost": self.manual_seen.focus_lost,
+                    "cursor_left": self.manual_seen.cursor_left,
+                    "zero_resizes": self.zero_resizes,
+                    "failure": self.failure,
                     "passed": self.passed,
                 })
             }
@@ -247,12 +341,17 @@ impl App {
         if !self.probe {
             return;
         }
-        let t = self.started.elapsed().as_millis();
-        // 相位节奏：每相 700ms（settle 首相 1500ms）。
-        let at = |phase: usize, ms: u128| self.phase == phase && t >= ms;
+        if let Some(why) = self.failure.clone() {
+            self.marks.push(("failed".into(), 0));
+            eprintln!("PROBE FAILURE: {why}");
+            self.verify_and_finish(e);
+            return;
+        }
+        if self.kb_target.is_some() && !self.kb_step() {
+            return;
+        }
         match self.phase {
-            0 if t >= 1500 => {
-                self.phase = 1;
+            0 if self.held(1500) => {
                 if let Some(w) = &self.window {
                     self.scale_observed = w.scale_factor() as f32;
                 }
@@ -262,74 +361,79 @@ impl App {
                     self.epochs_before_toggle = [h.region_epoch(P1), h.region_epoch(STRIP)];
                     self.logical_sizes.push(h.logical());
                 }
+                self.goto(1);
             }
-            1 if at(1, 2200) => {
-                self.phase = 2;
+            1 if self.held(700) => {
                 self.click(BUMP);
+                self.goto(2);
             }
-            2 if at(2, 2900) => {
-                self.phase = 3;
+            2 if self.held(700) => {
                 self.click(P1);
+                self.goto(3);
             }
-            3 if at(3, 3600) => {
-                self.phase = 4;
+            3 if self.held(700) => {
+                self.strip_before = self.bounds4(STRIP);
                 self.click(STRIP); // count 1 → 101
+                self.goto(4);
             }
-            4 if at(4, 4300) => {
-                self.phase = 5;
-                if let Some(w) = &self.window {
-                    if probe::os_key_client_once(TITLE, VK_TAB) {
-                        self.posted_keys += 1;
-                    }
-                    let _ = w;
-                }
+            4 => {
+                self.kb_start(TOGGLE);
+                self.goto(5);
             }
-            5 if at(5, 5000) => {
-                self.phase = 6;
-                if probe::os_key_client_once(TITLE, VK_RETURN) {
-                    self.posted_keys += 1;
-                }
-            }
-            6 if at(6, 5700) => {
-                self.phase = 7;
-                // 隐藏态：p1/p2 撤呈现；strip 布局上移——移动后布局点击。
-                let cb = self
+            5 => {
+                // Deterministic gate (F-066-R2-01): the p1 region must really be
+                // unmounted (epoch None) AND the strip must have followed the
+                // moved layout before the strip click is placed; a blind 700 ms
+                // click raced the Enter. (The dash fixture keeps p3/strip/m3
+                // mounted, so the visible count is 4 → 3, not 2.)
+                let hidden = self
                     .host
-                    .as_mut()
-                    .map(|h| h.app().ui.callbacks)
-                    .unwrap_or(0);
-                self.marks.push(("hidden".into(), cb));
-                self.click(STRIP); // count 101 → 201（真实布局跟随路由）
-            }
-            // 二次回切：Enter 激活后焦点仍在 toggle（环=bump/toggle）；
-            // Tab×2 确定性回到 toggle（1→0→1），Enter 激活回 show=1。
-            7 if at(7, 6400) => {
-                self.phase = 8;
-                if probe::os_key_client_once(TITLE, VK_TAB) {
-                    self.posted_keys += 1;
+                    .as_ref()
+                    .is_some_and(|h| h.region_epoch(P1).is_none());
+                let followed = match (self.bounds4(STRIP), self.strip_before) {
+                    (Some(now), Some(before)) => {
+                        (now[1] - before[1]).abs() > 0.5 || (now[3] - before[3]).abs() > 0.5
+                    }
+                    _ => false,
+                };
+                if hidden && followed {
+                    let cb = self
+                        .host
+                        .as_mut()
+                        .map(|h| h.app().ui.callbacks)
+                        .unwrap_or(0);
+                    self.marks.push(("hidden".into(), cb));
+                    let moved_y = self.bounds4(STRIP).unwrap_or([0.0; 4])[1];
+                    self.marks.push(("strip_moved".into(), moved_y as u64));
+                    self.click(STRIP); // count 101 → 201（真实布局跟随路由）
+                    self.goto(6);
+                } else if self.held(4000) {
+                    let active = self.active();
+                    self.fail(format!(
+                        "hide/layout not observed (hidden={hidden}, active={active}, followed={followed})"
+                    ));
                 }
             }
-            8 if at(8, 6800) => {
-                self.phase = 9;
-                if probe::os_key_client_once(TITLE, VK_TAB) {
-                    self.posted_keys += 1;
+            6 => {
+                self.kb_start(TOGGLE);
+                self.goto(7);
+            }
+            7 => {
+                let shown = self
+                    .host
+                    .as_ref()
+                    .is_some_and(|h| h.region_epoch(P1).is_some() && h.active_count() == 4);
+                if shown {
+                    if let Some(h) = self.host.as_mut() {
+                        self.epochs_after_remount = [h.region_epoch(P1), h.region_epoch(STRIP)];
+                    }
+                    self.click(P1); // 新代次：x 12 → 24
+                    self.goto(8);
+                } else if self.held(4000) {
+                    self.fail("show not observed after the second toggle");
                 }
             }
-            9 if at(9, 7400) => {
-                self.phase = 10;
-                if probe::os_key_client_once(TITLE, VK_RETURN) {
-                    self.posted_keys += 1;
-                }
-            }
-            10 if at(10, 8100) => {
-                self.phase = 11;
-                if let Some(h) = self.host.as_mut() {
-                    self.epochs_after_remount = [h.region_epoch(P1), h.region_epoch(STRIP)];
-                }
-                self.click(P1); // 新代次：x 12 → 24
-            }
-            11 if at(11, 8800) => {
-                self.phase = 12;
+            8 if self.held(700) => {
                 // 真实窗 resize：Windows 同步路径 request_inner_size 直接
                 // 返回新物理尺寸（无后续 Resized 事件）；异步平台由
                 // Resized 事件驱动 host.resize。两条路径同一 host 入口。
@@ -357,39 +461,49 @@ impl App {
                         let _ = h.resize(logical);
                     }
                 }
+                self.goto(9);
             }
-            12 if at(12, 9500) => {
-                self.phase = 13;
-                if let (Some(w), Some(h)) = (self.window.as_ref(), self.host.as_mut()) {
-                    let phys = w.inner_size();
-                    self.physical_sizes.push([phys.width, phys.height]);
-                    self.logical_sizes.push(h.logical());
+            9 => {
+                // Gate the post-resize hit on the applied logical size (F-066-
+                // R2-01: the 0×0/0.5 event must be refused, not clicked into).
+                let applied = self.host.as_ref().is_some_and(|h| {
+                    let l = h.logical();
+                    (l[0] - RESIZED[0]).abs() < 0.5 && (l[1] - RESIZED[1]).abs() < 0.5
+                });
+                if applied {
+                    if let (Some(w), Some(h)) = (self.window.as_ref(), self.host.as_mut()) {
+                        let phys = w.inner_size();
+                        self.physical_sizes.push([phys.width, phys.height]);
+                        self.logical_sizes.push(h.logical());
+                    }
+                    // PLAN-066 T-03: the post-resize hit uses the same posted
+                    // physical channel (logical layout × scale); bump +1
+                    // (201→202) proves the hit follows the new layout.
+                    self.click(BUMP);
+                    self.goto(10);
+                } else if self.held(4000) {
+                    self.fail("resize not applied (post-resize hit deferred)");
                 }
-                // PLAN-066 T-03: the post-resize hit uses the same posted
-                // physical channel (logical layout × scale); bump +1 (201→202)
-                // proves the hit follows the new layout.
-                self.click(BUMP);
             }
-            13 if at(13, 10300) => {
-                self.phase = 14;
+            10 if self.held(900) => {
                 let cb = self
                     .host
                     .as_mut()
                     .map(|h| h.app().ui.callbacks)
                     .unwrap_or(0);
                 self.marks.push(("idle_start".into(), cb));
+                self.goto(11);
             }
-            14 if at(14, 11100) => {
-                self.phase = 15;
+            11 if self.held(900) => {
                 let cb = self
                     .host
                     .as_mut()
                     .map(|h| h.app().ui.callbacks)
                     .unwrap_or(0);
                 self.marks.push(("idle_end".into(), cb));
+                self.goto(12);
             }
-            15 if at(15, 11900) => {
-                self.phase = 16;
+            12 if self.held(300) => {
                 self.verify_and_finish(e);
             }
             _ => {}
@@ -479,8 +593,16 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => self.verify_and_finish(e),
             WindowEvent::Resized(size) => {
+                // PLAN-066 T-03 (F-066-R2-01): a minimized window delivers
+                // Resized(0×0). Never turn that into a 0.5×0.5 logical surface;
+                // ignore it and let the next real resize re-apply the layout.
+                if size.width == 0 || size.height == 0 {
+                    self.zero_resizes += 1;
+                    self.marks.push(("resize_zero_ignored".into(), 0));
+                    return;
+                }
                 self.marks.push(("resized_event".into(), size.width as u64));
-                self.manual_seen.resizes += u32::from(self.manual);
+                self.manual_seen.resizes += 1;
                 if self.manual {
                     if let Some(w) = &self.window {
                         self.manual_seen.scales.push(w.scale_factor() as f32);
@@ -490,10 +612,7 @@ impl ApplicationHandler for App {
                     return;
                 };
                 let scale = window_scale_of(self.window.as_ref());
-                let logical = [
-                    size.width.max(1) as f32 / scale,
-                    size.height.max(1) as f32 / scale,
-                ];
+                let logical = [size.width as f32 / scale, size.height as f32 / scale];
                 {
                     // 单设备合同：GPU 由 host 独占持有（rt.gpu() 借用面）。
                     let gpu = host.rt.gpu();
@@ -538,14 +657,17 @@ impl ApplicationHandler for App {
             WindowEvent::Focused(false) => {
                 // PLAN-066 T-03: a real OS focus loss cancels in-flight capture
                 // and invalidates the keyboard focus (no stale Enter target).
-                self.manual_seen.focus_lost += u32::from(self.manual);
+                // A probe continues via the adaptive Tab re-acquisition.
+                self.manual_seen.focus_lost += 1;
                 self.marks.push(("focus_lost".into(), 1));
                 if let Some(h) = self.host.as_mut() {
                     h.window_focus_lost();
                 }
             }
             WindowEvent::CursorLeft { .. } => {
-                self.manual_seen.cursor_left += u32::from(self.manual);
+                // Pointer leaving cancels the in-flight press/capture only; the
+                // keyboard focus is owned by the focus channel above.
+                self.manual_seen.cursor_left += 1;
                 if let Some(h) = self.host.as_mut() {
                     h.cancel_all(agp::core::composition::input::CancelReason::PointerLeftWindow);
                     self.marks.push(("cursor_left".into(), 1));

@@ -266,8 +266,79 @@ fn flow_window_blur_clears_keyboard_focus_and_outside_clicks_do_not_leak() {
     );
     settle(&mut h, 3);
     assert_eq!(texts(&mut h)[0], "1", "bump advanced once after re-focus");
+    // Pointer leave and window focus loss are separate channels: leaving the
+    // window cancels the in-flight press/capture but must keep the keyboard
+    // focus (only Focused(false) clears it).
+    h.cancel_all(agp::core::composition::input::CancelReason::PointerLeftWindow);
+    assert!(
+        h.key(PlatformKey::Enter),
+        "pointer leave keeps keyboard focus"
+    );
+    settle(&mut h, 3);
+    assert_eq!(texts(&mut h)[0], "2", "activation after pointer leave");
     assert!(
         h.mount_errors.is_empty(),
         "focus round-trip stayed in domain"
     );
+}
+
+// --------------------------------------- PLAN-066 T-03 degenerate resize ----
+
+#[test]
+fn flow_degenerate_resize_is_refused_and_the_layout_recovers() {
+    // F-066-R2-01: a minimized window delivers Resized(0×0), and
+    // 1 px / scale 2 = 0.5 logical. The host must refuse the degenerate request
+    // without touching the last good target/layout, and the next real resize
+    // plus hit-testing must keep working.
+    let mut h = host(SWAP_UI, SWAP_WORLD, "plan066-resize-zero");
+    settle(&mut h, 4);
+    let logical = h.logical();
+    let before = h.widget_bounds("Panel/b1#band").expect("bounds");
+    for bad in [
+        [0.0, 0.0],
+        [0.0, 560.0],
+        [480.0, 0.0],
+        [0.5, 0.5],
+        [f32::NAN, 100.0],
+    ] {
+        let err = h
+            .resize(bad)
+            .expect_err("degenerate resize must be refused");
+        assert!(err.contains("degenerate"), "{bad:?}: {err}");
+        assert_eq!(h.logical(), logical, "{bad:?} keeps the last good size");
+    }
+    settle(&mut h, 2);
+    let after = h
+        .widget_bounds("Panel/b1#band")
+        .expect("bounds after refusals");
+    assert!(
+        (after.x - before.x).abs() < 1e-3
+            && (after.y - before.y).abs() < 1e-3
+            && (after.w - before.w).abs() < 1e-3
+            && (after.h - before.h).abs() < 1e-3,
+        "refused resize must keep the layout: {before:?} -> {after:?}"
+    );
+    assert_eq!(h.active_count(), 4, "regions stay active after refusals");
+    // Hit-testing still routes on the preserved layout.
+    click_widget(&mut h, "Panel/b1#band");
+    assert_eq!(quad_x_of(&mut h, "Panel/b1"), 9.0, "click after refusals");
+    // A real resize still applies and keeps routing consistent.
+    h.resize([500.0, 560.0])
+        .expect("real resize after refusals");
+    settle(&mut h, 4);
+    assert_eq!(h.logical(), [500.0, 560.0]);
+    let moved = h
+        .widget_bounds("Panel/b1#band")
+        .expect("bounds after resize");
+    assert!(
+        moved.w > 0.0 && moved.h > 0.0,
+        "layout resolves after resize: {moved:?}"
+    );
+    click_widget(&mut h, "Panel/b1#band");
+    assert_eq!(
+        quad_x_of(&mut h, "Panel/b1"),
+        18.0,
+        "click after real resize"
+    );
+    assert!(h.mount_errors.is_empty());
 }

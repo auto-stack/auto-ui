@@ -436,7 +436,20 @@ impl MixedRegionsHost {
 
     /// resize：UI 逻辑尺寸＋GPU target＋图尺寸事务重建＋路由器尺寸；
     /// 区域挂载几何由后续帧的实际布局 SetMount 刷新。
+    ///
+    /// PLAN-066 T-03: a minimized window arrives as `Resized(0×0)`, and a
+    /// physical 1 px at scale 2 becomes a 0.5 logical size. A degenerate
+    /// request is refused *without* touching the last good target/layout, so
+    /// the next real resize recovers instead of leaving a 0.5×0.5 surface.
     pub fn resize(&mut self, logical: [f32; 2]) -> Result<(), String> {
+        if !(logical[0].is_finite() && logical[1].is_finite())
+            || logical[0] < 1.0
+            || logical[1] < 1.0
+        {
+            return Err(format!(
+                "resize: degenerate logical size {logical:?} (minimum 1x1; kept the last good size)"
+            ));
+        }
         self.rt
             .resize_surface(self.ui, logical)
             .map_err(|e| format!("resize: {e:?}"))?;
@@ -498,6 +511,12 @@ impl MixedRegionsHost {
     /// 当前焦点元素键（测试/诊断/呈现面）。
     pub fn focused_key(&self) -> Option<&str> {
         self.app.ui.focused_key()
+    }
+
+    /// PLAN-066 T-03: platform keyboard focus is held only after a routed Tab;
+    /// a window focus loss clears it (probes/tests must re-acquire via Tab).
+    pub fn keyboard_focus_active(&self) -> bool {
+        self.app.ui.focus_active()
     }
 
     fn absorb(&mut self, outcome: InputOutcome, press: bool) -> RouteReport {
