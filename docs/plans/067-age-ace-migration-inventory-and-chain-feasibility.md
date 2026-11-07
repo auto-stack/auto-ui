@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-07
 plan_revision: 2
-current_step: 1
+current_step: 2
 total_steps: 9
 depends_on: []
 supersedes_spec_components: []
@@ -120,7 +120,7 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 | T | owner_stage | 依赖 | 写面/结果 | AC | 进度 |
 |---|---|---|---|---|---|
 | T-01 | work | 另行启动；独立于M1收口 | 冻结ACE实际交付/旧引擎全图/跨仓owner与材料，重核922 F11/C08/UK06 | AC-01 | [x] 2026-11-07 冻结清单 `plan-artifacts/plan-067/auto-ui/t01-inventory.md`（14,100B / sha256 `f1feb80a01…0f8cdc4a`）；整链7段+profile矩阵+ACE 13 profile核验+922 F-11/C-08/UK-06重核 |
-| T-02 | work | T01 | 固定最低样本/独立oracle/类型和资源规则、最多两机制与可执行probe入口 | AC-02/03 | [ ] |
+| T-02 | work | T01 | 固定最低样本/独立oracle/类型和资源规则、最多两机制与可执行probe入口 | AC-02/03 | [x] 2026-11-07 冻结见 `plan-artifacts/plan-067/auto-ui/t02-design.md`（6,464B / sha256 `ff62617223…fb8089a`）；样本 main.at/counter.at 被交付前门 `load_project_mixed`+`lower_project_node_mixed_regions` 接受，产出 `world_sha256=1599d225…4218b9`（15,689B）；oracle 常量与生成源逐项相同、改源 b.step 2→3 产品变 `[1,3]`；`probe/run.py` 三阶段 pass，ACE 阶段 not-run（T-03） |
 | T-03 | work | T02；固定当前正式交付基线（go支路另需对应接口实交付） | 执行最小整链或真实阻断对照，确定go/bounded-go/no-go，缺接口不跨仓补实现 | AC-02/03 | [ ] |
 | T-04 | work | T03；可达支路 | 源编辑/增量/同PID观察与legacy反控；阻断支路明确not-run | AC-04 | [ ] |
 | T-05 | work | T03；可达支路 | 恢复/取消/20轮Run/资源收支及坏件修复；未知不能冒pass | AC-04 | [ ] |
@@ -142,6 +142,10 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 - stage: work | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | outcome: pass（T-01 完成；T-02..T-06 未开始，work 阶段继续） | worktree: D:/autostack/.wt/ui-067/auto-ui | branch: codex/plan-067-dev | base_commit: 4bb54e36 | code_commit: 无（本单元只读盘点，树未改） | dependency_revisions: auto-lang 436ac91f（experimental/ace 0 修改）/ ag-examples 5384f7b / engine-lock sdk_pin 7b987ca8（source-lock 另钉 932ad487，UK-06 未闭） | task_ids: T-01 | evidence: plan-artifacts/plan-067/auto-ui/t01-inventory.md（14,100B / sha256 f1feb80a01…0f8cdc4a）；§4三条输入指纹重核全等；.sdk-source==sdk/frozen 681/681 全等；ACE 13 profile+3 capability、有限模块能力仅 i32/bool 顶层自由函数；auto-ui 直接 ACE 依赖 0（仅经旧 auto-lang-core 链入数据契约 ace-semantics-contract） | blockers: 无用户待答 | next_responsible_role: work（T-02 固定最低样本+独立 oracle+probe 入口）
 
 - stage: goal | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | round: 1 | from: drafting | to: executing | status: executing | outcome: pass（T-01 完成，work 继续） | worktree: D:/autostack/.wt/ui-067/auto-ui | commit: 4bb54e36 | next: work T-02。
+
+- stage: work | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | outcome: pass（T-02 完成；T-03..T-06 未开始，work 阶段继续） | worktree: D:/autostack/.wt/ui-067/auto-ui | branch: codex/plan-067-dev | base_commit: 4bb54e36 | code_commit: 无（产品树未改；探针/样本/构建均在 scratch `plan-artifacts/plan-067/auto-ui/`） | dependency_revisions: auto-lang 436ac91f（新增只读兄弟树 `D:/autostack/.wt/ui-067/auto-lang`，detached、clean，供前门 path 依赖解析）/ ag-examples 5384f7b / engine-lock sdk_pin 7b987ca8（UK-06 两钉不一致未闭） | task_ids: T-02 | evidence: t02-design.md（sha256 ff62617223…）+ `probe/run.py --out out/probe` 结果 partial：oracle/legacy_frontdoor/legacy_source_change 三阶段 pass、ace_frontdoor not-run；交付前门接受样本并产出 world_sha256 1599d225…4218b9（15,689B；schema autographics.node-ui-mixed-regions/2）；11 项结构断言全真；改源 b.step 2→3 后生成 `counter_step=[1,3]` | blockers: 无用户待答 | next_responsible_role: work（T-03 ACE 前门实测与 go/bounded-go/no-go）
+
+- stage: goal | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | round: 2 | from: work | to: work | status: executing | outcome: pass（T-02 完成） | worktree: D:/autostack/.wt/ui-067/auto-ui | commit: 4bb54e36 | next: work T-03。
 
 ## 10. 待澄清事项
 
