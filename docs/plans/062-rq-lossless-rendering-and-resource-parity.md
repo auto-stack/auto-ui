@@ -97,7 +97,7 @@ T-02：`crates/auto-ui-runtime/src/ui/desktop_protocol/headless.rs`及`message.r
 | Case | AC | 输入/真实入口与负控 | 可观察oracle/关闭条件 | 责任任务/边界 |
 |---|---|---|---|---|
 | V-01 | AC-01 | UI061能力表、原direct金样、同source VM/Rust绘图fixture六格（§5） | 每个绘图ID有真实输出，结构/资源与像素对拍；旧direct未退化；必要平台未测明确阻塞 | T-01/T-05；全部现有绘图能力 |
-| V-02 | AC-02 | mesh+SVG+raw text、RTL/连字/中文回退、rotation/shear、blur/clip叠层；删除命令/替换font反控 | 默认模式：布局/命令/资源结构一致 + 客户区像素差 ≤0.1%（矩阵设门，梯度/阴影例同样受门）；v3 富模式：glyph 坐标对 `physical()` 全等、阴影与 shader 同式，像素差 ≤1.0% 具名记录；原反控必红；无省略日志冒PASS | T-02/T-05；字体与原语 |
+| V-02 | AC-02 | mesh+SVG+raw text、RTL/连字/中文回退、rotation/shear、blur/clip叠层；删除命令/替换font反控 | 默认模式：布局/命令/资源结构一致 + 客户区像素差 ≤0.1%（矩阵设门，梯度/阴影例同样受门）；v3 富模式：glyph 坐标对 `physical()` 全等、阴影与 shader 同式，像素差按族具名上界（glyph run ≤1.0%、含阴影贴片 ≤1.5%）记录；原反控必红；无省略日志冒PASS | T-02/T-05；字体与原语 |
 | V-07 | AC-07 | 生产双进程慢Host、突发帧与媒体资源更新、原direct对照 | 队列帧/字节峰值在预算内；只合并过期画面而保资源/输入依赖，M-01～06/M-08按触面通过；默认 produce p95 ≤10ms（SVG 例外具名、单列不抵扣） | T-04/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
 | V-03 | AC-03 | 图片更新/视频帧/thumbnail、重用ID不同generation、释放后重建、缺资源与健康对照 | 资源只在正确surface生效、尺寸/alpha/采样一致、失败保旧、GPU在用时不早释；最后owner释放 | T-03/T-05；所有资源族 |
 | V-04 | AC-04 | 双进程坏长度/乘积溢出/NaN/栈错配、未知required capability、慢Host/旧ACK/乱序资源 | 入帧前明确拒绝、旧完整帧保持，队列有界，资源与传输槽回收不混淆；旧合法协议控制仍可用 | T-04/T-05；协议事务与生命周期 |
@@ -128,7 +128,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | ID | owner_stage | 可观察行为/判据 |
 |---|---|---|
 | AC-01 | work | UI061全部绘图/资源能力与direct旧行为经两执行形态真实producer与两Host replay验证；按§5绘图fixture验，不以公开运行链为前置，缺口不删分母 |
-| AC-02 | work | 文字与全部原语不静默省略（2026-11-07 r4 裁定）：默认 producer（字符串文字 + scrim 阴影）在§6冻结 fixture 上相对 direct 金样像素差 ≤0.1%（阈值 2/255，矩阵默认模式设门）；文字经 Host 同字体栈重排属**具名降级**且必须可观测（不得静默）。v3 富模式（glyph run + SDF 贴片）为 opt-in：结构面必须被断言（glyph 坐标 = cosmic-text `physical()`、阴影与 wgpu shader 同式），其像素差 ≤1.0% 并作为具名边界记录，**不得计为 exact**。共用实现无第二布局器。 |
+| AC-02 | work | 文字与全部原语不静默省略（2026-11-07 r4 裁定）：默认 producer（字符串文字 + scrim 阴影）在§6冻结 fixture 上相对 direct 金样像素差 ≤0.1%（阈值 2/255，矩阵默认模式设门）；文字经 Host 同字体栈重排属**具名降级**且必须可观测（不得静默）。v3 富模式（glyph run + SDF 贴片）为 opt-in：结构面必须被断言（glyph 坐标 = cosmic-text `physical()`、阴影与 wgpu shader 同式），其像素差按族设具名上界（glyph run 例 ≤1.0%、含阴影贴片的例 ≤1.5%，实测 text 0.798%/shadow_only 0.741%/gradient 1.374%）并作为具名边界记录，**不得计为 exact**。共用实现无第二布局器。 |
 | AC-03 | work | 资源版本/传输/更新/最后owner/GPU释放及图片媒体表现正确，无App隐藏窗/GPU/整帧自绘 |
 | AC-04 | work | 协商/兼容、坏帧保旧、背压和generation负控通过，未知必需能力显式拒绝 |
 | AC-05 | review | 独立上下文逐项验证当前修订AC/V、真实源和规范增量，所有必需项有可复核证据；不能只读完成勾选 |
