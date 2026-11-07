@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-067
-status: reviewed
+status: archived
 feature_name: AGE迁移ACE全消费者清单与最小整链先证
 author: [Codex]
 created_at: 2026-11-06
@@ -126,7 +126,7 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 | T-05 | work | T03；可达支路 | 恢复/取消/20轮Run/资源收支及坏件修复；未知不能冒pass | AC-04 | [x] 2026-11-07 **not-run（不可达）**：无 ACE 运行会话，冷恢复/取消/Stop/20 轮/Run 代次与资源收支均无可观测对象；不伪造微样本 PASS，REP-07 等仍归后续 ACE 宿主合同 |
 | T-06 | work | T04/05分类齐 | 冻结SD/完整缺口与既有959/979–981/985–987的逐项接收映射、实际owner和关闭oracle；覆盖项不另立重复合同，报告与真实工件一致 | AC-05 | [x] 2026-11-07（R1/R2/R4 已修）SD-01 候选落工作树 `docs/specs/auto-graphics/ace-migration-feasibility.md`（15,834B / sha256 `12150fc8…1deae2b49`，commit `d4745281`）；G1–G9 逐项映射 981 B-SOURCE/B-SESSION/B-CONTENT、980 B-DIALECT/B-NATIVE、979 T-02/T-03/T-08、961、939 T-03..T-08、967/968、985–987；REP 按权威 M2 合同全称与 owner 分账（REP-01 原源与全消费者=959+每能力包；REP-06=967+980；REP-08=986；REP-10=987；REP-11=985+各consumer），全 pending；能力常量 4 个、实测入口 2 条（modules.scalar + scalar profile）；UK-06 具名移交、无未归属 unknown；附录A与样本逐字相等（check exit 0）；未新立合同 |
 | T-07 | review | T-01..06实质完成 | 独立final；不修实现，finding交work，同员受影响复核 | AC-06 | [x] 2026-11-07 独立 final **pass** @ `d4745281`（reviewer 独立 subagent 上下文 043c5659…，review_scope: final）；AC-01..AC-06 全 pass；F-067-R1..R4 全关；spec 15,834B `12150fc8…`；AC-07/AC-08 属 merge |
-| T-08 | merge | T-07 pass | 冻结门/身份落主、canonical/导航/同号归档；不自动tag/远端发布 | AC-07 | [ ] |
+| T-08 | merge | T-07 pass | 冻结门/身份落主、canonical/导航/同号归档；不自动tag/远端发布 | AC-07 | [x] 2026-11-07 `prepared`: reviewed r2 @ `d4745281`（独立 final pass，round 8）；dev 分支 rebase `2a23e859`→`21fa29e0`，`git range-diff 4bb54e36..d4745281 2a23e859..21fa29e0` 4/4 全等；`landed`: master **ff-only** `2a23e859..21fa29e0`（无 merge commit，tip=`21fa29e0`）；`canonical_verified`: `docs/specs/auto-graphics/ace-migration-feasibility.md` 15,834B sha256 `12150fc8…b49` 于 main 与审查基线同 hash；`archived`: `docs/plans/archived/067-…md` status archived（本次 docs 提交） |
 | T-09 | merge | T-08 | 全输出对账/摘要/guard/清理/登记；实完才勾 | AC-08 | [ ] |
 
 ## 9. 复审记录
@@ -170,6 +170,8 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 - stage: review | review_scope: final | reviewer: 独立 subagent 上下文（043c5659-0e2d-49b7-a9a3-65456484222d） | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | outcome: pass | worktree: D:/autostack/.wt/ui-067/auto-ui | branch: codex/plan-067-dev | reviewed_commit: d4745281 | base_commit: 4bb54e36 | dependency_revisions: auto-lang 436ac91f（ACE 子树 clean）/ ag-examples 5384f7b | spec_inputs: `docs/specs/auto-graphics/ace-migration-feasibility.md` sha256 12150fc8…b49（15,834B）；sample/main.at 7a14519f…、counter.at 8734bef7… | acceptance_results: AC-01 pass、AC-02 pass、AC-03 pass、AC-04 pass、AC-05 pass、AC-06 satisfied；R1（REP 全称/owner）、R3（探针哈希）、R4（4 常量/2 入口表述）复核实测接受，R2 于上轮修复后接受 | pending_closeout_gates: AC-07（落主/canonical/归档）与 AC-08（对账/摘要/清理/登记）属 merge；统一回归/冻结门归 merge | findings: none（F-067-R1..R4 全关） | evidence: `plan-artifacts/plan-067/auto-ui/review/re-review-report.md`；check_spec_appendix.py exit 0（附录逐字相等）；`out/review/report.json`（输入未变，复用前轮 exit 0/result pass） | next: merge（T-08/T-09）
 
 - stage: goal | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | round: 8 | from: review | to: merge | status: reviewed | outcome: pass（独立 final pass @ d4745281） | worktree: D:/autostack/.wt/ui-067/auto-ui | commit: d4745281 | next: merge T-08。
+
+- stage: merge | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | outcome: in_progress（archived；cleanup/registry 待做） | delivery_commit: `21fa29e0` | canonical: `docs/specs/auto-graphics/ace-migration-feasibility.md`（15,834B / sha256 `12150fc8…b49`） | archive: `docs/plans/archived/067-age-ace-migration-inventory-and-chain-feasibility.md` | checkpoints: **prepared**=reviewed r2 @ d4745281（独立 final pass）+ dev 分支 rebase `2a23e859→21fa29e0`，`git range-diff 4bb54e36..d4745281 2a23e859..21fa29e0` 4/4 全等；**landed**=master `git merge --ff-only` `2a23e859..21fa29e0`，无 merge commit，tip=delivery；**canonical_verified**=main 上 spec 与审查基线同 hash（15,834B `12150fc8…`），索引自动、无人工索引/ledger 写入；**archived**=同号归档文件 status archived（本次 docs 提交） | 对账: 落地 diff 仅新增 1 个 Spec 文件 310 行，无产品代码/依赖/安装/二进制变更；probe 与 review 证据见 §9 rounds 1–8（入口/退出码/哈希/诊断已在案） | next: cleanup（fresh guard → 移除 ui-067 两树/分支/组目录 → 删 plan-artifacts scope → 刷新 registry）+ 交付后观察
 
 ## 10. 待澄清事项
 
