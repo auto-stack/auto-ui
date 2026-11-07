@@ -239,7 +239,10 @@ fn measure_case(
     view: View<()>,
     out: &std::path::Path,
     name: &str,
+    mode: &str,
+    glyph_runs: bool,
 ) -> Result<CellReading, String> {
+    let name = &format!("{name}-{mode}");
     let client_bg = client_bg();
 
     // direct 代理金样：同一客户区底色（否则“谁画底色”会吞掉原语差）。
@@ -276,8 +279,11 @@ fn measure_case(
     let backdrop = corner_color(&direct_png);
 
     let mut surface = HeadlessSurface::new(CellComponent { view }, W, H);
-    // T-02：本矩阵按用户裁定打开 glyph run（Host 不重排文字）。
-    surface.set_glyph_runs(true);
+    // 两种 producer 模式都要量：default = 生产默认（字符串面），glyph_runs =
+    // 用户裁定打开的 glyph run 面（非默认）。
+    surface.set_glyph_runs(glyph_runs);
+    // “v3 富模式”同时打开 SDF 阴影贴片；默认面保留 scrim 近似（见 Spec §2.3）。
+    surface.set_shadow_patches(glyph_runs);
     let (mut produce, mut encode, mut decode, mut replay) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let mut inventory_json = serde_json::Value::Null;
@@ -383,12 +389,25 @@ fn rq_cells_t05_six_cell_matrix() {
             CellStatus::Runnable | CellStatus::InprocApprox => {
                 let mut cases = Vec::new();
                 for (name, view) in case_views() {
-                    match measure_case(view, &out, name) {
+                  for (mode, glyph_runs) in [("default", false), ("glyph_runs", true)] {
+                    match measure_case(view.clone(), &out, name, mode, glyph_runs) {
                         Ok(reading) => {
+                            if mode == "default" {
+                                // 门只压默认 producer（生产路径）：文字/路径/SVG/滚动
+                                // 必须 ≤0.2%（阈值 2/255）；阴影两例的残差已具名，
+                                // 这里记录不设门。
+                                if matches!(name, "path_mesh" | "svg_icon" | "text_cjk" | "scroll_clip" | "progress_bar") {
+                                    assert!(
+                                        reading.diff_ratio <= 0.002,
+                                        "{name} 默认 producer 的像素差 {:.4} 超 0.2% 门",
+                                        reading.diff_ratio
+                                    );
+                                }
+                            }
                             println!(
                                 "[RQCELLS] {}",
                                 serde_json::json!({
-                                    "tag": "case", "cell": cell.id, "case": name,
+                                    "tag": "case", "cell": cell.id, "case": name, "producer_mode": mode,
                                     "inventory": reading.inventory,
                                     "produce_p50": reading.produce_p50,
                                     "produce_p95": reading.produce_p95,
@@ -404,7 +423,7 @@ fn rq_cells_t05_six_cell_matrix() {
                                 })
                             );
                             cases.push(serde_json::json!({
-                                "case": name,
+                                "case": name, "producer_mode": mode,
                                 "inventory": reading.inventory,
                                 "timing_ms": {
                                     "produce_p50": reading.produce_p50,
@@ -425,10 +444,11 @@ fn rq_cells_t05_six_cell_matrix() {
                         }
                         Err(err) => {
                             cases.push(serde_json::json!({
-                                "case": name, "error": err, "status": "failed",
+                                "case": name, "producer_mode": mode, "error": err, "status": "failed",
                             }));
                         }
                     }
+                  }
                 }
                 cell_rows.push(serde_json::json!({
                     "cell": cell.id, "producer": cell.producer, "host": cell.host,

@@ -86,6 +86,9 @@ pub struct HeadlessSurface<C: Component> {
     /// PLAN-062 T-02：文本以 glyph run 过线（Host 不重排）。默认关 = 字符串
     /// `TextStyled` 兼容面；对端声明 `fidelity/glyphrun/1` 后再打开。
     glyph_runs: bool,
+    /// PLAN-062 T-02：阴影以生产端 SDF 贴片过线。默认关——实测贴片经画布图像
+    /// 合成后比单层 scrim 更远（见 Spec §2.3 的 A/B），需先解决合成对齐。
+    shadow_patches: bool,
 }
 
 /// PLAN-062 T-03：位图资源身份与驻留缓存（P-02）。
@@ -330,6 +333,7 @@ where
             preedit_reported: None,
             resources: ResourceCache::default(),
             glyph_runs: false,
+            shadow_patches: false,
         }
     }
 
@@ -382,6 +386,7 @@ where
             &mut self.resources,
             bitmaps,
             self.glyph_runs,
+            self.shadow_patches,
             scale,
         )
     }
@@ -390,6 +395,11 @@ where
     /// 是兼容面；对端声明 `fidelity/glyphrun/1` 后再打开。
     pub fn set_glyph_runs(&mut self, on: bool) {
         self.glyph_runs = on;
+    }
+
+    /// 阴影是否以生产端 SDF 贴片过线（默认关 = 单层 scrim 近似）。
+    pub fn set_shadow_patches(&mut self, on: bool) {
+        self.shadow_patches = on;
     }
 
     /// 产帧后核对 per-App 上传预算：超限则回滚本帧资源登记并返回 true，
@@ -1650,6 +1660,7 @@ fn lower_layers_v2(
     resources: &mut ResourceCache,
     bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
     glyph_runs: bool,
+    shadow_patches: bool,
     scale: f32,
 ) -> DisplayList {
     let mut ops = Vec::new();
@@ -1668,6 +1679,7 @@ fn lower_layers_v2(
                 observations,
                 resources,
                 bitmaps,
+                shadow_patches,
                 scale,
             );
         }
@@ -1838,6 +1850,7 @@ fn lower_quad_v2(
     observations: &mut Vec<String>,
     resources: &mut ResourceCache,
     bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
+    shadow_patches: bool,
     scale: f32,
 ) {
     let rect = to_wrect(quad.bounds);
@@ -1870,11 +1883,12 @@ fn lower_quad_v2(
     // PLAN-062 T-02：shadow blur 不再靠 Host 垫层近似——生产端按 iced_wgpu
     // 阴影 shader 的同一 SDF 公式把阴影预栅格化成贴片资源（`scale` = 设备
     // 像素/逻辑像素），Host 只需合成位图，因此可以逐像素对齐。
-    if quad.shadow.color.a > 0.0
+    let has_shadow = quad.shadow.color.a > 0.0
         && (quad.shadow.blur_radius > 0.0
             || quad.shadow.offset.x != 0.0
-            || quad.shadow.offset.y != 0.0)
-    {
+            || quad.shadow.offset.y != 0.0);
+    let mut shadow_spec = None;
+    if has_shadow && shadow_patches {
         if let Some((patch_rect, w, h, rgba)) = resources.shadow_patch(quad, scale) {
             let src = resources.intern(w, h, &rgba, bitmaps);
             if let Some(src) = src {
@@ -1887,14 +1901,20 @@ fn lower_quad_v2(
         } else {
             observations.push("shadow 贴片栅格化失败（该 quad 阴影不呈现，具名诊断）".to_string());
         }
+    } else if has_shadow {
+        // 默认面：Quad 携 ShadowSpec，Host 以单层垫层近似（具名降级）。
+        shadow_spec = Some(ShadowSpec {
+            color: to_rgba8(quad.shadow.color),
+            offset: (quad.shadow.offset.x, quad.shadow.offset.y),
+            blur: quad.shadow.blur_radius,
+        });
     }
     ops.push(DisplayOp::Quad {
         rect,
         fill,
         radius,
         border,
-        // 阴影已由贴片承载；Quad 不再要求 Host 画垫层近似。
-        shadow: None,
+        shadow: shadow_spec,
     });
 }
 
@@ -2734,7 +2754,7 @@ mod tests {
         };
         let mut cache = ResourceCache::default();
         let mut bms = Vec::new();
-        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms, false, 2.0);
+        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms, false, false, 2.0);
         let replay = bottom(&replayed).expect("bottom text survives host replay");
         assert!(
             (replay.0 - x - 5.0).abs() < 0.1 && (replay.1 - y - 7.0).abs() < 0.1,
