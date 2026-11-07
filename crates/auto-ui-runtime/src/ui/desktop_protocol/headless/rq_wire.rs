@@ -301,6 +301,8 @@ where
 enum WireSource {
     Rust(HeadlessFrameSource<StaticView>),
     Vm(HeadlessFrameSource<crate::ui::dynamic::DynamicComponent>),
+    /// 负控用的逐拍变化产者（tick 驱动，v2/v3 可切）。
+    Live(HeadlessFrameSource<SwitchingView>),
 }
 
 macro_rules! wire_delegate {
@@ -308,6 +310,7 @@ macro_rules! wire_delegate {
         match $this {
             WireSource::Rust(s) => s.$method($($arg),*),
             WireSource::Vm(s) => s.$method($($arg),*),
+            WireSource::Live(s) => s.$method($($arg),*),
         }
     };
 }
@@ -592,4 +595,289 @@ fn cell_id(producer: ProducerKind, host: &str) -> String {
         ProducerKind::Vm => "vm",
     };
     format!("{p}/{host}")
+}
+// ---------------------------------------------------------------------------
+// AC-04 负控：慢宿主 / 旧 ACK / 旧宿主（能力收窄），全部跑在真实管道上
+// ---------------------------------------------------------------------------
+
+/// 逐拍变化的产者：`canvas=true` 产 v3（Path，需 `fidelity/pathfill/1`），
+/// 否则产 v2 词汇（字符串文字）。用来把「新产者 × 旧宿主」配对做成真实 wire。
+#[derive(Debug)]
+struct SwitchingView {
+    canvas: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ticks: u32,
+}
+
+impl Component for SwitchingView {
+    type Msg = ();
+
+    fn on(&mut self, _msg: ()) {
+        self.ticks = self.ticks.wrapping_add(1);
+    }
+
+    fn view(&self) -> View<()> {
+        if self.canvas.load(std::sync::atomic::Ordering::Relaxed) {
+            super::rq_seams::canvas_scene_view()
+        } else {
+            View::text("v2 回退帧")
+        }
+    }
+
+    fn tick_interval_ms(&self) -> Option<u32> {
+        Some(15)
+    }
+
+    fn tick_msg(&self) -> Option<()> {
+        Some(())
+    }
+}
+
+/// 负控用的 standalone 宿主装配（真管道 + 真端点，产者/宿主两端分开泵）。
+struct WireCell {
+    wellknown: String,
+    serve: std::sync::Arc<crate::ui::desktop_protocol::rqhost::RqServe>,
+    _claim: crate::ui::desktop_protocol::transport::PipeClaim,
+    pump: ClientPump<WireSource>,
+    client: crate::ui::desktop_protocol::rqhost::RqClient,
+    ids: crate::ui::desktop_protocol::rqhost::RqIds,
+}
+
+impl WireCell {
+    fn start(tag: &str, source: WireSource) -> Result<Self, String> {
+        use crate::ui::desktop_protocol::rqhost;
+        let wellknown = format!("plan062-neg-{}-{tag}", std::process::id());
+        let (serve, claim) =
+            rqhost::RqServe::start(&wellknown).map_err(|e| format!("rqserve: {e:?}"))?;
+        let (_, end) =
+            rqhost::adopt(&wellknown, "plan062-neg", 5000).map_err(|e| format!("adopt: {e:?}"))?;
+        let mut pump = ClientPump::new(end, source, client_config(), None);
+        pump.set_v2(true);
+        let mut ids = rqhost::RqIds::default();
+        let mut client = None;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while client.is_none() && Instant::now() < deadline {
+            let pending: Vec<_> = serve.pending.lock().unwrap().drain(..).collect();
+            for (app_name, end) in pending {
+                if client.is_none() {
+                    client = rqhost::adopt_one(app_name, end, &mut ids, 4000).map(|(c, _)| c);
+                }
+            }
+            let _ = pump.step();
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        let client = client.ok_or_else(|| "负控宿主 5s 未激活".to_string())?;
+        Ok(Self {
+            wellknown,
+            serve,
+            _claim: claim,
+            pump,
+            client,
+            ids,
+        })
+    }
+
+    /// 只泵产者（宿主"停摆"）：模拟慢 Host。
+    fn pump_producer(&mut self) {
+        let _ = self.pump.step();
+    }
+
+    /// 只泵宿主，返回连接是否仍存活。
+    fn pump_host(&mut self) -> bool {
+        let (_events, alive) = crate::ui::desktop_protocol::rqhost::pump_client(
+            &mut self.client,
+            &mut self.ids,
+        );
+        alive
+    }
+
+    fn pump_both(&mut self) -> bool {
+        self.pump_producer();
+        self.pump_host()
+    }
+
+    fn composed(&self) -> Option<&DisplayList> {
+        crate::ui::desktop_protocol::rqhost::composed_v2(&self.client)
+    }
+}
+
+impl Drop for WireCell {
+    fn drop(&mut self) {
+        self.serve.stop(&self.wellknown);
+    }
+}
+
+fn switching_source(canvas: std::sync::Arc<std::sync::atomic::AtomicBool>) -> WireSource {
+    WireSource::Live(HeadlessFrameSource::new(
+        SwitchingView { canvas, ticks: 0 },
+        W,
+        H,
+    ))
+}
+
+/// **慢宿主**（P-03/AC-04）：宿主停摆时队列按槽信用有界（在途帧 = 2），第三帧
+/// 被推迟而不是覆盖在途槽；宿主恢复后帧继续落地、待发位清空、最终有完整帧。
+#[test]
+fn rq_wire_slow_host_backpressures_without_overwrite_and_catches_up() {
+    let canvas = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut cell = WireCell::start("slow", switching_source(std::sync::Arc::clone(&canvas)))
+        .expect("slow cell");
+
+    // 宿主停摆 250ms：只泵产者（tick 15ms → 应有十余个新 revision）。
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_millis(250) {
+        cell.pump_producer();
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    println!(
+        "[RQNEG] {}",
+        serde_json::json!({
+            "tag": "slow_host", "frames_in_flight": cell.pump.frames_in_flight(),
+            "pending": cell.pump.is_frame_pending(), "host_frames": cell.client.frames,
+        })
+    );
+    assert_eq!(
+        cell.pump.frames_in_flight(),
+        2,
+        "宿主停摆时在途帧必须被槽数（2）封顶，不得无界堆积"
+    );
+    assert!(
+        cell.pump.is_frame_pending(),
+        "信用耗尽必须置待发位（推迟补发，不丢帧、不覆盖在途槽）"
+    );
+
+    // 恢复泵：帧继续落地，待发位清空。
+    let deadline = Instant::now() + Duration::from_secs(4);
+    while Instant::now() < deadline {
+        cell.pump_both();
+        if !cell.pump.is_frame_pending() && cell.client.frames >= 3 {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        cell.client.frames >= 3,
+        "宿主恢复后必须继续合成多帧（实得 {}）",
+        cell.client.frames
+    );
+    assert!(!cell.pump.is_frame_pending(), "恢复后待发位必须清空");
+    assert!(cell.composed().is_some(), "最终必须有完整合成面");
+}
+
+/// **旧 ACK / 重复 ACK**（AC-04）：宿主回一个早已归还的槽与过期 frame_id，
+/// 端点不得不崩/不串槽；连接存活且后续帧继续合成（到来乱序 ACK 属真实场景）。
+#[test]
+fn rq_wire_stale_ack_does_not_break_slot_accounting() {
+    use crate::ui::desktop_protocol::message::{FrameMsg, ProtocolMsg};
+
+    let canvas = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut cell = WireCell::start("stale-ack", switching_source(std::sync::Arc::clone(&canvas)))
+        .expect("stale ack cell");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < deadline && cell.client.frames < 2 {
+        cell.pump_both();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(cell.client.frames >= 2, "先要有在途/已合成帧");
+    let frames_before = cell.client.frames;
+    let wid = cell.client.inner.wid.expect("Active 即有 wid").0;
+
+    // 过期 / 重复 ACK：frame_id 远小于当前、槽是早已归还的那个。
+    let stale = ProtocolMsg::Frame(FrameMsg::FrameAck {
+        wid,
+        frame_id: 1,
+        slot: 1,
+    });
+    let sent = cell.client.inner.end.send(&stale);
+    assert!(sent.is_ok(), "过期 ACK 必须能落管道（不是产者侧拒绝）");
+
+    // 端点继续工作：连接存活 + 帧继续合成（不 panic、不串槽）。
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut alive = true;
+    while Instant::now() < deadline && cell.client.frames < frames_before + 1 {
+        alive = cell.pump_both();
+        assert!(alive, "过期 ACK 不得断开连接");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    println!(
+        "[RQNEG] {}",
+        serde_json::json!({
+            "tag": "stale_ack", "frames_before": frames_before,
+            "frames_after": cell.client.frames, "alive": alive,
+        })
+    );
+    assert!(
+        cell.client.frames > frames_before,
+        "过期 ACK 之后必须仍能合成新帧（实得 {} → {}）",
+        frames_before,
+        cell.client.frames
+    );
+    assert!(cell.composed().is_some(), "合成面必须仍然有效");
+}
+
+/// **旧宿主 × 新产者**（AC-04 / V-09）：宿主只声明 v2 能力面时，v3 帧
+/// （Path，required `fidelity/pathfill/1`）必须被**入帧前拒绝**且保旧帧
+/// （不呈现半帧、不断流）；产者切回 v2 词汇后同一连接恢复合成。
+#[test]
+fn rq_wire_old_host_rejects_v3_frames_and_recovers_on_v2() {
+    use crate::ui::desktop_protocol::message::CapabilitySet;
+
+    let canvas = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let mut cell = WireCell::start("old-host", switching_source(std::sync::Arc::clone(&canvas)))
+        .expect("old host cell");
+    // 旧宿主能力面：只有 glyphrun，没有 pathfill —— v3 Path 帧必须被拒。
+    cell.client.inner.surfaces.set_capabilities(CapabilitySet::parse(&[
+        "optional:fidelity/glyphrun/1".to_string(),
+    ]));
+
+    let start = Instant::now();
+    let mut alive = true;
+    while start.elapsed() < Duration::from_millis(400) {
+        alive = cell.pump_both();
+        assert!(alive, "拒绝入帧不得断流");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    println!(
+        "[RQNEG] {}",
+        serde_json::json!({
+            "tag": "old_host", "phase": "v3_rejected", "frames": cell.client.frames,
+            "composed": cell.composed().is_some(), "alive": alive,
+        })
+    );
+    assert_eq!(
+        cell.client.frames, 0,
+        "旧宿主不得合成 v3 帧（入帧前拒绝，不是半帧呈现）"
+    );
+    assert!(
+        cell.composed().is_none(),
+        "旧宿主在 v3 帧期必须保持旧帧（此处无旧帧 → 空）"
+    );
+
+    // 产者切回 v2 词汇：同一连接必须恢复合成（不是靠重连）。
+    canvas.store(false, std::sync::atomic::Ordering::Relaxed);
+    let deadline = Instant::now() + Duration::from_secs(4);
+    while Instant::now() < deadline && cell.composed().is_none() {
+        alive = cell.pump_both();
+        assert!(alive, "回退帧不得断流");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    let composed = cell.composed().expect("v2 回退后必须合成");
+    assert!(
+        composed
+            .ops
+            .iter()
+            .any(|op| matches!(op, DisplayOp::TextStyled { .. })),
+        "回退帧必须是 v2 词汇（字符串文字）"
+    );
+    assert!(
+        composed.required_capabilities().is_empty(),
+        "回退帧不得再要求 v3 能力"
+    );
+    println!(
+        "[RQNEG] {}",
+        serde_json::json!({
+            "tag": "old_host", "phase": "v2_recovered", "frames": cell.client.frames,
+            "ops": composed.ops.len(),
+        })
+    );
 }

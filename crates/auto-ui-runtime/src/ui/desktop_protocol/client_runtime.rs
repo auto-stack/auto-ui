@@ -508,6 +508,21 @@ impl<S: FrameSource> ClientPump<S> {
         self.v2 = v2;
     }
 
+    /// PLAN-062 T-05（AC-04 观测口）：在途帧数（已发未 ACK 的槽数）。
+    /// 慢宿主负控用它证明队列按槽信用有界，不是无界堆积。
+    pub fn frames_in_flight(&self) -> usize {
+        self.endpoint
+            .as_ref()
+            .map(|app| app.frames_in_flight())
+            .unwrap_or(0)
+    }
+
+    /// PLAN-062 T-04/T-05：本拍是否有被背压推迟、等待槽归还后补发的帧。
+    /// true = 信用耗尽且**未丢帧**（下一拍重试），false = 无待发帧。
+    pub fn is_frame_pending(&self) -> bool {
+        self.frame_pending
+    }
+
     /// 以给定 projector 建端点并发 Hello（首连 / 重连共用）。
     fn attach(&mut self, projector: S) {
         let mut app = AppEndpoint::new(
