@@ -53,8 +53,10 @@ Checked 凭证：签名/类型/arity 由下游唯一 resolve/typecheck 核验。
 
 `node`、`model`、`msg`、`view`、`on`、`Life`、`view-2d`、`view-3d`、`shape2d`、
 `cylinder3d` 等 AGE 作者构造不在任何 profile；无公开 f32 位置 lane（profile
-词法把浮点字面量归 `Raw`，报 “not part of this source profile”）；无图形资源
-句柄/代次/释放、无同步回调、无 UI host/文本槽/事件派发面。
+词法把浮点字面量归 `Raw`，报 “not part of this source profile”）；源码能力不含
+图形资源句柄/代次/释放声明，也不含 UI 回调与文本槽/事件派发面。ACE 的通用
+foreign resource/callback 与 host 机制（939、967、`av-core`/`av`）存在或在建，
+但不等于 AGE 图形句柄/宿主语义，且本次链未触达、未验证——不得据此认领 G6/G7。
 
 ### 2.3 正控与负控（同一前门、同一构建）
 
