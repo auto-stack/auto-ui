@@ -100,6 +100,9 @@ pub struct ResourceCache {
     /// 命中数（未重复上传的帧引用）。
     pub hits: u64,
     pub evictions: u64,
+    /// SVG 设备像素栅格缓存（内容+尺寸不变 → 不重复 resvg 栅格化，P-02）。
+    rasters: std::collections::HashMap<([u8; 32], u32, u32), Vec<u8>>,
+    pub raster_hits: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -120,6 +123,8 @@ impl Default for ResourceCache {
             uploaded_bytes: 0,
             hits: 0,
             evictions: 0,
+            rasters: std::collections::HashMap::new(),
+            raster_hits: 0,
         }
     }
 }
@@ -133,6 +138,21 @@ impl ResourceCache {
 
     pub fn resident_bytes(&self) -> usize {
         self.resident_bytes
+    }
+
+    /// SVG 栅格缓存查询：同内容同尺寸直接复用（不重复跑 resvg）。
+    fn raster_lookup(&mut self, key: [u8; 32], w: u32, h: u32) -> Option<Vec<u8>> {
+        match self.rasters.get(&(key, w, h)) {
+            Some(bytes) => {
+                self.raster_hits += 1;
+                Some(bytes.clone())
+            }
+            None => None,
+        }
+    }
+
+    fn raster_store(&mut self, key: [u8; 32], w: u32, h: u32, bytes: Vec<u8>) {
+        self.rasters.insert((key, w, h), bytes);
     }
 
     /// 按最早键驱逐直到驻留字节回落到上限内（预算收紧也立即生效）。
@@ -256,6 +276,11 @@ where
             self.resources.evictions,
             self.resources.resident_bytes(),
         )
+    }
+
+    /// SVG 栅格缓存命中数（P-02 资源面观测）。
+    pub fn raster_cache_hits(&self) -> u64 {
+        self.resources.raster_hits
     }
 
     /// 调整资源驻留上限（预算/驱逐探针用；生产默认 256 MiB/App）。
@@ -1875,10 +1900,12 @@ fn lower_image_v2(
             }
             (*bounds, image.rotation.0, (w, h, rgba))
         }
-        GfxImage::Vector { svg, bounds, .. } => match rasterize_svg(svg, *bounds, observations) {
-            Some((w, h, rgba)) => (*bounds, 0.0, (w, h, rgba)),
-            None => return,
-        },
+        GfxImage::Vector { svg, bounds, .. } => {
+            match rasterize_svg(svg, *bounds, observations, resources) {
+                Some((w, h, rgba)) => (*bounds, 0.0, (w, h, rgba)),
+                None => return,
+            }
+        }
     };
 
     let (w, h, rgba) = pixels;
@@ -1968,6 +1995,7 @@ fn rasterize_svg(
     svg: &iced::advanced::svg::Svg,
     bounds: iced::Rectangle,
     observations: &mut Vec<String>,
+    resources: &mut ResourceCache,
 ) -> Option<(u32, u32, Vec<u8>)> {
     use iced::advanced::svg::Data;
 
@@ -1981,6 +2009,19 @@ fn rasterize_svg(
             }
         },
     };
+    let w = bounds.width.round().max(1.0) as u32;
+    let h = bounds.height.round().max(1.0) as u32;
+    // 内容身份：同 SVG 字节 + 同目标尺寸 → 直接复用上次栅格（内容未变的
+    // 重复帧不再跑 resvg；T-05 实测未缓存时 20–33ms/帧）。
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&bytes);
+    hasher.update(&svg.color.map(|c| to_rgba8(c).r).unwrap_or(0).to_le_bytes());
+    hasher.update(&w.to_le_bytes());
+    hasher.update(&h.to_le_bytes());
+    let key = *hasher.finalize().as_bytes();
+    if let Some(cached) = resources.raster_lookup(key, w, h) {
+        return Some((w, h, cached));
+    }
     let tree = match resvg::usvg::Tree::from_data(&bytes, &resvg::usvg::Options::default()) {
         Ok(tree) => tree,
         Err(err) => {
@@ -1988,8 +2029,6 @@ fn rasterize_svg(
             return None;
         }
     };
-    let w = bounds.width.round().max(1.0) as u32;
-    let h = bounds.height.round().max(1.0) as u32;
     const MAX_RASTER_EDGE: u32 = 4096;
     if w > MAX_RASTER_EDGE || h > MAX_RASTER_EDGE {
         observations.push(format!(
@@ -2026,6 +2065,7 @@ fn rasterize_svg(
             px[3] = (px[3] as f32 * (tint.a as f32 / 255.0)).round() as u8;
         }
     }
+    resources.raster_store(key, w, h, rgba.clone());
     Some((w, h, rgba))
 }
 
@@ -2049,6 +2089,9 @@ mod rq_repair;
 // PLAN-062 T-02: v3 无损原语线合同探针（test-only）。
 #[cfg(test)]
 mod rq_lossless;
+// PLAN-062 T-05: 六格绘图/资源重放矩阵与指标重放（test-only）。
+#[cfg(test)]
+mod rq_cells;
 
 // ================================ 测试 ================================
 
