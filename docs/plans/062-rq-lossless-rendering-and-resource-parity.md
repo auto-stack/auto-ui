@@ -142,7 +142,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | [x] | T-01 | work | UI061正式可行决策 | 重核UI061全能力ID、direct旧基准、实现来源与预算；冻结当前绘图能力并集及精确接缝；接受UI061 r3性能合同与预算，冻结P/M对应实现来源和direct对照版本，缺预算不进入性能签收 | V-01；AC-01；AC-07/V-05～08（按§6分工）——见§9 2026-11-07 work 轮次：39 View ID + 8 能力ID入编译常量、061 冻结预算原样接受 |
 | [ ] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02；AC-07/V-05～08（按§6分工）——进行中：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`，mesh 重放 0.0%、SVG 0.333%）；GlyphRun wire、blur/SDF、几何渐变仍具名缺口（§9） |
 | [ ] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03；AC-07/V-05～08（按§6分工）——进行中：内容身份+驻留缓存（稳定帧 0 重传、驱逐可解释）、图片 alpha/rotation、SVG 栅格资源已交付；媒体族与 wire generation 字段待补（§9） |
-| [ ] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——进行中：能力协商/准入保旧帧、槽 credit 背压、无覆盖在途槽已交付；per-App 上传速率/CPU 预算与慢 Host 负控待补（§9） |
+| [ ] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——进行中：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控已交付（`4263ff3c`）；wire generation 字段与乱序资源负控待补（§9） |
 | [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——进行中：六格真实 wire（`4e2f53d3`：两产者 × 两宿主，含 v3 tag 3 槽分派缺陷修复）+ 39/39 逐能力读数（`77f92dda`，26/39 ≤0.1%，13 个文字密集/宿主依赖族具名）；M-02/06/07 与 AC-03/AC-04 项待补 |
 | [ ] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
 | [ ] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
@@ -406,3 +406,17 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 仍缺（不签 T-05/T-03/T-04）：AC-03 媒体资源族与 wire generation；AC-04 真两进程 v2↔v3 配对、慢 Host/旧 ACK/乱序资源负控；M-02/M-06/M-07 未测。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 8 | from: work | to: work | status: executing | outcome: pass（39/39 逐能力读数 + 测量口径修复） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 77f92dda | next: work（AC-03 资源族 / AC-04 负控）
+
+### 2026-11-07 work AC-04 负控（慢宿主 / 旧 ACK / 旧宿主 × 新产者）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r4 / outcome: 进行中（AC-04 的“慢 Host/旧 ACK”与“v2↔v3 配对”已有真实管道证据；剩两进程与乱序资源） / worktree: `D:/autostack/.wt/ui-062/auto-ui` / code_commit: `4263ff3c`
+- 三条负控都跑在真管道上（standalone 宿主，两端可分别泵；产者用 tick 驱动的 `SwitchingView`，v2/v3 可切）：
+  1. **慢宿主**：宿主停摆 250ms 只泵产者（tick 15ms）→ 在途帧 **= 2**（槽数封顶）、待发位 **true**、宿主侧 0 帧；恢复后继续合成 ≥3 帧、待发位清空。即队列按信用有界，只有过期画面合并，不覆盖在途槽、不丢最终状态。
+  2. **旧/重复 ACK**：宿主回 `FrameAck{frame_id:1, slot:1}`（早已归还的槽 + 过期 id）→ 连接存活、槽账不串、帧数 2 → 3 继续增长、合成面仍有效。
+  3. **旧宿主 × 新产者**：宿主能力面收窄为只有 glyphrun（无 `fidelity/pathfill/1`），产者先发 v3 Path 帧再切回 v2 词汇 → v3 帧**入帧前拒绝**（frames=0、无合成面 = 不呈现半帧、连接不掉），切回 v2 后**同一连接**恢复合成（1 帧字符串、required_capabilities 为空）。
+- 观测口：`ClientPump::frames_in_flight()` / `is_frame_pending()`（小 API，兼作 M-04/M-05 计数面）；未改任何协议语义。
+- Spec（SD-01）：新增 §5.4 三条负控的实测表与语义要点，并显式保留未覆盖项（真两进程配对、乱序 BitmapReady）。
+- 回归面（本树 `4263ff3c`）：`rq_wire` **5/0**；`ui::desktop_protocol::` **264 passed / 4 failed**（同基线 4 红：autocenter 内容居中、stage3 stress n3/n5、t3_examples_queue_end_to_end——三者均为 062 开工前既有失败，非本轮引入）。
+- 仍缺（不签 T-05/T-03）：AC-03 wire generation 字段与**媒体资源族**（mpv 帧走 GPU 纹理、无 CPU 读回，跨线需独立读回/媒体传输设计）；AC-04 真两进程（独立 exe）配对、乱序资源负控；M-02/M-06/M-07 未测。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 9 | from: work | to: work | status: executing | outcome: pass（AC-04 三条负控） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 4263ff3c | next: work（wire generation / 两进程配对 / 媒体边界裁定）
