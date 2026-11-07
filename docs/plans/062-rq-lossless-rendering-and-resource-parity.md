@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-062
-status: executing
+status: execution_done
 feature_name: RQ无损原语、文字图形与资源重放
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-07
 plan_revision: 4
-current_step: 1
+current_step: 5
 total_steps: 7
 depends_on: [auto-ui/PLAN-061]
 supersedes_spec_components: []
@@ -140,10 +140,10 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | 完成 | ID | owner_stage | 依赖/进入门 | 文件/操作与结果 | 关闭方式/AC |
 |---|---|---|---|---|---|
 | [x] | T-01 | work | UI061正式可行决策 | 重核UI061全能力ID、direct旧基准、实现来源与预算；冻结当前绘图能力并集及精确接缝；接受UI061 r3性能合同与预算，冻结P/M对应实现来源和direct对照版本，缺预算不进入性能签收 | V-01；AC-01；AC-07/V-05～08（按§6分工）——见§9 2026-11-07 work 轮次：39 View ID + 8 能力ID入编译常量、061 冻结预算原样接受 |
-| [ ] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02；AC-07/V-05～08（按§6分工）——进行中：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`，mesh 重放 0.0%、SVG 0.333%）；GlyphRun wire、blur/SDF、几何渐变仍具名缺口（§9） |
-| [ ] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03；AC-07/V-05～08（按§6分工）——进行中：内容身份+驻留、图片 alpha/rotation、SVG 栅格、wire generation（tag 13）、媒体静态帧（`3eadae59`，0.000/0 重传）已交付；**跨进程释放/引用记账**（最后 owner）仍缺（§9） |
-| [ ] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——进行中：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、wire generation（tag 13 + HostCaps 下行补到两宿主，`d2e41c58`）已交付；乱序资源负控待补（§9） |
-| [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——进行中：六格真实 wire（`4e2f53d3`）+ 39/39 逐能力读数（`77f92dda`）+ AC-04 负控与真两进程配对（`4263ff3c`/`39bd7bef`）；仅剩媒体资源族（待裁定）与 M-02/06/07 |
+| [x] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02——完成：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`）；GlyphRun/SDF 贴片按 r4 口径为 **opt-in 具名边界**（富模式 0.798%/1.374%，默认面 ≤0.1%，结构面断言 + 可观测降级），连续两轮独立复审无未决项 |
+| [x] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03——完成：内容身份+驻留、图片 alpha/rotation、SVG 栅格、wire generation（tag 13）、媒体静态帧（`3eadae59`，0.000/0 重传）、跨进程释放/引用记账（`44079c22`，tag 14 + BitmapRefs 延后释放）；连续媒体帧按 2026-11-08 裁定另立 |
+| [x] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；V-09——完成：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、wire generation + HostCaps 下行（`d2e41c58`）、资源释放 + 引用记账（`44079c22`）、真两进程配对（`39bd7bef`）；乱序上传由 generation 守卫覆盖，可控重排通道属具名边界 |
+| [x] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——完成：六格真实 wire（`4e2f53d3`）+ 39/39 逐能力读数（`77f92dda`）+ 负控/两进程（`4263ff3c`/`39bd7bef`）+ 媒体静态帧（`3eadae59`）；M-02/06/07 归 OS063（§5） |
 | [ ] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
 | [ ] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
 
@@ -472,3 +472,21 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 13 | from: work | to: work | status: executing | outcome: pass（静态媒体帧 + 探针键修正） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eadae59 | next: work（资源释放/引用记账）
 
+
+
+### 2026-11-08 work T-05 收口：执行完成，移交独立复审（stage: work → execution_done）
+
+- stage: work | plan_id: auto-ui/PLAN-062 | plan_revision: r4 | outcome: **pass（work-owned 完项）** | worktree: `D:/autostack/.wt/ui-062/auto-ui` | branch: `codex/plan-062-dev` | base_commit: `3d64877d` | code_commit: `44079c22` | dependency_revisions: auto-lang `8337bab5`(只读)、auto-web `2d698413`、auto-down `58ea33f` | task_ids: T-01..T-05 | next_responsible_role: review（T-06）
+- **AC 结果（work-owned，证据锚点）**：
+  - AC-01：六格全部有真实 wire 证据（`4e2f53d3`：两产者 × 两宿主，v3 tag 3 槽分派缺陷修复）；39/39 View 能力 ID 逐项读数（`77f92dda`，26/39 ≤0.1%，13 个文字密集/宿主依赖族具名）；真两进程配对（`39bd7bef`）。
+  - AC-02：默认 producer 矩阵门 ≤0.1%（7 例全部通过）；GlyphRun/SDF 富模式为 r4 具名边界（0.798%/1.374%），默认面不重排且降级可观测（`rq_string_text_path_is_observable_degradation`）；图像环已修正为真实渲染（`3eadae59`，此前探针键缺前缀导致带图行量到占位）。
+  - AC-03：内容身份/驻留/预算/驱逐、图片 alpha/rotation、SVG 栅格、wire generation（tag 13）、跨进程释放 + 宿主帧引用记账（tag 14，`44079c22`）、媒体静态帧（`3eadae59`，0.000 像素差、0 重传）；连续媒体帧按 2026-11-08 用户裁定另立计划。
+  - AC-04：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、HostCaps 下行补齐两宿主（`d2e41c58`）、真两进程 v2↔v3 配对（`39bd7bef`）。
+  - AC-07：默认 producer produce p50 0.17–0.24ms（p95 ≤0.387ms），SVG 例外 ≈32.5ms 为 r4 唯一具名例外（记录路径每帧新建 iced renderer）；M-04/M-08 measured、M-01/M-03/M-05 proxy、M-02/M-06/M-07 未测（owner OS063，§5/§6）。
+- **顺带修掉的实现/测量缺陷（评审需知）**：① v3 帧在 shm 槽分派被静默丢弃（`4e2f53d3`）；② HostCaps 下行只存在 `host::ProtocolHost`，两处真宿主缺（`d2e41c58`）；③ 探针位图缓存键缺 `bitmap://` 前缀、被全局缓存命中掩盖（`3eadae59`，现加硬断言）。
+- **capability 分母变化**：8 → **9**（新增 `resource/release/1`；`resource/generation/1` 早已在冻结表内）。这是本计划自有协议的追加式可选面，旧端不产不出。
+- **开放中的合同级边界（已具名、有 owner/关闭条件，不阻塞交 review）**：连续媒体帧（裁定另立，OS063 传输/媒体面）；乱序资源注入负控（管道 FIFO，generation 守卫已覆盖上传方向）；M-02/M-06/M-07（OS063）；释放为单向通知（无 ACK/双向引用计数）。
+- **复跑面（本树 `44079c22`）**：`rq_` **39/0**；`ui::desktop_protocol::` **272 passed / 4 failed**；`ui::iced::broker_surface` **13/0**；`media` 过滤 **17/0**。4 红与 base `3d64877d` 同组（autocenter 居中、stage3 stress n3/n5、t3_examples_queue_end_to_end），非本计划引入。统一回归（冻结并集）归 merge；本轮未跑全仓。
+- **待 review 决定的事**：上述边界是否满足 r4 合同；6 个能力面的证据是否足以签 AC-03/AC-04；`current_step=5`、`status=execution_done` 是否应以此修订前进。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 15 | from: work | to: review | status: execution_done | outcome: pass（T-01..T-05 完成） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 44079c22 | next: review（T-06）
