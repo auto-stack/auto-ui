@@ -1,10 +1,10 @@
 ---
 plan_id: PLAN-062
-status: drafting
+status: executing
 feature_name: RQ无损原语、文字图形与资源重放
 author: [Codex]
 created_at: 2026-11-05
-updated_at: 2026-11-05
+updated_at: 2026-11-07
 plan_revision: 3
 current_step: 1
 total_steps: 7
