@@ -1117,12 +1117,11 @@ fn paint_glyph_run<R>(
         if w == 0 || h == 0 {
             continue;
         }
-        let handle = iced::widget::image::Handle::from_rgba(w, h, rgba.pixels.clone());
         let x = (ix + rgba.left) as f32;
         let y = (iy - rgba.top) as f32 + line_offset;
         frame.draw_image(
             iced::Rectangle::new(iced::Point::new(x, y), iced::Size::new(w as f32, h as f32)),
-            &handle,
+            &rgba.handle,
         );
     }
 }
@@ -1134,6 +1133,9 @@ struct CachedGlyph {
     left: i32,
     top: i32,
     pixels: Vec<u8>,
+    /// iced 图像句柄按 CacheKey 复用（每次 draw 新建句柄会每字形每帧重建
+    /// GPU 纹理，P-02 违约 + 8–13ms 级重放开销）。
+    handle: iced::widget::image::Handle,
 }
 
 fn glyph_cache() -> &'static Mutex<std::collections::HashMap<cosmic_text::CacheKey, std::sync::Arc<CachedGlyph>>> {
@@ -1167,12 +1169,14 @@ fn glyph_rgba(image: &cosmic_text::SwashImage, color: Rgba8) -> Option<CachedGly
         }
         cosmic_text::SwashContent::SubpixelMask => return None,
     }
+    let handle = iced::widget::image::Handle::from_rgba(width, height, pixels.clone());
     Some(CachedGlyph {
         width,
         height,
         left: image.placement.left,
         top: image.placement.top,
         pixels,
+        handle,
     })
 }
 

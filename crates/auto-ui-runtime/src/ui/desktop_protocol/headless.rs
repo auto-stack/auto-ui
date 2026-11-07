@@ -108,6 +108,9 @@ pub struct ResourceCache {
     /// 命中数（未重复上传的帧引用）。
     pub hits: u64,
     pub evictions: u64,
+    /// 阴影贴片缓存：同参数（几何/半径/模糊/偏移/颜色）不重复逐像素求值。
+    shadow_patches: std::collections::HashMap<[u8; 32], (WRect, u32, u32, Vec<u8>)>,
+    pub shadow_patch_hits: u64,
     /// SVG 设备像素栅格缓存（内容+尺寸不变 → 不重复 resvg 栅格化，P-02）。
     rasters: std::collections::HashMap<([u8; 32], u32, u32), Vec<u8>>,
     pub raster_hits: u64,
@@ -143,6 +146,8 @@ impl Default for ResourceCache {
             uploaded_bytes: 0,
             hits: 0,
             evictions: 0,
+            shadow_patches: std::collections::HashMap::new(),
+            shadow_patch_hits: 0,
             rasters: std::collections::HashMap::new(),
             raster_hits: 0,
             rate_limit_bytes: 8 * 1024 * 1024,
@@ -232,7 +237,6 @@ impl ResourceCache {
         }
         self.uploads = self.uploads.saturating_sub(self.frame_uploads);
         self.uploaded_bytes = self.uploaded_bytes.saturating_sub(self.frame_bytes);
-        self.hits = self.hits.saturating_sub(0);
         self.frame_uploads = 0;
         self.frame_bytes = 0;
         self.budget_deferrals += 1;
@@ -1837,11 +1841,13 @@ fn lower_quad_v2(
     scale: f32,
 ) {
     let rect = to_wrect(quad.bounds);
+    // 半径是逻辑单位，而 rect/bounds 已是设备像素（记录层已乘 viewport
+    // scale）——必须同尺度放大，否则重放的圆角只有一半大小。
     let radius = [
-        quad.border.radius.top_left,
-        quad.border.radius.top_right,
-        quad.border.radius.bottom_right,
-        quad.border.radius.bottom_left,
+        quad.border.radius.top_left * scale,
+        quad.border.radius.top_right * scale,
+        quad.border.radius.bottom_right * scale,
+        quad.border.radius.bottom_left * scale,
     ];
     let fill = match background {
         iced::Background::Color(color) => Fill::Color(to_rgba8(*color)),
@@ -1869,7 +1875,7 @@ fn lower_quad_v2(
             || quad.shadow.offset.x != 0.0
             || quad.shadow.offset.y != 0.0)
     {
-        if let Some((patch_rect, w, h, rgba)) = rasterize_shadow(quad, scale) {
+        if let Some((patch_rect, w, h, rgba)) = resources.shadow_patch(quad, scale) {
             let src = resources.intern(w, h, &rgba, bitmaps);
             if let Some(src) = src {
                 ops.push(DisplayOp::Image {
@@ -1892,6 +1898,36 @@ fn lower_quad_v2(
     });
 }
 
+impl ResourceCache {
+    /// 阴影贴片：同参数命中缓存（逐像素 SDF 每帧重算会把 produce 推到 10ms+）。
+    fn shadow_patch(
+        &mut self,
+        quad: &advanced_renderer::Quad,
+        scale: f32,
+    ) -> Option<(WRect, u32, u32, Vec<u8>)> {
+        let b = quad.bounds;
+        let mut hasher = blake3::Hasher::new();
+        for v in [
+            b.x, b.y, b.width, b.height, scale,
+            quad.shadow.blur_radius, quad.shadow.offset.x, quad.shadow.offset.y,
+            quad.border.radius.top_left, quad.border.radius.top_right,
+            quad.border.radius.bottom_right, quad.border.radius.bottom_left,
+        ] {
+            hasher.update(&v.to_le_bytes());
+        }
+        let color = to_rgba8(quad.shadow.color);
+        hasher.update(&[color.r, color.g, color.b, color.a]);
+        let key = *hasher.finalize().as_bytes();
+        if let Some(cached) = self.shadow_patches.get(&key) {
+            self.shadow_patch_hits += 1;
+            return Some(cached.clone());
+        }
+        let patch = rasterize_shadow(quad, scale)?;
+        self.shadow_patches.insert(key, patch.clone());
+        Some(patch)
+    }
+}
+
 /// 阴影贴片：按 iced_wgpu `solid.wgsl` 的 SDF/平滑步进公式逐像素求值。
 ///
 /// 与 shader 同口径：quad 在设备像素空间，`pos`/`scale` 为 quad 顶左与尺寸，
@@ -1905,11 +1941,13 @@ fn rasterize_shadow(
     let blur = quad.shadow.blur_radius * scale;
     let ox = quad.shadow.offset.x * scale;
     let oy = quad.shadow.offset.y * scale;
+    // 半径与几何同为设备像素后再 clamp（shader 的 clamp 也是设备尺度）。
+    let half = b.width.min(b.height) / 2.0;
     let r = [
-        quad.border.radius.top_left.min(b.width.min(b.height) / 2.0),
-        quad.border.radius.top_right.min(b.width.min(b.height) / 2.0),
-        quad.border.radius.bottom_right.min(b.width.min(b.height) / 2.0),
-        quad.border.radius.bottom_left.min(b.width.min(b.height) / 2.0),
+        (quad.border.radius.top_left * scale).min(half),
+        (quad.border.radius.top_right * scale).min(half),
+        (quad.border.radius.bottom_right * scale).min(half),
+        (quad.border.radius.bottom_left * scale).min(half),
     ];
     // 贴片覆盖 shader 里被扩边的几何（否则模糊外沿会被裁掉）。
     let x0 = (b.x + ox.min(0.0) - blur).floor();
@@ -2020,9 +2058,7 @@ fn lower_glyph_run(
     let pos = position * transformation;
     let system = font_system();
     let mut font_system = system.write().expect("Write font system");
-    // 字体内容身份按 fontdb ID 缓存（每帧每字面只哈希一次，不逐字形拷字节）。
-    let mut hash_by_id: std::collections::HashMap<cosmic_text::fontdb::ID, Option<[u8; 16]>> =
-        std::collections::HashMap::new();
+
     let mut unshipped: Vec<u16> = Vec::new();
     for run in buffer.layout_runs() {
         let line_offset = (run.line_y * scale).round();
@@ -2032,12 +2068,11 @@ fn lower_glyph_run(
         let mut weight = 400u16;
         let mut flags = 0u32;
         for glyph in run.glyphs {
-            let hash = *hash_by_id.entry(glyph.font_id).or_insert_with(|| {
-                font_system
-                    .raw()
-                    .get_font(glyph.font_id, glyph.font_weight)
-                    .map(|font| super::glyph_fonts::font_hash(font.data()))
-            });
+            let hash = super::glyph_fonts::hash_for_font_id(
+                font_system.raw(),
+                glyph.font_id,
+                glyph.font_weight,
+            );
             let Some(hash) = hash else {
                 unshipped.push(glyph.glyph_id);
                 continue;
@@ -2418,7 +2453,9 @@ fn rasterize_svg(
     // 重复帧不再跑 resvg；T-05 实测未缓存时 20–33ms/帧）。
     let mut hasher = blake3::Hasher::new();
     hasher.update(&bytes);
-    hasher.update(&svg.color.map(|c| to_rgba8(c).r).unwrap_or(0).to_le_bytes());
+    let tint = svg.color.map(to_rgba8);
+    hasher.update(&[tint.map(|c| c.r).unwrap_or(0), tint.map(|c| c.g).unwrap_or(0),
+        tint.map(|c| c.b).unwrap_or(0), tint.map(|c| c.a).unwrap_or(0)]);
     hasher.update(&w.to_le_bytes());
     hasher.update(&h.to_le_bytes());
     let key = *hasher.finalize().as_bytes();

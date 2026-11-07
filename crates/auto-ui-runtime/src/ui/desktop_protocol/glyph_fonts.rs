@@ -30,6 +30,28 @@ fn registry() -> &'static Mutex<HashMap<FontHash, cosmic_text::fontdb::ID>> {
     REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// fontdb ID → 内容身份（字体字节的哈希很贵：回退字体可达数十 MB，逐帧重算
+/// 会把 produce 推到 10–25ms 级；这里进程内只算一次）。
+fn id_to_hash() -> &'static Mutex<HashMap<cosmic_text::fontdb::ID, Option<FontHash>>> {
+    static IDS: OnceLock<Mutex<HashMap<cosmic_text::fontdb::ID, Option<FontHash>>>> =
+        OnceLock::new();
+    IDS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// 取（必要时计算并缓存）某面在宿主字体系统里的内容身份。
+pub fn hash_for_font_id(
+    system: &mut cosmic_text::FontSystem,
+    id: cosmic_text::fontdb::ID,
+    weight: cosmic_text::fontdb::Weight,
+) -> Option<FontHash> {
+    if let Some(cached) = id_to_hash().lock().unwrap().get(&id).copied() {
+        return cached;
+    }
+    let hash = system.get_font(id, weight).map(|font| font_hash(font.data()));
+    id_to_hash().lock().unwrap().insert(id, hash);
+    hash
+}
+
 /// 登记一个已装载字体（重复登记幂等）。
 pub fn register_loaded_font(bytes: &[u8], id: cosmic_text::fontdb::ID) {
     registry().lock().unwrap().insert(font_hash(bytes), id);
