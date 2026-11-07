@@ -325,3 +325,16 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 仍缺（如实记录）：Host 侧**显式释放**路径（`CacheControl` 不携带 bitmap src）与“最后 owner 释放”语义未实现——目前只靠上限裁剪，AC-03 的释放面因此不签。
 - 回归面：**256 passed / 4 failed**（基线同组 4 红）。
 - 复审状态：首轮 needs_fix 的 B1/B2/B3/B4/B5 均已处理（B5 的释放面列为遗留），已提交待第二轮独立复审。
+### 2026-11-07 第二轮独立复审与修复（needs_fix → 已修，待裁定 AC 措辞）
+
+- stage: review（第二轮，独立上下文）/ reviewed_commit: `4b0e7ee7` / **outcome: needs_fix**（记录：`plan-artifacts/plan-062/auto-ui/review2/REVIEW2-2026-11-07.md`）。
+- 复现：reviewer 自跑 `rq_` 28/0 与 `ui::desktop_protocol::` 256/4（4 红与 base `3d64877d` 同组）；并给出双模式新鲜读数（default / v3-rich）：path_mesh 0.0949/0.0949、svg 0.1000/0.1000、text 0.0938/0.7979、gradient 0.0625/1.3740、scroll 0.0000/0.3298、shadow_only 0.0053/0.7410、progress 0.0057/0.0057。
+- B1/B3/B4 判定已修（B3 附两点 caveat：mode 名误导、gradient/shadow 无门）；**B2 partial**（`SurfaceStore::set_capabilities` 无生产调用者、镜像转发无准入、Welcome 无能力尾）；**B5 partial + 新隐患**（512 FIFO 会淘汰 `bitmap://` → 占位永久化；generation 守卫结构上不可能触发）。
+- 本轮修复（`f03a2747`）：
+  1. `bitmap://` 句柄不参与本地淘汰（producer 拥有、丢失不可自愈）；文件/http/资产仍受 512 上限。
+  2. 删除 vacuous generation 守卫，Plan/Spec 改为如实记录“wire 无显式 generation 字段”。
+  3. `SurfaceStore::default` 默认全能力（空集会拒掉所有 v3 帧），`ProtocolHost` 在 Hello 落点用 `HostEndpoint::supported` 覆盖；rqhost 镜像转发前也走准入。
+  4. 矩阵默认模式的门覆盖 gradient/shadow（0.0625%→1.37% 的默认退化现在会失败）；opt-in 模式改名 `v3_rich`。
+  5. Spec 修正：表头不再写“默认 = glyph run 开”，§2.2 补默认关caveat，§3 记 Host 上限与 bitmap 豁免，§5 性能刷新（默认 produce 0.17–0.24ms、svg ~32.5ms、replay 5.2–6.5ms 含一次 10.09ms 离群），§6 补三条遗留（Welcome 无能力尾、Host 无显式释放、wire 无 generation）。
+- 复跑：`rq_` 28/0；`ui::desktop_protocol::` 256/4（基线同组）。
+- **待裁定**：两轮独立复审一致认定，按现行 AC-02/AC-07 文字 062 **不能签**（AC-02 要求“无近似/不重排”，而默认面恰是 Host 重排、v3 富模式又非 exact；AC-07 的 svg produce 32.5ms 超冻结 ≤10ms 预算）。要收口必须由用户选择：**(a)** r4 修订 AC-02/AC-07，把“具名窄容差 + 具名降级”写成验收口径；**(b)** 继续做 Host 同源文本合成与 renderer 生命周期改造（工作量大，062 顺延）；**(c)** 以当前能力集收口 062，精确重放另立 Plan。
