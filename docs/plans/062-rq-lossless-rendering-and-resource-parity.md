@@ -612,3 +612,8 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 两项都不改变 AC 的功能部分；本轮先记录数据，等选择后再动实现（避免再次无授权改口径）。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 22 | from: work | to: user | status: execution_done | outcome: waiting（尾部根因已定位；固定开销修复 vs 口径修订需选择） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 978ea7da | next: user
+
+- **N-02 收口（2026-11-08，`acace4aa`）**：所有计时断言改为**只在隔离窗口**执行（`AUTO_RQ_TIMING_WINDOW=isolated`），共享跑机只记录并逐行标 `timing_gate=skipped_shared_window`；像素/结构门不受影响。依据是 Plan §6 本身的规定 + 实测负载放大（SVG produce p50 32→76ms、replay p50 5→18ms、button replay p95 12→30ms）。复核：`ui::desktop_protocol::` **278 passed / 4 failed**（恰为基线 4 红，计时假红消失）。
+- **由此产生的口径事实（评审需知）**：共享窗口的绿灯**只覆盖功能与保真**；W-C 与 replay 预算的签收必须是一次隔离窗口运行，而本机目前测不过（见上表根因）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 23 | from: work | to: user | status: execution_done | outcome: waiting（N-01/N-02/N-04/N-05 收口；固定开销修复 vs 口径修订需选择） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: acace4aa | next: user
