@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-07
 plan_revision: 3
-current_step: 5
+current_step: 6
 total_steps: 6
 depends_on: []
 supersedes_spec_components: []
@@ -253,7 +253,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | [x] | T-03 | work | T-02；生产共享符号只读 | 按§5交付平台兼容和下游adapter接口清单（V-09），不重做OS062；冻结wire/envelope/capability、glyph/font、资源generation/ACK/GPU寿命、原子帧和版本迁移决策；检查三类Host与未来ACE/AGE边界；冻结帧调度、资源预算、per-App公平/过载策略和ACK/fence所有权；可复用片段按证据决策，不强建复杂增量状态 | V-03；AC-03；AC-07/V-05～08（按§6分工）；V-09——证据见§9 2026-11-07 T-03 记录与暂存区 t03-wire-contract.md |
 | [x] | T-04 | work | T-03；不等后继生产全量 | 区分研究样本与真实运行缺格及后继owner；提供direct/两个RQ Host六格对拍驱动原型、负控、完整差额及后继包逐项映射；精确记录可行/不可行，不以研究交付认定全功能；交付M-01～08原型测量及direct/RQ对比、负控、后继预算；样本不足/未测分列，不将代理present时间称物理上屏 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——首轮见§9 T-04；T-05 复审 needs_fix 的 F-R1～F-R3 已由 §9 2026-11-07 T-04 修复记录闭环 |
 | [x] | T-05 | review | T-04 | 独立上下文核全能力分母、候选实际产物、负控和设计选择，给revision-bound verdict；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07——三次复审 final pass（见§9 2026-11-07 T-05 三次复审） |
-| [ ] | T-06 | merge | T-05 pass | 定向冻结门、沉淀能力/协议决策Spec；更新子路线及062/063执行入口，归档并guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
+| [x] | T-06 | merge | T-05 pass | 定向冻结门、沉淀能力/协议决策Spec；更新子路线及062/063执行入口，归档并guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
 
 work项完成才进入execution_done；review/merge项仍待办，不能为交接伪勾。每个任务读取§4对应实际路径及主设计证据；新增接口先由有界决策任务确认。全部原始材料merge折摘要进本Plan§9后删自有scope；移除树先wt-guard clean，不穿透链接、不清未知owner目录。
 
@@ -430,7 +430,14 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 冻结并集（affected gate）：cargo test -p auto-ui-runtime --lib 'rq_' -- --test-threads=1 在 delivery commit 上 **21/21 通过（111.42s）**；git diff --check b4094acd..3efe4538 退出0。
 - landing checks：本 Plan 生产代码零改动（仅 test-only 探针 + docs），无 release/daemon/web bundle 消费面；main tip == delivery commit，故 worktree 门证据同 commit 有效。batch regression 为 auto-lang 机制（本仓无 .last-batch-regression.json 约定）→ 不适用。
 - archived：docs/plans/archived/061-rq-fidelity-contract-and-feasibility.md（本文件），待与 docs 一并提交后生效。
-- cleaned：待 worktree/branch/group/plan-artifacts scope 清理与 registry 刷新后补记。
+- cleaned（2026-11-07）：worktree `D:/autostack/.wt/ui-061/auto-ui` 在 fresh `wt-guard` clean 后移除；分支 `codex/plan-061-dev`（曾 3efe4538）已删除且其提交已全部落主（delivery commit 是 master 6d9ad9a3 的祖先）；同组只读依赖树 auto-lang/auto-web/auto-down 已从各自仓 worktree 移除；空组目录 `.wt/ui-061` 删除；`plan-artifacts/plan-061/` 整 scope 删除（**490 文件 / 8.2 MB**：能力矩阵、指标冻结、T-02 接缝、T-03 合同、T-04 六格/负控/修复、验证日志与 `baseline|seam|matrix|verify` PNG），无保留文件、无具名 hold；registry `plan-artifacts/.retention/policy.json` 已将该 scope 从 in-flight 更新为 archived+deleted（delivery 3efe4538 / archive 6d9ad9a3）。
+- landing checks：本 Plan 生产代码零改动（test-only 探针 + docs），不消费 release/daemon/web bundle；master tip == delivery commit `3efe4538`，故 worktree 冻结门证据（rq_ 21/21，111.42s）对同一 tree 有效。batch regression 为 auto-lang 机制，本仓不适用（无 `.last-batch-regression.json` 约定）。
+- 观察项（非 hold，owner）：主检出 `docs/plans/README.md` 仍带一份未提交的 RQ 规划 WIP（含 061 的 drafting 行与 062/063/066/067 入口）；该文件非本 Plan 交付，未提交、未改写；其索引更新随该规划批次落地，归档页本身已路径可查。
+
+### 2026-11-07 goal round 10（merge 完成 / goal delivered）
+
+- stage: goal | plan_id: auto-ui/PLAN-061 | plan_revision: r3 | round: 10 | from: merge | to: done | status: archived | outcome: pass | delivery_commit: 3efe453811d4992aec6fb2c47ea9fbbb0516059c | archive_commit: 6d9ad9a3ab4e0caea904321577930a14d0eab459 | spec: docs/specs/runtime/rq-fidelity-contract.md (sha256 ff2afb2464e4ffad46b76cd0f06b74dfef9ae53722d2dabb13b605dac1d7be9c) | archive: docs/plans/archived/061-rq-fidelity-contract-and-feasibility.md | cleanup: worktree/branch/group/dependency-trees/plan-artifacts scope removed; registry refreshed | holds: none | next: done
+
 
 ## 10. 待澄清事项
 
