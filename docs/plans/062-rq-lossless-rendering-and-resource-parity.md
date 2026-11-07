@@ -211,6 +211,16 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r3 | round: 2 | from: work | to: work | status: executing | outcome: pass（T-05 矩阵/指标增量；遗留未清零） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 52c11feb | next: work（具名缺口或转 review）
 
+### 2026-11-07 work per-App 上传预算（T-04 收口一项）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r3 / outcome: 进行中（T-04 的 per-App 上传速率预算落地；CPU 预算与文字/模糊两项仍待用户裁定） / code_commit: `0e614935`
+- 实现：`ResourceCache` 增 8 MiB/1s 滑动窗口（061 冻结值）；超预算帧**整帧回滚**（撤销本帧登记的资源键、复原 uploads/字节/驻留计数），`FrameSource::take_upload_budget_overrun` 让端点决定提交或回滚，`AppEndpoint` 以 `ProtocolError::Backpressure{resource:"upload"}` 报出并归还槽位；客户端泵既有 `frame_pending` 重试路径覆盖该背压（不丢帧）。
+- 证据：`rq_v3_upload_budget_defers_frame_without_partial_registration` 退出 0 —— 1024B 预算下：首图放行（uploads=1/驻留 1024）→ 加第二张图延期（`deferrals=1`、`pending_bitmaps` 为空、uploads 仍 1/驻留仍 1024 = 无半登记）→ 预算回补后重试补齐（uploads=2，首图命中缓存）。`[RQ062] {"tag":"upload_budget","deferrals":1,"uploads_after_retry":2,"partial_registration":false}`。
+- 回归面：`cargo test -p auto-ui-runtime --lib "ui::desktop_protocol::" -- --test-threads=1` → **253 passed / 4 failed**（仍是基线同组 4 红，无新增）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r3 | round: 3 | from: work | to: work | status: executing | outcome: pass（T-04 上传预算收口） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 0e614935 | next: user（§10 三项裁定）
+
+
 
 
 ## 10. 待澄清事项
@@ -218,7 +228,8 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 2026-11-07 实施后发现的三项**合同级缺口**（需用户裁定的范围/预算决定，不能用测试绕过）：
   1. **GlyphRun 与“Host 不重排文字”**（T-02/AC-02）：061 §4 要求文本优先携 glyph run；本仓 Host 重放面是 iced canvas（无 glyph 绘制 API），要满足“Host 不重排”必须新增 Host 侧字形栅格/图集能力（或改用 AGE/自绘 Host 后端）。当前实现仍是字符串 `TextStyled` + FontBlob（Host 用同一字体栈重排），只能算“降级可观测”，不是合同要求的精确重放。需要决定：(a) 在 062 内新增 Host glyph 图集（工作量与风险显著）；(b) 修订 AC-02 把“字符串+同字体栈重排”作为验收口径（具名降级）；(c) 把 glyph run 重放移入依赖 AGE 的后续计划。
   2. **shadow blur / SDF**：重放面仍为单层垫层近似；精确复现需 Host 具备 blur/SDF 能力（61 具名缺口）。同上需要范围决定。
-  3. **per-App 上传速率（≤8MiB/s）与 CPU 工作预算/公平调度**（T-04/P-04）：本轮只落地驻留字节上限与槽 credit 背压；速率与 CPU 预算未实现，1/4/8 App 真实规模归 UI063/OS063。
+  3. **per-App CPU 工作预算/公平调度**（T-04/P-04）：上传速率预算已于 `0e614935` 落地（8 MiB/1s 滑动窗口、超限整帧回滚 + 背压重试）；仍缺的是 CPU 侧分批/限流与 1/4/8 App 公平策略（真实规模归 UI063/OS063）。若要求本 Plan 内实现 CPU 预算，需要先定“分批单位与抢占点”，否则只能做代理测量。
+- **本轮已收口的项**：per-App 上传速率（8 MiB/s + 整帧回滚 + 背压）已完成并用负控验证，不含在上述待裁定清单内。
 - 性能数值预算/实际刷新率/可运行规模待UI061授权执行后按先基线后候选冻结；无预算不签PASS，支持承诺或阈值变化须具名修订。
 - SVG 记录路径每帧新建 iced renderer（produce ≈20–32ms，T-05 实测）属 T-02 生产侧实现债，修它需要改 `HeadlessSurface` 的 renderer 生命周期（缓存迁移风险），建议单独有界任务而不是塞进本 Plan 收尾。
 - 本轮没有必须再询问才能成稿的问题；实施暂停来自用户的规划范围。后续启动不改变既有依赖门。
