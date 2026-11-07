@@ -1647,6 +1647,8 @@ fn decode_image_rgba(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
 // PLAN-061 T-01: direct 基线 + RQ 产帧计时/计数探针（test-only）。
 #[cfg(test)]
 mod rq_probe;
+#[cfg(test)]
+mod rq_seams;
 
 // ================================ 测试 ================================
 
