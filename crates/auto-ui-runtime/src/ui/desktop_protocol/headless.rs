@@ -1649,6 +1649,8 @@ fn decode_image_rgba(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
 mod rq_probe;
 #[cfg(test)]
 mod rq_seams;
+#[cfg(test)]
+mod rq_matrix;
 
 // ================================ 测试 ================================
 

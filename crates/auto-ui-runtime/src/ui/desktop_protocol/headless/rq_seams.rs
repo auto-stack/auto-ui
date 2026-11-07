@@ -248,7 +248,7 @@ fn rotated_hint(path: &tiny_skia::Path) -> usize {
     0
 }
 
-fn canvas_scene_view() -> View<()> {
+pub(super) fn canvas_scene_view() -> View<()> {
     View::Canvas {
         scene: CanvasScene {
             strokes: vec![

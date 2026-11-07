@@ -46,11 +46,11 @@ const PROBE_H: u32 = 400;
 const WARMUP: usize = 3;
 const SAMPLES: usize = 20;
 
-fn theme() -> iced::Theme {
+pub(super) fn theme() -> iced::Theme {
     crate::ui::iced::renderer::shadcn_theme(crate::ui::style_iced_adapter::dark_mode())
 }
 
-fn out_dir() -> PathBuf {
+pub(super) fn out_dir() -> PathBuf {
     match std::env::var_os("AUTO_RQ_PROBE_OUT") {
         Some(v) => PathBuf::from(v),
         None => std::env::temp_dir().join("rq_probe"),
@@ -577,16 +577,16 @@ fn corpus() -> Vec<Case> {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy)]
-struct Stats {
-    n: usize,
-    p50: f64,
-    p95: f64,
-    p99: f64,
-    max: f64,
-    mean: f64,
+pub(super) struct Stats {
+    pub(super) n: usize,
+    pub(super) p50: f64,
+    pub(super) p95: f64,
+    pub(super) p99: f64,
+    pub(super) max: f64,
+    pub(super) mean: f64,
 }
 
-fn stats(mut xs: Vec<f64>) -> Stats {
+pub(super) fn stats(mut xs: Vec<f64>) -> Stats {
     assert!(!xs.is_empty(), "stats requires samples");
     xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let n = xs.len();
@@ -611,7 +611,7 @@ fn stats_json(s: Stats) -> serde_json::Value {
     })
 }
 
-fn ms(d: std::time::Duration) -> f64 {
+pub(super) fn ms(d: std::time::Duration) -> f64 {
     d.as_secs_f64() * 1000.0
 }
 
@@ -620,7 +620,7 @@ fn ms(d: std::time::Duration) -> f64 {
 ///   属冷启动量级（M-06 代理；非稳态帧成本）。
 /// - `frame`：同一 Simulator 上的 snapshot（update(RedrawRequested) + draw +
 ///   GPU 读回）稳态 p50/p95——M-02/M-03 的帧级代理，不是物理上屏。
-fn direct_frames(view: View<()>, png: Option<&Path>) -> Result<(f64, Stats), String> {
+pub(super) fn direct_frames(view: View<()>, png: Option<&Path>) -> Result<(f64, Stats), String> {
     let t = Instant::now();
     let mut sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
