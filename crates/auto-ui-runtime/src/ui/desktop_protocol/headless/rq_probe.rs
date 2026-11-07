@@ -1577,3 +1577,101 @@ fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
 
     media_poster::clear(src);
 }
+
+/// PLAN-062（AC-07 / 复审 F-03 有界性能任务）：把重放尾部按 **shape** 分桶测量，
+/// 先证伪/证实“每帧重做文字整形”的假设，再决定修哪里。
+///
+/// 形状：空帧 / 1 段文字 / 50 段文字 / 1 张图（已驻留）/ 20 张图 / 200 quad。
+/// 每形状 5 预热 + 40 采样，输出 p50/p95/max（ms）。不是产品 workload，只用于
+/// 定位尾部来源；结论写回 Spec §5.3。
+#[test]
+fn rq_perf_replay_shapes() {
+    use crate::ui::desktop_protocol::message::{
+        DisplayList, DisplayOp, Fill, ImageFit, Rgba8, WRect,
+    };
+
+    let text = |x: f32, y: f32, i: usize| DisplayOp::TextStyled {
+        x,
+        y,
+        size: 16.0,
+        line_height: 20.8,
+        color: Rgba8::new(240, 240, 240, 255),
+        weight: 400,
+        italic: false,
+        text: format!("shape-{i} 中文混排"),
+    };
+    let quad = |x: f32, y: f32| DisplayOp::Quad {
+        rect: WRect::new(x, y, 8.0, 8.0),
+        fill: Fill::Color(Rgba8::new(60, 120, 200, 255)),
+        radius: [0.0; 4],
+        border: None,
+        shadow: None,
+    };
+    let src = "bitmap://perf-shape-img";
+    let mut px = Vec::new();
+    for _ in 0..(16 * 16) {
+        px.extend_from_slice(&[200u8, 40, 40, 255]);
+    }
+    crate::ui::iced::broker_surface::bitmap_cache_put(src, 16, 16, 64, px);
+    let image = |x: f32| DisplayOp::Image {
+        rect: WRect::new(x, 16.0, 16.0, 16.0),
+        src: src.to_string(),
+        fit: ImageFit::Stretch,
+    };
+
+    let shapes: Vec<(&str, DisplayList)> = vec![
+        ("empty", DisplayList { clear: None, ops: Vec::new() }),
+        (
+            "text_1",
+            DisplayList { clear: None, ops: vec![text(8.0, 8.0, 0)] },
+        ),
+        (
+            "text_50",
+            DisplayList {
+                clear: None,
+                ops: (0..50).map(|i| text(8.0, 8.0 + i as f32 * 22.0, i)).collect(),
+            },
+        ),
+        ("image_1", DisplayList { clear: None, ops: vec![image(8.0)] }),
+        (
+            "image_20",
+            DisplayList {
+                clear: None,
+                ops: (0..20).map(|i| image(8.0 + i as f32 * 20.0)).collect(),
+            },
+        ),
+        (
+            "quad_200",
+            DisplayList {
+                clear: None,
+                ops: (0..200).map(|i| quad((i % 20) as f32 * 30.0, (i / 20) as f32 * 30.0)).collect(),
+            },
+        ),
+    ];
+
+    for (name, list) in shapes {
+        let mut sim = iced_test::simulator::Simulator::with_size(
+            iced::Settings::default(),
+            iced::Size::new(PROBE_W as f32, PROBE_H as f32),
+            crate::ui::iced::broker_surface::displaylist_element::<()>(&list),
+        );
+        let mut samples = Vec::new();
+        let warmup = std::env::var("AUTO_RQ_PERF_WARMUP").ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(5);
+        for i in 0..(warmup + 40) {
+            let t = std::time::Instant::now();
+            sim.snapshot(&theme()).expect("shape snapshot");
+            let ms = crate::ui::desktop_protocol::headless::rq_probe::ms(t.elapsed());
+            if i >= warmup {
+                samples.push(ms);
+            }
+        }
+        let st = stats(samples);
+        println!(
+            "[RQPERF] {}",
+            serde_json::json!({
+                "tag": "replay_shape", "shape": name, "ops": list.ops.len(),
+                "p50": st.p50, "p95": st.p95, "max": st.max, "n": st.n,
+            })
+        );
+    }
+}

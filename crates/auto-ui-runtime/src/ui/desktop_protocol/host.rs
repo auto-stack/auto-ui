@@ -192,6 +192,8 @@ pub struct BitmapRefs {
     pending: std::collections::BTreeSet<String>,
     /// 已真正驱逐过的 src（producer 重发释放不重复动作；重新被引用时清除）。
     applied: std::collections::BTreeSet<String>,
+    /// `applied` 的插入序（FIFO 修剪用——长时间会话不得无界增长）。
+    applied_order: std::collections::VecDeque<String>,
 }
 
 impl BitmapRefs {
@@ -215,6 +217,23 @@ impl BitmapRefs {
     }
 
     /// 兑现“已无人引用”的挂起释放。
+    /// `applied` 上限（复审 N-01）：长时间会话只保留最近的释放记录即可保证
+    /// “重发释放不重复驱逐”；更早的记录被 FIFO 淘汰（重新上传会得到新 id）。
+    const APPLIED_LIMIT: usize = 4096;
+
+    fn remember_applied(&mut self, src: String) {
+        if self.applied.insert(src.clone()) {
+            self.applied_order.push_back(src);
+        }
+        while self.applied.len() > Self::APPLIED_LIMIT {
+            if let Some(oldest) = self.applied_order.pop_front() {
+                self.applied.remove(&oldest);
+            } else {
+                break;
+            }
+        }
+    }
+
     fn settle(&mut self) -> Vec<String> {
         let ready: Vec<String> = self
             .pending
@@ -224,7 +243,7 @@ impl BitmapRefs {
             .collect();
         for src in &ready {
             self.pending.remove(src);
-            self.applied.insert(src.clone());
+            self.remember_applied(src.clone());
         }
         ready
     }
@@ -259,7 +278,7 @@ impl BitmapRefs {
             if self.referenced(&src) {
                 self.pending.insert(src);
             } else {
-                self.applied.insert(src.clone());
+                self.remember_applied(src.clone());
                 ready.push(src);
             }
         }
@@ -1198,6 +1217,32 @@ mod release_tests {
         )
         .expect("v2 帧应通过准入");
         assert_eq!(evicted, vec!["bitmap://A".to_string()]);
+    }
+
+    /// 复审 N-01：`applied`（已驱逐记录）必须有界——长时间会话不得无界增长，
+    /// 但仍保证“重发释放不重复驱逐”。
+    #[test]
+    fn applied_set_is_bounded() {
+        let mut refs = BitmapRefs::default();
+        let total = BitmapRefs::APPLIED_LIMIT + 64;
+        for i in 0..total {
+            let src = format!("bitmap://bounded-{i}");
+            assert_eq!(refs.on_release(vec![src.clone()]), vec![src]);
+        }
+        assert!(
+            refs.tracking_len().1 <= BitmapRefs::APPLIED_LIMIT,
+            "applied 必须被修剪（实得 {}）",
+            refs.tracking_len().1
+        );
+        // 最近的记录仍在（重发幂等），最老的已被淘汰。
+        let newest = format!("bitmap://bounded-{}", total - 1);
+        assert!(refs.on_release(vec![newest]).is_empty(), "最近记录仍幂等");
+        let oldest = "bitmap://bounded-0".to_string();
+        assert_eq!(
+            refs.on_release(vec![oldest.clone()]),
+            vec![oldest],
+            "最老记录被 FIFO 淘汰后允许再次驱逐（其 id 也不会复用）"
+        );
     }
 
     /// 复审 N-01：窗口回收清引用记账，且回收后不再阻挡释放。

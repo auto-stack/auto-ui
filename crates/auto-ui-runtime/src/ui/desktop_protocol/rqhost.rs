@@ -779,6 +779,11 @@ fn apply_actions(
                         }
                     }
                     client.inner.surfaces.release(surface);
+                    // PLAN-062（AC-03 / 复审 N-04）：独立宿主回收路径同样清引用
+                    // 记账（旧表面键会永久占住挂起释放，句柄缓存也就永远清不掉）。
+                    for src in client.inner.refs.forget_surface(surface) {
+                        crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                    }
                     to_app.push(ProtocolMsg::Frame(FrameMsg::BufferRelease { surface }));
                 }
                 if client.inner.wid == Some(Wid(wid)) {
