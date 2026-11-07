@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-069
-status: executing
+status: execution_done
 feature_name: VM合成输入值写与路由状态提交缺陷收口（068后续，round-19家族）
 author: [ZCode]
 created_at: 2026-11-07
@@ -8,7 +8,7 @@ updated_at: 2026-11-07
 plan_revision: 1
 base_branch: master
 base_commit: ab19ff63
-current_step: 5
+current_step: 6
 total_steps: 8
 depends_on: [auto-ui/PLAN-068, READER-009]
 supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md, docs/specs/runtime/vm-route-page-loading.md, docs/specs/runtime/native-vm-app-validation.md]
@@ -134,7 +134,9 @@ auto-ui Rust runtime/compiler（crates/auto-ui-runtime、auto-ui-dialect/auto-ui
 - **T-03（完成）** F3 根因=路由页实例身份带 outlet 路由装饰（`Page@/book/7/chapter/1`），名字类解析从身份**后缀**猜类型 → 取到路由尾段（"1"/""）→ 名字合成派发与「身份 miss 重定向」两臂恒 miss → 落根态 → 页 `.route_id` 空 → Back 构建 `/book/`。修复：`ChildInstanceRecord` 记录注册类型名，`VmBridge::child_instance_identities_of_type`/`child_instance_widget_name` 类型精确匹配；7 处身份名过滤点（派发解析/重定向、`call_widget_handler`、instance-type 派发、重载迁移 schema、iced devtools 输入缓存键、native a11y 重定向）统一改用该口径，身份串与 `@route`/`#key` 装饰格式不变。永久反例 `plan069_route_dispatch_tests`（4 例）：修前 4/4 红（Back 实测 `/book/`，与现场逐字符一致），修后 4/4 绿。
 - **T-04（完成，附具名分叉）** F4 卡行（for 内 row 双参 onclick）派发 → 路由提交 + 目标页 Init 读回同一 param：VM 链路修前修后均绿（`f4_loop_card_click_commits_route_and_param`，契约 oracle 非红证）；009 runs 25/31 真实点击已可提交路由。**残留**：runs 25/31 在 阅读页→详情页 换代后出现 `[RC canary] use-after-free: heap object 4000013` + `app view/update panicked`（详情页不落屏）；本 scope 两条最小链路（parked Init 换代取消 / parked UI handler 卸载取消）**未复现**。判定为 VM RC 生命周期域（auto-lang 资产），待 T-05 用本树工具重跑 009 门复核：消失即收口；仍在则具名范围分叉交用户裁定（不静默扩面）。
 - **受影响回归（第 2 轮，全绿）**：plan069 10、plan051_p2 3、plan051_ext 3、plan051_timer 9、plan437 5、plan492 9、plan056 15、plan606 1、plan622 8、plan633 4、plan712_route_param 3、plan712_back_prefix 1、plan739 1、plan624 5、plan370_store_vm 6、plan370_015 12、plan066 4、plan089 1（`--test-threads=1`）；集成档 `--test plan041_instance_ownership` 4。
-- 代码提交：`c283dbcb`（F1/F2，4 files）、`370948d3`（F3/F4，6 files +375/−45）。
+- **T-03 追加（第 3 轮，RC 生命周期定谳）** 详情腿残留根因不是 route 链而是**根态被释放**：实例对象拥有自己的字段引用（`materialize_init_value` 造容器 retain；`__auto_parent`/`__auto_root` VmRef 分配处 retain；auto-lang `free_heap_id` 逐字段递归 release），而 teardown 又「字段循环 + 显式 parent/root release」释放一遍 → 每次页换代根态净 -4（挂载 +2），RC `3→5→3→…→0`，根态被回收，之后每帧读根（`dark_mode` 等）即 `[RC canary] use-after-free: heap object 4000013`，详情页体恒空。修复 `01c0ab2c`：teardown 只释放挂载 stake（字段引用留给对象回收级联释放一次）；`ensure_child_instance` parent-change 臂同规律去重。永久反例 `f3_page_transition_keeps_root_state_alive`（8 次换代后根态 RC>0 且可读；修前第 2 次换代归零，实测 rc 3→1→0）。实证链：根态 id=4000013（teardown 打印 parent_id）、RC 打点轨迹、`RUST_BACKTRACE=1` 栈顶（projection→read_state→get_heap_object→canary）、`P419_TRACE=1` 释放轨迹（级联释放早期 id 4000004..11）。
+- **T-05（完成）** 交付源 tool 自 `01c0ab2c` 构建（sha256 `3204811e…68d4`），以 009 组依赖 pin（auto-man `03bb65e`/auto-lang `373506568`/auto-web `bf72baa`/auto-down `58ea33f`）+ 冻结 Reader 源（`cf4677e` + 其未提交 UI 门改动）复跑 UI 门：**warm-query 默认 clear_first 路径 PASS**（`matched=193/193, 0.30s`）、grid/list 21 页 PASS、**group-create-rename PASS / membership PASS**（需详情页真实装载——W-05 详情腿）、exit PASS；整轮 `RC canary`/`app view panicked` = **0**。具名残留：cold-load `19.23s>15s`→PLAN-995；W-06 批量腿（全选 1000 vs 193、移除 503）→READER-009 W-06/其后端时延；W-07 `未读` 控件时序→READER-009 W-07。交接件 `plan-artifacts/plan-069/auto-ui/t05-consumption-handoff.md`（pin/tool/hash/命令/边界），原始证据 `consumption/run-03-final`（results `AD131B00…`、app.log `BC5C3A62…`）。
+- 代码提交：`c283dbcb`（F1/F2，4 files）、`370948d3`（F3/F4，6 files）、`01c0ab2c`（RC 生命周期 + SD 草案，5 files）。
 
 
 ## 9. 复审记录
@@ -151,10 +153,21 @@ auto-ui Rust runtime/compiler（crates/auto-ui-runtime、auto-ui-dialect/auto-ui
 
 - stage: goal | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass（T-03/T-04 落地；T-05 待启） | worktree: D:/autostack/.wt/ui-069/auto-ui | commit: 370948d3 | next: work T-05。
 
+- stage: work | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | outcome: pass（T-03 追加 + T-05 完成；全部 work-owned 任务完成，转复审） | worktree: D:/autostack/.wt/ui-069/auto-ui | branch: codex/plan-069-dev | base_commit: 37a7aa43 | code_commit: 01c0ab2c | dependency_revisions: 交付树 auto-lang 160ed38f；消费复跑按 009 组 pin auto-man 03bb65e / auto-lang 373506568 / auto-web bf72baa / auto-down 58ea33f | task_ids: T-03（追加）, T-05 | evidence: plan-artifacts/plan-069/auto-ui/t00-mechanism-decision.md（第 3 轮段：UAF 定谳链 + 修复 + 回归）、t05-consumption-handoff.md（pin/tool/hash/命令/边界）；plan069 11 passed；plan041_instance_ownership 4 / plan068_routed_continuations 14 / 其余 17 组全绿；消费 run-03-final（warm-query 默认路径 PASS、group-create-rename/membership PASS、canary=0，tool sha256 3204811e…） | blockers: 无用户待答；具名外部残留 cold-load→PLAN-995、W-06/W-07→READER-009，均与本计划改面无交集 | next_responsible_role: review（T-06 独立终审：复演 V01～V03 高风险 + Spec 增量；树内写入暂停）
+
+- stage: goal | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | round: 4 | from: work | to: review | status: execution_done | outcome: pass（work 完成，交独立终审） | worktree: D:/autostack/.wt/ui-069/auto-ui | commit: 01c0ab2c | next: review T-06。
+
 ## 10. 待澄清事项
 
 无待答范围授权。三项协调注记（非用户待答，责任方明确）：
 
 1. **PLAN-068 T08接替**：068所有者需在其§9/§8记T08 superseded回执（授权由本计划继承，理由=round27②A家族包）；在该回执前，068/T08不得与新树并行写入值写臂域（一写入者）。若用户希望改由068/T08继续typing修复而本计划排除F2，则为范围变更，须用户明示后修revision。
 2. **auto-ui master他计划WIP**：起草时master存在未提交改面（desktop_protocol/headless|host|rqhost、session.rs、docs/design等）。本计划T-00起点重冻结master tip；若该WIP后续落地触碰同文件（vm_bridge/mcp_server/dynamic），T-00须rebase并复核锚点行号（§4锚点为ab19ff63观测）。
-3. **009依赖pin身份**：009回执中dependency "auto cb31bc2a"未在本仓/本组语言仓历史中定位（起草核查），T-00与009会话核对该pin所指后重冻结消费基准；不阻塞本计划自身实施。
+3. **009依赖pin身份（已定）**：009回执的 dependency `auto cb31bc2a` = **工具链 CLI `auto.exe` 的 sha256**，实体为 `plan-artifacts/plan-009/t01/toolchain-target/debug/auto.exe`（本轮 T-05 消费复跑即用此 CLI；`auto-ui-tool` 另行自本树构建，sha256 `3204811e…`）。消费基准已按此重冻结。
+
+## 11. 交付后具名残留（非本计划 AC，责任方已定）
+
+1. cold-load 预算 `19.23s > 15s` → **PLAN-995**（VM json/装载 perf），本计划未触碰。
+2. READER-009 W-06 批量腿：`全选当前结果` 得 1000（期望 193）、`移除（可恢复）` 出现 503 取消 → **READER-009 W-06/其后端时延**（本轮环境单请求 2–17s，批量 RESTORE 超时）。
+3. READER-009 W-07 `未读` 控件时序（`control not visible in time`）→ **READER-009 W-07**。
+4. OS 三通道（UIA invoke/物理 click/sendclick）在卡行上的投递面仍归 READER-009 门的通道选择；本计划只交付 VM 链路与合成派发的路由提交（不把「物理输入已达」冒充为交付，Sky 外部限制照旧）。
