@@ -940,3 +940,149 @@ fn rq_wire_generation_capability_is_negotiated_and_applied() {
         })
     );
 }
+// ---------------------------------------------------------------------------
+// AC-04 / V-09：**真两进程** v2↔v3 配对（独立 exe，真管道 + 真跨进程 shm）
+// ---------------------------------------------------------------------------
+
+/// 子进程体（`current_exe` 自派生，env 驱动；无 env = 直接返回，普通跑套件时
+/// 零副作用）。父进程见 [`rq_wire_two_process_v2_v3_pairing`]。
+#[test]
+fn rq_wire_child_body() {
+    let Ok(wellknown) = std::env::var("AUTO_RQ062_CHILD_PIPE") else {
+        return;
+    };
+    let app = std::env::var("AUTO_RQ062_CHILD_APP").unwrap_or_else(|_| "plan062-child".into());
+    let mode = std::env::var("AUTO_RQ062_CHILD_MODE").unwrap_or_else(|_| "v3".into());
+    let (_, end) = crate::ui::desktop_protocol::rqhost::adopt(&wellknown, &app, 15_000)
+        .expect("子进程采纳");
+    let view = if mode == "v3" {
+        super::rq_seams::canvas_scene_view()
+    } else {
+        View::text("子进程 v2 帧")
+    };
+    let mut pump = ClientPump::new(
+        end,
+        WireSource::Rust(HeadlessFrameSource::new(StaticView { view }, W, H)),
+        {
+            // Hello 凭据带子进程身份：宿主侧 `RqClient.app_name` 由 Hello 回填，
+            // 两条连接据此可区分（adopt 记录名只用于管道分配）。
+            let mut config = client_config();
+            config.app_name = app.clone();
+            config.title = app.clone();
+            config
+        },
+        None,
+    );
+    pump.set_v2(true);
+    // 阻塞主循环：宿主关闭/EOF → HostLost → 退出（进程随测试结束）。
+    let (exit, _source) = pump.run();
+    eprintln!("[RQPROC] child `{app}` exit={exit:?}");
+}
+
+/// 父进程：spawn 两个**独立进程**子产者（一个产 v3 Path 帧、一个产 v2 字符串帧），
+/// 同一宿主实例收两路——证明跨进程（真 exe）+ v2/v3 载荷配对，而不是同进程近似。
+#[test]
+fn rq_wire_two_process_v2_v3_pairing() {
+    use crate::ui::desktop_protocol::rqhost;
+
+    let wellknown = format!("plan062-two-proc-{}", std::process::id());
+    let (serve, claim) =
+        rqhost::RqServe::start(&wellknown).map_err(|e| format!("rqserve: {e:?}")).expect("serve");
+
+    let exe = std::env::current_exe().expect("current_exe");
+    let mut children = Vec::new();
+    for (app, mode) in [("plan062-child-v3", "v3"), ("plan062-child-v2", "v2")] {
+        let mut cmd = std::process::Command::new(&exe);
+        cmd.args(["rq_wire_child_body", "--test-threads", "1", "--nocapture"])
+            .env("AUTO_RQ062_CHILD_PIPE", &wellknown)
+            .env("AUTO_RQ062_CHILD_APP", app)
+            .env("AUTO_RQ062_CHILD_MODE", mode)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::inherit());
+        for (k, _) in std::env::vars() {
+            if k.starts_with("NEXTEST_") {
+                cmd.env_remove(&k);
+            }
+        }
+        children.push(cmd.spawn().expect("spawn child"));
+    }
+
+    // 宿主：认领两条转连（独立进程各一条）。
+    let mut ids = rqhost::RqIds::default();
+    let mut clients: Vec<rqhost::RqClient> = Vec::new();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while clients.len() < 2 && Instant::now() < deadline {
+        let pending: Vec<_> = serve.pending.lock().unwrap().drain(..).collect();
+        for (app_name, end) in pending {
+            if let Some((client, _)) = rqhost::adopt_one(app_name, end, &mut ids, 5000) {
+                clients.push(client);
+            }
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(clients.len(), 2, "两个独立子进程必须都被接纳");
+    // 两条连接必须来自两个不同 app（独立进程各自的 Hello 凭据）。
+    let mut names: Vec<&str> = clients
+        .iter()
+        .map(|c| c.app_name.as_str())
+        .collect();
+    names.sort_unstable();
+    assert_eq!(
+        names,
+        vec!["plan062-child-v2", "plan062-child-v3"],
+        "两条连接必须来自两个不同子进程"
+    );
+    // 子进程在断言期必须仍存活（不是早退留下的空连接）。
+    for child in children.iter_mut() {
+        assert!(
+            matches!(child.try_wait(), Ok(None)),
+            "子进程在配对期必须存活（实得 {:?}）",
+            child.try_wait()
+        );
+    }
+
+    // 各自泵到有合成面；按内容区分 v3（Path）与 v2（字符串）。
+    let mut v3_ok = false;
+    let mut v2_ok = false;
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline && !(v3_ok && v2_ok) {
+        for client in clients.iter_mut() {
+            let _ = rqhost::pump_client(client, &mut ids);
+        }
+        for client in clients.iter() {
+            let Some(list) = rqhost::composed_v2(client) else {
+                continue;
+            };
+            let has_path = list
+                .ops
+                .iter()
+                .any(|op| matches!(op, DisplayOp::Path { .. }));
+            let has_text = list
+                .ops
+                .iter()
+                .any(|op| matches!(op, DisplayOp::TextStyled { .. }));
+            if has_path && list.requires_v3() {
+                v3_ok = true;
+            }
+            if has_text && !list.requires_v3() {
+                v2_ok = true;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    println!(
+        "[RQPROC] {}",
+        serde_json::json!({
+            "tag": "two_process", "children": children.len(),
+            "v3_path_frame": v3_ok, "v2_text_frame": v2_ok,
+        })
+    );
+    serve.stop(&wellknown);
+    drop(claim);
+    for child in children.iter_mut() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    assert!(v3_ok, "v3 子进程（独立 exe）的 Path 帧必须跨进程落地");
+    assert!(v2_ok, "v2 子进程（独立 exe）的字符串帧必须跨进程落地");
+}
