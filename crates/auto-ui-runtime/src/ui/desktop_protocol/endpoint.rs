@@ -43,6 +43,9 @@ pub enum ProtocolError {
     /// 背压：本 App 的在途槽已用尽（未 ACK），本次不产帧且**不覆盖**在途
     /// 槽（PLAN-062 T-04 / P-01）。调用方应保留待发状态稍后重试。
     Backpressure { resource: &'static str },
+    /// 能力准入失败：App 声明的必需能力宿主不支持（PLAN-062 T-04）。
+    /// 携带能力 ID，调用方须具名失败而不是继续握手。
+    Admission(String),
 }
 
 impl From<CodecError> for ProtocolError {
@@ -359,6 +362,14 @@ impl<S: FrameSource> AppEndpoint<S> {
                 if self.session.theme_capable() {
                     caps.push("theme-policy/1".to_string());
                 }
+                // PLAN-062 T-04：本 producer 会发 v3 `Path`（mesh/canvas），
+                // 因此把 `fidelity/pathfill/1` 作为**必需**能力声明；glyph run
+                // 是 opt-in，按 optional 声明。
+                caps.push(format!(
+                    "required:{}",
+                    super::message::CAP_PATH_FILL
+                ));
+                caps.push(format!("optional:{}", super::message::CAP_GLYPH_RUN));
                 caps
             },
         }))
@@ -817,6 +828,11 @@ pub struct HostEndpoint {
     pub extra_surfaces: Vec<(u64, u64)>,
     /// 表面帧载荷模式（v1.3：activate 时随裁决结果定档）。
     pub frame_mode: FrameMode,
+    /// 宿主声明支持的能力（PLAN-062 T-04）。默认 = 全部冻结能力。
+    pub supported: super::message::CapabilitySet,
+    /// Hello 里 App 声明的能力（required 落在握手门：宿主不支持的必需能力
+    /// → 拒绝激活，不进入 Active）。
+    pub app_caps: super::message::CapabilitySet,
 }
 
 impl HostEndpoint {
@@ -828,7 +844,27 @@ impl HostEndpoint {
             surface: None,
             extra_surfaces: Vec::new(),
             frame_mode: FrameMode::Commands,
+            supported: super::message::CapabilitySet::all_optional(),
+            app_caps: super::message::CapabilitySet::default(),
         }
+    }
+
+    /// 收窄宿主声明支持的能力（负控/受限宿主用）。
+    pub fn set_supported(
+        &mut self,
+        caps: super::message::CapabilitySet,
+    ) {
+        self.supported = caps;
+    }
+
+    /// Hello 声明的必需能力是否全部被宿主支持（否则具名拒绝）。
+    fn admit_hello(&self) -> Result<(), ProtocolError> {
+        for cap in &self.app_caps.required {
+            if !self.supported.supports(cap) {
+                return Err(ProtocolError::Admission(cap.clone()));
+            }
+        }
+        Ok(())
     }
 
     /// Active 帧路由：消息 wid → surface 句柄（多表面客户端第二及以后
@@ -871,6 +907,9 @@ impl HostEndpoint {
                         msg: "empty app_name",
                     });
                 }
+                // PLAN-062 T-04：Hello 的能力声明落盘到握手门（required 未被
+                // 宿主支持 → activate 具名拒绝，不进入 Active）。
+                self.app_caps = super::message::CapabilitySet::parse(&theme_caps);
                 Ok(vec![HostAction::ResolveAndAttach {
                     version,
                     app_name,
@@ -1106,6 +1145,7 @@ impl HostEndpoint {
                 msg: "activate()",
             });
         }
+        self.admit_hello()?;
         self.state = HostState::Active;
         self.app_id = Some(app_id);
         self.wid = Some(wid);
@@ -1138,6 +1178,7 @@ impl HostEndpoint {
                 msg: "activate_multi()",
             });
         }
+        self.admit_hello()?;
         self.state = HostState::Active;
         self.app_id = Some(app_id);
         self.wid = Some(wid);
@@ -1430,6 +1471,70 @@ mod tests {
             panic!()
         };
         assert_eq!((*frame_id, *slot), (2, 1));
+    }
+
+    #[test]
+    fn capability_negotiation_gates_activation() {
+        use crate::ui::desktop_protocol::message::{
+            CapabilitySet, HandshakeMsg, CAP_GLYPH_RUN, CAP_PATH_FILL,
+        };
+
+        // 负控：App 声明宿主不支持的必需能力 → 激活被具名拒绝，且不进入 Active。
+        let mut host = HostEndpoint::listen();
+        host.set_supported(CapabilitySet::parse(&[format!(
+            "optional:{CAP_PATH_FILL}"
+        )]));
+        let hello = ProtocolMsg::Handshake(HandshakeMsg::Hello {
+            version: 1,
+            app_name: "cap-probe".to_string(),
+            title: "cap".to_string(),
+            icon: None,
+            width: 320.0,
+            height: 200.0,
+            fonts: Vec::new(),
+            surfaces: Vec::new(),
+            theme_caps: vec![format!("required:{CAP_GLYPH_RUN}")],
+        });
+        let actions = host.on_message(hello).expect("Hello 合法");
+        assert!(matches!(actions[0], HostAction::ResolveAndAttach { .. }));
+        let err = host
+            .activate(1, 3, 42, WRect::new(0.0, 0.0, 320.0, 200.0), FrameMode::Commands)
+            .expect_err("缺必需能力必须拒绝激活");
+        assert_eq!(err, ProtocolError::Admission(CAP_GLYPH_RUN.to_string()));
+        assert_eq!(host.state, HostState::Listening, "拒绝后保持在监听态");
+
+        // 正控：声明的必需能力被支持 → 正常激活。
+        let mut host = HostEndpoint::listen();
+        let hello = ProtocolMsg::Handshake(HandshakeMsg::Hello {
+            version: 1,
+            app_name: "cap-probe".to_string(),
+            title: "cap".to_string(),
+            icon: None,
+            width: 320.0,
+            height: 200.0,
+            fonts: Vec::new(),
+            surfaces: Vec::new(),
+            theme_caps: vec![format!("required:{CAP_PATH_FILL}")],
+        });
+        host.on_message(hello).expect("Hello 合法");
+        let welcome = host
+            .activate(1, 3, 42, WRect::new(0.0, 0.0, 320.0, 200.0), FrameMode::Commands)
+            .expect("能力齐备应激活");
+        assert!(matches!(welcome, ProtocolMsg::Handshake(HandshakeMsg::Welcome { .. })));
+        assert_eq!(host.state, HostState::Active);
+
+        // 真实 App 端点声明的必需能力必须被默认宿主接受（默认全能力）。
+        let mut app = AppEndpoint::new(StubSource::new(), "counter", "c", 480.0, 320.0);
+        let mut host = HostEndpoint::listen();
+        let _ = activate_pair(&mut app, &mut host);
+        assert_eq!(app.state, AppState::Active);
+        assert!(
+            host.app_caps
+                .required
+                .iter()
+                .any(|c| c == CAP_PATH_FILL),
+            "App 必须把 pathfill 作为必需能力声明"
+        );
     }
 
     #[test]

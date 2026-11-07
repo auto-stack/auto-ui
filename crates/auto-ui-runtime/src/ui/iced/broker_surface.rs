@@ -81,6 +81,47 @@ fn handle_cache() -> &'static Mutex<HashMap<String, Option<ImageHandle>>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// 句柄缓存的插入序（FIFO 上限用；PLAN-062 复审 B5：Host 侧必须有界）。
+fn handle_order() -> &'static Mutex<std::collections::VecDeque<String>> {
+    static ORDER: OnceLock<Mutex<std::collections::VecDeque<String>>> = OnceLock::new();
+    ORDER.get_or_init(|| Mutex::new(std::collections::VecDeque::new()))
+}
+
+/// 句柄缓存上限（超过即按插入序逐出；不承诺 LRU）。
+const HANDLE_CACHE_CAP: usize = 512;
+
+/// 已接受的位图 generation（src → seq；小 seq 的迟到更新被拒绝）。
+fn bitmap_generations() -> &'static Mutex<HashMap<String, u64>> {
+    static GENS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
+    GENS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// 入句柄缓存并维持上限（FIFO；同 src 重入不重复排队）。
+fn handle_cache_insert(src: &str, handle: Option<ImageHandle>) -> Option<Option<ImageHandle>> {
+    let previous = handle_cache()
+        .lock()
+        .unwrap()
+        .insert(src.to_string(), handle);
+    {
+        let mut order = handle_order().lock().unwrap();
+        if previous.is_none() && !order.iter().any(|k| k == src) {
+            order.push_back(src.to_string());
+        }
+        while order.len() > HANDLE_CACHE_CAP {
+            if let Some(oldest) = order.pop_front() {
+                handle_cache().lock().unwrap().remove(&oldest);
+            }
+        }
+    }
+    previous
+}
+
+/// 从本地 id 里取 generation 序号（`<pid>-rq-img-<seq>-<hash8>`）。
+fn bitmap_generation_of(src: &str) -> Option<u64> {
+    let (_, rest) = src.rsplit_once("rq-img-")?;
+    rest.split('-').next()?.parse::<u64>().ok()
+}
+
 /// http(s) 在途集：后台解码去重（同 src 至多一线程；失败由负缓存止位，
 /// 不重试风暴）。
 fn http_inflight() -> &'static Mutex<HashSet<String>> {
@@ -126,6 +167,22 @@ fn decode_handle(bytes: &[u8]) -> Option<ImageHandle> {
 /// 号，单写者时序由 BitmapAck 槽纪律钉死）。stride 宽于 w×4 时行重排
 /// （`Handle::from_rgba` 要紧排像素）。
 pub(crate) fn bitmap_cache_put(src: &str, w: u32, h: u32, stride: u32, rgba: Vec<u8>) {
+    // PLAN-062 复审 B5：迟到的小 generation 更新必须被拒绝（旧帧不得覆盖
+    // 新内容）；无 generation 的旧词汇照旧接受。
+    if let Some(gen) = bitmap_generation_of(src) {
+        let mut gens = bitmap_generations().lock().unwrap();
+        match gens.get(src) {
+            Some(known) if gen < *known => {
+                observe(&format!(
+                    "bitmap 旧 generation 更新被拒绝: {src} gen={gen} < {known}"
+                ));
+                return;
+            }
+            _ => {
+                gens.insert(src.to_string(), gen);
+            }
+        }
+    }
     let tight = (w as usize) * 4;
     let pixels = if stride as usize == tight {
         // 紧排直用（stride == w×4 主路径）。
@@ -153,10 +210,7 @@ pub(crate) fn bitmap_cache_put(src: &str, w: u32, h: u32, stride: u32, rgba: Vec
         ));
         None
     };
-    handle_cache()
-        .lock()
-        .unwrap()
-        .insert(src.to_string(), handle);
+    handle_cache_insert(src, handle);
 }
 
 /// 位图键逐出（宿主 ReclaimWindow/断连清 client 位图——防 pid 复用串扰）。
@@ -213,7 +267,7 @@ pub(crate) fn resolve_drawlist_image(src: &str, w: u32, h: u32) -> Option<ImageH
                 let handle = crate::ui::iced::renderer::load_image_bytes(&owned)
                     .and_then(|bytes| decode_handle(&bytes));
                 let hit = handle.is_some();
-                handle_cache().lock().unwrap().insert(owned.clone(), handle);
+                handle_cache_insert(&owned, handle);
                 http_inflight().lock().unwrap().remove(&owned);
                 if hit {
                     observe(&format!("http image ready: {owned}"));
@@ -229,10 +283,7 @@ pub(crate) fn resolve_drawlist_image(src: &str, w: u32, h: u32) -> Option<ImageH
     if handle.is_none() {
         observe_unresolved(src);
     }
-    handle_cache()
-        .lock()
-        .unwrap()
-        .insert(src.to_string(), handle.clone());
+    handle_cache_insert(src, handle.clone());
     handle
 }
 
@@ -383,7 +434,7 @@ fn resolve_lucide(src: &str, rest: &str, w: u32, h: u32) -> Option<ImageHandle> 
     if handle.is_none() {
         observe_unresolved(src);
     }
-    handle_cache().lock().unwrap().insert(key, handle.clone());
+    handle_cache_insert(&key, handle.clone());
     handle
 }
 
@@ -1109,7 +1160,7 @@ fn paint_glyph_run<R>(
                     continue;
                 };
                 let rgba = std::sync::Arc::new(rgba);
-                cache.insert(key, rgba.clone());
+                glyph_cache_insert(&mut cache, key, rgba.clone());
                 rgba
             }
         };
@@ -1138,11 +1189,26 @@ struct CachedGlyph {
     handle: iced::widget::image::Handle,
 }
 
-fn glyph_cache() -> &'static Mutex<std::collections::HashMap<cosmic_text::CacheKey, std::sync::Arc<CachedGlyph>>> {
-    static CACHE: OnceLock<
-        Mutex<std::collections::HashMap<cosmic_text::CacheKey, std::sync::Arc<CachedGlyph>>>,
-    > = OnceLock::new();
-    CACHE.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+type GlyphCacheMap = std::collections::HashMap<cosmic_text::CacheKey, std::sync::Arc<CachedGlyph>>;
+
+fn glyph_cache() -> &'static Mutex<GlyphCacheMap> {
+    static CACHE: OnceLock<Mutex<GlyphCacheMap>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(GlyphCacheMap::new()))
+}
+
+/// 字形位图缓存上限（复审 B5：Host 侧缓存不得无界；超过即整体裁剪到
+/// 上限的一半——字形重算比无界增长安全）。
+const GLYPH_CACHE_CAP: usize = 4096;
+
+fn glyph_cache_insert(
+    cache: &mut GlyphCacheMap,
+    key: cosmic_text::CacheKey,
+    glyph: std::sync::Arc<CachedGlyph>,
+) {
+    if cache.len() >= GLYPH_CACHE_CAP {
+        cache.clear();
+    }
+    cache.insert(key, glyph);
 }
 
 /// swash 位图 → straight RGBA（Mask = 颜色 × 覆盖率；Color = 原位图）。
