@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-07
 plan_revision: 2
-current_step: 7
+current_step: 9
 total_steps: 9
 depends_on: []
 supersedes_spec_components: []
@@ -127,7 +127,7 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 | T-06 | work | T04/05分类齐 | 冻结SD/完整缺口与既有959/979–981/985–987的逐项接收映射、实际owner和关闭oracle；覆盖项不另立重复合同，报告与真实工件一致 | AC-05 | [x] 2026-11-07（R1/R2/R4 已修）SD-01 候选落工作树 `docs/specs/auto-graphics/ace-migration-feasibility.md`（15,834B / sha256 `12150fc8…1deae2b49`，commit `d4745281`）；G1–G9 逐项映射 981 B-SOURCE/B-SESSION/B-CONTENT、980 B-DIALECT/B-NATIVE、979 T-02/T-03/T-08、961、939 T-03..T-08、967/968、985–987；REP 按权威 M2 合同全称与 owner 分账（REP-01 原源与全消费者=959+每能力包；REP-06=967+980；REP-08=986；REP-10=987；REP-11=985+各consumer），全 pending；能力常量 4 个、实测入口 2 条（modules.scalar + scalar profile）；UK-06 具名移交、无未归属 unknown；附录A与样本逐字相等（check exit 0）；未新立合同 |
 | T-07 | review | T-01..06实质完成 | 独立final；不修实现，finding交work，同员受影响复核 | AC-06 | [x] 2026-11-07 独立 final **pass** @ `d4745281`（reviewer 独立 subagent 上下文 043c5659…，review_scope: final）；AC-01..AC-06 全 pass；F-067-R1..R4 全关；spec 15,834B `12150fc8…`；AC-07/AC-08 属 merge |
 | T-08 | merge | T-07 pass | 冻结门/身份落主、canonical/导航/同号归档；不自动tag/远端发布 | AC-07 | [x] 2026-11-07 `prepared`: reviewed r2 @ `d4745281`（独立 final pass，round 8）；dev 分支 rebase `2a23e859`→`21fa29e0`，`git range-diff 4bb54e36..d4745281 2a23e859..21fa29e0` 4/4 全等；`landed`: master **ff-only** `2a23e859..21fa29e0`（无 merge commit，tip=`21fa29e0`）；`canonical_verified`: `docs/specs/auto-graphics/ace-migration-feasibility.md` 15,834B sha256 `12150fc8…b49` 于 main 与审查基线同 hash；`archived`: `docs/plans/archived/067-…md` status archived（本次 docs 提交） |
-| T-09 | merge | T-08 | 全输出对账/摘要/guard/清理/登记；实完才勾 | AC-08 | [ ] |
+| T-09 | merge | T-08 | 全输出对账/摘要/guard/清理/登记；实完才勾 | AC-08 | [x] 2026-11-07 全输出对账/摘要已折入 §9 合并收据；fresh `wt-guard.sh` clean（Git Bash，auto-ui 与 auto-lang 两树）→ auto-ui 工作树移除、`codex/plan-067-dev` 删除（was `21fa29e0`）、auto-lang 只读兄弟树移除、组目录 `.wt/ui-067` 删除；`plan-artifacts/plan-067` 全 scope 删除（9,410 文件 / 7.1 GB，含 target-probe/target-ace 构建物）；registry 刷新为 deleted-at-merge、无 holds；交付后观察与批量回归到期已记录 |
 
 ## 9. 复审记录
 
@@ -172,6 +172,42 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 - stage: goal | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | round: 8 | from: review | to: merge | status: reviewed | outcome: pass（独立 final pass @ d4745281） | worktree: D:/autostack/.wt/ui-067/auto-ui | commit: d4745281 | next: merge T-08。
 
 - stage: merge | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | outcome: in_progress（archived；cleanup/registry 待做） | delivery_commit: `21fa29e0` | canonical: `docs/specs/auto-graphics/ace-migration-feasibility.md`（15,834B / sha256 `12150fc8…b49`） | archive: `docs/plans/archived/067-age-ace-migration-inventory-and-chain-feasibility.md` | checkpoints: **prepared**=reviewed r2 @ d4745281（独立 final pass）+ dev 分支 rebase `2a23e859→21fa29e0`，`git range-diff 4bb54e36..d4745281 2a23e859..21fa29e0` 4/4 全等；**landed**=master `git merge --ff-only` `2a23e859..21fa29e0`，无 merge commit，tip=delivery；**canonical_verified**=main 上 spec 与审查基线同 hash（15,834B `12150fc8…`），索引自动、无人工索引/ledger 写入；**archived**=同号归档文件 status archived（本次 docs 提交） | 对账: 落地 diff 仅新增 1 个 Spec 文件 310 行，无产品代码/依赖/安装/二进制变更；probe 与 review 证据见 §9 rounds 1–8（入口/退出码/哈希/诊断已在案） | next: cleanup（fresh guard → 移除 ui-067 两树/分支/组目录 → 删 plan-artifacts scope → 刷新 registry）+ 交付后观察
+
+### 合并收据与证据索引（PLAN-067:r2，2026-11-07）
+
+**命令/退出码对账**
+
+| 命令 | 退出码 | 关键结果 |
+|---|---|---|
+| `python probe/run.py --out out/probe --controls` | 0 | report `pass`；四阶段 oracle/legacy_frontdoor/legacy_source_change/ace_frontdoor；三输入双入口拒绝；正控 accepted；四负控具名拒绝 |
+| `python probe/run.py --out out/review --controls`（独立复审复跑） | 0 | report `pass`；诊断 stage/code/span 与首轮逐项一致 |
+| `python check_spec_appendix.py` | 0 | 附录 A 两段与冻结样本逐字节相等 |
+| `git range-diff 4bb54e36..d4745281 2a23e859..21fa29e0` | 0 | 4/4 `=`（rebase 等价） |
+| `git merge --ff-only codex/plan-067-dev` | 0 | `2a23e859..21fa29e0`，无 merge commit |
+| `wt-guard.sh`（Git Bash；auto-ui 与 auto-lang 两树各一次） | 0 | clean |
+
+**关键数字**
+
+- 样本：`main.at` 1,990B `7a14519f…`；`counter.at` 1,025B `8734bef7…`。
+- legacy 参考产物：`world.at` 15,689B `world_sha256 1599d225623e9874d8fd1731888fd77c3a9a0fb5e1e91293f060d0c8df4218b9`；`ui.json` schema `autographics.node-ui-mixed-regions/2`。
+- oracle 期望：root.steps=5、reg2x=14、reg3x=11；a.count=6/a.bumps=1；b.count=20/b.bumps=0；改源 `b.step 2→3` → b.count=25。
+- ACE 拒绝（模块能力与标量 profile 双入口）：`main.at` `source.unsupported`@`use`486..489；`counter.at` `source.syntax` "expected `fn`, found `node`"319..323；legacy `world.at` `source.unsupported`@`var`228..231。
+- 正控：标量模块图 accepted（units=2/items=2）；负控：`source.module-missing` / `source.module-duplicate-import` / `source.module-private` / `source.module-cycle`。
+- SD-01：`docs/specs/auto-graphics/ace-migration-feasibility.md` 15,834B sha256 `12150fc8fe59d557046c1b0d6d8692a61d327351ed77910fb4fc9451deae2b49`。
+
+**处置**
+
+- 工作树/分支/组目录：auto-ui 工作树移除、`codex/plan-067-dev` 删除（原 tip `21fa29e0`）、auto-lang 只读兄弟树移除、`.wt/ui-067` 组目录删除。
+- 材料 scope：`plan-artifacts/plan-067` 全删（9,410 文件 / 7.1 GB，含 `target-probe`/`target-ace` 构建物）；结论与身份已折入本文件与 SD-01。
+- registry：`auto-ui/PLAN-067` 记 `deleted-at-merge`，无 holds。
+
+**交付后观察**：本交付仅新增一个 `docs/specs/` 文件（无代码、依赖、feature、安装载荷、二进制、web bundle、daemon 变更），不存在需重建/重启的 stale 生产制品——显式记录为不适用，不触发重建。
+
+**批量回归到期**：`docs/plans/.last-batch-regression.json` 缺失 → 到期；按 merge 合同交 `/auto-plan:regress` 在主检出单实例执行（本 merge 未运行；不改变本 Plan 交付结论）。
+
+**不认领**：迁移完成、ACE M1/M2 签章、AGE M1-ready、Schema/UI 融合、全量替换。
+
+- stage: goal | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | round: 9 | from: merge | to: done | status: archived | outcome: pass（delivered + archived + cleaned） | delivery_commit: 21fa29e0 | canonical: docs/specs/auto-graphics/ace-migration-feasibility.md（12150fc8…） | archive: docs/plans/archived/067-…md | cleanup: worktree/branch/group/scope 全清洁净，registry 已刷新 | next: done。
 
 ## 10. 待澄清事项
 
