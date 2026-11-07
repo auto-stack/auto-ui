@@ -451,3 +451,11 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 11 | from: work | to: work | status: executing | outcome: pass（真两进程配对） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 39bd7bef | next: user（媒体族边界裁定）
 
 
+
+### 2026-11-08 用户裁定（媒体族与主检出 WIP）
+
+- **媒体资源族**：用户选择 **(c) 只做静态/海报帧读回，连续播放具名留后**。即 062 内交付“一张已解码帧 → 资源身份/generation/预算/驻留 → 跨线重放”的完整链路并用合成帧源验证；连续视频（每帧读回 + 带宽）明确列为具名遗留，与 OS063 传输/媒体管线另立计划，**不改冻结的上传预算**。
+- **主检出 WIP**：用户裁定“先由该 owner 归位”，本轮不 stash、不 patch、不 restore；merge 前该 WIP 必须回零（若届时仍未归位，merge 会按 stop condition 停下并报具体 unblock 动作）。
+- 影响：T-05 的 AC-03 媒体面按“海报帧链路交付 + 连续播放具名”收口；AC-03 其余面（身份/版本/传输/更新/最后 owner/GPU 释放）此前已交付。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 12 | from: user | to: work | status: executing | outcome: pass（裁定落地） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 39bd7bef | next: work（海报帧链路）
