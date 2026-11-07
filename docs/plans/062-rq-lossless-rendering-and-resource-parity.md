@@ -307,3 +307,13 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - UI061的准确录制接缝/版本/资源预算是具名技术决策；未取得可行证据前不猜其后继实现，若改变承诺/仓scope给具体修订。
 - 字体/IME/媒体/自定义图形或产品原有缺口不能以N/A自动缩分母；明确owner、实际失败入口、关闭条件，必要时另立Plan，当前必需项保持未完。
 - Linux自有compositor和ACE/AGE的未来接口按战略进入门另立实施合同，本Plan没有自动切平台/引擎授权。
+
+### 2026-11-07 work 复审修复 B3 + v3 富模式改为 opt-in
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r3 / outcome: 进行中（B1/B3/B4/N1/N3 已修；B2/B5 仍开） / code_commit: `54b0b6e2`
+- 变更：`HeadlessSurface` 新增 `set_shadow_patches`（默认关，与 `set_glyph_runs` 同律）——默认 producer = 字符串文字 + scrim 阴影，v3 富模式（glyph run + SDF 贴片）为 opt-in；`rq_cells` 每例**两种模式都测**、读数带 `producer_mode`，且**只对默认模式设门**（path_mesh/svg_icon/text_cjk/scroll_clip/progress_bar ≤0.2%，阈值 2/255）。
+- 双模式读数（standalone-RQ 相对 direct，同 harness）：
+  - **default**：path_mesh 0.095%、svg 0.100%、text_cjk 0.094%、gradient 0.0625%、scroll 0.000%、shadow_only 0.005%、progress 0.006% —— 全部 ≤0.1%，门通过。
+  - **v3 富模式**：text_cjk 0.798%、gradient 1.374%、scroll 0.330%、shadow_only 0.741% —— 与复审 A/B 一致，作为具名遗留，不计入通过。
+- 结论：复审 B3 关闭（矩阵不再用非默认 producer 冒充默认且有阈值门）；B4 关闭（半径同尺度）；B1 关闭（句柄复用 + 字体/贴片缓存，produce 0.18–0.33ms）。B2（线上能力协商）与 B5（Host 上限/release/generation）仍开，AC-02/AC-04/AC-07 不签。
+- 回归面：**255 passed / 4 failed**（基线同组 4 红）。
