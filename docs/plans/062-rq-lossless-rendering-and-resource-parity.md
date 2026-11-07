@@ -317,3 +317,11 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
   - **v3 富模式**：text_cjk 0.798%、gradient 1.374%、scroll 0.330%、shadow_only 0.741% —— 与复审 A/B 一致，作为具名遗留，不计入通过。
 - 结论：复审 B3 关闭（矩阵不再用非默认 producer 冒充默认且有阈值门）；B4 关闭（半径同尺度）；B1 关闭（句柄复用 + 字体/贴片缓存，produce 0.18–0.33ms）。B2（线上能力协商）与 B5（Host 上限/release/generation）仍开，AC-02/AC-04/AC-07 不签。
 - 回归面：**255 passed / 4 failed**（基线同组 4 红）。
+### 2026-11-07 work 复审修复 B2 + B5（首轮 needs_fix 全部关闭）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r3 / outcome: 进行中 / code_commit: `4b0e7ee7`
+- **B2（能力协商上真线）**：App 的 Hello 能力尾声明 `required:fidelity/pathfill/1` + `optional:fidelity/glyphrun/1`；`HostEndpoint` 在 Hello 处解析成 `CapabilitySet`，`activate`/`activate_multi` 前校验 required ⊆ supported，缺一返回 `ProtocolError::Admission(cap)` 且**保持 Listening**（不半启动）；`set_supported` 供受限宿主收窄。新测试 `capability_negotiation_gates_activation`：负控（要求 glyphrun、宿主不支持 → 拒绝且仍 Listening）、正控（要求 pathfill → Welcome + Active）、以及真实 App 端点确实声明 pathfill。
+- **B5（Host 有界与旧写拒绝）**：`handle_cache` 改 FIFO 上限 512（`handle_cache_insert`），`glyph_cache` 上限 4096（溢出裁剪）；`bitmap_cache_put` 从 `rq-img-<seq>-<hash>` 解析 generation，**旧的迟到更新被拒**并留具名观测（此前无版本号、旧 BitmapReady 可静默覆盖）。
+- 仍缺（如实记录）：Host 侧**显式释放**路径（`CacheControl` 不携带 bitmap src）与“最后 owner 释放”语义未实现——目前只靠上限裁剪，AC-03 的释放面因此不签。
+- 回归面：**256 passed / 4 failed**（基线同组 4 红）。
+- 复审状态：首轮 needs_fix 的 B1/B2/B3/B4/B5 均已处理（B5 的释放面列为遗留），已提交待第二轮独立复审。
