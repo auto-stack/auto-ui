@@ -46,12 +46,19 @@ Run 代次与队列 64 上界具名拒绝；v1/v2/048 schema 双向互拒。**�
 制（坏副本具名拒绝，精确修复后下一次实际 Run 恢复）；区域事件声明对账
 fail-closed（挂载知识由消费者注册表声明）。**原生窗口**
 （`bin/mixed_ui_window.rs --probe` 为 049 入口不变；v2 入口
-`bin/mixed_regions_window.rs --probe`）——真实 OS 窗口 posted 注入五点击
-＋五按键（Tab/Enter 真实键盘通道驱动条件挂卸两轮），count=201、p1 跨挂卸
-x=12→24、挂载代次 3→7（未卸载区域代次不变）、真实窗 resize 逻辑
-480×560→400×420 且区域保持活跃、空闲零 Tick、scale_factor 2.0 全程
-posted 坐标＝逻辑×scale，exit 0。真实 native SendInput/焦点捕获/DPI 真切
-换通道沿 048/049 手工取证先例（不在自动链；本档不冒称已验）。
+`bin/mixed_regions_window.rs --probe`）——真实 OS 窗口 posted 注入六点击
+＋五按键（Tab/Enter 经平台键盘路由驱动条件挂卸两轮），count=202（含 resize
+后命中 +1）、p1 跨挂卸 x=12→24、挂载代次 3→7（未卸载区域代次不变）、真实
+窗 resize 逻辑 480×560→400×420 且区域保持活跃、**resize 后控件命中按新布
+局**（posted 物理坐标＝逻辑×scale）、空闲零 Tick、scale_factor 2.0，exit 0。
+PLAN-066 起焦点面收口：`Tab` 才取得键盘焦点（未 Tab 的 Enter 不激活任何按
+钮）；真实 `Focused(false)`/`CursorLeft` 经宿主入口取消在途捕获并清焦点，
+旧焦点按钮不得在下一次 Enter 被激活（永久回归在
+`tests/mixed_regions_lifecycle_flow.rs`）。真实 native SendInput/焦点捕获/
+DPI 真切换仍为手动门：`mixed_regions_window --manual` 是可执行记录器（关窗
+写 `manual-native-gate.json`，`auto_pass:false`，记录真实 OS 键/点击/失焦/
+离窗/resize/scale）；缺第二 DPI 设备或明确授权时保持 pending，本档不冒称
+已验。
 `tools/verify_plan054.py --controls` 全过：三 v2 产物身份链＋组件区域形
 状（4 组件区域）＋半缓冲边界＋bool 高槽修正标记＋双图容量常数（含 v2 活
 区域 4）＋SDK681 verify＋旧档控制在场＋全部再生字节同一（含 049 v1 夹
@@ -118,6 +125,10 @@ pilot 16 例；v1 夹具再生字节同一）；文字越界与文本槽预算�
   收支闭合）；实例行（状态 owner）不随挂卸生灭；重挂＝新挂载代次；旧代
   次区域事件在 drain 派发前具名拒绝（未挂载与重挂后都拒绝）；陈旧 Run
   代次沿 049 面；重绘/layout/挂载刷新永不代 Tick（空闲零回调实测）。
+- 键盘焦点（PLAN-066）：`Tab` 取得焦点并循环，`Enter` 只在取得后激活当前
+  按钮（与鼠标同队列同派发器）；真实窗口失焦（`Focused(false)`）或指针离
+  窗（`CursorLeft`）清焦点/取消在途捕获，旧焦点按钮不跨失焦泄漏；无 Tab
+  的 Enter 不激活任何按钮。
 - 故障域：Session 故障 → 相关域停止（队列清空、最后可用呈现保留、具名
   错误）；激活资源失败（surface/view/portal）具名记账且应用保持可用；
   非法区域（越界/坏 dim/集外元素）生成与消费双侧具名拒绝。

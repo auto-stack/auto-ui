@@ -113,3 +113,32 @@ player.glb、mob.glb；godotengine/godot-demo-projects@b761b4cd，
 `generated-components3d-runtime/`（字节冻结，verify_plan027 再生
 门守护）；消费 = driver `tests/node3d_runtime_flow.rs`（include_str!
 冻结产品字节，provenance 逐产品对账）。
+
+## 4. PLAN-066 边界证据（work 实测；只述已跑）
+
+- 隐藏父级 + 注册 solid 子行：父 group 隐藏使子行 `effective=0`，注册 solid
+  在滑扫期被临时置 1，因此仍阻挡（
+  `tests/character3d_api.rs::hidden_parent_group_with_registered_solid_child_still_blocks`，
+  200 tick 后 x≈2.598）；同一场景不注册时该隐藏子行被跳过（x>5 对照）。
+  064 的“父级隐藏 solid 未单测”残余关闭。
+- 揭示失败出口：一个 tick 内第二次 move 在 slide 内触发 32-credit 计费
+  fault 10；返回前 `effective[]` 已恢复文档可见性（同测试 `v_ok/v_fail==0`、
+  `ag_visible` 仍 0、失败 move 无 token），不依赖下一 tick 的 derive 自愈。
+- 127/128 注册 solid：两者都在 INIT 被原每回调累计步门拒绝（budget），128
+  容量拒绝被该门遮蔽（129 行同样），8 个注册仍初始化并推进；行数≠注册数，
+  不提升容量（
+  `registered_solid_capacity_and_init_budget_are_separate_boundaries`）。
+- 跨文档 Session 复用不可达：每个 Run 由 `Play::new` 新建 Session
+  （`src/authoring/play.rs` 663-669），`_ag_reset` 只在 Run 起始队列出现一
+  次；没有公开入口把一个 Session 复用于另一文档，所以旧 `_ag_char3_solids`
+  注册不能写入其他文档；新 Run 初态由 20 轮 SaveAs/重开与同进程寿命门复验。
+- 同进程寿命（V-04）：一个进程顺序创建/使用/退出 8 个 Host、各 20 轮
+  Start/Stop；每轮 Stop 后 Run 级 target（4 slots / 7,584,000 B）回到
+  pre-run 基线，共享 store（7 meshes / 136,952 B）与峰值均不增长；9 个 host
+  的基线逐个相同，最后的 tail host 仍可 Run，进程 exit0 无 AV（
+  `tests/host_lifetime_flow.rs::v04_eight_hosts_and_twenty_rounds_keep_the_owner_ledger_flat`，
+  driver `--test-threads=1`）。不把进程 RSS 平稳当释放证明，也不要求驱动
+  进程内存逐轮回到启动值。
+- 未证边界：真实 OS SendInput/焦点捕获/DPI 真切换仍是手动门（当前机器唯一
+  1920×1280 虚拟显示、单一 scale）；不改 043 可见行语义、不提升注册容量、
+  不声称多窗口/任意状态迁移/全物理。
