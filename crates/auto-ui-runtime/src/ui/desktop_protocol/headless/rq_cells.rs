@@ -175,6 +175,10 @@ fn inventory(list: &DisplayList) -> serde_json::Value {
                 path_segs += p.segs.len();
             }
             DisplayOp::Image { .. } => img += 1,
+            DisplayOp::GlyphRun { glyphs, .. } => {
+                text += 1;
+                path_segs += glyphs.len();
+            }
             DisplayOp::Scissor { .. } | DisplayOp::ScissorPop => clip += 1,
             DisplayOp::Transform { .. } | DisplayOp::TransformPop => xform += 1,
         }
@@ -266,6 +270,8 @@ fn measure_case(
     let backdrop = corner_color(&direct_png);
 
     let mut surface = HeadlessSurface::new(CellComponent { view }, W, H);
+    // T-02：本矩阵按用户裁定打开 glyph run（Host 不重排文字）。
+    surface.set_glyph_runs(true);
     let (mut produce, mut encode, mut decode, mut replay) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let mut inventory_json = serde_json::Value::Null;

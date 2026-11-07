@@ -931,6 +931,27 @@ where
                 }
                 i += 1;
             }
+            DisplayOp::GlyphRun {
+                font_hash,
+                font_size,
+                weight,
+                flags,
+                color,
+                line_offset,
+                glyphs,
+            } => {
+                paint_glyph_run(
+                    frame,
+                    font_hash,
+                    *font_size,
+                    *weight,
+                    *flags,
+                    *color,
+                    *line_offset,
+                    glyphs,
+                );
+                i += 1;
+            }
             DisplayOp::Image { rect, src, .. } => {
                 let at = iced::Point::new(rect.x, rect.y);
                 let size = iced::Size::new(rect.w.max(0.0), rect.h.max(0.0));
@@ -1035,6 +1056,120 @@ fn wire_path_bounds(path: &crate::ui::desktop_protocol::message::WirePath) -> ic
         iced::Point::new(min_x, min_y),
         iced::Size::new((max_x - min_x).max(0.0), (max_y - min_y).max(0.0)),
     )
+}
+
+/// v3 字形 run 重放（PLAN-062 T-02）：按 wire 的字体内容身份与 CacheKey
+/// 参数取回**与生产端同一张**字形位图，按 wire 位置合成——不做整形/布局。
+///
+/// 字形位图按 `CacheKey` 全局缓存（跨帧/跨 op 复用），着色以 RGBA 位图承载
+/// （`Mask` 位图 = 颜色 × 覆盖率；emoji 的 `Color` 位图原样）。
+#[allow(clippy::too_many_arguments)]
+fn paint_glyph_run<R>(
+    frame: &mut iced::widget::canvas::Frame<R>,
+    font_hash: &[u8; 16],
+    font_size: f32,
+    weight: u16,
+    flags: u32,
+    color: Rgba8,
+    line_offset: f32,
+    glyphs: &[crate::ui::desktop_protocol::message::GlyphInstance],
+) where
+    R: iced::advanced::graphics::geometry::Renderer,
+{
+    use cosmic_text::CacheKey;
+
+    let Some(font_id) = crate::ui::desktop_protocol::glyph_fonts::font_id_for_hash(font_hash) else {
+        eprintln!(
+            "[rq-warn] glyph run 的字体内容身份未装载（{:02x?}）——该 run 不呈现并须上报",
+            &font_hash[..4]
+        );
+        return;
+    };
+    let system = iced::advanced::graphics::text::font_system();
+    let mut guard = system.write().expect("Write font system");
+    let mut cache = glyph_cache().lock().unwrap();
+    for glyph in glyphs {
+        let (key, ix, iy) =
+            CacheKey::new(
+            font_id,
+            glyph.glyph_id,
+            font_size,
+            (glyph.x, glyph.y),
+            cosmic_text::fontdb::Weight(weight),
+            cosmic_text::CacheKeyFlags::from_bits_truncate(flags),
+        );
+        let rgba = match cache.get(&key) {
+            Some(cached) => cached.clone(),
+            None => {
+                let mut swash = cosmic_text::SwashCache::new();
+                let Some(image) = swash.get_image_uncached(guard.raw(), key) else {
+                    continue;
+                };
+                let Some(rgba) = glyph_rgba(&image, color) else {
+                    continue;
+                };
+                let rgba = std::sync::Arc::new(rgba);
+                cache.insert(key, rgba.clone());
+                rgba
+            }
+        };
+        let (w, h) = (rgba.width, rgba.height);
+        if w == 0 || h == 0 {
+            continue;
+        }
+        let handle = iced::widget::image::Handle::from_rgba(w, h, rgba.pixels.clone());
+        let x = (ix + rgba.left) as f32;
+        let y = (iy - rgba.top) as f32 + line_offset;
+        frame.draw_image(
+            iced::Rectangle::new(iced::Point::new(x, y), iced::Size::new(w as f32, h as f32)),
+            &handle,
+        );
+    }
+}
+
+/// 字形位图 + 放置（以 `CacheKey` 为键缓存）。
+struct CachedGlyph {
+    width: u32,
+    height: u32,
+    left: i32,
+    top: i32,
+    pixels: Vec<u8>,
+}
+
+fn glyph_cache() -> &'static Mutex<std::collections::HashMap<cosmic_text::CacheKey, std::sync::Arc<CachedGlyph>>> {
+    static CACHE: OnceLock<
+        Mutex<std::collections::HashMap<cosmic_text::CacheKey, std::sync::Arc<CachedGlyph>>>,
+    > = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+/// swash 位图 → straight RGBA（Mask = 颜色 × 覆盖率；Color = 原位图）。
+fn glyph_rgba(image: &cosmic_text::SwashImage, color: Rgba8) -> Option<CachedGlyph> {
+    let width = image.placement.width;
+    let height = image.placement.height;
+    if width == 0 || height == 0 {
+        return None;
+    }
+    let mut pixels = Vec::with_capacity((width * height * 4) as usize);
+    match image.content {
+        cosmic_text::SwashContent::Mask => {
+            for alpha in &image.data {
+                let a = ((*alpha as u16 * color.a as u16) / 255) as u8;
+                pixels.extend_from_slice(&[color.r, color.g, color.b, a]);
+            }
+        }
+        cosmic_text::SwashContent::Color => {
+            pixels.extend_from_slice(&image.data);
+        }
+        cosmic_text::SwashContent::SubpixelMask => return None,
+    }
+    Some(CachedGlyph {
+        width,
+        height,
+        left: image.placement.left,
+        top: image.placement.top,
+        pixels,
+    })
 }
 
 /// shadow 垫层（P683-D4 近似）：偏移圆角矩形，alpha 按模糊半径弱化

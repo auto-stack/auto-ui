@@ -42,10 +42,15 @@ pub(crate) fn ensure_headless_fonts() {
     use std::sync::Once;
     static FONTS: Once = Once::new();
     FONTS.call_once(|| {
-        let mut system = font_system().write().expect("Write font system");
-        system.load_font(crate::ui::iced::renderer::INTER_FONT_REGULAR.into());
-        system.load_font(crate::ui::iced::renderer::INTER_FONT_MEDIUM.into());
-        system.load_font(crate::ui::iced::renderer::INTER_FONT_SEMIBOLD.into());
+        // PLAN-062 T-02：装载即登记字体内容身份——glyph run 的 Host 侧按
+        // 内容哈希解析字体，不依赖路径/进程内 ID。
+        for bytes in [
+            crate::ui::iced::renderer::INTER_FONT_REGULAR,
+            crate::ui::iced::renderer::INTER_FONT_MEDIUM,
+            crate::ui::iced::renderer::INTER_FONT_SEMIBOLD,
+        ] {
+            let _ = super::glyph_fonts::register_font_bytes(bytes.to_vec());
+        }
     });
 }
 
@@ -78,6 +83,9 @@ pub struct HeadlessSurface<C: Component> {
     preedit_reported: Option<String>,
     /// PLAN-062 T-03：位图/矢量资源身份与驻留缓存（跨帧存活，P-02）。
     resources: ResourceCache,
+    /// PLAN-062 T-02：文本以 glyph run 过线（Host 不重排）。默认关 = 字符串
+    /// `TextStyled` 兼容面；对端声明 `fidelity/glyphrun/1` 后再打开。
+    glyph_runs: bool,
 }
 
 /// PLAN-062 T-03：位图资源身份与驻留缓存（P-02）。
@@ -317,6 +325,7 @@ where
             pending_controls: Vec::new(),
             preedit_reported: None,
             resources: ResourceCache::default(),
+            glyph_runs: false,
         }
     }
 
@@ -352,7 +361,19 @@ where
         self.pending_bitmaps.clear();
         self.resources.begin_frame();
         let bitmaps = &mut self.pending_bitmaps;
-        lower_layers_v2(&layers, &mut self.observations, &mut self.resources, bitmaps)
+        lower_layers_v2(
+            &layers,
+            &mut self.observations,
+            &mut self.resources,
+            bitmaps,
+            self.glyph_runs,
+        )
+    }
+
+    /// 文本是否以 glyph run 过线（Host 不重排）。默认关：字符串 `TextStyled`
+    /// 是兼容面；对端声明 `fidelity/glyphrun/1` 后再打开。
+    pub fn set_glyph_runs(&mut self, on: bool) {
+        self.glyph_runs = on;
     }
 
     /// 产帧后核对 per-App 上传预算：超限则回滚本帧资源登记并返回 true，
@@ -1612,6 +1633,7 @@ fn lower_layers_v2(
     observations: &mut Vec<String>,
     resources: &mut ResourceCache,
     bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
+    glyph_runs: bool,
 ) -> DisplayList {
     let mut ops = Vec::new();
     for (index, layer) in layers.iter().enumerate() {
@@ -1630,6 +1652,7 @@ fn lower_layers_v2(
                 item.transformation(),
                 &mut ops,
                 observations,
+                glyph_runs,
             );
         }
         for image in &layer.images {
@@ -1831,6 +1854,155 @@ fn lower_quad_v2(
     });
 }
 
+/// 字符串承载（兼容面）：与 `lower_glyph_run` 同一整形结果按行拆 run 过线，
+/// Host 用同一字体栈重排（具名降级，V-02 可观测）。
+fn lower_text_runs(
+    buffer: &cosmic_text::Buffer,
+    position: iced::Point,
+    color: iced::Color,
+    ops: &mut Vec<DisplayOp>,
+) {
+    buffer_runs(
+        buffer,
+        position,
+        color,
+        iced::Vector::default(),
+        &mut |x, y, size, lh, rgba, weight, text| {
+            ops.push(DisplayOp::TextStyled {
+                x,
+                y,
+                size,
+                line_height: lh,
+                color: rgba,
+                weight,
+                italic: false,
+                text,
+            });
+        },
+    );
+}
+
+/// PLAN-062 T-02：cosmic Buffer → 逐行 `GlyphRun`（Host 不重排）。
+///
+/// 坐标与 tiny-skia 绘制同口径：`physical()` 的入参 =
+/// `(glyph.x + glyph.x_offset·font_size) · scale + position·transform`；
+/// 行基线取整偏移单独随 run 过线。字体按**内容身份**过线；字体未装载/无
+/// 内容身份时整行退回字符串 `TextStyled` 并留具名观测（不静默换字体）。
+fn lower_glyph_run(
+    buffer: &cosmic_text::Buffer,
+    position: iced::Point,
+    color: iced::Color,
+    transformation: iced::Transformation,
+    ops: &mut Vec<DisplayOp>,
+    observations: &mut Vec<String>,
+) {
+    let rgba = to_rgba8(color);
+    let scale = transformation.scale_factor();
+    let pos = position * transformation;
+    let system = font_system();
+    let mut font_system = system.write().expect("Write font system");
+    // 字体内容身份按 fontdb ID 缓存（每帧每字面只哈希一次，不逐字形拷字节）。
+    let mut hash_by_id: std::collections::HashMap<cosmic_text::fontdb::ID, Option<[u8; 16]>> =
+        std::collections::HashMap::new();
+    let mut unshipped: Vec<u16> = Vec::new();
+    for run in buffer.layout_runs() {
+        let line_offset = (run.line_y * scale).round();
+        let mut glyphs = Vec::new();
+        let mut font_hash: Option<[u8; 16]> = None;
+        let mut font_size = 0.0f32;
+        let mut weight = 400u16;
+        let mut flags = 0u32;
+        for glyph in run.glyphs {
+            let hash = *hash_by_id.entry(glyph.font_id).or_insert_with(|| {
+                font_system
+                    .raw()
+                    .get_font(glyph.font_id, glyph.font_weight)
+                    .map(|font| super::glyph_fonts::font_hash(font.data()))
+            });
+            let Some(hash) = hash else {
+                unshipped.push(glyph.glyph_id);
+                continue;
+            };
+            if font_hash.is_none() {
+                font_hash = Some(hash);
+                font_size = glyph.font_size * scale;
+                weight = glyph.font_weight.0;
+                flags = glyph.cache_key_flags.bits();
+            } else if font_hash != Some(hash) {
+                // 同一行混排不同字面（例如中文回退）：按字形边界拆 run。
+                let split = DisplayOp::GlyphRun {
+                    font_hash: font_hash.expect("上方已设"),
+                    font_size,
+                    weight,
+                    flags,
+                    color: rgba,
+                    line_offset,
+                    glyphs: std::mem::take(&mut glyphs),
+                };
+                ops.push(split);
+                font_hash = Some(hash);
+                font_size = glyph.font_size * scale;
+                weight = glyph.font_weight.0;
+                flags = glyph.cache_key_flags.bits();
+            }
+            let x = (glyph.x + glyph.font_size * glyph.x_offset).mul_add(scale, pos.x);
+            let y = (glyph.y - glyph.font_size * glyph.y_offset).mul_add(scale, pos.y);
+            glyphs.push(crate::ui::desktop_protocol::message::GlyphInstance {
+                glyph_id: glyph.glyph_id,
+                x,
+                y,
+            });
+        }
+        if let Some(font_hash) = font_hash {
+            if !glyphs.is_empty() {
+                ops.push(DisplayOp::GlyphRun {
+                    font_hash,
+                    font_size,
+                    weight,
+                    flags,
+                    color: rgba,
+                    line_offset,
+                    glyphs,
+                });
+            }
+        }
+        if !unshipped.is_empty() {
+            observations.push(format!(
+                "字体内容身份不可得（glyph {}…）——该行退回字符串承载（Host 重排，具名降级）",
+                unshipped[0]
+            ));
+            unshipped.clear();
+        }
+        // 字符串回退：仅在没有任何 glyph 被承载时补一条 TextStyled，保证
+        // 文字永不静默消失（V-02 负控口径）。
+        if ops
+            .last()
+            .map(|op| !matches!(op, DisplayOp::GlyphRun { .. }))
+            .unwrap_or(true)
+        {
+            if let Some(first) = run.glyphs.first() {
+                let line_h = if run.line_height > 0.0 {
+                    run.line_height
+                } else {
+                    first.font_size * 1.3
+                };
+                let start = run.glyphs.iter().map(|g| g.start).min().unwrap_or(0);
+                let end = run.glyphs.iter().map(|g| g.end).max().unwrap_or(0);
+                ops.push(DisplayOp::TextStyled {
+                    x: pos.x + first.x,
+                    y: pos.y + run.line_top,
+                    size: first.font_size * scale,
+                    line_height: line_h * scale,
+                    color: rgba,
+                    weight: first.font_weight.0,
+                    italic: false,
+                    text: run.text[start..end].to_string(),
+                });
+            }
+        }
+    }
+}
+
 /// v2 文本：项级非恒等变换 → Transform 包络（scale+translate 近似——
 /// iced Transformation 未公开矩阵元，旋转/剪切不可达，观测留痕）；run
 /// 几何在变换局部坐标直落。
@@ -1848,6 +2020,7 @@ fn lower_text_v2(
     transformation: iced::Transformation,
     ops: &mut Vec<DisplayOp>,
     observations: &mut Vec<String>,
+    glyph_runs: bool,
 ) {
     for text in texts {
         // Live paragraphs/editors carry their own transform; Item::Live reports
@@ -1875,24 +2048,18 @@ fn lower_text_v2(
                 ..
             } => {
                 if let Some(paragraph) = paragraph.upgrade() {
-                    buffer_runs(
+                    if glyph_runs {
+                        lower_glyph_run(
                         paragraph.buffer(),
                         *position,
                         *color,
-                        iced::Vector::default(),
-                        &mut |x, y, size, lh, rgba, weight, text| {
-                            ops.push(DisplayOp::TextStyled {
-                                x,
-                                y,
-                                size,
-                                line_height: lh,
-                                color: rgba,
-                                weight,
-                                italic: false,
-                                text,
-                            });
-                        },
-                    );
+                            transformation,
+                            ops,
+                            observations,
+                        );
+                    } else {
+                        lower_text_runs(paragraph.buffer(), *position, *color, ops);
+                    }
                 }
             }
             GfxText::Editor {
@@ -1902,24 +2069,18 @@ fn lower_text_v2(
                 ..
             } => {
                 if let Some(editor) = editor.upgrade() {
-                    buffer_runs(
+                    if glyph_runs {
+                        lower_glyph_run(
                         editor.buffer(),
                         *position,
                         *color,
-                        iced::Vector::default(),
-                        &mut |x, y, size, lh, rgba, weight, text| {
-                            ops.push(DisplayOp::TextStyled {
-                                x,
-                                y,
-                                size,
-                                line_height: lh,
-                                color: rgba,
-                                weight,
-                                italic: false,
-                                text,
-                            });
-                        },
-                    );
+                            transformation,
+                            ops,
+                            observations,
+                        );
+                    } else {
+                        lower_text_runs(editor.buffer(), *position, *color, ops);
+                    }
                 }
             }
             GfxText::Cached {
@@ -2417,7 +2578,7 @@ mod tests {
         };
         let mut cache = ResourceCache::default();
         let mut bms = Vec::new();
-        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms);
+        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms, false);
         let replay = bottom(&replayed).expect("bottom text survives host replay");
         assert!(
             (replay.0 - x - 5.0).abs() < 0.1 && (replay.1 - y - 7.0).abs() < 0.1,

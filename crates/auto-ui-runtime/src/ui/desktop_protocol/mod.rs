@@ -34,7 +34,8 @@ pub mod demo;
 pub mod dual_mode;
 pub mod editor_frame;
 pub mod endpoint;
-/// PLAN-683（方案 2 远程 Renderer）：headless iced 宿主——iced 组件树照常
+/// PLAN-062 T-02：字体内容身份（glyph run 的 Host 侧字体解析）。
+pub mod glyph_fonts;/// PLAN-683（方案 2 远程 Renderer）：headless iced 宿主——iced 组件树照常
 /// 构建/布局/绘制，渲染原语经 tiny_skia 记录层截获降格为 DrawList 过线。
 pub mod headless;
 pub mod host;

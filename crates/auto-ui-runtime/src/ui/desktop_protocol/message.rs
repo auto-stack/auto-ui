@@ -363,6 +363,7 @@ pub fn rf_textdump(tag: &str, list: &DisplayList) {
             DisplayOp::TransformPop => trp += 1,
             DisplayOp::Image { .. } => im += 1,
             DisplayOp::Path { .. } => pa += 1,
+            DisplayOp::GlyphRun { .. } => pa += 1,
         }
     }
     eprintln!(
@@ -513,6 +514,16 @@ pub struct WireStroke {
     pub join: u8,
 }
 
+/// v3 字形实例：`x`/`y` 是送入 cosmic-text `CacheKey::new` 的**物理坐标**
+/// （含亚像素），Host 用同一 `(字体内容id, glyph id, 字号, x, y, 字重, flags)`
+/// 取回同一张字形位图——因此 Host 不需要任何重排。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GlyphInstance {
+    pub glyph_id: u16,
+    pub x: f32,
+    pub y: f32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum DisplayOp {
     /// 全参 quad（v1 Quad/QuadR 合并超集）：`radius` = 四角 [TL,TR,BR,BL]。
@@ -560,6 +571,20 @@ pub enum DisplayOp {
         /// true = even-odd，false = non-zero（tiny_skia FillRule）。
         even_odd: bool,
         stroke: Option<WireStroke>,
+    },
+    /// v3 字形 run（PLAN-062 T-02）：生产端已整形，Host 按同一字体内容身份
+    /// 与同一 CacheKey 取字形位图，不做任何布局/整形。
+    GlyphRun {
+        /// 字体内容身份（blake3 前 16 字节；禁路径当身份）。
+        font_hash: [u8; 16],
+        /// 已乘 viewport scale 的字号（`physical()` 同口径）。
+        font_size: f32,
+        weight: u16,
+        flags: u32,
+        color: Rgba8,
+        /// 行基线取整偏移（`round(line_y * scale)`，与 tiny-skia 绘制同律）。
+        line_offset: f32,
+        glyphs: Vec<GlyphInstance>,
     },
 }
 
@@ -640,11 +665,11 @@ impl DisplayList {
         }
     }
 
-    /// 载荷含 v3 专属原语（当前为 `Path`）。
+    /// 载荷含 v3 专属原语（当前为 `Path` / `GlyphRun`）。
     pub fn requires_v3(&self) -> bool {
         self.ops
             .iter()
-            .any(|op| matches!(op, DisplayOp::Path { .. }))
+            .any(|op| matches!(op, DisplayOp::Path { .. } | DisplayOp::GlyphRun { .. }))
     }
 
     pub fn encode(&self, out: &mut Vec<u8>) {
@@ -765,6 +790,29 @@ impl DisplayList {
                             put_u8(out, s.join);
                         }
                         None => put_bool(out, false),
+                    }
+                }
+                DisplayOp::GlyphRun {
+                    font_hash,
+                    font_size,
+                    weight,
+                    flags,
+                    color,
+                    line_offset,
+                    glyphs,
+                } => {
+                    put_u8(out, 9);
+                    out.extend_from_slice(font_hash);
+                    put_f32(out, *font_size);
+                    put_u16(out, *weight);
+                    put_u32(out, *flags);
+                    color.encode(out);
+                    put_f32(out, *line_offset);
+                    put_u32(out, glyphs.len() as u32);
+                    for glyph in glyphs {
+                        put_u16(out, glyph.glyph_id);
+                        put_f32(out, glyph.x);
+                        put_f32(out, glyph.y);
                     }
                 }
             }
@@ -892,6 +940,35 @@ impl DisplayList {
                         fill,
                         even_odd,
                         stroke,
+                    });
+                }
+                9 if v3 => {
+                    let mut font_hash = [0u8; 16];
+                    for byte in &mut font_hash {
+                        *byte = r.u8()?;
+                    }
+                    let font_size = r.f32()?;
+                    let weight = r.u16()?;
+                    let flags = r.u32()?;
+                    let color = Rgba8::decode(r)?;
+                    let line_offset = r.f32()?;
+                    let n = r.u32()? as usize;
+                    let mut glyphs = Vec::with_capacity(n.min(4096));
+                    for _ in 0..n {
+                        glyphs.push(GlyphInstance {
+                            glyph_id: r.u16()?,
+                            x: r.f32()?,
+                            y: r.f32()?,
+                        });
+                    }
+                    ops.push(DisplayOp::GlyphRun {
+                        font_hash,
+                        font_size,
+                        weight,
+                        flags,
+                        color,
+                        line_offset,
+                        glyphs,
                     });
                 }
                 tag => return Err(CodecError::UnknownTag(tag)),
@@ -1029,7 +1106,7 @@ impl std::fmt::Display for AdmissionError {
 }
 
 impl DisplayList {
-    /// 载荷依赖的能力 ID（当前 v3 增量：路径填充/描边）。
+    /// 载荷依赖的能力 ID（v3 增量：路径填充/描边、字形 run）。
     pub fn required_capabilities(&self) -> Vec<&'static str> {
         let mut caps = Vec::new();
         if self
@@ -1038,6 +1115,13 @@ impl DisplayList {
             .any(|op| matches!(op, DisplayOp::Path { .. }))
         {
             caps.push(CAP_PATH_FILL);
+        }
+        if self
+            .ops
+            .iter()
+            .any(|op| matches!(op, DisplayOp::GlyphRun { .. }))
+        {
+            caps.push(CAP_GLYPH_RUN);
         }
         caps
     }
