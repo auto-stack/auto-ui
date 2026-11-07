@@ -229,6 +229,21 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 影响：T-02 行新增 glyph atlas 与 SDF blur 两个实现面，SD-01 的规范增量须包含“glyph run wire 结构 + 字体内容身份 + SDF/blur 支持边界”；工程量与风险显著上升，后续轮次以增量提交（wire → Host 图集 → 像素对拍）推进，未收敛前不签 T-02。
 - 记录：裁定只改变实现路径，不改变 AC/范围/仓库集合，无需 r4 修订；若实现中发现 canvas 重放面无法精确表达 blur（例如需要自定义 shader），按 §2 具名阻塞并回到用户裁定，不静默降级。
 
+### 2026-11-07 work glyph run（T-02 按裁定实现，默认关闭待混合对齐）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r3 / outcome: 进行中（能力与重放面已实现；像素对齐未收敛，故默认仍走字符串面） / code_commit: `0696129b`
+- 实现：
+  - wire：`DisplayOp::GlyphRun`（载荷 tag 3）携字体内容身份（blake3 前 16B）、已乘 scale 的字号、字重、`CacheKeyFlags`、颜色、行基线取整偏移与逐字形 `(glyph_id, x, y)`——x/y 即送入 cosmic-text `CacheKey::new` 的物理坐标（含亚像素）。能力 `fidelity/glyphrun/1` 进 `required_capabilities`（不支持的对端在入帧前被拒）。
+  - 生产端：`lower_glyph_run` 遍历 layout runs，按字面变化拆 run（中英混排），每帧按 fontdb ID 只哈希一次字体字节；无内容身份时整行退回 `TextStyled` 并留具名观测。
+  - Host：`paint_glyph_run` 按内容哈希解析字体（登记表 + 对系统回退字面的一次性 fontdb 扫描），逐字形重建同一 `CacheKey`、经 swash 取位图、按 `CacheKey` 全局缓存，再按 wire 位置与 run 颜色合成——**不做任何整形/布局**。
+  - 开关：`HeadlessSurface::set_glyph_runs`（默认关）。六格矩阵已按裁定打开，其余生产/测试面仍走字符串兼容面。
+- 实测（`rq_cells`，text_cjk 例，相对 direct 金样）：glyph run 面 **0.92%**（9434/1024000 px 差），字符串面 **0.094%**。差异集中在字形边缘（delta 分布 1–12 级不等，视觉上 glyph run 偏“粗”），根因是位图合成走 wgpu 图像管线与 direct 文本管线的 alpha/sRGB 混合不一致，不是位置或字形选错（结构面 2 runs / 15 glyphs、tag 3、能力=glyphrun/1 均正确）。
+- 结论：T-02 的“Host 不重排”路径已具备并有真实录制/重放；但**精确像素未达 direct 水平**，因此不把 glyph run 设为默认、不签 AC-02。下一轮先做混合对齐（预乘/线性空间补偿或改用 canvas 文本管线可控面），对齐后再翻默认。
+- 回归面：`cargo test -p auto-ui-runtime --lib "ui::desktop_protocol::" -- --test-threads=1` → **254 passed / 4 failed**（基线同组 4 红）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r3 | round: 4 | from: work | to: work | status: executing | outcome: pass（glyph run 能力与重放落地；对齐未收敛） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 0696129b | next: work（混合对齐 → SDF blur）
+
+
 
 
 
