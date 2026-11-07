@@ -585,3 +585,6 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
   - **(b) r5 合同修订**：把该尾部条款按实测口径写成具名边界（稳态 p50 设门、p95 记录；produce 门在负载下跳过须具名），并顺带把 SVG 例外 p50 上限对齐实测（现 60ms vs 记录 32.5ms）。这是 AC-07 的验收口径变更，需你批准。
   - **(c) 以当前能力集收口**：接受 `execution_done`，把 F-03 作为具名遗留另立计划（性能专项），062 不再追 replay 尾部条款。
   - 三者都附带：N-01（`applied` 回收）、N-02（计时门独立机也不稳）、N-04（rqhost 回收缺 `forget_surface`）、N-05（文档补跳过口径）这四项小修——它们不改变 AC，可在同一轮一起做。
+
+- stage: user | plan_id: PLAN-062 | plan_revision: r4 | round: 21 | from: user | to: work | status: execution_done | outcome: pass（裁定落地：有界性能任务 + 四项小修一并做） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 63ffebc4 | next: work（replay 尾部性能 + N-01/N-02/N-04/N-05）
+- **用户裁定（2026-11-08）**：①对 F-03 授权**有界性能任务**（不改 AC；先证伪/证实“重放画布每帧重做文字整形”的假设，用 isolated 窗口前后对照，不收敛再回 (b)/(c)）；②N-01/N-02/N-04/N-05 四项小修**现在一起做**。三循环上限的“停止第四次循环”约束由本授权解除（性能任务不属于未经授权的重复修复）。
