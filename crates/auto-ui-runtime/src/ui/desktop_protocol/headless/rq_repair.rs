@@ -440,3 +440,200 @@ fn rq_repair_fr3_slot_credit_model_and_overwrite_negative_control() {
         })
     );
 }
+
+// ---------------------------------------------------------------------------
+// F-R4：资源身份/generation（V-06/P-02）——稳定帧零重传模型 + 当前路径负控
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum ResourceKind {
+    Bitmap,
+    Font,
+    Svg,
+    Mesh,
+    Media,
+}
+
+/// 内容身份 + generation 注册表（T-03 §3 冻结方案的探针模型）。
+struct ResourceRegistry {
+    entries: std::collections::HashMap<(ResourceKind, [u8; 32]), u64>,
+    next_gen: u64,
+}
+
+impl ResourceRegistry {
+    fn new() -> Self {
+        Self {
+            entries: std::collections::HashMap::new(),
+            next_gen: 0,
+        }
+    }
+
+    /// Some(generation) = 需要上传（首次/内容变更/驱逐后）；None = 稳定命中（零上传）。
+    fn observe(&mut self, kind: ResourceKind, key: [u8; 32]) -> Option<u64> {
+        if self.entries.contains_key(&(kind, key)) {
+            return None;
+        }
+        self.next_gen += 1;
+        self.entries.insert((kind, key), self.next_gen);
+        Some(self.next_gen)
+    }
+
+    fn evict(&mut self, kind: ResourceKind, key: &[u8; 32]) {
+        self.entries.remove(&(kind, *key));
+    }
+
+    fn new_session(&mut self) {
+        self.entries.clear();
+    }
+}
+
+fn bitmap_key(u: &super::super::endpoint::BitmapUpload) -> [u8; 32] {
+    let mut h = blake3::Hasher::new();
+    h.update(&u.w.to_le_bytes());
+    h.update(&u.h.to_le_bytes());
+    h.update(&u.stride.to_le_bytes());
+    h.update(&u.rgba);
+    *h.finalize().as_bytes()
+}
+
+fn produce_uploads(view: View<()>) -> (usize, Vec<[u8; 32]>, usize) {
+    let mut surface = HeadlessSurface::new(RepairComponent { view }, W, H);
+    let mut uploads = Vec::new();
+    let mut bytes = 0usize;
+    let _ = surface.render_frame_v2();
+    for u in surface.drain_bitmap_uploads() {
+        bytes += u.rgba.len();
+        uploads.push(bitmap_key(&u));
+    }
+    (uploads.len(), uploads, bytes)
+}
+
+#[test]
+fn rq_repair_fr4_resource_identity_zero_reupload() {
+    // 1) 当前路径负控：同内容稳定帧仍每帧上传（V-06 违约可检出）。
+    //    先跑数帧找到“内容稳定段”（编辑器首帧字形栅格尚未稳定）。
+    let stable: View<()> = View::code_editor("fr4-stable")
+        .value("fn main() {\n    println!(\"稳定\");\n}")
+        .lang("rust")
+        .build();
+    let mut raw: Vec<Vec<[u8; 32]>> = Vec::new();
+    let mut counts = Vec::new();
+    let mut bytes = Vec::new();
+    for _ in 0..6 {
+        let mut surface = HeadlessSurface::new(RepairComponent { view: stable.clone() }, W, H);
+        let _ = surface.render_frame_v2();
+        let uploads: Vec<_> = surface.drain_bitmap_uploads();
+        counts.push(uploads.len());
+        bytes.push(uploads.iter().map(|u| u.rgba.len()).sum::<usize>());
+        raw.push(uploads.iter().map(bitmap_key).collect());
+    }
+    let prefixes: Vec<Vec<String>> = raw
+        .iter()
+        .map(|ks| {
+            ks.iter()
+                .map(|k| format!("{:02x}{:02x}{:02x}{:02x}", k[0], k[1], k[2], k[3]))
+                .collect()
+        })
+        .collect();
+    // 稳定起始帧：从第 i 帧起与上一帧键集相同。
+    let mut stable_from = None;
+    for i in 1..raw.len() {
+        if raw[i] == raw[i - 1] {
+            stable_from = Some(i);
+            break;
+        }
+    }
+    println!(
+        "[RQREPAIR] {}",
+        serde_json::json!({
+            "tag": "fr4_current_path", "uploads_per_frame": counts,
+            "bytes_per_frame": bytes, "key_prefixes": prefixes,
+            "stable_from_frame": stable_from,
+            "note": "同内容稳定帧每帧仍上传 = V-06 违约（负控）",
+        })
+    );
+    assert!(
+        counts.iter().all(|n| *n > 0),
+        "当前路径稳定帧仍上传（负控存在）"
+    );
+    let stable_from = stable_from.expect("编辑器应出现内容稳定的连续帧");
+    let key = raw[stable_from][0];
+
+    // 2) 冻结方案模型：稳定帧零重传；变更/驱逐/新 session 才重传。
+    let mut registry = ResourceRegistry::new();
+    let g1 = registry.observe(ResourceKind::Bitmap, key);
+    assert!(g1.is_some(), "首次出现必须上传");
+    let stable_uploads = (0..4)
+        .filter(|_| registry.observe(ResourceKind::Bitmap, key).is_some())
+        .count();
+    assert_eq!(stable_uploads, 0, "稳定帧（第 2 帧起）必须零上传");
+
+    // 内容变更 → 新键 → 重传
+    let changed: View<()> = View::code_editor("fr4-stable")
+        .value("fn main() {\n    println!(\"变更\");\n}")
+        .lang("rust")
+        .build();
+    // 内容变更：取同一稳定上传的字节做一次真实字节级修改（blake3 重算），
+    // 证明方案对“同尺寸不同内容”产生新身份并重传。
+    let mut warm_surface = HeadlessSurface::new(RepairComponent { view: stable.clone() }, W, H);
+    for _ in 0..3 {
+        let _ = warm_surface.render_frame_v2();
+        let _ = warm_surface.drain_bitmap_uploads();
+    }
+    let base_upload = {
+        let _ = warm_surface.render_frame_v2();
+        let ups = warm_surface.drain_bitmap_uploads();
+        assert!(!ups.is_empty(), "稳定帧应有位图上传");
+        ups.into_iter().next().unwrap()
+    };
+    assert_eq!(bitmap_key(&base_upload), key, "稳定上传内容键应可复现");
+    let mut changed_bytes = base_upload.clone();
+    changed_bytes.rgba[0] ^= 0xFF;
+    let changed_key = bitmap_key(&changed_bytes);
+    assert_ne!(changed_key, key, "字节级内容变更必须产生不同内容键");
+    let g2 = registry.observe(ResourceKind::Bitmap, changed_key);
+    assert!(g2.is_some(), "内容变更必须重传");
+    assert!(g2.unwrap() > g1.unwrap(), "generation 必须单调递增");
+    // 驱逐 → 同键重新上传；新 session → 清空后重传。
+    registry.evict(ResourceKind::Bitmap, &key);
+    assert!(
+        registry.observe(ResourceKind::Bitmap, key).is_some(),
+        "驱逐后同键必须重传"
+    );
+    registry.new_session();
+    assert!(
+        registry.observe(ResourceKind::Bitmap, key).is_some(),
+        "新 session 必须全量重传"
+    );
+    println!(
+        "[RQREPAIR] {}",
+        serde_json::json!({
+            "tag": "fr4_identity_model",
+            "first_gen": g1, "changed_gen": g2,
+            "stable_frame_uploads": stable_uploads,
+            "evict_reupload": true, "new_session_reupload": true,
+            "note": "冻结方案：内容身份+generation → 稳定帧 0 上传；实现归 UI062/UI063",
+        })
+    );
+
+    // 3) 资源种类通用性：同一注册表可承载 bitmap/font/svg/mesh/media 身份。
+    let mut multi = ResourceRegistry::new();
+    let mut kinds = Vec::new();
+    for kind in [
+        ResourceKind::Bitmap,
+        ResourceKind::Font,
+        ResourceKind::Svg,
+        ResourceKind::Mesh,
+        ResourceKind::Media,
+    ] {
+        kinds.push((format!("{kind:?}"), multi.observe(kind, key).is_some()));
+        assert!(
+            multi.observe(kind, key).is_none(),
+            "{kind:?} 稳定命中必须零上传"
+        );
+    }
+    println!(
+        "[RQREPAIR] {}",
+        serde_json::json!({ "tag": "fr4_kinds", "first_upload": kinds })
+    );
+}
