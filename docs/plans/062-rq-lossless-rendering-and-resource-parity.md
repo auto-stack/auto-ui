@@ -143,7 +143,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | [ ] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02；AC-07/V-05～08（按§6分工）——进行中：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`，mesh 重放 0.0%、SVG 0.333%）；GlyphRun wire、blur/SDF、几何渐变仍具名缺口（§9） |
 | [ ] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03；AC-07/V-05～08（按§6分工）——进行中：内容身份+驻留缓存（稳定帧 0 重传、驱逐可解释）、图片 alpha/rotation、SVG 栅格资源已交付；媒体族与 wire generation 字段待补（§9） |
 | [ ] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——进行中：能力协商/准入保旧帧、槽 credit 背压、无覆盖在途槽已交付；per-App 上传速率/CPU 预算与慢 Host 负控待补（§9） |
-| [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09 |
+| [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——进行中：六格已全部有真实 wire 证据（`4e2f53d3`：两产者 × 两宿主，含 v3 tag 3 槽分派缺陷修复），39 View ID 逐项读数与 M-02/06/07 待补 |
 | [ ] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
 | [ ] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
 
@@ -302,6 +302,7 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
   2. **shadow blur / SDF**：重放面仍为单层垫层近似；精确复现需 Host 具备 blur/SDF 能力（61 具名缺口）。同上需要范围决定。
   3. **per-App CPU 工作预算/公平调度**（T-04/P-04）：上传速率预算已于 `0e614935` 落地（8 MiB/1s 滑动窗口、超限整帧回滚 + 背压重试）；仍缺的是 CPU 侧分批/限流与 1/4/8 App 公平策略（真实规模归 UI063/OS063）。若要求本 Plan 内实现 CPU 预算，需要先定“分批单位与抢占点”，否则只能做代理测量。
 - **本轮已收口的项**：per-App 上传速率（8 MiB/s + 整帧回滚 + 背压）已完成并用负控验证，不含在上述待裁定清单内。
+- **2026-11-07 主检出存在他方未提交 WIP（merge 前必须由 owner 归位，不属本 Plan）**：主检出 `D:/autostack/auto-ui`（master `df09d816`）工作树里有未提交修改 `crates/auto-ui-runtime/src/ui/desktop_protocol/{headless,host,rqhost}.rs`、`ui/session.rs`，内容是把已撤回的 `drain_resource_releases`（PLAN-062 在 `00bd355d` 整提交撤回的 ResourceRelease）接线到 `FrameSource` 实现上；master 上这些方法不存在，该 WIP 与主线不可编译/语义不一致。本 Plan 未触碰、未 include、未 stash；worktree `codex/plan-062-dev` 不受影响。**merge 前**需其 owner 把这些改动路由回自己的树（stash/patch 交接或 fix worktree），否则主检出不满足 master-zero-WIP 门。
 - 性能数值预算/实际刷新率/可运行规模待UI061授权执行后按先基线后候选冻结；无预算不签PASS，支持承诺或阈值变化须具名修订。
 - SVG 记录路径每帧新建 iced renderer（produce ≈20–32ms，T-05 实测）属 T-02 生产侧实现债，修它需要改 `HeadlessSurface` 的 renderer 生命周期（缓存迁移风险），建议单独有界任务而不是塞进本 Plan 收尾。
 - 本轮没有必须再询问才能成稿的问题；实施暂停来自用户的规划范围。后续启动不改变既有依赖门。
@@ -379,3 +380,16 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
   3. **N2 关闭**：矩阵默认门 0.2% → **0.1%**（与 AC-02 r4 一致，实测 0.00094–0.00100 仍通过）。
 - 冻结门复跑（本树 `00bd355d`）：`rq_` **29/0**；`ui::desktop_protocol::` **258 passed / 4 failed**（基线同组）。
 - **未解决（需用户裁定或续做）**：AC-01（六格只跑 2 格、39 个 View ID 无逐项结果、无两 Host 真实重放）；AC-03（跨进程释放/引用记账、媒体族、wire generation）；AC-04（generation 负控、两进程 v2↔v3 配对、慢 Host/旧 ACK 负控）。按 r4 先例，这四项要么再授权一次口径修订（r5），要么继续实现；本 Goal 轮次预算已用尽，未 merge、未归档。
+### 2026-11-07 work 真实 wire 六格（T-05 传输级）与 v3 槽分派缺陷修复
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r4 / outcome: 进行中（六格全部有真实 wire 证据；“39 个 View ID 逐项”仍未做） / worktree: `D:/autostack/.wt/ui-062/auto-ui` / branch: `codex/plan-062-dev` / code_commit: `4e2f53d3`
+- 新增 `rq_wire`（test-only）：producer → `ClientPump`（Hello/激活/槽信用）→ 真实命名管道 + shm 帧槽 + ACK → 宿主端点 → **两套不同**的宿主合成面 → broker canvas 快照 → 与 direct 金样对拍。宿主：standalone = `rqhost::RqServe/adopt_one/pump_client`；desktop = `DesktopSession` 的 broker 客户端（同 `compose_v2` 准入/保旧帧语义）。产者：Rust 构件与 VM（`build_dynamic_component` 解释执行 AutoLang 源码；direct 金样取同一解释结果的 view，不手写期望包）。
+- **发现并修复线上缺陷（P0，`4e2f53d3`）**：`FrameReadyShared` 的槽载荷分派只认 tag 2；v3 帧（DisplayList tag 3）落进 v1 DrawList 分支解码失败后**被静默丢弃**——path_mesh 在两宿主上合成面恒空（inproc 矩阵不经传输，掩盖了该缺陷）。修复 = `shm::is_display_list_payload`（2|3）成为唯一判定点，三处消费（`rqhost`、`host::ProtocolHost`、桌面 `session`）共用；回归 `display_list_payload_kinds_cover_v2_and_v3`（含真实编码首字节 = 3 的断言）。
+- 读数（1280×800@scale2，阈值 2/255，默认 producer，**两宿主逐例相同**）：path_mesh **0.095%**（tag 3 经真实槽分派）、svg_icon 0.039%、text_cjk 0.094%、gradient_border_shadow 0.063%；VM 产者 vm_text 0.094%、vm_icon 0.057%、vm_row_button **0.000%**。全部 ≤0.1% 门。
+- 六格状态更新：`rust/direct`、`rust/standalone-rq`（本模块 inproc）+ `rust/desktop-rq`、`vm/direct`、`vm/standalone-rq`、`vm/desktop-rq`（`rq_wire` 真实 wire）——六格全部可运行且有逐例读数；`rq_cells` 的“四格不可运行”断言改为“六格必须有证据（本模块读数或 rq_wire 点名）”。**边界不变**：peer 跑本进程线程（真实管道/端点/shm/ACK），present 仍是 offscreen 快照；跨进程换载/物理上屏归 OS063。
+- 排障还原（不当结论）：首测 gradient 0.83%，根因是 `DesktopSession` boot 把**全局主题**切到 stella，direct 金样与产者不同主题；恢复全局主题后 0.063%。已写进 Spec §5.1（矩阵必须两侧同主题，否则量到的是主题漂移不是保真差）。
+- Spec 同步（SD-01 目标文件）：§1 增“槽载荷分派”规则（1=v1；2/3=DisplayList 同臂，唯一判定点）；§5 重写为“传输级六格 + 同进程矩阵”两层证据，并**修正上一版默认/富模式读数写反**的表格；§6 第 6 条更新为“同进程真实管道配对已覆盖，真两进程/慢 Host/旧 ACK 仍缺”。
+- 回归面（本树 `4e2f53d3`）：`rq_` **30/0**；`ui::desktop_protocol::` **260 passed / 4 failed**（4 红与 base `3d64877d` 同组：autocenter、stage3 stress n3/n5、t3_examples_queue_end_to_end）。
+- 仍缺（不签 T-05）：39 个 View ID 的逐项读数；AC-03 媒体族与 wire generation；AC-04 真两进程 v2↔v3 配对、慢 Host/旧 ACK/乱序资源负控；M-02/M-06/M-07 未测。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 7 | from: work | to: work | status: executing | outcome: pass（六格 wire 证据 + P0 槽分派修复） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 4e2f53d3 | next: work（39 View ID 逐项 / AC-03 / AC-04）
