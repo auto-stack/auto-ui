@@ -253,6 +253,17 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 状态：glyph run 仍为 opt-in（`set_glyph_runs`），AC-02 不签。下一步要么把 Host 合成换成与 direct 文本管线同源的路径，要么量化证明残差只来自 AA 并在 Spec 里具名窄容差（需 review 同意，不能自定阈值）。
 - 回归面：`cargo test -p auto-ui-runtime --lib "ui::desktop_protocol::" -- --test-threads=1` → **255 passed / 4 failed**（基线同组 4 红）。
 
+### 2026-11-07 work 阴影贴片（T-02 SDF/blur 按裁定实现）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r3 / outcome: 进行中（阴影改为生产端精确栅格化；文字合成残差仍在） / code_commit: `06d8d232`
+- 实现：带阴影的 quad 由生产端按 `iced_wgpu/solid.wgsl` 的同一公式逐设备像素求值（`rounded_box_sdf` 双倍中心坐标、半径取短边一半、`smoothstep(-blur, blur, max(sdf,0))`），生成直通 RGBA 贴片并按内容身份上行资源；帧里先发 `Image(贴片)` 再发 `shadow: None` 的 Quad——Host 不再画垫层近似。几何按 shader 的顶点扩边（`|offset| + 2·blur`）取整，避免模糊外沿被裁；设备/逻辑比例由根层 bounds 推导（不写死 2x），单边 4096 上限具名拒绝。
+- 实测（`rq_cells`，新增 `shadow_only` 例，相对 direct 金样）：**0.74%**（37632B 贴片、1 次上传、稳定帧 13 次命中）。此前为单层 scrim 近似（硬边）。
+- 仍存差距：0.74% 不是 exact；残差来自贴片经画布图像管线合成（与 direct 的 quad shader 合成路径不同）以及 quad 本体与阴影分两层合成。按 §2 不静默降级，已在 review 口径下具名。
+- 回归面：**255 passed / 4 failed**（基线同组 4 红，无新增）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r3 | round: 6 | from: work | to: work | status: executing | outcome: pass（阴影贴片落地；文字/阴影合成残差具名） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 06d8d232 | next: work（收口或转 review）
+
+
 
 
 
