@@ -388,12 +388,14 @@ impl<'a> ProtocolHost<'a> {
                     ..
                 } => {
                     // 从共享内存槽读载荷 → 解码 → 与管道帧同路合成。
-                    // PLAN-683：槽内载荷种类 tag 分派（2 = v2 → v2 槽）。
+                    // PLAN-683：槽内载荷种类 tag 分派（2 = v2 / 3 = v3 超集）。
                     let slot_payload = self
                         .shm_buffers
                         .get(&surface)
                         .and_then(|shm| shm.read_slot(slot).ok());
-                    if super::shm::frame_payload_kind(slot_payload.as_deref().unwrap_or(&[])) == 2 {
+                    if super::shm::is_display_list_payload(super::shm::frame_payload_kind(
+                        slot_payload.as_deref().unwrap_or(&[]),
+                    )) {
                         let ready_v2 = slot_payload
                             .as_deref()
                             .and_then(|p| super::shm::display_list_from_slot_payload(p).ok());

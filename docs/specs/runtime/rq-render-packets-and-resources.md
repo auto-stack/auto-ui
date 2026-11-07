@@ -17,6 +17,11 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 - **编码规则**：一帧只用一种 tag。含 `Path`/`GlyphRun` → tag 3；否则仍编
   tag 2（旧 Host 的双读窗口不被破坏）。旧 Host 对 tag 3 明确 `UnknownTag(3)`
   拒绝并**保旧帧**（不呈现半帧）。
+- **槽载荷分派**（`FrameReadyShared` + shm 槽）：槽内首字节 = 载荷种类 tag。
+  `1` = DrawList v1；`2`/`3` = **DisplayList**（v2 词汇 / v3 超集），二者必须
+  **同臂**进入 v2 合成面（`compose_v2` 负责能力准入与保旧帧）。把 tag 3 当 v1
+  解码会**静默丢整帧**——`shm::is_display_list_payload` 是唯一判定点，三处宿主
+  消费（`rqhost`、`host::ProtocolHost`、桌面 `session`）共用。
 - 信封 `PROTOCOL_VERSION` 不变（v3 只是载荷演进）。
 
 ## 2. v3 原语
@@ -105,32 +110,61 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 
 ## 5. 实测保真边界（2026-11-07，offscreen 代理终点）
 
-六格矩阵（`rq_cells`）：`rust/direct` 可跑、`rust/standalone-rq` 可跑（inproc
-近似），`rust/desktop-rq`、`vm/direct`、`vm/standalone-rq`、`vm/desktop-rq`
-为**不可运行格**（owner UI063/OS063，fixture 不冒充真实 producer）。同 source/
-主题/1280×800@scale2，逐例像素差（阈值 2/255）：
+两层证据，缺一不可：传输级（真实 wire + 两宿主）证明**链路不丢帧/不改帧**；
+同进程矩阵证明**记录/降格本身的保真**。
 
-| 例 | v3 原语 | 默认 producer（字符串 + scrim） | v3 富模式（glyph run + SDF 贴片，opt-in） |
+### 5.1 传输级六格（`rq_wire`，真实管道 + 两宿主合成面）
+
+链路：producer → `ClientPump`（Hello/激活/槽信用）→ 真实命名管道（编解码）+
+shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → broker canvas 快照：
+
+- standalone：`rqhost::RqServe` / `adopt_one` / `pump_client`（独立 RQ 宿主同代码）；
+- desktop：`DesktopSession` 的 broker 客户端（桌面嵌载宿主同代码）。
+
+同 source/主题/1280×800@scale2，阈值 2/255（默认 producer = 字符串 + scrim）：
+
+| 格 | 产者 | 例 | 像素差 |
 |---|---|---|---|
-| path_mesh | Path×4（12 段） | 0.095% | 0.095% |
-| svg_icon | Image（16×16 资源） | 0.100% | 0.100% |
-| text_cjk | GlyphRun×2（15 glyph）/ TextStyled | **0.80%**（具名遗留） | 0.094% |
-| gradient_border_shadow | Quad + 阴影贴片 | 1.37% | 0.0625% |
-| shadow_only | Image（阴影贴片） | **0.74%**（具名遗留） | — |
-| scroll_clip | GlyphRun / TextStyled | 0.33% | 0.000% |
-| progress_bar | Quad×2 | 0.006% | 0.006% |
+| rust/standalone-rq、rust/desktop-rq | Rust 构件 | path_mesh（Path×4 / 12 段，tag 3） | 0.095% |
+| 同上 | Rust | svg_icon（Image 资源经 shm 位图段） | 0.039% |
+| 同上 | Rust | text_cjk（字符串面） | 0.094% |
+| 同上 | Rust | gradient_border_shadow | 0.063% |
+| vm/standalone-rq、vm/desktop-rq | VM（AutoLang 解释执行） | vm_text | 0.094% |
+| 同上 | VM | vm_icon（`icon` → lucide svg 资源） | 0.057% |
+| 同上 | VM | vm_row_button | 0.000% |
 
-- 结论清晰：**Path / SVG / Quad 类原语已经对齐（≤0.1%）**；文字与阴影在 glyph run /
-  贴片路径下**尚未 exact**（0.33–1.37%），退回字符串面时文字重新变好（0.094%）。
-- 两者的残差同源：贴片/字形位图经画布图像管线合成，与 direct 的文本/quad shader
-  合成路径不同（位置与几何已证相等，例如 glyph `x` 与 cosmic-text `physical()`
+- 两宿主逐例读数**相同**：同一载荷 + 同一 `front_v2` 合成面代码，差异只可能来自
+  传递层（当前为零）。
+- **v3 tag 3 帧必须经槽分派到达宿主**（见 §1）。真实 wire 首次实测时该分派只认
+  tag 2，v3 帧被当 v1 DrawList 解码失败后**静默丢弃**（path_mesh 合成面恒空）；
+  修复后 path_mesh 在两种宿主上都是 0.095%。
+- 边界：peer 跑本进程线程（真实管道/端点/shm/ACK），**不是独立进程**；present
+  是 offscreen 快照。跨进程换载、物理上屏与真实刷新 deadline 归 OS063。
+
+### 5.2 同进程矩阵（`rq_cells`，记录/降格保真）
+
+同 harness、同阈值；默认 producer 与 v3 富模式（glyph run + SDF 贴片，**opt-in**）
+分别度量：
+
+| 例 | 默认 producer（字符串 + scrim） | v3 富模式（opt-in） |
+|---|---|---|
+| path_mesh | 0.095% | 0.095% |
+| svg_icon | 0.100% | 0.100% |
+| text_cjk | 0.094% | **0.798%**（具名遗留） |
+| gradient_border_shadow | 0.063% | **1.374%**（具名遗留） |
+| scroll_clip | 0.000% | **0.330%**（具名遗留） |
+| shadow_only | 0.005% | **0.741%**（具名遗留） |
+| progress_bar | 0.006% | 0.006% |
+
+- 默认 producer 全部 ≤0.1%（AC-02 r4 门）；v3 富模式是**具名边界**，不得计为
+  exact，也不得用其读数替代默认面。
+- 富模式残差同源：字形位图/阴影贴片经画布图像管线合成，与 direct 的文本/quad
+  shader 合成路径不同（位置与几何已证相等：glyph `x` 与 cosmic-text `physical()`
   逐字相等；阴影贴片与 shader 同式求值）。
-- 因此 v3 glyph run **默认关闭**；打开它需要先解决合成对齐（Host 侧同源管线或
-  经 review 同意的具名窄容差）。字符串面保持 0.094% 且 Host 用同一字体栈重排
-  （可观测降级）。
-- 性能（p50，standalone-RQ 例，默认 producer）：produce 0.17–0.24ms（SVG 例外 ~32.5ms，根因是
+- 性能（p50，默认 producer）：produce 0.17–0.24ms（SVG 例外 ~32.5ms，根因是
   记录路径每帧新建 iced renderer 导致 iced 缓存冷启）、encode 0.005–0.008ms、
-  decode 0.004–0.008ms、replay 5.2–6.5ms（首帧有一次 10.09ms 离群），direct 稳态帧 p50 3.3–6.9ms。
+  decode 0.004–0.008ms、replay 5.2–6.5ms（首帧有一次 10.09ms 离群），direct 稳态帧
+  p50 3.3–6.9ms。
 - M 指标：M-04/M-08 measured；M-01/M-03/M-05 为 proxy（present 与 GPU 驻留未测）；
   M-02/M-06/M-07 unmeasured（真实 deadline、冷热启动、1/4/8 App 归 UI063/OS063）。
 
@@ -143,8 +177,9 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 4. per-App CPU 预算/公平调度未实现（真实规模归 UI063/OS063）；上传预算记账目前
    只有端点产帧路径会调用，探针/新 FrameSource 需自行调用。
 5. 媒体资源族（Video/RemoteFrame）未进本增量。
-6. v2↔v3 双读只做了 tag 语义与拒绝路径，未做两进程实机配对；慢 Host/乱序资源/
-   旧 ACK 负控未跑。
+6. v2↔v3 双读已覆盖 tag 语义、拒绝路径与**同进程真实管道**配对（`rq_wire`：
+   两种产者 × 两宿主）；仍缺**真两进程**（独立 exe）配对、慢 Host/乱序资源/
+   旧 ACK 负控。跨进程换载与物理上屏归 OS063。
 7. wire 无显式 generation 字段：`src` 已含内容哈希+单调序号，本地做不了有意义的
    “旧代号拒绝”；同 id 重上传按既有语义视为刷新（last-write-wins，由 ACK/槽纪律
    约束），跨进程乱序保护仍需 wire 字段。

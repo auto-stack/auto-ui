@@ -5715,16 +5715,17 @@ impl DesktopSession {
                     slot,
                     ..
                 } => {
-                    // PLAN-683：槽内载荷种类 tag 分派（2 = v2 → v2 槽）。
+                    // PLAN-683：槽内载荷种类 tag 分派（2 = v2 / 3 = v3 超集 → v2 槽）。
                     eprintln!("[plan060] frame compose wid={wid} frame_id={frame_id} slot={slot}");
                     let slot_payload = client
                         .shm
                         .get(&surface)
                         .and_then(|shm| shm.read_slot(slot).ok());
-                    if crate::ui::desktop_protocol::shm::frame_payload_kind(
-                        slot_payload.as_deref().unwrap_or(&[]),
-                    ) == 2
-                    {
+                    if crate::ui::desktop_protocol::shm::is_display_list_payload(
+                        crate::ui::desktop_protocol::shm::frame_payload_kind(
+                            slot_payload.as_deref().unwrap_or(&[]),
+                        ),
+                    ) {
                         let ready_v2 = slot_payload.as_deref().and_then(|p| {
                             crate::ui::desktop_protocol::shm::display_list_from_slot_payload(p).ok()
                         });

@@ -587,7 +587,9 @@ fn apply_actions(
                     .shm
                     .get(&surface)
                     .and_then(|s| s.read_slot(slot).ok());
-                if super::shm::frame_payload_kind(slot_payload.as_deref().unwrap_or(&[])) == 2 {
+                if super::shm::is_display_list_payload(super::shm::frame_payload_kind(
+                    slot_payload.as_deref().unwrap_or(&[]),
+                )) {
                     let ready_v2 = slot_payload.as_deref().and_then(|payload| {
                         super::shm::display_list_from_slot_payload(payload).ok()
                     });

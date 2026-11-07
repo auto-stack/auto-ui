@@ -325,10 +325,22 @@ pub fn display_list_from_slot_payload(
 }
 
 /// 槽载荷的帧版本分派（PLAN-683 remote 模式）：首字节 = 载荷种类 tag
-///（1 = DrawList v1 / 2 = DisplayList v2）——v2 统一 lift 后交 v2 消费面。
+///（1 = DrawList v1 / 2 = DisplayList v2 / 3 = DisplayList v3 超集）——v2/v3
+/// 统一 lift 后交 v2 消费面。
 pub fn frame_payload_kind(payload: &[u8]) -> u8 {
     payload.first().copied().unwrap_or(0)
 }
+
+/// 槽载荷是否 [`DisplayList`]（2 = v2 词汇 / 3 = v2 超集，含 Path/GlyphRun）。
+///
+/// PLAN-062 T-05 真实 wire 复现：v3 帧编码后的首字节是 DisplayList 自身的
+/// tag 3，而宿主分派此前只认 `== 2` —— v3 帧被当成 v1 DrawList 解码失败后
+/// **静默丢弃**（同进程矩阵不经过传输，掩盖了该缺陷）。能力准入与保旧帧
+/// 语义都在 `compose_v2` 里，故 v3 必须与 v2 同臂分派。
+pub fn is_display_list_payload(kind: u8) -> bool {
+    matches!(kind, 2 | 3)
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -337,6 +349,45 @@ mod tests {
 
     fn test_name(tag: &str) -> String {
         format!("autodesk-shm-386-{tag}-{}", std::process::id())
+    }
+
+    /// PLAN-062 T-05（真实 wire 复现）：槽载荷分派必须把 DisplayList 的
+    /// **v3 超集 tag 3** 与 v2 tag 2 同等看待。此前宿主只认 `== 2`，v3 帧
+    /// （Path/GlyphRun）被当 v1 DrawList 解码失败后**静默丢弃**——同进程
+    /// 矩阵不经过传输，掩蔽了该缺陷（wire 格 path_mesh 复现：合成面恒空）。
+    #[test]
+    fn display_list_payload_kinds_cover_v2_and_v3() {
+        assert!(is_display_list_payload(2), "v2 载荷必须走 DisplayList 分派");
+        assert!(is_display_list_payload(3), "v3 超集载荷必须走 DisplayList 分派");
+        assert!(!is_display_list_payload(1), "v1 DrawList 不得误入 v2 分派");
+        assert!(!is_display_list_payload(0), "空槽/未知载荷不得进入合成");
+
+        // 真实编码帧的首字节就是 DisplayList tag：v3 帧（含 Path）必为 3。
+        let v3 = crate::ui::desktop_protocol::message::DisplayList {
+            clear: None,
+            ops: vec![
+                crate::ui::desktop_protocol::message::DisplayOp::Path {
+                    path: crate::ui::desktop_protocol::message::WirePath {
+                        segs: vec![
+                            crate::ui::desktop_protocol::message::PathSeg::MoveTo(0.0, 0.0),
+                            crate::ui::desktop_protocol::message::PathSeg::LineTo(4.0, 4.0),
+                        ],
+                    },
+                    fill: Some(crate::ui::desktop_protocol::message::Fill::Color(Rgba8::new(
+                        0, 0, 0, 255,
+                    ))),
+                    even_odd: false,
+                    stroke: None,
+                },
+            ],
+        };
+        let mut bytes = Vec::new();
+        v3.encode(&mut bytes);
+        assert_eq!(frame_payload_kind(&bytes), 3, "v3 帧首字节 = DisplayList tag 3");
+        assert!(
+            is_display_list_payload(frame_payload_kind(&bytes)),
+            "v3 帧必须被槽分派接受（否则宿主静默丢帧）"
+        );
     }
 
     #[cfg(windows)]

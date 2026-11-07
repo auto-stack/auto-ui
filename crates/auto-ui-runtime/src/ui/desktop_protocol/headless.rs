@@ -2562,6 +2562,9 @@ mod rq_lossless;
 // PLAN-062 T-05: 六格绘图/资源重放矩阵与指标重放（test-only）。
 #[cfg(test)]
 mod rq_cells;
+// PLAN-062 T-05 补：真实 wire（管道/端点/shm）+ 两 Host 合成面重放（test-only）。
+#[cfg(test)]
+mod rq_wire;
 
 // ================================ 测试 ================================
 

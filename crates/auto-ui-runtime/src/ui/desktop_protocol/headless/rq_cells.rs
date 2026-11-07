@@ -43,12 +43,13 @@ impl Component for CellComponent {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CellStatus {
-    /// 本仓可真实执行（offscreen 代理终点）。
+    /// 本模块可真实执行（offscreen 代理终点）。
     Runnable,
     /// 可跑但为同进程近似（真实独立 Host 进程归 OS063）。
     InprocApprox,
-    /// 不可运行：显式缺口 + owner。
-    Unrunnable,
+    /// 不在本模块驱动，但已由 `rq_wire` 以真实 wire（管道/端点/shm + 宿主合成面）
+    /// 覆盖——证据在 `t05-wire.json`，不在此处重复跑。
+    CoveredByWire,
 }
 
 struct Cell {
@@ -76,39 +77,39 @@ fn cells() -> Vec<Cell> {
             host: "standalone RQHost（broker canvas 重放，inproc 近似）",
             status: CellStatus::InprocApprox,
             owner: "T-05（真实独立进程窗口归 OS063）",
-            note: "同 source/主题/viewport/scale/事件；present 为代理终点",
+            note: "同 source/主题/viewport/scale/事件；present 为代理终点；真实 wire 见 rq_wire",
         },
         Cell {
             id: "rust/desktop-rq",
             producer: "rust（同上）",
             host: "desktop RQHost（AutoOS 桌面嵌载 surface）",
-            status: CellStatus::Unrunnable,
-            owner: "UI063 / OS063",
-            note: "需桌面会话与嵌载 surface；本仓无自动运行入口",
+            status: CellStatus::CoveredByWire,
+            owner: "T-05 / rq_wire（跨进程换载与上屏归 OS063）",
+            note: "rq_wire：真实管道 + DesktopSession broker 合成面（同进程 peer）",
         },
         Cell {
             id: "vm/direct",
-            producer: "VM（a2r 执行）",
-            host: "direct",
-            status: CellStatus::Unrunnable,
-            owner: "UI063",
-            note: "需 VM 公开运行入口与 .at 语料（plan §5：fixture 不得替代 producer）",
+            producer: "VM（AutoLang 解释执行）",
+            host: "direct（同一产者的 iced 元素）",
+            status: CellStatus::CoveredByWire,
+            owner: "T-05 / rq_wire",
+            note: "rq_wire：build_dynamic_component 真实执行出的 view 作金样（非手写期望包）",
         },
         Cell {
             id: "vm/standalone-rq",
-            producer: "VM",
+            producer: "VM（AutoLang 解释执行）",
             host: "standalone RQHost",
-            status: CellStatus::Unrunnable,
-            owner: "UI063 / OS063",
-            note: "同上 + 独立 Host",
+            status: CellStatus::CoveredByWire,
+            owner: "T-05 / rq_wire（独立进程归 OS063）",
+            note: "rq_wire：真实管道 + RqServe/adopt_one/pump_client",
         },
         Cell {
             id: "vm/desktop-rq",
-            producer: "VM",
+            producer: "VM（AutoLang 解释执行）",
             host: "desktop RQHost",
-            status: CellStatus::Unrunnable,
-            owner: "UI063 / OS063",
-            note: "同上 + 桌面嵌载",
+            status: CellStatus::CoveredByWire,
+            owner: "T-05 / rq_wire（独立进程归 OS063）",
+            note: "rq_wire：真实管道 + 桌面 broker 合成面",
         },
     ]
 }
@@ -373,16 +374,18 @@ fn rq_cells_t05_six_cell_matrix() {
     let mut cell_rows = Vec::new();
     for cell in cells() {
         match cell.status {
-            CellStatus::Unrunnable => {
+            CellStatus::CoveredByWire => {
+                // 本模块不重复驱动：证据在 `rq_wire`（真实管道 + 宿主合成面）。
                 cell_rows.push(serde_json::json!({
                     "cell": cell.id, "producer": cell.producer, "host": cell.host,
-                    "status": "unrunnable", "owner": cell.owner, "note": cell.note,
+                    "status": "runnable", "evidence": "rq_wire", "owner": cell.owner,
+                    "note": cell.note,
                 }));
                 println!(
                     "[RQCELLS] {}",
                     serde_json::json!({
-                        "tag": "cell", "cell": cell.id, "status": "unrunnable",
-                        "owner": cell.owner,
+                        "tag": "cell", "cell": cell.id, "status": "runnable",
+                        "evidence": "rq_wire", "owner": cell.owner,
                     })
                 );
             }
@@ -483,28 +486,34 @@ fn rq_cells_t05_six_cell_matrix() {
     .expect("write report");
     println!("[RQCELLS] {}", serde_json::json!({ "tag": "cells_written", "path": out.join("t05-cells.json").display().to_string() }));
 
-    // 可运行格必须真有 v3 路径原语与资源身份；不可运行格必须有 owner。
+    // 六格必须全部有证据（本模块矩阵 或 `rq_wire` 真实 wire），不得删分母。
     let runnable = report["cells"]
         .as_array()
         .unwrap()
         .iter()
         .filter(|c| c["status"] == "runnable" || c["status"] == "inproc_approx")
         .count();
-    assert!(runnable >= 2, "至少 direct + standalone-RQ 两格可跑，实得 {runnable}");
+    assert_eq!(runnable, 6, "六格必须全部可运行/有 wire 证据，实得 {runnable}");
     let blocked = report["cells"]
         .as_array()
         .unwrap()
         .iter()
         .filter(|c| c["status"] == "unrunnable")
         .count();
-    assert_eq!(blocked, 4, "四个不可运行格必须显式登记（不删分母）");
+    assert_eq!(blocked, 0, "不得再有不可运行格（缺格不删分母）");
     for cell in report["cells"].as_array().unwrap() {
-        if cell["status"] == "unrunnable" {
-            assert!(
-                cell["owner"].as_str().map(|o| !o.is_empty()).unwrap_or(false),
-                "不可运行格必须具名 owner"
-            );
-        }
+        assert!(
+            cell["owner"].as_str().map(|o| !o.is_empty()).unwrap_or(false),
+            "每格必须有具名 owner/边界"
+        );
+        // 本模块驱动的格必须有逐例读数；wire 覆盖的格必须点名证据出处。
+        let driven_here = cell["cases"].as_array().map(|c| !c.is_empty()).unwrap_or(false);
+        let wire_backed = cell["evidence"] == "rq_wire";
+        assert!(
+            driven_here || wire_backed,
+            "格 {} 既无本模块读数也无 rq_wire 证据",
+            cell["cell"]
+        );
     }
 
     // mesh 例：v3 Path 必须在结构面出现（漏 mesh = AC-02 失败）。
