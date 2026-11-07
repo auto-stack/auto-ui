@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-069
-status: drafting
+status: executing
 feature_name: VM合成输入值写与路由状态提交缺陷收口（068后续，round-19家族）
 author: [ZCode]
 created_at: 2026-11-07
@@ -8,7 +8,7 @@ updated_at: 2026-11-07
 plan_revision: 1
 base_branch: master
 base_commit: ab19ff63
-current_step: 0
+current_step: 2
 total_steps: 8
 depends_on: [auto-ui/PLAN-068, READER-009]
 supersedes_spec_components: [docs/specs/runtime/component-and-store-instances.md, docs/specs/runtime/vm-route-page-loading.md, docs/specs/runtime/native-vm-app-validation.md]
@@ -124,11 +124,24 @@ auto-ui Rust runtime/compiler（crates/auto-ui-runtime、auto-ui-dialect/auto-ui
 
 起草时0/8。优先级：用户明示本计划优先于PLAN-995（perf）——解锁面更大（W-05/W-03/W-07详情腿+typing/query家族）。009不受阻叶子与本计划无写入交集，可并行。
 
+### 执行证据（append-only）
+
+- **T-00（进行中：F1/F2 定谳，F3/F4 待探针）** 2026-11-07：新树 `D:/autostack/.wt/ui-069/auto-ui`（分支 `codex/plan-069-dev`）于 master tip `37a7aa43` 冻结；组内依赖兄弟树 detached 只读（auto-lang `160ed38f`、auto-web `2d69841`、auto-down `58ea33f6`）。机制工件 `D:/autostack/plan-artifacts/plan-069/auto-ui/t00-mechanism-decision.md`。F1 定谳=`scan_node_for_inputs` 嵌套 store 路径静默丢弃（`dynamic.rs` 旧 4196-4203）；F2 定谳=clear_first 同 handler 双派发 + parked 单飞 guard（`mcp_server.rs` 旧 3500-3529 × `vm_bridge.rs:4208-4216`），009 并发会话实跑日志（`plan-009/t03/ws-ui-vm-29-w05/app.log` 51-55 行，sha256 `0CE94AA2…C3CC`）直证 `re-entry ignored (segment in flight)`。F3/F4 当前实测：真实输入卡点击同样不可达详情页（`ws-ui-vm-28/29 results.json`），故不可单为合成通道开洞；下一轮按工件「下一轮探针」1→3 定位。
+- **T-01（完成）** 嵌套 store 路径绑定注册为展平根字段 + 写通道「实例优先、缺字段回退根态」：`dynamic.rs`（`scan_node_for_inputs` 新 store 别名臂；`on_with_input_for_instance` 写回）+ 永久反例 `crates/auto-ui-runtime/src/ui_tests/plan069_synthetic_input_tests.rs`（3 例）。`cargo test -p auto-ui-runtime --lib plan069_synthetic_input_tests -- --test-threads=1` → 3 passed；修前基线（注册臂短路）2 failed/1 passed（直 field 对照绿=正确红绿分离）。
+- **T-02（完成）** `clear_first` 不再重入派发 Clear，单次 TypeText 携带全文（显式 `autoui_action clear` 保留 Clear 单派发；parked guard 语义不变）：`mcp_server.rs` `tool_type` + 工具描述 + 永久反例 `tests_plan069_f2`（3 例）。`cargo test --lib tests_plan069_f2` → 3 passed；修前基线（临时恢复旧双派发）实测 `[Clear(""), TypeText("reader-query")]` 2 条 → 默认路径红。
+- **受影响回归（本轮，均绿）**：plan739_input_pin_tests 1、tests_plan483_d4 4、plan712_route_param_tests 3、plan749_read_semantics_tests 13、plan066_filter_projection_tests 4、plan370_015_behavior_tests 12、plan624_cross_state_tests 5（`--test-threads=1`）。
+- 代码提交：`c283dbcb`（4 files，+379/−45，树内 clean）。
+
+
 ## 9. 复审记录
 
 2026-11-07：stage: new | auto-ui/PLAN-069 r1 | outcome: pass（草案可交接，未执行） | changed: 新建T-00～07、AC-01～08、V01～04、SD-01～03 | next: work T-00（新树建立+四族机制确认）。授权依据READER-009 round27②A（含round22 T08路由继承）；证据锚点为本轮起草实测核查（§4表），F3/F4根因未定谳已如实标注假设状态，T-00定谳前不实施依赖修复。
 
 - stage: goal | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | round: 1 | from: new | to: work | status: drafting→work待启 | outcome: pass | worktree: 待T-00创建（D:/autostack/.wt/ui-069/auto-ui拟） | commit: 本主检出簿记提交 | next: work T-00。
+
+- stage: work | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | outcome: pass（T-01/T-02 完成；T-00 部分——F1/F2 定谳，F3/F4 待探针） | worktree: D:/autostack/.wt/ui-069/auto-ui | branch: codex/plan-069-dev | base_commit: 37a7aa43（master tip 重冻结；起草 anchor ab19ff63 后仅 docs 提交） | code_commit: c283dbcb | dependency_revisions: auto-lang 160ed38f / auto-web 2d69841 / auto-down 58ea33f6（组内 detached 只读兄弟树） | task_ids: T-01, T-02（T-00 部分） | evidence: plan-artifacts/plan-069/auto-ui/t00-mechanism-decision.md；cargo test plan069_synthetic_input_tests 3 passed、tests_plan069_f2 3 passed（各自修前红在案）；受影响组 plan739 1/tests_plan483_d4 4/plan712 3/plan749 13/plan066 4/plan370_015 12/plan624 5 全绿 | blockers: 无用户待答；F3/F4 机制未定谳=下一轮 T-00 探针（route param 派发对象/卡点击链路） | next_responsible_role: work（T-00 F3/F4 探针 → T-03/T-04）
+
+- stage: goal | plan_id: auto-ui/PLAN-069 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass（work 阶段进行中：T-01/T-02 落地，T-00 F3/F4 待续） | worktree: D:/autostack/.wt/ui-069/auto-ui | commit: c283dbcb | next: work T-00（F3/F4 探针）→ T-03/T-04。
 
 ## 10. 待澄清事项
 
