@@ -197,10 +197,30 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r3 | round: 1 | from: drafting | to: work | status: executing | outcome: pass（T-01 完成；T-02～T-04 增量交付、T-05 待办） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 56139b78 | next: work（T-05）
 
+### 2026-11-07 work T-05 六格矩阵与指标（实施增量，未清零遗留）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r3 / outcome: 进行中（T-05 矩阵与指标已跑；遗留未清零，VM/桌面格不可运行） / code_commit: `52c11feb` / next: 待定（见§10 具名缺口）
+- 命令：`AUTO_RQ_PROBE_OUT=D:/autostack/plan-artifacts/plan-062/auto-ui cargo test -p auto-ui-runtime --lib rq_cells -- --test-threads=1 --nocapture` 退出 0（23.2s）；报告 `cells/t05-cells.json`。
+- **六格状态（不删分母）**：`rust/direct` = runnable（本进程 wgpu offscreen 代理金样）；`rust/standalone-rq` = inproc 近似（同源记录 + v3 wire + broker canvas 重放）；`rust/desktop-rq`（owner UI063/OS063）、`vm/direct`（owner UI063）、`vm/standalone-rq`、`vm/desktop-rq` = **unrunnable 且具名 owner**（fixture 不冒充 VM/桌面嵌载，plan §5 同律）。
+- **对拍读数（standalone-RQ 相对 direct 金样，同 source/主题/1280×800@scale2）**：path_mesh **0.095%**、svg_icon **0.100%**、text_cjk 0.094%、gradient_border_shadow 0.0625%、scroll_clip **0.000%**、progress_bar 0.0057%。结构面同时核验：mesh 例 `path=4 / path_segments=12 / payload_tag=3 / capabilities=[fidelity/pathfill/1]`；SVG 例 `image=1` + 资源上传 1×1024B；文本/渐变/滚动例 `payload_tag=2`（无 v3 原语不升 tag）。
+- **资源面（M-04/M-05 资源侧，P-02）**：SVG 例稳定帧 `uploads=1`、`hits=13`、`resident_bytes=1024`、`raster_hits=13`（栅格化与 payload 均只做一次）；其余例 0 上传。
+- **分段耗时（p50，standalone-RQ 例）**：produce 0.09–0.24ms（**svg 例外 31.5ms**）、encode 0.005–0.008ms、decode 0.004–0.008ms、replay 4.25–5.87ms；direct 稳态帧 p50 4.48–6.25ms。即 replay 与 direct 同量级，v3 线/编解码不是瓶颈。
+- **具名性能缺口**：SVG 例 produce ≈20–32ms/帧不是 resvg（`raster_hits=13` 已证栅格外置缓存生效），而是记录路径**每帧新建 iced renderer**（`drive_and_draw` 内 `Renderer::Secondary(new)`）导致 iced 的 SVG/text 缓存每帧冷启；owner = T-02 生产侧（需持久化 renderer 或等价缓存迁移），本轮不计入性能通过。
+- **M 指标状态**：M-04/M-08 measured；M-01/M-03/M-05 为 proxy（分段/驻留字节，present 与 GPU 驻留未测）；M-02/M-06/M-07 unmeasured（真实 deadline/冷热启动/1-4-8 规模归 UI063/OS063）。无任何数值预算超标结论，也未宣称性能 PASS。
+- 回归面：`cargo test -p auto-ui-runtime --lib "ui::desktop_protocol::" -- --test-threads=1` → **252 passed / 4 failed**；4 红与 `3d64877d` 基线同一组（autocenter、stage3 stress n3/n5、t3_examples_queue_end_to_end），本轮无新增红。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r3 | round: 2 | from: work | to: work | status: executing | outcome: pass（T-05 矩阵/指标增量；遗留未清零） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 52c11feb | next: work（具名缺口或转 review）
+
+
 
 ## 10. 待澄清事项
 
+- 2026-11-07 实施后发现的三项**合同级缺口**（需用户裁定的范围/预算决定，不能用测试绕过）：
+  1. **GlyphRun 与“Host 不重排文字”**（T-02/AC-02）：061 §4 要求文本优先携 glyph run；本仓 Host 重放面是 iced canvas（无 glyph 绘制 API），要满足“Host 不重排”必须新增 Host 侧字形栅格/图集能力（或改用 AGE/自绘 Host 后端）。当前实现仍是字符串 `TextStyled` + FontBlob（Host 用同一字体栈重排），只能算“降级可观测”，不是合同要求的精确重放。需要决定：(a) 在 062 内新增 Host glyph 图集（工作量与风险显著）；(b) 修订 AC-02 把“字符串+同字体栈重排”作为验收口径（具名降级）；(c) 把 glyph run 重放移入依赖 AGE 的后续计划。
+  2. **shadow blur / SDF**：重放面仍为单层垫层近似；精确复现需 Host 具备 blur/SDF 能力（61 具名缺口）。同上需要范围决定。
+  3. **per-App 上传速率（≤8MiB/s）与 CPU 工作预算/公平调度**（T-04/P-04）：本轮只落地驻留字节上限与槽 credit 背压；速率与 CPU 预算未实现，1/4/8 App 真实规模归 UI063/OS063。
 - 性能数值预算/实际刷新率/可运行规模待UI061授权执行后按先基线后候选冻结；无预算不签PASS，支持承诺或阈值变化须具名修订。
+- SVG 记录路径每帧新建 iced renderer（produce ≈20–32ms，T-05 实测）属 T-02 生产侧实现债，修它需要改 `HeadlessSurface` 的 renderer 生命周期（缓存迁移风险），建议单独有界任务而不是塞进本 Plan 收尾。
 - 本轮没有必须再询问才能成稿的问题；实施暂停来自用户的规划范围。后续启动不改变既有依赖门。
 - UI061的准确录制接缝/版本/资源预算是具名技术决策；未取得可行证据前不猜其后继实现，若改变承诺/仓scope给具体修订。
 - 字体/IME/媒体/自定义图形或产品原有缺口不能以N/A自动缩分母；明确owner、实际失败入口、关闭条件，必要时另立Plan，当前必需项保持未完。
