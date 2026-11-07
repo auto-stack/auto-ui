@@ -377,7 +377,7 @@ fn rq_v3_svg_and_image_replay_matches_direct() {
 
     // 生产重放：宿主把上传资源登记进图像缓存后按 src 解析。
     for up in &uploads {
-        broker_surface::bitmap_cache_put(&up.id, up.w, up.h, up.stride, up.rgba.clone());
+        broker_surface::bitmap_cache_put(&format!("bitmap://{}", up.id), up.w, up.h, up.stride, up.rgba.clone());
     }
     let mut buf = Vec::new();
     list.encode(&mut buf);

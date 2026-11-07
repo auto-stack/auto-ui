@@ -58,6 +58,10 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   `Rgba` 直取、`Bytes` 解码、SVG **生产端按设备像素栅格化**（resvg、
   `Svg::color` 以 alpha 掩膜着色、预乘→straight 归一，单边 4096 上限具名拒绝）。
 - 图像 `opacity` 烘焙进资源字节；`rotation` 以 `Transform` 包络过线。
+- **媒体静态帧**（2026-11-08 裁定）：视频/远端媒体的**一帧**（海报/首帧/暂停帧）
+  由 `ui::media_poster` 供给，`render_video` 命中即用普通 `image` 元素出图——
+  于是它就是普通图片资源（内容身份、去重、上传预算、驻留全部同律）。连续播放
+  帧不在本页能力内（见 §6）。
 - **阴影**：带 shadow 的 Quad 由生产端按 `iced_wgpu/solid.wgsl` 同式求值
   （`rounded_box_sdf` 双倍中心坐标、半径取 `min(r, 短边/2)`、
   `1 - smoothstep(-blur, blur, max(sdf,0))`），生成贴片资源，帧内先发
@@ -159,9 +163,9 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
 
 - **26/39 ≤0.1%**（本页 §5.3 的 exactness 口径）。
 - **>0.1% 的 13 个族（具名，诊断读数，不是 exactness 声明）**：managed_scroll_content
-  1.56%、code_editor 1.31%、video 0.92%、terminal 0.46%、rich 0.31%、input 0.25%、
-  scrollable 0.24%、text（latin 例）0.23%、navigation_rail 0.21%、table 0.20%、
-  remote_frame 0.17%、autodown_editor 0.15%、mouse_area 0.14%。
+  1.562%、video 0.922%、terminal 0.456%、code_editor 0.407%、rich 0.314%、input 0.253%、
+  scrollable 0.245%、text（latin 例）0.234%、navigation_rail 0.209%、table 0.203%、
+  remote_frame 0.169%、autodown_editor 0.148%、mouse_area 0.136%。
   这 13 个族都是**文字密集或宿主依赖面**（编辑器/终端/富文本/输入/表格/导航栏/
   媒体占位），残差与 §5.3 的文字残差同源（画布文本管线 vs direct 文本管线的
   字形覆盖率/AA），不是位置或内容丢失。
@@ -181,7 +185,7 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
 | 例 | 默认 producer（字符串 + scrim） | v3 富模式（opt-in） |
 |---|---|---|
 | path_mesh | 0.095% | 0.095% |
-| svg_icon | 0.100% | 0.100% |
+| svg_icon | 0.039% | 0.039% |
 | text_cjk | 0.094% | **0.798%**（具名遗留） |
 | gradient_border_shadow | 0.063% | **1.374%**（具名遗留） |
 | scroll_clip | 0.000% | **0.330%**（具名遗留） |
@@ -227,7 +231,13 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
 3. SVG 记录路径每帧新建 iced renderer → produce ≈32.5ms，超 061 冻结的 ≤10ms。
 4. per-App CPU 预算/公平调度未实现（真实规模归 UI063/OS063）；上传预算记账目前
    只有端点产帧路径会调用，探针/新 FrameSource 需自行调用。
-5. 媒体资源族（Video/RemoteFrame）未进本增量。
+5. **媒体族**：**静态帧（海报/首帧/暂停帧）链路已交付**（`ui::media_poster` 供给面；
+   `render_video` 命中即用普通 `image` 元素出图，记录器按栅格字节过线，资源身份/
+   去重/预算/驻留全部复用图片管线）。实测：过线字节与发布帧逐字节相等、稳定帧
+   0 重传、相对 direct 像素差 **0.000**。**连续播放帧未交付**——mpv 帧直写持久
+   wgpu 纹理、无 CPU 读回，且 1080p RGBA ≈8 MiB/帧远高于冻结的 8 MiB/s 上传预算；
+   按 2026-11-08 用户裁定另立计划（与 OS063 传输/媒体管线一起设计）。RemoteFrame
+   的远端帧同属该后续面。
 6. v2↔v3 双读已覆盖 tag 语义、拒绝路径、**同进程真实管道**（两种产者 × 两宿主）
    与**真两进程**（独立 exe 子产者）配对；慢 Host/旧 ACK/旧宿主负控均有实测
    （§5.4）。跨进程换载与物理上屏仍归 OS063。

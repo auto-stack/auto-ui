@@ -287,8 +287,7 @@ fn measure_case(
 
         // 宿主把本帧资源登记进图像缓存（生产路径 = BitmapReady → cache）。
         for up in surface.drain_bitmap_uploads() {
-            crate::ui::iced::broker_surface::bitmap_cache_put(
-                &up.id,
+            crate::ui::iced::broker_surface::bitmap_cache_put(&format!("bitmap://{}", up.id),
                 up.w,
                 up.h,
                 up.stride,

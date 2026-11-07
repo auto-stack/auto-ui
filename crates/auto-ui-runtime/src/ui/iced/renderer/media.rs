@@ -223,6 +223,41 @@ pub(super) fn render_video<M: Clone + Debug + 'static>(
 ) -> iced::Element<'static, M> {
     use iced::Length;
 
+    // PLAN-062（AC-03，用户裁定 2026-11-08）：**静态帧（海报/首帧/暂停帧）优先**。
+    // 媒体管线发布过一帧时，这里用普通 `image` 元素出图——资源身份/去重/上传
+    // 预算/驻留全部走既有图片管线（记录器按栅格字节过线），不新增第二套通道。
+    // 连续播放帧（每帧 GPU 读回）仍具名留后，见 Spec §6。
+    let poster_key = media_key.as_deref().unwrap_or(&src);
+    if let Some(poster) = crate::ui::media_poster::frame(poster_key) {
+        let image = iced::widget::image(iced::widget::image::Handle::from_rgba(
+            poster.w,
+            poster.h,
+            poster.rgba,
+        ))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .content_fit(iced::ContentFit::Contain);
+        let mut surface = iced::widget::container(image)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(|_theme| iced::widget::container::Style {
+                background: Some(iced::Background::Color(iced::Color::BLACK)),
+                ..Default::default()
+            });
+        if let Some(style) = style.as_ref() {
+            let is = IcedStyle::from_style(style);
+            let cs = build_container_style(&is);
+            surface = surface.style(move |_theme| cs.clone());
+            if let Some(ref w) = is.width {
+                surface = surface.width(iced_length(w));
+            }
+            if let Some(ref h) = is.height {
+                surface = surface.height(iced_length(h));
+            }
+        }
+        return surface.into();
+    }
+
     #[cfg(feature = "mpv-widget")]
     {
         use crate::ui::iced::video_uplink::VideoUplink;
@@ -801,4 +836,3 @@ pub(crate) fn shadcn_theme(dark: bool) -> iced::Theme {
         },
     )
 }
-

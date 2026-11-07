@@ -970,8 +970,7 @@ fn rq_probe_t05_capability_rows() {
         );
         let list = surface.render_frame_v2();
         for up in surface.drain_bitmap_uploads() {
-            crate::ui::iced::broker_surface::bitmap_cache_put(
-                &up.id,
+            crate::ui::iced::broker_surface::bitmap_cache_put(&format!("bitmap://{}", up.id),
                 up.w,
                 up.h,
                 up.stride,
@@ -980,6 +979,23 @@ fn rq_probe_t05_capability_rows() {
         }
         let mut painted = list.clone();
         painted.clear = Some(backdrop);
+        // 结构面硬断言：Image 引用的资源**必须真的在宿主缓存里**（键 = 线上
+        // `bitmap://<id>`）。此前探针用未加前缀的键 put，又被同进程其它测试的
+        // 全局缓存命中掩盖，占位会被当成“渲染成功”计入像素差——这条断言把
+        // “静默占位”变成硬失败。
+        for op in list.ops.iter() {
+            if let crate::ui::desktop_protocol::message::DisplayOp::Image { src, rect, .. } = op {
+                assert!(
+                    crate::ui::iced::broker_surface::resolve_drawlist_image(
+                        src,
+                        rect.w as u32,
+                        rect.h as u32
+                    )
+                    .is_some(),
+                    "{cap} 的图像资源 {src} 未在宿主缓存命中（探针键必须带 bitmap:// 前缀）"
+                );
+            }
+        }
         let rq_req = out.join(format!("{slug}-rq.png"));
         let _ = std::fs::remove_file(&rq_req);
         let _ = std::fs::remove_file(out.join(format!("{slug}-rq-wgpu.png")));
@@ -1406,4 +1422,128 @@ fn rq_probe_t01_style_class_denominator_is_complete() {
             "samples": samples.len(),
         })
     );
+}
+
+/// PLAN-062（AC-03，用户裁定 2026-11-08）：**媒体静态帧（海报/首帧/暂停帧）**
+/// 跨线重放——已解码的一帧按内容身份当图片资源过线，资源身份/去重/驻留走既有
+/// 图片管线；连续播放帧（每帧 GPU 读回）不在此口径内（Spec §6 具名留后）。
+#[test]
+fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
+    use crate::ui::media_poster;
+
+    media_poster::clear_all();
+    let (w, h) = (8u32, 6u32);
+    // 可辨识的非纯色图案：内容身份可核（纯色会让“字节相等”断言区分度不足）。
+    let rgba: Vec<u8> = (0..(w * h * 4)).map(|i| ((i * 7) % 251) as u8).collect();
+    let src = "probe://poster-frame.mp4";
+    assert!(media_poster::publish(src, w, h, rgba.clone()), "发布海报帧");
+    let video = || View::Video {
+        src: src.to_string(),
+        paused: true,
+        position: Some(0.0),
+        volume: 100,
+        muted: true,
+        rate: 1.0,
+        label: "海报帧".to_string(),
+        on_time_update: None,
+        on_loaded_metadata: None,
+        on_play_state: None,
+        on_ended: None,
+        on_media_error: None,
+        media_key: None,
+        style: None,
+    };
+
+    // ① 记录面：海报帧必须以 Image 原语过线，且上传字节与发布帧**完全相同**。
+    let mut surface = HeadlessSurface::new(StaticComponent { view: video() }, PROBE_W as f32, PROBE_H as f32);
+    let list = surface.render_frame_v2();
+    let image_srcs: Vec<String> = list
+        .ops
+        .iter()
+        .filter_map(|op| match op {
+            crate::ui::desktop_protocol::message::DisplayOp::Image { src, .. } => Some(src.clone()),
+            _ => None,
+        })
+        .collect();
+    println!("[RQPROBE-DIAG] poster ops={:?}", list.ops);
+    assert_eq!(
+        image_srcs.len(),
+        1,
+        "海报帧必须作为 Image 原语过线: {:?}",
+        list.ops
+    );
+    let uploads = surface.drain_bitmap_uploads();
+    assert_eq!(uploads.len(), 1, "海报帧必须作为位图资源上传一次");
+    assert_eq!((uploads[0].w, uploads[0].h, uploads[0].stride), (w, h, w * 4));
+    assert_eq!(uploads[0].rgba, rgba, "过线字节必须等于发布的静态帧");
+    assert_eq!(
+        image_srcs[0],
+        format!("bitmap://{}", uploads[0].id),
+        "帧内引用必须指向同一资源身份"
+    );
+
+    // ② 稳定帧：同一海报帧的第二帧不得重复上传（驻留命中）。
+    let _ = surface.render_frame_v2();
+    assert!(
+        surface.drain_bitmap_uploads().is_empty(),
+        "稳定帧不得重复上传海报帧（P-02 资源复用）"
+    );
+
+    // ③ 像素面：同一 View 的 direct 渲染 vs RQ 重放（同主题/同 viewport）。
+    let out = out_dir().join("media");
+    std::fs::create_dir_all(&out).expect("media out");
+    let direct_req = out.join("poster-direct.png");
+    let _ = std::fs::remove_file(&direct_req);
+    let _ = std::fs::remove_file(out.join("poster-direct-wgpu.png"));
+    let mut direct_sim = iced_test::simulator::Simulator::with_size(
+        iced::Settings::default(),
+        iced::Size::new(PROBE_W as f32, PROBE_H as f32),
+        iced::widget::container(video().into_iced())
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
+            .style(move |_t| iced::widget::container::Style {
+                background: Some(
+                    crate::ui::iced::broker_surface::to_color(
+                        crate::ui::desktop_protocol::client_runtime::bg(),
+                    )
+                    .into(),
+                ),
+                ..Default::default()
+            }),
+    );
+    direct_sim
+        .snapshot(&theme())
+        .expect("direct snapshot")
+        .matches_image(&direct_req)
+        .expect("direct png");
+    let direct_png = out.join("poster-direct-wgpu.png");
+
+    let mut recorded = HeadlessSurface::new(StaticComponent { view: video() }, PROBE_W as f32, PROBE_H as f32);
+    let recorded_list = recorded.render_frame_v2();
+    for up in recorded.drain_bitmap_uploads() {
+        crate::ui::iced::broker_surface::bitmap_cache_put(&format!("bitmap://{}", up.id), up.w, up.h, up.stride, up.rgba.clone());
+    }
+    let mut painted = recorded_list.clone();
+    painted.clear = Some(crate::ui::desktop_protocol::client_runtime::bg());
+    let replay_req = out.join("poster-rq.png");
+    let _ = std::fs::remove_file(&replay_req);
+    let _ = std::fs::remove_file(out.join("poster-rq-wgpu.png"));
+    let mut replay_sim = iced_test::simulator::Simulator::with_size(
+        iced::Settings::default(),
+        iced::Size::new(PROBE_W as f32, PROBE_H as f32),
+        crate::ui::iced::broker_surface::displaylist_element::<()>(&painted),
+    );
+    replay_sim
+        .snapshot(&theme())
+        .expect("replay snapshot")
+        .matches_image(&replay_req)
+        .expect("replay png");
+    let diff = pixel_diff_ratio(&direct_png, &out.join("poster-rq-wgpu.png"), 2);
+    println!("[RQPROBE] {}", serde_json::json!({
+        "tag": "media_poster", "poster": [w, h], "uploads": 1,
+        "pixel_diff_vs_direct": diff,
+    }));
+    assert!(diff <= 0.01, "海报帧重放相对 direct 的像素差 {diff:.5} 超 1%（静态帧应精确）");
+
+    media_poster::clear(src);
 }

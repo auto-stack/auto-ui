@@ -36,6 +36,7 @@ pub mod image_pipeline;
 // semantics).  Needs no optional dependency (blake3 is unconditional), so it is
 // ungated like `component` — the generated backend reaches it as
 // `auto_lang::ui::media_service`.
+pub mod media_poster;
 pub mod media_service;
 
 // PLAN-043 Part 1: local photo file service (recursive index + on-demand
