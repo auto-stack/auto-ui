@@ -143,7 +143,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | [ ] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02；AC-07/V-05～08（按§6分工）——进行中：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`，mesh 重放 0.0%、SVG 0.333%）；GlyphRun wire、blur/SDF、几何渐变仍具名缺口（§9） |
 | [ ] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03；AC-07/V-05～08（按§6分工）——进行中：内容身份+驻留缓存（稳定帧 0 重传、驱逐可解释）、图片 alpha/rotation、SVG 栅格资源已交付；媒体族与 wire generation 字段待补（§9） |
 | [ ] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——进行中：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、wire generation（tag 13 + HostCaps 下行补到两宿主，`d2e41c58`）已交付；乱序资源负控待补（§9） |
-| [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——进行中：六格真实 wire（`4e2f53d3`：两产者 × 两宿主，含 v3 tag 3 槽分派缺陷修复）+ 39/39 逐能力读数（`77f92dda`，26/39 ≤0.1%，13 个文字密集/宿主依赖族具名）；M-02/06/07 与 AC-03/AC-04 项待补 |
+| [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——进行中：六格真实 wire（`4e2f53d3`）+ 39/39 逐能力读数（`77f92dda`）+ AC-04 负控与真两进程配对（`4263ff3c`/`39bd7bef`）；仅剩媒体资源族（待裁定）与 M-02/06/07 |
 | [ ] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
 | [ ] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
 
@@ -301,7 +301,11 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
   1. **GlyphRun 与“Host 不重排文字”**（T-02/AC-02）：061 §4 要求文本优先携 glyph run；本仓 Host 重放面是 iced canvas（无 glyph 绘制 API），要满足“Host 不重排”必须新增 Host 侧字形栅格/图集能力（或改用 AGE/自绘 Host 后端）。当前实现仍是字符串 `TextStyled` + FontBlob（Host 用同一字体栈重排），只能算“降级可观测”，不是合同要求的精确重放。需要决定：(a) 在 062 内新增 Host glyph 图集（工作量与风险显著）；(b) 修订 AC-02 把“字符串+同字体栈重排”作为验收口径（具名降级）；(c) 把 glyph run 重放移入依赖 AGE 的后续计划。
   2. **shadow blur / SDF**：重放面仍为单层垫层近似；精确复现需 Host 具备 blur/SDF 能力（61 具名缺口）。同上需要范围决定。
   3. **per-App CPU 工作预算/公平调度**（T-04/P-04）：上传速率预算已于 `0e614935` 落地（8 MiB/1s 滑动窗口、超限整帧回滚 + 背压重试）；仍缺的是 CPU 侧分批/限流与 1/4/8 App 公平策略（真实规模归 UI063/OS063）。若要求本 Plan 内实现 CPU 预算，需要先定“分批单位与抢占点”，否则只能做代理测量。
-- **本轮已收口的项**：per-App 上传速率（8 MiB/s + 整帧回滚 + 背压）已完成并用负控验证，不含在上述待裁定清单内。
+- **2026-11-08 最后一项待裁定：媒体资源族（AC-03 的 “图片媒体表现”）**。事实：`ui/mpv` 的帧由 sw renderer 直接写进持久 wgpu 纹理（`channel.rs`），**没有 CPU 侧 RGBA 读回**；记录器（tiny-skia Secondary 层）只能看到占位。要把视频/远端帧真的跨线重放，只有三条路：
+  - **(a) 062 内实现读回**：每帧（或按需）`copy_texture_to_buffer` 读回 RGBA → 按内容身份当资源过线（复用现有 `Image`/生成/预算/驻留机制）。代价：每帧一次 GPU 读回 + 上传（1080p ≈ 8 MiB/帧，按现有 8 MiB/s 上传预算只能 ~1fps，**必须先改预算或按需采样**），且多一次全帧拷贝。
+  - **(b) 具名边界**：在 Spec/AC 里把“媒体帧跨线”写成具名边界（当前只保证占位/降级可观测），媒体传输另立计划（与 OS063/媒体管线一起设计）。
+  - **(c) 只做静态帧/海报帧**：把视频首帧或暂停帧读回一次当图片资源（证明链路+身份+预算可用），连续播放仍具名留后。
+- **本轮已收口的项**：per-App 上传速率（8 MiB/s + 整帧回滚 + 背压）已完成并用负控验证；wire generation、慢宿主/旧 ACK/旧宿主负控、真两进程配对亦已收口，均不含在上述待裁定清单内。
 - **2026-11-07 主检出存在他方未提交 WIP（merge 前必须由 owner 归位，不属本 Plan）**：主检出 `D:/autostack/auto-ui`（master `df09d816`）工作树里有未提交修改 `crates/auto-ui-runtime/src/ui/desktop_protocol/{headless,host,rqhost}.rs`、`ui/session.rs`，内容是把已撤回的 `drain_resource_releases`（PLAN-062 在 `00bd355d` 整提交撤回的 ResourceRelease）接线到 `FrameSource` 实现上；master 上这些方法不存在，该 WIP 与主线不可编译/语义不一致。本 Plan 未触碰、未 include、未 stash；worktree `codex/plan-062-dev` 不受影响。**merge 前**需其 owner 把这些改动路由回自己的树（stash/patch 交接或 fix worktree），否则主检出不满足 master-zero-WIP 门。
 - 性能数值预算/实际刷新率/可运行规模待UI061授权执行后按先基线后候选冻结；无预算不签PASS，支持承诺或阈值变化须具名修订。
 - SVG 记录路径每帧新建 iced renderer（produce ≈20–32ms，T-05 实测）属 T-02 生产侧实现债，修它需要改 `HeadlessSurface` 的 renderer 生命周期（缓存迁移风险），建议单独有界任务而不是塞进本 Plan 收尾。
@@ -433,4 +437,17 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 仍缺（不签 T-05/T-03）：**媒体资源族**（mpv 帧直写 GPU 纹理、无 CPU 读回——需要独立读回/媒体传输设计）；AC-04 真两进程（独立 exe）配对与乱序资源负控；M-02/M-06/M-07 未测。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 10 | from: work | to: work | status: executing | outcome: pass（wire generation + HostCaps 下行补齐） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: d2e41c58 | next: work（两进程配对；媒体边界裁定）
+
+
+### 2026-11-08 work 真两进程 v2↔v3 配对（T-05 / AC-04 最后一项）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r4 / outcome: 进行中（AC-04 的负控面收口；只剩媒体族待裁定） / worktree: `D:/autostack/.wt/ui-062/auto-ui` / code_commit: `39bd7bef`
+- 测试体：`rq_wire_child_body`（env 驱动；无 env 直接返回，普通跑套件零副作用）+ `rq_wire_two_process_v2_v3_pairing`（父进程起 `RqServe`，`current_exe` 派生两个**独立进程**子产者：一个产 v3 画布帧、一个产 v2 字符串帧）。
+- 断言：两条连接来自两个不同 app（Hello 凭据 `plan062-child-v3`/`-v2`）、两个子进程在配对期均存活、v3 帧 `requires_v3()=true` 且带 `Path`、v2 帧为字符串；两者都经**跨进程**管道与命名 shm 段落地，不是同进程近似。
+- Spec（SD-01）：§5.4 增“真两进程 v2↔v3 配对”行；§6 第 6 条改写为“tag 语义/拒绝路径/同进程两产者×两宿主/真两进程配对 + 慢 Host/旧 ACK/旧宿主负控均已实测；跨进程换载与物理上屏归 OS063”；§5.4 增“乱序资源”语义（上传方向由 generation 守卫；资源晚于引用帧到达 = 占位不落负缓存、到达后命中；仍有待可控重排通道的注入负控）。
+- 回归面（本树 `39bd7bef`）：`rq_` **37/0**；`ui::desktop_protocol::` **268 passed / 4 failed**（同基线 4 红）。
+- 仍缺：**媒体资源族**（Video/RemoteFrame 帧跨线——mpv 帧直写 GPU 纹理、无 CPU 读回，需用户裁定实现读回或在合同里具名为边界）；乱序资源注入负控（需可控重排通道）；M-02/M-06/M-07（OS063）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 11 | from: work | to: work | status: executing | outcome: pass（真两进程配对） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 39bd7bef | next: user（媒体族边界裁定）
+
 
