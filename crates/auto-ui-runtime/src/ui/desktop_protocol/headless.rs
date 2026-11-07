@@ -129,6 +129,8 @@ pub struct ResourceCache {
     frame_bytes: u64,
     over_budget: bool,
     pub budget_deferrals: u64,
+    /// 已驱逐、待通知 Host 释放的 `bitmap://` 源（P-02 最后 owner 归零）。
+    pending_releases: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -162,6 +164,7 @@ impl Default for ResourceCache {
             frame_bytes: 0,
             over_budget: false,
             budget_deferrals: 0,
+            pending_releases: Vec::new(),
         }
     }
 }
@@ -194,13 +197,25 @@ impl ResourceCache {
 
     /// 按最早键驱逐直到驻留字节回落到上限内（预算收紧也立即生效）。
     fn enforce_limit(&mut self) {
+        let mut skipped = 0usize;
         while self.resident_bytes > self.limit_bytes {
             let Some(oldest) = self.order.pop_front() else {
                 break;
             };
+            // 本帧刚登记的资源不能被驱逐（帧还引用它）：剩下全是本帧的
+            // 资源时停止驱逐，宁可当帧超出预算也不产生悬空引用。
+            if self.frame_keys.contains(&oldest) {
+                self.order.push_front(oldest);
+                break;
+            }
+            skipped = 0;
+            let _ = skipped;
             if let Some(dropped) = self.resident.remove(&oldest) {
                 self.resident_bytes = self.resident_bytes.saturating_sub(dropped.bytes);
                 self.evictions += 1;
+                // PLAN-062 T-04：驱逐 = 最后 owner 归零，记下待通知 Host 释放。
+                self.pending_releases
+                    .push(super::endpoint::bitmap_src(&dropped.local));
             }
         }
     }
@@ -424,6 +439,11 @@ where
     /// 上传预算延期次数（M-04/背压观测）。
     pub fn upload_budget_deferrals(&self) -> u64 {
         self.resources.budget_deferrals
+    }
+
+    /// 取出待通知 Host 释放的资源源（驱逐/最后 owner 归零）。
+    pub fn drain_resource_releases(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.resources.pending_releases)
     }
 
     /// 资源缓存读数（M-04/M-05 资源面：累计上传/命中/驱逐/驻留字节）。
@@ -1401,6 +1421,10 @@ where
         self.surface.drain_bitmap_uploads()
     }
 
+    fn drain_resource_releases(&mut self) -> Vec<String> {
+        self.surface.drain_resource_releases()
+    }
+
     fn drain_window_controls(&mut self) -> Vec<crate::ui::desktop_protocol::message::ControlMsg> {
         self.surface.drain_window_controls()
     }
@@ -1638,6 +1662,10 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
 
     fn drain_bitmap_uploads(&mut self) -> Vec<super::endpoint::BitmapUpload> {
         self.surface.drain_bitmap_uploads()
+    }
+
+    fn drain_resource_releases(&mut self) -> Vec<String> {
+        self.surface.drain_resource_releases()
     }
 
     fn drain_window_controls(&mut self) -> Vec<super::message::ControlMsg> {
