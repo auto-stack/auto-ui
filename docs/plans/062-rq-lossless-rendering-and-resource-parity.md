@@ -263,6 +263,15 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r3 | round: 6 | from: work | to: work | status: executing | outcome: pass（阴影贴片落地；文字/阴影合成残差具名） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 06d8d232 | next: work（收口或转 review）
 
+### 2026-11-07 work SD-01 规范增量草案（worktree 预备，merge 发布）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r3 / outcome: 进行中 / code_commit: `c22cb50c`
+- 产物：`docs/specs/runtime/rq-render-packets-and-resources.md`（SD-01 目标文件，worktree 内预备，**merge 时才发布**）+ `docs/specs/README.md` 导航一条。
+- 内容：v3 载荷与编解码规则（tag 2/3 双读窗口、旧端 UnknownTag 保旧帧）、`Path`/`GlyphRun` 的字段与坐标口径（glyph 坐标 = `CacheKey::new` 物理坐标、字体内容身份）、图像/SVG/阴影贴片的生产端职责、资源内容身份+驻留+8MiB/s 上传预算与整帧回滚、能力准入与槽 credit 背压、以及 §5 的**实测保真表**与 §6 的**六条具名遗留**（glyph 0.80%、阴影 0.74%、SVG 记录路径 20–32ms、CPU 预算、媒体族、v2↔v3 双进程未配对）。
+- 与 061 合同的边界：本页记录 062 增量，不覆盖 `rq-fidelity-contract.md` 的 v2 现状与冻结能力 ID；新增能力 `fidelity/pathfill/1`、`fidelity/glyphrun/1` 复用其语义。
+- 校验：文档命令 `git diff --check` 与链接可解析；实现侧断言由 `rq_*` 测试族复跑（见 §9 各轮）。
+
+
 
 
 
