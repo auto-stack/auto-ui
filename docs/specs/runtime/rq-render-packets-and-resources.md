@@ -69,6 +69,11 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   （等价 generation 语义）。内容未变的重复帧**零 payload 重传**，帧只引用同一
   `bitmap://` src；Host 侧按 src 复用已驻留纹理。
 - 驻留上限 256 MiB/App（最早键驱逐）；驱逐后的重引用会重传一次，计数可解释。
+  **驱逐不驱逐当帧刚登记的资源**：剩余候选全是本帧资源时停止驱逐并保留超额，
+  避免帧引用悬空。
+- **释放（最后 owner 归零）**：producer 驱逐即产生待释放源，经追加式
+  `FrameMsg::ResourceRelease { wid, srcs }`（tag 13）通知 Host；Host 丢弃对应
+  句柄（三处宿主消费点同律）。旧宿主收到未知 tag 明确拒绝，不会静默半应用。
   Host 侧句柄缓存上限 512 条，但 **`bitmap://` 条目不参与本地淘汰**（producer
   拥有、丢失不可自愈）；超限的其它来源（文件/http/资产）按插入序逐出。
 - **上传预算**：8 MiB/1s 滑动窗口（per-App）。超预算帧**整帧回滚**（撤销本帧
@@ -90,6 +95,10 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   Listening**（不半启动）。帧合成前再校验一次：缺必需能力即具名拒绝
   （`AdmissionError::UnknownRequiredCapability`），**不写槽**（保旧帧）并归还
   传输槽。v2 词汇在收窄能力集下仍受。
+- **宿主能力下行**：App 在 Hello 声明 `optional:welcome-caps/1` 时，Host 会在
+  Welcome 之后追加 `HandshakeMsg::HostCaps { caps }`（追加式 tag 4，未声明的
+  旧端永远收不到）；App 存入 `peer_caps`，producer 因此可从握手而非本地开关
+  决定是否用 v3 原语。
 - **槽 = 信用**：帧/位图槽按"空闲池优先 → 从未用过的槽"分配；在途（未 ACK）
   槽不得覆盖；无信用即 `Backpressure`，调用方保留待发状态重试。ACK 只归还传输
   槽并清在途标记，**不代表 GPU 完成**（GPU 寿命由 Host fence 管理）。
@@ -136,10 +145,10 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 5. 媒体资源族（Video/RemoteFrame）未进本增量。
 6. v2↔v3 双读只做了 tag 语义与拒绝路径，未做两进程实机配对；慢 Host/乱序资源/
    旧 ACK 负控未跑。
-7. Welcome 没有能力尾：producer 只能靠本地开关决定是否发 v3，无法从握手得知宿主
-   支持面（glyph/shadow 是配置项而非协商结果）。
-8. Host 无显式释放路径（`CacheControl` 不携带 bitmap src），最后 owner 释放语义
-   未实现；bitmap 只由 producer 侧驻留预算约束。
-9. wire 无显式 generation 字段：`src` 已含内容哈希+单调序号，本地做不了有意义的
-   “旧代号拒绝”；跨进程乱序只能靠 ACK/槽纪律约束。
+7. wire 无显式 generation 字段：`src` 已含内容哈希+单调序号，本地做不了有意义的
+   “旧代号拒绝”；同 id 重上传按既有语义视为刷新（last-write-wins，由 ACK/槽纪律
+   约束），跨进程乱序保护仍需 wire 字段。
+8. Host 侧 `bitmap://` 句柄只由 producer 的 `ResourceRelease` 与自身驻留预算回收；
+   没有引用计数，`ResourceRelease` 到达顺序与帧引用之间没有契约级保证（当前靠
+   泵的 FIFO 与“驱逐不下当前帧资源”的守卫）。
 
