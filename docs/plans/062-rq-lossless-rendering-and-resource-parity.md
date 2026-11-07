@@ -526,3 +526,41 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **未变**：连续媒体帧（用户裁定另立）、可控重排通道负控、M-02/06/07（OS063）仍为具名边界；主检出他方 WIP 仍待其 owner 归位（merge 门）。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 17 | from: work | to: review | status: execution_done | outcome: pass（F-01..F-07 关闭） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: f2cdafb4 | next: review（第二轮 final）
+
+### 2026-11-08 两连败 final review 的诊断检查点（work 技能要求）
+
+- 背景：`44079c22`（第一轮 final）与 `f2cdafb4`（第二轮 final 复评）连续两次 `needs_fix`。按 work 技能，下一次修复前必须有具名诊断，不能只“再改一遍”。
+- **为什么前两轮检查没抓到**：
+  1. **F-01（阴影 2.56%）**：所有门只压默认 producer（scrim），v3 富模式只“记录不设门”；而读数本身在 `3eadae59` 前是占位贴片的读数（0.74%/1.37%）——**度量对象是错的**（占位 vs 真图），门又没有覆盖该模式，于是“绿”与“真值”同时失真。
+  2. **F-02（释放记账次序）**：实现顺序错误（先记账后合成）只被“正向路径”测试覆盖——没有任何用例让 `compose_v2` 返回 Err 后再观察记账；多表面场景也没有负控。**测试面缺“拒绝/多实例”分支**。
+  3. **F-03/N-02（数值条款）**：把“文档写了阈值”当成“已断言”，且把 061 的 p95 口径搬到一个采样/预热不同的矩阵 harness 上；第一次又用 p50 替换了冻结口径——**口径所有权错位**（谁定义、在哪测）。
+- **本轮设计/口径调整（不是重跑同样的检查）**：
+  - 计量对象单一化：所有像素读数必须在“图像真的渲染出来”的前提下取得（`rq_probe` 逐能力表已加“Image src 必须命中宿主缓存”的硬断言）。
+  - 门覆盖模式：默认与 v3 富模式**各自设门**（富模式 ≤1.0%/≤1.5%），并用 `images_composite_after_geometry` 钉住底层画布行为。
+  - 顺序由构造保证：新增 `compose_v2_counted(surfaces, refs, bitmap_keys, …)`，三处宿主只能经它合成；单测直接喂被拒帧断言记账不动。
+  - 口径归位：冻结的 `replay p95 ≤1.25×direct+2ms` 由 061 的测量入口（`rq_probe_t01…`）在**隔离窗口**断言（env `AUTO_RQ_TIMING_WINDOW=isolated`），共享跑机只断言稳态 p50；produce 门只在冻结 fixture 矩阵（`rq_cells`）裁决，全语料含宿主依赖面（window_thumbnail ≈44ms）只记录。
+  - 记账生命周期：引用记账按表面并在 `ReclaimWindow` 回收（N-01），重复释放幂等。
+- **剩余不变项**：连续媒体帧（用户裁定另立）、可控重排通道负控、M-02/06/07（OS063）、主检出他方 WIP（merge 门）。此诊断不改变 AC/范围。
+
+### 2026-11-08 第二轮独立复审（final 复评，T-06）：needs_fix
+
+- stage: review | review_scope: final（修复复评） | reviewer_identity: 独立上下文子代理（模型/会话号未由运行环境暴露，按“独立 agent 会话”记录） | plan_id: auto-ui/PLAN-062 | plan_revision: r4 | outcome: **needs_fix** | worktree: `D:/autostack/.wt/ui-062/auto-ui` | branch: `codex/plan-062-dev` | reviewed_commit: `f2cdafb4` | base_commit: `3d64877d` | spec_inputs: `rq-fidelity-contract.md` §7、`rq-render-packets-and-resources.md` §2.3/§3/§5.3/§6（`f2cdafb4`） | evidence: `D:/autostack/plan-artifacts/plan-062/auto-ui/review5/REVIEW5-FINAL-2026-11-08.md`
+- **复现（reviewer 自跑，clean tree）**：cells idle exit 0（v3 text 0.7979/gradient 0.5876/scroll 0.3298/shadow 0.0691）；同命令 + 并发构建 exit 101（text v3 replay p50 28.00 > 11.47）；协议族 **273/4**（与 base 同组 4 红）；bitmap_refs 1/0、release_ 6/0；媒体过线 1/0；zorder pin 1/0。
+- **关闭**：F-01、F-04、F-06、F-07。**部分**：F-02（代码正确但缺“被拒帧 + 挂起释放”“双表面”两个负控）、F-03（replay 由冻结 p95 改 p50；产物 4/28 例缺 p95；SVG 60ms p50 偏松）、F-05（新页 §2.3 仍写 1.3740% 与“具名遗留”）。
+- **新发现**：N-01（low）`refs` 不随窗口回收、`applied` 无界；N-02（low）计时门并发负载下误红、空闲通过；N-03（info）iced `gradient.wgsl` 无 shadow 项，0.588% 属**参考侧**基线局限（Spec 未记）。
+- **AC 判定**：AC-01 pass（未触）、AC-02 pass（N-03 注）、AC-03 partial、AC-04 pass（未触）、AC-07 partial。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 18 | from: review | to: work | status: executing | outcome: needs_fix（F-02/F-03/F-05 部分 + N-01/N-02/N-03） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: f2cdafb4 | next: work（含两连败诊断）
+
+### 2026-11-08 work 第二轮复审修复（F-02/F-03/F-05 补全 + N-01/N-02/N-03，交第三轮 final）
+
+- stage: work | plan_id: auto-ui/PLAN-062 | plan_revision: r4 | outcome: **pass（复审 findings 全关 + 两连败诊断已记）** | worktree: `D:/autostack/.wt/ui-062/auto-ui` | branch: `codex/plan-062-dev` | code_commit: `63ffebc4` | next: review（T-06 第三轮 final）
+- **F-02 补全**：记账不变量改为**由构造保证**——`compose_v2_counted(surfaces, refs, bitmap_keys, …)` 是三处宿主唯一的合成入口，只在 `Ok(Some(_))` 时刷新引用；`BitmapRefs` 内部按表面记账、**任一表面仍引用即不驱逐**。补两个负控：①被拒 v3 帧后前台仍是旧帧、挂起释放不动；②双表面都显示 A 时释放挂起，两表面都换帧才兑现。重复释放仍幂等。
+- **N-01**：`ReclaimWindow`（`ProtocolHost` 与桌面 session）调用 `BitmapRefs::forget_surface`——按窗口清记账、挂起释放得以兑现，`applied` 随引用集回收（不再是只增集合）。
+- **F-03/N-02（口径归位）**：冻结 produce 门（W-C ≤10ms、SVG 例外按 p50）只在**冻结 fixture 矩阵**（`rq_cells` 7 workload）断言；全语料保留数字不设门（`window_thumbnail` 每帧重取快照 p95≈44ms，不属该预算）。冻结的 replay **p95** 条款在 061 的测量入口（`rq_probe_t01`）断言，且只在**隔离窗口**（`AUTO_RQ_TIMING_WINDOW=isolated`）——20 样本下 p95≈次大值、共享跑机同代码在 5–22ms 间摆动，而 p50 反优于 direct；稳态 p50 门处处断言。矩阵采样 12→30（p95 不再是 max），每行输出 `timing_gate=pass|skipped_loaded`。
+- **F-05/N-03（Spec）**：§2.3 的陈旧段（0.0625%→1.3740%、“具名遗留”）改为修复后读数（0.588%/0.069%）并记 N-03——iced gradient 面无 shadow 项，direct 金样在渐变例不画阴影，0.588% 主要是“RQ 画了、参考没画”；§5.3 增加计时门口径与归属说明。
+- **测试稳定性**：媒体过线用例改为容忍 per-App 上传预算延期（等到重试收敛，而不是要求首帧即命中）——这正是 P-01 的合同行为，也修掉了它对执行顺序的依赖。
+- **复跑面（本树 `63ffebc4`）**：`rq_` **40/0**；`ui::desktop_protocol::` **276 passed / 4 failed**（同基线 4 红）；`ui::iced::broker_surface` **14/0**；`media` **18/0**。
+- **未变**：连续媒体帧（裁定另立）、可控重排通道负控、M-02/06/07（OS063）、主检出他方 WIP（merge 门）。两连败诊断见上一节，不改变 AC/范围。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 19 | from: work | to: review | status: execution_done | outcome: pass（F-02/F-03/F-05/N-01/N-02/N-03 关闭） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 63ffebc4 | next: review（第三轮 final）
