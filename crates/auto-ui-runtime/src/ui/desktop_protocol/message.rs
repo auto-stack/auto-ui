@@ -1026,6 +1026,9 @@ pub const CAP_BLUR_SDF: &str = "fidelity/blur-sdf/1";
 pub const CAP_RESOURCE_GENERATION: &str = "resource/generation/1";
 pub const CAP_BACKPRESSURE: &str = "pipeline/backpressure/1";
 pub const CAP_ACK_FENCE_SPLIT: &str = "ack/fence-split/1";
+/// 协商标记（PLAN-062 T-04）：App 在 Hello 里声明它，宿主才在 Welcome 之后
+/// 追加 `HostCaps` 消息；未声明的旧端永远收不到这条消息。
+pub const CAP_WELCOME_CAPS: &str = "welcome-caps/1";
 
 /// 冻结的八个能力 ID（声明序稳定）。
 pub const ALL_FIDELITY_CAPS: [&str; 8] = [
@@ -1333,6 +1336,11 @@ pub enum HandshakeMsg {
         frame_mode: FrameMode,
         extra_surfaces: Vec<WelcomeSurface>,
     },
+    /// host→app（PLAN-062 T-04，追加式 tag 4）：宿主能力声明。
+    ///
+    /// 只在 App 于 Hello 里声明 `welcome-caps/1` 后由宿主主动下发——不声明
+    /// 的旧端永远收不到这条消息，Welcome 的字节与旧线完全一致。
+    HostCaps { caps: Vec<String> },
     /// app→host。握手完成确认（状态机 Active 的入场合）。
     Ready,
 }
@@ -1341,6 +1349,8 @@ impl HandshakeMsg {
     const HELLO: u8 = 1;
     const WELCOME: u8 = 2;
     const READY: u8 = 3;
+    /// PLAN-062 T-04：宿主能力声明（追加式 tag 4）。
+    const HOST_CAPS: u8 = 4;
 
     pub fn encode(&self, out: &mut Vec<u8>) {
         match self {
@@ -1415,6 +1425,13 @@ impl HandshakeMsg {
                     for s in extra_surfaces {
                         s.encode(out);
                     }
+                }
+            }
+            Self::HostCaps { caps } => {
+                put_u8(out, Self::HOST_CAPS);
+                put_u32(out, caps.len() as u32);
+                for c in caps {
+                    put_string(out, c);
                 }
             }
             Self::Ready => put_u8(out, Self::READY),
@@ -1501,6 +1518,14 @@ impl HandshakeMsg {
                     frame_mode,
                     extra_surfaces,
                 }
+            }
+            Self::HOST_CAPS => {
+                let n = r.u32()? as usize;
+                let mut caps = Vec::with_capacity(n.min(32));
+                for _ in 0..n {
+                    caps.push(r.string()?);
+                }
+                Self::HostCaps { caps }
             }
             Self::READY => Self::Ready,
             tag => return Err(CodecError::UnknownTag(tag)),

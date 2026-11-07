@@ -309,6 +309,19 @@ impl<'a> ProtocolHost<'a> {
                         self.endpoint.frame_mode, // v1.3 缺省 Commands（三态开关在 adjudicate 链接入时改写）
                     )?;
                     self.to_app.push(welcome);
+                    // PLAN-062 T-04：App 声明 `welcome-caps/1` 时下发宿主能力
+                    // 声明（追加式消息；旧端不声明 → 永不发送）。
+                    if self
+                        .endpoint
+                        .app_caps
+                        .supports(crate::ui::desktop_protocol::message::CAP_WELCOME_CAPS)
+                    {
+                        self.to_app.push(ProtocolMsg::Handshake(
+                            crate::ui::desktop_protocol::message::HandshakeMsg::HostCaps {
+                                caps: self.endpoint.supported.to_wire(),
+                            },
+                        ));
+                    }
                     self.to_app.push(ProtocolMsg::Frame(FrameMsg::BufferAlloc {
                         surface,
                         slots: 2,
@@ -651,14 +664,18 @@ mod tests {
 
         let hello = app.connect().unwrap();
         host.handle(&hello).unwrap();
-        // Welcome + BufferAlloc 都已排队。
-        assert_eq!(host.to_app.len(), 2);
+        // Welcome + HostCaps（App 声明了 welcome-caps 标记）+ BufferAlloc。
+        assert_eq!(host.to_app.len(), 3);
         assert!(matches!(
             host.to_app[0],
             ProtocolMsg::Handshake(HandshakeMsg::Welcome { .. })
         ));
         assert!(matches!(
             host.to_app[1],
+            ProtocolMsg::Handshake(HandshakeMsg::HostCaps { .. })
+        ));
+        assert!(matches!(
+            host.to_app[2],
             ProtocolMsg::Frame(FrameMsg::BufferAlloc { .. })
         ));
 

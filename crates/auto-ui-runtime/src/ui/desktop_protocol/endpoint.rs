@@ -211,6 +211,9 @@ pub struct AppEndpoint<S: FrameSource> {
     pub extra_surfaces: Vec<super::message::WelcomeSurface>,
     /// 表面帧载荷模式（v1.3：Welcome 协商结果；缺省 Commands）。
     pub frame_mode: FrameMode,
+    /// PLAN-062 T-04：宿主经 `HostCaps` 声明的能力集（未收到 = 空）。
+    /// producer 据此决定是否发 v3 原语，而不是靠本地开关猜。
+    pub peer_caps: super::message::CapabilitySet,
     /// 观测汇（Attach/Detach 维护）。
     pub observe_sink: Option<String>,
     /// 帧序号（单调）。
@@ -251,6 +254,7 @@ impl<S: FrameSource> AppEndpoint<S> {
             rect: None,
             extra_surfaces: Vec::new(),
             frame_mode: FrameMode::Commands,
+            peer_caps: super::message::CapabilitySet::default(),
             observe_sink: None,
             next_frame_id: 0,
             bm_last_slot: 0,
@@ -370,6 +374,8 @@ impl<S: FrameSource> AppEndpoint<S> {
                     super::message::CAP_PATH_FILL
                 ));
                 caps.push(format!("optional:{}", super::message::CAP_GLYPH_RUN));
+                // 声明“我会读宿主的能力声明”，宿主才会在 Welcome 之后补发。
+                caps.push(format!("optional:{}", super::message::CAP_WELCOME_CAPS));
                 caps
             },
         }))
@@ -566,6 +572,15 @@ impl<S: FrameSource> AppEndpoint<S> {
         use AppState::*;
         match (&self.state, msg) {
             // --- 握手 ---
+            (
+                Handshaking | Active,
+                ProtocolMsg::Handshake(HandshakeMsg::HostCaps { caps }),
+            ) => {
+                // PLAN-062 T-04：宿主能力声明（App 未声明 `welcome-caps/1` 时
+                // 宿主不会发这条；收到即记入 peer_caps 供 producer 决策）。
+                self.peer_caps = super::message::CapabilitySet::parse(&caps);
+                Ok(vec![])
+            }
             (
                 Handshaking,
                 ProtocolMsg::Handshake(HandshakeMsg::Welcome {
@@ -1235,6 +1250,7 @@ fn msg_name(msg: &ProtocolMsg) -> &'static str {
         ProtocolMsg::Handshake(m) => match m {
             HandshakeMsg::Hello { .. } => "Handshake::Hello",
             HandshakeMsg::Welcome { .. } => "Handshake::Welcome",
+            HandshakeMsg::HostCaps { .. } => "Handshake::HostCaps",
             HandshakeMsg::Ready => "Handshake::Ready",
         },
         ProtocolMsg::Frame(m) => match m {
@@ -1534,6 +1550,51 @@ mod tests {
                 .iter()
                 .any(|c| c == CAP_PATH_FILL),
             "App 必须把 pathfill 作为必需能力声明"
+        );
+    }
+
+    #[test]
+    fn host_caps_reach_the_app_after_welcome() {
+        use crate::ui::desktop_protocol::message::{CAP_PATH_FILL, CAP_WELCOME_CAPS};
+
+        let mut app = AppEndpoint::new(StubSource::new(), "counter", "c", 480.0, 320.0);
+        let mut host = HostEndpoint::listen();
+        let hello = app.connect().unwrap();
+        // App 必须声明会读宿主能力（否则宿主不会发 HostCaps）。
+        let ProtocolMsg::Handshake(HandshakeMsg::Hello { theme_caps, .. }) = &hello else {
+            panic!("期待 Hello");
+        };
+        assert!(
+            theme_caps.iter().any(|c| c.ends_with(CAP_WELCOME_CAPS)),
+            "Hello 必须声明 welcome-caps 标记"
+        );
+        assert!(theme_caps
+            .iter()
+            .any(|c| c == &format!("required:{CAP_PATH_FILL}")));
+
+        host.on_message(hello).expect("Hello 合法");
+        let welcome = host
+            .activate(1, 3, 42, WRect::new(0.0, 0.0, 480.0, 320.0), FrameMode::Commands)
+            .expect("能力齐备");
+        app.on_message(welcome).unwrap();
+        assert!(
+            !app.peer_caps.supports(CAP_PATH_FILL),
+            "Welcome 本身不携能力（旧端线不变）"
+        );
+
+        // 宿主按标记补发能力声明 → producer 能读到宿主支持面。
+        app.on_message(ProtocolMsg::Handshake(HandshakeMsg::HostCaps {
+            caps: host.supported.to_wire(),
+        }))
+        .unwrap();
+        assert!(
+            app.peer_caps.supports(CAP_PATH_FILL),
+            "HostCaps 之后 peer_caps 必须反映宿主能力"
+        );
+        assert_eq!(
+            app.state,
+            AppState::Active,
+            "HostCaps 不得改变会话状态"
         );
     }
 
