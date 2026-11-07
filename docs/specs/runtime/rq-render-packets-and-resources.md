@@ -57,6 +57,11 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   （`rounded_box_sdf` 双倍中心坐标、半径取 `min(r, 短边/2)`、
   `1 - smoothstep(-blur, blur, max(sdf,0))`），生成贴片资源，帧内先发
   `Image(贴片)` 再发 `shadow: None` 的 Quad。Host 不再以垫层近似。
+  **实测边界（不得写成改进）**：贴片路径相对原单层 scrim 在
+  `gradient_border_shadow` 上是退步（0.0625% → 1.3740%，同 harness/阈值），
+  因为贴片经画布图像管线合成、且阴影与 quad 分成两层而非 shader 内一次混合。
+  贴片的价值是几何正确（同式 SDF）而非像素更近；在合成对齐解决前，该能力按
+  **具名遗留**处理，不得作为保真通过证据。
 
 ## 3. 资源身份、驻留与预算
 
