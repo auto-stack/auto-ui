@@ -142,7 +142,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | [x] | T-01 | work | UI061正式可行决策 | 重核UI061全能力ID、direct旧基准、实现来源与预算；冻结当前绘图能力并集及精确接缝；接受UI061 r3性能合同与预算，冻结P/M对应实现来源和direct对照版本，缺预算不进入性能签收 | V-01；AC-01；AC-07/V-05～08（按§6分工）——见§9 2026-11-07 work 轮次：39 View ID + 8 能力ID入编译常量、061 冻结预算原样接受 |
 | [ ] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02；AC-07/V-05～08（按§6分工）——进行中：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`，mesh 重放 0.0%、SVG 0.333%）；GlyphRun wire、blur/SDF、几何渐变仍具名缺口（§9） |
 | [ ] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03；AC-07/V-05～08（按§6分工）——进行中：内容身份+驻留缓存（稳定帧 0 重传、驱逐可解释）、图片 alpha/rotation、SVG 栅格资源已交付；媒体族与 wire generation 字段待补（§9） |
-| [ ] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——进行中：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控已交付（`4263ff3c`）；wire generation 字段与乱序资源负控待补（§9） |
+| [ ] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——进行中：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、wire generation（tag 13 + HostCaps 下行补到两宿主，`d2e41c58`）已交付；乱序资源负控待补（§9） |
 | [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——进行中：六格真实 wire（`4e2f53d3`：两产者 × 两宿主，含 v3 tag 3 槽分派缺陷修复）+ 39/39 逐能力读数（`77f92dda`，26/39 ≤0.1%，13 个文字密集/宿主依赖族具名）；M-02/06/07 与 AC-03/AC-04 项待补 |
 | [ ] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
 | [ ] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
@@ -420,3 +420,17 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 仍缺（不签 T-05/T-03）：AC-03 wire generation 字段与**媒体资源族**（mpv 帧走 GPU 纹理、无 CPU 读回，跨线需独立读回/媒体传输设计）；AC-04 真两进程（独立 exe）配对、乱序资源负控；M-02/M-06/M-07 未测。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 9 | from: work | to: work | status: executing | outcome: pass（AC-04 三条负控） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 4263ff3c | next: work（wire generation / 两进程配对 / 媒体边界裁定）
+
+### 2026-11-08 work wire generation + HostCaps 下行（T-04/T-03，AC-03 generation 面）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r4 / outcome: 进行中（AC-03 的 wire generation 关闭；媒体族仍开） / worktree: `D:/autostack/.wt/ui-062/auto-ui` / code_commit: `d2e41c58`
+- 协议增量：`FrameMsg::BitmapReadyGen`（tag 13，字段序同 tag 10 + 尾追 `generation: u64`，会话内单调）。产者只在宿主 `HostCaps` 声明 `resource/generation/1` 时发送；未声明 = 旧 tag 10，**字节不变**；旧宿主读到 tag 13 命中 `UnknownTag` 明确拒绝，不会按旧布局误读多出的 8 字节（tag/长度差由 `message` 单测钉住）。
+- 宿主守卫：`broker_surface::bitmap_cache_put_gen` 按资源 id 记最后已应用序号，**严格更小（迟到/乱序）与相等（重复投递）一律丢弃并保旧内容**，仍回 `BitmapAck` 归还槽（槽不泄漏）；三处消费（`rqhost`/`host::ProtocolHost`/桌面 `session`）共用，旧 tag 路径语义不变（同 id 重上传 = 即时翻新）。
+- **发现并修复协商下行缺口（同类缺陷第二次出现）**：`HostCaps` 此前只有 `host::ProtocolHost` 发送；独立 RQ 宿主（`rqhost`）与桌面 broker 都不发——产者在**真实宿主**上永远学不到 `resource/generation/1` 等可选面，协商在线上是死的（与第二轮复审 B2 同根）。两处按同一条件补齐（App 必须声明 `welcome-caps/1` 才发，旧端零未知消息）。
+- 证据（本树 `d2e41c58`）：`bitmap_generation_only_on_negotiated_lines`（未协商 → tag 10；协商后 → tag 13，序号 2,3 单调）、`p062_bitmap_generation_rejects_late_and_duplicate_uploads`（gen5 接受 → gen3 拒 → gen5 拒 → gen6 翻新；旧 tag 仍翻新）、`rq_wire_generation_capability_is_negotiated_and_applied`（真管道：HostCaps 列出 8 个能力面含 `resource/generation/1`，svg 位图经该路径合成 `image_ops=1`）。
+- Spec（SD-01）：§3 增“线上 generation”规则（tag 13/序号守卫/槽归还/旧端兼容）；§6 第 7 条改写为“已交付 + 乱序资源负控仍缺（需可控重排通道，管道是 FIFO）”。
+- 回归面：`rq_` **35/0**；`ui::desktop_protocol::` **266 passed / 4 failed**（同基线 4 红：autocenter、stage3 stress n3/n5、t3_examples_queue_end_to_end）。
+- 仍缺（不签 T-05/T-03）：**媒体资源族**（mpv 帧直写 GPU 纹理、无 CPU 读回——需要独立读回/媒体传输设计）；AC-04 真两进程（独立 exe）配对与乱序资源负控；M-02/M-06/M-07 未测。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 10 | from: work | to: work | status: executing | outcome: pass（wire generation + HostCaps 下行补齐） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: d2e41c58 | next: work（两进程配对；媒体边界裁定）
+
