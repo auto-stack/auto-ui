@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-067
-status: execution_done
+status: reviewed
 feature_name: AGE迁移ACE全消费者清单与最小整链先证
 author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-07
 plan_revision: 2
-current_step: 6
+current_step: 7
 total_steps: 9
 depends_on: []
 supersedes_spec_components: []
@@ -125,7 +125,7 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 | T-04 | work | T03；可达支路 | 源编辑/增量/同PID观察与legacy反控；阻断支路明确not-run | AC-04 | [x] 2026-11-07 **not-run（不可达）**：T-03 作者源在 ACE 首个 Text 门被拒，无 ACE 目标/会话可编辑或同 PID 观测；legacy 侧仅有 T-02 产品级改源证据（`counter_step [1,2]→[1,3]`），不构成运行时增量证据；REP 不由研究签章 |
 | T-05 | work | T03；可达支路 | 恢复/取消/20轮Run/资源收支及坏件修复；未知不能冒pass | AC-04 | [x] 2026-11-07 **not-run（不可达）**：无 ACE 运行会话，冷恢复/取消/Stop/20 轮/Run 代次与资源收支均无可观测对象；不伪造微样本 PASS，REP-07 等仍归后续 ACE 宿主合同 |
 | T-06 | work | T04/05分类齐 | 冻结SD/完整缺口与既有959/979–981/985–987的逐项接收映射、实际owner和关闭oracle；覆盖项不另立重复合同，报告与真实工件一致 | AC-05 | [x] 2026-11-07（R1/R2/R4 已修）SD-01 候选落工作树 `docs/specs/auto-graphics/ace-migration-feasibility.md`（15,834B / sha256 `12150fc8…1deae2b49`，commit `d4745281`）；G1–G9 逐项映射 981 B-SOURCE/B-SESSION/B-CONTENT、980 B-DIALECT/B-NATIVE、979 T-02/T-03/T-08、961、939 T-03..T-08、967/968、985–987；REP 按权威 M2 合同全称与 owner 分账（REP-01 原源与全消费者=959+每能力包；REP-06=967+980；REP-08=986；REP-10=987；REP-11=985+各consumer），全 pending；能力常量 4 个、实测入口 2 条（modules.scalar + scalar profile）；UK-06 具名移交、无未归属 unknown；附录A与样本逐字相等（check exit 0）；未新立合同 |
-| T-07 | review | T-01..06实质完成 | 独立final；不修实现，finding交work，同员受影响复核 | AC-06 | [ ] |
+| T-07 | review | T-01..06实质完成 | 独立final；不修实现，finding交work，同员受影响复核 | AC-06 | [x] 2026-11-07 独立 final **pass** @ `d4745281`（reviewer 独立 subagent 上下文 043c5659…，review_scope: final）；AC-01..AC-06 全 pass；F-067-R1..R4 全关；spec 15,834B `12150fc8…`；AC-07/AC-08 属 merge |
 | T-08 | merge | T-07 pass | 冻结门/身份落主、canonical/导航/同号归档；不自动tag/远端发布 | AC-07 | [ ] |
 | T-09 | merge | T-08 | 全输出对账/摘要/guard/清理/登记；实完才勾 | AC-08 | [ ] |
 
@@ -166,6 +166,10 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 - stage: work | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | outcome: pass（复核残余 F-067-R4 修复；work 回到 execution_done） | worktree: D:/autostack/.wt/ui-067/auto-ui | branch: codex/plan-067-dev | base_commit: 4bb54e36 | code_commit: d4745281（工作树 clean） | dependency_revisions: auto-lang 436ac91f（ACE clean）/ ag-examples 5384f7b | task_ids: T-01, T-06（repair） | 修复: (a) `t06-report.md` §1 由 "13 profile/3 capability" 更正为 "13 profile / 4 公开能力常量，2 条入口实测"；(b) Plan T-01 行由"3 标量入口实测"更正为"实测仅 2 条入口：`ac.source.modules.scalar/v1` + `SourceProfile::Scalar`；instances/cte/packages 未触达"；(c) SD-01 §2.1 删除歧义表述"前两类标量入口"，改为具名两条入口并明确 instances/cte/packages 未验证 | evidence: SD-01 `docs/specs/auto-graphics/ace-migration-feasibility.md` 15,834B / sha256 `12150fc8…1deae2b49`（commit d4745281）；t06-report 5,168B / sha256 `3a567a10…19a1f1477`（§9 round 6 所记 6e083a64 为其旧版，以本条为准）；附录A逐字相等（check_spec_appendix.py exit 0）；git diff 仅 spec 文件 | findings: F-067-R4 已关；R1/R3 于上轮接受 | blockers: 无用户待答 | next_responsible_role: review（同员残余项受影响复核）
 
 - stage: goal | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | round: 7 | from: work | to: review | status: execution_done | outcome: pass（R4 修复完成） | worktree: D:/autostack/.wt/ui-067/auto-ui | commit: d4745281 | next: review 同员复核。
+
+- stage: review | review_scope: final | reviewer: 独立 subagent 上下文（043c5659-0e2d-49b7-a9a3-65456484222d） | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | outcome: pass | worktree: D:/autostack/.wt/ui-067/auto-ui | branch: codex/plan-067-dev | reviewed_commit: d4745281 | base_commit: 4bb54e36 | dependency_revisions: auto-lang 436ac91f（ACE 子树 clean）/ ag-examples 5384f7b | spec_inputs: `docs/specs/auto-graphics/ace-migration-feasibility.md` sha256 12150fc8…b49（15,834B）；sample/main.at 7a14519f…、counter.at 8734bef7… | acceptance_results: AC-01 pass、AC-02 pass、AC-03 pass、AC-04 pass、AC-05 pass、AC-06 satisfied；R1（REP 全称/owner）、R3（探针哈希）、R4（4 常量/2 入口表述）复核实测接受，R2 于上轮修复后接受 | pending_closeout_gates: AC-07（落主/canonical/归档）与 AC-08（对账/摘要/清理/登记）属 merge；统一回归/冻结门归 merge | findings: none（F-067-R1..R4 全关） | evidence: `plan-artifacts/plan-067/auto-ui/review/re-review-report.md`；check_spec_appendix.py exit 0（附录逐字相等）；`out/review/report.json`（输入未变，复用前轮 exit 0/result pass） | next: merge（T-08/T-09）
+
+- stage: goal | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | round: 8 | from: review | to: merge | status: reviewed | outcome: pass（独立 final pass @ d4745281） | worktree: D:/autostack/.wt/ui-067/auto-ui | commit: d4745281 | next: merge T-08。
 
 ## 10. 待澄清事项
 
