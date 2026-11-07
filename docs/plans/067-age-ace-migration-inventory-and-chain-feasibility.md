@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-06
 updated_at: 2026-11-07
 plan_revision: 2
-current_step: 2
+current_step: 3
 total_steps: 9
 depends_on: []
 supersedes_spec_components: []
@@ -121,7 +121,7 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 |---|---|---|---|---|---|
 | T-01 | work | 另行启动；独立于M1收口 | 冻结ACE实际交付/旧引擎全图/跨仓owner与材料，重核922 F11/C08/UK06 | AC-01 | [x] 2026-11-07 冻结清单 `plan-artifacts/plan-067/auto-ui/t01-inventory.md`（14,100B / sha256 `f1feb80a01…0f8cdc4a`）；整链7段+profile矩阵+ACE 13 profile核验+922 F-11/C-08/UK-06重核 |
 | T-02 | work | T01 | 固定最低样本/独立oracle/类型和资源规则、最多两机制与可执行probe入口 | AC-02/03 | [x] 2026-11-07 冻结见 `plan-artifacts/plan-067/auto-ui/t02-design.md`（6,464B / sha256 `ff62617223…fb8089a`）；样本 main.at/counter.at 被交付前门 `load_project_mixed`+`lower_project_node_mixed_regions` 接受，产出 `world_sha256=1599d225…4218b9`（15,689B）；oracle 常量与生成源逐项相同、改源 b.step 2→3 产品变 `[1,3]`；`probe/run.py` 三阶段 pass，ACE 阶段 not-run（T-03） |
-| T-03 | work | T02；固定当前正式交付基线（go支路另需对应接口实交付） | 执行最小整链或真实阻断对照，确定go/bounded-go/no-go，缺接口不跨仓补实现 | AC-02/03 | [ ] |
+| T-03 | work | T02；固定当前正式交付基线（go支路另需对应接口实交付） | 执行最小整链或真实阻断对照，确定go/bounded-go/no-go，缺接口不跨仓补实现 | AC-02/03 | [x] 2026-11-07 **no-go（作者profile整链）**：ACE `436ac91f` 前门实测 main.at `source.unsupported`@`use`486..489、counter.at `source.syntax` "expected `fn`, found `node`"319..323、legacy world.at `source.unsupported`@`var`228..231；相邻正控标量模块图 accepted、unknown/duplicate/private/cycle 四负控具名拒绝；语义/AV/host/GPU 后段 not-run。B 候选因需自解析/复制语义核心亦 no-go，停止替代机制。详见 t03-result.md（7,880B / sha256 `7163a1e4…22bc0af4`） |
 | T-04 | work | T03；可达支路 | 源编辑/增量/同PID观察与legacy反控；阻断支路明确not-run | AC-04 | [ ] |
 | T-05 | work | T03；可达支路 | 恢复/取消/20轮Run/资源收支及坏件修复；未知不能冒pass | AC-04 | [ ] |
 | T-06 | work | T04/05分类齐 | 冻结SD/完整缺口与既有959/979–981/985–987的逐项接收映射、实际owner和关闭oracle；覆盖项不另立重复合同，报告与真实工件一致 | AC-05 | [ ] |
@@ -147,6 +147,10 @@ T06逐差额记录接收Plan/任务/文件/owner/关闭oracle；T01若发现既�
 
 - stage: goal | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | round: 2 | from: work | to: work | status: executing | outcome: pass（T-02 完成） | worktree: D:/autostack/.wt/ui-067/auto-ui | commit: 4bb54e36 | next: work T-03。
 
+- stage: work | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | outcome: pass（T-03 完成，裁决 no-go；T-04/T-05 将按不可达记 not-run，T-06 待做） | worktree: D:/autostack/.wt/ui-067/auto-ui | branch: codex/plan-067-dev | base_commit: 4bb54e36 | code_commit: 无（产品树未改；探针在 scratch） | dependency_revisions: auto-lang 436ac91f（只读兄弟树，ACE 子树 clean）/ ag-examples 5384f7b | task_ids: T-03 | evidence: `python probe/run.py --out out/probe --controls` exit 0、report `pass`；t03-result.md（sha256 `7163a1e4…22bc0af4`）；前门实测：main.at `source.unsupported`@`use`(486..489)、counter.at `source.syntax` expected `fn` found `node`(319..323)、生成的 world.at `source.unsupported`@`var`(228..231)；正控 std.answer+entry accepted（units≥2/items≥1）；负控 module-missing / module-duplicate-import / module-private / module-cycle 全具名拒绝；观察：`answer(1)` 绑定期接受（类型核验属下游）；后段语义/AV/host/GPU/编辑/恢复 not-run | blockers: 无用户待答 | next_responsible_role: work（T-04/T-05 not-run 记录 + T-06 缺口映射与 SD-01）
+
+- stage: goal | plan_id: auto-ui/PLAN-067 | plan_revision: r2 | round: 3 | from: work | to: work | status: executing | outcome: pass（T-03 裁决 no-go） | worktree: D:/autostack/.wt/ui-067/auto-ui | commit: 4bb54e36 | next: work T-04/T-05 not-run + T-06。
+
 ## 10. 待澄清事项
 
-D01：Schema领域投影/host支持是否已可消费由T01核真实交付；不预判go。D02：研究no-go不是AGE M1阻塞，也不解除ACE M2最终迁移义务。D03：B/C/D优先交既有959/967–970/979–981/985–987合同，见§5；确无owner覆盖的差额才修订或另立有限合同，不重复取号/施工。
+D01：Schema领域投影/host支持是否已可消费由T01核真实交付；不预判go。（2026-11-07 T-03 实测：当前**不可消费**——正常作者源在 ACE 首个 Text 门被具体拒绝，见§9 r3 与 `t03-result.md`；结论 no-go，不影响 D02/D03 口径。）D02：研究no-go不是AGE M1阻塞，也不解除ACE M2最终迁移义务。D03：B/C/D优先交既有959/967–970/979–981/985–987合同，见§5；确无owner覆盖的差额才修订或另立有限合同，不重复取号/施工。
