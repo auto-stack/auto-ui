@@ -172,6 +172,23 @@ fn styled_text(content: &str, style: &str) -> View<()> {
 fn corpus() -> Vec<Case> {
     let mut cases: Vec<Case> = Vec::new();
 
+    // 39 个 View 变体的分母补齐（V-01 逐项读数要求每个能力 ID 至少一例；
+    // 缺例不能静默删分母，故 empty/column 这两条在此显式构造）。
+    cases.push(Case {
+        id: "empty",
+        view: View::Empty,
+        note: "ready（空占位——宿主底色，不画任何 op）",
+    });
+    cases.push(Case {
+        id: "column_stack",
+        view: View::col()
+            .spacing(6)
+            .child(View::text("列一"))
+            .child(View::text("列二"))
+            .build(),
+        note: "ready",
+    });
+
     cases.push(Case {
         id: "text_plain",
         view: View::text("Hello AutoUI"),
@@ -615,6 +632,58 @@ pub(super) fn ms(d: std::time::Duration) -> f64 {
     d.as_secs_f64() * 1000.0
 }
 
+/// 两张 PNG 的像素差比例（逐通道阈值 `allowance`；尺寸不一致 = 1.0）。
+///
+/// PLAN-062 T-05：`rq_cells` / `rq_wire` / 逐能力面表共用同一实现——三份拷贝
+/// 曾经各自演化（其中一份漏了尺寸检查），口径必须单点。
+pub(super) fn pixel_diff_ratio(a: &Path, b: &Path, allowance: u8) -> f64 {
+    let left = image::open(a).expect("left png").to_rgba8();
+    let right = image::open(b).expect("right png").to_rgba8();
+    if left.dimensions() != right.dimensions() {
+        return 1.0;
+    }
+    let mut diff = 0usize;
+    for (p, q) in left.pixels().zip(right.pixels()) {
+        if (p[0] as i32 - q[0] as i32).abs() > allowance as i32
+            || (p[1] as i32 - q[1] as i32).abs() > allowance as i32
+            || (p[2] as i32 - q[2] as i32).abs() > allowance as i32
+        {
+            diff += 1;
+        }
+    }
+    diff as f64 / (left.width() * left.height()) as f64
+}
+
+/// 结构清单：按 v3/v2 原语统计（漏图在结构面即可见）。
+pub(super) fn case_inventory(list: &super::super::message::DisplayList) -> serde_json::Value {
+    use super::super::message::DisplayOp;
+    let (mut quad, mut text, mut path, mut img, mut segments, mut clip, mut xform) =
+        (0, 0, 0, 0, 0, 0, 0);
+    for op in &list.ops {
+        match op {
+            DisplayOp::Quad { .. } => quad += 1,
+            DisplayOp::TextStyled { .. } => text += 1,
+            DisplayOp::Path { path: p, .. } => {
+                path += 1;
+                segments += p.segs.len();
+            }
+            DisplayOp::GlyphRun { glyphs, .. } => {
+                text += 1;
+                segments += glyphs.len();
+            }
+            DisplayOp::Image { .. } => img += 1,
+            DisplayOp::Scissor { .. } | DisplayOp::ScissorPop => clip += 1,
+            DisplayOp::Transform { .. } | DisplayOp::TransformPop => xform += 1,
+        }
+    }
+    serde_json::json!({
+        "ops": list.ops.len(), "quad": quad, "text": text, "path": path,
+        "segments_or_glyphs": segments, "image": img, "clip": clip, "transform": xform,
+        "payload_tag": if list.requires_v3() { 3 } else { 2 },
+        "capabilities": list.required_capabilities(),
+    })
+}
+
 /// 直接渲染帧（offscreen wgpu 代理终点）：
 /// - `startup`：Simulator 构建（含 wgpu 适配器/设备初始化 + 首次布局），
 ///   属冷启动量级（M-06 代理；非稳态帧成本）。
@@ -829,6 +898,175 @@ fn rq_probe_t01_capability_denominator_is_complete() {
             "capability_ids": ALL_VIEW_CAPABILITY_IDS.to_vec(),
         })
     );
+}
+
+/// PLAN-062 T-05 / AC-01：**39 个 View 能力 ID 的逐项读数**。
+///
+/// 每个 ID 取语料首个例，走与产品同源的记录路径（`HeadlessSurface` →
+/// `render_frame_v2` → broker canvas 重放），与 direct 金样（同一 View 的 iced
+/// 元素，不经协议）同主题/同 viewport 对拍；结构清单与资源计数一并记录。
+/// 缺例即断言失败（不删分母）。
+#[test]
+fn rq_probe_t05_capability_rows() {
+    let out = out_dir().join("capabilities");
+    std::fs::create_dir_all(&out).expect("cap out");
+    let settings = || iced::Settings::default();
+    let size = || iced::Size::new(PROBE_W as f32, PROBE_H as f32);
+
+    let mut rows: Vec<serde_json::Value> = Vec::new();
+    let mut seen: std::collections::BTreeSet<&'static str> = std::collections::BTreeSet::new();
+    for case in corpus() {
+        let cap = capability_id(&case.view);
+        if !seen.insert(cap) {
+            continue; // 每 ID 取首个例（其余例已在 t01 基线里跑计数）
+        }
+        // 快照写入器按最后一个点分段，能力 ID 里的点会让文件名塌成 "cap.view.png"，
+        // 故落盘名一律用短横线 slug（报告里的 capability 字段保留原名）。
+        let slug = cap.replace('.', "-");
+        let direct_req = out.join(format!("{slug}-direct.png"));
+        let _ = std::fs::remove_file(&direct_req);
+        let _ = std::fs::remove_file(out.join(format!("{slug}-direct-wgpu.png")));
+        let direct_element = iced::widget::container(case.view.clone().into_iced())
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
+            .style(move |_t| iced::widget::container::Style {
+                background: Some(
+                    crate::ui::iced::broker_surface::to_color(
+                        crate::ui::desktop_protocol::client_runtime::bg(),
+                    )
+                    .into(),
+                ),
+                ..Default::default()
+            });
+        let mut direct_sim =
+            iced_test::simulator::Simulator::with_size(settings(), size(), direct_element);
+        match direct_sim
+            .snapshot(&theme())
+            .map_err(|e| format!("direct snapshot: {e}"))
+            .and_then(|snap| {
+                snap.matches_image(&direct_req)
+                    .map(|_| ())
+                    .map_err(|e| e.to_string())
+            }) {
+            Ok(()) => {}
+            Err(err) => {
+                rows.push(serde_json::json!({
+                    "capability": cap, "case": case.id, "note": case.note,
+                    "status": "direct_failed", "error": err,
+                }));
+                continue;
+            }
+        }
+        let direct_png = out.join(format!("{slug}-direct-wgpu.png"));
+        // 两侧同底色：direct 金样的外层 container 用 `bg()`，重放清屏也用同一值。
+        // 不能用 direct 图的左上像素当底色——内容压住 (0,0) 的例（mouse_area/
+        // table 等）会把内容色当成底色刷满整屏（实测把 0.1% 级的差放大成 99%）。
+        let backdrop = crate::ui::desktop_protocol::client_runtime::bg();
+
+        let mut surface = HeadlessSurface::new(
+            StaticComponent { view: case.view.clone() },
+            PROBE_W as f32,
+            PROBE_H as f32,
+        );
+        let list = surface.render_frame_v2();
+        for up in surface.drain_bitmap_uploads() {
+            crate::ui::iced::broker_surface::bitmap_cache_put(
+                &up.id,
+                up.w,
+                up.h,
+                up.stride,
+                up.rgba.clone(),
+            );
+        }
+        let mut painted = list.clone();
+        painted.clear = Some(backdrop);
+        let rq_req = out.join(format!("{slug}-rq.png"));
+        let _ = std::fs::remove_file(&rq_req);
+        let _ = std::fs::remove_file(out.join(format!("{slug}-rq-wgpu.png")));
+        let mut rq_sim = iced_test::simulator::Simulator::with_size(
+            settings(),
+            size(),
+            crate::ui::iced::broker_surface::displaylist_element::<()>(&painted),
+        );
+        match rq_sim
+            .snapshot(&theme())
+            .map_err(|e| format!("rq snapshot: {e}"))
+            .and_then(|snap| snap.matches_image(&rq_req).map(|_| ()).map_err(|e| e.to_string()))
+        {
+            Ok(()) => {}
+            Err(err) => {
+                rows.push(serde_json::json!({
+                    "capability": cap, "case": case.id, "note": case.note,
+                    "status": "replay_failed", "error": err,
+                }));
+                continue;
+            }
+        }
+        let rq_png = out.join(format!("{slug}-rq-wgpu.png"));
+        let diff = pixel_diff_ratio(&direct_png, &rq_png, 2);
+        let (uploads, uploaded_bytes, hits, evictions, resident) = surface.resource_stats();
+        let row = serde_json::json!({
+            "capability": cap, "case": case.id, "note": case.note, "status": "ok",
+            "inventory": case_inventory(&list),
+            "resources": {
+                "uploads": uploads, "uploaded_bytes": uploaded_bytes, "hits": hits,
+                "evictions": evictions, "resident_bytes": resident,
+            },
+            "pixel_diff_vs_direct": diff,
+        });
+        println!("[RQCAPPROBE] {}", row);
+        rows.push(row);
+    }
+
+    let missing: Vec<&str> = ALL_VIEW_CAPABILITY_IDS
+        .iter()
+        .copied()
+        .filter(|id| !seen.contains(id))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "能力 ID 无逐项读数（不删分母）: {missing:?}"
+    );
+    let ok = rows.iter().filter(|r| r["status"] == "ok").count();
+    assert_eq!(ok, ALL_VIEW_CAPABILITY_IDS.len(), "39 个 ID 必须全部有成功读数");
+
+    // AC-01 的关闭条件（逐 ID）：**真实输出 + 结构对拍**，不是“渲染没崩”。
+    // - 除空/未注册控件外，每个能力至少产出一个绘制 op（内容静默丢失可检出）；
+    // - 像素差只设“毛刺级”诊断上限（2%）：它抓整片丢失/底色错误这类回归，
+    //   **不是** exactness 声明——exactness 由 §6 矩阵的 0.1% 门负责。
+    // 逐 ID 实测分布（2026-11-07）：26/39 ≤0.1%；>0.1% 的族见报告与 Spec §5。
+    for row in &rows {
+        let cap = row["capability"].as_str().unwrap_or_default();
+        let ops = row["inventory"]["ops"].as_u64().unwrap_or(0);
+        match cap {
+            "cap.view.empty" => assert_eq!(ops, 0, "empty 不得绘制任何原语"),
+            // 未注册的 Custom 走防御臂：不画任何原语是具名行为（不是丢失）。
+            "cap.view.custom" => assert_eq!(ops, 0, "未注册控件应为空防御臂"),
+            _ => assert!(ops >= 1, "{cap} 没有任何绘制 op（内容静默丢失）"),
+        }
+        let diff = row["pixel_diff_vs_direct"].as_f64().unwrap_or(1.0);
+        assert!(
+            diff <= 0.02,
+            "{cap} 像素差 {diff:.4} 超 2% 诊断上限（整片丢失/底色错误级回归）"
+        );
+    }
+
+    let report = serde_json::json!({
+        "tag": "plan062_t05_capability_rows",
+        "viewport": [PROBE_W, PROBE_H],
+        "scale": 2,
+        "ids": ALL_VIEW_CAPABILITY_IDS.len(),
+        "rows": rows,
+    });
+    std::fs::write(
+        out.join("t05-capability-rows.json"),
+        serde_json::to_string_pretty(&report).unwrap_or_default(),
+    )
+    .expect("write capability rows");
+    println!("[RQCAPPROBE] {}", serde_json::json!({
+        "tag": "rows_written", "ids": ALL_VIEW_CAPABILITY_IDS.len(),
+        "path": out.join("t05-capability-rows.json").display().to_string(),
+    }));
 }
 
 #[test]

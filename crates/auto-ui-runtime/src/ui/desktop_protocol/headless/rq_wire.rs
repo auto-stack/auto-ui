@@ -22,7 +22,7 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use super::rq_probe::{out_dir, theme};
+use super::rq_probe::{out_dir, pixel_diff_ratio, theme};
 use super::*;
 use crate::ui::component::Component;
 use crate::ui::desktop_protocol::client_runtime::{ClientConfig, ClientPump};
@@ -131,31 +131,6 @@ fn render_composed(
         .map_err(|e| format!("replay png: {e}"))?;
     Ok(out.join(format!("{name}-replay-wgpu.png")))
 }
-
-fn corner_color(png: &std::path::Path) -> Rgba8 {
-    let img = image::open(png).expect("corner png").to_rgba8();
-    let p = img.get_pixel(0, 0);
-    Rgba8::new(p[0], p[1], p[2], 255)
-}
-
-fn pixel_diff_ratio(a: &std::path::Path, b: &std::path::Path, allowance: u8) -> f64 {
-    let left = image::open(a).expect("left png").to_rgba8();
-    let right = image::open(b).expect("right png").to_rgba8();
-    if left.dimensions() != right.dimensions() {
-        return 1.0;
-    }
-    let mut diff = 0usize;
-    for (p, q) in left.pixels().zip(right.pixels()) {
-        if (p[0] as i32 - q[0] as i32).abs() > allowance as i32
-            || (p[1] as i32 - q[1] as i32).abs() > allowance as i32
-            || (p[2] as i32 - q[2] as i32).abs() > allowance as i32
-        {
-            diff += 1;
-        }
-    }
-    diff as f64 / (left.width() * left.height()) as f64
-}
-
 /// 结构清单：v3/v2 原语计数 + 载荷 tag + 必需能力（漏图在结构面即见）。
 fn inventory(list: &DisplayList) -> serde_json::Value {
     let (mut quad, mut text, mut path, mut img, mut glyphs, mut clip, mut xform) =
@@ -511,7 +486,9 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
                 continue;
             }
         };
-        let backdrop = corner_color(&gold);
+        // 两侧同底色 = 主题底色（direct 金样外层 container 用同一值）；
+        // 不用 direct 图左上像素——内容压住 (0,0) 的例会刷满整屏。
+        let backdrop = crate::ui::desktop_protocol::client_runtime::bg();
 
         for (host, kind) in [
             ("standalone-rq", HostKind::Standalone),

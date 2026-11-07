@@ -14,7 +14,7 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use super::rq_probe::{direct_frames, ms, out_dir, stats, theme};
+use super::rq_probe::{direct_frames, ms, out_dir, pixel_diff_ratio, stats, theme};
 use super::*;
 use crate::ui::component::Component;
 use crate::ui::desktop_protocol::client_runtime::bg as client_bg;
@@ -198,27 +198,6 @@ fn inventory(list: &DisplayList) -> serde_json::Value {
     })
 }
 
-/// direct 金样左上像素（= 该 View 族的实际底色）。
-fn corner_color(png: &std::path::Path) -> Rgba8 {
-    let img = image::open(png).expect("corner png").to_rgba8();
-    let p = img.get_pixel(0, 0);
-    Rgba8::new(p[0], p[1], p[2], 255)
-}
-
-fn pixel_diff_ratio(a: &std::path::Path, b: &std::path::Path, allowance: u8) -> f64 {    let left = image::open(a).expect("left png").to_rgba8();
-    let right = image::open(b).expect("right png").to_rgba8();
-    let mut diff = 0usize;
-    for (p, q) in left.pixels().zip(right.pixels()) {
-        if (p[0] as i32 - q[0] as i32).abs() > allowance as i32
-            || (p[1] as i32 - q[1] as i32).abs() > allowance as i32
-            || (p[2] as i32 - q[2] as i32).abs() > allowance as i32
-        {
-            diff += 1;
-        }
-    }
-    diff as f64 / (left.width() * left.height()) as f64
-}
-
 /// 单例 rust/rq 测点：产帧 → 编码 → 解码 → 重放，分段计时 + 资源计数。
 struct CellReading {
     inventory: serde_json::Value,
@@ -275,9 +254,9 @@ fn measure_case(
     }
     let direct_stats = stats(direct_frames_ms);
     let direct_png = written(out, &format!("{name}-direct"));
-    // 用 direct 金样的左上像素作为重放底色：不同 View 族（canvas 自绘底 vs
-    // 透明）底色来源不同，硬编码主题色会把“谁画底色”记成保真差。
-    let backdrop = corner_color(&direct_png);
+    // 两侧同底色 = 主题底色（direct 金样外层 container 用的同一个值）。
+    // 不用 direct 图左上像素：内容压住 (0,0) 的例会把它当底色刷满整屏。
+    let backdrop = client_bg;
 
     let mut surface = HeadlessSurface::new(CellComponent { view }, W, H);
     // 两种 producer 模式都要量：default = 生产默认（字符串面），glyph_runs =

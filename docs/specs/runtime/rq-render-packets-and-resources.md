@@ -141,7 +141,30 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
 - 边界：peer 跑本进程线程（真实管道/端点/shm/ACK），**不是独立进程**；present
   是 offscreen 快照。跨进程换载、物理上屏与真实刷新 deadline 归 OS063。
 
-### 5.2 同进程矩阵（`rq_cells`，记录/降格保真）
+### 5.2 逐能力面（39 个 `View` 变体 ID，`rq_probe_t05_capability_rows`）
+
+每个能力 ID 至少一例，走与产品同源的记录路径（`HeadlessSurface` →
+`render_frame_v2` → broker canvas 重放），与 direct 金样（同一 `View` 的 iced
+元素，不经协议）同主题/同 viewport 对拍；结构清单与资源计数一并落
+`t05-capability-rows.json`。**覆盖分母不删**：缺例即测试失败。
+
+- **26/39 ≤0.1%**（本页 §5.3 的 exactness 口径）。
+- **>0.1% 的 13 个族（具名，诊断读数，不是 exactness 声明）**：managed_scroll_content
+  1.56%、code_editor 1.31%、video 0.92%、terminal 0.46%、rich 0.31%、input 0.25%、
+  scrollable 0.24%、text（latin 例）0.23%、navigation_rail 0.21%、table 0.20%、
+  remote_frame 0.17%、autodown_editor 0.15%、mouse_area 0.14%。
+  这 13 个族都是**文字密集或宿主依赖面**（编辑器/终端/富文本/输入/表格/导航栏/
+  媒体占位），残差与 §5.3 的文字残差同源（画布文本管线 vs direct 文本管线的
+  字形覆盖率/AA），不是位置或内容丢失。
+- **逐 ID 的关闭条件**（AC-01）：每个 ID 有真实输出，且结构面断言——除
+  `cap.view.empty`（0 op）与未注册的 `cap.view.custom`（防御臂 0 op）外，每个
+  能力至少产出一个绘制 op；像素差设 **2% 毛刺级诊断上限**（抓整片丢失/底色
+  错误），exactness 仍由 §5.3 的 0.1% 门负责。
+- 底色口径（踩过的坑）：两侧都用主题底色 `bg()` 清屏；**不得**用 direct 图的
+  左上像素当重放底色——内容压住 (0,0) 的例（mouse_area/table 等）会把它当底色
+  刷满整屏，把 0.1% 级的差放大成 99%（已在本轮修掉并写进测试注释）。
+
+### 5.3 同进程矩阵（`rq_cells`，记录/降格保真）
 
 同 harness、同阈值；默认 producer 与 v3 富模式（glyph run + SDF 贴片，**opt-in**）
 分别度量：
@@ -185,4 +208,8 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
    约束），跨进程乱序保护仍需 wire 字段。
 8. Host 侧没有跨进程释放/引用记账（见 §3）：producer 驱逐不会通知 Host，
    泵的 FIFO 与“驱逐不下当前帧资源”的守卫）。
-
+9. 逐能力面 39 个 ID 中 **13 个族 >0.1%**（§5.2）：managed_scroll_content 1.56%、
+   code_editor 1.31%、video 0.92%、terminal 0.46% 等，都是文字密集或宿主依赖面，
+   残差与文字面同源（画布文本管线 vs direct 文本管线的字形覆盖率/AA）。**不属
+   exact**，不得计入 AC-02 的 0.1% 门；逐 ID 的关闭条件是“有真实输出 + 结构断言
+   + 2% 毛刺级上限”，不是逐 ID 都 ≤0.1%。
