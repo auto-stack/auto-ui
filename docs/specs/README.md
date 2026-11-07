@@ -7,7 +7,7 @@ language repository's `docs/specs/auto-ui/project.md`.
 ## Runtime
 
 - [RenderQueue fidelity contract](runtime/rq-fidelity-contract.md) — current wire/font/resource/present behavior, atomic-frame and ACK/fence rules, frozen capability IDs, and named fidelity gaps (PLAN-061).
-
+- [RenderQueue lossless primitives, glyph and resource replay](runtime/rq-render-packets-and-resources.md) — v3 payload (Path/GlyphRun), producer-side SDF shadow patches, content-addressed resource residency, upload budget, capability admission and slot-credit backpressure, with the measured fidelity table and named gaps (PLAN-062).
 - [VM route-page loading](runtime/vm-route-page-loading.md) — page imports,
   named diagnostics, store calls and lifecycle behavior for native multi-page apps.
 
