@@ -170,6 +170,8 @@ stage: goal | plan_id: PLAN-066 | plan_revision: r2 | round: 2 | from: review | 
 
 2026-11-07 / stage: merge（cleanup） | plan_id: auto-ui/PLAN-066 | plan_revision: r2 | outcome: pass（cleaned，T-09 完，9/9） | delivery_commit: `5a53b789` | guard: `"C:/Program Files/Git/bin/bash.exe" D:/autostack/wt-guard.sh D:/autostack/.wt/ui-066/auto-ui` = clean（exit0；本会话PATH的WSL bash会误报clean，见D05） | worktree_removed: `git worktree remove D:/autostack/.wt/ui-066/auto-ui` exit0，`git branch -d codex/plan-066-dev`（was `5a53b789`），空组 `.wt/ui-066` removed；verify：worktree list 无 ui-066、branch list 空、路径不存在 | scratch_deleted: `D:/autostack/plan-artifacts/plan-066/`（resolved 绝对路径已核；仅 `auto-ui/` 本仓；parent 无别仓）guard clean 后整删 = 20,138 files / 12,961,678,581 bytes；无具名 hold | registry: `.retention/policy.json` 追加 `auto-ui/PLAN-066` deleted-at-merge（delivery `5a53b789`、archive commit/sha256 见 registry 记录） | notes: batch due check 不适用（auto-ui 无 `.last-batch-regression.json` 机制）；landing artifacts 不适用（本仓无生产 release binary/web bundle 部署面）；主检出其余 WIP 为他会话（docs/design、README、.next-id、archived/060、untracked test PNG/062/063/067），未纳入未删除 | blockers: none
 
+stage: goal | plan_id: PLAN-066 | plan_revision: r2 | round: 4 | from: merge | to: done | status: archived | outcome: pass | worktree: removed | commit: `5a53b789` | next: done（delivered：delivery 5a53b789、archive 786b0c56、canonical 4753CD65…/6C5B5FD3…、worktree/branch/scratch 清理、registry 登记）
+
 ## 10. 待澄清事项
 
 D01：真实DPI设备/焦点窗口在T02安排，缺条件保pending。**work后状态（2026-11-07）**：本机唯一1920×1280虚拟显示、单一scale，第二DPI环境不可达；`mixed_regions_window --manual`可执行手工门已交（记录真实键/点击/失焦/离窗/resize/scale，auto_pass:false），真DPI切换保持pending，后续由用户手工取证或AG025同版候选复核。
