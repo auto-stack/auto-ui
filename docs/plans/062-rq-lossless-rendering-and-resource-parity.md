@@ -350,3 +350,11 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 依据（实测，§9 前文）：默认模式 path_mesh 0.095%、svg 0.100%、text_cjk 0.094%、gradient 0.0625%、scroll 0.000%、shadow_only 0.005%、progress 0.006%；v3 富模式 text 0.798%、gradient 1.374%、scroll 0.330%、shadow_only 0.741%；默认 produce 0.17–0.24ms（SVG ≈32.5ms）。
 - 保留：r1/r2/r3 历史与全部 §9 收据；status 仍 xecuting（本修订未完成 T-02/T-03/T-04 的收尾与 T-05 全量复核）。SD-01 目标文件不变，正文已按实测更新（表头/开关 caveat/Host 上限/遗留清单）。
 - 未做：本轮未改实现、未重跑全量、未做独立 final review；AC-05/T-06 与 AC-06/T-07 仍待办。
+### 2026-11-07 work 宿主能力声明（T-04 收口 AC-04 的协商一半）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r4 / outcome: 进行中 / code_commit: `6b3b7fb0`
+- 实现：新增追加式握手消息 `HandshakeMsg::HostCaps { caps }`（tag 4）。App 在 Hello 里声明 `optional:welcome-caps/1`，宿主据此在 Welcome 之后补发能力声明；`AppEndpoint::peer_caps` 保存解析结果（producer 可从握手得知宿主支持面，而不再只靠本地开关）。未声明标记的旧端永远收不到该消息，Welcome 字节不变。
+- 测试：`host_caps_reach_the_app_after_welcome`（声明标记 / Welcome 本身不带能力 / HostCaps 后 peer_caps 含 `fidelity/pathfill/1` / 状态不变）；`incubation_allocates_real_session_objects` 更新为 Welcome+HostCaps+BufferAlloc 三消息序。
+- 回归：`ui::desktop_protocol::` **257 passed / 4 failed**（基线同组）。
+- **尝试后撤回**：曾加“同 src 异内容即拒绝”的内容指纹守卫，被现有 codec 测试证伪——协议既有语义是“同 id 重上传 = 即时翻新”，因此 generation 乱序保护**必须**有 wire 显式字段，不能靠内容寻址替代。已 revert，Spec §6 继续把该字段列为具名遗留（这一结论现在是实测支撑，而不是猜测）。
+- 仍缺（AC-03/AC-04）：宿主显式释放路径（最后 owner 语义）、两进程 v2↔v3 配对、慢 Host/旧 ACK/乱序资源负控。
