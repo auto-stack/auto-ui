@@ -610,9 +610,15 @@ fn apply_actions(
                         super::shm::display_list_from_slot_payload(payload).ok()
                     });
                     if let Some(payload) = ready_v2 {
-                        match client.inner.surfaces.compose_v2(surface, slot, payload) {
-                            Ok(Some(freed)) => {
-                                client.inner.refresh_refs(surface);
+                        match crate::ui::desktop_protocol::host::compose_v2_counted(
+                            &mut client.inner.surfaces,
+                            &mut client.inner.refs,
+                            &mut client.inner.bitmap_keys,
+                            surface,
+                            slot,
+                            payload,
+                        ) {
+                            Ok((Some(freed), _)) => {
                                 client.frames += 1;
                                 note_revision(client, revision);
                                 to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
@@ -621,7 +627,7 @@ fn apply_actions(
                                     slot: freed,
                                 }));
                             }
-                            Ok(None) => {}
+                            Ok((None, _)) => {}
                             Err(err) => {
                                 // PLAN-062 T-04：准入拒绝保旧帧 + 归还槽。
                                 eprintln!(
@@ -662,9 +668,15 @@ fn apply_actions(
                 revision,
                 payload,
             } => {
-                match client.inner.surfaces.compose_v2(surface, slot, payload) {
-                    Ok(Some(freed)) => {
-                        client.inner.refresh_refs(surface);
+                match crate::ui::desktop_protocol::host::compose_v2_counted(
+                    &mut client.inner.surfaces,
+                    &mut client.inner.refs,
+                    &mut client.inner.bitmap_keys,
+                    surface,
+                    slot,
+                    payload,
+                ) {
+                    Ok((Some(freed), _)) => {
                                 client.frames += 1;
                         note_revision(client, revision);
                         to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
@@ -673,7 +685,7 @@ fn apply_actions(
                             slot: freed,
                         }));
                     }
-                    Ok(None) => {}
+                    Ok((None, _)) => {}
                     Err(err) => {
                         eprintln!(
                             "[rq-admission] 拒绝入帧 surface={surface} frame={frame_id}: {err}（保旧帧）"

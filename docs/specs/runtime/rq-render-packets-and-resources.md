@@ -69,13 +69,15 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   帧不在本页能力内（见 §6）。
 - **阴影**：带 shadow 的 Quad 由生产端按 `iced_wgpu/solid.wgsl` 同式求值
   （`rounded_box_sdf` 双倍中心坐标、半径取 `min(r, 短边/2)`、
-  `1 - smoothstep(-blur, blur, max(sdf,0))`），生成贴片资源，帧内先发
-  `Image(贴片)` 再发 `shadow: None` 的 Quad。Host 不再以垫层近似。
-  **实测边界（不得写成改进）**：贴片路径相对原单层 scrim 在
-  `gradient_border_shadow` 上是退步（0.0625% → 1.3740%，同 harness/阈值），
-  因为贴片经画布图像管线合成、且阴影与 quad 分成两层而非 shader 内一次混合。
-  贴片的价值是几何正确（同式 SDF）而非像素更近；在合成对齐解决前，该能力按
-  **具名遗留**处理，不得作为保真通过证据。
+  `1 - smoothstep(-blur, blur, max(sdf,0))`），生成**环带贴片**资源（quad 自身
+  圆角形状内部 alpha 清零，见上一条 z 序边界）。Host 不再以垫层近似。
+  **实测（2026-11-08 复审修复后）**：v3 富模式 `gradient_border_shadow` **0.588%**、
+  `shadow_only` **0.069%**（默认 scrim 面 0.063%/0.005%），均在 r4 的 ≤1.5% 具名
+  上界内；修复前整块贴片把这两例推到 2.56%/2.28%（超界）。
+  **参考侧局限（复审 N-03）**：iced 的 gradient 面 shader 没有 shadow 项，所以
+  direct 金样在渐变例上**不画阴影**，而 RQ 富模式按同一 SDF 画了阴影——这 0.588%
+  的残差主要是“RQ 画了、参考没画”，不是几何或合成错误。故该读数只作具名边界，
+  不作 exactness 声明；默认 producer（scrim）面仍是 0.063%，与参考同口径。
 
 ## 3. 资源身份、驻留与预算
 
@@ -214,6 +216,14 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
   记录路径每帧新建 iced renderer 导致 iced 缓存冷启）、encode 0.005–0.008ms、
   decode 0.004–0.008ms、replay 5.2–6.5ms（首帧有一次 10.09ms 离群），direct 稳态帧
   p50 3.3–6.9ms。
+- **计时门的口径与归属（复审 F-03/N-02）**：produce 预算（W-C ≤10ms，SVG 例按 p50
+  设界）只在**冻结 fixture 矩阵**（`rq_cells` 的 7 个 workload）上裁决——061 的
+  W-A/W-B/W-C 是逐 workload 冻结的，全语料里含宿主依赖面（`window_thumbnail`
+  每帧重取快照，实测 p95 ≈44ms），不属该预算。replay 稳态（p50 ≤1.25×direct
+  p50+2ms）在共享跑机上断言；冻结的 **p95** 条款（≤1.25×direct p95+2ms）只在
+  隔离窗口断言（`AUTO_RQ_TIMING_WINDOW=isolated`），因为 20 样本下 p95 ≈ 次大值，
+  共享跑机的调度抖动会顶穿它（实测同代码 replay p50 反优于 direct，p95 在 5–22ms
+  间波动）。Plan §6 已写明性能测量不得与其他会话争用 GPU。
 - M 指标：M-04/M-08 measured；M-01/M-03/M-05 为 proxy（present 与 GPU 驻留未测）；
   M-02/M-06/M-07 unmeasured（真实 deadline、冷热启动、1/4/8 App 归 UI063/OS063）。
 

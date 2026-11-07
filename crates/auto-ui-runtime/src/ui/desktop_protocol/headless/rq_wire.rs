@@ -1140,9 +1140,19 @@ fn rq_wire_media_poster_frame_crosses_the_wire() {
     let (image_src, _list) = hit.expect("海报帧必须经真实管道到达宿主合成面");
     assert!(image_src.starts_with("bitmap://"), "引用必须是资源身份: {image_src}");
     // 宿主缓存命中 = 位图段载荷真的到了（不只是帧里有个 src 字符串）。
+    // 注意：上传可能先被 per-App 8 MiB/s 预算延期（`Backpressure` + 帧重试），
+    // 所以这里给到期限内的收敛时间，而不是要求“首帧即命中”——延期不丢内容
+    // 正是 P-01 的合同行为。
+    let deadline = Instant::now() + Duration::from_secs(6);
+    while Instant::now() < deadline
+        && crate::ui::iced::broker_surface::resolve_drawlist_image(&image_src, pw, ph).is_none()
+    {
+        cell.pump_both();
+        std::thread::sleep(Duration::from_millis(5));
+    }
     assert!(
         crate::ui::iced::broker_surface::resolve_drawlist_image(&image_src, pw, ph).is_some(),
-        "宿主侧必须已收到海报帧位图（真实 shm/管道链路）"
+        "宿主侧必须最终收到海报帧位图（预算延期后可收敛，真实 shm/管道链路）"
     );
     println!(
         "[RQWIRE] {}",

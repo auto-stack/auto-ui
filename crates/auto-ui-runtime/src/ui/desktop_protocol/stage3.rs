@@ -67,7 +67,7 @@ pub struct BrokerClient {
     /// 零装载激活，不uring registry 构建）。
     pub adopt: bool,
     /// PLAN-062（AC-03）：资源引用记账 + 释放延后（v2 合成面刷新/释放消费）。
-    pub refs: std::collections::BTreeMap<u64, crate::ui::desktop_protocol::host::BitmapRefs>,
+    pub refs: crate::ui::desktop_protocol::host::BitmapRefs,
 }
 
 impl BrokerClient {
@@ -88,7 +88,7 @@ impl BrokerClient {
             theme_caps: Vec::new(),
             theme_pushed_rev: 0,
             adopt: false,
-            refs: std::collections::BTreeMap::new(),
+            refs: crate::ui::desktop_protocol::host::BitmapRefs::default(),
         }
     }
 
@@ -104,29 +104,13 @@ impl BrokerClient {
         self.surfaces.front_v2(surface)
     }
 
-    /// PLAN-062（AC-03）：**成功合成后**刷新该表面的前台引用集，并驱逐已无人
-    /// 引用的挂起释放。只读前台帧（`front_v2`）——准入拒绝时前台仍是旧帧，
-    /// 不能按被拒帧记账（复审 F-02）。
-    pub fn refresh_refs(&mut self, surface: u64) {
-        let evict = match self.surfaces.front_v2(surface) {
-            Some(front) => self.refs.entry(surface).or_default().on_compose(front),
-            None => return,
-        };
-        for src in evict {
-            crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-            if let Some(keys) = self.bitmap_keys.get_mut(&surface) {
-                keys.retain(|k| k != &src);
-            }
-        }
-    }
-
     /// PLAN-062（AC-03）：收到 producer 的资源释放，按 `wid` 归属表面
     /// （未知表面 = 无意义释放，忽略，不误伤其它表面）。
     pub fn release_refs(&mut self, wid: u64, srcs: Vec<String>) {
         let Some(surface) = self.wid_surface.get(&wid).copied() else {
             return;
         };
-        let ready = self.refs.entry(surface).or_default().on_release(srcs);
+        let ready = self.refs.on_release(srcs);
         for src in ready {
             crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
             if let Some(keys) = self.bitmap_keys.get_mut(&surface) {

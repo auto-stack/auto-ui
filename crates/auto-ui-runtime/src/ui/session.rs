@@ -5700,17 +5700,23 @@ impl DesktopSession {
                     payload,
                     ..
                 } => {
-                    match client.surfaces.compose_v2(surface, slot, payload) {
-                        Ok(Some(freed)) => {
+                    match crate::ui::desktop_protocol::host::compose_v2_counted(
+                        &mut client.surfaces,
+                        &mut client.refs,
+                        &mut client.bitmap_keys,
+                        surface,
+                        slot,
+                        payload,
+                    ) {
+                        Ok((Some(freed), _)) => {
                             crate::ui::theme_policy::mark_shell_dirty();
-                            client.refresh_refs(surface);
                             to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                 wid,
                                 frame_id,
                                 slot: freed,
                             }));
                         }
-                        Ok(None) => {}
+                        Ok((None, _)) => {}
                         Err(err) => {
                             // PLAN-062 T-04：准入拒绝保旧帧并归还传输槽。
                             eprintln!(
@@ -5749,17 +5755,23 @@ impl DesktopSession {
                             // Frame text may include credentials or private app content.
                             // Keep transport diagnostics structural only.
                             eprintln!("[plan060] frame2 wid={wid} nops={}", payload.ops.len());
-                            match client.surfaces.compose_v2(surface, slot, payload) {
-                                Ok(Some(freed)) => {
+                            match crate::ui::desktop_protocol::host::compose_v2_counted(
+                                &mut client.surfaces,
+                                &mut client.refs,
+                                &mut client.bitmap_keys,
+                                surface,
+                                slot,
+                                payload,
+                            ) {
+                                Ok((Some(freed), _)) => {
                                     crate::ui::theme_policy::mark_shell_dirty();
-                            client.refresh_refs(surface);
                                     to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                         wid,
                                         frame_id,
                                         slot: freed,
                                     }));
                                 }
-                                Ok(None) => {}
+                                Ok((None, _)) => {}
                                 Err(err) => {
                                     eprintln!(
                                         "[rq-admission] 拒绝入帧 surface={surface} frame={frame_id}: {err}（保旧帧）"
@@ -5870,6 +5882,12 @@ impl DesktopSession {
                             }
                         }
                         client.surfaces.release(surface);
+                        // PLAN-062（AC-03 / 复审 N-01）：窗口回收同时清引用记账，
+                        // 否则 front/applied 记账随窗口数量无界增长；回收后该
+                        // 表面不再阻挡释放，顺手兑现挂起项。
+                        for src in client.refs.forget_surface(surface) {
+                            crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                        }
                         to_app.push(ProtocolMsg::Frame(FrameMsg::BufferRelease { surface }));
                     }
                     if client.owns_wid(wid) {

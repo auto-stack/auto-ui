@@ -186,49 +186,77 @@ impl SurfaceStore {
 /// `ResourceRelease` 的第二条原因，现以引用记账正面解决。
 #[derive(Default)]
 pub struct BitmapRefs {
-    front: std::collections::BTreeSet<String>,
+    /// 每个表面**前台帧**引用的 src（合成成功后刷新）。
+    front: std::collections::BTreeMap<u64, std::collections::BTreeSet<String>>,
+    /// 收到释放但仍被某个表面前台帧引用的 src（等下一次合成再兑现）。
     pending: std::collections::BTreeSet<String>,
-    /// 已真正释放过的 src（producer 重发释放不重复驱逐；重新被帧引用时清除）。
+    /// 已真正驱逐过的 src（producer 重发释放不重复动作；重新被引用时清除）。
     applied: std::collections::BTreeSet<String>,
 }
 
 impl BitmapRefs {
-    /// 新帧合成时调用：刷新前台引用集，并返回“现在已无人引用”的挂起释放。
-    pub fn on_compose(
-        &mut self,
+    fn refs_of(
         payload: &crate::ui::desktop_protocol::message::DisplayList,
-    ) -> Vec<String> {
+    ) -> std::collections::BTreeSet<String> {
         use crate::ui::desktop_protocol::message::DisplayOp;
-        self.front = payload
+        payload
             .ops
             .iter()
             .filter_map(|op| match op {
                 DisplayOp::Image { src, .. } => Some(src.clone()),
                 _ => None,
             })
-            .collect();
+            .collect()
+    }
+
+    /// 任一表面仍在前台引用该 src。
+    fn referenced(&self, src: &str) -> bool {
+        self.front.values().any(|set| set.contains(src))
+    }
+
+    /// 兑现“已无人引用”的挂起释放。
+    fn settle(&mut self) -> Vec<String> {
         let ready: Vec<String> = self
             .pending
             .iter()
-            .filter(|src| !self.front.contains(*src))
+            .filter(|src| !self.referenced(src))
             .cloned()
             .collect();
         for src in &ready {
             self.pending.remove(src);
+            self.applied.insert(src.clone());
         }
-        // 重新被前台帧引用的 src 允许将来再次释放（不永久拉黑）。
-        self.applied.retain(|src| !self.front.contains(src));
         ready
     }
 
-    /// 收到释放：前台仍引用 → 挂起；否则立即可释放。
+    /// **成功合成**后刷新某表面的前台引用集，并兑现已无人引用的挂起释放。
+    /// 只在合成成功后调用——准入拒绝时前台仍是旧帧，不能按被拒帧记账。
+    pub fn on_compose(
+        &mut self,
+        surface: u64,
+        payload: &crate::ui::desktop_protocol::message::DisplayList,
+    ) -> Vec<String> {
+        let refs = Self::refs_of(payload);
+        self.front.insert(surface, refs);
+        // 重新被任一表面引用的 src 允许将来再次释放（不永久拉黑）。
+        let still: Vec<String> = self
+            .applied
+            .iter()
+            .filter(|src| !self.referenced(src))
+            .cloned()
+            .collect();
+        self.applied = still.into_iter().collect();
+        self.settle()
+    }
+
+    /// 收到释放：仍被**任一表面**前台引用 → 挂起；否则立即可驱逐。
     pub fn on_release(&mut self, srcs: Vec<String>) -> Vec<String> {
         let mut ready = Vec::new();
         for src in srcs {
             if self.applied.contains(&src) || self.pending.contains(&src) {
                 continue; // 重复释放：已驱逐/已挂起，不重复动作
             }
-            if self.front.contains(&src) {
+            if self.referenced(&src) {
                 self.pending.insert(src);
             } else {
                 self.applied.insert(src.clone());
@@ -238,10 +266,54 @@ impl BitmapRefs {
         ready
     }
 
+    /// 窗口/表面回收（N-01）：丢掉该表面的前台引用集，避免记账无界增长；
+    /// 回收后该表面不再阻挡释放，顺手兑现挂起项。
+    pub fn forget_surface(&mut self, surface: u64) -> Vec<String> {
+        self.front.remove(&surface);
+        self.settle()
+    }
+
     /// 挂起数（诊断/断言）。
     pub fn pending_len(&self) -> usize {
         self.pending.len()
     }
+
+    /// 记账规模（诊断/断言：表面数、已驱逐集合大小）。
+    pub fn tracking_len(&self) -> (usize, usize) {
+        (self.front.len(), self.applied.len())
+    }
+}
+
+/// PLAN-062（AC-03）：合成 + **仅在成功后**刷新引用记账（顺序由构造保证）。
+///
+/// 三处宿主共用这个入口：准入拒绝时 `compose_v2` 返回 Err，引用集与挂起释放
+/// 均不前移——否则被拒帧会把前台仍显示的 src 记成“已无引用”而提前驱逐
+/// （第二轮复审 F-02）。返回与 `compose_v2` 相同的结果。
+pub fn compose_v2_counted(
+    surfaces: &mut SurfaceStore,
+    refs: &mut BitmapRefs,
+    bitmap_keys: &mut std::collections::BTreeMap<u64, Vec<String>>,
+    surface: u64,
+    slot: u8,
+    payload: crate::ui::desktop_protocol::message::DisplayList,
+) -> Result<(Option<u8>, Vec<String>), crate::ui::desktop_protocol::message::AdmissionError>
+{
+    let result = surfaces.compose_v2(surface, slot, payload)?;
+    let mut evicted = Vec::new();
+    if result.is_some() {
+        let evict = match surfaces.front_v2(surface) {
+            Some(front) => refs.on_compose(surface, front),
+            None => Vec::new(),
+        };
+        for src in evict {
+            crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+            if let Some(keys) = bitmap_keys.get_mut(&surface) {
+                keys.retain(|k| k != &src);
+            }
+            evicted.push(src);
+        }
+    }
+    Ok((result, evicted))
 }
 
 /// 宿主侧协议运行时：端点 + 表面 + 真实会话绑定。
@@ -271,7 +343,7 @@ pub struct ProtocolHost<'a> {
     /// 孵化材料解析器。
     resolver: Box<dyn FnMut(&str) -> Result<DynamicComponent, String> + 'a>,
     /// PLAN-062（AC-03）：资源引用记账 + 释放延后。
-    refs: BTreeMap<u64, BitmapRefs>,
+    refs: BitmapRefs,
 }
 
 impl<'a> ProtocolHost<'a> {
@@ -291,24 +363,10 @@ impl<'a> ProtocolHost<'a> {
             bm_buffers: BTreeMap::new(),
             bitmap_keys: BTreeMap::new(),
             resolver: Box::new(resolver),
-            refs: BTreeMap::new(),
+            refs: BitmapRefs::default(),
         }
     }
 
-    /// PLAN-062（AC-03）：刷新某表面的前台引用集，并驱逐已无人引用的挂起释放。
-    /// **只在成功合成后调用**——准入拒绝时前台仍是旧帧，不能按被拒帧记账。
-    fn refresh_refs(&mut self, surface: u64) {
-        let evict = match self.surfaces.front_v2(surface) {
-            Some(front) => self.refs.entry(surface).or_default().on_compose(front),
-            None => Vec::new(),
-        };
-        for src in evict {
-            crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-            if let Some(keys) = self.bitmap_keys.get_mut(&surface) {
-                keys.retain(|k| k != &src);
-            }
-        }
-    }
 
     /// 入帧准入拒绝：具名诊断 + 归还传输槽（ACK 只表示“宿主已读走载荷”，
     /// 不表示合成成功）；前端帧保持上一次完整帧。
@@ -453,18 +511,22 @@ impl<'a> ProtocolHost<'a> {
                     payload,
                     ..
                 } => {
-                    match self.surfaces.compose_v2(surface, slot, payload) {
-                        Ok(Some(freed)) => {
-                            // PLAN-062（AC-03）：只在**成功合成**后刷新该表面的前台
-                            // 引用集（准入拒绝时前台仍是旧帧，不能按被拒帧记账）。
-                            self.refresh_refs(surface);
+                    match compose_v2_counted(
+                        &mut self.surfaces,
+                        &mut self.refs,
+                        &mut self.bitmap_keys,
+                        surface,
+                        slot,
+                        payload,
+                    ) {
+                        Ok((Some(freed), _)) => {
                             self.to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                 wid,
                                 frame_id,
                                 slot: freed,
                             }));
                         }
-                        Ok(None) => {}
+                        Ok((None, _)) => {}
                         Err(err) => self.reject_frame(surface, wid, frame_id, slot, &err),
                     }
                 }
@@ -488,17 +550,22 @@ impl<'a> ProtocolHost<'a> {
                             .as_deref()
                             .and_then(|p| super::shm::display_list_from_slot_payload(p).ok());
                         if let Some(payload) = ready_v2 {
-                            match self.surfaces.compose_v2(surface, slot, payload) {
-                                Ok(Some(freed)) => {
-                                    // PLAN-062（AC-03）：成功合成后才刷新引用集。
-                                    self.refresh_refs(surface);
+                            match compose_v2_counted(
+                                &mut self.surfaces,
+                                &mut self.refs,
+                                &mut self.bitmap_keys,
+                                surface,
+                                slot,
+                                payload,
+                            ) {
+                                Ok((Some(freed), _)) => {
                                     self.to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                         wid,
                                         frame_id,
                                         slot: freed,
                                     }));
                                 }
-                                Ok(None) => {}
+                                Ok((None, _)) => {}
                                 Err(err) => {
                                     self.reject_frame(surface, wid, frame_id, slot, &err)
                                 }
@@ -556,6 +623,10 @@ impl<'a> ProtocolHost<'a> {
                                 crate::ui::iced::broker_surface::bitmap_cache_evict(&key);
                             }
                         }
+                        // PLAN-062（AC-03 / 复审 N-01）：窗口回收清理引用记账。
+                        for src in self.refs.forget_surface(surface) {
+                            crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                        }
                         self.surfaces.release(surface);
                         self.to_app
                             .push(ProtocolMsg::Frame(FrameMsg::BufferRelease { surface }));
@@ -603,7 +674,7 @@ impl<'a> ProtocolHost<'a> {
                 HostAction::ResourceRelease { wid, srcs } => {
                     // 释放按 wid 归属表面；未知表面 = 无意义释放，忽略（不误伤他表）。
                     if let Some(surface) = self.wid_surface.get(&wid).copied() {
-                        let ready = self.refs.entry(surface).or_default().on_release(srcs);
+                        let ready = self.refs.on_release(srcs);
                         for src in ready {
                             crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
                             if let Some(keys) = self.bitmap_keys.get_mut(&surface) {
@@ -975,8 +1046,10 @@ mod tests {
 
 #[cfg(test)]
 mod release_tests {
-    use super::BitmapRefs;
-    use crate::ui::desktop_protocol::message::{DisplayList, DisplayOp, ImageFit, WRect};
+    use super::{compose_v2_counted, BitmapRefs, SurfaceStore};
+    use crate::ui::desktop_protocol::message::{
+        CapabilitySet, DisplayList, DisplayOp, Fill, ImageFit, PathSeg, Rgba8, WirePath, WRect,
+    };
 
     fn frame_with(src: Option<&str>) -> DisplayList {
         DisplayList {
@@ -993,35 +1066,151 @@ mod release_tests {
         }
     }
 
+    /// 需要 `fidelity/pathfill/1` 的 v3 帧（无该能力时触发准入拒绝）。
+    fn path_frame() -> DisplayList {
+        DisplayList {
+            clear: None,
+            ops: vec![DisplayOp::Path {
+                path: WirePath {
+                    segs: vec![PathSeg::MoveTo(0.0, 0.0), PathSeg::LineTo(4.0, 4.0)],
+                },
+                fill: Some(Fill::Color(Rgba8::new(0, 0, 0, 255))),
+                even_odd: false,
+                stroke: None,
+            }],
+        }
+    }
+
     /// PLAN-062（AC-03）：释放跟随帧引用——前台仍引用则延后，换帧后才真正驱逐；
-    /// 未被引用的释放立即兑现。
+    /// 未被引用的释放立即兑现；重复释放幂等。
     #[test]
     fn bitmap_refs_defers_release_until_no_frame_references_it() {
         let mut refs = BitmapRefs::default();
-        assert!(refs.on_compose(&frame_with(Some("bitmap://A"))).is_empty());
+        assert!(refs
+            .on_compose(1, &frame_with(Some("bitmap://A")))
+            .is_empty());
         assert!(
             refs.on_release(vec!["bitmap://A".into()]).is_empty(),
             "前台帧仍引用 A —— 必须延后释放（不丢在屏的图）"
         );
         assert_eq!(refs.pending_len(), 1);
 
-        // 新帧不再引用 A：挂起释放兑现，且只兑现一次。
         assert_eq!(
-            refs.on_compose(&frame_with(None)),
+            refs.on_compose(1, &frame_with(None)),
             vec!["bitmap://A".to_string()]
         );
         assert_eq!(refs.pending_len(), 0);
-        assert!(refs.on_compose(&frame_with(None)).is_empty());
+        assert!(refs.on_compose(1, &frame_with(None)).is_empty());
 
-        // 未被引用的释放立即兑现。
         assert_eq!(
             refs.on_release(vec!["bitmap://B".into()]),
             vec!["bitmap://B".to_string()]
         );
-        // 同一 src 重复释放（producer 重发）不重复驱逐。
         assert!(
             refs.on_release(vec!["bitmap://B".into()]).is_empty(),
             "重复释放必须幂等（不得二次驱逐）"
         );
+    }
+
+    /// 复审 F-02 负控①：**任一表面**仍在显示该 src 就不许驱逐（多表面宿主）。
+    #[test]
+    fn bitmap_refs_defers_while_any_surface_still_references() {
+        let mut refs = BitmapRefs::default();
+        refs.on_compose(1, &frame_with(Some("bitmap://A")));
+        refs.on_compose(2, &frame_with(Some("bitmap://A")));
+        assert!(
+            refs.on_release(vec!["bitmap://A".into()]).is_empty(),
+            "两个表面都在显示 A —— 释放必须挂起"
+        );
+        // 表面 1 换帧（不再引用 A）→ 表面 2 仍引用，不得兑现。
+        assert!(
+            refs.on_compose(1, &frame_with(None)).is_empty(),
+            "表面 2 仍在显示 A —— 不得驱逐"
+        );
+        assert_eq!(refs.pending_len(), 1);
+        // 表面 2 也换帧 → 此时才兑现。
+        assert_eq!(
+            refs.on_compose(2, &frame_with(None)),
+            vec!["bitmap://A".to_string()]
+        );
+        assert_eq!(refs.pending_len(), 0);
+    }
+
+    /// 复审 F-02 负控②：**准入拒绝**的帧不得前移引用记账（否则会在旧帧仍显示
+    /// 该 src 时兑现挂起释放，屏幕上变占位）。顺序由 `compose_v2_counted` 保证。
+    #[test]
+    fn compose_v2_counted_ignores_rejected_frames_for_accounting() {
+        let mut store = SurfaceStore::new();
+        let surface = store.alloc(64.0, 64.0);
+        // 宿主只声明 glyphrun，无 pathfill —— v3 Path 帧必被拒。
+        store.set_capabilities(CapabilitySet::parse(&[
+            "optional:fidelity/glyphrun/1".to_string(),
+        ]));
+        let mut refs = BitmapRefs::default();
+        let mut keys = std::collections::BTreeMap::new();
+
+        compose_v2_counted(
+            &mut store,
+            &mut refs,
+            &mut keys,
+            surface,
+            0,
+            frame_with(Some("bitmap://A")),
+        )
+        .expect("v2 帧应通过准入");
+        assert!(
+            refs.on_release(vec!["bitmap://A".into()]).is_empty(),
+            "前台仍显示 A —— 释放挂起"
+        );
+
+        let rejected = compose_v2_counted(
+            &mut store,
+            &mut refs,
+            &mut keys,
+            surface,
+            1,
+            path_frame(),
+        );
+        assert!(rejected.is_err(), "缺 pathfill 的 v3 帧必须被拒绝");
+        assert_eq!(
+            refs.pending_len(),
+            1,
+            "被拒帧不得刷新引用集、不得兑现挂起释放"
+        );
+        assert!(
+            store
+                .front_v2(surface)
+                .expect("保旧帧")
+                .ops
+                .iter()
+                .any(|op| matches!(op, DisplayOp::Image { src, .. } if src == "bitmap://A")),
+            "被拒后前台必须仍是旧帧（引用 A）"
+        );
+
+        // 换成不再引用 A 的合法帧 → 挂起释放兑现。
+        let (_, evicted) = compose_v2_counted(
+            &mut store,
+            &mut refs,
+            &mut keys,
+            surface,
+            0,
+            frame_with(None),
+        )
+        .expect("v2 帧应通过准入");
+        assert_eq!(evicted, vec!["bitmap://A".to_string()]);
+    }
+
+    /// 复审 N-01：窗口回收清引用记账，且回收后不再阻挡释放。
+    #[test]
+    fn forget_surface_bounds_tracking_and_releases_pending() {
+        let mut refs = BitmapRefs::default();
+        refs.on_compose(1, &frame_with(Some("bitmap://B")));
+        assert!(refs.on_release(vec!["bitmap://B".into()]).is_empty());
+        assert_eq!(refs.tracking_len().0, 1);
+
+        let evicted = refs.forget_surface(1);
+        assert_eq!(evicted, vec!["bitmap://B".to_string()], "回收后不再阻挡释放");
+        assert_eq!(refs.tracking_len().0, 0, "表面记账必须随窗口回收清空");
+        assert_eq!(refs.pending_len(), 0);
     }
 }
