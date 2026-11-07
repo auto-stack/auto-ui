@@ -6,7 +6,9 @@
 ///       -- --test-threads=1
 use agp::core::composition::Rect;
 use agp::renderer::GpuDevice;
-use autographics_auto_driver::node_mixed_regions::{MixedRegionsUiApp, parse_mixed_regions_artifact};
+use autographics_auto_driver::node_mixed_regions::{
+    parse_mixed_regions_artifact, MixedRegionsUiApp,
+};
 use autographics_auto_driver::node_mixed_regions_host::MixedRegionsHost;
 
 const SWAP_UI: &str = include_str!(
@@ -41,7 +43,9 @@ fn settle(h: &mut MixedRegionsHost, n: usize) {
 }
 
 fn click_widget(h: &mut MixedRegionsHost, key: &str) {
-    let r = h.widget_bounds(key).unwrap_or_else(|| panic!("bounds {key}"));
+    let r = h
+        .widget_bounds(key)
+        .unwrap_or_else(|| panic!("bounds {key}"));
     h.pointer_pressed(center(r)).expect("press");
     h.pointer_released();
     settle(h, 3);
@@ -53,7 +57,10 @@ fn texts(h: &mut MixedRegionsHost) -> Vec<String> {
 
 fn quad_x_of(h: &mut MixedRegionsHost, path: &str) -> f32 {
     let st = h.app().scene_state();
-    let r = st.iter().find(|s| s.path == path).unwrap_or_else(|| panic!("state {path}"));
+    let r = st
+        .iter()
+        .find(|s| s.path == path)
+        .unwrap_or_else(|| panic!("state {path}"));
     match &r.elems[0] {
         autographics_auto_driver::node_mixed::SceneElemState::Quad { x, .. } => *x,
         autographics_auto_driver::node_mixed::SceneElemState::Cylinder { tx, .. } => *tx,
@@ -163,13 +170,14 @@ fn flow_twenty_round_lifecycle_has_zero_resource_growth() {
     // 点 (3,22) 由内变外，呈现不滞留旧帧）。
     let px = |h: &mut MixedRegionsHost, key: &str, local: f32| -> [u8; 4] {
         let b = h.widget_bounds(key).expect(key);
-        h.rt
-            .probe_pixel(h.ui, [b.x + local, b.y + 22.0])
+        h.rt.probe_pixel(h.ui, [b.x + local, b.y + 22.0])
             .expect("pixel")
     };
     let before = px(&mut h, "Panel/b1#band", 3.0);
-    assert!(before[0] > 150 && u16::from(before[0]) > u16::from(before[1]) + 50,
-        "pip visible at start");
+    assert!(
+        before[0] > 150 && u16::from(before[0]) > u16::from(before[1]) + 50,
+        "pip visible at start"
+    );
     h.step(1.0 / 30.0).expect("step");
     settle(&mut h, 1);
     let after = px(&mut h, "Panel/b1#band", 3.0);
@@ -213,4 +221,53 @@ fn flow_v2_parse_gates_frozen_capacities() {
     // 实例表声明先序：3D 组件在前（换序面）。
     assert_eq!(a.instances[0].path, "Panel/d1");
     assert_eq!(a.instances[1].path, "Panel/b1");
+}
+
+// ------------------------------------------- PLAN-066 T-03 focus/blur -------
+
+#[test]
+fn flow_window_blur_clears_keyboard_focus_and_outside_clicks_do_not_leak() {
+    use autographics_auto_driver::node_ui::PlatformKey;
+    let mut h = host(SWAP_UI, SWAP_WORLD, "plan066-focus");
+    settle(&mut h, 4);
+    let cb0 = h.app().ui.callbacks;
+    // Clicking outside every control route-delivers to the UI but activates
+    // nothing (no implicit region/button hit at the window origin).
+    h.pointer_pressed([5.0, 5.0]).expect("outside press");
+    h.pointer_released();
+    settle(&mut h, 3);
+    assert_eq!(h.app().ui.callbacks, cb0, "outside click must not dispatch");
+    assert_eq!(h.active_count(), 4, "outside click must not mount/unmount");
+    // Enter without a routed Tab has no focused target (no stale first entry).
+    assert!(!h.key(PlatformKey::Enter), "Enter before any Tab is inert");
+    settle(&mut h, 2);
+    assert_eq!(h.app().ui.callbacks, cb0, "inert Enter dispatches nothing");
+    // Tab acquires focus; Enter activates the focused toggle (show 0 → hidden).
+    assert!(h.key(PlatformKey::Tab), "Tab routed");
+    assert!(
+        h.key(PlatformKey::Enter),
+        "Enter activates the focused button"
+    );
+    settle(&mut h, 3);
+    assert_eq!(h.active_count(), 2, "keyboard activation hid the regions");
+    // A real window focus loss clears the keyboard focus: the same Enter is
+    // inert until a new Tab, so a blurred window never re-activates a stale
+    // control (PLAN-066 T-03 fix).
+    h.window_focus_lost();
+    assert!(!h.key(PlatformKey::Enter), "Enter after blur is inert");
+    settle(&mut h, 3);
+    assert_eq!(h.active_count(), 2, "no stale activation after blur");
+    // Re-focus through Tab: the next activation lands on the next ring entry
+    // (bump), and the UI state advances exactly once.
+    assert!(h.key(PlatformKey::Tab), "Tab re-acquires focus");
+    assert!(
+        h.key(PlatformKey::Enter),
+        "Enter activates after re-focusing"
+    );
+    settle(&mut h, 3);
+    assert_eq!(texts(&mut h)[0], "1", "bump advanced once after re-focus");
+    assert!(
+        h.mount_errors.is_empty(),
+        "focus round-trip stayed in domain"
+    );
 }

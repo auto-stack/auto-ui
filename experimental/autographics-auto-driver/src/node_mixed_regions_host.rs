@@ -185,7 +185,10 @@ impl MixedRegionsHost {
         for entry in catalog {
             let visible = self
                 .rt
-                .iced_widget_bounds(self.ui, iced_wgpu::core::widget::Id::from(entry.key.clone()))
+                .iced_widget_bounds(
+                    self.ui,
+                    iced_wgpu::core::widget::Id::from(entry.key.clone()),
+                )
                 .is_some();
             if visible {
                 wanted.push(entry);
@@ -238,10 +241,7 @@ impl MixedRegionsHost {
                         let portal = self.active[&entry.key].portal;
                         let mount = MountKind::Flat2d {
                             offset: [rect.x, rect.y],
-                            scale: [
-                                rect.w / entry.width as f32,
-                                rect.h / entry.height as f32,
-                            ],
+                            scale: [rect.w / entry.width as f32, rect.h / entry.height as f32],
                             clip: rect,
                         };
                         let _ = self.rt.set_portal_mount(portal, mount);
@@ -260,10 +260,8 @@ impl MixedRegionsHost {
                 let size = [entry.width as f32, entry.height as f32];
                 let created = match entry.dim.as_str() {
                     "2d" => {
-                        let content = Game2dContent::simple(
-                            self.rt.gpu(),
-                            Color::rgb(0.09, 0.1, 0.13),
-                        );
+                        let content =
+                            Game2dContent::simple(self.rt.gpu(), Color::rgb(0.09, 0.1, 0.13));
                         self.rt
                             .add_surface(size, SurfaceContent::Game2d(Box::new(content)))
                     }
@@ -315,22 +313,18 @@ impl MixedRegionsHost {
                 };
                 let mount = MountKind::Flat2d {
                     offset: [rect.x, rect.y],
-                    scale: [
-                        rect.w / entry.width as f32,
-                        rect.h / entry.height as f32,
-                    ],
+                    scale: [rect.w / entry.width as f32, rect.h / entry.height as f32],
                     clip: rect,
                 };
-                let portal =
-                    match self.rt.add_portal(self.ui_view, surface, mount, true) {
-                        Ok(p) => p,
-                        Err(e) => {
-                            let _ = self.rt.drop_surface(surface);
-                            self.mount_errors
-                                .push(format!("region '{}': portal: {e:?}", entry.key));
-                            continue;
-                        }
-                    };
+                let portal = match self.rt.add_portal(self.ui_view, surface, mount, true) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        let _ = self.rt.drop_surface(surface);
+                        self.mount_errors
+                            .push(format!("region '{}': portal: {e:?}", entry.key));
+                        continue;
+                    }
+                };
                 self.next_epoch += 1;
                 let epoch = self.next_epoch;
                 let mark = [rect.x, rect.y, rect.w, rect.h];
@@ -480,9 +474,12 @@ impl MixedRegionsHost {
         self.absorb_cancel(cancelled);
     }
 
+    /// 窗口失焦：取消在途捕获/区域点击，并让键盘焦点失效（PLAN-066 T-03：
+    /// 旧焦点按钮不得在下一次 Enter 被激活）。
     pub fn window_focus_lost(&mut self) {
         let cancelled = self.ci.window_focus_lost();
         self.absorb_cancel(cancelled);
+        self.app.ui.focus_lost();
     }
 
     fn absorb_cancel(&mut self, cancelled: Option<SurfaceId>) {
@@ -527,9 +524,7 @@ impl MixedRegionsHost {
                                 None => (key.clone(), key.clone()),
                             };
                             if let Some(epoch) = epoch {
-                                let _ = self
-                                    .app
-                                    .enqueue_region_click_at(&path, &name, epoch);
+                                let _ = self.app.enqueue_region_click_at(&path, &name, epoch);
                             }
                             Some(format!("{path}#{name}"))
                         }

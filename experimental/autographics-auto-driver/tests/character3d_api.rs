@@ -45,6 +45,34 @@ fn source(body: &str) -> String {
 /// Run the frozen three-dimensional configuration protocol: transport reset,
 /// spatial rows, stable-id map, then `_ag_start` (app_start + the freeze).
 fn session(user: &str, name: &str, rows: &[Row]) -> Result<Session, String> {
+    let layout: Vec<(i32, i32, i32, [f32; 7])> = rows
+        .iter()
+        .map(|Row(kind, dim, box7)| (*kind, *dim, -1, *box7))
+        .collect();
+    session_layout(user, name, &layout)
+}
+
+/// Same protocol with an explicit parent per row (PLAN-066 T-04: hidden parent
+/// groups and registered solid children need real ancestry).
+fn session_layout(
+    user: &str,
+    name: &str,
+    rows: &[(i32, i32, i32, [f32; 7])],
+) -> Result<Session, String> {
+    let (session, init) = session_layout_init(user, name, rows)?;
+    match init {
+        Some(error) => Err(error),
+        None => Ok(session),
+    }
+}
+
+/// Same protocol, but the `_ag_start` outcome is returned instead of propagated
+/// (the capacity boundary keeps a diagnosable session).
+fn session_layout_init(
+    user: &str,
+    name: &str,
+    rows: &[(i32, i32, i32, [f32; 7])],
+) -> Result<(Session, Option<String>), String> {
     let snap = SourceSnapshot::from_bytes_for(
         Path::new(name),
         user.as_bytes().to_vec(),
@@ -58,10 +86,10 @@ fn session(user: &str, name: &str, rows: &[Row]) -> Result<Session, String> {
         &[Int(rows.len() as i32)],
         ResultKind::Unit,
     )?;
-    for (n, Row(kind, dim, box7)) in rows.iter().enumerate() {
+    for (n, (kind, dim, parent, box7)) in rows.iter().enumerate() {
         s.call(
             "_ag_identity",
-            &[Int(n as i32 + 1), Int(*kind), Int(*dim), Int(-1)],
+            &[Int(n as i32 + 1), Int(*kind), Int(*dim), Int(*parent)],
             ResultKind::Unit,
         )?;
         s.call("_ag_visibility", &[Int(1)], ResultKind::Unit)?;
@@ -84,8 +112,8 @@ fn session(user: &str, name: &str, rows: &[Row]) -> Result<Session, String> {
             ResultKind::Unit,
         )?;
     }
-    s.call("_ag_start", &[], ResultKind::Unit)?;
-    Ok(s)
+    let init = s.call("_ag_start", &[], ResultKind::Unit).err();
+    Ok((s, init))
 }
 
 fn status(s: &mut Session) -> i32 {
@@ -793,5 +821,157 @@ fn ancestor_group_translation_is_refused_at_the_tick_boundary() {
         fault_node(&mut s),
         2,
         "fault node is the group-carried solid run index"
+    );
+}
+
+// ------------------------------------------- PLAN-066 T-04 boundaries -------
+
+/// Scene rows for the 066 collision/lifetime boundaries: hero (stable 1),
+/// floor (stable 2), then `n` registered-solid cylinders starting at stable 3.
+fn solid_rows(n: usize) -> (Vec<(i32, i32, i32, [f32; 7])>, String) {
+    let mut rows = vec![
+        (2, 3, -1, [1., -0.4, -0.5, -0.4, 0.4, 0.5, 0.4]),
+        (2, 3, -1, [1., -8., -1., -8., 8., 0., 8.]),
+    ];
+    let mut start = String::from(" ag_set_local(0,1,0.5)\n ok=ok+ag_char3_bind(1)\n");
+    for i in 0..n {
+        let x = 100.0 + i as f32;
+        rows.push((2, 3, -1, [1., x, 0., -1., x + 0.2, 3., 1.]));
+        start.push_str(&format!(" ok=ok+ag_char3_solid({})\n", i + 3));
+    }
+    (rows, upd(&start, idle()))
+}
+
+#[test]
+fn hidden_parent_group_with_registered_solid_child_still_blocks() {
+    // PLAN-066 T-04 / 064 residual: a solid child carried by a hidden group is
+    // invisible (effective 0), so the 043 visible-row slide would skip it. The
+    // registered-solid reveal must re-enable it for the slide: ancestry never
+    // defeats solidity, while an unregistered hidden child stays skipped.
+    //   run 0 group (hidden) / run 1 hero / run 2 floor / run 3 solid wall (parent 0)
+    let rows = [
+        (5, 3, -1, [0.; 7]),
+        (2, 3, -1, [1., -0.4, -0.5, -0.4, 0.4, 0.5, 0.4]),
+        (2, 3, -1, [1., -8., -1., -8., 8., 0., 8.]),
+        (2, 3, 0, [1., 3., 0., -1., 3.2, 3., 1.]),
+    ];
+    let body = "let q=ag_char3_move(4.0*dt,0.0,0.0,0.002)\ng=ag_char3_grounded(q)\nx=ag_motion_origin(q,0)\n";
+    let registered = upd(
+        " ag_set_local(1,1,0.5)\n ag_set_visible(0,0)\n ok=ok+ag_char3_bind(2)\n ok=ok+ag_char3_solid(4)\n",
+        body,
+    );
+    let mut s = session_layout(&registered, "hidden-parent-solid.at", &rows).unwrap();
+    assert_eq!(status(&mut s), 0, "configuration");
+    assert_eq!(
+        int(&mut s, "ag_visible", 3),
+        0,
+        "the wall is invisible through its hidden group"
+    );
+    for step in 1..=200 {
+        tick(&mut s, step);
+        assert_eq!(status(&mut s), 0, "step {step}");
+    }
+    let x = s.float("x_v", &[]).unwrap();
+    assert!(
+        (x - (3.0 - 0.4 - CLEARANCE)).abs() < 1e-3,
+        "hidden-parent registered solid must still clip: x={x}"
+    );
+    // Control on the same scene: without registration the hidden child is a
+    // skipped row, so the walk passes it (the reveal is the only difference).
+    let unregistered = upd(
+        " ag_set_local(1,1,0.5)\n ag_set_visible(0,0)\n ok=ok+ag_char3_bind(2)\n",
+        body,
+    );
+    let mut c = session_layout(&unregistered, "hidden-parent-free.at", &rows).unwrap();
+    for step in 1..=200 {
+        tick(&mut c, step);
+        assert_eq!(status(&mut c), 0, "control step {step}");
+    }
+    let cx = c.float("x_v", &[]).unwrap();
+    assert!(
+        cx > 5.0,
+        "unregistered hidden-parent row must not block: x={cx}"
+    );
+}
+
+#[test]
+fn failed_move_restores_the_momentary_solid_reveal() {
+    // PLAN-066 T-04 / 064 residual: the reveal (`effective 1 -> slide ->
+    // restore`) must also close on the failure exit. Two moves in one tick
+    // exhaust the frozen 32-credit path exactly inside the slide; the second
+    // move faults (10) after the reveal, and effective[] must already be back
+    // to the document visibility before the callback returns (the tick-end
+    // derive is not allowed to be the repair).
+    let rows = [
+        (2, 3, -1, [1., -0.4, -0.5, -0.4, 0.4, 0.5, 0.4]),
+        (2, 3, -1, [1., -8., -1., -8., 8., 0., 8.]),
+        (2, 3, -1, [1., 3., 0., -1., 3.2, 3., 1.]),
+    ];
+    let user = format!(
+        "{PRELUDE}var q1=0\nvar q2=0\nvar v_ok=-1\nvar v_fail=-1\n\
+fn app_start() {{\n ag_set_local(0,1,0.5)\n ag_set_visible(2,0)\n ok=ok+ag_char3_bind(1)\n ok=ok+ag_char3_solid(3)\n}}\n\
+fn app_update(dt float) {{\nstepn=stepn+1\nif stepn==1 {{q1=ag_char3_move(0.0,0.0,0.0,0.002)\nv_ok=ag_visible(2)\nq2=ag_char3_move(0.0,0.0,0.0,0.002)\nv_fail=ag_visible(2)\nx=ag_motion_origin(q1,0)}}}}\n\
+fn q1_v() int {{return q1}}\nfn q2_v() int {{return q2}}\nfn v_ok_v() int {{return v_ok}}\nfn v_fail_v() int {{return v_fail}}\n{GETTERS}"
+    );
+    let mut s = session_layout(&user, "failed-move-reveal.at", &rows).unwrap();
+    assert_eq!(status(&mut s), 0, "configuration");
+    assert_eq!(
+        int(&mut s, "ag_visible", 2),
+        0,
+        "hidden solid stays invisible outside the reveal"
+    );
+    tick(&mut s, 1);
+    assert_eq!(
+        status(&mut s),
+        10,
+        "second move exhausts the 32-credit path"
+    );
+    let v_ok = s.int("v_ok_v", &[]).unwrap();
+    let v_fail = s.int("v_fail_v", &[]).unwrap();
+    assert_eq!(v_ok, 0, "successful move restores the reveal");
+    assert_eq!(v_fail, 0, "the failed-exit move restores the reveal");
+    let q1 = s.int("q1_v", &[]).unwrap();
+    let q2 = s.int("q2_v", &[]).unwrap();
+    assert!(q1 > 0, "first move mints a token: {q1}");
+    assert_eq!(q2, 0, "the failed move publishes no token");
+    assert_eq!(
+        int(&mut s, "ag_visible", 2),
+        0,
+        "no reveal residue after the fault"
+    );
+}
+
+#[test]
+fn registered_solid_capacity_and_init_budget_are_separate_boundaries() {
+    // PLAN-066 T-04 / 064 residual: 127 and 128 registered solids are both
+    // refused by the unchanged cumulative INIT guard (the host deep127 face)
+    // before the 128-entry registration capacity can ever speak. The capacity
+    // rejection is shadowed by the original budget gate, so no capacity change
+    // is required, the 128-row document envelope stays a row count (not a
+    // registration count), and a refused INIT publishes no partial run.
+    for n in [127usize, 128, 129] {
+        let (rows, user) = solid_rows(n);
+        let (_, init) = session_layout_init(&user, &format!("caps{n}.at"), &rows).unwrap();
+        let error = init.unwrap_or_else(|| {
+            panic!("{n} registered solids must be refused at INIT on this profile")
+        });
+        // The same per-callback guard reports under several budget spellings
+        // ("cumulative CPU", "instruction", "callback budget") depending on which
+        // slice limit fires first; the refusal must stay a budget refusal.
+        assert!(
+            error.to_lowercase().contains("budget") && error.to_lowercase().contains("exhaust"),
+            "{n}: only the unchanged cumulative guard may refuse: {error}"
+        );
+    }
+    // A small registered set still initializes and moves: the finding above is
+    // the original per-callback gate, not a general registration refusal.
+    let (rows, user) = solid_rows(8);
+    let mut s = session_layout(&user, "caps8.at", &rows).unwrap();
+    assert_eq!(status(&mut s), 0, "8 registered solids stay in domain");
+    tick(&mut s, 1);
+    assert_eq!(
+        status(&mut s),
+        0,
+        "8 registered solids: a move stays in budget"
     );
 }

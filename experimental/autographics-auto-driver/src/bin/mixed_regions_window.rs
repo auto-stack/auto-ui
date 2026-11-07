@@ -15,6 +15,10 @@
 //!           先例（不在本自动链；scale_factor 与 posted 坐标=逻辑×scale
 //!           在报告记录）。
 //! (默认)    素窗（无自动化、无报告）
+//! --manual  可执行手工门（PLAN-066 T-02）：人真实操作本窗（Tab/Enter、点击、
+//!           失焦、移出、resize、第二 DPI scale）；关窗时写
+//!           `manual-native-gate.json` 记录真实 OS 观察，auto_pass=false
+//!           （手工证据，不计自动 pass）。
 //! GPU/窗口/焦点单实例运行。
 use agp::host::iced_surface_probe as probe;
 use agp::renderer::{GpuDevice, WindowTarget};
@@ -27,8 +31,8 @@ use std::time::Instant;
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::NamedKey as WNamed;
 use winit::keyboard::Key as WKey;
+use winit::keyboard::NamedKey as WNamed;
 use winit::window::{Window, WindowId};
 
 const TITLE: &str = "AGE mixed-regions (PLAN-054)";
@@ -42,6 +46,9 @@ const VK_RETURN: u32 = 0x0D;
 
 struct App {
     probe: bool,
+    /// PLAN-066 T-02 manual gate: record real OS events (human-run) without
+    /// claiming an automatic pass.
+    manual: bool,
     report: PathBuf,
     ui_path: String,
     world_path: String,
@@ -61,12 +68,32 @@ struct App {
     epochs_before_toggle: [Option<u64>; 2],
     epochs_after_remount: [Option<u64>; 2],
     marks: Vec<(String, u64)>,
+    manual_seen: ManualSeen,
+}
+
+/// Real OS-channel observations for the manual gate (never auto-passed).
+#[derive(Default)]
+struct ManualSeen {
+    tabs: u32,
+    enters: u32,
+    clicks: u32,
+    focus_lost: u32,
+    cursor_left: u32,
+    resizes: u32,
+    scales: Vec<f32>,
 }
 
 impl App {
-    fn new(probe: bool, ui_path: String, world_path: String, report: PathBuf) -> Self {
+    fn new(
+        probe: bool,
+        manual: bool,
+        ui_path: String,
+        world_path: String,
+        report: PathBuf,
+    ) -> Self {
         Self {
             probe,
+            manual,
             report,
             ui_path,
             world_path,
@@ -86,6 +113,7 @@ impl App {
             epochs_before_toggle: [None; 2],
             epochs_after_remount: [None; 2],
             marks: Vec::new(),
+            manual_seen: ManualSeen::default(),
         }
     }
 
@@ -108,12 +136,7 @@ impl App {
         let h = self.host.as_mut().expect("host");
         let st = h.app().scene_state();
         let qx = |path: &str| -> f32 {
-            match &st
-                .iter()
-                .find(|s| s.path == path)
-                .expect(path)
-                .elems[0]
-            {
+            match &st.iter().find(|s| s.path == path).expect(path).elems[0] {
                 autographics_auto_driver::node_mixed::SceneElemState::Quad { x, .. } => *x,
                 autographics_auto_driver::node_mixed::SceneElemState::Cylinder { tx, .. } => *tx,
                 _ => 0.0,
@@ -123,6 +146,41 @@ impl App {
     }
 
     fn verify_and_finish(&mut self, e: &ActiveEventLoop) {
+        if self.manual {
+            let seen = &self.manual_seen;
+            let report = serde_json::json!({
+                "title": TITLE,
+                "mode": "manual-gate (PLAN-066 T-02)",
+                "auto_pass": false,
+                "observed": {
+                    "tabs": seen.tabs,
+                    "enters": seen.enters,
+                    "clicks": seen.clicks,
+                    "focus_lost": seen.focus_lost,
+                    "cursor_left": seen.cursor_left,
+                    "resizes": seen.resizes,
+                    "scales": seen.scales,
+                },
+                "checklist": [
+                    "Tab + Enter activate the next button exactly once",
+                    "a click outside every control changes nothing",
+                    "Alt-Tab away then back: the stale focused button does not activate on Enter",
+                    "mouse leave cancels the press (no region click)",
+                    "resize; the next click lands on the widget's new position",
+                    "repeat on a second DPI scale if the machine has one",
+                ],
+                "note": "real OS input evidence only; never an automatic pass",
+            });
+            std::fs::create_dir_all(&self.report).ok();
+            std::fs::write(
+                self.report.join("manual-native-gate.json"),
+                serde_json::to_string_pretty(&report).unwrap(),
+            )
+            .expect("manual report");
+            eprintln!("MIXED-REGIONS MANUAL GATE report: {report}");
+            e.exit();
+            return;
+        }
         let state = self.host.as_mut().map(|h| {
             (
                 h.app().ui.texts(0).to_vec(),
@@ -134,18 +192,13 @@ impl App {
             Some((texts, active, callbacks)) => {
                 let count = texts.get(0).cloned().unwrap_or_default();
                 let (p1x, p2x, m3tx) = self.scene_values();
-                let mark = |k: &str| {
-                    self.marks
-                        .iter()
-                        .find(|(n, _)| n == k)
-                        .map(|(_, v)| *v)
-                };
-                let idle_ok = mark("idle_start").is_some()
-                    && mark("idle_start") == mark("idle_end");
+                let mark = |k: &str| self.marks.iter().find(|(n, _)| n == k).map(|(_, v)| *v);
+                let idle_ok =
+                    mark("idle_start").is_some() && mark("idle_start") == mark("idle_end");
                 let toggled = self.epochs_before_toggle != self.epochs_after_remount
                     && self.epochs_after_remount.iter().all(|e| e.is_some());
                 self.passed = !self.probe
-                    || (count == "201"
+                    || (count == "202"
                         && p1x == 24.0
                         && p2x == 0.0
                         && m3tx >= 0.0
@@ -158,6 +211,7 @@ impl App {
                     "title": TITLE,
                     "host_chain": "MixedRegionsHost (PLAN-054 metadata assembly)",
                     "count": count,
+                    "post_resize_hit": count == "202",
                     "p1_x": p1x,
                     "p2_x": p2x,
                     "m3_tx": m3tx,
@@ -205,10 +259,7 @@ impl App {
                 if let Some(h) = self.host.as_mut() {
                     let cb = h.app().ui.callbacks;
                     self.marks.push(("start".into(), cb));
-                    self.epochs_before_toggle = [
-                        h.region_epoch(P1),
-                        h.region_epoch(STRIP),
-                    ];
+                    self.epochs_before_toggle = [h.region_epoch(P1), h.region_epoch(STRIP)];
                     self.logical_sizes.push(h.logical());
                 }
             }
@@ -242,7 +293,11 @@ impl App {
             6 if at(6, 5700) => {
                 self.phase = 7;
                 // 隐藏态：p1/p2 撤呈现；strip 布局上移——移动后布局点击。
-                let cb = self.host.as_mut().map(|h| h.app().ui.callbacks).unwrap_or(0);
+                let cb = self
+                    .host
+                    .as_mut()
+                    .map(|h| h.app().ui.callbacks)
+                    .unwrap_or(0);
                 self.marks.push(("hidden".into(), cb));
                 self.click(STRIP); // count 101 → 201（真实布局跟随路由）
             }
@@ -269,10 +324,7 @@ impl App {
             10 if at(10, 8100) => {
                 self.phase = 11;
                 if let Some(h) = self.host.as_mut() {
-                    self.epochs_after_remount = [
-                        h.region_epoch(P1),
-                        h.region_epoch(STRIP),
-                    ];
+                    self.epochs_after_remount = [h.region_epoch(P1), h.region_epoch(STRIP)];
                 }
                 self.click(P1); // 新代次：x 12 → 24
             }
@@ -282,10 +334,10 @@ impl App {
                 // 返回新物理尺寸（无后续 Resized 事件）；异步平台由
                 // Resized 事件驱动 host.resize。两条路径同一 host 入口。
                 if let (Some(w), Some(h)) = (self.window.as_ref(), self.host.as_mut()) {
-                    let req = w.request_inner_size(winit::dpi::LogicalSize::new(
-                        RESIZED[0], RESIZED[1],
-                    ));
-                    self.marks.push(("request_returned_sync".into(), req.is_some() as u64));
+                    let req =
+                        w.request_inner_size(winit::dpi::LogicalSize::new(RESIZED[0], RESIZED[1]));
+                    self.marks
+                        .push(("request_returned_sync".into(), req.is_some() as u64));
                     if let Some(phys) = req {
                         let scale = w.scale_factor() as f32;
                         let logical = [
@@ -313,16 +365,31 @@ impl App {
                     self.physical_sizes.push([phys.width, phys.height]);
                     self.logical_sizes.push(h.logical());
                 }
-                let cb = self.host.as_mut().map(|h| h.app().ui.callbacks).unwrap_or(0);
-                self.marks.push(("idle_start".into(), cb));
+                // PLAN-066 T-03: the post-resize hit uses the same posted
+                // physical channel (logical layout × scale); bump +1 (201→202)
+                // proves the hit follows the new layout.
+                self.click(BUMP);
             }
             13 if at(13, 10300) => {
                 self.phase = 14;
-                let cb = self.host.as_mut().map(|h| h.app().ui.callbacks).unwrap_or(0);
+                let cb = self
+                    .host
+                    .as_mut()
+                    .map(|h| h.app().ui.callbacks)
+                    .unwrap_or(0);
+                self.marks.push(("idle_start".into(), cb));
+            }
+            14 if at(14, 11100) => {
+                self.phase = 15;
+                let cb = self
+                    .host
+                    .as_mut()
+                    .map(|h| h.app().ui.callbacks)
+                    .unwrap_or(0);
                 self.marks.push(("idle_end".into(), cb));
             }
-            14 if at(14, 10900) => {
-                self.phase = 15;
+            15 if at(15, 11900) => {
+                self.phase = 16;
                 self.verify_and_finish(e);
             }
             _ => {}
@@ -352,6 +419,7 @@ fn window_scale_of(window: Option<&Arc<Window>>) -> f32 {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let probe_flag = args.iter().any(|a| a == "--probe");
+    let manual = args.iter().any(|a| a == "--manual");
     let ui = args
         .iter()
         .position(|a| a == "--ui")
@@ -372,7 +440,7 @@ fn main() {
         .unwrap_or_else(|| {
             PathBuf::from("D:/autostack/plan-artifacts/plan-054/auto-ui/t04/reports")
         });
-    let mut app = App::new(probe_flag, ui, world, report);
+    let mut app = App::new(probe_flag, manual, ui, world, report);
     EventLoop::new().unwrap().run_app(&mut app).unwrap();
     if probe_flag && !app.passed {
         std::process::exit(1);
@@ -412,9 +480,13 @@ impl ApplicationHandler for App {
             WindowEvent::CloseRequested => self.verify_and_finish(e),
             WindowEvent::Resized(size) => {
                 self.marks.push(("resized_event".into(), size.width as u64));
-                let (Some(target), Some(host)) =
-                    (self.target.as_mut(), self.host.as_mut())
-                else {
+                self.manual_seen.resizes += u32::from(self.manual);
+                if self.manual {
+                    if let Some(w) = &self.window {
+                        self.manual_seen.scales.push(w.scale_factor() as f32);
+                    }
+                }
+                let (Some(target), Some(host)) = (self.target.as_mut(), self.host.as_mut()) else {
                     return;
                 };
                 let scale = window_scale_of(self.window.as_ref());
@@ -428,7 +500,9 @@ impl ApplicationHandler for App {
                     let _ = target.handle_resize(gpu, size.width.max(1), size.height.max(1));
                 }
                 match host.resize(logical) {
-                    Ok(_) => self.marks.push(("resized_applied".into(), logical[0] as u64)),
+                    Ok(_) => self
+                        .marks
+                        .push(("resized_applied".into(), logical[0] as u64)),
                     Err(_) => self.marks.push(("resize_err".into(), 0)),
                 }
             }
@@ -448,6 +522,9 @@ impl ApplicationHandler for App {
                 if self.cursor_px[0] < 0.0 {
                     return;
                 }
+                if state == ElementState::Pressed {
+                    self.manual_seen.clicks += u32::from(self.manual);
+                }
                 let scale = window_scale_of(self.window.as_ref());
                 let logical = [self.cursor_px[0] / scale, self.cursor_px[1] / scale];
                 if let Some(h) = self.host.as_mut() {
@@ -458,6 +535,22 @@ impl ApplicationHandler for App {
                     }
                 }
             }
+            WindowEvent::Focused(false) => {
+                // PLAN-066 T-03: a real OS focus loss cancels in-flight capture
+                // and invalidates the keyboard focus (no stale Enter target).
+                self.manual_seen.focus_lost += u32::from(self.manual);
+                self.marks.push(("focus_lost".into(), 1));
+                if let Some(h) = self.host.as_mut() {
+                    h.window_focus_lost();
+                }
+            }
+            WindowEvent::CursorLeft { .. } => {
+                self.manual_seen.cursor_left += u32::from(self.manual);
+                if let Some(h) = self.host.as_mut() {
+                    h.cancel_all(agp::core::composition::input::CancelReason::PointerLeftWindow);
+                    self.marks.push(("cursor_left".into(), 1));
+                }
+            }
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state == ElementState::Pressed {
                     let key = match &event.logical_key {
@@ -466,6 +559,12 @@ impl ApplicationHandler for App {
                         _ => None,
                     };
                     if let Some(k) = key {
+                        if self.manual {
+                            match k {
+                                PlatformKey::Tab => self.manual_seen.tabs += 1,
+                                PlatformKey::Enter => self.manual_seen.enters += 1,
+                            }
+                        }
                         if let Some(h) = self.host.as_mut() {
                             h.key(k);
                         }

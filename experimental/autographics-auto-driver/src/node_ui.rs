@@ -650,6 +650,10 @@ pub struct NodeUiApp {
     /// 键盘焦点环（可见且可用的按钮，树序）。
     focus_ring: Vec<FocusEntry>,
     focus_index: usize,
+    /// PLAN-066 T-03: platform keyboard focus is only held after this window
+    /// (or the test) actually routed a Tab; a window blur clears it so Enter
+    /// cannot activate a stale focused button.
+    focus_active: bool,
     started: bool,
 }
 
@@ -705,6 +709,7 @@ impl NodeUiApp {
             region_epochs: None,
             focus_ring: Vec::new(),
             focus_index: 0,
+            focus_active: false,
             started: false,
         };
         app.build_rows()?;
@@ -970,17 +975,22 @@ impl NodeUiApp {
     }
 
     /// 平台键盘路由：Tab 循环焦点，Enter 激活当前焦点按钮（与鼠标同
-    /// 队列同派发器）。返回是否处理。
+    /// 队列同派发器）。返回是否处理。Enter 只在 Tab 取得焦点后生效——
+    /// 窗口失焦（PLAN-066）会清掉该状态，避免旧焦点泄漏到下一次键入。
     pub fn key(&mut self, key: PlatformKey) -> bool {
         match key {
             PlatformKey::Tab => {
                 if self.focus_ring.is_empty() {
                     return false;
                 }
+                self.focus_active = true;
                 self.focus_index = (self.focus_index + 1) % self.focus_ring.len();
                 true
             }
             PlatformKey::Enter => {
+                if !self.focus_active {
+                    return false;
+                }
                 let Some(entry) = self.focus_ring.get(self.focus_index) else {
                     return false;
                 };
@@ -993,6 +1003,12 @@ impl NodeUiApp {
                 )
             }
         }
+    }
+
+    /// 窗口失焦（真实 OS 焦点离开本窗）：键盘焦点失效，后续 Enter 不再
+    /// 激活旧按钮；下一次 Tab 重新取得焦点（PLAN-066 T-03）。
+    pub fn focus_lost(&mut self) {
+        self.focus_active = false;
     }
 
     /// 当前焦点元素键（测试/诊断/呈现面）。
