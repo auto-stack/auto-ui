@@ -442,7 +442,7 @@ impl DynamicComponent {
         let widget_name = widget.name.clone();
 
         // 3. Extract input-to-state mapping for text input handling
-        let input_state_map = extract_input_state_map(&widget.view_tree);
+        let input_state_map = extract_input_state_map(&widget.view_tree, &bridge);
 
         Ok(Self {
             bridge,
@@ -561,7 +561,7 @@ impl DynamicComponent {
         let widget_name = _logic.name.to_string();
 
         // 3. Extract input-to-state mapping for text input handling
-        let input_state_map = extract_input_state_map_with_registry(view.view_tree, &registry);
+        let input_state_map = extract_input_state_map_with_registry(view.view_tree, &registry, &bridge);
 
         // EDGE-01: merge element-attribute onkeydown.* bindings into key_bindings.
         let mut key_bindings = view.key_bindings.clone();
@@ -684,7 +684,7 @@ impl DynamicComponent {
         let view = view_widget.view_data();
         let view_template = view.view_tree.clone();
         let widget_name = view_widget.name.clone();
-        let input_state_map = extract_input_state_map_with_registry(view.view_tree, &registry);
+        let input_state_map = extract_input_state_map_with_registry(view.view_tree, &registry, &bridge);
 
         // PLAN-048 L1 (musk auth gate): merge store-as-child computeds into
         // the root computed table. Store fields are merged into root state as
@@ -873,7 +873,7 @@ impl DynamicComponent {
 
         let view_template = widget.view_tree.clone();
         let widget_name = widget.name.clone();
-        let input_state_map = extract_input_state_map(&widget.view_tree);
+        let input_state_map = extract_input_state_map(&widget.view_tree, &bridge);
         let mut last_schema = std::collections::HashMap::new();
         last_schema.insert(widget.name.clone(), widget.clone());
 
@@ -2380,7 +2380,7 @@ impl DynamicComponent {
             .collect();
         self.widget_name = new_widget.name.clone();
         self.input_state_map =
-            extract_input_state_map_with_registry(&new_widget.view_tree, &self.widget_registry);
+            extract_input_state_map_with_registry(&new_widget.view_tree, &self.widget_registry, &self.bridge);
         self.tick_interval = new_widget.tick_interval;
         self.span_map = new_widget.span_map.clone();
         self.dirty = true;
@@ -3372,8 +3372,18 @@ impl DynamicComponent {
                 let value = parse_input_value_for_field(text, state_field, &self.bridge);
                 // PLAN-041 T-02: instance-bound input back-writes land on the
                 // instance object; the root/legacy channel is unchanged.
+                //
+                // PLAN-069 F1: 与视图读通道同序（实例优先，缺字段回退根态）——
+                // 展平的 store 绑定（`.store.query`）落根态合并字段，页模型
+                // 字段（`.draft`）仍落实例对象。此前实例存在时一律写实例，
+                // store 绑定写到实例上因 FieldNotFound 静默失败 → 键入值不达。
                 if let Some(id) = instance_state_id {
-                    let _ = self.bridge.write_state_onto(id, state_field, value);
+                    let instance_write =
+                        self.bridge
+                            .write_state_onto(id, state_field, value.clone());
+                    if instance_write.is_err() {
+                        let _ = self.bridge.write_state(state_field, value);
+                    }
                 } else {
                     // Write to the root state (input bindings are root-level).
                     let _ = self.bridge.write_state(state_field, value);
@@ -4024,11 +4034,18 @@ fn clean_handler_name(pattern: &str) -> String {
 
 /// Scan the view tree for `input` elements with `value` from StateRef and an
 /// `oninput`/`onchange` event. Returns a map of event_name -> state_field_name.
+///
+/// PLAN-069 F1: `bridge` supplies the per-component store-alias snapshot so a
+/// nested store path binding (`.store.query` / `.StoreName.query`) registers
+/// under its **flattened root field name** — the same projection the view read
+/// channel uses (see `aura_view_builder::eval::read_state`, which strips the
+/// store alias and reads the bare root field).
 fn extract_input_state_map(
     view_tree: &auto_ui_compiler::aura::AuraNode,
+    bridge: &crate::ui::vm_bridge::VmBridge,
 ) -> HashMap<String, String> {
     let mut map = HashMap::new();
-    scan_node_for_inputs(view_tree, &mut map);
+    scan_node_for_inputs(view_tree, &mut map, bridge);
     map
 }
 
@@ -4041,15 +4058,16 @@ fn extract_input_state_map(
 fn extract_input_state_map_with_registry(
     view_tree: &auto_ui_compiler::aura::AuraNode,
     registry: &crate::ui::widget_registry::WidgetRegistry,
+    bridge: &crate::ui::vm_bridge::VmBridge,
 ) -> HashMap<String, String> {
     let mut map = HashMap::new();
-    scan_node_for_inputs(view_tree, &mut map);
+    scan_node_for_inputs(view_tree, &mut map, bridge);
     // Recurse into every registered child widget's view_tree. `all()` yields
     // owned AuraWidget clones (registry stores Arc internally); each carries a
     // &view_tree we can scan. First-match wins (entry().or_insert) so a root
     // binding isn't clobbered by a child's same-named event.
     for child in registry.all() {
-        scan_node_for_inputs(&child.view_tree, &mut map);
+        scan_node_for_inputs(&child.view_tree, &mut map, bridge);
     }
     map
 }
@@ -4178,6 +4196,7 @@ fn scan_node_for_onkeydown(
 fn scan_node_for_inputs(
     node: &auto_ui_compiler::aura::AuraNode,
     map: &mut HashMap<String, String>,
+    bridge: &crate::ui::vm_bridge::VmBridge,
 ) {
     use auto_lang_core::ast::Expr;
     use auto_ui_compiler::aura::{AuraNode, AuraPropValue};
@@ -4197,6 +4216,22 @@ fn scan_node_for_inputs(
                     AuraPropValue::Expr(Expr::Ident(name)) => Some(name.to_string()),
                     AuraPropValue::Expr(Expr::Dot(obj, field)) => match obj.as_ref() {
                         Expr::Ident(_) => Some(field.to_string()),
+                        // PLAN-069 F1（round-19 家族 query 绑定 extract 缺口）：
+                        // 嵌套 store 路径绑定 `.store.query` / `.StoreName.query`
+                        // 此前整条静默丢弃（obj 是 Dot → None）→ input_state_map
+                        // 不注册 → 键入值不写状态。store 字段合并进根态（视图读
+                        // 通道 eval.rs::read_state 剥掉 store 别名后读裸字段），
+                        // 因此这里注册为**裸字段名**，与读通道同口径；非 store
+                        // 别名的真嵌套对象（`.note.title`）不展平，保持原状。
+                        Expr::Dot(inner, alias)
+                            if matches!(
+                                inner.as_ref(),
+                                Expr::Ident(base)
+                                    if base.as_str() == "." || base.as_str() == "self"
+                            ) && bridge.store_alias_real_name(alias.as_str()).is_some() =>
+                        {
+                            Some(field.to_string())
+                        }
                         _ => None,
                     },
                     _ => None,
@@ -4233,12 +4268,12 @@ fn scan_node_for_inputs(
                 }
             }
             for child in children {
-                scan_node_for_inputs(child, map);
+                scan_node_for_inputs(child, map, bridge);
             }
         }
         AuraNode::ForLoop { body, .. } => {
             for child in body {
-                scan_node_for_inputs(child, map);
+                scan_node_for_inputs(child, map, bridge);
             }
         }
         AuraNode::Conditional {
@@ -4247,11 +4282,11 @@ fn scan_node_for_inputs(
             ..
         } => {
             for child in then_body {
-                scan_node_for_inputs(child, map);
+                scan_node_for_inputs(child, map, bridge);
             }
             if let Some(else_children) = else_body {
                 for child in else_children {
-                    scan_node_for_inputs(child, map);
+                    scan_node_for_inputs(child, map, bridge);
                 }
             }
         }

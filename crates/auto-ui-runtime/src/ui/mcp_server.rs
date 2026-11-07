@@ -1054,7 +1054,7 @@ fn tool_definitions() -> Vec<serde_json::Value> {
         json!({
             "name": "autoui_type",
             "title": "Type Text",
-            "description": "Type text into an input element. Optionally clear existing text first.\n\n## Workflow\n1. Use autoui_snapshot to find the input element ID\n2. Call autoui_type with element_id and text\n3. Optionally set clear_first=true to erase existing content\n\nMore convenient than autoui_action type_text for form input.",
+            "description": "Type text into an input element. The typed text replaces the input's current value (single dispatch, same semantics as real typing).\n\n## Workflow\n1. Use autoui_snapshot to find the input element ID\n2. Call autoui_type with element_id and text\n3. clear_first is retained for compatibility only — the typed value always replaces the previous content (use autoui_action clear for an explicit empty-value dispatch)\n\nMore convenient than autoui_action type_text for form input.",
             "inputSchema": {
                 "type": "object",
                 "required": ["text"],
@@ -1070,7 +1070,7 @@ fn tool_definitions() -> Vec<serde_json::Value> {
                     "clear_first": {
                         "type": "boolean",
                         "default": true,
-                        "description": "Clear existing text before typing"
+                        "description": "Compatibility flag (legacy: clear before typing). The typed text always replaces the field value in a single dispatch."
                     }
                 }
             },
@@ -3497,36 +3497,15 @@ fn tool_type(shared_handle: &SharedStateHandle, args: serde_json::Value) -> serd
         }
     };
 
-    // clear_first:type_text 前先清空(vnode_ 走 execute_action_vnode,aura_ 走旧路径)。
-    if clear_first {
-        let clear_result = {
-            let shared = shared_handle.lock().unwrap();
-            match element_id {
-                ElementId::Vnode(vid) => {
-                    execute_action_vnode(&shared, vid, UiActionType::Clear, None)
-                }
-                ElementId::Aura(aura_id) => {
-                    let (view, id_map) = match (&shared.view, &shared.id_map) {
-                        (Some(v), Some(m)) => (v, m),
-                        _ => return error_result("No UI available yet"),
-                    };
-                    let snapshot =
-                        SnapshotBuilder::build(&shared.widget_name, &shared.state, view, id_map);
-                    execute_action_on_shared(
-                        &shared,
-                        &snapshot.tree,
-                        aura_id,
-                        UiActionType::Clear,
-                        None,
-                    )
-                }
-            }
-        };
-        if let Err(e) = clear_result {
-            // Clear may not be supported on all elements, that's OK
-            eprintln!("AutoUI MCP: clear before type failed: {}", e);
-        }
-    }
+    // PLAN-069 F2（round-19 家族：VM-mode MCP type_text 值写臂 root fix）：
+    // clear_first 不再向 handler 重入派发 Clear。旧实现「Clear 派发 + TypeText
+    // 派发」对同一 handler 连发两次：clear 段常在 handler 内 HTTP 处 park
+    // （READER-009 实证：bookshelf.QueryChanged 的 prefs POST 挂起），第二段
+    // TypeText 命中 parked 段单飞 guard 被静默忽略（Ok(None)）→ typed 值丢弃。
+    // 输入语义本身是「整体替换」：TypeText 携带全文、绑定写回在派发前落状态，
+    // 单次派发即与真实输入同语义；显式清空请用 `autoui_action clear`。
+    // 参数保留解析以维持 API 兼容（clear_first 两个取值现在都是单派发）。
+    let _clear_first = clear_first;
 
     // Send type_text action
     let result = {
@@ -7183,4 +7162,163 @@ mod tests_plan781_t11 {
         assert_eq!(res["isError"], true);
     }
 }
+
+// ============================================================================
+// PLAN-069 T-02（F2）：clear_first 默认路径单派发回归。
+//
+// 缺陷形态（修前）：autoui_type 默认 clear_first=true 时先发 Clear 再发
+// TypeText；Clear 段在 handler 内 HTTP park 后，第二段 TypeText 命中 parked
+// 段单飞 guard（`re-entry ignored (segment in flight)`）被静默丢弃 →
+// typed 值不落状态（READER-009 round-27 真实日志实证）。本组钉住
+// 「一次调用 = 一次 ActionMessage，且携带全文」的可观察合同；显式
+// autoui_action clear 仍保留既有 Clear 单派发语义（不回退）。
+// ============================================================================
+
+#[cfg(test)]
+mod tests_plan069_f2 {
+    use super::*;
+    use crate::ui::debug_id_map::DebugIdMap;
+    use crate::ui::mcp_types::UiActionType;
+    use crate::ui::vnode::VNodeKind;
+    use crate::ui::vnode_converter::view_to_vtree_with_paths;
+
+    fn typed(event: &str) -> DynamicMessage {
+        DynamicMessage::Typed {
+            widget_name: "bookshelf".to_string(),
+            event_name: event.to_string(),
+            args: vec![],
+        }
+    }
+
+    fn input_view() -> View<DynamicMessage> {
+        View::Input {
+            placeholder: "搜索书籍…".to_string(),
+            value: String::new(),
+            on_change: Some(typed("QueryChanged")),
+            on_submit: None,
+            width: None,
+            password: false,
+            style: None,
+            disabled: false,
+        }
+    }
+
+    fn column(children: Vec<View<DynamicMessage>>) -> View<DynamicMessage> {
+        View::Column {
+            children,
+            spacing: 0,
+            padding: 0,
+            style: None,
+            onclick: None,
+            on_right_click: None,
+        }
+    }
+
+    /// VM-mode SharedState：typed view + styled vtree（真实 path）+ 动作通道，
+    /// 与 iced 帧发布后的读取面同形。
+    fn shared_with_input() -> (SharedStateHandle, mpsc::Receiver<ActionMessage>, String) {
+        let view = column(vec![input_view()]);
+        let tree = view_to_vtree_with_paths(view.clone(), |_| None);
+        assert!(
+            tree.nodes
+                .iter()
+                .any(|n| matches!(n.kind, VNodeKind::Input)),
+            "fixture vtree 必须含 Input 节点"
+        );
+        let snap = StyledNodeSnapshot::from_live("bookshelf", &tree, &InspectorCache::new());
+        let mut st = SharedState::new("bookshelf".into());
+        st.set_styled_vtree(snap);
+        st.update(
+            view,
+            DebugIdMap::default(),
+            HashMap::new(),
+            HashMap::from([("QueryChanged".to_string(), "q".to_string())]),
+            None,
+            HashMap::new(),
+        );
+        let input_id = tree
+            .nodes
+            .iter()
+            .find(|n| matches!(n.kind, VNodeKind::Input))
+            .map(|n| format!("vnode_{}", n.id.as_u64()))
+            .expect("fixture vtree 必须含 Input 节点");
+        let (tx, rx) = mpsc::channel::<ActionMessage>();
+        st.set_action_tx(tx);
+        (Arc::new(Mutex::new(st)), rx, input_id)
+    }
+
+    fn drain(rx: &mpsc::Receiver<ActionMessage>) -> Vec<ActionMessage> {
+        let mut out = Vec::new();
+        while let Ok(m) = rx.try_recv() {
+            out.push(m);
+        }
+        out
+    }
+
+    /// 修前红：Clear + TypeText 双消息；修后绿：单条 TypeText 且携带全文。
+    #[test]
+    fn f2_default_clear_first_is_single_dispatch_with_text() {
+        let (shared, rx, input_id) = shared_with_input();
+        let res = dispatch_tool_static(
+            &shared,
+            "autoui_type",
+            json!({ "element_id": input_id, "text": "reader-query", "clear_first": true }),
+        );
+        assert!(
+            !res["isError"].as_bool().unwrap_or(true),
+            "autoui_type 默认路径必须成功：{res}"
+        );
+        let msgs = drain(&rx);
+        assert_eq!(
+            msgs.len(),
+            1,
+            "clear_first 默认路径必须恰一次派发（旧实现 Clear+TypeText 双派发 → \
+             parked guard 静默丢值）；实际 {} 条：{msgs:?}",
+            msgs.len()
+        );
+        assert_eq!(msgs[0].action, UiActionType::TypeText, "单派发必须是 TypeText");
+        assert_eq!(
+            msgs[0].value.as_deref(),
+            Some("reader-query"),
+            "派发必须携带完整键入文本（handler 读到全文，而非空串）"
+        );
+    }
+
+    /// clear_first=false 既有通道（009 gate 单派发绕行）不回退：仍单派发全文。
+    #[test]
+    fn f2_clear_first_false_single_dispatch_unchanged() {
+        let (shared, rx, input_id) = shared_with_input();
+        let res = dispatch_tool_static(
+            &shared,
+            "autoui_type",
+            json!({ "element_id": input_id, "text": "gate-text", "clear_first": false }),
+        );
+        assert!(!res["isError"].as_bool().unwrap_or(true), "{res}");
+        let msgs = drain(&rx);
+        assert_eq!(msgs.len(), 1, "clear_first=false 单派发不回退：{msgs:?}");
+        assert_eq!(msgs[0].action, UiActionType::TypeText);
+        assert_eq!(msgs[0].value.as_deref(), Some("gate-text"));
+    }
+
+    /// 显式 autoui_action clear 语义不变：一条 Clear 派发（空值），
+    /// 供需要「清空事件」的调用方使用。
+    #[test]
+    fn f2_explicit_clear_action_still_dispatches_clear() {
+        let (shared, rx, input_id) = shared_with_input();
+        let res = dispatch_tool_static(
+            &shared,
+            "autoui_action",
+            json!({ "element_id": input_id, "action": "clear" }),
+        );
+        assert!(
+            !res["isError"].as_bool().unwrap_or(true),
+            "显式 clear 动作必须可用：{res}"
+        );
+        let msgs = drain(&rx);
+        assert_eq!(msgs.len(), 1, "显式 clear = 单条派发：{msgs:?}");
+        assert_eq!(msgs[0].action, UiActionType::Clear);
+        assert_eq!(msgs[0].value.as_deref(), Some(""));
+    }
+}
+
 
