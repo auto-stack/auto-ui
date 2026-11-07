@@ -143,7 +143,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | [ ] | T-02 | work | T-01 | 实现完整录制/原语表示与有序消费；文字glyph/font、mesh/path/SVG、transform/clip、gradient/border/shadow和可达custom primitive；禁止近似省略；去除Host重复文字整形/近似再构造；按完整原语批处理，不增加逐图元RPC | V-02；AC-02；AC-07/V-05～08（按§6分工）——进行中：Path/mesh/raw text/transform/SVG/image 已交付（`56139b78`，mesh 重放 0.0%、SVG 0.333%）；GlyphRun wire、blur/SDF、几何渐变仍具名缺口（§9） |
 | [ ] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03；AC-07/V-05～08（按§6分工）——进行中：内容身份+驻留缓存（稳定帧 0 重传、驱逐可解释）、图片 alpha/rotation、SVG 栅格资源已交付；媒体族与 wire generation 字段待补（§9） |
 | [ ] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；AC-07/V-05～08（按§6分工）；V-09——进行中：能力协商/准入保旧帧、槽 credit 背压、无覆盖在途槽已交付；per-App 上传速率/CPU 预算与慢 Host 负控待补（§9） |
-| [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——进行中：六格已全部有真实 wire 证据（`4e2f53d3`：两产者 × 两宿主，含 v3 tag 3 槽分派缺陷修复），39 View ID 逐项读数与 M-02/06/07 待补 |
+| [ ] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——进行中：六格真实 wire（`4e2f53d3`：两产者 × 两宿主，含 v3 tag 3 槽分派缺陷修复）+ 39/39 逐能力读数（`77f92dda`，26/39 ≤0.1%，13 个文字密集/宿主依赖族具名）；M-02/06/07 与 AC-03/AC-04 项待补 |
 | [ ] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
 | [ ] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
 
@@ -393,3 +393,16 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 仍缺（不签 T-05）：39 个 View ID 的逐项读数；AC-03 媒体族与 wire generation；AC-04 真两进程 v2↔v3 配对、慢 Host/旧 ACK/乱序资源负控；M-02/M-06/M-07 未测。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 7 | from: work | to: work | status: executing | outcome: pass（六格 wire 证据 + P0 槽分派修复） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 4e2f53d3 | next: work（39 View ID 逐项 / AC-03 / AC-04）
+
+### 2026-11-07 work 逐能力面 39/39（T-05 / AC-01 最后一项）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r4 / outcome: 进行中（AC-01 的“39 个 View ID 逐项”关闭；“六格/两 Host 真实重放”已在 `4e2f53d3` 关闭） / worktree: `D:/autostack/.wt/ui-062/auto-ui` / code_commit: `77f92dda`
+- 新增 `rq_probe_t05_capability_rows`：每个 View 能力 ID 一例（语料补齐 `empty`/`column`；**缺例即测试失败，不删分母**），走与产品同源记录路径（`HeadlessSurface` → `render_frame_v2` → broker canvas 重放），与 direct 金样（同一 View 的 iced 元素、不经协议）同主题同 viewport 对拍；每行带结构清单、资源计数（uploads/hits/evictions/resident）与像素差，落 `capabilities/t05-capability-rows.json`。
+- 读数：**26/39 ≤0.1%**；13 个 >0.1% 的族全部是文字密集或宿主依赖面——managed_scroll_content 1.56%、code_editor 1.31%、video 0.92%、terminal 0.46%、rich 0.31%、input 0.25%、scrollable 0.24%、text(latin) 0.23%、navigation_rail 0.21%、table 0.20%、remote_frame 0.17%、autodown_editor 0.15%、mouse_area 0.14%；与 Spec §5.3 已具名的文字合成残差同源（画布文本管线 vs direct 文本管线），不是位置或内容丢失。
+- 逐 ID 关闭条件（AC-01）：真实输出 + 结构断言（除 `empty` 与未注册 `custom` 防御臂外，每能力 ≥1 绘制 op）+ **2% 毛刺级诊断上限**（抓整片丢失/底色错误）；exactness 仍只由 §6 矩阵的 0.1% 门负责，不把逐 ID 读数当 exact。
+- **修掉一个测量 bug（非实现缺陷）**：重放清屏色原先取 direct 图左上像素；内容压住 (0,0) 的例（mouse_area/table/workspace_preview）会把它当底色刷满整屏，0.1% 级差被放大成 99.6/97.9/95.6%。改为两侧都用主题底色 `bg()` 后回到 0.14/0.20/0.03 量级；口径写进 Spec §5.2 与测试注释。顺带把三处探针各自的 diff/清单实现收敛到 `rq_probe`（其中一份拷贝漏了尺寸检查）。
+- Spec（SD-01）：新增 §5.2 逐能力面（39 ID 读数与关闭条件）、§6 第 9 条（13 个 >0.1% 族不属 exact，不得计入 AC-02 门）；§5 小节编号统一（5.1 传输级 / 5.2 逐能力 / 5.3 同进程矩阵）。
+- 回归面（本树 `77f92dda`；本轮改动全部是 `#[cfg(test)]` 与文档，生产代码与 `4e2f53d3` 相同）：`rq_` **31/0**；`ui::desktop_protocol::` **261 passed / 4 failed**（同基线 4 红：autocenter、stage3 stress n3/n5、t3_examples_queue_end_to_end）。
+- 仍缺（不签 T-05/T-03/T-04）：AC-03 媒体资源族与 wire generation；AC-04 真两进程 v2↔v3 配对、慢 Host/旧 ACK/乱序资源负控；M-02/M-06/M-07 未测。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 8 | from: work | to: work | status: executing | outcome: pass（39/39 逐能力读数 + 测量口径修复） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 77f92dda | next: work（AC-03 资源族 / AC-04 负控）
