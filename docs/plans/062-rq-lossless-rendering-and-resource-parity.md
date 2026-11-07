@@ -365,3 +365,17 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 正确性加固：`enforce_limit` 不再驱逐**当前帧刚登记**的资源（剩余候选全是本帧资源时停止驱逐并保留超额），避免帧引用悬空；测试用 1 字节预算验证只释放非本帧项（`released=["bitmap://…rq-img-1-ec3b998d"]`）。
 - 证据：`rq_resource_release_follows_producer_eviction` 通过；`ui::desktop_protocol::` **258 passed / 4 failed**（基线同组，无新增）。
 - AC 状态：AC-03 的“最后 owner → 释放”现已闭环（producer 侧驱逐语义 + Host 释放）；仍缺媒体资源族与 wire 显式 generation 字段。AC-04 仍缺两进程 v2↔v3 配对与慢 Host/旧 ACK/乱序负控。
+### 2026-11-07 最终独立复审（第三轮）与修复（needs_fix，未 merge）
+
+- stage: review（final，独立上下文）/ reviewed_commit: `310d9111` / **outcome: needs_fix**（记录：`plan-artifacts/plan-062/auto-ui/review3/REVIEW3-2026-11-07.md`）。
+- 复现：reviewer 自跑 `rq_` 29/0、`ui::desktop_protocol::` 258/4（4 红与 base `3d64877d` 同组）；新鲜矩阵 default 0.00095/0.00100/0.00094/0.00063/0.00000/0.00005/0.00006（全部 ≤0.1%）；v3_rich text 0.00798、shadow 0.00741、gradient 0.01374（均在 r4 具名界内）；default produce p95 ≤0.387ms（SVG 例外 37.5ms）。
+- **裁定：AC-07 可签**（其判断）；AC-01/AC-02/AC-03/AC-04 不可签。阻塞项：
+  - **B1** `ResourceRelease`（tag 13）未协商：旧宿主会 `UnknownTag(13)` 解流失败，不是“拒绝该帧、保旧帧”；且无 codec 往返测试。
+  - **B2** 释放可能驱逐仍在用的资源：无帧引用/ACK 记账，Host 立即驱逐 → 前台帧可能画占位。
+  - **B3** 默认字符串面（Host 重排）**没有产物观测**，不满足 r4 AC-02 的“具名且可观测”。
+- **本轮修复（`00bd355d`）**：
+  1. **整提交撤回** `ResourceRelease`（消息/宿主三处/泵/测试）——按 reviewer 给的“要么补齐记账，要么先移除”选项选择移除；Spec §3/§6 改为**具名记录“跨进程释放/引用记账未交付”+ 撤回原因 + 重引入条件**（协商标记属合同变更 + 帧引用计数）。
+  2. **B3 关闭**：`lower_text_runs` 每次产帧产出具名降级观测「文字降级：N 个 run 以字符串 TextStyled 过线」，新测试 `rq_string_text_path_is_observable_degradation` 断言其存在（non-silent）。
+  3. **N2 关闭**：矩阵默认门 0.2% → **0.1%**（与 AC-02 r4 一致，实测 0.00094–0.00100 仍通过）。
+- 冻结门复跑（本树 `00bd355d`）：`rq_` **29/0**；`ui::desktop_protocol::` **258 passed / 4 failed**（基线同组）。
+- **未解决（需用户裁定或续做）**：AC-01（六格只跑 2 格、39 个 View ID 无逐项结果、无两 Host 真实重放）；AC-03（跨进程释放/引用记账、媒体族、wire generation）；AC-04（generation 负控、两进程 v2↔v3 配对、慢 Host/旧 ACK 负控）。按 r4 先例，这四项要么再授权一次口径修订（r5），要么继续实现；本 Goal 轮次预算已用尽，未 merge、未归档。
