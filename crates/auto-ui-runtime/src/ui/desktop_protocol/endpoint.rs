@@ -148,6 +148,12 @@ pub trait FrameSource {
         super::message::DisplayList::from_v1(&self.render_frame())
     }
 
+    /// PLAN-062 T-04：本轮产帧是否因 per-App 上传预算被延期。true = 该帧的
+    /// 资源登记已回滚，调用方应以背压重试（不丢内容、不半登记）。
+    fn take_upload_budget_overrun(&mut self) -> bool {
+        false
+    }
+
     /// PLAN-690 T-02/T-05：App 派生窗口控制下行批读走（ImeRequest/
     /// SetCursor——headless 宿主 `State::Updated` 截获产物）。泵在产帧
     /// 后消费并上行 `ProtocolMsg::Control`（drain_desktop_commands 同型
@@ -285,6 +291,15 @@ impl<S: FrameSource> AppEndpoint<S> {
         Ok(slot)
     }
 
+    /// 归还因产帧失败而未使用的槽（预算/编码失败路径）。
+    fn return_frame_slot(&mut self, slot: u8) {
+        self.in_flight.remove(&slot);
+        self.used_slots.remove(&slot);
+        if !self.free_slots.contains(&slot) {
+            self.free_slots.push(slot);
+        }
+    }
+
     /// 取一个可用位图槽（同帧槽纪律）。
     fn take_bitmap_slot(&mut self) -> Result<u8, ProtocolError> {
         let slot = if let Some(slot) = self.bm_free_slots.pop() {
@@ -409,8 +424,12 @@ impl<S: FrameSource> AppEndpoint<S> {
         }
         let slot = self.take_frame_slot()?;
 
-        self.next_frame_id += 1;
         let payload = self.session.render_frame_v2();
+        if self.session.take_upload_budget_overrun() {
+            self.return_frame_slot(slot);
+            return Err(ProtocolError::Backpressure { resource: "upload" });
+        }
+        self.next_frame_id += 1;
         super::message::rf_textdump("prod", &payload);
         Ok(ProtocolMsg::Frame(super::message::FrameMsg::FrameReadyV2 {
             wid: self.wid.expect("Active 即有 wid"),
@@ -435,8 +454,12 @@ impl<S: FrameSource> AppEndpoint<S> {
         }
         let slot = self.take_frame_slot()?;
 
-        self.next_frame_id += 1;
         let payload = self.session.render_frame_v2();
+        if self.session.take_upload_budget_overrun() {
+            self.return_frame_slot(slot);
+            return Err(ProtocolError::Backpressure { resource: "upload" });
+        }
+        self.next_frame_id += 1;
         let mut encoded = Vec::new();
         payload.encode(&mut encoded);
         shm.write_slot(slot, &encoded).map_err(ProtocolError::Shm)?;

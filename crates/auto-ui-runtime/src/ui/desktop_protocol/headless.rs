@@ -103,6 +103,18 @@ pub struct ResourceCache {
     /// SVG 设备像素栅格缓存（内容+尺寸不变 → 不重复 resvg 栅格化，P-02）。
     rasters: std::collections::HashMap<([u8; 32], u32, u32), Vec<u8>>,
     pub raster_hits: u64,
+    /// per-App 上传预算（PLAN-062 T-04 / 061 冻结 ≤8 MiB·s⁻¹）：滑动窗口内
+    /// 的上传字节上限；超限则本帧资源登记回滚并让产帧背压（不丢内容）。
+    rate_limit_bytes: u64,
+    rate_window: std::time::Duration,
+    window_start: Option<std::time::Instant>,
+    window_bytes: u64,
+    /// 本帧新增的资源键（回滚用）与本帧上传计数。
+    frame_keys: Vec<([u8; 32], u32, u32)>,
+    frame_uploads: u64,
+    frame_bytes: u64,
+    over_budget: bool,
+    pub budget_deferrals: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +137,15 @@ impl Default for ResourceCache {
             evictions: 0,
             rasters: std::collections::HashMap::new(),
             raster_hits: 0,
+            rate_limit_bytes: 8 * 1024 * 1024,
+            rate_window: std::time::Duration::from_secs(1),
+            window_start: None,
+            window_bytes: 0,
+            frame_keys: Vec::new(),
+            frame_uploads: 0,
+            frame_bytes: 0,
+            over_budget: false,
+            budget_deferrals: 0,
         }
     }
 }
@@ -168,14 +189,73 @@ impl ResourceCache {
         }
     }
 
+    /// 开始一帧：清空本帧登记标记（预算回滚基线）。
+    fn begin_frame(&mut self) {
+        self.frame_keys.clear();
+        self.frame_uploads = 0;
+        self.frame_bytes = 0;
+        self.over_budget = false;
+    }
+
+    /// 提交一帧：上传字节计入滑动窗口。
+    fn commit_frame(&mut self) {
+        let now = std::time::Instant::now();
+        match self.window_start {
+            Some(start) if now.duration_since(start) < self.rate_window => {}
+            _ => {
+                self.window_start = Some(now);
+                self.window_bytes = 0;
+            }
+        }
+        self.window_bytes += self.frame_bytes;
+        self.frame_keys.clear();
+        self.frame_uploads = 0;
+        self.frame_bytes = 0;
+    }
+
+    /// 回滚一帧的资源登记：本帧新增的键全部撤销、上传计数复原（下一帧重试
+    /// 时会重新上传，不会留下半登记的资源）。
+    fn rollback_frame(&mut self) {
+        for key in self.frame_keys.drain(..) {
+            if let Some(dropped) = self.resident.remove(&key) {
+                self.resident_bytes = self.resident_bytes.saturating_sub(dropped.bytes);
+                self.order.retain(|k| *k != key);
+            }
+        }
+        self.uploads = self.uploads.saturating_sub(self.frame_uploads);
+        self.uploaded_bytes = self.uploaded_bytes.saturating_sub(self.frame_bytes);
+        self.hits = self.hits.saturating_sub(0);
+        self.frame_uploads = 0;
+        self.frame_bytes = 0;
+        self.budget_deferrals += 1;
+    }
+
+    fn over_budget(&self) -> bool {
+        self.over_budget
+    }
+
+    /// 滑动窗口内是否还有 `cost` 字节的预算。
+    fn budget_allows(&mut self, cost: u64) -> bool {
+        let now = std::time::Instant::now();
+        match self.window_start {
+            Some(start) if now.duration_since(start) < self.rate_window => {}
+            _ => {
+                self.window_start = Some(now);
+                self.window_bytes = 0;
+            }
+        }
+        self.window_bytes + self.frame_bytes + cost <= self.rate_limit_bytes
+    }
+
     /// 驻留或上传：命中返回既有 src（零上传），新内容登记并推入本帧上传表。
+    /// 返回 `None` = 本帧上传预算不足（帧将背压重试，内容不丢）。
     fn intern(
         &mut self,
         w: u32,
         h: u32,
         rgba: &[u8],
         bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
-    ) -> String {
+    ) -> Option<String> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&w.to_le_bytes());
         hasher.update(&h.to_le_bytes());
@@ -183,13 +263,20 @@ impl ResourceCache {
         let key = (*hasher.finalize().as_bytes(), w, h);
         if let Some(resident) = self.resident.get(&key) {
             self.hits += 1;
-            return super::endpoint::bitmap_src(&resident.local);
+            return Some(super::endpoint::bitmap_src(&resident.local));
+        }
+        if !self.budget_allows(rgba.len() as u64) {
+            self.over_budget = true;
+            return None;
         }
         self.next_seq += 1;
         let hash8: String = key.0[..4].iter().map(|b| format!("{b:02x}")).collect();
         let local = format!("rq-img-{}-{hash8}", self.next_seq);
         self.uploads += 1;
         self.uploaded_bytes += rgba.len() as u64;
+        self.frame_uploads += 1;
+        self.frame_bytes += rgba.len() as u64;
+        self.frame_keys.push(key);
         bitmaps.push(super::endpoint::BitmapUpload {
             id: super::endpoint::bitmap_local_id(&local),
             w,
@@ -207,7 +294,7 @@ impl ResourceCache {
         self.order.push_back(key);
         self.resident_bytes += rgba.len();
         self.enforce_limit();
-        super::endpoint::bitmap_src(&local)
+        Some(super::endpoint::bitmap_src(&local))
     }
 }
 
@@ -263,8 +350,33 @@ where
         let layers = self.drive_and_draw();
         self.observations.clear();
         self.pending_bitmaps.clear();
+        self.resources.begin_frame();
         let bitmaps = &mut self.pending_bitmaps;
         lower_layers_v2(&layers, &mut self.observations, &mut self.resources, bitmaps)
+    }
+
+    /// 产帧后核对 per-App 上传预算：超限则回滚本帧资源登记并返回 true，
+    /// 调用方以 `Backpressure{resource:"upload"}` 重试（P-04 预算、不丢内容）。
+    pub fn take_upload_budget_overrun(&mut self) -> bool {
+        if self.resources.over_budget() {
+            self.pending_bitmaps.clear();
+            self.resources.rollback_frame();
+            true
+        } else {
+            self.resources.commit_frame();
+            false
+        }
+    }
+
+    /// 设置 per-App 上传预算（默认 8 MiB / 1s；探针用小窗口做负控）。
+    pub fn set_upload_budget(&mut self, bytes_per_window: u64, window: std::time::Duration) {
+        self.resources.rate_limit_bytes = bytes_per_window;
+        self.resources.rate_window = window;
+    }
+
+    /// 上传预算延期次数（M-04/背压观测）。
+    pub fn upload_budget_deferrals(&self) -> u64 {
+        self.resources.budget_deferrals
     }
 
     /// 资源缓存读数（M-04/M-05 资源面：累计上传/命中/驱逐/驻留字节）。
@@ -1163,6 +1275,10 @@ where
         list
     }
 
+    fn take_upload_budget_overrun(&mut self) -> bool {
+        self.surface.take_upload_budget_overrun()
+    }
+
     fn on_input(&mut self, input: &crate::ui::desktop_protocol::message::InputMsg) {
         // Native remote clients use this generic source, while VM clients may
         // use McpHeadlessSource. Actions have no iced event representation.
@@ -1367,6 +1483,10 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
         let list = self.surface.render_frame_v2();
         self.publish_mcp();
         list
+    }
+
+    fn take_upload_budget_overrun(&mut self) -> bool {
+        self.surface.take_upload_budget_overrun()
     }
 
     fn on_input(&mut self, input: &super::message::InputMsg) {
@@ -1909,7 +2029,10 @@ fn lower_image_v2(
     };
 
     let (w, h, rgba) = pixels;
-    let src = resources.intern(w, h, &rgba, bitmaps);
+    // 上传预算不足 → 该帧不产内容（调用方背压重试，资源不半登记）。
+    let Some(src) = resources.intern(w, h, &rgba, bitmaps) else {
+        return;
+    };
     let rect = to_wrect(bounds);
     let rotated = rotation.abs() > f32::EPSILON;
     if rotated {

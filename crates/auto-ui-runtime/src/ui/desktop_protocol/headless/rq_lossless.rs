@@ -400,6 +400,57 @@ fn rq_v3_svg_and_image_replay_matches_direct() {
 }
 
 #[test]
+fn rq_v3_upload_budget_defers_frame_without_partial_registration() {
+    // per-App 上传预算（P-04 / 061 冻结 ≤8 MiB·s⁻¹ 的探针形态）：超限帧必须
+    // 整体回滚并背压重试——不得半登记资源、不得丢内容。
+    let one = View::image("lucide:bell");
+    let two = View::row()
+        .child(View::image("lucide:bell"))
+        .child(View::image("lucide:check"))
+        .build();
+    let mut surface = HeadlessSurface::new(LosslessComponent { view: one }, W, H);
+    surface.set_upload_budget(1024, std::time::Duration::from_secs(60));
+
+    let _ = surface.render_frame_v2();
+    assert!(!surface.take_upload_budget_overrun(), "首图 1024B 在预算内");
+    assert_eq!(surface.drain_bitmap_uploads().len(), 1);
+    let (uploads, bytes, _hits, _evictions, resident) = surface.resource_stats();
+    assert_eq!((uploads, bytes, resident), (1, 1024, 1024));
+
+    // 第二张图需要新的 1024B → 窗口总额 2048 > 1024 → 本帧延期。
+    surface.component.view = two.clone();
+    let _ = surface.render_frame_v2();
+    assert!(surface.take_upload_budget_overrun(), "超预算帧必须延期");
+    assert!(
+        surface.drain_bitmap_uploads().is_empty(),
+        "延期帧不得把已产出的上传半发出去"
+    );
+    let (uploads, bytes, _hits, _evictions, resident) = surface.resource_stats();
+    assert_eq!(
+        (uploads, bytes, resident),
+        (1, 1024, 1024),
+        "回滚后资源登记必须复原（不得留下半登记）"
+    );
+    assert_eq!(surface.upload_budget_deferrals(), 1);
+
+    // 预算回补 → 同一视图重试：第二张图上传一次，内容不丢。
+    surface.set_upload_budget(4096, std::time::Duration::from_secs(60));
+    let _ = surface.render_frame_v2();
+    assert!(!surface.take_upload_budget_overrun(), "预算回补后应放行");
+    assert_eq!(surface.drain_bitmap_uploads().len(), 1, "补齐第二张图");
+    let (uploads, _bytes, hits, _evictions, _resident) = surface.resource_stats();
+    assert_eq!(uploads, 2, "重试后累计上传 = 2（首图 + 第二张）");
+    assert!(hits > 0, "已驻留的首图必须命中缓存（零重传）");
+    println!(
+        "[RQ062] {}",
+        serde_json::json!({
+            "tag": "upload_budget", "deferrals": 1, "uploads_after_retry": uploads,
+            "partial_registration": false,
+        })
+    );
+}
+
+#[test]
 fn rq_v3_legacy_v2_host_rejects_v3_payload() {
     // 旧 Host（062 前）只认载荷 tag 2：v3 帧必须被明确拒绝而不是半帧呈现。
     let list = DisplayList {
