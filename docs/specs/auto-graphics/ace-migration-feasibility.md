@@ -40,8 +40,12 @@ go/bounded-go/no-go 与可执行后继接口。本稿是该研究的 canonical �
 `auto-lang/experimental/ace/grammars/auto-source.at` 的 profiles(version:1) 共 13 个：
 `core`、`scalar`、`text`、`record`、`text-record`、`entry-unit`、`host-console`、
 `collections`、`closures`、`scalar-instances`、`scalar-modules`、`packages-modules`、`scalar-ct`。
-公开能力常量：`ac.source.modules.scalar/v1`、`ac.source.instances.scalar/v1`、
-`ac.source.cte.scalar/v1`。
+`436ac91f` 实际导出的公开能力常量共 4 个：`ac.source.modules.scalar/v1`、
+`ac.source.instances.scalar/v1`、`ac.source.cte.scalar/v1`、
+`ac.source.modules.packages/v1`（`packages-modules` profile 的显式源码能力，
+`source/packages.rs:11`，canonical 见 `docs/specs/ace-migration/m2-modules.md:11`）。
+本合同的作者源实测只触达前两类标量入口；packages 能力未触达、未验证，不据此
+认领包/目录发现或类型/资源支持。
 
 有限模块域（`core::source::modules::parse_module_source` / `bind_modules`）：
 仅 i32/bool 顶层自由函数；`use` 只接 `<module>.<name>` 形式；无包/目录发现、
@@ -131,13 +135,13 @@ foreign resource/callback 与 host 机制（939、967、`av-core`/`av`）存在�
 
 ### 5.1 REP 分账（研究不签章）
 
-| REP | 内容 | 状态 | owner |
+| REP | 规范全称 | 状态 | owner |
 |---|---|---|---|
-| REP-01 | 旧执行器替换/接管 | pending | 981 `B-SESSION-*` + 967/968 |
-| REP-06 | 宿主完整性/嵌入面 | pending | 980 `B-NATIVE-*` + 967 |
-| REP-08 | 安装/发行图 | pending | 981 `B-CONTENT-*` + 986 |
-| REP-10 | vendored 旧 SDK 副本清理（`.sdk-source` + `sdk/frozen`，各 681 文件） | pending | 981/SOURCE 定钉 → 987 |
-| REP-11 | 测试迁移义务 | pending | 985 + 981 `B-CONTENT-V/R` |
+| REP-01 | 原源与全消费者（全场景分母及对应新 ACE 入口/owner 齐） | pending | 959 + 每个能力包 |
+| REP-06 | 现有宿主完整性（全当前应用所需 stdlib/host/FFI/权限与生命周期真实接通） | pending | 967 + 980 |
+| REP-08 | 全入口实际切换（所有受管 CLI/SDK/宿主/工具/安装/发行真实装载 ACE） | pending | 986（内容批次 981 `B-CONTENT-*` 供证据） |
+| REP-10 | 旧实现彻底 disable（default 与 all-features 均无可用旧引擎） | pending | 987（981/SOURCE 定操作钉先行；含 `.sdk-source`+`sdk/frozen` 清退） |
+| REP-11 | 产品及测试迁移收据（AutoUI/Man/其余场景在独立安装的 ACE 上运行） | pending | 985 + 各 consumer（981 `B-CONTENT-V/R` 供证据） |
 
 未归属 unknown：无。UK-06（两钉 `932ad487` vs `7b987ca8` 并存且不一致）已具名
 移交 981/SOURCE 定操作钉、987 清；不属未归属。
