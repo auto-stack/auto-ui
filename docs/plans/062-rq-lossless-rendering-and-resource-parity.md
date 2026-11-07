@@ -459,3 +459,15 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 影响：T-05 的 AC-03 媒体面按“海报帧链路交付 + 连续播放具名”收口；AC-03 其余面（身份/版本/传输/更新/最后 owner/GPU 释放）此前已交付。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 12 | from: user | to: work | status: executing | outcome: pass（裁定落地） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 39bd7bef | next: work（海报帧链路）
+
+### 2026-11-08 work 媒体静态帧链路 + 探针位图键缺陷修正（T-03/AC-03）
+
+- stage: work / plan_id: auto-ui/PLAN-062 / plan_revision: r4 / outcome: 进行中（AC-03 的媒体静态帧面关闭；剩“最后 owner/释放记账”） / worktree: `D:/autostack/.wt/ui-062/auto-ui` / code_commit: `3eadae59`
+- 按用户裁定实现静态帧链路：`ui::media_poster`（进程级注册表：媒体键 → 一帧紧排 RGBA + 单调代次）→ `render_video` 命中即用普通 `image` 元素出图 → 记录器按栅格字节过线，**身份/去重/上传预算/驻留全部复用图片管线**（不新增第二套资源通道）。命中后不再走 shader/占位分支；未发布时行为不变。
+- 证据（`rq_probe_t05_media_poster_frame_crosses_the_wire`）：①帧内 Image 原语 1 个、上传字节与发布帧**逐字节相等**、引用 src 指向同一资源身份；②稳定第二帧**0 重传**（驻留）；③相对 direct 像素差 **0.000**（静态帧精确）。`media_poster` 另有单测（发布/更新代次/非法长度拒收/清除）。
+- **同时修正一个探针缺陷（影响此前读数）**：inproc 探针用未加前缀的资源 id 调 `bitmap_cache_put`，而线上键是 `bitmap://<id>`；同进程其它测试的全局缓存命中把 miss 掩盖了，**若干带图的行实际量的是占位**。现改为带前缀，并在逐能力表里硬断言“每个 Image src 必须在宿主缓存命中”（占位= 硬失败）。修正后的读数：矩阵 svg_icon **0.100% → 0.039%**；逐能力 image 0.10%→**0.04%**、window_thumbnail 0.10%→**0.06%**、code_editor 1.31%→**0.41%**；仍 26/39 ≤0.1%。
+- Spec（SD-01）：§2.3 增“媒体静态帧=普通图片资源”口径；§5.1/§5.2/§5.3 读数按修正后刷新；§6 第 5 条改为“静态帧已交付（0.000、0 重传）、连续播放另立计划（GPU 读回 + 带宽，属 OS063 传输/媒体面）”。
+- 回归面（本树 `3eadae59`）：`rq_` **38/0**；`ui::desktop_protocol::` **269 passed / 4 failed**（同基线 4 红）；`media` 过滤 **17/0**。
+- 仍缺（不签 T-03/T-05）：**跨进程资源释放/引用记账**（“最后 owner 释放”仍是被撤回后具名的边界，Spec §3/§6 第 8 条）；连续媒体帧（已裁定另立）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 13 | from: work | to: work | status: executing | outcome: pass（静态媒体帧 + 探针键修正） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eadae59 | next: work（资源释放/引用记账）
