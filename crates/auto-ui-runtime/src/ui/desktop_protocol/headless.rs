@@ -129,6 +129,9 @@ pub struct ResourceCache {
     frame_bytes: u64,
     over_budget: bool,
     pub budget_deferrals: u64,
+    /// PLAN-062（AC-03）：被驱逐（最后 owner 归零）的资源 src 队列——供
+    /// `FrameSource::drain_resource_releases` 取出并通知宿主释放。
+    released: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -162,6 +165,7 @@ impl Default for ResourceCache {
             frame_bytes: 0,
             over_budget: false,
             budget_deferrals: 0,
+            released: Vec::new(),
         }
     }
 }
@@ -201,6 +205,12 @@ impl ResourceCache {
             if let Some(dropped) = self.resident.remove(&oldest) {
                 self.resident_bytes = self.resident_bytes.saturating_sub(dropped.bytes);
                 self.evictions += 1;
+                // PLAN-062（AC-03）：“最后 owner 归零”→ 记入待释放队列，由泵在
+                // 排水时通知宿主（宿主侧按帧引用记账延后真正释放）。
+                self.released.push(format!(
+                    "bitmap://{}",
+                    super::endpoint::bitmap_local_id(&dropped.local)
+                ));
             }
         }
     }
@@ -427,6 +437,12 @@ where
     }
 
     /// 资源缓存读数（M-04/M-05 资源面：累计上传/命中/驱逐/驻留字节）。
+    /// PLAN-062（AC-03）：取出待通知宿主的资源释放（最后 owner 归零的 src）。
+    /// 泵在排水点调用并经 `ResourceRelease` 过线（宿主声明 `resource/release/1` 时）。
+    pub fn drain_resource_releases(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.resources.released)
+    }
+
     pub fn resource_stats(&self) -> (u64, u64, u64, u64, usize) {
         (
             self.resources.uploads,
@@ -1326,6 +1342,10 @@ where
         self.surface.take_upload_budget_overrun()
     }
 
+    fn drain_resource_releases(&mut self) -> Vec<String> {
+        self.surface.drain_resource_releases()
+    }
+
     fn on_input(&mut self, input: &crate::ui::desktop_protocol::message::InputMsg) {
         // Native remote clients use this generic source, while VM clients may
         // use McpHeadlessSource. Actions have no iced event representation.
@@ -1534,6 +1554,10 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
 
     fn take_upload_budget_overrun(&mut self) -> bool {
         self.surface.take_upload_budget_overrun()
+    }
+
+    fn drain_resource_releases(&mut self) -> Vec<String> {
+        self.surface.drain_resource_releases()
     }
 
     fn on_input(&mut self, input: &super::message::InputMsg) {
@@ -3178,10 +3202,3 @@ mod tests {
         }
     }
 }
-
-
-
-
-
-
-

@@ -66,6 +66,8 @@ pub struct BrokerClient {
     /// PLAN-053 T-05：`adopt` 外部 rqhost 客户端（自持 VM/组件——宿主
     /// 零装载激活，不uring registry 构建）。
     pub adopt: bool,
+    /// PLAN-062（AC-03）：资源引用记账 + 释放延后（v2 合成面刷新/释放消费）。
+    pub refs: crate::ui::desktop_protocol::host::BitmapRefs,
 }
 
 impl BrokerClient {
@@ -86,6 +88,7 @@ impl BrokerClient {
             theme_caps: Vec::new(),
             theme_pushed_rev: 0,
             adopt: false,
+            refs: crate::ui::desktop_protocol::host::BitmapRefs::default(),
         }
     }
 

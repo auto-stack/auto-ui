@@ -610,6 +610,13 @@ fn apply_actions(
                         super::shm::display_list_from_slot_payload(payload).ok()
                     });
                     if let Some(payload) = ready_v2 {
+                        // PLAN-062（AC-03）：刷新前台引用集 + 驱逐已无人引用的挂起释放。
+                        for src in client.inner.refs.on_compose(&payload) {
+                            crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                            for keys in client.inner.bitmap_keys.values_mut() {
+                                keys.retain(|k| k != &src);
+                            }
+                        }
                         match client.inner.surfaces.compose_v2(surface, slot, payload) {
                             Ok(Some(freed)) => {
                                 client.frames += 1;
@@ -661,6 +668,13 @@ fn apply_actions(
                 revision,
                 payload,
             } => {
+                // PLAN-062（AC-03）：刷新前台引用集 + 驱逐已无人引用的挂起释放。
+                for src in client.inner.refs.on_compose(&payload) {
+                    crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                    for keys in client.inner.bitmap_keys.values_mut() {
+                        keys.retain(|k| k != &src);
+                    }
+                }
                 match client.inner.surfaces.compose_v2(surface, slot, payload) {
                     Ok(Some(freed)) => {
                         client.frames += 1;
@@ -681,6 +695,17 @@ fn apply_actions(
                             frame_id,
                             slot,
                         }));
+                    }
+                }
+            }
+            // PLAN-062（AC-03）：producer 通知“最后 owner 归零”——前台帧仍
+            // 引用就挂起，否则立即驱逐（引用记账在 BitmapRefs）。
+            HostAction::ResourceRelease { wid, srcs } => {
+                let _ = wid;
+                for src in client.inner.refs.on_release(srcs) {
+                    crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                    for keys in client.inner.bitmap_keys.values_mut() {
+                        keys.retain(|k| k != &src);
                     }
                 }
             }

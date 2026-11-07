@@ -5700,6 +5700,13 @@ impl DesktopSession {
                     payload,
                     ..
                 } => {
+                    // PLAN-062（AC-03）：刷新前台引用集 + 驱逐已无人引用的挂起释放。
+                    for src in client.refs.on_compose(&payload) {
+                        crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                        for keys in client.bitmap_keys.values_mut() {
+                            keys.retain(|k| k != &src);
+                        }
+                    }
                     match client.surfaces.compose_v2(surface, slot, payload) {
                         Ok(Some(freed)) => {
                             crate::ui::theme_policy::mark_shell_dirty();
@@ -5748,6 +5755,13 @@ impl DesktopSession {
                             // Frame text may include credentials or private app content.
                             // Keep transport diagnostics structural only.
                             eprintln!("[plan060] frame2 wid={wid} nops={}", payload.ops.len());
+                            // PLAN-062（AC-03）：刷新前台引用集 + 驱逐已无人引用的挂起释放。
+                            for src in client.refs.on_compose(&payload) {
+                                crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                                for keys in client.bitmap_keys.values_mut() {
+                                    keys.retain(|k| k != &src);
+                                }
+                            }
                             match client.surfaces.compose_v2(surface, slot, payload) {
                                 Ok(Some(freed)) => {
                                     crate::ui::theme_policy::mark_shell_dirty();
@@ -5788,6 +5802,17 @@ impl DesktopSession {
                     }
                 }
                 // PLAN-034 T-05（D3）：位图就绪——读位图段槽入宿主图像
+                // PLAN-062（AC-03）：producer 通知“最后 owner 归零”——前台帧仍
+                // 引用就挂起，否则立即驱逐（引用记账在 BitmapRefs）。
+                HostAction::ResourceRelease { wid, srcs } => {
+                    let _ = wid;
+                    for src in client.refs.on_release(srcs) {
+                        crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                        for keys in client.bitmap_keys.values_mut() {
+                            keys.retain(|k| k != &src);
+                        }
+                    }
+                }
                 // 缓存（`bitmap://{id}` 键）+ BitmapAck 归还槽（与 rqhost/
                 // loopback 宿主同律）。
                 HostAction::BitmapReady {

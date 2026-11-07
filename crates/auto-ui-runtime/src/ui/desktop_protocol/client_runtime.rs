@@ -658,6 +658,8 @@ impl<S: FrameSource> ClientPump<S> {
         self.drain_desktop_bus();
         // PLAN-690：产帧/拍可能截获新 IME/光标态——控制下行同点读走。
         self.drain_window_controls();
+        // PLAN-062（AC-03）：资源释放与本拍帧同批排水（生产端驱逐即通知宿主）。
+        self.drain_resource_releases();
     }
 
     /// PLAN-034 T-05（D3）：位图上传排水（drain_desktop_bus 同点位）——
@@ -693,6 +695,34 @@ impl<S: FrameSource> ClientPump<S> {
                     up.id
                 ),
             }
+        }
+    }
+
+    /// PLAN-062（AC-03）：资源释放排水——producer 侧“最后 owner 归零”的 src
+    /// 批量经线上报。仅在宿主声明 `resource/release/1` 时发送（旧宿主零未知
+    /// 消息）；宿主按帧引用记账决定立即驱逐还是延后。
+    fn drain_resource_releases(&mut self) {
+        let Some(app) = self.endpoint.as_mut() else {
+            return;
+        };
+        if app.state != AppState::Active {
+            return;
+        }
+        if !app
+            .peer_caps
+            .supports(super::message::CAP_RESOURCE_RELEASE)
+        {
+            return;
+        }
+        let srcs = app.session.drain_resource_releases();
+        if srcs.is_empty() {
+            return;
+        }
+        match app.produce_resource_release(srcs) {
+            Ok(msg) => {
+                let _ = self.app_end.send(&msg);
+            }
+            Err(e) => eprintln!("[rq-client] 资源释放弃置（{}）：{e:?}", self.config.app_name),
         }
     }
 

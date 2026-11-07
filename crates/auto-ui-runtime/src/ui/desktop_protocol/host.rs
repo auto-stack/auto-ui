@@ -178,6 +178,64 @@ impl SurfaceStore {
 // ProtocolHost
 // ---------------------------------------------------------------------------
 
+/// PLAN-062（AC-03）：资源引用记账 + 释放延后（三处宿主消费共用）。
+///
+/// 宿主每次合成 v2 帧时刷新“前台帧引用的 src 集合”；收到 producer 的资源释放
+/// 时，仍被前台帧引用的 src 进入**挂起集**，等下一次合成不再引用时才真正驱逐。
+/// 这样“最后 owner 归零立即释放”不会把仍在屏上的图丢掉——这是上一轮撤回未协商
+/// `ResourceRelease` 的第二条原因，现以引用记账正面解决。
+#[derive(Default)]
+pub struct BitmapRefs {
+    front: std::collections::BTreeSet<String>,
+    pending: std::collections::BTreeSet<String>,
+}
+
+impl BitmapRefs {
+    /// 新帧合成时调用：刷新前台引用集，并返回“现在已无人引用”的挂起释放。
+    pub fn on_compose(
+        &mut self,
+        payload: &crate::ui::desktop_protocol::message::DisplayList,
+    ) -> Vec<String> {
+        use crate::ui::desktop_protocol::message::DisplayOp;
+        self.front = payload
+            .ops
+            .iter()
+            .filter_map(|op| match op {
+                DisplayOp::Image { src, .. } => Some(src.clone()),
+                _ => None,
+            })
+            .collect();
+        let ready: Vec<String> = self
+            .pending
+            .iter()
+            .filter(|src| !self.front.contains(*src))
+            .cloned()
+            .collect();
+        for src in &ready {
+            self.pending.remove(src);
+        }
+        ready
+    }
+
+    /// 收到释放：前台仍引用 → 挂起；否则立即可释放。
+    pub fn on_release(&mut self, srcs: Vec<String>) -> Vec<String> {
+        let mut ready = Vec::new();
+        for src in srcs {
+            if self.front.contains(&src) {
+                self.pending.insert(src);
+            } else {
+                ready.push(src);
+            }
+        }
+        ready
+    }
+
+    /// 挂起数（诊断/断言）。
+    pub fn pending_len(&self) -> usize {
+        self.pending.len()
+    }
+}
+
 /// 宿主侧协议运行时：端点 + 表面 + 真实会话绑定。
 ///
 /// `resolver` 是孵化材料源（app_name → 编译装载）——与
@@ -204,6 +262,8 @@ pub struct ProtocolHost<'a> {
     bitmap_keys: BTreeMap<u64, Vec<String>>,
     /// 孵化材料解析器。
     resolver: Box<dyn FnMut(&str) -> Result<DynamicComponent, String> + 'a>,
+    /// PLAN-062（AC-03）：资源引用记账 + 释放延后。
+    refs: BitmapRefs,
 }
 
 impl<'a> ProtocolHost<'a> {
@@ -223,6 +283,7 @@ impl<'a> ProtocolHost<'a> {
             bm_buffers: BTreeMap::new(),
             bitmap_keys: BTreeMap::new(),
             resolver: Box::new(resolver),
+            refs: BitmapRefs::default(),
         }
     }
 
@@ -369,6 +430,13 @@ impl<'a> ProtocolHost<'a> {
                     payload,
                     ..
                 } => {
+                    // PLAN-062（AC-03）：刷新前台引用集，并驱逐已无人引用的挂起释放。
+                    for src in self.refs.on_compose(&payload) {
+                        crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                        if let Some(keys) = self.bitmap_keys.get_mut(&surface) {
+                            keys.retain(|k| k != &src);
+                        }
+                    }
                     match self.surfaces.compose_v2(surface, slot, payload) {
                         Ok(Some(freed)) => self.to_app.push(ProtocolMsg::Frame(
                             FrameMsg::FrameAck {
@@ -400,6 +468,13 @@ impl<'a> ProtocolHost<'a> {
                             .as_deref()
                             .and_then(|p| super::shm::display_list_from_slot_payload(p).ok());
                         if let Some(payload) = ready_v2 {
+                            // PLAN-062（AC-03）：刷新前台引用集，并驱逐已无人引用的挂起释放。
+                            for src in self.refs.on_compose(&payload) {
+                                crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                                if let Some(keys) = self.bitmap_keys.get_mut(&surface) {
+                                    keys.retain(|k| k != &src);
+                                }
+                            }
                             match self.surfaces.compose_v2(surface, slot, payload) {
                                 Ok(Some(freed)) => self.to_app.push(ProtocolMsg::Frame(
                                     FrameMsg::FrameAck {
@@ -507,6 +582,17 @@ impl<'a> ProtocolHost<'a> {
                     }
                     self.to_app
                         .push(ProtocolMsg::Frame(FrameMsg::BitmapAck { wid, slot }));
+                }
+                // PLAN-062（AC-03）：producer 通知“最后 owner 归零”；前台帧仍在
+                // 引用就挂起（不丢在屏的图），否则立即驱逐。
+                HostAction::ResourceRelease { wid, srcs } => {
+                    let _ = wid;
+                    for src in self.refs.on_release(srcs) {
+                        crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                        for keys in self.bitmap_keys.values_mut() {
+                            keys.retain(|k| k != &src);
+                        }
+                    }
                 }
                 HostAction::ObserveUp { msg } => self.observe_inbox.push(msg),
                 // v1.11 命令上行：loopback 路径的收件箱落点在下方的原始
@@ -863,5 +949,58 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(host.observe_inbox.len(), 1);
+    }
+}
+
+
+
+
+#[cfg(test)]
+mod release_tests {
+    use super::BitmapRefs;
+    use crate::ui::desktop_protocol::message::{DisplayList, DisplayOp, ImageFit, WRect};
+
+    fn frame_with(src: Option<&str>) -> DisplayList {
+        DisplayList {
+            clear: None,
+            ops: src
+                .map(|s| {
+                    vec![DisplayOp::Image {
+                        rect: WRect::new(0.0, 0.0, 8.0, 8.0),
+                        src: s.to_string(),
+                        fit: ImageFit::Stretch,
+                    }]
+                })
+                .unwrap_or_default(),
+        }
+    }
+
+    /// PLAN-062（AC-03）：释放跟随帧引用——前台仍引用则延后，换帧后才真正驱逐；
+    /// 未被引用的释放立即兑现。
+    #[test]
+    fn bitmap_refs_defers_release_until_no_frame_references_it() {
+        let mut refs = BitmapRefs::default();
+        assert!(refs.on_compose(&frame_with(Some("bitmap://A"))).is_empty());
+        assert!(
+            refs.on_release(vec!["bitmap://A".into()]).is_empty(),
+            "前台帧仍引用 A —— 必须延后释放（不丢在屏的图）"
+        );
+        assert_eq!(refs.pending_len(), 1);
+
+        // 新帧不再引用 A：挂起释放兑现，且只兑现一次。
+        assert_eq!(
+            refs.on_compose(&frame_with(None)),
+            vec!["bitmap://A".to_string()]
+        );
+        assert_eq!(refs.pending_len(), 0);
+        assert!(refs.on_compose(&frame_with(None)).is_empty());
+
+        // 未被引用的释放立即兑现。
+        assert_eq!(
+            refs.on_release(vec!["bitmap://B".into()]),
+            vec!["bitmap://B".to_string()]
+        );
+        // 同一 src 重复释放（producer 重发）不重复驱逐。
+        assert!(refs.on_release(vec!["bitmap://B".into()]).len() == 1);
     }
 }

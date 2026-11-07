@@ -695,3 +695,37 @@ fn rq_repair_fr4_resource_identity_zero_reupload() {
         serde_json::json!({ "tag": "fr4_kinds", "first_upload": kinds })
     );
 }
+
+/// PLAN-062（AC-03）：producer 侧“最后 owner 归零”（驻留驱逐）→ 释放队列；
+/// 泵排水点经 `ResourceRelease` 上报（宿主再按帧引用记账决定立即/延后驱逐）。
+#[test]
+fn rq_repair_release_follows_last_owner_eviction() {
+    let view: View<()> = View::image("lucide:bell");
+    let mut surface = HeadlessSurface::new(RepairComponent { view }, W, H);
+    let _ = surface.render_frame_v2();
+    let ups = surface.drain_bitmap_uploads();
+    assert_eq!(ups.len(), 1, "SVG 图标必须作为资源上传一次");
+    assert!(
+        surface.drain_resource_releases().is_empty(),
+        "仍在驻留的资源不得出现在释放队列"
+    );
+
+    // 驻留上限压到 1 字节 → 驱逐唯一资源（最后 owner 归零）。
+    surface.set_resource_limit_bytes(1);
+    let releases = surface.drain_resource_releases();
+    assert_eq!(releases.len(), 1, "驱逐必须产生一条释放记录");
+    assert_eq!(
+        releases[0],
+        format!("bitmap://{}", ups[0].id),
+        "释放 src 必须与过线引用同一身份"
+    );
+    // 排水幂等：同一资源不重复上报。
+    assert!(surface.drain_resource_releases().is_empty());
+    println!(
+        "[RQREPAIR] {}",
+        serde_json::json!({
+            "tag": "release_on_eviction", "released": releases,
+            "evictions": surface.resource_stats().3,
+        })
+    );
+}

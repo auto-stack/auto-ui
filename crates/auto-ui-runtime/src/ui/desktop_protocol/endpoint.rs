@@ -157,6 +157,12 @@ pub trait FrameSource {
         false
     }
 
+    /// PLAN-062（AC-03）：取出“最后 owner 归零”的资源 src，泵排水时经
+    /// `ResourceRelease` 通知宿主（宿主声明 `resource/release/1` 时才发）。
+    fn drain_resource_releases(&mut self) -> Vec<String> {
+        Vec::new()
+    }
+
     /// PLAN-690 T-02/T-05：App 派生窗口控制下行批读走（ImeRequest/
     /// SetCursor——headless 宿主 `State::Updated` 截获产物）。泵在产帧
     /// 后消费并上行 `ProtocolMsg::Control`（drain_desktop_commands 同型
@@ -577,6 +583,29 @@ impl<S: FrameSource> AppEndpoint<S> {
         ))
     }
 
+    /// PLAN-062（AC-03）：产一条资源释放消息。仅在 Active 且对端声明
+    /// `resource/release/1` 时可用（未声明 = 旧宿主，不产该 tag）。
+    pub fn produce_resource_release(
+        &mut self,
+        srcs: Vec<String>,
+    ) -> Result<ProtocolMsg, ProtocolError> {
+        if self.state != AppState::Active {
+            return Err(ProtocolError::NotActive);
+        }
+        if !self
+            .peer_caps
+            .supports(super::message::CAP_RESOURCE_RELEASE)
+        {
+            return Err(ProtocolError::Admission(
+                "unsupported: resource/release/1".to_string()
+            ));
+        }
+        Ok(ProtocolMsg::Frame(super::message::FrameMsg::ResourceRelease {
+            wid: self.wid.expect("Active 即有 wid"),
+            srcs,
+        }))
+    }
+
     /// app 主动请求退出：Active → Closing，产出 ExitRequest。
     pub fn send_exit(&mut self) -> Result<ProtocolMsg, ProtocolError> {
         if self.state != AppState::Active {
@@ -833,6 +862,9 @@ pub enum HostAction {
         len: u32,
         generation: Option<u64>,
     },
+    /// PLAN-062（AC-03）：资源释放（`ResourceRelease` 过线）——宿主按帧引用
+    /// 记账决定立即驱逐还是延后到不再被前台帧引用。
+    ResourceRelease { wid: u64, srcs: Vec<String> },
     /// app→host 命令上行（v1.11 落地）：`record` = `DesktopCommand` 单记录
     /// 编码串（`verb␟arg`）——适配层 parse_records 单点解析执行；归因按
     /// wid → registry_id。此前在端点丢弃臂中无声消失（desktop.* wire 化
@@ -1110,6 +1142,11 @@ impl HostEndpoint {
                     generation: Some(generation),
                 }])
             }
+            // PLAN-062（AC-03）：资源释放（旧宿主永不收到该 tag）。
+            (
+                HostState::Active,
+                ProtocolMsg::Frame(super::message::FrameMsg::ResourceRelease { wid, srcs }),
+            ) => Ok(vec![HostAction::ResourceRelease { wid, srcs }]),
             // 握手确认（app 的 Ready）：Active 后的例行收尾，无动作。
             (HostState::Active, ProtocolMsg::Handshake(HandshakeMsg::Ready)) => Ok(vec![]),
             // Plan 508：HitTable 为宿主→远程镜像端变体，宿主端点不产不出、
@@ -1322,6 +1359,7 @@ fn msg_name(msg: &ProtocolMsg) -> &'static str {
             super::message::FrameMsg::BitmapReady { .. } => "Frame::BitmapReady",
             super::message::FrameMsg::BitmapAck { .. } => "Frame::BitmapAck",
             super::message::FrameMsg::BitmapReadyGen { .. } => "Frame::BitmapReadyGen",
+            super::message::FrameMsg::ResourceRelease { .. } => "Frame::ResourceRelease",
             super::message::FrameMsg::FrameReadyV2 { .. } => "Frame::FrameReadyV2",
         },
         ProtocolMsg::Input(_) => "Input",
@@ -1696,6 +1734,42 @@ mod tests {
         let f2 = app.produce_frame(None).unwrap();
         assert_eq!(slot_of(&f2), slot0, "归还槽优先复用");
         assert_eq!(app.frames_in_flight(), 2);
+    }
+
+    /// PLAN-062（AC-03）：资源释放只在协商连线上产出（未声明 = 旧宿主，跳过）。
+    #[test]
+    fn resource_release_only_on_negotiated_lines() {
+        use super::super::message::{CapabilitySet, CAP_RESOURCE_RELEASE};
+
+        let mut app = AppEndpoint::new(StubSource::new(), "rel", "r", 480.0, 320.0);
+        let mut host = HostEndpoint::listen();
+        let _ = activate_pair(&mut app, &mut host);
+
+        app.peer_caps = CapabilitySet::default();
+        match app.produce_resource_release(vec!["bitmap://a".into()]) {
+            Err(ProtocolError::Admission(reason)) => {
+                assert!(reason.contains("resource/release/1"), "具名拒绝原因: {reason}")
+            }
+            other => panic!("未协商时不得产释放消息，实得 {other:?}"),
+        }
+
+        app.peer_caps = CapabilitySet::parse(&[format!("optional:{CAP_RESOURCE_RELEASE}")]);
+        let msg = app
+            .produce_resource_release(vec!["bitmap://a".into()])
+            .expect("协商后应可产释放消息");
+        match &msg {
+            ProtocolMsg::Frame(FrameMsg::ResourceRelease { wid, srcs }) => {
+                assert_eq!(*wid, 3, "释放必须带当前 wid");
+                assert_eq!(srcs, &vec!["bitmap://a".to_string()]);
+            }
+            other => panic!("必须是 ResourceRelease，实得 {other:?}"),
+        }
+        // 宿主端点把它翻成动作（引用记账在宿主适配层）。
+        let actions = host.on_message(msg).expect("宿主接受释放");
+        assert!(matches!(
+            actions.first(),
+            Some(HostAction::ResourceRelease { .. })
+        ));
     }
 
     /// PLAN-062（AC-03）：位图 generation 只在宿主声明
@@ -2149,5 +2223,3 @@ mod tests {
         }
     }
 }
-
-

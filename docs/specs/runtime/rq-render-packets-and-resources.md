@@ -87,13 +87,18 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   `HostCaps` 下行在三个宿主都已接线（此前只有 `host::ProtocolHost` 有，独立
   RQ 宿主与桌面 broker 的协商在线上是死的）。
 - 驻留上限 256 MiB/App（最早键驱逐）；驱逐后的重引用会重传一次，计数可解释。
-- **释放（未实现，具名）**：跨进程释放/引用记账**尚未交付**——曾实现的
-  `ResourceRelease` 因“未协商的 tag 会让旧宿主解流失败”且“Host 立即驱逐会
-  丢掉仍被帧引用/前台在用的纹理”被撤回。当前 host 侧 `bitmap://` 句柄只增不落
-  （受 Host 自身上限与进程寿命约束），producer 侧驻留仍按 256 MiB/App 预算驱逐。
-  重新引入需要：协商标记（新能力 ID 属合同变更）+ 帧引用计数/ACK 后释放。
-  Host 侧句柄缓存上限 512 条，但 **`bitmap://` 条目不参与本地淘汰**（producer
-  拥有、丢失不可自愈）；超限的其它来源（文件/http/资产）按插入序逐出。
+- **释放（AC-03，已交付）**：producer 侧资源的**最后 owner 归零**（驻留驱逐）时，
+  驱逐记录进入释放队列，泵在排水点经 `ResourceRelease`（tag 14）批量上报
+  `bitmap://<id>`。仅在宿主声明 `resource/release/1` 时发送——旧宿主永远收不到该
+  tag（字节流不变，不会解流失败）。
+  宿主侧做**帧引用记账**（`host::BitmapRefs`）：每次合成 v2 帧刷新“前台帧引用的
+  src 集合”，收到释放时**前台仍引用就挂起**，等下一帧不再引用才真正驱逐并清缓存
+  键——所以“立即释放”不会把仍在屏上的图丢掉。未被引用的释放立即兑现；producer
+  重发同一 src 不重复驱逐。三处宿主消费（`rqhost`、`host::ProtocolHost`、桌面
+  `session`）共用同一记账件。
+  仍有具名边界：释放是**单向通知**（无 ACK/无引用计数交换），Host 自身上限仍
+  兜底；Host 侧句柄缓存上限 512 条，但 **`bitmap://` 条目不参与本地淘汰**
+  （producer 拥有、丢失不可自愈）；超限的其它来源（文件/http/资产）按插入序逐出。
 - **上传预算**：8 MiB/1s 滑动窗口（per-App）。超预算帧**整帧回滚**（撤销本帧
   登记的资源键、复原 uploads/字节/驻留计数），端点返回
   `ProtocolError::Backpressure{resource:"upload"}` 并归还槽位；内容不丢、不得
@@ -105,7 +110,9 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 
 - 能力 ID 与 required/optional 语义见[保真合同 §7](rq-fidelity-contract.md)；
   本页新增的必需能力：`fidelity/pathfill/1`（Path）、`fidelity/glyphrun/1`
-  （GlyphRun）。
+  （GlyphRun）；新增的**可选面**（协商后启用、旧端不产不出）：`resource/generation/1`
+  （位图显式 generation，tag 13）、`resource/release/1`（资源释放，tag 14）。
+  冻结能力分母由 8 项扩为 **9 项**（`ALL_FIDELITY_CAPS`）。
 - 线词汇：`required:<cap>` / `optional:<cap>`；裸串按 optional 解释（旧 tail
   字节兼容）。声明可逆（`CapabilitySet::to_wire` round-trip）。
 - **握手准入**：App 在 Hello 尾声明 `required:`/`optional:` 能力；Host 解析后若有
@@ -245,10 +252,11 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
    + `resource/generation/1` 协商，宿主按 `id` 拒迟到/重复上传（见 §3）。未覆盖
    的相邻项：**乱序资源负控**（BitmapReady 早于引用帧 / 帧引用尚未到达的 src）
    仍缺——需要可控的消息重排通道，当前管道是 FIFO。
-8. Host 侧没有跨进程释放/引用记账（见 §3）：producer 驱逐不会通知 Host，
-   泵的 FIFO 与“驱逐不下当前帧资源”的守卫）。
-9. 逐能力面 39 个 ID 中 **13 个族 >0.1%**（§5.2）：managed_scroll_content 1.56%、
-   code_editor 1.31%、video 0.92%、terminal 0.46% 等，都是文字密集或宿主依赖面，
+8. ~~Host 侧没有跨进程释放/引用记账~~ **已交付（AC-03）**：`ResourceRelease`
+   （tag 14）+ `resource/release/1` 协商 + 宿主 `BitmapRefs` 帧引用记账（见 §3）。
+   仍属**单向通知**：无释放 ACK、无双向引用计数交换；Host 自身上限仍兜底。
+9. 逐能力面 39 个 ID 中 **13 个族 >0.1%**（§5.2）：managed_scroll_content 1.562%、
+   video 0.922%、terminal 0.456%、code_editor 0.407% 等，都是文字密集或宿主依赖面，
    残差与文字面同源（画布文本管线 vs direct 文本管线的字形覆盖率/AA）。**不属
    exact**，不得计入 AC-02 的 0.1% 门；逐 ID 的关闭条件是“有真实输出 + 结构断言
    + 2% 毛刺级上限”，不是逐 ID 都 ≤0.1%。

@@ -1024,6 +1024,9 @@ pub const CAP_SVG_RASTER: &str = "fidelity/svg-raster/1";
 pub const CAP_IMAGE_PARAMS: &str = "fidelity/image-params/1";
 pub const CAP_BLUR_SDF: &str = "fidelity/blur-sdf/1";
 pub const CAP_RESOURCE_GENERATION: &str = "resource/generation/1";
+/// PLAN-062（AC-03）：跨进程资源释放（`ResourceRelease`）。宿主声明后产者才会
+/// 通知“最后 owner 归零”的资源；旧宿主永远收不到该 tag。
+pub const CAP_RESOURCE_RELEASE: &str = "resource/release/1";
 pub const CAP_BACKPRESSURE: &str = "pipeline/backpressure/1";
 pub const CAP_ACK_FENCE_SPLIT: &str = "ack/fence-split/1";
 /// 协商标记（PLAN-062 T-04）：App 在 Hello 里声明它，宿主才在 Welcome 之后
@@ -1031,13 +1034,14 @@ pub const CAP_ACK_FENCE_SPLIT: &str = "ack/fence-split/1";
 pub const CAP_WELCOME_CAPS: &str = "welcome-caps/1";
 
 /// 冻结的八个能力 ID（声明序稳定）。
-pub const ALL_FIDELITY_CAPS: [&str; 8] = [
+pub const ALL_FIDELITY_CAPS: [&str; 9] = [
     CAP_PATH_FILL,
     CAP_GLYPH_RUN,
     CAP_SVG_RASTER,
     CAP_IMAGE_PARAMS,
     CAP_BLUR_SDF,
     CAP_RESOURCE_GENERATION,
+    CAP_RESOURCE_RELEASE,
     CAP_BACKPRESSURE,
     CAP_ACK_FENCE_SPLIT,
 ];
@@ -1646,6 +1650,12 @@ pub enum FrameMsg {
         len: u32,
         generation: u64,
     },
+    /// app→host。**资源释放**（PLAN-062 tag 14，AC-03）：producer 侧资源的最后
+    /// owner 归零（驻留驱逐/内容替换）时通知宿主丢弃对应句柄。仅在宿主声明
+    /// [`CAP_RESOURCE_RELEASE`] 时发送——旧宿主永远收不到该 tag（字节流不变）。
+    /// 宿主按**帧引用记账**处理：前台帧仍引用该 src 时延后释放，等下一帧不再
+    /// 引用再真正驱逐（避免把仍在屏上的图丢掉）。
+    ResourceRelease { wid: u64, srcs: Vec<String> },
     /// app→host。**帧就绪 v2**（PLAN-683 tag 12，DisplayList v2 载荷——
     /// 方案 2 远程 Renderer 的 remote 模式帧）：字段序 FrameReady 同构，
     /// 载荷换 `DisplayList`（原语超集；追加式变体——旧端不产不出，
@@ -1701,6 +1711,8 @@ impl FrameMsg {
     /// PLAN-062（AC-03）：位图就绪 + 显式 generation（协商标记
     /// [`CAP_RESOURCE_GENERATION`]；旧端不产不出）。
     const BITMAP_READY_GEN: u8 = 13;
+    /// PLAN-062（AC-03）：资源释放（`srcs` 批量）。
+    const RESOURCE_RELEASE: u8 = 14;
 
     pub fn encode(&self, out: &mut Vec<u8>) {
         match self {
@@ -1889,6 +1901,13 @@ impl FrameMsg {
                 put_u32(out, *stride);
                 put_u32(out, *len);
                 put_u64(out, *generation);
+            }            Self::ResourceRelease { wid, srcs } => {
+                put_u8(out, Self::RESOURCE_RELEASE);
+                put_u64(out, *wid);
+                put_u32(out, srcs.len() as u32);
+                for src in srcs {
+                    put_string(out, src);
+                }
             }
             Self::FrameReadyV2 {
                 wid,
@@ -2093,6 +2112,14 @@ impl FrameMsg {
                     len,
                     generation,
                 }
+            }            Self::RESOURCE_RELEASE => {
+                let wid = r.u64()?;
+                let count = r.u32()? as usize;
+                let mut srcs = Vec::with_capacity(count.min(1024));
+                for _ in 0..count {
+                    srcs.push(r.string()?);
+                }
+                Self::ResourceRelease { wid, srcs }
             }
             Self::FRAME_READY_V2 => {
                 let wid = r.u64()?;
@@ -3251,6 +3278,20 @@ mod tests {
             len: 1024,
             generation: 42,
         }));
+        // PLAN-062（AC-03）：资源释放（tag 14）——编码/解码保真 + 与既有 tag 可区分。
+        round_trip(ProtocolMsg::Frame(FrameMsg::ResourceRelease {
+            wid: 9,
+            srcs: vec!["bitmap://a".into(), "bitmap://b".into()],
+        }));
+        {
+            let mut rel = Vec::new();
+            FrameMsg::ResourceRelease {
+                wid: 1,
+                srcs: vec!["bitmap://x".into()],
+            }
+            .encode(&mut rel);
+            assert_eq!(rel[0], 14, "资源释放 tag = 14");
+        }
         {
             let mut old = Vec::new();
             FrameMsg::BitmapReady {
@@ -4278,5 +4319,3 @@ mod tests {
         assert_eq!(DisplayList::decode(&mut r).unwrap(), lifted);
     }
 }
-
-
