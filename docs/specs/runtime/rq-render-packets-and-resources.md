@@ -69,11 +69,11 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   （等价 generation 语义）。内容未变的重复帧**零 payload 重传**，帧只引用同一
   `bitmap://` src；Host 侧按 src 复用已驻留纹理。
 - 驻留上限 256 MiB/App（最早键驱逐）；驱逐后的重引用会重传一次，计数可解释。
-  **驱逐不驱逐当帧刚登记的资源**：剩余候选全是本帧资源时停止驱逐并保留超额，
-  避免帧引用悬空。
-- **释放（最后 owner 归零）**：producer 驱逐即产生待释放源，经追加式
-  `FrameMsg::ResourceRelease { wid, srcs }`（tag 13）通知 Host；Host 丢弃对应
-  句柄（三处宿主消费点同律）。旧宿主收到未知 tag 明确拒绝，不会静默半应用。
+- **释放（未实现，具名）**：跨进程释放/引用记账**尚未交付**——曾实现的
+  `ResourceRelease` 因“未协商的 tag 会让旧宿主解流失败”且“Host 立即驱逐会
+  丢掉仍被帧引用/前台在用的纹理”被撤回。当前 host 侧 `bitmap://` 句柄只增不落
+  （受 Host 自身上限与进程寿命约束），producer 侧驻留仍按 256 MiB/App 预算驱逐。
+  重新引入需要：协商标记（新能力 ID 属合同变更）+ 帧引用计数/ACK 后释放。
   Host 侧句柄缓存上限 512 条，但 **`bitmap://` 条目不参与本地淘汰**（producer
   拥有、丢失不可自愈）；超限的其它来源（文件/http/资产）按插入序逐出。
 - **上传预算**：8 MiB/1s 滑动窗口（per-App）。超预算帧**整帧回滚**（撤销本帧
@@ -148,7 +148,6 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 7. wire 无显式 generation 字段：`src` 已含内容哈希+单调序号，本地做不了有意义的
    “旧代号拒绝”；同 id 重上传按既有语义视为刷新（last-write-wins，由 ACK/槽纪律
    约束），跨进程乱序保护仍需 wire 字段。
-8. Host 侧 `bitmap://` 句柄只由 producer 的 `ResourceRelease` 与自身驻留预算回收；
-   没有引用计数，`ResourceRelease` 到达顺序与帧引用之间没有契约级保证（当前靠
+8. Host 侧没有跨进程释放/引用记账（见 §3）：producer 驱逐不会通知 Host，
    泵的 FIFO 与“驱逐不下当前帧资源”的守卫）。
 

@@ -490,6 +490,37 @@ fn rq_glyph_positions_match_physical_formula() {
 }
 
 #[test]
+fn rq_string_text_path_is_observable_degradation() {
+    // PLAN-062 r4 AC-02：默认字符串面 = Host 重排，必须**具名可观测**。
+    let mut surface = HeadlessSurface::new(
+        LosslessComponent {
+            view: View::text("string path probe"),
+        },
+        W,
+        H,
+    );
+    let list = surface.render_frame_v2();
+    assert!(
+        list.ops
+            .iter()
+            .any(|op| matches!(op, DisplayOp::TextStyled { .. })),
+        "默认面必须以 TextStyled 过线"
+    );
+    let seen = surface
+        .observations()
+        .iter()
+        .any(|o| o.contains("文字降级"));
+    println!(
+        "[RQ062] {}",
+        serde_json::json!({
+            "tag": "text_degradation_observed",
+            "observations": surface.observations(),
+        })
+    );
+    assert!(seen, "字符串面必须产出具名降级观测（不得静默）");
+}
+
+#[test]
 fn rq_v3_legacy_v2_host_rejects_v3_payload() {
     // 旧 Host（062 前）只认载荷 tag 2：v3 帧必须被明确拒绝而不是半帧呈现。
     let list = DisplayList {

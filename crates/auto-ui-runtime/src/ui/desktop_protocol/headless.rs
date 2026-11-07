@@ -2038,13 +2038,18 @@ fn lower_text_runs(
     position: iced::Point,
     color: iced::Color,
     ops: &mut Vec<DisplayOp>,
+    observations: &mut Vec<String>,
 ) {
+    // PLAN-062 r4 AC-02：字符串面 = Host 用同一字体栈重排，属**具名降级**；
+    // 每次产出必须留可观测记录（不得静默）。
+    let mut runs = 0usize;
     buffer_runs(
         buffer,
         position,
         color,
         iced::Vector::default(),
         &mut |x, y, size, lh, rgba, weight, text| {
+            runs += 1;
             ops.push(DisplayOp::TextStyled {
                 x,
                 y,
@@ -2057,6 +2062,11 @@ fn lower_text_runs(
             });
         },
     );
+    if runs > 0 {
+        observations.push(format!(
+            "文字降级：{runs} 个 run 以字符串 TextStyled 过线（Host 用同一字体栈重排，非 glyph run）"
+        ));
+    }
 }
 
 /// PLAN-062 T-02：cosmic Buffer → 逐行 `GlyphRun`（Host 不重排）。
@@ -2232,7 +2242,7 @@ fn lower_text_v2(
                             observations,
                         );
                     } else {
-                        lower_text_runs(paragraph.buffer(), *position, *color, ops);
+                        lower_text_runs(paragraph.buffer(), *position, *color, ops, observations);
                     }
                 }
             }
@@ -2253,7 +2263,7 @@ fn lower_text_v2(
                             observations,
                         );
                     } else {
-                        lower_text_runs(editor.buffer(), *position, *color, ops);
+                        lower_text_runs(editor.buffer(), *position, *color, ops, observations);
                     }
                 }
             }

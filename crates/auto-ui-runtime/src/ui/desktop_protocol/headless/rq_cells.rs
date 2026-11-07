@@ -398,8 +398,8 @@ fn rq_cells_t05_six_cell_matrix() {
                                 // 这里记录不设门。
                                 if matches!(name, "path_mesh" | "svg_icon" | "text_cjk" | "scroll_clip" | "progress_bar" | "gradient_border_shadow" | "shadow_only") {
                                     assert!(
-                                        reading.diff_ratio <= 0.002,
-                                        "{name} 默认 producer 的像素差 {:.4} 超 0.2% 门",
+                                        reading.diff_ratio <= 0.001,
+                                        "{name} 默认 producer 的像素差 {:.4} 超 0.1% 门（AC-02 r4）",
                                         reading.diff_ratio
                                     );
                                 }
