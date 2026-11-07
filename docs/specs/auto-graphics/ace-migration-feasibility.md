@@ -44,8 +44,10 @@ go/bounded-go/no-go 与可执行后继接口。本稿是该研究的 canonical �
 `ac.source.instances.scalar/v1`、`ac.source.cte.scalar/v1`、
 `ac.source.modules.packages/v1`（`packages-modules` profile 的显式源码能力，
 `source/packages.rs:11`，canonical 见 `docs/specs/ace-migration/m2-modules.md:11`）。
-本合同的作者源实测只触达前两类标量入口；packages 能力未触达、未验证，不据此
-认领包/目录发现或类型/资源支持。
+本合同的作者源实测只触达**两条入口**：`ac.source.modules.scalar/v1`（模块能力）
+与 `SourceProfile::Scalar`（标量 profile）。`ac.source.instances.scalar/v1`、
+`ac.source.cte.scalar/v1`、`ac.source.modules.packages/v1` 均未触达、未验证；
+不据此认领实例/CTE/包/目录发现或类型/资源支持。
 
 有限模块域（`core::source::modules::parse_module_source` / `bind_modules`）：
 仅 i32/bool 顶层自由函数；`use` 只接 `<module>.<name>` 形式；无包/目录发现、
