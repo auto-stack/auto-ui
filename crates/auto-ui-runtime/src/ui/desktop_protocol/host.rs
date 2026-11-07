@@ -43,11 +43,29 @@ pub struct Surface {
 pub struct SurfaceStore {
     next_surface: u64,
     surfaces: BTreeMap<u64, Surface>,
+    /// 宿主声明支持的能力（PLAN-062 T-04 入帧准入基线）。默认支持全部冻结
+    /// 能力（本仓 v3 重放端齐全）；对端未声明的 required 能力仍按拒绝处理。
+    capabilities: crate::ui::desktop_protocol::message::CapabilitySet,
 }
 
 impl SurfaceStore {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            capabilities: crate::ui::desktop_protocol::message::CapabilitySet::all_optional(),
+            ..Self::default()
+        }
+    }
+
+    /// 设置宿主可接受的能力集合（握手声明来源）。
+    pub fn set_capabilities(
+        &mut self,
+        caps: crate::ui::desktop_protocol::message::CapabilitySet,
+    ) {
+        self.capabilities = caps;
+    }
+
+    pub fn capabilities(&self) -> &crate::ui::desktop_protocol::message::CapabilitySet {
+        &self.capabilities
     }
 
     /// 分配双缓冲表面（v1 固定 2 槽），返回句柄。
@@ -87,20 +105,26 @@ impl SurfaceStore {
 
     /// 合成一帧 v2（PLAN-683 remote 模式）：DisplayList 入 v2 槽并翻面；
     /// 槽纪律与 v1 compose 同构（FrameAck 归还原 front）。
+    ///
+    /// PLAN-062 T-04：入槽前做**能力准入**——帧所需必需能力未 1 对端声明时
+    /// 返回具名错误且**不写槽**（前端帧保持不变 = 保旧帧，不呈现半帧）。
     pub fn compose_v2(
         &mut self,
         surface: u64,
         slot: u8,
         payload: crate::ui::desktop_protocol::message::DisplayList,
-    ) -> Option<u8> {
-        let s = self.surfaces.get_mut(&surface)?;
+    ) -> Result<Option<u8>, crate::ui::desktop_protocol::message::AdmissionError> {
+        payload.admit(&self.capabilities)?;
+        let Some(s) = self.surfaces.get_mut(&surface) else {
+            return Ok(None);
+        };
         if slot as usize >= s.v2_slots.len() {
-            return None;
+            return Ok(None);
         }
         s.v2_slots[slot as usize] = Some(payload);
         let freed = s.front;
         s.front = slot;
-        Some(freed)
+        Ok(Some(freed))
     }
 
     /// PLAN-060 扩展：表面尺寸（指针坐标投影换算用）。
@@ -192,6 +216,23 @@ impl<'a> ProtocolHost<'a> {
             bitmap_keys: BTreeMap::new(),
             resolver: Box::new(resolver),
         }
+    }
+
+    /// 入帧准入拒绝：具名诊断 + 归还传输槽（ACK 只表示“宿主已读走载荷”，
+    /// 不表示合成成功）；前端帧保持上一次完整帧。
+    fn reject_frame(
+        &mut self,
+        surface: u64,
+        wid: u64,
+        frame_id: u64,
+        slot: u8,
+        err: &crate::ui::desktop_protocol::message::AdmissionError,
+    ) {
+        eprintln!(
+            "[rq-admission] 拒绝入帧 surface={surface} frame={frame_id}: {err}（保旧帧，槽 {slot} 归还）"
+        );
+        self.to_app
+            .push(ProtocolMsg::Frame(FrameMsg::FrameAck { wid, frame_id, slot }));
     }
 
     /// 宿主侧处理一条来自 app 的消息；回发消息累积进 [`Self::to_app`]。
@@ -303,15 +344,18 @@ impl<'a> ProtocolHost<'a> {
                     payload,
                     ..
                 } => {
-                    if let Some(freed) = self.surfaces.compose_v2(surface, slot, payload) {
-                        self.to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
-                            wid,
-                            frame_id,
-                            slot: freed,
-                        }));
+                    match self.surfaces.compose_v2(surface, slot, payload) {
+                        Ok(Some(freed)) => self.to_app.push(ProtocolMsg::Frame(
+                            FrameMsg::FrameAck {
+                                wid,
+                                frame_id,
+                                slot: freed,
+                            },
+                        )),
+                        Ok(None) => {}
+                        Err(err) => self.reject_frame(surface, wid, frame_id, slot, &err),
                     }
-                }
-                HostAction::ComposeFrameShared {
+                }                HostAction::ComposeFrameShared {
                     surface,
                     wid,
                     frame_id,
@@ -329,12 +373,18 @@ impl<'a> ProtocolHost<'a> {
                             .as_deref()
                             .and_then(|p| super::shm::display_list_from_slot_payload(p).ok());
                         if let Some(payload) = ready_v2 {
-                            if let Some(freed) = self.surfaces.compose_v2(surface, slot, payload) {
-                                self.to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
-                                    wid,
-                                    frame_id,
-                                    slot: freed,
-                                }));
+                            match self.surfaces.compose_v2(surface, slot, payload) {
+                                Ok(Some(freed)) => self.to_app.push(ProtocolMsg::Frame(
+                                    FrameMsg::FrameAck {
+                                        wid,
+                                        frame_id,
+                                        slot: freed,
+                                    },
+                                )),
+                                Ok(None) => {}
+                                Err(err) => {
+                                    self.reject_frame(surface, wid, frame_id, slot, &err)
+                                }
                             }
                         }
                         continue;

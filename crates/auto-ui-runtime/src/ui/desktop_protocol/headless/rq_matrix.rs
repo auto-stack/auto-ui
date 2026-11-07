@@ -145,8 +145,8 @@ fn produce_v2(view: View<()>) -> (Vec<Layer>, super::super::message::DisplayList
     let layers = surface.drive_and_draw();
     let mut obs = Vec::new();
     let mut bms = Vec::new();
-    let mut seq = 0;
-    let list = lower_layers_v2(&layers, &mut obs, &mut bms, &mut seq);
+    let mut cache = ResourceCache::default();
+    let list = lower_layers_v2(&layers, &mut obs, &mut cache, &mut bms);
     (layers, list, bms.len())
 }
 

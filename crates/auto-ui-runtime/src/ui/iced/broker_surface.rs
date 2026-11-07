@@ -742,17 +742,33 @@ where
                     }
                 }
                 let [m00, m01, m10, m11, tx, ty] = *matrix;
-                let axis_aligned = m01 == 0.0 && m10 == 0.0;
+                // PLAN-062 T-02：仿射分解为 translate ∘ rotate ∘ scale（canvas
+                // 变换栈可精确表达该族）。剪切（含非正交 m01/m10）不可达，
+                // 具名降级为纯平移并在走样前保留诊断。
+                let scale_x = (m00 * m00 + m10 * m10).sqrt();
+                let theta = m10.atan2(m00);
+                let det = m00 * m11 - m01 * m10;
+                let scale_y = if scale_x.abs() > f32::EPSILON {
+                    det / scale_x
+                } else {
+                    1.0
+                };
+                let shear = (m01 + theta.sin() * scale_y).abs()
+                    + (m10 - theta.sin() * scale_x).abs();
                 frame.push_transform();
-                if axis_aligned {
-                    frame.translate(iced::Vector::new(tx, ty));
-                    if (m00 - 1.0).abs() > f32::EPSILON || (m11 - 1.0).abs() > f32::EPSILON {
-                        frame.scale_nonuniform(iced::Vector::new(m00, m11));
-                    }
+                frame.translate(iced::Vector::new(tx, ty));
+                if theta.abs() > f32::EPSILON {
+                    frame.rotate(iced::Radians(theta));
                 }
-                // 非轴对齐（剪切/旋转）= 降格端不可产面；宽容直落平移。
-                if !axis_aligned {
-                    frame.translate(iced::Vector::new(tx, ty));
+                if (scale_x - 1.0).abs() > f32::EPSILON
+                    || (scale_y - 1.0).abs() > f32::EPSILON
+                {
+                    frame.scale_nonuniform(iced::Vector::new(scale_x, scale_y));
+                }
+                if shear > 1e-3 {
+                    eprintln!(
+                        "[rq-warn] transform 含剪切不可达（residual={shear:.4}）——按旋转+缩放降级"
+                    );
                 }
                 paint_ops_v2(frame, &ops[i + 1..end]);
                 frame.pop_transform();
@@ -861,6 +877,60 @@ where
                 });
                 i += 1;
             }
+            DisplayOp::Path {
+                path,
+                fill,
+                even_odd,
+                stroke,
+            } => {
+                if let Some(built) = canvas_path(path) {
+                    let bounds = wire_path_bounds(path);
+                    if let Some(fill) = fill {
+                        let style: iced::widget::canvas::Style = match fill {
+                            WireFill::Color(c) => to_color(*c).into(),
+                            WireFill::LinearGradient { angle, stops } => {
+                                let (start, end) = iced::Radians(*angle).to_distance(&bounds);
+                                let mut linear =
+                                    iced::widget::canvas::gradient::Linear::new(start, end);
+                                for (offset, color) in stops {
+                                    linear = linear.add_stop(*offset, to_color(*color));
+                                }
+                                iced::widget::canvas::Style::Gradient(
+                                    iced::widget::canvas::Gradient::Linear(linear),
+                                )
+                            }
+                        };
+                        frame.fill(
+                            &built,
+                            iced::widget::canvas::Fill {
+                                style,
+                                rule: if *even_odd {
+                                    iced::widget::canvas::fill::Rule::EvenOdd
+                                } else {
+                                    iced::widget::canvas::fill::Rule::NonZero
+                                },
+                            },
+                        );
+                    }
+                    if let Some(s) = stroke {
+                        let mut spec = iced::widget::canvas::Stroke::default()
+                            .with_color(to_color(s.color))
+                            .with_width(s.width);
+                        spec.line_cap = match s.cap {
+                            1 => iced::widget::canvas::LineCap::Round,
+                            2 => iced::widget::canvas::LineCap::Square,
+                            _ => iced::widget::canvas::LineCap::Butt,
+                        };
+                        spec.line_join = match s.join {
+                            1 => iced::widget::canvas::LineJoin::Round,
+                            2 => iced::widget::canvas::LineJoin::Bevel,
+                            _ => iced::widget::canvas::LineJoin::Miter,
+                        };
+                        frame.stroke(&built, spec);
+                    }
+                }
+                i += 1;
+            }
             DisplayOp::Image { rect, src, .. } => {
                 let at = iced::Point::new(rect.x, rect.y);
                 let size = iced::Size::new(rect.w.max(0.0), rect.h.max(0.0));
@@ -882,6 +952,89 @@ where
             }
         }
     }
+}
+
+/// v3 路径 → canvas 路径（verb 直落；坐标已是记录端烘焙后的设备坐标）。
+/// 首个 `MoveTo` 之前的绘制段一律忽略（canvas Builder 要求先定位）。
+fn canvas_path(
+    path: &crate::ui::desktop_protocol::message::WirePath,
+) -> Option<iced::widget::canvas::Path> {
+    use crate::ui::desktop_protocol::message::PathSeg;
+    use iced::widget::canvas::path::Builder;
+
+    if path.segs.is_empty() {
+        return None;
+    }
+    let mut builder = Builder::new();
+    let mut positioned = false;
+    for seg in &path.segs {
+        match seg {
+            PathSeg::MoveTo(x, y) => {
+                builder.move_to(iced::Point::new(*x, *y));
+                positioned = true;
+            }
+            PathSeg::LineTo(x, y) if positioned => {
+                builder.line_to(iced::Point::new(*x, *y));
+            }
+            PathSeg::QuadTo(x1, y1, x, y) if positioned => {
+                builder.quadratic_curve_to(
+                    iced::Point::new(*x1, *y1),
+                    iced::Point::new(*x, *y),
+                );
+            }
+            PathSeg::CubicTo(x1, y1, x2, y2, x, y) if positioned => {
+                builder.bezier_curve_to(
+                    iced::Point::new(*x1, *y1),
+                    iced::Point::new(*x2, *y2),
+                    iced::Point::new(*x, *y),
+                );
+            }
+            PathSeg::Close if positioned => builder.close(),
+            _ => {}
+        }
+    }
+    if !positioned {
+        return None;
+    }
+    Some(builder.build())
+}
+
+/// 路径包围盒（渐变 fill 的 angle→绝对几何还原所需）。
+fn wire_path_bounds(path: &crate::ui::desktop_protocol::message::WirePath) -> iced::Rectangle {
+    use crate::ui::desktop_protocol::message::PathSeg;
+
+    let (mut min_x, mut min_y) = (f32::INFINITY, f32::INFINITY);
+    let (mut max_x, mut max_y) = (f32::NEG_INFINITY, f32::NEG_INFINITY);
+    let mut add = |x: f32, y: f32| {
+        if x.is_finite() && y.is_finite() {
+            min_x = min_x.min(x);
+            min_y = min_y.min(y);
+            max_x = max_x.max(x);
+            max_y = max_y.max(y);
+        }
+    };
+    for seg in &path.segs {
+        match seg {
+            PathSeg::MoveTo(x, y) | PathSeg::LineTo(x, y) => add(*x, *y),
+            PathSeg::QuadTo(x1, y1, x, y) => {
+                add(*x1, *y1);
+                add(*x, *y);
+            }
+            PathSeg::CubicTo(x1, y1, x2, y2, x, y) => {
+                add(*x1, *y1);
+                add(*x2, *y2);
+                add(*x, *y);
+            }
+            PathSeg::Close => {}
+        }
+    }
+    if !min_x.is_finite() || !min_y.is_finite() {
+        return iced::Rectangle::default();
+    }
+    iced::Rectangle::new(
+        iced::Point::new(min_x, min_y),
+        iced::Size::new((max_x - min_x).max(0.0), (max_y - min_y).max(0.0)),
+    )
 }
 
 /// shadow 垫层（P683-D4 近似）：偏移圆角矩形，alpha 按模糊半径弱化

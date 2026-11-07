@@ -592,16 +592,28 @@ fn apply_actions(
                         super::shm::display_list_from_slot_payload(payload).ok()
                     });
                     if let Some(payload) = ready_v2 {
-                        if let Some(freed) =
-                            client.inner.surfaces.compose_v2(surface, slot, payload)
-                        {
-                            client.frames += 1;
-                            note_revision(client, revision);
-                            to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
-                                wid,
-                                frame_id,
-                                slot: freed,
-                            }));
+                        match client.inner.surfaces.compose_v2(surface, slot, payload) {
+                            Ok(Some(freed)) => {
+                                client.frames += 1;
+                                note_revision(client, revision);
+                                to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
+                                    wid,
+                                    frame_id,
+                                    slot: freed,
+                                }));
+                            }
+                            Ok(None) => {}
+                            Err(err) => {
+                                // PLAN-062 T-04：准入拒绝保旧帧 + 归还槽。
+                                eprintln!(
+                                    "[rq-admission] 拒绝入帧 surface={surface} frame={frame_id}: {err}（保旧帧）"
+                                );
+                                to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
+                                    wid,
+                                    frame_id,
+                                    slot,
+                                }));
+                            }
                         }
                     }
                 } else {
@@ -631,14 +643,27 @@ fn apply_actions(
                 revision,
                 payload,
             } => {
-                if let Some(freed) = client.inner.surfaces.compose_v2(surface, slot, payload) {
-                    client.frames += 1;
-                    note_revision(client, revision);
-                    to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
-                        wid,
-                        frame_id,
-                        slot: freed,
-                    }));
+                match client.inner.surfaces.compose_v2(surface, slot, payload) {
+                    Ok(Some(freed)) => {
+                        client.frames += 1;
+                        note_revision(client, revision);
+                        to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
+                            wid,
+                            frame_id,
+                            slot: freed,
+                        }));
+                    }
+                    Ok(None) => {}
+                    Err(err) => {
+                        eprintln!(
+                            "[rq-admission] 拒绝入帧 surface={surface} frame={frame_id}: {err}（保旧帧）"
+                        );
+                        to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
+                            wid,
+                            frame_id,
+                            slot,
+                        }));
+                    }
                 }
             }
             // PLAN-034 T-05（D3）：位图就绪——读位图段槽入宿主图像

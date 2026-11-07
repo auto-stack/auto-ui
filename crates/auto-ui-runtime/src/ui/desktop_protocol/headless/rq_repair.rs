@@ -40,8 +40,8 @@ fn produce(view: View<()>) -> (super::super::message::DisplayList, f64) {
     let layers = surface.drive_and_draw();
     let mut obs = Vec::new();
     let mut bms = Vec::new();
-    let mut seq = 0;
-    let list = lower_layers_v2(&layers, &mut obs, &mut bms, &mut seq);
+    let mut cache = ResourceCache::default();
+    let list = lower_layers_v2(&layers, &mut obs, &mut cache, &mut bms);
     (list, ms(t.elapsed()))
 }
 
@@ -510,8 +510,7 @@ fn produce_uploads(view: View<()>) -> (usize, Vec<[u8; 32]>, usize) {
 
 #[test]
 fn rq_repair_fr4_resource_identity_zero_reupload() {
-    // 1) 当前路径负控：同内容稳定帧仍每帧上传（V-06 违约可检出）。
-    //    先跑数帧找到“内容稳定段”（编辑器首帧字形栅格尚未稳定）。
+    // 1) 负控（无驻留缓存 = 062 前行为）：每帧新建 surface → 每帧都重传。
     let stable: View<()> = View::code_editor("fr4-stable")
         .value("fn main() {\n    println!(\"稳定\");\n}")
         .lang("rust")
@@ -546,20 +545,92 @@ fn rq_repair_fr4_resource_identity_zero_reupload() {
     println!(
         "[RQREPAIR] {}",
         serde_json::json!({
-            "tag": "fr4_current_path", "uploads_per_frame": counts,
+            "tag": "fr4_nocache_control", "uploads_per_frame": counts,
             "bytes_per_frame": bytes, "key_prefixes": prefixes,
             "stable_from_frame": stable_from,
-            "note": "同内容稳定帧每帧仍上传 = V-06 违约（负控）",
+            "note": "无驻留缓存（每帧新 surface）= 062 前行为：稳定内容仍每帧上传（负控）",
         })
     );
     assert!(
         counts.iter().all(|n| *n > 0),
-        "当前路径稳定帧仍上传（负控存在）"
+        "无缓存负控：稳定帧仍逐帧上传（否则对照不成立）"
     );
     let stable_from = stable_from.expect("编辑器应出现内容稳定的连续帧");
     let key = raw[stable_from][0];
 
-    // 2) 冻结方案模型：稳定帧零重传；变更/驱逐/新 session 才重传。
+    // 2) 正控（062 生产路径：内容身份 + 驻留缓存）：同一 surface 连帧，
+    //    首帧上传、稳定帧零上传、字节级变更才重传、改回命中驻留。
+    let mut surface = HeadlessSurface::new(RepairComponent { view: stable.clone() }, W, H);
+    let mut per_frame = Vec::new();
+    for _ in 0..5 {
+        let _ = surface.render_frame_v2();
+        per_frame.push(surface.drain_bitmap_uploads().len());
+    }
+    let (uploads, _uploaded_bytes, hits, _evictions, resident) = surface.resource_stats();
+    println!(
+        "[RQREPAIR] {}",
+        serde_json::json!({
+            "tag": "fr4_production_cache", "uploads_per_frame": per_frame,
+            "total_uploads": uploads, "hits": hits, "resident_bytes": resident,
+        })
+    );
+    assert!(per_frame[0] > 0, "首帧必须上传资源");
+    assert_eq!(
+        per_frame[1..].iter().sum::<usize>(),
+        0,
+        "稳定帧必须零重传（P-02/V-06）"
+    );
+    assert!(hits > 0, "稳定帧必须命中驻留缓存");
+    assert_eq!(uploads as usize, per_frame[0], "稳定段不得产生新上传");
+
+    // 内容变更 → 新身份 → 一次重传；改回 → 命中驻留（零重传）。
+    // 用矢量图标（生产端栅格化资源）做内容变更面：改文本不必然改变位图。
+    let mut icon_surface = HeadlessSurface::new(
+        RepairComponent {
+            view: View::image("lucide:bell"),
+        },
+        W,
+        H,
+    );
+    let _ = icon_surface.render_frame_v2();
+    let first_icon_uploads = icon_surface.drain_bitmap_uploads().len();
+    assert!(first_icon_uploads > 0, "矢量图标必须栅格化为位图资源");
+    let _ = icon_surface.render_frame_v2();
+    assert_eq!(
+        icon_surface.drain_bitmap_uploads().len(),
+        0,
+        "同图标稳定帧必须零重传"
+    );
+    icon_surface.component.view = View::image("lucide:check");
+    let _ = icon_surface.render_frame_v2();
+    let changed_upload_count = icon_surface.drain_bitmap_uploads().len();
+    assert!(changed_upload_count > 0, "内容变更必须以新身份重传一次");
+    icon_surface.component.view = View::image("lucide:bell");
+    let _ = icon_surface.render_frame_v2();
+    assert_eq!(
+        icon_surface.drain_bitmap_uploads().len(),
+        0,
+        "改回原内容必须命中驻留缓存"
+    );
+
+    // 驱逐 → 同内容重传一次（小上限迫使最早键出列）。
+    icon_surface.set_resource_limit_bytes(1);
+    let _ = icon_surface.render_frame_v2();
+    assert!(
+        !icon_surface.drain_bitmap_uploads().is_empty(),
+        "驱逐后同内容必须重传（可解释的重传）"
+    );
+    let (_, _, _, evictions, _) = icon_surface.resource_stats();
+    assert!(evictions > 0, "小上限必须发生驱逐");
+    println!(
+        "[RQREPAIR] {}",
+        serde_json::json!({
+            "tag": "fr4_change_evict", "changed_uploads": changed_upload_count,
+            "evictions": evictions,
+        })
+    );
+
+    // 3) 冻结方案模型：稳定帧零重传；变更/驱逐/新 session 才重传。
     let mut registry = ResourceRegistry::new();
     let g1 = registry.observe(ResourceKind::Bitmap, key);
     assert!(g1.is_some(), "首次出现必须上传");
@@ -568,28 +639,15 @@ fn rq_repair_fr4_resource_identity_zero_reupload() {
         .count();
     assert_eq!(stable_uploads, 0, "稳定帧（第 2 帧起）必须零上传");
 
-    // 内容变更 → 新键 → 重传
-    let changed: View<()> = View::code_editor("fr4-stable")
-        .value("fn main() {\n    println!(\"变更\");\n}")
-        .lang("rust")
-        .build();
-    // 内容变更：取同一稳定上传的字节做一次真实字节级修改（blake3 重算），
-    // 证明方案对“同尺寸不同内容”产生新身份并重传。
-    let mut warm_surface = HeadlessSurface::new(RepairComponent { view: stable.clone() }, W, H);
-    for _ in 0..3 {
-        let _ = warm_surface.render_frame_v2();
-        let _ = warm_surface.drain_bitmap_uploads();
-    }
-    let base_upload = {
-        let _ = warm_surface.render_frame_v2();
-        let ups = warm_surface.drain_bitmap_uploads();
-        assert!(!ups.is_empty(), "稳定帧应有位图上传");
-        ups.into_iter().next().unwrap()
-    };
-    assert_eq!(bitmap_key(&base_upload), key, "稳定上传内容键应可复现");
-    let mut changed_bytes = base_upload.clone();
-    changed_bytes.rgba[0] ^= 0xFF;
-    let changed_key = bitmap_key(&changed_bytes);
+    let mut changed_bytes = raw[stable_from][0];
+    changed_bytes[0] ^= 0xFF;
+    let changed_key = bitmap_key(&super::super::endpoint::BitmapUpload {
+        id: String::new(),
+        w: 1,
+        h: 1,
+        stride: 4,
+        rgba: changed_bytes.to_vec(),
+    });
     assert_ne!(changed_key, key, "字节级内容变更必须产生不同内容键");
     let g2 = registry.observe(ResourceKind::Bitmap, changed_key);
     assert!(g2.is_some(), "内容变更必须重传");
@@ -612,11 +670,11 @@ fn rq_repair_fr4_resource_identity_zero_reupload() {
             "first_gen": g1, "changed_gen": g2,
             "stable_frame_uploads": stable_uploads,
             "evict_reupload": true, "new_session_reupload": true,
-            "note": "冻结方案：内容身份+generation → 稳定帧 0 上传；实现归 UI062/UI063",
+            "note": "内容身份+generation 模型与 062 生产缓存同律（V-06 关闭口径）",
         })
     );
 
-    // 3) 资源种类通用性：同一注册表可承载 bitmap/font/svg/mesh/media 身份。
+    // 4) 资源种类通用性：同一注册表可承载 bitmap/font/svg/mesh/media 身份。
     let mut multi = ResourceRegistry::new();
     let mut kinds = Vec::new();
     for kind in [

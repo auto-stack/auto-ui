@@ -694,8 +694,8 @@ fn rq_measure(view: View<()>, png: Option<&Path>) -> Result<RqMeasure, String> {
         let t = Instant::now();
         let mut obs: Vec<String> = Vec::new();
         let mut bms: Vec<super::super::endpoint::BitmapUpload> = Vec::new();
-        let mut seq = 0usize;
-        let list = lower_layers_v2(&layers, &mut obs, &mut bms, &mut seq);
+        let mut cache = ResourceCache::default();
+        let list = lower_layers_v2(&layers, &mut obs, &mut cache, &mut bms);
         let lower_d = t.elapsed();
 
         let t = Instant::now();

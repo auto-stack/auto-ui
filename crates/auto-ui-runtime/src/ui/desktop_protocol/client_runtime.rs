@@ -466,6 +466,9 @@ pub struct ClientPump<S: FrameSource> {
     /// PLAN-683（remote 模式）：v2 产线帧（DisplayList 载荷——shm 槽
     /// 载荷种类 tag 2 / 内嵌 = FrameReadyV2）。缺省 false = v1 既有行为。
     v2: bool,
+    /// PLAN-062 T-04：被背压推迟的帧（槽用尽时不丢帧——credit 归还后补发，
+    /// 输入/资源依赖与 revision 前进一起保留）。
+    frame_pending: bool,
 }
 
 /// 进程级泵起点（诊断时间戳基准）。
@@ -494,6 +497,7 @@ impl<S: FrameSource> ClientPump<S> {
             disconnected_at: None,
             spent: false,
             v2: false,
+            frame_pending: false,
         };
         pump.attach(projector);
         pump
@@ -622,7 +626,7 @@ impl<S: FrameSource> ClientPump<S> {
         // PLAN-034（D3）：位图上传排水在产帧前（管道 FIFO——宿主先
         // BitmapReady 入缓存，后合成引用帧）。
         self.drain_bitmap_uploads();
-        if advanced {
+        if advanced || self.frame_pending {
             self.push_frame();
         }
         // PLAN-033 T-03③（D3）：timer 拍的 handler 可能写 `__desktop_cmd`
@@ -879,16 +883,27 @@ impl<S: FrameSource> ClientPump<S> {
         // PLAN-683（remote 模式）：v2 位分派——同 shm 槽纪律，载荷种类
         // tag 区分（宿主按槽内首字节分派）；无 shm 段回退内嵌
         //（FrameReadyV2 / FrameReady）。
+        self.frame_pending = false;
         let frame = if self.v2 {
             match app.produce_frame_shared_v2(shm, None) {
                 Ok(f) => Some(f),
                 Err(super::endpoint::ProtocolError::Shm(_)) => app.produce_frame_v2(None).ok(),
+                Err(super::endpoint::ProtocolError::Backpressure { .. }) => {
+                    // PLAN-062 T-04：槽未归还 → 保留待发状态，下一拍重试（不丢帧、
+                    // 不覆盖在途槽）。
+                    self.frame_pending = true;
+                    None
+                }
                 Err(_) => None,
             }
         } else {
             match app.produce_frame_shared(shm, None) {
                 Ok(f) => Some(f),
                 Err(super::endpoint::ProtocolError::Shm(_)) => app.produce_frame(None).ok(),
+                Err(super::endpoint::ProtocolError::Backpressure { .. }) => {
+                    self.frame_pending = true;
+                    None
+                }
                 Err(_) => None,
             }
         };

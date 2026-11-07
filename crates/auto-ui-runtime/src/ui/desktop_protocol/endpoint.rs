@@ -40,6 +40,9 @@ pub enum ProtocolError {
     ResolveFailed(String),
     /// 共享内存操作失败（S9）。
     Shm(TransportError),
+    /// 背压：本 App 的在途槽已用尽（未 ACK），本次不产帧且**不覆盖**在途
+    /// 槽（PLAN-062 T-04 / P-01）。调用方应保留待发状态稍后重试。
+    Backpressure { resource: &'static str },
 }
 
 impl From<CodecError> for ProtocolError {
@@ -209,10 +212,17 @@ pub struct AppEndpoint<S: FrameSource> {
     pub free_slots: Vec<u8>,
     /// 槽总数（Welcome 后 = 2）。
     slot_count: u8,
+    /// PLAN-062 T-04：在途（已产帧、未 ACK）的槽——不得被覆盖。
+    in_flight: std::collections::BTreeSet<u8>,
+    /// PLAN-062 T-04：曾经承载过内容的槽（未用过的槽可直接使用）。
+    used_slots: std::collections::BTreeSet<u8>,
     /// PLAN-034：位图槽（双缓冲翻转基线——BitmapReady/Ack 纪律镜像帧槽）。
     bm_last_slot: u8,
     /// PLAN-034：位图空闲槽（BitmapAck 归还）。
     pub bm_free_slots: Vec<u8>,
+    /// PLAN-062 T-04：位图在途槽与已用槽（同帧槽纪律）。
+    bm_in_flight: std::collections::BTreeSet<u8>,
+    bm_used_slots: std::collections::BTreeSet<u8>,
 }
 
 impl<S: FrameSource> AppEndpoint<S> {
@@ -239,6 +249,10 @@ impl<S: FrameSource> AppEndpoint<S> {
             last_slot: 0,
             free_slots: Vec::new(),
             slot_count: 0,
+            in_flight: std::collections::BTreeSet::new(),
+            used_slots: std::collections::BTreeSet::new(),
+            bm_in_flight: std::collections::BTreeSet::new(),
+            bm_used_slots: std::collections::BTreeSet::new(),
         }
     }
 
@@ -252,6 +266,53 @@ impl<S: FrameSource> AppEndpoint<S> {
     pub fn with_surfaces(mut self, surfaces: Vec<super::message::SurfaceDecl>) -> Self {
         self.surfaces = surfaces;
         self
+    }
+
+    /// 取一个可用帧槽：空闲池优先，其次从未使用过的槽；否则背压（不覆盖在途槽）。
+    fn take_frame_slot(&mut self) -> Result<u8, ProtocolError> {
+        let slot = if let Some(slot) = self.free_slots.pop() {
+            slot
+        } else if let Some(slot) = (0..self.slot_count.max(2))
+            .find(|slot| !self.used_slots.contains(slot))
+        {
+            slot
+        } else {
+            return Err(ProtocolError::Backpressure { resource: "frame" });
+        };
+        self.last_slot = slot;
+        self.in_flight.insert(slot);
+        self.used_slots.insert(slot);
+        Ok(slot)
+    }
+
+    /// 取一个可用位图槽（同帧槽纪律）。
+    fn take_bitmap_slot(&mut self) -> Result<u8, ProtocolError> {
+        let slot = if let Some(slot) = self.bm_free_slots.pop() {
+            slot
+        } else if let Some(slot) = (0..self.slot_count.max(2))
+            .find(|slot| !self.bm_used_slots.contains(slot))
+        {
+            slot
+        } else {
+            return Err(ProtocolError::Backpressure { resource: "bitmap" });
+        };
+        self.bm_last_slot = slot;
+        self.bm_in_flight.insert(slot);
+        self.bm_used_slots.insert(slot);
+        Ok(slot)
+    }
+
+    /// 当前可产帧数（背压观测/调度用）。
+    pub fn frame_credits(&self) -> usize {
+        let unused = (0..self.slot_count.max(2))
+            .filter(|slot| !self.used_slots.contains(slot))
+            .count();
+        self.free_slots.len() + unused
+    }
+
+    /// 帧槽在途数（未 ACK）。
+    pub fn frames_in_flight(&self) -> usize {
+        self.in_flight.len()
     }
 
     /// 发起孵化握手：Detached → Handshaking，产出 Hello。
@@ -293,11 +354,8 @@ impl<S: FrameSource> AppEndpoint<S> {
         if self.state != AppState::Active {
             return Err(ProtocolError::NotActive);
         }
-        let slot = match self.free_slots.pop() {
-            Some(s) => s,
-            None => 1 - self.last_slot,
-        };
-        self.last_slot = slot;
+        let slot = self.take_frame_slot()?;
+
         self.next_frame_id += 1;
         let payload = self.session.render_frame();
         Ok(ProtocolMsg::Frame(super::message::FrameMsg::FrameReady {
@@ -320,11 +378,8 @@ impl<S: FrameSource> AppEndpoint<S> {
         if self.state != AppState::Active {
             return Err(ProtocolError::NotActive);
         }
-        let slot = match self.free_slots.pop() {
-            Some(s) => s,
-            None => 1 - self.last_slot,
-        };
-        self.last_slot = slot;
+        let slot = self.take_frame_slot()?;
+
         self.next_frame_id += 1;
         let payload = self.session.render_frame();
         let mut encoded = Vec::new();
@@ -352,11 +407,8 @@ impl<S: FrameSource> AppEndpoint<S> {
         if self.state != AppState::Active {
             return Err(ProtocolError::NotActive);
         }
-        let slot = match self.free_slots.pop() {
-            Some(s) => s,
-            None => 1 - self.last_slot,
-        };
-        self.last_slot = slot;
+        let slot = self.take_frame_slot()?;
+
         self.next_frame_id += 1;
         let payload = self.session.render_frame_v2();
         super::message::rf_textdump("prod", &payload);
@@ -381,11 +433,8 @@ impl<S: FrameSource> AppEndpoint<S> {
         if self.state != AppState::Active {
             return Err(ProtocolError::NotActive);
         }
-        let slot = match self.free_slots.pop() {
-            Some(s) => s,
-            None => 1 - self.last_slot,
-        };
-        self.last_slot = slot;
+        let slot = self.take_frame_slot()?;
+
         self.next_frame_id += 1;
         let payload = self.session.render_frame_v2();
         let mut encoded = Vec::new();
@@ -417,11 +466,8 @@ impl<S: FrameSource> AppEndpoint<S> {
         if self.state != AppState::Active {
             return Err(ProtocolError::NotActive);
         }
-        let slot = match self.bm_free_slots.pop() {
-            Some(s) => s,
-            None => 1 - self.bm_last_slot,
-        };
-        self.bm_last_slot = slot;
+        let slot = self.take_bitmap_slot()?;
+
         shm.write_slot(slot, &up.rgba).map_err(ProtocolError::Shm)?;
         Ok(ProtocolMsg::Frame(super::message::FrameMsg::BitmapReady {
             wid: self.wid.expect("Active 即有 wid"),
@@ -448,11 +494,8 @@ impl<S: FrameSource> AppEndpoint<S> {
         if self.state != AppState::Active {
             return Err(ProtocolError::NotActive);
         }
-        let slot = match self.free_slots.pop() {
-            Some(s) => s,
-            None => 1 - self.last_slot,
-        };
-        self.last_slot = slot;
+        let slot = self.take_frame_slot()?;
+
         self.next_frame_id += 1;
         shm.write_slot(slot, rgba).map_err(ProtocolError::Shm)?;
         Ok(ProtocolMsg::Frame(
@@ -552,11 +595,15 @@ impl<S: FrameSource> AppEndpoint<S> {
                 }
             }
             (Active, ProtocolMsg::Frame(super::message::FrameMsg::FrameAck { slot, .. })) => {
+                // PLAN-062 T-04：ACK 只归还传输槽并清在途标记（GPU 寿命由
+                // Host fence 管理，App 不得据 ACK 判资源已完成）。
+                self.in_flight.remove(&slot);
                 self.free_slots.push(slot);
                 Ok(vec![])
             }
             // PLAN-034（D3）：位图槽归还——同 FrameAck 纪律。
             (Active, ProtocolMsg::Frame(super::message::FrameMsg::BitmapAck { slot, .. })) => {
+                self.bm_in_flight.remove(&slot);
                 self.bm_free_slots.push(slot);
                 Ok(vec![])
             }
@@ -584,6 +631,10 @@ impl<S: FrameSource> AppEndpoint<S> {
                 self.slot_count = 0;
                 self.free_slots.clear();
                 self.bm_free_slots.clear();
+                self.in_flight.clear();
+                self.used_slots.clear();
+                self.bm_in_flight.clear();
+                self.bm_used_slots.clear();
                 Ok(vec![])
             }
             (Active, ProtocolMsg::Observe(ob)) => {
@@ -1356,6 +1407,49 @@ mod tests {
             panic!()
         };
         assert_eq!((*frame_id, *slot), (2, 1));
+    }
+
+    #[test]
+    fn frame_slot_credits_backpressure_without_overwrite() {
+        // PLAN-062 T-04（P-01）：容量耗尽必须有界背压，不得覆盖未 ACK 槽。
+        let mut app = AppEndpoint::new(StubSource::new(), "counter", "c", 480.0, 320.0);
+        let mut host = HostEndpoint::listen();
+        let _ = activate_pair(&mut app, &mut host);
+
+        let slot_of = |m: &ProtocolMsg| -> u8 {
+            let ProtocolMsg::Frame(FrameMsg::FrameReady { slot, .. }) = m else {
+                panic!("FrameReady");
+            };
+            *slot
+        };
+
+        let f0 = app.produce_frame(None).unwrap();
+        let f1 = app.produce_frame(None).unwrap();
+        let (slot0, slot1) = (slot_of(&f0), slot_of(&f1));
+        assert_ne!(slot0, slot1, "两帧应分别占用两槽");
+        assert_eq!(app.frame_credits(), 0);
+        assert_eq!(app.frames_in_flight(), 2);
+
+        match app.produce_frame(None) {
+            Err(ProtocolError::Backpressure { resource }) => {
+                assert_eq!(resource, "frame", "背压原因须具名");
+            }
+            Ok(_) => panic!("第三帧无 credit 时不得产帧（会覆盖未 ACK 槽）"),
+            Err(other) => panic!("背压应以 Backpressure 报出，实得 {other:?}"),
+        }
+        assert_eq!(app.frames_in_flight(), 2, "背压不得改变在途账");
+
+        // 归还一个槽 → 恢复产帧并沿用归还槽。
+        app.on_message(ProtocolMsg::Frame(FrameMsg::FrameAck {
+            wid: 3,
+            frame_id: 1,
+            slot: slot0,
+        }))
+        .unwrap();
+        assert_eq!(app.frame_credits(), 1);
+        let f2 = app.produce_frame(None).unwrap();
+        assert_eq!(slot_of(&f2), slot0, "归还槽优先复用");
+        assert_eq!(app.frames_in_flight(), 2);
     }
 
     #[test]

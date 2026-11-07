@@ -351,8 +351,8 @@ pub fn rf_textdump(tag: &str, list: &DisplayList) {
     if DUMPS.fetch_add(1, Ordering::Relaxed) >= 8 {
         return;
     }
-    let (mut q, mut t, mut s, mut sp, mut tr, mut trp, mut im) =
-        (0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32);
+    let (mut q, mut t, mut s, mut sp, mut tr, mut trp, mut im, mut pa) =
+        (0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32);
     for op in &list.ops {
         match op {
             DisplayOp::Quad { .. } => q += 1,
@@ -362,10 +362,11 @@ pub fn rf_textdump(tag: &str, list: &DisplayList) {
             DisplayOp::Transform { .. } => tr += 1,
             DisplayOp::TransformPop => trp += 1,
             DisplayOp::Image { .. } => im += 1,
+            DisplayOp::Path { .. } => pa += 1,
         }
     }
     eprintln!(
-        "[rf-dump:{tag}] ops={} quad={q} text={t} scissor={s}/{sp} transform={tr}/{trp} image={im} clear={:?}",
+        "[rf-dump:{tag}] ops={} quad={q} text={t} scissor={s}/{sp} transform={tr}/{trp} image={im} path={pa} clear={:?}",
         list.ops.len(),
         list.clear
     );
@@ -430,6 +431,88 @@ pub struct ShadowSpec {
     pub blur: f32,
 }
 
+/// v3 路径段（tiny_skia verb 直落）：mesh/canvas 几何以 `Primitive::Fill/Stroke`
+/// 记录时坐标已烘焙变换（061 T-02 实测），故此处坐标即最终设备坐标。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PathSeg {
+    MoveTo(f32, f32),
+    LineTo(f32, f32),
+    QuadTo(f32, f32, f32, f32),
+    CubicTo(f32, f32, f32, f32, f32, f32),
+    Close,
+}
+
+impl PathSeg {
+    fn encode(&self, out: &mut Vec<u8>) {
+        match self {
+            PathSeg::MoveTo(x, y) => {
+                put_u8(out, 1);
+                put_f32(out, *x);
+                put_f32(out, *y);
+            }
+            PathSeg::LineTo(x, y) => {
+                put_u8(out, 2);
+                put_f32(out, *x);
+                put_f32(out, *y);
+            }
+            PathSeg::QuadTo(x1, y1, x, y) => {
+                put_u8(out, 3);
+                for v in [x1, y1, x, y] {
+                    put_f32(out, *v);
+                }
+            }
+            PathSeg::CubicTo(x1, y1, x2, y2, x, y) => {
+                put_u8(out, 4);
+                for v in [x1, y1, x2, y2, x, y] {
+                    put_f32(out, *v);
+                }
+            }
+            PathSeg::Close => put_u8(out, 5),
+        }
+    }
+
+    fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
+        Ok(match r.u8()? {
+            1 => PathSeg::MoveTo(r.f32()?, r.f32()?),
+            2 => PathSeg::LineTo(r.f32()?, r.f32()?),
+            3 => PathSeg::QuadTo(r.f32()?, r.f32()?, r.f32()?, r.f32()?),
+            4 => PathSeg::CubicTo(
+                r.f32()?,
+                r.f32()?,
+                r.f32()?,
+                r.f32()?,
+                r.f32()?,
+                r.f32()?,
+            ),
+            5 => PathSeg::Close,
+            tag => return Err(CodecError::UnknownTag(tag)),
+        })
+    }
+}
+
+/// v3 路径（按绘制序的段序列；坐标已烘焙变换，见 [`PathSeg`]）。
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct WirePath {
+    pub segs: Vec<PathSeg>,
+}
+
+impl WirePath {
+    pub fn is_empty(&self) -> bool {
+        self.segs.is_empty()
+    }
+}
+
+/// v3 描边参数（宽度/颜色/线帽/连接；tiny_skia `Stroke` 语义）。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WireStroke {
+    pub width: f32,
+    pub color: Rgba8,
+    /// tiny_skia `LineCap`：0 Butt / 1 Round / 2 Square。
+    pub cap: u8,
+    /// tiny_skia `LineJoin`：0 Miter / 1 Round / 2 Bevel。
+    pub join: u8,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum DisplayOp {
     /// 全参 quad（v1 Quad/QuadR 合并超集）：`radius` = 四角 [TL,TR,BR,BL]。
@@ -468,6 +551,15 @@ pub enum DisplayOp {
         rect: WRect,
         src: String,
         fit: ImageFit,
+    },
+    /// v3 路径填充/描边（mesh/canvas 几何；payload kind 3 专属）。填充与描边
+    /// 可同时在场（iced `Primitive::Fill/Stroke` 各自独立记录，gex 同序）。
+    Path {
+        path: WirePath,
+        fill: Option<Fill>,
+        /// true = even-odd，false = non-zero（tiny_skia FillRule）。
+        even_odd: bool,
+        stroke: Option<WireStroke>,
     },
 }
 
@@ -548,8 +640,19 @@ impl DisplayList {
         }
     }
 
+    /// 载荷含 v3 专属原语（当前为 `Path`）。
+    pub fn requires_v3(&self) -> bool {
+        self.ops
+            .iter()
+            .any(|op| matches!(op, DisplayOp::Path { .. }))
+    }
+
     pub fn encode(&self, out: &mut Vec<u8>) {
-        put_u8(out, 2); // 载荷种类 tag：2 = DisplayList v2
+        // 载荷种类 tag：2 = DisplayList v2（七原语）、3 = v3（v2 超集 +
+        // Path）。纯 v2 词汇仍以 2 编码，旧 Host 可继续双读；
+        // 仅当出现 v3 专属原语才升 3（旧端按 UnknownTag(3) 明确拒绝并保旧帧）。
+        let v3 = self.requires_v3();
+        put_u8(out, if v3 { 3 } else { 2 });
         match self.clear {
             Some(c) => {
                 put_bool(out, true);
@@ -634,15 +737,47 @@ impl DisplayList {
                     put_string(out, src);
                     put_u8(out, fit.as_u8());
                 }
+                DisplayOp::Path {
+                    path,
+                    fill,
+                    even_odd,
+                    stroke,
+                } => {
+                    put_u8(out, 8);
+                    put_u32(out, path.segs.len() as u32);
+                    for seg in &path.segs {
+                        seg.encode(out);
+                    }
+                    match fill {
+                        Some(fill) => {
+                            put_bool(out, true);
+                            encode_fill(out, fill);
+                        }
+                        None => put_bool(out, false),
+                    }
+                    put_bool(out, *even_odd);
+                    match stroke {
+                        Some(s) => {
+                            put_bool(out, true);
+                            put_f32(out, s.width);
+                            s.color.encode(out);
+                            put_u8(out, s.cap);
+                            put_u8(out, s.join);
+                        }
+                        None => put_bool(out, false),
+                    }
+                }
             }
         }
     }
 
     pub fn decode(r: &mut Reader<'_>) -> Result<Self, CodecError> {
         let kind = r.u8()?;
-        if kind != 2 {
-            return Err(CodecError::UnknownTag(kind));
-        }
+        let v3 = match kind {
+            2 => false,
+            3 => true,
+            other => return Err(CodecError::UnknownTag(other)),
+        };
         let clear = if r.bool()? {
             Some(Rgba8::decode(r)?)
         } else {
@@ -726,6 +861,39 @@ impl DisplayList {
                     let fit = ImageFit::from_u8(r.u8()?)?;
                     ops.push(DisplayOp::Image { rect, src, fit });
                 }
+                8 if v3 => {
+                    let n = r.u32()? as usize;
+                    let mut segs = Vec::with_capacity(n.min(4096));
+                    for _ in 0..n {
+                        segs.push(PathSeg::decode(r)?);
+                    }
+                    let fill = if r.bool()? {
+                        Some(decode_fill(r)?)
+                    } else {
+                        None
+                    };
+                    let even_odd = r.bool()?;
+                    let stroke = if r.bool()? {
+                        let width = r.f32()?;
+                        let color = Rgba8::decode(r)?;
+                        let cap = r.u8()?;
+                        let join = r.u8()?;
+                        Some(WireStroke {
+                            width,
+                            color,
+                            cap,
+                            join,
+                        })
+                    } else {
+                        None
+                    };
+                    ops.push(DisplayOp::Path {
+                        path: WirePath { segs },
+                        fill,
+                        even_odd,
+                        stroke,
+                    });
+                }
                 tag => return Err(CodecError::UnknownTag(tag)),
             }
         }
@@ -766,6 +934,123 @@ fn decode_fill(r: &mut Reader<'_>) -> Result<Fill, CodecError> {
             Ok(Fill::LinearGradient { angle, stops })
         }
         tag => Err(CodecError::UnknownTag(tag)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 能力协商与入帧准入（PLAN-062 T-04；ID 冻结见 061 T-03 / rq-fidelity-contract §7）
+// ---------------------------------------------------------------------------
+
+pub const CAP_PATH_FILL: &str = "fidelity/pathfill/1";
+pub const CAP_GLYPH_RUN: &str = "fidelity/glyphrun/1";
+pub const CAP_SVG_RASTER: &str = "fidelity/svg-raster/1";
+pub const CAP_IMAGE_PARAMS: &str = "fidelity/image-params/1";
+pub const CAP_BLUR_SDF: &str = "fidelity/blur-sdf/1";
+pub const CAP_RESOURCE_GENERATION: &str = "resource/generation/1";
+pub const CAP_BACKPRESSURE: &str = "pipeline/backpressure/1";
+pub const CAP_ACK_FENCE_SPLIT: &str = "ack/fence-split/1";
+
+/// 冻结的八个能力 ID（声明序稳定）。
+pub const ALL_FIDELITY_CAPS: [&str; 8] = [
+    CAP_PATH_FILL,
+    CAP_GLYPH_RUN,
+    CAP_SVG_RASTER,
+    CAP_IMAGE_PARAMS,
+    CAP_BLUR_SDF,
+    CAP_RESOURCE_GENERATION,
+    CAP_BACKPRESSURE,
+    CAP_ACK_FENCE_SPLIT,
+];
+
+/// 能力声明集合。线词汇：`required:<cap>` / `optional:<cap>`；裸串按
+/// **optional** 解释（旧端 tail 只有裸串，保持字节兼容与不阻塞）。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CapabilitySet {
+    pub required: Vec<String>,
+    pub optional: Vec<String>,
+}
+
+impl CapabilitySet {
+    pub fn parse(tail: &[String]) -> Self {
+        let mut set = Self::default();
+        for token in tail {
+            let token = token.trim();
+            if token.is_empty() {
+                continue;
+            }
+            if let Some(cap) = token.strip_prefix("required:") {
+                set.required.push(cap.to_string());
+            } else if let Some(cap) = token.strip_prefix("optional:") {
+                set.optional.push(cap.to_string());
+            } else {
+                set.optional.push(token.to_string());
+            }
+        }
+        set
+    }
+
+    /// 全部冻结能力按 optional 声明（支持但不强制对端）。
+    pub fn all_optional() -> Self {
+        Self {
+            required: Vec::new(),
+            optional: ALL_FIDELITY_CAPS.iter().map(|c| c.to_string()).collect(),
+        }
+    }
+
+    pub fn supports(&self, cap: &str) -> bool {
+        self.required.iter().any(|c| c == cap) || self.optional.iter().any(|c| c == cap)
+    }
+
+    /// 回写线词汇（required 保留强制语义）。
+    pub fn to_wire(&self) -> Vec<String> {
+        self.required
+            .iter()
+            .map(|c| format!("required:{c}"))
+            .chain(self.optional.iter().map(|c| format!("optional:{c}")))
+            .collect()
+    }
+}
+
+/// 入帧前准入失败：具名拒绝，调用方保旧帧（不呈现半帧）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AdmissionError {
+    /// 帧需要、而对端未声明支持的能力（required 语义）。
+    UnknownRequiredCapability(String),
+}
+
+impl std::fmt::Display for AdmissionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AdmissionError::UnknownRequiredCapability(cap) => {
+                write!(f, "对端不支持必需能力：{cap}")
+            }
+        }
+    }
+}
+
+impl DisplayList {
+    /// 载荷依赖的能力 ID（当前 v3 增量：路径填充/描边）。
+    pub fn required_capabilities(&self) -> Vec<&'static str> {
+        let mut caps = Vec::new();
+        if self
+            .ops
+            .iter()
+            .any(|op| matches!(op, DisplayOp::Path { .. }))
+        {
+            caps.push(CAP_PATH_FILL);
+        }
+        caps
+    }
+
+    /// 入帧前准入：必需能力必须被对端声明支持，否则具名拒绝（保旧帧）。
+    /// optional 缺失不阻塞（降级须由重放端产出可观测事件）。
+    pub fn admit(&self, peer: &CapabilitySet) -> Result<(), AdmissionError> {
+        for cap in self.required_capabilities() {
+            if !peer.supports(cap) {
+                return Err(AdmissionError::UnknownRequiredCapability(cap.to_string()));
+            }
+        }
+        Ok(())
     }
 }
 

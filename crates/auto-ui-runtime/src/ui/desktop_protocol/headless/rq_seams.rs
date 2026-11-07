@@ -896,7 +896,10 @@ fn rq_wire_t03_frame_atomicity_and_guards() {
     // 4) 帧原子性/保旧：坏载荷解码失败 → 不 compose → front 保持上一完整帧。
     let mut store = SurfaceStore::new();
     let sid = store.alloc(100.0, 60.0);
-    let freed = store.compose_v2(sid, 1, frame.clone()).expect("首帧合成");
+    let freed = store
+        .compose_v2(sid, 1, frame.clone())
+        .expect("准入通过（v2 词汇无需能力声明）")
+        .expect("首帧合成");
     assert_eq!(freed, 0, "首帧释放的应是另一槽");
     assert_eq!(store.front_v2(sid).unwrap().ops.len(), 3);
     // 应用层只在解码成功时 compose（host.rs/rqhost.rs 现有纪律）。

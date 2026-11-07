@@ -483,13 +483,30 @@ mod tests {
         );
 
         // 帧递增 ×2：frame_id 单调、槽交替、宿主从 shm 读到字节。
+        // PLAN-062 T-04：槽 = 信用，宿主合成后必须归还旧前台槽，App 才能
+        // 继续产帧（不得覆盖未 ACK 槽）。
         let f2 = PixelsFrame::solid(64, 32, [10, 20, 30, 255]);
         let f3 = PixelsFrame::solid(64, 32, [1, 2, 3, 255]);
-        for (i, frame) in [f2, f3].into_iter().enumerate() {
-            child.request_capture();
-            let msg = child.capture(frame).expect(&format!("帧 {}", i + 2));
-            frames.push(msg);
+        child.request_capture();
+        let m2 = child.capture(f2).expect("帧 2");
+        let slot_f2 = slot_of(&m2);
+        frames.push(m2);
+        // 宿主把 f2 合成进新槽 → 归还此前前台槽（两槽轮转的另一槽）。
+        let freed_slot = 1 - slot_f2;
+        let replies = child.on_protocol(
+            ProtocolMsg::Frame(FrameMsg::FrameAck {
+                wid: 7,
+                frame_id: 1,
+                slot: freed_slot,
+            }),
+            None,
+        );
+        for r in replies.0 {
+            host_end.send(&r).unwrap();
         }
+        child.request_capture();
+        let m3 = child.capture(f3).expect("帧 3");
+        frames.push(m3);
 
         let ids: Vec<u64> = frames.iter().map(|m| frame_id_of(m)).collect();
         assert_eq!(ids, vec![1, 2, 3], "frame_id 单调递增");
@@ -529,6 +546,18 @@ mod tests {
         );
         assert!(replies.is_empty());
         assert!(want, "输入触发截图");
+        // f3 合成后宿主归还 f2 的槽——f4 才再次有 credit（不覆盖在途槽）。
+        let replies = child.on_protocol(
+            ProtocolMsg::Frame(FrameMsg::FrameAck {
+                wid: 7,
+                frame_id: 2,
+                slot: slot_f2,
+            }),
+            None,
+        );
+        for r in replies.0 {
+            host_end.send(&r).unwrap();
+        }
         assert!(child.request_capture());
         let m4 = child
             .capture(PixelsFrame::solid(64, 32, [9, 9, 9, 255]))

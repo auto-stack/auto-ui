@@ -5685,13 +5685,27 @@ impl DesktopSession {
                     payload,
                     ..
                 } => {
-                    if let Some(freed) = client.surfaces.compose_v2(surface, slot, payload) {
-                                crate::ui::theme_policy::mark_shell_dirty();
-                        to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
-                            wid,
-                            frame_id,
-                            slot: freed,
-                        }));
+                    match client.surfaces.compose_v2(surface, slot, payload) {
+                        Ok(Some(freed)) => {
+                            crate::ui::theme_policy::mark_shell_dirty();
+                            to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
+                                wid,
+                                frame_id,
+                                slot: freed,
+                            }));
+                        }
+                        Ok(None) => {}
+                        Err(err) => {
+                            // PLAN-062 T-04：准入拒绝保旧帧并归还传输槽。
+                            eprintln!(
+                                "[rq-admission] 拒绝入帧 surface={surface} frame={frame_id}: {err}（保旧帧）"
+                            );
+                            to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
+                                wid,
+                                frame_id,
+                                slot,
+                            }));
+                        }
                     }
                 }
                 HostAction::ComposeFrameShared {
@@ -5718,14 +5732,26 @@ impl DesktopSession {
                             // Frame text may include credentials or private app content.
                             // Keep transport diagnostics structural only.
                             eprintln!("[plan060] frame2 wid={wid} nops={}", payload.ops.len());
-                            if let Some(freed) = client.surfaces.compose_v2(surface, slot, payload)
-                            {
-                                crate::ui::theme_policy::mark_shell_dirty();
-                                to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
-                                    wid,
-                                    frame_id,
-                                    slot: freed,
-                                }));
+                            match client.surfaces.compose_v2(surface, slot, payload) {
+                                Ok(Some(freed)) => {
+                                    crate::ui::theme_policy::mark_shell_dirty();
+                                    to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
+                                        wid,
+                                        frame_id,
+                                        slot: freed,
+                                    }));
+                                }
+                                Ok(None) => {}
+                                Err(err) => {
+                                    eprintln!(
+                                        "[rq-admission] 拒绝入帧 surface={surface} frame={frame_id}: {err}（保旧帧）"
+                                    );
+                                    to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
+                                        wid,
+                                        frame_id,
+                                        slot,
+                                    }));
+                                }
                             }
                         }
                         continue;

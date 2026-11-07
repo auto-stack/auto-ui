@@ -20,8 +20,8 @@
 
 use crate::ui::component::Component;
 use crate::ui::desktop_protocol::message::{
-    BorderSpec, ControlMsg, DisplayList, DisplayOp, DrawList, DrawOp, Fill, ImeReq, Rgba8,
-    ShadowSpec, WRect,
+    BorderSpec, ControlMsg, DisplayList, DisplayOp, DrawList, DrawOp, Fill, ImeReq, PathSeg, Rgba8,
+    ShadowSpec, WirePath, WireStroke, WRect,
 };
 use crate::ui::iced::renderer::IntoIcedElement;
 
@@ -76,6 +76,119 @@ pub struct HeadlessSurface<C: Component> {
     /// 内容——上行 Preedit 事件 → App iced 态 → 原样上报的环测断言口；
     /// wire ImeRequest v1 不携带组合串本体）。
     preedit_reported: Option<String>,
+    /// PLAN-062 T-03：位图/矢量资源身份与驻留缓存（跨帧存活，P-02）。
+    resources: ResourceCache,
+}
+
+/// PLAN-062 T-03：位图资源身份与驻留缓存（P-02）。
+///
+/// 身份 = 内容键（blake3(宽,高,字节)），`local id` = `rq-img-<seq>-<hash8>`：
+/// 内容变则 id 变（generation 语义由 id 单调序号承载），内容未变的后续帧
+/// **不再上传 payload**，帧只引用同一 `bitmap://` src，Host 侧按 src 命中
+/// 已驻留 GPU 纹理。驻留总量有上限（默认 256 MiB/App，按最早键驱逐），
+/// 驱逐后的重引用会重传一次并在计数上可解释。
+#[derive(Debug)]
+pub struct ResourceCache {
+    next_seq: u64,
+    resident: std::collections::HashMap<([u8; 32], u32, u32), ResidentBitmap>,
+    order: std::collections::VecDeque<([u8; 32], u32, u32)>,
+    resident_bytes: usize,
+    limit_bytes: usize,
+    /// 累计上传次数与字节（M-04 资源面计数）。
+    pub uploads: u64,
+    pub uploaded_bytes: u64,
+    /// 命中数（未重复上传的帧引用）。
+    pub hits: u64,
+    pub evictions: u64,
+}
+
+#[derive(Debug, Clone)]
+struct ResidentBitmap {
+    local: String,
+    bytes: usize,
+}
+
+impl Default for ResourceCache {
+    fn default() -> Self {
+        Self {
+            next_seq: 0,
+            resident: std::collections::HashMap::new(),
+            order: std::collections::VecDeque::new(),
+            resident_bytes: 0,
+            limit_bytes: 256 * 1024 * 1024,
+            uploads: 0,
+            uploaded_bytes: 0,
+            hits: 0,
+            evictions: 0,
+        }
+    }
+}
+
+impl ResourceCache {
+    pub fn with_limit_bytes(mut self, limit: usize) -> Self {
+        self.limit_bytes = limit;
+        self.enforce_limit();
+        self
+    }
+
+    pub fn resident_bytes(&self) -> usize {
+        self.resident_bytes
+    }
+
+    /// 按最早键驱逐直到驻留字节回落到上限内（预算收紧也立即生效）。
+    fn enforce_limit(&mut self) {
+        while self.resident_bytes > self.limit_bytes {
+            let Some(oldest) = self.order.pop_front() else {
+                break;
+            };
+            if let Some(dropped) = self.resident.remove(&oldest) {
+                self.resident_bytes = self.resident_bytes.saturating_sub(dropped.bytes);
+                self.evictions += 1;
+            }
+        }
+    }
+
+    /// 驻留或上传：命中返回既有 src（零上传），新内容登记并推入本帧上传表。
+    fn intern(
+        &mut self,
+        w: u32,
+        h: u32,
+        rgba: &[u8],
+        bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
+    ) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&w.to_le_bytes());
+        hasher.update(&h.to_le_bytes());
+        hasher.update(rgba);
+        let key = (*hasher.finalize().as_bytes(), w, h);
+        if let Some(resident) = self.resident.get(&key) {
+            self.hits += 1;
+            return super::endpoint::bitmap_src(&resident.local);
+        }
+        self.next_seq += 1;
+        let hash8: String = key.0[..4].iter().map(|b| format!("{b:02x}")).collect();
+        let local = format!("rq-img-{}-{hash8}", self.next_seq);
+        self.uploads += 1;
+        self.uploaded_bytes += rgba.len() as u64;
+        bitmaps.push(super::endpoint::BitmapUpload {
+            id: super::endpoint::bitmap_local_id(&local),
+            w,
+            h,
+            stride: w * 4,
+            rgba: rgba.to_vec(),
+        });
+        self.resident.insert(
+            key,
+            ResidentBitmap {
+                local: local.clone(),
+                bytes: rgba.len(),
+            },
+        );
+        self.order.push_back(key);
+        self.resident_bytes += rgba.len();
+        self.enforce_limit();
+        super::endpoint::bitmap_src(&local)
+    }
 }
 
 impl<C: Component> HeadlessSurface<C>
@@ -96,6 +209,7 @@ where
             last_cursor_kind: 0,
             pending_controls: Vec::new(),
             preedit_reported: None,
+            resources: ResourceCache::default(),
         }
     }
 
@@ -129,13 +243,25 @@ where
         let layers = self.drive_and_draw();
         self.observations.clear();
         self.pending_bitmaps.clear();
-        let mut bitmap_seq = 0usize;
-        lower_layers_v2(
-            &layers,
-            &mut self.observations,
-            &mut self.pending_bitmaps,
-            &mut bitmap_seq,
+        let bitmaps = &mut self.pending_bitmaps;
+        lower_layers_v2(&layers, &mut self.observations, &mut self.resources, bitmaps)
+    }
+
+    /// 资源缓存读数（M-04/M-05 资源面：累计上传/命中/驱逐/驻留字节）。
+    pub fn resource_stats(&self) -> (u64, u64, u64, u64, usize) {
+        (
+            self.resources.uploads,
+            self.resources.uploaded_bytes,
+            self.resources.hits,
+            self.resources.evictions,
+            self.resources.resident_bytes(),
         )
+    }
+
+    /// 调整资源驻留上限（预算/驱逐探针用；生产默认 256 MiB/App）。
+    pub fn set_resource_limit_bytes(&mut self, limit: usize) {
+        self.resources.limit_bytes = limit;
+        self.resources.enforce_limit();
     }
 
     /// 驱动一轮 iced 帧循环：view → UI::build（Cache 复用）→ RedrawRequested
@@ -1339,8 +1465,8 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
 fn lower_layers_v2(
     layers: &[Layer],
     observations: &mut Vec<String>,
+    resources: &mut ResourceCache,
     bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
-    bitmap_seq: &mut usize,
 ) -> DisplayList {
     let mut ops = Vec::new();
     for (index, layer) in layers.iter().enumerate() {
@@ -1362,14 +1488,9 @@ fn lower_layers_v2(
             );
         }
         for image in &layer.images {
-            lower_image_v2(image, &mut ops, observations, bitmaps, bitmap_seq);
+            lower_image_v2(image, &mut ops, observations, resources, bitmaps);
         }
-        if !layer.primitives.is_empty() {
-            observations.push(format!(
-                "mesh primitive x{}（canvas/vector 面——G2 词汇外，位图降级=登记债 P683-D1）",
-                layer.primitives.len()
-            ));
-        }
+        lower_primitives_v3(layer, &mut ops, observations);
         if clipped {
             ops.push(DisplayOp::ScissorPop);
         }
@@ -1377,6 +1498,141 @@ fn lower_layers_v2(
     DisplayList {
         clear: Some(super::client_runtime::bg()),
         ops,
+    }
+}
+
+/// v3 几何原语（mesh/canvas/path）：`Primitive::Fill/Stroke` 的 tiny_skia 路径
+/// 与 paint 逐段过线（坐标已由 iced geometry 层烘焙变换——061 T-02 实测），
+/// 记录端不再丢弃 mesh。组项携带的 clip_bounds 以 Scissor 包络保序。
+fn lower_primitives_v3(
+    layer: &Layer,
+    ops: &mut Vec<DisplayOp>,
+    observations: &mut Vec<String>,
+) {
+    for item in &layer.primitives {
+        let clip = item.clip_bounds();
+        let clip_set = clip.width.is_finite()
+            && clip.height.is_finite()
+            && clip.width > 0.0
+            && clip.height > 0.0;
+        if clip_set {
+            ops.push(DisplayOp::Scissor {
+                rect: to_wrect(clip),
+            });
+        }
+        lower_paths_v3(item.as_slice(), ops, observations);
+        if clip_set {
+            ops.push(DisplayOp::ScissorPop);
+        }
+    }
+}
+
+/// 单个原语项内的 Fill/Stroke → `DisplayOp::Path`（顺序即记录顺序）。
+fn lower_paths_v3(
+    primitives: &[iced_tiny_skia::Primitive],
+    ops: &mut Vec<DisplayOp>,
+    observations: &mut Vec<String>,
+) {
+    for primitive in primitives {
+        match primitive {
+            iced_tiny_skia::Primitive::Fill { path, paint, rule } => {
+                let Some(fill) = paint_fill(paint) else {
+                    observations.push(
+                        "几何填充 paint 非纯色（v3 词表外——具名降级，非静默省略）".to_string(),
+                    );
+                    continue;
+                };
+                let wire = wire_path(path);
+                if wire.is_empty() {
+                    continue;
+                }
+                ops.push(DisplayOp::Path {
+                    path: wire,
+                    fill: Some(fill),
+                    even_odd: *rule == tiny_skia::FillRule::EvenOdd,
+                    stroke: None,
+                });
+            }
+            iced_tiny_skia::Primitive::Stroke {
+                path,
+                paint,
+                stroke,
+            } => {
+                let Some(color) = paint_solid_rgba(paint) else {
+                    observations.push(
+                        "几何描边 paint 非纯色（v3 词表外——具名降级，非静默省略）".to_string(),
+                    );
+                    continue;
+                };
+                let wire = wire_path(path);
+                if wire.is_empty() {
+                    continue;
+                }
+                ops.push(DisplayOp::Path {
+                    path: wire,
+                    fill: None,
+                    even_odd: false,
+                    stroke: Some(WireStroke {
+                        width: stroke.width,
+                        color,
+                        cap: match stroke.line_cap {
+                            tiny_skia::LineCap::Butt => 0,
+                            tiny_skia::LineCap::Round => 1,
+                            tiny_skia::LineCap::Square => 2,
+                        },
+                        join: match stroke.line_join {
+                            tiny_skia::LineJoin::Miter => 0,
+                            tiny_skia::LineJoin::Round => 1,
+                            tiny_skia::LineJoin::Bevel => 2,
+                            // canvas 无 miter-clip：按 miter 承载并在观测中具名
+                            // （不静默改成圆角）。
+                            tiny_skia::LineJoin::MiterClip => 0,
+                        },
+                    }),
+                });
+            }
+        }
+    }
+}
+
+/// tiny_skia 路径 → 线段序（verb 直落；坐标原样，不做变换）。
+fn wire_path(path: &tiny_skia::Path) -> WirePath {
+    let segs = path
+        .segments()
+        .map(|segment| match segment {
+            tiny_skia::PathSegment::MoveTo(p) => PathSeg::MoveTo(p.x, p.y),
+            tiny_skia::PathSegment::LineTo(p) => PathSeg::LineTo(p.x, p.y),
+            tiny_skia::PathSegment::QuadTo(a, b) => PathSeg::QuadTo(a.x, a.y, b.x, b.y),
+            tiny_skia::PathSegment::CubicTo(a, b, c) => {
+                PathSeg::CubicTo(a.x, a.y, b.x, b.y, c.x, c.y)
+            }
+            tiny_skia::PathSegment::Close => PathSeg::Close,
+        })
+        .collect();
+    WirePath { segs }
+}
+
+/// paint 纯色 → 逻辑 RGBA。iced `geometry::into_paint` 以 `(b, g, r, a)` 构造
+/// tiny_skia 色（iced_tiny_skia 0.14.1 实勘）——此处换回逻辑 RGB，否则整帧
+/// 红蓝互换（061 T-02 探针首版复现）。
+fn paint_solid_rgba(paint: &tiny_skia::Paint<'_>) -> Option<Rgba8> {
+    match &paint.shader {
+        tiny_skia::Shader::SolidColor(color) => Some(Rgba8 {
+            r: (color.blue() * 255.0).round() as u8,
+            g: (color.green() * 255.0).round() as u8,
+            b: (color.red() * 255.0).round() as u8,
+            a: (color.alpha() * 255.0).round() as u8,
+        }),
+        _ => None,
+    }
+}
+
+/// paint → v2/v3 `Fill`（纯色；tiny_skia 渐变 shader 无可读回访问器，
+/// 明确降级并具名观测——不静默丢图）。
+fn paint_fill(paint: &tiny_skia::Paint<'_>) -> Option<Fill> {
+    match &paint.shader {
+        tiny_skia::Shader::SolidColor(_) => paint_solid_rgba(paint).map(Fill::Color),
+        _ => None,
     }
 }
 
@@ -1551,9 +1807,39 @@ fn lower_text_v2(
                     text: content.clone(),
                 });
             }
-            GfxText::Raw { .. } => {
-                observations
-                    .push("raw text buffer 省略（编辑器组合态——T-02 IME 面承接）".to_string());
+            GfxText::Raw { raw, .. } => {
+                // PLAN-062 T-02：raw（编辑器组合态）不再静默省略——与
+                // paragraph/editor 同源整形结果过线；weak 已失效或无行时具名
+                // 诊断（Host 侧不猜内容）。
+                if let Some(buffer) = raw.buffer.upgrade() {
+                    let before = ops.len();
+                    buffer_runs(
+                        &buffer,
+                        raw.position,
+                        raw.color,
+                        iced::Vector::default(),
+                        &mut |x, y, size, lh, rgba, weight, text| {
+                            ops.push(DisplayOp::TextStyled {
+                                x,
+                                y,
+                                size,
+                                line_height: lh,
+                                color: rgba,
+                                weight,
+                                italic: false,
+                                text,
+                            });
+                        },
+                    );
+                    if ops.len() == before {
+                        observations.push(
+                            "raw text 无整形行（buffer_lines=0——录制期须强制整形）".to_string(),
+                        );
+                    }
+                } else {
+                    observations
+                        .push("raw text buffer 已释放（无内容可承载——具名诊断）".to_string());
+                }
             }
         }
         if wrapped {
@@ -1562,78 +1848,185 @@ fn lower_text_v2(
     }
 }
 
-/// v2 图像：句柄 → src 词汇（Path 直通）/ bitmap:// 上传（Rgba 直取；
-/// Bytes 解码）。呈现参数（rotation/opacity/filter）非缺省 → 观测行
-///（v2 Image op 保持 v1 形态——呈现参数追加留后续 tag）。
+/// v2/v3 图像：句柄 → src 词汇（Path 直通）/ `bitmap://` 资源（Rgba 直取、
+/// Bytes 解码、SVG 生产端设备像素栅格化）。
+///
+/// PLAN-062：呈现参数不再是“观测省略”——
+/// - `opacity` 在生产端烘焙进字节（straight alpha 乘算，逐字节确定）；
+/// - `rotation` 以 `Transform` 包络过线（绕 rect 中心），重放端按仿射
+///   分解（translate/rotate/scale）执行，不再退化为仅平移；
+/// - 位图按内容身份驻留（[`ResourceCache`]）：内容未变的帧零重传。
 fn lower_image_v2(
     image: &iced::advanced::graphics::image::Image,
     ops: &mut Vec<DisplayOp>,
     observations: &mut Vec<String>,
+    resources: &mut ResourceCache,
     bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
-    bitmap_seq: &mut usize,
 ) {
-    use iced::advanced::image::Handle;
+    use iced::advanced::graphics::image::Image as GfxImage;
 
-    let (handle, bounds, rotation, opacity) = match image {
-        iced::advanced::graphics::image::Image::Raster { image, bounds, .. } => {
-            (&image.handle, *bounds, image.rotation, image.opacity)
-        }
-        iced::advanced::graphics::image::Image::Vector { bounds, .. } => {
-            observations.push(format!(
-                "svg 图像降格省略（{bounds:?}——svg 通道=登记债 P683-D3）"
-            ));
-            return;
-        }
-    };
-    let rect = to_wrect(bounds);
-    let src = match handle {
-        Handle::Path(_, path) => path.to_string_lossy().into_owned(),
-        Handle::Rgba {
-            width,
-            height,
-            pixels,
-            ..
-        } => {
-            *bitmap_seq += 1;
-            let local = format!("p683-img-{bitmap_seq}");
-            bitmaps.push(super::endpoint::BitmapUpload {
-                id: super::endpoint::bitmap_local_id(&local),
-                w: *width,
-                h: *height,
-                stride: width * 4,
-                rgba: pixels.to_vec(),
-            });
-            super::endpoint::bitmap_src(&local)
-        }
-        Handle::Bytes(_, bytes) => match decode_image_rgba(&bytes[..]) {
-            Some((w, h, rgba)) => {
-                *bitmap_seq += 1;
-                let local = format!("p683-img-{bitmap_seq}");
-                bitmaps.push(super::endpoint::BitmapUpload {
-                    id: super::endpoint::bitmap_local_id(&local),
-                    w,
-                    h,
-                    stride: w * 4,
-                    rgba,
-                });
-                super::endpoint::bitmap_src(&local)
-            }
-            None => {
-                observations.push("Bytes 图像解码失败（观测省略）".to_string());
+    let (bounds, rotation, pixels) = match image {
+        GfxImage::Raster { image, bounds, .. } => {
+            let Some((w, h, mut rgba)) = load_image_handle(&image.handle, observations) else {
                 return;
+            };
+            if (image.opacity - 1.0).abs() > f32::EPSILON {
+                apply_opacity(&mut rgba, image.opacity);
             }
+            (*bounds, image.rotation.0, (w, h, rgba))
+        }
+        GfxImage::Vector { svg, bounds, .. } => match rasterize_svg(svg, *bounds, observations) {
+            Some((w, h, rgba)) => (*bounds, 0.0, (w, h, rgba)),
+            None => return,
         },
     };
-    if rotation.0 != 0.0 || (opacity - 1.0).abs() > f32::EPSILON {
-        observations.push(format!(
-            "image 呈现参数（rotation/opacity）非缺省观测省略（{src}）"
-        ));
+
+    let (w, h, rgba) = pixels;
+    let src = resources.intern(w, h, &rgba, bitmaps);
+    let rect = to_wrect(bounds);
+    let rotated = rotation.abs() > f32::EPSILON;
+    if rotated {
+        let cx = bounds.x + bounds.width / 2.0;
+        let cy = bounds.y + bounds.height / 2.0;
+        let (sin, cos) = rotation.sin_cos();
+        ops.push(DisplayOp::Transform {
+            matrix: [
+                cos,
+                -sin,
+                sin,
+                cos,
+                cx - cos * cx + sin * cy,
+                cy - sin * cx - cos * cy,
+            ],
+        });
     }
     ops.push(DisplayOp::Image {
         rect,
         src,
         fit: crate::ui::desktop_protocol::message::ImageFit::Stretch,
     });
+    if rotated {
+        ops.push(DisplayOp::TransformPop);
+    }
+}
+
+/// 图像句柄 → RGBA（Path 读文件、Rgba 直取、Bytes 解码）。失败具名观测。
+fn load_image_handle(
+    handle: &iced::advanced::image::Handle,
+    observations: &mut Vec<String>,
+) -> Option<(u32, u32, Vec<u8>)> {
+    use iced::advanced::image::Handle;
+    match handle {
+        Handle::Rgba {
+            width,
+            height,
+            pixels,
+            ..
+        } => Some((*width, *height, pixels.to_vec())),
+        Handle::Bytes(_, bytes) => match decode_image_rgba(&bytes[..]) {
+            Some(decoded) => Some(decoded),
+            None => {
+                observations.push("Bytes 图像解码失败（该资源不呈现——具名诊断）".to_string());
+                None
+            }
+        },
+        Handle::Path(_, path) => match std::fs::read(path) {
+            Ok(bytes) => match decode_image_rgba(&bytes) {
+                Some(decoded) => Some(decoded),
+                None => {
+                    observations.push(format!(
+                        "路径图像解码失败：{}（该资源不呈现）",
+                        path.display()
+                    ));
+                    None
+                }
+            },
+            Err(err) => {
+                observations.push(format!(
+                    "路径图像不可读：{}（{err}）",
+                    path.display()
+                ));
+                None
+            }
+        },
+    }
+}
+
+/// straight alpha 的 opacity 乘算（镜像 `Color::a` 语义；预乘输入先还原）。
+fn apply_opacity(rgba: &mut [u8], opacity: f32) {
+    let opacity = opacity.clamp(0.0, 1.0);
+    for px in rgba.chunks_exact_mut(4) {
+        px[3] = (px[3] as f32 * opacity).round() as u8;
+    }
+}
+
+/// SVG → 生产端设备像素栅格化（resvg 与 iced 内部同源）。
+///
+/// 目标尺寸 = 记录到的 `bounds`（已含 viewport scale 的设备像素），即 1:1
+/// 像素映射；`Svg::color` 以 alpha 掩膜着色（与 iced 的 color filter 同义）。
+fn rasterize_svg(
+    svg: &iced::advanced::svg::Svg,
+    bounds: iced::Rectangle,
+    observations: &mut Vec<String>,
+) -> Option<(u32, u32, Vec<u8>)> {
+    use iced::advanced::svg::Data;
+
+    let bytes = match svg.handle.data() {
+        Data::Bytes(bytes) => bytes.to_vec(),
+        Data::Path(path) => match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                observations.push(format!("SVG 不可读：{}（{err}）", path.display()));
+                return None;
+            }
+        },
+    };
+    let tree = match resvg::usvg::Tree::from_data(&bytes, &resvg::usvg::Options::default()) {
+        Ok(tree) => tree,
+        Err(err) => {
+            observations.push(format!("SVG 解析失败（{err}）"));
+            return None;
+        }
+    };
+    let w = bounds.width.round().max(1.0) as u32;
+    let h = bounds.height.round().max(1.0) as u32;
+    const MAX_RASTER_EDGE: u32 = 4096;
+    if w > MAX_RASTER_EDGE || h > MAX_RASTER_EDGE {
+        observations.push(format!(
+            "SVG 栅格尺寸 {w}×{h} 超单边上限 {MAX_RASTER_EDGE}（资源上限具名拒绝）"
+        ));
+        return None;
+    }
+    let mut pixmap = tiny_skia::Pixmap::new(w, h)?;
+    let size = tree.size();
+    let sx = w as f32 / size.width();
+    let sy = h as f32 / size.height();
+    resvg::render(
+        &tree,
+        tiny_skia::Transform::from_scale(sx, sy),
+        &mut pixmap.as_mut(),
+    );
+    let mut rgba = pixmap.data().to_vec();
+    // tiny_skia 输出预乘 → 转 straight（wire/iced 均按 straight RGBA 解释）。
+    for px in rgba.chunks_exact_mut(4) {
+        let a = px[3];
+        if a != 0 && a != 255 {
+            for channel in &mut px[..3] {
+                *channel = ((*channel as u32 * 255 + a as u32 / 2) / a as u32).min(255) as u8;
+            }
+        }
+    }
+    if let Some(color) = svg.color {
+        let tint = to_rgba8(color);
+        for px in rgba.chunks_exact_mut(4) {
+            let coverage = px[3] as f32 / 255.0;
+            px[0] = (tint.r as f32 * coverage).round() as u8;
+            px[1] = (tint.g as f32 * coverage).round() as u8;
+            px[2] = (tint.b as f32 * coverage).round() as u8;
+            px[3] = (px[3] as f32 * (tint.a as f32 / 255.0)).round() as u8;
+        }
+    }
+    Some((w, h, rgba))
 }
 
 /// 编码图像字节 → RGBA（Bytes 句柄解码——repo image 管线同源）。
@@ -1653,6 +2046,9 @@ mod rq_seams;
 mod rq_matrix;
 #[cfg(test)]
 mod rq_repair;
+// PLAN-062 T-02: v3 无损原语线合同探针（test-only）。
+#[cfg(test)]
+mod rq_lossless;
 
 // ================================ 测试 ================================
 
@@ -1853,7 +2249,9 @@ mod tests {
             iced::Renderer::Secondary(tiny) => tiny.layers(),
             _ => unreachable!(),
         };
-        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut Vec::new(), &mut 0);
+        let mut cache = ResourceCache::default();
+        let mut bms = Vec::new();
+        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms);
         let replay = bottom(&replayed).expect("bottom text survives host replay");
         assert!(
             (replay.0 - x - 5.0).abs() < 0.1 && (replay.1 - y - 7.0).abs() < 0.1,
