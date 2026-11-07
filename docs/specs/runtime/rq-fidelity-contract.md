@@ -100,7 +100,11 @@ M-01～M-08 定义为准；无预算或必需测量缺席不得签性能 PASS。
 能力 ID（Hello/Welcome 双向声明 required/optional）：
 `fidelity/pathfill/1`、`fidelity/glyphrun/1`、`fidelity/svg-raster/1`、
 `fidelity/image-params/1`、`fidelity/blur-sdf/1`、`resource/generation/1`、
-`pipeline/backpressure/1`、`ack/fence-split/1`。
+`resource/release/1`、`pipeline/backpressure/1`、`ack/fence-split/1`。
+
+PLAN-062（r4）追加 `resource/release/1`（跨进程资源释放，`ResourceRelease` tag 14）：
+仍属 optional 面、旧端不产不出；语义与帧引用记账见
+[rq-render-packets-and-resources.md](rq-render-packets-and-resources.md) §3。
 
 - required 未知 → **入帧前拒绝**并具名诊断；optional 未知 → 允许降级但必须
   产出可观测降级事件。

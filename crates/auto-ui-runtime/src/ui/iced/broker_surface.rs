@@ -199,6 +199,9 @@ pub(crate) fn bitmap_cache_put(src: &str, w: u32, h: u32, stride: u32, rgba: Vec
 /// 位图键逐出（宿主 ReclaimWindow/断连清 client 位图——防 pid 复用串扰）。
 pub(crate) fn bitmap_cache_evict(src: &str) {
     handle_cache().lock().unwrap().remove(src);
+    // PLAN-062（AC-03 / 复审 F-04）：句柄与 generation 记账同生共死，避免
+    // 逐出后 generation 表无界增长（也使“重新上传同 id”从 0 起算，语义正确）。
+    bitmap_generations().lock().unwrap().remove(src);
 }
 
 /// PLAN-062（AC-03）：每个资源 id 最后已应用的 generation（只有协商
@@ -1756,5 +1759,47 @@ mod tests {
             } => (*width, *height, pixels.to_vec()),
             _ => panic!("期望 RGBA Handle"),
         }
+    }
+}
+
+#[cfg(test)]
+mod zorder_pin {
+    use crate::ui::desktop_protocol::message::{DisplayList, DisplayOp, Fill, ImageFit, Rgba8, WRect};
+
+    #[test]
+    fn images_composite_after_geometry() {
+        let src = "bitmap://zorder-diag";
+        // 8x8 纯红图
+        let mut px = Vec::new();
+        for _ in 0..64 { px.extend_from_slice(&[255u8, 0, 0, 255]); }
+        super::bitmap_cache_put(src, 8, 8, 32, px);
+        let list = DisplayList {
+            clear: Some(Rgba8::new(0, 0, 0, 255)),
+            ops: vec![
+                DisplayOp::Image { rect: WRect::new(0.0, 0.0, 8.0, 8.0), src: src.to_string(), fit: ImageFit::Stretch },
+                DisplayOp::Quad { rect: WRect::new(0.0, 0.0, 4.0, 4.0), fill: Fill::Color(Rgba8::new(0, 255, 0, 255)), radius: [0.0; 4], border: None, shadow: None },
+            ],
+        };
+        let mut sim = iced_test::simulator::Simulator::with_size(
+            iced::Settings::default(),
+            iced::Size::new(8.0, 8.0),
+            super::displaylist_element::<()>(&list),
+        );
+        let png = std::env::temp_dir().join("zorder-diag.png");
+        let _ = std::fs::remove_file(&png);
+        let _ = std::fs::remove_file(std::env::temp_dir().join("zorder-diag-wgpu.png"));
+        let snap = sim.snapshot(&crate::ui::iced::renderer::shadcn_theme(crate::ui::style_iced_adapter::dark_mode())).expect("snap");
+        snap.matches_image(&png).expect("png");
+        let img = image::open(std::env::temp_dir().join("zorder-diag-wgpu.png")).expect("open").to_rgba8();
+        let p = img.get_pixel(1, 1);
+        println!("[ZORDER-PIN] pixel(1,1)={:?}", p);
+        // 固定行为（PLAN-062 复审 F-01 的根因）：重放画布的 `draw_image` 是延后
+        // 批次，**图像在几何之后合成**——即使 wire 顺序是 Image 再 Quad，图像
+        // 仍盖在 quad 上。producer 因此不得依赖“图垫在几何下面”：阴影贴片只
+        // 画环带（见 Spec §2.3）。若 iced 改变该行为，本 pin 会失败并提醒复核。
+        assert!(
+            p[0] > p[1],
+            "图像应在几何之后合成（实得 {p:?}）；行为变化需复核阴影贴片与 z 序边界"
+        );
     }
 }

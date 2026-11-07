@@ -708,14 +708,13 @@ impl<S: FrameSource> ClientPump<S> {
         if app.state != AppState::Active {
             return;
         }
-        if !app
+        let supported = app
             .peer_caps
-            .supports(super::message::CAP_RESOURCE_RELEASE)
-        {
-            return;
-        }
+            .supports(super::message::CAP_RESOURCE_RELEASE);
+        // 未协商也要排水并丢弃：否则 producer 侧释放队列在旧宿主连线上无界增长
+        // （复审 F-04；旧宿主本来就不认这个 tag）。
         let srcs = app.session.drain_resource_releases();
-        if srcs.is_empty() {
+        if srcs.is_empty() || !supported {
             return;
         }
         match app.produce_resource_release(srcs) {

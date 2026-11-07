@@ -579,7 +579,7 @@ fn apply_actions(
                 ..
             } => {
                 if let Some(freed) = client.inner.surfaces.compose(surface, slot, payload) {
-                    client.frames += 1;
+                                client.frames += 1;
                     note_revision(client, revision);
                     to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                         wid,
@@ -610,15 +610,9 @@ fn apply_actions(
                         super::shm::display_list_from_slot_payload(payload).ok()
                     });
                     if let Some(payload) = ready_v2 {
-                        // PLAN-062（AC-03）：刷新前台引用集 + 驱逐已无人引用的挂起释放。
-                        for src in client.inner.refs.on_compose(&payload) {
-                            crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-                            for keys in client.inner.bitmap_keys.values_mut() {
-                                keys.retain(|k| k != &src);
-                            }
-                        }
                         match client.inner.surfaces.compose_v2(surface, slot, payload) {
                             Ok(Some(freed)) => {
+                                client.inner.refresh_refs(surface);
                                 client.frames += 1;
                                 note_revision(client, revision);
                                 to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
@@ -647,7 +641,7 @@ fn apply_actions(
                         .and_then(|payload| super::shm::draw_list_from_slot_payload(payload).ok());
                     if let Some(payload) = ready {
                         if let Some(freed) = client.inner.surfaces.compose(surface, slot, payload) {
-                            client.frames += 1;
+                                client.frames += 1;
                             note_revision(client, revision);
                             to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                 wid,
@@ -668,16 +662,10 @@ fn apply_actions(
                 revision,
                 payload,
             } => {
-                // PLAN-062（AC-03）：刷新前台引用集 + 驱逐已无人引用的挂起释放。
-                for src in client.inner.refs.on_compose(&payload) {
-                    crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-                    for keys in client.inner.bitmap_keys.values_mut() {
-                        keys.retain(|k| k != &src);
-                    }
-                }
                 match client.inner.surfaces.compose_v2(surface, slot, payload) {
                     Ok(Some(freed)) => {
-                        client.frames += 1;
+                        client.inner.refresh_refs(surface);
+                                client.frames += 1;
                         note_revision(client, revision);
                         to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                             wid,
@@ -701,13 +689,7 @@ fn apply_actions(
             // PLAN-062（AC-03）：producer 通知“最后 owner 归零”——前台帧仍
             // 引用就挂起，否则立即驱逐（引用记账在 BitmapRefs）。
             HostAction::ResourceRelease { wid, srcs } => {
-                let _ = wid;
-                for src in client.inner.refs.on_release(srcs) {
-                    crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-                    for keys in client.inner.bitmap_keys.values_mut() {
-                        keys.retain(|k| k != &src);
-                    }
-                }
+                client.inner.release_refs(wid, srcs);
             }
             // PLAN-034 T-05（D3）：位图就绪——读位图段槽入宿主图像
             // 缓存（`bitmap://{id}` 键——broker_surface resolve 前缀臂

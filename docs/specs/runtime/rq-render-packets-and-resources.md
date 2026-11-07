@@ -58,6 +58,11 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
   `Rgba` 直取、`Bytes` 解码、SVG **生产端按设备像素栅格化**（resvg、
   `Svg::color` 以 alpha 掩膜着色、预乘→straight 归一，单边 4096 上限具名拒绝）。
 - 图像 `opacity` 烘焙进资源字节；`rotation` 以 `Transform` 包络过线。
+- **图像与几何的合成顺序（关键边界）**：重放画布把 `Image` 放在几何之后合成
+  （iced `CanvasFrame::draw_image` 是延后批次），**wire 里“Image 在 Quad 之前”
+  不保证视觉在下**。因此阴影贴片只允许画**环带**（quad 自身圆角形状内部 alpha
+  清零），任何 producer 也不得依赖“图垫在几何下面”的 z 序。整块贴片会把 quad
+  内部再压暗一层（实测把 v3 富模式从 0.59% 推到 2.56%）。
 - **媒体静态帧**（2026-11-08 裁定）：视频/远端媒体的**一帧**（海报/首帧/暂停帧）
   由 `ui::media_poster` 供给，`render_video` 命中即用普通 `image` 元素出图——
   于是它就是普通图片资源（内容身份、去重、上传预算、驻留全部同律）。连续播放
@@ -110,9 +115,10 @@ canonical 规范。来源：PLAN-062（r3）的实施与实测。与
 
 - 能力 ID 与 required/optional 语义见[保真合同 §7](rq-fidelity-contract.md)；
   本页新增的必需能力：`fidelity/pathfill/1`（Path）、`fidelity/glyphrun/1`
-  （GlyphRun）；新增的**可选面**（协商后启用、旧端不产不出）：`resource/generation/1`
-  （位图显式 generation，tag 13）、`resource/release/1`（资源释放，tag 14）。
-  冻结能力分母由 8 项扩为 **9 项**（`ALL_FIDELITY_CAPS`）。
+  （GlyphRun）。`resource/generation/1` 是 061 已冻结的 8 项之一，本页只把它**落到
+  线上**（tag 13）；本页新增进冻结表的是 `resource/release/1`（资源释放，tag 14，
+  见[保真合同 §7](rq-fidelity-contract.md)）。冻结能力分母由 8 项扩为 **9 项**
+  （`ALL_FIDELITY_CAPS`）。
 - 线词汇：`required:<cap>` / `optional:<cap>`；裸串按 optional 解释（旧 tail
   字节兼容）。声明可逆（`CapabilitySet::to_wire` round-trip）。
 - **握手准入**：App 在 Hello 尾声明 `required:`/`optional:` 能力；Host 解析后若有
@@ -194,9 +200,9 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
 | path_mesh | 0.095% | 0.095% |
 | svg_icon | 0.039% | 0.039% |
 | text_cjk | 0.094% | **0.798%**（具名遗留） |
-| gradient_border_shadow | 0.063% | **1.374%**（具名遗留） |
+| gradient_border_shadow | 0.063% | **0.588%**（具名边界） |
 | scroll_clip | 0.000% | **0.330%**（具名遗留） |
-| shadow_only | 0.005% | **0.741%**（具名遗留） |
+| shadow_only | 0.005% | **0.069%**（具名边界） |
 | progress_bar | 0.006% | 0.006% |
 
 - 默认 producer 全部 ≤0.1%（AC-02 r4 门）；v3 富模式是**具名边界**，不得计为
@@ -234,7 +240,10 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
 
 1. glyph run 边缘对齐：v3 富模式 0.80%（默认 producer 仍走字符串面，Host 用同一
    字体栈重排——可观测但**不是** AC-02 要求的“不重排+精确”）。
-2. 阴影贴片合成残差：v3 富模式 0.74%（默认面仍是 scrim 近似 0.0625%）。
+2. 阴影贴片合成残差：v3 富模式 **0.588%（gradient 例）/0.069%（shadow_only 例）**
+   （默认面 scrim 近似 0.063%/0.005%）。2026-11-08 复审前该族实测 2.56%/2.28%——
+   根因是重放画布把图像排在几何之后（整块贴片压暗 quad 内部）；改为**只画环带**
+   后回到上界内（≤1.5%）。
 3. SVG 记录路径每帧新建 iced renderer → produce ≈32.5ms，超 061 冻结的 ≤10ms。
 4. per-App CPU 预算/公平调度未实现（真实规模归 UI063/OS063）；上传预算记账目前
    只有端点产帧路径会调用，探针/新 FrameSource 需自行调用。

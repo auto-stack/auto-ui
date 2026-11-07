@@ -2019,6 +2019,19 @@ fn rasterize_shadow(
                 [r[0] * 2.0, r[1] * 2.0, r[2] * 2.0, r[3] * 2.0],
             ) / 2.0;
             let alpha = 1.0 - smoothstep(-blur, blur, sdf.max(0.0));
+            // PLAN-062（AC-02 / 复审 F-01）：**只保留环带**。重放画布的图像通道
+            // 在几何之后合成（iced `CanvasFrame::draw_image` 是延后批次），
+            // DisplayList 里“图在 quad 之前”的顺序不保证视觉在下——整块贴片会
+            // 把 quad 内部再压暗一层（实测 v3 富模式 2.56%）。把 quad 自身圆角
+            // 形状内部的 alpha 清零后，贴片只画外环：顺序无关、视觉等价。
+            let quad_sdf = rounded_box_sdf(
+                -((fx - b.x - b.width / 2.0) * 2.0),
+                -((fy - b.y - b.height / 2.0) * 2.0),
+                b.width,
+                b.height,
+                [r[0] * 2.0, r[1] * 2.0, r[2] * 2.0, r[3] * 2.0],
+            ) / 2.0;
+            let alpha = if quad_sdf < -0.5 { 0.0 } else { alpha };
             let a = (alpha.clamp(0.0, 1.0) * color.a as f32).round() as u8;
             // 阴影为纯色（shader 的 premultiply 在合成时做）：这里按 straight
             // 输出，与其它位图资源同口径。

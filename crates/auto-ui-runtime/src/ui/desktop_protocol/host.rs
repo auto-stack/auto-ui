@@ -188,6 +188,8 @@ impl SurfaceStore {
 pub struct BitmapRefs {
     front: std::collections::BTreeSet<String>,
     pending: std::collections::BTreeSet<String>,
+    /// 已真正释放过的 src（producer 重发释放不重复驱逐；重新被帧引用时清除）。
+    applied: std::collections::BTreeSet<String>,
 }
 
 impl BitmapRefs {
@@ -214,6 +216,8 @@ impl BitmapRefs {
         for src in &ready {
             self.pending.remove(src);
         }
+        // 重新被前台帧引用的 src 允许将来再次释放（不永久拉黑）。
+        self.applied.retain(|src| !self.front.contains(src));
         ready
     }
 
@@ -221,9 +225,13 @@ impl BitmapRefs {
     pub fn on_release(&mut self, srcs: Vec<String>) -> Vec<String> {
         let mut ready = Vec::new();
         for src in srcs {
+            if self.applied.contains(&src) || self.pending.contains(&src) {
+                continue; // 重复释放：已驱逐/已挂起，不重复动作
+            }
             if self.front.contains(&src) {
                 self.pending.insert(src);
             } else {
+                self.applied.insert(src.clone());
                 ready.push(src);
             }
         }
@@ -263,7 +271,7 @@ pub struct ProtocolHost<'a> {
     /// 孵化材料解析器。
     resolver: Box<dyn FnMut(&str) -> Result<DynamicComponent, String> + 'a>,
     /// PLAN-062（AC-03）：资源引用记账 + 释放延后。
-    refs: BitmapRefs,
+    refs: BTreeMap<u64, BitmapRefs>,
 }
 
 impl<'a> ProtocolHost<'a> {
@@ -283,7 +291,22 @@ impl<'a> ProtocolHost<'a> {
             bm_buffers: BTreeMap::new(),
             bitmap_keys: BTreeMap::new(),
             resolver: Box::new(resolver),
-            refs: BitmapRefs::default(),
+            refs: BTreeMap::new(),
+        }
+    }
+
+    /// PLAN-062（AC-03）：刷新某表面的前台引用集，并驱逐已无人引用的挂起释放。
+    /// **只在成功合成后调用**——准入拒绝时前台仍是旧帧，不能按被拒帧记账。
+    fn refresh_refs(&mut self, surface: u64) {
+        let evict = match self.surfaces.front_v2(surface) {
+            Some(front) => self.refs.entry(surface).or_default().on_compose(front),
+            None => Vec::new(),
+        };
+        for src in evict {
+            crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+            if let Some(keys) = self.bitmap_keys.get_mut(&surface) {
+                keys.retain(|k| k != &src);
+            }
         }
     }
 
@@ -430,25 +453,22 @@ impl<'a> ProtocolHost<'a> {
                     payload,
                     ..
                 } => {
-                    // PLAN-062（AC-03）：刷新前台引用集，并驱逐已无人引用的挂起释放。
-                    for src in self.refs.on_compose(&payload) {
-                        crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-                        if let Some(keys) = self.bitmap_keys.get_mut(&surface) {
-                            keys.retain(|k| k != &src);
-                        }
-                    }
                     match self.surfaces.compose_v2(surface, slot, payload) {
-                        Ok(Some(freed)) => self.to_app.push(ProtocolMsg::Frame(
-                            FrameMsg::FrameAck {
+                        Ok(Some(freed)) => {
+                            // PLAN-062（AC-03）：只在**成功合成**后刷新该表面的前台
+                            // 引用集（准入拒绝时前台仍是旧帧，不能按被拒帧记账）。
+                            self.refresh_refs(surface);
+                            self.to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                 wid,
                                 frame_id,
                                 slot: freed,
-                            },
-                        )),
+                            }));
+                        }
                         Ok(None) => {}
                         Err(err) => self.reject_frame(surface, wid, frame_id, slot, &err),
                     }
-                }                HostAction::ComposeFrameShared {
+                }
+                HostAction::ComposeFrameShared {
                     surface,
                     wid,
                     frame_id,
@@ -468,21 +488,16 @@ impl<'a> ProtocolHost<'a> {
                             .as_deref()
                             .and_then(|p| super::shm::display_list_from_slot_payload(p).ok());
                         if let Some(payload) = ready_v2 {
-                            // PLAN-062（AC-03）：刷新前台引用集，并驱逐已无人引用的挂起释放。
-                            for src in self.refs.on_compose(&payload) {
-                                crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-                                if let Some(keys) = self.bitmap_keys.get_mut(&surface) {
-                                    keys.retain(|k| k != &src);
-                                }
-                            }
                             match self.surfaces.compose_v2(surface, slot, payload) {
-                                Ok(Some(freed)) => self.to_app.push(ProtocolMsg::Frame(
-                                    FrameMsg::FrameAck {
+                                Ok(Some(freed)) => {
+                                    // PLAN-062（AC-03）：成功合成后才刷新引用集。
+                                    self.refresh_refs(surface);
+                                    self.to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                         wid,
                                         frame_id,
                                         slot: freed,
-                                    },
-                                )),
+                                    }));
+                                }
                                 Ok(None) => {}
                                 Err(err) => {
                                     self.reject_frame(surface, wid, frame_id, slot, &err)
@@ -586,11 +601,14 @@ impl<'a> ProtocolHost<'a> {
                 // PLAN-062（AC-03）：producer 通知“最后 owner 归零”；前台帧仍在
                 // 引用就挂起（不丢在屏的图），否则立即驱逐。
                 HostAction::ResourceRelease { wid, srcs } => {
-                    let _ = wid;
-                    for src in self.refs.on_release(srcs) {
-                        crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
-                        for keys in self.bitmap_keys.values_mut() {
-                            keys.retain(|k| k != &src);
+                    // 释放按 wid 归属表面；未知表面 = 无意义释放，忽略（不误伤他表）。
+                    if let Some(surface) = self.wid_surface.get(&wid).copied() {
+                        let ready = self.refs.entry(surface).or_default().on_release(srcs);
+                        for src in ready {
+                            crate::ui::iced::broker_surface::bitmap_cache_evict(&src);
+                            if let Some(keys) = self.bitmap_keys.get_mut(&surface) {
+                                keys.retain(|k| k != &src);
+                            }
                         }
                     }
                 }
@@ -1001,6 +1019,9 @@ mod release_tests {
             vec!["bitmap://B".to_string()]
         );
         // 同一 src 重复释放（producer 重发）不重复驱逐。
-        assert!(refs.on_release(vec!["bitmap://B".into()]).len() == 1);
+        assert!(
+            refs.on_release(vec!["bitmap://B".into()]).is_empty(),
+            "重复释放必须幂等（不得二次驱逐）"
+        );
     }
 }

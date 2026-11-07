@@ -1086,3 +1086,69 @@ fn rq_wire_two_process_v2_v3_pairing() {
     assert!(v3_ok, "v3 子进程（独立 exe）的 Path 帧必须跨进程落地");
     assert!(v2_ok, "v2 子进程（独立 exe）的字符串帧必须跨进程落地");
 }
+
+/// PLAN-062（AC-03 / 复审 F-06）：媒体静态帧**真正过线**——poster 经
+/// producer→管道→宿主→位图段→宿主缓存，装配出来的帧里 Image 引用在宿主侧
+/// 命中（in-process 的记录面测试另见 `rq_probe_t05_media_poster_frame_crosses_the_wire`）。
+#[test]
+fn rq_wire_media_poster_frame_crosses_the_wire() {
+    use crate::ui::media_poster;
+
+    media_poster::clear_all();
+    let (pw, ph) = (8u32, 6u32);
+    let rgba: Vec<u8> = (0..(pw * ph * 4)).map(|i| ((i * 5) % 251) as u8).collect();
+    let src = "probe://poster-wire.mp4";
+    assert!(media_poster::publish(src, pw, ph, rgba.clone()));
+
+    let view = View::Video {
+        src: src.to_string(),
+        paused: true,
+        position: Some(0.0),
+        volume: 100,
+        muted: true,
+        rate: 1.0,
+        label: "海报".to_string(),
+        on_time_update: None,
+        on_loaded_metadata: None,
+        on_play_state: None,
+        on_ended: None,
+        on_media_error: None,
+        media_key: None,
+        style: None,
+    };
+    let mut cell = WireCell::start(
+        "poster",
+        WireSource::Rust(HeadlessFrameSource::new(StaticView { view }, W, H)),
+    )
+    .expect("poster cell");
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut hit = None;
+    while Instant::now() < deadline {
+        cell.pump_both();
+        if let Some(list) = cell.composed() {
+            if let Some(src) = list.ops.iter().find_map(|op| match op {
+                DisplayOp::Image { src, .. } => Some(src.clone()),
+                _ => None,
+            }) {
+                hit = Some((src, list.clone()));
+                break;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    let (image_src, _list) = hit.expect("海报帧必须经真实管道到达宿主合成面");
+    assert!(image_src.starts_with("bitmap://"), "引用必须是资源身份: {image_src}");
+    // 宿主缓存命中 = 位图段载荷真的到了（不只是帧里有个 src 字符串）。
+    assert!(
+        crate::ui::iced::broker_surface::resolve_drawlist_image(&image_src, pw, ph).is_some(),
+        "宿主侧必须已收到海报帧位图（真实 shm/管道链路）"
+    );
+    println!(
+        "[RQWIRE] {}",
+        serde_json::json!({
+            "tag": "media_poster_wire", "src": image_src, "poster": [pw, ph],
+        })
+    );
+    media_poster::clear(src);
+}

@@ -375,16 +375,58 @@ fn rq_cells_t05_six_cell_matrix() {
                         Ok(reading) => {
                             if mode == "default" {
                                 // 门只压默认 producer（生产路径）：文字/路径/SVG/滚动
-                                // 必须 ≤0.2%（阈值 2/255）；阴影两例的残差已具名，
-                                // 这里记录不设门。
-                                if matches!(name, "path_mesh" | "svg_icon" | "text_cjk" | "scroll_clip" | "progress_bar" | "gradient_border_shadow" | "shadow_only") {
-                                    assert!(
-                                        reading.diff_ratio <= 0.001,
-                                        "{name} 默认 producer 的像素差 {:.4} 超 0.1% 门（AC-02 r4）",
-                                        reading.diff_ratio
-                                    );
-                                }
+                                // 必须 ≤0.1%（阈值 2/255）。
+                                assert!(
+                                    reading.diff_ratio <= 0.001,
+                                    "{name} 默认 producer 的像素差 {:.4} 超 0.1% 门（AC-02 r4）",
+                                    reading.diff_ratio
+                                );
+                            } else {
+                                // v3 富模式是 r4 的具名边界（不得计为 exact），但边界
+                                // 本身必须被**断言**（复审 F-03）：文字类 ≤1.0%、
+                                // 含阴影贴片的例 ≤1.5%，其余原语维持 0.1%。
+                                let bound = match name {
+                                    "text_cjk" | "scroll_clip" => 0.010,
+                                    "gradient_border_shadow" | "shadow_only" => 0.015,
+                                    _ => 0.001,
+                                };
+                                assert!(
+                                    reading.diff_ratio <= bound,
+                                    "{name} v3 富模式像素差 {:.4} 超具名上界 {bound}（AC-02 r4）",
+                                    reading.diff_ratio
+                                );
                             }
+                            // AC-07（r4）：默认 producer 的 produce p95 ≤10ms；SVG 例是
+                            // **唯一具名例外**（记录路径每帧新建 iced renderer），仍须有界。
+                            if name == "svg_icon" {
+                                // p95 在负载下会被调度抖动放大（同一份代码实测
+                                // 32–90ms），故例外按 **p50**（成本类别）设界，p95
+                                // 只记录；非例外 workload 仍按 p95 压 10ms。
+                                assert!(
+                                    reading.produce_p50 <= 60.0,
+                                    "SVG 例外仍须有界：produce p50 {:.2}ms > 60ms",
+                                    reading.produce_p50
+                                );
+                            } else {
+                                assert!(
+                                    reading.produce_p95 <= 10.0,
+                                    "{name} produce p95 {:.2}ms 超 061 冻结 W-C ≤10ms（且不属具名例外）",
+                                    reading.produce_p95
+                                );
+                            }
+                            // 重放不劣于 direct 稳态帧太多：**p50** ≤ 1.25×direct p50 + 2ms。
+                            // 用 p50 而不是 p95：p95 在共享跑机上有调度抖动（同一份
+                            // 代码实测 direct p95 3–9ms、replay p95 5–18ms），把抖动
+                            // 当回归会误报；p95 仍记录在报告里供评审看。
+                            let direct_p50 = reading.inventory["direct_frame_p50_ms"]
+                                .as_f64()
+                                .unwrap_or(f64::NAN);
+                            assert!(
+                                reading.replay_p50 <= direct_p50 * 1.25 + 2.0,
+                                "{name} replay p50 {:.2}ms 超 1.25×direct({:.2}ms)+2ms",
+                                reading.replay_p50,
+                                direct_p50
+                            );
                             println!(
                                 "[RQCELLS] {}",
                                 serde_json::json!({
