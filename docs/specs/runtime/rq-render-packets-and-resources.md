@@ -294,8 +294,10 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
 - wire `GlyphRun` 携**逻辑坐标**（与 TextStyled 同空间；缩放由 Transform
   信封承载）。位图栅格化是 Host 本地决定：按 `字号 × 宿主设备 scale`
   栅格化、逻辑 rect 绘制 → 1:1 纹理映射。宿主 scale 经
-  `window::scale_factor` 落簿（rqhost）；desktop session broker 落簿归
-  T-05 具名义务（未落簿窗按 1.0，HiDPI 维持旧分辨率行为——具名非静默）。
+  `window::scale_factor` 落簿（rqhost 已接）；**desktop session broker 的
+  scale 落簿为具名 hold**（owner=OS063 桌面壳窗口生命周期域；关闭条件=
+  壳层接入 scale 事件并传入 `displaylist_element`）。未落簿窗按 1.0，
+  HiDPI 协商会话的 broker 内嵌字形维持记录期分辨率（具名软字，非静默）。
 - 字形位图 = **直通 alpha**（`Handle::from_rgba` 合同）；图像 atlas 为
   Rgba8UnormSrgb——sRGB 字节采样时硬件解码到线性，与 direct 文本管线
   （cryoglyph Accurate 线性混合）同空间。预乘烘焙为已修缺陷（勿回退）。
