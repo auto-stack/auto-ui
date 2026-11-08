@@ -251,6 +251,12 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - M 指标终值（rqhost in-proc 真实采纳，代理终点具名）：M-01 p50=0.055/p95=3.18/max=4.42ms（n=40，硬门 p95≤100ms）；M-07 轻App p95=3.11ms（重载在流，硬门同）；M-06 冷 60.0ms/热 36.9ms；M-02 p50=263.7ms；M-05 进程 36.5MB（合并口径）。具名未测：M-03 GPU、高刷新、物理上屏、1/4/8 规模（归 OS063）。
 - 证据处置：plan-artifacts/plan-063 按delete-at-merge 裁定删除（本节已折入全部持久数字与哈希）；构建中间物随 worktree 移除。landing≠deployment：release 制品（Man release exe 等）未重建——观察项记于 merge 收据。
 
+### merge 收据（stage:merge / outcome:pass）
+
+- stage:merge / plan_id:auto-ui/PLAN-063 / plan_revision:r4 / outcome:pass / delivery_commit:auto-ui `96236725`（ff-only，master tip 证实）+ auto-man `347c29f`（ff-only）/ canonical:docs/specs/runtime/rq-execution-input-and-host-services.md（SHA256 前16 `2139d5bc1829127e`，landed @96236725；无 no-impact 豁免——真实增量）/ archive:docs/plans/archived/063-rq-vm-rust-runtime-and-input-parity.md（`646d868f` + 折入 `4226a8e2`，status=archived）/ cleaned:两仓 worktree+分支删除（wt-guard clean ×2 复验）、组目录移除、plan-artifacts/plan-063 删除、registry 刷新（deleted-at-merge，无 holds）
+- **landing≠deployment 观察项**（显式记录，未重建）：release 制品早于本交付——Man release `auto.exe`、auto-ui release 构建树、运行中的桌面/守护进程均消费旧二进制；下次 release 重建/重启时自然拾取（本 Plan 交付面 = 源码 + debug 测试/探针证据，无产品 release 承诺）。auto-lang 批量回归：本仓无 .last-batch-regression.json due 机制（auto-lang 专属规则），不适用。
+- 检查点：prepared ✓ / landed ✓（ff-only 线性史）/ canonical_verified ✓（源哈希+交付 commit）/ archived ✓（docs 已入默认分支）/ cleaned ✓（含 scope 删除+registry）。
+
 ## 10. 待澄清事项
 
 - **T-05 收尾后具名边界（2026-11-08 round 3，非豁免、归 OS063/后继）**：M-03 GPU 时间（平台计时能力缺席）、高刷新适用面（无实测环境）、M-01 物理上屏终点、1/4/8 规模组合、V-10 端到端终值——见 spec §3.1 具名未测表。①旧红族全闭、②V-02/03/04 证据齐、③P-04 机制落地、④M-01/02/04/05/06/07 实测+V-12 身份绑定（round 3 收据）。
