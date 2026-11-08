@@ -812,3 +812,16 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **landing 检查（如实观察）**：本仓不产出独立发布二进制/前端包；受影响的消费面是 auto-os 的 `ui-desktop` 与远端宿主构建，本会话**未重建**任何生产产物（记录为 stale-artifact observation，未声称已刷新）。仓库内消费点：`desktop_protocol` 由 auto-os 侧编译。
 - **批量回归到期检查**：`docs/plans/.last-batch-regression.json` 属 auto-lang 固定组；plan id 62 非 5 的倍数，不触发自动批回归；本次未运行跨仓 `cargo t`。
 - **证据处置**：Plan 相关证据已全部折叠进本文件；`plan-artifacts/plan-062/` 依 2026-10-31 delete-at-merge 规则删除。唯一保留记录：主检出遗留 WIP 的补丁存档 `stale-main-wip/main-checkout-wip.patch`（sha256 `0cc1abd45bc92c45d2f96ec8d0b5124518b39e3fc92794972fcd2ffc00916675`，4 个文件、被撤回特性的宿主侧残留），其归属与删除理由见 §10；该补丁不构成未决 hold。
+
+### 2026-11-08 merge 收尾（清理与 landing 检查，最终状态）
+
+- stage: merge | plan_id: auto-ui/PLAN-062 | plan_revision: r5 | outcome: **pass（delivered + archived + cleaned）** | delivery_commit: `cae1632e` | archive_commit: `a1cdfaa7`
+- **worktree 清理（4 个，逐个 wt-guard clean 后移除）**：`auto-ui`（分支树）、`auto-lang`（detached `8337bab5`）、`auto-web`（detached `2d69841`）、`auto-down`（detached `58ea33f`）——后三个是本组只读协作树，均干净无 reparse point；组目录 `.wt/ui-062` 变空后删除。
+- **分支**：`codex/plan-062-dev` 已删（指向 `cae1632e`，已 ff-only 进 master）。
+- **plan-artifacts**：`plan-062/` 依 delete-at-merge 规则删除（**11,460 文件 / ≈10.76 GB**，其中 `review4/` 占 10.7 GB）；保留内容的可复核信息已折叠进本文件（含主检出遗留 WIP 补丁 sha256 `0cc1abd4…`）。
+- **registry**：`D:/autostack/plan-artifacts/.retention/policy.json` 的 `auto-ui/PLAN-062` 条目标为 `deleted-at-merge`，记录 delivery/archive/规范 blob、files/bytes、worktrees=4、branches=1、`holds: []`；`last_merge_closeout` 更新。
+- **landing 检查（如实观察）**：本仓不产出独立发布二进制或前端包；消费方是 auto-os 的 `ui-desktop` 与远端宿主构建，本会话**未重建**生产产物（记录为 stale-artifact observation）。代码路径工作树干净（`git status --porcelain -- crates` = 空）。
+- **批量回归**：`docs/plans/.last-batch-regression.json` 属 auto-lang 固定组，plan id 62 非 5 的倍数 → 不触发；本会话未跑跨仓 `cargo t`。
+- **最终状态**：master `a1cdfaa7`；`062-…md` 位于 `docs/plans/archived/`、`status: archived`、`current_step: 7`；三份规范页在 `docs/specs/`；无遗留 worktree/branch/scope。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 37 | from: merge | to: done | status: archived | outcome: **pass（计划已交付并归档）** | worktree: 已删除 | commit: cae1632e | next: —
