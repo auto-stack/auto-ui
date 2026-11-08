@@ -318,7 +318,19 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
   28 行 produce/SVG/pixel 门 asserted）**是“在该窗口内成立”的记录，不等于空闲主机签收**。
   若后续需要把 AC-07 的计时结论写进正式交付边界，应在真正空闲的机器上重跑一次同一命令集。
 - **本轮已收口的项**：per-App 上传速率（8 MiB/s + 整帧回滚 + 背压）已完成并用负控验证；wire generation、慢宿主/旧 ACK/旧宿主负控、真两进程配对亦已收口，均不含在上述待裁定清单内。
-- **2026-11-07 主检出存在他方未提交 WIP（merge 前必须由 owner 归位，不属本 Plan）**：主检出 `D:/autostack/auto-ui`（master `df09d816`）工作树里有未提交修改 `crates/auto-ui-runtime/src/ui/desktop_protocol/{headless,host,rqhost}.rs`、`ui/session.rs`，内容是把已撤回的 `drain_resource_releases`（PLAN-062 在 `00bd355d` 整提交撤回的 ResourceRelease）接线到 `FrameSource` 实现上；master 上这些方法不存在，该 WIP 与主线不可编译/语义不一致。本 Plan 未触碰、未 include、未 stash；worktree `codex/plan-062-dev` 不受影响。**merge 前**需其 owner 把这些改动路由回自己的树（stash/patch 交接或 fix worktree），否则主检出不满足 master-zero-WIP 门。
+- **2026-11-07/08 主检出 WIP 归属更正与清理（2026-11-08 用户授权）**：此前 §10 记的“他方 WIP”
+  **归属判断错误**——那 4 个文件（`desktop_protocol/{headless,host,rqhost}.rs`、`ui/session.rs`）
+  是**本计划上一会话**的遗留：注释逐字为 `PLAN-062 T-04：App 释放资源…`，arm 与
+  `310d9111`（2026-11-07 21:33）相同；文件 mtime 21:18–21:19（早于该提交、早于撤回
+  `87780481`/`00bd355d`）；本 goal 会话开始于 22:10:42 且只改 worktree。该特性随后被撤回，
+  主检出未回滚 → 死代码：它引用的 `HeadlessSurface::drain_resource_releases` 与
+  `HostAction::ResourceRelease` 在 master 上不存在（`git grep`=0），工作树**不可编译**。
+  处置（用户 2026-11-08 批准“按推荐做”）：diff 存档到
+  `D:/autostack/plan-artifacts/plan-062/auto-ui/stale-main-wip/main-checkout-wip.patch`
+  （+README.md 记归属证据），4 文件 `git restore` 回 master；同日把
+  `crates/auto-ui-runtime/test/ui/terminal_pixel/` 下 4 张 2026-11-03 的金样 PNG
+  （terminal_pixel_tests 产物，与本 WIP 无关）移入同目录 `terminal_pixel-artifacts/`。
+  结果：`git status --porcelain -- crates` **空**，`drain_resource_releases` 在 master 工作树为 0。
 - 性能数值预算/实际刷新率/可运行规模待UI061授权执行后按先基线后候选冻结；无预算不签PASS，支持承诺或阈值变化须具名修订。
 - SVG 记录路径每帧新建 iced renderer（produce ≈20–32ms，T-05 实测）属 T-02 生产侧实现债，修它需要改 `HeadlessSurface` 的 renderer 生命周期（缓存迁移风险），建议单独有界任务而不是塞进本 Plan 收尾。
 - 本轮没有必须再询问才能成稿的问题；实施暂停来自用户的规划范围。后续启动不改变既有依赖门。
@@ -776,3 +788,13 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **本 Plan 侧已就绪的证据**：最终复审 pass（`3eef8a32`，review10）；隔离窗口计时与像素门全绿；`wt-guard` clean；主检出/分支文件集零重叠。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 35 | from: merge | to: user | status: reviewed | outcome: **blocked**（主检出他方 WIP，连续 3 轮） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: user（owner 归位后恢复 merge）
+
+### 2026-11-08 merge 入口门解除（主检出 WIP 归属更正并清理）
+
+- stage: merge（入口清理） | plan_id: auto-ui/PLAN-062 | plan_revision: r5 | outcome: pass（门已解除） | worktree: `D:/autostack/.wt/ui-062/auto-ui`（clean @ `3eef8a32`） | 主检出：`D:/autostack/auto-ui` master
+- **更正**：所谓“他方 WIP”实为**本计划上一会话**的残留（证据：注释 `PLAN-062 T-04`、arm 与 `310d9111` 逐字相同、mtime 21:18–21:19 早于该提交与撤回、符号只存在于 `codex/plan-062-dev`、master 无对应符号故不可编译）。上一轮把它记作他方是我的误判。
+- **动作**（用户 2026-11-08 授权）：diff 存档 `stale-main-wip/main-checkout-wip.patch`（4008B）+ README 归属说明；4 文件 `git restore`；4 张 2026-11-03 terminal_pixel 金样移入 `stale-main-wip/terminal_pixel-artifacts/`。
+- **验证**：`git status --porcelain -- crates` → 空；`git grep drain_resource_releases -- crates` → 0；`git status --porcelain` 仅剩他计划/设计的 docs 未跟踪与非 code-path 文档改动（不属 code-path WIP）。
+- 后续：直接进入 T-07（整合 → 冻结 union 回归 → SD-01/SD-02 发布 → 归档 → 清理 → landing）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 36 | from: merge | to: merge | status: reviewed | outcome: pass（merge 入口门解除，归属更正） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: merge（T-07 正式执行）
