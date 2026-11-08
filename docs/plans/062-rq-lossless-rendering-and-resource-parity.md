@@ -719,3 +719,15 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **未变**：AC-01..AC-04 证据（第五轮 reviewer 复确认，diff 仅 `#[cfg(test)]` + 文档）；SD-01/SD-02 发布、统一回归、归档清理归 merge；主检出他方 WIP 仍是 merge 门。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 30 | from: work | to: review | status: execution_done | outcome: pass（R-2/R-4 收尾；AC-07 按 r5 已 pass） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 4f510ed1 | next: review（第六轮 final）
+
+### 2026-11-08 第六轮独立复审（final，r5）与 R-4(c) 收尾
+
+- stage: review | review_scope: final | reviewer_identity: 独立上下文子代理（模型/会话号未由运行环境暴露） | plan_id: auto-ui/PLAN-062 | plan_revision: 5 | outcome: **needs_fix**（仅剩 R-4 的子项 c） | reviewed_commit: `4f510ed1` | base_commit: `3d64877d` | evidence: `D:/autostack/plan-artifacts/plan-062/auto-ui/review9/REVIEW9-FINAL-2026-11-08.md`
+- **关闭**：**R-2**（Spec §5.3 已是单一 r5 计时块，全页无残留 p95 门/共享窗口 p50 断言；与 AC-07、V-07、代码一致）；**R-4(a)(b)**（`direct_p95` 已删、`cargo check --tests` exit 0 无该警告、注释块唯一、括号缩进正确）。
+- **未闭（R-4c）**：`rq_probe.rs:1102-1105` 与第五轮逐字节相同，仍写“replay p95 ≤1.25×direct+2ms…标 skipped_loaded”——一个已删的门 + 一个全树不存在的标记，且紧邻 r5 新注释，函数内再次出现两套矛盾规则（与 R-2 同一反模式）。reviewer 也指出我 r5 收据“rq_probe 残留注释已改”只部分为真。
+- **本轮修复（`3eef8a32`）**：把该头部注释重写为**单一 r5 块**（p50 设门且只在隔离窗口、p95 只记录、produce 只在冻结矩阵裁决），并加一行明示“r4 的 p95 设门 + skipped_loaded 已被 r5 取代，保留仅为解释历史”，不重新引入该门；全树复查 `skipped_loaded`/`p95 ≤1.25` 只剩这条历史注记，Spec 中为 0。
+- **修复后复跑（本树 `3eef8a32`）**：隔离窗口 `rq_probe_t01` **exit 0**；共享窗口 `rq_` **41/0**；此前一轮的隔离矩阵 28/28 asserted 与协议族 278/4（同基线 4 红）不变（本轮只改注释，逻辑未动）。
+- **AC 状态（第六轮 reviewer 自跑）**：AC-01..AC-04 pass（diff 仅两个 `#[cfg(test)]` 模块 + 未发布的 Spec 页，无生产代码）；**AC-07 pass（r5 判据）**：隔离 `rq_cells` 28/28 asserted、produce 非 SVG 0.095–0.316ms、SVG p50 30.8–32.0ms；隔离 `rq_probe` 41/41、replay p50 max 5.02ms（最差余量 1.81ms）、p95 max 6.47ms 仅记录。
+- **未变**：统一回归、SD-01/SD-02 发布、归档/清理归 merge；主检出他方 WIP 仍是 merge 门；M-02/06/07（OS063）、连续媒体帧、可控重排通道负控仍具名。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 31 | from: work | to: review | status: execution_done | outcome: pass（R-4c 收尾；其余全绿） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: review（第七轮 final）
