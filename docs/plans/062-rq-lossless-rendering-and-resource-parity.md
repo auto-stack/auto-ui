@@ -111,7 +111,6 @@ T-02：`crates/auto-ui-runtime/src/ui/desktop_protocol/headless.rs`及`message.r
 | V-04 | AC-04 | 双进程坏长度/乘积溢出/NaN/栈错配、未知required capability、慢Host/旧ACK/乱序资源 | 入帧前明确拒绝、旧完整帧保持，队列有界，资源与传输槽回收不混淆；旧合法协议控制仍可用 | T-04/T-05；协议事务与生命周期 |
 | V-05 | AC-07 | 批量帧、延迟ACK、槽满与旧ACK；逐图元同步反控 | 稳态无逐图元往返/强制逐帧呈现屏障，按信用有界流水与背压；M-04消息/等待证据 | T-02/T-04/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
 | V-06 | AC-07 | 稳定font/image/mesh重复帧、单项更新/驱逐/最后owner、旧generation | 重复payload/GPU创建为0（驻留未变前提）；变化恰当失效，M-04/M-05可核，GPU在用不早释 | T-03/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
-| V-07 | AC-07 | 生产双进程慢Host、突发帧与媒体资源更新、原direct对照 | 队列帧/字节峰值在预算内；只合并过期画面而保资源/输入依赖，M-01～06/M-08按触面通过 | T-04/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
 | V-08 | AC-07 | 重App大资源/复杂绘图与轻App共享真实Host，长锁/无限队列负控 | per-App预算生效，CPU任务不独占，轻App与重App均按策略有进展，M-07通过且保功能 | T-04/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
 | V-09 | AC-04 | 旧新producer/Host配对、容量单位、unknown capability、平台backend fixture与合法对照 | 兼容真实可用，不兼容明确拒绝；提交/反馈接口可消费；fixture不冒真Linux | T-04/T-05；协议接缝 |
 
@@ -672,8 +671,32 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **隔离窗口复跑**（`AUTO_RQ_TIMING_WINDOW=isolated`，本树 `ecf8496c`）：
   - `rq_cells_t05_six_cell_matrix` exit 0，逐例 `timing_gate=asserted`：**produce p50/p95** = path_mesh 0.11/0.15、svg_icon 31.79/33.20（p50 ≤60 具名例外）、text_cjk 0.11/0.18、gradient 0.14/0.17、scroll 0.15/0.21、shadow_only 0.13/0.19、progress 0.13/0.18（单位 ms，全部 ≪ W-C 10ms）；像素门：default 全 ≤0.1%（0.095/0.039/0.094/0.062/0.000/0.005/0.006%），v3_rich text 0.798%（≤1.0）、gradient 0.588%、shadow 0.069%、scroll 0.330%（≤1.5/≤1.0）。
   - `rq_probe_t01_direct_and_rq_baseline` exit 0（r5 的 replay **p50** 门：全部通过；p95 按 r5 只记录）。
+  **更正（2026-11-08，第四轮复审 R-1 指出）**：当时代码里仍保留 p95 断言，我的那次通过属偶然；该断言已删除，本收据的“只记录”到 `ecf8496c` 之后才真正成立。
 - **共享窗口复跑**（默认，不带 env）：`rq_` **41/0**；计时门记 `timing_gate=skipped_shared_window`，像素/结构门照常生效。
 - **仍未签收**：统一回归（冻结并集）与 Spec 发布归 merge；M-02/M-06/M-07（OS063）；连续媒体帧（另行）；可控重排通道负控（具名）。
 - **交 review 的事**：按 r5 措辞复核 AC-07（p50 门 + 隔离窗口 + SVG 例外口径）与先前已批的 AC-01/02/03/04 证据；确认 `plan_revision: 5` 的合同与代码一致。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 27 | from: work | to: review | status: execution_done | outcome: pass（r5 隔离窗口复跑全绿） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: ecf8496c | next: review（T-06 第四轮 final）
+
+### 2026-11-08 第四轮独立复审（final，r5）与 R-1..R-4 修复
+
+- stage: review | review_scope: final | reviewer_identity: 独立上下文子代理（模型/会话号未由运行环境暴露） | plan_id: auto-ui/PLAN-062 | plan_revision: **5** | outcome: **needs_fix** | worktree: `D:/autostack/.wt/ui-062/auto-ui` | branch: `codex/plan-062-dev` | reviewed_commit: `ecf8496c` | base_commit: `3d64877d` | evidence: `D:/autostack/plan-artifacts/plan-062/auto-ui/review7/REVIEW7-FINAL-2026-11-08.md`
+- **r5 授权/最小性：pass**——`d9df86d9`（+25/−5）只动 frontmatter、一条 §5 bullet、V-07 行、AC-07 行；`a89c321c` 只动 status+§9。可追溯到 round 24/25/26 的裁定链：公平轮转测量证伪“直绘修复”前提 → 用户改选 r5。未删 AC、未改范围/仓库/任务，1.25×direct+2ms 仍是冻结公式（只是作用在 p50）。
+- **AC 判定（reviewer 自跑）**：AC-01 pass；**AC-02 pass**；**AC-03 pass**；**AC-04 pass**；AC-07 **partial**（produce 全绿：path 0.15/0.18、svg 43.04/51.44 具名、text 0.13/0.16、gradient 0.18/0.22、scroll 0.23/0.26、shadow 0.15/0.18、progress 0.14/0.19 ms；replay p50 在 run-1 的 20 例全绿，但全语料未证——测试在 R-1 处中止）。
+- **R-1（blocking，AC-07）**：`rq_probe.rs` 仍断言 `replay p95 ≤1.25×direct p95+2`（r5 已把 p95 改为只记录）；reviewer 的隔离跑在此中止（mouse_area 9.60 > 9.475）。**同时我的 r5 收据 “p95 按 r5 只记录 / exit 0” 是错的**——代码里仍有断言，我那次只是恰好通过。**已修**：删除该断言、保留 p95 记录；并在此更正收据。
+- **R-2（medium，SD-01）**：Spec §5.3 的计时段落仍写“p50 在共享跑机断言、p95 在隔离窗口设门”，与 r5/代码相反。**已修**：改为“p50 设门 + p95 只记录；所有计时断言仅在隔离窗口”。
+- **R-3（low）**：§6 有两行 V-07（109/114），r5 只更新了主行。**已修**：删除陈旧重复行。
+- **R-4（info）**：`rq_cells` 的“安静基线/skipped_loaded”注释与未使用的 `ratio`。**已修**。
+- **修复后复跑（本树）**：隔离窗口 `rq_probe_t01` exit 0（p50 门全过）、`rq_cells_t05_six_cell_matrix` exit 0（produce/SVG/像素门 asserted）；共享窗口 `rq_` **41/0**；`ui::desktop_protocol::` **278/4**（同基线 4 红）；`broker_surface` 14/14。
+- **AC-07 结论**：R-1 修好后，隔离窗口的 p50 门与 produce 门在同一树全部通过；**唯一未证**的是“真正空闲主机上的全语料 replay p50”——reviewer 明确指出其窗口有并发 ACE 构建（CPU 9–23%），且 `AUTO_RQ_TIMING_WINDOW=isolated` 只是标签、不隔离资源。这一点写进 §10 作为已知测量限制。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 28 | from: review | to: work | status: executing | outcome: needs_fix（R-1..R-4，已修） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: ecf8496c | next: work（修复已落，交第五轮 final）
+
+### 2026-11-08 work R-1..R-4 修复复跑（交第五轮 final）
+
+- stage: work | plan_id: auto-ui/PLAN-062 | plan_revision: r5 | outcome: **pass（R-1..R-4 全关）** | worktree: `D:/autostack/.wt/ui-062/auto-ui` | branch: `codex/plan-062-dev` | code_commit: `3a3be18d` | next: review（T-06 第五轮 final）
+- 复跑（本树 `3a3be18d`）：隔离窗口 `rq_probe_t01_direct_and_rq_baseline` **exit 0**（p50 门全过，p95 仅记录）、`rq_cells_t05_six_cell_matrix` **exit 0**（produce/SVG/像素门 `timing_gate=asserted`）；共享窗口 `rq_` **41/0**、`ui::desktop_protocol::` **278 passed / 4 failed**（同基线 4 红）、`broker_surface` 14/14。
+- **已知测量限制（写进 §10，评审需知）**：`AUTO_RQ_TIMING_WINDOW=isolated` 只是**标签**，不隔离机器资源；reviewer 的窗口里有并发 ACE 构建（CPU 9–23%），其 run-2 的 `code_editor replay p50 12.15 > 8.55` 属主机抖动。真正签收 AC-07 需要一次空闲主机运行；本会话无法保证。
+- **未变**：AC-01..AC-04 的既有证据（reviewer 第四轮已判 pass）；SD-01/SD-02 发布、统一回归、归档与清理归 merge；主检出他方 WIP 仍是 merge 门。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 29 | from: work | to: review | status: execution_done | outcome: pass（R-1..R-4 关闭，隔离窗口复跑全绿） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3a3be18d | next: review（第五轮 final）
