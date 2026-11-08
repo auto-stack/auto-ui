@@ -47,8 +47,10 @@ pub fn post(title: &str, message: u32, wparam: usize, point: (i32, i32)) -> Resu
     let packed = if message == 0x100 || message == 0x101 {
         let scan: u32 = unsafe { MapVirtualKeyW(wparam as u32, 0) };
         let extended: u32 = u32::from((0x25..=0x28).contains(&wparam)) << 24;
-        let release: u32 = u32::from(message == 0x101) << 30;
-        (1u32 | (scan << 16) | extended | release) as isize
+        // WM_KEYUP carries previous-state (bit 30) AND transition (bit 31)
+        // set; without the transition bit the release reads as a repeat.
+        let up: u32 = u32::from(message == 0x101) * 0xC0000000;
+        (1u32 | (scan << 16) | extended | up) as isize
     } else {
         ((point.0 as u32 & 0xffff) | ((point.1 as u32 & 0xffff) << 16)) as isize
     };
@@ -76,3 +78,22 @@ pub const WM_MOUSEMOVE: u32 = 0x0200;
 pub const WM_LBUTTONDOWN: u32 = 0x0201;
 pub const WM_LBUTTONUP: u32 = 0x0202;
 pub const WM_MOUSEWHEEL: u32 = 0x020A;
+
+/// The double-click failure surface: a startup/fatal error is named in a
+/// blocking dialog (product entries only; QA entries fail through the report
+/// so a hung dialog can never stall an automated run).
+#[cfg(windows)]
+pub fn fatal_message(title: &str, text: &str) {
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn MessageBoxW(h: *mut std::ffi::c_void, text: *const u16, caption: *const u16, kind: u32) -> i32;
+    }
+    let wide = |s: &str| -> Vec<u16> { s.encode_utf16().chain([0]).collect() };
+    let (t, c) = (wide(text), wide(title));
+    unsafe {
+        MessageBoxW(std::ptr::null_mut(), t.as_ptr(), c.as_ptr(), 0x10);
+    }
+}
+
+#[cfg(not(windows))]
+pub fn fatal_message(_title: &str, _text: &str) {}

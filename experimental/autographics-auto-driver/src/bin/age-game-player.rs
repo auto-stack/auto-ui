@@ -29,12 +29,12 @@ fn main() {
     // The product entry takes no required argument: player.json beside the
     // exe is the launch description. QA flags exist for the bounded proof and
     // the integration test only; unknown flags are rejected, not ignored.
-    let known = ["--qa", "--report", "--config"];
+    let known = ["--qa", "--report", "--config", "--user-data-dir"];
     let unknown = args.iter().skip(1).any(|v| {
         v.starts_with("--") && !known.iter().any(|k| v == *k)
     });
     if unknown {
-        eprintln!("usage: age-game-player [--config <player.json>] [--qa platformer-2d|platformer-3d --report <path>]");
+        eprintln!("usage: age-game-player [--config <player.json>] [--user-data-dir <dir>] [--qa platformer-2d|platformer-3d --report <path>]");
         std::process::exit(2);
     }
     let root = std::env::current_exe()
@@ -70,7 +70,25 @@ fn main() {
         eprintln!("--qa and --report must be given together");
         std::process::exit(2);
     }
-    let launch = app::App::new(config, root, qa, value("--report").map(PathBuf::from));
+    // Run data goes to a user-writable scope: QA pins it explicitly; the
+    // product default is %APPDATA%/<game_id> (never the release layout).
+    let user_data = match value("--user-data-dir") {
+        Some(dir) => PathBuf::from(dir),
+        None => std::env::var("APPDATA")
+            .map(|base| PathBuf::from(base).join(&config.game_id))
+            .unwrap_or_else(|_| root.join("player-data")),
+    };
+    if let Err(e) = std::fs::create_dir_all(&user_data) {
+        eprintln!("user-data dir {:?} unusable: {e}", user_data);
+        std::process::exit(1);
+    }
+    let launch = app::App::new(
+        config,
+        root,
+        qa,
+        value("--report").map(PathBuf::from),
+        user_data,
+    );
     let code = app::run(launch);
     std::process::exit(code);
 }
