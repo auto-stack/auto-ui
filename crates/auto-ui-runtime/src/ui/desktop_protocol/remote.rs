@@ -198,8 +198,8 @@ impl DesktopSession {
             return; // 目标未落地：留待下拍重试
         };
         mirror.wid = Some(wid);
-        // PLAN-063 诊断（临时）：订阅期 wm rect 与孪生视口（对拍 child
-        // 侧 480x900 与点击几何）。
+        // PLAN-063 取证面（AUTO_PLAN060_DIAG 门）：订阅期 wm rect 与
+        // 孪生视口（镜像命中表几何归因）。
         if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
             eprintln!(
                 "[p063-diag] mirror subscribe rect=({},{},{},{}) twin_viewport=({width},{height})",

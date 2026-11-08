@@ -4942,8 +4942,8 @@ impl DesktopSession {
             return Ok(());
         }
         if client.surfaces.size(surface) != Some((size.width, size.height)) {
-            // PLAN-063 诊断（AUTO_PLAN060_DIAG 门）：视口同步实况（outproc
-            // 点击族根因取证——rect/表面尺寸错位）。
+            // PLAN-063 取证面（AUTO_PLAN060_DIAG 门）：视口同步实况
+            //（rect/表面尺寸错位归因——采纳期钳制/resize 链诊断）。
             if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
                 eprintln!(
                     "[p063-diag] viewport sync wid={} surface {:?} -> content {:?} (Resize 下发)",
