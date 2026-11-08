@@ -70,6 +70,7 @@ pub fn post(_: &str, _: u32, _: usize, _: (i32, i32)) -> Result<(), String> {
 pub const VK_SPACE: usize = 0x20;
 pub const VK_RETURN: usize = 0x0D;
 pub const VK_KEY_D: usize = 0x44;
+pub const VK_KEY_S: usize = 0x53;
 pub const VK_KEY_W: usize = 0x57;
 pub const WM_CLOSE: u32 = 0x0010;
 pub const WM_KEYDOWN: u32 = 0x0100;

@@ -49,6 +49,8 @@ pub struct Qa {
     pixels_t0: Option<Value>,
     walk_x0: Option<f32>,
     walk_repress: u64,
+    enter_repress: u64,
+    audio_baseline: Value,
 }
 
 impl Qa {
@@ -72,6 +74,8 @@ impl Qa {
             pixels_t0: None,
             walk_x0: None,
             walk_repress: 0,
+            enter_repress: 0,
+            audio_baseline: Value::Null,
         }
     }
 
@@ -195,15 +199,15 @@ impl Qa {
 
     /// The fresh-round observation shared by both scripts: a new Run back at
     /// the original spawn; 2D then closes, 3D opens the camera phases.
-    fn respawn_or_close(&mut self, h: &mut Host, w: &Window, frame: u64) -> Result<(), String> {
+    fn respawn_or_close(&mut self, h: &mut Host, w: &Window, frame: u64) -> Result<bool, String> {
         let two_d = matches!(self.script, Script::TwoD);
         let p = Self::play(h)?;
         if p.state != State::Running || p.pending() || p.last.is_none() {
-            return Ok(());
+            return Ok(false);
         }
         let run = p.run_id();
         if run <= self.run1 {
-            return Ok(());
+            return Ok(false);
         }
         let respawn = Self::actor_translation(h, two_d)?;
         let drift = (0..3)
@@ -232,7 +236,7 @@ impl Qa {
             self.records.push(json!({"case":"orbit-press","at":[cx, cy]}));
         }
         self.next(frame);
-        Ok(())
+        Ok(true)
     }
 
     pub fn step(&mut self, h: &mut Host, w: &Window, frame: u64) {
@@ -253,6 +257,12 @@ impl Qa {
             // Posted messages reach this window's queue regardless of
             // foreground state; keep asking for focus but never gate on it.
             w.focus_window();
+        }
+        // Uniform recovery: while paused, re-enter the pointer and re-request
+        // focus on a throttle, so any auto pause (focus/cursor) resolves as
+        // soon as its cause ends instead of starving the chain.
+        if !Self::running(h) && self.phase > 0 && frame % 45 == 0 {
+            self.poke_pointer(w);
         }
         let result: Result<(), String> = (|| {
             match self.phase {
@@ -276,25 +286,30 @@ impl Qa {
                     self.next(frame);
                     Ok(())
                 }
-                // 1: the first press (2D jump; 3D begins the -z walk). Only a
-                // Running run may receive it; a paused window gets the legal
+                // 1: the first press: 2D jumps; 3D walks +x (camera-right)
+                // toward the designed gap. Paused windows get the legal
                 // pointer-recovery poke and the press waits for the next step.
                 1 => {
                     if !Self::running(h) {
                         self.poke_pointer(w);
                         return Ok(());
                     }
-                    self.send(if two_d { VK_SPACE } else { VK_KEY_W }, true)?;
+                    self.send(if two_d { VK_SPACE } else { VK_KEY_D }, true)?;
                     self.next(frame);
                     Ok(())
                 }
                 2 => match self.script {
                     Script::TwoD => {
                         self.send(VK_SPACE, false)?;
+                        self.records.push(json!({"case":"space-tap"}));
                         self.next(frame);
                         Ok(())
                     }
                     Script::ThreeD => {
+                        let x = Self::actor_translation(h, two_d)?[0];
+                        if x <= 6.8 {
+                            return Ok(());
+                        }
                         self.send(VK_SPACE, true)?;
                         self.next(frame);
                         Ok(())
@@ -336,16 +351,12 @@ impl Qa {
                     }
                     Ok(())
                 }
-                // 4: hold movement until the fall; the 2D hero crosses y=-1.5
-                // inside the x 8..10 gap, the 3D player passes y=-0.5 off the
-                // z=0 edge (W stays held into phase 5).
+                // 4: 2D holds D until the fall crosses y=-1.5 in the gap;
+                // 3D starts the S diagonal once deck2 is reached.
                 4 => {
                     if two_d {
                         let y = Self::actor_translation(h, two_d)?[1];
                         if y > -1.5 {
-                            // A held key pressed while an auto pause ate the
-                            // edge leaves the actor standing; a fresh press is
-                            // the same recovery a player makes.
                             if let Some(x0) = self.walk_x0 {
                                 let x = Self::actor_translation(h, two_d)?[0];
                                 if frame - self.at > 120
@@ -358,6 +369,7 @@ impl Qa {
                                         .push(json!({"case":"walk-retry","attempt":self.walk_repress,"x":x}));
                                     self.send(VK_KEY_D, true)?;
                                     self.walk_x0 = Some(x);
+                                    self.at = frame;
                                 }
                             }
                             return Ok(());
@@ -368,17 +380,19 @@ impl Qa {
                         );
                         self.next(frame);
                     } else {
-                        let y = Self::actor_translation(h, two_d)?[1];
-                        if y > -0.5 {
+                        let p = Self::actor_translation(h, two_d)?;
+                        if p[0] <= 10.5 || p[1] <= 0.0 {
                             return Ok(());
                         }
-                        self.records.push(json!({"case":"3d-off-edge","y":y}));
+                        self.send(VK_KEY_S, true)?;
+                        self.audio_baseline = Self::audio(h);
                         self.next(frame);
                     }
                     Ok(())
                 }
-                // 5-8: defeat cue -> fresh-Enter restart. 2D: the fall is
-                // already detected at phase 4; 3D falls past y=-3.4 here.
+                // 5: 2D waits out the defeat cue then presses Enter;
+                // 3D aims at the hazard line (release S at z>3.55) and then
+                // presses Enter once the death is confirmed (phase 6).
                 5 => {
                     if two_d {
                         if frame - self.at < 60 {
@@ -387,21 +401,21 @@ impl Qa {
                         self.records.push(
                             json!({"case":"audio-after-defeat","audio":Self::audio(h),"audio_at_start":self.audio_t0}),
                         );
-                    } else {
-                        let y = Self::actor_translation(h, two_d)?[1];
-                        if y > -3.4 {
+                        if !Self::running(h) {
+                            self.poke_pointer(w);
                             return Ok(());
                         }
-                        self.send(VK_KEY_W, false)?;
-                        self.records
-                            .push(json!({"case":"fell-below-fail-line","y":y}));
+                        self.send(VK_RETURN, true)?;
+                        self.next(frame);
+                    } else {
+                        let z = Self::actor_translation(h, two_d)?[2];
+                        if z <= 3.55 {
+                            return Ok(());
+                        }
+                        self.send(VK_KEY_S, false)?;
+                        self.records.push(json!({"case":"3d-aimed","z":z}));
+                        self.next(frame);
                     }
-                    if !Self::running(h) {
-                        self.poke_pointer(w);
-                        return Ok(());
-                    }
-                    self.send(VK_RETURN, true)?;
-                    self.next(frame);
                     Ok(())
                 }
                 6 => {
@@ -409,11 +423,18 @@ impl Qa {
                         self.send(VK_RETURN, false)?;
                         self.next(frame);
                     } else {
-                        if frame - self.at < 60 {
+                        // Death is confirmed by the device itself: the defeat
+                        // cue raises the observed non-zero PCM over the
+                        // post-jump baseline. Then release the walk.
+                        let a = Self::audio(h);
+                        let base = a["nonzero"].as_u64().unwrap_or(0);
+                        let prev = self.audio_baseline["nonzero"].as_u64().unwrap_or(0);
+                        if base < prev + 3000 {
                             return Ok(());
                         }
+                        self.send(VK_KEY_D, false)?;
                         self.records.push(
-                            json!({"case":"audio-after-defeat","audio":Self::audio(h),"audio_at_start":self.audio_t0}),
+                            json!({"case":"audio-after-defeat","audio":a,"audio_baseline":self.audio_baseline}),
                         );
                         self.next(frame);
                     }
@@ -443,9 +464,21 @@ impl Qa {
                     Ok(())
                 }
                 // 9: 2D never reaches here; 3D observes the fresh round and
-                // opens the camera phases (left-drag orbit, wheel zoom).
+                // opens the camera phases (left-drag orbit, wheel zoom). An
+                // end-state press eaten by an auto pause is retried as a
+                // fresh press, the same way a player recovers.
                 9 => {
-                    self.respawn_or_close(h, w, frame)?;
+                    let observed = self.respawn_or_close(h, w, frame)?;
+                    if !observed && !self.done && frame - self.at > 240 {
+                        self.enter_repress += 1;
+                        if self.enter_repress >= JUMP_ATTEMPTS {
+                            return Err("qa: fresh-Enter never opened a new round".into());
+                        }
+                        self.records
+                            .push(json!({"case":"enter-retry","attempt":self.enter_repress}));
+                        self.send(VK_RETURN, true)?;
+                        self.at = frame;
+                    }
                     Ok(())
                 }
                 10 => {

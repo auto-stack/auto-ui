@@ -49,7 +49,7 @@ fn main() {
         Some(p) => PathBuf::from(p),
         None => root.join("player.json"),
     };
-    let config = match config::PlayerConfig::load(&config_path) {
+    let mut config = match config::PlayerConfig::load(&config_path) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("{e}");
@@ -58,7 +58,13 @@ fn main() {
     };
     let qa = match value("--qa") {
         Some(name) => match app::script_from(&name) {
-            Some(script) => Some(qa::Qa::new(script, config.display.title.clone())),
+            Some(script) => {
+                // The QA window tells a human what it is: an automated run
+                // that takes under a minute, not a stuck popup.
+                config.display.title =
+                    format!("{} [自动测试 约40秒 勿关]", config.display.title);
+                Some(qa::Qa::new(script, config.display.title.clone()))
+            }
             None => {
                 eprintln!("--qa expects platformer-2d or platformer-3d");
                 std::process::exit(2);
