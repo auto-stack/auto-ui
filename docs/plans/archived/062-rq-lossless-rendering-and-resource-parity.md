@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-062
-status: reviewed
+status: archived
 feature_name: RQ无损原语、文字图形与资源重放
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-08
 plan_revision: 5
-current_step: 6
+current_step: 7
 total_steps: 7
 depends_on: [auto-ui/PLAN-061]
 supersedes_spec_components: []
@@ -152,7 +152,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | [x] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；V-09——完成：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、wire generation + HostCaps 下行（`d2e41c58`）、资源释放 + 引用记账（`44079c22`，复审 F-02/F-04/F-07 修复：合成成功后才记账、按表面、幂等、旧宿主不积压，`f2cdafb4`）、真两进程配对（`39bd7bef`）；乱序上传由 generation 守卫覆盖，可控重排通道属具名边界 |
 | [x] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——完成：六格真实 wire（`4e2f53d3`）+ 39/39 逐能力读数（`77f92dda`）+ 负控/两进程（`4263ff3c`/`39bd7bef`）+ 媒体静态帧（`3eadae59`，复审 F-06 补了真管道过线用例）、数值条款全部落为断言（复审 F-03）、Spec 增量补 SD-02（复审 F-05）——`f2cdafb4`；M-02/06/07 归 OS063（§5） |
 | [x] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
-| [ ] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
+| [x] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
 
 work项完成才进入execution_done；review/merge项仍待办，不能为交接伪勾。每个任务读取§4对应实际路径及主设计证据；新增接口先由有界决策任务确认。全部原始材料merge折摘要进本Plan§9后删自有scope；移除树先wt-guard clean，不穿透链接、不清未知owner目录。
 
@@ -798,3 +798,17 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 后续：直接进入 T-07（整合 → 冻结 union 回归 → SD-01/SD-02 发布 → 归档 → 清理 → landing）。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 36 | from: merge | to: merge | status: reviewed | outcome: pass（merge 入口门解除，归属更正） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: merge（T-07 正式执行）
+
+### 2026-11-08 merge（T-07）：落地、发布、归档
+
+- stage: merge | plan_id: auto-ui/PLAN-062 | plan_revision: r5 | outcome: **pass** | worktree: `D:/autostack/.wt/ui-062/auto-ui` | branch: `codex/plan-062-dev` | reviewed_commit: `3eef8a32` | delivery_commit: **`cae1632e`** | base_commit: `3d64877d`
+- **整合**：`git rebase master`（master `7d235525`，分支 +32 / master 自 base +77，改动文件集交集 0）→ 32/32 提交冲突为零；`git range-diff 3d64877d..3eef8a32 7d235525..cae1632e` **32 行全部 `=`（逐补丁等价）**；old→new 映射：`3eef8a32 → cae1632e`（reviewed tip）、`3d64877d → 7d235525`（base 平移）。
+- **冻结并集回归（在整合后的基线 `cae1632e` 上，非旧树）**：`ui::desktop_protocol::` **278 passed / 4 failed**（4 红与 base `3d64877d` 同组：`autocenter_translates_hits_with_ops`、`stage3_multi_app_stress_n3`、`stage3_multi_app_stress_n5`、`t3_examples_queue_end_to_end`，本计划未引入、亦未修复）；`ui::iced::broker_surface` **14/0**；`media` **18/0**；隔离窗口计时门与像素门已在 `3eef8a32` 断言（review10），整合未改这些文件的补丁内容。
+- **落地**：主检出 `git merge --ff-only codex/plan-062-dev` → HEAD `cae1632e`（无 merge commit、历史线性）；合并前核验：合并文件集（26）与主检出脏/未跟踪路径**零重叠**，`docs/specs` 干净。
+- **规范发布（canonical）**：
+  - `docs/specs/runtime/rq-render-packets-and-resources.md` blob `ff28dcd9`（新增，SD-01；与 review10 审阅的 blob 同值）
+  - `docs/specs/runtime/rq-fidelity-contract.md` blob `3f251d75`（§7 冻结能力 8→9，追加 `resource/release/1`，SD-02）
+  - `docs/specs/README.md` 导航项更新
+- **landing 检查（如实观察）**：本仓不产出独立发布二进制/前端包；受影响的消费面是 auto-os 的 `ui-desktop` 与远端宿主构建，本会话**未重建**任何生产产物（记录为 stale-artifact observation，未声称已刷新）。仓库内消费点：`desktop_protocol` 由 auto-os 侧编译。
+- **批量回归到期检查**：`docs/plans/.last-batch-regression.json` 属 auto-lang 固定组；plan id 62 非 5 的倍数，不触发自动批回归；本次未运行跨仓 `cargo t`。
+- **证据处置**：Plan 相关证据已全部折叠进本文件；`plan-artifacts/plan-062/` 依 2026-10-31 delete-at-merge 规则删除。唯一保留记录：主检出遗留 WIP 的补丁存档 `stale-main-wip/main-checkout-wip.patch`（sha256 `0cc1abd45bc92c45d2f96ec8d0b5124518b39e3fc92794972fcd2ffc00916675`，4 个文件、被撤回特性的宿主侧残留），其归属与删除理由见 §10；该补丁不构成未决 hold。
