@@ -742,3 +742,15 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **未变**：M-02/M-06/M-07（OS063）、连续媒体帧（裁定另立）、可控重排通道负控（具名）仍为边界；AC-05/AC-06 由本轮 review 与后续 merge 承担。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 32 | from: review | to: merge | status: reviewed | outcome: pass（final review 通过） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: merge（T-07）
+
+### 2026-11-08 merge 入口门：主检出他方 WIP 仍未归位（等待中）
+
+- stage: merge（入口检查，未开始落地） | plan_id: auto-ui/PLAN-062 | plan_revision: r5 | outcome: waiting | worktree: `D:/autostack/.wt/ui-062/auto-ui`（clean @ `3eef8a32`） | 主检出：`D:/autostack/auto-ui` master @ `a078833a`
+- **门未过**：主检出仍有 5 条 code-path 未提交改动 + 1 个未跟踪目录：
+  - `crates/auto-ui-runtime/src/ui/desktop_protocol/{headless,host,rqhost}.rs`、`crates/auto-ui-runtime/src/ui/session.rs`（内容是把已撤回的 `drain_resource_releases` 接线到 `FrameSource` 实现——master 上无该方法，属上一轮已记录的他方 WIP）；
+  - `crates/auto-ui-runtime/test/`（未跟踪）。
+- **为什么不能落**：merge 要求在干净主检出上 fast-forward/合入并跑冻结 union 回归；这 5 条改动与 062 改的同名文件冲突，`git merge/checkout` 会拒绝或被污染，违反 master-zero-WIP。
+- **精确 unblock 动作（owner 侧，已由用户裁定“由该 owner 归位”）**：该会话把上述 5 个文件改动与 `crates/auto-ui-runtime/test/` 提交到它自己的分支/worktree，或 `git stash`/`git worktree add` 迁出；主检出 `git status --porcelain -- crates` 归零后，本 Plan 的 T-07 可继续（无需再问用户）。
+- 处置：本轮不 stash、不 patch、不 restore（用户已裁定不动）。后续每轮复查一次；连续 3 轮仍不归位则按 goal 策略把目标标为 blocked 并附本条件。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 33 | from: review | to: merge | status: reviewed | outcome: waiting（主检出他方 WIP 未归位） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: merge（等待主检出归零）
