@@ -754,3 +754,14 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 处置：本轮不 stash、不 patch、不 restore（用户已裁定不动）。后续每轮复查一次；连续 3 轮仍不归位则按 goal 策略把目标标为 blocked 并附本条件。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 33 | from: review | to: merge | status: reviewed | outcome: waiting（主检出他方 WIP 未归位） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: merge（等待主检出归零）
+
+### 2026-11-08 merge 预检（不依赖干净主检出的部分，已完成）
+
+- stage: merge（预检） | plan_id: auto-ui/PLAN-062 | plan_revision: r5 | reviewed_commit: `3eef8a32` | outcome: 预检通过；入口门仍被主检出 WIP 挡住
+- **分叉**：merge-base `3d64877d`；分支 **+32** 提交、master 自 base 起 **+77** 提交 → 不能 fast-forward，落地需要一个整合提交（merge 或 rebase）。
+- **冲突风险：零文件重叠**。分支改动 26 个文件、master 自 base 改动 24 个文件，两者交集 **0** → 干净整合预期；落地后仍须按 merge 技能跑冻结 union 回归并做 landing 检查（合并提交会改变 HEAD，`reviewed_commit` 的证据需绑定到整合后的树或明确沿用同一 diff 集）。
+- **但**：主检出**未提交**的 4 个文件（`desktop_protocol/{headless,host,rqhost}.rs`、`session.rs`）恰好属于分支改动文件集；若那份 WIP 被**提交进 master** 而不是迁到它自己的分支，整合将不得不在“062 已撤回 ResourceRelease”与“他方把 drain_resource_releases 接回来”之间做语义决断——那时需要该 owner 与 062 一起定夺，不能由 merge 静默择一。
+- **wt-guard 预检**：`bash wt-guard.sh /mnt/d/autostack/.wt/ui-062/auto-ui` → **clean（无 reparse point）**，清理前置条件满足。
+- 结论：只要主检出 `git status --porcelain -- crates` 归零且那份 WIP 不落到 master 的同一文件上，T-07 可以一次跑完（整合 → 冻结回归 → Spec 发布 → 归档 → 清理 → landing 检查）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 34 | from: merge | to: merge | status: reviewed | outcome: waiting（预检通过；入口门仍被主检出 WIP 挡住） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: merge（等待主检出归零）
