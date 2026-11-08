@@ -397,13 +397,6 @@ fn rq_cells_t05_six_cell_matrix() {
                                     reading.diff_ratio
                                 );
                             }
-                            // AC-07（r5）计时门：只在**隔离窗口**（AUTO_RQ_TIMING_WINDOW
-                            // =isolated）断言；共享窗口只记录并标 skipped_shared_window。
-                            // 依据：实测主机负载会把 produce/replay 放大 3–6 倍（复审
-                            // N-02/F-03），共享窗口判红是假红。像素门不受影响。
-                            let direct_p95 = reading.inventory["direct_frame_p95_ms"]
-                                .as_f64()
-                                .unwrap_or(f64::NAN);
                             // Plan §6：性能测量只在**隔离窗口**有效（不与其他会话
                             // 争用 GPU）。共享窗口一律只记录：跑机负载会把 produce/
                             // replay 的尾部放大到数倍（实测 SVG produce p50 32→76ms、
@@ -428,11 +421,7 @@ fn rq_cells_t05_six_cell_matrix() {
                                         reading.produce_p95
                                     );
                                 }
-                                // replay/direct 比值**不在此裁决**：本矩阵每 (例×模式)
-                                // 只跑一组样本、且与 061 冻结口径的采样/预热不同；该
-                                // 条款由 061 的测量入口 `rq_probe_t01_direct_and_rq_baseline`
-                                // 断言（同一基线、同口径）。这里只记录比值供对照。
-                                }
+                            }
                             println!(
                                 "[RQCELLS] {}",
                                 serde_json::json!({
