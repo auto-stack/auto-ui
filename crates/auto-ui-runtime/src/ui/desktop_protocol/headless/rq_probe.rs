@@ -1099,17 +1099,17 @@ fn rq_probe_t01_direct_and_rq_baseline() {
 
         match (&direct, &rq) {
             (Ok((cold_build, frame)), Ok(r)) => {
-                // AC-07（r4）在 061 冻结的**测量入口**上断言：produce p95 ≤10ms
-                // （SVG 例为唯一具名例外，按 p50 设界）、replay p95 ≤1.25×direct
-                // p95+2ms。跑机被抢占时（direct p95 >8ms）只记录、标 skipped_loaded，
-                // 不把调度抖动当回归（复审 F-03/N-02）。
-                // produce 门只在**冻结 fixture 矩阵**（`rq_cells` 的 7 个 workload）上
-                // 裁决——061 的 W-A/W-B/W-C 是逐 workload 冻结的，全语料里含宿主
-                // 依赖面（如 window_thumbnail 每次产帧重取快照，实测 p95 ≈44ms），
-                // 不属于那套预算。这里只记录。
-                // r5：replay 只对 **p50** 设门，且只在隔离窗口断言（Plan §6）；
-                // 共享窗口只记录——跑机负载会把 replay 的 p50 从 ~4ms 放大到 ~18ms
-                // （复审 N-02 实测），判红即假红。p95 一律只记录（见上方说明）。
+                // AC-07（**2026-11-08 r5**）在 061 冻结的测量入口上断言：
+                // - replay 只对 **p50** 设门（≤1.25×direct p50+2.0ms），且只在
+                //   隔离窗口（`AUTO_RQ_TIMING_WINDOW=isolated`）断言；共享窗口只
+                //   记录——跑机负载会把 p50 从 ~4ms 放大到 ~18ms（复审 N-02）。
+                // - **p95 只记录、不设门**（20 样本下 p95≈次大值；同一实现实测
+                //   4.1–10ms 随主机负载变化、max 可达 40ms）。
+                // - produce 门（W-C ≤10ms、SVG 例外按 p50 ≤60ms）只在**冻结 fixture
+                //   矩阵**（`rq_cells` 的 7 个 workload）上裁决，本语料只记录——
+                //   其中含宿主依赖面（`window_thumbnail` 每次产帧重取快照，p95≈44ms）。
+                // 历史：r4 的“p95 设门 + skipped_loaded”口径已由 r5 取代，**不再是**
+                // 本入口的规则（保留此句只为解释 r4 收据，不重新引入该门）。
                 let isolated = std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated");
                 if isolated {
                     assert!(
