@@ -1456,3 +1456,59 @@ fn p073_t01_slow_host_backpressure_1080p() {
     );
     crate::ui::media_poster::clear(&src);
 }
+
+/// PLAN-073 T-03（A5，062 Spec §6#3 owner=UI073）：SVG 场景产帧计时——
+/// 常驻 tiny_skia 记录器复用后，热帧产帧必须显著低于 062 实测 ≈32.5ms/帧
+/// （每帧新建 Renderer → Engine 字体缓存冷启的根因已除；061 冻结 W-C ≤10ms）。
+#[test]
+fn p073_t03_svg_produce_warm_renderer_reuse() {
+    let mut surface = super::HeadlessSurface::new(
+        StaticView {
+            view: View::image("lucide:bell"),
+        },
+        640.0,
+        400.0,
+    );
+    // 首帧含惰性记录器构造 + 字体冷启（基线帧，不计入热判定）。
+    let cold = {
+        let t = Instant::now();
+        let _ = surface.render_frame_v2();
+        t.elapsed()
+    };
+    const WARM: u32 = 8;
+    let warm_total = {
+        let t = Instant::now();
+        for _ in 0..WARM {
+            let _ = surface.render_frame_v2();
+        }
+        t.elapsed()
+    };
+    let cold_ms = cold.as_secs_f64() * 1000.0;
+    let warm_avg_ms = warm_total.as_secs_f64() * 1000.0 / WARM as f64;
+    println!(
+        "[T03-SVG-PRODUCE] {}",
+        serde_json::json!({
+            "tag": "t03_svg_produce",
+            "cold_first_frame_ms": cold_ms,
+            "warm_frames": WARM,
+            "warm_avg_ms": warm_avg_ms,
+            "baseline_062_ms": 32.5,
+        })
+    );
+    assert!(
+        warm_avg_ms < cold_ms,
+        "热帧必须快于含构造的冷帧（复用生效），cold {cold_ms:.2}ms vs warm {warm_avg_ms:.2}ms"
+    );
+    // release：热帧达 061 冻结 W-C ≤10ms；debug：至少低于 062 基线一半。
+    if cfg!(debug_assertions) {
+        assert!(
+            warm_avg_ms < 16.0,
+            "debug 热帧应显著低于 062 基线 32.5ms 的一半，实得 {warm_avg_ms:.2}ms"
+        );
+    } else {
+        assert!(
+            warm_avg_ms <= 10.0,
+            "release 热帧应达 W-C 冻结 ≤10ms，实得 {warm_avg_ms:.2}ms"
+        );
+    }
+}

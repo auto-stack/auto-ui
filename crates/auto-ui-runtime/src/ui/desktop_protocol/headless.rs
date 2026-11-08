@@ -160,6 +160,12 @@ pub struct HeadlessSurface<C: Component> {
     /// PLAN-062 T-02：阴影以生产端 SDF 贴片过线。默认关——实测贴片经画布图像
     /// 合成后比单层 scrim 更远（见 Spec §2.3 的 A/B），需先解决合成对齐。
     shadow_patches: bool,
+    /// PLAN-073 T-03（A5，062 Spec §6#3 owner=UI073）：常驻 tiny_skia 记录器。
+    /// 此前每帧新建 `iced_tiny_skia::Renderer` → Engine 字体/排版缓存每帧
+    /// 冷启，SVG 场景产帧 ≈32.5ms（超 061 冻结 W-C ≤10ms）。`ui.draw` 每帧
+    /// 先 `renderer.reset(viewport)`（iced_runtime user_interface.rs:490），
+    /// 复用不跨帧累积层。首帧惰性构造（在 ensure_headless_fonts 之后）。
+    renderer: Option<iced::Renderer>,
 }
 
 /// PLAN-062 T-03：位图资源身份与驻留缓存（P-02）。
@@ -415,6 +421,7 @@ where
             resources: ResourceCache::default(),
             glyph_runs: false,
             shadow_patches: false,
+            renderer: None,
         }
     }
 
@@ -543,10 +550,16 @@ where
         let element: Element<'_, C::Msg> = view.into_iced();
 
         // tiny_skia Secondary 臂：纯 CPU 记录器（iced::Renderer 的合法值）。
-        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
-            crate::ui::iced::renderer::INTER_FONT,
-            iced::Pixels(16.0),
-        ));
+        // PLAN-073 T-03（A5）：常驻复用——Engine 字体/排版缓存跨帧热，消除
+        // 每帧冷启 ≈32.5ms 产帧（062 实测 SVG 场景超 W-C ≤10ms 的根因）；
+        // `ui.draw` 每帧先 reset 层栈，复用不会跨帧累积记录层。
+        if self.renderer.is_none() {
+            self.renderer = Some(iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                crate::ui::iced::renderer::INTER_FONT,
+                iced::Pixels(16.0),
+            )));
+        }
+        let mut renderer = self.renderer.take().expect("T-03 常驻记录器初始化失败");
 
         let cache = std::mem::take(&mut self.cache);
         let mut ui = UserInterface::build(
@@ -588,10 +601,12 @@ where
         }
 
         // Secondary 臂拆取 tiny_skia 记录层（fallback 枚举不转发 layers()）。
-        match &mut renderer {
+        let layers = match &mut renderer {
             iced::Renderer::Secondary(tiny) => tiny.layers().to_vec(),
             iced::Renderer::Primary(_) => unreachable!("headless 宿主恒构造 Secondary 臂"),
-        }
+        };
+        self.renderer = Some(renderer);
+        layers
     }
 
     /// 远程事件注入（T-02 事件回路径主入口；T-00 首帧 spike 仅渲染）。
