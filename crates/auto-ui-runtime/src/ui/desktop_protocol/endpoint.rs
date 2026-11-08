@@ -163,6 +163,15 @@ pub trait FrameSource {
         Vec::new()
     }
 
+    /// PLAN-073 T-03（A1 收口）：宿主 `HostCaps` 抵达后的产者面钩子——
+    /// 能力协商结果驱动产者词汇（如 `fidelity/glyphrun/1` → 文本以
+    /// GlyphRun 过线，宿主不再重排）。缺省空（不声明即不改变行为，
+    /// 旧/降级宿主保持 `TextStyled` 兼容面）。HostCaps 在握手期抵达，
+    /// 早于任何产帧，故首帧即按协商词汇生产。
+    fn on_host_caps(&mut self, caps: &super::message::CapabilitySet) {
+        let _ = caps;
+    }
+
     /// PLAN-690 T-02/T-05：App 派生窗口控制下行批读走（ImeRequest/
     /// SetCursor——headless 宿主 `State::Updated` 截获产物）。泵在产帧
     /// 后消费并上行 `ProtocolMsg::Control`（drain_desktop_commands 同型
@@ -632,6 +641,8 @@ impl<S: FrameSource> AppEndpoint<S> {
                 // PLAN-062 T-04：宿主能力声明（App 未声明 `welcome-caps/1` 时
                 // 宿主不会发这条；收到即记入 peer_caps 供 producer 决策）。
                 self.peer_caps = super::message::CapabilitySet::parse(&caps);
+                // PLAN-073 T-03（A1）：协商结果即刻驱动产者词汇（首帧前生效）。
+                self.session.on_host_caps(&self.peer_caps);
                 Ok(vec![])
             }
             (

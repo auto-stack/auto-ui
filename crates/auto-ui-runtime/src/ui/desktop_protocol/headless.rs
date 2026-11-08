@@ -1405,6 +1405,14 @@ where
         self.rev
     }
 
+    // PLAN-073 T-03（A1 收口）：宿主声明 `fidelity/glyphrun/1`（HostCaps
+    // 握手期抵达，早于首帧）→ 文本以 GlyphRun 过线（宿主不再重排——
+    // 062 Spec §2.2 优先级合同的默认路径启用）；未声明保持 `TextStyled`
+    // 兼容面（旧/降级宿主行为不变）。
+    fn on_host_caps(&mut self, caps: &super::message::CapabilitySet) {
+        self.surface.glyph_runs = caps.supports(super::message::CAP_GLYPH_RUN);
+    }
+
     // PLAN-055 T-03（auto-os 055）：主题策略面 = 组件转发——remote/v2 臂
     // 是 a2r exe 桌面/rq 载体的主产线，缺省 false 会把 NativeThemeCarrier
     // 的 caps 门压掉（Hello theme_caps=[] 实证株），宿主永不推送。
@@ -2231,6 +2239,62 @@ fn lower_text_runs(
 /// `(glyph.x + glyph.x_offset·font_size) · scale + position·transform`；
 /// 行基线取整偏移单独随 run 过线。字体按**内容身份**过线；字体未装载/无
 /// 内容身份时整行退回字符串 `TextStyled` 并留具名观测（不静默换字体）。
+/// PLAN-073 T-03（A1 收口）：Cached 文本（`View::text` 默认路径——iced
+/// 文本缓存臂）的记录期整形 → GlyphRun 承载。此前仅 Paragraph/Editor 臂
+/// 响应 `glyph_runs`，Cached 臂恒走 `TextStyled`（宿主重排）——协商成立
+/// 后默认路径的重排面由此关闭。整形用全局 FontSystem（与 paragraph 同源
+/// 同缓存），逐行提取复用 [`lower_glyph_run`]（字体混排拆 run、无身份行
+/// 具名回退 `TextStyled`——永不静默丢字的 V-02 口径原样保留）。
+fn shape_cached_text_glyph_runs(
+    content: &str,
+    size: f32,
+    line_height: f32,
+    font: &iced::Font,
+    x: f32,
+    y: f32,
+    color: iced::Color,
+    transformation: iced::Transformation,
+    ops: &mut Vec<DisplayOp>,
+    observations: &mut Vec<String>,
+) {
+    let lh = if line_height > 0.0 { line_height } else { size * 1.3 };
+    // 锁作用域仅限整形；Buffer 自持整形行数据，锁释放后提取安全
+    // （lower_glyph_run 内部再取写锁——先释放防重入死锁）。
+    let family = match &font.family {
+        iced::font::Family::Name(name) => cosmic_text::Family::Name(name),
+        iced::font::Family::Serif => cosmic_text::Family::Serif,
+        iced::font::Family::SansSerif => cosmic_text::Family::SansSerif,
+        iced::font::Family::Cursive => cosmic_text::Family::Cursive,
+        iced::font::Family::Fantasy => cosmic_text::Family::Fantasy,
+        iced::font::Family::Monospace => cosmic_text::Family::Monospace,
+    };
+    let buffer = {
+        let system = font_system();
+        let mut fonts = system.write().expect("Write font system");
+        let mut buffer =
+            cosmic_text::Buffer::new(fonts.raw(), cosmic_text::Metrics::new(size, lh));
+        buffer.set_text(
+            fonts.raw(),
+            content,
+            &cosmic_text::Attrs::new()
+                .family(family)
+                .weight(cosmic_text::Weight(iced_weight_u16(font.weight))),
+            cosmic_text::Shaping::Advanced,
+            None,
+        );
+        buffer.shape_until_scroll(fonts.raw(), false);
+        buffer
+    };
+    lower_glyph_run(
+        &buffer,
+        iced::Point::new(x, y),
+        color,
+        transformation,
+        ops,
+        observations,
+    );
+}
+
 fn lower_glyph_run(
     buffer: &cosmic_text::Buffer,
     position: iced::Point,
@@ -2439,6 +2503,24 @@ fn lower_text_v2(
                     iced::advanced::text::Alignment::Right => bounds.x - width,
                     _ => bounds.x,
                 };
+                // PLAN-073 T-03（A1）：协商成立时 Cached 文本也以 GlyphRun
+                // 过线（记录期整形，Host 不重排）；无身份等回退由
+                // shape_cached_text_glyph_runs → lower_glyph_run 的具名
+                // TextStyled 兜底承担（V-02 永不静默丢字口径不变）。
+                if glyph_runs {
+                    shape_cached_text_glyph_runs(
+                        content,
+                        size.0,
+                        line_height.0,
+                        font,
+                        x,
+                        bounds.y,
+                        *color,
+                        transformation,
+                        ops,
+                        observations,
+                    );
+                } else {
                 ops.push(DisplayOp::TextStyled {
                     x,
                     y: bounds.y,
@@ -2452,6 +2534,7 @@ fn lower_text_v2(
                     ),
                     text: content.clone(),
                 });
+                }
             }
             GfxText::Raw { raw, .. } => {
                 // PLAN-062 T-02：raw（编辑器组合态）不再静默省略——与

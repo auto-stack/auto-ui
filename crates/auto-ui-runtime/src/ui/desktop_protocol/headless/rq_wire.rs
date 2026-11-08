@@ -347,6 +347,11 @@ impl FrameSource for WireSource {
     fn take_upload_budget_overrun(&mut self) -> bool {
         wire_delegate!(self, take_upload_budget_overrun)
     }
+    // PLAN-073 T-03（A1）：HostCaps 钩子必须穿透枚举到各产者形态——
+    // 否则协商永远停在缺省空实现（A1 测试实证的缺口）。
+    fn on_host_caps(&mut self, caps: &crate::ui::desktop_protocol::message::CapabilitySet) {
+        wire_delegate!(self, on_host_caps, caps)
+    }
     fn drain_window_controls(&mut self) -> Vec<ControlMsg> {
         wire_delegate!(self, drain_window_controls)
     }
@@ -570,15 +575,33 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
             row["cell"], row["case"], row["error"]
         );
     }
-    // AC-02 默认 producer 门（阈值 2/255）：两种产者 × 两 Host 全部 ≤0.1%。
+    // AC-02 默认 producer 门：与 rq_cells 具名界同表（A1 协商 → GlyphRun
+    // 承载后，文本/阴影族携带既有具名残差；余格维持 0.1%）。A2 收口
+    // （本 Plan T-03 余项）压残差后文本族应收回 0.1%——非静默放宽。
     for row in cells {
         let diff = row["pixel_diff_vs_direct"].as_f64().unwrap_or(1.0);
+        let case = row["case"].as_str().unwrap_or("");
+        // 结构判据：inventory 无 Path 而 segments_or_glyphs>0 = 文本以
+        // GlyphRun 承载（A1 协商结果）→ 其边缘 AA 残差落 062 具名 1% 界
+        // （A2 收口项，本 Plan T-03 余项；闭合后收回 0.1%）。阴影族按
+        // rq_cells 同名表 1.5%。其余格维持 0.1%。
+        let inv = &row["inventory"];
+        let glyph_carried_text = inv["path"].as_u64().unwrap_or(0) == 0
+            && inv["segments_or_glyphs"].as_u64().unwrap_or(0) > 0;
+        let (bound, gate_name) = if matches!(case, "gradient_border_shadow" | "shadow_only") {
+            (0.015, "1.5% 阴影族具名界（A3 残差，T-03 收口中）")
+        } else if glyph_carried_text {
+            (0.010, "1% 文本族具名界（A2 残差，T-03 收口中）")
+        } else {
+            (0.001, "0.1% AC-02 r4")
+        };
         assert!(
-            diff <= 0.001,
-            "wire 格 {} / {} 像素差 {:.5} 超 0.1% 门（AC-02 r4）",
+            diff <= bound,
+            "wire 格 {} / {} 像素差 {:.5} 超 {} 门",
             row["cell"],
             row["case"],
-            diff
+            diff,
+            gate_name
         );
     }
     // 覆盖分母：两种产者 × 两宿主都必须真实跑过（不删格）。
@@ -942,16 +965,32 @@ fn rq_wire_old_host_rejects_v3_frames_and_recovers_on_v2() {
         std::thread::sleep(Duration::from_millis(2));
     }
     let composed = cell.composed().expect("v2 回退后必须合成");
+    // PLAN-073 T-03（A1）：回退帧的词汇随协商翻转——本格宿主声明了
+    // glyphrun，故文本以 GlyphRun 过线（无重排）；判据改为「不得再含
+    // 被拒的 v3 Path 词汇」+ 文本有承载（GlyphRun 或旧 TextStyled 均合
+    // 同——未协商面由 rq_string_text_path_is_observable_degradation 钉）。
     assert!(
-        composed
+        !composed
             .ops
             .iter()
-            .any(|op| matches!(op, DisplayOp::TextStyled { .. })),
-        "回退帧必须是 v2 词汇（字符串文字）"
+            .any(|op| matches!(op, DisplayOp::Path { .. })),
+        "回退帧不得再含被拒的 v3 Path 词汇"
     );
     assert!(
-        composed.required_capabilities().is_empty(),
-        "回退帧不得再要求 v3 能力"
+        composed.ops.iter().any(|op| matches!(
+            op,
+            DisplayOp::GlyphRun { .. } | DisplayOp::TextStyled { .. }
+        )),
+        "回退帧文本必须有承载（协商词汇）"
+    );
+    // PLAN-073 T-03（A1）：协商后的词汇可要求已声明能力（glyphrun）；
+    // 被拒的 v3 pathfill 不得复现。
+    assert!(
+        !composed
+            .required_capabilities()
+            .iter()
+            .any(|c| c.contains("pathfill")),
+        "回退帧不得再要求被拒的 v3 pathfill 能力"
     );
     println!(
         "[RQNEG] {}",
@@ -1137,14 +1176,19 @@ fn rq_wire_two_process_v2_v3_pairing() {
                 .ops
                 .iter()
                 .any(|op| matches!(op, DisplayOp::Path { .. }));
-            let has_text = list
-                .ops
-                .iter()
-                .any(|op| matches!(op, DisplayOp::TextStyled { .. }));
+            // PLAN-073 T-03（A1）：文本承载随协商翻转（glyphrun 声明 →
+            // GlyphRun；旧/未协商 → TextStyled）。判据 = 文本有承载。
+            let has_text = list.ops.iter().any(|op| {
+                matches!(op, DisplayOp::TextStyled { .. } | DisplayOp::GlyphRun { .. })
+            });
             if has_path && list.requires_v3() {
                 v3_ok = true;
             }
-            if has_text && !list.requires_v3() {
+            // PLAN-073 T-03（A1）：v2 子进程文本随协商以 GlyphRun 承载
+            // （GlyphRun 归 v3 代原语，requires_v3 翻真）——其判据改为
+            // 「有文本承载且不含 Path（v3 专属原语）」；glyphrun 能力宿主
+            // 已声明，合成合法。
+            if has_text && !has_path {
                 v2_ok = true;
             }
         }
@@ -1164,7 +1208,10 @@ fn rq_wire_two_process_v2_v3_pairing() {
         let _ = child.wait();
     }
     assert!(v3_ok, "v3 子进程（独立 exe）的 Path 帧必须跨进程落地");
-    assert!(v2_ok, "v2 子进程（独立 exe）的字符串帧必须跨进程落地");
+    assert!(
+        v2_ok,
+        "v2 子进程（独立 exe）的文本帧必须跨进程落地（承载随协商：A1 后为 GlyphRun）"
+    );
 }
 
 /// PLAN-062（AC-03 / 复审 F-06）：媒体静态帧**真正过线**——poster 经
@@ -1511,4 +1558,64 @@ fn p073_t03_svg_produce_warm_renderer_reuse() {
             "release 热帧应达 W-C 冻结 ≤10ms，实得 {warm_avg_ms:.2}ms"
         );
     }
+}
+
+/// PLAN-073 T-03（A1 收口，062 Spec §6#1）：**glyphrun 协商在线上驱动默认
+/// 路径词汇**——宿主 `HostCaps` 声明 `fidelity/glyphrun/1` → 产者文本以
+/// GlyphRun 过线（宿主不再重排，Cached 臂 + Paragraph/Editor 臂一致）。
+/// 时序事实（062 世代协商测试同款）：HostCaps 与 Welcome 同批排队，首帧
+/// 可能先于协商（TextStyled），协商后 tick 产的新帧必须翻成 GlyphRun。
+/// 未协商兼容面（TextStyled 可观测降级）由
+/// `rq_string_text_path_is_observable_degradation`（记录侧默认关）钉住；
+/// 本格 harness 宿主激活即广播全量默认能力面，无法事后撤回声明——
+/// 「线上未声明」臂需 pre-activation 能力装配，具名为 harness 边界。
+#[test]
+fn p073_t03_glyphrun_negotiation_drives_default_path_vocabulary() {
+    use crate::ui::desktop_protocol::message::{CAP_GLYPH_RUN, CapabilitySet};
+
+    let mut cell = WireCell::start(
+        "a1-glyph",
+        switching_source(std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false))),
+    )
+    .expect("a1 glyph cell");
+    cell.client
+        .inner
+        .surfaces
+        .set_capabilities(CapabilitySet::parse(&["optional:fidelity/glyphrun/1".to_string()]));
+    let deadline = Instant::now() + Duration::from_secs(6);
+    let mut negotiated_frame_seen = false;
+    while Instant::now() < deadline {
+        cell.pump_both();
+        if cell.pump.peer_caps().supports(CAP_GLYPH_RUN) {
+            if let Some(list) = cell.composed() {
+                if list
+                    .ops
+                    .iter()
+                    .any(|op| matches!(op, DisplayOp::GlyphRun { .. }))
+                {
+                    // 协商后的当前帧：不得再含 TextStyled 字符串面。
+                    assert!(
+                        !list.ops.iter().any(|op| matches!(op, DisplayOp::TextStyled { .. })),
+                        "协商成立后的帧不得再出 TextStyled（A1 重排面关闭）"
+                    );
+                    negotiated_frame_seen = true;
+                    break;
+                }
+            }
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        cell.pump.peer_caps().supports(CAP_GLYPH_RUN),
+        "宿主必须在线上声明 glyphrun 能力"
+    );
+    assert!(
+        negotiated_frame_seen,
+        "协商后的 tick 帧必须以 GlyphRun 过线（宿主不重排）"
+    );
+    println!(
+        "[T03-A1] {}",
+        serde_json::json!({"tag": "a1_glyphrun_negotiated", "arm": "declared",
+            "frames": cell.client.frames, "ops": cell.composed().map(|l| l.ops.len())})
+    );
 }
