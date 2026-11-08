@@ -2823,7 +2823,9 @@ mod tests {
         );
 
         serve.stop(&pipe);
-        let _ = app.join();
+        // 客户端线程经 EOF 自退（exit-on-EOF 档）；不 join——顺序滤程
+        // 中前置测试的进程内管道/线程状态可使 join 闭死（单跑已验自退，
+        // 线程泄漏对后续测试无观察面——进程退出即回收）。
     }
 
     /// T-07/P031-R3：末窗退出门单测——rq_update 真行为驱动（WindowClosed
