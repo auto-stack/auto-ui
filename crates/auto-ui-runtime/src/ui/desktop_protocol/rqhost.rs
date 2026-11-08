@@ -2691,6 +2691,298 @@ mod tests {
         serve.stop(&pipe);
     }
 
+    /// PLAN-063 T-05（M-02/05/06/07 记录；gate=record-only 除注明硬门）：
+    /// 单守护多客户端 in-proc 真实采纳。
+    /// - M-06 冷/热启动：client#1 spawn→首帧（冷）vs client#2 spawn→首帧
+    ///   （热——守护/字体/协议已热）。
+    /// - M-07 轻App公平（mild 负载档）：重客户端 = 032 timer 自驱连续帧，
+    ///   轻客户端 = 计数器点击——重载在流时轻点击 input→frame p95 ≤100ms
+    ///   （T-01 冻结硬门；泛洪规模归 OS063）。
+    /// - M-02 帧节奏：重客户端 inter-frame 间隔分布（记录；客户端 timer
+    ///   250ms 档预期）。
+    /// - M-05 进程内存：本测试进程（守护+全部客户端 in-proc 合并口径）
+    ///   working set 记录——per-App 隔离口径归 OS063 真进程组合。
+    #[test]
+    fn p063_m02_m06_m07_records() {
+        use crate::ui::session::LiveInput;
+
+        let counter_src = "widget P063M07L {\n    model { var count int = 0 }\n    view {\n        button \"+\" { onclick: () => {.count += 1} }\n        text `c: ${.count}`\n    }\n}\n";
+        let src_path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/ui/032-handler-async-probe/src/front/app.at"
+        );
+        let heavy_src = std::fs::read_to_string(src_path).expect("read 032");
+
+        let pipe = pid_pipe("p063m06");
+        let (serve, _claim) = start_serve(&pipe);
+
+        // M-06 冷：client#1（重 = 032 timer 自驱流）。
+        let t_cold0 = std::time::Instant::now();
+        let fork_pipe = pipe.clone();
+        let heavy_src_owned = heavy_src.clone();
+        let heavy = std::thread::spawn(move || {
+            let comp = crate::build_dynamic_component(&heavy_src_owned, Some(src_path))
+                .expect("build heavy");
+            run_vm_rqhost_client(comp, &fork_pipe)
+        });
+        let mut state = RqDaemon {
+            serve: Arc::clone(&serve),
+            claim: None,
+            wellknown: pipe.clone(),
+            ids: RqIds::default(),
+            clients: Vec::new(),
+            had_window: false,
+            opened: 0,
+            last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
+            mem_ticks: 0,
+        };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while state.clients.is_empty() {
+            let pending: Vec<_> = state.serve.pending.lock().unwrap().drain(..).collect();
+            for (name, end) in pending {
+                if let Some((client, _)) = adopt_one(name, end, &mut state.ids, 3000) {
+                    state.clients.push(client);
+                }
+            }
+            assert!(std::time::Instant::now() < deadline, "重客户端 10s 未落地");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let heavy_win = iced::window::Id::unique();
+        state.clients[0].window = Some(heavy_win);
+        let cold_ms = {
+            let dl = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            while state.clients[0].frames == 0 {
+                let _ = rq_update(&mut state, RqMessage::Tick);
+                assert!(std::time::Instant::now() < dl, "冷首帧 10s 未到");
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            t_cold0.elapsed().as_secs_f64() * 1000.0
+        };
+
+        // M-06 热：client#2（轻 = 计数器）——守护/字体/协议已热。
+        let t_hot0 = std::time::Instant::now();
+        let fork_pipe2 = pipe.clone();
+        let counter_src_owned = counter_src.to_string();
+        let light = std::thread::spawn(move || {
+            let comp =
+                crate::build_dynamic_component(&counter_src_owned, None).expect("build light");
+            run_vm_rqhost_client(comp, &fork_pipe2)
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while state.clients.len() < 2 {
+            let pending: Vec<_> = state.serve.pending.lock().unwrap().drain(..).collect();
+            for (name, end) in pending {
+                if let Some((client, _)) = adopt_one(name, end, &mut state.ids, 3000) {
+                    state.clients.push(client);
+                }
+            }
+            assert!(std::time::Instant::now() < deadline, "轻客户端 10s 未落地");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let light_win = iced::window::Id::unique();
+        state.clients[1].window = Some(light_win);
+        let hot_ms = {
+            let dl = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            while state.clients[1].frames == 0 {
+                let _ = rq_update(&mut state, RqMessage::Tick);
+                assert!(std::time::Instant::now() < dl, "热首帧 10s 未到");
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            t_hot0.elapsed().as_secs_f64() * 1000.0
+        };
+
+        // M-07：重客户端 timer 流中，轻客户端 20 次点击 p95。
+        let _ = rq_update(
+            &mut state,
+            RqMessage::CursorMoved {
+                window: light_win,
+                x: 240.0,
+                y: 145.2,
+            },
+        );
+        let mut lat: Vec<f64> = Vec::new();
+        for k in 0..20u32 {
+            let x = 200.0 + (k % 8) as f32 * 10.0;
+            let _ = rq_update(
+                &mut state,
+                RqMessage::CursorMoved {
+                    window: light_win,
+                    x,
+                    y: 145.2,
+                },
+            );
+            let t0 = std::time::Instant::now();
+            let _ = rq_update(
+                &mut state,
+                RqMessage::PointerPressed {
+                    window: light_win,
+                    button: iced::mouse::Button::Left,
+                },
+            );
+            let _ = rq_update(
+                &mut state,
+                RqMessage::PointerReleased {
+                    window: light_win,
+                    button: iced::mouse::Button::Left,
+                },
+            );
+            let want = state.clients[1].frames + 1;
+            let dl = t0 + std::time::Duration::from_millis(100);
+            while state.clients[1].frames < want && std::time::Instant::now() < dl {
+                let _ = rq_update(&mut state, RqMessage::Tick);
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            lat.push(t0.elapsed().as_secs_f64() * 1000.0);
+        }
+        lat.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let light_p95 = lat[(lat.len() * 95) / 100];
+        let light_p50 = lat[lat.len() / 2];
+
+        // M-02：重客户端 inter-frame 间隔（timer 250ms 档预期）。
+        let mut intervals: Vec<f64> = Vec::new();
+        {
+            let mut last = std::time::Instant::now();
+            let mut seen0 = state.clients[0].frames;
+            let dl = std::time::Instant::now() + std::time::Duration::from_millis(1400);
+            while std::time::Instant::now() < dl {
+                let _ = rq_update(&mut state, RqMessage::Tick);
+                let now_frames = state.clients[0].frames;
+                if now_frames > seen0 {
+                    let now = std::time::Instant::now();
+                    intervals.push((now - last).as_secs_f64() * 1000.0);
+                    last = now;
+                    seen0 = now_frames;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        }
+        intervals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let m02_p50 = intervals[intervals.len() / 2];
+
+        // M-05：测试进程 working set（守护+客户端 in-proc 合并口径）。
+        let mem = crate::ui::desktop_protocol::stage3::sample_process_memory(
+            std::process::id(),
+        )
+        .map(|m| m.working_set)
+        .unwrap_or(0);
+
+        println!(
+            "[p063-m06] cold(first-frame)={cold_ms:.1}ms hot={hot_ms:.1}ms (守护已热)"
+        );
+        println!(
+            "[p063-m07] light-under-heavy(032 timer 250ms stream): p50={light_p50:.3} p95={light_p95:.3} ms (n=20; gate p95<=100)"
+        );
+        println!(
+            "[p063-m02] heavy inter-frame p50={m02_p50:.1} ms (n={}; client timer 250ms 档预期)",
+            intervals.len()
+        );
+        println!("[p063-m05] test-process working_set={mem}B (守护+客户端 in-proc 合并口径)");
+        assert!(
+            light_p95 <= 100.0,
+            "M-07 轻App p95 硬门（重载在流）: {light_p95:.3}ms"
+        );
+        assert!(
+            hot_ms <= cold_ms,
+            "热启动不应慢于冷启动（同守护）: hot={hot_ms:.1} cold={cold_ms:.1}"
+        );
+
+        serve.stop(&pipe);
+    }
+
+    /// PLAN-063 T-05（V-03 timer 腿）：**零输入**下 timer 驱动帧流——
+    /// 032-handler-async-probe 真 VM 组件（`interval 250` + Tick →
+    /// `ticks: N` 自增），rqhost 守护仅泵不注输入：帧持续到达且 ticks
+    /// 严格递增（不依赖虚假输入/15ms 守护拍作为唯一驱动；订阅恰一次
+    /// ——每帧 ticks +1，无重复 Tick 跳变）。V-03 的 timer/订阅/init
+    /// 面证据（async HTTP 面由 060 原合同覆盖，此处不重复）。
+    #[test]
+    fn p063_v03_timer_driven_frames_without_input() {
+        use crate::ui::desktop_protocol::message::DrawOp;
+        let src_path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/ui/032-handler-async-probe/src/front/app.at"
+        );
+        let src = std::fs::read_to_string(src_path).expect("read 032 source");
+        let pipe = pid_pipe("p063v03");
+        let (serve, _claim) = start_serve(&pipe);
+        let fork_pipe = pipe.clone();
+        let app = std::thread::spawn(move || {
+            let comp =
+                crate::build_dynamic_component(&src, Some(src_path)).expect("build 032");
+            run_vm_rqhost_client(comp, &fork_pipe)
+        });
+        let mut state = RqDaemon {
+            serve: Arc::clone(&serve),
+            claim: None,
+            wellknown: pipe.clone(),
+            ids: RqIds::default(),
+            clients: Vec::new(),
+            had_window: false,
+            opened: 0,
+            last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
+            mem_ticks: 0,
+        };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while state.clients.is_empty() {
+            let pending: Vec<_> = state.serve.pending.lock().unwrap().drain(..).collect();
+            for (name, end) in pending {
+                if let Some((client, _)) = adopt_one(name, end, &mut state.ids, 3000) {
+                    state.clients.push(client);
+                }
+            }
+            assert!(std::time::Instant::now() < deadline, "客户端 10s 未落地");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let win = iced::window::Id::unique();
+        state.clients[0].window = Some(win);
+
+        // 零输入窗：只泵（守护 250ms 待命档），收 timer 帧 ~1.6s。
+        let frames_before = state.clients[0].frames;
+        let sample_deadline = std::time::Instant::now() + std::time::Duration::from_millis(1600);
+        let mut seen_ticks: Vec<u32> = Vec::new();
+        while std::time::Instant::now() < sample_deadline {
+            let _ = rq_update(&mut state, RqMessage::Tick);
+            {
+                let client = &state.clients[0];
+                if let Some(list) = composed(client) {
+                    for op in list.ops.iter() {
+                        if let DrawOp::Text { text, .. } = op {
+                            if let Some(rest) = text.strip_prefix("ticks: ") {
+                                if let Ok(n) = rest.trim().parse::<u32>() {
+                                    if seen_ticks.last() != Some(&n) {
+                                        seen_ticks.push(n);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(15));
+        }
+        let frames_after = state.clients[0].frames;
+        // timer 帧：零输入 ≥2 帧推进（250ms 间隔 × 1.6s 窗）。
+        assert!(
+            frames_after - frames_before >= 2,
+            "零输入 timer 帧未到（V-03）：{} 帧",
+            frames_after - frames_before
+        );
+        // 订阅恰一次：ticks 严格 +1 递增（无重复 Tick 跳变——重复订阅
+        // 会一帧多跳）。
+        for pair in seen_ticks.windows(2) {
+            assert_eq!(
+                pair[1],
+                pair[0] + 1,
+                "ticks 须逐帧 +1（订阅恰一次）: {seen_ticks:?}"
+            );
+        }
+        assert!(seen_ticks.len() >= 2, "ticks 读数不足: {seen_ticks:?}");
+
+        serve.stop(&pipe);
+    }
+
     /// PLAN-063 T-05（M-01 代理分段 + M-04 守恒；预算先于测量冻结——
     /// t01-freeze §5）：真实采纳 + 真 VM 组件（按钮计数器）+ 输入臂
     /// 即时泵——**输入→帧到宿主**（含客户端 update/编码/线往返/宿主
