@@ -49,11 +49,19 @@ epochs）。
 
 - **mixed**：`mixed_regions_window --manual --ui <ui.json> --world
   <world.at> --report <显式目录>`（关窗写 `manual-native-gate.json`；legacy
-  字段 title/mode_note/observed/checklist/note 与 auto_pass=false 逐字保
-  持，新增 schema/run_id/project/candidate/window/checkpoints/os_events/
-  checklist_items/observer/tier/status 面）。`--probe` 代码路径不变
+  字段 title/observed/checklist/note 与 auto_pass=false 逐字保持，新增
+  schema/run_id/project/candidate/window/checkpoints/os_events/
+  checklist_items/observer/tier/status 面。**legacy `mode` 值改名**：旧字符串
+  `"manual-gate (PLAN-066 T-02)"` → schema 字段 `mode: "native-manual"`，
+  旧字面量保存在新增字段 `mode_note`——按旧 `mode` 字符串过滤的消费者改读
+  `mode_note` 或 schema `mode`）。`--probe` 代码路径不变
   （记录器只在 manual 分支活动）；`--report` 必须显式指向本 scope，
   禁止沿代码默认旧 plan054 路径落材料。
+- **身份分层（F-T07-02 裁定）**：`mixed_regions_window --probe/--manual`
+  的原生报告**按设计不含 runner sha 自绑字段**——真窗 posted/手工层的
+  runner 身份由本档 §3 冻结（构建面）＋ AG026 checker 消费时对实际二进制
+  实测 sha 绑定；报告内自绑由 editor `--evidence-record`（写
+  `runner_sha256`）承担。不把"报告未自绑"误读为"证据未绑定"。
 - **editor**：`autographics-authoring --open <project/scene.agscene>
   --evidence-record <显式 out.json> [--evidence-attach <原 OS 阶段报告>]`
   ——绑定实际项目/当前状态（open path、document sha、history/dirty/
@@ -83,27 +91,41 @@ pilot 生成器（consumer 臂新增）任一变化 → 本档冻结的 runner s
 在同版受影响门重验；原 M1 失效规则不放宽，第二真实 scale 外部门不因本
 档关闭。
 
-## 4. AG026/027 消费配方（交付时命令，全部显式输出）
+## 4. AG026/027 消费配方（交付时命令，全部显式输出；每条自带 cwd）
 
-- 再生成 fixture（字节恒等由 pilot gates 钉）：
+`<root>` = auto-ui 检出根（worktree 或落主后的主检出）。二进制在
+`<root>/experimental/autographics-auto-driver/target/debug/`（或计划
+CARGO_TARGET_DIR 的 debug 面）。
+
+- 再生成 fixture（字节恒等由 pilot gates 钉）。cwd：
+  `<root>/experimental/autographics-node2d-pilot`
   `cargo run -p autographics-node2d-pilot --bin node2d-lower -- --profile
   node-ui-mixed-regions --entry fixtures/node-mixed-regions/dashclip.at
   --out generated-node-mixed-regions/ui-m1-clip-forensics`
-- 应用级 clip/路由/挂卸门（离屏，本档 oracle）：
+- 应用级 clip/路由/挂卸门（离屏，本档 oracle）。cwd：
+  `<root>/experimental/autographics-auto-driver`
   `cargo test -p autographics-auto-driver --test m1_native_evidence_support
   -- --test-threads=1`
-- 真窗单档 posted 回归（原 showcase fixture，exit 0 oracle）：
-  `mixed_regions_window --probe --ui
-  generated-node-mixed-regions/ui-dash-regions/ui.json --world …/world.at
+- 真窗单档 posted 回归（原 showcase fixture，exit 0 oracle）。cwd：
+  `<root>/experimental/autographics-auto-driver`
+  `target/debug/mixed_regions_window.exe --probe --ui
+  ../autographics-node2d-pilot/generated-node-mixed-regions/ui-dash-regions/ui.json
+  --world
+  ../autographics-node2d-pilot/generated-node-mixed-regions/ui-dash-regions/world.at
   --report <显式目录>`
-- 手工门（AG026 N1..N6 逐项＋双档，人工执行；结论/观察人由人填）：
-  `mixed_regions_window --manual --ui
-  generated-node-mixed-regions/ui-m1-clip-forensics/ui.json --world
-  …/world.at --report <显式目录>`，随后 `m1_evidence::validate_file` 判
+- 手工门（AG026 N1..N6 逐项＋双档，人工执行；结论/观察人由人填）。cwd：
+  `<root>/experimental/autographics-auto-driver`
+  `target/debug/mixed_regions_window.exe --manual --ui
+  ../autographics-node2d-pilot/generated-node-mixed-regions/ui-m1-clip-forensics/ui.json
+  --world
+  ../autographics-node2d-pilot/generated-node-mixed-regions/ui-m1-clip-forensics/world.at
+  --report <显式目录>`，随后 `m1_evidence::validate_file` 判
   pending/native-pass。
-- 编辑器绑定记录（AG027 原阶段记录接面）：
-  `autographics-authoring --open <project/scene.agscene>
-  --evidence-record <显式 out.json> --evidence-attach <原报告>`。
+- 编辑器绑定记录（AG027 原阶段记录接面）。cwd：
+  `<root>/experimental/autographics-auto-driver`
+  `target/debug/autographics-authoring.exe --open
+  ../autographics-node2d-pilot/generated-editor-projects/g04-editor-2d/scene.agscene
+  --evidence-record <显式 out.json> [--evidence-attach <原报告>]`。
 
 ## 5. 当前未证边界（不因本档关闭）
 
