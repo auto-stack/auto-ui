@@ -619,3 +619,26 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 23 | from: work | to: user | status: execution_done | outcome: waiting（N-01/N-02/N-04/N-05 收口；固定开销修复 vs 口径修订需选择） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: acace4aa | next: user
 
 - stage: user | plan_id: PLAN-062 | plan_revision: r4 | round: 24 | from: user | to: work | status: execution_done | outcome: pass（裁定：实现直绘路径，去掉 canvas 包装的 ≈3ms 固定开销；不改 AC） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: acace4aa | next: work（DisplayListWidget 直绘 + 前后对照）
+
+### 2026-11-08 work 性能探测（第二版，公平轮转）——**证伪了“canvas 包装 3ms 固定开销”**
+
+- stage: work | plan_id: auto-ui/PLAN-062 | plan_revision: r4 | outcome: 进行中（结论需用户重新选择；未改实现） | worktree: `D:/autostack/.wt/ui-062/auto-ui` | code_commit: `acace4aa`（本轮只改测试/文档，未提交实现）
+- **第一版方法有缺陷**：顺序测（先 plain、再 empty、再 text…）把“进程级预热/首个元素类型”的代价全记在第一个 shape 上——同一份代码两次跑出相反结论（一次 plain 最慢 7.07/8.76、canvas 4.1–5.2；一次 empty 最慢 7.14/8.40）。
+- **第二版方法（公平轮转）**：先建全部模拟器、逐个预热 10 帧，然后 40 轮 **round-robin**（每轮每 shape 各一帧）。实测（p50/p95/max ms）：
+  | shape | ops | p50 | p95 | max |
+  |---|---|---|---|---|
+  | plain_widget_tree（无 canvas） | 0 | 8.23 | 15.15 | 40.53 |
+  | empty（canvas） | 0 | 7.58 | 10.38 | 23.79 |
+  | text_1 | 1 | 7.26 | 11.98 | 13.46 |
+  | text_50 | 50 | 7.06 | 11.19 | 39.00 |
+  | image_1 | 1 | 6.73 | 11.80 | 18.79 |
+  | image_20 | 20 | 6.86 | 13.08 | 21.61 |
+  | quad_200 | 200 | 10.18 | 18.48 | 29.11 |
+- **结论（与第一版相反，按公平测量为准）**：
+  1. **没有 canvas 固定开销**：`empty`(7.58) 比同轮 `plain_widget_tree`(8.23) 还快 → “去掉 canvas 包装”不成立（用户此前的选择基于我的错误结论，已在本轮更正）。
+  2. **文字每帧几乎免费**（text_50 ≈ empty）→ 698 说的“每段 0.22ms/帧”也是顺序偏差；iced 本身缓存整形。
+  3. **只有几何量与规模相关**（200 quad：+2.6 p50/+8 p95）。
+  4. 绝对值与 max（6.7–10ms p50、max 高到 40ms）说明**当前主机负载很高**（连续多小时的构建/测试）；同一代码上一轮是 4.1–5.2ms。
+- **因此**：重放路径没有可修的“固定开销”；冻结的 `1.25×direct+2ms` 之所以在本机测不过，是**主机/进程级抖动**（在负载下可放大到 3–6 倍），不是重放设计。可选项回到 **(B) r5 口径修订** 或 **(C) 以当前能力集收口**；若坚持原口径，需要在**真正空闲**的机器上跑一次隔离窗口（本会话无法保证）。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 25 | from: work | to: user | status: execution_done | outcome: waiting（直绘修复假设被公平测量证伪；请在 B/C 间选择） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: acace4aa | next: user
