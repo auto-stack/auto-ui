@@ -1,6 +1,6 @@
 # standalone-windows-game-player
 
-状态：canonical候选（PLAN-072 SD-01 交付；本文随 PLAN-072 落主生效）。
+状态：canonical（PLAN-072 SD-01 交付，随交付 5fd25be8 落主）。
 本文描述 Windows x64 独立持续运行宿主 `age-game-player` 的产品接面：双击
 `player.json` 旁的 exe 即进入指定游戏 Playing，只呈现游戏视口与 HUD，原生
 键鼠与设备音频持续成立，终局 fresh Enter 重开、干净退出。游戏业务仍为原
