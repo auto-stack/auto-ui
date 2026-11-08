@@ -1601,8 +1601,11 @@ fn rq_view(state: &RqDaemon, window: iced::window::Id) -> iced::Element<'_, RqMe
     // 无 v2 帧 = v1 既有路径（queue 臂 DrawListPainter）。
     let client = state.clients.iter().find(|c| c.window == Some(window));
     let cursor_kind = client.map(|c| c.cursor_kind).unwrap_or(0);
+    // PLAN-073 T-03（A2 修）：宿主窗口设备 scale（window::scale_factor 落簿）
+    // 驱动 GlyphRun 位图的栅格化分辨率（1:1 纹理映射，不再 2× 上采样）。
+    let device_scale = client.map(|c| c.scale as f32).unwrap_or(1.0);
     let content: iced::Element<'_, RqMessage> = if let Some(v2) = client.and_then(composed_v2) {
-        crate::ui::iced::broker_surface::displaylist_element(v2)
+        crate::ui::iced::broker_surface::displaylist_element(v2, device_scale)
     } else {
         match client.and_then(composed) {
             Some(list) => crate::ui::iced::broker_surface::drawlist_element(list),
@@ -3636,6 +3639,9 @@ mod tests {
                 None,
             );
             pump.set_v2(true);
+            // 字符串面回路（PLAN-073 T-03）：断言以 TextStyled 文本为 oracle，
+            // 显式关闭 glyphrun 协商（v3 代词汇不进本回路的 oracle）。
+            pump.set_glyphrun_optin(false);
             let (exit, _source) = pump.run();
             exit
         });
@@ -3830,6 +3836,9 @@ mod tests {
                 None,
             );
             pump.set_v2(true);
+            // 字符串面回路（PLAN-073 T-03）：IME/值文本 oracle 以 TextStyled
+            // 承载，显式关闭 glyphrun 协商。
+            pump.set_glyphrun_optin(false);
             let (exit, _source) = pump.run();
             exit
         });

@@ -540,7 +540,9 @@ impl<M> canvas::Program<M> for RemoteFramePainter<M> {
                         crate::ui::iced::broker_surface::to_color(clear),
                     );
                 }
-                crate::ui::iced::broker_surface::paint_ops_v2(&mut frame, &list.ops);
+                // 预览/缩略面（fit 缩放由画布变换承担），非保真门面：
+                // 位图按原分辨率纹理映射（zoom 放大时软化为预览可接受行为）。
+                crate::ui::iced::broker_surface::paint_ops_v2(&mut frame, &list.ops, 1.0);
             }
             _ => {
                 // 无帧占位：灰底 + 相位诊断文本（AC-02 占位态可视面）。

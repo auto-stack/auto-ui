@@ -146,7 +146,16 @@ fn produce_v2(view: View<()>) -> (Vec<Layer>, super::super::message::DisplayList
     let mut obs = Vec::new();
     let mut bms = Vec::new();
     let mut cache = ResourceCache::default();
-    let list = lower_layers_v2(&layers, &mut obs, &mut cache, &mut bms, false, false, 2.0);
+    let list = lower_layers_v2(
+        &layers,
+        &mut obs,
+        &mut cache,
+        &mut bms,
+        false,
+        false,
+        2.0,
+        2.0,
+    );
     (layers, list, bms.len())
 }
 
@@ -161,7 +170,7 @@ fn displaylist_element_snapshot(
     let mut sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
         iced::Size::new(W, H),
-        crate::ui::iced::broker_surface::displaylist_element::<()>(&neutral),
+        crate::ui::iced::broker_surface::displaylist_element::<()>(&neutral, super::rq_probe::SIMULATOR_SCALE),
     );
     let snap = sim.snapshot(&theme()).map_err(|e| e.to_string())?;
     snap.matches_image(png).map_err(|e| e.to_string())?;

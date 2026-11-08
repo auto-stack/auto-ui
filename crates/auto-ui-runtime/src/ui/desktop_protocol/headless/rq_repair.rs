@@ -41,7 +41,7 @@ fn produce(view: View<()>) -> (super::super::message::DisplayList, f64) {
     let mut obs = Vec::new();
     let mut bms = Vec::new();
     let mut cache = ResourceCache::default();
-    let list = lower_layers_v2(&layers, &mut obs, &mut cache, &mut bms, false, false, 2.0);
+    let list = lower_layers_v2(&layers, &mut obs, &mut cache, &mut bms, false, false, 2.0, 2.0);
     (list, ms(t.elapsed()))
 }
 
@@ -69,7 +69,7 @@ impl ReplayCell {
             self.sim = Some(iced_test::simulator::Simulator::with_size(
                 iced::Settings::default(),
                 iced::Size::new(W, H),
-                crate::ui::iced::broker_surface::displaylist_element::<()>(leaked),
+                crate::ui::iced::broker_surface::displaylist_element::<()>(leaked, super::rq_probe::SIMULATOR_SCALE),
             ));
             self.startup_ms = ms(t.elapsed());
         }

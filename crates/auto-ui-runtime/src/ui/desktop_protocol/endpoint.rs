@@ -226,6 +226,12 @@ pub struct AppEndpoint<S: FrameSource> {
     pub extra_surfaces: Vec<super::message::WelcomeSurface>,
     /// 表面帧载荷模式（v1.3：Welcome 协商结果；缺省 Commands）。
     pub frame_mode: FrameMode,
+    /// PLAN-073 T-03：glyphrun 协商 opt-in（默认 true）。v2 钉面
+    /// （`ClientPump::set_v2(true)`，字符串词汇回路）置 false——GlyphRun
+    /// 是 v3 代原语，v2 面客户端不得切换文本词汇（宿主重排面由 v2 合同
+    /// 具名承载）。Hello 仍可声明 optional（可选项非承诺），本端生产词
+    /// 汇由 HostCaps 臂按此开关裁决。
+    glyphrun_optin: bool,
     /// PLAN-062 T-04：宿主经 `HostCaps` 声明的能力集（未收到 = 空）。
     /// producer 据此决定是否发 v3 原语，而不是靠本地开关猜。
     pub peer_caps: super::message::CapabilitySet,
@@ -273,6 +279,7 @@ impl<S: FrameSource> AppEndpoint<S> {
             extra_surfaces: Vec::new(),
             frame_mode: FrameMode::Commands,
             peer_caps: super::message::CapabilitySet::default(),
+            glyphrun_optin: true,
             observe_sink: None,
             next_frame_id: 0,
             bm_last_slot: 0,
@@ -629,6 +636,13 @@ impl<S: FrameSource> AppEndpoint<S> {
         }))
     }
 
+
+    /// glyphrun 协商 opt-in（PLAN-073 T-03）：false = v2 字符串钉面，
+    /// HostCaps 到达也不切换文本词汇（Hello 的 optional 声明保留——
+    /// optional 非承诺，客户端保留钉面决定权）。
+    pub fn set_glyphrun_optin(&mut self, on: bool) {
+        self.glyphrun_optin = on;
+    }
     /// app 侧状态机：处理一条来自宿主的消息，返回要回发的消息序列。
     pub fn on_message(&mut self, msg: ProtocolMsg) -> Result<Vec<ProtocolMsg>, ProtocolError> {
         use AppState::*;
@@ -642,7 +656,12 @@ impl<S: FrameSource> AppEndpoint<S> {
                 // 宿主不会发这条；收到即记入 peer_caps 供 producer 决策）。
                 self.peer_caps = super::message::CapabilitySet::parse(&caps);
                 // PLAN-073 T-03（A1）：协商结果即刻驱动产者词汇（首帧前生效）。
-                self.session.on_host_caps(&self.peer_caps);
+                // v2 钉面（glyphrun_optin=false）不切换文本词汇——GlyphRun 是
+                // v3 代原语，v2 回路的产者保持字符串承载（宿主重排为 v2 合
+                // 同具名面）。
+                if self.glyphrun_optin {
+                    self.session.on_host_caps(&self.peer_caps);
+                }
                 Ok(vec![])
             }
             (
@@ -941,6 +960,7 @@ impl HostEndpoint {
     ) {
         self.supported = caps;
     }
+
 
     /// Hello 声明的必需能力是否全部被宿主支持（否则具名拒绝）。
     fn admit_hello(&self) -> Result<(), ProtocolError> {

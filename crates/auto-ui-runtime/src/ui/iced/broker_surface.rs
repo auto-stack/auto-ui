@@ -653,13 +653,21 @@ use crate::ui::desktop_protocol::message::{
 
 struct DisplayListPainter<M> {
     list: DisplayList,
+    /// 宿主设备/逻辑像素比：GlyphRun 位图按它栅格化（PLAN-073 T-03 A2）。
+    device_scale: f32,
     _message: std::marker::PhantomData<fn() -> M>,
 }
 
 /// remote 臂内容：DisplayList v2 → canvas 元素（Fill×Fill 客户区）。
-pub fn displaylist_element<'a, M: 'a>(list: &DisplayList) -> iced::Element<'a, M> {
+///
+/// `device_scale` = 宿主窗口设备/逻辑像素比（rqhost 经
+/// `window::scale_factor` 落簿）：GlyphRun 位图按它栅格化到设备分辨率，
+/// 逻辑 rect 绘制时 1:1 纹理映射（PLAN-073 T-03 A2）。测试侧模拟器硬编码
+/// scale 2.0（iced_test simulator.rs:221）。
+pub fn displaylist_element<'a, M: 'a>(list: &DisplayList, device_scale: f32) -> iced::Element<'a, M> {
     iced::widget::canvas(DisplayListPainter::<M> {
         list: list.clone(),
+        device_scale: device_scale.max(1.0),
         _message: std::marker::PhantomData,
     })
     .width(iced::Length::Fill)
@@ -678,7 +686,7 @@ impl<M> iced::widget::canvas::Program<M> for DisplayListPainter<M> {
         bounds: iced::Rectangle,
         _cursor: iced::mouse::Cursor,
     ) -> Vec<iced::widget::canvas::Geometry> {
-        paint_display_list(_renderer, &self.list, bounds.size())
+        paint_display_list(_renderer, &self.list, bounds.size(), self.device_scale)
     }
 }
 
@@ -752,7 +760,12 @@ where R: iced::advanced::graphics::geometry::Renderer {
     ordered_geometries(renderer, list.clear, size, runs, paint_ops::<R>)
 }
 
-fn paint_display_list<R>(renderer: &R, list: &DisplayList, size: iced::Size) -> Vec<R::Geometry>
+fn paint_display_list<R>(
+    renderer: &R,
+    list: &DisplayList,
+    size: iced::Size,
+    device_scale: f32,
+) -> Vec<R::Geometry>
 where R: iced::advanced::graphics::geometry::Renderer {
     let runs = clipped_paint_runs(&list.ops, |op| match op {
         DisplayOp::Scissor { .. } => PaintScope::ClipPush,
@@ -764,14 +777,24 @@ where R: iced::advanced::graphics::geometry::Renderer {
         DisplayOp::Transform { .. } => DisplayOp::TransformPop,
         _ => DisplayOp::ScissorPop,
     });
-    ordered_geometries(renderer, list.clear, size, runs, paint_ops_v2::<R>)
+    ordered_geometries(renderer, list.clear, size, runs, move |frame, ops| {
+        paint_ops_v2(frame, ops, device_scale)
+    })
 }
 
 /// v2 原语 canvas 重放（paint_ops 同构 + v2 原生面）：Quad 全参（渐变
 /// angle→to_distance 绝对几何重建 + 四角半径 + border 内描边 + shadow
 /// 垫层近似）；Transform 压出栈（轴对齐矩阵直落 translate+scale，剪切
 /// 面观测省略——降格端只产轴对齐形态）；Scissor/文本/图像与 v1 同路。
-pub(crate) fn paint_ops_v2<R>(frame: &mut iced::widget::canvas::Frame<R>, ops: &[DisplayOp])
+///
+/// `device_scale` = 宿主设备/逻辑像素比：GlyphRun 以 `字号×scale` 栅格化、
+/// 逻辑 rect 绘制（PLAN-073 T-03 A2）；Transform 信封内的字形再乘信封
+/// scale（光栅分辨率跟随最终设备尺寸）。
+pub(crate) fn paint_ops_v2<R>(
+    frame: &mut iced::widget::canvas::Frame<R>,
+    ops: &[DisplayOp],
+    device_scale: f32,
+)
 where
     R: iced::advanced::graphics::geometry::Renderer,
 {
@@ -799,7 +822,7 @@ where
                     iced::Point::new(rect.x, rect.y),
                     iced::Size::new(rect.w.max(0.0), rect.h.max(0.0)),
                 );
-                frame.with_clip(region, |f| paint_ops_v2(f, &ops[i + 1..end]));
+                frame.with_clip(region, |f| paint_ops_v2(f, &ops[i + 1..end], device_scale));
                 i = end + 1;
             }
             DisplayOp::ScissorPop => i += 1,
@@ -850,7 +873,7 @@ where
                         "[rq-warn] transform 含剪切不可达（residual={shear:.4}）——按旋转+缩放降级"
                     );
                 }
-                paint_ops_v2(frame, &ops[i + 1..end]);
+                paint_ops_v2(frame, &ops[i + 1..end], device_scale * scale_x);
                 frame.pop_transform();
                 i = end + 1;
             }
@@ -1029,6 +1052,7 @@ where
                     *color,
                     *line_offset,
                     glyphs,
+                    device_scale,
                 );
                 i += 1;
             }
@@ -1144,6 +1168,11 @@ fn wire_path_bounds(path: &crate::ui::desktop_protocol::message::WirePath) -> ic
 /// 字形位图按 `CacheKey` 全局缓存（跨帧/跨 op 复用），着色以 RGBA 位图承载
 /// （`Mask` 位图 = 颜色 × 覆盖率；emoji 的 `Color` 位图原样）。
 #[allow(clippy::too_many_arguments)]
+/// GlyphRun 重放（PLAN-073 T-03 A2 修）：字形几何是**逻辑坐标**；位图按
+/// `字号 × device_scale` 栅格化到设备分辨率、以逻辑 rect 绘制——宿主画布
+/// 最终按 `rect × device_scale` 出图，恰好 1:1 纹理映射（不再双线性上采样）。
+/// 子像素分数由 `CacheKey` 的 SubpixelBin 烘焙进位图，放置取整后除回 scale。
+/// `device_scale` 已含 Transform 信封缩放（paint_ops_v2 栈内累积）。
 fn paint_glyph_run<R>(
     frame: &mut iced::widget::canvas::Frame<R>,
     font_hash: &[u8; 16],
@@ -1153,6 +1182,7 @@ fn paint_glyph_run<R>(
     color: Rgba8,
     line_offset: f32,
     glyphs: &[crate::ui::desktop_protocol::message::GlyphInstance],
+    device_scale: f32,
 ) where
     R: iced::advanced::graphics::geometry::Renderer,
 {
@@ -1165,6 +1195,7 @@ fn paint_glyph_run<R>(
         );
         return;
     };
+    let raster_size = font_size * device_scale;
     let system = iced::advanced::graphics::text::font_system();
     let mut guard = system.write().expect("Write font system");
     let mut cache = glyph_cache().lock().unwrap();
@@ -1173,8 +1204,8 @@ fn paint_glyph_run<R>(
             CacheKey::new(
             font_id,
             glyph.glyph_id,
-            font_size,
-            (glyph.x, glyph.y),
+            raster_size,
+            (glyph.x * device_scale, glyph.y * device_scale),
             cosmic_text::fontdb::Weight(weight),
             cosmic_text::CacheKeyFlags::from_bits_truncate(flags),
         );
@@ -1197,10 +1228,13 @@ fn paint_glyph_run<R>(
         if w == 0 || h == 0 {
             continue;
         }
-        let x = (ix + rgba.left) as f32;
-        let y = (iy - rgba.top) as f32 + line_offset;
+        let x = (ix + rgba.left) as f32 / device_scale;
+        let y = (iy - rgba.top) as f32 / device_scale + line_offset;
         frame.draw_image(
-            iced::Rectangle::new(iced::Point::new(x, y), iced::Size::new(w as f32, h as f32)),
+            iced::Rectangle::new(
+                iced::Point::new(x, y),
+                iced::Size::new(w as f32 / device_scale, h as f32 / device_scale),
+            ),
             &rgba.handle,
         );
     }
@@ -1240,7 +1274,9 @@ fn glyph_cache_insert(
     cache.insert(key, glyph);
 }
 
-/// swash 位图 → straight RGBA（Mask = 颜色 × 覆盖率；Color = 原位图）。
+/// swash 位图 → RGBA（**straight alpha + 线性烘焙颜色**）：iced 图像管线按
+/// `SrcAlpha` 直通混合、纹理值作线性——覆盖率走 alpha 通道（PLAN-073
+/// T-03 A2 两段修：预乘→直通→线性对齐 direct 文本管线）。
 fn glyph_rgba(image: &cosmic_text::SwashImage, color: Rgba8) -> Option<CachedGlyph> {
     let width = image.placement.width;
     let height = image.placement.height;
@@ -1250,13 +1286,9 @@ fn glyph_rgba(image: &cosmic_text::SwashImage, color: Rgba8) -> Option<CachedGly
     let mut pixels = Vec::with_capacity((width * height * 4) as usize);
     match image.content {
         cosmic_text::SwashContent::Mask => {
-            // 画布图像管线按**预乘**语义合成（与 tiny-skia 的 PixmapPaint 同
-            // 律）：覆盖率乘进 RGB，否则半透明边缘会被当成不透明色加亮，
-            // 表现为整段文字偏粗。
             for alpha in &image.data {
                 let a = ((*alpha as u16 * color.a as u16) / 255) as u8;
-                let premul = |c: u8| ((c as u16 * a as u16) / 255) as u8;
-                pixels.extend_from_slice(&[premul(color.r), premul(color.g), premul(color.b), a]);
+                pixels.extend_from_slice(&[color.r, color.g, color.b, a]);
             }
         }
         cosmic_text::SwashContent::Color => {
@@ -1334,8 +1366,12 @@ pub fn broker_client_content(
         return Some(pixels_element(px));
     }
     // PLAN-683：v2 合成面优先（remote 臂——DisplayListPainter）。
+    // PLAN-073 T-03（A2 具名残差）：desktop session broker 尚未落簿窗口
+    // 设备 scale（rqhost 有 window::scale_factor 臂，此处无）——按 1.0
+    // 栅格化，HiDPI 桌面嵌载的 GlyphRun 位图维持旧分辨率行为；scale
+    // 落簿归 T-05 六格的 desktop-RQ 宿主义务（计划 §9 登记在案）。
     if let Some(v2) = client.composed_v2() {
-        return Some(displaylist_element(v2));
+        return Some(displaylist_element(v2, 1.0));
     }
     client.composed().map(drawlist_element)
 }
@@ -1387,7 +1423,7 @@ mod tests {
             DisplayOp::Quad { rect: WRect::new(20.0,20.0,10.0,10.0), fill: Fill::Color(Rgba8::new(255,0,0,255)), radius:[0.0;4], border:None, shadow:None },
             DisplayOp::ScissorPop,
         ] };
-        let geometries = super::paint_display_list(&Recorder, &list, iced::Size::new(100.0,100.0));
+        let geometries = super::paint_display_list(&Recorder, &list, iced::Size::new(100.0,100.0), 1.0);
         let mut clips=Vec::new();
         for geometry in geometries {
             let iced_wgpu::geometry::Geometry::Live { meshes, .. } = geometry else { panic!("expected live geometry"); };
@@ -1783,7 +1819,7 @@ mod zorder_pin {
         let mut sim = iced_test::simulator::Simulator::with_size(
             iced::Settings::default(),
             iced::Size::new(8.0, 8.0),
-            super::displaylist_element::<()>(&list),
+            super::displaylist_element::<()>(&list, 2.0),
         );
         let png = std::env::temp_dir().join("zorder-diag.png");
         let _ = std::fs::remove_file(&png);

@@ -160,6 +160,10 @@ pub struct HeadlessSurface<C: Component> {
     /// PLAN-062 T-02：阴影以生产端 SDF 贴片过线。默认关——实测贴片经画布图像
     /// 合成后比单层 scrim 更远（见 Spec §2.3 的 A/B），需先解决合成对齐。
     shadow_patches: bool,
+    /// PLAN-073 T-03（A3 修）：远端视口设备/逻辑像素比。阴影贴片按它栅格化
+    /// 到设备分辨率（与宿主 1:1 纹理映射）；显示列表坐标仍是逻辑空间。
+    /// 默认 1.0（scale=1 宿主行为与旧版一致）。
+    viewport_scale: f32,
     /// PLAN-073 T-03（A5，062 Spec §6#3 owner=UI073）：常驻 tiny_skia 记录器。
     /// 此前每帧新建 `iced_tiny_skia::Renderer` → Engine 字体/排版缓存每帧
     /// 冷启，SVG 场景产帧 ≈32.5ms（超 061 冻结 W-C ≤10ms）。`ui.draw` 每帧
@@ -433,6 +437,7 @@ where
             resources: ResourceCache::default(),
             glyph_runs: false,
             shadow_patches: false,
+            viewport_scale: 1.0,
             renderer: None,
         }
     }
@@ -488,6 +493,7 @@ where
             self.glyph_runs,
             self.shadow_patches,
             scale,
+            self.viewport_scale,
         )
     }
 
@@ -500,6 +506,12 @@ where
     /// 阴影是否以生产端 SDF 贴片过线（默认关 = 单层 scrim 近似）。
     pub fn set_shadow_patches(&mut self, on: bool) {
         self.shadow_patches = on;
+    }
+
+    /// 远端视口设备/逻辑像素比（PLAN-073 T-03 A3）：阴影贴片栅格化分辨率。
+    /// 产者必须宣布与宿主一致的 scale（同 viewport 合同），默认 1.0。
+    pub fn set_viewport_scale(&mut self, scale: f32) {
+        self.viewport_scale = scale.max(1.0);
     }
 
     /// 产帧后核对 per-App 上传预算：超限则回滚本帧资源登记并返回 true，
@@ -1384,6 +1396,12 @@ where
     pub fn set_upload_budget_bytes_per_window(&mut self, bytes: u64) {
         self.surface.resources.rate_limit_bytes = bytes;
     }
+
+    /// PLAN-073 T-03（A3 修）：远端视口设备 scale 透传（阴影贴片栅格化
+    /// 分辨率）。探针侧与宿主模拟器同值（SIMULATOR_SCALE）。
+    pub fn set_viewport_scale(&mut self, scale: f32) {
+        self.surface.set_viewport_scale(scale);
+    }
 }
 
 /// PLAN-060 诊断：帧产出计数（env AUTO_PLAN060_DIAG 同路径）。
@@ -1817,6 +1835,7 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
 /// translate 近似，旋转不可达见观测）；图像句柄 → src 词汇或 bitmap://
 /// 上传通道。mesh（canvas/vector）= v2 词汇面外（G2 词汇表未列），位图
 /// 降级承接为登记债（试点三例无 canvas 面）。
+#[allow(clippy::too_many_arguments)]
 fn lower_layers_v2(
     layers: &[Layer],
     observations: &mut Vec<String>,
@@ -1825,6 +1844,7 @@ fn lower_layers_v2(
     glyph_runs: bool,
     shadow_patches: bool,
     scale: f32,
+    viewport_scale: f32,
 ) -> DisplayList {
     let mut ops = Vec::new();
     for (index, layer) in layers.iter().enumerate() {
@@ -1844,6 +1864,7 @@ fn lower_layers_v2(
                 bitmaps,
                 shadow_patches,
                 scale,
+                viewport_scale,
             );
         }
         for item in &layer.text {
@@ -2006,6 +2027,7 @@ fn paint_fill(paint: &tiny_skia::Paint<'_>) -> Option<Fill> {
 
 /// v2 quad：原生全参——Fill（色/渐变 angle+stops）、四角半径、border、
 /// shadow 直落 wire（v1 近似面全部消除）。
+#[allow(clippy::too_many_arguments)]
 fn lower_quad_v2(
     quad: &advanced_renderer::Quad,
     background: &iced::Background,
@@ -2015,6 +2037,7 @@ fn lower_quad_v2(
     bitmaps: &mut Vec<super::endpoint::BitmapUpload>,
     shadow_patches: bool,
     scale: f32,
+    viewport_scale: f32,
 ) {
     let rect = to_wrect(quad.bounds);
     // 半径是逻辑单位，而 rect/bounds 已是设备像素（记录层已乘 viewport
@@ -2052,11 +2075,20 @@ fn lower_quad_v2(
             || quad.shadow.offset.y != 0.0);
     let mut shadow_spec = None;
     if has_shadow && shadow_patches {
-        if let Some((patch_rect, w, h, rgba)) = resources.shadow_patch(quad, scale) {
+        // PLAN-073 T-03（A3 修）：贴片按远端视口设备 scale 栅格化（SDF 逐像
+        // 素公式在设备像素上与 direct 同口径），Image rect 折回逻辑坐标——
+        // 宿主画布按逻辑 rect 绘制时恰好 1:1 纹理映射。scale=1 时与旧行为
+        // 完全一致。
+        if let Some((patch_rect, w, h, rgba)) = resources.shadow_patch(quad, viewport_scale) {
             let src = resources.intern(w, h, &rgba, bitmaps);
             if let Some(src) = src {
                 ops.push(DisplayOp::Image {
-                    rect: patch_rect,
+                    rect: WRect::new(
+                        patch_rect.x / viewport_scale,
+                        patch_rect.y / viewport_scale,
+                        patch_rect.w / viewport_scale,
+                        patch_rect.h / viewport_scale,
+                    ),
                     src,
                     fit: crate::ui::desktop_protocol::message::ImageFit::Stretch,
                 });
@@ -2113,14 +2145,21 @@ impl ResourceCache {
 
 /// 阴影贴片：按 iced_wgpu `solid.wgsl` 的 SDF/平滑步进公式逐像素求值。
 ///
-/// 与 shader 同口径：quad 在设备像素空间，`pos`/`scale` 为 quad 顶左与尺寸，
-/// 半径取 `min(radius, 短边/2)`；阴影矩形 = quad + offset，扩边 =
-/// `|offset| + 2·blur`（shader 的顶点扩边同式）。
+/// 与 shader 同口径：**全部几何先乘 `scale` 进设备像素空间**（quad bounds、
+/// offset、blur、半径同尺度后再 clamp——shader 的 clamp 也是设备尺度），返回
+/// 设备空间 rect + 设备分辨率位图；调用方把 rect 折回逻辑坐标（PLAN-073
+/// T-03 A3）。扩边 = `|offset| + 2·blur`（shader 的顶点扩边同式）。
 fn rasterize_shadow(
     quad: &advanced_renderer::Quad,
     scale: f32,
 ) -> Option<(WRect, u32, u32, Vec<u8>)> {
-    let b = quad.bounds;
+    let raw = quad.bounds;
+    let b = iced::Rectangle {
+        x: raw.x * scale,
+        y: raw.y * scale,
+        width: raw.width * scale,
+        height: raw.height * scale,
+    };
     let blur = quad.shadow.blur_radius * scale;
     let ox = quad.shadow.offset.x * scale;
     let oy = quad.shadow.offset.y * scale;
@@ -2265,7 +2304,6 @@ fn shape_cached_text_glyph_runs(
     x: f32,
     y: f32,
     color: iced::Color,
-    transformation: iced::Transformation,
     ops: &mut Vec<DisplayOp>,
     observations: &mut Vec<String>,
 ) {
@@ -2297,33 +2335,29 @@ fn shape_cached_text_glyph_runs(
         buffer.shape_until_scroll(fonts.raw(), false);
         buffer
     };
-    lower_glyph_run(
-        &buffer,
-        iced::Point::new(x, y),
-        color,
-        transformation,
-        ops,
-        observations,
-    );
+    lower_glyph_run(&buffer, iced::Point::new(x, y), color, ops, observations);
 }
 
+/// GlyphRun 降为**逻辑坐标**（PLAN-073 T-03 A2 修）：字形几何与 `TextStyled`
+/// 同一空间，位图栅格化分辨率是 Host 本地的（重放按宿主设备 scale 出图，
+/// 1:1 纹理映射）。此前把变换 scale 烘焙进位置/字号，重放画布按逻辑坐标
+/// 绘制会在 HiDPI 宿主上把字形位图 2× 双线性上采样（笔画强度腰斩、边缘
+/// 光晕，实测富模式 text_cjk 0.798% 残差的主源）。非恒等变换仍由
+/// `lower_text_v2` 的 Transform 信封承载，这里不再重复烘焙。
 fn lower_glyph_run(
     buffer: &cosmic_text::Buffer,
     position: iced::Point,
     color: iced::Color,
-    transformation: iced::Transformation,
     ops: &mut Vec<DisplayOp>,
     observations: &mut Vec<String>,
 ) {
     let rgba = to_rgba8(color);
-    let scale = transformation.scale_factor();
-    let pos = position * transformation;
     let system = font_system();
     let mut font_system = system.write().expect("Write font system");
 
     let mut unshipped: Vec<u16> = Vec::new();
     for run in buffer.layout_runs() {
-        let line_offset = (run.line_y * scale).round();
+        let line_offset = run.line_y;
         let mut glyphs = Vec::new();
         let mut font_hash: Option<[u8; 16]> = None;
         let mut font_size = 0.0f32;
@@ -2341,7 +2375,7 @@ fn lower_glyph_run(
             };
             if font_hash.is_none() {
                 font_hash = Some(hash);
-                font_size = glyph.font_size * scale;
+                font_size = glyph.font_size;
                 weight = glyph.font_weight.0;
                 flags = glyph.cache_key_flags.bits();
             } else if font_hash != Some(hash) {
@@ -2357,12 +2391,12 @@ fn lower_glyph_run(
                 };
                 ops.push(split);
                 font_hash = Some(hash);
-                font_size = glyph.font_size * scale;
+                font_size = glyph.font_size;
                 weight = glyph.font_weight.0;
                 flags = glyph.cache_key_flags.bits();
             }
-            let x = (glyph.x + glyph.font_size * glyph.x_offset).mul_add(scale, pos.x);
-            let y = (glyph.y - glyph.font_size * glyph.y_offset).mul_add(scale, pos.y);
+            let x = glyph.x + glyph.font_size * glyph.x_offset + position.x;
+            let y = glyph.y - glyph.font_size * glyph.y_offset + position.y;
             glyphs.push(crate::ui::desktop_protocol::message::GlyphInstance {
                 glyph_id: glyph.glyph_id,
                 x,
@@ -2390,7 +2424,7 @@ fn lower_glyph_run(
             unshipped.clear();
         }
         // 字符串回退：仅在没有任何 glyph 被承载时补一条 TextStyled，保证
-        // 文字永不静默消失（V-02 负控口径）。
+        // 文字永不静默消失（V-02 负控口径）。同 GlyphRun：逻辑坐标。
         if ops
             .last()
             .map(|op| !matches!(op, DisplayOp::GlyphRun { .. }))
@@ -2405,10 +2439,10 @@ fn lower_glyph_run(
                 let start = run.glyphs.iter().map(|g| g.start).min().unwrap_or(0);
                 let end = run.glyphs.iter().map(|g| g.end).max().unwrap_or(0);
                 ops.push(DisplayOp::TextStyled {
-                    x: pos.x + first.x,
-                    y: pos.y + run.line_top,
-                    size: first.font_size * scale,
-                    line_height: line_h * scale,
+                    x: first.x + position.x,
+                    y: run.line_top + position.y,
+                    size: first.font_size,
+                    line_height: line_h,
                     color: rgba,
                     weight: first.font_weight.0,
                     italic: false,
@@ -2465,14 +2499,7 @@ fn lower_text_v2(
             } => {
                 if let Some(paragraph) = paragraph.upgrade() {
                     if glyph_runs {
-                        lower_glyph_run(
-                        paragraph.buffer(),
-                        *position,
-                        *color,
-                            transformation,
-                            ops,
-                            observations,
-                        );
+                        lower_glyph_run(paragraph.buffer(), *position, *color, ops, observations);
                     } else {
                         lower_text_runs(paragraph.buffer(), *position, *color, ops, observations);
                     }
@@ -2486,14 +2513,7 @@ fn lower_text_v2(
             } => {
                 if let Some(editor) = editor.upgrade() {
                     if glyph_runs {
-                        lower_glyph_run(
-                        editor.buffer(),
-                        *position,
-                        *color,
-                            transformation,
-                            ops,
-                            observations,
-                        );
+                        lower_glyph_run(editor.buffer(), *position, *color, ops, observations);
                     } else {
                         lower_text_runs(editor.buffer(), *position, *color, ops, observations);
                     }
@@ -2521,15 +2541,7 @@ fn lower_text_v2(
                 // TextStyled 兜底承担（V-02 永不静默丢字口径不变）。
                 if glyph_runs {
                     shape_cached_text_glyph_runs(
-                        content,
-                        size.0,
-                        line_height.0,
-                        font,
-                        x,
-                        bounds.y,
-                        *color,
-                        transformation,
-                        ops,
+                        content, size.0, line_height.0, font, x, bounds.y, *color, ops,
                         observations,
                     );
                 } else {
@@ -3005,7 +3017,7 @@ mod tests {
             iced::Pixels(16.0),
         ));
         let mut frame = iced::widget::canvas::Frame::new(&renderer, iced::Size::new(240.0, 160.0));
-        crate::ui::iced::broker_surface::paint_ops_v2(&mut frame, &scrolled.ops);
+        crate::ui::iced::broker_surface::paint_ops_v2(&mut frame, &scrolled.ops, 1.0);
         iced::advanced::Renderer::start_transformation(
             &mut renderer,
             iced::Transformation::translate(5.0, 7.0),
@@ -3018,7 +3030,7 @@ mod tests {
         };
         let mut cache = ResourceCache::default();
         let mut bms = Vec::new();
-        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms, false, false, 2.0);
+        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms, false, false, 2.0, 2.0);
         let replay = bottom(&replayed).expect("bottom text survives host replay");
         assert!(
             (replay.0 - x - 5.0).abs() < 0.1 && (replay.1 - y - 7.0).abs() < 0.1,
@@ -3422,7 +3434,7 @@ mod tests {
                         iced::Color::from_rgba8(clear.r, clear.g, clear.b, 1.0),
                     );
                 }
-                crate::ui::iced::broker_surface::paint_ops_v2(&mut frame, &v2.ops);
+                crate::ui::iced::broker_surface::paint_ops_v2(&mut frame, &v2.ops, 1.0);
             }
             #[cfg(not(debug_assertions))]
             let _ = v2;

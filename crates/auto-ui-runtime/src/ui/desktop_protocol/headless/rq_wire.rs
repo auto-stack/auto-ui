@@ -120,7 +120,7 @@ fn render_composed(
     let mut sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
         iced::Size::new(W, H),
-        crate::ui::iced::broker_surface::displaylist_element::<()>(&painted),
+        crate::ui::iced::broker_surface::displaylist_element::<()>(&painted, super::rq_probe::SIMULATOR_SCALE),
     );
     let req = out.join(format!("{name}-replay.png"));
     let _ = std::fs::remove_file(&req);
@@ -308,6 +308,18 @@ enum WireSource {
     Media(HeadlessFrameSource<MediaStreamView>),
 }
 
+impl WireSource {
+    /// PLAN-073 T-03（A3）：视口设备 scale 透传（阴影贴片栅格化分辨率）。
+    fn set_viewport_scale(&mut self, scale: f32) {
+        match self {
+            WireSource::Rust(s) => s.set_viewport_scale(scale),
+            WireSource::Vm(s) => s.set_viewport_scale(scale),
+            WireSource::Live(s) => s.set_viewport_scale(scale),
+            WireSource::Media(s) => s.set_viewport_scale(scale),
+        }
+    }
+}
+
 macro_rules! wire_delegate {
     ($this:ident, $method:ident $(, $arg:expr)*) => {
         match $this {
@@ -441,18 +453,21 @@ impl CaseBody {
     }
 
     fn source(&self) -> Result<WireSource, String> {
-        match self {
-            CaseBody::Rust(v) => Ok(WireSource::Rust(HeadlessFrameSource::new(
+        // 远端视口与重放模拟器同 scale（阴影贴片设备分辨率；PLAN-073 A3）。
+        let mut src = match self {
+            CaseBody::Rust(v) => WireSource::Rust(HeadlessFrameSource::new(
                 StaticView { view: v.clone() },
                 W,
                 H,
-            ))),
+            )),
             CaseBody::Vm(src) => {
                 let component = crate::build_dynamic_component(src, None)
                     .map_err(|e| format!("vm build: {e}"))?;
-                Ok(WireSource::Vm(HeadlessFrameSource::new(component, W, H)))
+                WireSource::Vm(HeadlessFrameSource::new(component, W, H))
             }
-        }
+        };
+        src.set_viewport_scale(super::rq_probe::SIMULATOR_SCALE);
+        Ok(src)
     }
 }
 
@@ -528,8 +543,24 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
                     continue;
                 }
             };
-            let diff = match render_composed(&list, backdrop, &out, &name) {
-                Ok(png) => pixel_diff_ratio(&gold, &png, 2),
+            let (diff, residual) = match render_composed(&list, backdrop, &out, &name) {
+                Ok(png) => {
+                    let diff = pixel_diff_ratio(&gold, &png, 2);
+                    // >0.1% 行的像素级残差报告（PLAN-073 T-03 关闭依据）；
+                    // 界与行门同表（阴影 1.5%、GlyphRun 文本 1%、余 0.1%）。
+                    let residual = (diff > 0.001).then(|| {
+                        let rep =
+                            super::rq_probe::analyze_residual_pair(&gold, &png, backdrop);
+                        let bound = if matches!(case, "gradient_border_shadow") {
+                            0.015
+                        } else {
+                            0.010
+                        };
+                        super::rq_probe::assert_named_aa_closure(&name, &rep, bound);
+                        rep
+                    });
+                    (diff, residual)
+                }
                 Err(err) => {
                     println!("[RQWIRE] {}", serde_json::json!({
                         "tag": "failed", "cell": cell, "case": case, "stage": "replay", "error": err,
@@ -545,10 +576,12 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
             println!("[RQWIRE] {}", serde_json::json!({
                 "tag": "cell", "producer": pname, "cell": cell, "case": case, "host": host,
                 "inventory": inv, "pixel_diff_vs_direct": diff,
+                "residual": residual.as_ref().map(|r| r.to_json()),
             }));
             rows.push(serde_json::json!({
                 "producer": pname, "cell": cell, "case": case, "host": host,
                 "status": "ok", "inventory": inv, "pixel_diff_vs_direct": diff,
+                "residual": residual.as_ref().map(|r| r.to_json()),
             }));
         }
     }
@@ -1385,8 +1418,16 @@ fn t01_absorb_composed(
     if let Some(list) = cell.composed() {
         for op in &list.ops {
             if let DisplayOp::Image { src, .. } = op {
-                if src.starts_with("bitmap://") && seen.insert(src.clone()) {
-                    if crate::ui::iced::broker_surface::resolve_drawlist_image(src, 1920, 1080)
+                if src.starts_with("bitmap://") {
+                    seen.insert(src.clone());
+                    // PLAN-073 T-03（harness 竞态修）：上传落宿主缓存与宿主
+                    // 合成引用分属两线程——引用可先于 put 抵达。未命中的
+                    // 身份必须留待后续合成重查（此前先入 seen 锁死 = 宿主
+                    // 侧稍慢即整批永久误计 0，负载敏感假红）。
+                    if !received.contains(src)
+                        && crate::ui::iced::broker_surface::resolve_drawlist_image(
+                            src, 1920, 1080,
+                        )
                         .is_some()
                     {
                         received.insert(src.clone());

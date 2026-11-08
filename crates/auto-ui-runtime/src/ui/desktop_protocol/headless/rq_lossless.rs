@@ -121,7 +121,7 @@ fn render_rq_png(list: &DisplayList, out: &std::path::Path, name: &str) -> PathB
     let mut sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
         iced::Size::new(W, H),
-        crate::ui::iced::broker_surface::displaylist_element::<()>(list),
+        crate::ui::iced::broker_surface::displaylist_element::<()>(list, super::rq_probe::SIMULATOR_SCALE),
     );
     let snap = sim.snapshot(&theme()).expect("rq snapshot");
     snap.matches_image(&snapshot_path(out, name)).expect("rq png");
@@ -452,8 +452,9 @@ fn rq_v3_upload_budget_defers_frame_without_partial_registration() {
 
 #[test]
 fn rq_glyph_positions_match_physical_formula() {
-    // 诊断：wire 的 x/y 必须与 cosmic-text `physical()` 完全一致（否则 Host
-    // 按绝对坐标合成会逐字漂移）。
+    // 诊断：wire 的 x/y = **逻辑坐标**（= cosmic-text `physical(pos, 1.0)`）；
+    // 位图分辨率是 Host 本地的（重放按宿主设备 scale 出图，PLAN-073 T-03
+    // A2）。设备坐标由重放侧 `物理位置 = 逻辑 × 宿主 scale` 派生。
     use cosmic_text::{Attrs, Buffer, Metrics, Shaping};
     let mut fs = iced::advanced::graphics::text::font_system()
         .write()
@@ -467,24 +468,34 @@ fn rq_glyph_positions_match_physical_formula() {
     let mut rows = Vec::new();
     for run in buffer.layout_runs() {
         for glyph in run.glyphs.iter().take(4) {
+            // wire 合同：逻辑坐标 = physical(pos, 1.0)；设备坐标 = ×scale
+            //（宿主栅格化分辨率），两者都必须与 cosmic-text 公式一致。
+            let logical = glyph.physical(pos, 1.0);
             let physical = glyph.physical(pos, scale);
-            let mine_x = (glyph.x + glyph.font_size * glyph.x_offset).mul_add(scale, pos.0);
-            let mine_y = (glyph.y - glyph.font_size * glyph.y_offset).mul_add(scale, pos.1);
+            let mine_x = glyph.x + glyph.font_size * glyph.x_offset + pos.0;
+            let mine_y = glyph.y - glyph.font_size * glyph.y_offset + pos.1;
             rows.push(serde_json::json!({
                 "id": glyph.glyph_id,
-                "physical_x": physical.x, "mine_x": mine_x,
-                "physical_y": physical.y, "mine_y": mine_y,
-                "size": glyph.font_size * scale,
+                "logical_x": logical.x, "mine_x": mine_x,
+                "logical_y": logical.y, "mine_y": mine_y,
+                "device_x": physical.x, "device_scale_x": mine_x * scale,
+                "size": glyph.font_size,
             }));
         }
     }
     println!("[RQ062] {}", serde_json::json!({ "tag": "glyph_positions", "rows": rows }));
     for row in &rows {
-        let px = row["physical_x"].as_i64().unwrap() as f32;
+        let lx = row["logical_x"].as_i64().unwrap() as f32;
         let mx = row["mine_x"].as_f64().unwrap() as f32;
         assert!(
-            (px - mx.trunc()).abs() < 0.01,
-            "wire x 必须等于 physical().x：{row}"
+            (lx - mx.trunc()).abs() < 0.01,
+            "wire x（逻辑）必须等于 physical(pos,1.0).x：{row}"
+        );
+        let dx = row["device_x"].as_f64().unwrap() as f32;
+        let dsx = row["device_scale_x"].as_f64().unwrap() as f32;
+        assert!(
+            (dx - dsx.trunc()).abs() < 0.01,
+            "宿主设备坐标（wire×scale）必须等于 physical(pos,scale).x：{row}"
         );
     }
 }

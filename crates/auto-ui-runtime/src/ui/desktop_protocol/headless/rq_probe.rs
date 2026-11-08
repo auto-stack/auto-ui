@@ -57,6 +57,11 @@ pub(super) fn out_dir() -> PathBuf {
     }
 }
 
+/// iced_test 模拟器的硬编码设备/逻辑像素比（iced_test simulator.rs:221
+/// `scale_factor = 2.0`）。重放画布的 GlyphRun/阴影贴片按它栅格化才能与
+/// 同模拟器直出金样 1:1 纹理对齐（PLAN-073 T-03 A2/A3）。
+pub(super) const SIMULATOR_SCALE: f32 = 2.0;
+
 // ---------------------------------------------------------------------------
 // 1. 全能力分母（穷尽 match = 编译期完整性；ID 稳定可引用）
 // ---------------------------------------------------------------------------
@@ -654,6 +659,310 @@ pub(super) fn pixel_diff_ratio(a: &Path, b: &Path, allowance: u8) -> f64 {
     diff as f64 / (left.width() * left.height()) as f64
 }
 
+/// 像素级 AA 残差报告（PLAN-073 T-03：A2/A3/A4 的具名残差关闭依据）。
+///
+/// 判据（V-03「每个非 exact 有关闭依据 + 敏感负控」的可执行形态）：
+/// - `flat_diff == 0`：两侧都平坦（5×5 域内通道跨度 ≤4/255）的区域无差——
+///   错色/错填充/整块丢失必落此处；
+/// - `edge_miss == 0`（或 `max_delta ≤ 16` 的软渐变带例外）：每个差像素
+///   距任一侧的强边缘（3×3 跨度 >24/255）≤2px——纯 AA 覆盖率差的几何特征；
+/// - `ink_hole_blocks == 0`：32px 块内 direct 墨量 ≥4000 而 replay <50% 的
+///   「墨洞」为零——掉字负控实测 1-2 洞、合法重排 0 洞（判别整段丢失的
+///   主判据；帧级 `ink_ratio` 仅记录不断言——≤2/255 的全域亮度微差会让
+///   它被大面积面板色差主导，实测 code_editor 2.06 而 diff 仅 0.41%）；
+/// - 列墨量轮廓无显著更优平移：`profile_peak_ratio ≥ 0.5`——整内容错位
+///   负控实测 0.17；宿主重排的局部亚像素/1px 漂移实测 0.61-0.93；
+/// - `edge_miss_strong ≤ 8`（幅度 >16/通道且远离任何强边缘的孤立差）：
+///   隔离内容错误信号；软带（≤16/通道，如 table 条纹底色差）与贴边差
+///   不计——丢失字形贴着 direct 字形边缘走，此值不涨；
+/// - 平坦区差零容，**编辑器 caret 例外**：记录面聚焦态与 direct 模拟器的
+///   iced 原生 caret 可见性独立（061 具名移交 UI063 的组合态家族），实测
+///   单个 2×4 实心块——允许 ≤64px 的单个平坦差块（错误填充/丢失字形为
+///   字形级数百 px，仍必炸）。
+#[derive(Debug, Clone)]
+pub(super) struct ResidualReport {
+    pub diff_px: u64,
+    pub ratio: f64,
+    pub max_delta: u32,
+    pub flat_diff: u64,
+    /// 平坦差的最大连通块（caret 级瞬态 ≤64px；错误填充为数百 px）。
+    pub flat_blob_max: usize,
+    pub edge_miss: u64,
+    /// `edge_miss` 中幅度 >16/通道的强信号子集（断言对象）。
+    pub edge_miss_strong: u64,
+    pub max_blob: usize,
+    pub ink_ratio: f64,
+    /// 32px 块级墨洞数（direct 有墨而 replay 近乎无墨——掉字信号）。
+    pub ink_hole_blocks: u64,
+    /// 列墨量轮廓最佳整数平移（0 = 对齐；记录用，判据看 peak_ratio）。
+    pub profile_best_shift: i64,
+    /// 最佳平移得分 / 0 平移得分（<0.8 = 某个非零平移显著更优 = 错位信号）。
+    pub profile_peak_ratio: f64,
+}
+
+impl ResidualReport {
+    pub(super) fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "diff_px": self.diff_px, "ratio": self.ratio,
+            "max_delta": self.max_delta, "flat_diff": self.flat_diff,
+            "flat_blob_max": self.flat_blob_max,
+            "edge_miss": self.edge_miss,
+            "edge_miss_strong": self.edge_miss_strong, "max_blob": self.max_blob,
+            "ink_ratio": self.ink_ratio,
+            "ink_hole_blocks": self.ink_hole_blocks,
+            "profile_best_shift": self.profile_best_shift,
+            "profile_peak_ratio": self.profile_peak_ratio,
+        })
+    }
+}
+
+/// 断言该行属于「具名平台 AA 残差」而非未解释差异（V-03 关闭依据）。
+pub(super) fn assert_named_aa_closure(name: &str, rep: &ResidualReport, bound: f64) {
+    assert!(
+        rep.ratio <= bound,
+        "{name} 像素差 {:.5} 超具名上界 {bound}",
+        rep.ratio
+    );
+    assert!(
+        rep.flat_diff == 0 || (rep.flat_diff <= 64 && rep.flat_blob_max <= 64),
+        "{name} 平坦区差异超 caret 级瞬态容许（错色/整块丢失，非 AA 残差）：{}",
+        rep.to_json()
+    );
+    assert!(
+        rep.edge_miss_strong <= 8,
+        "{name} 存在远离任何边缘的强幅度孤立差异（{}）",
+        rep.to_json()
+    );
+    assert_eq!(
+        rep.ink_hole_blocks, 0,
+        "{name} 存在块级墨洞（掉字信号）：{}",
+        rep.to_json()
+    );
+    assert!(
+        rep.profile_peak_ratio >= 0.5,
+        "{name} 列墨量轮廓存在显著更优平移（错位信号）：{}",
+        rep.to_json()
+    );
+}
+
+/// 对 direct/replay PNG 对计算 [`ResidualReport`]。`backdrop` = 两侧共同
+/// 底色（墨量参照）。
+pub(super) fn analyze_residual_pair(
+    a: &Path,
+    b: &Path,
+    backdrop: crate::ui::desktop_protocol::message::Rgba8,
+) -> ResidualReport {
+    let left = image::open(a).expect("left png").to_rgba8();
+    let right = image::open(b).expect("right png").to_rgba8();
+    assert_eq!(
+        left.dimensions(),
+        right.dimensions(),
+        "对拍 PNG 尺寸不一致"
+    );
+    let (w, h) = left.dimensions();
+    let n = (w as usize) * (h as usize);
+    let l = left.into_raw();
+    let r = right.into_raw();
+    let w = w as usize;
+    let h = h as usize;
+
+    let allowance = 2i32;
+    let mut diff_mask = vec![false; n];
+    let mut delta = vec![0u32; n];
+    let mut diff_px = 0u64;
+    let mut max_delta = 0u32;
+    for i in 0..n {
+        let (lp, rp) = (&l[i * 4..i * 4 + 3], &r[i * 4..i * 4 + 3]);
+        let d = [
+            (lp[0] as i32 - rp[0] as i32).abs(),
+            (lp[1] as i32 - rp[1] as i32).abs(),
+            (lp[2] as i32 - rp[2] as i32).abs(),
+        ];
+        let dm = d[0].max(d[1]).max(d[2]);
+        if dm > allowance {
+            diff_mask[i] = true;
+            delta[i] = dm as u32;
+            diff_px += 1;
+            max_delta = max_delta.max(dm as u32);
+        }
+    }
+
+    // 局部跨度（k 域内与中心像素的最大通道变化）——边缘/平坦掩码。
+    let span = |src: &[u8], k: usize| -> Vec<u32> {
+        let mut out = vec![0u32; n];
+        for y in 0..h {
+            for x in 0..w {
+                let i = y * w + x;
+                let b = &src[i * 4..i * 4 + 3];
+                let mut mx = [0u32; 3];
+                for dy in -(k as i64)..=(k as i64) {
+                    let ny = (y as i64 + dy).clamp(0, h as i64 - 1) as usize;
+                    for dx in -(k as i64)..=(k as i64) {
+                        let nx = (x as i64 + dx).clamp(0, w as i64 - 1) as usize;
+                        let p = &src[(ny * w + nx) * 4..(ny * w + nx) * 4 + 3];
+                        for c in 0..3 {
+                            mx[c] = mx[c].max((p[c] as i32 - b[c] as i32).unsigned_abs());
+                        }
+                    }
+                }
+                out[i] = *mx.iter().max().unwrap();
+            }
+        }
+        out
+    };
+    let span_l1 = span(&l, 1);
+    let span_r1 = span(&r, 1);
+    let span_l2 = span(&l, 2);
+    let span_r2 = span(&r, 2);
+    let edge = |i: usize| span_l1[i] > 24 || span_r1[i] > 24;
+    // edge ±2px 邻域（Chebyshev）。
+    let mut near_edge = vec![false; n];
+    for y in 0..h {
+        for x in 0..w {
+            if edge(y * w + x) {
+                for dy in -2i64..=2 {
+                    for dx in -2i64..=2 {
+                        let ny = y as i64 + dy;
+                        let nx = x as i64 + dx;
+                        if ny >= 0 && ny < h as i64 && nx >= 0 && nx < w as i64 {
+                            near_edge[(ny * w as i64 + nx) as usize] = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut edge_miss = 0u64;
+    let mut edge_miss_strong = 0u64;
+    let mut flat_diff = 0u64;
+    let mut flat_mask = vec![false; n];
+    for i in 0..n {
+        if diff_mask[i] {
+            if !near_edge[i] {
+                edge_miss += 1;
+                if delta[i] > 16 {
+                    edge_miss_strong += 1;
+                }
+            }
+            if span_l2[i] <= 4 && span_r2[i] <= 4 {
+                flat_diff += 1;
+                flat_mask[i] = true;
+            }
+        }
+    }
+
+    // 最大 8 连通块遍历（漏字 = 字形大小实心块；AA 残差 = 细长条）。
+    let max_blob_of = |mask: &[bool]| -> usize {
+        let mut visited = vec![false; n];
+        let mut max = 0usize;
+        let mut stack: Vec<usize> = Vec::new();
+        for start in 0..n {
+            if mask[start] && !visited[start] {
+                stack.clear();
+                stack.push(start);
+                visited[start] = true;
+                let mut size = 0usize;
+                while let Some(i) = stack.pop() {
+                    size += 1;
+                    let y = (i / w) as i64;
+                    let x = (i % w) as i64;
+                    for dy in -1i64..=1 {
+                        for dx in -1i64..=1 {
+                            let ny = y + dy;
+                            let nx = x + dx;
+                            if ny >= 0 && ny < h as i64 && nx >= 0 && nx < w as i64 {
+                                let j = (ny * w as i64 + nx) as usize;
+                                if mask[j] && !visited[j] {
+                                    visited[j] = true;
+                                    stack.push(j);
+                                }
+                            }
+                        }
+                    }
+                }
+                max = max.max(size);
+            }
+        }
+        max
+    };
+    let max_blob = max_blob_of(&diff_mask);
+    let flat_blob_max = max_blob_of(&flat_mask);
+
+    // 墨量（相对共同底色）与列墨量轮廓对齐。
+    let bg = [
+        backdrop.r as i64,
+        backdrop.g as i64,
+        backdrop.b as i64,
+    ];
+    let mut ink_l = vec![0i64; w as usize];
+    let mut ink_r = vec![0i64; w as usize];
+    let (mut total_l, mut total_r) = (0i64, 0i64);
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            let (lp, rp) = (&l[i * 4..i * 4 + 3], &r[i * 4..i * 4 + 3]);
+            let il: i64 = (0..3).map(|c| (lp[c] as i64 - bg[c]).abs()).sum();
+            let ir: i64 = (0..3).map(|c| (rp[c] as i64 - bg[c]).abs()).sum();
+            ink_l[x] += il;
+            ink_r[x] += ir;
+            total_l += il;
+            total_r += ir;
+        }
+    }
+    // 块级墨洞：32px 块内 direct 墨量 ≥4000 且 replay <50%（掉字信号；
+    // 合法亚像素重排/AA 残差在块内收支相抵，实测 0 洞）。
+    let block = 32usize;
+    let mut ink_hole_blocks = 0u64;
+    for by in (0..h).step_by(block) {
+        for bx in (0..w).step_by(block) {
+            let (mut da, mut db) = (0i64, 0i64);
+            for y in by..(by + block).min(h) {
+                for x in bx..(bx + block).min(w) {
+                    da += ink_l[x];
+                    db += ink_r[x];
+                }
+            }
+            if da >= 4000 && db * 2 < da {
+                ink_hole_blocks += 1;
+            }
+        }
+    }
+    let zero = ink_l.iter().zip(ink_r.iter()).map(|(a, b)| (a - b).abs()).sum::<i64>();
+    let mut best_shift = 0i64;
+    let mut best_score = zero;
+    for t in -2i64..=2 {
+        if t == 0 {
+            continue;
+        }
+        let score: i64 = (0..w)
+            .map(|x| {
+                let sx = (x as i64 + t).clamp(0, w as i64 - 1) as usize;
+                ink_l[x] - ink_r[sx]
+            })
+            .map(|v| v.abs())
+            .sum();
+        if score < best_score {
+            best_score = score;
+            best_shift = t;
+        }
+    }
+
+    ResidualReport {
+        diff_px,
+        ratio: diff_px as f64 / n as f64,
+        max_delta,
+        flat_diff,
+        edge_miss,
+        max_blob,
+        flat_blob_max,
+        edge_miss_strong,
+        ink_ratio: total_r as f64 / total_l.max(1) as f64,
+        ink_hole_blocks,
+        profile_best_shift: best_shift,
+        profile_peak_ratio: best_score as f64 / zero.max(1) as f64,
+    }
+}
+
 /// 结构清单：按 v3/v2 原语统计（漏图在结构面即可见）。
 pub(super) fn case_inventory(list: &super::super::message::DisplayList) -> serde_json::Value {
     use super::super::message::DisplayOp;
@@ -764,7 +1073,16 @@ fn rq_measure(view: View<()>, png: Option<&Path>) -> Result<RqMeasure, String> {
         let mut obs: Vec<String> = Vec::new();
         let mut bms: Vec<super::super::endpoint::BitmapUpload> = Vec::new();
         let mut cache = ResourceCache::default();
-        let list = lower_layers_v2(&layers, &mut obs, &mut cache, &mut bms, false, false, 2.0);
+        let list = lower_layers_v2(
+        &layers,
+        &mut obs,
+        &mut cache,
+        &mut bms,
+        false,
+        false,
+        2.0,
+        2.0,
+    );
         let lower_d = t.elapsed();
 
         let t = Instant::now();
@@ -797,7 +1115,7 @@ fn rq_measure(view: View<()>, png: Option<&Path>) -> Result<RqMeasure, String> {
             replay_sim = Some(iced_test::simulator::Simulator::with_size(
                 iced::Settings::default(),
                 iced::Size::new(PROBE_W as f32, PROBE_H as f32),
-                crate::ui::iced::broker_surface::displaylist_element::<()>(&replay_list),
+                crate::ui::iced::broker_surface::displaylist_element::<()>(&replay_list, super::rq_probe::SIMULATOR_SCALE),
             ));
             replay_build = Some(ms(t.elapsed()));
         }
@@ -1002,7 +1320,7 @@ fn rq_probe_t05_capability_rows() {
         let mut rq_sim = iced_test::simulator::Simulator::with_size(
             settings(),
             size(),
-            crate::ui::iced::broker_surface::displaylist_element::<()>(&painted),
+            crate::ui::iced::broker_surface::displaylist_element::<()>(&painted, super::rq_probe::SIMULATOR_SCALE),
         );
         match rq_sim
             .snapshot(&theme())
@@ -1021,6 +1339,20 @@ fn rq_probe_t05_capability_rows() {
         let rq_png = out.join(format!("{slug}-rq-wgpu.png"));
         let diff = pixel_diff_ratio(&direct_png, &rq_png, 2);
         let (uploads, uploaded_bytes, hits, evictions, resident) = surface.resource_stats();
+        // PLAN-073 T-03（A4 逐 ID 收口）：>0.1% 的能力行必须落「具名平台
+        // AA 残差」——像素级关闭依据（平坦区零差/边缘带/墨量守恒/轮廓对齐）
+        // 可复核，2% 只是诊断上限不是 exact 豁免（SpecA §6#9）。≤0.1% 行
+        // 标 exact，不重复具名化。
+        let residual = (diff > 0.001).then(|| {
+            let rep = analyze_residual_pair(&direct_png, &rq_png, backdrop);
+            assert_named_aa_closure(cap, &rep, 0.02);
+            rep
+        });
+        let closure = if diff > 0.001 {
+            serde_json::json!({ "class": "named-aa", "report": residual.as_ref().map(|r| r.to_json()) })
+        } else {
+            serde_json::json!({ "class": "exact" })
+        };
         let row = serde_json::json!({
             "capability": cap, "case": case.id, "note": case.note, "status": "ok",
             "inventory": case_inventory(&list),
@@ -1029,6 +1361,7 @@ fn rq_probe_t05_capability_rows() {
                 "evictions": evictions, "resident_bytes": resident,
             },
             "pixel_diff_vs_direct": diff,
+            "closure": closure,
         });
         println!("[RQCAPPROBE] {}", row);
         rows.push(row);
@@ -1297,7 +1630,7 @@ fn rq_probe_t01_interaction_baseline() {
         let mut sim = iced_test::simulator::Simulator::with_size(
             iced::Settings::default(),
             iced::Size::new(240.0, 160.0),
-            crate::ui::iced::broker_surface::displaylist_element::<()>(list),
+            crate::ui::iced::broker_surface::displaylist_element::<()>(list, super::rq_probe::SIMULATOR_SCALE),
         );
         let snap = sim.snapshot(&theme()).expect("interaction replay frame");
         snap.matches_image(out.join(format!("{tag}-rq.png")))
@@ -1556,7 +1889,7 @@ fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
     let mut replay_sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
         iced::Size::new(PROBE_W as f32, PROBE_H as f32),
-        crate::ui::iced::broker_surface::displaylist_element::<()>(&painted),
+        crate::ui::iced::broker_surface::displaylist_element::<()>(&painted, super::rq_probe::SIMULATOR_SCALE),
     );
     replay_sim
         .snapshot(&theme())
@@ -1653,7 +1986,7 @@ fn rq_perf_replay_shapes() {
             Some(list) => iced_test::simulator::Simulator::with_size(
                 iced::Settings::default(),
                 iced::Size::new(PROBE_W as f32, PROBE_H as f32),
-                crate::ui::iced::broker_surface::displaylist_element::<()>(&list),
+                crate::ui::iced::broker_surface::displaylist_element::<()>(&list, super::rq_probe::SIMULATOR_SCALE),
             ),
             None => {
                 let plain: iced::Element<'static, ()> =

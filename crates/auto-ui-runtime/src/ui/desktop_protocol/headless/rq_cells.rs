@@ -14,7 +14,10 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use super::rq_probe::{direct_frames, ms, out_dir, pixel_diff_ratio, stats, theme};
+use super::rq_probe::{
+    analyze_residual_pair, assert_named_aa_closure, direct_frames, ms, out_dir,
+    pixel_diff_ratio, stats, theme,
+};
 use super::*;
 use crate::ui::component::Component;
 use crate::ui::desktop_protocol::client_runtime::bg as client_bg;
@@ -214,6 +217,8 @@ struct CellReading {
     raster_hits: u64,
     resident_bytes: usize,
     diff_ratio: f64,
+    /// >0.1% 行的像素级残差报告（具名 AA 残差关闭依据；PLAN-073 T-03）。
+    residual: Option<super::rq_probe::ResidualReport>,
 }
 
 fn measure_case(
@@ -265,6 +270,8 @@ fn measure_case(
     surface.set_glyph_runs(glyph_runs);
     // “v3 富模式”同时打开 SDF 阴影贴片；默认面保留 scrim 近似（见 Spec §2.3）。
     surface.set_shadow_patches(glyph_runs);
+    // 远端视口与重放模拟器同 scale（阴影贴片按设备分辨率栅格化）。
+    surface.set_viewport_scale(super::rq_probe::SIMULATOR_SCALE);
     let (mut produce, mut encode, mut decode, mut replay) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let mut inventory_json = serde_json::Value::Null;
@@ -303,7 +310,7 @@ fn measure_case(
             replay_sim = Some(iced_test::simulator::Simulator::with_size(
                 iced::Settings::default(),
                 iced::Size::new(W, H),
-                crate::ui::iced::broker_surface::displaylist_element::<()>(&replay_list),
+                crate::ui::iced::broker_surface::displaylist_element::<()>(&replay_list, super::rq_probe::SIMULATOR_SCALE),
             ));
         }
         let t = Instant::now();
@@ -323,6 +330,9 @@ fn measure_case(
 
     let rq_png = written(out, &format!("{name}-rq"));
     let diff = pixel_diff_ratio(&direct_png, &rq_png, 2);
+    // >0.1% 行生成像素级残差报告（0.1% 内 = exact 门已满足，无需具名化）。
+    let residual =
+        (diff > 0.001).then(|| analyze_residual_pair(&direct_png, &rq_png, backdrop));
     let (uploads, uploaded_bytes, hits, _evictions, resident) = surface.resource_stats();
     let raster_hits = surface.raster_cache_hits();
     let mut inventory_json = inventory_json;
@@ -342,6 +352,7 @@ fn measure_case(
         raster_hits,
         resident_bytes: resident,
         diff_ratio: diff,
+        residual,
     })
 }
 
@@ -396,6 +407,16 @@ fn rq_cells_t05_six_cell_matrix() {
                                     "{name} v3 富模式像素差 {:.4} 超具名上界 {bound}（AC-02 r4）",
                                     reading.diff_ratio
                                 );
+                                // PLAN-073 T-03（A2/A3 收口）：>0.1% 的具名残差
+                                // 必须带像素级关闭依据（平坦区零差 + 边缘带 +
+                                // 墨量守恒 + 轮廓对齐）——非静默放宽。
+                                if let Some(rep) = &reading.residual {
+                                    assert_named_aa_closure(
+                                        &format!("{name} v3_rich"),
+                                        rep,
+                                        bound,
+                                    );
+                                }
                             }
                             // Plan §6：性能测量只在**隔离窗口**有效（不与其他会话
                             // 争用 GPU）。共享窗口一律只记录：跑机负载会把 produce/
@@ -438,6 +459,7 @@ fn rq_cells_t05_six_cell_matrix() {
                                     "hits": reading.hits,
                                     "resident_bytes": reading.resident_bytes, "raster_hits": reading.raster_hits,
                                     "pixel_diff_vs_direct": reading.diff_ratio,
+                                    "residual": reading.residual.as_ref().map(|r| r.to_json()),
                                     "timing_gate": if std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated") { "asserted" } else { "skipped_shared_window" },
                                 })
                             );
@@ -459,6 +481,7 @@ fn rq_cells_t05_six_cell_matrix() {
                                     "resident_bytes": reading.resident_bytes, "raster_hits": reading.raster_hits,
                                 },
                                 "pixel_diff_vs_direct": reading.diff_ratio,
+                                "residual": reading.residual.as_ref().map(|r| r.to_json()),
                                 "timing_gate": if std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated") { "asserted" } else { "skipped_shared_window" },
                             }));
                         }
@@ -531,6 +554,90 @@ fn rq_cells_t05_six_cell_matrix() {
             "格 {} 既无本模块读数也无 rq_wire 证据",
             cell["cell"]
         );
+    }
+
+    // PLAN-073 T-03（V-03 敏感负控）：残差判据必须能击穿错误实现——
+    // ① GlyphRun 整体平移 1 逻辑像素（轮廓错位信号）② 丢一个字形
+    // （墨量蒸发信号）。两者都必须被 [`assert_named_aa_closure`] 的判据
+    // 检出，否则该判据对真实缺陷不敏感（具名残差通道失效）。
+    {
+        let mut surface = HeadlessSurface::new(
+            CellComponent {
+                view: View::text("中文路径客户数据库混排 ABC"),
+            },
+            W,
+            H,
+        );
+        surface.set_glyph_runs(true);
+        surface.set_shadow_patches(true);
+        surface.set_viewport_scale(super::rq_probe::SIMULATOR_SCALE);
+        let base = surface.render_frame_v2();
+
+        let mut shifted = base.clone();
+        let mut dropped = base.clone();
+        // ① 错位：第一个 GlyphRun 所有字形 x +1 逻辑像素。
+        for op in &mut shifted.ops {
+            if let DisplayOp::GlyphRun { glyphs, .. } = op {
+                for g in glyphs.iter_mut() {
+                    g.x += 1.0;
+                }
+                break;
+            }
+        }
+        // ② 丢字：第一个 GlyphRun 删除一个字形。
+        for op in &mut dropped.ops {
+            if let DisplayOp::GlyphRun { glyphs, .. } = op {
+                if glyphs.len() > 1 {
+                    glyphs.remove(glyphs.len() / 2);
+                }
+                break;
+            }
+        }
+
+        let backdrop = client_bg();
+        let direct_png = out.join("text_cjk-v3_rich-direct-wgpu.png");
+        assert!(direct_png.exists(), "负控依赖 direct 金样已落盘");
+        for (name, list) in [("nc-shift1px", shifted), ("nc-drop-glyph", dropped)] {
+            let mut replay = list.clone();
+            replay.clear = Some(backdrop);
+            let mut sim = iced_test::simulator::Simulator::with_size(
+                iced::Settings::default(),
+                iced::Size::new(W, H),
+                crate::ui::iced::broker_surface::displaylist_element::<()>(
+                    &replay,
+                    super::rq_probe::SIMULATOR_SCALE,
+                ),
+            );
+            let req = out.join(format!("{name}.png"));
+            let _ = std::fs::remove_file(&req);
+            let _ = std::fs::remove_file(out.join(format!("{name}-wgpu.png")));
+            sim.snapshot(&theme())
+                .map_err(|e| format!("{name}: {e}"))
+                .and_then(|snap| {
+                    snap.matches_image(&req)
+                        .map(|_| ())
+                        .map_err(|e| format!("{name}: {e}"))
+                })
+                .unwrap_or_else(|e| panic!("{name} 重放快照失败: {e}"));
+            let replay_png = written(&out, name);
+            let rep = analyze_residual_pair(&direct_png, &replay_png, backdrop);
+            let detected = rep.profile_peak_ratio < 0.5
+                || rep.ink_hole_blocks > 0
+                || !(0.90..=1.10).contains(&rep.ink_ratio)
+                || rep.flat_diff > 64;
+            println!(
+                "[RQCELLS] {}",
+                serde_json::json!({
+                    "tag": "nc_residual", "name": name, "report": rep.to_json(),
+                    "detected": detected,
+                })
+            );
+            assert!(
+                detected,
+                "{name} 负控未被残差判据检出（判据不敏感，具名通道失效）: {}",
+                rep.to_json()
+            );
+        }
     }
 
     // mesh 例：v3 Path 必须在结构面出现（漏 mesh = AC-02 失败）。

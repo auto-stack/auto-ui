@@ -452,6 +452,8 @@ pub struct ClientPump<S: FrameSource> {
     app_end: Box<dyn Transport + Send>,
     /// None = 断连待重连（projector 已回 [`Self::projector`] 暂存）。
     endpoint: Option<AppEndpoint<S>>,
+    /// PLAN-073 T-03：glyphrun 协商 opt-in（默认 true；字符串面回路显式关）。
+    glyphrun_optin: bool,
     shm: Option<SharedFrameBuffer>,
     /// PLAN-034（D3）：位图段（BufferAlloc.bm 协商开段；None = 宿主
     /// v1.14 前/开段失败——位图通道缺席，帧照常）。
@@ -497,6 +499,7 @@ impl<S: FrameSource> ClientPump<S> {
             disconnected_at: None,
             spent: false,
             v2: false,
+            glyphrun_optin: true,
             frame_pending: false,
         };
         pump.attach(projector);
@@ -506,6 +509,16 @@ impl<S: FrameSource> ClientPump<S> {
     /// PLAN-683（remote 模式）：翻 v2 产线帧（建泵后、run 前调用）。
     pub fn set_v2(&mut self, v2: bool) {
         self.v2 = v2;
+    }
+
+    /// PLAN-073 T-03：glyphrun 协商 opt-out（字符串面回路测试用——
+    /// GlyphRun 是 v3 代词汇，钉字符串承载的回路显式关闭协商；Hello 若
+    /// 未发则同时抑制 optional 声明）。
+    pub fn set_glyphrun_optin(&mut self, on: bool) {
+        self.glyphrun_optin = on;
+        if let Some(app) = self.endpoint.as_mut() {
+            app.set_glyphrun_optin(on);
+        }
     }
 
     /// PLAN-062 T-05（AC-04 观测口）：在途帧数（已发未 ACK 的槽数）。
@@ -541,6 +554,9 @@ impl<S: FrameSource> ClientPump<S> {
             self.config.width,
             self.config.height,
         );
+        if !self.glyphrun_optin {
+            app.set_glyphrun_optin(false);
+        }
         let hello = match app.connect() {
             Ok(h) => h,
             Err(_) => {
