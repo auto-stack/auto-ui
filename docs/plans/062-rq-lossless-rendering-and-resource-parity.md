@@ -765,3 +765,14 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 结论：只要主检出 `git status --porcelain -- crates` 归零且那份 WIP 不落到 master 的同一文件上，T-07 可以一次跑完（整合 → 冻结回归 → Spec 发布 → 归档 → 清理 → landing 检查）。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 34 | from: merge | to: merge | status: reviewed | outcome: waiting（预检通过；入口门仍被主检出 WIP 挡住） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: merge（等待主检出归零）
+
+### 2026-11-08 merge 入口门第三次复查：仍被主检出他方 WIP 挡住（目标标 blocked）
+
+- stage: merge（入口门复查 3/3） | plan_id: auto-ui/PLAN-062 | plan_revision: r5 | outcome: **blocked** | reviewed_commit: `3eef8a32` | 主检出 master @ `b0f951d5` | worktree `D:/autostack/.wt/ui-062/auto-ui`（clean）
+- **条件未变（连续三轮相同）**：主检出 `git status --porcelain -- crates` 仍有 5 项 ——
+  `crates/auto-ui-runtime/src/ui/desktop_protocol/{headless,host,rqhost}.rs`、`crates/auto-ui-runtime/src/ui/session.rs`（未提交，内容为把已撤回的 `drain_resource_releases` 接回 `FrameSource`）+ 未跟踪 `crates/auto-ui-runtime/test/`。
+- **为什么不自行处置**：这些改动不属于本 Plan / 本会话；用户 2026-11-08 已裁定“先由该 owner 归位”。且这 4 个文件正属 062 分支改动集——若其被提交进 master，整合必须在“062 撤回 ResourceRelease”与“他方接回 drain_resource_releases”之间做语义决断，不能由 merge 静默择一。
+- **精确 unblock 动作（owner 侧）**：该会话把上述 4 个文件改动与 `crates/auto-ui-runtime/test/` 提交到自己的分支/worktree（或 `git stash -u` 暂存、`git worktree add` 迁出）；随后主检出 `git status --porcelain -- crates` 归零。此后无需再经用户确认：T-07 可直接执行（整合 [零文件重叠，预检已证] → 冻结 union 回归 → SD-01/SD-02 发布 → 归档 → worktree 清理 [wt-guard 已 clean] → landing 检查）。
+- **本 Plan 侧已就绪的证据**：最终复审 pass（`3eef8a32`，review10）；隔离窗口计时与像素门全绿；`wt-guard` clean；主检出/分支文件集零重叠。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 35 | from: merge | to: user | status: reviewed | outcome: **blocked**（主检出他方 WIP，连续 3 轮） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: user（owner 归位后恢复 merge）
