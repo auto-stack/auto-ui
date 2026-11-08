@@ -4682,6 +4682,12 @@ fn run_session(
                             state.route_live_input(&input);
                         }
                     }
+                    // PLAN-063（OS T-03，P-03/P-04 接线）：broker 活跃档
+                    // 专泵——仅泵（预算切片防重窗垄断），壳层职责仍归
+                    // 400ms ServiceTick（其泵调用保留为待命档兜底）。
+                    DesktopEvent::BrokerPump => {
+                        state.pump_broker_clients();
+                    }
                     // Plan 462：desktop 帧泵 —— 空更新，仅驱动 view 重算
                     //（MCP 截图请求在 view 投递 / update 消费）。
                     // Plan 464 T4：帧泵期排空（463 排空 #1 上移后的空闲期
@@ -7063,6 +7069,12 @@ fn run_session(
                         && std::env::var("AUTOUI_MCP_DISABLE").map_or(true, |v| v != "1"))
                 {
                     subs.push(crate::ui::session::desktop_service_tick(400));
+                }
+                // PLAN-063（OS T-03，P-03/P-04 接线）：broker 客户端在场 =
+                // 活跃档 15ms 专泵（daemon `rq_subscription` 同律同值；
+                // 零客户端不订——空闲零新增唤醒，400ms ServiceTick 兜底）。
+                if state.is_desktop() && !state.broker_clients.is_empty() {
+                    subs.push(crate::ui::session::broker_pump_tick(15));
                 }
                 // Plan 412 续(toast 修正 5):toast 到期 tick —— 桌面共享堆叠
                 // 只订一份;到期的移除逻辑在 update 的 __toast_tick 分支。

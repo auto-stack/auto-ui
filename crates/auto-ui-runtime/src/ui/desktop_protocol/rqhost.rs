@@ -871,7 +871,9 @@ pub fn adopt_one(
 /// 拍）；超预算余量下拍续排（管道 FIFO 不丢——输入/资源依赖保序，
 /// 过期画面由槽信用自然合并）。64 ≫ 稳态帧流（槽信用 ≤2 在途），
 /// 只在病态积压时触界。
-const PUMP_MSG_BUDGET_PER_TICK: usize = 64;
+/// PLAN-063（OS 侧 T-03 消费）：桌面会话 broker 泵（`pump_broker_clients`）
+/// 使用同一预算常量——单源，不另造机制。
+pub const PUMP_MSG_BUDGET_PER_TICK: usize = 64;
 
 pub fn pump_client(client: &mut RqClient, ids: &mut RqIds) -> (Vec<RqEvent>, bool) {
     let mut events = Vec::new();

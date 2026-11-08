@@ -3005,6 +3005,11 @@ pub enum DesktopEvent {
     /// 让 MCP 截图等"view 侧投递 / update 侧消费"的异步请求有机会被
     /// 处理；独立模式不订——保持空闲零开销）。
     ServiceTick,
+    /// PLAN-063（OS T-03，P-03 接线）：broker 客户端在场活跃档专泵——
+    /// 15ms 节拍 drain 全部在册连接（daemon `rq_subscription` 活跃档同律
+    /// 同值）；零客户端不订阅（400ms ServiceTick 兜底 = 待命档）。每拍
+    /// 仅泵（预算切片防重窗垄断），壳层职责仍归 ServiceTick。
+    BrokerPump,
     /// Plan 463 T6：launcher 召唤（桌面热键 Ctrl+Space / shell ⊞ 按钮，
     /// 经 `__desktop_cmd` `summon\tlauncher` 转发）。464 前无消费者——
     /// update 臂静默；464 在 overlay 槽挂 launcher 并消费本事件。
@@ -3248,6 +3253,14 @@ pub fn live_input_from_wheel(delta: &iced::mouse::ScrollDelta) -> Option<LiveInp
 pub fn desktop_service_tick(ms: u64) -> iced::Subscription<DesktopMessage> {
     iced::time::every(std::time::Duration::from_millis(ms))
         .map(|_| DesktopMessage::Desktop(DesktopEvent::ServiceTick))
+}
+
+/// PLAN-063（OS T-03，P-03 接线）：broker 活跃档专泵订阅（时长哈希为
+/// 订阅 id——daemon `rq_subscription` 同律；调用方按客户端在场切档，
+/// 15ms 活跃 / 缺席不订）。
+pub fn broker_pump_tick(ms: u64) -> iced::Subscription<DesktopMessage> {
+    iced::time::every(std::time::Duration::from_millis(ms))
+        .map(|_| DesktopMessage::Desktop(DesktopEvent::BrokerPump))
 }
 
 /// PLAN-815 T-05（F03）：宿主退出请求轮询订阅（23ms 空拍；置位时产
@@ -3780,6 +3793,9 @@ impl DesktopSession {
                 let _ = client.end.send(&msg);
             }
         }
+        // P-03 即时泵：焦点沿→帧同拍（blur/focus 边合成响应无档位等待；
+        // daemon WindowFocus 臂同律）。
+        self.pump_broker_client_for_wid(wid);
     }
 
     /// PLAN-526 T20：软聚焦（GlobalPress 点击聚焦专用；置顶推迟到 mouse
@@ -4962,6 +4978,88 @@ impl DesktopSession {
         Ok(())
     }
 
+    /// PLAN-063（OS T-03，P-04 接线）：单客户端单拍泵——预算切片消费
+    /// daemon 同源常量 `rqhost::PUMP_MSG_BUDGET_PER_TICK`（`pump_client`
+    /// 同律：预算尽余量下拍续排——管道 FIFO 不丢、输入/资源依赖保序、
+    /// 过期画面由槽信用自然合并；64 ≫ 稳态帧流，只在病态积压触界）。
+    /// viewport 同步与主题推送沿既有泵体——400ms 日常泵与即时泵共用，
+    /// 语义零分叉。返回存活。
+    fn pump_one_broker_client(
+        &mut self,
+        pipe: &str,
+        client: &mut crate::ui::desktop_protocol::stage3::BrokerClient,
+    ) -> bool {
+        let mut alive = true;
+        let mut budget = crate::ui::desktop_protocol::rqhost::PUMP_MSG_BUDGET_PER_TICK;
+        loop {
+            match client.end.try_recv() {
+                Some(Ok(msg)) => {
+                    let actions = match client.endpoint.on_message(msg) {
+                        Ok(a) => a,
+                        Err(_) => {
+                            alive = false;
+                            break;
+                        }
+                    };
+                    let replies = self.broker_apply_actions(client, actions);
+                    for reply in replies {
+                        let _ = client.end.send(&reply);
+                    }
+                    budget -= 1;
+                    if budget == 0 {
+                        break;
+                    }
+                }
+                Some(Err(_)) => {
+                    alive = false;
+                    break;
+                }
+                None => {
+                    alive = alive && !client.end.is_eof();
+                    break;
+                }
+            }
+        }
+        if alive && self.sync_broker_client_viewport(client).is_err() {
+            alive = false;
+        }
+        // PLAN-053 T-03：主题策略推送排水（提交臂入队 → 此处按连接发出）。
+        if alive {
+            let pending: Vec<crate::ui::desktop_protocol::message::ProtocolMsg> = {
+                let mut q = self.theme_push_queue.borrow_mut();
+                let (mine, rest): (Vec<_>, Vec<_>) =
+                    q.drain(..).partition(|(p, _)| p == pipe);
+                *q = rest;
+                mine.into_iter().map(|(_, m)| m).collect()
+            };
+            for m in pending {
+                let _ = client.end.send(&m);
+            }
+        }
+        alive
+    }
+
+    /// PLAN-063（OS T-03，P-03 接线）：目标窗客户端即时泵——输入/焦点/
+    /// resize 臂后联（daemon `pump_window` 同律）：输入→帧合成同拍返回，
+    /// 无 400ms ServiceTick 档等待；预算与日常泵同源。未命中（窗无在册
+    /// 客户端）零开销。死亡路径不就地回收——EOF/协议错由下一日常泵死集
+    /// 臂统一回收（与既有跨拍死亡时延同律）。
+    pub fn pump_broker_client_for_wid(&mut self, wid: Wid) {
+        let Some(pipe) = self
+            .broker_clients
+            .iter()
+            .find(|(_, c)| c.owns_wid(wid))
+            .map(|(p, _)| p.clone())
+        else {
+            return;
+        };
+        let mut clients = std::mem::take(&mut self.broker_clients);
+        if let Some(client) = clients.get_mut(&pipe) {
+            self.pump_one_broker_client(&pipe, client);
+        }
+        self.broker_clients = clients;
+    }
+
     pub fn pump_broker_clients(&mut self) {
         if self.broker_clients.is_empty() {
             return;
@@ -4969,49 +5067,7 @@ impl DesktopSession {
         let mut clients = std::mem::take(&mut self.broker_clients);
         let mut dead = Vec::new();
         for (pipe, client) in clients.iter_mut() {
-            let mut alive = true;
-            loop {
-                match client.end.try_recv() {
-                    Some(Ok(msg)) => {
-                        let actions = match client.endpoint.on_message(msg) {
-                            Ok(a) => a,
-                            Err(_) => {
-                                alive = false;
-                                break;
-                            }
-                        };
-                        let replies = self.broker_apply_actions(client, actions);
-                        for reply in replies {
-                            let _ = client.end.send(&reply);
-                        }
-                    }
-                    Some(Err(_)) => {
-                        alive = false;
-                        break;
-                    }
-                    None => {
-                        alive = alive && !client.end.is_eof();
-                        break;
-                    }
-                }
-            }
-            if alive && self.sync_broker_client_viewport(client).is_err() {
-                alive = false;
-            }
-            // PLAN-053 T-03：主题策略推送排水（提交臂入队 → 此处按连接发出）。
-            if alive {
-                let pending: Vec<crate::ui::desktop_protocol::message::ProtocolMsg> = {
-                    let mut q = self.theme_push_queue.borrow_mut();
-                    let (mine, rest): (Vec<_>, Vec<_>) = q
-                        .drain(..)
-                        .partition(|(p, _)| p == pipe);
-                    *q = rest;
-                    mine.into_iter().map(|(_, m)| m).collect()
-                };
-                for m in pending {
-                    let _ = client.end.send(&m);
-                }
-            }
+            let mut alive = self.pump_one_broker_client(pipe, client);
             if !alive {
                 dead.push(pipe.clone());
             }
@@ -5104,26 +5160,32 @@ impl DesktopSession {
                 None => return false,
             }
         };
-        for client in self.broker_clients.values_mut() {
-            if client.owns_wid(wid) {
-                // PLAN-060 扩展：宿主窗 rect 与 child 表面尺寸不同（投影缩放）
-                // 时按比例把 canvas 局部坐标换算回 child 表面坐标，否则
-                // 指针永远落在错误控件上（calendar「>」delivered=true 但无反应）。
-                let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
-                    !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
-                // PLAN-063 T-03（G-03）：真修饰位（desktop.current_modifiers
-                // 事实源——此前恒 0，shift/ctrl 点击子面不可区分）。
-                let input = ProtocolMsg::Input(InputMsg::PointerPressed {
-                    wid: wid.0,
-                    button,
-                    x: lx,
-                    y: ly,
-                    modifiers,
-                });
-                return client.end.send(&input).is_ok();
+        {
+            let Some(client) = self.broker_clients.values_mut().find(|c| c.owns_wid(wid)) else {
+                return false;
+            };
+            // PLAN-060 扩展：宿主窗 rect 与 child 表面尺寸不同（投影缩放）
+            // 时按比例把 canvas 局部坐标换算回 child 表面坐标，否则
+            // 指针永远落在错误控件上（calendar「>」delivered=true 但无反应）。
+            let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
+                !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
+            // PLAN-063 T-03（G-03）：真修饰位（desktop.current_modifiers
+            // 事实源——此前恒 0，shift/ctrl 点击子面不可区分）。
+            let input = ProtocolMsg::Input(InputMsg::PointerPressed {
+                wid: wid.0,
+                button,
+                x: lx,
+                y: ly,
+                modifiers,
+            });
+            if !client.end.send(&input).is_ok() {
+                return false;
             }
         }
-        false
+        // P-03 即时泵：press→帧同拍（daemon `pump_window` 同律——点击
+        // 响应帧不经 400ms ServiceTick 档等待）。
+        self.pump_broker_client_for_wid(wid);
+        true
     }
 
     /// PLAN-030 T-04：pointer release 生产路径（`broker_pointer_down` 的
@@ -5152,22 +5214,27 @@ impl DesktopSession {
         };
         // PLAN-063 T-03（G-03）：修饰位循环外先取（同 press）。
         let modifiers = self.desktop_modifiers_wire();
-        for client in self.broker_clients.values_mut() {
-            if client.owns_wid(wid) {
-                let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
-                    !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
-                // PLAN-063 T-03（G-03）：release 同 press 真修饰位。
-                let input = ProtocolMsg::Input(InputMsg::PointerReleased {
-                    wid: wid.0,
-                    button,
-                    x: lx,
-                    y: ly,
-                    modifiers,
-                });
-                return client.end.send(&input).is_ok();
+        {
+            let Some(client) = self.broker_clients.values_mut().find(|c| c.owns_wid(wid)) else {
+                return false;
+            };
+            let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
+                !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
+            // PLAN-063 T-03（G-03）：release 同 press 真修饰位。
+            let input = ProtocolMsg::Input(InputMsg::PointerReleased {
+                wid: wid.0,
+                button,
+                x: lx,
+                y: ly,
+                modifiers,
+            });
+            if !client.end.send(&input).is_ok() {
+                return false;
             }
         }
-        false
+        // P-03 即时泵：release→帧同拍（click 收尾帧无档位等待）。
+        self.pump_broker_client_for_wid(wid);
+        true
     }
 
     /// PLAN-025 T-05 宿主生产路径（镜像 `broker_pointer_down` 收尾——
@@ -5191,12 +5258,17 @@ impl DesktopSession {
             key,
             modifiers,
         });
-        for client in self.broker_clients.values_mut() {
-            if client.owns_wid(wid) {
-                return client.end.send(&input).is_ok();
+        {
+            let Some(client) = self.broker_clients.values_mut().find(|c| c.owns_wid(wid)) else {
+                return false;
+            };
+            if !client.end.send(&input).is_ok() {
+                return false;
             }
         }
-        false
+        // P-03 即时泵：按键→帧同拍。
+        self.pump_broker_client_for_wid(wid);
+        true
     }
 
     /// PLAN-063 T-03（G-02）：键释放路由（`broker_key_event` 收尾镜像
@@ -5218,12 +5290,17 @@ impl DesktopSession {
             key,
             modifiers,
         });
-        for client in self.broker_clients.values_mut() {
-            if client.owns_wid(wid) {
-                return client.end.send(&input).is_ok();
+        {
+            let Some(client) = self.broker_clients.values_mut().find(|c| c.owns_wid(wid)) else {
+                return false;
+            };
+            if !client.end.send(&input).is_ok() {
+                return false;
             }
         }
-        false
+        // P-03 即时泵：键释放→帧同拍。
+        self.pump_broker_client_for_wid(wid);
+        true
     }
 
     /// PLAN-063 T-03（G-04）：hover 路由——指针命中窗属 broker 客户端
@@ -5246,25 +5323,33 @@ impl DesktopSession {
             None => return false,
         };
         let mut routed = false;
-        for client in self.broker_clients.values_mut() {
-            if client.owns_wid(wid) {
-                if let Some((lx, ly)) = broker_surface_local(
-                    client,
-                    wid,
-                    x - rect.x,
-                    y - rect.y,
-                    rect.width,
-                    rect.height,
-                    !self.desktop.shell_pseudo_wids.contains(&wid),
-                ) {
-                    let msg = ProtocolMsg::Input(InputMsg::PointerMoved {
-                        wid: wid.0,
-                        x: lx,
-                        y: ly,
-                    });
-                    routed |= client.end.send(&msg).is_ok();
+        {
+            for client in self.broker_clients.values_mut() {
+                if client.owns_wid(wid) {
+                    if let Some((lx, ly)) = broker_surface_local(
+                        client,
+                        wid,
+                        x - rect.x,
+                        y - rect.y,
+                        rect.width,
+                        rect.height,
+                        !self.desktop.shell_pseudo_wids.contains(&wid),
+                    ) {
+                        let msg = ProtocolMsg::Input(InputMsg::PointerMoved {
+                            wid: wid.0,
+                            x: lx,
+                            y: ly,
+                        });
+                        routed |= client.end.send(&msg).is_ok();
+                    }
                 }
             }
+        }
+        if routed {
+            // P-03 即时泵：hover/drag→帧同拍（daemon CursorMoved 臂同律；
+            // 预算切片使指针洪泛不垄断泵拍——拖拽 resize 的 viewport
+            // 重同步也在此同拍下发）。
+            self.pump_broker_client_for_wid(wid);
         }
         routed
     }
@@ -5290,12 +5375,17 @@ impl DesktopSession {
             }
         };
         let input = ProtocolMsg::Input(InputMsg::CharTyped { wid: wid.0, ch });
-        for client in self.broker_clients.values_mut() {
-            if client.owns_wid(wid) {
-                return client.end.send(&input).is_ok();
+        {
+            let Some(client) = self.broker_clients.values_mut().find(|c| c.owns_wid(wid)) else {
+                return false;
+            };
+            if !client.end.send(&input).is_ok() {
+                return false;
             }
         }
-        false
+        // P-03 即时泵：字符→帧同拍（IME 组合输入响应无档位等待）。
+        self.pump_broker_client_for_wid(wid);
+        true
     }
 
     /// 桌面级 IME 提交路由：焦点窗 → (Wid, ImeCommit) 注入
@@ -7620,6 +7710,161 @@ mod tests {
         session.pump_broker_clients();
         std::thread::sleep(std::time::Duration::from_millis(30));
         assert!(child.try_recv().is_none());
+    }
+
+    /// PLAN-063（OS T-03，P-04 接线）：桌面 broker 泵单客户端预算切片——
+    /// 洪泛 100 条合法上行，一拍恰消费 64（daemon `pump_client` 同源常量
+    /// 同律），余量下拍续排（FIFO 不丢），连接不被误杀。
+    #[test]
+    fn p063_os_desktop_pump_budget_slices_flood() {
+        use super::*;
+        use crate::ui::desktop_protocol::{
+            endpoint::AppEndpoint,
+            headless::HeadlessFrameSource,
+            message::{ControlMsg, ProtocolMsg},
+            stage3::BrokerClient,
+            transport,
+        };
+        let pipe = format!("autodesk-p063-budget-{}", std::process::id());
+        let listener = transport::listen(&pipe).unwrap();
+        let mut child = transport::connect(&pipe, 2000).unwrap();
+        let end = listener.wait_connect().unwrap();
+        let mut session = DesktopSession::__test_session();
+        session.__test_open_desktop();
+        let component =
+            crate::build_dynamic_component(r#"widget t { view { text "observer" } }"#, None)
+                .unwrap();
+        let mut app_endpoint = AppEndpoint::new(
+            HeadlessFrameSource::new(component, 1280.0, 800.0),
+            "budget",
+            "budget",
+            1280.0,
+            800.0,
+        );
+        let mut client = BrokerClient::new(pipe.clone(), end);
+        client.adopt = true;
+        let actions = client
+            .endpoint
+            .on_message(app_endpoint.connect().unwrap())
+            .unwrap();
+        for reply in session.broker_apply_actions(&mut client, actions) {
+            app_endpoint.on_message(reply).unwrap();
+        }
+        assert!(client.wid.is_some(), "attach 必须落地才能泵");
+        session.broker_clients.insert(pipe.clone(), client);
+        // 洪泛 100 条 DesktopBus 上行（合法幂等记录——每条恰好一个 inbox 项，
+        // 无需真实组件语义；执行归泵后 ServiceTick 排空，本测不排）。
+        for _ in 0..100 {
+            child
+                .send(&ProtocolMsg::Control(ControlMsg::DesktopBus {
+                    wid: 0,
+                    record: "refresh_desktop_icons".to_string(),
+                }))
+                .unwrap();
+        }
+        session.pump_broker_clients();
+        let budget = crate::ui::desktop_protocol::rqhost::PUMP_MSG_BUDGET_PER_TICK;
+        assert_eq!(
+            session.desktop.desktop_bus_inbox.len(),
+            budget,
+            "一拍必须按预算切片（{budget}），不得整洪泛吞下"
+        );
+        assert!(
+            session.broker_clients.contains_key(&pipe),
+            "预算切片不得误杀健康连接"
+        );
+        // 余量下拍续排（FIFO 不丢——重客户端泛帧不挤占他人泵拍的同律面）。
+        session.pump_broker_clients();
+        assert_eq!(session.desktop.desktop_bus_inbox.len(), 100);
+        assert!(session.broker_clients.contains_key(&pipe));
+        session.desktop.desktop_bus_inbox.clear();
+    }
+
+    /// PLAN-063（OS T-03，P-03 接线）：输入发送臂即时泵——`broker_key_event`
+    /// 后联单客户端泵（daemon `pump_window` 同律）：同一次调用内 viewport
+    /// 重同步（Resize）与按键已上线，无 400ms ServiceTick 档等待。
+    #[test]
+    fn p063_os_desktop_input_immediate_pump_same_call() {
+        use super::*;
+        use crate::ui::desktop_protocol::{
+            endpoint::AppEndpoint,
+            headless::HeadlessFrameSource,
+            message::{ControlMsg, FrameMsg, InputMsg, ProtocolMsg},
+            stage3::BrokerClient,
+            transport,
+        };
+        fn receive(child: &mut Box<dyn transport::Transport + Send>, label: &str) -> ProtocolMsg {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+            loop {
+                if let Some(msg) = child.try_recv() {
+                    return msg.unwrap();
+                }
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "[{label}] 即时泵消息未在同一调用内上线"
+                );
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+        }
+        let pipe = format!("autodesk-p063-immediate-{}", std::process::id());
+        let listener = transport::listen(&pipe).unwrap();
+        let mut child = transport::connect(&pipe, 2000).unwrap();
+        let end = listener.wait_connect().unwrap();
+        let mut session = DesktopSession::__test_session();
+        session.__test_open_desktop();
+        let component =
+            crate::build_dynamic_component(r#"widget t { view { text "observer" } }"#, None)
+                .unwrap();
+        let mut app_endpoint = AppEndpoint::new(
+            HeadlessFrameSource::new(component, 1280.0, 800.0),
+            "immediate",
+            "immediate",
+            1280.0,
+            800.0,
+        );
+        let mut client = BrokerClient::new(pipe.clone(), end);
+        client.adopt = true;
+        let actions = client
+            .endpoint
+            .on_message(app_endpoint.connect().unwrap())
+            .unwrap();
+        for reply in session.broker_apply_actions(&mut client, actions) {
+            app_endpoint.on_message(reply).unwrap();
+        }
+        let wid = client.wid.unwrap();
+        let surface = client.wid_surface[&wid.0];
+        session.broker_clients.insert(pipe.clone(), client);
+        session.pump_broker_clients();
+        let _initial = receive(&mut child, "initial-resize"); // attach 期首拍 Resize（基线）
+        // 确保焦点在目标窗（attach 默认聚焦时 wm_focus 无沿、不产消息——
+        // prev == Some(wid) 守卫；漂焦时补沿）。边沿消息清仓后再断言。
+        session.wm_focus(wid);
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        while child.try_recv().is_some() {}
+        // maximize 改变 rect → Resize 待发（旧律要等下一 400ms 泵）。
+        session.wm_toggle_maximize(wid);
+        let outer = *session.host.as_ref().unwrap().wm.wins[&wid].rect.borrow();
+        let size = crate::ui::iced::virtual_window::vwin_content_size(outer);
+        // 输入臂后联即时泵：同一调用内 KeyPressed 与 Resize 均上线。
+        assert!(session.broker_key_event(65, 0), "键盘路由至焦点窗");
+        let pressed = receive(&mut child, "pressed");
+        assert_eq!(
+            pressed,
+            ProtocolMsg::Input(InputMsg::KeyPressed {
+                wid: wid.0,
+                key: 65,
+                modifiers: 0
+            })
+        );
+        let resized = receive(&mut child, "resized");
+        assert_eq!(
+            resized,
+            ProtocolMsg::Frame(FrameMsg::Resize {
+                surface,
+                width: size.width,
+                height: size.height
+            })
+        );
     }
 
     #[test]
@@ -11522,8 +11767,9 @@ mod live_input_tests {
         }
     }
 
-    /// 键盘映射：Named → KeyPressed（含 wire 修饰位）；Character+text →
-    /// Chars；KeyReleased/ModifiersChanged/修饰 Named 不转发。
+    /// 键盘映射：Named → KeyPressed/KeyReleased（含 wire 修饰位，UI063
+    /// G-02 交付后释放沿为真实生产者——Named → VK 同表）；Character+text
+    /// → Chars；ModifiersChanged/修饰 Named 不转发。
     #[test]
     fn keyboard_mapping_shapes() {
         use iced::keyboard::{key::Named as N, Event as Kb, Key, Modifiers};
@@ -11573,16 +11819,21 @@ mod live_input_tests {
             repeat: false,
         })
         .is_empty());
-        assert!(live_inputs_from_keyboard(&Kb::KeyReleased {
-            key: Key::Named(N::Enter),
-            modified_key: Key::Named(N::Enter),
-            physical_key: iced::keyboard::key::Physical::Unidentified(
-                iced::keyboard::key::NativeCode::Unidentified
-            ),
-            location: iced::keyboard::Location::Standard,
-            modifiers: Modifiers::default(),
-        })
-        .is_empty());
+        assert_eq!(
+            live_inputs_from_keyboard(&Kb::KeyReleased {
+                key: Key::Named(N::Enter),
+                modified_key: Key::Named(N::Enter),
+                physical_key: iced::keyboard::key::Physical::Unidentified(
+                    iced::keyboard::key::NativeCode::Unidentified
+                ),
+                location: iced::keyboard::Location::Standard,
+                modifiers: Modifiers::default(),
+            }),
+            vec![LiveInput::KeyReleased {
+                key: 13,
+                modifiers: 0
+            }]
+        );
         assert!(live_inputs_from_keyboard(&Kb::ModifiersChanged(Modifiers::default())).is_empty());
     }
 
