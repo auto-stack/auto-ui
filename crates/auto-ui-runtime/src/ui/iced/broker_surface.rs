@@ -212,6 +212,12 @@ fn bitmap_generations() -> &'static std::sync::Mutex<std::collections::HashMap<S
     GENS.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
 }
 
+/// 观测口：某资源身份当前已应用的 generation（PLAN-073 T-04 V-04
+/// 乱序负控的 oracle 面——拒收/应用都落到这本账）。
+pub(crate) fn bitmap_generation_of(src: &str) -> Option<u64> {
+    bitmap_generations().lock().unwrap().get(src).copied()
+}
+
 /// 带显式 generation 的位图入缓存（`BitmapReadyGen` 三消费面共用）。
 ///
 /// 语义：同一 `src` 只接受**严格更新**的序号；相等（重复投递）或更小

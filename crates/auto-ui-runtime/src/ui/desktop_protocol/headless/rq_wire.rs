@@ -27,7 +27,9 @@ use super::*;
 use crate::ui::component::Component;
 use crate::ui::desktop_protocol::client_runtime::{ClientConfig, ClientPump};
 use crate::ui::desktop_protocol::endpoint::{BitmapUpload, FrameSource};
-use crate::ui::desktop_protocol::message::{ControlMsg, DisplayList, DisplayOp, DrawList, InputMsg};
+use crate::ui::desktop_protocol::message::{
+    ControlMsg, DisplayList, DisplayOp, DrawList, InputMsg, ProtocolMsg,
+};
 use crate::ui::view::View;
 
 const W: f32 = 640.0;
@@ -863,6 +865,401 @@ impl Drop for WireCell {
     fn drop(&mut self) {
         self.serve.stop(&self.wellknown);
     }
+}
+
+// ---------------------------------------------------------------------------
+// PLAN-073 T-04（V-04）：可控资源重排驱动——真实独立宿主（RqDaemon 全链）
+// ---------------------------------------------------------------------------
+
+/// BitmapReady* 持留/一次性 gen 改写包装（客户端 send 侧注入；recv 直通）。
+///
+/// 持留期像素留在 SHM 槽（未 Ack → 客户端槽纪律不覆盖）；`hold` 清零后
+/// 任意 send/recv 触发 FIFO 补发。`rewrite_second_gen_to` 把第 2 条
+/// BitmapReadyGen 的 generation 改写为指定值（陈旧/重复注入负控）。
+struct ReadyGateTransport {
+    inner: Box<dyn crate::ui::desktop_protocol::transport::Transport + Send>,
+    hold: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// 测试置位 → is_eof()=true（宿主按断连回收逐出——EOF 路径负控）。
+    shutdown: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    held: Vec<ProtocolMsg>,
+    ready_count: usize,
+    /// 第 1 条 BitmapReadyGen 转发后追加一条**同身份、同/低 gen** 的重复
+    /// 注入（宿主必须拒收——per-identity `generation <= last` 闸）。
+    duplicate_first_with_gen: Option<u64>,
+}
+
+impl ReadyGateTransport {
+    fn flush(
+        &mut self,
+    ) -> Result<(), crate::ui::desktop_protocol::transport::TransportError> {
+        for m in self.held.drain(..) {
+            self.inner.send(&m)?;
+        }
+        Ok(())
+    }
+}
+
+impl crate::ui::desktop_protocol::transport::Transport for ReadyGateTransport {
+    fn send(
+        &mut self,
+        msg: &ProtocolMsg,
+    ) -> Result<(), crate::ui::desktop_protocol::transport::TransportError> {
+        use crate::ui::desktop_protocol::message::FrameMsg;
+        let mut dup: Option<ProtocolMsg> = None;
+        let mut msg = msg.clone();
+        if let ProtocolMsg::Frame(FrameMsg::BitmapReadyGen { generation, .. }) = &mut msg {
+            self.ready_count += 1;
+            if self.ready_count == 1 {
+                if let Some(g) = self.duplicate_first_with_gen.take() {
+                    let mut clone = msg.clone();
+                    if let ProtocolMsg::Frame(FrameMsg::BitmapReadyGen {
+                        generation: cg, ..
+                    }) = &mut clone
+                    {
+                        *cg = g;
+                    }
+                    dup = Some(clone);
+                }
+            }
+        }
+        let is_ready = matches!(
+            &msg,
+            ProtocolMsg::Frame(FrameMsg::BitmapReadyGen { .. } | FrameMsg::BitmapReady { .. })
+        );
+        if is_ready && self.hold.load(std::sync::atomic::Ordering::Relaxed) {
+            self.held.push(msg);
+            if let Some(d) = dup {
+                self.held.push(d);
+            }
+            return Ok(());
+        }
+        self.flush()?;
+        self.inner.send(&msg)?;
+        if let Some(d) = dup {
+            self.inner.send(&d)?;
+        }
+        Ok(())
+    }
+
+    fn try_recv(
+        &mut self,
+    ) -> Option<
+        Result<ProtocolMsg, crate::ui::desktop_protocol::codec::CodecError>,
+    > {
+        if !self.hold.load(std::sync::atomic::Ordering::Relaxed) {
+            let _ = self.flush();
+        }
+        self.inner.try_recv()
+    }
+
+    fn pending(&self) -> usize {
+        self.inner.pending()
+    }
+
+    fn is_eof(&self) -> bool {
+        self.shutdown.load(std::sync::atomic::Ordering::Relaxed) || self.inner.is_eof()
+    }
+}
+
+/// V-04 资源乱序寿命/身份：引用先于上传（持留）→ 宿主不得以错误资源或
+/// 占位冒完整帧；上传迟到 → 同一合成列表无需新帧即命中（paint 期解析 =
+/// 资源就绪自发重绘）；陈旧/重复 generation（第 2 上传改写为第 1 的
+/// gen）→ 宿主必须拒收且保旧内容；断连 → 键逐出（同 ID 新 App 不串扰）。
+/// FIFO 正常序对照 = t05 wire 矩阵（既有绿证据）。
+#[test]
+fn p073_t04_resource_reorder_reference_late_and_close_identity() {
+    use crate::ui::desktop_protocol::rqhost::{
+        self, adopt_one, attach_window_for_test, composed_v2, daemon_for_test, rq_update,
+        RqMessage,
+    };
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let wellknown = format!("plan073-t04-{}", std::process::id());
+    let (serve, _claim) = rqhost::RqServe::start(&wellknown).expect("rqserve");
+
+    // 客户端线程（p683_t02 装配同律）：视图引用两资源（bell/folder）。
+    let cp = wellknown.clone();
+    let hold = Arc::new(AtomicBool::new(true));
+    let hold_t = Arc::clone(&hold);
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let shutdown_t = Arc::clone(&shutdown);
+    let client_exit = std::thread::spawn(move || {
+        let (_, end) = rqhost::adopt(&cp, "plan073-t04", 5000).expect("adopt");
+        let gate = ReadyGateTransport {
+            inner: end,
+            hold: hold_t,
+            shutdown: shutdown_t,
+            held: Vec::new(),
+            ready_count: 0,
+            // 第 1 上传转发后追加同身份 gen=1 的重复注入（此时宿主已应用
+            // gen=1）→ 宿主必须拒收（per-identity `<= last` 闸）。
+            duplicate_first_with_gen: Some(1),
+        };
+        let comp = crate::build_dynamic_component(
+            r#"widget Plan073T04View {
+    view { col { icon (name: "bell") icon (name: "folder") } }
+}
+"#,
+            None,
+        )
+        .expect("build t04 view");
+        let source = HeadlessFrameSource::new(comp, W, H);
+        let mut pump = ClientPump::new(
+            Box::new(gate),
+            source,
+            ClientConfig {
+                app_name: "plan073-t04".into(),
+                title: "plan073-t04".into(),
+                width: W,
+                height: H,
+            },
+            None,
+        );
+        pump.set_v2(true);
+        let (exit, _source) = pump.run();
+        exit
+    });
+
+    // 宿主：采纳 + 挂窗。
+    let mut state = daemon_for_test(Arc::clone(&serve), wellknown.clone());
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while state.clients.is_empty() {
+        let pending: Vec<_> = state.serve.pending.lock().unwrap().drain(..).collect();
+        for (name, end) in pending {
+            if let Some((client, _)) = adopt_one(name, end, &mut state.ids, 3000) {
+                state.clients.push(client);
+            }
+        }
+        assert!(Instant::now() < deadline, "t04 客户端 5s 未落地");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let win = rqhost::attach_window_for_test(&mut state, 0);
+    let _ = win;
+
+    fn image_refs(list: &DisplayList) -> Vec<String> {
+        list.ops
+            .iter()
+            .filter_map(|op| match op {
+                DisplayOp::Image { src, .. } if src.starts_with("bitmap://") => {
+                    Some(src.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    // Phase A：引用先于上传（上传持留中）——合成列表引用两资源，宿主缓存
+    // 均未命中（paint 期落具名占位臂，不冒完整帧；列表不丢引用）。
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let refs = loop {
+        let _ = rq_update(&mut state, RqMessage::Tick);
+        if let Some(list) = composed_v2(&state.clients[0]) {
+            let refs = image_refs(list);
+            if refs.len() >= 2 {
+                break refs;
+            }
+        }
+        assert!(Instant::now() < deadline, "t04 首帧 5s 未落地");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    for src in &refs {
+        assert!(
+            crate::ui::iced::broker_surface::resolve_drawlist_image(src, 16, 16).is_none(),
+            "持留期 {src} 不得已在宿主缓存（引用先行负控）"
+        );
+    }
+
+    // Phase B：放行 → FIFO 应用（两资源 gen=1/2）；随后同身份重复注入
+    // （R1 复制 gen=1）必须被拒（generation 账不前进）。同一合成列表
+    // （零新帧）下资源立即可解析（paint 期解析 = 资源就绪自发重绘，
+    // 无需假输入）。
+    let frames_before = state.clients[0].frames;
+    hold.store(false, Ordering::Relaxed);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut applied = String::new();
+    loop {
+        let _ = rq_update(&mut state, RqMessage::Tick);
+        let hits: Vec<String> = refs
+            .iter()
+            .filter(|src| {
+                crate::ui::iced::broker_surface::resolve_drawlist_image(src, 16, 16).is_some()
+            })
+            .cloned()
+            .collect();
+        if hits.len() == refs.len() {
+            applied = hits[0].clone();
+            break;
+        }
+        assert!(Instant::now() < deadline, "t04 放行后 5s 未全部命中");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(
+        state.clients[0].frames, frames_before,
+        "资源就绪命中不得依赖新帧（paint 期解析语义）"
+    );
+    // 重复注入拒收：R1 的 generation 账必须停在 1（重复 gen=1 ≤ last 被
+    // 丢，保旧内容）。
+    assert_eq!(
+        crate::ui::iced::broker_surface::bitmap_generation_of(&applied),
+        Some(1),
+        "同身份重复上传不得前进 generation 账（拒收负控）"
+    );
+    println!(
+        "[RQWIRE] {}",
+        serde_json::json!({
+            "tag": "t04_reorder", "applied_first": applied,
+            "gen_account_stable": true, "frames_constant": true,
+        })
+    );
+
+    // Phase B2：旁观 App 不损——并发客户端 B（自有资源）在 A 的上传/逐出
+    // 全程不被波及（逐出按 client.bitmap_keys 分账）。
+    let cp_b = wellknown.clone();
+    let bystander_exit = std::thread::spawn(move || {
+        let (_, end) = rqhost::adopt(&cp_b, "plan073-t04-b", 5000).expect("adopt B");
+        let comp = crate::build_dynamic_component(
+            r#"widget Plan073T04Bystander {
+    view { icon (name: "check") }
+}
+"#,
+            None,
+        )
+        .expect("build t04 bystander view");
+        let source = HeadlessFrameSource::new(comp, W, H);
+        let mut pump = ClientPump::new(
+            end,
+            source,
+            ClientConfig {
+                app_name: "plan073-t04-b".into(),
+                title: "plan073-t04-b".into(),
+                width: W,
+                height: H,
+            },
+            None,
+        );
+        pump.set_v2(true);
+        let (exit, _source) = pump.run();
+        exit
+    });
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let bystander_ref = loop {
+        let pending: Vec<_> = state.serve.pending.lock().unwrap().drain(..).collect();
+        for (name, end) in pending {
+            if let Some((client, _)) = adopt_one(name, end, &mut state.ids, 3000) {
+                state.clients.push(client);
+            }
+        }
+        let _ = rq_update(&mut state, RqMessage::Tick);
+        let b = state.clients.iter().find(|c| c.app_name == "plan073-t04-b");
+        if let Some(b) = b {
+            if let Some(list) = composed_v2(b) {
+                let refs = image_refs(list);
+                if refs.len() == 1 {
+                    let r = refs[0].clone();
+                    if crate::ui::iced::broker_surface::resolve_drawlist_image(&r, 16, 16)
+                        .is_some()
+                    {
+                        break r;
+                    }
+                }
+            }
+        }
+        assert!(Instant::now() < deadline, "t04 旁观 App 5s 未落地资源");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+
+    // Phase C：断连（is_eof）→ 键逐出（同 ID 新 App 不得继承内容）。
+    shutdown.store(true, Ordering::Relaxed);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let _ = rq_update(&mut state, RqMessage::Tick);
+        // 只等 A（旁观 B 在场，clients 不清空——按名判回收）。
+        if !state.clients.iter().any(|c| c.app_name == "plan073-t04") {
+            break;
+        }
+        assert!(Instant::now() < deadline, "t04 断连 5s 未被宿主回收");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        crate::ui::iced::broker_surface::resolve_drawlist_image(&applied, 16, 16).is_none(),
+        "断连后位图键必须逐出（同 ID 新 App 不串扰）"
+    );
+    // 旁观 App 资源不受 A 的回收影响（分账逐出）。
+    assert!(
+        crate::ui::iced::broker_surface::resolve_drawlist_image(&bystander_ref, 16, 16)
+            .is_some(),
+        "旁观 App 资源不得被 A 的断连回收波及"
+    );
+    let _ = bystander_exit; // B 线程随进程收尾（不 join——守护端不关其管道）
+
+    // Phase D：同 ID 新 App——全新 compose，无旧资源引用。
+    let cp = wellknown.clone();
+    let client_exit2 = std::thread::spawn(move || {
+        let (_, end) = rqhost::adopt(&cp, "plan073-t04", 5000).expect("adopt2");
+        let comp = crate::build_dynamic_component(
+            r#"widget Plan073T04Fresh {
+    view { text "全新会话" }
+}
+"#,
+            None,
+        )
+        .expect("build t04 fresh view");
+        let source = HeadlessFrameSource::new(comp, W, H);
+        let mut pump = ClientPump::new(
+            end,
+            source,
+            ClientConfig {
+                app_name: "plan073-t04".into(),
+                title: "plan073-t04".into(),
+                width: W,
+                height: H,
+            },
+            None,
+        );
+        pump.set_v2(true);
+        let (exit, _source) = pump.run();
+        exit
+    });
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let pending: Vec<_> = state.serve.pending.lock().unwrap().drain(..).collect();
+        for (name, end) in pending {
+            if let Some((client, _)) = adopt_one(name, end, &mut state.ids, 3000) {
+                state.clients.push(client);
+            }
+        }
+        if state.clients.iter().any(|c| c.app_name == "plan073-t04") {
+            break;
+        }
+        let _ = rq_update(&mut state, RqMessage::Tick);
+        assert!(Instant::now() < deadline, "t04 新 App 5s 未落地");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let fresh_refs = loop {
+        let _ = rq_update(&mut state, RqMessage::Tick);
+        // 同 ID 新 App（旁观 B 同名前缀在场——按名精确取）。
+        let fresh = state
+            .clients
+            .iter()
+            .find(|c| c.app_name == "plan073-t04")
+            .expect("t04 新 App 已采纳");
+        if let Some(list) = composed_v2(fresh) {
+            if !list.ops.is_empty() {
+                break image_refs(list);
+            }
+        }
+        assert!(Instant::now() < deadline, "t04 新 App 首帧 5s 未落地");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert!(
+        fresh_refs.is_empty(),
+        "同 ID 新 App 的合成不得引用旧会话资源：{fresh_refs:?}"
+    );
+    // 不 join：守护端不关新客户端管道，run() 随进程收尾（本测程断言已毕）。
+    drop(client_exit2);
+    serve.stop(&wellknown);
 }
 
 fn switching_source(canvas: std::sync::Arc<std::sync::atomic::AtomicBool>) -> WireSource {

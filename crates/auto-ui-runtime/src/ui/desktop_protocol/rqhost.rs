@@ -1349,7 +1349,33 @@ fn pump_window(state: &mut RqDaemon, window: iced::window::Id) -> iced::Task<RqM
 }
 
 /// daemon update：Tick（采纳+泵）/ resize / 关窗 / 输入路由（D4）。
-fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
+/// 测试助手：空守护进程（p683/p690 同款初值；rq_wire 的 V-04 驱动跨模块
+/// 复用——字段私有，跨模块不能字面构造）。
+pub(crate) fn daemon_for_test(serve: std::sync::Arc<RqServe>, wellknown: String) -> RqDaemon {
+    RqDaemon {
+        serve,
+        claim: None,
+        wellknown,
+        ids: RqIds::default(),
+        clients: Vec::new(),
+        had_window: false,
+        opened: 0,
+        last_cursor: std::collections::BTreeMap::new(),
+        last_modifiers: 0,
+        mem_ticks: 0,
+    }
+}
+
+/// 测试助手：给已采纳的客户端挂测试窗（p683/p690 同款簿记；rq_wire
+/// 的 V-04 驱动跨模块复用）。
+pub(crate) fn attach_window_for_test(state: &mut RqDaemon, idx: usize) -> iced::window::Id {
+    let win = iced::window::Id::unique();
+    state.clients[idx].window = Some(win);
+    state.had_window = true;
+    win
+}
+
+pub(crate) fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
     match msg {
         RqMessage::Tick => {
             let mut tasks = Vec::new();
