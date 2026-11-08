@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-062
-status: executing
+status: execution_done
 feature_name: RQ无损原语、文字图形与资源重放
 author: [Codex]
 created_at: 2026-11-05
@@ -665,3 +665,15 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - 依据（本会话实测，见 §9 前文）：`rq_perf_replay_shapes` 公平轮转表；review6 的 isolated 数值；matrix/probe 在共享窗口的负载放大记录。
 - 保留：r1–r4 历史与全部 §9 收据；status 回 `executing`（技能要求：语义修订前把 execution_done 退回 executing），T-01..T-05 保持 [x]，`current_step=5`。
 - 未做：本轮未改实现、未改 Spec 正文（仅 Plan 合同）、未做独立 final review；AC-05/T-06 与 AC-06/T-07 仍待办。
+
+### 2026-11-08 work r5 条款复跑（隔离窗口）与交第四轮 final
+
+- stage: work | plan_id: auto-ui/PLAN-062 | plan_revision: **r5** | outcome: **pass（r5 条款全部满足）** | worktree: `D:/autostack/.wt/ui-062/auto-ui` | code_commit: `ecf8496c`（r5 只改合同；实现未动） | next: review（T-06 第四轮 final）
+- **隔离窗口复跑**（`AUTO_RQ_TIMING_WINDOW=isolated`，本树 `ecf8496c`）：
+  - `rq_cells_t05_six_cell_matrix` exit 0，逐例 `timing_gate=asserted`：**produce p50/p95** = path_mesh 0.11/0.15、svg_icon 31.79/33.20（p50 ≤60 具名例外）、text_cjk 0.11/0.18、gradient 0.14/0.17、scroll 0.15/0.21、shadow_only 0.13/0.19、progress 0.13/0.18（单位 ms，全部 ≪ W-C 10ms）；像素门：default 全 ≤0.1%（0.095/0.039/0.094/0.062/0.000/0.005/0.006%），v3_rich text 0.798%（≤1.0）、gradient 0.588%、shadow 0.069%、scroll 0.330%（≤1.5/≤1.0）。
+  - `rq_probe_t01_direct_and_rq_baseline` exit 0（r5 的 replay **p50** 门：全部通过；p95 按 r5 只记录）。
+- **共享窗口复跑**（默认，不带 env）：`rq_` **41/0**；计时门记 `timing_gate=skipped_shared_window`，像素/结构门照常生效。
+- **仍未签收**：统一回归（冻结并集）与 Spec 发布归 merge；M-02/M-06/M-07（OS063）；连续媒体帧（另行）；可控重排通道负控（具名）。
+- **交 review 的事**：按 r5 措辞复核 AC-07（p50 门 + 隔离窗口 + SVG 例外口径）与先前已批的 AC-01/02/03/04 证据；确认 `plan_revision: 5` 的合同与代码一致。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 27 | from: work | to: review | status: execution_done | outcome: pass（r5 隔离窗口复跑全绿） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: ecf8496c | next: review（T-06 第四轮 final）
