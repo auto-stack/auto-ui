@@ -206,6 +206,9 @@ pub struct ResourceCache {
     frame_bytes: u64,
     over_budget: bool,
     pub budget_deferrals: u64,
+    /// PLAN-073 T-02：媒体类（media_poster 在册帧）上传独立计量——观测面，
+    /// 不参与 8 MiB/s 内容预算闸（用户裁定 2026-11-08）。
+    pub media_uploaded_bytes: u64,
     /// PLAN-062（AC-03）：被驱逐（最后 owner 归零）的资源 src 队列——供
     /// `FrameSource::drain_resource_releases` 取出并通知宿主释放。
     released: Vec<String>,
@@ -242,6 +245,7 @@ impl Default for ResourceCache {
             frame_bytes: 0,
             over_budget: false,
             budget_deferrals: 0,
+            media_uploaded_bytes: 0,
             released: Vec::new(),
         }
     }
@@ -367,9 +371,17 @@ impl ResourceCache {
             self.hits += 1;
             return Some(super::endpoint::bitmap_src(&resident.local));
         }
-        if !self.budget_allows(rgba.len() as u64) {
+        // PLAN-073 T-02（用户裁定 2026-11-08）：媒体类资源类别——在册
+        // media_poster 帧的位图豁免 8 MiB/s 内容上传预算，改独立媒体计量
+        // （仅观测计数，实测 24fps@1080p 需 ≈190 MiB/s 瞬时）；UI 内容类
+        // 预算与 generation/驻留语义不变。
+        let media_class = crate::ui::media_poster::is_media_frame(w, h, rgba);
+        if !media_class && !self.budget_allows(rgba.len() as u64) {
             self.over_budget = true;
             return None;
+        }
+        if media_class {
+            self.media_uploaded_bytes = self.media_uploaded_bytes.saturating_add(rgba.len() as u64);
         }
         self.next_seq += 1;
         let hash8: String = key.0[..4].iter().map(|b| format!("{b:02x}")).collect();

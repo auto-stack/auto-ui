@@ -670,6 +670,11 @@ struct MediaStreamView {
     h: u32,
     frame_no: u64,
     tick_ms: u32,
+    /// T-02：暂停（true = 停止重发布，帧冻结在最后已发布内容）。
+    pause: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// T-02：seek 目标（>当前 frame_no 时内容跳变——确定性 content(n)，
+    /// 同 n 同字节，供身份级 no-backfill 断言）。
+    seek_to: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl MediaStreamView {
@@ -685,6 +690,11 @@ impl MediaStreamView {
                 px[3] = 255;
             }
         }
+        // 末 8 字节嵌全帧号（**循环后**覆写——content(n) 单射的判据基座；
+        // 前置写法会被渐变循环覆盖，mod-256 别名致 n=512 与 n=0 同字节，
+        // 身份相同 = T-02 no-backfill 假倒灌的假阳性根因）。
+        let tail = v.len() - 8;
+        v[tail..].copy_from_slice(&n.to_le_bytes());
         v
     }
 }
@@ -693,11 +703,24 @@ impl Component for MediaStreamView {
     type Msg = ();
 
     fn on(&mut self, _msg: ()) {
-        self.frame_no = self.frame_no.wrapping_add(1);
+        if self.pause.load(std::sync::atomic::Ordering::Relaxed) {
+            return; // 暂停：帧冻结在最后已发布内容（live 帧仍在册）。
+        }
+        eprintln!(
+            "[T02DBG] publish n={} (pause={})",
+            self.frame_no,
+            self.pause.load(std::sync::atomic::Ordering::Relaxed)
+        );
+        let seek = self.seek_to.load(std::sync::atomic::Ordering::Relaxed);
+        self.frame_no = if seek > self.frame_no {
+            seek // seek：内容确定性跳变（同 n 同字节）。
+        } else {
+            self.frame_no.wrapping_add(1)
+        };
         let rgba = self.frame_rgba(self.frame_no);
         assert!(
             crate::ui::media_poster::publish(&self.src, self.w, self.h, rgba),
-            "T-01 海报重发布失败"
+            "T-02 海报重发布失败"
         );
     }
 
@@ -1315,14 +1338,23 @@ fn t01_media_stream_start(
     tag: &str,
     src: &str,
     budget_bytes: Option<u64>,
-) -> (WireCell, String) {
+) -> (
+    WireCell,
+    String,
+    std::sync::Arc<std::sync::atomic::AtomicBool>,
+    std::sync::Arc<std::sync::atomic::AtomicU64>,
+) {
     let (w, h) = (1920u32, 1080u32);
+    let pause = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let seek_to = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
     let mut probe = MediaStreamView {
         src: src.to_string(),
         w,
         h,
         frame_no: 0,
         tick_ms: 41, // 尝试 24fps
+        pause: std::sync::Arc::clone(&pause),
+        seek_to: std::sync::Arc::clone(&seek_to),
     };
     let rgba0 = probe.frame_rgba(0);
     assert!(
@@ -1340,7 +1372,7 @@ fn t01_media_stream_start(
         height: T01_SURF_H,
     };
     let cell = WireCell::start_with(tag, WireSource::Media(source), cfg).expect("T-01 wire cell");
-    (cell, src.to_string())
+    (cell, src.to_string(), pause, seek_to)
 }
 
 /// 统计宿主合成面上已见过的独立 bitmap 资源身份，并只把**内容已抵达
@@ -1365,57 +1397,17 @@ fn t01_absorb_composed(
     }
 }
 
-/// Path A（as-built 预算）：1080p 连续流在 8 MiB·s⁻¹ 下的实际通过率。
-/// 预期：≈1 帧/秒（7.91 MiB/帧 ÷ 8 MiB/s）——预算饿死连续视频的实测证据。
-#[test]
-fn p073_t01_path_a_budget_limited_1080p_continuous() {
-    let (mut cell, src) = t01_media_stream_start("t01-budget", "probe://t01-budget.mp4", None);
-    const RUN: Duration = Duration::from_secs(6);
-    let start = Instant::now();
-    let mut seen = std::collections::HashSet::new();
-    let mut received = std::collections::HashSet::new();
-    let mut composed_total = 0u64;
-    while start.elapsed() < RUN {
-        if cell.pump_both() {
-            composed_total = cell.client.frames;
-        }
-        t01_absorb_composed(&cell, &mut seen, &mut received);
-        std::thread::sleep(Duration::from_millis(2));
-    }
-    let elapsed = start.elapsed().as_secs_f64();
-    let produced = crate::ui::media_poster::generation(&src);
-    println!(
-        "[T01-PATH-A-BUDGET] {}",
-        serde_json::json!({
-            "tag": "t01_path_a_budget",
-            "window_s": elapsed,
-            "surface": [T01_SURF_W, T01_SURF_H],
-            "produced_frames": produced,
-            "produced_fps": (produced as f64 / elapsed),
-            "referenced_identities": seen.len(),
-            "received_frames": received.len(),
-            "received_fps": (received.len() as f64 / elapsed),
-            "host_composed_total": composed_total,
-            "frame_mib": 7.91,
-            "budget": "8MiB/1s (as-built)",
-        })
-    );
-    assert!(
-        produced >= 20,
-        "产者必须真实连续产帧（实测节拍受记录成本限制），实得 {produced}"
-    );
-    assert!(
-        received.len() <= 12,
-        "8MiB/s 预算下 1080p 连续流应被限制在 ≈1fps（6s 窗 ≤12 帧实收），实得 {}",
-        received.len()
-    );
-    crate::ui::media_poster::clear(&src);
-}
-
+// PLAN-073 T-01「Path A as-built 预算受限」探针已随用户裁定（2026-11-08，
+// 媒体类资源类别豁免 8 MiB/s 内容预算）废止：其前提（媒体流受内容预算
+// 闸）不再存在。实测证据归档 plan-artifacts/plan-073/auto-ui/
+// t01-probe-{run1,run2,run3,final,release}.log（受限 ≈0.999fps / 豁免
+// 23.83fps）；内容预算本体仍由
+// rq_v3_upload_budget_defers_frame_without_partial_registration（非媒体
+// 内容）钉住。
 /// Path A'（媒体类豁免原型）：预算旋钮放大后的传输容量上限实测。
 #[test]
 fn p073_t01_media_class_capacity_1080p() {
-    let (mut cell, src) = t01_media_stream_start(
+    let (mut cell, src, _pause, _seek) = t01_media_stream_start(
         "t01-capacity",
         "probe://t01-capacity.mp4",
         Some(u64::MAX / 2),
@@ -1461,7 +1453,7 @@ fn p073_t01_media_class_capacity_1080p() {
 /// 不丢不覆（槽信用合同 P-01）。断言：连接存活、宿主有帧、内容连续。
 #[test]
 fn p073_t01_slow_host_backpressure_1080p() {
-    let (mut cell, src) = t01_media_stream_start(
+    let (mut cell, src, _pause, _seek) = t01_media_stream_start(
         "t01-slowhost",
         "probe://t01-slowhost.mp4",
         Some(u64::MAX / 2),
@@ -1618,4 +1610,181 @@ fn p073_t03_glyphrun_negotiation_drives_default_path_vocabulary() {
         serde_json::json!({"tag": "a1_glyphrun_negotiated", "arm": "declared",
             "frames": cell.client.frames, "ops": cell.composed().map(|l| l.ops.len())})
     );
+}
+
+// ---------------------------------------------------------------------------
+// PLAN-073 T-02（AC-02/V-02）：连续媒体资源帧路径——豁免政策落地后的
+// 永久正/负控（用户裁定 2026-11-08：媒体类豁免 8 MiB/s 内容预算）。
+// ---------------------------------------------------------------------------
+
+/// 正控：媒体类豁免生效——默认预算（不旋钮）下 1080p 连续流高频落地。
+/// 冻结预算假实现（老政策）在此只有 ≈1fps，必然失败本断言。
+#[test]
+fn p073_t02_media_class_exempt_continuous_1080p() {
+    let (mut cell, src, _pause, _seek) =
+        t01_media_stream_start("t02-exempt", "probe://t02-exempt.mp4", None);
+    const RUN: Duration = Duration::from_secs(6);
+    let start = Instant::now();
+    let mut received = std::collections::HashSet::new();
+    while start.elapsed() < RUN {
+        cell.pump_both();
+        t01_absorb_composed(&cell, &mut std::collections::HashSet::new(), &mut received);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    let elapsed = start.elapsed().as_secs_f64();
+    println!(
+        "[T02-EXEMPT] {}",
+        serde_json::json!({
+            "tag": "t02_media_exempt", "window_s": elapsed,
+            "received_frames": received.len(),
+            "received_fps": (received.len() as f64 / elapsed),
+            "throughput_mib_s": (received.len() as f64 * 7.91 / elapsed),
+        })
+    );
+    // 阈值分档：release 实测 23.8fps（≥60/6s）；debug 记录成本 ~10×，
+    // 且三探针并行时更低——冻结预算假实现只有 ≈0.99fps，10 倍差距即区分。
+    let floor = if cfg!(debug_assertions) { 12 } else { 60 };
+    assert!(
+        received.len() >= floor,
+        "媒体类豁免下 1080p 连续流必须高频落地（本档 ≥{floor}/6s，冻结预算假实现只有 ≈6），实得 {}",
+        received.len()
+    );
+    crate::ui::media_poster::clear(&src);
+}
+
+/// 负控（V-02 冻结 poster 假实现必败）：冻结产者（发布一帧后暂停）的
+/// 独立接收身份必须 ≤2——连续流（上一测试实测 ≥12，冻结预算假实现
+/// ≈1）无法满足本断言的上界；本测试与
+/// `p073_t02_media_class_exempt_continuous_1080p` 的下界构成判据对。
+/// （曾内嵌同进程 live 对照臂：同 PID 位图 src 与全局缓存串扰致 0 帧
+/// 假象，具名为 harness 边界——判据对结构等价且稳定。）
+#[test]
+fn p073_t02_frozen_poster_fake_discriminated() {
+    let (mut frozen, fsrc, pause, _seek) =
+        t01_media_stream_start("t02-frozen", "probe://t02-frozen.mp4", None);
+    pause.store(true, std::sync::atomic::Ordering::Relaxed);
+    let start = Instant::now();
+    let mut frozen_received = std::collections::HashSet::new();
+    while start.elapsed() < Duration::from_secs(3) {
+        frozen.pump_both();
+        t01_absorb_composed(&frozen, &mut std::collections::HashSet::new(), &mut frozen_received);
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    println!(
+        "[T02-FROZEN-CTRL] {}",
+        serde_json::json!({
+            "tag": "t02_frozen_ctrl",
+            "frozen_distinct": frozen_received.len(),
+        })
+    );
+    assert!(
+        frozen_received.len() <= 2,
+        "冻结 poster 假实现的独立身份数必须 ≤2（内容与身份不变），实得 {}",
+        frozen_received.len()
+    );
+    crate::ui::media_poster::clear(&fsrc);
+}
+
+/// 负控（V-02 seek 后旧帧不倒灌）：seek 使内容确定性跳变（同 n 同字节
+/// → 身份稳定）；新身份落地后，旧身份不得再出现在任何后续合成帧。
+/// 另验暂停语义：暂停期合成面保持最后帧（原子保旧，不清屏）。
+#[test]
+fn p073_t02_seek_pause_no_backfill() {
+    let (mut cell, src, pause, seek_to) =
+        t01_media_stream_start("t02-seek", "probe://t02-seek.mp4", None);
+    // 流跑 2s 收集 seek 前身份集。
+    let start = Instant::now();
+    let mut pre_seek = std::collections::HashSet::new();
+    while start.elapsed() < Duration::from_secs(2) {
+        cell.pump_both();
+        t01_absorb_composed(&cell, &mut std::collections::HashSet::new(), &mut pre_seek);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert!(!pre_seek.is_empty(), "seek 前必须有帧落地");
+
+    // seek：内容跳变（目标远超当前 frame_no）。
+    seek_to.store(500, std::sync::atomic::Ordering::Relaxed);
+    let start = Instant::now();
+    let mut post_seek_new = std::collections::HashSet::new();
+    // 第一阶段：等到第一个「不在 seek 前身份集」的合成帧落地（确认跳变
+    // 已过线；此前的过渡帧不参与后续判据）。
+    let mut seek_landed = false;
+    while start.elapsed() < Duration::from_secs(6) && !seek_landed {
+        cell.pump_both();
+        let mut fresh = std::collections::HashSet::new();
+        t01_absorb_composed(&cell, &mut fresh, &mut post_seek_new);
+        if post_seek_new.iter().any(|id| !pre_seek.contains(id)) {
+            seek_landed = true;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert!(seek_landed, "seek 后必须落地新身份帧（内容跳变可见）");
+
+    // seek 落地后继续泵：旧身份不得倒灌。（诊断：逐拍打印合成身份序列）
+    let start = Instant::now();
+    let mut seq: Vec<(f64, Vec<String>)> = Vec::new();
+    while start.elapsed() < Duration::from_secs(2) {
+        cell.pump_both();
+        let mut seen_now = std::collections::HashSet::new();
+        t01_absorb_composed(&cell, &mut seen_now, &mut post_seek_new);
+        if let Some(list) = cell.composed() {
+            let ids: Vec<String> = list
+                .ops
+                .iter()
+                .filter_map(|op| match op {
+                    DisplayOp::Image { src, .. } if src.starts_with("bitmap://") => {
+                        Some(src.clone())
+                    }
+                    _ => None,
+                })
+                .collect();
+            seq.push((start.elapsed().as_secs_f64(), ids.clone()));
+        }
+        for id in &seen_now {
+            if pre_seek.contains(id) {
+                eprintln!("[T02DBG] VIOLATION at t={:.3}s offending={id}", start.elapsed().as_secs_f64());
+                for (t, ids) in &seq {
+                    eprintln!("[T02DBG] t={t:.3}s ids={ids:?}");
+                }
+                eprintln!("[T02DBG] current composed={:?}", cell.composed().map(|l| l.ops.iter().filter_map(|op| match op { DisplayOp::Image { src, .. } => Some(src.clone()), _ => None }).collect::<Vec<_>>()));
+                panic!("seek 落地后旧 generation 身份不得倒灌：{id}");
+            }
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    eprintln!("[T02DBG] post-seek composed sequence:");
+    for (t, ids) in &seq {
+        eprintln!("[T02DBG] t={t:.3}s ids={ids:?}");
+    }
+
+    // 暂停：合成面保持最后帧（不丢、不清）。
+    let last_before = cell.composed().map(|l| l.ops.len()).unwrap_or(0);
+    pause.store(true, std::sync::atomic::Ordering::Relaxed);
+    std::thread::sleep(Duration::from_millis(200));
+    let mut held = false;
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(2) {
+        cell.pump_both();
+        if let Some(list) = cell.composed() {
+            if !list.ops.is_empty() {
+                held = true;
+                break;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    let last_after = cell.composed().map(|l| l.ops.len()).unwrap_or(0);
+    assert!(
+        held && last_after > 0,
+        "暂停期合成面必须保持最后帧（原子保旧合同），实得 held={held} ops={last_after}（暂停前 {last_before}）"
+    );
+    println!(
+        "[T02-SEEK-PAUSE] {}",
+        serde_json::json!({
+            "tag": "t02_seek_pause", "pre_seek_identities": pre_seek.len(),
+            "post_seek_new": post_seek_new.len(),
+            "pause_held_ops": last_after,
+        })
+    );
+    crate::ui::media_poster::clear(&src);
 }

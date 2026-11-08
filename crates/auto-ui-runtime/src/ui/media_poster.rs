@@ -99,6 +99,17 @@ pub fn clear_all() {
     generations().lock().unwrap().clear();
 }
 
+/// PLAN-073 T-02（用户裁定 2026-11-08）：内容分类——该 (w,h,rgba) 是否
+/// 为在册媒体帧（任一 live poster 帧内容相同即真）。资源登记路径据此把
+/// 媒体类位图豁免 8 MiB/s 内容预算（独立计量）；在册帧数极少（每 App
+/// 视频面数个），逐帧比对成本可忽略。暂停帧也是 live 帧（暂停 = 停止
+/// 重发布，非撤册）。
+pub fn is_media_frame(w: u32, h: u32, rgba: &[u8]) -> bool {
+    let reg = registry().lock().unwrap();
+    reg.values()
+        .any(|f| f.w == w && f.h == h && f.rgba.as_slice() == rgba)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

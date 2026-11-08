@@ -34,3 +34,11 @@ threads-required = 1
 [[profile.default.overrides]]
 filter = 'test(/^(ui::iced::(layout_tests|terminal_pixel_tests|p022_stack_click_tests|terminal_input_tests|pointer_placement_tests)|ui::terminal::iced::(p025_scroll_render_tests|widget::virtual_scroll_tests::(probe_publish_follows_available_width_and_stays_stable|shortcut_hit_captures_single_fire_across_stack)))/) or test(/^ui::iced::selectable_text::tests::text_selection_simulator/) or test(/^ui::iced::renderer::line_edit_tests::p(483|490|491)_/) or test(/^ui::iced::renderer::plan080_uat_cjk_bubble_tests/) or test(/^ui::native_dock::win32::(native_dock_events|native_dock_geometry)/)'
 threads-required = 1
+
+# PLAN-073 T-02：1080p 连续媒体流测试族——吞吐/帧率门（媒体类豁免正控、
+# 冻结 poster 负控、seek/pause 不倒灌）只在隔离窗有效（062/063 共享窗
+# 教训同源：并行重负载下 1080p debug 记录成本倍增，吞吐门必假红）。
+# threads-required = num-cpus：独占整机槽位预算 → 对其余测试等效串行。
+[[profile.default.overrides]]
+filter = 'test(p073_t02)'
+threads-required = "num-cpus"

@@ -229,6 +229,12 @@ pub(super) fn render_video<M: Clone + Debug + 'static>(
     // 连续播放帧（每帧 GPU 读回）仍具名留后，见 Spec §6。
     let poster_key = media_key.as_deref().unwrap_or(&src);
     if let Some(poster) = crate::ui::media_poster::frame(poster_key) {
+        #[cfg(debug_assertions)]
+        eprintln!(
+            "[T02DBG] media.rs read poster gen={} n0={:?}",
+            crate::ui::media_poster::generation(poster_key),
+            &poster.rgba[0..8]
+        );
         let image = iced::widget::image(iced::widget::image::Handle::from_rgba(
             poster.w,
             poster.h,
