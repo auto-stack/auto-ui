@@ -39,6 +39,8 @@ threads-required = 1
 # 冻结 poster 负控、seek/pause 不倒灌）只在隔离窗有效（062/063 共享窗
 # 教训同源：并行重负载下 1080p debug 记录成本倍增，吞吐门必假红）。
 # threads-required = num-cpus：独占整机槽位预算 → 对其余测试等效串行。
+# PLAN-073 T-05：p073_t05 媒体两 Host 语义面同样吃实时吞吐/时序（与
+# p073_t02 同纪律独占，防同批并发假红）。
 [[profile.default.overrides]]
-filter = 'test(p073_t02)'
+filter = 'test(p073_t02) or test(p073_t05)'
 threads-required = "num-cpus"

@@ -72,7 +72,7 @@ fn out_wire() -> PathBuf {
     out_dir().join("wire")
 }
 
-fn client_config() -> ClientConfig {
+pub(super) fn client_config() -> ClientConfig {
     ClientConfig {
         app_name: "plan062-wire".into(),
         title: "plan062-wire".into(),
@@ -699,21 +699,21 @@ impl Component for SwitchingView {
 /// 真实 mpv 解码读回属 T-02/V-02 交付面——本探针量的是资源通道容量与
 /// 上传预算行为（V-01）。
 #[derive(Debug)]
-struct MediaStreamView {
-    src: String,
-    w: u32,
-    h: u32,
-    frame_no: u64,
-    tick_ms: u32,
+pub(super) struct MediaStreamView {
+    pub(super) src: String,
+    pub(super) w: u32,
+    pub(super) h: u32,
+    pub(super) frame_no: u64,
+    pub(super) tick_ms: u32,
     /// T-02：暂停（true = 停止重发布，帧冻结在最后已发布内容）。
-    pause: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub(super) pause: std::sync::Arc<std::sync::atomic::AtomicBool>,
     /// T-02：seek 目标（>当前 frame_no 时内容跳变——确定性 content(n)，
     /// 同 n 同字节，供身份级 no-backfill 断言）。
-    seek_to: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    pub(super) seek_to: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl MediaStreamView {
-    fn frame_rgba(&self, n: u64) -> Vec<u8> {
+    pub(super) fn frame_rgba(&self, n: u64) -> Vec<u8> {
         let w = self.w as usize;
         let h = self.h as usize;
         let mut v = vec![0u8; w * h * 4];

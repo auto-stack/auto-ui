@@ -184,6 +184,11 @@ pub(crate) fn bitmap_cache_put(src: &str, w: u32, h: u32, stride: u32, rgba: Vec
         }
         packed
     };
+    let hash_input = if pixels.len() == tight * h as usize && w > 0 && h > 0 {
+        Some(pixels.clone())
+    } else {
+        None
+    };
     let handle = if pixels.len() == tight * h as usize && w > 0 && h > 0 {
         Some(ImageHandle::from_rgba(w, h, pixels))
     } else {
@@ -193,7 +198,25 @@ pub(crate) fn bitmap_cache_put(src: &str, w: u32, h: u32, stride: u32, rgba: Vec
         ));
         None
     };
+    // PLAN-073 T-05：宿主侧独立内容哈希账（V-02 读回；put 即记）。
     handle_cache_insert(src, handle);
+    match hash_input {
+        Some(px) => {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(&(w as u32).to_le_bytes());
+            hasher.update(&(h as u32).to_le_bytes());
+            hasher.update(&px);
+            let mut out = [0u8; 32];
+            out.copy_from_slice(hasher.finalize().as_bytes());
+            bitmap_content_hashes()
+                .lock()
+                .unwrap()
+                .insert(src.to_string(), out);
+        }
+        None => {
+            bitmap_content_hashes().lock().unwrap().remove(src);
+        }
+    }
 }
 
 /// 位图键逐出（宿主 ReclaimWindow/断连清 client 位图——防 pid 复用串扰）。
@@ -202,6 +225,8 @@ pub(crate) fn bitmap_cache_evict(src: &str) {
     // PLAN-062（AC-03 / 复审 F-04）：句柄与 generation 记账同生共死，避免
     // 逐出后 generation 表无界增长（也使“重新上传同 id”从 0 起算，语义正确）。
     bitmap_generations().lock().unwrap().remove(src);
+    // PLAN-073 T-05：内容哈希账同生共死。
+    bitmap_content_hashes().lock().unwrap().remove(src);
 }
 
 /// PLAN-062（AC-03）：每个资源 id 最后已应用的 generation（只有协商
@@ -210,6 +235,22 @@ fn bitmap_generations() -> &'static std::sync::Mutex<std::collections::HashMap<S
     static GENS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, u64>>> =
         std::sync::OnceLock::new();
     GENS.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// PLAN-073 T-05（V-02 独立读回账）：src → 宿主侧内容 blake3（put 记录、
+/// evict 同删）。哈希由宿主侧独立计算——产者/宿主两侧各自哈希后对表，
+/// 不共享中间状态。
+fn bitmap_content_hashes(
+) -> &'static std::sync::Mutex<std::collections::HashMap<String, [u8; 32]>> {
+    static HASHES: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, [u8; 32]>>,
+    > = std::sync::OnceLock::new();
+    HASHES.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// 观测口：某资源身份宿主侧内容哈希（V-02 独立读回）。
+pub(crate) fn bitmap_content_hash_of(src: &str) -> Option<[u8; 32]> {
+    bitmap_content_hashes().lock().unwrap().get(src).copied()
 }
 
 /// 观测口：某资源身份当前已应用的 generation（PLAN-073 T-04 V-04

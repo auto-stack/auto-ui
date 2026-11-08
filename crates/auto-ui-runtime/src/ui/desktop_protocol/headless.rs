@@ -2822,6 +2822,9 @@ mod rq_repair;
 // PLAN-062 T-02: v3 无损原语线合同探针（test-only）。
 #[cfg(test)]
 mod rq_lossless;
+// PLAN-073 T-05: 持续媒体语义面两 Host 矩阵 + 独立内容读回（test-only）。
+#[cfg(test)]
+mod rq_media;
 // PLAN-062 T-05: 六格绘图/资源重放矩阵与指标重放（test-only）。
 #[cfg(test)]
 mod rq_cells;
