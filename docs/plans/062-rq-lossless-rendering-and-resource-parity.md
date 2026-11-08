@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-062
-status: execution_done
+status: reviewed
 feature_name: RQ无损原语、文字图形与资源重放
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-08
 plan_revision: 5
-current_step: 5
+current_step: 6
 total_steps: 7
 depends_on: [auto-ui/PLAN-061]
 supersedes_spec_components: []
@@ -151,7 +151,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | [x] | T-03 | work | T-02 | 实现资源create/update/release、字节/句柄身份、图片采样/alpha/rotation与媒体更新，Host重放及direct共用语义；实现驻留资源ID/generation复用、按变化上传和有界缓存；计数payload/GPU创建，合法驱逐/恢复单列 | V-03；AC-03——完成：内容身份+驻留、图片 alpha/rotation、SVG 栅格、wire generation（tag 13）、媒体静态帧（`3eadae59`，0.000/0 重传）、跨进程释放/引用记账（`44079c22`，tag 14 + BitmapRefs 延后释放）；连续媒体帧按 2026-11-08 裁定另立 |
 | [x] | T-04 | work | T-03；OS062共享符号按§5单写 | 交付UI063提交/反馈接口及旧新端兼容V-09；实现能力/版本协商、原子帧、长度/浮点/栈/资源校验、generation及背压/ACK/GPU fence寿命，保旧兼容明确失败；实现有界异步批量提交及槽信用、资源顺序/背压与per-App上传/驻留/CPU工作预算，避免长临界区和单App垄断 | V-04；AC-04；V-09——完成：能力协商/准入保旧帧、槽 credit 背压、上传预算、慢宿主/旧 ACK/旧宿主×新产者负控（`4263ff3c`）、wire generation + HostCaps 下行（`d2e41c58`）、资源释放 + 引用记账（`44079c22`，复审 F-02/F-04/F-07 修复：合成成功后才记账、按表面、幂等、旧宿主不积压，`f2cdafb4`）、真两进程配对（`39bd7bef`）；乱序上传由 generation 守卫覆盖，可控重排通道属具名边界 |
 | [x] | T-05 | work | T-04 | 按§5绘图fixture完成六格全部绘图能力和两Host真实重放，不等UI063公开运行链；保迁移前direct金样；记录资源峰值/帧延迟，整理规范增量与遗留为零；按冻结M-01～08重放实际绘图/资源职责指标与公平/慢Host负控，保direct基线和完整功能，接线端指标交UI063/OS063最终消费 | V-01..04；AC-01..04；AC-07/V-05～08（按§6分工）；V-09——完成：六格真实 wire（`4e2f53d3`）+ 39/39 逐能力读数（`77f92dda`）+ 负控/两进程（`4263ff3c`/`39bd7bef`）+ 媒体静态帧（`3eadae59`，复审 F-06 补了真管道过线用例）、数值条款全部落为断言（复审 F-03）、Spec 增量补 SD-02（复审 F-05）——`f2cdafb4`；M-02/06/07 归 OS063（§5） |
-| [ ] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
+| [x] | T-06 | review | T-05 | 独立上下文复核实际GPU画面、全部能力ID、敏感负控及应用无GPU路径，冻结双端修订；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
 | [ ] | T-07 | merge | T-06 pass | 定向冻结职责门，正式落地并沉淀wire/资源/保真Spec，保兼容及恢复收据，归档guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
 
 work项完成才进入execution_done；review/merge项仍待办，不能为交接伪勾。每个任务读取§4对应实际路径及主设计证据；新增接口先由有界决策任务确认。全部原始材料merge折摘要进本Plan§9后删自有scope；移除树先wt-guard clean，不穿透链接、不清未知owner目录。
@@ -731,3 +731,14 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **未变**：统一回归、SD-01/SD-02 发布、归档/清理归 merge；主检出他方 WIP 仍是 merge 门；M-02/06/07（OS063）、连续媒体帧、可控重排通道负控仍具名。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 31 | from: work | to: review | status: execution_done | outcome: pass（R-4c 收尾；其余全绿） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: review（第七轮 final）
+
+### 2026-11-08 第七轮独立复审（final，r5）：**pass** → reviewed
+
+- stage: review | review_scope: final | reviewer_identity: 独立上下文子代理（模型/会话号未由运行环境暴露） | plan_id: auto-ui/PLAN-062 | plan_revision: **5** | outcome: **pass** | worktree: `D:/autostack/.wt/ui-062/auto-ui`（clean） | branch: `codex/plan-062-dev` | reviewed_commit: `3eef8a32` | base_commit: `3d64877d` | dependency_revisions: auto-lang `8337bab5`(只读)、auto-web `2d698413`、auto-down `58ea33f` | spec_inputs: `docs/specs/runtime/rq-render-packets-and-resources.md` @`3eef8a32`（blob `ff28dcd9`）、`rq-fidelity-contract.md §7` | evidence: `D:/autostack/plan-artifacts/plan-062/auto-ui/review10/REVIEW10-FINAL-2026-11-08.md`（+ t01-isolated.log / rq-group.log / t01-isolated-nocapture.log）
+- **R-4c 关闭**：`rq_probe.rs:1102-1112` 为单一 r5 块（p50 只在隔离窗口断言 `:1113-1121`、p95 只记录、produce 只在冻结矩阵），r4 口径仅作为**明示历史**保留（`:1111-1112` “不再是本入口的规则”）。全树 grep：`skipped_loaded` 仅该历史行 1 处、`p95 <=1.25`/`p95+2ms` 0 处、Spec 0 处；唯一存活 p95 门是 produce ≤10ms（`rq_cells.rs:419`，在 `if isolated_window` 内、7 个冻结 workload）。diff `4f510ed1..3eef8a32` = 1 提交/1 文件/+11−11、逐行皆为注释（机械核验 0 非注释行），`rq_probe` 为 `#[cfg(test)]`。
+- **reviewer 复跑**：隔离 `rq_probe_t01` exit 0（41/41、replay p50 max 6.20ms、最差余量 1.19ms）；共享 `rq_` **41/0**；再跑一次带 `--nocapture`：p50 max 5.99ms、**p95 max 17.01ms 被打印但未被断言**（正是 r5 要“只记录”的情形）。主机负载 4%→46%→35%（4 个外来 cargo 进程），不影响判定。
+- **AC 结果**：AC-01/AC-02/AC-03/AC-04 **pass**（沿用第六轮；本轮 diff 仅 test-only 注释）；**AC-07 pass**（r5 判据，数字见上）。
+- **pending_closeout_gates（merge 拥有）**：冻结 union 的统一回归；SD-01/SD-02 发布进 `docs/specs/`；归档 + worktree 清理（含 `wt-guard` 收据）；landing 检查；**主检出他方 WIP 的处置**。
+- **未变**：M-02/M-06/M-07（OS063）、连续媒体帧（裁定另立）、可控重排通道负控（具名）仍为边界；AC-05/AC-06 由本轮 review 与后续 merge 承担。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 32 | from: review | to: merge | status: reviewed | outcome: pass（final review 通过） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3eef8a32 | next: merge（T-07）
