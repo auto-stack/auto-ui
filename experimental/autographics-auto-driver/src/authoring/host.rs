@@ -180,6 +180,8 @@ pub struct Host {
     pub camera_drag: Option<CameraDrag>,
     /// Camera presentation facts for probes/tests.
     pub camera_saturation: u32,
+    /// The last in-run pointer press routing outcome, for probes/tests.
+    pub last_press_outcome: Option<String>,
     /// PLAN-072: standalone player presentation (no portaled editor chrome;
     /// the iced panel is an unportaled witness and is never re-rendered).
     pub player: bool,
@@ -234,9 +236,12 @@ impl Host {
         let editor = Editor::with_project(doc, assets, code)?;
         let gpu = GpuDevice::new().map_err(|e| format!("{e:?}"))?;
         let mut rt = SurfaceRuntime::new(gpu).map_err(|e| format!("{e:?}"))?;
+        // The top view's logical size is the layout the portals live in:
+        // the editor's fixed 1200x800, or exactly the game surface in player
+        // mode (the window target scales it, so no presentation changes).
         let (is_player, top_size) = match player {
             None => (false, [1200.0, 800.0]),
-            Some((_, window)) => (true, window),
+            Some((two_d, _)) => (true, if two_d { [800.0, 380.0] } else { [800.0, 400.0] }),
         };
         let top = rt
             .add_surface(
@@ -340,7 +345,6 @@ impl Host {
                 // PLAN-072: exactly one game surface fills the top view; the
                 // game surface keeps its proven fixed logical size and the
                 // window scales it, so no presentation math changes.
-                let layout: [f32; 2] = if two_d { [800.0, 380.0] } else { [800.0, 400.0] };
                 let game = if two_d { two } else { three };
                 rt.add_portal(
                     view,
@@ -348,7 +352,7 @@ impl Host {
                     MountKind::Flat2d {
                         offset: [0.0, 0.0],
                         scale: [1.0, 1.0],
-                        clip: Rect::at(0.0, 0.0, layout[0], layout[1]),
+                        clip: Rect::at(0.0, 0.0, top_size[0], top_size[1]),
                     },
                     true,
                 )
@@ -444,6 +448,7 @@ impl Host {
             accepted: 0,
             camera_drag: None,
             camera_saturation: 0,
+            last_press_outcome: None,
             player: is_player,
             top_layout: top_size,
         };

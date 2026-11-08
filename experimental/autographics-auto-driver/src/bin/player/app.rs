@@ -236,6 +236,9 @@ impl ApplicationHandler for App {
                 button: MouseButton::Left,
                 ..
             } => {
+                if let Some(qa) = &self.qa {
+                    qa.buttons_seen.set(qa.buttons_seen.get() + 1);
+                }
                 if state == ElementState::Pressed {
                     h.pointer_down(self.cursor);
                 } else {
@@ -247,13 +250,23 @@ impl ApplicationHandler for App {
                 // running, but no stale drag capture survives it (the same
                 // capture-clearing contract as the editor, without the
                 // editor's pause — a game must not stop because the mouse
-                // crossed the window edge).
-                h.cancel_camera_drag();
-                h.input.pointer_left_window();
+                // crossed the window edge). On the private QA desktop the
+                // real cursor is on another desktop entirely and its leave
+                // tracking is meaningless, so posted drags stay authoritative.
+                if self.qa.is_none() {
+                    h.cancel_camera_drag();
+                    h.input.pointer_left_window();
+                }
             }
             WindowEvent::Focused(false) => {
-                h.input.window_focus_lost();
-                h.blur();
+                // On the private QA desktop the never-activated window still
+                // receives activation flaps; with no human able to alt-tab
+                // there, a focus pause is meaningless and would only eat the
+                // camera-drag capture. The product keeps its focus pause.
+                if self.qa.is_none() {
+                    h.input.window_focus_lost();
+                    h.blur();
+                }
             }
             WindowEvent::Focused(true) => {
                 // No editor panel exists to click Resume on: the focus pause
@@ -265,8 +278,13 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::Occluded(occluded) => {
+                // A private QA desktop may keep the window permanently
+                // occluded; the pause there would never resolve, so QA runs
+                // keep playing and the product keeps its occlusion pause.
                 if occluded {
-                    h.pause_play("auto-Pause: window occluded");
+                    if self.qa.is_none() {
+                        h.pause_play("auto-Pause: window occluded");
+                    }
                 } else if let Err(error) = maybe_auto_resume(h, "auto-Pause: window occluded") {
                     self.error = Some(format!("auto resume failed: {error}"));
                     e.exit();

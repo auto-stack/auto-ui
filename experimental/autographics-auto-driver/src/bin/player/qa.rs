@@ -37,6 +37,8 @@ pub struct Qa {
     pub keys_seen: std::rc::Rc<std::cell::Cell<u64>>,
     /// Observed event descriptors, for the input-delivery drift record.
     pub key_log: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+    /// Received left-button events (winit-visible).
+    pub buttons_seen: std::rc::Rc<std::cell::Cell<u64>>,
     pub records: Vec<Value>,
     pub done: bool,
     pub error: Option<String>,
@@ -51,6 +53,9 @@ pub struct Qa {
     walk_repress: u64,
     enter_repress: u64,
     audio_baseline: Value,
+    last_actor: Option<[f32; 3]>,
+    frozen_frames: u64,
+    orbit_attempts: u64,
 }
 
 impl Qa {
@@ -62,6 +67,7 @@ impl Qa {
             at: 0,
             keys_seen: std::rc::Rc::new(std::cell::Cell::new(0)),
             key_log: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+            buttons_seen: std::rc::Rc::new(std::cell::Cell::new(0)),
             records: vec![],
             done: false,
             error: None,
@@ -76,6 +82,9 @@ impl Qa {
             walk_repress: 0,
             enter_repress: 0,
             audio_baseline: Value::Null,
+            last_actor: None,
+            frozen_frames: 0,
+            orbit_attempts: 0,
         }
     }
 
@@ -232,6 +241,9 @@ impl Qa {
             self.cam_before = Some([cam.yaw, cam.pitch, cam.distance]);
             let size = w.inner_size();
             let (cx, cy) = (size.width as i32 / 2, size.height as i32 / 2);
+            // The press routes through the last seen pointer position: the
+            // drag opens with an explicit move to the press point.
+            native::post(&self.title, WM_MOUSEMOVE, 0, (cx, cy))?;
             native::post(&self.title, WM_LBUTTONDOWN, 1, (cx, cy))?;
             self.records.push(json!({"case":"orbit-press","at":[cx, cy]}));
         }
@@ -249,7 +261,8 @@ impl Qa {
         }
         let two_d = matches!(self.script, Script::TwoD);
         let limit = if matches!(self.phase, 0) { 1500 } else { 480 };
-        if let Err(e) = self.gate(h, frame, 8, limit) {
+        let settle = if matches!(self.phase, 10..=12) { 0 } else { 8 };
+        if let Err(e) = self.gate(h, frame, settle, limit) {
             self.error = Some(e);
             return;
         }
@@ -423,18 +436,25 @@ impl Qa {
                         self.send(VK_RETURN, false)?;
                         self.next(frame);
                     } else {
-                        // Death is confirmed by the device itself: the defeat
-                        // cue raises the observed non-zero PCM over the
-                        // post-jump baseline. Then release the walk.
-                        let a = Self::audio(h);
-                        let base = a["nonzero"].as_u64().unwrap_or(0);
-                        let prev = self.audio_baseline["nonzero"].as_u64().unwrap_or(0);
-                        if base < prev + 3000 {
+                        // Death is the hero freeze itself: the only in-run
+                        // freeze is a kill trigger (hero_frozen), so a
+                        // Running run whose actor stops moving for ~45
+                        // consecutive frames is dead. Cues alone cannot be
+                        // the criterion - the gap landing plays its own.
+                        let t = Self::actor_translation(h, two_d)?;
+                        if self.last_actor == Some(t) {
+                            self.frozen_frames += 1;
+                        } else {
+                            self.frozen_frames = 0;
+                            self.last_actor = Some(t);
+                        }
+                        if self.frozen_frames < 45 {
                             return Ok(());
                         }
+                        let a = Self::audio(h);
                         self.send(VK_KEY_D, false)?;
                         self.records.push(
-                            json!({"case":"audio-after-defeat","audio":a,"audio_baseline":self.audio_baseline}),
+                            json!({"case":"audio-after-defeat","audio":a,"frozen_at":t}),
                         );
                         self.next(frame);
                     }
@@ -474,8 +494,18 @@ impl Qa {
                         if self.enter_repress >= JUMP_ATTEMPTS {
                             return Err("qa: fresh-Enter never opened a new round".into());
                         }
-                        self.records
-                            .push(json!({"case":"enter-retry","attempt":self.enter_repress}));
+                        let p = Self::play(h)?;
+                        let rounds = p
+                            .last
+                            .as_ref()
+                            .and_then(|f| f.rounds.as_ref())
+                            .map(|r| json!({"restart_requested": r.restart_requested, "restart_tick": r.restart_tick}));
+                        self.records.push(json!({
+                            "case":"enter-retry","attempt":self.enter_repress,
+                            "rounds":rounds,
+                            "actor":Self::actor_translation(h, two_d)?,
+                            "state":format!("{:?}", p.state),
+                        }));
                         self.send(VK_RETURN, true)?;
                         self.at = frame;
                     }
@@ -484,7 +514,27 @@ impl Qa {
                 10 => {
                     let size = w.inner_size();
                     let (cx, cy) = (size.width as i32 / 2, size.height as i32 / 2);
+                    self.records.push(json!({
+                        "case":"drag-captured","drag": h.camera_drag.is_some(),
+                        "keys_seen": self.keys_seen.get(),
+                        "buttons_seen": self.buttons_seen.get(),
+                        "kb_target": format!("{:?}", h.input.keyboard_target()),
+                        "three": format!("{:?}", h.three),
+                        "press_outcome": h.last_press_outcome.clone(),
+                        "window_size": [h.input.window_size[0], h.input.window_size[1]],
+                        "top_logical": [h.input.top_logical[0], h.input.top_logical[1]],
+                    }));
                     native::post(&self.title, WM_MOUSEMOVE, 0, (cx + 90, cy + 24))?;
+                    self.next(frame);
+                    Ok(())
+                }
+                // The press carries no coordinates on its own: the App routes
+                // it through the last seen pointer position, so the drag opens
+                // with an explicit move to the press point first.
+                9 => {
+                    let size = w.inner_size();
+                    let (cx, cy) = (size.width as i32 / 2, size.height as i32 / 2);
+                    native::post(&self.title, WM_MOUSEMOVE, 0, (cx, cy))?;
                     self.next(frame);
                     Ok(())
                 }
@@ -506,12 +556,29 @@ impl Qa {
                     let before = self
                         .cam_before
                         .ok_or_else(|| "qa: missing camera baseline".to_string())?;
+                    if (cam.yaw - before[0]).abs() < 0.5 && (cam.pitch - before[1]).abs() < 0.5 {
+                        // A transient auto pause between press and release
+                        // cancels the capture; the whole drag retries fresh.
+                        self.orbit_attempts += 1;
+                        if self.orbit_attempts >= JUMP_ATTEMPTS {
+                            self.records.push(
+                                json!({"case":"orbit-applied","before":before,"after":[cam.yaw, cam.pitch, cam.distance],
+                                       "drag_active": h.camera_drag.is_some(),
+                                       "saturation": h.camera_saturation,
+                                       "play_state": format!("{:?}", p.state)}),
+                            );
+                            return Err("qa: left-drag orbit changed neither yaw nor pitch".into());
+                        }
+                        self.records.push(
+                            json!({"case":"orbit-retry","attempt":self.orbit_attempts,"yaw":cam.yaw,"pitch":cam.pitch}),
+                        );
+                        self.phase = 10;
+                        self.at = frame;
+                        return Ok(());
+                    }
                     self.records.push(
                         json!({"case":"orbit-applied","before":before,"after":[cam.yaw, cam.pitch, cam.distance]}),
                     );
-                    if (cam.yaw - before[0]).abs() < 0.5 && (cam.pitch - before[1]).abs() < 0.5 {
-                        return Err("qa: left-drag orbit changed neither yaw nor pitch".into());
-                    }
                     self.zoom_before = Some(cam.distance);
                     let size = w.inner_size();
                     let (cx, cy) = (size.width as i32 / 2, size.height as i32 / 2);

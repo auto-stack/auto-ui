@@ -23,7 +23,9 @@ pub fn post(title: &str, message: u32, wparam: usize, point: (i32, i32)) -> Resu
     if pid != std::process::id() {
         return Err("refuse another process's window".into());
     }
-    if message == 0x200 {
+    if message == 0x200
+        && !PRIVATE_DESKTOP.load(std::sync::atomic::Ordering::Relaxed)
+    {
         let mut screen = [point.0, point.1];
         if unsafe { ClientToScreen(h, &mut screen) } == 0 {
             return Err("native ClientToScreen failed".into());
@@ -64,6 +66,65 @@ pub fn post(title: &str, message: u32, wparam: usize, point: (i32, i32)) -> Resu
 #[cfg(not(windows))]
 pub fn post(_: &str, _: u32, _: usize, _: (i32, i32)) -> Result<(), String> {
     Err("the standalone player QA requires Windows".into())
+}
+
+/// QA runs on a private Windows desktop: no human cursor/focus contention,
+/// posted input stays authoritative. The calling thread must not own any
+/// window yet (called first thing in main, before the event loop).
+#[cfg(windows)]
+pub fn enter_private_desktop(name: &str) -> Result<(), String> {
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn CreateDesktopW(
+            lpszDesktop: *const u16,
+            lpszDevice: *const u16,
+            pDevmode: *mut u8,
+            dwFlags: u32,
+            dwDesiredAccess: u32,
+            lpsa: *const u8,
+        ) -> *mut std::ffi::c_void;
+        fn SetThreadDesktop(hDesktop: *mut std::ffi::c_void) -> i32;
+        fn CloseDesktop(hDesktop: *mut std::ffi::c_void) -> i32;
+    }
+    const GENERIC_ALL: u32 = 0x1000_0000;
+    let wide: Vec<_> = name.encode_utf16().chain([0]).collect();
+    let desktop = unsafe {
+        CreateDesktopW(
+            wide.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null_mut(),
+            0,
+            GENERIC_ALL,
+            std::ptr::null(),
+        )
+    };
+    if desktop.is_null() {
+        return Err(format!(
+            "qa private desktop {:?} unavailable: {}",
+            name,
+            std::io::Error::last_os_error()
+        ));
+    }
+    if unsafe { SetThreadDesktop(desktop) } == 0 {
+        let err = std::io::Error::last_os_error();
+        unsafe { CloseDesktop(desktop) };
+        return Err(format!("qa SetThreadDesktop failed: {err}"));
+    }
+    // The handle stays alive for the process lifetime on purpose: the
+    // desktop must not be closed under the running event loop.
+    std::mem::forget(desktop);
+    PRIVATE_DESKTOP.store(true, std::sync::atomic::Ordering::Relaxed);
+    Ok(())
+}
+
+/// Set on the private QA desktop: posted mouse moves need no real-pointer
+/// dance there (SetCursorPos has nothing to move and can report failure).
+pub static PRIVATE_DESKTOP: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(not(windows))]
+pub fn enter_private_desktop(_: &str) -> Result<(), String> {
+    Ok(())
 }
 
 /// Virtual-Key codes the QA chains use.

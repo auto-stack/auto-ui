@@ -1095,9 +1095,9 @@ impl Host {
     }
     pub fn pointer_down(&mut self, p: [f32; 2]) {
         if self.play.is_some() {
-            if let Some(InputOutcome::Delivered { surface, local }) =
-                self.input.pointer_pressed(&self.rt.graph, p)
-            {
+            let outcome = self.input.pointer_pressed(&self.rt.graph, p);
+            self.last_press_outcome = Some(format!("{outcome:?}"));
+            if let Some(InputOutcome::Delivered { surface, local }) = outcome {
                 // 2D camera letterbox bars never receive the game pointer.
                 let bar_hit = surface == self.two
                     && self

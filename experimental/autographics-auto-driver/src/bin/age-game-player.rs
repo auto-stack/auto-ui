@@ -56,6 +56,14 @@ fn main() {
             std::process::exit(1);
         }
     };
+    // QA chains run on a private desktop: the automated stimulus must not
+    // contend with the user's foreground session (focus, cursor, typing).
+    if value("--qa").is_some() {
+        if let Err(e) = native::enter_private_desktop("age-player-qa") {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    }
     let qa = match value("--qa") {
         Some(name) => match app::script_from(&name) {
             Some(script) => {

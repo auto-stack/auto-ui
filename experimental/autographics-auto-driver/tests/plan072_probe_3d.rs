@@ -102,6 +102,17 @@ fn platformer3d_real_game_end_state_enter_restarts_via_host_router() {
         if diagonal && p[2] > 3.55 {
             h.play.as_mut().unwrap().char_key(s_key, false, false);
         }
+        if i % 60 == 0 {
+            let rounds = h
+                .play
+                .as_ref()
+                .unwrap()
+                .last
+                .as_ref()
+                .and_then(|f| f.rounds.as_ref())
+                .map(|r| (r.restart_requested, r.restart_tick));
+            println!("tick {i}: {p:?} rounds={rounds:?}");
+        }
         if diagonal && !died && p[0] > 13.0 && p[2] > 2.5 {
             died = true;
             println!("hazard zone reached at tick {i}: {p:?}");
@@ -138,4 +149,25 @@ fn platformer3d_real_game_end_state_enter_restarts_via_host_router() {
         (p[2] - 2.0).abs() < 0.7 && (p[0] - 2.0).abs() < 0.7,
         "the new round respawns at the original spawn"
     );
+}
+
+#[test]
+fn player_composition_hit_test_captures_camera_drag() {
+    let (doc, assets, code, _) =
+        Storage::load_project(std::path::Path::new(SCENE), &Default::default())
+            .expect("project loads");
+    let mut h = Host::with_project_player(doc, assets, code, false, [1600.0, 800.0])
+        .expect("player host");
+    h.resize(1600, 800);
+    h.start_selected_play().expect("run starts");
+    settle(&mut h).expect("run settles");
+    // The composition hit-test: the window centre press must capture the
+    // camera drag on the portaled 3D surface (top view = the game layout,
+    // scaled by the window - the editor-proven geometry).
+    h.pointer_down([800.0, 400.0]);
+    let captured = h.camera_drag.is_some();
+    let kb = format!("{:?}", h.input.keyboard_target());
+    h.pointer_up([800.0, 400.0]);
+    println!("captured {captured}; kb_target {kb}");
+    assert!(captured, "the centre press must capture the camera drag");
 }
