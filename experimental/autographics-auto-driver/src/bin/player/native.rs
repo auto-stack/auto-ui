@@ -134,6 +134,7 @@ pub const VK_KEY_D: usize = 0x44;
 pub const VK_KEY_S: usize = 0x53;
 pub const VK_KEY_W: usize = 0x57;
 pub const WM_CLOSE: u32 = 0x0010;
+pub const WM_SIZE: u32 = 0x0005;
 pub const WM_KEYDOWN: u32 = 0x0100;
 pub const WM_KEYUP: u32 = 0x0101;
 pub const WM_MOUSEMOVE: u32 = 0x0200;

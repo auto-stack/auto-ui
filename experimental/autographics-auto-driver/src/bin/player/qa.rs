@@ -56,6 +56,7 @@ pub struct Qa {
     last_actor: Option<[f32; 3]>,
     frozen_frames: u64,
     orbit_attempts: u64,
+    resize_t0: Option<(u64, i32)>,
 }
 
 impl Qa {
@@ -85,6 +86,7 @@ impl Qa {
             last_actor: None,
             frozen_frames: 0,
             orbit_attempts: 0,
+            resize_t0: None,
         }
     }
 
@@ -229,11 +231,18 @@ impl Qa {
             json!({"case":"respawned","old_run":self.run1,"new_run":run,"respawn":respawn,"drift":drift,"keys_seen":self.keys_seen.get()}),
         );
         if two_d {
+            // V-02 resize evidence: a real window resize pauses the run and
+            // the player resumes it once the resize settles (phase 10 then
+            // verifies the round still ticks exactly once per credit).
+            let size = w.inner_size();
+            let (wpx, hpx) = (size.width as i32, size.height as i32);
+            let rw = (wpx * 3 / 4) & !1;
+            let rh = (hpx * 3 / 4) & !1;
+            // post() packs the point tuple as MAKELPARAM(x, y) for
+            // non-keyboard messages, which is exactly WM_SIZE's lparam.
+            native::post(&self.title, WM_SIZE, 0, (rw, rh))?;
             self.records
-                .push(json!({"case":"audio-final","audio":Self::audio(h)}));
-            native::post(&self.title, WM_CLOSE, 0, (0, 0))?;
-            self.records.push(json!({"case":"close-requested"}));
-            self.done = true;
+                .push(json!({"case":"resize-posted","to":[rw, rh]}));
         } else {
             let cam = p
                 .camera_frame()
@@ -261,7 +270,8 @@ impl Qa {
         }
         let two_d = matches!(self.script, Script::TwoD);
         let limit = if matches!(self.phase, 0) { 1500 } else { 480 };
-        let settle = if matches!(self.phase, 10..=12) { 0 } else { 8 };
+        let camera_phase = !two_d && matches!(self.phase, 9..=12);
+        let settle = if camera_phase { 0 } else { 8 };
         if let Err(e) = self.gate(h, frame, settle, limit) {
             self.error = Some(e);
             return;
@@ -403,9 +413,8 @@ impl Qa {
                     }
                     Ok(())
                 }
-                // 5: 2D waits out the defeat cue then presses Enter;
-                // 3D aims at the hazard line (release S at z>3.55) and then
-                // presses Enter once the death is confirmed (phase 6).
+                // 5: 2D waits out the defeat cue then presses Enter; 3D aims
+                // at the hazard line (release S at z>3.55) and keeps walking.
                 5 => {
                     if two_d {
                         if frame - self.at < 60 {
@@ -431,16 +440,15 @@ impl Qa {
                     }
                     Ok(())
                 }
+                // 6: 2D releases Enter; 3D detects the death as the only
+                // in-run freeze there is - a kill trigger's hero_frozen.
+                // Cues alone cannot be the criterion: the gap landing plays
+                // its own sound. Then the walk releases.
                 6 => {
                     if two_d {
                         self.send(VK_RETURN, false)?;
                         self.next(frame);
                     } else {
-                        // Death is the hero freeze itself: the only in-run
-                        // freeze is a kill trigger (hero_frozen), so a
-                        // Running run whose actor stops moving for ~45
-                        // consecutive frames is dead. Cues alone cannot be
-                        // the criterion - the gap landing plays its own.
                         let t = Self::actor_translation(h, two_d)?;
                         if self.last_actor == Some(t) {
                             self.frozen_frames += 1;
@@ -483,68 +491,91 @@ impl Qa {
                     }
                     Ok(())
                 }
-                // 9: 2D never reaches here; 3D observes the fresh round and
-                // opens the camera phases (left-drag orbit, wheel zoom). An
-                // end-state press eaten by an auto pause is retried as a
-                // fresh press, the same way a player recovers.
+                // 9: 2D waits out the posted resize's auto pause; 3D observes
+                // the fresh round (retrying the end-state press when an auto
+                // pause ate it) and opens the camera drag.
                 9 => {
-                    let observed = self.respawn_or_close(h, w, frame)?;
-                    if !observed && !self.done && frame - self.at > 240 {
-                        self.enter_repress += 1;
-                        if self.enter_repress >= JUMP_ATTEMPTS {
-                            return Err("qa: fresh-Enter never opened a new round".into());
+                    if two_d {
+                        if !Self::running(h) {
+                            return Ok(());
                         }
-                        let p = Self::play(h)?;
-                        let rounds = p
-                            .last
-                            .as_ref()
-                            .and_then(|f| f.rounds.as_ref())
-                            .map(|r| json!({"restart_requested": r.restart_requested, "restart_tick": r.restart_tick}));
-                        self.records.push(json!({
-                            "case":"enter-retry","attempt":self.enter_repress,
-                            "rounds":rounds,
-                            "actor":Self::actor_translation(h, two_d)?,
-                            "state":format!("{:?}", p.state),
-                        }));
-                        self.send(VK_RETURN, true)?;
-                        self.at = frame;
+                        self.records.push(json!({"case":"resumed-after-resize"}));
+                        self.next(frame);
+                    } else {
+                        let observed = self.respawn_or_close(h, w, frame)?;
+                        if !observed && !self.done && frame - self.at > 240 {
+                            self.enter_repress += 1;
+                            if self.enter_repress >= JUMP_ATTEMPTS {
+                                return Err("qa: fresh-Enter never opened a new round".into());
+                            }
+                            let p = Self::play(h)?;
+                            let rounds = p
+                                .last
+                                .as_ref()
+                                .and_then(|f| f.rounds.as_ref())
+                                .map(|r| {
+                                    json!({"restart_requested": r.restart_requested, "restart_tick": r.restart_tick})
+                                });
+                            self.records.push(json!({
+                                "case":"enter-retry","attempt":self.enter_repress,
+                                "rounds":rounds,
+                                "actor":Self::actor_translation(h, two_d)?,
+                                "state":format!("{:?}", p.state),
+                            }));
+                            self.send(VK_RETURN, true)?;
+                            self.at = frame;
+                        }
                     }
                     Ok(())
                 }
+                // 10: 2D verifies the resumed round keeps ticking, then the
+                // clean close; 3D drags the orbit and rolls into the check.
                 10 => {
-                    let size = w.inner_size();
-                    let (cx, cy) = (size.width as i32 / 2, size.height as i32 / 2);
-                    self.records.push(json!({
-                        "case":"drag-captured","drag": h.camera_drag.is_some(),
-                        "keys_seen": self.keys_seen.get(),
-                        "buttons_seen": self.buttons_seen.get(),
-                        "kb_target": format!("{:?}", h.input.keyboard_target()),
-                        "three": format!("{:?}", h.three),
-                        "press_outcome": h.last_press_outcome.clone(),
-                        "window_size": [h.input.window_size[0], h.input.window_size[1]],
-                        "top_logical": [h.input.top_logical[0], h.input.top_logical[1]],
-                    }));
-                    native::post(&self.title, WM_MOUSEMOVE, 0, (cx + 90, cy + 24))?;
-                    self.next(frame);
-                    Ok(())
-                }
-                // The press carries no coordinates on its own: the App routes
-                // it through the last seen pointer position, so the drag opens
-                // with an explicit move to the press point first.
-                9 => {
-                    let size = w.inner_size();
-                    let (cx, cy) = (size.width as i32 / 2, size.height as i32 / 2);
-                    native::post(&self.title, WM_MOUSEMOVE, 0, (cx, cy))?;
-                    self.next(frame);
+                    if two_d {
+                        // The tick sample spans steps: remember the first
+                        // observation and compare on a later frame.
+                        if self.resize_t0.is_none() {
+                            self.resize_t0 = Some((frame, Self::play(h)?.tick()));
+                            return Ok(());
+                        }
+                        let (f0, t1) = self.resize_t0.unwrap();
+                        if frame - f0 < 45 {
+                            return Ok(());
+                        }
+                        let t2 = Self::play(h)?.tick();
+                        if t2 <= t1 {
+                            return Err(format!(
+                                "qa: no tick advance after resize ({t1} -> {t2})"
+                            ));
+                        }
+                        self.resize_t0 = None;
+                        self.records
+                            .push(json!({"case":"ticks-advance-after-resize","t1":t1,"t2":t2}));
+                        self.records
+                            .push(json!({"case":"audio-final","audio":Self::audio(h)}));
+                        native::post(&self.title, WM_CLOSE, 0, (0, 0))?;
+                        self.records.push(json!({"case":"close-requested"}));
+                        self.done = true;
+                    } else {
+                        let size = w.inner_size();
+                        let (cx, cy) = (size.width as i32 / 2, size.height as i32 / 2);
+                        native::post(&self.title, WM_MOUSEMOVE, 0, (cx + 90, cy + 24))?;
+                        self.next(frame);
+                    }
                     Ok(())
                 }
                 11 => {
-                    let size = w.inner_size();
-                    let (cx, cy) = (size.width as i32 / 2, size.height as i32 / 2);
-                    native::post(&self.title, WM_LBUTTONUP, 0, (cx, cy))?;
-                    self.next(frame);
+                    if !two_d {
+                        let size = w.inner_size();
+                        let (cx, cy) = (size.width as i32 / 2, size.height as i32 / 2);
+                        native::post(&self.title, WM_LBUTTONUP, 0, (cx, cy))?;
+                        self.next(frame);
+                    }
                     Ok(())
                 }
+                // 12 (3D): the orbit must have changed yaw or pitch; a
+                // transient auto pause between press and release cancels the
+                // capture, so the whole drag retries fresh.
                 12 => {
                     let p = Self::play(h)?;
                     if p.pending() {
@@ -557,8 +588,6 @@ impl Qa {
                         .cam_before
                         .ok_or_else(|| "qa: missing camera baseline".to_string())?;
                     if (cam.yaw - before[0]).abs() < 0.5 && (cam.pitch - before[1]).abs() < 0.5 {
-                        // A transient auto pause between press and release
-                        // cancels the capture; the whole drag retries fresh.
                         self.orbit_attempts += 1;
                         if self.orbit_attempts >= JUMP_ATTEMPTS {
                             self.records.push(
@@ -572,7 +601,7 @@ impl Qa {
                         self.records.push(
                             json!({"case":"orbit-retry","attempt":self.orbit_attempts,"yaw":cam.yaw,"pitch":cam.pitch}),
                         );
-                        self.phase = 10;
+                        self.phase = 9;
                         self.at = frame;
                         return Ok(());
                     }
