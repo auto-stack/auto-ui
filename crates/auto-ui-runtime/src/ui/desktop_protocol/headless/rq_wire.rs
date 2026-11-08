@@ -710,6 +710,9 @@ pub(super) struct MediaStreamView {
     /// T-02：seek 目标（>当前 frame_no 时内容跳变——确定性 content(n)，
     /// 同 n 同字节，供身份级 no-backfill 断言）。
     pub(super) seek_to: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// PLAN-073 T-06：发布时点账（n → publish Instant；端到端延迟分布
+    /// 的产者锚点；None = 不记）。
+    pub(super) publish_ledger: Option<std::sync::Arc<std::sync::Mutex<Vec<(u64, Instant)>>>>,
 }
 
 impl MediaStreamView {
@@ -757,6 +760,12 @@ impl Component for MediaStreamView {
             crate::ui::media_poster::publish(&self.src, self.w, self.h, rgba),
             "T-02 海报重发布失败"
         );
+        if let Some(ledger) = &self.publish_ledger {
+            ledger
+                .lock()
+                .unwrap()
+                .push((self.frame_no, Instant::now()));
+        }
     }
 
     fn view(&self) -> View<()> {
@@ -1785,6 +1794,7 @@ fn t01_media_stream_start(
         tick_ms: 41, // 尝试 24fps
         pause: std::sync::Arc::clone(&pause),
         seek_to: std::sync::Arc::clone(&seek_to),
+        publish_ledger: None,
     };
     let rgba0 = probe.frame_rgba(0);
     assert!(

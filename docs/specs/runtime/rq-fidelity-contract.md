@@ -37,17 +37,25 @@ app id/wid/surface/rect/frame_mode）→ `Ready`。
   坐标），但 v2 wire 无路径原语 → 当前被省略（仅记观测）。
 - **SVG / vector 图像**：记录层以 `Image::Vector` 出现，v2 省略；需生产端按
   设备 scale 栅格化为位图资源（同设备 scale 下可逐字节一致）。
-- **文本**：记录层对 live paragraph/editor 含 glyph 几何（字体整形后），但
-  v2 `TextStyled` 只携字符串/字号/字重/斜体/颜色，Host 必须用自身字体栈重排；
-  冷帧可能尚未整形（`buffer_lines=0`）→ 首帧缺字风险。`Raw`（编辑器组合态）
-  当前直接省略。
+- **文本**：记录层对 live paragraph/editor 含 glyph 几何（字体整形后）。
+  协商 `fidelity/glyphrun/1`（073 A1）后默认路径文本以 GlyphRun 过线
+  （Host 不重排；逻辑坐标 + 宿主设备 scale 栅格化，见
+  rq-render-packets §7.1）；未协商宿主保持 `TextStyled` 字符串面（Host
+  重排 = 具名降级，实测富文本行尾累计步进漂移 ~6px）。`Raw`（编辑器
+  组合态）**已过线**（与 paragraph 同源整形，073 更正本行——非"直接省略"）。
 - **完整 2D 变换**：canvas 几何的旋转/缩放会烘焙进路径（可达）；但 iced
   `Transformation` 仅 scale+translate，文本旋转/斜切不可经该类型表达（几何
   文本会退化为 outline path，可保真但失去文本语义）。
-- **阴影 blur**：`Quad.shadow(color/offset/blur)` 参数在 wire 中，但重放端
-  无 blur 原语（现为单层 scrim 近似）；精确复现需 Host 具备 blur/SDF 能力。
-- **图像呈现参数**：`Image` 不携 rotation/opacity/filter，当前丢弃。
-- **资源复用**：当前稳定重复帧仍每帧上传位图（无内容身份/缓存）——违反 P-02。
+- **阴影 blur**：富模式（v3 + `shadow_patches`）产端 SDF 贴片已精确过线
+  （062 T-02；073 A3 修：贴片按视口设备 scale 栅格化、rect 折回逻辑坐标，
+  1:1 纹理映射——实测 0.588%→0.111%）。默认面仍单层 scrim 近似（具名）。
+- **图像呈现参数**（073 调和 `fidelity/image-params/1`）：rotation 与
+  opacity **已过线**（记录端 Transform 信封 + 透明度乘算）；**filter 仍
+  不携**（wire `Image` 无 filter 字段）——该 ID 的 filter 分量为具名缺口，
+  不得宣称完整兑现。
+- **资源复用**：（已过时——062 交付内容身份/驻留缓存，稳定帧零重传；
+  073 媒体类豁免见 `rq-continuous-media.md` §2。保留本行仅存档 062 前
+  状态。）
 - **剪贴板**：headless/记录路径以 `clipboard::Null` 驱动，剪贴板族不可用。
 - **呈现反馈**：无独立 present 事件；评测终点为代理（draw/读回），不是物理上屏。
 
@@ -127,3 +135,19 @@ PLAN-062（r4）追加 `resource/release/1`（跨进程资源释放，`ResourceR
 2. SVG 的 Skia 级 filter 子集（resvg 覆盖外）。
 3. 要求保留可编辑文本语义的旋转文本（outline path 可保真但失语义）。
 4. 物理上屏/真实 present 时序（归平台/OS063；评测终点须标代理）。
+
+## 10. PLAN-073 实测更新（2026-11-09）
+
+- 富模式具名界内实测收敛：text_cjk 0.798%→**0.260%**（两宿主同数）、
+  gradient_border_shadow 0.588%→**0.111%**、shadow_only 0.069%→0.035%、
+  scroll_clip 0.33%→0.119%、vm_row_button 0.172%→0.043%。残留 = 字形
+  亚像素相位类平台 AA（atlas 采样相位 vs glyphon 直绘），全部落
+  rq-render-packets §7.2 像素级关闭判据。
+- 隔离窗计时（V-06 冻结分布，debug）：produce p50 0.06–0.24ms /
+  p95 ≤0.70ms（W-C ≤10ms，14× 余量；SVG 例外 p50 ≤60ms 具名维持）；
+  replay p50 3.2–5.7ms / p95 ≤8.0ms（replay p50 门 1.25×direct+2ms 内）。
+- 媒体端到端延迟（publish→宿主内容首见，n=39）：p50 16.6ms / p95
+  18.1ms / max 24.4ms（冻结预算 250ms）；物理上屏归 OS063。
+- OS063 交接面：`rq-continuous-media.md`（媒体类资源类别/槽几何/延迟
+  读数/冻结负控）+ 本节分布 + `rq-render-packets §7`（字形坐标空间/
+  保真判据/乱序不变量）。OS063 消费正式接口后重建再验（M-02/06/07）。

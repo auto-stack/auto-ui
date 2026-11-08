@@ -44,6 +44,7 @@ fn producer_hash(n: u64) -> [u8; 32] {
         tick_ms: 41,
         pause: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         seek_to: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        publish_ledger: None,
     };
     let rgba = probe.frame_rgba(n);
     let mut h = blake3::Hasher::new();
@@ -137,6 +138,9 @@ fn media_phases_standalone() {
     let cp = wellknown.clone();
     let pause_t = Arc::clone(&pause);
     let seek_t = Arc::clone(&seek_to);
+    let publish_ledger: Arc<std::sync::Mutex<Vec<(u64, Instant)>>> =
+        Arc::new(std::sync::Mutex::new(Vec::new()));
+    let ledger_t = Arc::clone(&publish_ledger);
     let client_handle = std::thread::spawn(move || {
         let (_, end) = rqhost::adopt(&cp, "plan073-t05", 5000).expect("t05 adopt");
         let probe = MediaStreamView {
@@ -147,6 +151,7 @@ fn media_phases_standalone() {
             tick_ms: 41,
             pause: pause_t,
             seek_to: seek_t,
+            publish_ledger: Some(ledger_t),
         };
         let _ = crate::ui::media_poster::publish(&src_uri, MW, MH, probe.frame_rgba(0));
         let source = HeadlessFrameSource::new(probe, SW, SH);
@@ -180,28 +185,91 @@ fn media_phases_standalone() {
     }
     let _ = attach_window_for_test(&mut state, 0);
 
-    // ① 连续：≥3 个不同内容帧在宿主落地并可读回。
+    // ① 连续：≥3 个不同内容帧在宿主落地并可读回；记录每帧宿主首见时刻
+    // （V-06 端到端延迟分布的宿主锚点）。
     let deadline = Instant::now() + Duration::from_secs(8);
     let mut continuous = BTreeSet::new();
+    let mut pending: Vec<String> = Vec::new();
+    let mut arrival: Vec<(String, Instant)> = Vec::new();
     loop {
         let _ = rq_update(&mut state, RqMessage::Tick);
         if let Some(list) = composed_v2(&state.clients[0]) {
             for src in image_refs(list) {
-                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH)
-                    .is_some()
-                {
-                    continuous.insert(src);
+                if continuous.insert(src.clone()) {
+                    pending.push(src);
                 }
             }
         }
-        if continuous.len() >= 3 {
+        // 首次「内容命中」时刻 = 帧抵达（put 落账与合成同批或随后到——
+        // 以重试语义记录命中点，不假设同一 tick 内先后）。
+        let mut still: Vec<String> = Vec::new();
+        for src in pending.drain(..) {
+            if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH).is_some() {
+                arrival.push((src.clone(), Instant::now()));
+            } else {
+                still.push(src);
+            }
+        }
+        pending = still;
+        if continuous.len() >= 40 && pending.is_empty() {
             break;
         }
-        assert!(Instant::now() < deadline, "t05 连续面 8s 未落地 3 帧");
+        assert!(Instant::now() < deadline, "t05 连续面 8s 未落地 40 帧");
         std::thread::sleep(Duration::from_millis(2));
     }
     let ids: Vec<_> = continuous.iter().cloned().collect();
     assert_readback("standalone", &ids, 400);
+
+    // V-06 媒体端到端延迟分布（publish → 宿主内容首见；n↔id 经内容哈希
+    // 对表；样本 = 连续相全部新落地帧）。
+    let latencies_ms: Vec<f64> = {
+        let hash_to_n: std::collections::HashMap<[u8; 32], u64> =
+            (0..=200).map(|n| (producer_hash(n), n)).collect();
+        let ledger = publish_ledger.lock().unwrap().clone();
+        let mut lat: Vec<(u64, f64)> = Vec::new();
+        for (src, t_arrive) in &arrival {
+            if let Some(h) = crate::ui::iced::broker_surface::bitmap_content_hash_of(src) {
+                if let Some(n) = hash_to_n.get(&h) {
+                    if let Some((_, t_pub)) =
+                        ledger.iter().find(|(ln, _)| ln == n)
+                    {
+                        lat.push((*n, t_arrive.saturating_duration_since(*t_pub).as_secs_f64() * 1000.0));
+                    }
+                }
+            }
+        }
+        lat.sort_by_key(|(n, _)| *n);
+        let mut vals: Vec<f64> = lat.into_iter().map(|(_, v)| v).collect();
+        vals.retain(|v| v.is_finite());
+        vals
+    };
+    {
+        let mut sorted = latencies_ms.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let p = |q: f64| -> f64 {
+            let idx = ((sorted.len() as f64 - 1.0) * q).round() as usize;
+            sorted.get(idx).copied().unwrap_or(f64::NAN)
+        };
+        println!(
+            "[RQMEDIA] {}",
+            serde_json::json!({
+                "tag": "media_e2e_latency_standalone",
+                "samples": sorted.len(),
+                "p50_ms": p(0.5), "p95_ms": p(0.95), "max_ms": sorted.last().copied().unwrap_or(f64::NAN),
+                "note": "publish(tick on()) → 宿主内容首见；含 41ms tick 粒度",
+            })
+        );
+        assert!(
+            sorted.len() >= 20,
+            "延迟样本不足（连续相须 ≥20 帧落地）: {}",
+            sorted.len()
+        );
+        assert!(
+            p(0.95) <= 250.0,
+            "媒体端到端 p95 {:.1}ms 超 250ms 冻结预算（tick 粒度 41ms + 管线）",
+            p(0.95)
+        );
+    }
 
     // ② 暂停：先排空在途（≤槽信用），稳定后冻结——稳定窗内无新 id、
     // 最后帧保旧可解析。
@@ -329,6 +397,8 @@ fn media_phases_desktop() {
     let src_uri = format!("probe://t05-desktop-{}.mp4", std::process::id());
     let pause = Arc::new(AtomicBool::new(false));
     let seek_to = Arc::new(AtomicU64::new(0));
+    let publish_ledger: Arc<std::sync::Mutex<Vec<(u64, Instant)>>> =
+        Arc::new(std::sync::Mutex::new(Vec::new()));
     let probe = MediaStreamView {
         src: src_uri.clone(),
         w: MW,
@@ -337,6 +407,7 @@ fn media_phases_desktop() {
         tick_ms: 41,
         pause: Arc::clone(&pause),
         seek_to: Arc::clone(&seek_to),
+        publish_ledger: Some(Arc::clone(&publish_ledger)),
     };
     let _ = crate::ui::media_poster::publish(&src_uri, MW, MH, probe.frame_rgba(0));
     let source = HeadlessFrameSource::new(probe, SW, SH);
@@ -493,6 +564,7 @@ fn media_phases_desktop() {
         tick_ms: 41,
         pause: Arc::new(AtomicBool::new(false)),
         seek_to: Arc::new(AtomicU64::new(0)),
+        publish_ledger: None,
     };
     let _ = crate::ui::media_poster::publish(&src2, MH, MH, probe2.frame_rgba(0));
     let source2 = HeadlessFrameSource::new(probe2, SW, SH);

@@ -283,3 +283,61 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
    残差与文字面同源（画布文本管线 vs direct 文本管线的字形覆盖率/AA）。**不属
    exact**，不得计入 AC-02 的 0.1% 门；逐 ID 的关闭条件是“有真实输出 + 结构断言
    + 2% 毛刺级上限”，不是逐 ID 都 ≤0.1%。
+
+## 7. PLAN-073 增补：字形几何坐标空间、像素级保真判据与资源乱序不变量（2026-11-09）
+
+保 062 历史与本表不变；本节记录 073 的合同增补与逐 ID 关闭证据（详情与
+测量见 Plan 073 §9 与 `rq-continuous-media.md`）。
+
+### 7.1 GlyphRun 坐标空间（修正 062 降格面）
+
+- wire `GlyphRun` 携**逻辑坐标**（与 TextStyled 同空间；缩放由 Transform
+  信封承载）。位图栅格化是 Host 本地决定：按 `字号 × 宿主设备 scale`
+  栅格化、逻辑 rect 绘制 → 1:1 纹理映射。宿主 scale 经
+  `window::scale_factor` 落簿（rqhost）；desktop session broker 落簿归
+  T-05 具名义务（未落簿窗按 1.0，HiDPI 维持旧分辨率行为——具名非静默）。
+- 字形位图 = **直通 alpha**（`Handle::from_rgba` 合同）；图像 atlas 为
+  Rgba8UnormSrgb——sRGB 字节采样时硬件解码到线性，与 direct 文本管线
+  （cryoglyph Accurate 线性混合）同空间。预乘烘焙为已修缺陷（勿回退）。
+- v2 钉面（`ClientPump::set_v2(true)`）不切换文本词汇；字符串面回路经
+  `set_glyphrun_optin(false)` 显式钉回 TextStyled（GlyphRun 属 v3 代词汇）。
+
+### 7.2 像素级保真判据（>0.1% 行的具名 AA 残差关闭依据）
+
+`analyze_residual_pair` / `assert_named_aa_closure`（rq_probe，接 rq_cells /
+rq_wire / 39 行能力面三道门）：
+
+- `flat_diff == 0`（错色/整块丢失必炸；编辑器 caret 瞬态 ≤64px 单块具名
+  容许——061 移交 UI063 组合态家族）；
+- `edge_miss_strong ≤ 8`（>16/通道且远离强边缘的孤立差；软带 ≤16/通道如
+  table 条纹色调差不计）；
+- `ink_hole_blocks == 0`（32px 块级墨洞 = 掉字主判据；帧级 ink_ratio 仅
+  记录——≤2/255 全域亮度微差会主导它）；
+- `profile_peak_ratio ≥ 0.5`（列墨量轮廓错位信号）；
+- **敏感负控（永久）**：GlyphRun 整体平移 1 逻辑 px、删单字形必须被检出。
+- 062 具名界维持（文本族 1%、阴影族 1.5%、其余 0.1%；2% 为诊断上限非
+  exact 豁免）。073 实测：富模式 text_cjk **0.260%**（062 0.798%）、
+  gradient_border_shadow **0.111%**（0.588%）；39 能力行 13 族 >0.1% 全部
+  class=named-aa（strong=0/holes=0——宿主重排亚像素/行尾步进漂移、条纹
+  色调、caret 瞬态，机制分列具名）。
+
+### 7.3 资源乱序不变量（V-04，永久驱动 `p073_t04_*`）
+
+- 引用先于上传：合成引用未落地资源 = 具名占位臂（不冒完整帧）；资源
+  就绪后**同一合成列表零新帧**即可解析（paint 期解析语义）。
+- generation 闸按**资源身份**（per-src `generation ≤ last` 拒收保旧）；
+  同身份重复上传不前进代际账。
+- 逐出分账（per-client bitmap_keys）；断连/窗回收键逐出（同 ID 新 App
+  不串扰）；旁观 App 资源不受他人回收波及。
+- 重排驱动覆盖 standalone 宿主全链；desktop session broker 共用同一闸
+  （`bitmap_cache_put_gen` 单点三消费面）——具名覆盖边界。
+- 四旧红（autocenter/stage3 n3/n5/t3_examples）：UI063 域根因（通用输入/
+  调度/几何），落主后基线两轮独立全绿复核——非绘制/资源缺陷，不豁免
+  M1（073 绘制修复不触其路径仍绿即适用性证据）。
+
+### 7.4 具名不可达（吸收 A15）
+
+- shear：**无生产发射面**（canvas 含剪切的仿射在记录期烘焙进 Path 几何
+  = 精确过线；文本信封 scale+translate（P683-D2）；图像信封旋转精确）。
+  重放端剪切 warn 为防御性具名降级。iced 公开矩阵元补面（跨
+  iced_graphics/iced_tiny_skia/iced_wgpu）为具名后继，零当前消费者。
