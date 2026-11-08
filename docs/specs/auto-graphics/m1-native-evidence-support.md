@@ -54,14 +54,17 @@ epochs）。
   checklist_items/observer/tier/status 面。**legacy `mode` 值改名**：旧字符串
   `"manual-gate (PLAN-066 T-02)"` → schema 字段 `mode: "native-manual"`，
   旧字面量保存在新增字段 `mode_note`——按旧 `mode` 字符串过滤的消费者改读
-  `mode_note` 或 schema `mode`）。`--probe` 代码路径不变
+  `mode_note` 或 schema `mode`。`--probe` 代码路径不变
   （记录器只在 manual 分支活动）；`--report` 必须显式指向本 scope，
   禁止沿代码默认旧 plan054 路径落材料。
-- **身份分层（F-T07-02 裁定）**：`mixed_regions_window --probe/--manual`
-  的原生报告**按设计不含 runner sha 自绑字段**——真窗 posted/手工层的
-  runner 身份由本档 §3 冻结（构建面）＋ AG026 checker 消费时对实际二进制
-  实测 sha 绑定；报告内自绑由 editor `--evidence-record`（写
-  `runner_sha256`）承担。不把"报告未自绑"误读为"证据未绑定"。
+- **身份分层（F-T07-02 裁定）**：`mixed_regions_window --probe` 的原生报告
+  **按设计不含 runner sha 自绑字段**——posted 层的 runner 身份由本档 §3
+  冻结（构建面）＋ AG026 checker 消费时对实际二进制实测 sha 绑定；
+  `--manual` 记录则**自证绑定** `candidate.runner.{window_runner_path,
+  window_runner_sha256}`（关窗写报告时实测），编辑器
+  `--evidence-record` 同样自写 `runner_sha256`。AG026 checker 在消费时仍
+  应对实际二进制复测 sha（不把报告自报当唯一来源）。不把"报告未自绑"
+  误读为"证据未绑定"。
 - **editor**：`autographics-authoring --open <project/scene.agscene>
   --evidence-record <显式 out.json> [--evidence-attach <原 OS 阶段报告>]`
   ——绑定实际项目/当前状态（open path、document sha、history/dirty/
