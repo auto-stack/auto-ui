@@ -642,3 +642,6 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **因此**：重放路径没有可修的“固定开销”；冻结的 `1.25×direct+2ms` 之所以在本机测不过，是**主机/进程级抖动**（在负载下可放大到 3–6 倍），不是重放设计。可选项回到 **(B) r5 口径修订** 或 **(C) 以当前能力集收口**；若坚持原口径，需要在**真正空闲**的机器上跑一次隔离窗口（本会话无法保证）。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 25 | from: work | to: user | status: execution_done | outcome: waiting（直绘修复假设被公平测量证伪；请在 B/C 间选择） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: acace4aa | next: user
+
+- stage: user | plan_id: PLAN-062 | plan_revision: r4 | round: 26 | from: user | to: new | status: execution_done | outcome: pass（裁定：r5 修订 AC-07 的 replay 口径；不改目标/范围/仓库集合） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: ecf8496c | next: new（r5 合同修订）
+- **用户裁定（2026-11-08，基于公平轮转测量）**：AC-07 的 replay 条款改为“**p50 设门 + p95 记录**，且只在隔离窗口签收”；同时把 SVG 例外的“记录值 ≈32.5ms”与“上限 ≤60ms p50（吸收主机负载）”区分清楚；在 Spec/AC 里具名本主机测量限制（同一代码在 4.1–10ms 间随负载变化，max 可到 40ms）。目标、AC 的其余部分、范围与仓库集合不变，属有界合同修订（r5）。
