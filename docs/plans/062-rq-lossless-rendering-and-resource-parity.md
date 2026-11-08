@@ -312,6 +312,11 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
   - **(a) 062 内实现读回**：每帧（或按需）`copy_texture_to_buffer` 读回 RGBA → 按内容身份当资源过线（复用现有 `Image`/生成/预算/驻留机制）。代价：每帧一次 GPU 读回 + 上传（1080p ≈ 8 MiB/帧，按现有 8 MiB/s 上传预算只能 ~1fps，**必须先改预算或按需采样**），且多一次全帧拷贝。
   - **(b) 具名边界**：在 Spec/AC 里把“媒体帧跨线”写成具名边界（当前只保证占位/降级可观测），媒体传输另立计划（与 OS063/媒体管线一起设计）。
   - **(c) 只做静态帧/海报帧**：把视频首帧或暂停帧读回一次当图片资源（证明链路+身份+预算可用），连续播放仍具名留后。
+- **测量窗口限制（2026-11-08，第五轮复审提出须落在 §10）**：`AUTO_RQ_TIMING_WINDOW=isolated`
+  只是**标签**，不隔离机器资源；本会话的主机长期与其它会话/构建共享（reviewer 记录 CPU 9–23%）。
+  因此 r5 的计时证据（隔离窗口 `rq_probe_t01` 41/41 p50 通过、最差余量 2.70ms；`rq_cells`
+  28 行 produce/SVG/pixel 门 asserted）**是“在该窗口内成立”的记录，不等于空闲主机签收**。
+  若后续需要把 AC-07 的计时结论写进正式交付边界，应在真正空闲的机器上重跑一次同一命令集。
 - **本轮已收口的项**：per-App 上传速率（8 MiB/s + 整帧回滚 + 背压）已完成并用负控验证；wire generation、慢宿主/旧 ACK/旧宿主负控、真两进程配对亦已收口，均不含在上述待裁定清单内。
 - **2026-11-07 主检出存在他方未提交 WIP（merge 前必须由 owner 归位，不属本 Plan）**：主检出 `D:/autostack/auto-ui`（master `df09d816`）工作树里有未提交修改 `crates/auto-ui-runtime/src/ui/desktop_protocol/{headless,host,rqhost}.rs`、`ui/session.rs`，内容是把已撤回的 `drain_resource_releases`（PLAN-062 在 `00bd355d` 整提交撤回的 ResourceRelease）接线到 `FrameSource` 实现上；master 上这些方法不存在，该 WIP 与主线不可编译/语义不一致。本 Plan 未触碰、未 include、未 stash；worktree `codex/plan-062-dev` 不受影响。**merge 前**需其 owner 把这些改动路由回自己的树（stash/patch 交接或 fix worktree），否则主检出不满足 master-zero-WIP 门。
 - 性能数值预算/实际刷新率/可运行规模待UI061授权执行后按先基线后候选冻结；无预算不签PASS，支持承诺或阈值变化须具名修订。
@@ -700,3 +705,17 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **未变**：AC-01..AC-04 的既有证据（reviewer 第四轮已判 pass）；SD-01/SD-02 发布、统一回归、归档与清理归 merge；主检出他方 WIP 仍是 merge 门。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 29 | from: work | to: review | status: execution_done | outcome: pass（R-1..R-4 关闭，隔离窗口复跑全绿） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 3a3be18d | next: review（第五轮 final）
+
+### 2026-11-08 第五轮独立复审（final，r5）与 R-2/R-4 收尾
+
+- stage: review | review_scope: final | reviewer_identity: 独立上下文子代理（模型/会话号未由运行环境暴露） | plan_id: auto-ui/PLAN-062 | plan_revision: 5 | outcome: **needs_fix**（仅文档/清理项） | reviewed_commit: `3a3be18d` | base_commit: `3d64877d` | evidence: `D:/autostack/plan-artifacts/plan-062/auto-ui/review8/REVIEW8-FINAL-2026-11-08.md`
+- **关闭**：R-1（行为）——p95 断言已删、只记录；隔离跑 41/41 例 replay p50 全过（max 6.23ms，最差余量 2.70ms），p95 max 8.04ms 仅记录；§9 的收据更正已在位。R-3——§6 只剩一行 V-07 且带 replay/隔离条款。**AC-07 按 r5 判据：pass**。
+- **未闭**：R-2（Spec §5.3 同时保留了旧口径与新口径，自相矛盾——虽已追加 r5 段但没删旧句）；R-4（`direct_p95` 变成未使用变量、括号缩进、rq_probe 仍留着已删门的注释）。
+- **本轮修复（`4f510ed1`）**：
+  1. **R-2**：把 §5.3 的“计时门口径”整段重写为**单一 r5 块**（produce 只在冻结矩阵、SVG p50 ≤60、replay p50 设门/p95 只记录、所有计时断言仅在隔离窗口），删除旧句；§5.3 不再与 AC-07/V-07/代码冲突。
+  2. **R-4**：`rq_cells` 删除未用的 `direct_p95`、去掉重复陈旧注释、修正错位括号；`rq_probe` 残留注释改为“p95 只记录、p50 设门”。
+  3. **§10**：显式记录“`AUTO_RQ_TIMING_WINDOW=isolated` 只是标签、不隔离资源；本会话主机长期共享（reviewer 记录 CPU 9–23%），计时证据是该窗口内的记录而非空闲主机签收”。
+- **修复后复跑（本树 `4f510ed1`）**：隔离窗口 `rq_cells_t05_six_cell_matrix` **exit 0**、`rq_probe_t01_direct_and_rq_baseline` **exit 0**；共享窗口 `rq_` **41/0**；`ui::desktop_protocol::` **278 passed / 4 failed**（恰为基线 4 红）。
+- **未变**：AC-01..AC-04 证据（第五轮 reviewer 复确认，diff 仅 `#[cfg(test)]` + 文档）；SD-01/SD-02 发布、统一回归、归档清理归 merge；主检出他方 WIP 仍是 merge 门。
+
+- stage: goal | plan_id: PLAN-062 | plan_revision: r5 | round: 30 | from: work | to: review | status: execution_done | outcome: pass（R-2/R-4 收尾；AC-07 按 r5 已 pass） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: 4f510ed1 | next: review（第六轮 final）
