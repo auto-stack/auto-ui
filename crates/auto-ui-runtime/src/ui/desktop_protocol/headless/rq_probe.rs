@@ -1580,17 +1580,19 @@ fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
     media_poster::clear(src);
 }
 
-/// PLAN-062（AC-07 / 复审 F-03 有界性能任务）：把重放尾部按 **shape** 分桶测量，
-/// 先证伪/证实“每帧重做文字整形”的假设，再决定修哪里。
+/// PLAN-062（AC-07 / 复审 F-03 有界性能任务）：把重放尾部按 **shape** 分桶测量。
 ///
-/// 形状：空帧 / 1 段文字 / 50 段文字 / 1 张图（已驻留）/ 20 张图 / 200 quad。
-/// 每形状 5 预热 + 40 采样，输出 p50/p95/max（ms）。不是产品 workload，只用于
-/// 定位尾部来源；结论写回 Spec §5.3。
+/// 关键方法（第一版直接顺序测被“进程级预热顺序”污染过，见 2026-11-08 的 A/B）：
+/// 先建好**全部**模拟器、逐个跑 `warmup` 帧做全局预热，然后**轮转（round-robin）**
+/// 采样——每个 round 各 shape 各一帧。这样机器负载漂移与预热顺序对每个 shape
+/// 公平，差异才归因到 shape 本身，而不是“谁是第一个被测的”。
 #[test]
 fn rq_perf_replay_shapes() {
     use crate::ui::desktop_protocol::message::{
-        DisplayList, DisplayOp, Fill, ImageFit, Rgba8, WRect,
+        DisplayOp, DisplayList, Fill, ImageFit, Rgba8, WRect,
     };
+
+    type Sim = iced_test::simulator::Simulator<'static, (), iced::Theme, iced::Renderer>;
 
     let text = |x: f32, y: f32, i: usize| DisplayOp::TextStyled {
         x,
@@ -1621,57 +1623,89 @@ fn rq_perf_replay_shapes() {
         fit: ImageFit::Stretch,
     };
 
-    let shapes: Vec<(&str, DisplayList)> = vec![
-        ("empty", DisplayList { clear: None, ops: Vec::new() }),
+    let mut shapes: Vec<(String, Option<DisplayList>)> = vec![
+        ("plain_widget_tree".to_string(), None),
+        ("empty".to_string(), Some(DisplayList { clear: None, ops: Vec::new() })),
+        ("text_1".to_string(), Some(DisplayList { clear: None, ops: vec![text(8.0, 8.0, 0)] })),
         (
-            "text_1",
-            DisplayList { clear: None, ops: vec![text(8.0, 8.0, 0)] },
-        ),
-        (
-            "text_50",
-            DisplayList {
+            "text_50".to_string(),
+            Some(DisplayList {
                 clear: None,
-                ops: (0..50).map(|i| text(8.0, 8.0 + i as f32 * 22.0, i)).collect(),
-            },
+                ops: (0..50).map(|i| text(8.0, 8.0 + i as f32 * 2.0, i)).collect(),
+            }),
         ),
-        ("image_1", DisplayList { clear: None, ops: vec![image(8.0)] }),
+        ("image_1".to_string(), Some(DisplayList { clear: None, ops: vec![image(8.0)] })),
         (
-            "image_20",
-            DisplayList {
+            "image_20".to_string(),
+            Some(DisplayList {
                 clear: None,
                 ops: (0..20).map(|i| image(8.0 + i as f32 * 20.0)).collect(),
-            },
+            }),
         ),
         (
-            "quad_200",
-            DisplayList {
+            "quad_200".to_string(),
+            Some(DisplayList {
                 clear: None,
-                ops: (0..200).map(|i| quad((i % 20) as f32 * 30.0, (i / 20) as f32 * 30.0)).collect(),
-            },
+                ops: (0..200)
+                    .map(|i| quad((i % 20) as f32 * 28.0, (i / 20) as f32 * 28.0))
+                    .collect(),
+            }),
         ),
     ];
 
-    for (name, list) in shapes {
-        let mut sim = iced_test::simulator::Simulator::with_size(
-            iced::Settings::default(),
-            iced::Size::new(PROBE_W as f32, PROBE_H as f32),
-            crate::ui::iced::broker_surface::displaylist_element::<()>(&list),
-        );
-        let mut samples = Vec::new();
-        let warmup = std::env::var("AUTO_RQ_PERF_WARMUP").ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(5);
-        for i in 0..(warmup + 40) {
-            let t = std::time::Instant::now();
-            sim.snapshot(&theme()).expect("shape snapshot");
-            let ms = crate::ui::desktop_protocol::headless::rq_probe::ms(t.elapsed());
-            if i >= warmup {
-                samples.push(ms);
+    let mut sims: Vec<(String, usize, Sim)> = Vec::new();
+    for (name, list) in shapes.drain(..) {
+        let ops = list.as_ref().map(|l| l.ops.len()).unwrap_or(0);
+        let sim: Sim = match list {
+            Some(list) => iced_test::simulator::Simulator::with_size(
+                iced::Settings::default(),
+                iced::Size::new(PROBE_W as f32, PROBE_H as f32),
+                crate::ui::iced::broker_surface::displaylist_element::<()>(&list),
+            ),
+            None => {
+                let plain: iced::Element<'static, ()> =
+                    iced::widget::container(iced::widget::text("A/B 基线").size(16))
+                        .width(iced::Length::Fill)
+                        .height(iced::Length::Fill)
+                        .into();
+                iced_test::simulator::Simulator::with_size(
+                    iced::Settings::default(),
+                    iced::Size::new(PROBE_W as f32, PROBE_H as f32),
+                    plain,
+                )
             }
+        };
+        sims.push((name, ops, sim));
+    }
+
+    let warmup: usize = std::env::var("AUTO_RQ_PERF_WARMUP")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
+    let rounds: usize = 40;
+
+    // 全局预热：每个 shape 各 warmup 帧。
+    for (_, _, sim) in sims.iter_mut() {
+        for _ in 0..warmup {
+            sim.snapshot(&theme()).expect("warmup snapshot");
         }
-        let st = stats(samples);
+    }
+
+    let mut samples: Vec<Vec<f64>> = vec![Vec::new(); sims.len()];
+    for _ in 0..rounds {
+        for (idx, (_, _, sim)) in sims.iter_mut().enumerate() {
+            let t = std::time::Instant::now();
+            sim.snapshot(&theme()).expect("round-robin snapshot");
+            samples[idx].push(crate::ui::desktop_protocol::headless::rq_probe::ms(t.elapsed()));
+        }
+    }
+
+    for (idx, (name, ops, _)) in sims.iter().enumerate() {
+        let st = stats(std::mem::take(&mut samples[idx]));
         println!(
             "[RQPERF] {}",
             serde_json::json!({
-                "tag": "replay_shape", "shape": name, "ops": list.ops.len(),
+                "tag": "replay_shape", "shape": name, "ops": ops,
                 "p50": st.p50, "p95": st.p95, "max": st.max, "n": st.n,
             })
         );
