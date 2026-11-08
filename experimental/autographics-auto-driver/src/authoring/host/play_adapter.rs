@@ -105,7 +105,7 @@ impl Host {
         if let Some(error) = error {
             ui.error = error;
         }
-        if changed {
+        if changed && !self.player {
             self.rt.graph.mark_content_dirty(self.panel);
         }
     }

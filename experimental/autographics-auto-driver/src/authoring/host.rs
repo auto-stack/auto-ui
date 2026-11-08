@@ -180,6 +180,12 @@ pub struct Host {
     pub camera_drag: Option<CameraDrag>,
     /// Camera presentation facts for probes/tests.
     pub camera_saturation: u32,
+    /// PLAN-072: standalone player presentation (no portaled editor chrome;
+    /// the iced panel is an unportaled witness and is never re-rendered).
+    pub player: bool,
+    /// Logical size of the top view. The editor's fixed 1200x800 layout in
+    /// editor mode; exactly the game surface's proven size in player mode.
+    top_layout: [f32; 2],
 }
 
 /// One active orbit drag: the last delivered logical position on the 3D game
@@ -200,12 +206,41 @@ impl Host {
         assets: super::assets::Registry,
         code: Option<super::behavior_project::Code>,
     ) -> Result<Self, String> {
+        Self::with_project_mode(doc, assets, code, None)
+    }
+    /// PLAN-072 standalone player presentation: the same accepted editor,
+    /// Play/admission/pump/restart/audio machinery and the same fixed-size
+    /// game surfaces as the editor composition, but exactly one game surface
+    /// is portaled into a window-sized top view. The iced panel still exists
+    /// as a 2x2 unportaled witness so every Panel consumer keeps working; it
+    /// is never marked dirty after construction, so no editor chrome is
+    /// presented or re-rendered. `two_d` selects the portaled profile surface;
+    /// `window` is the top view's logical (and initial physical) size.
+    pub fn with_project_player(
+        doc: Document,
+        assets: super::assets::Registry,
+        code: Option<super::behavior_project::Code>,
+        two_d: bool,
+        window: [f32; 2],
+    ) -> Result<Self, String> {
+        Self::with_project_mode(doc, assets, code, Some((two_d, window)))
+    }
+    fn with_project_mode(
+        doc: Document,
+        assets: super::assets::Registry,
+        code: Option<super::behavior_project::Code>,
+        player: Option<(bool, [f32; 2])>,
+    ) -> Result<Self, String> {
         let editor = Editor::with_project(doc, assets, code)?;
         let gpu = GpuDevice::new().map_err(|e| format!("{e:?}"))?;
         let mut rt = SurfaceRuntime::new(gpu).map_err(|e| format!("{e:?}"))?;
+        let (is_player, top_size) = match player {
+            None => (false, [1200.0, 800.0]),
+            Some((_, window)) => (true, window),
+        };
         let top = rt
             .add_surface(
-                [1200.0, 800.0],
+                top_size,
                 SurfaceContent::Game2d(Box::new(Game2dContent::simple(
                     rt.gpu(),
                     Color::rgb(0.02, 0.03, 0.04),
@@ -286,32 +321,58 @@ impl Host {
             bounds: Default::default(),
         };
         ui.sync(&editor);
+        let (panel_size, two_d) = match player {
+            None => ([390.0, 800.0], None),
+            Some((two_d, _)) => ([2.0, 2.0], Some(two_d)),
+        };
         let panel = rt
             .add_surface(
-                [390.0, 800.0],
+                panel_size,
                 SurfaceContent::Iced(Box::new(IcedContent::borrowed(
                     rt.gpu(),
-                    [390.0, 800.0],
+                    panel_size,
                     Box::new(ui),
                 ))),
             )
             .map_err(|e| format!("{e:?}"))?;
-        for (id, xy, size) in [
-            (two, [0.0, 0.0], [800.0, 380.0]),
-            (three, [0.0, 400.0], [800.0, 400.0]),
-            (panel, [810.0, 0.0], [390.0, 800.0]),
-        ] {
-            rt.add_portal(
-                view,
-                id,
-                MountKind::Flat2d {
-                    offset: xy,
-                    scale: [1.0, 1.0],
-                    clip: Rect::at(xy[0], xy[1], size[0], size[1]),
-                },
-                true,
-            )
-            .map_err(|e| format!("{e:?}"))?;
+        match two_d {
+            Some(two_d) => {
+                // PLAN-072: exactly one game surface fills the top view; the
+                // game surface keeps its proven fixed logical size and the
+                // window scales it, so no presentation math changes.
+                let layout: [f32; 2] = if two_d { [800.0, 380.0] } else { [800.0, 400.0] };
+                let game = if two_d { two } else { three };
+                rt.add_portal(
+                    view,
+                    game,
+                    MountKind::Flat2d {
+                        offset: [0.0, 0.0],
+                        scale: [1.0, 1.0],
+                        clip: Rect::at(0.0, 0.0, layout[0], layout[1]),
+                    },
+                    true,
+                )
+                .map_err(|e| format!("{e:?}"))?;
+            }
+            None => {
+                for (id, xy, size) in [
+                    (two, [0.0, 0.0], [800.0, 380.0]),
+                    (three, [0.0, 400.0], [800.0, 400.0]),
+                    (panel, [810.0, 0.0], [390.0, 800.0]),
+                ] {
+                    rt.add_portal(
+                        view,
+                        id,
+                        MountKind::Flat2d {
+                            offset: xy,
+                            scale: [1.0, 1.0],
+                            clip: Rect::at(xy[0], xy[1], size[0], size[1]),
+                        },
+                        true,
+                    )
+                    .map_err(|e| format!("{e:?}"))?;
+                }
+            }
         }
         let mut models = vec![];
         let mesh = agp::render3d::cylinder_mesh();
@@ -364,7 +425,7 @@ impl Host {
             editor,
             storage: Storage::default(),
             rt,
-            input: CompositionInput::new([1200.0, 800.0], [1200.0, 800.0]),
+            input: CompositionInput::new(top_size, top_size),
             panel,
             two,
             three,
@@ -383,6 +444,8 @@ impl Host {
             accepted: 0,
             camera_drag: None,
             camera_saturation: 0,
+            player: is_player,
+            top_layout: top_size,
         };
         h.input.mapper.register(h.three, h.camera(), [800.0, 400.0]);
         // Fixed-resource warm upload: one resident store on the renderer device.
@@ -475,7 +538,11 @@ impl Host {
         ui.dialog = dialog;
         ui.reset_draft();
         self.sync_play_ui();
-        self.rt.graph.mark_content_dirty(self.panel);
+        if !self.player {
+            // Player mode never presents the panel witness; keeping it clean
+            // means no per-tick editor UI re-render behind the game.
+            self.rt.graph.mark_content_dirty(self.panel);
+        }
     }
     fn active_assets(&self) -> Result<super::assets::Registry, String> {
         let mut assets = self.editor.assets.clone();

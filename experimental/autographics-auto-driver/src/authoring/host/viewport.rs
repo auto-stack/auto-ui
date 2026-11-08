@@ -790,7 +790,7 @@ impl Host {
         self.pause_play("auto-Pause: resize/DPI");
         self.cancel_gesture();
         self.cancel_camera_drag();
-        self.input.set_sizes([w as f32, h as f32], [1200.0, 800.0]);
+        self.input.set_sizes([w as f32, h as f32], self.top_layout);
     }
     pub fn frame(&mut self, window: Option<&mut WindowTarget>) -> Result<(), String> {
         let now = Instant::now();
@@ -966,12 +966,15 @@ impl Host {
             return;
         }
         let wheel_top = self.input.window_to_top(position);
+        // Editor geometry places the 3D surface at top y=400; the player's
+        // game surface owns the whole top view at [0,0].
+        let in_3d = |p: [f32; 2], player: bool| {
+            let p = if player { p } else { [p[0], p[1] - 400.0] };
+            crate::authoring::interaction::inside(p, [800.0, 400.0])
+        };
         if let Some(play) = &mut self.play {
             if play.camera_dim() == Some(crate::authoring::runtime_camera::CameraDim::ThreeD)
-                && crate::authoring::interaction::inside(
-                    [wheel_top[0], wheel_top[1] - 400.0],
-                    [800.0, 400.0],
-                )
+                && in_3d(wheel_top, self.player)
             {
                 let notches = match delta {
                     iced_wgpu::core::mouse::ScrollDelta::Lines { x, y }

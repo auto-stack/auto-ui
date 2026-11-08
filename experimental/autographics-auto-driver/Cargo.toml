@@ -7,6 +7,10 @@ default-run = "autographics-auto-driver"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "age-game-player"
+path = "src/bin/age-game-player.rs"
+
 [dependencies]
 auto-lang-core = { path = ".sdk-source/crates/auto-lang-core" }
 auto-val = { path = ".sdk-source/crates/auto-val" }
