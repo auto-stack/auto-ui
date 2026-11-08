@@ -915,21 +915,94 @@ pub fn composed_v2(
 // -q vm 轨客户端分岔（T-05/D6）：装载链零改
 // ---------------------------------------------------------------------------
 
+/// vm 轨 `-q` 底座裁决（PLAN-063 T-02：值域与 a2r exe
+/// [`super::render_cli::RenderBase`] 同一——rq/remote/rqhost、desktop、
+/// independent）。返回 `(remote, target)`：
+/// - `remote|rq|rqhost` → `(true, Rqhost)`——headless v2 精确 remote 臂
+///   （无自窗、不回退）；
+/// - `desktop` → `(true, Desktop)`——端点取 `desktop_endpoint`
+///   （AUTO_DESKTOP_ENDPOINT）；缺席 = 具名报错（提示先启动虚拟桌面，
+///   不代孵）；
+/// - `independent` → 观测行 + `(false, Rqhost)`——`-q` 轨无自窗臂，
+///   independent 声明按显式 legacy queue 兑现（留痕，不冒 remote；
+///   自窗请去掉 `-q`）；
+/// - `queue` / 缺席 / 未知值 → `(false, Rqhost)` 显式 legacy queue
+///   （未知值附观测行——render_cli env 腿"跳过 + 留痕"同律）。
+pub fn resolve_vm_rq_base(
+    base_env: Option<&str>,
+    desktop_endpoint: Option<&str>,
+    wellknown: &str,
+    app_name: &str,
+) -> Result<(bool, super::client_entry::ClientTarget), String> {
+    use super::client_entry::ClientTarget;
+    use super::render_cli::RenderBase;
+    let rqhost_target = || ClientTarget::Rqhost {
+        wellknown: wellknown.to_string(),
+        app_name: app_name.to_string(),
+    };
+    let Some(raw) = base_env.map(str::trim).filter(|v| !v.is_empty()) else {
+        return Ok((false, rqhost_target()));
+    };
+    match RenderBase::parse(raw) {
+        Some(RenderBase::Rq) => {
+            println!("[render] render-mode: rq (AUTO_VM_RENDER env)");
+            Ok((true, rqhost_target()))
+        }
+        Some(RenderBase::Desktop) => {
+            let endpoint = desktop_endpoint
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .ok_or_else(|| {
+                    "desktop 模式需要 --desktop-endpoint <pipe>（AUTO_DESKTOP_ENDPOINT）——请先启动虚拟桌面"
+                        .to_string()
+                })?;
+            println!("[render] render-mode: desktop (AUTO_VM_RENDER env) → endpoint {endpoint}");
+            Ok((
+                true,
+                ClientTarget::Desktop {
+                    endpoint: endpoint.to_string(),
+                    app_name: app_name.to_string(),
+                },
+            ))
+        }
+        Some(RenderBase::Independent) => {
+            eprintln!(
+                "[render] AUTO_VM_RENDER=independent 与 -q 轨冲突——按显式 legacy queue 兑现（自窗请去掉 -q）"
+            );
+            Ok((false, rqhost_target()))
+        }
+        None => {
+            eprintln!("[render] AUTO_VM_RENDER={raw:?} 不识——按 legacy queue（不冒 remote）");
+            Ok((false, rqhost_target()))
+        }
+    }
+}
+
 /// vm 轨 -q 客户端（`auto run -r vm -q`）：run_vm_ui 的 CWD/主题/后端序
 /// 上游照常执行后，本函数替代 `run_dynamic_iced` 的"自开 OS 窗"——组件
 /// 原地转 rqhost 客户端（AppProjector 产帧，exit-on-EOF 档）。
 /// rendezvous 采纳内建（`ClientTarget::Rqhost`——不预连不烧管道实例）；
 /// Hello 凭据：title = `AUTO_VM_TITLE` env 缺省 widget 名；尺寸 =
 /// `AUTO_VM_WINDOW` 解析（[`vm_window_size`]）。
+/// PLAN-063 T-02：底座裁决统一走 [`resolve_vm_rq_base`]——AUTO_VM_RENDER
+/// 显式 rq/desktop 都走精确 remote；desktop 端点 = AUTO_DESKTOP_ENDPOINT；
+/// legacy queue 保持显式（无静默 remote/direct 换轨）。
 pub fn run_vm_rqhost_client(
     component: crate::ui::dynamic::DynamicComponent,
     wellknown: &str,
 ) -> Result<String, String> {
-    use super::client_entry::{self, ClientOpts, ClientTarget};
+    use super::client_entry::{self, ClientOpts};
     use super::message::FrameMode;
     let app_name = component.widget_name().to_string();
     let title = std::env::var("AUTO_VM_TITLE").unwrap_or_else(|_| app_name.clone());
     let (width, height) = vm_window_size();
+    let env = |k: &str| std::env::var(k).ok();
+    let (remote, target) = resolve_vm_rq_base(
+        env("AUTO_VM_RENDER").as_deref(),
+        env("AUTO_DESKTOP_ENDPOINT").as_deref(),
+        wellknown,
+        &app_name,
+    )?;
     let opts = ClientOpts {
         app_name: app_name.clone(),
         title,
@@ -937,16 +1010,7 @@ pub fn run_vm_rqhost_client(
         height,
         frame_mode: FrameMode::Commands,
         auto_downgraded: false,
-        // PLAN-683（remote 模式）：`desktop_render: remote` 经 env 透传
-        //（AUTO_VM_RENDER=remote——AUTO_VM_WINDOW/TITLE 同型缝；CLI/pac
-        // 层在 T-04 试点接线）。
-        remote: std::env::var("AUTO_VM_RENDER")
-            .map(|v| v.trim().eq_ignore_ascii_case("remote"))
-            .unwrap_or(false),
-    };
-    let target = ClientTarget::Rqhost {
-        wellknown: wellknown.to_string(),
-        app_name,
+        remote,
     };
     client_entry::run_dynamic_client(component, opts, target)
         .map(|_| "rqhost client exited".to_string())
@@ -1012,6 +1076,15 @@ pub enum RqMessage {
         window: iced::window::Id,
         scale: f32,
     },
+    /// PLAN-063 T-03（G-03）：修饰键态（ModifiersChanged 事实源——指针
+    /// 事件的 modifiers 字节此前恒 0）。
+    ModifiersChanged { modifiers: u8 },
+    /// PLAN-063 T-03（G-05）：窗焦点进出（`ControlMsg::Focus` 首个生产者
+    /// ——客户端 focus/blur 沿此前无事件）。
+    WindowFocus {
+        window: iced::window::Id,
+        focused: bool,
+    },
 }
 
 /// daemon 状态：客户端表（窗注册表即 `client.window`）+ serve 柄。
@@ -1029,6 +1102,9 @@ pub struct RqDaemon {
     /// 窗 → 最近光标位（窗口本地坐标；按下事件的坐标源——Button 事件
     /// 不带位，WM `last_cursor` 簿记同型）。
     last_cursor: BTreeMap<iced::window::Id, (f32, f32)>,
+    /// PLAN-063 T-03（G-03）：最近修饰键态（ModifiersChanged 臂维护；
+    /// 指针事件 modifiers 字节的事实源——此前恒 0）。
+    last_modifiers: u8,
     /// PLAN-034 T-03（D5 自观测面）：Tick 计数——每 ~300 拍（≈4.5s）
     /// 自采样一行内存观测（轻量形态，不接 mem_guard 冻结语义：daemon
     /// 是共享宿主，冻结语义不适用）。
@@ -1039,6 +1115,12 @@ impl RqDaemon {
     /// 按发生窗找客户端（输入/resize/关窗路由键——D4）。
     fn client_of(&mut self, window: iced::window::Id) -> Option<&mut RqClient> {
         self.clients.iter_mut().find(|c| c.window == Some(window))
+    }
+
+    /// PLAN-063 T-04（P-03）：事件臂后联泵的索引定位（同 [`Self::client_of`]
+    /// 谓词）。
+    fn client_index_of(&self, window: iced::window::Id) -> Option<usize> {
+        self.clients.iter().position(|c| c.window == Some(window))
     }
 
     /// 该窗标题（`.title` 装配面）。
@@ -1152,6 +1234,15 @@ fn live_input_msgs(wid: u64, input: &crate::ui::session::LiveInput) -> Vec<Input
                 modifiers: *modifiers,
             }]
         }
+        // PLAN-063 T-03（G-02）：release 沿上线（tag 5 首个生产者；
+        // headless v2 臂转 iced KeyReleased，v1 投影器忽略）。
+        LiveInput::KeyReleased { key, modifiers } => {
+            vec![InputMsg::KeyReleased {
+                wid,
+                key: *key,
+                modifiers: *modifiers,
+            }]
+        }
         LiveInput::Chars { text } => text
             .chars()
             .map(|ch| InputMsg::CharTyped { wid, ch })
@@ -1174,6 +1265,74 @@ fn live_input_msgs(wid: u64, input: &crate::ui::session::LiveInput) -> Vec<Input
             dy: *dy,
         }],
     }
+}
+
+/// 单客户端即时泵（PLAN-063 T-04，P-03）：输入/焦点/resize 臂后联——
+/// 输入→帧合成无 15ms 档等待（readiness 及时唤醒的输入半边）。Tick
+/// 日常泵复用同函数（语义零变化）。返回存活。
+fn pump_one_client(
+    state: &mut RqDaemon,
+    idx: usize,
+    tasks: &mut Vec<iced::Task<RqMessage>>,
+) -> bool {
+    let (events, alive) = pump_client(&mut state.clients[idx], &mut state.ids);
+    for ev in events {
+        match ev {
+            RqEvent::Adopted { .. } => {
+                state.opened += 1;
+                state.had_window = true;
+                tasks.push(open_window_for(&mut state.clients[idx], state.opened));
+            }
+            RqEvent::Reclaimed { .. } => {
+                if let Some(w) = state.clients[idx].window.take() {
+                    tasks.push(iced::window::close(w));
+                }
+            }
+            RqEvent::ImeRequest { enabled } => {
+                let client = &mut state.clients[idx];
+                // 去重（App 每帧重发请求——IMM 写是 OS 往返，重复刷会
+                // 扰动候选窗状态）。
+                if client.ime_applied != enabled {
+                    client.ime_applied = enabled.clone();
+                    if let Some(window) = client.window {
+                        let scale = client.scale;
+                        tasks.push(apply_ime_request(
+                            window,
+                            enabled,
+                            scale,
+                            &client.app_name,
+                        ));
+                    }
+                }
+            }
+            RqEvent::SetCursor { kind } => {
+                let client = &mut state.clients[idx];
+                if client.cursor_kind != kind {
+                    client.cursor_kind = kind;
+                    eprintln!("[rqhost] cursor `{}` -> kind {kind}", client.app_name);
+                }
+            }
+        }
+    }
+    // 首帧观测行（e2e 断言锚点：帧已到宿主并合成）。
+    let client = &mut state.clients[idx];
+    if client.frames >= 1 && !client.first_frame_observed {
+        client.first_frame_observed = true;
+        eprintln!("[rqhost] first frame `{}`", client.app_name);
+    }
+    alive
+}
+
+
+/// PLAN-063 T-04（P-03）：事件臂后联——目标窗客户端即时泵（输入/焦点/
+/// resize → 帧合成同拍返回，无 15ms 档等待；readiness 输入半边。空闲
+/// 窗零开销——client_index_of 未命中直接 none）。
+fn pump_window(state: &mut RqDaemon, window: iced::window::Id) -> iced::Task<RqMessage> {
+    let mut tasks = Vec::new();
+    if let Some(idx) = state.client_index_of(window) {
+        pump_one_client(state, idx, &mut tasks);
+    }
+    iced::Task::batch(tasks)
 }
 
 /// daemon update：Tick（采纳+泵）/ resize / 关窗 / 输入路由（D4）。
@@ -1239,58 +1398,14 @@ fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
                     None => eprintln!("[rqhost] adoption 未达 Active（预算耗尽弃置）"),
                 }
             }
-            // ② 日常泵（帧合成/回收；EOF 判死）。
+            // ② 日常泵（帧合成/回收；EOF 判死）——PLAN-063 T-04：单客户端
+            // 泵体抽 [`pump_one_client`]（输入臂后联共用，语义零变化）。
             let mut dead: Vec<usize> = Vec::new();
             // PLAN-690 T-04：子类桥 IME 上行排水（提交/组合串——winit
             // 旗标门控外原语面）。
             drain_ime_uplinks(state);
             for idx in 0..state.clients.len() {
-                let (events, alive) = pump_client(&mut state.clients[idx], &mut state.ids);
-                for ev in events {
-                    match ev {
-                        RqEvent::Adopted { .. } => {
-                            state.opened += 1;
-                            state.had_window = true;
-                            tasks.push(open_window_for(&mut state.clients[idx], state.opened));
-                        }
-                        RqEvent::Reclaimed { .. } => {
-                            if let Some(w) = state.clients[idx].window.take() {
-                                tasks.push(iced::window::close(w));
-                            }
-                        }
-                        RqEvent::ImeRequest { enabled } => {
-                            let client = &mut state.clients[idx];
-                            // 去重（App 每帧重发请求——IMM 写是 OS 往返，
-                            // 重复刷会扰动候选窗状态）。
-                            if client.ime_applied != enabled {
-                                client.ime_applied = enabled.clone();
-                                if let Some(window) = client.window {
-                                    let scale = client.scale;
-                                    tasks.push(apply_ime_request(
-                                        window,
-                                        enabled,
-                                        scale,
-                                        &client.app_name,
-                                    ));
-                                }
-                            }
-                        }
-                        RqEvent::SetCursor { kind } => {
-                            let client = &mut state.clients[idx];
-                            if client.cursor_kind != kind {
-                                client.cursor_kind = kind;
-                                eprintln!("[rqhost] cursor `{}` -> kind {kind}", client.app_name);
-                            }
-                        }
-                    }
-                }
-                // 首帧观测行（e2e 断言锚点：帧已到宿主并合成）。
-                let client = &mut state.clients[idx];
-                if client.frames >= 1 && !client.first_frame_observed {
-                    client.first_frame_observed = true;
-                    eprintln!("[rqhost] first frame `{}`", client.app_name);
-                }
-                if !alive {
+                if !pump_one_client(state, idx, &mut tasks) {
                     dead.push(idx);
                 }
             }
@@ -1352,6 +1467,25 @@ fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
             }
             iced::Task::none()
         }
+        // PLAN-063 T-03（G-03）：修饰键态事实源落簿（后续指针事件携带）。
+        RqMessage::ModifiersChanged { modifiers } => {
+            state.last_modifiers = modifiers;
+            iced::Task::none()
+        }
+        // PLAN-063 T-03（G-05）：焦点进出下发（ControlMsg::Focus 首个
+        // 生产者——客户端 iced focus/blur 沿与 direct 同律）。
+        RqMessage::WindowFocus {
+            window,
+            focused,
+        } => {
+            if let Some(client) = state.client_of(window) {
+                if let Some(wid) = client.inner.wid.map(|w| w.0) {
+                    let msg = ProtocolMsg::Control(ControlMsg::Focus { wid, focused });
+                    let _ = client.inner.end.send(&msg);
+                }
+            }
+            pump_window(state, window)
+        }
         RqMessage::WindowClosed { window } => {
             // 用户关窗 → 宿主 Close 下发（app ExitRequest → Reclaim →
             // 退出码 0——端点状态机既有，D5②）。
@@ -1379,7 +1513,7 @@ fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
                     }
                 }
             }
-            iced::Task::none()
+            pump_window(state, window)
         }
         RqMessage::CursorMoved { window, x, y } => {
             state.last_cursor.insert(window, (x, y));
@@ -1391,7 +1525,7 @@ fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
                         .send(&ProtocolMsg::Input(InputMsg::PointerMoved { wid, x, y }));
                 }
             }
-            iced::Task::none()
+            pump_window(state, window)
         }
         RqMessage::PointerPressed { window, button } => {
             let at = state
@@ -1399,6 +1533,8 @@ fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
                 .get(&window)
                 .copied()
                 .unwrap_or((0.0, 0.0));
+            // PLAN-063 T-03（G-03）：修饰位先取（client_of 可变借用冲突）。
+            let modifiers = state.last_modifiers;
             if let Some(client) = state.client_of(window) {
                 if let Some(wid) = client.inner.wid.map(|w| w.0) {
                     let _ = client
@@ -1409,11 +1545,11 @@ fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
                             button: wire_button(button),
                             x: at.0,
                             y: at.1,
-                            modifiers: 0,
+                            modifiers,
                         }));
                 }
             }
-            iced::Task::none()
+            pump_window(state, window)
         }
         RqMessage::PointerReleased { window, button } => {
             let at = state
@@ -1421,6 +1557,7 @@ fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
                 .get(&window)
                 .copied()
                 .unwrap_or((0.0, 0.0));
+            let modifiers = state.last_modifiers;
             if let Some(client) = state.client_of(window) {
                 if let Some(wid) = client.inner.wid.map(|w| w.0) {
                     let _ = client
@@ -1431,11 +1568,11 @@ fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMessage> {
                             button: wire_button(button),
                             x: at.0,
                             y: at.1,
-                            modifiers: 0,
+                            modifiers,
                         }));
                 }
             }
-            iced::Task::none()
+            pump_window(state, window)
         }
     }
 }
@@ -1470,14 +1607,23 @@ fn rq_view(state: &RqDaemon, window: iced::window::Id) -> iced::Element<'_, RqMe
         .into()
 }
 
-/// daemon 订阅：15ms 帧泵 + 窗事件流 + 输入流（键盘/滚轮/IME Ignored
+/// daemon 订阅：帧泵 + 窗事件流 + 输入流（键盘/滚轮/IME Ignored
 /// 门 + 指针全事件——desktop_window_events 029 族同源直调，D4）。
-fn rq_subscription(_state: &RqDaemon) -> iced::Subscription<RqMessage> {
+/// PLAN-063 T-04（P-03）：固定 15ms 档升两级——**输入/焦点/resize 事件
+/// 臂即时泵**（`pump_window`，输入→帧同拍，事件驱动不再依赖档位）；
+/// 档位兜底自适配：有在册客户端 = 活跃档 15ms（客户端自驱帧——timer/
+/// 动画/异步产帧的排水节拍，与既有预算同律的具名 fallback）；零客户端
+/// = 待命档 250ms（采纳巡逻，空闲近零开销）。iced `Every(duration)` 以
+/// 时长哈希为订阅 id——档位切换即重建定时器，确定性生效。
+fn rq_subscription(state: &RqDaemon) -> iced::Subscription<RqMessage> {
     use crate::ui::session::{
         live_input_from_input_method, live_input_from_wheel, live_inputs_from_keyboard,
     };
+    let active = state.clients.iter().any(|c| c.window.is_some());
+    let interval_ms: u64 = if active { 15 } else { 250 };
     iced::Subscription::batch(vec![
-        iced::time::every(std::time::Duration::from_millis(15)).map(|_| RqMessage::Tick),
+        iced::time::every(std::time::Duration::from_millis(interval_ms))
+            .map(|_| RqMessage::Tick),
         iced::event::listen_with(|e, status, window_id| match e {
             iced::Event::Window(iced::window::Event::Resized(size)) => {
                 Some(RqMessage::WindowResized {
@@ -1488,6 +1634,27 @@ fn rq_subscription(_state: &RqDaemon) -> iced::Subscription<RqMessage> {
             }
             iced::Event::Window(iced::window::Event::Closed) => {
                 Some(RqMessage::WindowClosed { window: window_id })
+            }
+            // PLAN-063 T-03（G-05）：焦点进出 → ControlMsg::Focus（客户端
+            // focus/blur 沿此前无事件；不门控——Captured 态焦点变化同报）。
+            iced::Event::Window(iced::window::Event::Focused) => {
+                Some(RqMessage::WindowFocus {
+                    window: window_id,
+                    focused: true,
+                })
+            }
+            iced::Event::Window(iced::window::Event::Unfocused) => {
+                Some(RqMessage::WindowFocus {
+                    window: window_id,
+                    focused: false,
+                })
+            }
+            // PLAN-063 T-03（G-03）：修饰键态事实源（指针事件 modifiers
+            // 字节来源；不带 Ignored 门——修饰变化无 widget 消费语义）。
+            iced::Event::Keyboard(iced::keyboard::Event::ModifiersChanged(m)) => {
+                Some(RqMessage::ModifiersChanged {
+                    modifiers: crate::ui::session::wire_modifiers(&m),
+                })
             }
             // live 输入三族（Ignored 门——Captured = 宿主真 widget 已消费；
             // rqhost 窗内容 = canvas 无交互 widget，稳态恒 Ignored）。
@@ -1572,6 +1739,7 @@ pub fn run_daemon(wellknown: &str) -> Result<(), String> {
         had_window: false,
         opened: 0,
         last_cursor: BTreeMap::new(),
+        last_modifiers: 0,
         mem_ticks: 0,
     };
     // boot 闭包 Fn 约束——RefCell 一次性提取（renderer.rs run_session 同型）。
@@ -1812,6 +1980,65 @@ pub fn run_bridge(wellknown: &str, ws_port: u16, token: &str) -> Result<(), Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PLAN-063 T-02（V-01）：`-q` 底座裁决矩阵——rq/remote 别名精确
+    /// remote；desktop 需端点（缺 = 具名报错）；independent/queue/缺席/
+    /// 未知 = 显式 legacy queue（remote=false，无静默换轨）。
+    #[test]
+    fn p063_resolve_vm_rq_base_matrix() {
+        use crate::ui::desktop_protocol::client_entry::ClientTarget;
+        let wk = "autodesk-rqhost-p063";
+        let app = "counter";
+        let target_of = |t: &ClientTarget, wk: &str| match t {
+            ClientTarget::Rqhost { wellknown, .. } => wellknown == wk,
+            _ => false,
+        };
+        // rq / remote / rqhost 别名 → remote=true + Rqhost。
+        for v in ["remote", "rq", "rqhost", "REMOTE"] {
+            let (remote, target) = resolve_vm_rq_base(Some(v), None, wk, app).unwrap();
+            assert!(remote, "{v} = 精确 remote");
+            assert!(target_of(&target, wk), "{v} = Rqhost 采纳");
+        }
+        // desktop + 端点 → remote=true + Desktop{endpoint}。
+        let (remote, target) =
+            resolve_vm_rq_base(Some("desktop"), Some("desk-pipe-1"), wk, app).unwrap();
+        assert!(remote);
+        match target {
+            ClientTarget::Desktop {
+                endpoint,
+                app_name,
+            } => {
+                assert_eq!(endpoint, "desk-pipe-1");
+                assert_eq!(app_name, app);
+            }
+            ClientTarget::Rqhost { .. } | ClientTarget::Direct(_) | ClientTarget::Broker { .. } => {
+                panic!("desktop 应为 Desktop target")
+            }
+        }
+        // desktop 缺端点 = 具名报错（提示先启动桌面，不代孵不静默）。
+        //（Ok 侧 ClientTarget 非 Debug——match 取 Err，勿 unwrap_err。）
+        let err = match resolve_vm_rq_base(Some("desktop"), None, wk, app) {
+            Err(e) => e,
+            Ok(_) => panic!("desktop 缺端点应报错"),
+        };
+        assert!(err.contains("--desktop-endpoint") && err.contains("虚拟桌面"), "{err}");
+        let err = match resolve_vm_rq_base(Some("desktop"), Some("  "), wk, app) {
+            Err(e) => e,
+            Ok(_) => panic!("desktop 空白端点应报错"),
+        };
+        assert!(err.contains("虚拟桌面"), "空白端点同律: {err}");
+        // queue / independent / 未知 / 缺席 → legacy queue（remote=false）。
+        for v in [Some("queue"), Some("independent"), Some("weird")] {
+            let (remote, target) = resolve_vm_rq_base(v, None, wk, app).unwrap();
+            assert!(!remote, "{v:?} 不冒 remote");
+            assert!(target_of(&target, wk));
+        }
+        let (remote, target) = resolve_vm_rq_base(None, None, wk, app).unwrap();
+        assert!(!remote && target_of(&target, wk), "缺席 = legacy queue 既有行为");
+        // 空串 = 未声明（同缺席）。
+        let (remote, _) = resolve_vm_rq_base(Some(""), None, wk, app).unwrap();
+        assert!(!remote);
+    }
 
     /// PLAN-876 REV2（F-876-R-07）：`auto` 目录探测含 Windows `auto.cmd`
     /// 包装名；名字优先级 `.exe` > `.cmd` > 无后缀，且只认真实存在的文件。
@@ -2243,6 +2470,7 @@ mod tests {
             had_window: false,
             opened: 0,
             last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
             mem_ticks: 0,
         };
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -2347,6 +2575,109 @@ mod tests {
         serve.stop(&pipe);
     }
 
+    /// PLAN-063 T-03/T-04（V-02/V-09 线级）：修饰位真实携带 + 键释放沿
+    ///（tag 5 首个生产者）+ 焦点沿（ControlMsg::Focus 首个生产者）——
+    /// 单客户端三型按序到达；事件臂后联泵不引入串扰。
+    #[test]
+    fn p063_keyrelease_focus_modifiers_reach_client() {
+        use crate::ui::session::LiveInput;
+
+        let pipe = pid_pipe("p063kf");
+        let (serve, _claim) = start_serve(&pipe);
+        let (_, mut app_end) = adopt(&pipe, "p063client", 2000).expect("adopt");
+        app_end.send(&hello("p063client", "p063client")).unwrap();
+        let mut state = RqDaemon {
+            serve: Arc::clone(&serve),
+            claim: None,
+            wellknown: pipe.clone(),
+            ids: RqIds::default(),
+            clients: Vec::new(),
+            had_window: false,
+            opened: 0,
+            last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
+            mem_ticks: 0,
+        };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while state.clients.is_empty() {
+            let pending: Vec<_> = state.serve.pending.lock().unwrap().drain(..).collect();
+            for (name, end) in pending {
+                if let Some((client, _)) = adopt_one(name, end, &mut state.ids, 3000) {
+                    state.clients.push(client);
+                }
+            }
+            assert!(std::time::Instant::now() < deadline, "客户端 5s 未落地");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let win = iced::window::Id::unique();
+        state.clients[0].window = Some(win);
+        let wid = state.clients[0].inner.wid.unwrap().0;
+        // 消费握手回包（Welcome/BufferAlloc）。
+        let _ = app_end.recv_wait(500);
+        let _ = app_end.recv_wait(500);
+
+        // 修饰态落簿 → 按下携带真修饰位（此前恒 0）。
+        let _ = rq_update(
+            &mut state,
+            RqMessage::ModifiersChanged { modifiers: 3 },
+        );
+        let _ = rq_update(
+            &mut state,
+            RqMessage::PointerPressed {
+                window: win,
+                button: iced::mouse::Button::Left,
+            },
+        );
+        // 键释放沿（LiveInput::KeyReleased → tag 5）。
+        let _ = rq_update(
+            &mut state,
+            RqMessage::Live {
+                window: win,
+                input: LiveInput::KeyReleased {
+                    key: 13,
+                    modifiers: 3,
+                },
+            },
+        );
+        // 焦点沿（WindowFocus → ControlMsg::Focus）。
+        let _ = rq_update(
+            &mut state,
+            RqMessage::WindowFocus {
+                window: win,
+                focused: true,
+            },
+        );
+
+        // 按序断言：press(modifiers=3) → KeyReleased(3) → Focus(true)。
+        let got = app_end.recv_wait(2000).expect("press").expect("解码");
+        match got {
+            ProtocolMsg::Input(InputMsg::PointerPressed { wid: w, modifiers, .. }) => {
+                assert_eq!(w, wid);
+                assert_eq!(modifiers, 3, "修饰位应真实携带（非恒 0）");
+            }
+            other => panic!("期待 PointerPressed: {other:?}"),
+        }
+        let got = app_end.recv_wait(2000).expect("key release").expect("解码");
+        match got {
+            ProtocolMsg::Input(InputMsg::KeyReleased { wid: w, key, modifiers }) => {
+                assert_eq!(w, wid);
+                assert_eq!(key, 13);
+                assert_eq!(modifiers, 3);
+            }
+            other => panic!("期待 KeyReleased: {other:?}"),
+        }
+        let got = app_end.recv_wait(2000).expect("focus").expect("解码");
+        match got {
+            ProtocolMsg::Control(ControlMsg::Focus { wid: w, focused }) => {
+                assert_eq!(w, wid);
+                assert!(focused);
+            }
+            other => panic!("期待 Control::Focus: {other:?}"),
+        }
+
+        serve.stop(&pipe);
+    }
+
     /// T-07/P031-R3：末窗退出门单测——rq_update 真行为驱动（WindowClosed
     /// 消息），三负一正：双窗在册不退 / 单窗在册不退 / 曾有窗但有待定
     /// 采纳不退 / 末窗且无待定且曾有窗 → 停机旗标置位（iced::exit 的
@@ -2372,6 +2703,7 @@ mod tests {
             had_window: false,
             opened: 0,
             last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
             mem_ticks: 0,
         };
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -2446,6 +2778,7 @@ mod tests {
             had_window: false,
             opened: 0,
             last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
             mem_ticks: 0,
         };
         let ghost = iced::window::Id::unique();
@@ -2647,6 +2980,7 @@ mod tests {
             had_window: false,
             opened: 0,
             last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
             mem_ticks: 0,
         };
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -2874,6 +3208,7 @@ mod tests {
             had_window: false,
             opened: 0,
             last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
             mem_ticks: 0,
         };
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -3066,6 +3401,7 @@ mod tests {
             had_window: false,
             opened: 0,
             last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
             mem_ticks: 0,
         };
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);

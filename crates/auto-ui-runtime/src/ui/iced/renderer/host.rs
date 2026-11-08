@@ -5937,6 +5937,27 @@ fn run_session(
                                         }
                                         return iced::Task::none();
                                     }
+                                    // PLAN-063 T-03（G-04）：hover 下行——WM
+                                    // 未消费（无拖拽/缩放交互进行）时，指针
+                                    // 移动投递命中 broker 客户端（rqhost
+                                    // daemon CursorMoved 臂同语义；此前桌面
+                                    // 会话无 PointerMoved 生产，outproc 子面
+                                    // hover 态缺席）。
+                                    {
+                                        let hit = state
+                                            .host
+                                            .as_ref()
+                                            .and_then(|h| h.wm.hit_test(x, y));
+                                        if let Some(wid) = hit {
+                                            if state
+                                                .broker_clients
+                                                .values()
+                                                .any(|c| c.owns_wid(wid))
+                                            {
+                                                state.broker_pointer_move(x, y);
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

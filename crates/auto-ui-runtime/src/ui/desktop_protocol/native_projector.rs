@@ -3768,20 +3768,28 @@ mod tests {
     }
 
     /// AUTO_NO_AUTOCENTER=1 → 通道旁路（构造期读取——nextest 逐测试
-    /// 进程隔离，env 置位零串染）。
+    /// 进程隔离，env 置位零串染）。PLAN-063 V-11 根因修复：**必须还原**
+    /// ——`cargo test --test-threads=1`（desktop_protocol 顺序滤程）同
+    /// 进程共享 env，置位不撤销会让后续所有 `RqProjector::new` 旁路
+    /// 居中（autocenter_translates_hits_with_ops 布局漂移假红）。
     #[test]
     fn autocenter_env_gate_bypasses_translation() {
         std::env::set_var("AUTO_NO_AUTOCENTER", "1");
-        let mut p = RqProjector::new(PlainProbe, 480.0, 320.0);
-        let frame = p.render_frame();
-        let xs: Vec<f32> = frame
-            .ops
-            .iter()
-            .filter_map(|op| match op {
-                DrawOp::Text { x, .. } | DrawOp::TextStyled { x, .. } => Some(*x),
-                _ => None,
-            })
-            .collect();
+        // panic 安全还原：断言失败也不把 env 串染给顺序滤程的后续测试。
+        let result = std::panic::catch_unwind(|| {
+            let mut p = RqProjector::new(PlainProbe, 480.0, 320.0);
+            let frame = p.render_frame();
+            frame
+                .ops
+                .iter()
+                .filter_map(|op| match op {
+                    DrawOp::Text { x, .. } | DrawOp::TextStyled { x, .. } => Some(*x),
+                    _ => None,
+                })
+                .collect::<Vec<f32>>()
+        });
+        std::env::remove_var("AUTO_NO_AUTOCENTER");
+        let xs = result.expect("env 门测试自身不应 panic");
         assert_eq!(xs.len(), 1);
         assert!(
             (xs[0] - MARGIN).abs() < 1.0,

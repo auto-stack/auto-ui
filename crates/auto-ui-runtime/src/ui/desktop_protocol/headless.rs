@@ -54,6 +54,77 @@ pub(crate) fn ensure_headless_fonts() {
     });
 }
 
+/// PLAN-063 T-03（rq-fidelity-contract §3 缺口"剪贴板 Null"关闭）：
+/// headless/远程客户端的 iced widget 剪贴板面——OS 桥（arboard，与
+/// direct 的 handler 面 [crate::ui::clipboard] 同源）。此前 `clipboard::Null`
+/// 使 widget 内 Ctrl+C/V 复制粘贴在远程轨静默失效（direct winit 臂读
+/// 同一 OS 剪贴板——同源 direct 是兼容基准）。Primary（X11/Wayland
+/// 选择区）在 Windows 无对应：read None / write 忽略，与 direct winit
+/// 行为同律；Clipboard 族往返与可用性由 V-02 真实负控核验。
+pub struct OsClipboard;
+
+impl iced::advanced::clipboard::Clipboard for OsClipboard {
+    fn read(&self, kind: iced::advanced::clipboard::Kind) -> Option<String> {
+        match kind {
+            iced::advanced::clipboard::Kind::Standard => crate::ui::clipboard::clipboard_get(),
+            iced::advanced::clipboard::Kind::Primary => None,
+        }
+    }
+
+    fn write(&mut self, kind: iced::advanced::clipboard::Kind, contents: String) {
+        if kind == iced::advanced::clipboard::Kind::Standard {
+            crate::ui::clipboard::clipboard_set(&contents);
+        }
+    }
+}
+
+#[cfg(test)]
+mod p063_clipboard_tests {
+    use super::*;
+
+    /// PLAN-063 T-03（G-01/V-02）：widget 剪贴板面 OS 往返——OsClipboard
+    /// write→read 闭环（与 direct handler 面同源 arboard；Primary 无对应
+    /// = None/忽略同 direct winit 律）。环境探针先行：provider 裸面
+    /// set→get 失败 = 本机剪贴板被占（外部环境，2026-11-08 共享机实录）
+    /// → 跳过不冒红；provider 通而 trait 面断 = 真缺陷必须红。
+    #[test]
+    fn p063_os_clipboard_roundtrip() {
+        #[cfg(windows)]
+        let _global = match crate::ui::clipboard_native::GlobalClipboardTestLock::acquire() {
+            Some(g) => g,
+            None => return, // 拿锁超时视同 headless 跳过
+        };
+        // provider 裸面探针（环境门）：失败 = 环境不可验，跳过。
+        if !crate::ui::clipboard::clipboard_set("p063-probe")
+            || crate::ui::clipboard::clipboard_get().as_deref() != Some("p063-probe")
+        {
+            eprintln!("[p063] provider 裸面 set→get 失败——本机剪贴板环境不可验，跳过");
+            return;
+        }
+        let mut cb = OsClipboard;
+        use iced::advanced::clipboard::Clipboard as _;
+        use iced::advanced::clipboard::Kind;
+        cb.write(Kind::Standard, "p063-os-clipboard-roundtrip".to_string());
+        assert_eq!(
+            cb.read(Kind::Standard).as_deref(),
+            Some("p063-os-clipboard-roundtrip"),
+            "widget 面 write→read OS 往返"
+        );
+        // Primary：Windows 无选择区——读 None 写忽略（不污染 Standard）。
+        cb.write(Kind::Primary, "should-be-ignored".to_string());
+        assert_eq!(
+            cb.read(Kind::Primary),
+            None,
+            "Primary 读 None（同 direct winit 律）"
+        );
+        assert_eq!(
+            cb.read(Kind::Standard).as_deref(),
+            Some("p063-os-clipboard-roundtrip"),
+            "Primary 写不污染 Standard"
+        );
+    }
+}
+
 /// headless 会话表面：组件 + 视口 + iced widget 树缓存。
 /// 帧循环（T-02 扩展 revision 门控）：`render_frame` = view() →
 /// UserInterface::build（复用 Cache 状态树 diff）→ draw（tiny_skia 记录）
@@ -488,13 +559,16 @@ where
         // RedrawRequested 先行（iced_test snapshot 同款驱动）——部分 widget
         // 首帧状态推进依赖一次 redraw 事件。
         let mut messages = Vec::new();
+        // PLAN-063 T-03：widget 剪贴板面接 OS 桥（此前 Null——远程轨
+        // Ctrl+C/V 静默失效）。
+        let mut clipboard = OsClipboard;
         let (state, _) = ui.update(
             &[iced::Event::Window(iced::window::Event::RedrawRequested(
                 iced::time::Instant::now(),
             ))],
             self.cursor,
             &mut renderer,
-            &mut iced::advanced::clipboard::Null,
+            &mut clipboard,
             &mut messages,
         );
         // PLAN-690 T-01：State::Updated.input_method / mouse_interaction
@@ -540,11 +614,14 @@ where
         );
         let mut messages = Vec::new();
         if !events.is_empty() {
+            // PLAN-063 T-03：事件路径同接 OS 桥剪贴板（与 drive_and_draw
+            // 同面——Ctrl+V 粘贴在 KeyPressed 事件轮内读 OS 剪贴板）。
+            let mut clipboard = OsClipboard;
             let _ = ui.update(
                 events,
                 self.cursor,
                 &mut renderer,
-                &mut iced::advanced::clipboard::Null,
+                &mut clipboard,
                 &mut messages,
             );
             // 截获面不在事件路径：iced_winit 只在 RedrawRequested 处理臂
@@ -1384,6 +1461,23 @@ where
         if let ControlMsg::Resize { width, height, .. } = control {
             if self.surface.resize(*width, *height) {
                 self.rev += 1;
+            }
+        }
+        // PLAN-063 T-03（G-05）：焦点沿——ControlMsg::Focus → iced 窗
+        // 焦点事件（direct winit 同律；客户端 focus/blur widget 态）。
+        if let ControlMsg::Focus { focused, .. } = control {
+            let ev = iced::window::Event::Focused;
+            let ev = if *focused {
+                ev
+            } else {
+                iced::window::Event::Unfocused
+            };
+            let msgs = self.surface.update(&[iced::Event::Window(ev)]);
+            if !msgs.is_empty() {
+                self.rev += 1;
+                for m in msgs {
+                    self.surface.component.on(m);
+                }
             }
         }
     }

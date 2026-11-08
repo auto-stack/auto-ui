@@ -3075,6 +3075,14 @@ pub enum LiveInput {
         key: u32,
         modifiers: u8,
     },
+    /// PLAN-063 T-03（G-02）：Named 键释放（同 VK 表）——远程轨此前
+    /// 不转发释放（InputMsg::KeyReleased tag 5 有线无产），iced widget
+    /// 侧按键沿（release 触发的快捷/手势面）缺事件；headless v2 臂
+    /// 转 iced KeyReleased，v1 投影器忽略。
+    KeyReleased {
+        key: u32,
+        modifiers: u8,
+    },
     /// 可打印 text（逐字符 `broker_char`——CharTyped 语义；控制字符在
     /// 投影器 char_typed 侧被滤，此处原样透传）。
     Chars {
@@ -3160,9 +3168,9 @@ pub fn named_key_vk(name: &iced::keyboard::key::Named) -> Option<u32> {
 }
 
 /// 键盘事件 → live 输入（纯函数）：`KeyPressed` Named → VK 转发；
-/// Character 且有 text → `Chars`；`KeyReleased`/`ModifiersChanged` 不
-/// 转发（broker 无 key_released、修饰态由 `__modifiers_changed` 独立
-/// 维护）。
+/// Character 且有 text → `Chars`；`KeyReleased` Named → VK 转发
+///（PLAN-063 T-03 G-02——release 沿同表，Character 释放不转发）；
+/// `ModifiersChanged` 不转发（修饰态由 `__modifiers_changed` 独立维护）。
 pub fn live_inputs_from_keyboard(kb: &iced::keyboard::Event) -> Vec<LiveInput> {
     match kb {
         iced::keyboard::Event::KeyPressed {
@@ -3185,6 +3193,21 @@ pub fn live_inputs_from_keyboard(kb: &iced::keyboard::Event) -> Vec<LiveInput> {
                 .map(|t| {
                     vec![LiveInput::Chars {
                         text: t.to_string(),
+                    }]
+                })
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        },
+        iced::keyboard::Event::KeyReleased {
+            key,
+            modifiers,
+            ..
+        } => match key {
+            iced::keyboard::Key::Named(name) => named_key_vk(name)
+                .map(|key| {
+                    vec![LiveInput::KeyReleased {
+                        key,
+                        modifiers: wire_modifiers(modifiers),
                     }]
                 })
                 .unwrap_or_default(),
@@ -3729,16 +3752,49 @@ impl DesktopSession {
     }
 
     pub fn wm_focus(&mut self, wid: Wid) {
+        let prev = self.host.as_ref().and_then(|h| h.wm.focused);
         if let Some(host) = self.host.as_mut() {
             host.wm.focus(wid);
+        }
+        // PLAN-063 T-03（G-05）：焦点变化 → ControlMsg::Focus 下发
+        //（旧焦点窗 blur、新焦点窗 focus；broker 客户端的 iced 焦点沿
+        // 与 direct 同律。WmState::focus 幂等——同 wid 重复聚焦不下发）。
+        if prev != Some(wid) {
+            if let Some(old) = prev {
+                self.broker_send_focus(old, false);
+            }
+            self.broker_send_focus(wid, true);
+        }
+    }
+
+    /// PLAN-063 T-03（G-05）：`ControlMsg::Focus` 下发（命中 broker 客户端
+    /// 才发；v1 投影器 on_control 忽略）。
+    fn broker_send_focus(&mut self, wid: Wid, focused: bool) {
+        use crate::ui::desktop_protocol::message::{ControlMsg, ProtocolMsg};
+        let msg = ProtocolMsg::Control(ControlMsg::Focus {
+            wid: wid.0,
+            focused,
+        });
+        for client in self.broker_clients.values_mut() {
+            if client.owns_wid(wid) {
+                let _ = client.end.send(&msg);
+            }
         }
     }
 
     /// PLAN-526 T20：软聚焦（GlobalPress 点击聚焦专用；置顶推迟到 mouse
     /// released 偿还，见 [`WmState::focus_soft`]）。
     pub fn wm_focus_soft(&mut self, wid: Wid) {
+        let prev = self.host.as_ref().and_then(|h| h.wm.focused);
         if let Some(host) = self.host.as_mut() {
             host.wm.focus_soft(wid);
+        }
+        // PLAN-063 T-03（G-05）：软聚焦同焦点沿下发（wm_focus 同律）。
+        if prev != Some(wid) {
+            if let Some(old) = prev {
+                self.broker_send_focus(old, false);
+            }
+            self.broker_send_focus(wid, true);
         }
     }
 
@@ -5026,6 +5082,9 @@ impl DesktopSession {
             }
         };
         self.wm_focus(wid);
+        // PLAN-063 T-03（G-03）：修饰位循环外先取（broker_clients 可变
+        // 借用冲突；desktop.current_modifiers 事实源——此前恒 0）。
+        let modifiers = self.desktop_modifiers_wire();
         let rect = {
             let Some(host) = self.host.as_ref() else {
                 return false;
@@ -5042,12 +5101,14 @@ impl DesktopSession {
                 // 指针永远落在错误控件上（calendar「>」delivered=true 但无反应）。
                 let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
                     !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
+                // PLAN-063 T-03（G-03）：真修饰位（desktop.current_modifiers
+                // 事实源——此前恒 0，shift/ctrl 点击子面不可区分）。
                 let input = ProtocolMsg::Input(InputMsg::PointerPressed {
                     wid: wid.0,
                     button,
                     x: lx,
                     y: ly,
-                    modifiers: 0,
+                    modifiers,
                 });
                 return client.end.send(&input).is_ok();
             }
@@ -5079,16 +5140,19 @@ impl DesktopSession {
             };
             (wid, rect)
         };
+        // PLAN-063 T-03（G-03）：修饰位循环外先取（同 press）。
+        let modifiers = self.desktop_modifiers_wire();
         for client in self.broker_clients.values_mut() {
             if client.owns_wid(wid) {
                 let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
                     !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
+                // PLAN-063 T-03（G-03）：release 同 press 真修饰位。
                 let input = ProtocolMsg::Input(InputMsg::PointerReleased {
                     wid: wid.0,
                     button,
                     x: lx,
                     y: ly,
-                    modifiers: 0,
+                    modifiers,
                 });
                 return client.end.send(&input).is_ok();
             }
@@ -5123,6 +5187,84 @@ impl DesktopSession {
             }
         }
         false
+    }
+
+    /// PLAN-063 T-03（G-02）：键释放路由（`broker_key_event` 收尾镜像
+    /// ——同焦点窗，`InputMsg::KeyReleased`；v1 投影器忽略，headless
+    /// v2 臂转 iced KeyReleased）。
+    pub fn broker_key_released(&mut self, key: u32, modifiers: u8) -> bool {
+        use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
+        let wid = {
+            let Some(host) = self.host.as_ref() else {
+                return false;
+            };
+            match host.wm.focused {
+                Some(w) => w,
+                None => return false,
+            }
+        };
+        let input = ProtocolMsg::Input(InputMsg::KeyReleased {
+            wid: wid.0,
+            key,
+            modifiers,
+        });
+        for client in self.broker_clients.values_mut() {
+            if client.owns_wid(wid) {
+                return client.end.send(&input).is_ok();
+            }
+        }
+        false
+    }
+
+    /// PLAN-063 T-03（G-04）：hover 路由——指针命中窗属 broker 客户端
+    /// 时投递 `PointerMoved`（rqhost daemon 同语义；桌面会话此前无
+    /// hover 生产，outproc 子面 hover 态缺席）。不聚焦不动 z；
+    /// 坐标换算与 [`Self::broker_pointer_down`] 同律（rect 投影缩放）。
+    pub fn broker_pointer_move(&mut self, x: f32, y: f32) -> bool {
+        use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
+        let Some(host) = self.host.as_ref() else {
+            return false;
+        };
+        let Some(wid) = host.wm.hit_test(x, y) else {
+            return false;
+        };
+        if !self.broker_clients.values().any(|c| c.owns_wid(wid)) {
+            return false;
+        }
+        let rect = match host.wm.wins.get(&wid) {
+            Some(v) => *v.rect.borrow(),
+            None => return false,
+        };
+        let mut routed = false;
+        for client in self.broker_clients.values_mut() {
+            if client.owns_wid(wid) {
+                if let Some((lx, ly)) = broker_surface_local(
+                    client,
+                    wid,
+                    x - rect.x,
+                    y - rect.y,
+                    rect.width,
+                    rect.height,
+                    !self.desktop.shell_pseudo_wids.contains(&wid),
+                ) {
+                    let msg = ProtocolMsg::Input(InputMsg::PointerMoved {
+                        wid: wid.0,
+                        x: lx,
+                        y: ly,
+                    });
+                    routed |= client.end.send(&msg).is_ok();
+                }
+            }
+        }
+        routed
+    }
+
+    /// PLAN-063 T-03（G-03）：宿主修饰态 → wire 修饰位（事实源
+    /// `desktop.current_modifiers`——`__modifiers_changed` 臂维护；
+    /// 缺席 = 0 与旧行为同）。
+    fn desktop_modifiers_wire(&self) -> u8 {
+        let m = self.desktop.current_modifiers.borrow();
+        crate::ui::session::wire_modifiers(&m)
     }
 
     /// 桌面级字符输入路由：焦点窗 → (Wid, CharTyped) 注入。
@@ -5248,6 +5390,10 @@ impl DesktopSession {
     pub fn route_live_input(&mut self, input: &LiveInput) -> bool {
         match input {
             LiveInput::KeyPressed { key, modifiers } => self.broker_key_event(*key, *modifiers),
+            // PLAN-063 T-03（G-02）：release 沿同焦点窗路由。
+            LiveInput::KeyReleased { key, modifiers } => {
+                self.broker_key_released(*key, *modifiers)
+            }
             LiveInput::Chars { text } => {
                 let mut routed = false;
                 for ch in text.chars() {
