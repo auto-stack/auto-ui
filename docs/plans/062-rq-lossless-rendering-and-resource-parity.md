@@ -1,11 +1,11 @@
 ---
 plan_id: PLAN-062
-status: execution_done
+status: executing
 feature_name: RQ无损原语、文字图形与资源重放
 author: [Codex]
 created_at: 2026-11-05
-updated_at: 2026-11-07
-plan_revision: 4
+updated_at: 2026-11-08
+plan_revision: 5
 current_step: 5
 total_steps: 7
 depends_on: [auto-ui/PLAN-061]
@@ -76,6 +76,13 @@ Rust、现有iced/wgpu、desktop_protocol二进制消息/共享资源；当前Wi
 - 驻留且未变font/image/mesh资源重复帧不重复上传payload/创建GPU资源；合法失效、驱逐、重建单列，不重整形App已定位的文字。片段复用先实证，不默认重做全局增量场景。
 - 及时响应输入/资源完成并按deadline/present调度，固定15ms轮询不能是唯一驱动；在途帧/字节有上限，可合并过期画面但不能丢输入、资源依赖或业务副作用。
 - per-App上传/资源/CPU工作预算与公平调度必须有轻重混合负控；长任务分批/限流，不能假设任意GPU命令可抢占。Host/device loss仍是共享故障域，不冒完全隔离。
+- **测量窗口与 replay 口径（2026-11-08 r5 裁定，用户批准）**：所有计时断言只在**隔离窗口**执行
+  （`AUTO_RQ_TIMING_WINDOW=isolated`），共享窗口只记录并逐行标 `timing_gate=skipped_shared_window`——
+  Plan §6 本就规定性能测量不得与其他会话争用 GPU，而实测负载会把同一份代码放大 3–6 倍
+  （replay p50 4.1→10ms、p95 max 40ms；SVG produce p50 32→76ms）。replay 相对 direct 的判据改为
+  **p50 ≤1.25×direct p50+2.0ms 设门、p95 只记录**（20 样本下 p95≈次大值；公平轮转测量还证伪了
+  “重放固定开销”假设：空帧 canvas 7.58/10.38ms 快于纯 widget 树 8.23/15.15ms，text_50≈empty）。
+  produce 的 W-C ≤10ms 与 SVG 具名例外（p50 ≤60ms，安静机记录值 ≈32.5ms）不变。
 - 数值预算由UI061先量原direct基线、在候选比较前冻结：逐workload列单位/统计量/绝对与相对上限/样本/owner/失败处理。本轮无数值或测量结论；后继缺预算或必要测量不能签性能PASS，超标不得测后改阈值。
 
 ### 任务落点
@@ -99,7 +106,7 @@ T-02：`crates/auto-ui-runtime/src/ui/desktop_protocol/headless.rs`及`message.r
 |---|---|---|---|---|
 | V-01 | AC-01 | UI061能力表、原direct金样、同source VM/Rust绘图fixture六格（§5） | 每个绘图ID有真实输出，结构/资源与像素对拍；旧direct未退化；必要平台未测明确阻塞 | T-01/T-05；全部现有绘图能力 |
 | V-02 | AC-02 | mesh+SVG+raw text、RTL/连字/中文回退、rotation/shear、blur/clip叠层；删除命令/替换font反控 | 默认模式：布局/命令/资源结构一致 + 客户区像素差 ≤0.1%（矩阵设门，梯度/阴影例同样受门）；v3 富模式：glyph 坐标对 `physical()` 全等、阴影与 shader 同式，像素差按族具名上界（glyph run ≤1.0%、含阴影贴片 ≤1.5%）记录；原反控必红；无省略日志冒PASS | T-02/T-05；字体与原语 |
-| V-07 | AC-07 | 生产双进程慢Host、突发帧与媒体资源更新、原direct对照 | 队列帧/字节峰值在预算内；只合并过期画面而保资源/输入依赖，M-01～06/M-08按触面通过；默认 produce p95 ≤10ms（SVG 例外具名、单列不抵扣） | T-04/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
+| V-07 | AC-07 | 生产双进程慢Host、突发帧与媒体资源更新、原direct对照 | 队列帧/字节峰值在预算内；只合并过期画面而保资源/输入依赖，M-01～06/M-08按触面通过；默认 produce p95 ≤10ms（SVG 例外具名、单列不抵扣）；replay **p50** ≤1.25×direct p50+2ms 设门、p95 记录；计时门在隔离窗口（`AUTO_RQ_TIMING_WINDOW=isolated`）签收 | T-04/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
 | V-03 | AC-03 | 图片更新/视频帧/thumbnail、重用ID不同generation、释放后重建、缺资源与健康对照 | 资源只在正确surface生效、尺寸/alpha/采样一致、失败保旧、GPU在用时不早释；最后owner释放 | T-03/T-05；所有资源族 |
 | V-04 | AC-04 | 双进程坏长度/乘积溢出/NaN/栈错配、未知required capability、慢Host/旧ACK/乱序资源 | 入帧前明确拒绝、旧完整帧保持，队列有界，资源与传输槽回收不混淆；旧合法协议控制仍可用 | T-04/T-05；协议事务与生命周期 |
 | V-05 | AC-07 | 批量帧、延迟ACK、槽满与旧ACK；逐图元同步反控 | 稳态无逐图元往返/强制逐帧呈现屏障，按信用有界流水与背压；M-04消息/等待证据 | T-02/T-04/T-05；work；本Plan职责，机制相同且身份未变证据可复用 |
@@ -134,7 +141,7 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | AC-04 | work | 协商/兼容、坏帧保旧、背压和generation负控通过，未知必需能力显式拒绝 |
 | AC-05 | review | 独立上下文逐项验证当前修订AC/V、真实源和规范增量，所有必需项有可复核证据；不能只读完成勾选 |
 | AC-06 | merge | 通过后按依赖顺序合入、canonical读回、路线回填，归档/guard/材料清理与恢复摘要完整；交付边界如实记录 |
-| AC-07 | work | 真实producer/协议/Replay满足P-01/P-02及P-03队列、P-04资源/工作隔离；V-05～08证明驻留不重复上传、慢Host不覆盖/无界增长、混合负载有进展；默认 producer 的 produce p95 满足 061 冻结的 W-C ≤10ms；**唯一具名例外** = SVG 例（≈32.5ms，根因是记录路径每帧新建 iced renderer，需独立任务修复），该例外不得冲抵其它 workload，也不得据此宣称性能 PASS；本职责M指标满足UI061冻结预算，端到端不得借单测冒通过（2026-11-07 r4 裁定）。 |
+| AC-07 | work | 真实producer/协议/Replay满足P-01/P-02及P-03队列、P-04资源/工作隔离；V-05～08证明驻留不重复上传、慢Host不覆盖/无界增长、混合负载有进展；**默认 producer 的 produce p95 满足 061 冻结的 W-C ≤10ms**，**唯一具名例外** = SVG 例（安静机记录值 ≈32.5ms、负载下实测 p50 可到 45–60ms；上限设 p50 ≤60ms 以吸收主机负载，根因是记录路径每帧新建 iced renderer，需独立任务修复），该例外不得冲抵其它 workload，也不得据此宣称性能 PASS；**replay 相对 direct 的口径（2026-11-08 r5 裁定）**：稳态 **p50 ≤1.25×direct p50+2.0ms 设门**，p95 只记录不设门（20 样本下 p95≈次大值，实测同代码在 4.1–10ms 间随主机负载变化、max 可到 40ms；公平轮转测量证伪了“重放固定开销”假设——空帧 canvas 7.58/10.38ms 快于纯 widget 树 8.23/15.15ms）；**所有计时门只在隔离窗口签收**（`AUTO_RQ_TIMING_WINDOW=isolated`，共享窗口只记录并标 `timing_gate=skipped_shared_window`）；本职责M指标满足UI061冻结预算，端到端不得借单测冒通过。 |
 
 ## 8. 执行步骤
 
@@ -645,3 +652,16 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 
 - stage: user | plan_id: PLAN-062 | plan_revision: r4 | round: 26 | from: user | to: new | status: execution_done | outcome: pass（裁定：r5 修订 AC-07 的 replay 口径；不改目标/范围/仓库集合） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: ecf8496c | next: new（r5 合同修订）
 - **用户裁定（2026-11-08，基于公平轮转测量）**：AC-07 的 replay 条款改为“**p50 设门 + p95 记录**，且只在隔离窗口签收”；同时把 SVG 例外的“记录值 ≈32.5ms”与“上限 ≤60ms p50（吸收主机负载）”区分清楚；在 Spec/AC 里具名本主机测量限制（同一代码在 4.1–10ms 间随负载变化，max 可到 40ms）。目标、AC 的其余部分、范围与仓库集合不变，属有界合同修订（r5）。
+
+### 2026-11-08 r5 合同修订（AC-07 replay 口径，用户批准）
+
+- stage: new | plan_id: auto-ui/PLAN-062 | plan_revision: **r5**（r4→r5，语义合同修订） | outcome: pass（合同修订，不是实现验收） | next: work（按 r5 复跑隔离窗口并交第四轮 final review）
+- 授权：用户 2026-11-08 两次选择——先选“实现直绘路径”，在我用**公平轮转测量证伪“canvas 固定开销”假设**后，改选 **r5 修订 AC-07 的 replay 口径**。目标、非目标、仓库集合、其余 AC 与任务集均不变。
+- 修订内容：
+  1. **AC-07**：replay 相对 direct 改为 **p50 ≤1.25×direct p50+2.0ms 设门、p95 只记录**；**所有计时门只在隔离窗口签收**（共享窗口记录并标 `skipped_shared_window`）；SVG 例外区分“安静机记录值 ≈32.5ms”与“上限 p50 ≤60ms（吸收主机负载）”。
+  2. **V-07**（§6 主行）：同步为新口径。
+  3. **§5 性能合同**：新增“测量窗口与 replay 口径”条目，写明实测依据（负载放大 3–6 倍；公平测量：empty 7.58/10.38 vs plain 8.23/15.15；text_50≈empty）与“共享窗口绿灯不证明 W-C/replay 预算”。
+  4. SD-01 目标页 §5.3 已在实现轮次写入同一口径，无需再改表结构。
+- 依据（本会话实测，见 §9 前文）：`rq_perf_replay_shapes` 公平轮转表；review6 的 isolated 数值；matrix/probe 在共享窗口的负载放大记录。
+- 保留：r1–r4 历史与全部 §9 收据；status 回 `executing`（技能要求：语义修订前把 execution_done 退回 executing），T-01..T-05 保持 [x]，`current_step=5`。
+- 未做：本轮未改实现、未改 Spec 正文（仅 Plan 合同）、未做独立 final review；AC-05/T-06 与 AC-06/T-07 仍待办。
