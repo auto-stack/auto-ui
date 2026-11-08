@@ -825,6 +825,23 @@ impl<S: FrameSource> ClientPump<S> {
                 }
                 None
             }
+            // PLAN-063 T-05（V-11 根因修复，AC-02 resize 腿）：视口同步
+            // 臂此前缺席——宿主 `sync_broker_client_viewport` 的
+            // `FrameMsg::Resize`（采纳期 rect 缩放/桌面可用区钳制 ≠ Hello
+            // 尺寸；rqhost 宿主窗 resize 同型）在泵侧被静默丢弃，子面恒
+            // Hello 尺寸渲染，与宿主命中表/坐标换算错位（t2/t3/stress
+            // 点击族系统性红根因）。转发端点（宽高更新 + session
+            // on_control）并按新视口立即产帧（resize 中途不丢帧）。
+            ProtocolMsg::Frame(FrameMsg::Resize { .. }) => {
+                let app = self.endpoint.as_mut()?;
+                if app.on_message(msg).is_err() {
+                    return self.on_disconnect();
+                }
+                if app.state == AppState::Active {
+                    self.push_frame();
+                }
+                None
+            }
             ProtocolMsg::Control(ControlMsg::L2Detach { .. }) => {
                 let replies = match self.endpoint.as_mut()?.on_message(msg) {
                     Ok(r) => r,

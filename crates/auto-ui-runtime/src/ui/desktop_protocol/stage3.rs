@@ -3193,39 +3193,14 @@ mod tests {
         session.enable_broker(&broker_pipe, Arc::clone(&stop));
 
         // 孪生投影器（同源布局 → 命中坐标；PLAN-033 T-04 迁 native——
-        // 与子进程同布局引擎）。
-        let twins: Vec<(String, RqProjector<crate::ui::dynamic::DynamicComponent>)> = names
-            .iter()
-            .map(|n| {
-                let src = example_source(n);
-                let comp = crate::build_dynamic_component(&src, None).expect("twin build");
-                // PLAN-678：孪生与 T3 子臂同态（双侧缺省居中）。
-                let mut p = RqProjector::new(comp, T3_W, T3_H);
-                {
-                    use crate::ui::desktop_protocol::endpoint::FrameSource;
-                    p.render_frame();
-                }
-                (n.clone(), p)
-            })
-            .collect();
-        let twin_hit = |app: &str, needle: &str| -> Option<(f32, f32)> {
-            twins.iter().find(|(n, _)| n == app).and_then(|(_, p)| {
-                p.hit_regions()
-                    .into_iter()
-                    .find(|(_, k)| k.contains(needle))
-                    .map(|(r, _)| (r.x + r.w / 2.0, r.y + r.h / 2.0))
-            })
-        };
-        /// 命中区序选（row 内第 idx 个匹配；002 的 "+" 是第三个按钮）。
-        let twin_hit_nth = |app: &str, needle: &str, idx: usize| -> Option<(f32, f32)> {
-            twins.iter().find(|(n, _)| n == app).and_then(|(_, p)| {
-                p.hit_regions()
-                    .into_iter()
-                    .filter(|(_, k)| k.contains(needle))
-                    .nth(idx)
-                    .map(|(r, _)| (r.x + r.w / 2.0, r.y + r.h / 2.0))
-            })
-        };
+        // 与子进程同布局引擎）。PLAN-063 T-05（V-11 根因修复）：构建移到
+        // place_window 之后、视口 = `vwin_content_size(rect)`——子面经
+        // 视口同步（FrameMsg::Resize）恒渲染内容尺寸；T3_W/T3_H 是 Hello
+        // 尺寸，可用区钳制后与子面实际视口分岔（点击坐标系统性错位）。
+        // 点击换算补 `+TITLEBAR_H`（`broker_command_pointer_local` 减
+        // 宿主标题栏——chrome 实装后窗内容原点 = rect.y + 36）。
+        let twins: std::sync::Mutex<Vec<(String, RqProjector<crate::ui::dynamic::DynamicComponent>)>> =
+            std::sync::Mutex::new(Vec::new());
 
         let mut children: Vec<std::process::Child> = names
             .iter()
@@ -3248,7 +3223,52 @@ mod tests {
             place_window(&mut session, wid, i);
         }
 
-        // ---- 逐示例交互闭环（坐标 = 孪生命中区中心 + 窗原点）。 ----
+        // ---- 孪生投影器构建（place 后：视口 = 放置 rect 内容尺寸）----
+        {
+            use crate::ui::desktop_protocol::endpoint::FrameSource;
+            let mut built = twins.lock().unwrap();
+            for n in names.iter() {
+                let src = example_source(n);
+                let comp = crate::build_dynamic_component(&src, None).expect("twin build");
+                let rect = session
+                    .broker_clients
+                    .values()
+                    .find(|c| c.app_name.as_deref() == Some(n.as_str()))
+                    .and_then(|c| c.wid)
+                    .and_then(|wid| {
+                        session
+                            .host
+                            .as_ref()
+                            .and_then(|h| h.wm.wins.get(&wid))
+                            .map(|v| *v.rect.borrow())
+                    })
+                    .expect("placed rect");
+                let size = crate::ui::iced::virtual_window::vwin_content_size(rect);
+                let mut p = RqProjector::new(comp, size.width.max(1.0), size.height.max(1.0));
+                p.render_frame();
+                built.push((n.clone(), p));
+            }
+        }
+        let twin_hit = |app: &str, needle: &str| -> Option<(f32, f32)> {
+            twins.lock().unwrap().iter().find(|(n, _)| n == app).and_then(|(_, p)| {
+                p.hit_regions()
+                    .into_iter()
+                    .find(|(_, k)| k.contains(needle))
+                    .map(|(r, _)| (r.x + r.w / 2.0, r.y + r.h / 2.0))
+            })
+        };
+        /// 命中区序选（row 内第 idx 个匹配；002 的 "+" 是第三个按钮）。
+        let twin_hit_nth = |app: &str, needle: &str, idx: usize| -> Option<(f32, f32)> {
+            twins.lock().unwrap().iter().find(|(n, _)| n == app).and_then(|(_, p)| {
+                p.hit_regions()
+                    .into_iter()
+                    .filter(|(_, k)| k.contains(needle))
+                    .nth(idx)
+                    .map(|(r, _)| (r.x + r.w / 2.0, r.y + r.h / 2.0))
+            })
+        };
+
+        // ---- 逐示例交互闭环（坐标 = 孪生命中区中心 + 窗原点 + 标题栏）。----
         let origin_of = |session: &DesktopSession, app: &str| -> Option<(f32, f32)> {
             session
                 .broker_clients
@@ -3332,6 +3352,8 @@ mod tests {
         // "Out" 保留——孪生投影器同源布局判定。
         {
             let p515_twins = twins
+                .lock()
+                .unwrap()
                 .iter()
                 .find(|(n, _)| n == "p515-scroll-overflow")
                 .map(|(_, p)| p.hit_regions());
@@ -3348,7 +3370,12 @@ mod tests {
                 twin_hit_nth("002-counter", "button:", 2).expect("002 孪生按钮坐标（+ 为第三个）");
             let (ox, oy) = origin_of(&session, "002-counter").expect("002 窗原点");
             assert!(
-                session.broker_pointer_down(ox + hx, oy + hy, MouseButton::Left),
+                session
+                    .broker_pointer_down(
+                        ox + hx,
+                        oy + crate::ui::iced::virtual_window::TITLEBAR_H + hy,
+                        MouseButton::Left,
+                    ),
                 "002 点击路由"
             );
             assert!(
@@ -3363,7 +3390,11 @@ mod tests {
         {
             let (hx, hy) = twin_hit("003-converter", "input:celsius").expect("003 celsius 坐标");
             let (ox, oy) = origin_of(&session, "003-converter").expect("003 窗原点");
-            assert!(session.broker_pointer_down(ox + hx, oy + hy, MouseButton::Left));
+            assert!(session.broker_pointer_down(
+                ox + hx,
+                oy + crate::ui::iced::virtual_window::TITLEBAR_H + hy,
+                MouseButton::Left
+            ));
             // PLAN-025 T-05（AC-04 解释态同册受益实证）：键入改走宿主
             // 生产路径 `broker_char`（WM 焦点窗 → 命中窗 client 管道）——
             // 原直注 client.end 的协议级承载退役。
@@ -3390,7 +3421,7 @@ mod tests {
         {
             let (hx, hy) = twin_hit("005-login", "input:email").expect("005 email 坐标");
             let (ox, oy) = origin_of(&session, "005-login").expect("005 窗原点");
-            assert!(session.broker_pointer_down(ox + hx, oy + hy, MouseButton::Left));
+            assert!(session.broker_pointer_down(ox + hx, oy + crate::ui::iced::virtual_window::TITLEBAR_H + hy, MouseButton::Left));
             let wid = session
                 .broker_clients
                 .values()
@@ -3410,7 +3441,11 @@ mod tests {
                 }
             }
             let (bx, by) = twin_hit("005-login", "button:Submit").expect("005 Sign In 坐标");
-            assert!(session.broker_pointer_down(ox + bx, oy + by, MouseButton::Left));
+            assert!(session.broker_pointer_down(
+                ox + bx,
+                oy + crate::ui::iced::virtual_window::TITLEBAR_H + by,
+                MouseButton::Left
+            ));
             assert!(
                 wait_frames(&mut session, |s| composed_texts(s, "005-login")
                     .iter()
@@ -3438,7 +3473,11 @@ mod tests {
                 twin_hit("p507-tier-coverage", "button:ToggleOk").expect("p507 checkbox 坐标");
             let (ox, oy) = origin_of(&session, "p507-tier-coverage").expect("p507 窗原点");
             assert!(
-                session.broker_pointer_down(ox + hx, oy + hy, MouseButton::Left),
+                session.broker_pointer_down(
+                    ox + hx,
+                    oy + crate::ui::iced::virtual_window::TITLEBAR_H + hy,
+                    MouseButton::Left,
+                ),
                 "p507 点击路由"
             );
             assert!(
@@ -3630,9 +3669,59 @@ mod tests {
             .collect();
 
         // ---- 逐 App 点击：帧 count 递增（shm 载荷断言）。
+        // PLAN-063 T-05（V-11 根因修复）：点击坐标 = 孪生（内容视口同律
+        // ——子面经视口同步恒渲染 `vwin_content_size`）按钮中心 + 窗原点
+        // + 标题栏。旧固定 (base_x+60, 56) 是 pre-autocenter/pre-chrome
+        // 布局遗留（子面按钮现居中 (180,127.2,120,36)），必 miss。
+        use crate::ui::desktop_protocol::endpoint::FrameSource as _;
+        let stress_click = {
+            let (rect0) = {
+                let c = session.broker_clients.values().next().expect("client 在册");
+                let wid = c.wid.expect("wid");
+                *session
+                    .host
+                    .as_ref()
+                    .unwrap()
+                    .wm
+                    .wins
+                    .get(&wid)
+                    .unwrap()
+                    .rect
+                    .borrow()
+            };
+            let size = crate::ui::iced::virtual_window::vwin_content_size(rect0);
+            let comp = crate::build_dynamic_component(STRESS_SRC, None).expect("twin build");
+            let mut twin = RqProjector::new(comp, size.width.max(1.0), size.height.max(1.0));
+            // PLAN-678 合同：压测子臂 `proj_autocenter_off`（子面渲染
+            // raw 布局，按钮 (10,10,120,36)）——孪生同律（居中孪生与
+            // 该子面错位 170px）。
+            twin.proj_autocenter_off();
+            twin.render_frame();
+            twin.hit_regions()
+                .first()
+                .map(|(r, _)| (r.x + r.w / 2.0, r.y + r.h / 2.0))
+                .expect("stress 按钮命中区")
+        };
         for (i, wid) in wids.iter().enumerate() {
-            let base_x = 16.0 + 500.0 * i as f32;
-            let routed = session.broker_pointer_down(base_x + 60.0, 16.0 + 40.0, MouseButton::Left);
+            let (rx, ry) = {
+                let rect = *session
+                    .host
+                    .as_ref()
+                    .unwrap()
+                    .wm
+                    .wins
+                    .get(wid)
+                    .unwrap()
+                    .rect
+                    .borrow();
+                (rect.x, rect.y)
+            };
+            let (cx, cy) = stress_click;
+            let routed = session.broker_pointer_down(
+                rx + cx,
+                ry + crate::ui::iced::virtual_window::TITLEBAR_H + cy,
+                MouseButton::Left,
+            );
             assert!(routed, "App {i} 点击路由");
             let mut seen = false;
             for _ in 0..300 {
@@ -4695,7 +4784,11 @@ mod tests {
             for k in 0..23 {
                 let t0 = std::time::Instant::now();
                 assert!(
-                    session.broker_pointer_down(origin.0 + hx, origin.1 + hy, MouseButton::Left),
+                    session.broker_pointer_down(
+                        origin.0 + hx,
+                        origin.1 + crate::ui::iced::virtual_window::TITLEBAR_H + hy,
+                        MouseButton::Left,
+                    ),
                     "002 点击路由"
                 );
                 let want = format!("Counter: {}", k + 1);

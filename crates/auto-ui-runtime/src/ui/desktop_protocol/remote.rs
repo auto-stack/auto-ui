@@ -188,11 +188,24 @@ impl DesktopSession {
             let host = self.host.as_ref()?;
             let v = host.wm.wins.get(&wid)?;
             let r = *v.rect.borrow();
-            Some((app_id, wid, r, r.width.max(1.0), r.height.max(1.0)))
+            // PLAN-063 T-05（V-11 根因修复）：孪生视口 = 内容尺寸——子面
+            // 经视口同步（FrameMsg::Resize）恒渲染 `vwin_content_size`，
+            // raw rect 含宿主 chrome（边框/标题栏）；同律后孪生命中表与
+            // 子面命中面几何一致。
+            let size = crate::ui::iced::virtual_window::vwin_content_size(r);
+            Some((app_id, wid, r, size.width.max(1.0), size.height.max(1.0)))
         })() else {
             return; // 目标未落地：留待下拍重试
         };
         mirror.wid = Some(wid);
+        // PLAN-063 诊断（临时）：订阅期 wm rect 与孪生视口（对拍 child
+        // 侧 480x900 与点击几何）。
+        if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
+            eprintln!(
+                "[p063-diag] mirror subscribe rect=({},{},{},{}) twin_viewport=({width},{height})",
+                rect.x, rect.y, rect.width, rect.height,
+            );
+        }
         // Welcome（帧模式恒 Commands——镜像只走内联命令帧）。
         let welcome = ProtocolMsg::Handshake(HandshakeMsg::Welcome {
             app_id: app_id.0,

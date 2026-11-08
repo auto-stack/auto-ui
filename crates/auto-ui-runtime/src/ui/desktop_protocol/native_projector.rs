@@ -1023,6 +1023,28 @@ impl<C: Component> RqProjector<C> {
             .rev()
             .find(|e| rect_contains(e.rect(), x, y))
             .cloned();
+        // PLAN-063 诊断（AUTO_PLAN060_DIAG 门）：左键派发实况——命中数/
+        // 命中区/表规模（outproc 点击族根因取证，t2/stress/t3）。
+        if std::env::var_os("AUTO_PLAN060_DIAG").is_some() {
+            let n_contains = self
+                .hits
+                .iter()
+                .filter(|e| rect_contains(e.rect(), x, y))
+                .count();
+            let dump: Vec<String> = self
+                .hits
+                .iter()
+                .map(|e| {
+                    let r = e.rect();
+                    format!("({},{},{},{})", r.x, r.y, r.w, r.h)
+                })
+                .collect();
+            eprintln!(
+                "[p063-diag] pointer_down_left ({x},{y}) contains={n_contains} total={} rects={:?}",
+                self.hits.len(),
+                dump
+            );
+        }
         match hit {
             Some(HitEntry::Msg { msg, .. }) => {
                 self.component.on(msg);
@@ -3845,6 +3867,96 @@ mod tests {
             "内容 bbox 中心应=视口中心 (240,160)，实得 ({:.1},{:.1})",
             (min_x + max_x) / 2.0,
             (min_y + max_y) / 2.0
+        );
+    }
+
+    /// PLAN-063 T-05（V-11 收口钉）：stress 子源两条布局律——①缺省
+    /// autocenter：按钮居中（480×320 → (180,127.2,120,36)），raw 点
+    /// (60,40) 落空；②`proj_autocenter_off`（stage3 压测子臂的
+    /// PLAN-678 合同）：raw 布局 (10,10,120,36)，(60,40) 可命中。
+    /// 宿主点击须按对应律取坐标（stage3_multi_app_stress 的孪生推导
+    /// 即 ② 律 + 标题栏偏移）。
+    #[test]
+    fn p063_stress_click_geometry_probe() {
+        const SRC: &str = "widget StressCounter {\n    model { var count int = 0 }\n    view {\n        button \"+\" { onclick: () => {.count += 1} }\n        text `count: ${.count}`\n    }\n}\n";
+        let click_at = |centered: bool, x: f32, y: f32| -> bool {
+            let component = crate::build_dynamic_component(SRC, None).expect("build");
+            let mut p = RqProjector::new(component, 480.0, 320.0);
+            if !centered {
+                p.proj_autocenter_off();
+            }
+            p.render_frame();
+            let hit = p.hits.iter().any(|e| rect_contains(e.rect(), x, y));
+            if hit {
+                p.on_input(&InputMsg::PointerPressed {
+                    wid: 0,
+                    button: crate::ui::desktop_protocol::message::MouseButton::Left,
+                    x,
+                    y,
+                    modifiers: 0,
+                });
+            }
+            hit
+        };
+        assert!(click_at(true, 240.0, 145.2), "居中律：中心命中");
+        assert!(!click_at(true, 60.0, 40.0), "居中律：raw 点落空");
+        assert!(click_at(false, 60.0, 40.0), "off 律：(60,40) 命中 raw 按钮");
+    }
+
+    /// PLAN-063 T-05（V-11 根因定位探针·t2 形）：t2 的孪生命中表几何
+    /// ——002-counter 例源 480x900 投影，打印 BUTTON 族命中区与第三
+    /// 按钮（"+"）中心，再以同构投影器（child 替身）按该中心点击 →
+    /// 断言 Counter: 1（wire 层 == 进程内几何时此探针必须绿）。
+    #[test]
+    fn p063_counter_twin_click_probe() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/ui/002-counter/src/front/app.at"
+        );
+        let src = std::fs::read_to_string(path).expect("read 002-counter");
+        let comp = crate::build_dynamic_component(&src, Some(path)).expect("build");
+        let mut twin = RqProjector::new(comp, 480.0, 900.0);
+        twin.render_frame();
+        let regions = twin.hit_regions();
+        for (i, (r, kind)) in regions.iter().enumerate() {
+            println!("REGION[{i}] kind={kind} rect=({},{},{},{})", r.x, r.y, r.w, r.h);
+        }
+        // 孪生侧 "+" 文本 op（与 t2 diag 的 child 侧 (363.8,433.35) 对拍）。
+        let frame0 = twin.render_frame();
+        for op in frame0.ops.iter() {
+            if let DrawOp::Text { x, y, text, .. } = op {
+                if text == "+" {
+                    println!("TWIN \"+\" text op at ({x},{y})");
+                }
+            }
+        }
+        let r = regions.get(2).map(|(r, _)| *r).expect("第三命中区");
+        let (cx, cy) = (r.x + r.w / 2.0, r.y + r.h / 2.0);
+        println!("CLICK3 center=({cx},{cy})");
+        // child 替身：同源重建 + 该中心点击。
+        let comp2 = crate::build_dynamic_component(&src, Some(path)).expect("build2");
+        let mut child = RqProjector::new(comp2, 480.0, 900.0);
+        child.render_frame();
+        child.on_input(&InputMsg::PointerPressed {
+            wid: 0,
+            button: crate::ui::desktop_protocol::message::MouseButton::Left,
+            x: cx,
+            y: cy,
+            modifiers: 0,
+        });
+        let frame = child.render_frame();
+        let texts: Vec<String> = frame
+            .ops
+            .iter()
+            .filter_map(|op| match op {
+                DrawOp::Text { text, .. } => Some(text.clone()),
+                _ => None,
+            })
+            .collect();
+        println!("AFTER-CLICK texts={texts:?}");
+        assert!(
+            texts.iter().any(|t| t == "Counter: 1"),
+            "twin 第三按钮中心点击应得 Counter: 1"
         );
     }
 
