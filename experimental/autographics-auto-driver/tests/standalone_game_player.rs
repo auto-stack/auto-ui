@@ -249,7 +249,16 @@ fn qa_chain_2d_full_run_restart_close() {
         respawned["drift"].as_f64().unwrap_or(1e9) < 0.7,
         "respawn returns to the original spawn"
     );
-    let audio = &data["audio_final"];
+    // Fixed-dt integrity: wall frames and 60Hz ticks run 1:1 in a green run;
+    // a ticking violation (double dispatch) breaks the ratio and the
+    // sabotage control below must be the only place that goes red.
+    assert_eq!(
+        data["tick_rate_ok"], serde_json::json!(true),
+        "fixed-dt tick/frame ratio must hold"
+    );
+    // Device PCM evidence lives in the pre-close audio-final record (the
+    // finalize snapshot runs after the Host teardown, manager dropped).
+    let audio = record(&data, "audio-final")["audio"].clone();
     assert_eq!(audio["manager"], serde_json::json!(true));
     assert!(
         audio["callbacks"].as_u64().unwrap_or(0) > 0,
@@ -307,9 +316,50 @@ fn qa_chain_3d_full_run_restart_camera_close() {
         (zoom["after"].as_f64().unwrap() - zoom["before"].as_f64().unwrap()).abs() >= 0.05,
         "wheel notch changed the camera distance"
     );
-    let audio = &data["audio_final"];
-    assert!(audio["nonzero"].as_u64().unwrap_or(0) > 0, "device PCM ran");
+    let audio = record(&data, "audio-final")["audio"].clone();
+    assert!(
+        audio["nonzero"].as_u64().unwrap_or(0) > 0,
+        "device PCM ran (defeat cue reached the device)"
+    );
     println!("3d chain ok: orbit+zoom applied, audio nonzero {}", audio["nonzero"]);
+}
+
+#[cfg(windows)]
+#[test]
+fn double_tick_sabotage_is_distinguished_from_a_green_run() {
+    let Some(dir) = stage("player-2d") else {
+        pending("double_tick_sabotage_is_distinguished_from_a_green_run");
+        return;
+    };
+    let report = scratch().join("qa-2d-sabotage.json");
+    let out = run(
+        &dir,
+        &[
+            "--qa",
+            "platformer-2d",
+            "--qa-sabotage",
+            "--report",
+            report.to_str().unwrap(),
+            "--user-data-dir",
+            scratch().join("ud-2d-sab").to_str().unwrap(),
+        ],
+        Duration::from_secs(300),
+    )
+    .expect("sabotage run exits");
+    let data = parse_report(&report);
+    assert_eq!(data["sabotage"], serde_json::json!(true));
+    // The control's red: the extra dispatch per frame must break the fixed-dt
+    // ratio or fail the run outright - never read as a green pass.
+    let red = !out.status.success()
+        || data["passed"] != serde_json::json!(true)
+        || data["tick_rate_ok"] != serde_json::json!(true);
+    assert!(red, "the double-tick sabotage must not read as a green run");
+    println!(
+        "sabotage red: exit {:?}, passed {}, tick_rate_ok {}",
+        out.status.code(),
+        data["passed"],
+        data["tick_rate_ok"]
+    );
 }
 
 fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {

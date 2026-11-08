@@ -84,3 +84,13 @@ msg/on/Life.Tick）加上 `components2d` 作者块，表达角色/敌人/同定�
 - 正式游戏放独立仓（ag-examples/games/platformer-2d，AG014）；游戏 T-05
   才绑定本计划实际交付源/SDK/锁/身份。接口以本文 + identity.json 为准；
   变更仅走新 revision 与影响清单。
+
+## 独立窗口消费者（PLAN-072 SD-02 增补）
+
+`age-game-player`（docs/specs/auto-graphics/standalone-windows-game-player.md）
+是本组合的新增独立窗口消费者：以 `Host::with_project_player` 复用同一
+components2d 装配、同一 Play/准入/pump/restart/音频机制，仅组合呈现不同
+（恰一个游戏 surface 充满窗口尺寸 top view；iced panel 为 2×2 不 portal
+见证）。原规则/预算/触发/回合/音频语义逐字节不变；本 spec 的全部冻结
+合同（root `state`、角色 `pose`/`facing`、快照与 despawn 预算）对独立
+窗口同责。迁移归属 auto-lang/PLAN-981（SOURCE/SESSION/CONTENT/AUDIT）。

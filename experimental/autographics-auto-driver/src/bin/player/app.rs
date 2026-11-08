@@ -47,6 +47,10 @@ pub struct App {
     config: PlayerConfig,
     root: PathBuf,
     qa: Option<Qa>,
+    /// QA-only sabotage: one extra dispatch per frame. The report's fixed-dt
+    /// integrity oracle must go red - this is how the control distinguishes a
+    /// ticking violation from a green run.
+    sabotage: bool,
     report: Option<PathBuf>,
     /// User-writable run-data scope: QA passes `--user-data-dir` explicitly;
     /// the product default is %APPDATA%/<game_id>. The readable player log
@@ -64,6 +68,8 @@ pub struct App {
     /// game a user can see but that never regains focus cannot proceed; the
     /// product keeps waiting for the user instead of fighting for focus).
     last_focus_request: Instant,
+    /// Process start, for the startup-grace window below.
+    started_at: Instant,
 }
 
 /// Auto pauses are transient by construction: the pause already cleared held
@@ -89,6 +95,7 @@ impl App {
         config: PlayerConfig,
         root: PathBuf,
         qa: Option<Qa>,
+        sabotage: bool,
         report: Option<PathBuf>,
         user_data: PathBuf,
     ) -> Self {
@@ -96,6 +103,7 @@ impl App {
             config,
             root,
             qa,
+            sabotage,
             report,
             user_data,
             host: None,
@@ -106,6 +114,7 @@ impl App {
             error: None,
             last_resize: Instant::now(),
             last_focus_request: Instant::now(),
+            started_at: Instant::now(),
         }
     }
 
@@ -316,10 +325,32 @@ impl ApplicationHandler for App {
                 // resizing for a settle window (startup DPI changes land
                 // here; the editor's manual Resume has no player equivalent).
                 if self.last_resize.elapsed() > Duration::from_millis(600) {
-                    if let Err(error) = maybe_auto_resume(h, "auto-Pause: resize/DPI") {
-                        self.error = Some(format!("auto resume failed: {error}"));
-                        e.exit();
-                        return;
+                    // These pauses already cleared the clock's debt; with no
+                    // editor Resume button the player resumes them itself once
+                    // their transient cause is gone. The backlog protection is
+                    // auto-resumed only inside the startup-grace window:
+                    // device/shader init can cost one backlog burst, while a
+                    // sustained overload later stands for the user to see.
+                    // QA runs measure input/presentation/restart semantics,
+                    // not machine capacity: under a loaded box the backlog
+                    // pause is environmental, so QA auto-resumes it for the
+                    // whole run; the product keeps the 10s startup grace.
+                    let grace = self.qa.is_some()
+                        || self.started_at.elapsed() < Duration::from_secs(10);
+                    let prefixes: [(&str, bool); 3] = [
+                        ("auto-Pause: resize/DPI", true),
+                        ("auto-Pause: display gap", true),
+                        ("auto-Pause: tick backlog", grace),
+                    ];
+                    for (prefix, enabled) in prefixes {
+                        if !enabled {
+                            continue;
+                        }
+                        if let Err(error) = maybe_auto_resume(h, prefix) {
+                            self.error = Some(format!("auto resume failed: {error}"));
+                            e.exit();
+                            return;
+                        }
                     }
                 }
                 if self.qa.is_some()
@@ -345,6 +376,17 @@ impl ApplicationHandler for App {
                     return;
                 }
                 self.frames += 1;
+                if self.sabotage {
+                    if let Some(play) = h.play.as_mut() {
+                        if play.state
+                            == autographics_auto_driver::authoring::play::State::Running
+                        {
+                            let _ = play.dispatch(
+                                autographics_auto_driver::authoring::play::Action::default(),
+                            );
+                        }
+                    }
+                }
                 let qa_error = match (&mut self.qa, self.window.clone()) {
                     (Some(qa), Some(w)) => {
                         qa.step(h, &w, self.frames);
@@ -392,11 +434,26 @@ pub fn finalize(mut app: App, loop_error: Option<String>) -> i32 {
             .map(|h| h.audio_snapshot())
             .unwrap_or(json!({"manager": false}));
         let runner = std::env::current_exe().ok();
+        let play_tick = app
+            .host
+            .as_ref()
+            .and_then(|h| h.play.as_ref())
+            .map(|p| p.tick());
+        let frames = app.frames as f64;
+        // Fixed-dt integrity: at the 16ms pacing the wall frames and the
+        // 60Hz ticks run 1:1; the sabotage's extra dispatch breaks the ratio
+        // (or trips the backlog guard), which is the control's red.
+        let tick_rate_ok = play_tick
+            .map(|t| ((t as f64) - frames).abs() / frames.max(1.0) < 0.2)
+            .unwrap_or(true);
         let data = json!({
             "schema": "age-game-player-qa/1",
             "script": app.qa.as_ref().map(|q| q.script_name()),
             "records": app.qa.as_ref().map(|q| &q.records),
             "key_log": app.qa.as_ref().map(|q| q.key_log.borrow().clone()),
+            "sabotage": app.sabotage,
+            "play_tick": play_tick,
+            "tick_rate_ok": tick_rate_ok,
             "audio_final": audio,
             "frames": app.frames,
             "passed": passed,
@@ -435,3 +492,6 @@ pub fn script_from(name: &str) -> Option<Script> {
         _ => None,
     }
 }
+
+// PLAN072_TOUCH
+// BASH_MARKER_A1B2

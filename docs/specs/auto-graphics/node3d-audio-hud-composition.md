@@ -75,3 +75,12 @@ verify_plan034 旧档并集）；运行门 driver 侧单实例
 `node3d_audio_hud_storage`（版本化闭包保存/搬移/重开/坏件拒绝→精确
 恢复→同入口再绿 3）。未来游戏消费面：公共链 + 三永久夹具 + 上述
 冻结命令；正式内容交付仍须独立合同。
+
+## 独立窗口消费者（PLAN-072 SD-03 增补）
+
+`age-game-player`（docs/specs/auto-graphics/standalone-windows-game-player.md）
+是本组合的新增独立窗口消费者：以 `Host::with_project_player` 复用同一
+components3d 装配与同一 Play/运行相机/音频机制；左拖 orbit、滚轮 zoom、
+固定 dt 与预算沿原契约（0.25°/逻辑px、×1.1^-1 每格、距离夹 4..12、俯仰
+15°..75°），无第二实现。原规则/预算/触发/回合语义逐字节不变。迁移归属
+auto-lang/PLAN-981（SOURCE/SESSION/CONTENT/AUDIT）。

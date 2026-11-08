@@ -29,7 +29,7 @@ fn main() {
     // The product entry takes no required argument: player.json beside the
     // exe is the launch description. QA flags exist for the bounded proof and
     // the integration test only; unknown flags are rejected, not ignored.
-    let known = ["--qa", "--report", "--config", "--user-data-dir"];
+    let known = ["--qa", "--qa-sabotage", "--report", "--config", "--user-data-dir"];
     let unknown = args.iter().skip(1).any(|v| {
         v.starts_with("--") && !known.iter().any(|k| v == *k)
     });
@@ -100,6 +100,7 @@ fn main() {
         config,
         root,
         qa,
+        args.iter().any(|v| v == "--qa-sabotage"),
         value("--report").map(PathBuf::from),
         user_data,
     );
