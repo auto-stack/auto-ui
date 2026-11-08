@@ -46,6 +46,9 @@ pub struct Qa {
     jump_attempts: u64,
     cam_before: Option<[f32; 3]>,
     zoom_before: Option<f32>,
+    pixels_t0: Option<Value>,
+    walk_x0: Option<f32>,
+    walk_repress: u64,
 }
 
 impl Qa {
@@ -66,6 +69,9 @@ impl Qa {
             jump_attempts: 0,
             cam_before: None,
             zoom_before: None,
+            pixels_t0: None,
+            walk_x0: None,
+            walk_repress: 0,
         }
     }
 
@@ -109,6 +115,21 @@ impl Qa {
     fn audio(h: &Host) -> Value {
         let s = h.audio_snapshot();
         json!({"manager":s["manager"],"device":s["device"],"rate":s["rate"],"callbacks":s["callbacks"],"nonzero":s["nonzero"],"peak":s["peak"],"run":s["run"]})
+    }
+
+    /// The presented game surface's capture identity: two different hashes
+    /// around an input are the pixel-level evidence that the OS input moved
+    /// the visible frame (not just the internal state).
+    fn pixels(h: &mut Host, two_d: bool) -> Value {
+        let surface = if two_d {
+            h.rt.capture(h.two, "qa2d")
+        } else {
+            h.rt.capture(h.three, "qa3d")
+        };
+        match surface {
+            Some((sha, _, _, _)) => json!({"sha256": sha}),
+            None => json!({"missing": true}),
+        }
     }
 
     fn play(h: &Host) -> Result<&Play, String> {
@@ -248,8 +269,9 @@ impl Qa {
                     self.spawn = Self::actor_translation(h, two_d)?;
                     self.run1 = p.run_id();
                     self.audio_t0 = Self::audio(h);
+                    self.pixels_t0 = Some(Self::pixels(h, two_d));
                     self.records.push(
-                        json!({"case":"started","spawn":self.spawn,"run":self.run1,"audio":self.audio_t0,"keys_seen":self.keys_seen.get()}),
+                        json!({"case":"started","spawn":self.spawn,"run":self.run1,"audio":self.audio_t0,"pixels":self.pixels_t0,"keys_seen":self.keys_seen.get()}),
                     );
                     self.next(frame);
                     Ok(())
@@ -298,8 +320,10 @@ impl Qa {
                             }
                             return Ok(());
                         }
-                        self.records
-                            .push(json!({"case":"jumped","y":y,"audio_after":Self::audio(h)}));
+                        self.walk_x0 = Some(Self::actor_translation(h, two_d)?[0]);
+                        self.records.push(
+                            json!({"case":"jumped","y":y,"audio_after":Self::audio(h),"pixels":Self::pixels(h, two_d),"pixels_at_start":self.pixels_t0}),
+                        );
                         if !Self::running(h) {
                             return Ok(());
                         }
@@ -319,11 +343,29 @@ impl Qa {
                     if two_d {
                         let y = Self::actor_translation(h, two_d)?[1];
                         if y > -1.5 {
+                            // A held key pressed while an auto pause ate the
+                            // edge leaves the actor standing; a fresh press is
+                            // the same recovery a player makes.
+                            if let Some(x0) = self.walk_x0 {
+                                let x = Self::actor_translation(h, two_d)?[0];
+                                if frame - self.at > 120
+                                    && x < x0 + 0.5
+                                    && self.walk_repress < 3
+                                    && Self::running(h)
+                                {
+                                    self.walk_repress += 1;
+                                    self.records
+                                        .push(json!({"case":"walk-retry","attempt":self.walk_repress,"x":x}));
+                                    self.send(VK_KEY_D, true)?;
+                                    self.walk_x0 = Some(x);
+                                }
+                            }
                             return Ok(());
                         }
                         self.send(VK_KEY_D, false)?;
-                        self.records
-                            .push(json!({"case":"fell-below-fail-line","y":y}));
+                        self.records.push(
+                            json!({"case":"fell-below-fail-line","y":y,"pixels":Self::pixels(h, two_d)}),
+                        );
                         self.next(frame);
                     } else {
                         let y = Self::actor_translation(h, two_d)?[1];

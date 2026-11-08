@@ -187,7 +187,10 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, e: &ActiveEventLoop) {
         if let Err(error) = self.enter_game(e) {
             self.log(&format!("fatal: {error}"));
-            if self.qa.is_none() {
+            // The dialog is the double-click failure surface. Automated
+            // entries (QA or AGE_PLAYER_HEADLESS) must fail non-interactively
+            // so a hung dialog can never stall a run.
+            if self.qa.is_none() && std::env::var("AGE_PLAYER_HEADLESS").as_deref() != Ok("1") {
                 super::native::fatal_message(&self.config.display.title, &error);
             }
             self.fail(e, error);
