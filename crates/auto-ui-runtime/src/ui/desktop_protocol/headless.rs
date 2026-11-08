@@ -1350,6 +1350,13 @@ where
     pub fn component_mut(&mut self) -> &mut C {
         &mut self.surface.component
     }
+
+    /// PLAN-073 T-01：媒体类上传预算原型旋钮——探针以「既有 8 MiB·s⁻¹
+    /// 合同值」与「媒体类豁免（旋钮放大）」两案实测 1080p 连续帧容量；
+    /// T-02 依实测决定正式媒体资源类别政策。默认不改（8 MiB/1s）。
+    pub fn set_upload_budget_bytes_per_window(&mut self, bytes: u64) {
+        self.surface.resources.rate_limit_bytes = bytes;
+    }
 }
 
 /// PLAN-060 诊断：帧产出计数（env AUTO_PLAN060_DIAG 同路径）。
@@ -1411,6 +1418,7 @@ where
     fn render_frame_v2(&mut self) -> DisplayList {
         let list = self.surface.render_frame_v2();
         self.observations = self.surface.observations().to_vec();
+        #[cfg(debug_assertions)]
         plan060_frame_diag(self.rev);
         list
     }
@@ -1450,6 +1458,7 @@ where
             return;
         }
         let messages = self.surface.update(&events);
+        #[cfg(debug_assertions)]
         plan060_diag(input, &messages);
         // 消息产出 = 组件状态可能变化 → revision 前进（泵对账产帧）。
         if !messages.is_empty() {
@@ -1679,6 +1688,7 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
             return;
         }
         let messages = self.surface.update(&events);
+        #[cfg(debug_assertions)]
         plan060_diag(input, &messages);
         if !messages.is_empty() {
             self.rev += 1;

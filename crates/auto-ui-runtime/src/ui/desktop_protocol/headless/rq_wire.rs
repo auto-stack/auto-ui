@@ -303,6 +303,9 @@ enum WireSource {
     Vm(HeadlessFrameSource<crate::ui::dynamic::DynamicComponent>),
     /// 负控用的逐拍变化产者（tick 驱动，v2/v3 可切）。
     Live(HeadlessFrameSource<SwitchingView>),
+    /// PLAN-073 T-01：逐拍变化的 1080p 媒体流产者（海报重发布 →
+    /// 资源通道连续帧）。
+    Media(HeadlessFrameSource<MediaStreamView>),
 }
 
 macro_rules! wire_delegate {
@@ -311,6 +314,7 @@ macro_rules! wire_delegate {
             WireSource::Rust(s) => s.$method($($arg),*),
             WireSource::Vm(s) => s.$method($($arg),*),
             WireSource::Live(s) => s.$method($($arg),*),
+            WireSource::Media(s) => s.$method($($arg),*),
         }
     };
 }
@@ -632,6 +636,76 @@ impl Component for SwitchingView {
     }
 }
 
+/// PLAN-073 T-01 探针产者：逐拍重发布同键海报（内容随帧变化 → blake3
+/// 新资源身份 → 资源通道连续帧）。内容为合成 1080p（尺寸/节奏真实）；
+/// 真实 mpv 解码读回属 T-02/V-02 交付面——本探针量的是资源通道容量与
+/// 上传预算行为（V-01）。
+#[derive(Debug)]
+struct MediaStreamView {
+    src: String,
+    w: u32,
+    h: u32,
+    frame_no: u64,
+    tick_ms: u32,
+}
+
+impl MediaStreamView {
+    fn frame_rgba(&self, n: u64) -> Vec<u8> {
+        let w = self.w as usize;
+        let h = self.h as usize;
+        let mut v = vec![0u8; w * h * 4];
+        for (y, row) in v.chunks_exact_mut(w * 4).enumerate() {
+            for (x, px) in row.chunks_exact_mut(4).enumerate() {
+                px[0] = (x as u8).wrapping_add(n as u8);
+                px[1] = (y as u8).wrapping_add((n.wrapping_mul(7)) as u8);
+                px[2] = ((x + y) as u8).wrapping_add((n.wrapping_mul(13)) as u8);
+                px[3] = 255;
+            }
+        }
+        v
+    }
+}
+
+impl Component for MediaStreamView {
+    type Msg = ();
+
+    fn on(&mut self, _msg: ()) {
+        self.frame_no = self.frame_no.wrapping_add(1);
+        let rgba = self.frame_rgba(self.frame_no);
+        assert!(
+            crate::ui::media_poster::publish(&self.src, self.w, self.h, rgba),
+            "T-01 海报重发布失败"
+        );
+    }
+
+    fn view(&self) -> View<()> {
+        View::Video {
+            src: self.src.clone(),
+            paused: true,
+            position: Some(0.0),
+            volume: 100,
+            muted: true,
+            rate: 1.0,
+            label: "T01连续流".to_string(),
+            on_time_update: None,
+            on_loaded_metadata: None,
+            on_play_state: None,
+            on_ended: None,
+            on_media_error: None,
+            media_key: None,
+            style: None,
+        }
+    }
+
+    fn tick_interval_ms(&self) -> Option<u32> {
+        Some(self.tick_ms)
+    }
+
+    fn tick_msg(&self) -> Option<()> {
+        Some(())
+    }
+}
+
 /// 负控用的 standalone 宿主装配（真管道 + 真端点，产者/宿主两端分开泵）。
 struct WireCell {
     wellknown: String,
@@ -644,13 +718,19 @@ struct WireCell {
 
 impl WireCell {
     fn start(tag: &str, source: WireSource) -> Result<Self, String> {
+        Self::start_with(tag, source, client_config())
+    }
+
+    /// PLAN-073 T-01：探针需要宣布与媒体帧匹配的视口（位图段槽尺寸随
+    /// Hello 视口推导，host.rs bm_slot_size = w×h×4×4+4）。
+    fn start_with(tag: &str, source: WireSource, cfg: ClientConfig) -> Result<Self, String> {
         use crate::ui::desktop_protocol::rqhost;
         let wellknown = format!("plan062-neg-{}-{tag}", std::process::id());
         let (serve, claim) =
             rqhost::RqServe::start(&wellknown).map_err(|e| format!("rqserve: {e:?}"))?;
         let (_, end) =
             rqhost::adopt(&wellknown, "plan062-neg", 5000).map_err(|e| format!("adopt: {e:?}"))?;
-        let mut pump = ClientPump::new(end, source, client_config(), None);
+        let mut pump = ClientPump::new(end, source, cfg, None);
         pump.set_v2(true);
         let mut ids = rqhost::RqIds::default();
         let mut client = None;
@@ -1161,4 +1241,218 @@ fn rq_wire_media_poster_frame_crosses_the_wire() {
         })
     );
     media_poster::clear(src);
+}
+
+// ---------------------------------------------------------------------------
+// PLAN-073 T-01（V-01）：1080p 连续媒体流 × 资源通道容量探针。
+//
+// T-01 首轮实测发现（2026-11-08，t01-probe-run1.log）：位图段槽尺寸 =
+// 宿主表面 w×h×4×4+4（host.rs:451，4× 表面像素字节余量）——640×400 表面
+// 的槽仅 4.1 MiB，装不下 1080p 帧（8.29 MiB）→ 「媒体帧 ≤ 4× 表面字节」
+// 是资源通道的具名几何约束。本组探针改用 1920×1080 宿主表面（真实全高
+// 清窗，槽 33.3 MiB），并在判据上只数**宿主已收到的内容**
+// （resolve_drawlist_image 命中），不是仅引用串。
+//
+// 两案（§2 允许的最多两案比较，纸面核算见 plan-artifacts t01 档案 §4）：
+// - Path A（既有资源通道 + 8 MiB·s⁻¹ 上传预算，as-built）；
+// - Path A'（同一通道 + 媒体类预算豁免原型旋钮，即 T-02 候选「媒体资源
+//   类别」的传输容量上限）。
+// 产者 = MediaStreamView（逐拍重发布 1080p 海报，合成内容、真实尺寸/节奏；
+// 真实 mpv 解码读回归 T-02/V-02）。宿主 = WireCell 真 RqServe 管道端。
+// ---------------------------------------------------------------------------
+
+const T01_SURF_W: f32 = 1920.0;
+const T01_SURF_H: f32 = 1080.0;
+
+fn t01_media_stream_start(
+    tag: &str,
+    src: &str,
+    budget_bytes: Option<u64>,
+) -> (WireCell, String) {
+    let (w, h) = (1920u32, 1080u32);
+    let mut probe = MediaStreamView {
+        src: src.to_string(),
+        w,
+        h,
+        frame_no: 0,
+        tick_ms: 41, // 尝试 24fps
+    };
+    let rgba0 = probe.frame_rgba(0);
+    assert!(
+        crate::ui::media_poster::publish(src, w, h, rgba0),
+        "T-01 初帧发布失败"
+    );
+    let mut source = HeadlessFrameSource::new(probe, T01_SURF_W, T01_SURF_H);
+    if let Some(budget) = budget_bytes {
+        source.set_upload_budget_bytes_per_window(budget);
+    }
+    let cfg = ClientConfig {
+        app_name: format!("plan073-{tag}"),
+        title: format!("plan073-{tag}"),
+        width: T01_SURF_W,
+        height: T01_SURF_H,
+    };
+    let cell = WireCell::start_with(tag, WireSource::Media(source), cfg).expect("T-01 wire cell");
+    (cell, src.to_string())
+}
+
+/// 统计宿主合成面上已见过的独立 bitmap 资源身份，并只把**内容已抵达
+/// 宿主**（resolve_drawlist_image 命中）的计入 received。
+fn t01_absorb_composed(
+    cell: &WireCell,
+    seen: &mut std::collections::HashSet<String>,
+    received: &mut std::collections::HashSet<String>,
+) {
+    if let Some(list) = cell.composed() {
+        for op in &list.ops {
+            if let DisplayOp::Image { src, .. } = op {
+                if src.starts_with("bitmap://") && seen.insert(src.clone()) {
+                    if crate::ui::iced::broker_surface::resolve_drawlist_image(src, 1920, 1080)
+                        .is_some()
+                    {
+                        received.insert(src.clone());
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Path A（as-built 预算）：1080p 连续流在 8 MiB·s⁻¹ 下的实际通过率。
+/// 预期：≈1 帧/秒（7.91 MiB/帧 ÷ 8 MiB/s）——预算饿死连续视频的实测证据。
+#[test]
+fn p073_t01_path_a_budget_limited_1080p_continuous() {
+    let (mut cell, src) = t01_media_stream_start("t01-budget", "probe://t01-budget.mp4", None);
+    const RUN: Duration = Duration::from_secs(6);
+    let start = Instant::now();
+    let mut seen = std::collections::HashSet::new();
+    let mut received = std::collections::HashSet::new();
+    let mut composed_total = 0u64;
+    while start.elapsed() < RUN {
+        if cell.pump_both() {
+            composed_total = cell.client.frames;
+        }
+        t01_absorb_composed(&cell, &mut seen, &mut received);
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    let elapsed = start.elapsed().as_secs_f64();
+    let produced = crate::ui::media_poster::generation(&src);
+    println!(
+        "[T01-PATH-A-BUDGET] {}",
+        serde_json::json!({
+            "tag": "t01_path_a_budget",
+            "window_s": elapsed,
+            "surface": [T01_SURF_W, T01_SURF_H],
+            "produced_frames": produced,
+            "produced_fps": (produced as f64 / elapsed),
+            "referenced_identities": seen.len(),
+            "received_frames": received.len(),
+            "received_fps": (received.len() as f64 / elapsed),
+            "host_composed_total": composed_total,
+            "frame_mib": 7.91,
+            "budget": "8MiB/1s (as-built)",
+        })
+    );
+    assert!(
+        produced >= 20,
+        "产者必须真实连续产帧（实测节拍受记录成本限制），实得 {produced}"
+    );
+    assert!(
+        received.len() <= 12,
+        "8MiB/s 预算下 1080p 连续流应被限制在 ≈1fps（6s 窗 ≤12 帧实收），实得 {}",
+        received.len()
+    );
+    crate::ui::media_poster::clear(&src);
+}
+
+/// Path A'（媒体类豁免原型）：预算旋钮放大后的传输容量上限实测。
+#[test]
+fn p073_t01_media_class_capacity_1080p() {
+    let (mut cell, src) = t01_media_stream_start(
+        "t01-capacity",
+        "probe://t01-capacity.mp4",
+        Some(u64::MAX / 2),
+    );
+    const RUN: Duration = Duration::from_secs(6);
+    let start = Instant::now();
+    let mut seen = std::collections::HashSet::new();
+    let mut received = std::collections::HashSet::new();
+    let mut composed_total = 0u64;
+    while start.elapsed() < RUN {
+        if cell.pump_both() {
+            composed_total = cell.client.frames;
+        }
+        t01_absorb_composed(&cell, &mut seen, &mut received);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    let elapsed = start.elapsed().as_secs_f64();
+    let produced = crate::ui::media_poster::generation(&src);
+    println!(
+        "[T01-PATH-A-CAPACITY] {}",
+        serde_json::json!({
+            "tag": "t01_path_a_capacity",
+            "window_s": elapsed,
+            "surface": [T01_SURF_W, T01_SURF_H],
+            "produced_frames": produced,
+            "produced_fps": (produced as f64 / elapsed),
+            "referenced_identities": seen.len(),
+            "received_frames": received.len(),
+            "received_fps": (received.len() as f64 / elapsed),
+            "host_composed_total": composed_total,
+            "throughput_mib_s": (received.len() as f64 * 7.91 / elapsed),
+        })
+    );
+    assert!(
+        received.len() >= 10,
+        "豁免案必须证明多帧内容真实抵达宿主（零选择不 PASS），实得 {}",
+        received.len()
+    );
+    crate::ui::media_poster::clear(&src);
+}
+
+/// 慢宿主对照（V-01 负控）：豁免预算 + 宿主 5 拍泵 1 拍——背压/合流，
+/// 不丢不覆（槽信用合同 P-01）。断言：连接存活、宿主有帧、内容连续。
+#[test]
+fn p073_t01_slow_host_backpressure_1080p() {
+    let (mut cell, src) = t01_media_stream_start(
+        "t01-slowhost",
+        "probe://t01-slowhost.mp4",
+        Some(u64::MAX / 2),
+    );
+    const RUN: Duration = Duration::from_secs(5);
+    let start = Instant::now();
+    let mut seen = std::collections::HashSet::new();
+    let mut received = std::collections::HashSet::new();
+    let mut iter: u64 = 0;
+    let mut alive = true;
+    while start.elapsed() < RUN && alive {
+        let _ = cell.pump_producer();
+        if iter % 5 == 0 {
+            alive = cell.pump_host();
+        }
+        t01_absorb_composed(&cell, &mut seen, &mut received);
+        iter += 1;
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    let elapsed = start.elapsed().as_secs_f64();
+    println!(
+        "[T01-SLOW-HOST] {}",
+        serde_json::json!({
+            "tag": "t01_slow_host",
+            "window_s": elapsed,
+            "host_composed_total": cell.client.frames,
+            "referenced_identities": seen.len(),
+            "received_frames": received.len(),
+            "received_fps": (received.len() as f64 / elapsed),
+            "alive": alive,
+        })
+    );
+    assert!(alive, "慢宿主下连接必须存活（不因背压断链）");
+    assert!(cell.client.frames > 0, "慢宿主必须仍收到帧");
+    assert!(
+        received.len() >= 2,
+        "慢宿主下内容仍应连续抵达（合流不冻结），实得 {}",
+        received.len()
+    );
+    crate::ui::media_poster::clear(&src);
 }
