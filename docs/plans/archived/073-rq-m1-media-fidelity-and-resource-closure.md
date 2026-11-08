@@ -251,7 +251,7 @@ CPU/GPU资源所有权、换帧期间旧帧有效性、取消/关闭/最后owner
 - **landed**：rebase master（4ebc51ce）后 range-diff 全等（补丁等价证明；old→new 映射：d00fa0a2→02680ab0、f8a55bd6→82e5f49f、f2ec9f72→b3d26083、dfedfa81→8bfcf6a3、2cf7b43e→82b61084）；主检出 `git merge --ff-only` **无合并提交**，master tip = **82b61084** = 交付提交。
 - **canonical_verified**（主检出源哈希，sha256 前 16）：`1e27842ac6da9ce8` rq-continuous-media.md（新增）；`9396e4cac31378de` rq-render-packets-and-resources.md（§7 增补）；`f3aef37bf4294cec` rq-fidelity-contract.md（§3 更正 + §10）。交付提交内三文件齐（git log 确认 create/modify 落 82b61084 谱系）。
 - **archived**：Plan 移入 docs/plans/archived/（untracked→新建归档文件）+ status: archived + T-07/T-08 勾选（8/8）；本收据与归档文件随本次簿记提交入库（PLAN-104 UAT-K13：非 untracked docs）。
-- **cleaned**（随后执行并回填）：wt-guard clean → worktree/分支移除 → plan-artifacts/plan-073/auto-ui 折叠删除 → 登记刷新。
+- **cleaned（已执行回填）**：wt-guard clean（无 reparse point）→ worktree 移除 + 分支 codex/plan-073-dev 删除（was 82b61084=交付 tip）→ 组目录 .wt/ui-073/（含只读依赖树 lang/web/down）移除 + 三仓 worktree prune → plan-artifacts/plan-073 删除（867 文件/~19MB； durable 摘要已全部折入本文件 §9/§10）→ 登记刷新（deleted-at-merge + F-1 hold：owner=OS063 + 关闭条件）。
 - **生产制品现况观察（landing≠deployment）**：本 Plan 未触 release 二进制/daemon/web bundle 的消费面变更（crate 库内实现 + 测试面）；OS063 消费正式接口后重建再验（SD-01 §6/SD-03 §10 交接面）。登记为观察项，不阻塞 delivered。
 - **批量回归 due 检查**：073 % 5 ≠ 0；due 文件核对见 cleaned 回填。
-- next: 清理回填 → 报告 pass。
+- next: 清理回填完成 → **报告 pass**（delivered @82b61084）。
