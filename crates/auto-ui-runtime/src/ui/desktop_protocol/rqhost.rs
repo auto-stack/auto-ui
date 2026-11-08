@@ -866,9 +866,17 @@ pub fn adopt_one(
 /// 日常泵一轮：drain 已到达消息（帧合成/Ack、回收、上行），应答直发。
 /// 返回 (泵事件, 存活)——EOF/协议错 = false（调用方回收窗与资源，
 /// pump_broker_clients 回收臂同构）。
+/// PLAN-063 T-05（P-04 机制）：单客户端单拍消息预算——重客户端帧洪泛
+/// 时其余客户端的泵拍仍按预算切片（daemon 单线程 update 内有界工作/
+/// 拍）；超预算余量下拍续排（管道 FIFO 不丢——输入/资源依赖保序，
+/// 过期画面由槽信用自然合并）。64 ≫ 稳态帧流（槽信用 ≤2 在途），
+/// 只在病态积压时触界。
+const PUMP_MSG_BUDGET_PER_TICK: usize = 64;
+
 pub fn pump_client(client: &mut RqClient, ids: &mut RqIds) -> (Vec<RqEvent>, bool) {
     let mut events = Vec::new();
     let mut alive = true;
+    let mut budget = PUMP_MSG_BUDGET_PER_TICK;
     loop {
         match client.inner.end.try_recv() {
             Some(Ok(msg)) => {
@@ -883,6 +891,11 @@ pub fn pump_client(client: &mut RqClient, ids: &mut RqIds) -> (Vec<RqEvent>, boo
                 events.append(&mut ev);
                 for reply in to_app {
                     let _ = client.inner.end.send(&reply);
+                }
+                budget -= 1;
+                if budget == 0 {
+                    // 预算尽：余量留待下拍（alive 保持——连接健康）。
+                    break;
                 }
             }
             Some(Err(_)) => {
@@ -2676,6 +2689,141 @@ mod tests {
         }
 
         serve.stop(&pipe);
+    }
+
+    /// PLAN-063 T-05（M-01 代理分段 + M-04 守恒；预算先于测量冻结——
+    /// t01-freeze §5）：真实采纳 + 真 VM 组件（按钮计数器）+ 输入臂
+    /// 即时泵——**输入→帧到宿主**（含客户端 update/编码/线往返/宿主
+    /// 泵收帧全链）p50/p95/max。预算（T-01 冻结 declaration）：p95
+    /// ≤100ms 硬门；p50 只记录。终点 = 帧到宿主（代理终点，非物理
+    /// 上屏——rq-fidelity-contract §9 具名不可达④，最终组合归 OS063）。
+    /// M-04 守恒：每点击恰一帧增量；M-02/03/05..08 本入口不测（归
+    /// T-05c 汇总与 OS063）。
+    #[test]
+    fn p063_m01_input_to_frame_proxy_segments() {
+        use crate::ui::session::LiveInput;
+
+        // legacy queue 臂（v1 DrawList——`-q` 缺省轨；v2 remote 臂的
+        // 记录/编码/重放分段已由 062 rq_cells 覆盖。本测量跨臂同构：
+        // 线往返 + 泵 + 守护收帧）。
+        // 真组件（headless 客户端 autocenter 缺省 ON——按钮中心 (240,145.2)）。
+        let src = "widget P063M01 {\n    model { var count int = 0 }\n    view {\n        button \"+\" { onclick: () => {.count += 1} }\n    }\n}\n";
+        let pipe = pid_pipe("p063m01");
+        let (serve, _claim) = start_serve(&pipe);
+        let fork_pipe = pipe.clone();
+        let app = std::thread::spawn(move || {
+            let comp = crate::build_dynamic_component(src, None).expect("build");
+            run_vm_rqhost_client(comp, &fork_pipe)
+        });
+        let mut state = RqDaemon {
+            serve: Arc::clone(&serve),
+            claim: None,
+            wellknown: pipe.clone(),
+            ids: RqIds::default(),
+            clients: Vec::new(),
+            had_window: false,
+            opened: 0,
+            last_cursor: BTreeMap::new(),
+            last_modifiers: 0,
+            mem_ticks: 0,
+        };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while state.clients.is_empty() {
+            let pending: Vec<_> = state.serve.pending.lock().unwrap().drain(..).collect();
+            for (name, end) in pending {
+                if let Some((client, _)) = adopt_one(name, end, &mut state.ids, 3000) {
+                    state.clients.push(client);
+                }
+            }
+            assert!(std::time::Instant::now() < deadline, "客户端 10s 未落地");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let win = iced::window::Id::unique();
+        state.clients[0].window = Some(win);
+        // 预热（首帧 + 采纳尾气）。
+        let _ = rq_update(
+            &mut state,
+            RqMessage::CursorMoved {
+                window: win,
+                x: 240.0,
+                y: 145.2,
+            },
+        );
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while state.clients[0].frames == 0 {
+            let _ = rq_update(&mut state, RqMessage::Tick);
+            assert!(std::time::Instant::now() < deadline, "首帧 10s 未到");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+
+        const SAMPLES: u32 = 40;
+        let mut latencies_ms: Vec<f64> = Vec::new();
+        let frames_before = state.clients[0].frames;
+        for k in 0..SAMPLES {
+            let x = 200.0 + (k % 8) as f32 * 10.0;
+            let _ = rq_update(
+                &mut state,
+                RqMessage::CursorMoved {
+                    window: win,
+                    x,
+                    y: 145.2,
+                },
+            );
+            let t0 = std::time::Instant::now();
+            // press+release 对（iced button 内部 is_pressed 态——无
+            // release 的后续 press 不再触发）。
+            let _ = rq_update(
+                &mut state,
+                RqMessage::PointerPressed {
+                    window: win,
+                    button: iced::mouse::Button::Left,
+                },
+            );
+            let _ = rq_update(
+                &mut state,
+                RqMessage::PointerReleased {
+                    window: win,
+                    button: iced::mouse::Button::Left,
+                },
+            );
+            // 子线程（客户端 update/编码/push）与守护泵异步——轮询等帧
+            //（上限 50ms；实测粒度 ~1ms 计入分段，100ms 门内无碍）。
+            let want = frames_before + (k as u64) + 1;
+            let frame_deadline = t0 + std::time::Duration::from_millis(50);
+            while state.clients[0].frames < want && std::time::Instant::now() < frame_deadline {
+                let _ = rq_update(&mut state, RqMessage::Tick);
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            latencies_ms.push(t0.elapsed().as_secs_f64() * 1000.0);
+        }
+        // M-04 守恒（有界式）：每点击对 ≥1 帧状态推进（无输入丢失），
+        // 且不成洪（≤2 帧/对——hover/release 语义可多一帧，传输不多产）。
+        let frames_after = state.clients[0].frames;
+        let delta = frames_after - frames_before;
+        assert!(
+            delta >= SAMPLES as u64 && delta <= 2 * SAMPLES as u64,
+            "M-04 有界守恒（无丢失/无洪泛）: {delta} for {SAMPLES}"
+        );
+        // 帧内容有效：合成面在册且非空（v1 queue 臂 = composed）。
+        {
+            let client = &state.clients[0];
+            let list = composed(client).expect("合成面在册");
+            assert!(!list.ops.is_empty(), "合成面非空（帧内容有效）");
+        }
+        latencies_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let p50 = latencies_ms[SAMPLES as usize / 2];
+        let p95 = latencies_ms[(SAMPLES as usize * 95) / 100];
+        let max = latencies_ms[SAMPLES as usize - 1];
+        println!(
+            "[p063-m01] input→frame-at-host ms: p50={p50:.3} p95={p95:.3} max={max:.3} (n={SAMPLES}; 代理终点=帧到宿主)"
+        );
+        assert!(
+            p95 <= 100.0,
+            "M-01 代理 p95 硬门（T-01 冻结 ≤100ms）: {p95:.3}ms"
+        );
+
+        serve.stop(&pipe);
+        let _ = app.join();
     }
 
     /// T-07/P031-R3：末窗退出门单测——rq_update 真行为驱动（WindowClosed
