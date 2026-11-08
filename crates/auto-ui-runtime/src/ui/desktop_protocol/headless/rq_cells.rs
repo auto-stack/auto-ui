@@ -397,10 +397,10 @@ fn rq_cells_t05_six_cell_matrix() {
                                     reading.diff_ratio
                                 );
                             }
-                            // AC-07（r4）计时门：只在**安静基线**下判红。direct p95 是
-                            // 同一跑的对照；跑机被并发任务抢占时（061 冻结典型 3–6.9ms，
-                            // 这里以 ≤8ms 判安静）把计时数字记入报告、标 skipped_loaded，
-                            // 不把调度抖动当回归（复审 N-02/F-03）。像素门不受影响。
+                            // AC-07（r5）计时门：只在**隔离窗口**（AUTO_RQ_TIMING_WINDOW
+                            // =isolated）断言；共享窗口只记录并标 skipped_shared_window。
+                            // 依据：实测主机负载会把 produce/replay 放大 3–6 倍（复审
+                            // N-02/F-03），共享窗口判红是假红。像素门不受影响。
                             let direct_p95 = reading.inventory["direct_frame_p95_ms"]
                                 .as_f64()
                                 .unwrap_or(f64::NAN);
@@ -432,8 +432,7 @@ fn rq_cells_t05_six_cell_matrix() {
                                 // 只跑一组样本、且与 061 冻结口径的采样/预热不同；该
                                 // 条款由 061 的测量入口 `rq_probe_t01_direct_and_rq_baseline`
                                 // 断言（同一基线、同口径）。这里只记录比值供对照。
-                                let ratio = reading.replay_p95 / direct_p95.max(0.001);
-                            }
+                                }
                             println!(
                                 "[RQCELLS] {}",
                                 serde_json::json!({

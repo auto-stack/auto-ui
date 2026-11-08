@@ -224,13 +224,16 @@ shm 帧槽 + ACK → 宿主端点 → 两套**不同**的宿主合成实现 → 
   隔离窗口断言（`AUTO_RQ_TIMING_WINDOW=isolated`），因为 20 样本下 p95 ≈ 次大值，
   共享跑机的调度抖动会顶穿它（实测同代码 replay p50 反优于 direct，p95 在 5–22ms
   间波动）。Plan §6 已写明性能测量不得与其他会话争用 GPU。
+  **口径（2026-11-08 r5 裁定）**：replay 相对 direct 的判据是
+  **稳态 p50 ≤1.25×direct p50 + 2.0ms，p95 只记录不设门**（20 样本下 p95≈次大值，
+  同一实现实测在 4.1–10ms 间随主机负载变化、max 可达 40ms）；produce 的
+  W-C ≤10ms 与其具名例外（SVG，p50 ≤60ms，安静机记录值 ≈32.5ms）不变。
   **所有计时断言只在隔离窗口执行**（`AUTO_RQ_TIMING_WINDOW=isolated`）：Plan §6
   规定性能测量不得与其他会话争用 GPU，而共享跑机的负载会把 produce/replay 放大
-  到数倍（实测 SVG produce p50 32→76ms、replay p50 5→18ms、button replay p95
-  12→30ms），据此判红是假红。共享窗口只记录数字，报告每行标
-  `timing_gate=skipped_shared_window`；像素门与结构门不受此影响、始终生效。
-  换言之：**共享窗口的绿灯只覆盖功能与保真，不证明 W-C/replay 预算**；性能签收
-  必须是一次隔离窗口运行。
+  数倍（实测 SVG produce p50 32→76ms、replay p50 5→18ms），据此判红是假红。
+  共享窗口只记录数字，报告每行标 `timing_gate=skipped_shared_window`；像素门与
+  结构门不受此影响、始终生效。换言之：**共享窗口的绿灯只覆盖功能与保真，不证明
+  W-C/replay 预算**；性能签收必须是一次隔离窗口运行。
 - M 指标：M-04/M-08 measured；M-01/M-03/M-05 为 proxy（present 与 GPU 驻留未测）；
   M-02/M-06/M-07 unmeasured（真实 deadline、冷热启动、1/4/8 App 归 UI063/OS063）。
 
