@@ -196,6 +196,8 @@ pub(super) fn run() {
                 probe
             }),
         report: value("--report").map(PathBuf::from),
+        evidence_record: value("--evidence-record").map(PathBuf::from),
+        evidence_attach: value("--evidence-attach").map(PathBuf::from),
         ..Default::default()
     };
     if let Err(error) = EventLoop::new().unwrap().run_app(&mut app) {
@@ -505,6 +507,95 @@ pub(super) fn run() {
             );
             data.insert("runner_path".into(), serde_json::json!(runner));
             std::fs::write(path, serde_json::to_vec_pretty(&data).unwrap()).expect("report");
+        }
+    }
+    // PLAN-071 T-04: read-only evidence record (schema
+    // autographics.m1-native-evidence/1). Binds the ACTUAL project/current
+    // state identity and optionally attaches an original OS-phase report by
+    // content identity. It runs no oracle and never upgrades to a native pass
+    // (mode 'state-record' is a binding tier for AG027 consumption).
+    if let Some(out) = app.evidence_record.clone() {
+        match app.host.as_mut() {
+            Some(h) => {
+                let mut record = autographics_auto_driver::m1_evidence::EvidenceRecord::new(
+                    "authoring-editor",
+                    "state-record",
+                );
+                let mut bindings = serde_json::json!({
+                    "open_path": app
+                        .open
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default(),
+                    "history": serde_json::json!(h.editor.history()),
+                    "dirty": serde_json::json!(h.editor.dirty()),
+                    "selection": serde_json::json!(h.editor.selection),
+                });
+                if let Ok(doc) = h.editor.document.hash() {
+                    bindings["document_sha256"] = serde_json::json!(doc);
+                }
+                record.bind_project("editor-project", bindings);
+                let runner = std::env::current_exe().ok().map(|p| {
+                    let bytes = std::fs::read(&p).unwrap_or_default();
+                    serde_json::json!({
+                        "runner_path": p,
+                        "runner_sha256": agp::renderer::capture::sha256_hex(&bytes),
+                    })
+                });
+                record.bind_candidate(serde_json::json!({ "runner": runner }));
+                if let Some(w) = app.window.as_ref() {
+                    let size = w.inner_size();
+                    let scale = w.scale_factor();
+                    record.observe_window(
+                        scale,
+                        [
+                            size.width.max(1) as f64 / scale,
+                            size.height.max(1) as f64 / scale,
+                        ],
+                        [size.width, size.height],
+                    );
+                }
+                let two = h.rt.capture(h.two, "evidence-2d").map(|v| v.0);
+                let three = h.rt.capture(h.three, "evidence-3d").map(|v| v.0);
+                let top = h.rt.capture(h.top, "evidence-top").map(|v| v.0);
+                record.checkpoint(
+                    "editor-state",
+                    serde_json::json!({
+                        "history": h.editor.history(),
+                        "dirty": h.editor.dirty(),
+                        "selection": h.editor.selection,
+                        "frames": app.frames,
+                        "captures": { "two": two, "three": three, "top": top },
+                    }),
+                );
+                if let Some(attach) = &app.evidence_attach {
+                    let bytes = std::fs::read(attach).unwrap_or_default();
+                    let parsed: Option<serde_json::Value> =
+                        serde_json::from_slice(&bytes).ok();
+                    record.checkpoint(
+                        "attached-os-phase-record",
+                        serde_json::json!({
+                            "path": attach.display().to_string(),
+                            "sha256": agp::renderer::capture::sha256_hex(&bytes),
+                            "bytes": bytes.len(),
+                            "schema": parsed.as_ref().and_then(|v| v.get("schema")).cloned(),
+                            "passed": parsed.as_ref().and_then(|v| v.get("passed")).cloned(),
+                        }),
+                    );
+                }
+                record.set_tier_channel("record");
+                if let Err(e) = record.write_json(&out) {
+                    app.error = Some(format!("evidence record write failed: {e}"));
+                }
+            }
+            None => {
+                let mut record = autographics_auto_driver::m1_evidence::EvidenceRecord::new(
+                    "authoring-editor",
+                    "state-record",
+                );
+                record.fail("no host (project never opened)");
+                let _ = record.write_json(&out);
+            }
         }
     }
     if let Some(error) = app.error {

@@ -1,0 +1,66 @@
+// PLAN-071 T-02 forensics fixture root: a COPY of the PLAN-054 `Dash`
+// showcase root (same business/region semantics: Bump +1 & strip_x +10,
+// StripHit +100, Toggle flips .show), with high-contrast edge geometry added
+// so composed clip evidence has recognizable content crossing region
+// boundaries. Exactly 4 declared regions (p1/m3/strip/p2) mount with no
+// rejection. The strip edge quad (x=104, w=24 in a 120-wide region) crosses
+// the right boundary; the dot follows .strip_x (+10 per Bump).
+use gaugeclip: ClipGauge
+use meterclip: ClipMeter
+
+node Dash {
+    model {
+        var count = 0
+        var show = 1
+        var strip_x = 0
+    }
+    msg {
+        Bump
+        StripHit
+        Toggle
+    }
+    view {
+        column root {
+            spacing: 8
+            padding: 12
+            text count_text { text: .count }
+            row actions {
+                button bump { text: "bump", onclick: .Bump }
+                button toggle { text: "toggle", onclick: .Toggle }
+            }
+            if .show {
+                ClipGauge p1 {
+                }
+            }
+            ClipMeter m3 {
+            }
+            row strip_row {
+                view-2d strip {
+                    width: 120
+                    height: 48
+                    onclick: .StripHit
+                    shape2d slug { kind: quad, x: .strip_x, y: 12, w: 16, h: 16, color: (40, 90, 200) }
+                    shape2d edge { kind: quad, x: 104, y: 32, w: 24, h: 12, color: (255, 0, 255) }
+                }
+            }
+            ClipGauge p2 {
+            }
+        }
+    }
+    on {
+        Life.Start -> {
+            .count = 0
+        }
+        .Bump -> {
+            .count = .count + 1
+            .strip_x = .strip_x + 10
+        }
+        .StripHit -> {
+            .count = .count + 100
+        }
+        .Toggle -> {
+            .show = 1 - .show
+        }
+    }
+}
+fn main() {}

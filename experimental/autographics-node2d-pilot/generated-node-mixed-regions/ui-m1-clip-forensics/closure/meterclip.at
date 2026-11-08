@@ -1,0 +1,30 @@
+// PLAN-071 T-02 forensics fixture component: COPY of the PLAN-054 `Meter`
+// (view-3d `dial` region, Tap +2 / Tick +1 business semantics kept) with a
+// near-edge cylinder added at int translation x=3 (radius 1 → spans 2..4;
+// the 45° projection half-extent at z=0 is ≈3.31, so the composed clip must
+// truncate it inside the 80×80 region; scene bindings are frozen to ints).
+node ClipMeter {
+    model {
+        var tx = 0
+    }
+    msg {
+        Tap
+    }
+    view {
+        view-3d dial {
+            width: 80
+            height: 80
+            onclick: .Tap
+            cylinder3d rod { translation: (.tx, 0, 0), color: (90, 200, 90) }
+            cylinder3d edge { translation: (3, 0, 0), color: (255, 0, 255) }
+        }
+    }
+    on {
+        .Tap -> {
+            .tx = .tx + 2
+        }
+        Life.Tick -> {
+            .tx = .tx + 1
+        }
+    }
+}

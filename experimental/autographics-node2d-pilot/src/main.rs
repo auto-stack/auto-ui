@@ -1708,6 +1708,9 @@ fn main() {
                 "ui-dash-regions" => {
                     "experimental/autographics-auto-driver/tests/node_mixed_regions_*.rs (PLAN-054 owner evidence)"
                 }
+                "ui-m1-clip-forensics" => {
+                    "experimental/autographics-auto-driver/tests/m1_native_evidence_support.rs + bin/mixed_regions_window.rs (PLAN-071 app-clip/native-evidence evidence)"
+                }
                 _ => "unrecorded (this out dir has no registered flow consumer)",
             };
             identity.push_str(&format!("  \"product\": \"{product}\",\n"));

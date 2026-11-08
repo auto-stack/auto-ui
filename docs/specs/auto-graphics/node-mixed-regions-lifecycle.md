@@ -138,3 +138,48 @@ pilot 16 例；v1 夹具再生字节同一）；文字越界与文本槽预算�
 - 故障域：Session 故障 → 相关域停止（队列清空、最后可用呈现保留、具名
   错误）；激活资源失败（surface/view/portal）具名记账且应用保持可用；
   非法区域（越界/坏 dim/集外元素）生成与消费双侧具名拒绝。
+
+## 4. 应用级合成 clip 与只读取证接面（PLAN-071 实测增量）
+
+Status: 本节为 auto-ui PLAN-071 T-01..T-03 实测交付的增量；以上 0..3 节
+语义逐字保持。真实双 DPI 档与逐项人工语义**仍未证**——它们是 ag-examples
+DEBT-001（AG026 外部门），本档不冒称关闭。
+
+- **最终合成可观测（零新增访问器）**：`MixedRegionsHost::frame` 把每个
+  活动区域门户按 clip 合成进 UI 窗口面 target（`composite_portals_of`
+  quad+scissor），呈现即 blit 该纹理。因此对 `host.ui` 的
+  `rt.capture/probe_pixel(s)` 读到**真实混合最终合成**（UI＋2D/3D 区域＋
+  clip 后像素），离屏与真窗同面。ROI 独立来源＝`widget_bounds`（真实
+  iced 布局 rect）＋ fixture 声明几何比例——不得用 clip 实现本身算
+  expected。
+- **应用级 clip oracle 与反控（永久门
+  `tests/m1_native_evidence_support.rs`，9 例）**：高对比边界几何在
+  region rect 内可见、rect 外（右缘外至 1.5 宽扫描线）与干净参照同值且
+  无边界识别色；2D（strip edge quad x=104..128@120）与 3D（dial 近边界
+  圆柱 x=3,r=1，投影半宽 ≈3.31@80）各一例。反控打在生产缝隙：
+  **mount 漂移**（`rt.set_portal_mount`——offset/scale/clip 同随一个错
+  rect，真实故障形＝陈旧 bounds/旧 ROI；scissor 单独移除在 app 层不可
+  见，因为 v2 host 的 extent==clip 结构性成立——引擎层 scissor 反控仍在
+  prototype `surface_lifecycle.rs` V-08）必被 oracle 捕捉、精确修复同副
+  本回绿；**内部缺画**（`with_game2d_mut` 清 commands，同
+  `present_region` 缝隙）必红，真实状态变化重建呈现后回绿。
+- **边界路由**：region rect 内缘点击只推进命中 receiver（同定义实例状
+  态隔离）；rect 外 2px 同一行点击不派发；UI 按钮消费与区域互不误动；
+  卸载/重挂后旧 ROI 点击落在**真实新占位**（不误派发旧键），重挂代次
+  单调递增，旧代次 `enqueue_region_click_at` drain 前具名拒绝
+  （`stale_rejected`），resize 后重新实测 bounds 命中照常。
+- **取证 fixture（永久，仅新增不回写）**：pilot
+  `fixtures/node-mixed-regions/{dashclip,gaugeclip,meterclip}.at`（054
+  Dash/Gauge/Meter showcase 内容副本，业务/区域语义保持；新增高对比边
+  界几何与近边界种子），产物
+  `generated-node-mixed-regions/ui-m1-clip-forensics/`（world sha
+  `9c18df0014dbf45da5affe4f9e97a3882f8c871b7d29f9f5fa6c346ecd1ce7a8`，
+  identity consumer 记本档测试＋window bin）。原三份 054 产物不动
+  （`verify_plan054.py --controls` 再生逐字节一致仍全绿）。
+- **真实窗口单档重验**：`mixed_regions_window --probe`（原 showcase
+  fixture）在本机单档 scale=2.0 连续语义复现：exit 0、count=202、
+  resize 后命中、挂卸两轮、空闲零 Tick。真 native SendInput/焦点捕获/
+  第二真实 scale/逐项语义仍为 `--manual` 人工门（auto_pass=false），
+  由 `m1-native-evidence-support` 档接面承接。
+- 只读证据记录（N1..N6/ScaleFactorChanged/检查点/schema 校验）见
+  `docs/specs/auto-graphics/m1-native-evidence-support.md`（SD-02）。

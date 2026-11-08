@@ -1,0 +1,32 @@
+// PLAN-071 T-02 forensics fixture component: COPY of the PLAN-054 `Gauge`
+// (view-2d `arc` region, Ping +12 / Tick +4 business semantics kept), with
+// the dot SEEDED at x=72 (spans 72..96, flush against the 96-wide region's
+// right edge) and a static high-contrast edge quad at x=88 w=24 (spans
+// 88..112 — crosses the boundary; the composed clip must truncate it at 96).
+node ClipGauge {
+    model {
+        var x = 72
+        var hits = 0
+    }
+    msg {
+        Ping
+    }
+    view {
+        view-2d arc {
+            width: 96
+            height: 64
+            onclick: .Ping
+            shape2d dot { kind: quad, x: .x, y: 20, w: 24, h: 24, color: (200, 40, 40) }
+            shape2d edge { kind: quad, x: 88, y: 48, w: 24, h: 12, color: (255, 0, 255) }
+        }
+    }
+    on {
+        .Ping -> {
+            .x = .x + 12
+            .hits = .hits + 1
+        }
+        Life.Tick -> {
+            .x = .x + 4
+        }
+    }
+}

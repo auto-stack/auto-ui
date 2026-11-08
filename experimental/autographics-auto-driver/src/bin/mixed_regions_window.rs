@@ -22,6 +22,7 @@
 //! GPU/窗口/焦点单实例运行。
 use agp::host::iced_surface_probe as probe;
 use agp::renderer::{GpuDevice, WindowTarget};
+use autographics_auto_driver::m1_evidence::MIXED_MANUAL_CHECKLIST;
 use autographics_auto_driver::node_mixed_regions::MixedRegionsUiApp;
 use autographics_auto_driver::node_mixed_regions_host::MixedRegionsHost;
 use autographics_auto_driver::node_ui::PlatformKey;
@@ -74,6 +75,9 @@ struct App {
     epochs_after_remount: [Option<u64>; 2],
     marks: Vec<(String, u64)>,
     manual_seen: ManualSeen,
+    /// PLAN-071 T-04: read-only actual-read checkpoints around each manual OS
+    /// event (scale/size/counters/epochs at that instant; no business access).
+    manual_checkpoints: Vec<serde_json::Value>,
     /// Keyboard target of the current adaptive Tab job (None = no job).
     kb_target: Option<String>,
     kb_posted: u32,
@@ -95,6 +99,9 @@ struct ManualSeen {
     cursor_left: u32,
     resizes: u32,
     scales: Vec<f32>,
+    /// PLAN-071 T-04: real ScaleFactorChanged events (before, after) — the
+    /// window's actual scale readback on both sides of the OS change.
+    scale_factor_changed: Vec<(f32, f32)>,
 }
 
 impl App {
@@ -129,6 +136,7 @@ impl App {
             epochs_after_remount: [None; 2],
             marks: Vec::new(),
             manual_seen: ManualSeen::default(),
+            manual_checkpoints: Vec::new(),
             kb_target: None,
             kb_posted: 0,
             zero_resizes: 0,
@@ -184,6 +192,32 @@ impl App {
         }
     }
 
+    /// PLAN-071 T-04: one read-only actual-read snapshot around a manual OS
+    /// event — scale/size from the real window, counters/epochs from the host
+    /// public faces. Recording never touches Tick/dispatch/routing.
+    fn manual_checkpoint(&mut self, label: &str) {
+        if !self.manual {
+            return;
+        }
+        let mut entry = serde_json::json!({ "label": label });
+        if let Some(w) = &self.window {
+            entry["scale"] = serde_json::json!(w.scale_factor());
+            let size = w.inner_size();
+            entry["physical"] = serde_json::json!([size.width, size.height]);
+        }
+        if let Some(h) = self.host.as_mut() {
+            entry["logical"] = serde_json::json!(h.logical());
+            entry["count_text"] = serde_json::json!(h.app().ui.texts(0).first().cloned());
+            entry["callbacks"] = serde_json::json!(h.app().ui.callbacks);
+            entry["active_regions"] = serde_json::json!(h.active_keys());
+            entry["epochs"] = serde_json::json!([
+                h.region_epoch(P1),
+                h.region_epoch(STRIP),
+            ]);
+        }
+        self.manual_checkpoints.push(entry);
+    }
+
     fn bounds4(&mut self, key: &str) -> Option<[f32; 4]> {
         self.host
             .as_mut()
@@ -237,29 +271,126 @@ impl App {
     fn verify_and_finish(&mut self, e: &ActiveEventLoop) {
         if self.manual {
             let seen = &self.manual_seen;
-            let report = serde_json::json!({
-                "title": TITLE,
-                "mode": "manual-gate (PLAN-066 T-02)",
-                "auto_pass": false,
-                "observed": {
-                    "tabs": seen.tabs,
-                    "enters": seen.enters,
-                    "clicks": seen.clicks,
-                    "focus_lost": seen.focus_lost,
-                    "cursor_left": seen.cursor_left,
-                    "resizes": seen.resizes,
-                    "scales": seen.scales,
-                },
-                "checklist": [
-                    "Tab + Enter activate the next button exactly once",
-                    "a click outside every control changes nothing",
-                    "Alt-Tab away then back: the stale focused button does not activate on Enter",
-                    "mouse leave cancels the press (no region click)",
-                    "resize; the next click lands on the widget's new position",
-                    "repeat on a second DPI scale if the machine has one",
-                ],
-                "note": "real OS input evidence only; never an automatic pass",
+            // PLAN-071 T-04: the same real-OS observation now lands in the
+            // versioned evidence schema (autographics.m1-native-evidence/1).
+            // N1..N6 carry the observed counters each; the human conclusions
+            // and observer name stay null until a person fills them in, and
+            // the validator keeps the record pending until then.
+            let mut record = autographics_auto_driver::m1_evidence::EvidenceRecord::new(
+                "mixed-regions",
+                "native-manual",
+            );
+            let ui_sha = std::fs::read(&self.ui_path)
+                .ok()
+                .map(|b| agp::renderer::capture::sha256_hex(&b));
+            let world_sha = std::fs::read(&self.world_path)
+                .ok()
+                .map(|b| agp::renderer::capture::sha256_hex(&b));
+            let mut bindings = serde_json::json!({
+                "ui_json_path": self.ui_path,
+                "world_at_path": self.world_path,
             });
+            if let Some(sha) = &ui_sha {
+                bindings["ui.json#sha256"] = serde_json::json!(sha);
+            }
+            if let Some(sha) = &world_sha {
+                bindings["world.at#sha256"] = serde_json::json!(sha);
+            }
+            record.bind_project("mixed-artifact", bindings);
+            let runner = std::env::current_exe().ok().map(|p| {
+                let bytes = std::fs::read(&p).unwrap_or_default();
+                serde_json::json!({
+                    "window_runner_path": p,
+                    "window_runner_sha256": agp::renderer::capture::sha256_hex(&bytes),
+                })
+            });
+            record.bind_candidate(serde_json::json!({
+                "window": TITLE,
+                "runner": runner,
+            }));
+            if let Some(w) = &self.window {
+                let size = w.inner_size();
+                let scale = w.scale_factor();
+                record.observe_window(
+                    scale,
+                    [
+                        size.width.max(1) as f64 / scale,
+                        size.height.max(1) as f64 / scale,
+                    ],
+                    [size.width, size.height],
+                );
+            }
+            for (before, after) in &seen.scale_factor_changed {
+                record.record_scale_change(*before as f64, *after as f64, "manual");
+            }
+            for cp in &self.manual_checkpoints {
+                let label = cp["label"].as_str().unwrap_or("checkpoint").to_string();
+                record.checkpoint(&label, cp.clone());
+            }
+            for (kind, count) in [
+                ("tabs", seen.tabs),
+                ("enters", seen.enters),
+                ("clicks", seen.clicks),
+                ("focus_lost", seen.focus_lost),
+                ("cursor_left", seen.cursor_left),
+                ("resizes", seen.resizes),
+            ] {
+                for _ in 0..count {
+                    record.count_os_event(kind);
+                }
+            }
+            record.observe_checklist(
+                "N1",
+                serde_json::json!({ "tabs": seen.tabs, "enters": seen.enters }),
+            );
+            record.observe_checklist(
+                "N2",
+                serde_json::json!({ "clicks": seen.clicks }),
+            );
+            record.observe_checklist(
+                "N3",
+                serde_json::json!({ "focus_lost": seen.focus_lost, "enters": seen.enters }),
+            );
+            record.observe_checklist(
+                "N4",
+                serde_json::json!({ "cursor_left": seen.cursor_left }),
+            );
+            record.observe_checklist(
+                "N5",
+                serde_json::json!({
+                    "resizes": seen.resizes,
+                    "logical_sizes": self.logical_sizes,
+                    "physical_sizes": self.physical_sizes,
+                }),
+            );
+            record.observe_checklist(
+                "N6",
+                serde_json::json!({
+                    "scale_factor_changed": seen.scale_factor_changed,
+                    "scales": seen.scales,
+                }),
+            );
+            record.set_tier_channel("native");
+            let mut report = record.to_value();
+            // Legacy face (PLAN-066 T-02 consumers) keeps its field names.
+            report["title"] = serde_json::json!(TITLE);
+            report["mode_note"] = serde_json::json!("manual-gate (PLAN-066 T-02; PLAN-071 T-04 evidence schema)");
+            report["observed"] = serde_json::json!({
+                "tabs": seen.tabs,
+                "enters": seen.enters,
+                "clicks": seen.clicks,
+                "focus_lost": seen.focus_lost,
+                "cursor_left": seen.cursor_left,
+                "resizes": seen.resizes,
+                "scales": seen.scales,
+            });
+            report["checklist"] = serde_json::json!(MIXED_MANUAL_CHECKLIST
+                .iter()
+                .map(|(_, item)| item.to_string())
+                .collect::<Vec<_>>());
+            report["note"] = serde_json::json!(
+                "real OS input evidence only; never an automatic pass; N1..N6 conclusions and observer stay null until a human fills them"
+            );
             std::fs::create_dir_all(&self.report).ok();
             std::fs::write(
                 self.report.join("manual-native-gate.json"),
@@ -607,6 +738,7 @@ impl ApplicationHandler for App {
                     if let Some(w) = &self.window {
                         self.manual_seen.scales.push(w.scale_factor() as f32);
                     }
+                    self.manual_checkpoint("resize");
                 }
                 let (Some(target), Some(host)) = (self.target.as_mut(), self.host.as_mut()) else {
                     return;
@@ -643,6 +775,7 @@ impl ApplicationHandler for App {
                 }
                 if state == ElementState::Pressed {
                     self.manual_seen.clicks += u32::from(self.manual);
+                    self.manual_checkpoint("click");
                 }
                 let scale = window_scale_of(self.window.as_ref());
                 let logical = [self.cursor_px[0] / scale, self.cursor_px[1] / scale];
@@ -660,6 +793,7 @@ impl ApplicationHandler for App {
                 // A probe continues via the adaptive Tab re-acquisition.
                 self.manual_seen.focus_lost += 1;
                 self.marks.push(("focus_lost".into(), 1));
+                self.manual_checkpoint("focus_lost");
                 if let Some(h) = self.host.as_mut() {
                     h.window_focus_lost();
                 }
@@ -668,9 +802,26 @@ impl ApplicationHandler for App {
                 // Pointer leaving cancels the in-flight press/capture only; the
                 // keyboard focus is owned by the focus channel above.
                 self.manual_seen.cursor_left += 1;
+                self.manual_checkpoint("cursor_left");
                 if let Some(h) = self.host.as_mut() {
                     h.cancel_all(agp::core::composition::input::CancelReason::PointerLeftWindow);
                     self.marks.push(("cursor_left".into(), 1));
+                }
+            }
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                // PLAN-071 T-04: record the REAL OS scale change (winit actual
+                // before/after). Read-only: the following Resized event applies
+                // the geometry through the existing host path.
+                if self.manual {
+                    let before = self
+                        .window
+                        .as_ref()
+                        .map(|w| w.scale_factor())
+                        .unwrap_or(scale_factor);
+                    self.manual_seen
+                        .scale_factor_changed
+                        .push((before as f32, scale_factor as f32));
+                    self.manual_checkpoint("scale_factor_changed");
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
@@ -686,6 +837,11 @@ impl ApplicationHandler for App {
                                 PlatformKey::Tab => self.manual_seen.tabs += 1,
                                 PlatformKey::Enter => self.manual_seen.enters += 1,
                             }
+                            let label = match k {
+                                PlatformKey::Tab => "tab",
+                                PlatformKey::Enter => "enter",
+                            };
+                            self.manual_checkpoint(label);
                         }
                         if let Some(h) = self.host.as_mut() {
                             h.key(k);

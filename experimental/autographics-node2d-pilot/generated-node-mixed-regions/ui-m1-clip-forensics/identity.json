@@ -1,0 +1,21 @@
+{
+ "generator": "autographics-node2d-pilot plan054 node-ui-mixed-regions",
+ "api": "autographics.node-ui-mixed-regions/2",
+ "user_source_sha256": "9c18df0014dbf45da5affe4f9e97a3882f8c871b7d29f9f5fa6c346ecd1ce7a8",
+ "user_source_bytes": 7056,
+ "ui_schema": "autographics.node-ui-mixed-regions/2",
+  "module:dashclip": "7dbfd2637e3b0d6d89ceffb819bcc5f837e5a08f855102fa176f57601503bef4",
+  "module:gaugeclip": "6a1b72f701baea8930ba49934e79aafed4e0dfdd3b5e490b9a37f0cf3337df73",
+  "module:meterclip": "4156ea166ab2da6e8e7b8fc5adc4f723e6f9db5326a2f012cd670fc6fc6a5b19",
+ "closure": [
+  {"name": "dashclip", "sha256": "7dbfd2637e3b0d6d89ceffb819bcc5f837e5a08f855102fa176f57601503bef4", "bytes": 1901},
+  {"name": "gaugeclip", "sha256": "6a1b72f701baea8930ba49934e79aafed4e0dfdd3b5e490b9a37f0cf3337df73", "bytes": 941},
+  {"name": "meterclip", "sha256": "4156ea166ab2da6e8e7b8fc5adc4f723e6f9db5326a2f012cd670fc6fc6a5b19", "bytes": 873}
+ ],
+ "provenance": {
+  "product": "ui-m1-clip-forensics",
+  "consumer": "experimental/autographics-auto-driver/tests/m1_native_evidence_support.rs + bin/mixed_regions_window.rs (PLAN-071 app-clip/native-evidence evidence)",
+  "consumption": "ui.json regions in ANY def drive per-instance child surfaces (Game2d/Scene3d) mounted Flat2d into the UI view with identity {run generation, instance path, region local name, mount epoch}; active regions app-total <= 4; conditional unmount revokes portal+surface (last-owner release) and rejects queued region events by epoch; scene bindings read the SAME int getter ABI; region clicks dispatch through the shared _ui_click_ ABI with the instance index; one Session owner, one app_start/app_update per explicit step",
+  "world_sha256": "9c18df0014dbf45da5affe4f9e97a3882f8c871b7d29f9f5fa6c346ecd1ce7a8"
+ }
+}

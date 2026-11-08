@@ -457,6 +457,7 @@ mod terminal_policy_tests {
 pub mod squash;
 
 pub mod authoring;
+pub mod m1_evidence;
 pub mod node_mixed;
 pub mod node_mixed_host;
 pub mod node_mixed_regions;

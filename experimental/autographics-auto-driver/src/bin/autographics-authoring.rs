@@ -87,6 +87,10 @@ struct App {
     behavior: Option<String>,
     behavior_api: Option<autographics_auto_driver::authoring::behavior::Api>,
     report: Option<PathBuf>,
+    /// PLAN-071 T-04: read-only evidence record out path (explicit only) and
+    /// an optional original OS-phase report to attach by content identity.
+    evidence_record: Option<PathBuf>,
+    evidence_attach: Option<PathBuf>,
     error: Option<String>,
     probe: bool,
     interaction_probe: bool,
