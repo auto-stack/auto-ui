@@ -617,3 +617,5 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - **由此产生的口径事实（评审需知）**：共享窗口的绿灯**只覆盖功能与保真**；W-C 与 replay 预算的签收必须是一次隔离窗口运行，而本机目前测不过（见上表根因）。
 
 - stage: goal | plan_id: PLAN-062 | plan_revision: r4 | round: 23 | from: work | to: user | status: execution_done | outcome: waiting（N-01/N-02/N-04/N-05 收口；固定开销修复 vs 口径修订需选择） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: acace4aa | next: user
+
+- stage: user | plan_id: PLAN-062 | plan_revision: r4 | round: 24 | from: user | to: work | status: execution_done | outcome: pass（裁定：实现直绘路径，去掉 canvas 包装的 ≈3ms 固定开销；不改 AC） | worktree: D:/autostack/.wt/ui-062/auto-ui | commit: acace4aa | next: work（DisplayListWidget 直绘 + 前后对照）
