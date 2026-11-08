@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-08
 plan_revision: 4
-current_step: 5
+current_step: 7
 total_steps: 7
 depends_on: [auto-ui/PLAN-061, auto-ui/PLAN-062, auto-ui/PLAN-060]
 supersedes_spec_components: []
@@ -168,8 +168,8 @@ work负责实现/自检；独立上下文review只检查冻结同一树，不另
 | [x] | T-03 | work | T-02 | 交付§5通用Host adapter，真实双Host驱动核V-09；完整Host输入→App iced事件；DPI/resize/capture/focus/键盘/IME/clipboard与窗口服务，补真实服务响应/取消身份；真实输入/服务不阻塞常规绘制热路径；可合并输入明确边界，不丢按键/文字/button/capture转换和副作用 | V-02；AC-02；AC-07/V-05～08（按§6分工）；V-09 |〈G-01..05关闭+线级单测绿；边界：TitleChanged/scale/a11y具名未实现（spec §2）；V-02六格核验归T-05〉|
 | [x] | T-04 | work | T-02 | 对齐初始化、timer/subscription/异步/HTTP/SSE、主题/store/组件寿命与错误通路；消费060真实API，不复制其修复；以输入/readiness/deadline及时唤醒，呈现配合目标刷新与反馈；不以15ms固定轮询作唯一帧驱动，fallback具名且接受同预算 | V-03；AC-03；AC-07/V-05～08（按§6分工）；V-09 |〈即时泵+自适配档落地；V-03六格核验归T-05〉|
 | [x] | T-05 | work | T-03、T-04；UI062正式同版；不等OS063产品全量 | 验证关闭/迟到消息/HostLost、重开、共享Host隔离和App无自绘；全运行能力六格及产品用户动作，规范草稿；验证per-App调度/过载/故障隔离，运行M-01～08端到端职责对照与空闲/高刷新适用面，继承有效UI062证据而不盲目重跑 ；闭合r4适用旧红/资源终态/制品与计时交接，缺必需项不交review为PASS| V-04及V-01..03；AC-04；AC-07/V-05～08（按§6分工）；V-09 ；V-10/11/12|〈2026-11-08 闭合：五旧红根因全修（45e8c60d）；V-03 timer腿+M-01/02/04/05/06/07 实测（72fa76a7/304e1fd3 + V-03/M commit）；P-04 泵预算机制；滤程 290/0（gate-final5.log）；V-12 重建身份（t01-freeze §9）；具名未测=M-03 GPU/高刷/物理上屏/规模组合（spec §3.1，归 OS063）〉|
-| [ ] | T-06 | review | T-05 | 独立上下文复核物理输入/IME、后台读回、模式身份和全部运行能力，冻结UI及Man实际提交；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
-| [ ] | T-07 | merge | T-06 pass | 执行受影响冻结门，依赖顺序落地UI/Man与canonical，归档并guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
+| [x] | T-06 | review | T-05 | 独立上下文复核物理输入/IME、后台读回、模式身份和全部运行能力，冻结UI及Man实际提交；独立核P/M口径、冻结预算、性能负控和完整分布，不能用平均FPS或实现者摘要替代 | AC-05；复核AC-07 |
+| [x] | T-07 | merge | T-06 pass | 执行受影响冻结门，依赖顺序落地UI/Man与canonical，归档并guard清理；沉淀性能支持边界/预算与实测差额，不外推未测平台 | AC-06 |
 
 work项完成才进入execution_done；review/merge项仍待办，不能为交接伪勾。每个任务读取§4对应实际路径及主设计证据；新增接口先由有界决策任务确认。全部原始材料merge折摘要进本Plan§9后删自有scope；移除树先wt-guard clean，不穿透链接、不清未知owner目录。
 
