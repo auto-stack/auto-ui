@@ -244,6 +244,13 @@ work项完成才进入execution_done；review/merge项仍待办，不能为交�
 - pending_closeout_gates（merge 拥有）：SD-01 规范正式发布、落地后 landing checks（rebuild/重启或显式陈旧制品观察）、合并回归归属（本审已跑规范滤程=冻结受影响面；merge 不重跑全仓）。
 - next:merge（T-07）。
 
+### merge 收口摘要（2026-11-08，V-12 重建身份与证据折入）
+
+- 交付：auto-ui master `96236725`（ff-only，9 文件 +1537/−128；SD-01 规范 `docs/specs/runtime/rq-execution-input-and-host-services.md` SHA256 前 16 = `2139d5bc1829127e`）；auto-man master `347c29f`。归档 `646d868f`。
+- **V-12 重建身份**（交付时实测）：auto-ui-runtime 测试二进制 `276540856c47557a46591c0bb49f718ac06b41249ad22d289a9c2b1974220722`（滤程 290/0 用）；Man `auto.exe` `5178a7b44e901ac9cff88f5d83a1aa2f6cefd2310c9d62865e0fbf45e128f659`（144,615,424B debug；真入口探针用）；`auto-ui-tool.exe` `7aafb31acf21e84cc83001583c30537b6ef20ba769e1a7c99be072a749ec4941`。profile=cargo debug；依赖树=组内兄弟 auto-lang `a95d6dc41` / auto-web `2d69841` / auto-down `58ea33f`。
+- M 指标终值（rqhost in-proc 真实采纳，代理终点具名）：M-01 p50=0.055/p95=3.18/max=4.42ms（n=40，硬门 p95≤100ms）；M-07 轻App p95=3.11ms（重载在流，硬门同）；M-06 冷 60.0ms/热 36.9ms；M-02 p50=263.7ms；M-05 进程 36.5MB（合并口径）。具名未测：M-03 GPU、高刷新、物理上屏、1/4/8 规模（归 OS063）。
+- 证据处置：plan-artifacts/plan-063 按delete-at-merge 裁定删除（本节已折入全部持久数字与哈希）；构建中间物随 worktree 移除。landing≠deployment：release 制品（Man release exe 等）未重建——观察项记于 merge 收据。
+
 ## 10. 待澄清事项
 
 - **T-05 收尾后具名边界（2026-11-08 round 3，非豁免、归 OS063/后继）**：M-03 GPU 时间（平台计时能力缺席）、高刷新适用面（无实测环境）、M-01 物理上屏终点、1/4/8 规模组合、V-10 端到端终值——见 spec §3.1 具名未测表。①旧红族全闭、②V-02/03/04 证据齐、③P-04 机制落地、④M-01/02/04/05/06/07 实测+V-12 身份绑定（round 3 收据）。
