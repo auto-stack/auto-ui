@@ -16,6 +16,7 @@ broker）的输入与服务桥、帧调度合同。来源：PLAN-063（r4）的�
 |---|---|---|---|
 | VM | `auto run -r vm -q [--render=remote]` | `AUTO_RQHOST_PIPE` + `AUTO_VM_RENDER=remote` | headless v2 客户端采纳 standalone rqhost；无自窗 |
 | VM | `auto run -r vm --render=desktop --desktop-endpoint <pipe>`（`-q` 可省） | `AUTO_VM_RENDER=desktop` + `AUTO_DESKTOP_ENDPOINT` | 采纳桌面合成器端点（不孵化）；端点缺席 = 具名报错 |
+| VM | `auto run --autodesk-incubate --app386=<注册表id> [--autodesk-broker=<pipe>]` | broker 管道（缺省 `autodesk-broker`，`AUTOOS_BROKER_PIPE` 可改） | 孵化臂：broker 收纳（专用管道分配）→ attach 预算内 Active + 虚拟窗落地（PLAN-074 SD-01） |
 | VM | `--render=queue`（或 `-q` 无底座声明） | `AUTO_VM_RENDER` 缺席/`queue` | 显式 legacy queue（DrawList v1） |
 | Rust | a2r exe `--render-mode rq\|desktop\|independent` / `-q` / `--desktop-endpoint` | CLI > `AUTO_VM_RENDER` env > pac `desktop_render` > independent | rq/desktop → remote:true headless 臂 |
 | 两轨 | 无底座声明 | — | direct（iced 自窗）缺省不变 |
@@ -26,6 +27,21 @@ broker）的输入与服务桥、帧调度合同。来源：PLAN-063（r4）的�
   报错含端点名与"先启动虚拟桌面"提示；未知 `AUTO_VM_RENDER` 值 = 观测行 +
   legacy queue（不冒 remote）；`remote` 缺 `-q` 在 Man 侧激活同一 gate
   （不再静默直渲染）。
+- **外部 CLI 孵化臂合同（PLAN-074 SD-01——"收纳后 attach Active"从隐式转显式）**：
+  - 动词语义：`incubate` = **宿主经注册表装载**（`--app386` id 与桌面注册表
+    id 同源；客户端侧 .at 装载经 `AUTO_386_APP_ROOT`，双侧 id 不一致 = 具名
+    拒绝）；`adopt` = 外部自持组件零装载（D1，注册表不查）。
+  - 线级判据（Active 收敛）：Hello → Welcome/BufferAlloc → Ready →
+    **attach 预算（5000ms）内 Active + 虚拟窗（wid）落地**；宿主亡策略随
+    端点档（Desktop/Rqhost = exit-on-EOF；Direct/Broker = 30s 重连）。
+  - 失败路径全部具名（不吞错，PLAN-074 T-02）：解析拒绝三因分别留痕
+    `[autodesk-broker] incubate attach 拒绝：app `<id>` …`（宿主注册表缺席 /
+    未命中 / 注册表源编译失败）+ 既有 `[autodesk-broker] incubation …
+    failed to reach Active (budget)` 预算终局行；连接面缺席/错名 =
+    `broker 孵化失败: …` 具名。静默弃臂不视为已实现。
+  - 负控/红线锚：错名孵化零落地 + 具名（`p074_wrong_name_incubation_named_failure`）；
+    注册表同名 → 预算内 Active + wid（`p074_broker_incubate_vm_client_attach_active`，
+    修复前红证据 UI `c2254800`）。
 - 来源观测：`[render] render-mode: <base> (AUTO_VM_RENDER env)`（VM）与
   CLI/env/pac 观测行（Rust exe）——运行选择来源可审计。
 
