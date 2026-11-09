@@ -325,7 +325,11 @@ mod tests {
     /// PLAN-074 T-01 红线（OS063 DG-1 复现钉）：VM 组件 + `ClientTarget::Broker`
     /// 孵化全链——真实 DesktopSession broker（进程内 harness，t3 同款真实管道）
     /// 收纳 incubation 后，宿主 `attach_pending_incubations` 预算内必须达
-    /// Active + wid 落地。修复前此测必红（宿主零收客户端消息 → 预算耗尽）。
+    /// Active + wid 落地。T-02 定案：修复前红根因 = 宿主 ResolveAndAttach
+    /// 组件解析臂静默弃臂（harness 未注册 app_resolver → 不回 Welcome →
+    /// 预算耗尽）——incubate 合同 = 宿主经注册表装载，harness 按合同注册
+    /// （同 `enable_broker_incubates_into_real_session` 形）后此测必须绿；
+    /// 错名臂具名失败由 V-04 负控（session.rs 测试）钉住。
     #[test]
     fn p074_broker_incubate_vm_client_attach_active() {
         use crate::ui::session::DesktopSession;
@@ -335,6 +339,30 @@ mod tests {
         let broker_pipe = format!("autodesk-broker-p074-{}", std::process::id());
         let mut session = DesktopSession::__test_session();
         session.__test_open_desktop();
+        // incubate 合同（宿主注册表装载）：harness 注册同名 app——与客户端
+        // Hello 的 app_name 一致（生产 = 桌面注册表 id）。
+        let code = r#"widget t { view { text "p074 attach probe" } }"#.to_string();
+        session.desktop.app_resolver = Some(std::sync::Arc::new(move |name: &str| {
+            if name == "p074attach" {
+                Some(crate::ui::session::LaunchSpec {
+                    media_root: None,
+                    photo_root: None,
+                    back_entry: None,
+                    code: code.clone(),
+                    source_path: None,
+                    title: Some("p074".into()),
+                    name: None,
+                    daemon: None,
+                    back_root: None,
+                    fit: false,
+                    exe: None,
+                    opens: Vec::new(),
+                    render_decl: None,
+                })
+            } else {
+                None
+            }
+        }));
         session.enable_broker(&broker_pipe, std::sync::Arc::new(AtomicBool::new(false)));
 
         // 客户端臂：VM 组件 + Broker target（run_dynamic_client 阻塞至

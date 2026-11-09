@@ -5531,6 +5531,29 @@ impl DesktopSession {
         }
     }
 
+    /// PLAN-074 T-02：孵化组件解析（`incubate` 语义 = 宿主经注册表装载，
+    /// `adopt` 臂不经过本函数）。三因分别具名（DG-1 修复——原闭包三因同归
+    /// `None` 静默弃臂，客户端停等 Welcome 不可归因）；Err 文本即具名错误
+    /// 行（调用臂 eprintln，形态对齐既有 `[autodesk-broker] ... (budget)`
+    /// 惯例；协议词汇与 attach 预算零变化）。
+    fn resolve_incubation_component(
+        &self,
+        app_name: &str,
+    ) -> Result<DynamicComponent, String> {
+        let Some(registry) = self.desktop.app_resolver.as_ref() else {
+            return Err(format!(
+                "incubate attach 拒绝：app `{app_name}` 无宿主注册表（app_resolver 未接线——incubate = 宿主经注册表装载，外部自持组件客户端走 adopt 方言）"
+            ));
+        };
+        let Some(spec) = registry(app_name) else {
+            return Err(format!(
+                "incubate attach 拒绝：app `{app_name}` 未在宿主注册表解析（错名/未注册——--app386 id 须与桌面注册表一致）"
+            ));
+        };
+        crate::build_dynamic_component(&spec.code, spec.source_path.as_deref())
+            .map_err(|e| format!("incubate attach 拒绝：app `{app_name}` 注册表源编译失败: {e}"))
+    }
+
     /// 宿主动作落会话（与 `host::ProtocolHost::handle` 的动作臂同构；
     /// per-client 表面/shm/wid 映射挂在 [`stage3::BrokerClient`] 上）。
     fn broker_apply_actions(
@@ -5794,12 +5817,20 @@ impl DesktopSession {
                         }
                         built.ok()
                     } else {
-                        (|| {
-                            let registry = self.desktop.app_resolver.as_ref()?;
-                            let spec = registry(&app_name)?;
-                            crate::build_dynamic_component(&spec.code, spec.source_path.as_deref())
-                                .ok()
-                        })()
+                        // PLAN-074 T-02（DG-1 根因臂）：解析失败此前静默
+                        // `continue`——不回 Welcome、零具名错误，客户端停等
+                        // Welcome 至 attach 预算耗尽（外部 CLI 客户端形态的
+                        // "零消息"死法不可归因）。三因（resolver 缺席/注册
+                        // 表未命中/编译失败）现在分别具名留痕后同样弃臂
+                        //（attach 时序/预算语义零变化——V-04"错名仍具名
+                        // 失败（不吞错）"）。
+                        match Self::resolve_incubation_component(self, &app_name) {
+                            Ok(c) => Some(c),
+                            Err(line) => {
+                                eprintln!("[autodesk-broker] {line}");
+                                None
+                            }
+                        }
                     };
                     let Some(component) = component else { continue };
                     client.app_name = Some(app_name.clone());
@@ -7620,6 +7651,87 @@ impl HostStorage for ShimHostStorage {
 
 #[cfg(test)]
 mod tests {
+
+    /// PLAN-074 T-02 V-04 负控：错名孵化具名失败（不吞错）。注册表在册但
+    /// 请求名未注册 → 宿主 ResolveAndAttach 解析臂**具名拒绝**（不再静默
+    /// 弃臂——DG-1"零消息"死法不可归因的根因）+ attach 预算耗尽零落地；
+    /// resolver 缺席同具名。协议词汇/attach 预算语义零变化（终局仍走既有
+    /// budget 行惯例）。
+    #[test]
+    fn p074_wrong_name_incubation_named_failure() {
+        use super::*;
+        use crate::ui::desktop_protocol::broker;
+        use crate::ui::desktop_protocol::endpoint::AppEndpoint;
+        use crate::ui::desktop_protocol::headless::HeadlessFrameSource;
+        use std::sync::atomic::AtomicBool;
+
+        // 臂1：resolver 缺席（incubate = 宿主注册表装载，无注册表即拒）→ 具名。
+        let bare = DesktopSession::__test_session();
+        let err = bare.resolve_incubation_component("whatever").unwrap_err();
+        assert!(
+            err.contains("whatever") && err.contains("无宿主注册表"),
+            "resolver 缺席须具名: {err}"
+        );
+
+        // 臂2：注册表在册但错名 → 全链 attach 预算耗尽 + 具名拒绝。
+        let broker_pipe = format!("autodesk-broker-p074v04-{}", std::process::id());
+        let mut ds = DesktopSession::__test_session();
+        ds.__test_open_desktop();
+        let code = "widget Ok74 { view { text `ok` } }".to_string();
+        ds.desktop.app_resolver = Some(std::sync::Arc::new(move |name: &str| {
+            if name == "ok-app" {
+                Some(crate::ui::session::LaunchSpec {
+                    media_root: None,
+                    photo_root: None,
+                    back_entry: None,
+                    code: code.clone(),
+                    source_path: None,
+                    title: Some("Ok74".into()),
+                    name: None,
+                    daemon: None,
+                    back_root: None,
+                    fit: false,
+                    exe: None,
+                    opens: Vec::new(),
+                    render_decl: None,
+                })
+            } else {
+                None
+            }
+        }));
+        let stop = Arc::new(AtomicBool::new(false));
+        ds.enable_broker(&broker_pipe, Arc::clone(&stop));
+
+        // 真实客户端同位：孵化请求（错名）+ Hello（宿主解析臂据此触发）。
+        let (pipe_name, mut app_end) =
+            broker::request_incubation(&broker_pipe, "wrong-name", 5000).unwrap();
+        assert!(pipe_name.contains("-app-"));
+        let component =
+            crate::build_dynamic_component("widget W74 { view { text `x` } }", None).unwrap();
+        let mut app = AppEndpoint::new(
+            HeadlessFrameSource::new(component, 480.0, 320.0),
+            "wrong-name",
+            "wrong",
+            480.0,
+            320.0,
+        );
+        app_end.send(&app.connect().unwrap()).unwrap();
+
+        // attach：预算耗尽零落地（具名行随 eprintln 落日志；helper Err 文本
+        // 即具名断言锚——两臂同一函数，文本不漂移）。
+        let landed = ds.attach_pending_incubations(1500);
+        assert!(landed.is_empty(), "错名孵化不得落地");
+        assert!(ds.broker_clients.is_empty(), "错名客户端不得驻留");
+        let err = ds.resolve_incubation_component("wrong-name").unwrap_err();
+        assert!(
+            err.contains("wrong-name") && err.contains("未在宿主注册表解析"),
+            "错名须具名: {err}"
+        );
+
+        // 收尾：置位 + probe 连接唤醒 serve 线程退出。
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        let _ = crate::ui::desktop_protocol::transport::connect(&broker_pipe, 500);
+    }
 
     #[test]
     fn p060_broker_viewport_follows_actual_wm_client_once() {
