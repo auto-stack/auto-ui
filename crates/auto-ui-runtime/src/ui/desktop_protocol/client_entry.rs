@@ -414,6 +414,99 @@ mod tests {
             eprintln!("[p074-client] thread PANIC: {e:?}");
         }
     }
+
+    /// PLAN-075 T-01/T-02（DG-2）：attach 预算 env 档——延迟 Hello 客户端
+    /// （手动 transport，确定性）默认 5000 档必失败；env 大档必成功；
+    /// 非法/0/缺席 = 5000。env 恐慌安全还原（autocenter 同律）。
+    #[test]
+    fn p075_attach_budget_env_tiers() {
+        use crate::ui::desktop_protocol::broker;
+        use crate::ui::session::DesktopSession;
+        use std::sync::atomic::AtomicBool;
+        use std::time::{Duration, Instant};
+
+        let key = "AUTO_BROKER_ATTACH_BUDGET_MS";
+        let mut prev = std::env::var(key).ok();
+        let restore = |v: Option<String>| match v {
+            Some(v) => std::env::set_var(key, v),
+            None => std::env::remove_var(key),
+        };
+        let run_case = |tag: &str, delay_ms: u64| -> bool {
+            let broker_pipe = format!("autodesk-broker-p075-{}-{}", tag, std::process::id());
+            let mut session = DesktopSession::__test_session();
+            session
+                .enable_broker(&broker_pipe, std::sync::Arc::new(AtomicBool::new(false)));
+            let bp = broker_pipe.clone();
+            let cli = std::thread::spawn(move || {
+                let render = broker::RequestedRender {
+                    mode: FrameMode::Commands,
+                    auto_downgraded: false,
+                };
+                let (_name, mut end) = broker::request_incubation_render(
+                    &bp,
+                    "p075",
+                    render,
+                    3000,
+                )
+                .expect("incubate");
+                std::thread::sleep(Duration::from_millis(delay_ms));
+                let src = crate::build_dynamic_component(
+                    r#"widget t { view { text "p075" } }"#,
+                    None,
+                )
+                .expect("build");
+                let mut app = crate::ui::desktop_protocol::endpoint::AppEndpoint::new(
+                    crate::ui::desktop_protocol::headless::HeadlessFrameSource::new(
+                        src, 480.0, 320.0,
+                    ),
+                    "p075",
+                    "p075",
+                    480.0,
+                    320.0,
+                );
+                let hello = app.connect().expect("hello");
+                let _ = end.send(&hello);
+                let _ = end.recv_wait(1500);
+            });
+            let deadline = Instant::now() + Duration::from_secs(20);
+            while session.pending_incubations() == 0 {
+                assert!(Instant::now() < deadline, "20s 无孵化请求");
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            let attached = !session
+                .attach_pending_incubations(DesktopSession::broker_attach_budget_ms())
+                .is_empty();
+            session.shutdown_broker();
+            drop(session);
+            if let Err(e) = cli.join() {
+                eprintln!("[p075] client thread PANIC: {e:?}");
+            }
+            attached
+        };
+
+        // ①默认档：延迟 5.2s > 5000ms = 必失败（零行为变化钉）。
+        restore(None);
+        assert!(
+            !run_case("default", 5_200),
+            "默认 5000 档：延迟 Hello 5.2s 必须失败"
+        );
+        // ②大档（env 15000）：5.2s < 15s = 必成功（接线前红）。
+        restore(Some("15000".to_string()));
+        assert!(run_case("big", 5_200), "env 15000 档：延迟 5.2s 必须成功");
+        // ③非法/④0 档：= 5000 → 失败。
+        restore(Some("garbage".to_string()));
+        assert!(!run_case("bad", 5_200), "非法 env = 5000 原值");
+        restore(Some("0".to_string()));
+        assert!(!run_case("zero", 5_200), "0 视为非法回落 5000");
+        // ⑤解析单点三态。
+        restore(Some("30000".to_string()));
+        assert_eq!(DesktopSession::broker_attach_budget_ms(), 30_000);
+        restore(Some("abc".to_string()));
+        assert_eq!(DesktopSession::broker_attach_budget_ms(), 5_000);
+        restore(None);
+        assert_eq!(DesktopSession::broker_attach_budget_ms(), 5_000);
+        restore(prev.take());
+    }
 }
 
 /// native 轨三态 → 二态分派（Plan 020 T-04）。**PLAN-032 T-06 翻转**

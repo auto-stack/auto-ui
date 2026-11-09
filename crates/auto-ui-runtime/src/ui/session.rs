@@ -4630,6 +4630,12 @@ impl DesktopSession {
     /// Active（ProtocolHost ResolveAndAttach 同款动作臂，resolver = 桌面
     /// 既有 app registry）。**连接驻留** `broker_clients`（多 App 共享
     /// host：落地后持续泵帧/回收）。返回本次落地的虚拟窗列表。
+    /// PLAN-075 T-01/T-02（DG-2）：attach 预算 env 档——`AUTO_BROKER_ATTACH_BUDGET_MS`
+    /// 缺席/非法/0 = 5000 原值（零行为变化）。红线期硬编码桩（T-02 接线 env）。
+    pub fn broker_attach_budget_ms() -> u32 {
+        5000
+    }
+
     pub fn attach_pending_incubations(&mut self, budget_per_app_ms: u32) -> Vec<Wid> {
         use crate::ui::desktop_protocol::stage3::BrokerClient;
         let pending: Vec<_> = std::mem::take(&mut *self.broker_pending.lock().unwrap());
