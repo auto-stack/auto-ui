@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-074
-status: drafting
+status: executing
 feature_name: RQ桌面broker外部CLI客户端attach闭合（OS063 DG-1修复）
 author: [Codex]
 created_at: 2026-11-09
 updated_at: 2026-11-09
 plan_revision: 1
-current_step: 0
+current_step: 1
 total_steps: 5
 depends_on: [auto-ui/PLAN-063, auto-ui/PLAN-073]
 supersedes_spec_components: []
@@ -117,7 +117,7 @@ T-01/T-02 修改 `crates/auto-ui-runtime/src/ui/desktop_protocol/{client_entry,c
 
 | 完成 | ID | owner_stage | 依赖/进入门 | 文件/操作与结果 | 关闭方式/AC |
 |---|---|---|---|---|---|
-| [ ] | T-01 | work | 可立即（诊断事实充分） | 红线测试 V-01（必红留档）+ 根因定位记录（臂/行） | V-01；AC-01 |
+| [x] | T-01 | work | 可立即（诊断事实充分） | 红线测试 V-01（必红留档）+ 根因定位记录（臂/行） | V-01；AC-01 |
 | [ ] | T-02 | work | T-01 | 最小 diff 修复；V-01 绿；sibling V-03/V-04 族门 | AC-01/03/04 |
 | [ ] | T-03 | work | T-02 | 真实桌面端到端 V-02（OS063 基座）+ SD-01 草案 | V-02；AC-02 |
 | [ ] | T-04 | review | T-03 | 独立上下文复核（AC-05） | AC-05 |
@@ -133,3 +133,11 @@ T-01/T-02 修改 `crates/auto-ui-runtime/src/ui/desktop_protocol/{client_entry,c
 
 - 无阻塞性待决。根因落点（client_entry vs Man CLI）由 T-01 定案；若落在 Man CLI，
   双写面纪律按 §2（同组树 + auto-man 组树）。
+
+### 2026-11-09 work 进展（T-01 红线闭合）
+
+- stage:work / plan_id:auto-ui/PLAN-074 / plan_revision:r1 / outcome:pass（T-01） / worktree:D:/autostack/.wt/os-063/auto-ui / branch:auto-os-dev / base_commit:bcceb419 / code_commit:c2254800 / task_ids:T-01 / evidence:plan-artifacts/plan-063/auto-os/t04-campaign-runbook.md（PLAN-074 节） / blockers:无 / next_responsible_role:work（T-02 transport 层修复）
+- 红线测试 `p074_broker_incubate_vm_client_attach_active` 落地并按预期红（5s 确定性：
+  pending 出现 → attach 预算耗尽 → 0 落地）。逐层插桩（临时，已撤）定位：客户端 Hello
+  已发出（send 成功返回），宿主 pending 端 5s 零读——缺陷在传输配对层。T-02 断点：
+  transport.rs 最小二线程 loopback 复现 → serve_once wait_connect 端差异对照。
