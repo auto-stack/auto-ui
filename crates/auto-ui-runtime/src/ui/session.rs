@@ -334,6 +334,11 @@ pub struct DesktopState {
     /// 裁定 M1：原 `LAST_MODIFIERS` thread-local 与 DynamicState.current_modifiers
     /// 合并为唯一事实源；读点经访问器替换。
     pub current_modifiers: RefCell<iced::keyboard::Modifiers>,
+    /// PLAN-073 F-1 hold 关闭（OS063 桌面壳窗口生命周期域）：桌面壳宿主窗
+    /// 设备 scale——`window::scale_factor`（boot 一次性 Task）+ `Rescaled`
+    /// 事件双源落簿，消费点 `broker_client_content` 的 v2 臂
+    /// `displaylist_element`（GlyphRun 1:1 纹理映射；未落簿 = 1.0 旧行为）。
+    pub device_scale: Cell<f32>,
     /// 原 KEYBOARD_BINDINGS OnceLock 全局（renderer.rs:4158）迁入；
     /// keyboard_subscription 已收 &HashMap 参数，只需改供给源。
     pub keyboard_bindings: Arc<Mutex<HashMap<String, String>>>,
@@ -571,6 +576,7 @@ impl DesktopState {
     pub(crate) fn new(mcp_shared: Option<crate::ui::mcp_server::SharedStateHandle>) -> Self {
         Self {
             current_modifiers: RefCell::new(iced::keyboard::Modifiers::empty()),
+            device_scale: std::cell::Cell::new(1.0),
             keyboard_bindings: Arc::new(Mutex::new(HashMap::new())),
             hotkeys: HotkeyTable::builtin(),
             mcp_shared,
@@ -3010,6 +3016,14 @@ pub enum DesktopEvent {
     /// 同值）；零客户端不订阅（400ms ServiceTick 兜底 = 待命档）。每拍
     /// 仅泵（预算切片防重窗垄断），壳层职责仍归 ServiceTick。
     BrokerPump,
+    /// PLAN-073 F-1 hold 关闭（OS063 域）：宿主窗设备 scale 落簿——boot 期
+    /// `window::scale_factor` 一次性 Task 与 `Rescaled` 运行时事件双源；
+    /// 仅桌面壳宿主窗（`host.window`）生效，其余窗忽略（多屏混合 DPI 不
+    /// 串写）。消费点 = `broker_client_content` v2 臂栅格化分辨率。
+    HostScale {
+        window: iced::window::Id,
+        scale: f32,
+    },
     /// Plan 463 T6：launcher 召唤（桌面热键 Ctrl+Space / shell ⊞ 按钮，
     /// 经 `__desktop_cmd` `summon\tlauncher` 转发）。464 前无消费者——
     /// update 臂静默；464 在 overlay 槽挂 launcher 并消费本事件。
@@ -7867,6 +7881,33 @@ mod tests {
         );
     }
 
+    /// PLAN-073 F-1 hold 关闭（OS063 域）：宿主 scale 落簿读点——缺省 1.0
+    /// （未落簿具名旧行为），落簿后 v2 臂栅格化输入跟随，低值钳制与
+    /// `displaylist_element` 同律。
+    #[test]
+    fn p063_os_desktop_host_scale_reaches_broker_v2_readout() {
+        use super::*;
+        let mut ds = DesktopSession::__test_session();
+        ds.__test_open_desktop();
+        assert_eq!(
+            crate::ui::iced::broker_surface::broker_v2_device_scale(&ds),
+            1.0,
+            "未落簿缺省 1.0"
+        );
+        ds.desktop.device_scale.set(2.0);
+        assert_eq!(
+            crate::ui::iced::broker_surface::broker_v2_device_scale(&ds),
+            2.0,
+            "落簿后读点跟随"
+        );
+        ds.desktop.device_scale.set(0.75);
+        assert_eq!(
+            crate::ui::iced::broker_surface::broker_v2_device_scale(&ds),
+            1.0,
+            "低于 1.0 钳制"
+        );
+    }
+
     #[test]
     fn p060_command_pointer_matches_unscaled_client_canvas() {
         use super::broker_command_pointer_local as map;
@@ -11362,6 +11403,14 @@ pub fn desktop_window_events() -> iced::Subscription<DesktopMessage> {
         }
         iced::Event::Window(iced::window::Event::Unfocused) => {
             Some(DesktopMessage::Desktop(DesktopEvent::WindowUnfocused(wid)))
+        }
+        iced::Event::Window(iced::window::Event::Rescaled(scale)) => {
+            // PLAN-073 F-1 hold 关闭（OS063 域）：运行时 DPI 变化沿（初值
+            // 由 WindowOpened 臂的一次性 scale_factor Task 落簿）。
+            Some(DesktopMessage::Desktop(DesktopEvent::HostScale {
+                window: wid,
+                scale,
+            }))
         }
         iced::Event::Keyboard(kb) if status == iced::event::Status::Ignored => {
             live_inputs_from_keyboard(&kb)

@@ -961,7 +961,26 @@ fn run_session(
                 // 2026-09-17：桌面常驻，× = 隐藏 / dock ▦ 切换恢复；
                 // toggle 在未挂载态首次调用即挂载+显示，幂等）。
                 let dash_boot_task = toggle_dashboard(&mut session);
-                (session, open_task.discard().chain(dash_boot_task))
+                // PLAN-073 F-1 hold 关闭（OS063 域）：宿主窗设备 scale 初值
+                // 落簿——开窗后一次性 `window::scale_factor` 查询（rqhost 主
+                // 宿主同律）；运行时变化走 `Rescaled` 事件沿
+                // （desktop_window_events）。消费点 = broker_client_content
+                // v2 臂 GlyphRun 1:1 栅格化。
+                let scale_probe = iced::window::scale_factor(win_id).map(move |scale| {
+                    crate::ui::session::DesktopMessage::Desktop(
+                        crate::ui::session::DesktopEvent::HostScale {
+                            window: win_id,
+                            scale,
+                        },
+                    )
+                });
+                (
+                    session,
+                    open_task
+                        .discard()
+                        .chain(dash_boot_task)
+                        .chain(scale_probe),
+                )
             }
             RunMode::Standalone => {
                 let mut open_tasks = Vec::new();
@@ -4636,6 +4655,19 @@ fn run_session(
                     }
                     DesktopEvent::WindowFocused(id) => {
                         *state.focused_window.borrow_mut() = Some(id);
+                    }
+                    DesktopEvent::HostScale { window, scale } => {
+                        // PLAN-073 F-1 hold 关闭（OS063 域）：仅桌面壳宿主窗
+                        // 生效——native 槽窗自具 DPI 面、非宿主窗不串写簿；
+                        // 变更可观测行（T-04 双 Host 运行审计锚）。
+                        let desktop_window = state.host.as_ref().map(|h| h.window);
+                        if desktop_window == Some(window) {
+                            let prev = state.desktop.device_scale.get();
+                            if (prev - scale).abs() > f32::EPSILON {
+                                state.desktop.device_scale.set(scale.max(1.0));
+                                eprintln!("[ui-desktop] host device scale {scale}");
+                            }
+                        }
                     }
                     DesktopEvent::WindowUnfocused(id) => {
                         // 仅当失焦者正是当前焦点时清空（防多窗口事件乱序误清）。

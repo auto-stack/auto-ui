@@ -1401,6 +1401,13 @@ pub fn pixels_element<'a, M: 'a>(surface: &PixelsSurface) -> iced::Element<'a, M
         .into()
 }
 
+/// PLAN-073 F-1 hold 关闭（OS063 域）：v2 臂栅格化 scale 读点——桌面壳
+/// 宿主窗落簿值（boot 一次性 Task + `Rescaled` 事件双源；缺省 1.0 =
+/// 未落簿旧行为，与 `displaylist_element` 内部钳制同律）。
+pub(crate) fn broker_v2_device_scale(state: &DesktopSession) -> f32 {
+    state.desktop.device_scale.get().max(1.0)
+}
+
 /// 虚拟窗 wid → broker 表面内容（非 broker 窗 = None，调用方走本地
 /// dynamic_view 既有路径）。
 pub fn broker_client_content(
@@ -1413,12 +1420,11 @@ pub fn broker_client_content(
         return Some(pixels_element(px));
     }
     // PLAN-683：v2 合成面优先（remote 臂——DisplayListPainter）。
-    // PLAN-073 T-03（A2 具名残差）：desktop session broker 尚未落簿窗口
-    // 设备 scale（rqhost 有 window::scale_factor 臂，此处无）——按 1.0
-    // 栅格化，HiDPI 桌面嵌载的 GlyphRun 位图维持旧分辨率行为；scale
-    // 落簿归 T-05 六格的 desktop-RQ 宿主义务（计划 §9 登记在案）。
+    // PLAN-073 F-1 hold 关闭（OS063 域）：桌面壳宿主窗设备 scale 落簿
+    // 驱动 GlyphRun 位图栅格化分辨率——与 rqhost 主宿主同律 1:1 纹理
+    // 映射，HiDPI 桌面嵌载不再软字。
     if let Some(v2) = client.composed_v2() {
-        return Some(displaylist_element(v2, 1.0));
+        return Some(displaylist_element(v2, broker_v2_device_scale(state)));
     }
     client.composed().map(drawlist_element)
 }
