@@ -4633,7 +4633,11 @@ impl DesktopSession {
     /// PLAN-075 T-01/T-02（DG-2）：attach 预算 env 档——`AUTO_BROKER_ATTACH_BUDGET_MS`
     /// 缺席/非法/0 = 5000 原值（零行为变化）。红线期硬编码桩（T-02 接线 env）。
     pub fn broker_attach_budget_ms() -> u32 {
-        5000
+        std::env::var("AUTO_BROKER_ATTACH_BUDGET_MS")
+            .ok()
+            .and_then(|v| v.trim().parse::<u32>().ok())
+            .filter(|v| *v > 0)
+            .unwrap_or(5000)
     }
 
     pub fn attach_pending_incubations(&mut self, budget_per_app_ms: u32) -> Vec<Wid> {

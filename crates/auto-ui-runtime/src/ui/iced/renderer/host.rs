@@ -4897,7 +4897,12 @@ fn run_session(
                         // Plan 480 S3/S4：broker 孵化落地 + 多 client 帧泵
                         // （有在册/排队连接才有成本，零排队两调用皆空转）。
                         if state.pending_incubations() > 0 {
-                            state.attach_pending_incubations(5000);
+                                                    // PLAN-075（DG-2）：attach 预算 env 档（缺席/非法 = 5000 原值）。
+                        let attach_budget = crate::ui::session::DesktopSession::broker_attach_budget_ms();
+                        if attach_budget != 5000 {
+                            eprintln!("[ui-desktop] broker attach budget {attach_budget}ms");
+                        }
+                        state.attach_pending_incubations(attach_budget);
                         }
                         state.pump_broker_clients();
                         // PLAN-030 T-05/T-06：泵后三件——①壳看门兵（到期

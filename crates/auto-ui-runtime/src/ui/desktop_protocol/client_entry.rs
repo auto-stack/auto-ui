@@ -434,6 +434,31 @@ mod tests {
         let run_case = |tag: &str, delay_ms: u64| -> bool {
             let broker_pipe = format!("autodesk-broker-p075-{}-{}", tag, std::process::id());
             let mut session = DesktopSession::__test_session();
+            session.__test_open_desktop();
+            // incubate 合同（宿主注册表装载）：harness 注册同名 app——与
+            // 客户端 Hello 的 app_name 一致（PLAN-074 T-02 同律）。
+            let code = r#"widget t { view { text "p075 budget probe" } }"#.to_string();
+            session.desktop.app_resolver = Some(std::sync::Arc::new(move |name: &str| {
+                if name == "p075" {
+                    Some(crate::ui::session::LaunchSpec {
+                        media_root: None,
+                        photo_root: None,
+                        back_entry: None,
+                        code: code.clone(),
+                        source_path: None,
+                        title: Some("p075".into()),
+                        name: None,
+                        daemon: None,
+                        back_root: None,
+                        fit: false,
+                        exe: None,
+                        opens: Vec::new(),
+                        render_decl: None,
+                    })
+                } else {
+                    None
+                }
+            }));
             session
                 .enable_broker(&broker_pipe, std::sync::Arc::new(AtomicBool::new(false)));
             let bp = broker_pipe.clone();
