@@ -121,7 +121,7 @@ T-01/T-02 修改 `crates/auto-ui-runtime/src/ui/desktop_protocol/{client_entry,c
 | [x] | T-02 | work | T-01 | 最小 diff 修复（session.rs 具名弃臂 + 红线 harness 注册表 + V-04 负控）；V-01 绿；sibling V-03/V-04 族门（9be553e4） | AC-01/03/04 |
 | [x] | T-03 | work | T-02 | 真实桌面端到端 V-02（probe-root 基座，release host@9be553e4，战役方言 --app386=auto-calc）：3/3 attach Active + wid 落地（frame compose wid=1/2/3），零 budget/拒绝行；SD-01 草案（39f490a3） | V-02；AC-02 |
 | [x] | T-04 | review | T-03 | 独立上下文复核（AC-05）：final **pass**（独立 agent 全 AC 自跑验证 + SD-01 逐锚核实；F-1 low 不设门） | AC-05 |
-| [ ] | T-05 | merge | T-04 pass | 落地/归档/清理 + OS063 回执 | AC-06 |
+| [x] | T-05 | merge | T-04 pass | 落地（ff-only 5d8056f3）/归档（archived/ @2bec0f3c）/清理（scope 删除 + 组树具名持有）+ OS063 回执（runbook） | AC-06 |
 
 ## 9. 复审记录
 
@@ -243,5 +243,11 @@ T-01/T-02 修改 `crates/auto-ui-runtime/src/ui/desktop_protocol/{client_entry,c
 
 ### 2026-11-09 merge（T-05 落地/归档/清理，AC-06）
 
-- stage:merge / PLAN-074:r1 / outcome:（进行中→归档后终版） / prepared:reviewed 基线 39f490a3（branch auto-os-dev，guard clean）；SD-01 已随 T-03 在 worktree 提交（canonical target docs/specs/runtime/rq-execution-input-and-host-services.md，无 spec-components 外落点——既有页面既有约定） / landed:**master tip = 5d8056f3b4cce3c0b9a12007970f9b0a5850724f**（ff-only，无 merge commit；rebase master 后旧→新映射 c2254800→bffd0719、9be553e4→f26804bf、**39f490a3→5d8056f3**、OS063 谱系 71150e75→e701c612、17880ccb→56376ae0；range-diff 三 commits 全 `=` 等价证明；无冲突——master 侧两 commits 仅触 docs/plans/074 本文件） / canonical_verified:HEAD:docs/specs/runtime/rq-execution-input-and-host-services.md 四锚全在（拒绝串/双测试锚/5000ms） / smoke:ff 后 main 树 ≡ 已验证分支树（review agent 2/2 p074 + broker 族 4/4 + 双方言 1/1 + 族门 299/299+110/110 在恒等代码上），复用成立 / 落地携带:本分支含 OS063 T-03/T-04 UI 侧两 commits（重放后 e701c612/56376ae0）——os-063 组树谱系整体落地，OS063 消费回执注明 / 主检出 WIP:docs/design/*、docs/plans/058、README、archived/060 等为**他方在途 docs 工作**（非本 Plan、非代码路径）——保留未动未包含
+- stage:merge / PLAN-074:r1 / outcome:**pass** / prepared:reviewed 基线 39f490a3（branch auto-os-dev，guard clean）；SD-01 已随 T-03 在 worktree 提交（canonical target docs/specs/runtime/rq-execution-input-and-host-services.md，无 spec-components 外落点——既有页面既有约定） / landed:**master tip = 5d8056f3b4cce3c0b9a12007970f9b0a5850724f**（ff-only，无 merge commit；rebase master 后旧→新映射 c2254800→bffd0719、9be553e4→f26804bf、**39f490a3→5d8056f3**、OS063 谱系 71150e75→e701c612、17880ccb→56376ae0；range-diff 三 commits 全 `=` 等价证明；无冲突——master 侧两 commits 仅触 docs/plans/074 本文件） / canonical_verified:HEAD:docs/specs/runtime/rq-execution-input-and-host-services.md 四锚全在（拒绝串/双测试锚/5000ms） / smoke:ff 后 main 树 ≡ 已验证分支树（review agent 2/2 p074 + broker 族 4/4 + 双方言 1/1 + 族门 299/299+110/110 在恒等代码上），复用成立 / 落地携带:本分支含 OS063 T-03/T-04 UI 侧两 commits（重放后 e701c612/56376ae0）——os-063 组树谱系整体落地，OS063 消费回执注明 / 主检出 WIP:docs/design/*、docs/plans/058、README、archived/060 等为**他方在途 docs 工作**（非本 Plan、非代码路径）——保留未动未包含
+- archived:docs/plans/archived/074-rq-desktop-broker-attach-closure.md（git mv @6d47c4f6 + 回执内容 @2bec0f3c；status: archived；completion_kind: delivered——T=5/5、AC=6/6，Task/计数与档案一致）
+- cleaned:wt-guard 复核 clean、worktree 零 dirty、分支全 commits 已落地（5d8056f3 ∈ master 祖先）。**组树处置 = 具名持有（不删）**：D:/autostack/.wt/os-063/auto-ui + branch auto-os-dev（@5d8056f3 = 已落地交付）为 OS063 战役（auto-os/PLAN-063）的构建依赖（desktop-runtime path-dep + 冻结 env AUTO_UI_ROOT）与战役恢复基座——本 Plan §2 明示"延用 os-063 组树、不新建组"，删除即破坏 AC-06 交还。持有登记：registry policy.json（owner/closure = OS063 closeout）+ 战役 runbook 回执。
+- evidence 删除:plan-artifacts/plan-074/ 全 scope 已删（t02-diagnosis、t03 三日志、probe-storage、review-agent-verdict 快照、wip-os063-session 并发会话探针存档——全部要点已折入本文件各 receipt；F-1 所述运行#2 client log 本就不存在，无从补存）。
+- landing-not-deployment 观测:desktop-runtime release ui-desktop.exe = T-03 当日 15:50 以本修复构建（新于交付）；release auto.exe（client）= 战役今日产物、本 Plan client 侧零代码变更——均不 stale；用户生产桌面环境不在本仓范围。
+- batch regression:PLAN-074 % 5 ≠ 0 → 不 due；auto-ui master 无 .last-batch-regression.json 惯例文件。
+- OS063 消费回执:已录 plan-artifacts/plan-063/auto-os/t04-campaign-runbook.md（PLAN-074 交还节）——DG-1 关闭、方言修正（--app386=auto-calc + AUTO_386_APP_ROOT=probe-root/apps + AUTO_OS_ROOT=probe-root）、战役步骤①-⑦可恢复；其步骤④（输入点击取证）仍为战役自有 gate。
 
