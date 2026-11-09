@@ -251,3 +251,8 @@ T-01/T-02 修改 `crates/auto-ui-runtime/src/ui/desktop_protocol/{client_entry,c
 - batch regression:PLAN-074 % 5 ≠ 0 → 不 due；auto-ui master 无 .last-batch-regression.json 惯例文件。
 - OS063 消费回执:已录 plan-artifacts/plan-063/auto-os/t04-campaign-runbook.md（PLAN-074 交还节）——DG-1 关闭、方言修正（--app386=auto-calc + AUTO_386_APP_ROOT=probe-root/apps + AUTO_OS_ROOT=probe-root）、战役步骤①-⑦可恢复；其步骤④（输入点击取证）仍为战役自有 gate。
 
+### 2026-11-09 goal 终局回执（全链交付完成）
+
+- stage:goal / plan_id:auto-ui/PLAN-074 / plan_revision:r1 / outcome:**pass（delivered，to: done）** / delivery_commit:**5d8056f3b4cce3c0b9a12007970f9b0a5850724f**（master ff-only；旧→新映射 39f490a3→5d8056f3 等，range-diff 等价证明在 merge receipt） / spec_paths:docs/specs/runtime/rq-execution-input-and-host-services.md（SD-01 四锚 main 验证在案） / archive_path:docs/plans/archived/074-rq-desktop-broker-attach-closure.md（status: archived，@2bec0f3c/be138e3c） / cleanup_state:plan-artifacts/plan-074 scope 全删 + registry 已登记；wt-guard clean、分支全 commits 已落地；**具名持有** D:/autostack/.wt/os-063/auto-ui + branch auto-os-dev（owner=OS063 战役 auto-os/PLAN-063，closure=其 closeout——组树为战役构建依赖与恢复基座，登记于 registry policy.json + 战役 runbook） / consumer_receipt:OS063 runbook PLAN-074 交还节（方言修正 + 步骤①-⑦恢复） / pending:无（OS063 战役步骤④为其自有 gate，非本 Plan 欠账）
+- 全链：work（T-01..03）→ review（T-04 final pass，独立 agent 上下文）→ merge（T-05 落地/归档/清理）→ done。Done criteria 五项磁盘实证核对在案（本 §9 各 receipt + registry + runbook）。
+
