@@ -97,4 +97,4 @@ Rust、现有 harness；nextest sanctioned 上下文。
 
 ## 10. 待澄清事项
 
-- 无阻塞性待决。
+- **T-03 实测推翻 AC-02 前提（2026-11-10）**：todo/video 在客户端覆盖门即拒（todo: `style:list-none`；video: `style:native-unstyled, style:stroke-1, tag:video`——禁静默错绘），**不到 attach**。预算旋钮机制已交付并五档验证（2ca3eea6；ui::session 110/0、p074 1/1），但 AC-02"todo/video env 30000 嵌入运行"按原文不可达——真实阻塞 = 产品视图能力在投影覆盖集之外（owner = 投影 coverage 域 + 产品 owner，非本 Plan 预算面）。处置建议：needs_replan（AC-02 改挂覆盖缺口关闭条件）或以旋钮交付 + 具名差额收口——待用户裁定。
