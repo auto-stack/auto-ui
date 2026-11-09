@@ -321,6 +321,71 @@ mod tests {
         );
         serve.stop(&endpoint);
     }
+
+    /// PLAN-074 T-01 红线（OS063 DG-1 复现钉）：VM 组件 + `ClientTarget::Broker`
+    /// 孵化全链——真实 DesktopSession broker（进程内 harness，t3 同款真实管道）
+    /// 收纳 incubation 后，宿主 `attach_pending_incubations` 预算内必须达
+    /// Active + wid 落地。修复前此测必红（宿主零收客户端消息 → 预算耗尽）。
+    #[test]
+    fn p074_broker_incubate_vm_client_attach_active() {
+        use crate::ui::session::DesktopSession;
+        use std::sync::atomic::AtomicBool;
+        use std::time::{Duration, Instant};
+
+        let broker_pipe = format!("autodesk-broker-p074-{}", std::process::id());
+        let mut session = DesktopSession::__test_session();
+        session.__test_open_desktop();
+        session.enable_broker(&broker_pipe, std::sync::Arc::new(AtomicBool::new(false)));
+
+        // 客户端臂：VM 组件 + Broker target（run_dynamic_client 阻塞至
+        // EOF——独立线程；exit-on-EOF 由宿主 drop 收口）。组件在客户端线程
+        // 内构建（DynamicComponent 非 Send——真实 CLI 形态即进程内装载）。
+        let client_thread = std::thread::spawn(move || {
+            let client_src = r#"widget t { view { text "p074 attach probe" } }"#;
+                    let component = crate::build_dynamic_component(client_src, None).expect("build");
+                    let opts = ClientOpts {
+                app_name: "p074attach".to_string(),
+                title: "p074".to_string(),
+                width: 480.0,
+                height: 320.0,
+                frame_mode: FrameMode::Commands,
+                auto_downgraded: false,
+                remote: true,
+            };
+            let target = ClientTarget::Broker {
+                broker_pipe: broker_pipe.clone(),
+            };
+            let _ = run_dynamic_client(component, opts, target);
+        });
+
+        // 宿主臂：等 pending（客户端 connect + incubate 记录）→ attach 预算。
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while session.pending_incubations() == 0 {
+            assert!(Instant::now() < deadline, "10s 内客户端未发起孵化请求");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        session.attach_pending_incubations(5000);
+        assert_eq!(
+            session.broker_clients.len(),
+            1,
+            "attach 必须落地（DG-1 修复判据：预算内 Active + wid）"
+        );
+        let client = session.broker_clients.values().next().unwrap();
+        assert!(client.wid.is_some(), "attach 必须开虚拟窗");
+        assert!(
+            client
+                .endpoint
+                .state
+                == crate::ui::desktop_protocol::endpoint::HostState::Active,
+            "端点必须达 Active（宿主必须收到客户端 Hello 后续握手）"
+        );
+
+        // 收尾：宿主 drop → EOF → 客户端线程 exit-on-EOF 自退。
+        drop(session);
+        if let Err(e) = client_thread.join() {
+            eprintln!("[p074-client] thread PANIC: {e:?}");
+        }
+    }
 }
 
 /// native 轨三态 → 二态分派（Plan 020 T-04）。**PLAN-032 T-06 翻转**
