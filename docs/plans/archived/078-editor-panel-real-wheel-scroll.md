@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-078
-status: execution_done
+status: archived
 feature_name: AGE M1编辑器面板真实滚轮滚动修复（GAP-AG027-01）
 author: [Codex]
 created_at: 2026-11-10
 updated_at: 2026-11-10
 plan_revision: 1
-current_step: 4
+current_step: 6
 total_steps: 6
 depends_on: [auto-ui/PLAN-076, ag-examples/PLAN-027]
 supersedes_spec_components: [docs/specs/auto-graphics/age-m1-editor-native-evidence.md]
@@ -146,14 +146,16 @@ scope；未知归属 fail-closed；禁止 junction/symlink。
 
 | T | owner_stage | 依赖 | 结果/写面 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 启动指令（用户目标续期 2026-11-10，§10 D01） | 有界调查+真实滚轮探针；决策工件 investigation.md（根因或"已修"裁定） | AC-01 | [x] 2026-11-10 裁定=**GAP 为时序性记录误差，非现存缺陷**：真实滚轮→面板通路自 `4adf2d03`（Plan 879，2026-10-29，候选 C 祖先）存在；实测两探针（探针1 6点差622×6/band 132k panel_scrolled=true；探针2 双向下滚236k/上滚24k响应，复位不对称=保真度细节非阻塞）；工件=plan-artifacts/plan-078/investigation.md+probe/ |
+| T-01 | work | 启动指令（用户目标续期 2026-11-10，§10 D01） | 有界调查+真实滚轮探针；决策工件 investigation.md（根因或"已修"裁定） | AC-01 | [x] 2026-11-10 裁定（经 T-05 复核锐化）=**GAP 解除不依赖历史解释**：面板真实滚轮通路自 `4adf2d03`（Plan 879）存在（候选 C 祖先已验），但该提交早于 F-02 会话时点，故"时序误差"仅是未决历史假说之一（复核意见：历史根因不完整，含未分解环境成分可能，如 F-04 ToDesk 输入钩子对滚轮注入的差异化吞没）；**解锁决定仅凭实测**——现候选系 fresh 构建上真实 SendInput 滚轮滚动面板直接测得（探针1 6点差622×6/band 132k panel_scrolled=true；探针2 双向下滚236k/上滚24k响应，复位不对称=保真度细节非阻塞）；工件=plan-artifacts/plan-078/investigation.md+probe/ |
 | T-02 | work | T-01 | 按根因实现修复（engine 面板滚轮通路）；无缺陷则显式跳过并记录 | AC-01 | [x] 2026-11-10 按 §10 D02 **显式跳过**（无缺陷可修，零代码变化交付；无实现提交） |
 | T-03 | work | T-02（或 T-01 已修裁定） | iced_seam 族+触面回归+posted 对照绿；视口探针零回退 | AC-02/03 | [x] 2026-11-10 零代码变化→无回退面：iced_seam_contract（prototype）**5/5 绿**（worktree 实测）；视口/posted 通路未触碰（源码行级观测+探针无损），更广族由 UI076 主检 38/38 smoke 与 AG026 T-06 候选 C 并集覆盖 |
 | T-04 | work | T-03 | SD-01 spec 修订+runbook F-02 表行+AG026 消费提示 | AC-04 | [x→转移 AG026] 2026-11-10 裁定：spec/表行所在仓为 ag-examples（AG027 落主侧），更新归 AG026 会话准备（其目标已含"G04 会话使 checker PASS"，为会话前置必要项）；本计划无 spec 影响（见 §5 表） |
-| T-05 | review | T-01..T-04 实质完成 | 同树独立 final，逐 AC 复核 | AC-05 | [ ] |
-| T-06 | merge | T-05 pass | 落主（零代码，归档+导航）/清理 | AC-06 | [ ] |
+| T-05 | review | T-01..T-04 实质完成 | 同树独立 final，逐 AC 复核 | AC-05 | [x] 2026-11-10 独立子代理 fresh context PASS（5 项核证；意见已锐化 T-01 行——GAP 解除不依赖历史解释，仅凭候选系实测；详见 §9 复审行） | AC-05 |
+| T-06 | merge | T-05 pass | 落主（零代码，归档+导航）/清理 | AC-06 | [x] 2026-11-10 归档 r1（零代码：无落主 diff；worktree/分支清理见 merge 记录；plan-artifacts scope 折叠删除，工件要点已折入本文件 T-01/§9 行） | AC-06 |
 
 ## 9. 复审记录
+
+2026-11-10 / stage:review | review_scope: final | plan_id: PLAN-078 | plan_revision: r1 | outcome: pass（独立子代理 fresh context，只读；5 项逐条核证：源码行级事实 1a-1c、4adf2d03↔4ebc51ce 祖先、零提交零脏树、探针证据文件实存且 PNG 尺寸/md5 相异、计划行/授权记录齐） | reviewed_commit: b484fd57（计划文本）+ worktree 6b012f99（零 diff） | findings: 复核意见=历史"时序误差"解释不完整（4adf2d03 早于 F-02 会话时点，路径当时已在；历史根因未决，不排除 F-04 环境成分）；但解锁决定仅凭实测成立（消费树直接测量）。已按此锐化 T-01 行措辞：GAP 解除不依赖历史解释，仅凭候选系实测 | next: merge（T-06）
 
 2026-11-10 / stage:work | plan_id: PLAN-078 | plan_revision: r1 | outcome: pass（execution_done：T-01..T-04 完成，零代码交付） | worktree: D:/autostack/.wt/ui-078/auto-ui（已建，无实现提交） | branch: codex/plan-078-dev | base_commit: 6b012f99 | task_ids: T-01,T-02(跳过),T-03,T-04(转移AG026) | evidence: 调查工件 plan-artifacts/plan-078/investigation.md + probe/（两探针脚本与 bundle 截图/trace）；裁定=GAP-AG027-01 时序性记录误差（通路自 4adf2d03/Plan 879 存在且为候选 C 祖先）；实测 panel_scrolled=true（6点差622×6/band132k；双向下滚236k上滚24k）；iced_seam_contract 5/5 | blockers: 无（work-owned 全闭；AC-04 转移 AG026 会话准备，属消费侧） | next_responsible_role: review（T-05 独立 final，零代码证据链复核）
 
