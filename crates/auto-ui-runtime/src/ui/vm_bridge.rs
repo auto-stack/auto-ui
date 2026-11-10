@@ -518,6 +518,11 @@ struct InitDemandRecord {
     identity: String,
     phase: InitDemandPhase,
     generation: u64,
+    /// PLAN-079 D1: the instance state object this demand was registered
+    /// for — the parked Init segment's `owner_state_id`. Generation
+    /// supersede cancels use it so a sibling instance's same-fn segment is
+    /// never mis-cancelled (teardown-cancel owner-filter).
+    state_obj_id: u64,
 }
 
 /// PLAN-711 T-03: [`VmBridge::register_init_demand`] 的判定结果。
@@ -2435,6 +2440,7 @@ impl VmBridge {
                 identity: identity.to_string(),
                 phase: InitDemandPhase::Done,
                 generation: self.init_generation.get(),
+                state_obj_id: obj_id,
             },
         );
         Ok(())
@@ -2607,6 +2613,9 @@ impl VmBridge {
         // Cancel by the original receiver before releasing its fields. A late
         // HTTP/CPU continuation must never mutate the surviving App root or
         // a fresh instance with the same textual key.
+        // PLAN-079 D1: 取消必须带属主 id——pending 名单虽已按 owner 过滤，
+        // 但旧版 cancel_parked_by_fn 按 fn_name 全局首匹配会错杀同 fn 的
+        // 其它实例（B 先入册即被 A 卸载误杀）。
         let pending: Vec<String> = self
             .parked_tasks
             .borrow()
@@ -2615,7 +2624,7 @@ impl VmBridge {
             .map(|p| p.fn_name.clone())
             .collect();
         for name in pending {
-            self.cancel_parked_by_fn(&name);
+            self.cancel_parked_by_fn(&name, rec.state_obj_id);
         }
         self.cpu_write_queue
             .borrow_mut()
@@ -3276,12 +3285,16 @@ impl VmBridge {
                 // 身份变化 = 新代际：先取消旧代际（未执行丢弃/在途取消一次清理），
                 // 再推进代际号登记新 demand（A→B→A 的第二个 A 由此重跑 Init）。
                 let old_identity = rec.identity.clone();
+                // PLAN-079 D1: 在途 Init 段的 owner = 旧代际实例 state 对象
+                // id——记录先留档再被覆盖，取消时按属主精确匹配。
+                let old_state_obj_id = rec.state_obj_id;
                 let had_pending = rec.phase == InitDemandPhase::Queued;
                 let had_in_flight = rec.phase == InitDemandPhase::InFlight;
                 rec.widget = widget_name.to_string();
                 rec.identity = identity.to_string();
                 rec.phase = InitDemandPhase::Queued;
                 rec.generation = generation + 1;
+                rec.state_obj_id = state_obj_id;
                 self.init_generation.set(generation + 1);
                 drop(records);
                 if had_pending {
@@ -3290,7 +3303,7 @@ impl VmBridge {
                 if had_in_flight {
                     let fn_name =
                         crate::ui::handler_codegen::namespaced_handler_fn_name(widget_name, "Init");
-                    self.cancel_parked_by_fn(&fn_name);
+                    self.cancel_parked_by_fn(&fn_name, old_state_obj_id);
                 }
             }
             None => {
@@ -3313,11 +3326,17 @@ impl VmBridge {
                     .collect();
                 drop(seen);
                 let mut cancel_queued: Vec<String> = Vec::new();
-                let mut cancel_parked = false;
+                // PLAN-079 D1: 在途兄弟 Init 段的 owner = 各自记录里的
+                // state_obj_id（段注册时以之为 receiver），取消按属主精确匹配。
+                let mut cancel_parked_owners: Vec<u64> = Vec::new();
                 for (key, phase) in siblings.iter() {
                     match phase {
                         InitDemandPhase::Queued => cancel_queued.push(key.clone()),
-                        InitDemandPhase::InFlight => cancel_parked = true,
+                        InitDemandPhase::InFlight => {
+                            if let Some(r) = records.get(key) {
+                                cancel_parked_owners.push(r.state_obj_id);
+                            }
+                        }
                         _ => {}
                     }
                     records.remove(key);
@@ -3329,6 +3348,7 @@ impl VmBridge {
                         identity: identity.to_string(),
                         phase: InitDemandPhase::Queued,
                         generation: generation + 1,
+                        state_obj_id,
                     },
                 );
                 self.init_generation.set(generation + 1);
@@ -3336,10 +3356,12 @@ impl VmBridge {
                 for key in &cancel_queued {
                     self.cancel_queued_init(key);
                 }
-                if cancel_parked {
+                if !cancel_parked_owners.is_empty() {
                     let fn_name =
                         crate::ui::handler_codegen::namespaced_handler_fn_name(widget_name, "Init");
-                    self.cancel_parked_by_fn(&fn_name);
+                    for owner in cancel_parked_owners {
+                        self.cancel_parked_by_fn(&fn_name, owner);
+                    }
                 }
             }
         }
@@ -3572,12 +3594,19 @@ impl VmBridge {
     /// - `Future` → 无宿主资源可回收（唤醒源在引擎侧，future 槽随 task 弃）；
     /// - `CpuRunnable` → 纯栈份额，随清栈释放。
     /// 取消不回滚已发生副作用（前缀写入保留，M-01 契约）。
-    pub fn cancel_parked_by_fn(&self, fn_name: &str) -> bool {
+    ///
+    /// PLAN-079 D1（teardown-cancel owner-filter）：取消按
+    /// `(fn_name, owner_state_id)` 二元匹配——跨实例同名 handler（每张书卡
+    /// 同 fn_name）是常态，旧版按 fn_name 取**全局第一个匹配**会错杀活实例
+    /// 的 parked 段（七臂 B/C 自返 + run81/86 静默消失根因；7d3a73aa 的
+    /// teardown-cancel 语义在 d0e1a688 基线上重做）。实例卸载路径只取消
+    /// 属主为本实例的段；其余段（迟到事件仍可执行）原样存活。
+    pub fn cancel_parked_by_fn(&self, fn_name: &str, owner_state_id: u64) -> bool {
         let pos = self
             .parked_tasks
             .borrow()
             .iter()
-            .position(|p| p.fn_name == fn_name);
+            .position(|p| p.fn_name == fn_name && p.owner_state_id == owner_state_id);
         let Some(idx) = pos else {
             return false;
         };
@@ -7325,6 +7354,194 @@ widget Store {
 
         // Silence unused warning for scan_use_statements when the body returns early.
         let _ = scan_use_statements;
+    }
+
+    /// PLAN-079 T-01：teardown-cancel 必须只取消**属主为本实例**的 parked
+    /// 段（D1 错杀负例，红证先行）。两实例同名 handler（同 fn_name、不同
+    /// owner_state_id——每张书卡同 fn_name 的现实形态），卸载 A → 断言
+    /// B 的 parked 段存活（迟到事件仍可恢复的执行前提）、无"全部结束"
+    /// 误判（`has_parked_tasks` 仍真）。
+    ///
+    /// 修复前行为（七臂 B/C 自返 + run81/86 静默消失根因）：
+    /// `release_child_instance` 已按 owner 收集待取消 fn 名，但
+    /// `cancel_parked_by_fn` 按 fn_name 取**全局第一个匹配**——若 B 的段
+    /// 先入册，A 卸载即错杀 B 的活段；若受害者是最后活段，VM 判"全部
+    /// 结束"→ 会话无 host 退出请求而自返，或与 rc 清账竞争静默消失。
+    #[test]
+    fn f2_teardown_cancels_only_owner_parked_segments() {
+        use auto_lang_core::vm::engine::{ParkedSegment, ParkedWait};
+        use auto_lang_core::vm::task::AutoTask;
+        let widget = make_test_widget("BookShelf", vec![]);
+        let bridge = VmBridge::new(&widget).expect("bridge");
+
+        // 两实例 A/B 同 widget 类型、不同身份（路由装饰身份）——
+        // 同名 handler 是跨实例常态。
+        let fn_name =
+            crate::ui::handler_codegen::namespaced_handler_fn_name("BookShelf", "Load");
+        let a_id = bridge.ensure_child_instance(
+            "BookShelf",
+            "BookShelf@/book/A/chapter/1",
+            bridge.state_obj_id,
+            &[],
+            &std::collections::HashSet::new(),
+            &std::collections::HashMap::new(),
+        );
+        let b_id = bridge.ensure_child_instance(
+            "BookShelf",
+            "BookShelf@/book/B/chapter/1",
+            bridge.state_obj_id,
+            &[],
+            &std::collections::HashSet::new(),
+            &std::collections::HashMap::new(),
+        );
+        assert_ne!(a_id, b_id, "两实例必须有独立 state 对象");
+
+        // 注入同名 parked 段：B 先入册（修复前全局首匹配指向 B），A 后入册。
+        let park = |owner: u64| ParkedTask {
+            owner_state_id: owner,
+            task: AutoTask::new(0, 4096, 0),
+            seg: ParkedSegment {
+                fn_name: fn_name.clone(),
+                saved_bp: 0,
+                saved_fn_n_args: 0,
+            },
+            wait: ParkedWait::Future(0),
+            fn_name: fn_name.clone(),
+            event_name: "Load".to_string(),
+            release_stack_on_complete: false,
+            parked_at: std::time::Instant::now(),
+        };
+        bridge.parked_tasks.borrow_mut().push(park(b_id));
+        bridge.parked_tasks.borrow_mut().push(park(a_id));
+        assert_eq!(bridge.parked_count(), 2, "两实例同名段均在册");
+
+        // A 卸载：仅 A 的段被取消，B 的段必须存活。
+        bridge.release_child_instance("BookShelf@/book/A/chapter/1");
+        assert_eq!(
+            bridge.parked_count(),
+            1,
+            "A 卸载后 B 的 parked 段必须存活（错杀即 D1 根因）"
+        );
+        assert!(bridge.has_parked_tasks(), "仍有活段——不得判'全部结束'");
+        let survivor = bridge.parked_tasks.borrow()[0].owner_state_id;
+        assert_eq!(survivor, b_id, "幸存段必须属主 B（A 卸载只取消本实例段）");
+
+        // B 的迟到事件仍可执行的前提：段仍在册，凭据就绪后恢复泵续跑
+        //（恢复机制本身由 plan702 组覆盖，此处只断言段存活=迟到执行可能）。
+        // 再卸载 B：段出清，"全部结束"合法。
+        bridge.release_child_instance("BookShelf@/book/B/chapter/1");
+        assert_eq!(bridge.parked_count(), 0);
+        assert!(!bridge.has_parked_tasks());
+    }
+
+    /// PLAN-079 T-03: 多实例（≥8）同名 handler 随机卸载 N 轮压测——断言
+    /// 无静默消失（卸载只取消本实例段、活实例段恒存活）与账务守恒
+    /// （受害者 state 对象挂载 stake 恰释放一次、根态 RC 不被 teardown
+    /// 触碰——PLAN-069 F3 纪律的 D1 面）。
+    #[test]
+    fn f2_multi_instance_random_teardown_keeps_live_segments() {
+        use auto_lang_core::vm::engine::{ParkedSegment, ParkedWait};
+        use auto_lang_core::vm::task::AutoTask;
+        let widget = make_test_widget("BookShelf", vec![]);
+        let bridge = VmBridge::new(&widget).expect("bridge");
+
+        const N: usize = 8;
+        const ROUNDS: usize = N;
+        let fn_name = crate::ui::handler_codegen::namespaced_handler_fn_name("BookShelf", "Load");
+
+        let mut instances: Vec<(String, u64)> = Vec::new();
+        for i in 0..N {
+            let identity = format!("BookShelf@/book/{i}/chapter/1");
+            let id = bridge.ensure_child_instance(
+                "BookShelf",
+                &identity,
+                bridge.state_obj_id,
+                &[],
+                &std::collections::HashSet::new(),
+                &std::collections::HashMap::new(),
+            );
+            instances.push((identity, id));
+        }
+        assert_eq!(instances.len(), N);
+
+        // 逆序注入同名 parked 段——段序与实例序解耦：修复前按 fn_name
+        // 全局首匹配，取消命中谁完全取决于入册顺序，逆序注入坐实错杀面。
+        let park = |owner: u64| ParkedTask {
+            owner_state_id: owner,
+            task: AutoTask::new(0, 4096, 0),
+            seg: ParkedSegment {
+                fn_name: fn_name.clone(),
+                saved_bp: 0,
+                saved_fn_n_args: 0,
+            },
+            wait: ParkedWait::Future(0),
+            fn_name: fn_name.clone(),
+            event_name: "Load".to_string(),
+            release_stack_on_complete: false,
+            parked_at: std::time::Instant::now(),
+        };
+        for (_, id) in instances.iter().rev() {
+            bridge.parked_tasks.borrow_mut().push(park(*id));
+        }
+        assert_eq!(bridge.parked_count(), N, "全部同名段在册");
+
+        // 根态 RC 基准：N 次 ensure 各 retain 一次后固定；teardown 不得触碰。
+        let root_rc_base = bridge.rc_count(bridge.state_obj_id);
+
+        // 确定性 xorshift（无 rand 依赖）：同一随机序列可复现。
+        let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
+        let mut next_rand = |seed: &mut u64| {
+            *seed ^= *seed << 13;
+            *seed ^= *seed >> 7;
+            *seed ^= *seed << 17;
+            *seed
+        };
+
+        let mut remaining = instances.clone();
+        for round in 0..ROUNDS {
+            let idx = (next_rand(&mut seed) % remaining.len() as u64) as usize;
+            let (victim_identity, victim_obj) = remaining.remove(idx);
+            let victim_rc_before = bridge.rc_count(victim_obj);
+            let before = bridge.parked_count();
+
+            bridge.release_child_instance(&victim_identity);
+
+            assert_eq!(
+                bridge.parked_count(),
+                before - 1,
+                "round {round}: 卸载只取消受害者本实例的段"
+            );
+            for (_, obj) in &remaining {
+                assert!(
+                    bridge
+                        .parked_tasks
+                        .borrow()
+                        .iter()
+                        .any(|p| p.owner_state_id == *obj),
+                    "round {round}: 活实例 {obj} 的段被误杀——静默消失根因"
+                );
+            }
+            // 账务守恒：挂载 stake 恰释放一次（069 F3 双释放族）；根态 RC
+            // 不被 teardown 触碰。
+            assert_eq!(
+                bridge.rc_count(victim_obj),
+                victim_rc_before - 1,
+                "round {round}: 受害者挂载 stake 恰释放一次"
+            );
+            assert_eq!(
+                bridge.rc_count(bridge.state_obj_id),
+                root_rc_base,
+                "round {round}: teardown 不得释放/retain 根态"
+            );
+            assert_eq!(
+                bridge.has_parked_tasks(),
+                !remaining.is_empty(),
+                "round {round}: 有活段即不得判'全部结束'"
+            );
+        }
+
+        assert_eq!(bridge.parked_count(), 0, "全部卸载后段出清");
+        assert!(!bridge.has_parked_tasks());
     }
 }
 
