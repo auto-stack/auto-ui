@@ -5635,6 +5635,26 @@ fn walk_theme_files(root: &Path) -> Vec<(String, u64)> {
     out
 }
 
+/// PLAN-1003 复审 R1（F-1003-R1-03）：交付清单记录交付根**静态携带**的策略
+/// （即根 manifest 内的策略块），不记录生成期环境合成的标签——消费侧不继承
+/// 生成器环境，`c+user:…` 会把纯 C 包误标为覆盖臂。生成期存在的 cargo 原生
+/// 局部覆盖单列为 `generation_env_override_not_carried`（审计用，未随包）。
+fn delivery_debug_policy_record(
+    selection: &auto_api_gen::generated_build::DebugPolicySelection,
+) -> serde_json::Value {
+    let source = if selection.user_partial_env().is_some() {
+        // 策略本身来自受管缺省；局部覆盖只作用于生成器进程的 cargo。
+        "managed-default"
+    } else {
+        selection.source.as_str()
+    };
+    serde_json::json!({
+        "label": selection.policy.as_str(),
+        "source": source,
+        "generation_env_override_not_carried": selection.user_partial_env(),
+    })
+}
+
 fn generate_delivery_root_manifest(
     producer_root: &Path,
     app_member: &str,
@@ -7133,11 +7153,8 @@ fn generate_rust_ui_delivery_inner(
             "resources_algo": "sha-256",
             "note": "python verify.py（交付根内）——缺资源/等长篡改/坏 hash/未登记资源判红",
         },
-        // PLAN-1003：交付根携带的有效受管调试策略（根 manifest 内静态块）。
-        "debug_policy": {
-            "label": debug_policy.label,
-            "source": debug_policy.source,
-        },
+        // PLAN-1003：交付根携带的受管调试策略（根 manifest 内静态块）。
+        "debug_policy": delivery_debug_policy_record(&debug_policy),
         "crates": crate_entries,
         "root_inputs": root_input_entries,
         "theme_package": theme_section,
@@ -10612,6 +10629,33 @@ pub fn create_work(title str) Work {
 
         let missing = dir.path().join("absent");
         assert!(delivery_pins(&missing, None, None).is_err(), "锁缺失受管判红");
+    }
+
+    /// PLAN-1003 复审 R1（F-1003-R1-03）：交付清单的策略记录只描述随包静态
+    /// 内容——生成期 `CARGO_PROFILE_DEV_DEBUG` 不随包，不得把纯 C 包标成
+    /// `c+user:…`；显式 full 如实记 full。
+    #[test]
+    fn delivery_debug_policy_record_describes_bundle_not_generator_env() {
+        use auto_api_gen::generated_build::resolve_debug_policy_from;
+        let default = delivery_debug_policy_record(&resolve_debug_policy_from(None, None).unwrap());
+        assert_eq!(default["label"], "c");
+        assert_eq!(default["source"], "managed-default");
+        assert!(default["generation_env_override_not_carried"].is_null());
+        let partial =
+            delivery_debug_policy_record(&resolve_debug_policy_from(None, Some("2")).unwrap());
+        assert_eq!(
+            partial["label"], "c",
+            "bundle content is plain C: {partial}"
+        );
+        assert_eq!(partial["source"], "managed-default");
+        assert_eq!(
+            partial["generation_env_override_not_carried"],
+            "CARGO_PROFILE_DEV_DEBUG"
+        );
+        let full =
+            delivery_debug_policy_record(&resolve_debug_policy_from(Some("full"), None).unwrap());
+        assert_eq!(full["label"], "full");
+        assert_eq!(full["source"], "AUTO_GENERATED_DEBUG_POLICY");
     }
 
     /// PLAN-792：交付根 manifest 装配——[patch.crates-io] 在消费根（不写
