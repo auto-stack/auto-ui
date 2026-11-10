@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-079
-status: drafting
+status: execution_done
 feature_name: vm_bridge teardown-cancel owner-filter、picker 对话框生成稳定化与阅读主题种子链闭合
 author: [relay/009-session]
 created_at: 2026-11-11T00:00:00Z
-updated_at: 2026-11-11T00:00:00Z
+updated_at: 2026-11-11T01:30:00Z
 plan_revision: 1
-current_step: 0
+current_step: 6
 total_steps: 7
 supersedes_spec_components: []
 new_spec_components: []
@@ -162,6 +162,8 @@ UIA 诊断链（消费方 009 已建 uia_act.ps1 + picker harness，验收消费
 | T-06 | work | — | D3 种子链修复（导航播种） | 009 F-derive 哨兵绿 | AC-03 |
 | T-07 | review | T-03/T-05/T-06 | 009 换 pin 消费回归（跨仓协作：READER-009 会话执行，本计划验收其证据） | 82 叶零死亡+三 AC 消费证据 | AC-04 |
 
+- T-01..T-06 [x]（work 已完成，见 §9 r1 work 收据）；T-07 [ ] review-owned。
+
 - 实现worktree：`D:/autostack/.wt/plan-079/auto-ui`，分支 `codex/plan-079-dev`，
   基线 d0e1a688。
 - 消费方交接：交付 pin+驱动哈希回执 → READER-009 会话换 pin 终收口。
@@ -169,6 +171,17 @@ UIA 诊断链（消费方 009 已建 uia_act.ps1 + picker harness，验收消费
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | outcome: pass（可交 work；T-04 为有界调查带决策工件） | 起草：READER-009 会话（用户授权"我在此起草"） | next: work（auto-ui 会话接手，T-01 红证起步）。
+
+- stage: work | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | outcome: pass（execution_done；T-01..T-06 完成，T-07 review-owned 保持开放） | worktree: D:/autostack/.wt/plan-079/auto-ui | branch: codex/plan-079-dev | base_commit: d0e1a688 | code_commits: c241f796（D1 owner-filter + 负例/压测）、89c5b718（D2 插桩链）、08a5f320（D3 种子链 + 测试）、9dd3fc27（SD-01/02/03） | dependency_revisions: auto-lang@0b3fc9063（H 配方基线，只读检出 .wt/plan-079/auto-lang）、auto-web@bf72baab、auto-down@58ea33f | task_ids: T-01..T-06 | evidence:
+  - D1 红证：`cargo nextest run -p auto-ui-runtime --lib f2_teardown_cancels_only_owner_parked_segments` 修复前 FAIL（幸存段 4000001≠B 的 4000002，错杀形态）；修复后 PASS。
+  - D1 压测：`f2_multi_instance_random_teardown_keeps_live_segments` PASS（8 实例×8 轮随机卸载：活段守恒/受害者挂载 stake 恰释放一次/根态 RC 不动）。
+  - D1 组回归：130 tests PASS（vm_bridge 模块 + plan069/702/711/841/056/041/370 并集）。
+  - D2 决策工件：plan-artifacts/plan-079/D2-decision-artifact.md（丢失点=teardown-cancel 跨实例错杀，与 D1 同根；7d3a73aa diff + 版本相关性 + 009 round49 收据）；插桩 AUTO_DIALOG_DIAG=1 四点就绪（park/cancel/release/host）。
+  - D3：`f2_navigation_seeds_host_policy_dark_mode` PASS（light→dark→light 三导航播种 + 未声明字段负控）；组回归 194 tests PASS（vm_bridge + theme/plan370/056/069/711/osconfig 并集）。
+  - SD-01/02/03 canonical 增量在 worktree 提交 9dd3fc27（未发布，merge 落地）。
+  | blockers: 无（AC-02 的 009 picker 3 连矩阵与 AC-03 的 F-derive 哨兵、AC-04 全矩阵归 T-07/review 消费验证） | next_responsible_role: review（独立 review 对 9dd3fc27 复审；T-07 跨仓消费回归由 READER-009 会话执行，本计划验收其证据）。
+
+- stage: goal | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | round: 1 | from: new | to: work | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/plan-079/auto-ui | commit: 9dd3fc27 | next: review
 
 ## 10. 待澄清事项
 
