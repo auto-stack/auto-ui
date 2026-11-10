@@ -8,6 +8,7 @@ M2另有两项独立硬门：980完整传统AutoUI（原widget/store源、纯UI 
 
 | M1相关计划 | 当前状态 | 交付/剩余 |
 |---|---|---|
+| [UI076 scale轨迹与N4语义](076-m1-native-scale-trail-and-n4-semantics.md) | drafting r1，0/7 | 修 AG026 双档会话路由的 F-SCALE-02（scales_observed 关窗覆盖丢起始档）与 F-N4-01（区域按下即派发 vs N4 离窗取消语义裁定=方案b收窄）；落地后 AG026 重判 N4 关 DEBT-001 |
 | [UI071 本机clip/取证支撑](archived/071-age-m1-local-clip-and-native-evidence-support.md) | archived r1，9/9 | a20fa04d已交，026/027该前置已满足 |
 | [UI072 独立游戏宿主](archived/072-age-games-standalone-windows-player.md) | archived r1，10/10 | 5fd25be8已交，已供028消费 |
 | [AG028 两游戏exe＋资源发行](../../../ag-examples/docs/plans/archived/028-age-games-windows-binary-and-resource-release.md) | archived r1，11/11 | 两Windows便携ZIP及清单已交，REL-DELIVERY-001仅持有最终文件待用户接管；不重开 |
