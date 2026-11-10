@@ -183,6 +183,15 @@ UIA 诊断链（消费方 009 已建 uia_act.ps1 + picker harness，验收消费
 
 - stage: goal | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | round: 1 | from: new | to: work | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/plan-079/auto-ui | commit: 9dd3fc27 | next: review
 
+- stage: review | review_scope: internal（计划 §8 指定 T-07=READER-009 会话为终审验收执行者；本收据为 work-owned 判定的独立工件复核，同实现会话执行、判定从 Plan/代码/diff/测试在盘推导） | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | outcome: pass（work-owned 判定；终态 `reviewed` 待 T-07 消费证据验收） | worktree: D:/autostack/.wt/plan-079/auto-ui | branch: codex/plan-079-dev | reviewed_commit: 9dd3fc27 | base_commit: d0e1a688 | dependency_revisions: auto-lang@0b3fc9063（只读检出 .wt/plan-079/auto-lang，未改动）、auto-web@bf72baab、auto-down@58ea33f | spec_inputs: docs/specs/runtime/component-and-store-instances.md（sha 1731317a）、native-vm-app-validation.md（sha 8f7ab2ca）、vm-route-page-loading.md（sha 3d532167），均未发布、merge 落地 | acceptance_results:
+  - AC-01 **pass**：`f2_teardown_cancels_only_owner_parked_segments` 修复前 FAIL（幸存 4000001≠B 4000002，错杀形态实证）→ 修复后 PASS；`f2_multi_instance_random_teardown_keeps_live_segments` PASS（8×8 随机卸载：活段守恒/受害者挂载 stake 恰释放一次/根态 RC 不动）；冻结并集 211 tests PASS（vm_bridge + plan069/702/711/841/056/041/370/theme/409/osconfig/dialog/plan804）。
+  - AC-02 work 侧 **pass**（丢失点定谳 + 插桩 AUTO_DIALOG_DIAG ①-④ + 段存活不变量的永久反例）；009 picker 3 连全量矩阵 **pending**（T-07）。
+  - AC-03 work 侧 **pass**（`f2_navigation_seeds_host_policy_dark_mode`：light→dark→light 三导航播种 + 未声明字段负控）；009 theme-gate F-derive 哨兵 **pending**（T-07）。
+  - AC-04 **pending**（009 换 pin 全矩阵 82 叶零死亡 + 三 AC 消费证据，T-07）。
+  | findings: 无 needs_fix。注记：cancel_parked_by_fn 的 PLAN-711 原文档首句仍为旧签名措辞（下文已补 D1 段落），非语义问题。 | pending_closeout_gates: T-07（READER-009 换 pin 消费回归：82 叶零死亡 + picker 3 连无 NO DIALOG + theme F-derive 翻绿；驱动/代码 pin = 本 branch @ 9dd3fc27 + auto-lang 0b3fc9063） | evidence: 见 r1 work 收据（红证/压测/组回归命令与结果在盘）；本收据复核了 4 提交 diff（c241f796/89c5b718/08a5f320/9dd3fc27）、worktree 洁净度、依赖检出未改动、无 ledger/specs.json 写入 | next: review（T-07 消费方 READER-009 执行；其 round49 已登记"等 auto-ui owner-filter 修复交付后消费修复版+picker 门接回"）。
+
+- stage: goal | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | round: 2 | from: work | to: review | status: execution_done | outcome: pass（内部 review：work-owned 判定 pass；T-07 消费验证 pending） | worktree: D:/autostack/.wt/plan-079/auto-ui | commit: 9dd3fc27 | next: review（T-07/READER-009）
+
 ## 10. 待澄清事项
 
 - 7d3a73aa 中与本三缺陷无关的有效改动是否随其回退一并丢失→本计划仅重做
