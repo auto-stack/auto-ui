@@ -110,4 +110,5 @@ Rust、现有 harness；nextest sanctioned 上下文。
 ### 2026-11-10 merge 收据（T-05）
 
 - stage:merge / plan_id:auto-ui/PLAN-075 / plan_revision:r2 / outcome:pass（delivered）/ completion_kind:delivered / delivery_commit:auto-ui master `128cef27`（ff-only 0eb79ec8→128cef27 on 22ba6192）/ canonical：docs/specs/runtime/rq-execution-input-and-host-services.md §1 attach 预算 env 一句话（本次提交）/ archive:docs/plans/archived/075-…（本文件，status=archived）/ cleaned:组树 `.wt/os-063/auto-ui` 具名持有（owner=OS063 goal 会话续用——PLAN-063 战役未完，不删除；分支 auto-os-dev 续用）
+- **披露（merge 提交 9684ca5e）**：首次提交误扫工作区未跟踪的他会话 docs/design WIP——已 soft-reset 剔除重提交；但索引中他方**已完成**的 058 r2 修订簿记（README/058/060 各一处，2026-11-09 完整内容）随之入库——内容完整保留，归属其会话，特此披露。
 - OS063 回执：DG-2 井盖已交付——OS063 战役对重编译产品扫设 `AUTO_BROKER_ATTACH_BUDGET_MS=30000` 即可；todo/video 产品面仍挂覆盖缺口（style:list-none / native-unstyled / stroke-1 / tag:video，owner=投影 coverage 域+产品 owner）——该缺口关闭前两品不进嵌入扫描（PLAN-063 §10 待办已更正归因）。
