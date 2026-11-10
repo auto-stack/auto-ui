@@ -2258,6 +2258,32 @@ impl VmBridge {
             .insert(identity.to_string());
     }
 
+    /// PLAN-079 D3: 页面创建/导航时按宿主策略重播种新页面 widget 的
+    /// `dark_mode` 保留字段——与壳根同字段同源（`allocate_app` 对顶层 App
+    /// 播种同一 `crate::ui::style::theme::dark_mode()`；AUTOOS_DESKTOP_CONFIG
+    /// 派生链已汇入该全局）。字段未声明（widget 无 dark_mode model 变量）
+    /// → 不写不增字段；值变才 bump（PLAN-045 T-02 纪律）。显式选择
+    /// （theme_explicit）的优先语义由页面自身派生逻辑裁决，此处只喂输入。
+    fn seed_host_policy_dark_mode(&self, target_obj_id: u64) {
+        let dark = crate::ui::style::theme::dark_mode();
+        if let Some(obj) = self.vm.get_heap_object(target_obj_id) {
+            let mut guard = obj.write().unwrap();
+            if let Some(inst) = guard.as_any_mut().downcast_mut::<GenericInstanceData>() {
+                if let Some(idx) = inst.field_names.iter().position(|n| n == "dark_mode") {
+                    let storable = auto_val::Value::Bool(dark);
+                    let changed = inst.get_field(idx) != Some(&storable);
+                    if changed {
+                        if let Some(old) = inst.get_field(idx) {
+                            self.release_init_value(old);
+                        }
+                        let _ = inst.set_field(idx, storable);
+                        self.vm.bump_path(target_obj_id, Some("dark_mode"));
+                    }
+                }
+            }
+        }
+    }
+
     /// PLAN-041 T-02: re-seed a props snapshot onto a specific state object
     /// (value-change-only bump; PLAN-045 T-02 discipline). Shared by the
     /// instance re-seed path and the Init-demand pre-dispatch replay.
@@ -3505,6 +3531,12 @@ impl VmBridge {
             // tick 8000/4000/2000 消失）；配合 props 快照重播种即为完整
             // 旧"播种即派发"交错等价。
             let state_obj_id = demand.state_obj_id;
+            // PLAN-079 D3: 页面创建/导航时按宿主策略重播种新页面 widget 的
+            // `dark_mode` 保留字段（与壳根同字段同源：allocate_app 对顶层
+            // App 播种同一 `theme::dark_mode()`；059 的显式优先语义由页面
+            // 自身 `theme_explicit` 派生逻辑保证——这里只喂派生输入）。
+            // 放在 Missing 检查前：未导出 Init 的页面同样获得播种。
+            self.seed_host_policy_dark_mode(state_obj_id);
             if !self.vm.flash.exports_by_name.contains_key(&fn_name) {
                 // Missing：声明了 lifecycle.Init 但未导出——静默（正常程序
                 // 契约；异常导出缺失的显式失败面归 T-05 错误态）。
@@ -7573,6 +7605,124 @@ widget Store {
 
         assert_eq!(bridge.parked_count(), 0, "全部卸载后段出清");
         assert!(!bridge.has_parked_tasks());
+    }
+
+    /// PLAN-079 T-06: D3 阅读主题种子链——页面创建/导航时按宿主策略
+    /// （`theme::dark_mode()`，与壳根 allocate_app 播种同源）重播种新页面
+    /// widget 的 `dark_mode` 保留字段（theme-gate F-derive 哨兵：无显式
+    /// 选择时 reading_page 由该字段派生 theme="dark"）。未声明 dark_mode
+    /// 的 widget 不得被增字段；显式优先语义由页面自身 theme_explicit
+    /// 派生逻辑裁决，运行时只喂派生输入。
+    #[test]
+    fn f2_navigation_seeds_host_policy_dark_mode() {
+        use auto_lang_core::vm::engine::CpuSliceBudget;
+        use auto_ui_compiler::style::theme;
+        let widget = make_test_widget("reading_page", vec![]);
+        let bridge = VmBridge::new(&widget).expect("bridge");
+
+        let page_props = |dark: bool| {
+            vec![
+                ("dark_mode".to_string(), Value::Bool(dark)),
+                ("theme".to_string(), Value::str("light")),
+                ("theme_explicit".to_string(), Value::Bool(false)),
+            ]
+        };
+        let page_fields: Vec<String> = vec![
+            "dark_mode".to_string(),
+            "theme".to_string(),
+            "theme_explicit".to_string(),
+        ];
+        let empty_names = std::collections::HashSet::new();
+
+        // 首次导航：宿主策略=light → 页面播种 false。
+        theme::set_dark_mode(false);
+        let identity1 = "reading_page@/book/abc/chapter/1";
+        let page1 = bridge.ensure_child_instance(
+            "reading_page",
+            identity1,
+            bridge.state_obj_id,
+            &page_fields,
+            &empty_names,
+            &page_props(false).into_iter().collect(),
+        );
+        assert_eq!(
+            bridge.read_child_state(page1, "dark_mode").unwrap(),
+            Value::Bool(false),
+            "宿主 light → 页面 dark_mode=false"
+        );
+
+        // 宿主策略=dark → 新页面（导航）播种 true（009 theme-gate
+        // F-derive 哨兵：reading_page theme=light + theme_explicit=false
+        // 时由 .dark_mode 派生 theme="dark"）。
+        theme::set_dark_mode(true);
+        let identity2 = "reading_page@/book/abc/chapter/2";
+        let page2 = bridge.ensure_child_instance(
+            "reading_page",
+            identity2,
+            bridge.state_obj_id,
+            &page_fields,
+            &empty_names,
+            &page_props(false).into_iter().collect(),
+        );
+        bridge.register_init_demand(
+            "reading_page",
+            identity2,
+            page2,
+            page_props(false),
+        );
+        bridge.dispatch_pending_inits(CpuSliceBudget::d2_default());
+        assert_eq!(
+            bridge.read_child_state(page2, "dark_mode").unwrap(),
+            Value::Bool(true),
+            "宿主 dark_mode 必须在导航播种到页面保留字段（F-derive 哨兵）"
+        );
+
+        // 宿主策略翻转 → 再导航新页面播种回 false。
+        theme::set_dark_mode(false);
+        let identity3 = "reading_page@/book/abc/chapter/3";
+        let page3 = bridge.ensure_child_instance(
+            "reading_page",
+            identity3,
+            bridge.state_obj_id,
+            &page_fields,
+            &empty_names,
+            &page_props(false).into_iter().collect(),
+        );
+        bridge.register_init_demand(
+            "reading_page",
+            identity3,
+            page3,
+            page_props(false),
+        );
+        bridge.dispatch_pending_inits(CpuSliceBudget::d2_default());
+        assert_eq!(
+            bridge.read_child_state(page3, "dark_mode").unwrap(),
+            Value::Bool(false),
+            "宿主翻转后新页面播种回 false"
+        );
+
+        // 负控：未声明 dark_mode 的 widget 不增字段。
+        theme::set_dark_mode(true);
+        let plain_fields: Vec<String> = vec!["theme".to_string()];
+        let plain = bridge.ensure_child_instance(
+            "plain_page",
+            "plain_page@/x",
+            bridge.state_obj_id,
+            &plain_fields,
+            &empty_names,
+            &HashMap::from([("theme".to_string(), Value::str("light"))]),
+        );
+        bridge.register_init_demand(
+            "plain_page",
+            "plain_page@/x",
+            plain,
+            Vec::new(),
+        );
+        bridge.dispatch_pending_inits(CpuSliceBudget::d2_default());
+        assert!(
+            bridge.read_child_state(plain, "dark_mode").is_err(),
+            "未声明 dark_mode 的页面不得被增字段"
+        );
     }
 }
 
