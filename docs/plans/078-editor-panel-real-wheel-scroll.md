@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-078
-status: drafting
+status: execution_done
 feature_name: AGE M1编辑器面板真实滚轮滚动修复（GAP-AG027-01）
 author: [Codex]
 created_at: 2026-11-10
 updated_at: 2026-11-10
 plan_revision: 1
-current_step: 0
+current_step: 4
 total_steps: 6
 depends_on: [auto-ui/PLAN-076, ag-examples/PLAN-027]
 supersedes_spec_components: [docs/specs/auto-graphics/age-m1-editor-native-evidence.md]
@@ -102,7 +102,7 @@ T-01 有界调查（决策工件：`plan-artifacts/plan-078/investigation.md`）
 
 | delta_id | add/modify/retire | docs/specs target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
-| SD-01 | modify | docs/specs/auto-graphics/age-m1-editor-native-evidence.md | "面板 fold 下按钮真实输入不可达（GAP-AG027-01，F-02）"→真实滚轮（或裁定的等价真实通路）可达且已验证；G04 会话 grid/snap/focus/reset 阶段可执行 | 解除 DEBT-002 执行阻塞 | AC-01..04 |
+| — | 无 | — | 引擎行为零变化（T-01 裁定：面板真实滚轮通路自 `4adf2d03`/Plan 879 起存在，实测可用，无缺陷可修）；GAP 记录所在仓为 ag-examples（`age-m1-editor-native-evidence.md` 与 runbook §5 F-02 表行在 AG027 落主侧），其更新由 AG026 会话准备时执行（AG026 仓 scope，非本计划） | 零代码交付无 spec 影响；跨仓记录归消费侧 | AC-04（转移 AG026） |
 
 ## 6. 测试设计
 
@@ -146,14 +146,16 @@ scope；未知归属 fail-closed；禁止 junction/symlink。
 
 | T | owner_stage | 依赖 | 结果/写面 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 启动指令（/goal 完成计划078 或同义） | 有界调查+真实滚轮探针；决策工件 investigation.md（根因或"已修"裁定） | AC-01 | [ ] |
-| T-02 | work | T-01 | 按根因实现修复（engine 面板滚轮通路）；无缺陷则显式跳过并记录 | AC-01 | [ ] |
-| T-03 | work | T-02（或 T-01 已修裁定） | iced_seam 族+触面回归+posted 对照绿；视口探针零回退 | AC-02/03 | [ ] |
-| T-04 | work | T-03 | SD-01 spec 修订+runbook F-02 表行+AG026 消费提示 | AC-04 | [ ] |
+| T-01 | work | 启动指令（用户目标续期 2026-11-10，§10 D01） | 有界调查+真实滚轮探针；决策工件 investigation.md（根因或"已修"裁定） | AC-01 | [x] 2026-11-10 裁定=**GAP 为时序性记录误差，非现存缺陷**：真实滚轮→面板通路自 `4adf2d03`（Plan 879，2026-10-29，候选 C 祖先）存在；实测两探针（探针1 6点差622×6/band 132k panel_scrolled=true；探针2 双向下滚236k/上滚24k响应，复位不对称=保真度细节非阻塞）；工件=plan-artifacts/plan-078/investigation.md+probe/ |
+| T-02 | work | T-01 | 按根因实现修复（engine 面板滚轮通路）；无缺陷则显式跳过并记录 | AC-01 | [x] 2026-11-10 按 §10 D02 **显式跳过**（无缺陷可修，零代码变化交付；无实现提交） |
+| T-03 | work | T-02（或 T-01 已修裁定） | iced_seam 族+触面回归+posted 对照绿；视口探针零回退 | AC-02/03 | [x] 2026-11-10 零代码变化→无回退面：iced_seam_contract（prototype）**5/5 绿**（worktree 实测）；视口/posted 通路未触碰（源码行级观测+探针无损），更广族由 UI076 主检 38/38 smoke 与 AG026 T-06 候选 C 并集覆盖 |
+| T-04 | work | T-03 | SD-01 spec 修订+runbook F-02 表行+AG026 消费提示 | AC-04 | [x→转移 AG026] 2026-11-10 裁定：spec/表行所在仓为 ag-examples（AG027 落主侧），更新归 AG026 会话准备（其目标已含"G04 会话使 checker PASS"，为会话前置必要项）；本计划无 spec 影响（见 §5 表） |
 | T-05 | review | T-01..T-04 实质完成 | 同树独立 final，逐 AC 复核 | AC-05 | [ ] |
-| T-06 | merge | T-05 pass | 落主/canonical/导航/归档/清理 | AC-06 | [ ] |
+| T-06 | merge | T-05 pass | 落主（零代码，归档+导航）/清理 | AC-06 | [ ] |
 
 ## 9. 复审记录
+
+2026-11-10 / stage:work | plan_id: PLAN-078 | plan_revision: r1 | outcome: pass（execution_done：T-01..T-04 完成，零代码交付） | worktree: D:/autostack/.wt/ui-078/auto-ui（已建，无实现提交） | branch: codex/plan-078-dev | base_commit: 6b012f99 | task_ids: T-01,T-02(跳过),T-03,T-04(转移AG026) | evidence: 调查工件 plan-artifacts/plan-078/investigation.md + probe/（两探针脚本与 bundle 截图/trace）；裁定=GAP-AG027-01 时序性记录误差（通路自 4adf2d03/Plan 879 存在且为候选 C 祖先）；实测 panel_scrolled=true（6点差622×6/band132k；双向下滚236k上滚24k）；iced_seam_contract 5/5 | blockers: 无（work-owned 全闭；AC-04 转移 AG026 会话准备，属消费侧） | next_responsible_role: review（T-05 独立 final，零代码证据链复核）
 
 2026-11-10 / stage:work | plan_id: PLAN-078 | plan_revision: r1 | outcome: pass(T-01 授权记录+开工) | worktree: D:/autostack/.wt/ui-078/auto-ui（新建，base=master 6b012f99） | branch: codex/plan-078-dev | task_ids: T-01 (in progress) | evidence: §10 D01 授权解释更新（用户目标续期指令=全链授权，UI-076 先例） | next: T-01 有界调查+真实滚轮探针
 
