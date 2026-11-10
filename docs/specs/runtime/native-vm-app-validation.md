@@ -109,8 +109,21 @@ VM 默认父窗绑定保持，生成 Rust 沿既有 unparented 门面语义；�
 owner enabled；provider 单测与源码生成文本断言不能替代该层证据。
 Reader 的真实按钮→picker→导入与持久化完整验收归 READER-009。
 
-## MCP synthetic text input contract (PLAN-069 SD-03)
+## 页面保留字段的宿主策略播种（PLAN-079 SD-02，D3 定谳）
 
+- 页面创建/导航路径上，新页面 widget 的 `dark_mode` 保留字段按宿主策略
+  重播种——与壳根同字段同源：均读 `style::theme::dark_mode()`（desktop
+  宿主下由 AUTOOS_DESKTOP_CONFIG 派生链汇入该全局；`allocate_app` 对顶层
+  App 的播种语义不变）。播种发生在 Init demand 派发时（Missing/正常路径
+  均覆盖），值变才 `bump_path`（PLAN-045 T-02 纪律）。
+- 未声明 `dark_mode` 的 widget 不被增字段（负控：无该 model 变量的页面
+  播种为 no-op）。
+- 显式选择的优先语义不变：`theme_explicit` 由页面自身派生逻辑裁决
+  （059 follow tier），运行时只喂派生输入，不写主题选择本身。
+- 永久反例：`ui::vm_bridge::tests::f2_navigation_seeds_host_policy_dark_mode`
+  （宿主 light→dark→light 三次导航播种断言 + 未声明字段负控）。
+
+## MCP synthetic text input contract (PLAN-069 SD-03)
 - `autoui_type` performs exactly ONE input dispatch carrying the whole typed
   text. The typed value replaces the bound field (binding writeback precedes
   the handler); it must not be delivered as a clear dispatch followed by a

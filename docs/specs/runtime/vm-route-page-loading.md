@@ -107,3 +107,23 @@ consumer Plan and is not replaced by these component-level checks.
   reaches the routed page instance; the Back chain builds the parameterised
   route and mounts the detail page; an identity-carrying control is unchanged.
   Pre-fix red proof: all four fail, Back produces exactly `/book/`.
+
+## Picker 对话框生成保证（PLAN-079 SD-03，D2 定谳）
+
+- 页面 handler 的 `dialog_open_files`/`dialog_open`（`pickLocalFiles().await`
+  形态）在 parked 后必须可靠生成 OS 对话框：**parked 段的存活是生成前提**
+  ——该段是 `rfd::FileDialog::pick_files` 的唯一执行载体。任何路径（实例
+  卸载 teardown-cancel、代际 supersede）取消 parked 段都会同时丢弃尚未
+  发起的对话框请求（NO DIALOG 形态：45s 无 #32770，009 run87/88 实证）。
+- 取消语义按 owner 过滤（见 component-and-store-instances.md §7 SD-01）后，
+  同 fn_name 的活实例 parked 段不再被错杀——`PickFiles` future 存活即
+  对话框生成链不被打断。
+- 生成链插桩（诊断契约）：`AUTO_DIALOG_DIAG=1` 时输出 `[DLG-DIAG]` 时间戳
+  行——park 注册（fn/owner/wait）、取消（fn/owner/remaining）、实例释放
+  （identity/owner/pending）、host 对话框进入/退出（filter/thread/时刻）。
+  消费方矩阵以此定位残余丢失点（若同实例自身在等待中被释放，`release`
+  行指认触发者）。
+- 真机验收归消费方（READER-009）：换 pin 后 picker 段 3 连全量矩阵无
+  NO DIALOG（AC-02）；组件级 `f2_teardown_cancels_only_owner_parked_segments`
+  与 `f2_multi_instance_random_teardown_keeps_live_segments` 为段存活
+  不变量的永久反例。

@@ -132,11 +132,24 @@
 - 实例卸载在字段引用释放前取消以其原始 receiver 挂起的任务（含等待凭据、
   栈份额与 busy 镜像），移除该 receiver 的排队写事件；相同文本 key 重挂后
   使用新堆 id，旧请求不能导航根或改变新实例。已完成的前缀副作用不回滚。
+- **取消的属主维度（PLAN-079 SD-01 增量，D1 定谳）**：parked 段取消按
+  `(fn_name, owner_state_id)` **二元匹配**——`owner_state_id` 为派发时
+  receiver 堆 id（7d3a73aa 起 ParkedTask 自有）。实例卸载只取消属主为
+  本实例的段；同 fn_name 的其它实例段原样存活（跨实例同名 handler 是
+  常态——每张书卡同 fn_name）。取消按 fn_name 全局首匹配的旧语义已废：
+  它会错杀活实例的段，受害者为最后活段时 VM 误判"全部结束"→ 会话无
+  host 退出请求而自返，或与 `rc_release_task_stack` 清账竞争静默消失
+  （七臂 B/C 自返 + run81/86 静默形态根因）。
 - 续体成功完成后统一处理路由参数、返回请求和视图 memo 失效；失败后已有
   可见状态也失效重建。状态已写入不等于完成可见投影。
 - 永久入口 `tests/plan068_routed_continuations.rs` 使用真实延迟 HTTP、实际 CPU
   让出、路由 child 的实例态和 rendered View 作 oracle；包括双同型实例共享
   Store、跨 App 隔离、卸载/重挂迟到控制。原 `(widget, handler)` 在途重入限制不变。
+- PLAN-079 D1 永久反例：`ui::vm_bridge::tests::f2_teardown_cancels_only_owner_
+  parked_segments`（两实例同名 handler，A 卸载 → B 段存活 + 无"全部结束"
+  误判）与 `f2_multi_instance_random_teardown_keeps_live_segments`（≥8 实例
+  随机卸载 N 轮：活段守恒 + 受害者挂载 stake 恰释放一次 + 根态 RC 不被
+  teardown 触碰）。
 
 - Send/MCP 消息先按 U+0001 分离件类型与不透明实例地址，再仅在类型段解释
   `@seq`；实例地址内的 `@`、路由斜杠和 key 数据必须原样保留。显式 instance
