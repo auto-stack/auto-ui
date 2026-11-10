@@ -2623,6 +2623,16 @@ impl VmBridge {
             .filter(|p| p.owner_state_id == rec.state_obj_id)
             .map(|p| p.fn_name.clone())
             .collect();
+        // PLAN-079 T-04: 插桩点③——实例卸载触发的 teardown-cancel 名单。
+        if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+            eprintln!(
+                "[DLG-DIAG] release identity={} owner={} pending={:?} t={}ms",
+                identity,
+                rec.state_obj_id,
+                pending,
+                crate::ui::dynamic::sched_diag_t0().elapsed().as_millis(),
+            );
+        }
         for name in pending {
             self.cancel_parked_by_fn(&name, rec.state_obj_id);
         }
@@ -2960,6 +2970,16 @@ impl VmBridge {
             "[VM-PARKED] {} parked (event {}, wait {:?}) — UI stays interactive",
             seg.fn_name, event_name, wait
         );
+        // PLAN-079 T-04: picker 生成链插桩点①——park 注册（owner/凭据/时刻）。
+        if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+            eprintln!(
+                "[DLG-DIAG] parked fn={} owner={} wait={:?} t={}ms",
+                seg.fn_name,
+                owner_state_id,
+                wait,
+                crate::ui::dynamic::sched_diag_t0().elapsed().as_millis(),
+            );
+        }
         if std::env::var_os("AUTO_DEBUG_G9").is_some() {
             let nv = task.ram.read_nv(0);
             eprintln!(
@@ -3611,6 +3631,17 @@ impl VmBridge {
             return false;
         };
         let mut p = self.parked_tasks.borrow_mut().remove(idx);
+        // PLAN-079 T-04: 插桩点②——取消命中（owner/剩余段数/时刻）。消费方
+        // 矩阵重跑时与①③④对齐即定位 picker 丢失点。
+        if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+            eprintln!(
+                "[DLG-DIAG] cancel fn={} owner={} remaining={} t={}ms",
+                fn_name,
+                owner_state_id,
+                self.parked_tasks.borrow().len(),
+                crate::ui::dynamic::sched_diag_t0().elapsed().as_millis(),
+            );
+        }
         match &p.wait {
             ParkedWait::HttpRequest(req_id) => {
                 auto_lang_core::vm::ffi::stdlib::drop_async_result(*req_id);

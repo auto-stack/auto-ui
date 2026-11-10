@@ -173,7 +173,16 @@ fn attach(dialog: rfd::FileDialog) -> rfd::FileDialog {
 
 /// 单一 OS open 实现（策略仅父窗一项）：filter 解析 → 非空加 filter →
 /// 按策略锚定父窗 → pick_file → `to_string_lossy`（取消/不可用 = ""）。
+/// PLAN-079 T-04: 插桩点④——host 对话框生成入口（线程/时刻）。
 fn os_open(attach_parent: bool, filter: &str) -> String {
+    if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+        eprintln!(
+            "[DLG-DIAG] host open enter filter={} thread={:?} t={}ms",
+            filter,
+            std::thread::current().id(),
+            crate::ui::dynamic::sched_diag_t0().elapsed().as_millis(),
+        );
+    }
     let exts = filter_exts(filter);
     let mut dialog = rfd::FileDialog::new();
     if !exts.is_empty() {
@@ -182,14 +191,30 @@ fn os_open(attach_parent: bool, filter: &str) -> String {
     if attach_parent {
         dialog = attach(dialog);
     }
-    dialog
+    let out: String = dialog
         .pick_file()
         .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+        eprintln!(
+            "[DLG-DIAG] host open exit len={} t={}ms",
+            out.len(),
+            crate::ui::dynamic::sched_diag_t0().elapsed().as_millis(),
+        );
+    }
+    out
 }
 
 /// Multi-select shares the same filter and parent policy as single-select.
 fn os_open_files(attach_parent: bool, filter: &str) -> Vec<String> {
+    if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+        eprintln!(
+            "[DLG-DIAG] host open_files enter filter={} thread={:?} t={}ms",
+            filter,
+            std::thread::current().id(),
+            crate::ui::dynamic::sched_diag_t0().elapsed().as_millis(),
+        );
+    }
     let exts = filter_exts(filter);
     let mut dialog = rfd::FileDialog::new();
     if !exts.is_empty() {
@@ -198,12 +223,20 @@ fn os_open_files(attach_parent: bool, filter: &str) -> Vec<String> {
     if attach_parent {
         dialog = attach(dialog);
     }
-    dialog
+    let out: Vec<String> = dialog
         .pick_files()
         .unwrap_or_default()
         .into_iter()
         .map(|p| p.to_string_lossy().into_owned())
-        .collect()
+        .collect();
+    if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+        eprintln!(
+            "[DLG-DIAG] host open_files exit n={} t={}ms",
+            out.len(),
+            crate::ui::dynamic::sched_diag_t0().elapsed().as_millis(),
+        );
+    }
+    out
 }
 
 /// 单一 OS save 实现：default_name 非空才 set_file_name → 按策略锚定
