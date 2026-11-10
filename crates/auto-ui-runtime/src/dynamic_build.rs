@@ -2238,11 +2238,32 @@ fn run_file_dynamic_ui_inner(
 /// 这些形态在本环解析失败是预期路由，不是静默死面，不得告警。
 /// PLAN-814 T-04：唯一消费方为本管线，随 lib.rs 迁入。
 fn is_non_fs_module_use(u: &auto_lang_core::use_scanner::UseStatement) -> bool {
-    u.is_python_import || u.module.starts_with("auto.") || u.module.starts_with(".web")
+    // OS068 R-02/041：widget 级 `use { package: official from "./components" }`
+    // 是组件包块语法（Vue codegen ComponentSource::Package 消费）；VM 轨
+    // 组件由运行时注册表提供，非文件系统模块。此前落 P-15 误报
+    // （module=`{ package`），与 auto.*/.web 同列为非文件系统形态静默跳过。
+    u.is_python_import
+        || u.module.starts_with("auto.")
+        || u.module.starts_with(".web")
+        || u.module.starts_with("{ package")
 }
 
 #[cfg(test)]
 mod plan841_domain_validation_tests {
+    /// OS068 R-02/041 永久反例：`{ package ... }` 块 use 必须按非文件系统
+    /// 形态静默跳过（不落 P-15 误报），与 auto.*/.web 同列。
+    #[test]
+    fn os068_package_block_use_is_non_fs() {
+        use auto_lang_core::use_scanner::UseStatement;
+        let pkg = UseStatement::new("{ package");
+        assert!(
+            super::is_non_fs_module_use(&pkg),
+            "package 块 use 必须是非文件系统形态"
+        );
+        let fs = UseStatement::new("stylekit.styles");
+        assert!(!super::is_non_fs_module_use(&fs), "文件系统模块保持可解析");
+    }
+
     #[test]
     fn dynamic_build_rejects_duplicate_widgets_and_accepts_valid_control() {
         let good = "widget App { view { text \"ok\" {} } }";
