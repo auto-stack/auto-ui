@@ -30,3 +30,22 @@
 - **关闭条件**：owner 仓立项（候选 003）并在 mcp_server 落地批量动作 +
   驱动侧（desktop_mcp/verify_basic 族）改用后，PAINT 类验收的点阵绘制
   从 O(N) 请求降到 O(1)。
+
+## DEBT-002 ag-examples AG026/DEBT-001 关闭窗口（M1 N4 重判＋接收器重跑）
+
+- **状态**：未立项（跨仓消费提示，UI076 落地解锁；改动面在 ag-examples，
+  不在本仓合同内）。来源：UI076（076-m1-native-scale-trail-and-n4-semantics）
+  T-07 消费提示，2026-11-10。
+- **动机**：UI076 已落主（8b4ff336）：F-SCALE-02 修复（`observe_window`
+  合并语义＋f64 真实读数跟踪——单次切档会话 `tier.scales_observed` 保留
+  [起始档, 末档]、`scale_factor_changed` 记真实前后对，validator 单档误拒
+  消失）；F-N4-01 语义裁定落地（方案 b：N4 检查表收窄为"空白区按下→离窗
+  →窗外释放 ⇒ 无按钮激活、无区域点击"；onclick 区域按下即派发为 canonical，
+  SD-01/SD-02 已沉淀入 `m1-native-evidence-support` 与
+  `node-mixed-regions-lifecycle` 两规范）。
+- **关闭条件**：ag-examples/PLAN-026（AG026）按本仓 8b4ff336+ 引擎
+  （1）以新 N4 检查表文本重判 N4；（2）重跑双档接收器（双档会话报告应产
+  `scales_observed=[2.0,2.5]`＋真实转换对，可 native-pass）；（3）关
+  ag-examples DEBT-001（其 session-bundle 其余证据已齐）。若 AG026 改派发
+  时机为 release-inside（方案 a）则与 canonical 冲突，需升格重验——不在
+  本提示范围。
