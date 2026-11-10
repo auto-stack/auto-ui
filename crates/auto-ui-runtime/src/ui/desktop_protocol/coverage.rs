@@ -2148,4 +2148,104 @@ mod tests {
             )
         );
     }
+
+    // ===================== PLAN-077 T-01 冻结复现 =====================
+    // 冻结源：auto-todo@0510e05 `src/front/todo_list.at:63`（`style:
+    // "list-none m-0 p-0"`）；auto-video@0922b44 `src/front/viewport.at:53`
+    // `<video>`（typed `View::Video`）。
+    // 冻结拒绝清单（PLAN-075 T-03 实测）：todo=`style:list-none`；video=
+    // `style:native-unstyled, style:stroke-1, tag:video`。两条执行形态：
+    // remote 臂（rq/desktop，HeadlessFrameSource，无覆盖门）与非 remote
+    // Commands 臂（RqProjector.ensure_covered 覆盖门）。红态基线先行。
+    /// 红态：Todo 的 List + ListNone → native 覆盖门拒绝 `style:list-none`
+    ///（编译轨 typed 扫描与 075 实测清单一致）。
+    #[test]
+    fn p077_todo_list_none_gate_red() {
+        let coverage = Coverage::native_queue_set();
+        let style = crate::ui::style::Style {
+            classes: vec![
+                crate::ui::style::StyleClass::ListNone,
+                crate::ui::style::StyleClass::Margin(crate::ui::style::SizeValue::Fixed(0)),
+                crate::ui::style::StyleClass::Padding(crate::ui::style::SizeValue::Fixed(0)),
+            ],
+            ..Default::default()
+        };
+        let view = crate::ui::view::View::<()>::List {
+            items: vec![],
+            spacing: 0,
+            style: Some(style),
+        };
+        let scan = scan_native_view(&view);
+        match judge(&scan, &coverage) {
+            Verdict::Covered => panic!("T-01 红态：list-none 当前应被覆盖门拒绝"),
+            Verdict::NotCovered(missing) => {
+                assert!(
+                    missing.iter().any(|m| m == "style:list-none"),
+                    "缺项应含 style:list-none（冻结清单）: {missing:?}"
+                );
+            }
+        }
+    }
+
+    /// 红态：Video 根 + stroke-1 + 未映射类（native-unstyled）→ 覆盖门
+    /// 拒绝（075 T-03 冻结清单；queue 投影器无 Video 臂——native_projector
+    /// 占位盒留痕，防静默错绘）。
+    #[test]
+    fn p077_video_tag_styles_gate_red() {
+        let coverage = Coverage::native_queue_set();
+        let style = crate::ui::style::Style {
+            classes: vec![
+                crate::ui::style::StyleClass::StrokeWidth(1.0),
+                // ObjectFit 未映射 → "native-unstyled"（Video 编译轨实测
+                // 同类——typed 扫描落入 fallback）。
+                crate::ui::style::StyleClass::ObjectFit(crate::ui::style::ObjectFit::Contain),
+            ],
+            ..Default::default()
+        };
+        let view = crate::ui::view::View::<()>::Video {
+            src: "file:///media/sample.mp4".into(),
+            paused: false,
+            position: None,
+            volume: 80,
+            muted: false,
+            rate: 1.0,
+            label: "sample.mp4".into(),
+            on_time_update: None,
+            on_loaded_metadata: None,
+            on_play_state: None,
+            on_ended: None,
+            on_media_error: None,
+            media_key: None,
+            style: Some(style),
+        };
+        let scan = scan_native_view(&view);
+        match judge(&scan, &coverage) {
+            Verdict::Covered => panic!("T-01 红态：video 当前应被覆盖门拒绝"),
+            Verdict::NotCovered(missing) => {
+                for want in ["tag:video", "style:stroke-1", "style:native-unstyled"] {
+                    assert!(
+                        missing.iter().any(|m| m == want),
+                        "缺项应含 {want}: {missing:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// 对照：remote 形态（rq/desktop）不设覆盖门（PLAN-683）——产品公开
+    /// remote 选路即完整渲染（iced 全集 + mpv widget），覆盖门不适用。
+    #[test]
+    fn p077_remote_mode_skips_coverage_gate() {
+        assert_eq!(RenderMode::resolve(Some("remote"), None), RenderMode::Remote);
+        // Remote 形态 = Commands 帧载荷 + 无降级观测行（effective_frame_mode
+        // 恒 (Commands, None)）；覆盖门由 client_entry 只在**非 remote**
+        // Commands 臂调用 ensure_covered（run_dynamic_client:196-202）——
+        // remote 臂直用 HeadlessFrameSource，结构保证无门。
+        let component =
+            crate::build_dynamic_component("widget v { view { text \"x\" } }", None).expect("build");
+        assert_eq!(
+            effective_frame_mode(RenderMode::Remote, &component),
+            (crate::ui::desktop_protocol::message::FrameMode::Commands, None)
+        );
+    }
 }
