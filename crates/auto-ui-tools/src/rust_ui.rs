@@ -5120,8 +5120,18 @@ pub const DELIVERY_CRATES: [&str; 28] = [
 /// PLAN-901：随包交付的 producer 仓根级树（源=语言仓相对路径 → 交付根
 /// 同形路径；auto-test-case 的 ../../vendor/autodown-test-parser 依赖在
 /// 交付根 crates/auto-test-case 处自然解析到本拷贝，零 path 改写）。
-const DELIVERY_VENDOR_TREES: [(&str, &str); 1] =
-    [("vendor/autodown-test-parser", "vendor/autodown-test-parser")];
+const DELIVERY_VENDOR_TREES: [(&str, &str); 2] = [
+    ("vendor/autodown-test-parser", "vendor/autodown-test-parser"),
+    // PLAN-1003 T-03（关闭 D-942-P1，受限修复）：auto-lang-core 自 PLAN-944
+    // 起非 optional 依赖 ace-semantics-contract（叶子 crate，仅 registry 依赖、
+    // 无 workspace 继承）；交付闭包缺它使原根/移根 `cargo build --locked`
+    // 101 红（预存生产回归，2026-11-06 立项）。同形镜像随包——
+    // crates/auto-lang-core 的 `../../experimental/...` 相对依赖零改写。
+    (
+        "experimental/ace/crates/semantics-contract",
+        "experimental/ace/crates/semantics-contract",
+    ),
+];
 
 /// 随包发行的本地 patch（相对 crates/patches/）。
 pub const DELIVERY_PATCHES: [&str; 1] = ["iced_widget"];
@@ -5621,6 +5631,7 @@ fn generate_delivery_root_manifest(
     producer_root: &Path,
     app_member: &str,
     receipt: Option<&auto_api_gen::source_owner::InstalledSdkReceipt>,
+    debug_policy: auto_api_gen::generated_build::DebugPolicy,
 ) -> AutoResult<String> {
     let root_manifest = fs::read_to_string(producer_root.join("Cargo.toml"))
         .map_err(|e| format!("delivery: producer 根 manifest 不可读: {e}"))?;
@@ -5628,7 +5639,14 @@ fn generate_delivery_root_manifest(
         receipt.verify_bytes("Cargo.toml", root_manifest.as_bytes())?;
     }
     let ws_deps = delivery_extract_toml_section(&root_manifest, "[workspace.dependencies]")?;
-    let profile_dev = delivery_extract_toml_section(&root_manifest, "[profile.dev]")?;
+    // PLAN-1003：交付根消费生成核心单一受管调试策略定义（默认C），不再
+    // 抄取 producer 工具根自身的 `[profile.dev]`——旧抄取只带出根表、
+    // 丢 `[profile.dev.package."*"]`，registry 依赖仍留 line-tables。此处
+    // 成员=app+受管闭包 vendored crates（line-tables-only），非成员=registry
+    // 依赖（debug=false）——按实际成员集生效；块随包静态携带（可搬动，
+    // 消费侧不读环境）。`full` 时仅 marker 注释（纯 cargo 默认 dev 全量）。
+    let profile_dev =
+        auto_api_gen::generated_build::managed_profile_toml(debug_policy).trim().to_string();
     // PLAN-901 r2/§5.5：交付闭包含 web owner crate（PLAN-906 后仅
     // auto-web 以 version/edition/license.workspace 继承；合同包已迁语言
     // 仓、显式字段）——组内 web 根 [workspace.package] 表字节副本随根发行；
@@ -6693,6 +6711,10 @@ fn generate_rust_ui_delivery_inner(
         "Generating Rust UI delivery bundle (PLAN-792 explicit delivery mode)".bright_cyan()
     );
 
+    // PLAN-1003：受管调试策略在任何 staging 写入前解析——未知/冲突策略为
+    // 具名失败，既往交付原样保留；有效策略随交付根静态携带并入清单。
+    let debug_policy = auto_api_gen::generated_build::resolve_debug_policy()?;
+
     let producer_root = delivery_producer_root()?;
     // Freeze the installation receipt used for preflight and the actual staged
     // bytes; the source can change between these phases.
@@ -6961,8 +6983,12 @@ fn generate_rust_ui_delivery_inner(
     // 根 manifest（消费根 patch）+ pin 集
     let app_package = to_snake_case(&compiled.project_name);
     // default-members 用 member 路径 "app"（固定应用位；包名是 ui_minimal 等）。
-    let root_manifest =
-        generate_delivery_root_manifest(&producer_root, "app", installed_receipt.as_ref())?;
+    let root_manifest = generate_delivery_root_manifest(
+        &producer_root,
+        "app",
+        installed_receipt.as_ref(),
+        debug_policy.policy,
+    )?;
     let root_manifest_path = delivery_root.join("Cargo.toml");
     fs::write(&root_manifest_path, &root_manifest)
         .map_err(|e| format!("delivery: 写交付根 manifest 失败: {e}"))?;
@@ -7097,6 +7123,11 @@ fn generate_rust_ui_delivery_inner(
             "entry": "verify.py",
             "resources_algo": "sha-256",
             "note": "python verify.py（交付根内）——缺资源/等长篡改/坏 hash/未登记资源判红",
+        },
+        // PLAN-1003：交付根携带的有效受管调试策略（根 manifest 内静态块）。
+        "debug_policy": {
+            "label": debug_policy.label,
+            "source": debug_policy.source,
         },
         "crates": crate_entries,
         "root_inputs": root_input_entries,
@@ -7744,6 +7775,8 @@ fn write_front_receipt_with_inputs(
         bin_name: None,
         cargo_bin: None,
         release: false,
+        // PLAN-1003：构建时有效受管调试策略入收据——策略切换不复用旧发布件。
+        debug_policy: Some(managed.context.debug_policy.clone()),
     };
     if let Some((exe, bin)) = artifact {
         receipt.exe = Some(exe.to_string_lossy().to_string());
@@ -7804,6 +7837,8 @@ fn front_needs_regeneration(
     }
     if receipt.generator != front_generator_identity(&managed.context)
         || receipt.context_id != managed.context.context_id
+        // PLAN-1003：策略身份——legacy 无字段收据或异策略收据永不 fresh。
+        || !receipt.debug_policy_matches(&managed.context)
     {
         return Ok((false, true));
     }
@@ -8624,6 +8659,7 @@ mod tests {
             context_id: "fixture956".into(), managed_rustflags: None,
             user_flags_override: None, toolchain: "fixture".into(),
             producer_origin: "test".into(),
+            debug_policy: "c".into(), debug_policy_source: "test".into(),
         };
         let executable = build_api_executable(&context, &member, &member).unwrap();
         assert!(executable.starts_with(member.join("bin")));
@@ -10571,7 +10607,9 @@ pub fn create_work(title str) Work {
 
     /// PLAN-792：交付根 manifest 装配——[patch.crates-io] 在消费根（不写
     /// 在依赖包内）、default-members 只含 app、[workspace.dependencies] 表
-    /// 为 producer 根表字节副本。
+    /// 为 producer 根表字节副本。PLAN-1003：profile 段改由生成核心单一
+    /// 受管调试策略定义供给（C 两表全带出——旧抄取丢 package."*" 覆盖），
+    /// 不再抄取 producer 工具根 `[profile.dev]`。
     #[test]
     fn delivery_root_manifest_shape() {
         let dir = tempfile::tempdir().unwrap();
@@ -10584,7 +10622,13 @@ pub fn create_work(title str) Work {
              [patch.crates-io]\niced_widget = { path = \"crates/patches/iced_widget\" }\n",
         )
         .unwrap();
-        let manifest = generate_delivery_root_manifest(dir.path(), "app", None).unwrap();
+        let manifest = generate_delivery_root_manifest(
+            dir.path(),
+            "app",
+            None,
+            auto_api_gen::generated_build::DebugPolicy::ManagedC,
+        )
+        .unwrap();
         assert!(
             manifest.contains(
                 "[patch.crates-io]\niced_widget = { path = \"crates/patches/iced_widget\" }"
@@ -10601,8 +10645,23 @@ pub fn create_work(title str) Work {
         );
         assert!(
             manifest.contains("[profile.dev]\ndebug = \"line-tables-only\""),
-            "profile 副本随包"
+            "PLAN-1003 受管C：成员行号级"
         );
+        assert!(
+            manifest.contains("[profile.dev.package.\"*\"]\ndebug = false"),
+            "PLAN-1003 受管C：非成员覆盖随包（旧抄取丢此段）"
+        );
+        assert!(!manifest.contains("[profile.release"), "release 永不写");
+        // full：仅 marker，不写任何 [profile.dev] 表（完整调试恢复）。
+        let full = generate_delivery_root_manifest(
+            dir.path(),
+            "app",
+            None,
+            auto_api_gen::generated_build::DebugPolicy::Full,
+        )
+        .unwrap();
+        assert!(!full.contains("[profile.dev"), "full 无受管调试段：{full}");
+        assert!(full.contains("AUTO_GENERATED_DEBUG_POLICY=full"), "{full}");
         assert!(
             manifest.contains("\"crates/auto-lang\""),
             "受管闭包成员在列"
@@ -10611,7 +10670,13 @@ pub fn create_work(title str) Work {
         let bare = dir.path().join("bare");
         std::fs::create_dir_all(&bare).unwrap();
         std::fs::write(bare.join("Cargo.toml"), "[workspace]\nmembers = []\n").unwrap();
-        assert!(generate_delivery_root_manifest(&bare, "app", None).is_err());
+        assert!(generate_delivery_root_manifest(
+            &bare,
+            "app",
+            None,
+            auto_api_gen::generated_build::DebugPolicy::ManagedC
+        )
+        .is_err());
     }
 
     /// PLAN-792：投影修剪——恒等/幂等合同。PLAN-901（Design 52 计划B）：语言仓
