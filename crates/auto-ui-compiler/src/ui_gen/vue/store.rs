@@ -218,9 +218,10 @@ impl VueGenerator {
         // bare local call via store_facade_from (vm A1 contract, mirrors the
         // regen.sh deploy sed this replaces).
         for sibling in &store.sibling_stores {
+            let comp = super::store_composable_name(sibling);
             code.push_str(&format!(
-                "import {{ use{}Store }} from './use{}Store'\n",
-                sibling, sibling
+                "import {{ {} }} from './{}'\n",
+                comp, comp
             ));
         }
         // Imports are module declarations; only sibling instances belong in
@@ -246,10 +247,11 @@ impl VueGenerator {
         ));
         if !store.sibling_stores.is_empty() {
             for sibling in &store.sibling_stores {
+                let comp = super::store_composable_name(sibling);
                 code.push_str(&format!(
-                    "const {} = reactive(use{}Store())\n",
+                    "const {} = reactive({}())\n",
                     facade_var_for(sibling),
-                    sibling
+                    comp
                 ));
             }
         }

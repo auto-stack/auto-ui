@@ -1032,7 +1032,7 @@ widget App {
                                     }
                                     table-body {
                                         for i, r in .activeRows {
-                                            table-row (key: i) {
+                                            table-row (key: "ar-" + i) {
                                                 table-cell (text: f"${r.id}", style: "font-mono text-xs px-2 py-1 tabular-nums text-muted-foreground") {}
                                                 table-cell (text: r.col1, style: "text-xs px-2 py-1 font-medium") {}
                                                 table-cell (text: r.col2, style: "text-xs px-2 py-1") {}
@@ -1084,7 +1084,7 @@ widget App {
                                     }
                                     table-body {
                                         for i, c in .schemaColumns {
-                                            table-row (key: i) {
+                                            table-row (key: "cols-" + i) {
                                                 table-cell (text: f"${c.cid}", style: "font-mono text-xs text-muted-foreground") {}
                                                 table-cell (text: c.name, style: "font-mono font-medium text-xs") {}
                                                 table-cell {
@@ -1119,7 +1119,7 @@ widget App {
                                         }
                                         table-body {
                                             for i, idx in .schemaIndexes {
-                                                table-row (key: i) {
+                                                table-row (key: "idx-" + i) {
                                                     table-cell (text: idx.name, style: "font-mono font-medium text-xs") {}
                                                     table-cell (text: idx.cols, style: "font-mono text-xs") {}
                                                     table-cell {
@@ -1207,7 +1207,7 @@ widget App {
                                         }
                                         table-body {
                                             for i, r in .sqlResultRows {
-                                                table-row (key: i) {
+                                                table-row (key: "sql-" + i) {
                                                     table-cell (text: r.col0, style: "font-mono text-xs") {}
                                                     table-cell (text: r.col1, style: "text-xs font-medium") {}
                                                     table-cell (text: r.col2, style: "text-xs") {}

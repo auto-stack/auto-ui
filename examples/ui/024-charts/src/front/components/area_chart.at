@@ -219,7 +219,7 @@ widget AreaChart (data: List, index: str = "m", fields: List<str> = ["v"], color
                     ci = ccount - 1
                 }
                 var color = cs[ci]
-                var name = f
+                var name str = f
                 var lname = .labels
                 if lname.len() > k {
                     name = lname[k]
@@ -366,7 +366,7 @@ widget AreaChart (data: List, index: str = "m", fields: List<str> = ["v"], color
                 var body = ""
                 var k2 = 0
                 for f2 in .fields {
-                    var name2 = f2
+                    var name2 str = f2
                     var lname2 = .labels
                     if lname2.len() > k2 {
                         name2 = lname2[k2]

@@ -1707,7 +1707,7 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                                         .to_string(),
                                 );
                             }
-                            "post" if pos_args.len() == 2 => {
+                            "post" | "post_json" if pos_args.len() == 2 => {
                                 write!(out, "(await (await fetch(").ok();
                                 transpile_expr(&pos_args[0], ctx, out);
                                 write!(out, ", {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify(").ok();
@@ -1722,8 +1722,11 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                                 write!(out, ", {{ method: 'DELETE' }})).json())").ok();
                                 return;
                             }
-                            "patch" | "put" if pos_args.len() == 2 => {
-                                let verb = method.as_str().to_ascii_uppercase();
+                            "patch" | "put" | "patch_json" | "put_json" if pos_args.len() == 2 => {
+                                let verb = match method.as_str() {
+                                    "put" | "put_json" => "PUT",
+                                    _ => "PATCH",
+                                };
                                 write!(out, "(await (await fetch(").ok();
                                 transpile_expr(&pos_args[0], ctx, out);
                                 write!(out, ", {{ method: '{}', headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify(", verb).ok();
@@ -1802,9 +1805,13 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                     // Handle common method call conversions
                     match method.as_str() {
                         "to_int" | "parse_int" => {
-                            write!(out, "parseInt(").ok();
+                            // OS068 R-01/024：`fi.to_int()`（fi: float）此前
+                            // 发射 parseInt(fi) → TS2345（parseInt 形参 string）。
+                            // String() 包裹双 receiver 兼容（string 解析语义
+                            // 不变，float 截断语义一致）。
+                            write!(out, "parseInt(String(").ok();
                             transpile_receiver(object, ctx, out);
-                            write!(out, ")").ok();
+                            write!(out, "))").ok();
                             return;
                         }
                         "to_float" | "to_double" | "parse_float" => {
@@ -2531,7 +2538,7 @@ fn try_transpile_builtin_call(
             } else {
                 let js_method = match method {
                     "parse" => "parse",
-                    "stringify" => "stringify",
+                    "stringify" | "encode" => "stringify",
                     _ => return false,
                 };
                 write!(out, "JSON.{}(", js_method).ok();
@@ -3085,6 +3092,50 @@ mod tests {
         assert!(
             code.contains("JSON.stringify({ title: body.value })"),
             "from_value 实参应恒等进入 Http 发射层的单层 stringify：{code}"
+        );
+    }
+
+    /// OS068 R-01/032：`Http.post_json(url, body)`（VM native 名）此前落
+    /// ts_adapter Http 映射的空臂 → 原样发射 `Http.post_json(...)` → 生成
+    /// App.vue 无 Http 声明 → vue-tsc TS2304。永久反例：三 *_json 动词必须
+    /// 与对应裸动词同发射（fetch + JSON.stringify body），且 get_json 保持
+    /// 既有 get 映射。
+    #[test]
+    fn os068_http_json_verbs_map_to_fetch() {
+        for src in [
+            "fn post_it() { let r = Http.post_json(\"http://127.0.0.1:7072/slow\", \"q=1\") }",
+            "fn put_it() { let r = Http.put_json(\"/api/x\", \"{}\") }",
+            "fn patch_it() { let r = Http.patch_json(\"/api/x\", \"{}\") }",
+        ] {
+            let ctx = collision_context(&[]);
+            let code = collision_body(src, &ctx);
+            assert!(
+                !code.contains("Http.post_json") && !code.contains("Http.put_json")
+                    && !code.contains("Http.patch_json"),
+                "不允许残留裸 Http.*_json 引用：{code}"
+            );
+            assert!(
+                code.contains("await fetch(") && code.contains("JSON.stringify("),
+                "*_json 必须发射 await fetch + JSON.stringify：{code}"
+            );
+        }
+    }
+
+    /// OS068 R-01/029：`json.encode(v)`（VM native 名）此前落 ts_adapter
+    /// json 模块映射空臂 → 原样发射 `json.encode(...)` → TS2304；配合
+    /// `storage.set(k, json.encode(list))` 的 JSON 往返持久化，TS 侧必须
+    /// JSON.stringify 对齐 VM Json.encode 的 value→JSON 字符串语义。
+    #[test]
+    fn os068_json_encode_maps_to_stringify() {
+        let ctx = collision_context(&[]);
+        let code = collision_body(
+            "fn save_it() { storage.set(\"g.favs\", json.encode(.favs)) }",
+            &ctx,
+        );
+        assert!(
+            code.contains("localStorage.setItem('g.favs', JSON.stringify(")
+                || code.contains("localStorage.setItem(\"g.favs\", JSON.stringify("),
+            "json.encode 在 storage.set 内必须发射 JSON.stringify：{code}"
         );
     }
 

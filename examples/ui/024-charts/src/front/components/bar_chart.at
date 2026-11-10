@@ -200,7 +200,7 @@ widget BarChart (data: List, index: str = "q", fields: List<str> = ["v"], colors
                     cik = ccount - 1
                 }
                 var color = cs[cik]
-                var name = f
+                var name str = f
                 var lname = .labels
                 if lname.len() > k {
                     name = lname[k]
@@ -340,7 +340,7 @@ widget BarChart (data: List, index: str = "q", fields: List<str> = ["v"], colors
                 var body = ""
                 var k3 = 0
                 for f5 in .fields {
-                    var name2 = f5
+                    var name2 str = f5
                     var lname2 = .labels
                     if lname2.len() > k3 {
                         name2 = lname2[k3]

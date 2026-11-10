@@ -2,6 +2,9 @@
 // article + comments, tag filter, and stage-2 write operations (CRUD,
 // comments, favorite). Tag filtering is client-side.
 use back.api: list_articles, get_article, list_comments, create_article, update_article, delete_article, create_comment, delete_comment, favorite_article, unfavorite_article, get_profile, follow, unfollow
+// OS068 R-01/023：CreateArticle 引用的 `.me.token` 属 AuthStore——
+// 跨 store 状态必须显式限定（Vue 轨 store 隔离发射，裸 me 落 TS2304）。
+use auth_store: AuthStore
 
 store ArticleStore {
     model {
@@ -64,7 +67,7 @@ store ArticleStore {
         .SetTag(t str) -> { .active_tag = t }
         .ClearTag -> { .active_tag = "" }
         .CreateArticle(slug str, title str, description str, body str, tagList str) -> {
-            create_article(slug, title, description, body, tagList, "Bearer " + .me.token)
+            create_article(slug, title, description, body, tagList, "Bearer " + AuthStore.me.token)
             .articles = list_articles()
         }
         .UpdateArticle(slug str, title str, description str, body str) -> {

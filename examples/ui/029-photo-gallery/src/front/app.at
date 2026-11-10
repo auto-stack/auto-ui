@@ -439,7 +439,7 @@ widget App {
             // 十进制（PLAN-043 实机踩坑，收藏恢复全失效）。
             .fav_records = []
             try {
-                let saved = json.to_value(Storage.get("photo-gallery.favs"))
+                let saved = json.parse(storage.get("photo-gallery.favs"))
                 if saved != null {
                     .fav_records = saved
                 }
@@ -763,7 +763,7 @@ widget App {
                 }
                 .fav_records = kept
             }
-            Storage.set("photo-gallery.favs", json.from_value(.fav_records))
+            storage.set("photo-gallery.favs", json.encode(.fav_records))
 
             .ApplyFilter()
             if .mode == "view" && .cur_id == pid {
