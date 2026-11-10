@@ -5139,12 +5139,20 @@ pub const DELIVERY_PATCHES: [&str; 1] = ["iced_widget"];
 /// 仓库根级编译期输入（auto-lang include_str! 越界引用面：stdlib_assembly
 /// 的 loader/manifest/providers + native_registry + aura/schema_loader——
 /// 缺一即受管 build 红，受管阶段判红不回退主检出）。
-const DELIVERY_ROOT_INPUTS: [&str; 5] = [
+const DELIVERY_ROOT_INPUTS: [&str; 7] = [
     "stdlib/assembly-providers.json",
     "stdlib/auto/image.at",
     "stdlib/auto/image.rs.at",
     "stdlib/auto/image.vm.at",
     "docs/schema/aura.at",
+    // PLAN-1003 T-05（D-942-P1 隐藏第二层，受限修复）：auto-lang-core 自
+    // PLAN-943（2026-11-05）起 `stdlib_assembly/contracts.rs` 以 include_str!
+    // 越界引用这两份合同表；交付包缺它们使 auto-lang-core 在包内编译红。
+    // 此前被 P1 的 metadata 101 挡住未露头（semantics-contract 补齐后
+    // V01-real-build 实测暴露）。全 28 交付 crate 的字面量 include_*! 越界
+    // 目标经扫描仅此两项未覆盖。
+    "stdlib/contracts/operations.toml",
+    "stdlib/contracts/compatibility.toml",
 ];
 
 /// 投影修剪 spec：vendored manifest 剥除的 optional path 依赖行（不在交付
