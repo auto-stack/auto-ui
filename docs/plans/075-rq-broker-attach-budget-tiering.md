@@ -5,8 +5,8 @@ feature_name: RQ broker attach 预算可配置（OS063 DG-2 重产品嵌入闭�
 author: [Codex]
 created_at: 2026-11-10
 updated_at: 2026-11-10
-plan_revision: 1
-current_step: 0
+plan_revision: 2
+current_step: 3
 total_steps: 5
 depends_on: [auto-ui/PLAN-074]
 supersedes_spec_components: []
@@ -74,7 +74,7 @@ Rust、现有 harness；nextest sanctioned 上下文。
 | ID | owner_stage | 判据 |
 |---|---|---|
 | AC-01 | work | env 三态解析正确；延迟客户端两档 attach 行为符合预算（V-01） |
-| AC-02 | work | 真桌面 todo/video env 30000 嵌入运行（DG-2 闭合，V-02） |
+| AC-02 | work | 【r2 修订】旋钮交付并五档验证（已闭）；todo/video 完整嵌入验证**改挂覆盖缺口关闭条件**（style:list-none / native-unstyled / stroke-1 / tag:video——owner=投影 coverage 域+产品 owner）：缺口闭后按 T-03 方法复验，本 Plan 不冒当前可测（V-02 改登记性） |
 | AC-03 | work | 族门零回归（V-03） |
 | AC-04 | review | 独立复核 + OS063 消费确认 |
 | AC-05 | merge | 落地/归档/清理 + OS063 回执 |
@@ -85,7 +85,7 @@ Rust、现有 harness；nextest sanctioned 上下文。
 |---|---|---|---|---|---|
 | [ ] | T-01 | work | 可立即 | 红线测试（env 三态 + 延迟客户端两档）——env 缺席态绿基线 + 大档红灯位 | V-01；AC-01 |
 | [ ] | T-02 | work | T-01 | env 解析 + 调用点接线 + 观测行；V-01 全绿；V-03 | AC-01/03 |
-| [ ] | T-03 | work | T-02 | 真桌面 todo/video env 30000 嵌入验证（OS063 基座）+ SD 草案 | V-02；AC-02 |
+| [x] | T-03 | work | T-02 | 【r2 修订】真桌面实测（todo/video 覆盖门拒——前提推翻，具名登记）；SD 草案=旋钮合同入 §1 页待 merge 发布 | V-02 登记性；AC-02（改挂） |
 | [ ] | T-04 | review | T-03 | 独立复核 | AC-04 |
 | [ ] | T-05 | merge | T-04 | 落地/归档/清理 + OS063 回执 | AC-05 |
 
@@ -97,4 +97,5 @@ Rust、现有 harness；nextest sanctioned 上下文。
 
 ## 10. 待澄清事项
 
+- **r2 修订（2026-11-10 用户裁定1）**：AC-02/T-03 改挂覆盖缺口关闭条件（上）；旋钮交付（2ca3eea6）保留为已完成主交付。T-04 review、T-05 merge 照常。
 - **T-03 实测推翻 AC-02 前提（2026-11-10）**：todo/video 在客户端覆盖门即拒（todo: `style:list-none`；video: `style:native-unstyled, style:stroke-1, tag:video`——禁静默错绘），**不到 attach**。预算旋钮机制已交付并五档验证（2ca3eea6；ui::session 110/0、p074 1/1），但 AC-02"todo/video env 30000 嵌入运行"按原文不可达——真实阻塞 = 产品视图能力在投影覆盖集之外（owner = 投影 coverage 域 + 产品 owner，非本 Plan 预算面）。处置建议：needs_replan（AC-02 改挂覆盖缺口关闭条件）或以旋钮交付 + 具名差额收口——待用户裁定。
