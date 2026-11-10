@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-079
-status: reviewed
+status: archived
 feature_name: vm_bridge teardown-cancel owner-filter、picker 对话框生成稳定化与阅读主题种子链闭合
 author: [relay/009-session]
 created_at: 2026-11-11T00:00:00Z
@@ -11,6 +11,7 @@ total_steps: 7
 supersedes_spec_components: []
 new_spec_components: []
 touched_goals: []
+completion_kind: delivered
 ---
 
 # PLAN-079：vm_bridge teardown-cancel owner-filter、picker 对话框生成稳定化与阅读主题种子链闭合
@@ -200,6 +201,10 @@ UIA 诊断链（消费方 009 已建 uia_act.ps1 + picker harness，验收消费
   | findings: 无 needs_fix。已知无关 pending（非本计划域，009 既有登记）：S01-dark 宿主 family/mode 面、S02-S11 dark/编辑腿、cold-load-budget、batch 503 风暴腿、restart-identities/tags-state、epub-gate CDP 工具链腿、W-03 picker 叶（picker-gate spec 仍暂摘，8 叶 not_run）。 | pending_closeout_gates: 无（T-07 完成；W-03 picker 叶的接回=009 会话在 picker-gate spec 原样接回时执行，属消费方自有协议，不阻塞本计划归档） | next: merge
 
 - stage: goal | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | round: 3 | from: review | to: merge | status: reviewed | outcome: pass（最终 review：三 AC 消费证据验收 + 82 叶零死亡复证） | worktree: D:/autostack/.wt/plan-079/auto-ui | commit: 9dd3fc27 | next: merge
+
+- stage: merge | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | outcome: pass（prepared/landed/canonical_verified/archived；cleaned 见下一收据） | delivery_commit: **8389a1e5**（rebase 后 tip；旧→新映射 12a012ae←c241f796、5a029d99←89c5b718、9be632a4←08a5f320、8389a1e5←9dd3fc27，range-diff 4/4 全等） | reviewer_gate: final review pass（r1 @9dd3fc27 消费证据，见 §9 final 收据） | worktree: D:/autostack/.wt/plan-079/auto-ui | branch: codex/plan-079-dev（已并入 master） | landed: `git merge --ff-only codex/plan-079-dev` → master tip=8389a1e5，零 merge commit | canonical_verified: docs/specs/runtime/component-and-store-instances.md（sha 1731317a）、native-vm-app-validation.md（sha 8f7ab2ca）、vm-route-page-loading.md（sha 3d532167）在落地提交内逐字节匹配 | archived: docs/plans/archived/079-vm-teardown-cancel-owner-filter-picker-spawn-theme-seed.md（status: archived, completion_kind: delivered）+ 本簿记提交 | 消费方交接：pin=master@8389a1e5（驱动/工具哈希 26aeb35c/1fc06935 为本次消费验证仪器，009 换 master pin 后由其自有构建重建）；009 组 auto-ui 检出已 pin 至 9dd3fc27（=落地内容），后续可快进 master | stale-artifact 观察：auto-ui 无独立 release 二进制（库）；消费侧 reader app 由 `auto run` 现构建，无陈旧产物；本次消费验证仪器（plan-artifacts 内）随 scope 清理，哈希在案供重建核验 | next: cleaned（见下收据）。
+
+- stage: merge（cleaned） | PLAN-079:r1 | outcome: pass | cleanup: wt-guard（WSL `/mnt/d/autostack/wt-guard.sh`）实测 **clean**（0 reparse point）；实施树 `D:/autostack/.wt/plan-079/auto-ui` 移除（含 target 中间物）+ 分支 `codex/plan-079-dev` 删除；组目录空则删；依赖检出 `auto-lang@0b3fc9063 / auto-web@bf72baab / auto-down@58ea33f`（只读、未改动）移除；`plan-artifacts/plan-079/` 全 scope 删除（决策工件与消费证据已折入 §9/SD-03）；registry 刷新。批回归：auto-ui 无 auto-lang 的 due-trigger 批门（该门归 auto-lang 会话）。
 
 ## 10. 待澄清事项
 
