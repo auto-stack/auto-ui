@@ -99,6 +99,10 @@ struct ManualSeen {
     cursor_left: u32,
     resizes: u32,
     scales: Vec<f32>,
+    /// F-SCALE-02（PLAN-076）：开窗时播种的起始 scale 档；每次真实
+    /// ScaleFactorChanged 后跟新——关窗写报告用它确保起始档在
+    /// `scales_observed` 里（合并幂等）。
+    last_scale: Option<f32>,
     /// PLAN-071 T-04: real ScaleFactorChanged events (before, after) — the
     /// window's actual scale readback on both sides of the OS change.
     scale_factor_changed: Vec<(f32, f32)>,
@@ -311,6 +315,19 @@ impl App {
             if let Some(w) = &self.window {
                 let size = w.inner_size();
                 let scale = w.scale_factor();
+                // F-SCALE-02（PLAN-076）：关窗读回前先以跟踪的起始档播种
+                // （observe_window 合并幂等——单次切档会话保住开窗档）；
+                // 随后的最终读回覆盖 window.* 实测字段。
+                if let Some(start) = self.manual_seen.last_scale {
+                    record.observe_window(
+                        start as f64,
+                        [
+                            size.width.max(1) as f64 / scale,
+                            size.height.max(1) as f64 / scale,
+                        ],
+                        [size.width, size.height],
+                    );
+                }
                 record.observe_window(
                     scale,
                     [
@@ -661,6 +678,15 @@ fn window_scale_of(window: Option<&Arc<Window>>) -> f32 {
     window.map(|w| w.scale_factor() as f32).unwrap_or(1.0)
 }
 
+/// F-SCALE-02（PLAN-076）：真实 (before, after) 对取自开窗起跟踪的
+/// `last_scale`，并跟新之。无播种时的退化形状（before==after）保持可见，
+/// 不冒称真实转换。
+fn push_scale_pair(seen: &mut ManualSeen, new_scale: f32) -> (f32, f32) {
+    let before = seen.last_scale.replace(new_scale).unwrap_or(new_scale);
+    seen.scale_factor_changed.push((before, new_scale));
+    (before, new_scale)
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let probe_flag = args.iter().any(|a| a == "--probe");
@@ -715,6 +741,8 @@ impl ApplicationHandler for App {
         let app = MixedRegionsUiApp::new(&ui_json, &world_at, "plan054-window").expect("v2 app");
         let fmt = target.format();
         let host = MixedRegionsHost::new(gpu, app, LOGICAL, Some(fmt)).expect("v2 host");
+        // F-SCALE-02（PLAN-076）：开窗即播种起始 scale 档（真实 winit 读回）。
+        self.manual_seen.last_scale = Some(window.scale_factor() as f32);
         self.window = Some(window);
         self.target = Some(target);
         self.host = Some(host);
@@ -810,17 +838,13 @@ impl ApplicationHandler for App {
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 // PLAN-071 T-04: record the REAL OS scale change (winit actual
-                // before/after). Read-only: the following Resized event applies
-                // the geometry through the existing host path.
+                // before/after). F-SCALE-02（PLAN-076）: `before` 取自开窗起
+                // 跟踪的 last_scale——事件到达时 winit 已换新值，晚读
+                // `scale_factor()` 必产 (X, X)。Read-only: the following
+                // Resized event applies the geometry through the existing
+                // host path.
                 if self.manual {
-                    let before = self
-                        .window
-                        .as_ref()
-                        .map(|w| w.scale_factor())
-                        .unwrap_or(scale_factor);
-                    self.manual_seen
-                        .scale_factor_changed
-                        .push((before as f32, scale_factor as f32));
+                    push_scale_pair(&mut self.manual_seen, scale_factor as f32);
                     self.manual_checkpoint("scale_factor_changed");
                 }
             }
@@ -861,5 +885,34 @@ impl ApplicationHandler for App {
         // Poll：探针窗需要确定性泵送（沿 049 实测——WaitUntil 在节流桌面
         // 上休眠丢相位）。
         e.set_control_flow(ControlFlow::Poll);
+    }
+}
+
+/// F-SCALE-02（PLAN-076）scale 会话跟踪单元：真窗事件在 CI 不可重放，
+/// 跟踪逻辑以纯函数面单测钉住（开窗播种 → 真实对 → 关窗读回由
+/// `m1_native_evidence_support` 会话形测试覆盖）。
+#[cfg(test)]
+mod scale_track_tests {
+    use super::{push_scale_pair, ManualSeen};
+
+    #[test]
+    fn scale_pairs_come_from_tracked_open_scale_not_late_readback() {
+        // 会话：开窗 2.0 → 切 2.5 → 切 1.25。旧实现（事件内晚读
+        // `scale_factor()`）产 (2.5, 2.5)/(1.25, 1.25)——本用例对旧实现必红。
+        let mut seen = ManualSeen::default();
+        seen.last_scale = Some(2.0); // resumed() 播种
+        assert_eq!(push_scale_pair(&mut seen, 2.5), (2.0, 2.5));
+        assert_eq!(push_scale_pair(&mut seen, 1.25), (2.5, 1.25));
+        assert_eq!(seen.scale_factor_changed, vec![(2.0, 2.5), (2.5, 1.25)]);
+        assert_eq!(seen.last_scale, Some(1.25), "tracker follows the last real factor");
+    }
+
+    #[test]
+    fn unseeded_tracker_degenerates_visibly_to_same_factor_pair() {
+        // 无播种（理论上不可达：resumed() 先于事件）；退化形状保持可见，
+        // 不冒称真实转换。
+        let mut seen = ManualSeen::default();
+        assert_eq!(push_scale_pair(&mut seen, 2.0), (2.0, 2.0));
+        assert_eq!(seen.last_scale, Some(2.0));
     }
 }

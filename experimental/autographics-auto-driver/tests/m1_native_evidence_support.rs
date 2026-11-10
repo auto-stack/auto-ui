@@ -460,6 +460,14 @@ fn m1_manual_checklist_is_frozen_and_never_auto_passes() {
     rec.bind_project("mixed-artifact", serde_json::json!({ "world.at": fixture_sha() }));
     rec.bind_candidate(serde_json::json!({ "window": "mixed_regions_window" }));
     rec.observe_window(2.0, [480.0, 560.0], [960, 1120]);
+    // F-N4-01（PLAN-076）：N4 文本逐字冻结——2026-11-10 语义裁定（方案 b）
+    // 后的可满足形态；任何措辞漂移（含回退旧"mouse leave cancels"歧义态）
+    // 在此具名红。
+    assert_eq!(
+        MIXED_MANUAL_CHECKLIST[3].1,
+        "press on empty UI space, leave the window and release outside: no button activates and no region click is dispatched",
+        "N4 wording is frozen at the 2026-11-10 semantic ruling"
+    );
     for (id, item) in MIXED_MANUAL_CHECKLIST {
         rec.observe_checklist(
             id,
@@ -488,4 +496,97 @@ fn m1_manual_checklist_is_frozen_and_never_auto_passes() {
     let v = m1_evidence::validate(&rec.to_value());
     assert_eq!(v.status, "pending");
     assert!(v.blocked.iter().any(|b| b.contains("N4")));
+}
+
+// ============================== PLAN-076: F-SCALE-02 session shape ========
+
+#[test]
+fn m1_manual_session_report_keeps_start_tier_and_real_scale_pairs() {
+    // F-SCALE-02（PLAN-076）：mixed_regions_window --manual 的单次切档会话
+    // 全形——开窗播种（resumed 读回 2.0）→ 真实 ScaleFactorChanged
+    // (2.0→2.5，last_scale 跟踪) → 关窗读回 2.5（observe_window 合并幂等
+    // 播种起始档后覆盖 window.* 实测字段）。AG026 实证旧实现（替换写法
+    // ＋事件内晚读）产 scales_observed=[2.5] 且 scale_factor_changed=
+    // [(2.5,2.5)]，validator 误判 single scale tier——本用例对旧实现必红。
+    let mut rec = EvidenceRecord::new("mixed-regions", "native-manual");
+    rec.bind_project(
+        "mixed-artifact",
+        serde_json::json!({ "world.at": fixture_sha() }),
+    );
+    rec.bind_candidate(serde_json::json!({ "window": "mixed_regions_window" }));
+    rec.observe_window(2.0, [480.0, 560.0], [960, 1120]); // resumed() 播种
+    rec.record_scale_change(2.0, 2.5, "manual"); // 真实事件对（push_scale_pair）
+    rec.observe_window(2.5, [480.0, 560.0], [1200, 1400]); // 关窗读回（合并）
+    let record = rec.to_value();
+    assert_eq!(
+        record["tier"]["scales_observed"],
+        serde_json::json!([2.0, 2.5]),
+        "single-change session keeps [start, end]"
+    );
+    assert_eq!(
+        record["window"]["scale_factor_changed"],
+        serde_json::json!([{ "before": 2.0, "after": 2.5, "at": "manual" }]),
+        "pairs are the real transition, not the late (X, X) readback"
+    );
+    assert_eq!(record["window"]["scale"], serde_json::json!(2.5));
+    assert_eq!(record["window"]["physical"], serde_json::json!([1200, 1400]));
+    // validator 面起始档缺失即误拒：双档在列后 single-scale blocked 消失
+    // （其余人工项仍 pending，不在此关闭手工门）。
+    let v = m1_evidence::validate(&record);
+    assert!(
+        !v.blocked.iter().any(|b| b.contains("single scale tier")),
+        "dual-scale session must not read as single tier: {:?}",
+        v.blocked
+    );
+    assert_eq!(v.status, "pending", "manual gate still needs human conclusions");
+    assert!(v.blocked.iter().any(|b| b.contains("human conclusion")));
+}
+
+// ============================== PLAN-076: F-N4-01 semantic ruling ==========
+
+#[test]
+fn m1_n4_empty_press_cancels_on_leave_and_region_press_dispatches_at_hit() {
+    // N4（PLAN-076 语义裁定·方案 b）行为回归：空白 UI 区按下 → 离窗
+    // （CursorLeft→cancel_all）→ 窗外释放（宿主不见真实释放；迟到释放无处
+    // 投递）⇒ 无按钮激活、无区域点击入队。canonical 对照（054“命中即入
+    // 队”，裁定保留）：strip 按下即派发，离窗取消只作用于在途捕获，不可
+    // 撤回已派发交互。区分性：若派发改到 release-inside（被否决的方案 a）
+    // 或 cancel 泄漏到已派发交互，两侧断言必红。
+    let mut h = host("plan076-n4");
+    settle(&mut h, 4);
+    let strip = bounds(&mut h, STRIP);
+
+    // 取消路径：空白区按下 → 离窗 → 窗外释放。
+    let cb0 = h.app().ui.callbacks;
+    let count0 = texts(&mut h)[0].clone();
+    let empty = [strip.x + strip.w + 2.0, strip.y + strip.h * 0.79];
+    let press = h.pointer_pressed(empty).expect("press on empty UI space");
+    assert!(press.region.is_none(), "empty-space press hits no region");
+    h.cancel_all(agp::core::composition::input::CancelReason::PointerLeftWindow);
+    let late = h.pointer_released().expect("release outside (late arrival)");
+    assert!(
+        late.region.is_none() && late.delivered.is_none(),
+        "cancelled press delivers nothing on release"
+    );
+    settle(&mut h, 3);
+    assert_eq!(h.app().ui.callbacks, cb0, "no button activates");
+    assert_eq!(texts(&mut h)[0], count0, "no region click is dispatched");
+
+    // canonical 对照：区域命中即派发（按下时），离窗不可撤回。
+    let press = h
+        .pointer_pressed([strip.x + strip.w - 2.0, strip.y + strip.h * 0.79])
+        .expect("press strip region");
+    assert_eq!(
+        press.region.as_deref(),
+        Some("Dash#strip"),
+        "region click dispatches at press (hit-enqueues, 054 canonical)"
+    );
+    h.cancel_all(agp::core::composition::input::CancelReason::PointerLeftWindow);
+    settle(&mut h, 3);
+    assert_eq!(
+        texts(&mut h)[0],
+        "100",
+        "already-dispatched interaction survives pointer leave"
+    );
+    assert!(h.mount_errors.is_empty());
 }

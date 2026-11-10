@@ -25,7 +25,13 @@ pub const MIXED_MANUAL_CHECKLIST: [(&str, &str); 6] = [
         "N3",
         "Alt-Tab away then back: the stale focused button does not activate on Enter",
     ),
-    ("N4", "mouse leave cancels the press (no region click)"),
+    // F-N4-01（PLAN-076，2026-11-10 语义裁定·方案 b）：收窄为可满足形态——
+    // 空白区按下/离窗/窗外释放走取消路径；onclick 区域“命中即入队”（054
+    // canonical，按下即派发）不可离窗撤回，检查表不再与 canonical 冲突。
+    (
+        "N4",
+        "press on empty UI space, leave the window and release outside: no button activates and no region click is dispatched",
+    ),
     ("N5", "resize; the next click lands on the widget's new position"),
     ("N6", "repeat on a second DPI scale if the machine has one"),
 ];
@@ -91,12 +97,21 @@ impl EvidenceRecord {
         self.data["candidate"] = candidate;
     }
 
-    /// 实际窗口观察（winit 读回；不做推断）。
+    /// 实际窗口观察（winit 读回；不做推断）。开窗即调用即为播种；scale
+    /// 合并进 `scales_observed`（F-SCALE-02/PLAN-076：不再替换——单次切档
+    /// 会话关窗读回不抹掉起始档）。
     pub fn observe_window(&mut self, scale: f64, logical: [f64; 2], physical: [u32; 2]) {
         self.data["window"]["scale"] = serde_json::json!(scale);
         self.data["window"]["logical"] = serde_json::json!(logical);
         self.data["window"]["physical"] = serde_json::json!(physical);
-        self.data["tier"]["scales_observed"] = serde_json::json!([scale]);
+        let mut scales = self.data["tier"]["scales_observed"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        if !scales.iter().any(|v| v == &serde_json::json!(scale)) {
+            scales.push(serde_json::json!(scale));
+        }
+        self.data["tier"]["scales_observed"] = serde_json::Value::Array(scales);
     }
 
     /// 真实 ScaleFactorChanged（或平台等价）事件记录（前后实际读数）。
@@ -367,6 +382,78 @@ mod tests {
         assert_eq!(
             r.to_value()["tier"]["scales_observed"],
             serde_json::json!([2.0, 1.25])
+        );
+    }
+
+    /// F-SCALE-02（PLAN-076）：单次切档会话——开窗播种 2.0 → 真实切档
+    /// (2.0→2.5) → 关窗读回 2.5。起始档必须保留、真实前后对必须原样；
+    /// 旧实现（替换写法）在此形状产 [2.5] 且 validator 误判 single scale
+    /// tier——本用例对旧实现必红。
+    #[test]
+    fn single_scale_change_session_keeps_start_tier_and_real_pair() {
+        let mut r = bound_record();
+        r.observe_window(2.0, [480.0, 560.0], [960, 1120]); // open seed
+        r.record_scale_change(2.0, 2.5, "manual"); // tracked real pair
+        r.observe_window(2.5, [480.0, 560.0], [1200, 1400]); // close readback (merge)
+        let v = r.to_value();
+        assert_eq!(
+            v["tier"]["scales_observed"],
+            serde_json::json!([2.0, 2.5]),
+            "start tier must survive the close readback"
+        );
+        assert_eq!(
+            v["window"]["scale_factor_changed"],
+            serde_json::json!([{ "before": 2.0, "after": 2.5, "at": "manual" }]),
+            "the recorded pair is the real transition, not (X, X)"
+        );
+        assert_eq!(v["window"]["scale"], serde_json::json!(2.5), "final readback wins for window.*");
+        let verdict = validate(&v);
+        assert!(
+            !verdict
+                .blocked
+                .iter()
+                .any(|b| b.contains("single scale tier")),
+            "a dual-scale session must not be blocked as single tier: {:?}",
+            verdict.blocked
+        );
+    }
+
+    /// F-SCALE-02：多变档会话——全部触档在列（含起始档），序列保持触达序。
+    #[test]
+    fn multi_change_sessions_keep_every_touched_tier() {
+        let mut r = bound_record();
+        r.observe_window(1.0, [480.0, 560.0], [480, 560]);
+        r.record_scale_change(1.0, 2.0, "manual");
+        r.record_scale_change(2.0, 1.25, "manual");
+        r.observe_window(1.25, [480.0, 560.0], [600, 700]);
+        let v = r.to_value();
+        assert_eq!(
+            v["tier"]["scales_observed"],
+            serde_json::json!([1.0, 2.0, 1.25])
+        );
+        assert_eq!(
+            v["window"]["scale_factor_changed"],
+            serde_json::json!([
+                { "before": 1.0, "after": 2.0, "at": "manual" },
+                { "before": 2.0, "after": 1.25, "at": "manual" },
+            ])
+        );
+    }
+
+    /// D02（PLAN-076 §10）核对结论的测试面固化：编辑器路径不经
+    /// `observe_window`（`evidence_record` 字段存在但无 m1_evidence 调用点
+    /// ——T-01 有界核对），因此不存在同款覆盖写法；合并语义由本模块唯一
+    /// 定义。
+    #[test]
+    fn repeated_close_readbacks_are_merge_idempotent() {
+        let mut r = bound_record();
+        r.observe_window(2.0, [480.0, 560.0], [960, 1120]);
+        r.observe_window(2.0, [480.0, 560.0], [960, 1120]);
+        r.observe_window(2.0, [480.0, 560.0], [960, 1120]);
+        assert_eq!(
+            r.to_value()["tier"]["scales_observed"],
+            serde_json::json!([2.0]),
+            "repeated observation of one scale must not duplicate the tier"
         );
     }
 }

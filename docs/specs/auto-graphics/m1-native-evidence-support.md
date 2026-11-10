@@ -34,14 +34,18 @@ sha256）、候选身份、窗口实例（实际 scale/尺寸/真实 ScaleFactor
 | N1 | Tab + Enter activate the next button exactly once |
 | N2 | a click outside every control changes nothing |
 | N3 | Alt-Tab away then back: the stale focused button does not activate on Enter |
-| N4 | mouse leave cancels the press (no region click) |
+| N4 | press on empty UI space, leave the window and release outside: no button activates and no region click is dispatched |
 | N5 | resize; the next click lands on the widget's new position |
 | N6 | repeat on a second DPI scale if the machine has one |
 
 每项携带观察值（计数/尺寸/文本）；**结论**只由观察人写入
 （`conclude_checklist` / 手工填报告 `checklist_items.N*.conclusion`）；
-观察人字段（name/notes）同面。`ScaleFactorChanged` 记录真实 winit 事件
-（前后实际读数）并扩展 `tier.scales_observed`；resize/键鼠/失焦/离窗事件
+观察人字段（name/notes）同面。`tier.scales_observed` 规则（PLAN-076
+F-SCALE-02）：开窗即播种（winit 真实读回）、`ScaleFactorChanged` 真实
+事件**追加**触档、关窗读回**合并**（幂等，不替换）——单次切档会话保住
+`[起始档, 末档]`，多变档会话全部触档在列；`window.scale_factor_changed`
+记录真实 (before, after) 转换对（宿主以 last_scale 自开窗起跟踪，不在
+事件内晚读——晚读必产 (X, X)）。resize/键鼠/失焦/离窗事件
 各产生一个检查点（实际 scale/尺寸/count 文本/callbacks/active regions/
 epochs）。
 
