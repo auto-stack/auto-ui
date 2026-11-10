@@ -440,10 +440,10 @@ mod tests {
         );
     }
 
-    /// D02（PLAN-076 §10）核对结论的测试面固化：编辑器路径不经
-    /// `observe_window`（`evidence_record` 字段存在但无 m1_evidence 调用点
-    /// ——T-01 有界核对），因此不存在同款覆盖写法；合并语义由本模块唯一
-    /// 定义。
+    /// D02（PLAN-076 §10）核对结论（F-076-R2-01 更正）：editor 路径经
+    /// `#[path]` 包含的 `src/bin/authoring/cli.rs` 调用 `observe_window`
+    /// （对新记录单次调用，非同款覆盖写法）——合并语义无害继承（单次调用
+    /// → [scale]）；本模块的合并语义是两宿主（mixed/editor）唯一来源。
     #[test]
     fn repeated_close_readbacks_are_merge_idempotent() {
         let mut r = bound_record();
@@ -454,6 +454,16 @@ mod tests {
             r.to_value()["tier"]["scales_observed"],
             serde_json::json!([2.0]),
             "repeated observation of one scale must not duplicate the tier"
+        );
+        // 非 f32 精确档（Windows 自定义缩放 113%）恒等合并——单档会话不得
+        // 产出两条"档"（F-076-R2-02 镜像防护；f64 面精确比较）。
+        let mut e = bound_record();
+        e.observe_window(1.13, [480.0, 560.0], [542, 633]);
+        e.observe_window(1.13, [480.0, 560.0], [542, 633]);
+        assert_eq!(
+            e.to_value()["tier"]["scales_observed"],
+            serde_json::json!([1.13]),
+            "an f64-exact scale must not split into two tiers"
         );
     }
 }

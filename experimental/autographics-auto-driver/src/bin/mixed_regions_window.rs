@@ -99,13 +99,15 @@ struct ManualSeen {
     cursor_left: u32,
     resizes: u32,
     scales: Vec<f32>,
-    /// F-SCALE-02（PLAN-076）：开窗时播种的起始 scale 档；每次真实
-    /// ScaleFactorChanged 后跟新——关窗写报告用它确保起始档在
+    /// F-SCALE-02（PLAN-076）：开窗时播种的起始 scale 档（f64 原值——不截
+    /// 断 winit 读数，非 f32 精确档不得裂成两条"档"，F-076-R2-02）；
+    /// 每次真实 ScaleFactorChanged 后跟新——关窗写报告用它确保起始档在
     /// `scales_observed` 里（合并幂等）。
-    last_scale: Option<f32>,
+    last_scale: Option<f64>,
     /// PLAN-071 T-04: real ScaleFactorChanged events (before, after) — the
-    /// window's actual scale readback on both sides of the OS change.
-    scale_factor_changed: Vec<(f32, f32)>,
+    /// window's actual scale readback on both sides of the OS change
+    /// （f64 原值保真，F-076-R2-02）.
+    scale_factor_changed: Vec<(f64, f64)>,
 }
 
 impl App {
@@ -320,7 +322,7 @@ impl App {
                 // 随后的最终读回覆盖 window.* 实测字段。
                 if let Some(start) = self.manual_seen.last_scale {
                     record.observe_window(
-                        start as f64,
+                        start,
                         [
                             size.width.max(1) as f64 / scale,
                             size.height.max(1) as f64 / scale,
@@ -338,7 +340,7 @@ impl App {
                 );
             }
             for (before, after) in &seen.scale_factor_changed {
-                record.record_scale_change(*before as f64, *after as f64, "manual");
+                record.record_scale_change(*before, *after, "manual");
             }
             for cp in &self.manual_checkpoints {
                 let label = cp["label"].as_str().unwrap_or("checkpoint").to_string();
@@ -679,9 +681,9 @@ fn window_scale_of(window: Option<&Arc<Window>>) -> f32 {
 }
 
 /// F-SCALE-02（PLAN-076）：真实 (before, after) 对取自开窗起跟踪的
-/// `last_scale`，并跟新之。无播种时的退化形状（before==after）保持可见，
-/// 不冒称真实转换。
-fn push_scale_pair(seen: &mut ManualSeen, new_scale: f32) -> (f32, f32) {
+/// `last_scale`，并跟新之（f64 原值保真，F-076-R2-02）。无播种时的退化
+/// 形状（before==after）保持可见，不冒称真实转换。
+fn push_scale_pair(seen: &mut ManualSeen, new_scale: f64) -> (f64, f64) {
     let before = seen.last_scale.replace(new_scale).unwrap_or(new_scale);
     seen.scale_factor_changed.push((before, new_scale));
     (before, new_scale)
@@ -742,7 +744,7 @@ impl ApplicationHandler for App {
         let fmt = target.format();
         let host = MixedRegionsHost::new(gpu, app, LOGICAL, Some(fmt)).expect("v2 host");
         // F-SCALE-02（PLAN-076）：开窗即播种起始 scale 档（真实 winit 读回）。
-        self.manual_seen.last_scale = Some(window.scale_factor() as f32);
+        self.manual_seen.last_scale = Some(window.scale_factor());
         self.window = Some(window);
         self.target = Some(target);
         self.host = Some(host);
@@ -844,7 +846,7 @@ impl ApplicationHandler for App {
                 // Resized event applies the geometry through the existing
                 // host path.
                 if self.manual {
-                    push_scale_pair(&mut self.manual_seen, scale_factor as f32);
+                    push_scale_pair(&mut self.manual_seen, scale_factor);
                     self.manual_checkpoint("scale_factor_changed");
                 }
             }
@@ -905,6 +907,13 @@ mod scale_track_tests {
         assert_eq!(push_scale_pair(&mut seen, 1.25), (2.5, 1.25));
         assert_eq!(seen.scale_factor_changed, vec![(2.0, 2.5), (2.5, 1.25)]);
         assert_eq!(seen.last_scale, Some(1.25), "tracker follows the last real factor");
+        // f64 保真（F-076-R2-02）：非 f32 精确档（Windows 自定义缩放 113%）
+        // 原值存储不截断——截断会在单档会话裂出两条"档"，反常解除单档门。
+        let mut exotic = ManualSeen::default();
+        exotic.last_scale = Some(1.13);
+        assert_eq!(push_scale_pair(&mut exotic, 1.5), (1.13, 1.5));
+        assert_eq!(exotic.scale_factor_changed[0].0, 1.13);
+        assert_eq!(exotic.last_scale, Some(1.5));
     }
 
     #[test]

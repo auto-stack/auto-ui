@@ -76,8 +76,8 @@ epochs）。
   （sha256＋解析摘要）挂接原阶段记录；**不重建 20/34 阶段 oracle、不自动
   跑原 probe**。无 host（项目未开）写具名 fail 记录。
 - 共享模块：driver `src/m1_evidence.rs`（builder＋严格 validator＋
-  `validate_file` 消费入口；单元测试 6 例＋集成面在
-  `tests/m1_native_evidence_support.rs` 3 例）。
+  `validate_file` 消费入口；单元测试 9 例＋集成面在
+  `tests/m1_native_evidence_support.rs` 11 例——计数含 PLAN-076 增量）。
 
 ## 3. 冻结身份（2026-11-08 交付）
 
