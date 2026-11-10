@@ -2265,16 +2265,22 @@ mod tests {
     /// remote 选路即完整渲染（iced 全集 + mpv widget），覆盖门不适用。
     #[test]
     fn p077_remote_mode_skips_coverage_gate() {
-        assert_eq!(RenderMode::resolve(Some("remote"), None), RenderMode::Remote);
+        assert_eq!(
+            RenderMode::resolve(Some("remote"), None),
+            RenderMode::Remote
+        );
         // Remote 形态 = Commands 帧载荷 + 无降级观测行（effective_frame_mode
         // 恒 (Commands, None)）；覆盖门由 client_entry 只在**非 remote**
         // Commands 臂调用 ensure_covered（run_dynamic_client:196-202）——
         // remote 臂直用 HeadlessFrameSource，结构保证无门。
-        let component =
-            crate::build_dynamic_component("widget v { view { text \"x\" } }", None).expect("build");
+        let component = crate::build_dynamic_component("widget v { view { text \"x\" } }", None)
+            .expect("build");
         assert_eq!(
             effective_frame_mode(RenderMode::Remote, &component),
-            (crate::ui::desktop_protocol::message::FrameMode::Commands, None)
+            (
+                crate::ui::desktop_protocol::message::FrameMode::Commands,
+                None
+            )
         );
     }
 
@@ -2301,9 +2307,7 @@ mod tests {
 }"#;
         let component = crate::build_dynamic_component(src, None).expect("build todo");
         let mut projector = crate::ui::desktop_protocol::native_projector::RqProjector::new(
-            component,
-            480.0,
-            320.0,
+            component, 480.0, 320.0,
         );
         projector
             .ensure_covered()
@@ -2317,7 +2321,9 @@ mod tests {
             .ops
             .iter()
             .filter_map(|op| match op {
-                crate::ui::desktop_protocol::message::DrawOp::Text { text, .. } => Some(text.as_str()),
+                crate::ui::desktop_protocol::message::DrawOp::Text { text, .. } => {
+                    Some(text.as_str())
+                }
                 _ => None,
             })
             .collect();
@@ -2328,15 +2334,15 @@ mod tests {
         // 消息驱动（新建业务语义入口）：dispatch AddTodo 后组件状态
         // 更新 → 帧文本反映（.text = "added" → input 值可见；业务完整
         // 语义/持久化归产品与 OS066 最终验收）。
-        projector
-            .component_mut()
-            .dispatch_named("AddTodo", None);
+        projector.component_mut().dispatch_named("AddTodo", None);
         let frame2 = projector.render_frame();
         let texts2: Vec<&str> = frame2
             .ops
             .iter()
             .filter_map(|op| match op {
-                crate::ui::desktop_protocol::message::DrawOp::Text { text, .. } => Some(text.as_str()),
+                crate::ui::desktop_protocol::message::DrawOp::Text { text, .. } => {
+                    Some(text.as_str())
+                }
                 _ => None,
             })
             .collect();
@@ -2362,17 +2368,12 @@ mod tests {
 }"#;
         let component = crate::build_dynamic_component(src, None).expect("build video");
         let projector = crate::ui::desktop_protocol::native_projector::RqProjector::new(
-            component,
-            480.0,
-            320.0,
+            component, 480.0, 320.0,
         );
         match projector.ensure_covered() {
             Ok(()) => panic!("Video queue 臂必须拒绝（tag:video）"),
             Err(gate) => {
-                assert!(
-                    gate.contains("tag:video"),
-                    "拒绝信息应含 tag:video: {gate}"
-                );
+                assert!(gate.contains("tag:video"), "拒绝信息应含 tag:video: {gate}");
             }
         }
     }

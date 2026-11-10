@@ -48,6 +48,23 @@ broker）的输入与服务桥、帧调度合同。来源：PLAN-063（r4）的�
 - 来源观测：`[render] render-mode: <base> (AUTO_VM_RENDER env)`（VM）与
   CLI/env/pac 观测行（Rust exe）——运行选择来源可审计。
 
+### 1.1 产品覆盖能力准入（PLAN-077，2026-11-10）
+
+覆盖判定（[产品覆盖规范](windows-rq-product-coverage.md)）对 todo/video
+产品的公开入口行为：
+
+- `style:list-none` **精确放行**（覆盖表差额修复）：native `View::List`
+  无 marker 渲染 = list-none 语义成立；`native_queue_set`/`target_set` 的
+  `style_prefixes` 增 `"list-none"`（非 `"list-"` 通配——list-disc 等 marker
+  渲染未接仍拒绝）。Todo 产品（`auto-todo@0510e05`）Auto/queue 形态过门，
+  RqProjector 真渲。
+- Video 产品（`auto-video@0922b44`）在 **queue 形态保持覆盖门拒绝**（`tag:video`、
+  `style:stroke-1`、`style:native-unstyled`——queue 投影器无 Video 臂，禁静默
+  错绘）；**正确公开形态 = remote**（rq/desktop 臂，HeadlessFrameSource +
+  mpv widget 真渲，覆盖门不适用）。未知类拒绝契约不变，不放宽覆盖表。
+- 负控锚（p077_* 永久反例）：list-none 放行 / list-* 族拒绝 / video queue
+  拒绝 / remote 无门 / Todo queue 渲染可用 / Video remote 装配渲染。
+
 ## 2. 输入/服务桥（T-03 交付）
 
 线词汇 = InputMsg 1..11（指针/键/字符/滚轮/IME/Action）+ ControlMsg（窗服务）。
@@ -132,5 +149,8 @@ broker）的输入与服务桥、帧调度合同。来源：PLAN-063（r4）的�
 - UI073：连续媒体/RemoteFrame、精确绘制收口（13 非 exact 族/glyph 残差/
   SVG produce）、资源乱序注入负控；本页供真实接口（generation/release/
   HostCaps/Metric 通道）。
-- OS063：两 Host 最终产品组合、1/4/8 规模、M-02/06/07 终值与完整 P/M
-  验收；通用 Host adapter 面（本页 §1-3）只做策略装配。
+- UI077：todo/video 覆盖能力准入闭合（list-none 放行 + video queue 拒绝
+  保持 + 公开形态），交付见[产品覆盖规范](windows-rq-product-coverage.md)。
+- OS066：全 Demo/产品最终矩阵（含真实 Todo 业务/持久化、真实 mpv 播放、
+  全链重建消费）——Todo 走 queue/Auto、Video 走 remote，按产品覆盖规范
+  §4 交接命令/形态。
