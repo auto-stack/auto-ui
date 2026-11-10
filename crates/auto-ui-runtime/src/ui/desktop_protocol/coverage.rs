@@ -230,6 +230,10 @@ impl Coverage {
             // 装饰字段）。渲染端 no-op 挂 RenderQueue（planned-debt）。
             "backdrop-",
             "hover:",
+            // PLAN-077 T-02：list-none 精确放行（与 native_queue_set 同册
+            // ——native List 无 marker 渲染 = list-none 语义成立；解释态
+            // target_set 为参考表，防两表 drift）。
+            "list-none",
         ]
         .into_iter()
         .map(String::from)
@@ -461,6 +465,12 @@ impl Coverage {
             // 放行（queue 臂无折行通道 = 单行渲染 no-op，语义同 ⑥ 族）。
             "truncate",
             "break-words",
+            // PLAN-077 T-02（⑬）：list-none 精确放行——native List 渲染
+            // 无 marker（列表项直排，无圆点/编号），list-none 语义=移除
+            // marker=真实渲染面成立（style_parity.rs:308 断言在册）；仅
+            // 精确 token 放行，list-disc 等 marker 渲染未接仍拒绝（防
+            // 通配 "list-" 误放未实现 marker 族）。
+            "list-none",
         ]
         .into_iter()
         .map(String::from)
@@ -2157,10 +2167,11 @@ mod tests {
     // `style:native-unstyled, style:stroke-1, tag:video`。两条执行形态：
     // remote 臂（rq/desktop，HeadlessFrameSource，无覆盖门）与非 remote
     // Commands 臂（RqProjector.ensure_covered 覆盖门）。红态基线先行。
-    /// 红态：Todo 的 List + ListNone → native 覆盖门拒绝 `style:list-none`
-    ///（编译轨 typed 扫描与 075 实测清单一致）。
+    /// 永久反例（T-02 修复）：Todo 的 List + ListNone → Covered（list-none
+    /// = 移除列表 marker，native List 无 marker 渲染 = 真实语义成立——
+    /// style_parity.rs:308 断言在册；精确放行非通配）。
     #[test]
-    fn p077_todo_list_none_gate_red() {
+    fn p077_todo_list_none_covered() {
         let coverage = Coverage::native_queue_set();
         let style = crate::ui::style::Style {
             classes: vec![
@@ -2176,22 +2187,40 @@ mod tests {
             style: Some(style),
         };
         let scan = scan_native_view(&view);
-        match judge(&scan, &coverage) {
-            Verdict::Covered => panic!("T-01 红态：list-none 当前应被覆盖门拒绝"),
-            Verdict::NotCovered(missing) => {
-                assert!(
-                    missing.iter().any(|m| m == "style:list-none"),
-                    "缺项应含 style:list-none（冻结清单）: {missing:?}"
-                );
-            }
+        assert!(
+            judge(&scan, &coverage).is_covered(),
+            "list-none + m-0 + p-0 应 Covered（Todo 冻结源同构）"
+        );
+        // 解释态参考表同册（防 drift）。
+        assert!(
+            Coverage::target_set().style_token_supported("list-none"),
+            "target_set 应同册放行 list-none"
+        );
+    }
+
+    /// 负控（防通配放行）：list-disc 的 marker 渲染未接 → 必须保持拒绝。
+    /// list-none 精确放行不得开放 "list-" 前缀族（StyleClass 无 ListDisc
+    /// 变体——编译轨 parse 失败丢弃；解释轨原始 token "list-disc" 仍拒）。
+    #[test]
+    fn p077_list_disc_still_rejected() {
+        let coverage = Coverage::native_queue_set();
+        assert!(
+            coverage.style_token_supported("list-none"),
+            "list-none 精确放行"
+        );
+        for tok in ["list-disc", "list-inside", "list-outside", "list-decimal"] {
+            assert!(
+                !coverage.style_token_supported(tok),
+                "{tok} 必须保持拒绝（marker 渲染未接）"
+            );
         }
     }
 
-    /// 红态：Video 根 + stroke-1 + 未映射类（native-unstyled）→ 覆盖门
-    /// 拒绝（075 T-03 冻结清单；queue 投影器无 Video 臂——native_projector
-    /// 占位盒留痕，防静默错绘）。
+    /// 永久反例：Video 根 + stroke-1 + 未映射类（native-unstyled）→ 覆盖
+    /// 门保持拒绝（queue 投影器无 Video 臂——native_projector 占位盒留痕，
+    /// 防静默错绘；产品正确公开形态 = remote，V-01 对照在册）。
     #[test]
-    fn p077_video_tag_styles_gate_red() {
+    fn p077_video_tag_styles_gate_kept() {
         let coverage = Coverage::native_queue_set();
         let style = crate::ui::style::Style {
             classes: vec![
@@ -2247,5 +2276,63 @@ mod tests {
             effective_frame_mode(RenderMode::Remote, &component),
             (crate::ui::desktop_protocol::message::FrameMode::Commands, None)
         );
+    }
+
+    /// 产品贴合（T-02）：Todo 同构组件（todo_list.at:63 `list-none m-0 p-0`
+    /// 挂 col）经 ensure_covered 过门 + queue 帧非空——修复后 Auto/queue
+    /// 形态对 Todo 真实可用（RqProjector 真渲，非仅覆盖表放行）。
+    #[test]
+    fn p077_todo_product_queue_renders() {
+        use crate::ui::desktop_protocol::endpoint::FrameSource;
+        let src = r#"widget todo {
+    view {
+        col {
+            style: "list-none m-0 p-0"
+            text "pending items"
+        }
+    }
+}"#;
+        let component = crate::build_dynamic_component(src, None).expect("build todo");
+        let mut projector = crate::ui::desktop_protocol::native_projector::RqProjector::new(
+            component,
+            480.0,
+            320.0,
+        );
+        projector
+            .ensure_covered()
+            .unwrap_or_else(|gate| panic!("Todo 同构应过覆盖门: {gate}"));
+        let frame = projector.render_frame();
+        assert!(!frame.ops.is_empty(), "Todo queue 帧非空（真实渲染）");
+        assert!(projector.revision() >= 1);
+    }
+
+    /// 产品贴合（T-02）：Video 同构组件（viewport.at:53 `<video>`）在 queue
+    /// 臂必须被覆盖门拒绝（tag:video——queue 投影器无 Video 臂，防静默
+    /// 错绘）；产品正确公开形态 = remote。
+    #[test]
+    fn p077_video_product_queue_gate_rejects() {
+        let src = r#"widget v {
+    view {
+        video {
+            src: "file:///media/sample.mp4"
+            label: "sample.mp4"
+        }
+    }
+}"#;
+        let component = crate::build_dynamic_component(src, None).expect("build video");
+        let projector = crate::ui::desktop_protocol::native_projector::RqProjector::new(
+            component,
+            480.0,
+            320.0,
+        );
+        match projector.ensure_covered() {
+            Ok(()) => panic!("Video queue 臂必须拒绝（tag:video）"),
+            Err(gate) => {
+                assert!(
+                    gate.contains("tag:video"),
+                    "拒绝信息应含 tag:video: {gate}"
+                );
+            }
+        }
     }
 }
