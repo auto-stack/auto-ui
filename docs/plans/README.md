@@ -1,5 +1,21 @@
 # auto-ui 计划管理
 
+## AGE两阶段当前规划（2026-11-09）
+
+用户新方向将AGE原M2图形增强与M3融合并为M2：ACE/AV/A2R、二维、三维、生产融合四线并行规划，仍不实施/先证/制作素材或运行构建。979 r5（0/8）、980 r4（0/31）、981 r7（0/31）、UI058/AG023 r2（各0/10）复用原号；先中立图形服务，最终Node双后端接线消费正式ACE接口。完整范围与联合门见[当前两阶段路线§6/§13](../design/autographics/age-three-milestones-and-ace-m2.md)。AG020更名、RQ063/073仍守独立owner，不充M1或新增融合重复立项。
+
+M2另有两项独立硬门：980完整传统AutoUI（原widget/store源、纯UI AV/A2R、全部既有组件/模式）与981完整AGE语法（五view/选择/条件/Start-Tick-Frame/新旧UI互操作），不能以两个游戏/少量基础控件代替；状态均草案，仍仅规划。
+
+| M1相关计划 | 当前状态 | 交付/剩余 |
+|---|---|---|
+| [UI071 本机clip/取证支撑](archived/071-age-m1-local-clip-and-native-evidence-support.md) | archived r1，9/9 | a20fa04d已交，026/027该前置已满足 |
+| [UI072 独立游戏宿主](archived/072-age-games-standalone-windows-player.md) | archived r1，10/10 | 5fd25be8已交，已供028消费 |
+| [AG028 两游戏exe＋资源发行](../../../ag-examples/docs/plans/archived/028-age-games-windows-binary-and-resource-release.md) | archived r1，11/11 | 两Windows便携ZIP及清单已交，REL-DELIVERY-001仅持有最终文件待用户接管；不重开 |
+| [AG027 OS编辑20/34](../../../ag-examples/docs/plans/027-age-m1-editor-native-stage-debt-closure.md) | archived r2，10/10 | 已交4bfbb15；真实OS执行/负控仍为DEBT-002残余，不据归档签M1-ready |
+| [AG026 双DPI/最终M1收口](../../../ag-examples/docs/plans/026-age-m1-dpi-native-debt-and-final-closure.md) | drafting r1，0/11 | 071已交，准备可按启动指令推进；真实双scale外部门、027正式收据仍待 |
+
+因此M1当前剩余活动收口合同是AG026（AG027已归档、残余债务保留）；DEBT-001/002仍OPEN，M1-ready未签。两游戏发行是追加交付，不改变原M1签章判据。旧065/066/067/024/025已交付、039影子不重复计。更多来源见[路线当前M1清单](../design/autographics/age-three-milestones-and-ace-m2.md)。本次只修订阶段/合同与排程，未运行实现/测试/输入或新增计划。
+
 本仓独立编号从001开始；本地下一号见`.next-id`。跨仓身份写作`auto-ui/PLAN-NNN`。
 
 ## 当前合同
@@ -47,10 +63,10 @@
 | 043 | [Node3D模型资源对象模板](archived/043-autographics-node3d-model-object-templates.md) | Node模板builtin限制后继 | 已交付并归档/清理；静态opaque模型模板与非solid/owner边界见实际收据，不自动升级旧游戏锁 |
 | 044 | [Node源码定位与分层诊断](archived/044-autographics-node-source-diagnostics.md) | 多模块作者体验后继 | 已交付9bf9874a，canonical/归档清理齐；固定SDK无span时仍如实fallback |
 | 041 | [组件与Store实例所有权收口](archived/041-component-and-store-instance-ownership.md) | Design47/S后继 | archived/r1，10/10；delivered da4485b4（ff-only 落主）；独立 final pass @cf087715；SD-01..04 canonical 落地（component-and-store-instances.md）；VM 实例分裂+store 每App context；13 base-red/边界如实记录 |
-| 042 | [Reload/schema/effect有界核验](042-reload-schema-and-effect-readiness.md) | Design47/R后继 | drafting/r1，0/8；多文件/迁移/失败保旧/生命周期研究，相关腿接041正式端口；研究不冒完整HMR |
-| 045 | [媒体三Demo主题迁移](045-media-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；019/020/030，前置links/back contract/播放支持具名，不代产品；仅规划 |
-| 046 | [图像文件三Demo主题迁移](046-image-and-file-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；029/031iv/027，031iv七编译错/VM挂起先核，保像素/文件/性能条件；仅规划 |
-| 047 | [阅读编辑数据绘制六Demo主题迁移](047-specialized-workbench-demo-theme-migration.md) | 038实测后继 | drafting/r1，0/9；018/041/026/025/024/031-paint，挂载/旧定位/主题声明与内容owner，保原支持；仅规划 |
+| 042 | [Reload/schema/effect有界核验](archived/042-reload-schema-and-effect-readiness.md) | Design47/R后继 | archived/r1，8/8；研究交付；实际原子多文件Reload后继056，坏源由语言940，浏览器隔离由057 |
+| 045 | [媒体三Demo主题迁移](archived/045-media-demo-theme-migration.md) | 038实测后继 | archived/r1，9/9；019/020/030交付，TS1005既有红保留owner |
+| 046 | [图像文件三Demo主题迁移](archived/046-image-and-file-demo-theme-migration.md) | 038实测后继 | archived/r1，9/9；三例及Web/Man接缝已落地清理 |
+| 047 | [阅读编辑数据绘制六Demo主题迁移](archived/047-specialized-workbench-demo-theme-migration.md) | 038实测后继 | archived/r1；最终收据9/9、头6/9未同步；B3十二已迁、教学累计34；025 a2r既有红具名保留 |
 | 048 | [基础UI Node与Auto事件](archived/048-age-node-basic-ui-and-auto-events.md) | AGE M2-10基础UI | 已交付cd1e161a，归档/清理；四类控件/Auto事件已支持；final为同实现会话，独立上下文复用核验归054/AG021 |
 | 049 | [UI/2D/3D同应用组合](archived/049-age-ui-2d-3d-composition.md) | AGE M2-10混合切片 | 已交付b7f01267，归档/清理；root有限混合档，不支持组件区域/条件挂卸；同会话final限制保留，补齐归054 |
 | 054 | [混合区域组件与生命周期](archived/054-age-mixed-regions-components-and-lifecycle.md) | M2/AG021公共接线 | 已交付2571556e（ff-only落主），归档/清理；v2组件区域/条件挂卸/活区域≤4/bool高槽修正在案；独立final pass（subagent上下文）；AG021按SD-01候选§2配方消费 |
@@ -60,16 +76,33 @@
 
 043/044均已交付；055与ag-examples/022可并行准备M3输入，AG022最终容量建议等055实际研究结果，正式M3产品能力不倒灌M2。本轮只规划，不建树/运行/接管实现。取号独占核主检出、归档及所有注册worktree的本仓合同：原counter050落后于已存在050..053，上批取054/055时推进至056；本批另路线已取056/057，本批取058/059推进060。不覆盖其它合同，未来新号仍重新核现场。
 
+## 拆分路线下一批（2026-11-05）
+
+| 主合同 | 状态与边界 |
+|---|---|
+| [052原生exe生成器](archived/052-rust-exe-codegen-fix-for-app-backs.md) | archived5/5、64aef780交付；OS054接正式修复继续组合 |
+| [053宿主多API与栈修复](archived/053-desktop-host-multi-api-surface-and-stack-fix.md) | archived/r2，6/6；UI 9a94d568、lang 61207576b正式交付与清理完成 |
+| [056原子多文件Reload](056-atomic-multifile-reload-and-schema-lifecycle.md) | drafting/r1、0/8；坏源腿及最终交付接语言940，暂不实施 |
+| [057 Vue真实双App/Store隔离](057-vue-app-store-isolation-and-owner-lifecycle.md) | drafting/r1、0/7；接041/050/051，独立于完整Reload；暂不实施 |
+
+设计见[坏源/原子Reload/浏览器实例第二批](../design/autoui/atomic-reload-and-live-isolation-stage-two.md)，总调度见[拆分路线v27](../../../auto-lang/docs/plans/reports/v06-extraction-execution-roadmap.md)。AGE的054/055另线，OS055另仓同号不混用；三新合同未运行测试或实施。
+
 ## 下一批及真实执行顺序（2026-11-05）
 
 [全路线逐项状态](../design/autographics/plan-status-and-execution-order-2026-11-05.md)列全部本地AGE合同与交付来源，头部状态不能代真实完成。054已有唯一树/实现提交，头部drafting与执行记录不同步，按实施中未交付；不由本规划会话修改或提交其进度。055/AG022仍草案。
 
 | 本仓号 | 计划 | 状态与硬门 |
 |---|---|---|
-| 058 | [俯视二维控制/查询/精灵组合](058-age-topdown2d-queries-and-sprites.md) | drafting/r1/0-10；T-01可准备，T-02等055/AG022实交付及M2必需门齐，原预算最小链先证失败须replan |
+| 058 | [俯视二维控制/查询/精灵组合](058-age-topdown2d-queries-and-sprites.md) | drafting/r2/0-10；M2二维线，中立服务可与ACE并行，T-04起同源AV/A2R等981正式来源及原M1门；原最小样本/预算保留，未实施 |
 | 059 | [方向光/阴影作者链研究](archived/059-age-node3d-lighting-and-shadow-feasibility.md) | archived/r1/10-10；研究bounded-go：Auto标量绑定→真GPU；20轮研究Run/Stop及三路恢复；非正式Light API |
 
 主链054→AG021→M2结论；研究055与AG022准备、059可并行；M3二维正式链055→AG022＋M2收口→058→ag-examples/023。020仅M2后维护更名。056/057已由其它UI路线占用，本批独占重核取058/059，counter060；后续重新核现场，不覆盖其合同。
+
+## 拆分路线状态更新（2026-11-05，v27）
+
+UI052已交付；UI053已archived/r2/6-6并完成清理。UI060（索引、iced桌面outproc输入/刷新及真实native API）仍executing/r1/2-6，扩围与续接记录为准，当前合同已恢复[主检出](060-a2r-index-vm-semantics-and-desktop-outproc-input.md)；原owner继续执行，尚未正式交付。UI053/060分别为OS054的Vue/原生轨前置，不与OS060主题批次混用。UI056/057、语言940/942仍沿各自草案。
+
+OS055现已归档11/11，真实系统事件及载体闭环完成，OS061已executing2/9。仅更新状态，不改任何实施合同或代行验收；AGE054/055/058/059与本线分别管理。
 
 ## 债务/候选
 
@@ -91,3 +124,17 @@ r2文档原貌保留于本仓提交`6c7bcdccb08b6320e5920e704990ab6eaa515e41`；
 
 
 2026-11-05 UI055研究已交付：当前结论见[canonical可行性与容量](../specs/auto-graphics/topdown2d-feasibility.md)及[同号归档](archived/055-age-m3-topdown2d-feasibility-and-capacity.md)；055的旧规划状态由实际研究收据替代。AG022/058继续按其自身合同和已交付前置推进。
+
+
+## RQ完整功能子路线（2026-11-05新立，暂不实施）
+
+以[子路线](../design/autoui/renderqueue-refactoring-roadmap.md)为准；不重开683/690历史交付，不把未来ACE/AGE设为当前前置。
+
+- [061保真合同与可行性](061-rq-fidelity-contract-and-feasibility.md)：drafting r3，0/6。
+- [062无损绘制与资源](062-rq-lossless-rendering-and-resource-parity.md)：drafting r3，0/7，接061。
+- [063运行与输入](063-rq-vm-rust-runtime-and-input-parity.md)：drafting r3，0/7，接060正式修复与062。
+- [OS063双Host装配](../../../auto-os/docs/plans/063-rq-dual-host-assembly-and-parity.md)：drafting r3，0/7；OS062 Linux平台准入保原合同。
+
+2026-11-05 r2：四份合同补P-01～04性能机制、M-01～08 direct对比指标及AC-07/V-05～08；先基线后冻结预算，本轮不实施、不测量，任务数不变。
+
+2026-11-05 r3：四RQ草案范围/依赖复核，增加V-09接口兼容负控；绘图、运行、产品六格分层，明确UI060/OS062去重和OS063的UI策略接线。启动条件见[子路线§7](../design/autoui/renderqueue-refactoring-roadmap.md)；不实施、不更改在途合同。

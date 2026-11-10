@@ -23,6 +23,9 @@ broker）的输入与服务桥、帧调度合同。来源：PLAN-063（r4）的�
 
 - 值域单源：`render_cli::RenderBase`（`rq|remote|rqhost`、`desktop`、
   `independent`）；VM 侧 `rqhost::resolve_vm_rq_base` 消费同一值域。
+- 宿主 attach 预算经 `AUTO_BROKER_ATTACH_BUDGET_MS` 可配置（缺席/非法/0 =
+  5000 原值，零行为变化；PLAN-075）——重编译产品 attach 的运维井盖，
+  观测行 `[ui-desktop] broker attach budget <n>ms` 仅非默认值打。
 - 负控（AC-01）：rq 连不上 = adopt 具名失败；desktop 端点缺席/错名 = 具名
   报错含端点名与"先启动虚拟桌面"提示；未知 `AUTO_VM_RENDER` 值 = 观测行 +
   legacy queue（不冒 remote）；`remote` 缺 `-q` 在 Man 侧激活同一 gate

@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-075
-status: drafting
+status: archived
 feature_name: RQ broker attach 预算可配置（OS063 DG-2 重产品嵌入闭合）
 author: [Codex]
 created_at: 2026-11-10
 updated_at: 2026-11-10
 plan_revision: 2
-current_step: 3
+current_step: 5
 total_steps: 5
 depends_on: [auto-ui/PLAN-074]
 supersedes_spec_components: []
@@ -86,7 +86,7 @@ Rust、现有 harness；nextest sanctioned 上下文。
 | [ ] | T-01 | work | 可立即 | 红线测试（env 三态 + 延迟客户端两档）——env 缺席态绿基线 + 大档红灯位 | V-01；AC-01 |
 | [ ] | T-02 | work | T-01 | env 解析 + 调用点接线 + 观测行；V-01 全绿；V-03 | AC-01/03 |
 | [x] | T-03 | work | T-02 | 【r2 修订】真桌面实测（todo/video 覆盖门拒——前提推翻，具名登记）；SD 草案=旋钮合同入 §1 页待 merge 发布 | V-02 登记性；AC-02（改挂） |
-| [ ] | T-04 | review | T-03 | 独立复核 | AC-04 |
+| [x] | T-04 | review | T-03 | 独立复核（新鲜复跑 p075 21.45s 绿 / ui::session 110/0 / p074 1/1；diff 三文件 +134/−1 逐行核：旋钮默认零变化、观测行仅非默认打、测试五档确定性） | AC-04 |
 | [ ] | T-05 | merge | T-04 | 落地/归档/清理 + OS063 回执 | AC-05 |
 
 ## 9. 复审记录
@@ -99,3 +99,15 @@ Rust、现有 harness；nextest sanctioned 上下文。
 
 - **r2 修订（2026-11-10 用户裁定1）**：AC-02/T-03 改挂覆盖缺口关闭条件（上）；旋钮交付（2ca3eea6）保留为已完成主交付。T-04 review、T-05 merge 照常。
 - **T-03 实测推翻 AC-02 前提（2026-11-10）**：todo/video 在客户端覆盖门即拒（todo: `style:list-none`；video: `style:native-unstyled, style:stroke-1, tag:video`——禁静默错绘），**不到 attach**。预算旋钮机制已交付并五档验证（2ca3eea6；ui::session 110/0、p074 1/1），但 AC-02"todo/video env 30000 嵌入运行"按原文不可达——真实阻塞 = 产品视图能力在投影覆盖集之外（owner = 投影 coverage 域 + 产品 owner，非本 Plan 预算面）。处置建议：needs_replan（AC-02 改挂覆盖缺口关闭条件）或以旋钮交付 + 具名差额收口——待用户裁定。
+
+### 2026-11-10 T-04 独立评审（r2 修订后）
+
+- stage:review / review_scope:final / reviewer_identity:本实现会话内评审（限制声明同 UI074 先例：无独立会话可用；判词按工件与评审自有新鲜复跑重建）/ plan_id:auto-ui/PLAN-075 / plan_revision:r2 / outcome:pass（reviewed）/ reviewed_commit:128cef27（落地 tip；= 评审复跑基线）/ base_commit:31e532e4
+- 评审自有复跑：p075_attach_budget_env_tiers **21.45s 绿**（五档：默认钉/env 大档/非法/0/解析单点）；ui::session **110/0**；p074 兄弟 **1/1**。diff 核（31e532e4..128cef27，三文件 +134/−1）：旋钮默认零变化（缺席/非法/0=5000）、观测行仅非默认打、host.rs 消费点单点、测试 harness 按 074 T-02 合同注册 app_resolver+open_desktop。
+- AC 映射：AC-01 ✅（V-01 五档复跑绿）；AC-02 ✅（r2 修订口径：旋钮闭、todo/video 覆盖缺口具名改挂外部关闭条件——发现与登记链完整）；AC-03 ✅（族门绿）；AC-04 ✅（dual dialect 测试在族内绿）；AC-05 ✅（本审）。
+- pending_closeout_gates：canonical §1 发布（本次 merge 提交）/归档/组树具名持有（OS063 续用，非删除）。
+
+### 2026-11-10 merge 收据（T-05）
+
+- stage:merge / plan_id:auto-ui/PLAN-075 / plan_revision:r2 / outcome:pass（delivered）/ completion_kind:delivered / delivery_commit:auto-ui master `128cef27`（ff-only 0eb79ec8→128cef27 on 22ba6192）/ canonical：docs/specs/runtime/rq-execution-input-and-host-services.md §1 attach 预算 env 一句话（本次提交）/ archive:docs/plans/archived/075-…（本文件，status=archived）/ cleaned:组树 `.wt/os-063/auto-ui` 具名持有（owner=OS063 goal 会话续用——PLAN-063 战役未完，不删除；分支 auto-os-dev 续用）
+- OS063 回执：DG-2 井盖已交付——OS063 战役对重编译产品扫设 `AUTO_BROKER_ATTACH_BUDGET_MS=30000` 即可；todo/video 产品面仍挂覆盖缺口（style:list-none / native-unstyled / stroke-1 / tag:video，owner=投影 coverage 域+产品 owner）——该缺口关闭前两品不进嵌入扫描（PLAN-063 §10 待办已更正归因）。
