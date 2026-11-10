@@ -155,6 +155,8 @@ scope；未知归属 fail-closed；禁止 junction/symlink。
 
 ## 9. 复审记录
 
+2026-11-10 / stage:work | plan_id: PLAN-078 | plan_revision: r1 | outcome: pass(T-01 授权记录+开工) | worktree: D:/autostack/.wt/ui-078/auto-ui（新建，base=master 6b012f99） | branch: codex/plan-078-dev | task_ids: T-01 (in progress) | evidence: §10 D01 授权解释更新（用户目标续期指令=全链授权，UI-076 先例） | next: T-01 有界调查+真实滚轮探针
+
 2026-11-10 / stage:new / auto-ui/PLAN-078:r1 / outcome:pass（规划合同可审阅；
 纯文档，无实现/树/测试）/ next: 用户启动交付（先例口径：`/goal 完成计划078`）
 → T-01 起 0/6。依据=AG027 F-02/GAP-AG027-01 具名阻塞 + 候选 C 树观测事实
@@ -164,8 +166,14 @@ max=077 → 078，创建前唯一性复查通过。
 
 ## 10. 待澄清事项
 
-D01：**执行授权未给**——本计划 drafting 0/6，未建树/未改实现/未跑测试；
-交付启动沿用户明确指令（先例：`/goal 完成计划078`）。D02：若 T-01 裁定
+D01：**执行授权（2026-11-10 用户目标续期已给）**：用户在 PLAN-026 收口目标的
+连续两次续期指令中明确指名全链"启动 auto-ui/PLAN-078 端到端交付：修复
+GAP-AG027-01 → 本机 G04 原生 20/34+e 族会话使 verify_age_m1_editor_native
+PASS → 续 PLAN-026 T-08 签章摘要 → T-09 复审 → T-10/T-11 落主归档"；按
+UI-076 先例（/goal 机制=全链授权：work/review/有界修复/merge）记为交付授权，
+本条 2026-11-10 早前"执行授权未给"快照保留为历史。目标续期当时未获
+AskUserQuestion 交互应答，授权解释基于指令文本本身，记录于此供 review
+复核。D02：若 T-01 裁定
 "候选 C 已可滚"（F-02 会话时点晚于修复合入的时序误差），则 T-02 显式跳过、
 本计划以回归面+证据交付，AG026 直接解锁会话。D03：引擎 master 前进后
 AG026 已闭的同版并集是否需按 acceptance §3 重测——属 AG026 消费决策：
