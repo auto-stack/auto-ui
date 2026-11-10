@@ -5653,8 +5653,9 @@ fn generate_delivery_root_manifest(
     // 成员=app+受管闭包 vendored crates（line-tables-only），非成员=registry
     // 依赖（debug=false）——按实际成员集生效；块随包静态携带（可搬动，
     // 消费侧不读环境）。`full` 时仅 marker 注释（纯 cargo 默认 dev 全量）。
-    let profile_dev =
-        auto_api_gen::generated_build::managed_profile_toml(debug_policy).trim().to_string();
+    let profile_dev = auto_api_gen::generated_build::managed_profile_toml(debug_policy)
+        .trim()
+        .to_string();
     // PLAN-901 r2/§5.5：交付闭包含 web owner crate（PLAN-906 后仅
     // auto-web 以 version/edition/license.workspace 继承；合同包已迁语言
     // 仓、显式字段）——组内 web 根 [workspace.package] 表字节副本随根发行；
