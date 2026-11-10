@@ -2279,16 +2279,23 @@ mod tests {
     }
 
     /// 产品贴合（T-02）：Todo 同构组件（todo_list.at:63 `list-none m-0 p-0`
-    /// 挂 col）经 ensure_covered 过门 + queue 帧非空——修复后 Auto/queue
-    /// 形态对 Todo 真实可用（RqProjector 真渲，非仅覆盖表放行）。
+    /// 挂 col + input/button/checkbox 业务形态）经 ensure_covered 过门 +
+    /// queue 帧非空——修复后 Auto/queue 形态对 Todo 真实可用（RqProjector
+    /// 真渲，非仅覆盖表放行）。
     #[test]
     fn p077_todo_product_queue_renders() {
+        use crate::ui::component::Component;
         use crate::ui::desktop_protocol::endpoint::FrameSource;
         let src = r#"widget todo {
+    model { var text str = "" }
+    msg { AddTodo }
+    on { .AddTodo -> { .text = "added" } }
     view {
         col {
             style: "list-none m-0 p-0"
-            text "pending items"
+            input { value: .text, oninput: .SetText($0), placeholder: "add todo" }
+            button "add" { onclick: .AddTodo }
+            checkbox { label: "done", checked: false }
         }
     }
 }"#;
@@ -2304,6 +2311,40 @@ mod tests {
         let frame = projector.render_frame();
         assert!(!frame.ops.is_empty(), "Todo queue 帧非空（真实渲染）");
         assert!(projector.revision() >= 1);
+        // 业务形态在帧中可见：按钮标签文本 + checkbox 标记（渲染面消费
+        // 真实业务节点，非占位盒）。
+        let texts: Vec<&str> = frame
+            .ops
+            .iter()
+            .filter_map(|op| match op {
+                crate::ui::desktop_protocol::message::DrawOp::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            texts.iter().any(|t| t.contains("add")),
+            "按钮标签 'add' 应在帧中: {texts:?}"
+        );
+        // 消息驱动（新建业务语义入口）：dispatch AddTodo 后组件状态
+        // 更新 → 帧文本反映（.text = "added" → input 值可见；业务完整
+        // 语义/持久化归产品与 OS066 最终验收）。
+        projector
+            .component_mut()
+            .dispatch_named("AddTodo", None);
+        let frame2 = projector.render_frame();
+        let texts2: Vec<&str> = frame2
+            .ops
+            .iter()
+            .filter_map(|op| match op {
+                crate::ui::desktop_protocol::message::DrawOp::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            texts2.iter().any(|t| t.contains("added")),
+            "驱动后帧应含更新文本: {texts2:?}"
+        );
+        assert!(!frame2.ops.is_empty(), "驱动后帧仍非空");
     }
 
     /// 产品贴合（T-02）：Video 同构组件（viewport.at:53 `<video>`）在 queue
