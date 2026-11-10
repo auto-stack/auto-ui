@@ -181,10 +181,32 @@ pub(crate) fn framework_repo_root(from: &Path) -> Option<PathBuf> {
 /// name 蛇形 > pac name 原名（生成包名保 dash——hello-world.exe）> 目录名。
 /// 返回首个存在命中；全缺 = None。
 pub fn convention_native_exe(app_dir: &Path, name: Option<&str>) -> Option<PathBuf> {
+    convention_native_exe_with(app_dir, name, true)
+}
+
+/// PLAN-1003 复审 R1（F-1003-R1-02）：注册表**分类**用的在场判定——与
+/// [`convention_native_exe`] 同一发现序与同一身份规则（收据 context_id +
+/// 调试策略标签），但不读取发布件字节。逐次扫描对每个发布件做 sha256
+/// 实测 +81 ms/应用（10 应用扫描 812 ms vs 1.9 ms）；字节校验留给即将
+/// 执行/交出产物的路径（[`convention_native_exe`]/[`published_native_exe`]）。
+pub fn native_exe_present(app_dir: &Path, name: Option<&str>) -> bool {
+    convention_native_exe_with(app_dir, name, false).is_some()
+}
+
+fn convention_native_exe_with(
+    app_dir: &Path,
+    name: Option<&str>,
+    verify_bytes: bool,
+) -> Option<PathBuf> {
     // PLAN-910: receipt-first — the managed front member publishes its exe
     // into its own bin dir and records the absolute path; the convention
     // probes below remain the legacy fallback for pre-910 layouts.
-    if let Some(published) = published_native_exe(app_dir) {
+    let published = if verify_bytes {
+        published_native_exe(app_dir)
+    } else {
+        auto_generation_core::generated_build::discover_front_exe_identity(app_dir)
+    };
+    if let Some(published) = published {
         return Some(published);
     }
     let dir_name = app_dir.file_name()?.to_string_lossy().to_string();
@@ -292,7 +314,7 @@ fn entry_for_dir(
     //（Plan 020 G1 裁定）：render 过滤豁免 + 桌面可见性缺省翻转（主根
     // opt-in 语义对编译产物 App 无意义——编译即桌面 App）。
     let exe_backed = fields.contains_key("desktop_exe")
-        || convention_native_exe(dir, fields.get("name").map(|s| s.as_str())).is_some();
+        || native_exe_present(dir, fields.get("name").map(|s| s.as_str()));
     let render = fields
         .get("render")
         .cloned()
