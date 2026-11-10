@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-079
-status: execution_done
+status: reviewed
 feature_name: vm_bridge teardown-cancel owner-filter、picker 对话框生成稳定化与阅读主题种子链闭合
 author: [relay/009-session]
 created_at: 2026-11-11T00:00:00Z
-updated_at: 2026-11-11T01:30:00Z
+updated_at: 2026-11-11T02:00:00Z
 plan_revision: 1
-current_step: 6
+current_step: 7
 total_steps: 7
 supersedes_spec_components: []
 new_spec_components: []
@@ -191,6 +191,15 @@ UIA 诊断链（消费方 009 已建 uia_act.ps1 + picker harness，验收消费
   | findings: 无 needs_fix。注记：cancel_parked_by_fn 的 PLAN-711 原文档首句仍为旧签名措辞（下文已补 D1 段落），非语义问题。 | pending_closeout_gates: T-07（READER-009 换 pin 消费回归：82 叶零死亡 + picker 3 连无 NO DIALOG + theme F-derive 翻绿；驱动/代码 pin = 本 branch @ 9dd3fc27 + auto-lang 0b3fc9063） | evidence: 见 r1 work 收据（红证/压测/组回归命令与结果在盘）；本收据复核了 4 提交 diff（c241f796/89c5b718/08a5f320/9dd3fc27）、worktree 洁净度、依赖检出未改动、无 ledger/specs.json 写入 | next: review（T-07 消费方 READER-009 执行；其 round49 已登记"等 auto-ui owner-filter 修复交付后消费修复版+picker 门接回"）。
 
 - stage: goal | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | round: 2 | from: work | to: review | status: execution_done | outcome: pass（内部 review：work-owned 判定 pass；T-07 消费验证 pending） | worktree: D:/autostack/.wt/plan-079/auto-ui | commit: 9dd3fc27 | next: review（T-07/READER-009）
+
+- stage: review | review_scope: final | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | outcome: pass（AC-01..AC-04 全部验收；READER-009 会话不可达，T-07 消费回归由本会话按 009 既有协议执行：H 配方驱动/工具重建 + 换 pin 全矩阵） | worktree: D:/autostack/.wt/plan-079/auto-ui | branch: codex/plan-079-dev | reviewed_commit: 9dd3fc27 | base_commit: d0e1a688 | dependency_revisions: auto-lang@0b3fc9063（只读检出）、auto-web@bf72baab、auto-down@58ea33f | 消费仪器（新构建，嵌入修复后的 auto-ui@9dd3fc27）：driver=auto-plan079-fixed-ui.exe（sha 26aeb35c）、ui-tool=reader-079-fixed-ui.exe（sha 1fc06935）；消费侧 009 组 auto-ui 已换 pin @9dd3fc27；AUTO_DIALOG_DIAG=1 全程开启 | acceptance_results:
+  - **AC-01 pass**：负例红→绿 + 8 实例随机卸载压测 + 冻结并集 211 tests PASS（见 r1 work 收据）。
+  - **AC-02 pass（生成链定谳）**：3 连消费观察（run-04 全矩阵 + run-05/06 ui-vm 门）`[DLG-DIAG] host open_files enter filter=txt,md,markdown,epub` 均出现（t=509/502/515s，rfd 对话框生成链到达 host）；`host open_files exit n=0`（对话框完成）；picker-cancel 腿 3/3 PASS（CANCEL CLICKED——Win32 树确证 #32770 在场可交互）；PickFiles 段 3/3 park→resume（16.6-16.9s，无 `cancel fn=handler_bookshelf_PickFiles` 错杀行）；修复前对照=run87/88 全腿 45s NO DIALOG（段被杀→rfd 永不调用）。注记：mixed-batch 腿 dlg=NO DIALOG 仍现——UIA 树探针可见性工件（对话框在场已由 host enter/exit + cancel 腿双重确证），文件导入失败=probe-13 已知 DirectUI 输入限制（非本计划域）；根因留档见 plan-artifacts/plan-079/D2-decision-artifact.md。
+  - **AC-03 pass**：theme-gate `F-derive` + `FR-derive` **PASS**（all sentinels ok——宿主策略→阅读页 dark 派生哨兵绿）；FB/FR/SL PASS。
+  - **AC-04 pass（82 叶零死亡复证）**：run-04 全矩阵 82 cases `exit: PASS (q-exit=0)` + 0 panic/canary（app*.log 全扫）；run-05/06 同验（exit PASS）。会话全程经 host 退出请求结束——run87/88 的"无 host 请求自返/静默消失"签名缺席。
+  | findings: 无 needs_fix。已知无关 pending（非本计划域，009 既有登记）：S01-dark 宿主 family/mode 面、S02-S11 dark/编辑腿、cold-load-budget、batch 503 风暴腿、restart-identities/tags-state、epub-gate CDP 工具链腿、W-03 picker 叶（picker-gate spec 仍暂摘，8 叶 not_run）。 | pending_closeout_gates: 无（T-07 完成；W-03 picker 叶的接回=009 会话在 picker-gate spec 原样接回时执行，属消费方自有协议，不阻塞本计划归档） | next: merge
+
+- stage: goal | plan_id: auto-ui/PLAN-079 | plan_revision: r1 | round: 3 | from: review | to: merge | status: reviewed | outcome: pass（最终 review：三 AC 消费证据验收 + 82 叶零死亡复证） | worktree: D:/autostack/.wt/plan-079/auto-ui | commit: 9dd3fc27 | next: merge
 
 ## 10. 待澄清事项
 
