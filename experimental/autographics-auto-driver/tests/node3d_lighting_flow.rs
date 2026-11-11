@@ -300,6 +300,7 @@ fn v06_twenty_rounds_resize_zero_size_and_device_epoch() {
     };
     let l = light(Vec3::Z, 0.5, false);
     let start = Instant::now();
+    let warm = store.uploads.snapshot();
     for i in 0..20 {
         let mut p = MeshPipeline::new(&g, OffscreenTarget::FORMAT).unwrap();
         // device epoch 必须与管道一致（旧 epoch 拒绝）。
@@ -312,6 +313,12 @@ fn v06_twenty_rounds_resize_zero_size_and_device_epoch() {
         }
         drop(p);
         g.wait_idle();
+        // warm mesh 上传字节无增长（identity 去重，059 §9）。
+        assert_eq!(
+            store.uploads.snapshot().bytes_rewritten,
+            warm.bytes_rewritten,
+            "round {i}: warm mesh must not re-upload"
+        );
     }
     assert!(start.elapsed().as_secs() < 120, "20 rounds too slow");
 }
@@ -422,6 +429,7 @@ fn get_r_shadow() int {return r_shadow}
     vm.close();
     assert!(!alive(), "session owner released on close");
 }
+
 
 
 
