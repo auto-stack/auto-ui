@@ -65,7 +65,34 @@ uniform；替换候选失败不动当前代，Stop 最后 owner 释放；新 epo
 - 旧触面：全部 `sample_light()` 调用点仍在 prototype 内部 host 用例，
   `LightDef` 结构未变；prototype lib 35/35、textured_models 4/4 绿。
 
-## 5. Pending（T-04 并入）
+## 5. 受影响命名 case 并集（T-06 冻结，中立部分）
+
+| Case / 入口 | 范围 | 状态 |
+|---|---|---|
+| `experimental/autographics-prototype/tests/node3d_lighting.rs`（2 cases） | 中立端口→GPU 像素 oracle、拒绝保 last-good | 绿（T-02） |
+| `experimental/autographics-auto-driver/tests/node3d_lighting_flow.rs`（4 cases） | V-02/V-03/V-05/V-06 中立验证 | 绿（T-03） |
+| prototype `src/render3d/light.rs` 单测（5） | 域边界/非法近邻/up 回退 | 绿（T-02） |
+| driver `tests/node3d_runtime_flow.rs` vs06 | 坏 world 拒绝→修复→恢复、20 轮 Run/Stop | 既有绿，T-05 复用 |
+| prototype `tests/textured_models.rs`、lib 35 项 | 旧触面回归 | 绿 |
+| 主 checkout `tests/surface_review_r2.rs` | 预存编译缺陷（缺 `hud_overlay` 字段，master HEAD 同败，非本计划引入） | 不修，merge 不扩无关门 |
+
+冷消费：AG030 只消费本 spec 冻结的公共 typed 端口（`LightParams`/`LightDef`）
+与数值域，不复制引擎实现；其 T-03 配方入口为
+`examples/m2/directional-light/` + `tools/verify_directional_light.py`（AG030
+创建），须 UI080 落主与 979/981 A 接口齐后实施。
+
+## 6. G3-C01..06 身份与限制（逐项，T-06 登记）
+
+| ID | 中立已验证（T-02/T-03） | 待作者整链（T-04，979/981 A 切片后） |
+|---|---|---|
+| G3-C01 | 单灯 typed 端口、第二灯 GPU 前拒绝、last-good | Node 声明/原 span/包实例身份、实例事件 2:1 |
+| G3-C02 | 方向有限非零/归一化/up 回退、energy∈[0,1]、color∈[0,1]、非均匀缩放法线 | 作者值经 AV/A2R 双端生效 |
+| G3-C03 | 单张 2048² Depth32Float 硬阴影、开关/移动正反控 | 作者源改 shadow 开关/遮挡位置 |
+| G3-C04 | opaque 参与投影/受影、逆转置法线、culling/bias 保留 | 同源资产双端一致 |
+| G3-C05 | —（需 979/981） | 同源 AV/A2R 真实 rustc/GPU、改 Auto 常量双端变化 |
+| G3-C06 | 准入/失败保旧、resize/零尺寸、device epoch、20 轮 owner | 作者 Run/Stop 与最后 owner 释放 |
+
+## 7. Pending（T-04 并入）
 
 同源 Node 声明 → 979 共同前门 → 981 SOURCE/SESSION/RUST/LANGUAGE A 切片 →
 AV 开发/新 A2R 真实 rustc 编译/真实 GPU 的作者整链；V-01（声明/span/实例
