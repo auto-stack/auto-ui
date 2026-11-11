@@ -3695,7 +3695,19 @@ impl DynamicComponent {
                 // 原样保留。
                 let _handler_missing =
                     matches!(_e, crate::ui::vm_bridge::VmBridgeError::HandlerNotFound(_));
-                let _framework_probe = _handler_missing && clean_name.starts_with("__");
+                // PLAN-068 T-07 (V-05): 纯 emit 子件（msg 声明但子件无自有
+                // handler，如 TreeView.Toggle/Select——父路由回送在下方
+                // handler-less declarative 分支照常派发）的 HandlerNotFound
+                // 是常态，与 `__` 框架探针同列降 debug；041 实机每次点击
+                // 树节点此前刷一行 error syslog 噪音，功能实际正常。
+                let _emit_route_hit = _handler_missing
+                    && crate::ui::child_emit::lookup_route(
+                        &emit_widget,
+                        &format!("on{}", clean_name),
+                    )
+                    .is_some();
+                let _framework_probe =
+                    _handler_missing && (clean_name.starts_with("__") || _emit_route_hit);
                 if !_framework_probe {
                     // PLAN-042 T-03：VM handler 失败入环（三层采集③）——
                     // face 归因：source_path 父目录/文件干（app 仓形态

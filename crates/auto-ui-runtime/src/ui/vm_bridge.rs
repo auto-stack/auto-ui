@@ -4323,9 +4323,18 @@ impl VmBridge {
             // PLAN-041 T-12：框架探测事件（`__` 前缀）按契约可选——缺失
             // 静默降 debug（否则 __mcp_heartbeat/__scroll_state_read 每
             // 2s 单行刷屏，75s 空闲 28 行实录）；用户代码 handler 原样。
-            if event_name.starts_with("__") {
+            // PLAN-068 T-07 (V-05)：纯 emit 子件（msg 声明但子件无自有
+            // handler，如 TreeView.Toggle/Select——父路由回送由 dynamic
+            // 派发链照常执行）的 HandlerNotFound 同为常态，降 debug
+            //（041 树点击实机：功能正常，仅此前刷 stderr 噪音）。
+            let _emit_route_hit = crate::ui::child_emit::lookup_route(
+                widget_name,
+                &format!("on{}", event_name),
+            )
+            .is_some();
+            if event_name.starts_with("__") || _emit_route_hit {
                 log::debug!(
-                    "[CALL_HANDLER_FOR_NOT_FOUND] fn_name={} not in exports (framework probe)",
+                    "[CALL_HANDLER_FOR_NOT_FOUND] fn_name={} not in exports (probe/emit-child)",
                     fn_name
                 );
             } else {
