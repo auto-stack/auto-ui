@@ -448,6 +448,21 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（扩展诊断在册，门控）。
 
+### T-04c-10 复验尝试轮（新机器窗续，worktree 最新）
+
+- **bookswitch-20**：跑至腿 A 阅读（sync tap=true computed=35 在册），
+  probe 快照仍无 onclick；MCP 后亡。
+- **bookswitch-21**：早死（阅读腿前）；**副产品=merge 修复在
+  `__bounds_collected` 泵中稳定运行**（bounds-merge diag 正常逐帧输出，
+  无恐慌）——修复本体无稳定性问题。
+- **判定**：live 复验仍被机器窗口击杀（本轮 2 死）；修复已部署且泵内
+  行为稳定。剩余验证（快照 onclick 在场 + press 派发 + W-07 五叶）
+  待稳定窗复跑 bookswitch（同命令）。
+- **注意**：run 20 的失败快照仍是"行内容在/onclick 缺"形态——修复后
+  泵合并应保留 sync 记录，该形态若在稳定窗复现，则下一嫌疑=泵与 sync
+  的**写序**（泵先于 sync 用旧 prev 合并）→ 届时在 merge diag 加
+  prev_tap 时序定位。
+
 ### T-04c-10 修复落地 + live 复验机器阻塞（同日深夜，944dcdcb）
 
 - **修复已落**（host.rs `__bounds_collected` 臂，944dcdcb）：from_live
