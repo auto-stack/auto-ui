@@ -291,6 +291,30 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   （零迭代全空）形态不同——转绿后若 bookswitch 快照仍缺 computed，
   下一嫌疑=PLAN-725 提升帧/bounds 回路，勿混两案。
 
+### T-04c-4 outlet 层清白定谳（同日，worktree 提交）
+
+- **红锚转绿**：`plan081_outlet_page_for_rows_survive_memo_two_frame_timeline`
+  转 green 常驻锚（第三锚）。红相根因=**测试台三项伪影**（非产品缺陷）：
+  ①直调 `prepare` 未套 `OUTLET_INIT_IDENTITY` 守卫（outlet 渲染期
+  thread-local，装饰 identity 的唯一来源）→ 写读对象错位；②子字段段落=
+  根数组 VmRef——写必须穿引用原地改根数组（对齐 VM SET_FIELD 语义）；
+  ③子实例事件携带实例身份=`DynamicMessage::TypedInst`（PLAN-041），
+  测试匹配器须双型接受。
+- **累计清白面**：编译器投影 / 渲染 View（含 TypedInst/outlet 子件/
+  ScrollAnchorMark 透传）/ probe 记录 / 两帧时序 / outlet+memo 集成——
+  **全部单元级清白**（plan081 三锚常驻）。
+- **live 缺陷（行内容在、computed 缺失）剩余嫌疑面**（唯一未测层）：
+  ①PLAN-725 提升帧构建（frame_build/AbstractView 中间层的 probe 路径）；
+  ②`__bounds_collected` from_live 覆盖（debug 门——harness 无 F12，疑可
+  排除但未证）；③MCP autoui_action 对容器 press 的语义（歧义在案）。
+- **测试台教训入档**（后续锚作者必读）：outlet 子件探针断言须 (a) 套
+  OUTLET_INIT_IDENTITY 守卫、(b) 经 VmRef 语义写状态、(c) TypedInst 双型
+  匹配；阅读页 Init ~16s（四段 HTTP）——壳先渲染，行判定须等
+  `onclick: .TapParagraph` 在场而非 Contents。
+- **下一步（T-04c-5）**：PLAN-725 提升帧 probe 路径核对（projection.rs
+  frame_build 来源的 probe 与 build_with_debug 的 path 空间差异）——
+  若提升层丢记录即 product fix 位；随后 bookswitch/W-07 复验。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
