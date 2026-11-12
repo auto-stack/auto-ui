@@ -199,6 +199,37 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
 - **用户裁定（2026-11-12）**：D1/D2 收束，"plan-081 只留 D3"；AutoUI 自制
   文件选择器组件方向另议；桌面侵入式实验禁行（须先征得同意）。
 
+### T-04b 定谳证据（2026-11-12 下午，root cause 已锁定到渲染投影层）
+
+- **复现矩阵**：hctx-run3（仪器工具，全矩阵）——W-07 五叶全断
+  `handler node not visible: TapParagraph`（与 run97 同签名）；
+  本轮 S02-S12 级联为截图工具环境故障（非应用）；batch-503 族维持。
+- **确定性廉价复现**：bookswitch_probe（boot→卡行→阅读页，plan-081/
+  bookswitch-3）——**首访即复现**：¶ 行内容渲染（¶0/¶1 + 正文文本 + 书题）
+  但行上 `onclick: .TapParagraph(p.idx)` 与 style 数组**整块缺失**，
+  A/B/C 三书一致；vnode id 与 run3 失败快照逐位相同（模板稳定 id）。
+- **快照忠实性定谳**：autoui_snapshot 来自 styled vtree（mcp_server.rs:1560
+  `build_aura_from_styled_vtree`）——快照=渲染树忠实反映；PRE-RENDER 回退
+  有显式标注（排除）。即 **View::Column.onclick 在这些行上确为 None**。
+- **测量教训入档**：阅读页 Init ~16-18s（books/toc/chapter/annotations 四段
+  HTTP）——Contents 壳先渲染；+5s 快照=壳态（早期探针的"有 onclick"误读
+  已纠正：7 个 onclick 全是工具栏钮）。
+- **排除项**：route_id 空指针说（probe 证伪：back push 落正确 /book/:id，
+  详情页在 probe-3 编辑链全绿）；theme 切换（theme-probe-2：暗/亮后 60s 内
+  详情正常）；套间/父窗（T-01）；`[VM-INIT] … cancelled (generation
+  superseded)` 为设计内 teardown-cancel（079 owner-filter 域）非本因。
+- **根因定位（假设→下一轮验证）**：渲染投影层丢属性——内层 col 的
+  onclick+三元数组 style 同时缺失而子内容正常。两条候选：
+  ① auto-ui-compiler 模板投影对该构造（for 内 onclick 带循环变量载荷 +
+  嵌套三元数组 style）丢属性——查编译产物模板即判；
+  ② runtime view-builder 的 set_layout_events/extract_style 在该形态下
+  失败——单测二分（for + scroll-anchor 外层 + onclick(p.idx) 内层）。
+  注：events.rs:28 在案同族前科（"onclick: .SetAccent(\"indigo\") were
+  dropped (param not in bindings)"已修字面量臂；循环变量臂未证）。
+- **下一步（T-04c）**：查编译产物（UI cache 定位或 compiler 单测直投
+  reading_page.at 抽取块）→ 定谳①/② → 修复 + 单元锚（for 载荷 onclick
+  渲染断言）→ bookswitch_probe 复跑（tap_rows>0 为过）→ W-07 五叶。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
