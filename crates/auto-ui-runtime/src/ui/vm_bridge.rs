@@ -208,6 +208,7 @@ pub struct VmBridge {
     /// RefCell for the same render-path interior-mutability reason as
     /// `child_state_map`.
     child_instances: std::cell::RefCell<std::collections::HashMap<String, ChildInstanceRecord>>,
+    instance_callback_routes: std::cell::RefCell<std::collections::HashMap<(u64, String), crate::ui::child_emit::ParentRoute>>,
 
     /// PLAN-041 T-02: instance identities seen during the current / previous
     /// view build frame. An identity registered last frame but absent this
@@ -919,6 +920,7 @@ impl VmBridge {
             widget_name,
             child_state_map: std::cell::RefCell::new(std::collections::HashMap::new()),
             child_instances: std::cell::RefCell::new(std::collections::HashMap::new()),
+            instance_callback_routes: Default::default(),
             instance_seen_cur: std::cell::RefCell::new(std::collections::HashSet::new()),
             instance_seen_prev: std::cell::RefCell::new(std::collections::HashSet::new()),
             child_instances_released: std::cell::RefCell::new(std::collections::HashSet::new()),
@@ -1176,6 +1178,7 @@ impl VmBridge {
             widget_name,
             child_state_map: std::cell::RefCell::new(std::collections::HashMap::new()),
             child_instances: std::cell::RefCell::new(std::collections::HashMap::new()),
+            instance_callback_routes: Default::default(),
             instance_seen_cur: std::cell::RefCell::new(std::collections::HashSet::new()),
             instance_seen_prev: std::cell::RefCell::new(std::collections::HashSet::new()),
             child_instances_released: std::cell::RefCell::new(std::collections::HashSet::new()),
@@ -2236,6 +2239,24 @@ impl VmBridge {
     }
 
     /// PLAN-041 T-02: current state object id for an instance identity.
+    /// Callback ownership follows the actual child instance, including routed
+    /// parents. Type-wide process routes are only a legacy root-state fallback.
+    pub(crate) fn record_instance_callback(&self, child: u64, key: &str, route: crate::ui::child_emit::ParentRoute) {
+        self.instance_callback_routes.borrow_mut().insert((child, key.to_lowercase().replace('_', "")), route);
+    }
+
+    pub(crate) fn instance_callback(&self, child: u64, widget: &str, key: &str) -> Option<crate::ui::child_emit::ParentRoute> {
+        if child == self.state_obj_id {
+            return crate::ui::child_emit::lookup_route(widget, key);
+        }
+        self.instance_callback_routes.borrow().get(&(child, key.to_lowercase().replace('_', ""))).cloned()
+    }
+
+    pub(crate) fn callback_parent_state(&self, child: u64) -> Option<u64> {
+        if child == self.state_obj_id { return Some(child); }
+        self.child_instances.borrow().values().find(|record| record.state_obj_id == child).map(|record| record.parent_state_id)
+    }
+
     pub fn child_instance_state_id(&self, identity: &str) -> Option<u64> {
         self.child_instances
             .borrow()
@@ -2636,6 +2657,7 @@ impl VmBridge {
         let Some(rec) = self.child_instances.borrow_mut().remove(identity) else {
             return;
         };
+        self.instance_callback_routes.borrow_mut().retain(|(child, _), _| *child != rec.state_obj_id);
         // Cancel by the original receiver before releasing its fields. A late
         // HTTP/CPU continuation must never mutate the surviving App root or
         // a fresh instance with the same textual key.

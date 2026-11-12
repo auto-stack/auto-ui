@@ -1,0 +1,28 @@
+use auto.file
+
+widget selector {
+    msg { Open, Accepted(str), Cancelled }
+    model {
+        var pickerOpen bool = false
+        var result str = ""
+        var cancelCount int = 0
+    }
+    view {
+        col (style: "p-6 gap-4 w-full h-full bg-background text-foreground") {
+            button "选择文件" { onclick: .Open }
+            text f"选择结果 ${.result}"
+            text f"取消次数 ${.cancelCount}"
+            FileDialog (open: .pickerOpen, onaccepted: .Accepted($event), oncancelled: .Cancelled) {}
+        }
+    }
+    on {
+        .Open -> { .pickerOpen = true }
+        .Accepted(files str) -> {
+            .result = files
+            .pickerOpen = false
+            let output str = Env.get("FILE_DIALOG_RESULT_PATH")
+            if output != "" { file.write_text(output, files) }
+        }
+        .Cancelled -> { .cancelCount = .cancelCount + 1; .pickerOpen = false }
+    }
+}

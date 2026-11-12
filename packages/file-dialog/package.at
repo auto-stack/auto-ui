@@ -1,0 +1,4 @@
+name: "file-dialog"
+version: "0.1.0"
+namespace: "auto"
+description: "AutoUI in-app file selection component"

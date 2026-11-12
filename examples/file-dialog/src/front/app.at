@@ -1,0 +1,5 @@
+widget App {
+    use { package: file_dialog from "../../../../packages/file-dialog" }
+    routes { "/" -> use selector }
+    view { col (style: "w-full h-full") { outlet } }
+}

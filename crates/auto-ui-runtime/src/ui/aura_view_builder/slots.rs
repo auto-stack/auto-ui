@@ -527,17 +527,14 @@ impl<'a> AuraViewBuilder<'a> {
         if let Some(psink) = self.mount_path_sink {
             psink.register(&page_widget.name);
         }
-        Self::record_child_callback_routes_for(
-            self.widget_name.clone(),
-            page_widget.name.clone(),
-            empty_props,
-            empty_events,
-        );
         let child_state_id = self.prepare_child_render_state_with_identity(
             page_widget,
             empty_props,
             bindings,
             &pinned_identity,
+        );
+        self.record_child_callback_routes_for(
+            child_state_id, self.widget_name.clone(), page_widget.name.clone(), empty_props, empty_events,
         );
         let _slot_scope = ScopedSlotOverride {
             cell: &self.slot_resolution_override,

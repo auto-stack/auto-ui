@@ -89,6 +89,8 @@ pub struct DynamicComponent {
     /// VM bridge for state management and handler execution.
     bridge: VmBridge,
 
+    file_dialog_io: crate::ui::file_dialog::ComponentIo,
+
     /// PLAN-031 T-03：本组件（App/窗口）的主题作用域。`Some` 时 `view*`
     /// 构建入口临时安装它（family/mode/目录/design 的 App 级隔离）；
     /// `None` = 未绑定主题的 legacy 路径（仍走进程级槽位）。
@@ -444,6 +446,7 @@ impl DynamicComponent {
 
         Ok(Self {
             bridge,
+            file_dialog_io: Default::default(),
             theme_scope: None,
             view_template,
             named_templates: widget
@@ -579,6 +582,7 @@ impl DynamicComponent {
 
         Ok(Self {
             bridge,
+            file_dialog_io: Default::default(),
             theme_scope: None,
             view_template,
             named_templates: widget
@@ -815,6 +819,7 @@ impl DynamicComponent {
 
         Ok(Self {
             bridge,
+            file_dialog_io: Default::default(),
             theme_scope: None,
             view_template,
             named_templates: view_widget
@@ -877,6 +882,7 @@ impl DynamicComponent {
 
         Ok(Self {
             bridge,
+            file_dialog_io: Default::default(),
             theme_scope: None,
             view_template,
             named_templates: widget
@@ -2363,6 +2369,7 @@ impl DynamicComponent {
         }
 
         // 5. Update self
+        self.file_dialog_io = Default::default();
         self.bridge = new_bridge;
         self.view_template = new_widget.view_tree.clone();
         self.named_templates = new_widget
@@ -2976,17 +2983,17 @@ impl DynamicComponent {
     /// `VmBridge::call_handler`. Called before the Iced event loop starts so
     /// initial state (e.g. `build_month_grid(...)`) is populated before the
     /// first render.
-    /// PLAN-051 C2: 派发宿主回调路由。统一 state 架构下父 handler 与子
-    /// handler 共享同一根态对象（ensure_child_state 直写根态），故直接以
-    /// 当前 state_obj_id 调用父 widget 的 namespaced handler。
+    /// Dispatch a child callback against its recorded parent instance. Routed
+    /// pages and keyed parents do not share the App root state object.
     fn dispatch_parent_route(
         &mut self,
         child: &str,
+        child_state_id: u64,
         event: &str,
         route: &crate::ui::child_emit::ParentRoute,
         payload: auto_val::Value,
     ) {
-        let state_id = self.bridge.state_obj_id();
+        let Some(state_id) = self.bridge.callback_parent_state(child_state_id) else { return; };
         // 趋同修复汇流（PLAN-059 T9 musk DeleteConfirmDialog + auto-down
         // PLAN-051 T11 demo SettingsPopover.Close 双实证）：零参父 handler
         // 不得塞 Nil 载荷——调用帧从 [self] 变 [self, Nil],handler 体内
@@ -3198,6 +3205,11 @@ impl DynamicComponent {
         input_value: Option<String>,
         instance: Option<&str>,
     ) {
+        // Component IO only commits between VM segments. Child Tick events use
+        // the same event loop and keep the owning App responsive while scanning.
+        if !self.bridge.has_cpu_continuations() {
+            self.dirty |= self.file_dialog_io.pump(&mut self.bridge);
+        }
         // Split the Send carrier before interpreting the type's @seq suffix.
         // The opaque instance may itself contain @, route slashes or keyed data.
         // An explicit instance argument wins, but never becomes part of the type.
@@ -3599,7 +3611,7 @@ impl DynamicComponent {
                             .bridge
                             .write_state("__emit_msg", auto_val::Value::str(""));
                         let emit_key = format!("on{}", pending_msg);
-                        match crate::ui::child_emit::lookup_route(&emit_widget, &emit_key) {
+                        match self.bridge.instance_callback(state_obj_id, &emit_widget, &emit_key) {
                             Some(route) => {
                                 if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
                                     eprintln!(
@@ -3613,6 +3625,7 @@ impl DynamicComponent {
                                 }
                                 self.dispatch_parent_route(
                                     &emit_widget,
+                                    state_obj_id,
                                     &pending_msg,
                                     &route,
                                     payload,
@@ -3626,7 +3639,7 @@ impl DynamicComponent {
                 // `on<name>` 绑定（musk `send(str)` + `onsend: .SendInput($event)`
                 // 形态；载荷 = 子 handler 收到的首实参，无实参回落输入值）。
                 let emit_key = format!("on{}", clean_name);
-                match crate::ui::child_emit::lookup_route(&emit_widget, &emit_key) {
+                match self.bridge.instance_callback(state_obj_id, &emit_widget, &emit_key) {
                     Some(route) => {
                         if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
                             eprintln!(
@@ -3644,7 +3657,7 @@ impl DynamicComponent {
                             .cloned()
                             .or_else(|| input_value.clone().map(|t| auto_val::Value::Str(t.into())))
                             .unwrap_or(auto_val::Value::Nil);
-                        self.dispatch_parent_route(&emit_widget, &clean_name, &route, payload);
+                        self.dispatch_parent_route(&emit_widget, state_obj_id, &clean_name, &route, payload);
                     }
                     None => {
                         // 非错：未绑定回调的子 msg 不回送（vue 同语义）。
@@ -3654,9 +3667,9 @@ impl DynamicComponent {
                 // 快照实参回送（017-chat DoSend → on_send(.draft) →
                 // App.SendMessage(text) 形态）。
                 for (callback, payload) in stripped_payloads {
-                    match crate::ui::child_emit::lookup_route(&emit_widget, &callback) {
+                    match self.bridge.instance_callback(state_obj_id, &emit_widget, &callback) {
                         Some(route) => {
-                            self.dispatch_parent_route(&emit_widget, &clean_name, &route, payload);
+                            self.dispatch_parent_route(&emit_widget, state_obj_id, &clean_name, &route, payload);
                         }
                         None => {
                             eprintln!(
@@ -3759,7 +3772,7 @@ impl DynamicComponent {
                     // 回落输入值）。
                     let emit_key = format!("on{}", clean_name);
                     if let Some(route) =
-                        crate::ui::child_emit::lookup_route(&emit_widget, &emit_key)
+                        self.bridge.instance_callback(state_obj_id, &emit_widget, &emit_key)
                     {
                         let payload = args
                             .first()
@@ -3772,7 +3785,7 @@ impl DynamicComponent {
                                 emit_widget, clean_name, route.parent_widget, route.handler
                             );
                         }
-                        self.dispatch_parent_route(&emit_widget, &clean_name, &route, payload);
+                        self.dispatch_parent_route(&emit_widget, state_obj_id, &clean_name, &route, payload);
                         self.dirty = true;
                     }
                 }

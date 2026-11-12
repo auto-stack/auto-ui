@@ -276,6 +276,8 @@ impl<'a> AuraViewBuilder<'a> {
     /// 派发侧以 "on"+子 msg 名（声明式）或剥离调用名（体内式）查表。每帧重建
     /// 重放，同键后写覆盖。
     pub(super) fn record_child_callback_routes_for(
+        &self,
+        child_state_id: u64,
         parent_widget: String,
         child_name: String,
         props: &HashMap<String, AuraPropValue>,
@@ -307,8 +309,8 @@ impl<'a> AuraViewBuilder<'a> {
             } else {
                 format!("on{}", cleaned)
             };
-            crate::ui::child_emit::record_route(
-                &child_name,
+            self.bridge.record_instance_callback(
+                child_state_id,
                 &folded_key,
                 crate::ui::child_emit::ParentRoute {
                     parent_widget: parent_widget.clone(),
@@ -327,8 +329,8 @@ impl<'a> AuraViewBuilder<'a> {
             let Some((handler, params)) = callback_prop_route(expr) else {
                 continue;
             };
-            crate::ui::child_emit::record_route(
-                &child_name,
+            self.bridge.record_instance_callback(
+                child_state_id,
                 key,
                 crate::ui::child_emit::ParentRoute {
                     parent_widget: parent_widget.clone(),
@@ -364,14 +366,11 @@ impl<'a> AuraViewBuilder<'a> {
         if let Some(psink) = self.mount_path_sink {
             psink.register(&child_widget.name);
         }
-        Self::record_child_callback_routes_for(
-            self.widget_name.clone(),
-            child_widget.name.clone(),
-            props,
-            events,
-        );
         let (child_state_id, instance_identity, init_props) =
             self.prepare_child_render_state_snap(child_widget, props, bindings);
+        self.record_child_callback_routes_for(
+            child_state_id, self.widget_name.clone(), child_widget.name.clone(), props, events,
+        );
         // Plan 437 Phase 2: 子组件 Init 补发 —— 此前 VM 轨只有根 widget 的
         // Init 会触发(fire_init),视图中实例化的子组件 Init 从不运行,
         // 派生计算型组件(chart 几何)在 VM 轨无渲染期计算路径(vue 轨
@@ -484,12 +483,6 @@ impl<'a> AuraViewBuilder<'a> {
         if let Some(psink) = self.mount_path_sink {
             psink.register(&child_widget.name);
         }
-        Self::record_child_callback_routes_for(
-            self.widget_name.clone(),
-            child_widget.name.clone(),
-            props,
-            events,
-        );
         // PLAN-814 R9-03：count_keyed_loops_free 在 ui-iced 门内——诊断
         // 输出随同门（headless 构建无 iced 布局诊断面）。
         if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
@@ -502,6 +495,9 @@ impl<'a> AuraViewBuilder<'a> {
 
         let (child_state_id, instance_identity, init_props) =
             self.prepare_child_render_state_snap(child_widget, props, bindings);
+        self.record_child_callback_routes_for(
+            child_state_id, self.widget_name.clone(), child_widget.name.clone(), props, events,
+        );
         // Plan 437 Phase 2: 同 render_child_widget —— 子组件 Init 补发
         // (tracked 双胎保持同一渲染语义)。
         self.fire_child_init_if_any(

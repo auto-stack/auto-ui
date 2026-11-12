@@ -11,6 +11,7 @@
 pub use auto_val;
 
 pub mod component;
+pub mod file_dialog;
 
 // PLAN-716 组B: 帧时间戳观测通道（供②——AUTO_FRAME_BENCH 门控零开销；
 // VM 内建 9918/9919 + a2r 臂同源，SD-B 契约）。
