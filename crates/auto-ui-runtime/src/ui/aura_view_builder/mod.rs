@@ -9195,8 +9195,10 @@ mod plan080_rowclass_probe_tests {
         let mut cols = Vec::new();
         collect_cols(&view, &mut cols);
         let clicked = cols.iter().any(|(oc, _)| {
-            oc.is_some_and(|m| {
-                matches!(m, DynamicMessage::Typed { event_name, .. } if event_name == "TapParagraph")
+            oc.is_some_and(|m| match m {
+                DynamicMessage::Typed { event_name, .. } => event_name == "TapParagraph",
+                DynamicMessage::TypedInst { event_name, .. } => event_name == "TapParagraph",
+                _ => false,
             })
         });
         if !clicked {
@@ -9350,7 +9352,6 @@ mod plan080_rowclass_probe_tests {
     /// outlet 子页且 memo 缺省 on——帧 1（paragraphs 空）fill 缓存空行产物，
     /// 帧 2（段落就位）命中/重建后的 probe 记录必须完整。
     #[test]
-    #[ignore = "PLAN-081 T-04c 红锚：outlet memo 命中重放丢失帧 2 行 probe 记录（segments 未入 dep 集→version_fast 陈旧重放）；修复待 T-04c-3，转绿即收"]
     fn plan081_outlet_page_for_rows_survive_memo_two_frame_timeline() {
         use auto_ui_dialect::{UiCode, UiStmt};
         use auto_lang_core::parser::Parser;
@@ -9499,8 +9500,10 @@ mod plan080_rowclass_probe_tests {
             let builder0 =
                 AuraViewBuilder::with_registry(&bridge, "App081", &registry)
                     .with_routes(&routes);
-            // 与渲染路径同身份：route 装饰 identity（child_init_identity）经
-            // override 注入 prepare——否则落到未装饰对象，写读错位。
+            // 与渲染路径同身份：outlet 渲染期的 OUTLET_INIT_IDENTITY
+            // thread-local（OutletInitIdentityGuard）是装饰输入——测试直调
+            // 必须套同一守卫，否则 child_init_identity 返回未装饰名。
+            let _id_guard = OutletInitIdentityGuard::set("/reader");
             let pinned = builder0.child_init_identity(
                 &child_for_prepare,
                 &std::collections::HashMap::new(),
@@ -9520,16 +9523,20 @@ mod plan080_rowclass_probe_tests {
         println!(
             "plan081-diag: prepare child_state_id={child_state_id} identity={_ident}"
         );
-        bridge
-            .write_state_onto(
-                child_state_id,
-                "paragraphs",
-                auto_val::Value::Array(auto_val::Array::from(vec![
-                    mk(0, "k0", "para zero"),
-                    mk(1, "k1", "para one"),
-                ])),
-            )
-            .unwrap();
+        // live 写穿语义：子字段持有根数组 VmRef（prepare 实测 4000001）——
+        // 原地改根数组（非替换子字段），对齐 VM SET_FIELD 穿引用语义。
+        {
+            use auto_lang_core::vm::types::ListData;
+            let obj = bridge.vm().get_heap_object(4_000_001).expect("root array");
+            let mut g = obj.write().unwrap();
+            let list = g
+                .as_any_mut()
+                .downcast_mut::<ListData<Value>>()
+                .expect("root paragraphs is ListData");
+            list.elems.clear();
+            list.elems.push(mk(0, "k0", "para zero"));
+            list.elems.push(mk(1, "k1", "para one"));
+        }
         {
             use auto_lang_core::vm::generic_registry::GenericInstanceData;
             let back = bridge.vm().get_heap_object(child_state_id).and_then(|o| {
@@ -9566,8 +9573,8 @@ mod plan080_rowclass_probe_tests {
                     View::Column { onclick, children, .. }
                     | View::Row { onclick, children, .. } => {
                         if matches!(onclick.as_ref(),
-                            Some(DynamicMessage::Typed { event_name, .. })
-                            if event_name == "TapParagraph")
+                            Some(m)
+                            if matches!(m, DynamicMessage::Typed { event_name, .. } | DynamicMessage::TypedInst { event_name, .. } if event_name == "TapParagraph"))
                         {
                             return true;
                         }
@@ -9575,8 +9582,8 @@ mod plan080_rowclass_probe_tests {
                     }
                     View::Container { child, onclick, .. } => {
                         if matches!(onclick.as_ref(),
-                            Some(DynamicMessage::Typed { event_name, .. })
-                            if event_name == "TapParagraph")
+                            Some(m)
+                            if matches!(m, DynamicMessage::Typed { event_name, .. } | DynamicMessage::TypedInst { event_name, .. } if event_name == "TapParagraph"))
                         {
                             return true;
                         }
