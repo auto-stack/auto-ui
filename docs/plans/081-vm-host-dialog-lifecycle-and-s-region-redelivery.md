@@ -377,6 +377,23 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   （若=采样/重播种窗口→prepare 链修；若=数据层→Init 写径修）；
   ③bookswitch 快照 onclick 在场 + W-07 五叶；④T-05 review 交棒。
 
+### T-04c-7 首轮尝试：机器阻塞加重实录（同日深夜，9af5f605 后）
+
+- **四连死**：bookswitch-10/11/12/13 工具进程全部在阅读页附近死亡
+  （10 装载期/11、13 阅读 Init 复得后/12 同期），MCP 拒连，app.log 无
+  panic 截断；跨**两个构建**（扩展诊断版/回退简单诊断版）与**两种诊断
+  形态**——13 的回退版在书架帧就**零 sync 行**（9 版同帧有行）。
+- **事件日志**：19:01:52 BlueScreen/LiveKernelEvent ×4 实锤；其后 1h
+  内查询未见新 WER（查询面部分失效，未定谳）——机器不稳仍为首要
+  嫌疑，但"四连死于同一页"的非随机性要求下一轮做 **A/B 隔离**：
+  已知存活构建（bookswitch-9 时代）×当前机器复跑一次——存活=当前
+  构建回归（查 diff）；死亡=机器（继续等待稳定窗）。
+- **A/B 复跑命令**（bookswitch-9 构建重建法）：worktree checkout
+  2b3e503d 的 projection.rs → cargo build -p auto-ui-tools → 部署为
+  T06_UI_TOOL → bookswitch 复跑。
+- **状态**：worktree @ 9af5f605 后（诊断回退已提交）干净；红/绿锚与
+  生产插桩（prepare/同步块双点，门控）在册。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
