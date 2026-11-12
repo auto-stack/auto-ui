@@ -179,7 +179,15 @@ fn install_root_self_ref(vm: &mut AutoVM, state_obj_id: u64) {
     }
 }
 
+fn next_host_owner_id() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
 pub struct VmBridge {
+    /// Process-unique host owner identity. Heap ids are local to a VM and
+    /// therefore cannot identify an App across different initialized VMs.
+    host_owner_id: u64,
     /// AutoVM instance (owned, isolated per widget)
     vm: AutoVM,
 
@@ -705,6 +713,7 @@ impl Drop for VmBridge {
 }
 
 impl VmBridge {
+    pub(crate) fn host_owner_id(&self) -> u64 { self.host_owner_id }
     /// Audit B12(b): declared parameter count per `(widget, event)` handler.
     /// Dispatch sites use this to avoid pushing a phantom string argument at
     /// a NO-param handler (mcp submit/type pass the input text as
@@ -914,6 +923,7 @@ impl VmBridge {
         }
 
         Ok(Self {
+            host_owner_id: next_host_owner_id(),
             vm,
             state_obj_id,
             state_field_names: field_names,
@@ -1172,6 +1182,7 @@ impl VmBridge {
         }
 
         Ok(Self {
+            host_owner_id: next_host_owner_id(),
             vm,
             state_obj_id,
             state_field_names: field_names,

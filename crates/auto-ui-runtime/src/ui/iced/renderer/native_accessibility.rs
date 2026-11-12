@@ -2,6 +2,7 @@
 //! No VM object or debug/MCP tree crosses the platform adapter boundary.
 use super::{AbstractView, IcedMessage};
 use crate::ui::dynamic::DynamicComponent;
+use crate::ui::component::Component;
 use accesskit::{
     Action, ActionData, ActionHandler, ActionRequest, ActivationHandler, Node, NodeId, Rect, Role,
     Toggled, TreeId, TreeInfo, TreeUpdate,
@@ -40,13 +41,15 @@ fn shared(window: iced::window::Id) -> Shared {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Owner {
+    app: u64,
     root: u64,
     identity: Option<String>,
     receiver: u64,
 }
 impl Owner {
     fn alive(&self, component: &DynamicComponent) -> bool {
-        self.root == component.bridge().state_obj_id()
+        self.app == component.bridge().host_owner_id()
+            && self.root == component.bridge().state_obj_id()
             && self
                 .identity
                 .as_ref()
@@ -63,9 +66,11 @@ struct Entry {
     change: Option<IcedMessage>,
     focus: Option<iced::widget::Id>,
     bounds: Option<Rectangle>,
+    path: Vec<u16>,
 }
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct Key {
+    app: u64,
     path: Vec<usize>,
     parent: u64,
     receiver: u64,
@@ -338,6 +343,14 @@ pub(super) fn resolve(
         if !entry.owner.alive(component) || entry.node.is_disabled() || entry.bounds.is_none() {
             return None;
         }
+        let current_view = component.view();
+        // Revalidate at consumption, including requests queued from semantics
+        // published before a modal opened. No background system action may
+        // bypass the same live scope used by native input and MCP.
+        if !entry.owner.alive(component) || !crate::ui::modal::allows_path(&current_view, &entry.path)
+            || crate::ui::modal::at_path(&current_view, &entry.path).is_none() {
+            return None;
+        }
         match envelope.action {
             Requested::Click => entry.click.clone().map(Dispatch::Message),
             Requested::Focus => entry.focus.clone().map(Dispatch::Focus),
@@ -351,6 +364,7 @@ pub(super) fn resolve(
 }
 
 struct Build {
+    app: u64,
     state: Shared,
     root: u64,
     root_widget: String,
@@ -363,6 +377,7 @@ struct Build {
     keys: HashMap<Key, u64>,
     roots: Vec<NodeId>,
     occurrences: HashMap<(u64, Role, String), usize>,
+    modal_scope: Option<Vec<u16>>,
 }
 pub(super) fn with_scope<R>(
     window: iced::window::Id,
@@ -403,6 +418,7 @@ pub(super) fn with_scope<R>(
         })
         .collect();
     let build = Build {
+        app: component.bridge().host_owner_id(),
         state,
         root: component.bridge().state_obj_id(),
         root_widget: component.widget_name().to_string(),
@@ -413,6 +429,7 @@ pub(super) fn with_scope<R>(
         keys: HashMap::new(),
         roots: vec![],
         occurrences: HashMap::new(),
+        modal_scope: None,
     };
     let previous = BUILD.with(|slot| slot.replace(Some(build)));
     struct Restore(Option<Build>);
@@ -428,6 +445,7 @@ pub(super) fn with_scope<R>(
 }
 fn bind(build: &Build, message: Option<&IcedMessage>) -> (Owner, Option<IcedMessage>) {
     let root = Owner {
+        app: build.app,
         root: build.root,
         receiver: build.root,
         identity: None,
@@ -470,6 +488,7 @@ fn bind(build: &Build, message: Option<&IcedMessage>) -> (Owner, Option<IcedMess
         message.widget = format!("{widget}\u{1}{identity}");
         (
             Owner {
+                app: build.app,
                 root: build.root,
                 identity: Some(identity),
                 receiver,
@@ -509,6 +528,12 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
     BUILD.with(|slot| {
         let mut slot = slot.borrow_mut();
         let build = slot.as_mut()?;
+        if path.is_empty() {
+            build.modal_scope = crate::ui::modal::active_content_path(view);
+        }
+        let view_path: Vec<u16> = path.iter().map(|index| *index as u16).collect();
+        let modal_blocked = build.modal_scope.as_ref().is_some_and(|scope| !view_path.starts_with(scope));
+        let modal_ancestor = build.modal_scope.as_ref().is_some_and(|scope| scope.starts_with(&view_path));
         let shared_action_focus = match view {
             AbstractView::Button { onclick, disabled: false, .. } => Some(onclick),
             AbstractView::Checkbox { on_toggle: Some(message), .. } => Some(message),
@@ -693,6 +718,10 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
                     false,
                 ),
             };
+        // Ancestors must stay enabled so the system does not inherit a disabled
+        // state into the active modal; their own background actions are removed.
+        let disabled = disabled || (modal_blocked && !modal_ancestor
+            && (click.is_some() || change.is_some() || focus.is_some() || button_focus));
         let primary = click.or(change);
         let (owner, bound) = bind(build, primary);
         let owner_bound = primary.is_none() || bound.is_some();
@@ -713,6 +742,7 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             0
         };
         let key = Key {
+            app: build.app,
             path: if primary.is_some() {
                 vec![]
             } else {
@@ -739,7 +769,7 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             }
         };
         build.keys.insert(key, id);
-        let focus = if disabled || !owner_bound {
+        let focus = if disabled || !owner_bound || modal_blocked {
             None
         } else {
             shared_action_focus.clone().or(focus).or_else(|| {
@@ -755,7 +785,7 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
         }
         if disabled {
             node.set_disabled();
-        } else {
+        } else if !modal_blocked {
             if click.is_some() {
                 node.add_action(Action::Click);
             }
@@ -788,10 +818,11 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             Entry {
                 node,
                 owner,
-                click: click.clone(),
-                change,
+                click: if modal_blocked { None } else { click.clone() },
+                change: if modal_blocked { None } else { change },
                 focus: focus.clone(),
                 bounds,
+                path: view_path,
             },
         );
         if let Some(parent) = build.stack.last() {
@@ -809,10 +840,10 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             state: build.state.clone(),
             id,
             focus,
-            click: if disabled { None } else { click },
+            click: if disabled || modal_blocked { None } else { click },
             // Button/Checkbox now expose their actual cross-platform widget
             // focus. Keep the legacy semantic focus owner only for other roles.
-            button_focus: button_focus && shared_action_focus.is_none() && !disabled && owner_bound,
+            button_focus: button_focus && shared_action_focus.is_none() && !disabled && owner_bound && !modal_blocked,
         })
     })
 }
@@ -1329,6 +1360,50 @@ mod tests {
         remove(window);
     }
     #[test]
+    fn plan082_system_actions_obey_the_current_modal_even_before_republication() {
+        let source = r#"
+widget App {
+    msg { Open, Close, Background }
+    model {
+        var open bool = false
+        var count int = 0
+    }
+    view {
+        col {
+            button "background" { onclick: .Background }
+            dialog (open: .open, onclose: .Close, closeOnOutside: false) {
+                dialog-content { button "inside" { onclick: .Close } }
+            }
+        }
+    }
+    on {
+        .Open -> { .open = true }
+        .Close -> { .open = false }
+        .Background -> { .count = .count + 1 }
+    }
+}
+"#;
+        let mut component = crate::build_dynamic_component(source, None).unwrap();
+        let window = iced::window::Id::unique();
+        render(window, &mut component, &HashMap::new());
+        let named = |label: &str| {
+            let state = shared(window); let state = state.lock().unwrap();
+            *state.nodes.iter().find(|(_, entry)| entry.node.label() == Some(label)).unwrap().0
+        };
+        let background = named("background");
+        component.call_widget_handler("App", "Open", &[]).unwrap();
+        assert!(matches!(resolve(window, &component, &request(background, Requested::Click)), Some(Dispatch::Rejected)), "queued pre-modal semantics must not escape the live modal");
+        render(window, &mut component, &HashMap::new());
+        assert!(shared(window).lock().unwrap().nodes[&background].node.is_disabled());
+        let inside = named("inside");
+        apply(window, &mut component, inside, Requested::Click);
+        assert!(matches!(resolve(window, &component, &request(inside, Requested::Click)), Some(Dispatch::Rejected)), "closed modal controls must reject old system actions");
+        render(window, &mut component, &HashMap::new());
+        apply(window, &mut component, named("background"), Requested::Click);
+        assert_eq!(component.bridge().read_state("count").unwrap(), auto_val::Value::Int(1));
+        remove(window);
+    }
+    #[test]
     fn plan082_action_focus_is_shared_with_system_semantics_and_activates_once() {
         use crate::ui::component::Component;
         use iced_test::runtime::{core::{clipboard, renderer::Headless}, user_interface};
@@ -1606,6 +1681,7 @@ mod tests {
         let mut component = fixture();
         let other = fixture();
         render(window, &mut component, &HashMap::new());
+        let _ = other.view();
         let a = find(window, "/Probe#a", Role::Button);
         assert!(matches!(
             resolve(window, &other, &request(a, Requested::Click)),

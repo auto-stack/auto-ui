@@ -1,5 +1,13 @@
 widget App {
+    msg { ToggleTheme }
+    model { var dark_mode bool = false }
     use { package: file_dialog from "../../../../packages/file-dialog" }
     routes { "/" -> use selector }
-    view { col (style: "w-full h-full") { outlet } }
+    view {
+        col (style: "w-full h-full bg-background text-foreground") {
+            button "切换明暗" { onclick: .ToggleTheme }
+            outlet
+        }
+    }
+    on { .ToggleTheme -> { .dark_mode = !.dark_mode } }
 }

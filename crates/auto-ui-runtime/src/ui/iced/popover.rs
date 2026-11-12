@@ -133,11 +133,23 @@ impl<Message> Widget<Message, iced::Theme, iced::Renderer> for Popover<'_, Messa
 where
     Message: Clone + 'static,
 {
+    fn tag(&self) -> widget::tree::Tag { widget::tree::Tag::of::<ModalOpenState>() }
+
+    fn state(&self) -> widget::tree::State { widget::tree::State::new(ModalOpenState(self.open)) }
+
     fn children(&self) -> Vec<Tree> {
         vec![Tree::new(&self.anchor), Tree::new(&self.content)]
     }
 
     fn diff(&self, tree: &mut Tree) {
+        let previous = tree.state.downcast_mut::<ModalOpenState>();
+        let reopened = self.open && !previous.0;
+        previous.0 = self.open;
+        if reopened && self.placement == PopoverPlacement::ModalExplicit && tree.children.len() == 2 {
+            // A new explicit modal session must expose its initial focused
+            // input, rather than retain a previous session's scrolled viewport.
+            tree.children[1] = Tree::new(&self.content);
+        }
         tree.diff_children(&[self.anchor.as_widget(), self.content.as_widget()]);
     }
 
@@ -313,6 +325,8 @@ where
         });
     }
 }
+
+struct ModalOpenState(bool);
 
 impl<'a, Message> From<Popover<'a, Message>> for Element<'a, Message>
 where
