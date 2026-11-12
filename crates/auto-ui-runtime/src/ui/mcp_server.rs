@@ -1634,6 +1634,14 @@ fn tool_snapshot(shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
     // 大树 build_aura 期间 UI 线程发帧不再等这把锁（P625-D1 AppHang 结构
     // 面孔的根修）。回退路径（首帧前源模板，小树、低频）保持原锁内语义。
     if let Some(snap) = shared.clone_styled_vtree() {
+        if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
+            let serve_tap = snap
+                .computed
+                .values()
+                .any(|c| c.events.iter().any(|(_, h)| h.contains("TapParagraph")));
+            let n = snap.computed.len();
+            eprintln!("[MEMO-DIAG] serve computed={n} serve_tap={serve_tap}");
+        }
         let layout_bounds = if include_bounds {
             shared.get_layout_bounds().clone()
         } else {
