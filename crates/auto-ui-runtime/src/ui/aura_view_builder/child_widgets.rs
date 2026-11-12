@@ -200,6 +200,12 @@ impl<'a> AuraViewBuilder<'a> {
             &prop_names,
             &resolved_props,
         );
+        if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
+            eprintln!(
+                "[MEMO-DIAG] prepare identity={identity} state_id={child_state_id} parent_state={parent_state_id} paragraphs_in_resolved={}",
+                resolved_props.get("paragraphs").map(|v| format!("{v:?}")).unwrap_or("ABSENT".into())
+            );
+        }
         let mut snapshot = resolved_props
             .into_iter()
             .collect::<Vec<(String, auto_val::Value)>>();

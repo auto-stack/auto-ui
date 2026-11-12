@@ -9469,6 +9469,11 @@ mod plan080_rowclass_probe_tests {
             auto_val::Value::Array(auto_val::Array::from(Vec::<auto_val::Value>::new())),
         );
         seed.insert("cur".to_string(), auto_val::Value::Int(0));
+        // live 形态：__current_route 在场（路由装饰 identity 的输入）。
+        seed.insert(
+            "__current_route".to_string(),
+            auto_val::Value::str("/reader"),
+        );
         bridge.ensure_child_state("reader081", &[], &seed);
         {
             let builder = AuraViewBuilder::with_registry(&bridge, "App081", &registry)
@@ -9512,6 +9517,9 @@ mod plan080_rowclass_probe_tests {
             builder0.instance_identity_override.set(None);
             out
         };
+        println!(
+            "plan081-diag: prepare child_state_id={child_state_id} identity={_ident}"
+        );
         bridge
             .write_state_onto(
                 child_state_id,
@@ -9522,6 +9530,17 @@ mod plan080_rowclass_probe_tests {
                 ])),
             )
             .unwrap();
+        {
+            use auto_lang_core::vm::generic_registry::GenericInstanceData;
+            let back = bridge.vm().get_heap_object(child_state_id).and_then(|o| {
+                let g = o.read().unwrap();
+                let inst = g.as_any().downcast_ref::<GenericInstanceData>()?;
+                inst.field_names.iter().position(|n| n == "paragraphs")
+                    .and_then(|i| inst.fields.get(i))
+                    .map(|v| format!("{v:?}"))
+            });
+            println!("plan081-diag: post-write readback={back:?}");
+        }
 
         // 帧 2：memo 判定（命中重放 vs 重建）——行事件记录必须在。
         {
