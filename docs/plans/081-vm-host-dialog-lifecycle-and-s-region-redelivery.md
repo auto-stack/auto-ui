@@ -323,10 +323,16 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
 - **outlet 单测结构富化**（嵌套 `if .loaded{if .is_real{scroll-pane{…for…}}}`
   + 工具栏兄弟 + `loaded` 两段写）——**全绿**（walker 补 `View::Scrollable`
   透传后）；builder 层对该结构依旧清白。
-- **live 分界点锁定（假设，待单测复现）**：失败快照中 computed 缺失的 ¶ 行
-  位于 `if .is_epub { doc-surface… }` 分支**之后**，有 computed 的工具栏在其
-  **之前**——doc-surface 条件分支的 path 记账（aura 结构路径 vs vtree
-  视图路径，分支未走/特殊变体层级差）为根因唯一位点。
+- **live 分界点（修正）**：失败快照里 **for 迭代 ¶ 行**无 computed，而
+  静态节点（页眉工具栏**和页脚 ← Prev/Next→**——页脚在行之后）均有
+  onclick——判别维度=**迭代行 vs 静态节点**，非位置分界；前记
+  "doc-surface 分支位置分界"作废（页脚反证）。
+- **单测现状**：富化结构（嵌套条件+scroll-pane+工具栏+页脚后置兄弟）
+  builder 级**全绿**——live 剩余增量清单（下一轮逐项加到红）：
+  ①scroll-pane 的 `controller: .rsc` 绑定 + style 数组含模型引用
+  （.theme_body_cls）；②行内 `if p.mark_n > 0` 等子条件；③段落条目
+  富字段（kind/img/lks）；④`if .is_epub { doc-surface }` 分支本体
+  （TXT=未走臂）；⑤段落条目为堆 VmRef 形态。
 - **live 交互面再证**：bookswitch-8 `autoui_inspect` 行 vnode 仅
   `kind: Column` 无 onclick/actions + press 不派发——inspect/action 读
   computed 面，与快照同源（三证一因）。
