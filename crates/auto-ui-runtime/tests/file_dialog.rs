@@ -196,9 +196,8 @@ fn package_fixture_builds_and_opens_a_real_component_instance() {
     wait(&mut component, |view| {
         format!("{view:?}").contains(&expected)
     });
-    // Let the component observe its parent's closed prop before reopening.
-    component.on_with_input_for_instance_type("FileDialog", "Tick", None);
-    let _ = component.view();
+    // A real consumer can reopen as soon as the callback closes the parent;
+    // no extra component clock is allowed to repair the missed closed edge.
     component.on_with_input_for_instance_type("selector", "Open", None);
     let _ = component.view();
     wait(&mut component, modal_open);

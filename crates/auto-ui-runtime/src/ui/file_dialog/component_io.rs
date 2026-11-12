@@ -87,12 +87,22 @@ impl ComponentIo {
                     events: VecDeque::new(),
                 };
             }
+            // Parent props are refreshed by view construction, independently
+            // of the 50ms component clock. Observe a closed prop at every host
+            // boundary so an immediate reopen cannot miss the false edge.
+            let desired_open = matches!(bridge.read_instance_state(&identity, "open"), Ok(Value::Bool(true)));
+            if !desired_open {
+                if matches!(bridge.read_instance_state(&identity, "seen_open"), Ok(Value::Bool(true))) {
+                    changed |= bridge.write_instance_state(&identity, "seen_open", Value::Bool(false)).is_ok();
+                }
+                slot.model.cancel();
+            }
             let command = text(bridge, &identity, "fd_command");
             if !command.is_empty() && command != slot.last_command {
                 slot.last_command = command.clone();
                 match serde_json::from_str::<Command>(&command) {
                     Ok(Command::Open { config }) => {
-                        if slot.model.open(config) {
+                        if desired_open && slot.model.open(config) {
                             slot.events.clear();
                             changed |= write(bridge, &identity, "fd_event", String::new());
                         }

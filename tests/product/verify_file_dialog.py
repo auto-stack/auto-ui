@@ -330,6 +330,14 @@ $toggle.Toggle()
 
 def run(args):
     root = Path(__file__).resolve().parents[2]
+    # The isolated app is outside the worktree group: pin source discovery
+    # explicitly instead of falling back to moving main checkouts.
+    dependency_roots = {}
+    for name in ['lang','ui','man','web','down']:
+        source = root.parent/('auto-'+name)
+        require(source.is_dir(),f'Missing pinned dependency root: {source}')
+        os.environ['AUTO_'+name.upper()+'_ROOT'] = str(source)
+        dependency_roots[name] = str(source)
     out = args.out_dir.resolve()
     require(not out.exists(), f'Use a fresh output directory: {out}')
     out.mkdir(parents=True)
@@ -354,7 +362,7 @@ def run(args):
         # is app-local configuration; do not rewrite the user's global config.
         (app/'am.at').write_text('index: { default: '+json.dumps(args.index_repo)+' }\n',encoding='utf-8')
     report = {'platform':sys.platform, 'scope':'narrow_visual' if args.visual_only else 'full_native_vm', 'graphics_backend':os.environ.get('ICED_BACKEND','default'), 'auto':{'path':str(args.auto_bin),'sha256':sha(args.auto_bin)},
-              'ui_tool':{'path':str(args.ui_tool_bin),'sha256':sha(args.ui_tool_bin)},'sessions':[]}
+              'ui_tool':{'path':str(args.ui_tool_bin),'sha256':sha(args.ui_tool_bin)},'dependency_roots':dependency_roots,'sessions':[]}
     session = None
     try:
         session = Session(args,app,out,1)
