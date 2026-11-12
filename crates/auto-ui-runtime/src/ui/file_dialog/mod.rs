@@ -9,6 +9,12 @@ use std::sync::{
     mpsc, Arc,
 };
 
+mod model;
+pub use model::{
+    DialogConfig, DialogEvent, DialogModel, FileChoice, FileSystem, Filter, LocalFileSystem,
+    Navigation, Projection, Row, SelectionMode,
+};
+
 #[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
 pub struct Entry {
     pub name: String,
@@ -18,7 +24,7 @@ pub struct Entry {
     pub size: u64,
 }
 
-#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct Failure {
     pub code: String,
     pub message: String,
@@ -26,6 +32,13 @@ pub struct Failure {
 }
 
 impl Failure {
+    pub fn new(code: &str, message: impl Into<String>, retryable: bool) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            retryable,
+        }
+    }
     fn io(path: &Path, error: std::io::Error) -> Self {
         use std::io::ErrorKind;
         Self {
@@ -81,7 +94,7 @@ pub fn list_directory(path: &Path, cancelled: &AtomicBool) -> Result<Listing, Fa
         #[cfg(windows)]
         let hidden = {
             use std::os::windows::fs::MetadataExt;
-            name.starts_with('.') || metadata.file_attributes() & 2 != 0
+            name.starts_with('.') || metadata.file_attributes() & (2 | 4) != 0
         };
         #[cfg(not(windows))]
         let hidden = name.starts_with('.');
@@ -168,80 +181,5 @@ impl Drop for DirectoryRequest {
     }
 }
 
-struct InstanceRequest {
-    state_id: u64,
-    generation: i64,
-    io: DirectoryRequest,
-}
-
-/// Private component/provider protocol, owned by the App's DynamicComponent.
-/// The .at component requests work using ordinary model fields, and consumes a
-/// JSON projection on its next Tick. This is not a language builtin or an OS
-/// dialog replacement. Worker results are never given access to the VM.
-#[derive(Default)]
-pub(crate) struct ComponentIo {
-    instances: std::collections::HashMap<String, InstanceRequest>,
-}
-
-impl ComponentIo {
-    pub fn pump(&mut self, bridge: &mut super::vm_bridge::VmBridge) -> bool {
-        use auto_val::Value;
-        let live = bridge.child_instance_identities_of_type("FileDialog");
-        self.instances.retain(|key, _| live.contains(key));
-        let mut changed = false;
-        for identity in live {
-            let active = matches!(
-                bridge.read_instance_state(&identity, "fd_active"),
-                Ok(Value::Bool(true))
-            );
-            if !active {
-                self.instances.remove(&identity);
-                continue;
-            }
-            let Some(state_id) = bridge.child_instance_state_id(&identity) else {
-                continue;
-            };
-            let generation = match bridge.read_instance_state(&identity, "fd_request") {
-                Ok(Value::Int(n)) => n as i64,
-                _ => continue,
-            };
-            let path = match bridge.read_instance_state(&identity, "fd_path") {
-                Ok(Value::Str(s)) => s.to_string(),
-                _ => continue,
-            };
-            let slot = self
-                .instances
-                .entry(identity.clone())
-                .or_insert_with(|| InstanceRequest {
-                    state_id,
-                    generation: -1,
-                    io: DirectoryRequest::default(),
-                });
-            if slot.state_id != state_id || slot.generation != generation {
-                slot.state_id = state_id;
-                slot.generation = generation;
-                let path = if path.is_empty() {
-                    dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
-                } else {
-                    PathBuf::from(path)
-                };
-                if let Err(error) = slot.io.start(path) {
-                    let reply = serde_json::json!({"generation":generation,"ok":false,"error":error});
-                    changed |= bridge
-                        .write_instance_state(&identity, "fd_reply", Value::str(reply.to_string()))
-                        .is_ok();
-                }
-            }
-            if let Some(result) = slot.io.poll() {
-                let reply = match result {
-                    Ok(listing) => serde_json::json!({"generation":generation,"ok":true,"listing":listing}),
-                    Err(error) => serde_json::json!({"generation":generation,"ok":false,"error":error}),
-                };
-                changed |= bridge
-                    .write_instance_state(&identity, "fd_reply", Value::str(reply.to_string()))
-                    .is_ok();
-            }
-        }
-        changed
-    }
-}
+mod component_io;
+pub(crate) use component_io::ComponentIo;

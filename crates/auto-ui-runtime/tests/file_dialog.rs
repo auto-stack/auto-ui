@@ -70,7 +70,66 @@ fn superseded_request_and_cancel_cannot_publish_old_results() {
 
 #[test]
 fn package_fixture_builds_and_opens_a_real_component_instance() {
+    use auto_ui_runtime::ui::dynamic::DynamicComponent;
+    use auto_ui_runtime::ui::{
+        interpreter::DynamicMessage,
+        view::{PopoverPlacement, View},
+    };
     use auto_ui_runtime::Component;
+    fn modal_open(view: &View<DynamicMessage>) -> bool {
+        match view {
+            View::Popover {
+                placement: PopoverPlacement::Modal,
+                open,
+                ..
+            } => *open,
+            View::Column { children, .. } | View::Row { children, .. } => {
+                children.iter().any(modal_open)
+            }
+            View::Container { child, .. } | View::Scrollable { child, .. } => modal_open(child),
+            _ => false,
+        }
+    }
+    fn checkboxes(view: &View<DynamicMessage>, out: &mut Vec<DynamicMessage>) {
+        match view {
+            View::Checkbox {
+                on_toggle: Some(message),
+                ..
+            } => out.push(message.clone()),
+            View::Popover {
+                open: true,
+                content,
+                ..
+            } => checkboxes(content, out),
+            View::Column { children, .. } | View::Row { children, .. } => {
+                for child in children {
+                    checkboxes(child, out);
+                }
+            }
+            View::Container { child, .. } | View::Scrollable { child, .. } => {
+                checkboxes(child, out)
+            }
+            _ => {}
+        }
+    }
+    fn wait(
+        comp: &mut DynamicComponent,
+        condition: impl Fn(&View<DynamicMessage>) -> bool,
+    ) -> View<DynamicMessage> {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            comp.on_with_input_for_instance_type("FileDialog", "Tick", None);
+            let view = comp.view();
+            if condition(&view) {
+                return view;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "fixture did not reach expected state: {view:?}"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
     let app = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/file-dialog/src/front/app.at");
     let source = std::fs::read_to_string(&app).unwrap();
@@ -80,44 +139,66 @@ fn package_fixture_builds_and_opens_a_real_component_instance() {
     component.on_with_input_for_instance_type("selector", "Open", None);
     let _ = component.view();
     component.drive_scheduler_to_quiescence(16);
-    component.on_with_input_for_instance_type("FileDialog", "Tick", None);
-    let debug = format!("{:?}", component.view());
-    assert!(
-        debug.contains("转到"),
-        "package modal must contain an actionable path control: {debug}"
-    );
-    assert!(debug.contains("Popover") && debug.contains("Modal"), "must use the production modal primitive: {debug}");
+    let view = wait(&mut component, modal_open);
+    assert!(format!("{view:?}").contains("转到"));
     let files = tempfile::tempdir().unwrap();
     let selected = files.path().join("中文 book.txt");
     std::fs::write(&selected, "independent fixture").unwrap();
-    assert!(component.on_with_input_for_instance_type("FileDialog", "SetPath", Some(files.path().to_str().unwrap().into())));
+    std::fs::write(files.path().join("中文 book2.txt"), "second").unwrap();
+    assert!(component.on_with_input_for_instance_type(
+        "FileDialog",
+        "SetPath",
+        Some(files.path().to_str().unwrap().into())
+    ));
     assert!(component.on_with_input_for_instance_type("FileDialog", "Go", None));
-    let deadline = Instant::now() + Duration::from_secs(5);
-    let canonical = std::fs::canonicalize(&selected).unwrap();
-    loop {
-        component.on_with_input_for_instance_type("FileDialog", "Tick", None);
-        let tree = format!("{:?}", component.view());
-        if tree.contains("中文 book.txt") { break; }
-        assert!(Instant::now() < deadline, "current IO result never rendered: {tree}");
-        std::thread::sleep(Duration::from_millis(10));
+    let view = wait(&mut component, |view| {
+        format!("{view:?}").contains("中文 book2.txt")
+    });
+    let mut actions = Vec::new();
+    checkboxes(&view, &mut actions);
+    assert_eq!(actions.len(), 2);
+    // Replay two actual view-bound checkbox events without a timer between
+    // them. A single undrained command slot would silently lose the first.
+    for action in actions {
+        let DynamicMessage::TypedInst {
+            widget_name,
+            event_name,
+            args,
+            instance,
+        } = action
+        else {
+            panic!("checkbox event lost its instance");
+        };
+        let [auto_val::Value::Str(id)] = args.as_slice() else {
+            panic!("checkbox row id missing: {args:?}");
+        };
+        let event = format!("{event_name}\u{1f}s\u{1f}{id}");
+        component.on_with_input_for_instance(&widget_name, &event, None, Some(&instance));
     }
-    let choose = format!("Choose\u{1f}s\u{1f}{}", canonical.to_str().unwrap());
-    assert!(component.on_with_input_for_instance_type("FileDialog", &choose, None));
+    wait(&mut component, |view| {
+        format!("{view:?}").contains("已选 2 项")
+    });
     assert!(component.on_with_input_for_instance_type("FileDialog", "Confirm", None));
-    let tree = format!("{:?}", component.view());
-    // This text belongs to the routed parent, not to the FileDialog projection.
+    let canonical = std::fs::canonicalize(&selected).unwrap();
     let expected = format!("{:?}", format!("选择结果 {}", canonical.display()));
-    assert!(tree.contains(&expected), "accepted event must mutate the actual routed parent, not root state or the dialog preview: {tree}");
+    wait(&mut component, |view| {
+        format!("{view:?}").contains(&expected)
+    });
+    // Let the component observe its parent's closed prop before reopening.
     component.on_with_input_for_instance_type("FileDialog", "Tick", None);
+    let _ = component.view();
     component.on_with_input_for_instance_type("selector", "Open", None);
     let _ = component.view();
-    component.on_with_input_for_instance_type("FileDialog", "Tick", None);
+    wait(&mut component, modal_open);
     component.on_with_input_for_instance_type("FileDialog", "Cancel", None);
-    let tree = format!("{:?}", component.view());
-    assert!(tree.contains("取消次数 1"), "cancel must reach the routed parent exactly once: {tree}");
+    wait(&mut component, |view| {
+        format!("{view:?}").contains("取消次数 1")
+    });
     component.on_with_input_for_instance_type("FileDialog", "Cancel", None);
-    let tree = format!("{:?}", component.view());
-    assert!(tree.contains("取消次数 1"), "duplicate cancellation must not publish twice: {tree}");
+    for _ in 0..3 {
+        component.on_with_input_for_instance_type("FileDialog", "Tick", None);
+    }
+    assert!(format!("{:?}", component.view()).contains("取消次数 1"));
 }
 
 #[test]
@@ -154,12 +235,24 @@ widget Emitter (tag: str) {
 "#;
     let mut a = auto_ui_runtime::build_dynamic_component(source, None).unwrap();
     let _ = a.view();
-    let mut b = auto_ui_runtime::build_dynamic_component(
-        &source.replace("onemit: .Got($event)", "onemit: .Other($event)"), None).unwrap();
+    let b = auto_ui_runtime::build_dynamic_component(
+        &source.replace("onemit: .Got($event)", "onemit: .Other($event)"),
+        None,
+    )
+    .unwrap();
     let _ = b.view();
     a.on_with_input_for_instance("Emitter", "Fire", None, Some("/Parent#left/Emitter#0"));
     let view = format!("{:?}", a.view());
-    assert!(view.contains("parent:left:left"), "callback must reach its own parent: {view}");
-    assert!(view.contains("content: \"parent:right:\""), "sibling must remain unchanged: {view}");
-    assert!(!view.contains("WRONG"), "another App's callback must not replace this App's binding");
+    assert!(
+        view.contains("parent:left:left"),
+        "callback must reach its own parent: {view}"
+    );
+    assert!(
+        view.contains("content: \"parent:right:\""),
+        "sibling must remain unchanged: {view}"
+    );
+    assert!(
+        !view.contains("WRONG"),
+        "another App's callback must not replace this App's binding"
+    );
 }

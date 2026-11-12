@@ -1,22 +1,24 @@
 use auto.json
 
-// T-01 executable feasibility slice. The complete public selection contract
-// is implemented after the package / provider / owner callback path is proven.
-widget FileDialog (open: bool = false, title: str = "选择文件", initialDirectory: str = "") {
-    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, accepted(str), cancelled }
+// Ordinary view state is a projection of the App-owned DialogModel. Selection,
+// filtering, validation and session lifetime have one owner in the runtime.
+widget FileDialog (open: bool = false, title: str = "选择文件", initialDirectory: str = "", selectionMode: str = "singleFile", filters: List = [], activeFilterId: str = "", acceptLabel: str = "打开", showHidden: bool = false) {
+    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, accepted(str), cancelled, error(str) }
     model {
         var interval int = 50
+        var fd_command str = ""
+        var fd_view str = ""
+        var fd_event str = ""
+        var fd_seq int = 0
         var fd_active bool = false
-        var fd_request int = 0
-        var fd_path str = ""
-        var fd_reply str = ""
-        var last_reply str = ""
+        var last_view str = ""
         var seen_open bool = false
         var pathInput str = ""
         var currentDirectory str = ""
         var entries = []
-        var selectedPath str = ""
-        var error str = ""
+        var selectedCount int = 0
+        var canAccept bool = false
+        var errorMessage str = ""
         var loading bool = false
     }
     view {
@@ -28,24 +30,24 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                     button "转到" { onclick: .Go }
                     text .currentDirectory
                     if .loading { text "载入中" }
-                    if .error != "" { text .error }
+                    if .errorMessage != "" { text .errorMessage }
                     col (style: "h-64 overflow-y-auto gap-1") {
                         for entry in .entries {
-                            if entry.is_dir {
-                                button (onclick: .Enter(entry.path)) { text f"进入 ${entry.name}" }
+                            if entry.isDir {
+                                button (onclick: .Enter(entry.id)) { text f"进入 ${entry.name}" }
                             } else {
                                 row (style: "gap-2 items-center") {
-                                    checkbox (checked: .selectedPath == entry.path, onclick: .Choose(entry.path)) {}
+                                    checkbox (checked: entry.selected, onclick: .Choose(entry.id)) {}
                                     text entry.name
                                 }
                             }
                         }
                     }
-                    text .selectedPath
+                    text f"已选 ${.selectedCount} 项"
                 }
                 dialog-footer {
                     button "取消" { onclick: .Cancel }
-                    button "打开" { onclick: .Confirm, disabled: .selectedPath == "" }
+                    button .acceptLabel { onclick: .Confirm, disabled: !.canAccept }
                 }
             }
         }
@@ -53,54 +55,58 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
     on {
         .Tick -> {
             if .open && !.seen_open {
-                .fd_active = true
-                .fd_path = .initialDirectory
-                .pathInput = .initialDirectory
-                .fd_request = .fd_request + 1
-                .loading = true
+                .fd_seq = .fd_seq + 1
+                .fd_command = json.stringify({op: "open", seq: .fd_seq, config: {initialDirectory: .initialDirectory, selectionMode: .selectionMode, filters: .filters, activeFilterId: .activeFilterId, showHidden: .showHidden}})
+            }
+            if !.open && .seen_open {
+                .fd_seq = .fd_seq + 1
+                .fd_command = json.stringify({op: "cancel", seq: .fd_seq})
             }
             .seen_open = .open
-            if !.open { .fd_active = false }
-            if .fd_reply != "" && .fd_reply != .last_reply {
-                .last_reply = .fd_reply
-                let response = json.parse(.fd_reply)
-                if response.generation == .fd_request && .fd_active {
-                    .loading = false
-                    if !response.ok {
-                        .error = response.error.message
-                    } else {
-                        .currentDirectory = response.listing.directory
-                        .pathInput = .currentDirectory
-                        .entries = response.listing.entries
-                        .error = ""
-                        .selectedPath = ""
-                    }
-                }
+            if .fd_view != "" && .fd_view != .last_view {
+                .last_view = .fd_view
+                let data = json.parse(.fd_view)
+                .fd_active = data.active
+                .loading = data.loading
+                .currentDirectory = data.currentDirectory
+                .pathInput = data.pathInput
+                .entries = data.entries
+                .selectedCount = data.selectedCount
+                .canAccept = data.canAccept
+                if data.error != nil { .errorMessage = data.error.message } else { .errorMessage = "" }
+            }
+            if .fd_event != "" {
+                let event = json.parse(.fd_event)
+                .fd_event = ""
+                if event.kind == "accepted" { ."accepted"(event.payload) }
+                if event.kind == "cancelled" { ."cancelled"() }
+                if event.kind == "error" { ."error"(event.payload) }
             }
         }
-        .SetPath(value str) -> { .pathInput = value }
+        .SetPath(value str) -> {
+            .pathInput = value
+            .fd_seq = .fd_seq + 1
+            .fd_command = json.stringify({op: "input", seq: .fd_seq, value: value})
+        }
         .Go -> {
-            .fd_path = .pathInput
-            .fd_request = .fd_request + 1
-            .loading = true
+            .fd_seq = .fd_seq + 1
+            .fd_command = json.stringify({op: "navigate", seq: .fd_seq, path: .pathInput})
         }
-        .Enter(path str) -> {
-            .fd_path = path
-            .fd_request = .fd_request + 1
-            .loading = true
+        .Enter(id str) -> {
+            .fd_seq = .fd_seq + 1
+            .fd_command = json.stringify({op: "enter", seq: .fd_seq, id: id})
         }
-        .Choose(path str) -> { .selectedPath = path }
+        .Choose(id str) -> {
+            .fd_seq = .fd_seq + 1
+            .fd_command = json.stringify({op: "toggle", seq: .fd_seq, id: id})
+        }
         .Confirm -> {
-            if .selectedPath != "" && .fd_active {
-                .fd_active = false
-                ."accepted"(.selectedPath)
-            }
+            .fd_seq = .fd_seq + 1
+            .fd_command = json.stringify({op: "confirm", seq: .fd_seq})
         }
         .Cancel -> {
-            if .fd_active {
-                .fd_active = false
-                ."cancelled"()
-            }
+            .fd_seq = .fd_seq + 1
+            .fd_command = json.stringify({op: "cancel", seq: .fd_seq})
         }
     }
 }

@@ -1,4 +1,5 @@
 use auto.file
+use auto.json
 
 widget selector {
     msg { Open, Accepted(str), Cancelled }
@@ -12,13 +13,13 @@ widget selector {
             button "选择文件" { onclick: .Open }
             text f"选择结果 ${.result}"
             text f"取消次数 ${.cancelCount}"
-            FileDialog (open: .pickerOpen, onaccepted: .Accepted($event), oncancelled: .Cancelled) {}
+            FileDialog (open: .pickerOpen, selectionMode: "multipleFiles", onaccepted: .Accepted($event), oncancelled: .Cancelled) {}
         }
     }
     on {
         .Open -> { .pickerOpen = true }
         .Accepted(files str) -> {
-            .result = files
+            .result = json.parse(files).files[0].path
             .pickerOpen = false
             let output str = Env.get("FILE_DIALOG_RESULT_PATH")
             if output != "" { file.write_text(output, files) }

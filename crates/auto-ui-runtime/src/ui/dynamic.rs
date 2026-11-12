@@ -89,7 +89,7 @@ pub struct DynamicComponent {
     /// VM bridge for state management and handler execution.
     bridge: VmBridge,
 
-    file_dialog_io: crate::ui::file_dialog::ComponentIo,
+    file_dialog_io: std::cell::RefCell<crate::ui::file_dialog::ComponentIo>,
 
     /// PLAN-031 T-03：本组件（App/窗口）的主题作用域。`Some` 时 `view*`
     /// 构建入口临时安装它（family/mode/目录/design 的 App 级隔离）；
@@ -1939,6 +1939,9 @@ impl DynamicComponent {
 
     /// Apply host-side effects after a suspended segment actually completes.
     fn publish_completed_handler_updates(&mut self) {
+        if !self.bridge.has_cpu_continuations() {
+            self.dirty |= self.file_dialog_io.get_mut().pump(&mut self.bridge);
+        }
         self.sync_route_params();
         self.consume_nav_back_pending();
         crate::ui::memo_deps::bump_ui_epoch();
@@ -1978,6 +1981,7 @@ impl DynamicComponent {
                 .with_mount_path_sink(self.mount_path_sink());
         let out = builder.build_with_debug(&self.view_template);
         self.bridge.end_child_instance_frame();
+        self.file_dialog_io.borrow_mut().retain_live(&self.bridge);
         self.view_mount_frame_finish(prev);
         out
     }
@@ -2027,6 +2031,7 @@ impl DynamicComponent {
                 .with_mount_path_sink(self.mount_path_sink());
         let out = builder.build_with_debug_gated(&self.view_template, capture_probe);
         self.bridge.end_child_instance_frame();
+        self.file_dialog_io.borrow_mut().retain_live(&self.bridge);
         self.view_mount_frame_finish(prev);
         if let Some(t0) = __diag_t0 {
             eprintln!(
@@ -2932,6 +2937,7 @@ impl Component for DynamicComponent {
                 .with_mount_path_sink(self.mount_path_sink());
         let view = builder.build(&self.view_template);
         self.bridge.end_child_instance_frame();
+        self.file_dialog_io.borrow_mut().retain_live(&self.bridge);
         self.view_mount_frame_finish(prev);
 
         view
@@ -3208,7 +3214,7 @@ impl DynamicComponent {
         // Component IO only commits between VM segments. Child Tick events use
         // the same event loop and keep the owning App responsive while scanning.
         if !self.bridge.has_cpu_continuations() {
-            self.dirty |= self.file_dialog_io.pump(&mut self.bridge);
+            self.dirty |= self.file_dialog_io.get_mut().pump(&mut self.bridge);
         }
         // Split the Send carrier before interpreting the type's @seq suffix.
         // The opaque instance may itself contain @, route slashes or keyed data.
@@ -3820,6 +3826,11 @@ impl DynamicComponent {
                     }
                 }
             }
+        }
+        // Drain a component command as part of the same event transaction.
+        // Two checkbox actions before the next timer tick must both apply.
+        if !self.bridge.has_cpu_continuations() {
+            self.dirty |= self.file_dialog_io.get_mut().pump(&mut self.bridge);
         }
     }
 }
