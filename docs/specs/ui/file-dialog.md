@@ -93,6 +93,9 @@ Each actual component instance owns one `DialogModel`, selection, session
 nonce, request generation, and private command/view/event mailbox. Parent
 pages receive terminal events and do not maintain a second selection algorithm.
 The private `fd_*` fields are not application or automation APIs.
+Row identities carry a JSON-escaped path as opaque data, so valid filename
+control characters cannot become message separators or alias another row.
+
 A parent closing and immediately reopening after a terminal callback must not
 need an extra timer frame. The host retains closed props observed in rendered views and event boundaries;
 terminal callbacks remain single-shot, including when the parent closes first.

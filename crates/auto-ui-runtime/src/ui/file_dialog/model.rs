@@ -513,7 +513,9 @@ impl DialogModel {
     }
 
     fn row_id(&self, path: &str) -> String {
-        format!("{}:{}:{}", self.session, self.revision, path)
+        // Tokens cross the shared typed-message framing. Keep raw filesystem
+        // control characters out of that framing, without changing the path.
+        format!("{}:{}:{}", self.session, self.revision, serde_json::to_string(path).expect("UTF-8 path JSON encoding"))
     }
 
     pub fn toggle(&mut self, row_id: &str) -> bool {
@@ -705,5 +707,23 @@ impl DialogModel {
             can_accept: self.active && self.pending.is_none() && !self.selected.is_empty(),
             error: self.error.clone(),
         }
+    }
+}
+
+
+#[cfg(test)]
+mod message_identity_tests {
+    use super::*;
+    #[test]
+    fn file_dialog_row_token_roundtrips_without_aliasing_another_path() {
+        let model = DialogModel::default();
+        let id = model.row_id("/directory/prefix\u{1f}suffix.txt");
+        let other = model.row_id("/directory/prefix");
+        let wire = crate::ui::mcp_types::encode_payload("Choose", &[auto_val::Value::str(id.clone())]);
+        let (event, args) = crate::ui::dynamic::decode_payload(&wire);
+        assert_eq!(event, "Choose");
+        assert_eq!(args.len(), 1);
+        assert_ne!(args[0], auto_val::Value::str(other), "a separator in one filename must not select a different file");
+        assert_eq!(args[0], auto_val::Value::str(id), "the real shared message codec must preserve the whole row identity");
     }
 }
