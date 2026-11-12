@@ -174,6 +174,7 @@ mod dialog_parent {
                     let mut pid = 0u32;
                     let owner_tid =
                         unsafe { GetWindowThreadProcessId(h, &mut pid) };
+                    let cur_tid = unsafe { GetCurrentThreadId() };
                     let owner = unsafe { GetWindow(h, GW_OWNER) };
                     let owner_desc = if owner == 0 {
                         "none".to_string()
@@ -182,11 +183,10 @@ mod dialog_parent {
                     };
                     eprintln!(
                         "[DLG-PROBE] parent hwnd={h:#x} class={class} title=\"{title}\" \
-                         visible={} enabled={} owner_tid={owner_tid} cur_tid={} owner={owner_desc}",
+                         visible={} enabled={} owner_tid={owner_tid} cur_tid={cur_tid} \
+                         owner={owner_desc}",
                         unsafe { IsWindowVisible(h) },
                         unsafe { IsWindowEnabled(h) },
-                        owner_tid,
-                        unsafe { GetCurrentThreadId() },
                     );
                 }
                 dialog.set_parent(&Owner(hwnd))
