@@ -198,6 +198,11 @@ pub struct VmBridge {
     /// State field names (ordered, matching GenericInstanceData field order)
     state_field_names: Vec<String>,
 
+    // Declared parent channels, excluding legacy copies of child model defaults.
+    root_parent_fields: std::collections::HashSet<String>,
+    // Explicit type-only dispatch keeps its documented legacy root receiver.
+    legacy_root_receivers: std::cell::RefCell<std::collections::HashSet<String>>,
+
     /// Widget name for debugging
     widget_name: String,
 
@@ -924,8 +929,10 @@ impl VmBridge {
 
         Ok(Self {
             host_owner_id: next_host_owner_id(),
+            legacy_root_receivers: Default::default(),
             vm,
             state_obj_id,
+            root_parent_fields: widget.state_vars.iter().map(|v| v.name.clone()).collect(),
             state_field_names: field_names,
             widget_name,
             child_state_map: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -1064,6 +1071,13 @@ impl VmBridge {
             field_values.push(eval_expr_to_value(&field.init, &mut vm));
         }
 
+        let mut root_parent_fields: std::collections::HashSet<String> = field_names.iter().cloned().collect();
+        for child in child_decls.iter().filter(|d| d.view.is_none()) {
+            if let Some(model) = &child.model {
+                root_parent_fields.extend(model.fields.iter().map(|f| f.name.to_string()));
+            }
+        }
+
         // Plan 370 D-GAP-4: merge store state fields into root state object.
         // Store fields are merged so that `store.X` (rewritten to `__state.X`)
         // resolves correctly at runtime.
@@ -1183,8 +1197,10 @@ impl VmBridge {
 
         Ok(Self {
             host_owner_id: next_host_owner_id(),
+            legacy_root_receivers: Default::default(),
             vm,
             state_obj_id,
+            root_parent_fields,
             state_field_names: field_names,
             widget_name,
             child_state_map: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -1224,17 +1240,21 @@ impl VmBridge {
         Self::new_with_imports(widget, Vec::new())
     }
 
-    /// Read a state field value from the VM.
-    ///
-    /// Accesses the state heap object and returns the field value by name.
-    ///
-    /// # Arguments
-    ///
-    /// * `field_name` - Name of the state field (e.g., "count")
-    ///
-    /// # Returns
-    ///
-    /// The current value of the field, or an error if the field doesn't exist.
+    pub(crate) fn note_legacy_root_receiver(&self, widget: &str) {
+        self.legacy_root_receivers.borrow_mut().insert(widget.to_string());
+    }
+
+    /// Implicit inheritance uses declared parent channels. An explicit legacy
+    /// type-only dispatch may still seed its target from its root receiver;
+    /// unrelated child defaults never become parent channels merely by name.
+    pub(crate) fn read_root_parent_state(&self, widget: &str, name: &str) -> Result<auto_val::Value> {
+        if !self.root_parent_fields.contains(name) && !self.legacy_root_receivers.borrow().contains(widget) {
+            return Err(VmBridgeError::InvalidState(format!("root parent does not declare {name}")));
+        }
+        self.read_state(name)
+    }
+
+    /// Read a root state field by name, including legacy merged fields.
     pub fn read_state(&self, field_name: &str) -> Result<Value> {
         // Find field index by name — prefer the cached field list, but fall
         // back to a name-based lookup on the live heap object. Plan 049:

@@ -3420,6 +3420,7 @@ impl DynamicComponent {
         // `.edit_title = .note.title` resolve .note from root state.
         let state_obj_id = instance_state_id.unwrap_or_else(|| self.bridge.state_obj_id());
         if instance_state_id.is_none() && widget_name != &self.widget_name {
+            self.bridge.note_legacy_root_receiver(widget_name);
             if let Some(child_id) = self.bridge.get_child_state_id(widget_name) {
                 self.bridge.sync_child_props_to_root(child_id);
             }

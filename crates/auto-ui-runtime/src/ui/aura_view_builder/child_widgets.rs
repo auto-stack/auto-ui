@@ -85,7 +85,12 @@ impl<'a> AuraViewBuilder<'a> {
         //    so child handlers can read/write shared parent state.
         for field_name in &child_field_names {
             if !resolved_props.contains_key(field_name) {
-                if let Ok(parent_val) = self.bridge.read_state(field_name) {
+                // A same-named field on another widget is not a parent channel.
+                let parent_value = match self.override_state_obj_id {
+                    Some(id) => self.bridge.read_child_state(id, field_name),
+                    None => self.bridge.read_root_parent_state(&child_widget.name, field_name),
+                };
+                if let Ok(parent_val) = parent_value {
                     resolved_props.insert(field_name.clone(), parent_val);
                 }
             }

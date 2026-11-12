@@ -383,3 +383,44 @@ widget App {
     for _ in 0..3 { tick(&mut app); let _ = app.view(); }
     assert!(format!("{:?}", app.view()).contains("content: \"cancelled:1\""), "current cancel must notify exactly once");
 }
+
+#[test]
+fn different_parent_types_keep_their_same_named_filter_models() {
+    use auto_ui_runtime::Component;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(temp.path().join("book.txt"), "book").unwrap();
+    std::fs::write(temp.path().join("picture.png"), "picture").unwrap();
+    let package = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/file-dialog");
+    let source = r#"
+widget App {
+ use { package: file_dialog from __PACKAGE__ }
+ view { col { LeftPage {} RightPage {} } }
+}
+widget LeftPage {
+ model { var picker_filters = [{id: "pictures", label: "PICTURES", extensions: ["png"]}] }
+ view { col { text "LEFT-BEGIN" {} FileDialog (open: true, filters: .picker_filters, initialDirectory: __DIRECTORY__) {} text "LEFT-END" {} } }
+}
+widget RightPage {
+ model { var picker_filters = [{id: "books", label: "BOOKS", extensions: ["txt"]}] }
+ view { col { text "RIGHT-BEGIN" {} FileDialog (open: true, filters: .picker_filters, initialDirectory: __DIRECTORY__) {} text "RIGHT-END" {} } }
+}
+"#
+        .replace("__PACKAGE__", &serde_json::to_string(&package.to_str().unwrap().replace('\\', "/")).unwrap())
+        .replace("__DIRECTORY__", &serde_json::to_string(temp.path().to_str().unwrap()).unwrap());
+    let mut app = auto_ui_runtime::build_dynamic_component(&source, None).unwrap();
+    let _ = app.view();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        for source in app.subscribable_instance_timesources().into_iter().filter(|s| s.widget == "FileDialog") {
+            app.on_with_input_for(source.path.as_str(), &source.event, None);
+        }
+        let tree = format!("{:?}", app.view());
+        let left = tree.split("LEFT-BEGIN").nth(1).unwrap().split("LEFT-END").next().unwrap();
+        let right = tree.split("RIGHT-BEGIN").nth(1).unwrap().split("RIGHT-END").next().unwrap();
+        assert!(left.contains("PICTURES") && !left.contains("book.txt"), "left parent config leaked: {left}");
+        assert!(right.contains("BOOKS") && !right.contains("picture.png"), "right parent config leaked: {right}");
+        if left.contains("picture.png") && right.contains("book.txt") { break; }
+        assert!(Instant::now() < deadline, "parent lists did not settle: {tree}");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
