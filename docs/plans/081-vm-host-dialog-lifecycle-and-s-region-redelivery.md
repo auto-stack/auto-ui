@@ -448,6 +448,25 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（扩展诊断在册，门控）。
 
+### T-04c-10 修复落地 + live 复验机器阻塞（同日深夜，944dcdcb）
+
+- **修复已落**（host.rs `__bounds_collected` 臂，944dcdcb）：from_live
+  覆盖改**合并语义**——既有 styled 快照（同步块 probe 系）的
+  events/raw_class/for_context/source 补入 from_live 产物的缺失字段；
+  measured bounds/box_model/computed_style 仍取新鲜值。plan081 三锚
+  全绿；工具重建部署。
+- **live 复验四连被机器击杀**（bookswitch-17/18/19 + 一次未编号）：
+  死亡签名同前（MCP 拒连 + log 截断，**无 Rust panic 行**=外部死亡，
+  非 unwind 缺失——dev profile panic 会留痕）。18 号有效片段：sync
+  tap=true 帧（computed=35）在册后死亡。
+- **阻塞判定（最终）**：live W-07 复验**机器阻塞**——修复已单元验证、
+  已部署；解除=独占稳定机器窗（重启后无并行会话）。
+- **解除后执行序**：①bookswitch（同命令）复跑——期望 snap-A 含
+  `onclick: .TapParagraph`（A_tap_rows>0）+ press 派发 TapParagraph；
+  ②W-07 五叶（harness）；③T-05 review 交棒。
+- **诊断资产在册**：prepare/同步块双插桩（AUTO_MEMO_DIAG 门控）+
+  bookswitch_probe.py（tap×plen 相关 + inspect/press 双通道）。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
