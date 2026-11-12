@@ -58,6 +58,8 @@ mod dialog_parent {
         bottom: i32,
     }
 
+    const GW_OWNER: u32 = 4;
+
     #[link(name = "user32")]
     extern "system" {
         fn EnumWindows(cb: extern "system" fn(isize, isize) -> i32, lparam: isize) -> i32;
@@ -65,6 +67,22 @@ mod dialog_parent {
         fn GetWindowThreadProcessId(hwnd: isize, pid: *mut u32) -> u32;
         fn GetClassNameW(hwnd: isize, class: *mut u16, max: i32) -> i32;
         fn GetWindowRect(hwnd: isize, rect: *mut Rect) -> i32;
+        fn GetWindowTextW(hwnd: isize, buf: *mut u16, max: i32) -> i32;
+        fn IsWindowEnabled(hwnd: isize) -> i32;
+        fn GetWindow(hwnd: isize, cmd: u32) -> isize;
+        fn GetCurrentThreadId() -> u32;
+    }
+
+    fn win_class(hwnd: isize) -> String {
+        let mut buf = [0u16; 64];
+        let n = unsafe { GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32) }.max(0) as usize;
+        String::from_utf16_lossy(&buf[..n])
+    }
+
+    fn win_title(hwnd: isize) -> String {
+        let mut buf = [0u16; 128];
+        let n = unsafe { GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32) }.max(0) as usize;
+        String::from_utf16_lossy(&buf[..n])
     }
 
     thread_local! {
@@ -140,7 +158,39 @@ mod dialog_parent {
     /// Attach `dialog` to the main window when one was found.
     pub fn attach(dialog: rfd::FileDialog) -> rfd::FileDialog {
         match main_hwnd() {
-            Some(hwnd) => dialog.set_parent(&Owner(hwnd)),
+            Some(hwnd) => {
+                // PLAN-081 T-01 父窗取证：锚定窗的类名/标题/可见/禁用/
+                // owner 链/归属线程 vs 调用线程——错窗假设判据。
+                if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+                    let h = hwnd.get();
+                    let mut buf = [0u16; 128];
+                    let n = unsafe { GetWindowTextW(h, buf.as_mut_ptr(), buf.len() as i32) }
+                        .max(0) as usize;
+                    let title = String::from_utf16_lossy(&buf[..n]);
+                    let mut cls = [0u16; 64];
+                    let cn = unsafe { GetClassNameW(h, cls.as_mut_ptr(), cls.len() as i32) }
+                        .max(0) as usize;
+                    let class = String::from_utf16_lossy(&cls[..cn]);
+                    let mut pid = 0u32;
+                    let owner_tid =
+                        unsafe { GetWindowThreadProcessId(h, &mut pid) };
+                    let owner = unsafe { GetWindow(h, GW_OWNER) };
+                    let owner_desc = if owner == 0 {
+                        "none".to_string()
+                    } else {
+                        format!("{owner:#x}({} \"{}\")", win_class(owner), win_title(owner))
+                    };
+                    eprintln!(
+                        "[DLG-PROBE] parent hwnd={h:#x} class={class} title=\"{title}\" \
+                         visible={} enabled={} owner_tid={owner_tid} cur_tid={} owner={owner_desc}",
+                        unsafe { IsWindowVisible(h) },
+                        unsafe { IsWindowEnabled(h) },
+                        owner_tid,
+                        unsafe { GetCurrentThreadId() },
+                    );
+                }
+                dialog.set_parent(&Owner(hwnd))
+            }
             None => dialog,
         }
     }
@@ -171,17 +221,283 @@ fn attach(dialog: rfd::FileDialog) -> rfd::FileDialog {
     dialog
 }
 
+/// PLAN-081 T-01 插桩探针（AUTO_DIALOG_DIAG 门控，Windows only）：mode A
+/// 自毁/mode B 不生成的生命周期取证。四路证据一次覆盖——
+/// 1. `CoGetApartmentType`：调用线程既有 COM 套间（MTA ⇒ rfd 的
+///    APARTMENTTHREADED init 失败 ⇒ 静默 n=0，mode B 候选根因）；
+/// 2. 父窗取证（在 [`dialog_parent::attach`] 内）：类名/标题/可见/禁用/
+///    owner 链/归属线程——错窗假设判据；
+/// 3. `WH_CBT` 线程钩子：show 期间本线程每个窗口的 create/destroy/
+///    activate/SC_CLOSE 时序——"对话框是否真出现过、何时消失"判据；
+/// 4. 首个 `#32770` 子类化：WM_CLOSE/WM_COMMAND(IDCANCEL/IDOK)/
+///    WM_SYSCOMMAND(SC_CLOSE)/WM_DESTROY 时序+当时前台窗/UIA 监听态——
+///    "谁经哪条消息关闭"判据。
+/// 门未设时零安装（无钩无子类无额外 OS 面）；钩子/子类化回调只读日志、
+/// 恒转发原 proc，不改变对话框行为。单模态假设：同一时刻至多一个对话框
+/// （主线程同步 pick），探针状态用原子量、单线程语义即可。
+#[cfg(target_os = "windows")]
+mod diag_probe {
+    use std::cell::Cell;
+    use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+
+    const WH_CBT: i32 = 5;
+    const HCBT_CREATEWND: i32 = 3;
+    const HCBT_DESTROYWND: i32 = 4;
+    const HCBT_ACTIVATE: i32 = 5;
+    const HCBT_SYSCOMMAND: i32 = 8;
+    const GWLP_WNDPROC: i32 = -4;
+    const WM_DESTROY: usize = 0x0002;
+    const WM_NCDESTROY: usize = 0x0082;
+    const WM_CLOSE: usize = 0x0010;
+    const WM_COMMAND: usize = 0x0111;
+    const WM_SYSCOMMAND: usize = 0x0112;
+    const SC_CLOSE: usize = 0xF060;
+    const GW_OWNER: u32 = 4;
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn SetWindowsHookExW(
+            idhook: i32,
+            proc_fn: extern "system" fn(i32, usize, isize) -> isize,
+            hmod: isize,
+            threadid: u32,
+        ) -> isize;
+        fn UnhookWindowsHookEx(hhk: isize) -> i32;
+        fn CallNextHookEx(hhk: isize, code: i32, wparam: usize, lparam: isize) -> isize;
+        fn GetCurrentThreadId() -> u32;
+        fn SetWindowLongPtrW(hwnd: isize, index: i32, value: isize) -> isize;
+        fn CallWindowProcW(prev: isize, hwnd: isize, msg: usize, wp: usize, lp: isize) -> isize;
+        fn GetWindowTextW(hwnd: isize, buf: *mut u16, max: i32) -> i32;
+        fn IsWindowEnabled(hwnd: isize) -> i32;
+        fn GetWindow(hwnd: isize, cmd: u32) -> isize;
+        fn GetForegroundWindow() -> isize;
+        fn GetClassNameW(hwnd: isize, class: *mut u16, max: i32) -> i32;
+    }
+    #[link(name = "ole32")]
+    extern "system" {
+        fn CoGetApartmentType(ptype: *mut i32, pqual: *mut i32) -> i32;
+    }
+    #[link(name = "uiautomationcore")]
+    extern "system" {
+        fn UiaClientsAreListening() -> i32;
+    }
+
+    thread_local! {
+        /// 探针安装时刻（钩子/子类化回调恒在本线程触发，thread_local 即可）。
+        static T0: Cell<Option<std::time::Instant>> = const { Cell::new(None) };
+    }
+
+    static HOOK: AtomicIsize = AtomicIsize::new(0);
+    static DLG_HWND: AtomicIsize = AtomicIsize::new(0);
+    static OLD_PROC: AtomicIsize = AtomicIsize::new(0);
+    /// 防重入（嵌套 show 不存在，但守卫 drop 顺序异常时不得二次卸钩）。
+    static INSTALLED: AtomicBool = AtomicBool::new(false);
+
+    fn ms() -> u128 {
+        T0.with(|t| {
+            t.get().map_or(0, |t0| t0.elapsed().as_millis())
+        })
+    }
+
+    fn diag(tag: &str, body: &str) {
+        eprintln!("[DLG-PROBE] {tag} {body} t={}ms", ms());
+    }
+
+    fn hwnd_class(hwnd: isize) -> String {
+        let mut buf = [0u16; 64];
+        let n = unsafe { GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32) }.max(0) as usize;
+        String::from_utf16_lossy(&buf[..n])
+    }
+
+    fn hwnd_title(hwnd: isize) -> String {
+        let mut buf = [0u16; 128];
+        let n = unsafe { GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32) }.max(0) as usize;
+        String::from_utf16_lossy(&buf[..n])
+    }
+
+    /// 调用线程既有套间 + 前台窗/UIA 监听快照（进入/关闭两点各记一次）。
+    pub fn note_state(tag: &str) {
+        let (mut apt, mut qual) = (-1i32, -1i32);
+        let hr = unsafe { CoGetApartmentType(&mut apt, &mut qual) };
+        let apt_name = match apt {
+            0 => "STA",
+            1 => "MTA",
+            2 => "NA",
+            3 => "MAINSTA",
+            _ => "?",
+        };
+        let fg = unsafe { GetForegroundWindow() };
+        let fg_desc = if fg == 0 {
+            "none".to_string()
+        } else {
+            format!("{}({})", hwnd_class(fg), hwnd_title(fg))
+        };
+        let uia = unsafe { UiaClientsAreListening() };
+        diag(
+            tag,
+            &format!(
+                "apt={apt_name} hr=0x{hr:08x} tid={} fg={fg_desc} uia_listening={uia}",
+                unsafe { GetCurrentThreadId() }
+            ),
+        );
+    }
+
+    /// RAII 探针：install ⇒ CBT 钩子；drop ⇒ 卸钩 + 关闭态快照。
+    pub struct Probe;
+
+    impl Probe {
+        pub fn install() -> Option<Probe> {
+            if INSTALLED.swap(true, Ordering::Relaxed) {
+                return None;
+            }
+            T0.with(|t| t.set(Some(std::time::Instant::now())));
+            DLG_HWND.store(0, Ordering::Relaxed);
+            OLD_PROC.store(0, Ordering::Relaxed);
+            let hook = unsafe {
+                SetWindowsHookExW(WH_CBT, cbt_proc, 0, unsafe { GetCurrentThreadId() })
+            };
+            if hook == 0 {
+                INSTALLED.store(false, Ordering::Relaxed);
+                diag("install", "CBT hook FAILED");
+                return None;
+            }
+            HOOK.store(hook, Ordering::Relaxed);
+            diag("install", "CBT hook ok");
+            Some(Probe)
+        }
+    }
+
+    impl Drop for Probe {
+        fn drop(&mut self) {
+            note_state("close-time");
+            let hook = HOOK.swap(0, Ordering::Relaxed);
+            if hook != 0 {
+                unsafe { UnhookWindowsHookEx(hook) };
+            }
+            INSTALLED.store(false, Ordering::Relaxed);
+            diag("remove", "CBT hook uninstalled");
+        }
+    }
+
+    extern "system" fn cbt_proc(code: i32, wparam: usize, lparam: isize) -> isize {
+        match code {
+            HCBT_CREATEWND => {
+                let hwnd = wparam as isize;
+                let class = hwnd_class(hwnd);
+                diag("create", &format!("hwnd={hwnd:#x} class={class}"));
+                // 子类化本 show 的首个 #32770（IFileDialog 宿主窗）。
+                if class == "#32770"
+                    && DLG_HWND
+                        .compare_exchange(0, hwnd, Ordering::Relaxed, Ordering::Relaxed)
+                        .is_ok()
+                {
+                    let prev = unsafe { SetWindowLongPtrW(hwnd, GWLP_WNDPROC, dlg_proc as isize) };
+                    OLD_PROC.store(prev, Ordering::Relaxed);
+                    diag("subclass", &format!("hwnd={hwnd:#x} prev={prev:#x}"));
+                }
+            }
+            HCBT_DESTROYWND => {
+                let hwnd = wparam as isize;
+                diag(
+                    "destroy",
+                    &format!("hwnd={hwnd:#x} class={}", hwnd_class(hwnd)),
+                );
+            }
+            HCBT_ACTIVATE => {
+                let hwnd = wparam as isize;
+                // lparam = 被"挤下"的激活窗（句柄低半）——前后台切换链。
+                let deact = (lparam as usize & 0xffff_ffff) as isize;
+                diag(
+                    "activate",
+                    &format!(
+                        "hwnd={hwnd:#x} class={} title={} deact={deact:#x}({})",
+                        hwnd_class(hwnd),
+                        hwnd_title(hwnd),
+                        if deact == 0 { "none".to_string() } else { hwnd_class(deact) }
+                    ),
+                );
+            }
+            HCBT_SYSCOMMAND => {
+                diag("syscommand", &format!("cmd={:#x} hwnd={:#x}", wparam, lparam));
+            }
+            _ => {}
+        }
+        unsafe { CallNextHookEx(0, code, wparam, lparam) }
+    }
+
+    /// #32770 子类 proc：只读日志 + 恒转发。NCDESTROY 先还原原 proc 再转发。
+    extern "system" fn dlg_proc(hwnd: isize, msg: usize, wp: usize, lp: isize) -> isize {
+        match msg {
+            WM_CLOSE => {
+                let fg = unsafe { GetForegroundWindow() };
+                diag(
+                    "wm_close",
+                    &format!(
+                        "hwnd={hwnd:#x} fg={fg:#x}({}) uia={}",
+                        if fg == 0 { "none".to_string() } else { hwnd_class(fg) },
+                        unsafe { UiaClientsAreListening() }
+                    ),
+                );
+            }
+            WM_SYSCOMMAND => {
+                if wp & 0xfff0 == SC_CLOSE {
+                    diag("wm_syscommand", &format!("SC_CLOSE hwnd={hwnd:#x}"));
+                }
+            }
+            WM_COMMAND => {
+                let id = wp & 0xffff;
+                if id == 1 || id == 2 {
+                    diag(
+                        "wm_command",
+                        &format!("id={id} ({}) hwnd={hwnd:#x}", if id == 1 { "IDOK" } else { "IDCANCEL" }),
+                    );
+                }
+            }
+            WM_DESTROY => diag("wm_destroy", &format!("hwnd={hwnd:#x}")),
+            WM_NCDESTROY => {
+                let prev = OLD_PROC.swap(0, Ordering::Relaxed);
+                DLG_HWND.store(0, Ordering::Relaxed);
+                if prev != 0 {
+                    unsafe { SetWindowLongPtrW(hwnd, GWLP_WNDPROC, prev) };
+                    return unsafe { CallWindowProcW(prev, hwnd, msg, wp, lp) };
+                }
+            }
+            _ => {}
+        }
+        let prev = OLD_PROC.load(Ordering::Relaxed);
+        if prev != 0 {
+            unsafe { CallWindowProcW(prev, hwnd, msg, wp, lp) }
+        } else {
+            0
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+mod diag_probe {
+    /// 非 Windows：探针不装配（现网诊断只在 Windows 形态运行）。
+    pub fn note_state(_tag: &str) {}
+    pub struct Probe;
+    impl Probe {
+        pub fn install() -> Option<Probe> {
+            None
+        }
+    }
+}
+
 /// 单一 OS open 实现（策略仅父窗一项）：filter 解析 → 非空加 filter →
 /// 按策略锚定父窗 → pick_file → `to_string_lossy`（取消/不可用 = ""）。
 /// PLAN-079 T-04: 插桩点④——host 对话框生成入口（线程/时刻）。
 fn os_open(attach_parent: bool, filter: &str) -> String {
-    if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+    let diag = std::env::var_os("AUTO_DIALOG_DIAG").is_some();
+    if diag {
         eprintln!(
             "[DLG-DIAG] host open enter filter={} thread={:?} t={}ms",
             filter,
             std::thread::current().id(),
             crate::ui::dynamic::sched_diag_t0().elapsed().as_millis(),
         );
+        diag_probe::note_state("open enter");
     }
     let exts = filter_exts(filter);
     let mut dialog = rfd::FileDialog::new();
@@ -191,11 +507,13 @@ fn os_open(attach_parent: bool, filter: &str) -> String {
     if attach_parent {
         dialog = attach(dialog);
     }
+    let _probe = if diag { diag_probe::Probe::install() } else { None };
     let out: String = dialog
         .pick_file()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default();
-    if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+    drop(_probe);
+    if diag {
         eprintln!(
             "[DLG-DIAG] host open exit len={} t={}ms",
             out.len(),
@@ -207,13 +525,15 @@ fn os_open(attach_parent: bool, filter: &str) -> String {
 
 /// Multi-select shares the same filter and parent policy as single-select.
 fn os_open_files(attach_parent: bool, filter: &str) -> Vec<String> {
-    if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+    let diag = std::env::var_os("AUTO_DIALOG_DIAG").is_some();
+    if diag {
         eprintln!(
             "[DLG-DIAG] host open_files enter filter={} thread={:?} t={}ms",
             filter,
             std::thread::current().id(),
             crate::ui::dynamic::sched_diag_t0().elapsed().as_millis(),
         );
+        diag_probe::note_state("open_files enter");
     }
     let exts = filter_exts(filter);
     let mut dialog = rfd::FileDialog::new();
@@ -223,13 +543,15 @@ fn os_open_files(attach_parent: bool, filter: &str) -> Vec<String> {
     if attach_parent {
         dialog = attach(dialog);
     }
+    let _probe = if diag { diag_probe::Probe::install() } else { None };
     let out: Vec<String> = dialog
         .pick_files()
         .unwrap_or_default()
         .into_iter()
         .map(|p| p.to_string_lossy().into_owned())
         .collect();
-    if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
+    drop(_probe);
+    if diag {
         eprintln!(
             "[DLG-DIAG] host open_files exit n={} t={}ms",
             out.len(),
