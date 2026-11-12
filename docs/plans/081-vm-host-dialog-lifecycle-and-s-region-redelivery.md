@@ -255,6 +255,25 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
 - **回归锚现状**：plan081 双测=已清白层的永久锚；outlet 层修复后补
   对应锚。
 
+### T-04c-2 复现器落地（2026-11-12 深夜，worktree b1f934f7）
+
+- **红锚入册**（`#[ignore]`，reason 在案）：`plan081_outlet_page_for_rows_
+  survive_memo_two_frame_timeline`——App081(routes+outlet)×reader081 子页
+  （¶ 行结构）两帧时序：帧 1 段落空（memo 因 for_loop DEGRADE→page_full
+  全渲染，0 行）；帧 2 段落写子页实例态（route 装饰 identity 经
+  `child_init_identity`+`instance_identity_override` 对齐
+  `prepare_child_render_state_snap`，`write_state_onto(child_state_id,...)`）
+  → **probe2 全空（entries=0）=for 零迭代=子读仍见旧段落**。
+- **排除**：memo 非凶手（两帧均 DEGRADE reason=for_loop → page_full 全渲染，
+  MEMO-DIAG 实证）；builder 单层（锚①②）；容器 press 歧义保持记档。
+- **下一轮第一步（精确）**：帧 2 子读为何不见写入——三个探查点：
+  ①`prepare_child_render_state_snap_impl` 的 identity 归一（我的 prepare
+  直调 vs 渲染路径 pinned 调用是否同对象）；②子读 scope 链
+  （`slot_resolution_override`/`override_state_obj_id` 在 render_outlet_
+  inner→page_full→child walk 三层的传递）；③`write_state_onto` 的
+  stake/seq 面（seq 抬升是否落子对象账）。诊断打印已埋（plan081-diag）。
+- **说明**：红锚 fail 属 TDD 红相（预期失败=证据）；修复转绿后删 ignore。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
