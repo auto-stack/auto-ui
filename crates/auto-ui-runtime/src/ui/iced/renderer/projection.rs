@@ -3954,6 +3954,16 @@ fn dynamic_view_impl_inner(
                         node.for_context = Some((f.var.clone(), f.index, f.value_repr.clone()));
                     }
                 }
+                if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
+                    let tap = computed
+                        .values()
+                        .any(|c| c.events.iter().any(|(_, h)| h.contains("TapParagraph")));
+                    eprintln!(
+                        "[MEMO-DIAG] sync computed={} probe_entries={} tap_present={tap}",
+                        computed.len(),
+                        sync_probe.snapshot().len()
+                    );
+                }
                 let state_vals = state.component.read_all_state_materialized();
                 let input_map = state.component.input_state_map().clone();
                 let view_template = Some(state.component.view_template().clone());
