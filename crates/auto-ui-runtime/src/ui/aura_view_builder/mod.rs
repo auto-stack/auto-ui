@@ -9446,8 +9446,10 @@ mod plan080_rowclass_probe_tests {
         let child = extract_widget_from_decl(&decls.remove(0)).expect("extract child");
         let routes = app.routes.as_ref().expect("app routes").routes.clone();
 
+        let child_for_prepare = child.clone();
         let mut registry = crate::ui::widget_registry::WidgetRegistry::new();
         registry.register(child);
+        registry.register_route_alias("reader081", "reader081");
 
         let mut bridge = VmBridge::new(&app).unwrap();
 
@@ -9478,7 +9480,9 @@ mod plan080_rowclass_probe_tests {
             );
         }
 
-        // 段落就位（=live Init 复得写状态，seq 抬升）。
+        // 段落就位（=live Init 复得写状态，seq 抬升）。写目标=子页实例
+        // 状态对象（子读经 override_state_obj_id；写 root 无效——FieldNotFound
+        // 教训）。child_state_id 经 prepare（幂等 get-or-create）解析。
         let mk = |idx: i32, key: &str, text: &str| {
             let mut o = auto_val::Obj::new();
             o.set("idx", auto_val::Value::Int(idx));
@@ -9486,8 +9490,31 @@ mod plan080_rowclass_probe_tests {
             o.set("text", auto_val::Value::str(text));
             auto_val::Value::Obj(Box::new(o))
         };
+        let (child_state_id, _ident, _ip) = {
+            let builder0 =
+                AuraViewBuilder::with_registry(&bridge, "App081", &registry)
+                    .with_routes(&routes);
+            // 与渲染路径同身份：route 装饰 identity（child_init_identity）经
+            // override 注入 prepare——否则落到未装饰对象，写读错位。
+            let pinned = builder0.child_init_identity(
+                &child_for_prepare,
+                &std::collections::HashMap::new(),
+                &Bindings::new(),
+            );
+            builder0
+                .instance_identity_override
+                .set(Some(pinned.clone()));
+            let out = builder0.prepare_child_render_state_snap(
+                &child_for_prepare,
+                &std::collections::HashMap::new(),
+                &Bindings::new(),
+            );
+            builder0.instance_identity_override.set(None);
+            out
+        };
         bridge
-            .write_state(
+            .write_state_onto(
+                child_state_id,
                 "paragraphs",
                 auto_val::Value::Array(auto_val::Array::from(vec![
                     mk(0, "k0", "para zero"),
@@ -9501,6 +9528,16 @@ mod plan080_rowclass_probe_tests {
             let builder = AuraViewBuilder::with_registry(&bridge, "App081", &registry)
                 .with_routes(&routes);
             let (view2, _im, probe2) = builder.build_with_debug(&app.view_tree);
+            if !tap_records(&probe2) {
+                let vtxt = format!("{view2:.1200?}");
+                let has_content = vtxt.contains("para zero");
+                let has_loading = vtxt.contains("Loading");
+                println!("plan081-diag: probe2 entries={} rows_content={has_content} loading={has_loading}", probe2.snapshot().len());
+                for (pp, e) in probe2.snapshot().iter() {
+                    println!("plan081-diag: probe path={pp:?} events={}", e.events.len());
+                }
+                println!("plan081-diag: probe2 empty={}", probe2.snapshot().is_empty());
+            }
             assert!(
                 tap_records(&probe2),
                 "帧 2 probe 必须记录行事件（memo 命中重放/重建两臂都不得丢）"
