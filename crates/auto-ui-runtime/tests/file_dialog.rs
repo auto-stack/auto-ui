@@ -284,6 +284,8 @@ widget App {
         }
     }
 }
+
+
 "#.replace("__PACKAGE__", &serde_json::to_string(&package.to_str().unwrap().replace('\\', "/")).unwrap())
   .replace("__DIRECTORY__", &serde_json::to_string(temp.path().to_str().unwrap()).unwrap());
     let mut component = auto_ui_runtime::build_dynamic_component(&source, None).unwrap();
@@ -299,4 +301,85 @@ widget App {
         assert!(Instant::now() < deadline, "active first owner was starved by the closed second instance: {tree}");
         std::thread::sleep(Duration::from_millis(2));
     }
+}
+
+#[test]
+fn root_parent_close_reopen_starts_a_fresh_session_before_another_clock() {
+    use auto_ui_runtime::ui::{dynamic::DynamicComponent, interpreter::DynamicMessage, view::View};
+    use auto_ui_runtime::Component;
+    fn tick(app: &mut DynamicComponent) {
+        for source in app.subscribable_instance_timesources().into_iter().filter(|s| s.widget == "FileDialog") {
+            app.on_with_input_for(source.path.as_str(), &source.event, None);
+        }
+    }
+    fn action(view: &View<DynamicMessage>, label: &str) -> Option<DynamicMessage> {
+        match view {
+            View::Checkbox { label: text, on_toggle: Some(message), .. } if text == label => Some(message.clone()),
+            View::Button { label: text, onclick, .. } if text == label => Some(onclick.clone()),
+            View::Popover { content, .. } => action(content, label),
+            View::Column { children, .. } | View::Row { children, .. } => children.iter().find_map(|v| action(v, label)),
+            View::Container { child, .. } | View::Scrollable { child, .. } => action(child, label),
+            _ => None,
+        }
+    }
+    fn dispatch(app: &mut DynamicComponent, event: &str) {
+        app.on(DynamicMessage::Typed { widget_name: "App".into(), event_name: event.into(), args: vec![] });
+        let _ = app.view();
+    }
+    fn wait(app: &mut DynamicComponent, predicate: impl Fn(&View<DynamicMessage>) -> bool) -> View<DynamicMessage> {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            tick(app);
+            let view = app.view();
+            if predicate(&view) { return view; }
+            assert!(Instant::now() < deadline, "parent lifecycle did not settle: {view:?}");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(temp.path().join("fresh.txt"), "owned fixture").unwrap();
+    let package = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/file-dialog");
+    let source = r#"
+widget App {
+    use { package: file_dialog from __PACKAGE__ }
+    msg { Open, Close, Cancelled }
+    model {
+        var picker_open bool = false
+        var cancel_count int = 0
+    }
+    view {
+        col {
+            text f"cancelled:${.cancel_count}"
+            FileDialog (open: .picker_open, initialDirectory: __DIRECTORY__, oncancelled: .Cancelled) {}
+        }
+    }
+    on {
+        .Open -> { .picker_open = true }
+        .Close -> { .picker_open = false }
+        .Cancelled -> { .cancel_count = .cancel_count + 1; .picker_open = false }
+    }
+}
+"#.replace("__PACKAGE__", &serde_json::to_string(&package.to_str().unwrap().replace('\\', "/")).unwrap())
+  .replace("__DIRECTORY__", &serde_json::to_string(temp.path().to_str().unwrap()).unwrap());
+    let mut app = auto_ui_runtime::build_dynamic_component(&source, None).unwrap();
+    let _ = app.view();
+    dispatch(&mut app, "Open");
+    let view = wait(&mut app, |v| action(v, "fresh.txt").is_some());
+    let old_row = action(&view, "fresh.txt").unwrap();
+    app.on(old_row.clone());
+    wait(&mut app, |v| format!("{v:?}").contains("已选 1 项"));
+    dispatch(&mut app, "Close");
+    // A rendered false prop is followed immediately by a root event. No child
+    // clock gets a chance to sample the false value in between.
+    dispatch(&mut app, "Open");
+    let fresh = wait(&mut app, |v| action(v, "fresh.txt").is_some() && format!("{v:?}").contains("已选 0 项"));
+    app.on(old_row);
+    for _ in 0..3 { tick(&mut app); let _ = app.view(); }
+    assert!(format!("{:?}", app.view()).contains("已选 0 项"), "old session row must be rejected");
+    app.on(action(&fresh, "fresh.txt").unwrap());
+    let view = wait(&mut app, |v| format!("{v:?}").contains("已选 1 项"));
+    app.on(action(&view, "取消").unwrap());
+    wait(&mut app, |v| format!("{v:?}").contains("content: \"cancelled:1\""));
+    for _ in 0..3 { tick(&mut app); let _ = app.view(); }
+    assert!(format!("{:?}", app.view()).contains("content: \"cancelled:1\""), "current cancel must notify exactly once");
 }

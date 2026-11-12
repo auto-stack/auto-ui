@@ -27,6 +27,7 @@ enum Command {
 struct Instance {
     state_id: u64,
     last_command: String,
+    closed_prop_observed: bool,
     model: DialogModel,
     events: VecDeque<serde_json::Value>,
 }
@@ -60,6 +61,14 @@ impl ComponentIo {
     pub fn retain_live(&mut self, bridge: &VmBridge) {
         let live = bridge.child_instance_identities_of_type("FileDialog");
         self.instances.retain(|key, _| live.contains(key));
+        // A view can observe false and the next root handler can immediately
+        // change it back to true before the next IO pump. Retain that boundary
+        // rather than sampling only the final value of the parent-backed prop.
+        for (identity, slot) in &mut self.instances {
+            if matches!(bridge.read_instance_state(identity, "open"), Ok(Value::Bool(false))) {
+                slot.closed_prop_observed = true;
+            }
+        }
     }
 
     pub fn pump(&mut self, bridge: &mut VmBridge) -> bool {
@@ -76,6 +85,7 @@ impl ComponentIo {
                 .or_insert_with(|| Instance {
                     state_id,
                     last_command: String::new(),
+                    closed_prop_observed: false,
                     model: DialogModel::default(),
                     events: VecDeque::new(),
                 });
@@ -83,6 +93,7 @@ impl ComponentIo {
                 *slot = Instance {
                     state_id,
                     last_command: String::new(),
+                    closed_prop_observed: false,
                     model: DialogModel::default(),
                     events: VecDeque::new(),
                 };
@@ -91,7 +102,8 @@ impl ComponentIo {
             // of the 50ms component clock. Observe a closed prop at every host
             // boundary so an immediate reopen cannot miss the false edge.
             let desired_open = matches!(bridge.read_instance_state(&identity, "open"), Ok(Value::Bool(true)));
-            if !desired_open {
+            if !desired_open || slot.closed_prop_observed {
+                slot.closed_prop_observed = false;
                 if matches!(bridge.read_instance_state(&identity, "seen_open"), Ok(Value::Bool(true))) {
                     changed |= bridge.write_instance_state(&identity, "seen_open", Value::Bool(false)).is_ok();
                 }

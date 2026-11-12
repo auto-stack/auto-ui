@@ -104,6 +104,8 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
     on {
         .Tick -> {
             if .open && !.seen_open {
+                // A pending terminal event belongs to the previous session.
+                .fd_event = ""
                 .fd_seq = .fd_seq + 1
                 .fd_command = json.stringify({op: "open", seq: .fd_seq, config: {initialDirectory: .initialDirectory, selectionMode: .selectionMode, filters: .filters, activeFilterId: .activeFilterId, showHidden: .showHidden}})
             }
