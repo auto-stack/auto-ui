@@ -307,6 +307,13 @@ $toggle.Toggle()
         (self.out/f'trace-{self.index}.json').write_text(json.dumps(self.trace,ensure_ascii=False,indent=2),encoding='utf-8')
 
     def cleanup_failure(self):
+        diagnostic = {'cli_exit_before_cleanup':self.process.poll(),
+                      'owned_processes_before_cleanup':list(owned_tree(self.process.pid))}
+        try:
+            diagnostic['live_snapshot_before_cleanup'] = self.snapshot()
+        except Exception as error:
+            diagnostic['snapshot_error_before_cleanup'] = repr(error)
+        (self.out/f'failure-state-{self.index}.json').write_text(json.dumps(diagnostic,ensure_ascii=False,indent=2),encoding='utf-8')
         self.save()
         if self.process.poll() is None:
             if os.name == 'nt':
