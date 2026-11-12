@@ -2233,11 +2233,38 @@ fn run_session(
                         let cache_borrow = state.app.live_cache.borrow();
                         let vtree_src = vtree_borrow.as_ref().or(live_borrow.as_ref());
                         if let (Some(vtree), Some(cache)) = (vtree_src, cache_borrow.as_ref()) {
-                            let snap = crate::ui::mcp_server::StyledNodeSnapshot::from_live(
+                            let mut snap = crate::ui::mcp_server::StyledNodeSnapshot::from_live(
                                 state.component.widget_name(),
                                 vtree,
                                 cache,
                             );
+                            // PLAN-081 T-04c-10: 合并语义——from_live 的
+                            // InspectorCache 面对普通 Column 容器不记
+                            // events/raw_class/for_context（button/input 族
+                            // 才记），整体覆盖会把同步块 probe 系 computed
+                            // 抹掉（W-07 迭代行 onclick 在覆盖帧消失实录，
+                            // harness press_onclick 因此找不到节点）。此处以
+                            // 既有 styled 快照（同步块 probe 系）补齐缺失
+                            // 元数据；measured bounds/box_model/computed_
+                            // style 仍以 from_live 新鲜值为准。vtree 同源
+                            // （mcp_sync_vtree），VNodeId 对齐，缺项跳过。
+                            if let Some(prev) = handle.clone_styled_vtree().as_ref() {
+                                for (vid, prev_c) in prev.computed.iter() {
+                                    let node = snap.computed.entry(*vid).or_default();
+                                    if node.events.is_empty() {
+                                        node.events = prev_c.events.clone();
+                                    }
+                                    if node.raw_class.is_none() {
+                                        node.raw_class = prev_c.raw_class.clone();
+                                    }
+                                    if node.for_context.is_none() {
+                                        node.for_context = prev_c.for_context.clone();
+                                    }
+                                    if node.source.is_none() {
+                                        node.source = prev_c.source.clone();
+                                    }
+                                }
+                            }
                             handle.set_styled_vtree(snap);
                         }
                     }
