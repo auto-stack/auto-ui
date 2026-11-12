@@ -73,16 +73,14 @@ fn package_fixture_builds_and_opens_a_real_component_instance() {
     use auto_ui_runtime::ui::dynamic::DynamicComponent;
     use auto_ui_runtime::ui::{
         interpreter::DynamicMessage,
-        view::{PopoverPlacement, View},
+        view::View,
     };
     use auto_ui_runtime::Component;
     fn modal_open(view: &View<DynamicMessage>) -> bool {
         match view {
             View::Popover {
-                placement: PopoverPlacement::Modal,
-                open,
-                ..
-            } => *open,
+                placement, open, ..
+            } if placement.is_modal_chrome() => *open,
             View::Column { children, .. } | View::Row { children, .. } => {
                 children.iter().any(modal_open)
             }
@@ -93,9 +91,8 @@ fn package_fixture_builds_and_opens_a_real_component_instance() {
     fn checkboxes(view: &View<DynamicMessage>, out: &mut Vec<DynamicMessage>) {
         match view {
             View::Checkbox {
-                on_toggle: Some(message),
-                ..
-            } => out.push(message.clone()),
+                on_toggle: Some(message), label, ..
+            } if label.ends_with(".txt") => out.push(message.clone()),
             View::Popover {
                 open: true,
                 content,
@@ -154,6 +151,19 @@ fn package_fixture_builds_and_opens_a_real_component_instance() {
     let view = wait(&mut component, |view| {
         format!("{view:?}").contains("中文 book2.txt")
     });
+    fn disabled_button(view: &View<DynamicMessage>, name: &str) -> Option<bool> {
+        match view {
+            View::Button { label, disabled, .. } if label == name => Some(*disabled),
+            View::Popover { open: true, content, .. } => disabled_button(content, name),
+            View::Column { children, .. } | View::Row { children, .. } => children.iter().find_map(|child| disabled_button(child, name)),
+            View::Container { child, .. } | View::Scrollable { child, .. } => disabled_button(child, name),
+            _ => None,
+        }
+    }
+    for label in ["打开", "清空选择", "上一页", "下一页", "书籍"] {
+        assert_eq!(disabled_button(&view, label), Some(true), "{label} must be disabled");
+    }
+    assert_eq!(disabled_button(&view, "图片"), Some(false));
     let mut actions = Vec::new();
     checkboxes(&view, &mut actions);
     assert_eq!(actions.len(), 2);
@@ -175,9 +185,11 @@ fn package_fixture_builds_and_opens_a_real_component_instance() {
         let event = format!("{event_name}\u{1f}s\u{1f}{id}");
         component.on_with_input_for_instance(&widget_name, &event, None, Some(&instance));
     }
-    wait(&mut component, |view| {
+    let view = wait(&mut component, |view| {
         format!("{view:?}").contains("已选 2 项")
     });
+    assert_eq!(disabled_button(&view, "打开"), Some(false));
+    assert_eq!(disabled_button(&view, "清空选择"), Some(false));
     assert!(component.on_with_input_for_instance_type("FileDialog", "Confirm", None));
     let canonical = std::fs::canonicalize(&selected).unwrap();
     let expected = format!("{:?}", format!("选择结果 {}", canonical.display()));
@@ -255,4 +267,37 @@ widget Emitter (tag: str) {
         !view.contains("WRONG"),
         "another App's callback must not replace this App's binding"
     );
+}
+
+#[test]
+fn each_file_dialog_clock_targets_its_real_instance() {
+    use auto_ui_runtime::Component;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(temp.path().join("clock-owner.txt"), "bytes").unwrap();
+    let package = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/file-dialog");
+    let source = r#"
+widget App {
+    use { package: file_dialog from __PACKAGE__ }
+    view {
+        col {
+            FileDialog (key: "first", open: true, initialDirectory: __DIRECTORY__) {}
+            FileDialog (key: "second", open: false, initialDirectory: __DIRECTORY__) {}
+        }
+    }
+}
+"#.replace("__PACKAGE__", &serde_json::to_string(&package.to_str().unwrap().replace('\\', "/")).unwrap())
+  .replace("__DIRECTORY__", &serde_json::to_string(temp.path().to_str().unwrap()).unwrap());
+    let mut component = auto_ui_runtime::build_dynamic_component(&source, None).unwrap();
+    let _ = component.view();
+    let sources = component.subscribable_instance_timesources().into_iter().filter(|s| s.widget=="FileDialog").collect::<Vec<_>>();
+    assert_eq!(sources.len(), 2);
+    assert_ne!(sources[0].path, sources[1].path);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        for source in &sources { component.on_with_input_for(source.path.as_str(), &source.event, None); }
+        let tree = format!("{:?}", component.view());
+        if tree.contains("clock-owner.txt") { break; }
+        assert!(Instant::now() < deadline, "active first owner was starved by the closed second instance: {tree}");
+        std::thread::sleep(Duration::from_millis(2));
+    }
 }

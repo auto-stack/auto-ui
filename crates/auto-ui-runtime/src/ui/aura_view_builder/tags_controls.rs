@@ -504,9 +504,13 @@ impl<'a> AuraViewBuilder<'a> {
         {
             !self.eval_condition_with(&cond, bindings)
         } else {
-            self.extract_string_with(props, "disabled", bindings)
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false)
+            match props.get("disabled") {
+                Some(AuraPropValue::Expr(expr)) => self.resolve_expr_to_value(expr, bindings)
+                    .map(|v| { let text = value_to_display_string(&v); text == "true" || text == "1" })
+                    .unwrap_or_else(|| self.extract_string_with(props, "disabled", bindings)
+                        .is_some_and(|v| v == "true" || v == "1")),
+                _ => false,
+            }
         };
 
         View::Button {
@@ -1416,8 +1420,8 @@ impl<'a> AuraViewBuilder<'a> {
         bindings: &Bindings,
     ) -> View<DynamicMessage> {
         let label = self
-            .extract_string(props, "text")
-            .or_else(|| self.extract_string(props, "label"))
+            .extract_string_with(props, "text", bindings)
+            .or_else(|| self.extract_string_with(props, "label", bindings))
             .unwrap_or_default();
 
         // Resolve checked from state ref, literal, or binding path (e.g., todo.done)
@@ -1433,9 +1437,12 @@ impl<'a> AuraViewBuilder<'a> {
             .flatten()
             .unwrap_or(false);
 
+        let disabled = matches!(props.get("disabled"), Some(AuraPropValue::Expr(expression))
+            if matches!(self.resolve_expr_to_value(expression, bindings), Some(Value::Bool(true))));
         let on_toggle = aura_events_get_base(events, "onclick")
             .or_else(|| aura_events_get_base(events, "change"))
             .or_else(|| aura_events_get_base(events, "onchange"))
+            .filter(|_| !disabled)
             .map(|event| self.event_to_message_with(event, bindings));
 
         let style = self.extract_style(props);

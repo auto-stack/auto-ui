@@ -2,21 +2,27 @@ use auto.file
 use auto.json
 
 widget selector {
-    msg { Open, Accepted(str), Cancelled }
+    msg { Init, Open, Accepted(str), Cancelled, Background }
     model {
         var pickerOpen bool = false
+        var initialDirectory str = ""
+        var backgroundCount int = 0
         var result str = ""
         var cancelCount int = 0
     }
     view {
         col (style: "p-6 gap-4 w-full h-full bg-background text-foreground") {
             button "选择文件" { onclick: .Open }
+            button "底层计数" { onclick: .Background }
+            text f"底层次数 ${.backgroundCount}"
             text f"选择结果 ${.result}"
             text f"取消次数 ${.cancelCount}"
-            FileDialog (open: .pickerOpen, selectionMode: "multipleFiles", onaccepted: .Accepted($event), oncancelled: .Cancelled) {}
+            FileDialog (open: .pickerOpen, selectionMode: "multipleFiles", initialDirectory: .initialDirectory, filters: [{id: "books", label: "书籍", extensions: ["txt", "md", "markdown", "epub"]}, {id: "images", label: "图片", extensions: ["png", "jpg", "webp"]}], onaccepted: .Accepted($event), oncancelled: .Cancelled) {}
         }
     }
     on {
+        .Init -> { .initialDirectory = Env.get("FILE_DIALOG_INITIAL_DIRECTORY") }
+        .Background -> { .backgroundCount = .backgroundCount + 1 }
         .Open -> { .pickerOpen = true }
         .Accepted(files str) -> {
             .result = json.parse(files).files[0].path

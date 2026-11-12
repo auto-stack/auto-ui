@@ -2946,6 +2946,10 @@ fn view_kind<M: Clone + std::fmt::Debug>(view: &AbstractView<M>) -> &'static str
 /// 路径(__focus_input / 未捕获 Tab fallback / refocus / launcher 召唤)按
 /// 此寻址「当前视图的首个 input」——取代共享字面量 prompt_input 的盲聚焦。
 pub(super) fn collect_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<iced::widget::Id>) {
+    if crate::ui::modal::active_content_path(view).is_some() {
+        let mut controls = Vec::new(); collect_focusable_inputs(view, &mut controls);
+        out.extend(controls.into_iter().map(|control| control.id)); return;
+    }
     match view {
         AbstractView::Input {
             placeholder,
@@ -2981,16 +2985,14 @@ pub(super) fn collect_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<
         // PLAN-013 W2：MouseArea/Popover 容器穿透——launcher search input
         // 包在 scrim mouse-area 内，缺臂使收集器永远到不了它（派生 None →
         // 回退 prompt_input 死 Id → 不聚焦+无法输入的真根因）。
-        AbstractView::MouseArea { content, .. } => {
-            collect_input_ids(content, out);
-        }
+        AbstractView::MouseArea { content, .. } => { collect_input_ids(content, out); }
         AbstractView::Popover {
-            anchor, content, ..
+            anchor, content, open, ..
         } => {
             if let crate::ui::view::PopoverAnchor::Widget(w) = anchor {
                 collect_input_ids(w, out);
             }
-            collect_input_ids(content, out);
+            if *open { collect_input_ids(content, out); }
         }
         AbstractView::Container { child, .. } | AbstractView::Scrollable { child, .. } => {
             collect_input_ids(child, out);
@@ -3005,12 +3007,12 @@ pub(super) fn collect_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<
             collect_input_ids(content, out);
         }
         AbstractView::Popover {
-            anchor, content, ..
+            anchor, content, open, ..
         } => {
             if let crate::ui::view::PopoverAnchor::Widget(w) = anchor {
                 collect_input_ids(w, out);
             }
-            collect_input_ids(content, out);
+            if *open { collect_input_ids(content, out); }
         }
         _ => {}
     }
@@ -3364,7 +3366,16 @@ pub(super) fn render_dynamic_view(
 ) -> iced::Element<'static, IcedMessage> {
     #[cfg(windows)]
     let ticket = super::native_accessibility::enter(&view, path);
+    let activation = match &view {
+        AbstractView::Button { onclick, disabled: false, .. } => Some(onclick.clone()),
+        AbstractView::Checkbox { on_toggle: Some(message), .. } => Some(message.clone()),
+        _ => None,
+    };
     let element = render_dynamic_view_inner(view, debug_ctx, path);
+    let element = if let Some(message) = activation {
+        let id = iced::widget::Id::from(crate::ui::iced::focus_target::action_key(&message.widget, &message.event));
+        crate::ui::iced::focus_target::FocusTarget::new(element, id, message).into()
+    } else { element };
     #[cfg(windows)]
     return super::native_accessibility::wrap(ticket, element);
     #[cfg(not(windows))]
@@ -3834,6 +3845,12 @@ fn render_dynamic_view_inner(
                 // 点击整吞），与 into_iced 臂同口径。
                 .modal(placement.is_modal_chrome())
                 .anchor_is_empty(anchor_is_empty);
+            if placement.is_modal_chrome() {
+                p = p.tab_handlers(
+                    IcedMessage { widget: String::new(), event: "__focus_next_input".into(), input_value: None },
+                    IcedMessage { widget: String::new(), event: "__focus_prev_input".into(), input_value: None },
+                );
+            }
             if let Some((x, y)) = anchor_point {
                 p = p.at_point(x, y);
             }

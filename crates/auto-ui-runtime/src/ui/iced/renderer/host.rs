@@ -2337,6 +2337,28 @@ fn run_session(
             return iced::Task::none();
         }
 
+        if msg.event == "__modal_escape" {
+            let (view, _, _) = state.component.view_with_debug_gated(false);
+            if let Some(message) = crate::ui::modal::escape_message(&convert_view_messages(view)) {
+                return iced::Task::done(message);
+            }
+            return iced::Task::none();
+        }
+        if msg.event == "__activate_focused_control" {
+            let (view, _, _) = state.component.view_with_debug_gated(false);
+            let converted = convert_view_messages(view);
+            if crate::ui::modal::active_content_path(&converted).is_none() { return iced::Task::none(); }
+            let mut submits = std::collections::HashMap::new();
+            modal_input_submits(&converted, &mut submits);
+            let enter = msg.input_value.as_deref() == Some("Enter");
+            return iced::advanced::widget::operate(crate::ui::iced::focus_target::ActivateFocused::<IcedMessage>::default()).then(
+                move |(focused, activation)| {
+                    let message = activation.or_else(|| if enter { focused.and_then(|id| submits.get(&id).cloned()) } else { None });
+                    message.map(iced::Task::done).unwrap_or_else(iced::Task::none)
+                }
+            );
+        }
+
         // Plan 057 (ash-gui): global uncaptured Tab → focus the prompt editor
         // (terminal-style). Resolve the focus Id the same way the update-tail
         // refocus does (last-edited textarea's stable Id, falling back to
@@ -4173,6 +4195,53 @@ fn run_session(
         // 原「refocus 必须先于 needs_bounds(否则被 bounds 收集链饿死)」的
         // 约束在 batch 模式下天然满足(两者同帧都执行)。
         let mut tail_tasks: Vec<iced::Task<IcedMessage>> = Vec::new();
+
+        // Modal entry/exit owns one focus transaction per App. A generation
+        // guard prevents a late focus operation from affecting a reopened scope.
+        {
+            let (view, _, _) = state.component.view_with_debug_gated(false);
+            let converted = convert_view_messages(view);
+            let mut all = Vec::new();
+            collect_focusable_controls(&converted, &mut all, true);
+            let requested = state.desktop.mcp_shared.as_ref().map(|shared|
+                shared.lock().unwrap().take_action_focus(&msg.widget, &msg.event)).unwrap_or(false);
+            if requested {
+                if let Some(control) = all.iter().find(|c| c.widget == msg.widget && c.event == msg.event) {
+                    *state.app.mcp_activation_focus.borrow_mut() = Some(control.id.clone());
+                    tail_tasks.push(iced::advanced::widget::operate(crate::ui::iced::focus_target::guarded_focus(
+                        control.id.clone(), state.app.modal_focus_generation.clone(), state.app.modal_focus_generation.load(std::sync::atomic::Ordering::Acquire))));
+                }
+            } else if !msg.event.starts_with("__") && msg.event != "Tick" {
+                state.app.mcp_activation_focus.borrow_mut().take();
+            }
+            let mut scoped = Vec::new();
+            collect_focusable_inputs(&converted, &mut scoped);
+            let scope = crate::ui::modal::active_content_path(&converted).map(|path|
+                format!("{path:?}:{}", scoped.first().map(|c| c.widget.as_str()).unwrap_or("")));
+            let previous = state.app.modal_scope.borrow().clone();
+            if scope != previous {
+                *state.app.modal_scope.borrow_mut() = scope.clone();
+                let generation = state.app.modal_focus_generation.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
+                if scope.is_some() {
+                    let first = scoped.iter().find(|c| c.is_input).or_else(|| scoped.first()).map(|c| c.id.clone());
+                    let requested_restore = state.app.mcp_activation_focus.borrow_mut().take();
+                    let restore = state.app.modal_restore.clone();
+                    let guard = state.app.modal_focus_generation.clone();
+                    if requested_restore.is_some() { *restore.lock().unwrap() = requested_restore.clone(); }
+                    tail_tasks.push(iced::advanced::widget::operate(FindFocusedInput::new()).then(move |current| {
+                        if guard.load(std::sync::atomic::Ordering::Acquire) != generation { return iced::Task::none(); }
+                        if requested_restore.is_none() { *restore.lock().unwrap() = current; }
+                        first.clone().map(|target| iced::advanced::widget::operate(crate::ui::iced::focus_target::guarded_focus(target, guard.clone(), generation))).unwrap_or_else(iced::Task::none)
+                    }));
+                } else {
+                    let saved = state.app.modal_restore.lock().unwrap().take();
+                    let target = saved.filter(|id| all.iter().any(|c| &c.id == id))
+                        .or_else(|| all.iter().find(|c| c.is_input).or_else(|| all.first()).map(|c| c.id.clone()));
+                    if let Some(target) = target { tail_tasks.push(iced::advanced::widget::operate(crate::ui::iced::focus_target::guarded_focus(target, state.app.modal_focus_generation.clone(), generation))); }
+                    state.app.mcp_activation_focus.borrow_mut().take();
+                }
+            }
+        }
 
         // Plan 047/057: 恢复输入焦点(最后被编辑的 textarea,按稳定 Id)。
         if state.app.devtools.needs_prompt_refocus.get() {

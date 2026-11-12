@@ -257,9 +257,10 @@ impl InstancePath {
 
     /// 解析出的 widget 类型名（`@` 前缀段）。
     pub fn widget_type(&self) -> &str {
-        match self.0.split_once('@') {
+        let head = self.0.split_once('\u{1}').map(|(widget, _)| widget).unwrap_or(self.0.as_str());
+        match head.split_once('@') {
             Some((w, _)) => w,
-            None => self.0.as_str(),
+            None => head,
         }
     }
 
@@ -274,7 +275,7 @@ impl InstancePath {
 
     /// 是否子组件实例 path（含 `@` 序号）。
     pub fn is_instance(&self) -> bool {
-        self.0.contains('@')
+        self.0.contains('@') || self.0.contains('\u{1}')
     }
 }
 
@@ -1121,6 +1122,18 @@ impl DynamicComponent {
         let mounted_paths = self.mounted_paths.borrow();
         let mut out: Vec<InstanceTimeSource> = Vec::new();
         for s in &self.timesources {
+            if matches!(s.kind, TimeSourceKind::Tick) && !self.always_mounted.contains(&s.widget) {
+                let identities = self.bridge.child_instance_identities_of_type(&s.widget);
+                if !identities.is_empty() {
+                    for identity in identities {
+                        out.push(InstanceTimeSource {
+                            path: InstancePath(format!("{}\u{1}{}", s.widget, identity)), kind: s.kind,
+                            widget: s.widget.clone(), event: s.event.clone(), every_ms: s.every_ms, when: s.when.clone(),
+                        });
+                    }
+                    continue;
+                }
+            }
             match s.kind {
                 TimeSourceKind::Tick => {}
                 TimeSourceKind::Timer => {

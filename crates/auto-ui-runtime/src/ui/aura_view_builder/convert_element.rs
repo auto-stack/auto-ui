@@ -296,12 +296,12 @@ impl<'a> AuraViewBuilder<'a> {
             // （untracked 镜像臂,D-GAP 规则）。见 convert_alert_dialog。
             // PLAN-533 T5: dialog 家族（可关闭模态）同走模态 Popover 臂。
             "dialog" | "Dialog" => {
-                self.convert_alert_dialog(props, children, bindings, ModalDialogFamily::Dialog)
+                self.convert_alert_dialog(props, events, children, bindings, ModalDialogFamily::Dialog)
             }
             "dropdown-menu" | "dropdown_menu" | "dropdownmenu" | "DropdownMenu" => self
-                .convert_alert_dialog(props, children, bindings, ModalDialogFamily::DropdownMenu),
+                .convert_alert_dialog(props, events, children, bindings, ModalDialogFamily::DropdownMenu),
             "alert-dialog" | "alert_dialog" | "alertdialog" => {
-                self.convert_alert_dialog(props, children, bindings, ModalDialogFamily::Alert)
+                self.convert_alert_dialog(props, events, children, bindings, ModalDialogFamily::Alert)
             }
             // PLAN-534: sheet/drawer → 贴边 Popover（untracked 镜像臂,
             // D-GAP 规则）。见 convert_side_panel。

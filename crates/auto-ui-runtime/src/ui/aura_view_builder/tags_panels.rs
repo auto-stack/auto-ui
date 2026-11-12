@@ -1121,6 +1121,7 @@ impl<'a> AuraViewBuilder<'a> {
     pub(super) fn convert_alert_dialog_raw(
         &self,
         props: &HashMap<String, AuraPropValue>,
+        events: &HashMap<String, AuraEvent>,
         children: &[AuraNode],
         bindings: &Bindings,
         family: ModalDialogFamily,
@@ -1201,7 +1202,13 @@ impl<'a> AuraViewBuilder<'a> {
         // PLAN-533 T6: 可关闭族（dialog）铸造形态的 ESC/外点/锚点 dismiss
         // 折算 __dlg_close_N（update:open(false)）;alert 族与显式绑定自管
         // 形态不接管。
-        let on_dismiss = if matches!(
+        let explicit_close = aura_events_get_base(events, "onclose")
+            .map(|event| self.event_to_message_with(event, bindings));
+        let placement = if explicit_close.is_some() && matches!(props.get("closeOnOutside"),
+            Some(AuraPropValue::Expr(expression)) if matches!(self.resolve_expr_to_value(expression, bindings), Some(Value::Bool(false)))) {
+            PopoverPlacement::ModalExplicit
+        } else { placement };
+        let on_dismiss = if explicit_close.is_some() { explicit_close } else if matches!(
             family,
             ModalDialogFamily::Dialog | ModalDialogFamily::DropdownMenu
         ) {
@@ -1223,6 +1230,7 @@ impl<'a> AuraViewBuilder<'a> {
     pub(super) fn convert_alert_dialog_tracked_ctx_raw(
         &self,
         props: &HashMap<String, AuraPropValue>,
+        events: &HashMap<String, AuraEvent>,
         children: &[AuraNode],
         path: &mut Vec<usize>,
         id_map: &mut DebugIdMap,
@@ -1309,7 +1317,13 @@ impl<'a> AuraViewBuilder<'a> {
         // PLAN-533 T6: 可关闭族（dialog）铸造形态的 ESC/外点/锚点 dismiss
         // 折算 __dlg_close_N（update:open(false)）;alert 族与显式绑定自管
         // 形态不接管。
-        let on_dismiss = if matches!(
+        let explicit_close = aura_events_get_base(events, "onclose")
+            .map(|event| self.event_to_message_with(event, bindings));
+        let placement = if explicit_close.is_some() && matches!(props.get("closeOnOutside"),
+            Some(AuraPropValue::Expr(expression)) if matches!(self.resolve_expr_to_value(expression, bindings), Some(Value::Bool(false)))) {
+            PopoverPlacement::ModalExplicit
+        } else { placement };
+        let on_dismiss = if explicit_close.is_some() { explicit_close } else if matches!(
             family,
             ModalDialogFamily::Dialog | ModalDialogFamily::DropdownMenu
         ) {
@@ -2538,6 +2552,7 @@ impl<'a> AuraViewBuilder<'a> {
     pub(super) fn convert_alert_dialog(
         &self,
         props: &HashMap<String, AuraPropValue>,
+        events: &HashMap<String, AuraEvent>,
         children: &[AuraNode],
         bindings: &Bindings,
         family: ModalDialogFamily,
@@ -2564,7 +2579,7 @@ impl<'a> AuraViewBuilder<'a> {
             MemoGateBegin::Fill(f) => Some(f),
         };
         let (out, rec) = self.fill_with_recording(|| {
-            let out = self.convert_alert_dialog_raw(props, children, bindings, family);
+            let out = self.convert_alert_dialog_raw(props, events, children, bindings, family);
             // PLAN-047 T-05: 槽表达式录制域内估值（同 menubar 组件门）。
             if let Some(f) = &fill {
                 let _ = self.memo_slots_fp(&f.slots, bindings);
@@ -2581,6 +2596,7 @@ impl<'a> AuraViewBuilder<'a> {
     pub(super) fn convert_alert_dialog_tracked_ctx(
         &self,
         props: &HashMap<String, AuraPropValue>,
+        events: &HashMap<String, AuraEvent>,
         children: &[AuraNode],
         path: &mut Vec<usize>,
         id_map: &mut DebugIdMap,
@@ -2612,7 +2628,7 @@ impl<'a> AuraViewBuilder<'a> {
         };
         let (out, rec) = self.fill_with_recording(|| {
             let out = self.convert_alert_dialog_tracked_ctx_raw(
-                props, children, path, id_map, probe, bindings, family,
+                props, events, children, path, id_map, probe, bindings, family,
             );
             // PLAN-047 T-05: 槽表达式录制域内估值（同 menubar 组件门）。
             if let Some(f) = &fill {

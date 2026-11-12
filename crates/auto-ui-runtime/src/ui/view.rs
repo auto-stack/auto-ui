@@ -1421,6 +1421,8 @@ pub enum PopoverPlacement {
     /// 发布）。alert-dialog 臂专用（shadcn AlertDialog 语义：外点/Esc 不关，
     /// 仅 cancel/action 操作钮经 VM 状态翻转关闭）。
     Modal,
+    /// Explicit close controls and Escape may close; outside clicks and loss of focus do not.
+    ModalExplicit,
     /// PLAN-534：viewport 贴边变体（sheet/drawer 专用）——面板贴 viewport
     /// 四缘之一（EdgeLeft/EdgeRight 全高，EdgeTop/EdgeBottom 全宽），
     /// 锚无关；挂 scrim + 面板外点击整吞（on_dismiss 为 Some 时同时发布，
@@ -1443,7 +1445,7 @@ impl PopoverPlacement {
     pub fn is_modal_chrome(&self) -> bool {
         matches!(
             self,
-            Self::Modal | Self::EdgeLeft | Self::EdgeRight | Self::EdgeTop | Self::EdgeBottom
+            Self::Modal | Self::ModalExplicit | Self::EdgeLeft | Self::EdgeRight | Self::EdgeTop | Self::EdgeBottom
         )
     }
 }

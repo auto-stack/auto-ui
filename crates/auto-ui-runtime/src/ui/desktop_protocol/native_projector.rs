@@ -354,7 +354,7 @@ fn popover_panel_origin(
     let cx = r.x + r.w / 2.0 - pw / 2.0;
     let cy = r.y + r.h / 2.0 - ph / 2.0;
     let (px, py) = match placement {
-        PopoverPlacement::Modal => ((vw - pw) / 2.0, (vh - ph) / 2.0),
+        PopoverPlacement::Modal | PopoverPlacement::ModalExplicit => ((vw - pw) / 2.0, (vh - ph) / 2.0),
         PopoverPlacement::EdgeLeft => (POP_MARGIN, (vh - ph) / 2.0),
         PopoverPlacement::EdgeRight => ((vw - pw - POP_MARGIN).max(POP_MARGIN), (vh - ph) / 2.0),
         PopoverPlacement::EdgeTop => ((vw - pw) / 2.0, POP_MARGIN),

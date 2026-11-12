@@ -2604,6 +2604,7 @@ mod plan095_focus_tests {
 
     fn input(widget: &str, event: &str) -> FocusableInput {
         FocusableInput {
+            is_input: true,
             id: iced::widget::Id::from(format!("textarea_{widget}_{event}")),
             widget: widget.to_string(),
             event: event.to_string(),
@@ -2664,13 +2665,26 @@ mod plan095_focus_tests {
 /// PLAN-095 T-04: 当前视图中可聚焦输入控件（Input/Textarea）的稳定 Id 与
 /// handler 寻址键（遍历面与 collect_input_ids/collect_media_surfaces 同族）。
 pub(crate) struct FocusableInput {
+    pub is_input: bool,
     pub id: iced::widget::Id,
     pub widget: String,
     pub event: String,
 }
 
 pub(super) fn collect_focusable_inputs(view: &AbstractView<IcedMessage>, out: &mut Vec<FocusableInput>) {
+    if let Some(path) = crate::ui::modal::active_content_path(view) {
+        if let Some(content) = crate::ui::modal::at_path(view, &path) { collect_focusable_controls(content, out, true); }
+    } else { collect_focusable_controls(view, out, false); }
+}
+
+pub(super) fn collect_focusable_controls(view: &AbstractView<IcedMessage>, out: &mut Vec<FocusableInput>, actions: bool) {
     match view {
+        AbstractView::Button { onclick: message, disabled: false, .. } if actions => {
+            out.push(FocusableInput { id: iced::widget::Id::from(crate::ui::iced::focus_target::action_key(&message.widget, &message.event)), widget: message.widget.clone(), event: message.event.clone(), is_input: false });
+        }
+        AbstractView::Checkbox { on_toggle: Some(message), .. } if actions => {
+            out.push(FocusableInput { id: iced::widget::Id::from(crate::ui::iced::focus_target::action_key(&message.widget, &message.event)), widget: message.widget.clone(), event: message.event.clone(), is_input: false });
+        }
         AbstractView::Input {
             placeholder,
             on_change,
@@ -2688,6 +2702,7 @@ pub(super) fn collect_focusable_inputs(view: &AbstractView<IcedMessage>, out: &m
                         .map(|m| (m.widget.as_str(), m.event.as_str()))
                 });
             out.push(FocusableInput {
+                is_input: true,
                 id: derive_input_id(primary, placeholder, *width, *password),
                 widget: primary.map(|(w, _)| w.to_string()).unwrap_or_default(),
                 event: primary.map(|(_, e)| e.to_string()).unwrap_or_default(),
@@ -2710,7 +2725,7 @@ pub(super) fn collect_focusable_inputs(view: &AbstractView<IcedMessage>, out: &m
                 .as_ref()
                 .map(|m| (m.widget.clone(), m.event.clone()))
                 .unwrap_or_default();
-            out.push(FocusableInput { id, widget, event });
+            out.push(FocusableInput { id, widget, event, is_input: true });
         }
         AbstractView::Column { children, .. }
         | AbstractView::Row { children, .. }
@@ -2718,29 +2733,29 @@ pub(super) fn collect_focusable_inputs(view: &AbstractView<IcedMessage>, out: &m
             items: children, ..
         } => {
             for child in children {
-                collect_focusable_inputs(child, out);
+                collect_focusable_controls(child, out, actions);
             }
         }
-        AbstractView::MouseArea { content, .. } => collect_focusable_inputs(content, out),
+        AbstractView::MouseArea { content, .. } => collect_focusable_controls(content, out, actions),
         AbstractView::Popover {
-            anchor, content, ..
+            anchor, content, open, ..
         } => {
             if let crate::ui::view::PopoverAnchor::Widget(w) = anchor {
-                collect_focusable_inputs(w, out);
+                collect_focusable_controls(w, out, actions);
             }
-            collect_focusable_inputs(content, out);
+            if *open { collect_focusable_controls(content, out, actions); }
         }
         AbstractView::Container { child, .. } | AbstractView::Scrollable { child, .. } => {
-            collect_focusable_inputs(child, out);
+            collect_focusable_controls(child, out, actions);
         }
         AbstractView::Grid { cells, .. } => {
             for cell in cells {
-                collect_focusable_inputs(cell, out);
+                collect_focusable_controls(cell, out, actions);
             }
         }
         AbstractView::Overlay { base, content, .. } => {
-            collect_focusable_inputs(base, out);
-            collect_focusable_inputs(content, out);
+            collect_focusable_controls(base, out, actions);
+            collect_focusable_controls(content, out, actions);
         }
         _ => {}
     }
@@ -3225,3 +3240,12 @@ pub(crate) fn layout_style_fn(
     }
 }
 
+
+pub(super) fn modal_input_submits(view: &AbstractView<IcedMessage>, out: &mut std::collections::HashMap<iced::widget::Id, IcedMessage>) {
+    if let AbstractView::Input { placeholder, on_change, on_submit: Some(message), width, password, value, .. } = view {
+        let primary = on_change.as_ref().map(|m| (m.widget.as_str(), m.event.as_str())).or(Some((message.widget.as_str(), message.event.as_str())));
+        let mut message = message.clone(); message.input_value = Some(value.clone());
+        out.insert(derive_input_id(primary, placeholder, *width, *password), message);
+    }
+    for child in crate::ui::vnode_converter::extract_children_ref(view) { modal_input_submits(child, out); }
+}

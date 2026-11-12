@@ -78,6 +78,10 @@ pub struct AppState {
     /// PLAN-095 T-04: ui.focus 待解析目标（target_key, 重试计数）——挂载
     /// 时序竞态的有限重试面，消费成功或 5 轮 miss 后清空。
     pub focus_pending: RefCell<Option<(String, u32)>>,
+    pub modal_scope: RefCell<Option<String>>,
+    pub modal_restore: std::sync::Arc<std::sync::Mutex<Option<iced::widget::Id>>>,
+    pub modal_focus_generation: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    pub mcp_activation_focus: RefCell<Option<iced::widget::Id>>,
     /// Plan 459：DevTools 全量状态下沉为 per-App（验收：双窗 DevTools
     /// 选择/日志互不串扰）。字段与布局逻辑保持原形状。
     pub devtools: DevToolsState,
@@ -103,6 +107,10 @@ impl AppState {
             aura_to_id_cache: RefCell::new(HashMap::new()),
             media_notify: RefCell::new(Vec::new()),
             focus_pending: RefCell::new(None),
+            modal_scope: RefCell::new(None),
+            modal_restore: Default::default(),
+            modal_focus_generation: Default::default(),
+            mcp_activation_focus: RefCell::new(None),
             devtools: DevToolsState::new(),
         }
     }

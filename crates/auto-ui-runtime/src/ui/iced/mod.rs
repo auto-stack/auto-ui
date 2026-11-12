@@ -19,6 +19,7 @@ pub mod video_uplink;
 // PLAN-002 B: 布局件 hover 态 widget(row/col/div 的 `hover:` 变体类消费;
 // 共享标志 + request_redraw,无 view 重建)。
 pub mod hover_area;
+pub mod focus_target;
 // PLAN-631 F-7: 指针按下记忆根 wrapper(popover placement "pointer" 锚源;
 // 窗口根单包装,ButtonPressed 现场记账窗口逻辑坐标到会话级单槽,纯委托)。
 pub mod right_press_area;

@@ -323,6 +323,8 @@ element checkbox {
     backends: { web: "component", iced: "full", gpui: "unknown" }
     vue: { component: "Checkbox", import: "@/components/ui/checkbox" }
     props: [
+        { name: "text", type: "union:string,state_ref", description: "Visible checkbox label" }
+        { name: "label", type: "union:string,state_ref", description: "Visible checkbox label alias" }
         { name: "checked", type: "union:bool,state_ref", default: "false", description: "Checked state" }
         { name: "onchange", type: "msg_ref", description: "Message on toggle" }
         { name: "class", type: "union:string,class_binding", description: "CSS class(es)" }
@@ -4188,6 +4190,7 @@ element dialog {
     sub_widgets: ["dialog-close", "dialog-content", "dialog-description", "dialog-footer", "dialog-header", "dialog-title", "dialog-trigger"]
     props: [
         { name: "open", type: "one_of:true,false", default: "false", description: "Controls dialog visibility" }
+        { name: "closeOnOutside", type: "bool", default: "true", description: "Whether an explicit onclose dialog dismisses on outside click or focus loss" }
         { name: "title", type: "string", description: "Dialog title" }
         { name: "description", type: "string", description: "Dialog description" }
     ]

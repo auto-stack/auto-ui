@@ -10735,3 +10735,61 @@ This is a **bold** and *italic* paragraph with `code` and [link](https://x).
         }
     }
 }
+
+#[cfg(test)]
+mod plan082_focus_tests {
+    use super::*;
+    use iced::advanced::widget::Operation;
+    use iced_test::runtime::{core::{clipboard, renderer::Headless, Size}, user_interface};
+    use crate::ui::view::{PopoverAnchor, PopoverPlacement};
+    fn msg(event: &str) -> IcedMessage { IcedMessage { widget: "Picker".into(), event: event.into(), input_value: None } }
+    fn column(children: Vec<AbstractView<IcedMessage>>) -> AbstractView<IcedMessage> {
+        AbstractView::Column { children, spacing: 6, padding: 6, style: None, onclick: None, on_right_click: None }
+    }
+    fn button(event: &str, disabled: bool) -> AbstractView<IcedMessage> {
+        AbstractView::Button { label: event.into(), onclick: msg(event), style: None, on_right_click: None, content: None, disabled }
+    }
+    fn input() -> AbstractView<IcedMessage> {
+        AbstractView::Input { placeholder: "Path".into(), value: String::new(), on_change: Some(msg("PathChanged")), on_submit: Some(msg("Navigate")), width: None, password: false, style: None, disabled: false }
+    }
+    fn view(open: bool) -> AbstractView<IcedMessage> {
+        column(vec![button("Trigger", false), AbstractView::Popover {
+            anchor: PopoverAnchor::Widget(Box::new(AbstractView::Empty)),
+            content: Box::new(column(vec![input(), AbstractView::Checkbox { is_checked: false, label: "book.txt".into(), on_toggle: Some(msg("Choose")), style: None }, button("Unavailable", true), button("Cancel", false)])),
+            placement: PopoverPlacement::ModalExplicit, open, on_dismiss: Some(msg("Cancel")),
+        }])
+    }
+    #[test]
+    fn modal_focus_registry_wraps_actions_and_native_keys_use_the_same_handler() {
+        let mut controls = Vec::new();
+        collect_focusable_inputs(&view(true), &mut controls);
+        assert_eq!(controls.iter().map(|c| c.event.as_str()).collect::<Vec<_>>(), ["PathChanged", "Choose", "Cancel"]);
+        let mut ids = Vec::new(); collect_input_ids(&view(true), &mut ids);
+        assert_eq!(ids, controls.iter().map(|c| c.id.clone()).collect::<Vec<_>>());
+        assert_eq!(focus_traverse(&ids, ids.last(), true), Some(ids[0].clone()));
+        assert_eq!(focus_traverse(&ids, ids.first(), false), Some(ids[2].clone()));
+        let mut renderer = iced_test::futures::futures::executor::block_on(iced::Renderer::new(iced::Font::DEFAULT, 12.0_f32.into(), None)).unwrap();
+        let el = render_dynamic_view(view(true), None, &mut Vec::new());
+        let mut ui = user_interface::UserInterface::build(el, Size::new(800.0,700.0), user_interface::Cache::default(), &mut renderer);
+        let mut messages = Vec::new();
+        let mut operation = iced_test::runtime::core::widget::operation::focusable::focus::<()>(ids[1].clone());
+        ui.operate(&mut renderer, &mut operation);
+        let mut activation = crate::ui::iced::focus_target::ActivateFocused::<IcedMessage>::default();
+        ui.operate(&mut renderer, &mut iced::advanced::widget::operation::black_box::<_, ()>(&mut activation));
+        assert!(matches!(activation.finish(), iced::advanced::widget::operation::Outcome::Some((Some(id),Some(message))) if id==ids[1] && message.event=="Choose"));
+        let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Space, None).collect::<Vec<_>>();
+        ui.update(&keys, iced::mouse::Cursor::Unavailable, &mut renderer, &mut clipboard::Null, &mut messages);
+        assert_eq!(messages.iter().map(|m| m.event.as_str()).collect::<Vec<_>>(), ["Choose"]);
+        messages.clear();
+        let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Tab, None).collect::<Vec<_>>();
+        ui.update(&keys, iced::mouse::Cursor::Unavailable, &mut renderer, &mut clipboard::Null, &mut messages);
+        assert_eq!(messages.iter().map(|m| m.event.as_str()).collect::<Vec<_>>(), ["__focus_next_input"]);
+        messages.clear();
+        let outside = [iced::Event::Mouse(iced::mouse::Event::CursorMoved { position: iced::Point::new(1.,1.) }), iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)), iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left))];
+        ui.update(&outside, iced::mouse::Cursor::Available(iced::Point::new(1.,1.)), &mut renderer, &mut clipboard::Null, &mut messages);
+        assert!(messages.is_empty(), "outside clicks neither dismiss nor activate background controls");
+        let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Escape, None).collect::<Vec<_>>();
+        ui.update(&keys, iced::mouse::Cursor::Unavailable, &mut renderer, &mut clipboard::Null, &mut messages);
+        assert_eq!(messages.iter().map(|m| m.event.as_str()).collect::<Vec<_>>(), ["Cancel"]);
+    }
+}

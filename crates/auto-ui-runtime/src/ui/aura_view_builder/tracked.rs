@@ -1406,6 +1406,7 @@ impl<'a> AuraViewBuilder<'a> {
             // PLAN-533 T5: dialog 家族（可关闭模态）同走模态 Popover 臂。
             "dialog" | "Dialog" => self.convert_alert_dialog_tracked_ctx(
                 props,
+                events,
                 children,
                 path,
                 id_map,
@@ -1416,6 +1417,7 @@ impl<'a> AuraViewBuilder<'a> {
             "dropdown-menu" | "dropdown_menu" | "dropdownmenu" | "DropdownMenu" => self
                 .convert_alert_dialog_tracked_ctx(
                     props,
+                events,
                     children,
                     path,
                     id_map,
@@ -1426,6 +1428,7 @@ impl<'a> AuraViewBuilder<'a> {
             "alert-dialog" | "alert_dialog" | "alertdialog" => self
                 .convert_alert_dialog_tracked_ctx(
                     props,
+                events,
                     children,
                     path,
                     id_map,

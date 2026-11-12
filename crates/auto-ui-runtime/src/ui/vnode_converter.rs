@@ -659,12 +659,12 @@ where
         // (坐标锚无 anchor 子)。子序 = snapshot/probe 约定 0/1。
         View::Popover {
             anchor: crate::ui::view::PopoverAnchor::Widget(w),
-            content,
-            ..
+            content, open, ..
         } => {
-            vec![*w.clone(), *content.clone()]
+            if *open { vec![*w.clone(), *content.clone()] } else { vec![*w.clone()] }
         }
-        View::Popover { content, .. } => vec![*content.clone()],
+        View::Popover { content, open: true, .. } => vec![*content.clone()],
+        View::Popover { .. } => vec![],
         // PLAN-089(T-07① 根修): mouse-area content 进 vtree——此前落 `_`
         // 叶子，content 子树整体不可见且与 builder 侧 push(0) 路径错位
         // (computed 合流 + MCP press 失配=FileTree 行按不动的仪器面根因)。
@@ -708,12 +708,12 @@ where
         // Plan 422: 与 extract_children 保持同序(widget 锚在前)。
         View::Popover {
             anchor: crate::ui::view::PopoverAnchor::Widget(w),
-            content,
-            ..
+            content, open, ..
         } => {
-            vec![w.as_ref(), content.as_ref()]
+            if *open { vec![w.as_ref(), content.as_ref()] } else { vec![w.as_ref()] }
         }
-        View::Popover { content, .. } => vec![content.as_ref()],
+        View::Popover { content, open: true, .. } => vec![content.as_ref()],
+        View::Popover { .. } => vec![],
         // PLAN-089(T-07① 根修): 与 extract_children 的 MouseArea 臂同序同构。
         View::MouseArea { content, .. } => vec![content.as_ref()],
         _ => Vec::new(),

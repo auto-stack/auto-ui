@@ -56,6 +56,7 @@ where
     /// 坐标锚(contextmenu);None = widget 锚(anchor 元素的 bounds)。
     at_point: Option<(f32, f32)>,
     on_dismiss: Option<Message>,
+    on_tab: Option<(Message, Message)>,
     /// True when the modal dialog has no trigger and uses an Empty anchor.
     anchor_is_empty: bool,
     gap: f32,
@@ -79,6 +80,7 @@ where
             modal: false,
             at_point: None,
             on_dismiss: None,
+            on_tab: None,
             anchor_is_empty: false,
             gap: DEFAULT_GAP,
             snap_within_viewport: true,
@@ -99,6 +101,10 @@ where
     pub fn modal(mut self, modal: bool) -> Self {
         self.modal = modal;
         self
+    }
+
+    pub fn tab_handlers(mut self, next: Message, previous: Message) -> Self {
+        self.on_tab = Some((next, previous)); self
     }
 
     pub fn on_dismiss(mut self, msg: Message) -> Self {
@@ -279,6 +285,7 @@ where
                 gap: self.gap,
                 snap_within_viewport: self.snap_within_viewport,
                 on_dismiss: self.on_dismiss.clone(),
+                on_tab: self.on_tab.clone(),
                 modal: self.modal,
                 clip_viewport: *viewport,
                 viewport: std::cell::Cell::new(*viewport),
@@ -359,6 +366,7 @@ where
     gap: f32,
     snap_within_viewport: bool,
     on_dismiss: Option<Message>,
+    on_tab: Option<(Message, Message)>,
     /// PLAN-530 步骤8（W13）：模态形态（遮罩 + 面板外点击整吞）。
     modal: bool,
     /// overlay() 入参的裁剪视口（窗内绝对坐标）——container clip /
@@ -461,7 +469,7 @@ where
                 size,
             ),
             // PLAN-530 步骤8（W13）：模态对话框——面板视口居中，与锚位无关。
-            PopoverPlacement::Modal => Rectangle::new(
+            PopoverPlacement::Modal | PopoverPlacement::ModalExplicit => Rectangle::new(
                 Point::new(
                     viewport.x + (viewport.width - size.width) / 2.0,
                     viewport.y + (viewport.height - size.height) / 2.0,
@@ -592,7 +600,7 @@ where
                 if over_anchor {
                     // 锚上点击:dismiss 并捕获 —— 基础树收不到 toggle,菜单经
                     // on_dismiss 干净关闭(点触发器 = 关,menubar 语义)。
-                    dismiss(shell, &self.on_dismiss);
+                    if self.placement != PopoverPlacement::ModalExplicit { dismiss(shell, &self.on_dismiss); }
                 }
                 if !over_panel && !over_anchor {
                     // 宿主视口外（虚拟窗标题栏/缩放把手等 chrome）——整段
@@ -611,7 +619,7 @@ where
                     }
                     // 面板/锚之外的点击:dismiss 但放行给基础树 —— 别的
                     // menubar 触发器可以直接切换菜单。
-                    dismiss(shell, &self.on_dismiss);
+                    if self.placement != PopoverPlacement::ModalExplicit { dismiss(shell, &self.on_dismiss); }
                     // PLAN-530 步骤8（W13）：模态形态整吞外点——遮罩语义，
                     // 基础树收不到（alert-dialog：外点不关闭不透传）。
                     // 仅宿主视口内（真遮罩区）；chrome 区已上方放行。
@@ -638,6 +646,13 @@ where
                 }
             }
             Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(keyboard::key::Named::Tab), modifiers, ..
+            }) if self.modal && self.on_tab.is_some() => {
+                let (next, previous) = self.on_tab.as_ref().unwrap();
+                shell.publish(if modifiers.shift() { previous.clone() } else { next.clone() });
+                shell.capture_event();
+            }
+            Event::Keyboard(keyboard::Event::KeyPressed {
                 key: keyboard::Key::Named(keyboard::key::Named::Escape),
                 ..
             }) => {
@@ -645,7 +660,7 @@ where
                 shell.capture_event();
             }
             Event::Window(window::Event::Unfocused) => {
-                dismiss(shell, &self.on_dismiss);
+                if self.placement != PopoverPlacement::ModalExplicit { dismiss(shell, &self.on_dismiss); }
             }
             _ => {
                 // 其余事件(移动/滚轮/键盘输入等)转发给 content,面板内
@@ -661,6 +676,7 @@ where
                     shell,
                     &Rectangle::with_size(Size::INFINITE),
                 );
+                if self.modal && matches!(event, Event::Keyboard(_)) { shell.capture_event(); }
             }
         }
     }

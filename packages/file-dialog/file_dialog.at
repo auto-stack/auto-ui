@@ -3,7 +3,7 @@ use auto.json
 // Ordinary view state is a projection of the App-owned DialogModel. Selection,
 // filtering, validation and session lifetime have one owner in the runtime.
 widget FileDialog (open: bool = false, title: str = "选择文件", initialDirectory: str = "", selectionMode: str = "singleFile", filters: List = [], activeFilterId: str = "", acceptLabel: str = "打开", showHidden: bool = false) {
-    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, accepted(str), cancelled, error(str) }
+    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, Up, Home, Refresh, Root(str), SetName(str), SetFilter(str), ToggleHidden, Clear, PreviousPage, NextPage, accepted(str), cancelled, error(str) }
     model {
         var interval int = 50
         var fd_command str = ""
@@ -20,30 +20,78 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
         var canAccept bool = false
         var errorMessage str = ""
         var loading bool = false
+        var roots = []
+        var homePath str = ""
+        var canUp bool = false
+        var nameQuery str = ""
+        var activeType str = ""
+        var hidden bool = false
+        var page int = 0
+        var pageCount int = 1
+        var totalEntries int = 0
+        var visibleFiles int = 0
     }
     view {
-        dialog (open: .fd_active) {
+        dialog (open: .fd_active, onclose: .Cancel, closeOnOutside: false) {
             dialog-content {
-                dialog-header { dialog-title .title }
-                col (style: "gap-2 w-full") {
-                    input (value: .pathInput, oninput: .SetPath, onenter: .Go, placeholder: "目录路径") {}
-                    button "转到" { onclick: .Go }
-                    text .currentDirectory
+                dialog-header {
+                    row (style: "justify-between items-center gap-2") {
+                        dialog-title .title
+                        button "关闭" { onclick: .Cancel }
+                    }
+                }
+                col (style: "gap-2 w-full min-w-0 max-h-80 overflow-y-auto") {
+                    row (style: "gap-2 items-center") {
+                        button "主目录" { onclick: .Home }
+                        button "上一级" { onclick: .Up, disabled: !.canUp }
+                        button "刷新" { onclick: .Refresh }
+                    }
+                    row (style: "gap-2 items-center w-full overflow-x-auto") {
+                        for root in .roots { if root != .homePath { button root { onclick: .Root(root) } } }
+                    }
+                    row (style: "gap-2 items-center w-full") {
+                        input (value: .pathInput, oninput: .SetPath, onenter: .Go, placeholder: "目录路径", style: "flex-1 min-w-0") {}
+                        button "转到" { onclick: .Go }
+                    }
+                    text .currentDirectory { style: "text-xs text-muted-foreground" }
+                    input (value: .nameQuery, oninput: .SetName, placeholder: "名称过滤", style: "w-full min-w-0") {}
+                    row (style: "gap-2 items-center flex-wrap") {
+                        for filter in .filters {
+                            button filter.label { onclick: .SetFilter(filter.id), disabled: .activeType == filter.id }
+                        }
+                    }
+                    checkbox { text: "显示隐藏文件", checked: .hidden, onclick: .ToggleHidden }
+                    text "切换目录或过滤条件会清空选择" { style: "text-xs text-muted-foreground" }
                     if .loading { text "载入中" }
-                    if .errorMessage != "" { text .errorMessage }
-                    col (style: "h-64 overflow-y-auto gap-1") {
+                    if .errorMessage != "" {
+                        text .errorMessage { style: "text-sm text-destructive" }
+                        button "重试" { onclick: .Go }
+                    }
+                    if !.loading && .errorMessage == "" {
+                        if .totalEntries == 0 { text "空目录" }
+                        if .totalEntries > 0 && .visibleFiles == 0 { text "没有匹配的文件，目录仍可进入" }
+                    }
+                    col (style: "h-48 overflow-y-auto gap-1") {
                         for entry in .entries {
                             if entry.isDir {
                                 button (onclick: .Enter(entry.id)) { text f"进入 ${entry.name}" }
                             } else {
                                 row (style: "gap-2 items-center") {
-                                    checkbox (checked: entry.selected, onclick: .Choose(entry.id)) {}
-                                    text entry.name
+                                    checkbox { text: entry.name, checked: entry.selected, onclick: .Choose(entry.id), disabled: .loading, style: "text-foreground" }
+                                    text f"${entry.size} B" { style: "text-xs text-muted-foreground" }
                                 }
                             }
                         }
                     }
-                    text f"已选 ${.selectedCount} 项"
+                    row (style: "gap-2 items-center flex-wrap") {
+                        button "上一页" { onclick: .PreviousPage, disabled: .page == 0 }
+                        text f"第 ${.page + 1} / ${.pageCount} 页"
+                        button "下一页" { onclick: .NextPage, disabled: .page + 1 >= .pageCount }
+                    }
+                    row (style: "gap-2 items-center flex-wrap") {
+                        text f"已选 ${.selectedCount} 项"
+                        button "清空选择" { onclick: .Clear, disabled: .selectedCount == 0 }
+                    }
                 }
                 dialog-footer {
                     button "取消" { onclick: .Cancel }
@@ -73,6 +121,16 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                 .entries = data.entries
                 .selectedCount = data.selectedCount
                 .canAccept = data.canAccept
+                .roots = data.roots
+                .homePath = data.home
+                .canUp = data.parent != nil
+                .nameQuery = data.nameQuery
+                .activeType = data.activeFilterId
+                .hidden = data.showHidden
+                .page = data.page
+                .pageCount = data.pageCount
+                .totalEntries = data.totalEntries
+                .visibleFiles = data.visibleFileCount
                 if data.error != nil { .errorMessage = data.error.message } else { .errorMessage = "" }
             }
             if .fd_event != "" {
@@ -108,5 +166,16 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
             .fd_seq = .fd_seq + 1
             .fd_command = json.stringify({op: "cancel", seq: .fd_seq})
         }
+        .Up -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "up", seq: .fd_seq}) }
+        .Home -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "navigate", seq: .fd_seq, path: .homePath}) }
+        .Refresh -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "refresh", seq: .fd_seq}) }
+        .Root(path str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "navigate", seq: .fd_seq, path: path}) }
+        .SetName(value str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "name", seq: .fd_seq, value: value}) }
+        .SetFilter(id str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "filter", seq: .fd_seq, id: id}) }
+        .ToggleHidden -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "hidden", seq: .fd_seq, value: !.hidden}) }
+        .Clear -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "clear", seq: .fd_seq}) }
+        .PreviousPage -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "page", seq: .fd_seq, index: .page - 1}) }
+        .NextPage -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "page", seq: .fd_seq, index: .page + 1}) }
+
     }
 }

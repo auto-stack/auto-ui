@@ -46,6 +46,7 @@ use auto_ui_compiler::aura::{AuraNode, AuraNodeId};
 /// Atom prop，node 仍输出（不变量：永不因缺数据 panic）。
 #[derive(Debug, Clone, Default)]
 pub struct ComputedNodeLite {
+    pub enabled: Option<bool>,
     /// 测量 border-box `(x, y, w, h)`——旧 `rect` 的超集/等价。
     pub bounds: Option<(f32, f32, f32, f32)>,
     /// 完整盒模型（content + padding + border + margin）。
@@ -66,6 +67,7 @@ impl ComputedNodeLite {
     /// 从 F12 的 [`ComputedNode`] 提炼。
     pub fn from_computed(c: &ComputedNode) -> Self {
         Self {
+            enabled: None,
             bounds: c.bounds.map(|r| (r.x, r.y, r.width, r.height)),
             box_model: c.box_model.clone(),
             computed_style: c.computed_style.clone(),
@@ -177,6 +179,8 @@ pub struct SharedState {
     /// Real-time styled VTree snapshot (Plan 314). Copied each frame by the
     /// iced renderer when F12 is open or MCP is active.
     styled_vtree: Option<std::sync::Arc<StyledNodeSnapshot>>,
+    action_identities: HashMap<VNodeId, String>,
+    action_focus_requests: std::sync::Mutex<std::collections::VecDeque<(String, String)>>,
     /// PLAN-646: .at 源码全文（`autoui_select_rect` 信封 source 切片用）。
     /// iced 线程随帧发布（ensure_source_loaded 幂等装载后 set）。
     source_code: Option<String>,
@@ -321,6 +325,8 @@ impl SharedState {
             layout_frame: 0,
             scroll_tick: 0,
             styled_vtree: None,
+            action_identities: HashMap::new(),
+            action_focus_requests: Default::default(),
             source_code: None,
             backend_kind: BackendKind::Unknown,
             headless_render: false,
@@ -486,6 +492,7 @@ impl SharedState {
     /// 发布点，读取方以「frame 是否增加」判定几何是否来自新一次测量。
     pub fn set_layout_bounds(&mut self, bounds: HashMap<String, (f32, f32, f32, f32)>) {
         self.layout_bounds = bounds;
+        self.alias_action_bounds();
         self.layout_frame = self.layout_frame.saturating_add(1);
     }
 
@@ -531,19 +538,90 @@ impl SharedState {
     /// 空的写入直接跳过（D-18 双态的防御性兜底：即使未来再出现空 computed
     /// 写入者，也不能把属性态打回空态）。合法的全量属性清空必然伴随重建帧
     /// ——F1a 后同步块即权威写入者，computed 非空时守卫恒放行。
-    pub fn set_styled_vtree(&mut self, snap: StyledNodeSnapshot) {
+    pub fn set_styled_vtree(&mut self, mut snap: StyledNodeSnapshot) {
         if snap.computed.is_empty() {
             if let Some(prev) = &self.styled_vtree {
                 if !prev.computed.is_empty() {
                     // VTree 未 derive PartialEq——守卫走 Debug 串比较（冷路径：
                     // 仅新 computed 为空时触发；正常帧带属性恒放行）。
-                    if format!("{:?}", prev.vtree) == format!("{:?}", snap.vtree) {
-                        return;
-                    }
+                    let same_tree = prev.vtree.nodes.len() == snap.vtree.nodes.len()
+                        && prev.vtree.nodes.iter().zip(&snap.vtree.nodes).all(|(a, b)|
+                            format!("{:?}", (a.kind, &a.props, &a.path, &a.source_span, &a.label))
+                            == format!("{:?}", (b.kind, &b.props, &b.path, &b.source_span, &b.label)));
+                    let same_actions = self.view.as_ref().map(|view| self.action_identities.iter().all(|(id, expected)|
+                        prev.vtree.get(*id).and_then(|node| find_view_by_path(view, &node.path)).and_then(action_identity).as_ref() == Some(expected)
+                    )).unwrap_or(true);
+                    if same_tree && same_actions { return; }
                 }
             }
         }
+        for id in self.action_identities.keys() {
+            self.layout_bounds.remove(&format!("vnode_{}", id.as_u64()));
+        }
+        self.action_identities.clear();
+        if let Some(view) = &self.view {
+            let old_root = snap.vtree.root().map(|n| n.id);
+            let mut remap = HashMap::new();
+            for node in &snap.vtree.nodes {
+                if let Some(target) = find_view_by_path(view, &node.path) {
+                    // Expanded component paths can differ from source-Aura
+                    // paths. Publish action metadata from the same live View
+                    // used by dispatch, rather than a neighbouring source node.
+                    let action = match target {
+                        View::Button { onclick, .. } => Some(("onclick", Some(onclick))),
+                        View::Checkbox { on_toggle, .. } => Some(("onchange", on_toggle.as_ref())),
+                        _ => None,
+                    };
+                    if let Some((name, message)) = action {
+                        let metadata = snap.computed.entry(node.id).or_default();
+                        metadata.events.clear();
+                        if let Some((_, event)) = message.and_then(extract_dyn_msg) {
+                            metadata.events.push((name.into(), format!(".{}", event.split('\u{1f}').next().unwrap_or(&event))));
+                        }
+                    }
+                    if let View::Checkbox { on_toggle, .. } = target {
+                        snap.computed.entry(node.id).or_default().enabled = Some(on_toggle.is_some());
+                    }
+                    if let Some(identity) = action_identity(target) {
+                        let mut id = crate::ui::vnode::id_from_path(&node.path);
+                        for byte in identity.as_bytes() { id = (id ^ *byte as u64).wrapping_mul(0x1000_0000_01b3); }
+                        let id = VNodeId::new(id.max(1));
+                        remap.insert(node.id, id);
+                        self.action_identities.insert(id, identity);
+                    }
+                }
+            }
+            let mut tree = VTree::new();
+            for mut node in std::mem::take(&mut snap.vtree.nodes) {
+                let is_root = Some(node.id) == old_root;
+                node.id = remap.get(&node.id).copied().unwrap_or(node.id);
+                node.parent = node.parent.map(|id| remap.get(&id).copied().unwrap_or(id));
+                for id in &mut node.children { *id = remap.get(id).copied().unwrap_or(*id); }
+                if is_root { tree.set_root(node); } else { tree.add_node(node); }
+            }
+            snap.vtree = tree;
+            snap.computed = std::mem::take(&mut snap.computed).into_iter()
+                .map(|(id, value)| (remap.get(&id).copied().unwrap_or(id), value)).collect();
+        }
         self.styled_vtree = Some(std::sync::Arc::new(snap));
+        self.alias_action_bounds();
+    }
+
+    pub(crate) fn take_action_focus(&self, widget: &str, event: &str) -> bool {
+        let mut requests = self.action_focus_requests.lock().unwrap();
+        if let Some(index) = requests.iter().position(|(w, e)| w == widget && e == event) {
+            requests.remove(index); true
+        } else { false }
+    }
+
+    fn alias_action_bounds(&mut self) {
+        if let Some(snapshot) = &self.styled_vtree {
+            for node in &snapshot.vtree.nodes {
+                if let Some(bounds) = self.layout_bounds.get(&format!("vnode_{}", crate::ui::vnode::id_from_path(&node.path))).copied() {
+                    self.layout_bounds.insert(format!("vnode_{}", node.id.as_u64()), bounds);
+                }
+            }
+        }
     }
 
     /// Take (move out) the latest styled VTree snapshot, if any (Plan 314).
@@ -1091,7 +1169,7 @@ fn tool_definitions() -> Vec<serde_json::Value> {
                 "properties": {
                     "key": {
                         "type": "string",
-                        "enum": ["Enter", "Tab", "Escape", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown", "F12"],
+                        "enum": ["Enter", "Tab", "Escape", "Space", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown", "F12"],
                         "description": "The key to press"
                     },
                     "modifiers": {
@@ -1776,6 +1854,11 @@ fn tool_action(shared_handle: &SharedStateHandle, args: serde_json::Value) -> se
             ))
         }
     };
+
+    {
+        let shared = shared_handle.lock().unwrap();
+        if let Err(error) = validate_modal_target(&shared, &element_id) { return error_result(error); }
+    }
 
     let action_type = match action_str {
         "press" => UiActionType::Press,
@@ -3607,6 +3690,17 @@ fn tool_keyboard(shared_handle: &SharedStateHandle, args: serde_json::Value) -> 
 
     let shared = shared_handle.lock().unwrap();
     let widget_name = shared.widget_name.clone();
+    if key != "F12" && shared.view.as_ref().and_then(crate::ui::modal::active_content_path).is_some() {
+        let event = match key {
+            "Tab" if _modifiers.iter().any(|m| m.eq_ignore_ascii_case("shift")) => "__focus_prev_input",
+            "Tab" => "__focus_next_input",
+            "Enter" | "Space" | " " => "__activate_focused_control",
+            "Escape" => "__modal_escape",
+            _ => return error_result("Modal dialog owns keyboard input; background shortcuts are unavailable"),
+        };
+        let message = ActionMessage { target: ActionTarget::Event { widget: String::new(), event: event.into() }, action: UiActionType::Press, value: Some(key.into()) };
+        return match shared.send_action(message) { Ok(()) => text_result(format!("Key sent in active modal: {key}")), Err(error) => error_result(error) };
+    }
 
     // Plan 371: F12 toggles DevTools directly (bypasses key_binding lookup).
     let msg = if key == "F12" {
@@ -3782,7 +3876,8 @@ fn find_first_input_vnode(shared: &SharedState) -> Option<VNodeId> {
     snap.vtree
         .nodes
         .iter()
-        .find(|n| matches!(n.kind, VNodeKind::Input | VNodeKind::Textarea))
+        .find(|n| matches!(n.kind, VNodeKind::Input | VNodeKind::Textarea)
+            && shared.view.as_ref().map(|v| crate::ui::modal::allows_path(v, &n.path)).unwrap_or(true))
         .map(|n| n.id)
 }
 
@@ -3853,6 +3948,7 @@ fn execute_action_on_shared(
     action: UiActionType,
     value: Option<auto_val::Value>,
 ) -> Result<ActionResult, String> {
+    validate_modal_target(shared, &ElementId::Aura(element_id))?;
     // Find target node
     let target = SnapshotBuilder::find_node(tree, element_id)
         .ok_or_else(|| format!("Element not found: #{}", element_id))?;
@@ -4049,6 +4145,28 @@ fn parse_aura_id(s: &str) -> Option<AuraNodeId> {
 enum ElementId {
     Aura(AuraNodeId),
     Vnode(VNodeId),
+}
+
+fn action_identity(view: &View<DynamicMessage>) -> Option<String> {
+    match view {
+        View::Button { onclick, .. } => Some(format!("button:{onclick:?}")),
+        View::Checkbox { on_toggle: Some(message), .. } => Some(format!("checkbox:{message:?}")),
+        _ => None,
+    }
+}
+
+fn validate_modal_target(shared: &SharedState, target: &ElementId) -> Result<(), String> {
+    let Some(view) = shared.view.as_ref() else { return Ok(()); };
+    let Some(scope) = crate::ui::modal::active_content_path(view) else { return Ok(()); };
+    let allowed = match target {
+        ElementId::Vnode(id) => shared.styled_vtree.as_ref().and_then(|s| s.vtree.get(*id))
+            .map(|node| node.path.starts_with(&scope)).unwrap_or(false),
+        ElementId::Aura(id) => shared.id_map.as_ref().map(|map| {
+            let paths = map.snapshot_prefix(&[]).into_iter().filter(|(_, candidate)| candidate == id).collect::<Vec<_>>();
+            !paths.is_empty() && paths.iter().all(|(path, _)| path.iter().map(|n| *n as u16).collect::<Vec<_>>().starts_with(&scope))
+        }).unwrap_or(false),
+    };
+    if allowed { Ok(()) } else { Err("Modal dialog owns input; target is outside the active dialog or no longer exists".into()) }
 }
 
 /// Parse either `aura_N` or `vnode_N` from a string.
@@ -4310,6 +4428,12 @@ fn execute_action_vnode(
         .get(vnode_id)
         .ok_or_else(|| format!("VNode not found: vnode_{}", vnode_id.as_u64()))?;
 
+    validate_modal_target(shared, &ElementId::Vnode(vnode_id))?;
+    if let (Some(expected), Some(view)) = (shared.action_identities.get(&vnode_id), shared.view.as_ref()) {
+        let actual = find_view_by_path(view, &vnode.path).and_then(action_identity);
+        if actual.as_ref() != Some(expected) { return Err("Stale action identity; discover the current tree again".into()); }
+    }
+
     // Validate action type by VNode kind (works for both VM and Rust mode)
     let action_name = match &action {
         UiActionType::Scroll => unreachable!("scroll handled in tool_action pre-branch"),
@@ -4455,6 +4579,13 @@ fn execute_action_vnode(
         ActionTarget::Path { path } => format!("<path {:?}>", path),
         ActionTarget::Fixture { request_id } => format!("<fixture {}>", request_id),
     };
+    if matches!(action, UiActionType::Press | UiActionType::Toggle | UiActionType::TypeText | UiActionType::Clear) {
+        if let ActionTarget::Event { widget, event } = &msg.target {
+            let mut requests = shared.action_focus_requests.lock().unwrap();
+            if requests.len() >= 64 { requests.pop_front(); }
+            requests.push_back((widget.clone(), event.clone()));
+        }
+    }
     shared.send_action(msg)?;
 
     Ok(ActionResult {
@@ -5035,6 +5166,7 @@ fn aura_vtree_node(
         &node.props,
         VNodeProps::Textarea { placeholder, .. } if !placeholder.is_empty()
     );
+    let prop_body = prop_body || matches!(&node.props, VNodeProps::Checkbox { .. } | VNodeProps::Button { disabled: true, .. });
     let has_body = !node.children.is_empty()
         || !events.is_empty()
         || raw_class.map_or(false, |c| !c.is_empty())
@@ -5141,6 +5273,10 @@ fn aura_vtree_node(
             }
         }
         _ => {}
+    }
+
+    if let Some(enabled) = comp.and_then(|c| c.enabled) {
+        out.push_str(&format!("{}enabled: {}\n", "  ".repeat(indent + 1), enabled));
     }
 
     // events (sorted for determinism)
@@ -7322,3 +7458,106 @@ mod tests_plan069_f2 {
 }
 
 
+
+#[cfg(test)]
+mod plan082_modal_tests {
+    use super::*;
+    use crate::ui::view::{PopoverAnchor, PopoverPlacement};
+    use crate::ui::vnode_converter::view_to_vtree_with_paths;
+
+    fn message(event: &str) -> DynamicMessage {
+        DynamicMessage::Typed { widget_name: "Picker".into(), event_name: event.into(), args: vec![] }
+    }
+    fn button(label: &str, event: &str) -> View<DynamicMessage> {
+        View::Button { label: label.into(), onclick: message(event), style: None, on_right_click: None, content: None, disabled: false }
+    }
+    fn column(children: Vec<View<DynamicMessage>>) -> View<DynamicMessage> {
+        View::Column { children, spacing: 0, padding: 0, style: None, onclick: None, on_right_click: None }
+    }
+    fn tree_view(open: bool, row: &str) -> View<DynamicMessage> {
+        column(vec![button("behind", "Background"), View::Popover {
+            anchor: PopoverAnchor::Widget(Box::new(View::Empty)),
+            content: Box::new(column(vec![button("row", row)])),
+            placement: PopoverPlacement::Modal, open, on_dismiss: None,
+        }])
+    }
+    fn publish(state: &mut SharedState, view: View<DynamicMessage>) {
+        let tree = view_to_vtree_with_paths(view.clone(), |_| None);
+        state.update(view, DebugIdMap::default(), HashMap::new(), HashMap::new(), None, HashMap::new());
+        state.set_styled_vtree(StyledNodeSnapshot::from_live("Picker", &tree, &InspectorCache::new()));
+    }
+    fn id(state: &SharedState, label: &str) -> VNodeId {
+        state.styled_vtree.as_ref().unwrap().vtree.nodes.iter().find(|node|
+            matches!(&node.props, VNodeProps::Button { label: text, .. } if text == label)).unwrap().id
+    }
+    #[test]
+    fn modal_blocks_background_actions_and_allows_its_current_controls() {
+        let mut state = SharedState::new("Picker".into());
+        let (tx, rx) = mpsc::channel();
+        state.action_tx = Some(tx);
+        publish(&mut state, tree_view(true, "SelectA"));
+        let behind = id(&state, "behind");
+        let inside = id(&state, "row");
+        let rejected = execute_action_vnode(&state, behind, UiActionType::Press, None).unwrap_err();
+        assert!(rejected.contains("Modal"));
+        assert!(rx.try_recv().is_err(), "background rejection must send no business event");
+        execute_action_vnode(&state, inside, UiActionType::Press, None).unwrap();
+        let action = rx.try_recv().unwrap();
+        assert!(matches!(action.target, ActionTarget::Event { event, .. } if event == "SelectA"));
+        publish(&mut state, tree_view(false, "SelectA"));
+        assert!(!state.styled_vtree.as_ref().unwrap().vtree.nodes.iter().any(|node|
+            matches!(&node.props, VNodeProps::Button { label, .. } if label == "row")), "closed modal contents must not be actionable or discoverable");
+        execute_action_vnode(&state, id(&state, "behind"), UiActionType::Press, None).unwrap();
+    }
+    #[test]
+    fn action_id_tracks_payload_and_preserves_layout_geometry() {
+        let mut state = SharedState::new("Picker".into());
+        let (tx, rx) = mpsc::channel();
+        state.action_tx = Some(tx);
+        publish(&mut state, tree_view(true, "Choose-old-path"));
+        let old = id(&state, "row");
+        let mut stale_metadata = (**state.styled_vtree.as_ref().unwrap()).clone();
+        stale_metadata.computed.entry(old).or_default().events = vec![("onclick".into(), ".WrongNeighbour".into())];
+        state.set_styled_vtree(stale_metadata);
+        assert_eq!(state.styled_vtree.as_ref().unwrap().computed[&old].events,
+            vec![("onclick".into(), ".Choose-old-path".into())], "snapshot metadata must describe the actual dispatched handler");
+        publish(&mut state, tree_view(true, "Choose-old-path"));
+        assert_eq!(id(&state, "row"), old, "unchanged action identity stays stable");
+        publish(&mut state, tree_view(true, "Choose-new-path"));
+        let current = id(&state, "row");
+        assert_ne!(current, old, "same list position with a different payload is a different action");
+        assert!(execute_action_vnode(&state, old, UiActionType::Press, None).is_err());
+        assert!(rx.try_recv().is_err());
+        execute_action_vnode(&state, current, UiActionType::Press, None).unwrap();
+        let action = rx.try_recv().unwrap();
+        assert!(matches!(action.target, ActionTarget::Event { event, .. } if event == "Choose-new-path"));
+        let path = state.styled_vtree.as_ref().unwrap().vtree.get(current).unwrap().path.clone();
+        let bounds = (10., 20., 80., 24.);
+        state.set_layout_bounds(HashMap::from([(format!("vnode_{}", crate::ui::vnode::id_from_path(&path)), bounds)]));
+        assert_eq!(state.get_layout_bounds().get(&format!("vnode_{}", current.as_u64())), Some(&bounds));
+        // Publication and view update may be observed separately by embedders;
+        // do not dispatch a newly-bound handler under the old snapshot id.
+        state.view = Some(tree_view(true, "Choose-third-path"));
+        assert!(execute_action_vnode(&state, current, UiActionType::Press, None).unwrap_err().contains("Stale"));
+    }
+    #[test]
+    fn modal_keyboard_cannot_dispatch_background_shortcuts() {
+        let mut state = SharedState::new("Picker".into());
+        let (tx, rx) = mpsc::channel(); state.action_tx = Some(tx);
+        state.key_bindings.insert("Tab".into(), "Picker.Background".into());
+        state.key_bindings.insert("Ctrl+s".into(), "Picker.Save".into());
+        publish(&mut state, tree_view(true, "SelectA"));
+        state.key_bindings.insert("Tab".into(), "Picker.Background".into());
+        state.key_bindings.insert("Ctrl+s".into(), "Picker.Save".into());
+        let shared = Arc::new(Mutex::new(state));
+        assert!(!tool_keyboard(&shared, json!({"key":"Tab"}))["isError"].as_bool().unwrap());
+        assert!(matches!(rx.try_recv().unwrap().target, ActionTarget::Event { event, .. } if event=="__focus_next_input"));
+        assert!(tool_keyboard(&shared, json!({"key":"s", "modifiers":["Ctrl"]}))["isError"].as_bool().unwrap());
+        assert!(rx.try_recv().is_err());
+        publish(&mut shared.lock().unwrap(), tree_view(false, "SelectA"));
+        shared.lock().unwrap().key_bindings.insert("Ctrl+s".into(), "Picker.Save".into());
+        assert!(!tool_keyboard(&shared, json!({"key":"s", "modifiers":["Ctrl"]}))["isError"].as_bool().unwrap());
+        assert!(matches!(rx.try_recv().unwrap().target, ActionTarget::Event { event, .. } if event=="Save"));
+    }
+
+}

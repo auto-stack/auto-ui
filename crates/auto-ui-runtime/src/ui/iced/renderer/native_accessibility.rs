@@ -509,6 +509,11 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
     BUILD.with(|slot| {
         let mut slot = slot.borrow_mut();
         let build = slot.as_mut()?;
+        let shared_action_focus = match view {
+            AbstractView::Button { onclick, disabled: false, .. } => Some(onclick),
+            AbstractView::Checkbox { on_toggle: Some(message), .. } => Some(message),
+            _ => None,
+        }.map(|message| iced::widget::Id::from(crate::ui::iced::focus_target::action_key(&message.widget, &message.event)));
         let (role, name, value, click, change, focus, disabled, toggled, selected, button_focus) =
             match view {
                 AbstractView::Button {
@@ -625,7 +630,7 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
                     on_toggle.as_ref(),
                     None,
                     None,
-                    false,
+                    on_toggle.is_none(),
                     Some(*is_checked),
                     None,
                     true,
@@ -737,7 +742,7 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
         let focus = if disabled || !owner_bound {
             None
         } else {
-            focus.or_else(|| {
+            shared_action_focus.clone().or(focus).or_else(|| {
                 button_focus.then(|| iced::widget::Id::from(format!("native_accessibility_{id}")))
             })
         };
@@ -805,7 +810,9 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             id,
             focus,
             click: if disabled { None } else { click },
-            button_focus: button_focus && !disabled && owner_bound,
+            // Button/Checkbox now expose their actual cross-platform widget
+            // focus. Keep the legacy semantic focus owner only for other roles.
+            button_focus: button_focus && shared_action_focus.is_none() && !disabled && owner_bound,
         })
     })
 }
@@ -1319,6 +1326,34 @@ mod tests {
             result.bounds
         );
         drop(state);
+        remove(window);
+    }
+    #[test]
+    fn plan082_action_focus_is_shared_with_system_semantics_and_activates_once() {
+        use crate::ui::component::Component;
+        use iced_test::runtime::{core::{clipboard, renderer::Headless}, user_interface};
+        let window = iced::window::Id::unique();
+        let mut component = fixture();
+        prepare(window);
+        let view = convert_view_messages(component.view());
+        let element = with_scope(window, &component, || super::super::devtools::render_dynamic_view(view, None, &mut vec![]));
+        let mut renderer = iced_test::futures::futures::executor::block_on(iced::Renderer::new(iced::Font::DEFAULT, 12.0_f32.into(), None)).unwrap();
+        let mut ui = user_interface::UserInterface::build(element, iced::Size::new(800., 700.), user_interface::Cache::default(), &mut renderer);
+        for label in ["Toggle second instance", "Selected fixture"] {
+            let (node, focus) = {
+                let state = shared(window);
+                let state = state.lock().unwrap();
+                let (node, entry) = state.nodes.iter().find(|(_, entry)| entry.node.label() == Some(label)).unwrap();
+                (*node, entry.focus.clone().unwrap())
+            };
+            let mut operation = iced_test::runtime::core::widget::operation::focusable::focus::<()>(focus);
+            ui.operate(&mut renderer, &mut operation);
+            assert_eq!(shared(window).lock().unwrap().focus, NodeId(node), "native and system focus must identify the same control");
+            let mut messages = Vec::new();
+            let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Space, None).collect::<Vec<_>>();
+            ui.update(&keys, iced::mouse::Cursor::Unavailable, &mut renderer, &mut clipboard::Null, &mut messages);
+            assert_eq!(messages.len(), 1, "one key must not activate two focus owners");
+        }
         remove(window);
     }
     #[test]

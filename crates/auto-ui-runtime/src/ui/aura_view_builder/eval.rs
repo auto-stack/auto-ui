@@ -696,6 +696,24 @@ impl<'a> AuraViewBuilder<'a> {
             // evaluate. Previously the literal fell to `_ => None`, voiding
             // any computed that compared against None (auth gate).
             Expr::None | Expr::Nil | Expr::Null => Some(Value::Nil),
+            // Boolean control props use the same typed expression path as
+            // conditions, including negation and ordered numeric comparisons.
+            Expr::Unary(Op::Not, operand) => self.resolve_expr_to_value(operand, bindings)
+                .map(|value| Value::Bool(!value.as_bool())),
+            Expr::Bina(left, op @ (Op::Lt | Op::Le | Op::Gt | Op::Ge), right) => {
+                let number = |value: Value| match value {
+                    Value::Int(v) => Some(v as f64),
+                    Value::Double(v) => Some(v),
+                    Value::Float(v) => Some(v as f64),
+                    _ => None,
+                };
+                let left = number(self.resolve_expr_to_value(left, bindings)?)?;
+                let right = number(self.resolve_expr_to_value(right, bindings)?)?;
+                Some(Value::Bool(match op {
+                    Op::Lt => left < right, Op::Le => left <= right,
+                    Op::Gt => left > right, Op::Ge => left >= right, _ => unreachable!(),
+                }))
+            }
             // Plan 339: binary comparison for if-expressions (e.g., i == .active_index)
             Expr::Bina(left, Op::Eq, right) => {
                 let l = self.resolve_expr_to_value(left, bindings)?;
