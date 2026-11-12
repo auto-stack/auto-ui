@@ -274,6 +274,23 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   stake/seq 面（seq 抬升是否落子对象账）。诊断打印已埋（plan081-diag）。
 - **说明**：红锚 fail 属 TDD 红相（预期失败=证据）；修复转绿后删 ignore。
 
+### T-04c-3 机制实测（同日晚，prepare 插桩轮）
+
+- **实测机制**（MEMO-DIAG prepare 插桩，两帧六次 prepare 全录）：
+  - 渲染路径 identity=**`reader081@/reader`**（路由装饰）→ 子状态对象
+    **4000002**，其 `paragraphs` 字段=**VmRef(4000001)**（step-3 父同步把
+    根数组引用传入——根上数组恒空，子写若落自己对象则与根脱钩）；
+  - 测试侧 `child_init_identity()` 直调返回**未装饰 `reader081`** → 对象
+    **4000003**——**写读对象错位即帧 2 空迭代直接原因**；
+  - `child_init_identity` 同参不同果（渲染期装饰/直调不装饰）=状态ful
+    判定，其输入面（__current_route 已 seed 仍不装饰）为下一步唯一疑点。
+- **下一步（T-04c-4，唯一任务）**：读 `child_init_identity` 实现，解释
+  装饰判定的状态依赖 → 测试侧以渲染同径取对象（或产品侧修 identity
+  归一）→ 红锚转绿 → bookswitch 快照复跑 → W-07。
+- **边界提醒**：live 失败态（行内容渲染但 computed 缺失）与红锚帧 2
+  （零迭代全空）形态不同——转绿后若 bookswitch 快照仍缺 computed，
+  下一嫌疑=PLAN-725 提升帧/bounds 回路，勿混两案。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
