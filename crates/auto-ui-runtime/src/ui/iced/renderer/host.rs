@@ -2249,6 +2249,15 @@ fn run_session(
                             // style 仍以 from_live 新鲜值为准。vtree 同源
                             // （mcp_sync_vtree），VNodeId 对齐，缺项跳过。
                             if let Some(prev) = handle.clone_styled_vtree().as_ref() {
+                                if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
+                                    let prev_tap = prev.computed.values().any(|c| c.events.iter().any(|(_, h)| h.contains("TapParagraph")));
+                                    let snap_tap = snap.computed.values().any(|c| c.events.iter().any(|(_, h)| h.contains("TapParagraph")));
+                                    let n_prev = prev.computed.len();
+                                    let n_snap = snap.computed.len();
+                                    eprintln!(
+                                        "[MEMO-DIAG] bounds-merge prev_entries={n_prev} snap_entries={n_snap} prev_tap={prev_tap} snap_tap={snap_tap}"
+                                    );
+                                }
                                 for (vid, prev_c) in prev.computed.iter() {
                                     let node = snap.computed.entry(*vid).or_default();
                                     if node.events.is_empty() {
