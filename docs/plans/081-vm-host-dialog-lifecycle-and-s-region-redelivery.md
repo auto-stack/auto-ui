@@ -448,6 +448,21 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（扩展诊断在册，门控）。
 
+### T-04c-10 复验续（2026-11-13，新机器窗）
+
+- **修复服务端效果确证**：bookswitch-23 **10 连** serve_tap=true、
+  bookswitch-24 **54 连** serve_tap=true——合并语义修复后，服务快照
+  **带 TapParagraph 事件端到端正确**（serve-path 诊断在册，
+  `T-04c-9b` 提交）。
+- **剩余失败模式（新定位）**：两轮 serve 线均在行渲染后**停止**
+  （23：10 serve 后断；24：54 serve 后断，probe 14×1.5s 重试耗尽仍
+  拒连）——主线程在行渲染后**停摆或长断窗**（>21s）。死亡签名与
+  前夜四连死一致，但此现象高度一致地出现在"行渲染后"，需甄别：
+  a) 真挂起（rebuild/泵死锁）——下轮**留活体检查**：probe 不 taskkill，
+     挂起态抓线程栈（procdump/WAT）；
+  b) 机器长断窗——重启/稳定窗复跑对照。
+- **worktree**：@ 最新干净（三重诊断在册：prepare/同步块/serve，门控）。
+
 ### T-04c-10 复验尝试轮（新机器窗续，worktree 最新）
 
 - **bookswitch-20**：跑至腿 A 阅读（sync tap=true computed=35 在册），
