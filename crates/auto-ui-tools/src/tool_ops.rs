@@ -206,6 +206,9 @@ fn generate_profile(
                 project
                     .ensure_code_editor_component()
                     .map_err(|e| ToolError::internal(format!("self-heal failed: {e}")))?;
+                project
+                    .refresh_component_dependencies()
+                    .map_err(|e| ToolError::internal(format!("component dependencies refresh failed: {e}")))?;
                 // PLAN-036 T-04（AC-03/V-04）：既有工程自愈路径补生成输入 receipt
                 // （与 run/regen 同律；写失败=消费失败）。
                 project

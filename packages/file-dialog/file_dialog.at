@@ -3,7 +3,7 @@ use auto.json
 // Ordinary view state is a projection of the App-owned DialogModel. Selection,
 // filtering, validation and session lifetime have one owner in the runtime.
 widget FileDialog (open: bool = false, title: str = "选择文件", initialDirectory: str = "", selectionMode: str = "singleFile", filters: List = [], activeFilterId: str = "", acceptLabel: str = "打开", showHidden: bool = false) {
-    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, Up, Home, Refresh, Root(str), SetName(str), SetFilter(str), ToggleHidden, Clear, PreviousPage, NextPage, accepted(str), cancelled, error(str) }
+    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, Up, Home, Refresh, Root(str), SetName(str), SetFilter(str), ToggleHidden, Clear, PreviousPage, NextPage, "accepted"(str), "cancelled", "error"(str) }
     model {
         var interval int = 50
         var fd_command str = ""
@@ -27,6 +27,7 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
         var activeType str = ""
         var hidden bool = false
         var page int = 0
+        var displayPage int = 1
         var pageCount int = 1
         var totalEntries int = 0
         var visibleFiles int = 0
@@ -85,7 +86,7 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                     }
                     row (style: "gap-2 items-center flex-wrap") {
                         button "上一页" { onclick: .PreviousPage, disabled: .page == 0 }
-                        text f"第 ${.page + 1} / ${.pageCount} 页"
+                        text f"第 ${.displayPage} / ${.pageCount} 页"
                         button "下一页" { onclick: .NextPage, disabled: .page + 1 >= .pageCount }
                     }
                     row (style: "gap-2 items-center flex-wrap") {
@@ -128,6 +129,7 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                 .activeType = data.activeFilterId
                 .hidden = data.showHidden
                 .page = data.page
+                .displayPage = data.page + 1
                 .pageCount = data.pageCount
                 .totalEntries = data.totalEntries
                 .visibleFiles = data.visibleFileCount

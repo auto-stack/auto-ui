@@ -4783,6 +4783,12 @@ export default router
             }
         }
 
+        // Dependency widgets participate in the same scaffold closure as pages.
+        // Scan the final corpus, including artifacts loaded through dep packages.
+        for (_, _, code, _) in &all_components {
+            all_shadcn_components.extend(detect_shadcn_components(code));
+        }
+
         let has_routes = !all_routes.is_empty();
 
         // Get App.vue code
@@ -5342,6 +5348,14 @@ export default router
             .map_err(|e: String| Box::<dyn std::error::Error>::from(e))?;
         ensure_editor_bridge(&self.output_dir, &usage)
             .map_err(|e: String| Box::<dyn std::error::Error>::from(e))?;
+        Ok(())
+    }
+
+    /// Refresh source-owned imports and the scaffold closure on incremental
+    /// generation too. Existing pages can introduce a newly declared package.
+    pub(crate) fn refresh_component_dependencies(&self) -> AutoResult<()> {
+        self.materialize_ui_components()?;
+        self.copy_ext_files()?;
         Ok(())
     }
 

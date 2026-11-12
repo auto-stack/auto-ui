@@ -1258,6 +1258,24 @@ if ((window as any).__AUTO_UI_THEME__ === 'light' || (window as any).__AUTO_UI_T
             );
         }
 
+        // Quoted messages are public emit contracts, including self-calls from
+        // another handler. VM forwards a message with no local handler to its
+        // owner; Vue needs the equivalent callable relay rather than a dangling
+        // function reference. Keep explicitly implemented handlers below.
+        let mut relay_events: Vec<_> = self.quoted_events.iter().cloned().collect();
+        relay_events.sort();
+        for event in relay_events {
+            let name = Self::sanitize_ident(&event);
+            if !self.has_emit || widget.handlers.keys().any(|pattern| self.pattern_to_handler_name(pattern) == name) {
+                continue;
+            }
+            let arity = self.msg_payload_arities.get(&name).copied().unwrap_or(0);
+            let params = (0..arity).map(|i| format!("arg{i}: any")).collect::<Vec<_>>().join(", ");
+            let args = (0..arity).map(|i| format!(", arg{i}")).collect::<String>();
+            let event = Self::escape_js_string(&event);
+            script.push_str(&format!("function {name}({params}): void {{ emit('{event}'{args}) }}\n\n"));
+        }
+
         // Generate event handlers
         // fn-name → on-block base pattern (e.g. update_modelValue →
         // ".update:modelValue"): fn names are sanitized JS identifiers while

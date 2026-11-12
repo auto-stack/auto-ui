@@ -19,7 +19,9 @@ fn official_file_dialog_compiles_through_both_generators() {
     assert!(rust.contains("fd_command") && rust.contains("selectionMode"));
     let vue = auto_ui_compiler::pipeline::ui_build(path, "ui", "vue", None).expect("official package Vue generation");
     assert!(vue.contains("<template>") && vue.contains("defineProps") && vue.contains("selectionMode"));
-    assert!(vue.contains("accepted") && vue.contains("cancelled"));
+    assert!(vue.contains("function accepted(arg0: any)") && vue.contains("emit('accepted', arg0)"));
+    assert!(vue.contains("function cancelled()") && vue.contains("emit('cancelled')"));
+    assert!(vue.contains("function error(arg0: any)") && vue.contains("emit('error', arg0)"));
 }
 
 #[test]
@@ -81,9 +83,24 @@ widget App {
 "#).unwrap();
     let request = auto_project_model::GenerationRequest::from_descriptor(&auto_project_model::parse_file(&root.join("pac.at")).unwrap());
     let mut project = auto_ui_tools::vue::VueProject::from_workspace_with_request(root, &request).unwrap();
-    project.output_dir = root.join("generated");
+    project.output_dir = root.join("gen/front/vue");
     project.generate().unwrap();
     let component = std::fs::read_to_string(project.output_dir.join("src/components/FileDialog.vue")).unwrap();
     assert!(component.contains("initialDirectory") && component.contains("显示隐藏文件"));
+    for dependency in ["dialog", "checkbox"] {
+        assert!(project.output_dir.join("src/components/ui").join(dependency).join("index.ts").exists(), "missing scaffold {dependency}");
+    }
     assert_eq!(std::fs::read(official.join("file_dialog.at")).unwrap(), std::fs::read(vendor.join("file_dialog.at")).unwrap());
+    // Exercise the real existing-project tool path: new forwarding modules and
+    // missing dependency scaffolds must refresh without deleting the project.
+    std::fs::write(front.join("picker_mode.web.at"), "fn nativePicker() bool { return false }\n").unwrap();
+    let app_path = front.join("app.at");
+    let original_app = std::fs::read_to_string(&app_path).unwrap();
+    std::fs::write(&app_path, format!("use.web nativePicker from \"src/front/picker_mode.at\"\n{original_app}")).unwrap();
+    std::fs::remove_dir_all(project.output_dir.join("src/components/ui/dialog")).unwrap();
+    auto_ui_tools::tool_ops::generate_report_with(&request, &Default::default()).unwrap();
+    assert!(project.output_dir.join("src/components/ui/dialog/index.ts").exists());
+    let port = std::fs::read_to_string(project.output_dir.join("src/ext/src/front/picker_mode.ts")).unwrap();
+    assert!(port.contains("nativePicker") && port.contains("false"), "{port}");
+
 }

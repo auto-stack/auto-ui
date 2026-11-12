@@ -3952,6 +3952,18 @@ fn dynamic_view_impl_inner(
                 let state_vals = state.component.read_all_state_materialized();
                 let input_map = state.component.input_state_map().clone();
                 let view_template = Some(state.component.view_template().clone());
+                // Bind action metadata against this frame's View. Publishing the
+                // snapshot first hashes the previous frame's handlers, leaving a
+                // settled conditional button permanently stale until another frame.
+                // PLAN-725 T-01：mcp.update 消费克隆（主重建段消费原件）。
+                mcp.update(
+                    view.clone(),
+                    id_map.clone(),
+                    state_vals,
+                    input_map,
+                    view_template,
+                    state.component.key_bindings().clone(),
+                );
                 // Plan 446 批一(J1 诊断层根因修复): styled_vtree 此前仅在
                 // __bounds_collected 回路后设置,而 bounds 只在 view() 脏重建时请求
                 // ——boot 后无重建则 styled 永不落盘,快照首问必走源树回退(子 widget
@@ -3980,15 +3992,6 @@ fn dynamic_view_impl_inner(
                     // AppState::mcp_sync_vtree 文档注释——禁止改用 live_vtree 源）。
                     *state.app.mcp_sync_vtree.borrow_mut() = Some(vtree);
                 }
-                // PLAN-725 T-01：mcp.update 消费克隆（主重建段消费原件）。
-                mcp.update(
-                    view.clone(),
-                    id_map.clone(),
-                    state_vals,
-                    input_map,
-                    view_template,
-                    state.component.key_bindings().clone(),
-                );
                 // PLAN-646: 源码全文随帧发布——`autoui_select_rect` 信封切片用
                 //（ensure 幂等：装载过零开销；未装载过此处读盘一次）。
                 ensure_source_loaded(state);
