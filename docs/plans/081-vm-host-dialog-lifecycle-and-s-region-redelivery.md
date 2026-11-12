@@ -248,7 +248,7 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   vnode id 与 run97/run3 失败快照逐位相同；route_id/theme/套间假设全排除；
   证据=run3 全矩阵 W-07 同签名复现 + bookswitch-3 首访复现）| worktree:
   D:/autostack/.wt/ui-081/auto-ui | branch: codex/plan-081-dev | base_commit:
-  9dd3fc27 | code_commit: 3227af96（探针；T-04c 修复未提交） |
+  9dd3fc27 | code_commit: 3227af96+b29af67e（探针+格式修复；T-04c 修复未提交） |
   dependency_revisions: auto-lang@0b3fc9063/auto-down@58ea33f/auto-web@bf72baa
   （组只读）+ 驱动 8d7dc2cf + 仪器工具 sha256 da154bfa | task_ids: T-01/T-04 |
   evidence: plan-081/{hctx-run3,bookswitch-3,theme-probe-2,edit-probe-3,
