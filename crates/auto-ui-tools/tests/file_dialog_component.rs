@@ -59,3 +59,31 @@ widget App {{
     let component = std::fs::read_to_string(project.output_dir.join("src/components/FileDialog.vue")).expect("imported package must generate a usable component artifact");
     assert!(component.contains("defineProps") && component.contains("initialDirectory") && component.contains("显示隐藏文件"));
 }
+
+#[test]
+fn declared_dependency_generates_the_same_official_component_without_unrelated_widgets() {
+    let temporary = scratch();
+    let root = temporary.path();
+    let front = root.join("src/front");
+    let vendor = root.join("vendor/file-dialog");
+    std::fs::create_dir_all(&front).unwrap();
+    std::fs::create_dir_all(&vendor).unwrap();
+    let official = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/file-dialog");
+    for name in ["package.at", "pac.at", "file_dialog.at"] {
+        std::fs::copy(official.join(name), vendor.join(name)).unwrap();
+    }
+    std::fs::write(root.join("pac.at"), "name: \"file-dialog-dependency-control\"\nscene: \"ui\"\nrender: \"vue\"\ndep file_dialog { path: \"vendor/file-dialog\" }\n").unwrap();
+    std::fs::write(front.join("app.at"), r#"
+widget App {
+    use { package: file_dialog from "../../vendor/file-dialog" }
+    view { FileDialog (open: false) {} }
+}
+"#).unwrap();
+    let request = auto_project_model::GenerationRequest::from_descriptor(&auto_project_model::parse_file(&root.join("pac.at")).unwrap());
+    let mut project = auto_ui_tools::vue::VueProject::from_workspace_with_request(root, &request).unwrap();
+    project.output_dir = root.join("generated");
+    project.generate().unwrap();
+    let component = std::fs::read_to_string(project.output_dir.join("src/components/FileDialog.vue")).unwrap();
+    assert!(component.contains("initialDirectory") && component.contains("显示隐藏文件"));
+    assert_eq!(std::fs::read(official.join("file_dialog.at")).unwrap(), std::fs::read(vendor.join("file_dialog.at")).unwrap());
+}

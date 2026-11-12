@@ -11,9 +11,11 @@ Import the package from a source-relative or absolute directory:
 use { package: file_dialog from "path/to/file-dialog" }
 ```
 
-The package contains `package.at` and `file_dialog.at`. For Vue source
-generation, vendor these unchanged files in the supported
-`src/front/components` package layout. Generating a Vue component does not
+The package contains `package.at`, `file_dialog.at`, and a `pac.at` dependency
+descriptor. For Vue source generation, either use the supported
+`src/front/components` layout or declare a path dependency on an unchanged
+`vendor/file-dialog` snapshot. The latter keeps unrelated project components
+outside the native package import. Generating a Vue component does not
 grant browser access to native directories: the IO mailbox is a native VM
 capability. Browser consumers keep their user-authorized File/byte-token path.
 Generated Rust source compatibility does not claim a Rust-host directory
