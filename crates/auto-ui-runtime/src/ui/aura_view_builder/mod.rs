@@ -9389,31 +9389,61 @@ mod plan080_rowclass_probe_tests {
 ",
             "        var cur int = 0
 ",
+            "        var loaded bool = false
+",
+            "        var is_real bool = true
+",
             "    }
 ",
             "    view {
 ",
             "        col {
 ",
-            "            for p in .paragraphs {
+            "            row {
 ",
-            "                col {
+            "                button \"←\" { onclick: .Back }
 ",
-            "                    scroll-anchor: p.key
+            "                button \"☰ Contents\" { onclick: .ToggleToc }
 ",
-            "                    col {
+            "            }
 ",
-            "                        onclick: .TapParagraph(p.idx)
+            "            if .loaded {
 ",
-            "                        style: [\"px-3 py-2\", if p.idx == .cur { \"bg-marked\" } else { \"bg-idle\" }]
+            "                if .is_real {
 ",
-            "                        row {
+            "                    scroll-pane {
 ",
-            "                            text f\"¶${p.idx}\" { style: \"text-xs\" }
+            "                        col {
+",
+            "                            text \"书题\" {}
+",
+            "                            for p in .paragraphs {
+",
+            "                                col {
+",
+            "                                    scroll-anchor: p.key
+",
+            "                                    col {
+",
+            "                                        onclick: .TapParagraph(p.idx)
+",
+            "                                        style: [\"px-3 py-2\", if p.idx == .cur { \"bg-marked\" } else { \"bg-idle\" }]
+",
+            "                                        row {
+",
+            "                                            text f\"¶${p.idx}\" { style: \"text-xs\" }
+",
+            "                                        }
+",
+            "                                        text p.text {}
+",
+            "                                    }
+",
+            "                                }
+",
+            "                            }
 ",
             "                        }
-",
-            "                        text p.text {}
 ",
             "                    }
 ",
@@ -9422,6 +9452,14 @@ mod plan080_rowclass_probe_tests {
             "            }
 ",
             "        }
+",
+            "    }
+",
+            "    on {
+",
+            "        .Back -> { }
+",
+            "        .ToggleToc -> { }
 ",
             "    }
 ",
@@ -9525,6 +9563,10 @@ mod plan080_rowclass_probe_tests {
         );
         // live 写穿语义：子字段持有根数组 VmRef（prepare 实测 4000001）——
         // 原地改根数组（非替换子字段），对齐 VM SET_FIELD 穿引用语义。
+        // loaded=true（live Init 完成序列：先 loaded 后 paragraphs）。
+        bridge
+            .write_state_onto(child_state_id, "loaded", auto_val::Value::Bool(true))
+            .unwrap();
         {
             use auto_lang_core::vm::types::ListData;
             let obj = bridge.vm().get_heap_object(4_000_001).expect("root array");
@@ -9590,6 +9632,7 @@ mod plan080_rowclass_probe_tests {
                         has_tap(child)
                     }
                     View::ScrollAnchorMark { child, .. } => has_tap(child),
+                    View::Scrollable { child, .. } => has_tap(child),
                     _ => false,
                 }
             }
