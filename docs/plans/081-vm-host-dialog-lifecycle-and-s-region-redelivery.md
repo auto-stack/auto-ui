@@ -409,6 +409,27 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
 - **worktree**：@ 最新（2b3e503d projection 检出版本，与 head 语义回退
   等价——下一轮先 `git checkout HEAD -- projection.rs` 归位再续）。
 
+### T-04c-8 决定性相关数据（新机器窗，worktree 最新）
+
+- **机器稳定**：bookswitch-15/16 两轮全程走完（A/B/C 三腿完整）——
+  五连死确证为当晚机器窗口问题，环境阻塞解除。
+- **决定性相关序列**（bookswitch-16，腿 A）：
+  ①route=chapter/1 tap=false computed=8（Init park，壳）
+  ②Init resumed（11.4s）
+  ③**tap=true computed=35**（行+记录入场，sync 落盘）
+  ④probe 的 `←` 按压 → route=/book/:id tap=false（detail，正常）
+  ——**阅读期行+记录在场且 sync 落盘**。
+- **红相核心（快照服务滞后）**：probe 75s 轮询仍失败，其保存的失败快照
+  （snap-A-no-rows.txt，136 行，非 PRE-RENDER 回退）= **行内容渲染
+  （¶0/正文在场）但该帧 computed 缺失**——即 probe 持续收到的
+  styled_vtree 停留在"行已渲染但记录未入"的帧，**滞后于最新 sync**
+  （③帧已带记录落盘）。
+- **下一步（T-04c-9，单一任务）**：快照**服务通道**诊断——
+  tool_snapshot 读哪个字段/是否另有缓存层（mcp_shared 外的 per-conn
+  或 vtree_atom），在 handler 加 seq/diag 对账"最新 set_styled_vtree vs
+  实际服务帧"；定位滞后环节 → 修复 → W-07。
+- **工作区**：@ 最新干净（扩展诊断在册）。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
