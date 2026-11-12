@@ -358,6 +358,25 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
 - **worktree**：@936ecbc6 干净；诊断双插桩（prepare/同步块）在册
   （AUTO_MEMO_DIAG 门控）。
 
+### T-04c-6 后半：机器阻塞实录（同日晚，9af5f605）
+
+- **扩展 sync diag**（paragraphs_len + route 相关维度）并入已证作用域、
+  重建部署完成（diag 工具 sha 同步替换 T01 名）。
+- **两次 live 验证运行被内核级事件击杀**：bookswitch-10（装载期）/
+  bookswitch-11（阅读 Init 期）工具进程死亡 + MCP 拒连，app.log 无 panic
+  截断；**Windows 事件日志 19:01:52 BlueScreen/LiveKernelEvent ×4**
+  （当日第二次，12:48 有前科）——机器级不稳实锤，非 cohort/代码问题。
+- **阻塞判定**：live 复现与修复验证通道**机器阻塞**（环境先例：009
+  round50"独占桌面窗"同款）。解除条件=**独占稳定机器窗**（无并行会话、
+  无内核事件窗）内重跑 bookswitch（diag 工具已部署）。
+- **既有有效生产数据不失效**（bookswitch-9，事件前）：computed=probe
+  恒 1:1；阅读页帧 tap_present=true 在场——行记录生产在册；红相聚焦
+  收窄为"帧采样时序×子数组内容抖动"窗口问题。
+- **下一轮执行序（解除阻塞后）**：①bookswitch（diag 工具）复跑取
+  tap_present×paragraphs_len 相关序列 → 定谳抖动窗口；②按定谳修复
+  （若=采样/重播种窗口→prepare 链修；若=数据层→Init 写径修）；
+  ③bookswitch 快照 onclick 在场 + W-07 五叶；④T-05 review 交棒。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
