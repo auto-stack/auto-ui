@@ -9447,6 +9447,14 @@ mod plan080_rowclass_probe_tests {
 ",
             "                    }
 ",
+            "                row {
+",
+            "                    button \"← Prev\" { onclick: .PrevChapter }
+",
+            "                    button \"Next →\" { onclick: .NextChapter }
+",
+            "                }
+",
             "                }
 ",
             "            }
