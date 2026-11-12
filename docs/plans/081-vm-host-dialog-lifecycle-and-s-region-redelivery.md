@@ -394,6 +394,21 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
 - **状态**：worktree @ 9af5f605 后（诊断回退已提交）干净；红/绿锚与
   生产插桩（prepare/同步块双点，门控）在册。
 
+### T-04c-7 A/B 定谳（同日深夜）
+
+- **A/B 结果**：以存活版 projection（2b3e503d，bookswitch-9 同源）重建
+  部署复跑（bookswitch-14）——**同样死亡**（MCP 拒连，同签名）。
+  **定谳：死亡=机器环境，非构建/诊断回归**；当前构建与两种诊断形态
+  全部无嫌疑。
+- **机器阻塞最终判定**：五连死（10/11/12/13/14）跨两构建两诊断形态，
+  同日内核事件 ×2（12:48/19:01）——live 验证通道需**独占稳定机器窗**
+  （重启后+无并行会话）方可复跑。
+- **解除后执行序（不变）**：①bookswitch 复跑（任一 diag 工具）→
+  tap_present×段落计数相关 → 抖动窗口定谳；②修复；③快照 onclick
+  在场 + W-07 五叶；④T-05 review 交棒。
+- **worktree**：@ 最新（2b3e503d projection 检出版本，与 head 语义回退
+  等价——下一轮先 `git checkout HEAD -- projection.rs` 归位再续）。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
