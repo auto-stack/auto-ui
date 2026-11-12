@@ -315,6 +315,25 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   frame_build 来源的 probe 与 build_with_debug 的 path 空间差异）——
   若提升层丢记录即 product fix 位；随后 bookswitch/W-07 复验。
 
+### T-04c-5 结构富化与分界点定位（同日深夜）
+
+- **提升帧门控读定**：`capture_debug = debug_mode || mcp_wants_live`
+  （harness 持续轮询→true→probe enabled）——"全有全无"不成立，live 快照
+  工具栏有 computed/¶ 行没有 = 部分节点路径失联，非门控。
+- **outlet 单测结构富化**（嵌套 `if .loaded{if .is_real{scroll-pane{…for…}}}`
+  + 工具栏兄弟 + `loaded` 两段写）——**全绿**（walker 补 `View::Scrollable`
+  透传后）；builder 层对该结构依旧清白。
+- **live 分界点锁定（假设，待单测复现）**：失败快照中 computed 缺失的 ¶ 行
+  位于 `if .is_epub { doc-surface… }` 分支**之后**，有 computed 的工具栏在其
+  **之前**——doc-surface 条件分支的 path 记账（aura 结构路径 vs vtree
+  视图路径，分支未走/特殊变体层级差）为根因唯一位点。
+- **live 交互面再证**：bookswitch-8 `autoui_inspect` 行 vnode 仅
+  `kind: Column` 无 onclick/actions + press 不派发——inspect/action 读
+  computed 面，与快照同源（三证一因）。
+- **下一步（T-04c-6）**：单测复现 doc-surface 条件（is_epub 双臂 + 后续
+  for 行）路径错位 → 修 path 记账（或 probe/vtree 路径统一）→ 红转绿 →
+  bookswitch 快照 `onclick: .TapParagraph` 在场 → W-07 五叶 → review。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
