@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-12T00:00:00Z
 updated_at: 2026-11-12T00:00:00Z
 plan_revision: 1
-current_step: 7
+current_step: 8
 total_steps: 8
 supersedes_spec_components: [docs/specs/reader/library-workspace.md]
 new_spec_components: [docs/specs/ui/file-dialog.md]
@@ -216,7 +216,7 @@ T-01..T-07已完成，AC-01..07由§9最终证据及独立最终复审覆盖；�
 | T-05 [x] | work | T-04；009写入交接 | Reader `bookshelf.at`/`book_detail.at` 与 `ports/file_host.vm.at` 事件接入、包依赖；`tests/product/picker_session.py`/聚合picker生产者改MCP自动操作（先核实际路径）；SD-03由009沉淀 | C-06八叶全PASS；Vue受影响回归；完整009矩阵实际结果/外域问题据实交接，无人工picker等待 | AC-06 |
 | T-06 [x] | work | T-05 | 汇总cohort/路径/命令/hash/每AC与Spec delta证据；内检反例/旧门、两仓pin候选；保持实现树供复审 | 第6节适用门及AC-01..06全部闭合，无缺平台/缺八叶；仅review/merge项未勾时可execution_done | AC-01..06 |
 | T-07 [x] | review | T-06 | 独立上下文同树复演并审规范，暂停实施写入；失败回原树修复 | AC-07 pass，精确版本绑定；不改源代码替实施者修复 | AC-07 |
-| T-08 [ ] | merge | T-07 pass | UI组件先交付、Reader消费精确pin按009原owner流程交付；canonical核验/耐久摘要/本计划归档与自有scope清理 | 实际交付哈希、规范路径/回执和清理齐全；009仍由原合同判全局完成 | AC-08 |
+| T-08 [x] | merge | T-07 pass | UI组件先交付、Reader消费精确pin按009原owner流程交付；canonical核验/耐久摘要/本计划归档与自有scope清理 | 实际交付哈希、规范路径/回执和清理齐全；009仍由原合同判全局完成 | AC-08 |
 
 实施树：UI `D:/autostack/.wt/ui-082/auto-ui`，分支 `codex/plan-082-dev`，已创建；T-01提交 `f8fbb1e1`。Reader **复用** `D:/autostack/.wt/reader-009/auto-reader` / `codex/reader-009-dev`，不另建副本并行写同一app；T-01记录实际resolved路径/branch/commit，T-05暂停009其他写入并交接。计划簿记留主检出。其他兄弟仓只读；需要跨仓能力前置另立合同，不直接扩范围。
 
@@ -393,6 +393,12 @@ T-01..T-07已完成，AC-01..07由§9最终证据及独立最终复审覆盖；�
 - Evidence ownership/retention：本goal所有已知scope文件已对§9命令/日期/产物核归属，补登记D:/autostack/plan-artifacts/.retention/policy.json为auto-ui/PLAN-082 in-flight；未知scope不删除。原matrix snapshot逐PID+创建时间核无残留；复审和landing窗口已各正常关闭。所有需保留的正反结果/矩阵红/哈希/回放方法均在本Plan耐久摘要，无需raw hold；清理时删除全部plan-082暂存，不重建附件/index。
 - Deployment observation（source landing非部署，保留当前运行服务）：D:/autostack/auto-ui/target/debug/auto-ui-tool.exe 最后构建2026-11-11 04:43:22，为旧产物，未覆盖/重启；主UI target/release/auto-ui-tool.exe不存在。D:/autostack/auto-reader/gen/front/vue/dist/index.html旧bundle日期2026-11-06 04:47:30，Reader主release/debug可执行文件不存在；Reader009旧UI兄弟源码9dd3fc27f5d8fbd4714a5c8aff1a5d9a50379608且无target/debug工具，未升级。Reader009本次gen/front/vue/dist/index.html日期2026-11-12 21:05:30，经浏览器3项实证，为开发验证构建；正式部署仍由009 owner按README精确源cohort重建/显式roots执行。其他仓无本计划产品源码改动，无依赖daemon重启。auto-lang未落源提交，非该仓batch触发，不另跑语言全仓回归。
 - archived checkpoint准备：completion_kind delivered；T08仍未勾、current_step7，因自有scope/树清理未完成。归档文件在默认分支提交后才记archived已验证，最终清理后回填8/8并再提交；不会将旧WIP或未提交docs视为归档完成。
+
+
+- stage: merge | goal_round: 10 | plan_id: PLAN-082 | plan_revision: 1 | outcome: pass | completion_kind: delivered | delivery_ui: dad0514fcba24452d6f19217b12e29189698f772 (master ff-only) | reader_scoped_handoff: f6ab049ab65e16de0f84a900a84a38400ee3e05f on codex/reader-009-dev | canonical_verified: SD01/02主UI Git blob8fa25b4b...899d4、SD03既定009交接Git blob86a086a6...6bb0ba均等于独立review冻结，最终复核未变 | archived: docs/plans/archived/082-file-dialog-component-and-reader-automation.md，归档提交d75e56f41be3bfcdbd874697b235d573bdfc3853已在默认分支，非untracked假归档 | cleaned: verified。
+- 清理实际结果：立即删除前逐树绝对路径限定D:/autostack/.wt/ui-082、git status clean、wt-guard clean；auto-ui/auto-lang/auto-web/auto-down/auto-man五树均由对应repo `git worktree remove`成功，UI已合并branch `codex/plan-082-dev`已删除，空ui-082组目录已删除。所有target/pdb/exe中间产物随树删除，不复制回存。Reader009权威树/其旧兄弟和其他任务树未移除，HEAD f6ab049 clean。
+- 暂存清理实际结果：scope wt-guard clean/注册归属/holds=[]均核验。最初变量路径的批量强制删除命令被自动审批拒绝（仅返回blocked by policy），未绕过审批；改用已核明确字面路径、不强制的Remove-Item获准执行。仅剩本任务为隐藏文件测试创建的input/.hidden-book.txt，恢复Normal属性后同一不强制删除完成。最终Test-Path plan-082=false、ui-082=false、开发branch查询不存在。全部raw证据已按本Plan摘要折叠，registry改deleted-at-merge/no holds；无未解决raw hold。
+- 最终实际状态检查：T01..T08全勾、current_step=total_steps=8，status archived；Plan已跟踪、三个本地Markdown链接解析有效，UI delivery为master祖先且其产品补丁线性，Reader业务/tests/Spec与review版本相同，仅README指向等价落地pin。无后续实现、测试或发布前置由082欠付；已记旧部署观察和Reader009外域红交接。主检出其他设计/计划/.next-id WIP全部保留，仅提交本Plan归档与本次receipt；不以整工作区clean为由丢弃他人改动。next: done。
 
 ## 10. 待澄清事项
 
