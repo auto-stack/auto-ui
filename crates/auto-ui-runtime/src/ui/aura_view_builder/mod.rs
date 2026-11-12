@@ -9393,6 +9393,12 @@ mod plan080_rowclass_probe_tests {
 ",
             "        var is_real bool = true
 ",
+            "        var rsc str = \"reading-pane\"
+",
+            "        var theme_body_cls str = \"bg-background text-foreground\"
+",
+            "        var is_epub bool = false
+",
             "    }
 ",
             "    view {
@@ -9407,11 +9413,21 @@ mod plan080_rowclass_probe_tests {
 ",
             "            }
 ",
+            "            if .is_epub {
+",
+            "                col {
+",
+            "                    text \"doc-surface arm (untaken)\" {}
+",
+            "                }
+",
+            "            }
+",
             "            if .loaded {
 ",
             "                if .is_real {
 ",
-            "                    scroll-pane {
+            "                    scroll-pane (controller: .rsc, style: [\"flex-1 min-h-0 w-full\", .theme_body_cls]) {
 ",
             "                        col {
 ",
@@ -9433,9 +9449,19 @@ mod plan080_rowclass_probe_tests {
 ",
             "                                            text f\"¶${p.idx}\" { style: \"text-xs\" }
 ",
+            "                                            if p.mark_n > 0 {
+",
+            "                                                text f\"✎ ${p.mark_n}\" { style: \"text-primary\" }
+",
+            "                                            }
+",
             "                                        }
 ",
-            "                                        text p.text {}
+            "                                        if p.kind == \"text\" {
+",
+            "                                            text p.text {}
+",
+            "                                        }
 ",
             "                                    }
 ",
@@ -9535,11 +9561,14 @@ mod plan080_rowclass_probe_tests {
         // 段落就位（=live Init 复得写状态，seq 抬升）。写目标=子页实例
         // 状态对象（子读经 override_state_obj_id；写 root 无效——FieldNotFound
         // 教训）。child_state_id 经 prepare（幂等 get-or-create）解析。
-        let mk = |idx: i32, key: &str, text: &str| {
+        let mk = |idx: i32, key: &str, text: &str, mark_n: i32| {
             let mut o = auto_val::Obj::new();
             o.set("idx", auto_val::Value::Int(idx));
             o.set("key", auto_val::Value::str(key));
             o.set("text", auto_val::Value::str(text));
+            o.set("mark_n", auto_val::Value::Int(mark_n));
+            o.set("kind", auto_val::Value::str("text"));
+            o.set("cur", auto_val::Value::Bool(false));
             auto_val::Value::Obj(Box::new(o))
         };
         let (child_state_id, _ident, _ip) = {
@@ -9572,6 +9601,9 @@ mod plan080_rowclass_probe_tests {
         // live 写穿语义：子字段持有根数组 VmRef（prepare 实测 4000001）——
         // 原地改根数组（非替换子字段），对齐 VM SET_FIELD 穿引用语义。
         // loaded=true（live Init 完成序列：先 loaded 后 paragraphs）。
+        // live Init 复得时 publish_completed_handler_updates 会 bump_ui_epoch
+        // （帧 1→帧 2 间 epoch 抬升，memo/epoch 通道失效面）。
+        crate::ui::memo_deps::bump_ui_epoch();
         bridge
             .write_state_onto(child_state_id, "loaded", auto_val::Value::Bool(true))
             .unwrap();
@@ -9584,8 +9616,8 @@ mod plan080_rowclass_probe_tests {
                 .downcast_mut::<ListData<Value>>()
                 .expect("root paragraphs is ListData");
             list.elems.clear();
-            list.elems.push(mk(0, "k0", "para zero"));
-            list.elems.push(mk(1, "k1", "para one"));
+            list.elems.push(mk(0, "k0", "para zero", 0));
+            list.elems.push(mk(1, "k1", "para one", 1));
         }
         {
             use auto_lang_core::vm::generic_registry::GenericInstanceData;
