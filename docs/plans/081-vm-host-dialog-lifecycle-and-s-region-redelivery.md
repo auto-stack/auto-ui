@@ -230,6 +230,31 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   reading_page.at 抽取块）→ 定谳①/② → 修复 + 单元锚（for 载荷 onclick
   渲染断言）→ bookswitch_probe 复跑（tap_rows>0 为过）→ W-07 五叶。
 
+### T-04c 二分进展（2026-11-12 晚，worktree commit 单元锚 ×2）
+
+- **单元锚已落**（`aura_view_builder/mod.rs`，cargo test plan081 双绿）：
+  ①`plan081_reading_row_onclick_survives_projection_render_and_probe`——
+  reading_page ¶ 行最小结构全链：**A 编译器投影 ✓**（模板带 onclick 载荷
+  p.idx）、**B 渲染 View ✓**（内层 Column.onclick=Some，经
+  ScrollAnchorMark 包装——其 vtree 转换透传，PLAN-781 已在 9dd3fc27）、
+  **C probe 记录 ✓**（computed 面来源记录在案）；
+  ②`plan081_reading_row_probe_survives_two_frame_timeline`——首帧空段落
+  （Init park 形态）→ 帧 2 行出现，probe 记录完整。
+- **定谳推进**：builder 单层（含两帧时序、scroll-anchor 包装、循环变量
+  载荷）**全部清白**——缺陷只剩 outlet 页集成层三候选：
+  ①outlet 页 memo 重放（`render_outlet_page_memo`，PLAN-045 缺省 on）的
+  probe 再记录缺口；②outlet 子件 instance build 的 probe 路径合并；
+  ③PLAN-725 提升帧构建（AbstractView 中间层）的探针旁路。
+- **live 交互测（bookswitch-7，按 vnode id 直按内层 col）**：
+  press 未触发 TapParagraph dispatch——但 MCP 对非 button 容器的 press
+  语义可能本就不派发（歧义未消），不足以单独定谳。
+- **下一轮执行序**：①outlet+memo 单测（App routes+registry+子页 widget
+  +两帧，断言页内 for 行 probe 记录）复现→修复；②修复后 bookswitch 复跑
+  （快照 `onclick: .TapParagraph` 在场为过）→ W-07 五叶（harness）；
+  ③统一回归（review 面）。
+- **回归锚现状**：plan081 双测=已清白层的永久锚；outlet 层修复后补
+  对应锚。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
@@ -243,20 +268,17 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   AutoUI 组件方向另议） | 修订：auto-ui 会话（用户 2026-11-12 裁定） |
   next: work（T-04 D3 复现定谳起步）。
 - stage: work | plan_id: auto-ui/PLAN-081 | plan_revision: r2 | outcome:
-  进行中（T-01 完成；T-04a/b 完成——**W-07 根因锁定**：阅读页 for 迭代 ¶ 行
-  onclick+style 渲染丢失，确定性、跨书一致、快照忠实（styled vtree）、
-  vnode id 与 run97/run3 失败快照逐位相同；route_id/theme/套间假设全排除；
-  证据=run3 全矩阵 W-07 同签名复现 + bookswitch-3 首访复现）| worktree:
-  D:/autostack/.wt/ui-081/auto-ui | branch: codex/plan-081-dev | base_commit:
-  9dd3fc27 | code_commit: 3227af96+b29af67e（探针+格式修复；T-04c 修复未提交） |
-  dependency_revisions: auto-lang@0b3fc9063/auto-down@58ea33f/auto-web@bf72baa
-  （组只读）+ 驱动 8d7dc2cf + 仪器工具 sha256 da154bfa | task_ids: T-01/T-04 |
-  evidence: plan-081/{hctx-run3,bookswitch-3,theme-probe-2,edit-probe-3,
-  dlg-stress,dlg-stress4}（scratch）+ §8 执行证据两节 | blockers: T-04c 二分
-  （编译器模板投影 vs runtime view-builder）未完成——ui-cache.json 文本探测
-  不确定（字节码形态） | next_responsible_role: work（T-04c：compiler 单测
-  直投 reading_page.at 抽取块判①/② → 修复 + for 载荷 onclick 单元锚 →
-  bookswitch_probe 复跑 tap_rows>0 → W-07 五叶）| next: work。
+  进行中（T-04c 二分落定一半：**builder 单层全清白**——编译器投影/渲染
+  View/probe 记录/两帧时序/scroll-anchor 包装五个维度单元锚全绿
+  （plan081 双测入册）；缺陷隔离到 outlet 页集成层（memo 重放/子件 probe
+  合并/P725 提升帧）三候选）| worktree: D:/autostack/.wt/ui-081/auto-ui |
+  branch: codex/plan-081-dev | base_commit: 9dd3fc27 | code_commit:
+  3227af96+b29af67e+锚测试 commit | dependency_revisions:
+  auto-lang@0b3fc9063/auto-down@58ea33f/auto-web@bf72baa（组只读）+ 驱动
+  8d7dc2cf + 仪器工具 da154bfa | task_ids: T-04 | evidence:
+  plan-081/{bookswitch-7（live 按 vnode 直按未派发，MCP 容器 press 语义
+  歧义）} + 单元锚两测 | blockers: outlet 集成层单测（routes+registry+子页
+  +两帧）未写——下一轮首步 | next_responsible_role: work | next: work。
 
 ## 10. 待澄清事项
 
