@@ -430,6 +430,24 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   实际服务帧"；定位滞后环节 → 修复 → W-07。
 - **工作区**：@ 最新干净（扩展诊断在册）。
 
+### T-04c-9 根因闭环（同日，服务通道对账完成）
+
+- **服务端证实**：tool_snapshot 直读 `shared.clone_styled_vtree()`——
+  无 per-conn 缓存、无其它中间层；"滞后"实为**写入被覆盖**。
+- **覆盖点**：host.rs:2222——`__bounds_collected` 泵（~500ms）用
+  `StyledNodeSnapshot::from_live(vtree, live_cache)` **整体覆盖**
+  styled_vtree：computed 由 live_cache（InspectorCache，view() iced
+  转换期记录）重建。**InspectorCache 对普通 Column 容器不记事件**
+  （button/input 族才记）→ 覆盖后 for 迭代行丢 onclick/raw_class；
+  工具栏=Button 族存活。**三现象一次解释**：翻帧（覆盖前读=正确/
+  覆盖后读=缺失）、工具栏存活、probe 数据正确（sync 块写入无误）。
+- **修复方向（T-04c-10）**：bounds 泵只应补 bounds——from_live 覆盖
+  改为**合并语义**（保留 sync 块 probe 系 computed 的 events/raw_class/
+  for_context，仅并入 measured bounds）；或 from_live 缺事件时保留
+  原 computed。改后红→绿序：单测（from_live 合并锚）→ bookswitch
+  快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
+- **worktree**：@ 最新干净（扩展诊断在册，门控）。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
