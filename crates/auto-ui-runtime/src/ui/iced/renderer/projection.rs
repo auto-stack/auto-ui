@@ -3959,18 +3959,10 @@ fn dynamic_view_impl_inner(
                     let tap = computed
                         .values()
                         .any(|c| c.events.iter().any(|(_, h)| h.contains("TapParagraph")));
-                    let plen = state_vals.get("paragraphs").map(|v| match v {
-                        auto_val::Value::Array(a) => a.len() as i64,
-                        _ => -1,
-                    });
-                    let route = state_vals
-                        .get("__current_route")
-                        .map(|v| v.to_string())
-                        .unwrap_or_else(|| "?".to_string());
                     let n_comp = computed.len();
                     let n_probe = sync_probe.snapshot().len();
                     eprintln!(
-                        "[MEMO-DIAG] sync computed={n_comp} probe_entries={n_probe} tap_present={tap} paragraphs_len={plen:?} route={route}"
+                        "[MEMO-DIAG] sync computed={n_comp} probe_entries={n_probe} tap_present={tap}"
                     );
                 }
                 let input_map = state.component.input_state_map().clone();
