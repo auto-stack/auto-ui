@@ -242,6 +242,21 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   3227af96 常驻）；T-02/T-03 撤销；AC-01/02 收束、AC-03/04 继续；
   AutoUI 组件方向另议） | 修订：auto-ui 会话（用户 2026-11-12 裁定） |
   next: work（T-04 D3 复现定谳起步）。
+- stage: work | plan_id: auto-ui/PLAN-081 | plan_revision: r2 | outcome:
+  进行中（T-01 完成；T-04a/b 完成——**W-07 根因锁定**：阅读页 for 迭代 ¶ 行
+  onclick+style 渲染丢失，确定性、跨书一致、快照忠实（styled vtree）、
+  vnode id 与 run97/run3 失败快照逐位相同；route_id/theme/套间假设全排除；
+  证据=run3 全矩阵 W-07 同签名复现 + bookswitch-3 首访复现）| worktree:
+  D:/autostack/.wt/ui-081/auto-ui | branch: codex/plan-081-dev | base_commit:
+  9dd3fc27 | code_commit: 3227af96（探针；T-04c 修复未提交） |
+  dependency_revisions: auto-lang@0b3fc9063/auto-down@58ea33f/auto-web@bf72baa
+  （组只读）+ 驱动 8d7dc2cf + 仪器工具 sha256 da154bfa | task_ids: T-01/T-04 |
+  evidence: plan-081/{hctx-run3,bookswitch-3,theme-probe-2,edit-probe-3,
+  dlg-stress,dlg-stress4}（scratch）+ §8 执行证据两节 | blockers: T-04c 二分
+  （编译器模板投影 vs runtime view-builder）未完成——ui-cache.json 文本探测
+  不确定（字节码形态） | next_responsible_role: work（T-04c：compiler 单测
+  直投 reading_page.at 抽取块判①/② → 修复 + for 载荷 onclick 单元锚 →
+  bookswitch_probe 复跑 tap_rows>0 → W-07 五叶）| next: work。
 
 ## 10. 待澄清事项
 
