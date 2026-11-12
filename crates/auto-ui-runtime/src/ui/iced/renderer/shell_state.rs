@@ -3961,7 +3961,7 @@ pub(super) fn refresh_hole_regions_at(
 }
 
 #[cfg(not(windows))]
-fn sync_native_geometry(_state: &mut crate::ui::session::DesktopSession) {}
+pub(super) fn sync_native_geometry(_state: &mut crate::ui::session::DesktopSession) {}
 
 /// PLAN-709：槽位交互的 DPI 折算系数（min_size_est 物理域 → 逻辑域；
 /// 无桌面窗可查时回退 1.0）。
@@ -3973,7 +3973,7 @@ pub(super) fn native_slot_dpi_scale() -> f32 {
 }
 
 #[cfg(not(windows))]
-fn native_slot_dpi_scale() -> f32 {
+pub(super) fn native_slot_dpi_scale() -> f32 {
     1.0
 }
 
@@ -4354,7 +4354,7 @@ fn drive_drag_watch(
 }
 
 #[cfg(not(windows))]
-fn handle_native_slot_event(
+pub(super) fn handle_native_slot_event(
     _state: &mut crate::ui::session::DesktopSession,
     _hwnd_value: isize,
     _kind: crate::ui::native_dock::NativeSlotEventKind,
@@ -4395,7 +4395,7 @@ pub(super) fn restore_all_native_slots(state: &mut crate::ui::session::DesktopSe
 }
 
 #[cfg(not(windows))]
-fn restore_all_native_slots(_state: &mut crate::ui::session::DesktopSession) {}
+pub(super) fn restore_all_native_slots(_state: &mut crate::ui::session::DesktopSession) {}
 
 /// LaunchApp 执行体（463 T4 主体抽出；472 T4 起被 LaunchApp/ActivateApp
 /// 两臂共用）。失败转 toast + 占位页（Design 24 §6.5）。
