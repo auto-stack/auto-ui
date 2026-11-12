@@ -9345,4 +9345,192 @@ mod plan080_rowclass_probe_tests {
             );
         }
     }
+
+    /// PLAN-081 T-04c 定谳锚③（outlet+memo 两帧时序）：live 阅读页是
+    /// outlet 子页且 memo 缺省 on——帧 1（paragraphs 空）fill 缓存空行产物，
+    /// 帧 2（段落就位）命中/重建后的 probe 记录必须完整。
+    #[test]
+    #[ignore = "PLAN-081 T-04c 红锚：outlet memo 命中重放丢失帧 2 行 probe 记录（segments 未入 dep 集→version_fast 陈旧重放）；修复待 T-04c-3，转绿即收"]
+    fn plan081_outlet_page_for_rows_survive_memo_two_frame_timeline() {
+        use auto_ui_dialect::{UiCode, UiStmt};
+        use auto_lang_core::parser::Parser;
+        use auto_lang_core::session::CompilerSession;
+        use auto_ui_compiler::aura::extract::extract_widget_from_decl;
+
+        let src = concat!(
+            "widget App081 {
+",
+            "    routes {
+",
+            "        \"/reader\" -> use reader081
+",
+            "    }
+",
+            "    view {
+",
+            "        col {
+",
+            "            outlet
+",
+            "        }
+",
+            "    }
+",
+            "}
+",
+            "widget reader081 {
+",
+            "    msg { TapParagraph(int) }
+",
+            "    model {
+",
+            "        var paragraphs List = []
+",
+            "        var cur int = 0
+",
+            "    }
+",
+            "    view {
+",
+            "        col {
+",
+            "            for p in .paragraphs {
+",
+            "                col {
+",
+            "                    scroll-anchor: p.key
+",
+            "                    col {
+",
+            "                        onclick: .TapParagraph(p.idx)
+",
+            "                        style: [\"px-3 py-2\", if p.idx == .cur { \"bg-marked\" } else { \"bg-idle\" }]
+",
+            "                        row {
+",
+            "                            text f\"¶${p.idx}\" { style: \"text-xs\" }
+",
+            "                        }
+",
+            "                        text p.text {}
+",
+            "                    }
+",
+            "                }
+",
+            "            }
+",
+            "        }
+",
+            "    }
+",
+            "}
+",
+        );
+        let session = CompilerSession::ui();
+        let mut parser = Parser::from(src).with_session(session);
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
+        let mut decls: Vec<_> = ast
+            .domain_stmts()
+            .filter_map(|s| match s {
+                UiStmt::WidgetDecl(d) => Some(d),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(decls.len(), 2, "App081 + reader081");
+        let app = extract_widget_from_decl(&decls.remove(0)).expect("extract app");
+        let child = extract_widget_from_decl(&decls.remove(0)).expect("extract child");
+        let routes = app.routes.as_ref().expect("app routes").routes.clone();
+
+        let mut registry = crate::ui::widget_registry::WidgetRegistry::new();
+        registry.register(child);
+
+        let mut bridge = VmBridge::new(&app).unwrap();
+
+        fn tap_records(probe: &crate::ui::debug::BuildProbe) -> bool {
+            probe
+                .snapshot()
+                .values()
+                .any(|e| e.events.iter().any(|ev| ev.handler.contains("TapParagraph")))
+        }
+
+        // 帧 1：paragraphs 空（live Init park 形态）。子页模型字段经
+        // ensure_child_state 在根态建场（shared-root 架构）；__current_route
+        // 未设时 render_outlet 回退首路由（dynamic.rs:717 注记）。
+        let mut seed = std::collections::HashMap::new();
+        seed.insert(
+            "paragraphs".to_string(),
+            auto_val::Value::Array(auto_val::Array::from(Vec::<auto_val::Value>::new())),
+        );
+        seed.insert("cur".to_string(), auto_val::Value::Int(0));
+        bridge.ensure_child_state("reader081", &[], &seed);
+        {
+            let builder = AuraViewBuilder::with_registry(&bridge, "App081", &registry)
+                .with_routes(&routes);
+            let (_v, _im, probe1) = builder.build_with_debug(&app.view_tree);
+            assert!(
+                !tap_records(&probe1),
+                "帧 1 段落空=无行事件（前置一致性）"
+            );
+        }
+
+        // 段落就位（=live Init 复得写状态，seq 抬升）。
+        let mk = |idx: i32, key: &str, text: &str| {
+            let mut o = auto_val::Obj::new();
+            o.set("idx", auto_val::Value::Int(idx));
+            o.set("key", auto_val::Value::str(key));
+            o.set("text", auto_val::Value::str(text));
+            auto_val::Value::Obj(Box::new(o))
+        };
+        bridge
+            .write_state(
+                "paragraphs",
+                auto_val::Value::Array(auto_val::Array::from(vec![
+                    mk(0, "k0", "para zero"),
+                    mk(1, "k1", "para one"),
+                ])),
+            )
+            .unwrap();
+
+        // 帧 2：memo 判定（命中重放 vs 重建）——行事件记录必须在。
+        {
+            let builder = AuraViewBuilder::with_registry(&bridge, "App081", &registry)
+                .with_routes(&routes);
+            let (view2, _im, probe2) = builder.build_with_debug(&app.view_tree);
+            assert!(
+                tap_records(&probe2),
+                "帧 2 probe 必须记录行事件（memo 命中重放/重建两臂都不得丢）"
+            );
+            fn has_tap(view: &View<DynamicMessage>) -> bool {
+                match view {
+                    View::Column { onclick, children, .. }
+                    | View::Row { onclick, children, .. } => {
+                        if matches!(onclick.as_ref(),
+                            Some(DynamicMessage::Typed { event_name, .. })
+                            if event_name == "TapParagraph")
+                        {
+                            return true;
+                        }
+                        children.iter().any(has_tap)
+                    }
+                    View::Container { child, onclick, .. } => {
+                        if matches!(onclick.as_ref(),
+                            Some(DynamicMessage::Typed { event_name, .. })
+                            if event_name == "TapParagraph")
+                        {
+                            return true;
+                        }
+                        has_tap(child)
+                    }
+                    View::ScrollAnchorMark { child, .. } => has_tap(child),
+                    _ => false,
+                }
+            }
+            assert!(has_tap(&view2), "帧 2 渲染树必须有 TapParagraph onclick");
+        }
+    }
 }
