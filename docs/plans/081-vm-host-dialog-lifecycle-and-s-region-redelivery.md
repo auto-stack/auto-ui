@@ -340,6 +340,24 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   for 行）路径错位 → 修 path 记账（或 probe/vtree 路径统一）→ 红转绿 →
   bookswitch 快照 `onclick: .TapParagraph` 在场 → W-07 五叶 → review。
 
+### T-04c-6 生产插桩实测（同日，worktree 936ecbc6）
+
+- **五项增量全加**（rsc/theme_body_cls 模型引用 style、is_epub 未走臂、
+  mark_n 行内条件、kind 条件正文、富字段条目 + 帧间 `bump_ui_epoch`）——
+  outlet 两帧锚**仍然绿**：builder 层对现实结构+epoch 通道**彻底清白**
+  （936ecbc6 富化锚常驻）。
+- **生产插桩**（projection.rs 同步块，AUTO_MEMO_DIAG 门控，2b3e503d）：
+  live 实测——computed=probe_entries **恒 1:1**（join 无错位）；
+  **tap_present 帧间翻转**（书架 438 条帧 false ↔ 阅读页 35 条帧 true，
+  翻转与页面切换/装载时序相关）；154 次 prepare 全指同一子状态对象
+  （4008069），paragraphs 恒=**VmRef(4000014) 根共享数组**。
+- **live 判读（记录，未定谳）**：行记录在阅读页帧**在场**——W-07 失败
+  快照取到的帧为何 tap 缺席 = **帧采样时序 + 子数组内容抖动**问题
+  （章节重载/重播种窗口），非结构性丢记录；下一轮把 sync diag 与
+  行内容帧相关（tap_present=false 帧打印段落计数），定谳抖动源。
+- **worktree**：@936ecbc6 干净；诊断双插桩（prepare/同步块）在册
+  （AUTO_MEMO_DIAG 门控）。
+
 ## 9. 复审记录
 
 - stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
