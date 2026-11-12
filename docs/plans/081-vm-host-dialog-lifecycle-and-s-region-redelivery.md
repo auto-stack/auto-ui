@@ -1,5 +1,5 @@
 ---
-plan_id: auto-ui/PLAN-080
+plan_id: auto-ui/PLAN-081
 status: drafting
 feature_name: VM 宿主 IFileDialog 生命周期/生成可靠性与 S 区编辑链修复再交付（READER-009 消费解除）
 author: [relay/009-session]
@@ -143,7 +143,7 @@ Win32 COM（CoGetApartmentType/SendInput/UIA 诊断）、现有 `cargo t` 组。
 
 ## 9. 复审记录
 
-- stage: new | plan_id: auto-ui/PLAN-080 | plan_revision: r1 | outcome: pass
+- stage: new | plan_id: auto-ui/PLAN-081 | plan_revision: r1 | outcome: pass
   （可交 work；T-01/T-04 为有界调查带决策工件） | 起草：READER-009 会话
   （round49 先例 + round54 方向确认） | next: work（auto-ui 会话接手，
   T-01 插桩定谳起步）。
@@ -155,3 +155,6 @@ Win32 COM（CoGetApartmentType/SendInput/UIA 诊断）、现有 `cargo t` 组。
 - D3 S 区修复 diff 的提取源（7d3a73aa 线的具体 commit 范围）——T-04 前由
   auto-ui 会话确认。
 - 若 mode A/B 与 auto-lang 段记账交互（bisect 辅项），升级为跨仓协调。
+
+
+> 编号注记（2026-11-12）：080 与并行会话的 080-age-node3d 冲突（本计划先提交 10:46，对方 11:08 误占同号）——本计划重编号为 081，080 归 AGE 域计划。
