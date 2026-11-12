@@ -9044,4 +9044,305 @@ mod plan080_rowclass_probe_tests {
             other => panic!("非 Column: {other:?}"),
         }
     }
+
+    /// PLAN-081 T-04c 定谳锚：reading_page ¶ 行全链（run3/bookswitch 实证
+    /// 快照内层 col 无 events/raw_class computed 记录）。三断言分层定责：
+    /// A=编译器投影（模板带 onclick+载荷）；
+    /// B=渲染 View（内层 col onclick/style 在场，载荷=循环变量解析值）；
+    /// C=probe 记录（computed 面——快照 events 的来源）。
+    #[test]
+    fn plan081_reading_row_onclick_survives_projection_render_and_probe() {
+        use auto_ui_dialect::{UiCode, UiStmt};
+        use auto_lang_core::parser::Parser;
+        use auto_lang_core::session::CompilerSession;
+        use auto_ui_compiler::aura::extract::extract_widget_from_decl;
+        use auto_ui_compiler::aura::AuraNode;
+
+        let src = concat!(
+            "widget Reader081 {\n",
+            "    msg { TapParagraph(int) }\n",
+            "    model {\n",
+            "        var paragraphs List = []\n",
+            "        var cur int = 0\n",
+            "    }\n",
+            "    view {\n",
+            "        col {\n",
+            "            for p in .paragraphs {\n",
+            "                col {\n",
+            "                    scroll-anchor: p.key\n",
+            "                    col {\n",
+            "                        onclick: .TapParagraph(p.idx)\n",
+            "                        style: [\"px-3 py-2\", if p.idx == .cur { \"bg-marked\" } else { \"bg-idle\" }]\n",
+            "                        row {\n",
+            "                            text f\"¶${p.idx}\" { style: \"text-xs\" }\n",
+            "                        }\n",
+            "                        text p.text {}\n",
+            "                    }\n",
+            "                }\n",
+            "            }\n",
+            "        }\n",
+            "    }\n",
+            "}\n",
+        );
+        let session = CompilerSession::ui();
+        let mut parser = Parser::from(src).with_session(session);
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
+        let decl = ast
+            .domain_stmts()
+            .find_map(|s| match s {
+                UiStmt::WidgetDecl(d) => Some(d),
+                _ => None,
+            })
+            .expect("widget decl");
+        let widget = extract_widget_from_decl(&decl).expect("extract");
+
+        // A：编译器投影——模板内层 col 带 onclick（载荷 p.idx）。
+        fn find_onclick(node: &AuraNode) -> Option<(String, Vec<String>)> {
+            match node {
+                AuraNode::Element {
+                    events, children, ..
+                } => {
+                    if let Some(ev) = events.get("onclick") {
+                        return Some((ev.handler.clone(), ev.params.clone()));
+                    }
+                    for c in children {
+                        if let Some(hit) = find_onclick(c) {
+                            return Some(hit);
+                        }
+                    }
+                    None
+                }
+                AuraNode::ForLoop { body, .. } => body.iter().find_map(find_onclick),
+                _ => None,
+            }
+        }
+        let hit = find_onclick(&widget.view_tree).expect("模板投影必须带 onclick");
+        assert!(
+            hit.0.contains("TapParagraph"),
+            "handler 应为 TapParagraph: {:?}",
+            hit.0
+        );
+        assert_eq!(hit.1, vec!["p.idx"], "载荷=循环变量");
+
+        // B：渲染——paragraphs 两条 Obj，内层 Column.onclick=Some(载荷解析)。
+        let mut bridge = VmBridge::new(&widget).unwrap();
+        let mut p0 = auto_val::Obj::new();
+        p0.set("idx", auto_val::Value::Int(0));
+        p0.set("key", auto_val::Value::str("k0"));
+        p0.set("text", auto_val::Value::str("para zero"));
+        let mut p1 = auto_val::Obj::new();
+        p1.set("idx", auto_val::Value::Int(1));
+        p1.set("key", auto_val::Value::str("k1"));
+        p1.set("text", auto_val::Value::str("para one"));
+        bridge
+            .write_state(
+                "paragraphs",
+                auto_val::Value::Array(auto_val::Array::from(vec![
+                    auto_val::Value::Obj(Box::new(p0)),
+                    auto_val::Value::Obj(Box::new(p1)),
+                ])),
+            )
+            .unwrap();
+        let builder = AuraViewBuilder::new(&bridge, "Reader081");
+        let (view, _id_map, probe) = builder.build_with_debug(&widget.view_tree);
+
+        fn collect_cols<'a>(
+            view: &'a View<DynamicMessage>,
+            out: &mut Vec<(Option<&'a DynamicMessage>, bool)>,
+        ) {
+            match view {
+                View::Column {
+                    children,
+                    onclick,
+                    style,
+                    ..
+                } => {
+                    out.push((onclick.as_ref(), style.is_some()));
+                    for c in children {
+                        collect_cols(c, out);
+                    }
+                }
+                View::Row {
+                    children,
+                    onclick,
+                    style,
+                    ..
+                } => {
+                    out.push((onclick.as_ref(), style.is_some()));
+                    for c in children {
+                        collect_cols(c, out);
+                    }
+                }
+                View::Container {
+                    child,
+                    onclick,
+                    style,
+                    ..
+                } => {
+                    out.push((onclick.as_ref(), style.is_some()));
+                    collect_cols(child, out);
+                }
+                View::ScrollAnchorMark { child, .. } => {
+                    collect_cols(child, out);
+                }
+                _ => {}
+            }
+        }
+        let mut cols = Vec::new();
+        collect_cols(&view, &mut cols);
+        let clicked = cols.iter().any(|(oc, _)| {
+            oc.is_some_and(|m| {
+                matches!(m, DynamicMessage::Typed { event_name, .. } if event_name == "TapParagraph")
+            })
+        });
+        if !clicked {
+            for (i, (oc, has_style)) in cols.iter().enumerate() {
+                let name = oc.map(|m| match m {
+                    DynamicMessage::Typed { event_name, .. } => event_name.clone(),
+                    DynamicMessage::TypedInst { event_name, .. } => event_name.clone(),
+                    _ => "<other>".to_string(),
+                });
+                println!("plan081 diag col[{i}]: onclick={name:?} style={has_style}");
+            }
+            let snapd = probe.snapshot();
+            for (path, e) in snapd.iter() {
+                if !e.events.is_empty() {
+                    println!("plan081 diag probe path={path:?} events={:?}", e.events);
+                }
+            }
+        }
+        assert!(clicked, "渲染树必须有带 TapParagraph onclick 的 Column");
+
+        // C：probe——computed 面（快照 events 的来源）记录该事件。
+        let snap = probe.snapshot();
+        assert!(
+            snap.values()
+                .any(|e| e.events.iter().any(|ev| ev.handler.contains("TapParagraph"))),
+            "probe 必须记录 TapParagraph 事件（快照 computed 的来源）"
+        );
+    }
+
+    /// PLAN-081 T-04c 定谳锚②（两帧时序）：live 应用首帧 paragraphs 为空
+    /// （Init park ~16s），行在后续帧出现——帧 2 的 probe 记录是否仍然完整。
+    #[test]
+    fn plan081_reading_row_probe_survives_two_frame_timeline() {
+        use auto_ui_dialect::{UiCode, UiStmt};
+        use auto_lang_core::parser::Parser;
+        use auto_lang_core::session::CompilerSession;
+        use auto_ui_compiler::aura::extract::extract_widget_from_decl;
+
+        let src = concat!(
+            "widget Reader081b {
+",
+            "    msg { TapParagraph(int) }
+",
+            "    model {
+",
+            "        var paragraphs List = []
+",
+            "        var cur int = 0
+",
+            "    }
+",
+            "    view {
+",
+            "        col {
+",
+            "            for p in .paragraphs {
+",
+            "                col {
+",
+            "                    scroll-anchor: p.key
+",
+            "                    col {
+",
+            "                        onclick: .TapParagraph(p.idx)
+",
+            "                        style: [\"px-3 py-2\", if p.idx == .cur { \"bg-marked\" } else { \"bg-idle\" }]
+",
+            "                        row {
+",
+            "                            text f\"¶${p.idx}\" { style: \"text-xs\" }
+",
+            "                        }
+",
+            "                        text p.text {}
+",
+            "                    }
+",
+            "                }
+",
+            "            }
+",
+            "        }
+",
+            "    }
+",
+            "}
+",
+        );
+        let session = CompilerSession::ui();
+        let mut parser = Parser::from(src).with_session(session);
+        let ast = UiCode(
+            parser
+                .parse_domain(&auto_ui_dialect::UiDialect)
+                .expect("parse"),
+        );
+        let decl = ast
+            .domain_stmts()
+            .find_map(|s| match s {
+                UiStmt::WidgetDecl(d) => Some(d),
+                _ => None,
+            })
+            .expect("widget decl");
+        let widget = extract_widget_from_decl(&decl).expect("extract");
+        let mut bridge = VmBridge::new(&widget).unwrap();
+
+        // 帧 1：paragraphs 空（Init park 形态）。
+        {
+            let builder = AuraViewBuilder::new(&bridge, "Reader081b");
+            let (_v, _im, probe1) = builder.build_with_debug(&widget.view_tree);
+            let s1 = probe1.snapshot();
+            assert!(
+                !s1.values()
+                    .any(|e| e.events.iter().any(|ev| ev.handler.contains("TapParagraph"))),
+                "帧 1 无行=无事件记录（前置一致性）"
+            );
+        }
+
+        // Init 复得：paragraphs 就位。
+        let mut p0 = auto_val::Obj::new();
+        p0.set("idx", auto_val::Value::Int(0));
+        p0.set("key", auto_val::Value::str("k0"));
+        p0.set("text", auto_val::Value::str("para zero"));
+        let mut p1 = auto_val::Obj::new();
+        p1.set("idx", auto_val::Value::Int(1));
+        p1.set("key", auto_val::Value::str("k1"));
+        p1.set("text", auto_val::Value::str("para one"));
+        bridge
+            .write_state(
+                "paragraphs",
+                auto_val::Value::Array(auto_val::Array::from(vec![
+                    auto_val::Value::Obj(Box::new(p0)),
+                    auto_val::Value::Obj(Box::new(p1)),
+                ])),
+            )
+            .unwrap();
+
+        // 帧 2：行出现——probe 事件记录必须在。
+        {
+            let builder = AuraViewBuilder::new(&bridge, "Reader081b");
+            let (_v, _im, probe2) = builder.build_with_debug(&widget.view_tree);
+            let s2 = probe2.snapshot();
+            assert!(
+                s2.values()
+                    .any(|e| e.events.iter().any(|ev| ev.handler.contains("TapParagraph"))),
+                "帧 2 probe 必须记录行事件（两帧时序下不得丢失）"
+            );
+        }
+    }
 }
