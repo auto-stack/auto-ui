@@ -21,7 +21,7 @@ touched_goals: []
 
 复用现有 pagination 组件族和 FileDialog/026 Database 的分页交互，新增 `packages/pagination/` 的 `PaginationControl` 受控组合组件，统一页码、边界、每页数量、MCP、主题和单页隐藏。迁移两个真实消费者，为 PLAN-084 的新 FileDialog 模式提供稳定依赖。
 
-路线：[组件库扩展 strategy / CL-03](../design/autoui/component-library-extension-strategy.md)。本轮只有计划和设计，不创建组件或声称测试已通过。
+路线：[组件库扩展 strategy / CL-03](../../design/autoui/component-library-extension-strategy.md)。本轮只有计划和设计，不创建组件或声称测试已通过。
 
 2026-11-14视觉补充：本次新增参考图/视觉case，原执行者已记录的T-01探针与后续进度保留；进入当前未完成任务时接入本次样式参考。r2未改变其已验证的API/整数域/依赖机制，原证据可用于对应机制，不替代新增V-08视觉证明；实现或输入变化仍须复核受影响证据。原拟树/未创建文字及上句“本轮只有计划”是初始背景，已有原owner实施树须沿用，不能因补图另建第二棵树；实际身份与进度以当前执行记录为准。
 
@@ -100,7 +100,7 @@ MCP 能读到当前页、总页、总量、每页数量、按钮禁用态及名�
 
 ### 视觉参考与实现边界（r2）
 
-2026-11-14按用户要求补充[文件导航视觉指南](../design/autoui/file-navigation-and-interaction-visual-guide.md)及[GPT参考图](../design/autoui/assets/file-navigation-084-086-reference-v1.png)，使用右下086区域的多页/首面/单页/空结果四状态，不要求一个页面同时显示四个分页器。
+2026-11-14按用户要求补充[文件导航视觉指南](../../design/autoui/file-navigation-and-interaction-visual-guide.md)及[GPT参考图](../../design/autoui/assets/file-navigation-084-086-reference-v1.png)，使用右下086区域的多页/首面/单页/空结果四状态，不要求一个页面同时显示四个分页器。
 
 默认有效单页/空结果时整个组不入树，含页码/箭头/容量控件；图中18 items是应用摘要，“Pagination hidden…”是说明文字，不是控件残留。非法配置仍显示错误，不得被隐藏规则掩盖。首面first/previous禁用，多页工具栏保持一行；图的25 per page只属于可变容量消费者，FileDialog仍固定100且不显示容量选择。026显式hideWhenSingle=false的语义不改变。
 
@@ -199,6 +199,17 @@ pending_closeout_gates：Linux native 腿（环境无 rust/node 工具链——W
 findings：R-1（dirty 双文件已补提交，R-1 fix 于 reviewed HEAD 验证）；R-2（trivial：shadcn_attrs.rs 一行 PLAN-053 注释被 T-05 编辑截断，代码完整非语义，merge 可顺手修复）；N-2（autoui_state 读根态——路由型示例的状态读回需快照 oracle，026/file-dialog 读回不受影响；基础设施观察非产品缺陷）。
 independent replay：执行会话之外自写解析的跨层 oracle 重放 PASS（rows 1..100→101..200 随 下一页 精确平移，第 1/11→2/11）；重新生成 SFC 实证 `:disabled="!can_prev || disabled"` 绑定（编译器适配生效）。
 evidence: docs/reviews/plan086/{decisions,evidence}.md；plan-artifacts/plan-086/{vp-review-native,vp-review-vue,vfd-review,probes/*}。next: merge（T-08）。
+
+
+2026-11-14：stage: merge；plan_id: PLAN-086；plan_revision: r2；outcome: pass（delivered + archived，cleanup 见下）；delivery_commit: 765251b9005ee9f1a56ce31449aa41da3337eaf1（master ff-only，linear，main tip = delivery commit）；canonical: docs/specs/ui/pagination.md（新增，SD-01/02）+ docs/specs/ui/file-dialog.md（SD-03 增量 12 行） landed + smoke（tools 3+2 pass on main checkout）；archive: docs/plans/archived/086-shared-pagination-control.md（status: archived，链接已按 archived 父目录修正 ../../design/…，已提交）。
+084 交接（T-08 交付义务）：可消费提交 = 765251b9（packages/pagination 三件套 + 文档）；闭包消费方式与合同 = docs/specs/ui/pagination.md + packages/pagination/README.md；084 重基线时以该 Spec/README 为依赖面，依赖具名解除。
+cleanup（分步核对）：
+1. worktree `D:/autostack/.wt/ui-086/auto-ui`：wt-guard clean（清除 pnpm 生成的 gen/node_modules junction 后）→ 待移除；
+2. 分支 codex/ui-086-pagination / codex/ui-086-automan 及组内依赖检出 → 待移除；
+3. plan-artifacts/plan-086/ 证据已折叠入本文件（decisions/evidence 落库 + 本收据）→ 待删除 + registry 刷新；
+4. 交付物构建态（landing≠deployment）：debug auto.exe/auto-ui-tool.exe 为计划验证构建（组内 .wt/ui-086/auto-man）；主仓 release 产物与本 Plan 无生产消费者（纯包/示例/测试变更，无守护进程/后端服务面）——如需产品化由后续产品化流程重建。
+completion_kind: delivered；merge-owned pending：Linux native 腿（环境无工具链）+ 统一回归（auto-ui 无 .last-batch-regression 惯例，按本仓各门为 owner 执行）。
+
 
 ## 10. 待澄清事项
 
