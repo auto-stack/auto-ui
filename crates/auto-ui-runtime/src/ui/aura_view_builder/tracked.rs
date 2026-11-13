@@ -228,6 +228,13 @@ impl<'a> AuraViewBuilder<'a> {
                 ..
             } => {
                 let is_true = self.eval_condition_with(condition, bindings);
+                if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1")
+                    && format!("{:?}", condition).contains("loaded")
+                {
+                    eprintln!(
+                        "[MEMO-DIAG] cond-loaded is_true={is_true}"
+                    );
+                }
                 let empty = Vec::new();
                 let body = if is_true {
                     then_body
@@ -698,6 +705,13 @@ impl<'a> AuraViewBuilder<'a> {
                 ..
             } => {
                 let is_true = self.eval_condition_with(condition, bindings);
+                if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1")
+                    && format!("{:?}", condition).contains("loaded")
+                {
+                    eprintln!(
+                        "[MEMO-DIAG] cond-loaded is_true={is_true}"
+                    );
+                }
                 let empty = Vec::new();
                 let body = if is_true {
                     then_body
