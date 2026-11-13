@@ -448,6 +448,29 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（扩展诊断在册，门控）。
 
+### T-04c-14 快照侧闭环 + 按压侧新根因（2026-11-13，w07-probe-2）
+
+- **快照侧闭环（live 实证）**：w07-probe-1/2——**三腿 `tap_rows=2`、
+  `reading_reached=true`**（快照含 `onclick: .TapParagraph` 行）；
+  bookswitch-30 同证。T-04c-13 scroll 路径修复的快照面 live 生效。
+- **按压侧新根因（press 派发不通）**：行按压响应=
+  `Error: View not found at path [1,0,2,0,0,1,1,0,0]`——
+  `execute_action_vnode → find_view_by_path(shared.view, vnode.path)`
+  失败：styled vtree 的 vnode path（快照帧的视图结构）与
+  `shared.view`（按帧克隆但转换/覆盖时序下结构分叉）在滚动区内容处
+  不一致。find_view_by_path 已委托 extract_children_ref（与 vtree
+  同构）——分叉在**源视图本身**（shared.view 的帧 ≠ styled 快照的帧，
+  或转换注入包装层）。
+- **修复方向（T-04c-15）**：press 派发改走 **styled 快照自身记录**——
+  computed[vnode_id].events 即该节点的事件（merge 修复后已带
+  onclick+载荷语义）；对 handler 串 `.TapParagraph(p.idx)` 走
+  parse_event_param_expr 同径解析实参（bindings 快照或实例态）派发
+  ActionMessage——绕开 find_view_by_path 的视图帧依赖。
+- **次生观察**：w07-probe-2 的 ②③④⑤ 步因 ① 断链未跑（step1_add_btn
+  false=记录位置态未置）；`vm-err-dump.txt` 未触发（grandchild 未走
+  Err 臂——本次死亡=工具树静默消失，审计无新行，机器嫌疑复归）。
+- **worktree**：@ 最新干净。
+
 ### T-04c-13 第三层根因锁定 + 修复（2026-11-13，90719bc0）
 
 - **单元级错位解剖（一致性检查器入锚）**：outlet 锚加 probe↔vtree 路径
