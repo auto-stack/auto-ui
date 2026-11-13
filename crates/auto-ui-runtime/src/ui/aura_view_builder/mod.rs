@@ -9677,6 +9677,62 @@ mod plan080_rowclass_probe_tests {
                 }
             }
             assert!(has_tap(&view2), "帧 2 渲染树必须有 TapParagraph onclick");
+
+            // 一致性检查器：probe 记录路径 → id_from_path 必须命中 vtree
+            // 节点集（生产 computed join 的键一致性——错位即快照丢 computed
+            // 的直接机制）。
+            let vtree = crate::ui::vnode_converter::view_to_vtree_with_paths(
+                view2.clone(),
+                |_| None,
+            );
+            let mut vtree_ids = std::collections::HashSet::new();
+            if let Some(root) = vtree.root() {
+                let mut stack = vec![root.id];
+                while let Some(id) = stack.pop() {
+                    vtree_ids.insert(id.as_u64());
+                    if let Some(children) = vtree.children(id) {
+                        for c in children {
+                            stack.push(c.id);
+                        }
+                    }
+                }
+            }
+            let mut mismatches = Vec::new();
+            for (path, entry) in probe2.snapshot().iter() {
+                let vid = crate::ui::vnode::VNodeId::new(crate::ui::vnode::id_from_path(path));
+                if !vtree_ids.contains(&vid.as_u64()) && !entry.events.is_empty() {
+                    mismatches.push((path.clone(), entry.events.clone()));
+                }
+            }
+            // dump：vtree 侧深度≥6 的全部路径 + probe 侧全部事件路径——
+            // 并排对比（错位解剖）。
+            let mut vtree_paths = Vec::new();
+            if let Some(root) = vtree.root() {
+                let mut stack = vec![(root.id, Vec::<u16>::new())];
+                while let Some((id, path)) = stack.pop() {
+                    if path.len() >= 6 {
+                        vtree_paths.push((path.clone(), id.as_u64()));
+                    }
+                    if let Some(children) = vtree.children(id) {
+                        for (i, c) in children.iter().enumerate() {
+                            let mut cp = path.clone();
+                            cp.push(i as u16);
+                            stack.push((c.id, cp));
+                        }
+                    }
+                }
+            }
+            vtree_paths.sort();
+            for (path, id) in vtree_paths.iter().take(24) {
+                println!("plan081 vtree path={path:?} id={id}");
+            }
+            for (path, ev) in mismatches.iter() {
+                println!("plan081 probe path={path:?} ev={:?}", ev.iter().map(|e| &e.handler).collect::<Vec<_>>());
+            }
+            assert!(
+                mismatches.is_empty(),
+                "probe 事件路径与 vtree 节点错位（computed join 丢键）: {mismatches:?}"
+            );
         }
     }
 }

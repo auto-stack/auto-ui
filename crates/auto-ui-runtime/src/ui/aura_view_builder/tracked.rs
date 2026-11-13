@@ -2510,11 +2510,24 @@ impl<'a> AuraViewBuilder<'a> {
         let style = self.extract_style_with(props, bindings); // Plan 057 (2.5)
 
         // Plan 476: 拼接感知收集(源索引编号) + 视觉空后置过滤(既有行为)。
+        // PLAN-081 T-04c-13: probe 路径补 Scrollable 合成内层 col 的段——
+        // 本转换把 children 包进 `View::Scrollable { child: col_view }`，
+        // vtree 侧该合成 col 占 `[path, 0]` 一层（view_to_vtree 的
+        // extract_children 展开）；probe 侧子树此前直接走在 scroll 自身
+        // 路径上 = 少一段（Plan 309 同族：probe=源结构 / vtree=渲染结构
+        // 错位），computed join 按 probe 路径取 id 时对 scroll 内子树
+        // 全体丢键——W-07 迭代 ¶ 行 onclick 在快照中消失的机制（run3/
+        // bookswitch 单元复现：probe [..,1,i,0] vs vtree [..,0,1,i,0,0]）。
+        // 修复=子树遍历压入合成 col 的段 [0]；视觉空过滤造成的源索引
+        // 压缩差为已文档化残留（仅当 scroll 直接子级存在视觉空节点时
+        // 仍可能错位，reading 页 scroll-pane 单 col 子级不受影响）。
+        path.push(0);
         let child_views: Vec<View<DynamicMessage>> = self
             .expand_children_spliced_source(children, path, id_map, probe, bindings)
             .into_iter()
             .filter(|v| !is_visually_empty(v))
             .collect();
+        path.pop();
 
         let mut builder = View::<DynamicMessage>::col()
             .spacing(spacing)

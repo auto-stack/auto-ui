@@ -154,6 +154,13 @@ fn run_internal_vm_session(entry: &str) -> i32 {
         Ok(_) => 0,
         Err(e) => {
             eprintln!("vm session failed: {e}");
+            // PLAN-081 T-04c-12: 现场存证——三层 stderr 转发链可能吞行
+            // （grandchild stderr=pipe→parent log stream），错误对象直落
+            // env 指定文件（probe 侧注入，随会话 env 传播）。
+            if let Ok(dump) = std::env::var("AUTO_UI_TOOL_VM_ERR_DUMP") {
+                let _ = std::fs::write(&dump, format!("vm session failed: {e:?}
+"));
+            }
             1
         }
     }
