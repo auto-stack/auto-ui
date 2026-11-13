@@ -509,6 +509,23 @@ impl<'a> AuraViewBuilder<'a> {
         self.record_child_callback_routes_for(
             child_state_id, self.widget_name.clone(), child_widget.name.clone(), props, events,
         );
+        if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
+            let loaded_v = self
+                .bridge
+                .read_child_state(child_state_id, "loaded")
+                .ok()
+                .map(|v| format!("{v:?}"))
+                .unwrap_or_else(|| "ABSENT".to_string());
+            let par_v = self
+                .bridge
+                .read_child_state_as_vec(child_state_id, "paragraphs")
+                .map(|v| format!("len={}", v.len()))
+                .unwrap_or_else(|_| "ABSENT".to_string());
+            eprintln!(
+                "[MEMO-DIAG] child-render page={} state_id={child_state_id} identity={instance_identity} loaded={loaded_v} paragraphs={par_v}",
+                child_widget.name
+            );
+        }
         // Plan 437 Phase 2: 同 render_child_widget —— 子组件 Init 补发
         // (tracked 双胎保持同一渲染语义)。
         self.fire_child_init_if_any(
