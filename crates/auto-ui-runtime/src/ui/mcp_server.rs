@@ -539,6 +539,16 @@ impl SharedState {
     /// 写入者，也不能把属性态打回空态）。合法的全量属性清空必然伴随重建帧
     /// ——F1a 后同步块即权威写入者，computed 非空时守卫恒放行。
     pub fn set_styled_vtree(&mut self, mut snap: StyledNodeSnapshot) {
+        if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
+            static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let tap = snap
+                .computed
+                .values()
+                .any(|c| c.events.iter().any(|(_, h)| h.contains("TapParagraph")));
+            let n_comp = snap.computed.len();
+            eprintln!("[MEMO-DIAG] set_styled seq={n} computed={n_comp} tap_present={tap}");
+        }
         if snap.computed.is_empty() {
             if let Some(prev) = &self.styled_vtree {
                 if !prev.computed.is_empty() {
