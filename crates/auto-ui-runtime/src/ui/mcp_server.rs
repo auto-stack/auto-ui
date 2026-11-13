@@ -4216,9 +4216,18 @@ pub(crate) fn find_view_by_path<'a>(
     // 在这些子树下失步（autoui_type 归因错位族）。同构不变量见
     // extract_children_ref 文档注释。
     let mut current = view;
-    for &idx in path {
+    for (depth, &idx) in path.iter().enumerate() {
         let children = crate::ui::vnode_converter::extract_children_ref(current);
-        current = children.get(idx as usize)?;
+        if children.get(idx as usize).is_none() {
+            if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
+                eprintln!(
+                    "[MEMO-DIAG] find_view break at depth={depth} idx={idx} avail={} path={path:?}",
+                    children.len()
+                );
+            }
+            return None;
+        }
+        current = children[idx as usize];
     }
     Some(current)
 }
