@@ -448,6 +448,28 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（四重诊断+cond-loaded 在册，门控）。
 
+### T-04c-19 第四层根因修复落地 + 核心链路 live 打通（2026-11-14）
+
+- **第四层根因（extract_children_ref/extract_children 缺 ScrollAnchorMark
+  透传）修复落地**（vnode_converter.rs 两变体 Column/Row 臂展平标记，
+  与 view_to_vtree 的 PLAN-781 透传三方对齐）。
+- **w07-probe-15 live 实证（决定性）**：
+  - 行按压响应 = **ActionResult（派发成功！）**——此前
+    "View not found"/"No 'press' handler" 全消；
+  - **① real-selection-save = TRUE**（批注经 TapParagraph→＋注释→
+    保存→API 落库全链）；
+  - **③ save-reselect = TRUE**（同段再保存第二条落库）；
+  - **⑤ anns_persist = TRUE**（返回书架后批注持久）；
+  - tap_rows=2 全程稳定。
+- **②④ 未绿**（edit-dialog=false/delete-revisit=false）= w07_probe
+  流程细节（②的 ✎注释/编辑 按压链与面板状态、④的删除按钮定位），
+  非派发层缺陷（①③⑤ 同类按压全通证明派发层已修复）。
+- **累计四层修复**：scroll 路径补段（90719bc0）/bounds 泵合并
+  （4cd6cc61→936ecbc6）/bounds-only 重做（4cd6cc61 系）/
+  **ScrollAnchorMark 透传展平（本轮）**+plan081 四锚+一致性检查器。
+- **下一轮（收口轮）**：②④ 流程细节修（probe 的面板按压链 or
+  harness 真流复验）→ 五叶全绿 → §9 work pass 回执 → T-05。
+
 ### T-04c-18 前置数据（2026-11-14，bookswitch-35）
 
 - **cond-loaded 诊断入册**（两条件臂，门控）+ **bookswitch-35 live 数据**：
