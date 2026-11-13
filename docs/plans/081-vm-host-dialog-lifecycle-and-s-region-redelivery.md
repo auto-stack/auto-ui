@@ -448,6 +448,43 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（四重诊断+cond-loaded 在册，门控）。
 
+### §9 work pass 回执（2026-11-14，W-07 五叶 live 全绿）
+
+- **stage: work | outcome: pass（execution_done）**。
+- **四层修复全部落地并验证**：
+  1. **scroll 路径补段**（90719bc0）：convert_scroll_tracked_ctx 的
+     probe 路径补 Scrollable 合成内层 col 段——plan081 一致性检查器
+     锚绿；
+  2. **bounds 泵合并语义**（4cd6cc61→936ecbc6→bounds-only 重做）：
+     `__bounds_collected` 的 from_live 覆盖改仅并入测量字段——
+     w07-probe-15 起 press 派发 ActionResult；
+  3. **ScrollAnchorMark 透传展平**（8db16c41）：
+     extract_children_ref/extract_children 补透传臂——find_view_by_path
+     穿透锚点标记成功（w07-probe-13+按压不再 View not found）；
+  4. **诊断体系**（ab3cc3bc 系+后续）：prepare/child-render/同步块/
+     set_styled/serve/find_view/cond-loaded/for-len/生命周期九类门控
+     诊断——本回执的全部定谳证据来源。
+- **AC-01/02（scroll 内子树 probe/vtree 对齐 + computed join 修复）**：
+  单元锚（一致性检查器）+ live（tap_rows=2 多轮）✅。
+- **AC-03（W-07 编辑链可用）**：**w07-probe-18 五叶 live 全绿**——
+  real-selection-save/edit-revisit/save-reselect/delete-revisit/
+  return-library-preserves-state 全 true（annotations API 独立读回
+  验证：保存/编辑反映/再选落库/删除生效/返回持久）✅。
+- **AC-04（009 换 pin 消费回归 82 叶）**：review/merge 域（T-05）。
+- **基线对照**：全 lib delta 分析无稳定回归（f5×4 基线既有红、
+  plan622_c2 顺序敏感 flaky、其余机器 flaky 双向翻转）。
+- **叠加面移交（非本计划域）**：①auto.exe main_err 根自退（batch 503
+  死亡簇，exit-audit 四行 main_err 实锤；已知 995 漂移家族，
+  owner=auto-lang 995 后域）；②机器内核级不稳（当日 BlueScreen/
+  LiveKernelEvent ×2+九次环境击杀实录）；③mem_guard 冻结窗
+  （AUTO_MEM_LIMIT_MB 采样阈值）造成的 MCP 瞬断窗。
+- **验证资产**：w07_probe.py/bookswitch_probe.py/dlg_stress.py/
+  dlg_attach.py/edit_chain_probe.py/theme_probe.py/bookswitch_probe.py
+  （plan-artifacts/plan-081/）+ 九类门控诊断（工具内）。
+- **worktree**：`D:/autostack/.wt/ui-081/auto-ui` 分支
+  `codex/plan-081-dev` @ 最新（基线 9dd3fc27，叠加四层修复+诊断）。
+- **next: review（T-05）**——82 叶消费回归+W-07 五叶复核归 review/merge。
+
 ### T-04c-19b ②④ 真因 + probe 流程修复（2026-11-14）
 
 - **② edit-revisit 真因**：①保存链 `show_anns=true`（面板已开）→
