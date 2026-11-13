@@ -9607,14 +9607,35 @@ mod plan080_rowclass_probe_tests {
         bridge
             .write_state_onto(child_state_id, "loaded", auto_val::Value::Bool(true))
             .unwrap();
+        // PLAN-081 rebase 对齐：数组堆 id 不再硬编码（master 基座多一次
+        // 分配使 id 漂移，旧 4000001 成了无关 ListData）——从子字段
+        // VmRef 读回真实后备数组 id（live 语义：子字段持根数组 VmRef）。
         {
             use auto_lang_core::vm::types::ListData;
-            let obj = bridge.vm().get_heap_object(4_000_001).expect("root array");
+            let array_id = {
+                use auto_lang_core::vm::generic_registry::GenericInstanceData;
+                let vid = bridge
+                    .vm()
+                    .get_heap_object(child_state_id)
+                    .and_then(|o| {
+                        let g = o.read().unwrap();
+                        let inst = g.as_any().downcast_ref::<GenericInstanceData>()?;
+                        inst.field_names.iter().position(|n| n == "paragraphs")
+                            .and_then(|i| inst.fields.get(i))
+                            .cloned()
+                    })
+                    .expect("child paragraphs field");
+                match &vid {
+                    auto_val::Value::VmRef(r) => r.id as u64,
+                    other => panic!("paragraphs not VmRef: {other:?}"),
+                }
+            };
+            let obj = bridge.vm().get_heap_object(array_id).expect("backing array");
             let mut g = obj.write().unwrap();
             let list = g
                 .as_any_mut()
                 .downcast_mut::<ListData<Value>>()
-                .expect("root paragraphs is ListData");
+                .expect("backing paragraphs is ListData");
             list.elems.clear();
             list.elems.push(mk(0, "k0", "para zero", 0));
             list.elems.push(mk(1, "k1", "para one", 1));
