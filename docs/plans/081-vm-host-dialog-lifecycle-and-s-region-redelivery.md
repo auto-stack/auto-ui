@@ -448,6 +448,30 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（扩展诊断在册，门控）。
 
+### T-04c-11 死亡审计捕获（同日，exit-audit 定谳）
+
+- **审计落网**：`install_native_crash_audit`（常开）在 LOCALAPPDATA
+  `auto-desktop/exit-audit.log` 录得**四次 `code=1 site=main_err`**
+  （每 run 一行，时间间距=run 间距）——**死亡=auto.exe（根/后端）自身
+  main 返回 Err**（PLAN-765 所述"静默码 1"家族；非 taskkill——外部
+  taskkill 无审计行）。
+- **双形态定谳**：
+  - **22-25**：auto.exe main_err 自退 → 工具子 stdio EOF 跟亡 →
+    MCP+后端全灭（"四连死"真身）；
+  - **26（KEEP_ALIVE）**：auto.exe **存活**（pid 9004 实测，305MB，
+    Responding）→ 工具子单独死亡（无审计行）→ MCP 拒连但后端活
+    （挂起形态）。
+- **两个未解纹**：①main Err 应打 `[X9] main Err: {e:?}` 到 app.log——
+  22-25 的 log **无此行**（stderr 面待查：可能走控制流/日志级别）；
+  ②26 设了 AUTO_DESKTOP_EXIT_LOG 重定向但审计仍走默认路径（env 读点
+  待查）。
+- **下一轮（T-04c-12）**：①复现一次即抓 `exit-audit.log` 全量+app.log
+  末 50 行对齐 pid；②查 auto.exe run_session 的 Err 源（阅读页时段
+  main 返回 Err 的错误对象——[X9] 缺行改用 strace 级 stderr 捕获）；
+  ③修复 Err 源 → W-07 五叶 → review。**注意**：W-07 快照缺 onclick
+  的根因修复（T-04c-10 merge）仍有效在册——死亡审计是叠加的第二
+  缺陷（或同一上游错误的两个面）。
+
 ### T-04c-10 复验续（2026-11-13，新机器窗）
 
 - **修复服务端效果确证**：bookswitch-23 **10 连** serve_tap=true、
