@@ -629,8 +629,18 @@ where
     M: Clone + std::fmt::Debug,
 {
     match view {
-        View::Column { children, .. } => children.clone(),
-        View::Row { children, .. } => children.clone(),
+        View::Column { children, .. } | View::Row { children, .. } => {
+            // PLAN-081 T-04c-19: 同 extract_children_ref 的标记透传展平。
+            let mut out: Vec<View<M>> = Vec::with_capacity(children.len());
+            for c in children {
+                let mut cur = c;
+                while let View::ScrollAnchorMark { child, .. } = cur {
+                    cur = child;
+                }
+                out.push(cur.clone());
+            }
+            out
+        }
         View::Overlay { base, content, .. } => vec![(**base).clone(), (**content).clone()],
         // Grid cells are the VTree children (Plan 319). MUST be explicit —
         // the `_` arm below would silently drop them.
@@ -644,6 +654,9 @@ where
         } => vec![(**c).clone()],
         View::Container { child, .. } => vec![*child.clone()],
         View::Scrollable { child, .. } => vec![*child.clone()],
+        // PLAN-081 T-04c-19: ScrollAnchorMark 透传（与 extract_children_ref/
+        // view_to_vtree 的 PLAN-781 处理三方对齐）。
+        View::ScrollAnchorMark { child, .. } => vec![*child.clone()],
         View::List { items, .. } => items.clone(),
         View::Table { headers, rows, .. } => {
             let mut children = headers.clone();
@@ -685,7 +698,21 @@ where
     M: Clone + std::fmt::Debug,
 {
     match view {
-        View::Column { children, .. } | View::Row { children, .. } => children.iter().collect(),
+        View::Column { children, .. } | View::Row { children, .. } => {
+            // PLAN-081 T-04c-19: ScrollAnchorMark 透传展平——标记不占枚举
+            // 层（与 view_to_vtree 的 PLAN-781 透传对齐）；否则
+            // find_view_by_path 消耗一个路径段穿透标记，子树整体少一层
+            // （W-07 ¶ 行按压 "View not found" 实录）。
+            let mut out: Vec<&View<M>> = Vec::with_capacity(children.len());
+            for c in children {
+                let mut cur = c;
+                while let View::ScrollAnchorMark { child, .. } = cur {
+                    cur = child;
+                }
+                out.push(cur);
+            }
+            out
+        }
         View::Overlay { base, content, .. } => vec![base.as_ref(), content.as_ref()],
         View::Grid { cells, .. } => cells.iter().collect(),
         // G4: keep the borrow variant in lockstep with extract_children —
@@ -694,6 +721,11 @@ where
             content: Some(c), ..
         } => vec![c.as_ref()],
         View::Container { child, .. } | View::Scrollable { child, .. } => vec![child.as_ref()],
+        // PLAN-081 T-04c-19: ScrollAnchorMark 与 view_to_vtree 的透传处理
+        // 对齐（PLAN-781：锚点标记不占 vtree 路径层）——缺此臂时
+        // find_view_by_path 无法穿透锚点标记（reading 页 ¶ 行按压
+        // "View not found" 实录），autoui_action 对锚点子树失联。
+        View::ScrollAnchorMark { child, .. } => vec![child.as_ref()],
         View::List { items, .. } => items.iter().collect(),
         View::Table { headers, rows, .. } => {
             let mut out: Vec<&View<M>> = headers.iter().collect();

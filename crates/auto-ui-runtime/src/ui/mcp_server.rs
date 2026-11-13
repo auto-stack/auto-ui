@@ -4220,8 +4220,10 @@ pub(crate) fn find_view_by_path<'a>(
         let children = crate::ui::vnode_converter::extract_children_ref(current);
         if children.get(idx as usize).is_none() {
             if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
+                let node_dbg = format!("{current:?}");
+                let head: String = node_dbg.chars().take(100).collect();
                 eprintln!(
-                    "[MEMO-DIAG] find_view break at depth={depth} idx={idx} avail={} path={path:?}",
+                    "[MEMO-DIAG] find_view break at depth={depth} idx={idx} avail={} path={path:?} node={head}",
                     children.len()
                 );
             }
@@ -4327,6 +4329,15 @@ pub(crate) fn extract_action_from_view(
         | View::Container { onclick, .. }
             if action_name == "press" =>
         {
+            if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1")
+                && onclick.is_none()
+            {
+                let dbg = format!("{view:?}");
+                let head: String = dbg.chars().take(120).collect();
+                eprintln!(
+                    "[MEMO-DIAG] layout-press target WITHOUT onclick: {head}"
+                );
+            }
             onclick.as_ref().and_then(|m| extract_dyn_msg(m))
         }
         // PLAN-089(musk T-07①): mouse-area on_click——FileTree 行点击面

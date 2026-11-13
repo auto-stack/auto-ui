@@ -2669,6 +2669,15 @@ impl VmBridge {
         let prev = self.instance_seen_prev.borrow().clone();
         let cur = self.instance_seen_cur.borrow().clone();
         let sweep: Vec<String> = prev.difference(&cur).cloned().collect();
+        if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
+            for identity in &sweep {
+                if identity.starts_with("reading_page") || identity.starts_with("bookshelf") {
+                    eprintln!(
+                        "[MEMO-DIAG] instance-frame sweep RELEASE identity={identity}"
+                    );
+                }
+            }
+        }
         for identity in &sweep {
             self.release_child_instance(identity);
         }
