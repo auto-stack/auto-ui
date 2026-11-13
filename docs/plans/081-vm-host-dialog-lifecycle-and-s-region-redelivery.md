@@ -485,6 +485,29 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   `codex/plan-081-dev` @ 最新（基线 9dd3fc27，叠加四层修复+诊断）。
 - **next: review（T-05）**——82 叶消费回归+W-07 五叶复核归 review/merge。
 
+### §9 review 回执（T-05，2026-11-14）
+
+- **stage: review | outcome: pass（附 82 叶全回归显式挂起门槛）**。
+- **复核面**：
+  1. **四层修复 code review** ✅：scroll 路径补段（tracked.rs，一致性
+     检查器锚）/bounds 泵合并（host.rs，bounds-only 语义）/
+     ScrollAnchorMark 透传（vnode_converter 双变体）/九类门控诊断——
+     commit 链 90719bc0..8db16c41+d2470ba6/fb8759fb，逐层有单元锚或
+     live 实证；
+  2. **W-07 五叶 live 证据复核** ✅：w07-probe-18 全绿（annotations
+     API 独立读回）+bookswitch-30/31/34/35 快照侧 tap_rows=2 多轮
+     一致——AC-03 live 闭环成立；
+  3. **快照侧多轮稳定** ✅：bookswitch-30/31/34/35 四轮 tap_rows=2。
+- **挂起门槛（owner=review/merge+009 消费侧）**：82 叶全回归五次尝试
+  均被机器 UI 不稳击杀（随机点：batch main_err 死亡簇/窗口零尺寸/
+  上一页 control/内核事件×2）——**非修复回归**（每次死点不同、
+  审计多行为干净 main_return、f5×4 等基线既有红对照在案）。** stable
+  机器窗复跑通过后 merge/archive 收口**；复跑若现修复回归→回
+  work 修。
+- **叠加面移交**：auto.exe main_err 死亡簇（995 漂移家族）→
+  auto-lang 域；mem_guard 冻结窗 → 独立议题。
+- **worktree**：`codex/plan-081-dev` @ 90719bc0+诊断（干净）。
+
 ### T-04c-19b ②④ 真因 + probe 流程修复（2026-11-14）
 
 - **② edit-revisit 真因**：①保存链 `show_anns=true`（面板已开）→
