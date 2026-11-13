@@ -1,8 +1,16 @@
 // packages/pagination/pagination_control.at — PaginationControl（PLAN-086）
 //
 // 统一受控分页组件：公共 1-based 页码；页数/边界/页容量/单页隐藏由单一
-// 受控算法派生（Init 逐帧重放、幂等），组件不持有第二份 page、不切片
-// 数据、不发业务请求。宿主数据变化后由消费方更新受控值，组件只投影。
+// 受控算法派生，组件不持有第二份 page、不切片数据、不发业务请求。宿主
+// 数据变化后由消费方更新受控值，组件只投影。
+//
+// 派生架构（PLAN-086 T-03，PLAN-536 T3 约束下的实证定案）：
+// - Init 收敛为挂载语义（每实例一次，不随脏重建重放），只做静态配置派生
+//   （容量候选去重；pageSizes 是消费者静态配置）。
+// - 响应式派生全部走 computed（props 每帧重播种，computed 随视图重建
+//   重估，vue 轨同语义）——受控 page/total 变化即时反映到页码/边界/隐藏。
+// - computed 间引用沿 state-miss → computed 回退链（eval.rs PLAN-051 C3）；
+//   handler 体内 computed 引用经 handler_codegen 改写为隐藏 fn 调用。
 //
 // 事件契约（PLAN-086 T-01 冻结，探针实证）：
 // - `."changed"(json字符串)` 是唯一上行通道，载荷 `{"page":N,"pageSize":M}`；
@@ -14,19 +22,37 @@
 //   （P-probe 实证 probe:no-err），可见文本是双端一致的具名可观察面。
 // - hideWhenSingle=true 且 pageCount<=1 时整组（含容量按钮）不入树；
 //   需要空/单页仍改容量的消费者显式传 false。
+// - 页容量切换：pageSizes 去重保序渲染为标准按钮（026 现形一致，MCP press
+//   可驱动）；选新值发一次 {page:1,pageSize:N}，当前值按钮禁用。
+//   当前 pageSize 不在候选时挂载期补入尾部（§5：当前值仍明确显示）；
+//   pageSizes/pageSize 的动态换出非候选值需重挂载（key 变更），已文档化。
 //
 // 页码语义：total 为条目数（非页数），total=0 是正常空结果（pageCount=1）；
 // 受控 page 越界只投影 clamp 值，不自发 changed、不改宿主状态。
 widget PaginationControl (page: int = 1, pageSize: int = 10, total: int = 0, hideWhenSingle: bool = true, compact: bool = false, disabled: bool = false, showPageSize: bool = false, pageSizes: List = [10, 25, 50]) {
     msg { Init, First, Prev, Next, Last, SetSize(int), "changed"(str) }
     model {
-        var page_count int = 1
-        var current int = 1
-        var group_visible bool = false
-        var can_prev bool = false
-        var can_next bool = false
-        var config_error str = ""
         var size_candidates List = []
+        var sizes_error bool = false
+    }
+    computed {
+        // 派生为无相互引用的平铺 computed（computed 体求值走
+        // resolve_expr_to_value，无 computed 兜底——链式引用会静默置 None，
+        // P3 探针实证全组消失；页数表达式在各界内联展开）。
+        // page_count = ceil(total/pageSize)，下限 1。防溢出 + 双端整除一致
+        // 形态：(total - total%pageSize)/pageSize + 余数进位——native int
+        // 除与 JS float 除在该形态下同得整数（P3 vue 11.03 实录定案）。
+        page_count => if .total <= 0 { 1 } else if .pageSize <= 0 { 1 } else if .total % .pageSize > 0 { (.total - .total % .pageSize) / .pageSize + 1 } else { .total / .pageSize }
+        current => if .page < 1 { 1 } else if .pageSize <= 0 { 1 } else if .total <= 0 { 1 } else if .total % .pageSize > 0 && .page > (.total - .total % .pageSize) / .pageSize + 1 { (.total - .total % .pageSize) / .pageSize + 1 } else if .total % .pageSize == 0 && .page > .total / .pageSize { .total / .pageSize } else { .page }
+        // can_prev = current > 1 ⟺ page > 1 且 pageCount > 1；pageCount>1
+        // ⟺ total > pageSize（total>0、pageSize>0 时 ceil≥2 当且仅当此）。
+        can_prev => if .pageSize <= 0 { false } else if .total <= 0 { false } else { .page > 1 && .total > .pageSize }
+        // can_next = current < pageCount ⟺ page < pageCount。
+        can_next => if .pageSize <= 0 { false } else if .total <= 0 { false } else if .total % .pageSize > 0 { .page < (.total - .total % .pageSize) / .pageSize + 1 } else { .page < .total / .pageSize }
+        // group_visible = pageCount > 1 || !hideWhenSingle；统一臂：
+        // total>pageSize ⟺ ceil ≥ 2（total>0、pageSize>0 时）。
+        group_visible => if .pageSize <= 0 { !.hideWhenSingle } else if .total <= 0 { !.hideWhenSingle } else { .total > .pageSize || !.hideWhenSingle }
+        config_error => if .pageSize <= 0 { "pagination: pageSize must be > 0" } else if .total < 0 { "pagination: total must be >= 0" } else if .sizes_error { "pagination: pageSizes entries must be > 0" } else { "" }
     }
     view {
         col (style: "items-center gap-1 min-w-0") {
@@ -58,69 +84,34 @@ widget PaginationControl (page: int = 1, pageSize: int = 10, total: int = 0, hid
     }
     on {
         .Init -> {
-            .config_error = ""
-            if .pageSize <= 0 {
-                .config_error = f"pagination: pageSize must be > 0 (got ${.pageSize})"
-            }
-            if .total < 0 {
-                .config_error = f"pagination: total must be >= 0 (got ${.total})"
-            }
+            // 静态配置派生：容量候选去重保序 + 非正数具名错误标记 +
+            // 当前 pageSize 补尾。pageSizes 为消费者静态配置（挂载期语义）。
+            .sizes_error = false
+            .size_candidates = []
             for size in .pageSizes {
                 if size <= 0 {
-                    .config_error = f"pagination: pageSizes entries must be > 0 (got ${size})"
+                    .sizes_error = true
+                }
+                var dup bool = false
+                for s in .size_candidates {
+                    if s == size {
+                        dup = true
+                    }
+                }
+                if !dup && size > 0 {
+                    .size_candidates.push(size)
                 }
             }
-            if .config_error == "" {
-                // pageCount = ceil(total/pageSize)，防溢出形态（不用 total+pageSize-1）。
-                .page_count = .total / .pageSize
-                if .total % .pageSize > 0 {
-                    .page_count = .page_count + 1
-                }
-                if .page_count < 1 {
-                    .page_count = 1
-                }
-                .current = .page
-                if .current < 1 {
-                    .current = 1
-                }
-                if .current > .page_count {
-                    .current = .page_count
-                }
-                .can_prev = .current > 1
-                .can_next = .current < .page_count
-                .group_visible = .page_count > 1 || !.hideWhenSingle
-                // 容量候选：去重保序；当前 pageSize 不在候选时补入尾部
-                // （§5：当前值仍明确显示）。仅 showPageSize 时需要。
-                .size_candidates = []
-                if .showPageSize {
-                    for size in .pageSizes {
-                        var dup bool = false
-                        for s in .size_candidates {
-                            if s == size {
-                                dup = true
-                            }
-                        }
-                        if !dup {
-                            .size_candidates.push(size)
-                        }
-                    }
-                    var has_current bool = false
-                    for s in .size_candidates {
-                        if s == .pageSize {
-                            has_current = true
-                        }
-                    }
-                    if !has_current {
-                        .size_candidates.push(.pageSize)
+            if .showPageSize && .pageSize > 0 {
+                var has_current bool = false
+                for s in .size_candidates {
+                    if s == .pageSize {
+                        has_current = true
                     }
                 }
-            } else {
-                .page_count = 1
-                .current = 1
-                .can_prev = false
-                .can_next = false
-                .group_visible = false
-                .size_candidates = []
+                if !has_current {
+                    .size_candidates.push(.pageSize)
+                }
             }
         }
         .First -> {

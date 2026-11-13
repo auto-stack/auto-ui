@@ -774,6 +774,38 @@ impl<'a> AuraViewBuilder<'a> {
                     _ => None,
                 }
             }
+            // PLAN-086 T-03（必要最小通用适配）: 整型/浮点四则 − * / % 用于
+            // computed 体的派生算术（受控分页 pageCount=ceil(total/pageSize)、
+            // clamp 投影实录）。此前缺臂使含除/模的计算体整体 None，computed
+            // 回退渲染字面量 "${name}" 占位（P3 探针实录，与 And/Or 臂注释
+            // 同一失效面）。与 Add 臂同构；Mod 仅整型；除零 → None（调用方
+            // 条件先行守卫，如分页 pageSize>0 臂）。
+            Expr::Bina(left, op @ (Op::Sub | Op::Mul | Op::Div | Op::Mod), right) => {
+                let l = self.resolve_expr_to_value(left, bindings)?;
+                let r = self.resolve_expr_to_value(right, bindings)?;
+                match (l, r) {
+                    (Value::Int(a), Value::Int(b)) => match op {
+                        Op::Sub => Some(Value::Int(a - b)),
+                        Op::Mul => Some(Value::Int(a * b)),
+                        Op::Div if b != 0 => Some(Value::Int(a / b)),
+                        Op::Mod if b != 0 => Some(Value::Int(a % b)),
+                        _ => None,
+                    },
+                    (Value::Double(a), Value::Double(b)) => match op {
+                        Op::Sub => Some(Value::Double(a - b)),
+                        Op::Mul => Some(Value::Double(a * b)),
+                        Op::Div if b != 0.0 => Some(Value::Double(a / b)),
+                        _ => None,
+                    },
+                    (Value::Float(a), Value::Float(b)) => match op {
+                        Op::Sub => Some(Value::Float(a - b)),
+                        Op::Mul => Some(Value::Float(a * b)),
+                        Op::Div if b != 0.0 => Some(Value::Float(a / b)),
+                        _ => None,
+                    },
+                    _ => None,
+                }
+            }
             // Plan 053 后续(ash-gui VM): a small set of string/list method calls on
             // state-backed receivers — starts_with / substr / len / trim — enough for
             // the cwd abbreviation computed and siblings. Generic dispatch stays in
