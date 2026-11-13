@@ -448,6 +448,32 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（扩展诊断在册，门控）。
 
+### T-04c-13 第三层根因锁定 + 修复（2026-11-13，90719bc0）
+
+- **单元级错位解剖（一致性检查器入锚）**：outlet 锚加 probe↔vtree 路径
+  对账——**实测错位**：probe 行路径 `[0,1,0,0,1,i,0]`（7 段）vs vtree
+  `[0,1,0,0,0,1,i,0,0]`（9 段）——**vtree 在深度 4 多一个合成 col 段**。
+- **第三层根因（最终）**：`convert_scroll_tracked_ctx` 把 children 包进
+  合成内层 col（`View::Scrollable{child: col_view}`）——vtree 侧合成 col
+  占 `[path,0]` 一层，probe 侧子树按源结构走在 scroll 自身路径上
+  （Plan 309"probe=源结构/vtree=渲染结构"错位家族，scroll 臂漏记）→
+  computed join 对 scroll 内子树**全体丢键**（W-07 ¶ 行、书架卡片等
+  scroll 内容的快照 computed 缺失同机制）。
+- **修复已落**（tracked.rs scroll 臂）：子树遍历压入合成 col 段 `[0]`
+  （push/pop 包裹 expand）；**plan081 三锚+一致性检查器全绿**；
+  全 lib 套件 delta 分析：f5_embedded×4=基线既有红、plan622_c2=顺序
+  敏感 flaky（单跑过）、其余=机器 flaky（双向翻转）——**无稳定回归**。
+- **live 复验仍受阻**：bookswitch-29 修复版下 39 帧 sync、17s 处
+  tap=true（行+记录）落盘后视图静止；**75s 时 probe 收到的快照
+  （1530 行）连行内容都无**——styled_vtree 在 17-75s 间被无行版本
+  覆盖（pump from_live 或其它写者，待下一轮对账）。**注意**：本次
+  死亡形态=主线程停摆后进程消失（KEEP_ALIVE 下进程不在），与
+  exit-audit 的 main_err 自退并存为两待修面。
+- **下一轮（T-04c-14）**：①styled_vtree 覆盖时间线对账（sync 行后
+  谁写、写的是什么）——在 set_styled_vtree 加 seq+tap 门控日志；
+  ②W-07 快照 onclick 在场复验；③exit-audit 的 main_err 自退源
+  （auto.exe main Err）定位修复。
+
 ### T-04c-11 死亡审计捕获（同日，exit-audit 定谳）
 
 - **审计落网**：`install_native_crash_audit`（常开）在 LOCALAPPDATA
