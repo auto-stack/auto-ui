@@ -146,9 +146,21 @@ impl VueGenerator {
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        // PLAN-086 T-05（必要最小通用适配）：布尔表达式 disabled
+                        // 此前静默丢弃——受控分页的 `disabled: !.can_prev || .disabled`
+                        // 在 vue 轨丢禁用视觉/交互态（native 正确、vue 可点实录）。
+                        // 与下方 title / checkbox checked 同款表达式绑定。
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
-                // PLAN-053 批4: `title` → 原生 tooltip 属性透传（shadcn Button
                 // 经 vue attr fallthrough 落到底层 button 元素；与 VM 轨
                 // convert_button 的 title→EE03 iced tooltip 对齐——musk 会话
                 // 侧栏 `title: .s.id` 悬停显示会话 id）。此前 button 臂静默
@@ -869,10 +881,19 @@ impl VueGenerator {
                     let placeholder = self.extract_string_value(value).unwrap_or("");
                     attrs.push(format!("placeholder=\"{}\"", placeholder));
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
                 // style/class
@@ -1056,10 +1077,19 @@ impl VueGenerator {
                     let rows = self.extract_int_value(value).unwrap_or(3);
                     attrs.push(format!(":rows=\"{}\"", rows));
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
                 // style/class
@@ -1088,10 +1118,19 @@ impl VueGenerator {
                         }
                     }
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
             }
@@ -1107,10 +1146,19 @@ impl VueGenerator {
                         attrs.push(":default-checked=\"true\"".to_string());
                     }
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
             }
@@ -1123,10 +1171,19 @@ impl VueGenerator {
                         attrs.push(format!("v-model=\"{}\"", model));
                     }
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
                 // Plan 012: forward `class:`/`style:` to the shadcn Select root
@@ -1145,10 +1202,19 @@ impl VueGenerator {
                 if let Some(value) = props.get("text") {
                     slot_content = self.prop_to_text_content(value).ok();
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
             }
@@ -1706,10 +1772,19 @@ impl VueGenerator {
                     let name = self.extract_string_value(value).unwrap_or("");
                     attrs.push(format!("name=\"{}\"", name));
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
             }
@@ -1726,10 +1801,19 @@ impl VueGenerator {
                     let id = self.extract_string_value(value).unwrap_or("");
                     attrs.push(format!("id=\"{}\"", id));
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
                 // label text
@@ -1826,10 +1910,19 @@ impl VueGenerator {
                     let val = self.extract_string_value(value).unwrap_or("");
                     attrs.push(format!("value=\"{}\"", val));
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
                 // text becomes slot content
@@ -2353,10 +2446,19 @@ impl VueGenerator {
                         attrs.push(format!(":step=\"{}\"", step));
                     }
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
             }
@@ -2544,10 +2646,19 @@ impl VueGenerator {
             }
 
             "context_menu_item" => {
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
                 // inset
@@ -2789,10 +2900,19 @@ impl VueGenerator {
                         attrs.push(format!(":step=\"{}\"", step));
                     }
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
             }
@@ -2931,10 +3051,19 @@ impl VueGenerator {
                         attrs.push(format!(":max-tags=\"{}\"", max));
                     }
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
             }
@@ -2988,10 +3117,19 @@ impl VueGenerator {
                         attrs.push(format!("size=\"{}\"", size));
                     }
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
             }
@@ -3010,10 +3148,19 @@ impl VueGenerator {
                         attrs.push(format!("aria-label=\"{}\"", label));
                     }
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
             }
@@ -3181,10 +3328,19 @@ impl VueGenerator {
                 if let Some(value) = props.get("text") {
                     slot_content = self.prop_to_text_content(value).ok();
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
                 // onclick
@@ -3217,10 +3373,19 @@ impl VueGenerator {
                     let name = self.extract_string_value(value).unwrap_or("");
                     attrs.push(format!("name=\"{}\"", name));
                 }
-                // disabled
+                // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if let AuraPropValue::Expr(e) = value {
+                        match self.expr_to_vue_bound_value(e) {
+                            Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),
+                            Err(err) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("disabled expression (shadcn): {}; binding not emitted", err),
+                            ),
+                        }
                     }
                 }
                 // class
