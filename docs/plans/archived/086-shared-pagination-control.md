@@ -204,11 +204,13 @@ evidence: docs/reviews/plan086/{decisions,evidence}.md；plan-artifacts/plan-086
 2026-11-14：stage: merge；plan_id: PLAN-086；plan_revision: r2；outcome: pass（delivered + archived，cleanup 见下）；delivery_commit: 765251b9005ee9f1a56ce31449aa41da3337eaf1（master ff-only，linear，main tip = delivery commit）；canonical: docs/specs/ui/pagination.md（新增，SD-01/02）+ docs/specs/ui/file-dialog.md（SD-03 增量 12 行） landed + smoke（tools 3+2 pass on main checkout）；archive: docs/plans/archived/086-shared-pagination-control.md（status: archived，链接已按 archived 父目录修正 ../../design/…，已提交）。
 084 交接（T-08 交付义务）：可消费提交 = 765251b9（packages/pagination 三件套 + 文档）；闭包消费方式与合同 = docs/specs/ui/pagination.md + packages/pagination/README.md；084 重基线时以该 Spec/README 为依赖面，依赖具名解除。
 cleanup（分步核对）：
-1. worktree `D:/autostack/.wt/ui-086/auto-ui`：wt-guard clean（清除 pnpm 生成的 gen/node_modules junction 后）→ 待移除；
-2. 分支 codex/ui-086-pagination / codex/ui-086-automan 及组内依赖检出 → 待移除；
-3. plan-artifacts/plan-086/ 证据已折叠入本文件（decisions/evidence 落库 + 本收据）→ 待删除 + registry 刷新；
+1. ✅ worktree `D:/autostack/.wt/ui-086/auto-ui`：wt-guard clean 后移除（含未跟踪测试截图，随树消亡）；
+2. ✅ 分支 codex/ui-086-pagination（deleted @765251b9）与 codex/ui-086-{automan,autolang,autoweb,autodown}（零自有提交）全删；组目录 `.wt/ui-086/` 已空并移除，worktree list 零残留；
+3. ✅ plan-artifacts/plan-086/（406MB）已删除；证据已折叠入本文件（decisions/evidence 落库）+ registry `.retention/policy.json` 已刷新（scopes.plan-086=deleted-at-merge，无具名持有）；
 4. 交付物构建态（landing≠deployment）：debug auto.exe/auto-ui-tool.exe 为计划验证构建（组内 .wt/ui-086/auto-man）；主仓 release 产物与本 Plan 无生产消费者（纯包/示例/测试变更，无守护进程/后端服务面）——如需产品化由后续产品化流程重建。
 completion_kind: delivered；merge-owned pending：Linux native 腿（环境无工具链）+ 统一回归（auto-ui 无 .last-batch-regression 惯例，按本仓各门为 owner 执行）。
+
+2026-11-14：cleaned 核对——worktree list 零 ui-086 残留、组目录已删、分支五删、plan-artifacts scope 删除且 registry 记录 deleted-at-merge（无未解决持有）、archived 文件 status: archived + 本收据已提交（4a5a118d 链）。最终任务计数：T-01…T-06 work ✅、T-07 review ✅（final pass）、T-08 merge ✅（8/8，其中 Linux 腿与统一回归为显式 pending closeout gates，非未完成实施）。交付面：packages/pagination + 两消费者迁移 + examples/pagination + 双轨产品门 + canonical Specs（pagination.md 新建、file-dialog.md 增量）。
 
 
 ## 10. 待澄清事项
