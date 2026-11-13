@@ -127,8 +127,18 @@ and readable B/KB/MB sizes. Checkboxes occupy their own fixed-width column;
 the filename remains their semantic name, and is drawn beside the file icon
 in the separate name column. Parent/refresh are icon-only buttons with named
 hover tooltips. Filename input and type-group buttons share one toolbar row.
-Hidden-file and pagination controls share one status row, with the entire
-pagination group absent when there is only one page (including empty results).
+Hidden-file and pagination controls share one status row. Pagination is the
+shared controlled `PaginationControl` package (PLAN-086; `packages/pagination`,
+public 1-based page, contract in docs/specs/ui/pagination.md): the dialog binds
+`page = displayPage` (host model page + 1), `pageSize = 100`,
+`total = visibleFileCount`, and translates `changed {page}` into the existing
+`fd_command` `page {index: page-1}` operation — the host model stays the sole
+owner of 0-based paging, slicing, filter/selection resets. The entire pagination
+group is absent when there is only one page (including empty results); the
+package carries the same hide-when-single default. The package dependency is
+part of the delivered closure: consumers vendor both packages byte-equal
+(`packages/pagination` alongside `packages/file-dialog`) and declare both roots;
+a missing dependency is a named build failure.
 A disabled accept button is visibly muted.
 The sidebar and list use compact dimensions below the small-screen breakpoint.
 Narrow windows must retain reachable cancel/accept controls.
