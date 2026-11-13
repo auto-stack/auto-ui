@@ -1,0 +1,131 @@
+// PLAN-086 分页演示页 — 四状态可驱动（多页/首面/单页/空结果），
+// 受控回路：changed → 应用更新 page/pageSize → 重切片合成行 → 组件投影同步。
+// "显示第 x - y 项 / 共 n 项" 是消费方内容摘要（视觉指南 §2.3），非分页文本。
+use auto.json
+
+widget demo {
+    msg { Init, SetTotal0, SetTotal1, SetTotal100, SetTotal1003, ToggleHide, ToggleSizeBar, ToggleCompact, ToggleDisabled, Apply(str) }
+    model {
+        var total int = 1003
+        var page int = 1
+        var page_size int = 100
+        var hide_when_single bool = true
+        var show_page_size bool = false
+        var compact bool = false
+        var disabled bool = false
+        var all_items List = []
+        var rows List = []
+        var showing str = ""
+        var last_changed str = ""
+    }
+    use { package: pagination from "../../../../../packages/pagination" }
+    view {
+        col (style: "w-full h-full bg-background text-foreground gap-3 p-4") {
+            text "PaginationControl 四状态演示" { style: "text-sm font-medium" }
+            row (style: "items-center gap-1.5 flex-wrap") {
+                button "总量0" { onclick: .SetTotal0, style: "px-2 py-1 text-xs rounded-md border border-border" }
+                button "总量1" { onclick: .SetTotal1, style: "px-2 py-1 text-xs rounded-md border border-border" }
+                button "总量100" { onclick: .SetTotal100, style: "px-2 py-1 text-xs rounded-md border border-border" }
+                button "总量1003" { onclick: .SetTotal1003, style: "px-2 py-1 text-xs rounded-md border border-border" }
+                checkbox { text: "单页隐藏", checked: .hide_when_single, onclick: .ToggleHide }
+                checkbox { text: "容量切换", checked: .show_page_size, onclick: .ToggleSizeBar }
+                checkbox { text: "紧凑", checked: .compact, onclick: .ToggleCompact }
+                checkbox { text: "禁用", checked: .disabled, onclick: .ToggleDisabled }
+            }
+            row (style: "items-center gap-2") {
+                text .showing { style: "text-xs text-muted-foreground" }
+                text f"最近变更 ${.last_changed}" { style: "text-xs text-muted-foreground" }
+            }
+            col (style: "gap-1 min-h-40") {
+                for r in .rows {
+                    text r { style: "text-xs text-foreground" }
+                }
+            }
+            PaginationControl (page: .page, pageSize: .page_size, total: .total, hideWhenSingle: .hide_when_single, compact: .compact, disabled: .disabled, showPageSize: .show_page_size, pageSizes: [10, 25, 50, 100], onchanged: .Apply($event)) {}
+        }
+    }
+    on {
+        .Init -> {
+            // 合成数据 1003 条（挂载期一次；页切片在 Apply/SetTotal 重算）。
+            var items List = []
+            var i int = 0
+            while i < 1003 {
+                var n int = i + 1
+                items.push(f"item ${n}")
+                i = i + 1
+            }
+            .all_items = items
+            var sl List = []
+            var j int = 0
+            for item in .all_items {
+                if j < 100 { sl.push(item) }
+                j = j + 1
+            }
+            .rows = sl
+            .showing = f"显示第 1 - ${sl.len()} 项 / 共 ${.total} 项"
+            .last_changed = ""
+        }
+        .Apply(ev str) -> {
+            .page = json.parse(ev).page
+            .page_size = json.parse(ev).pageSize
+            .last_changed = ev
+            var start int = (.page - 1) * .page_size
+            var sl List = []
+            var i int = 0
+            for item in .all_items {
+                if i >= start && i < start + .page_size {
+                    sl.push(item)
+                }
+                i = i + 1
+            }
+            .rows = sl
+            .showing = f"显示第 ${start + 1} - ${start + sl.len()} 项 / 共 ${.total} 项"
+        }
+        .SetTotal0 -> {
+            .total = 0
+            .page = 1
+            .rows = []
+            .showing = f"显示第 0 项 / 共 0 项"
+        }
+        .SetTotal1 -> {
+            .total = 1
+            .page = 1
+            var sl List = []
+            var i int = 0
+            for item in .all_items {
+                if i < 1 { sl.push(item) }
+                i = i + 1
+            }
+            .rows = sl
+            .showing = f"显示第 1 - 1 项 / 共 1 项"
+        }
+        .SetTotal100 -> {
+            .total = 100
+            .page = 1
+            var sl List = []
+            var i int = 0
+            for item in .all_items {
+                if i < 100 { sl.push(item) }
+                i = i + 1
+            }
+            .rows = sl
+            .showing = f"显示第 1 - 100 项 / 共 100 项"
+        }
+        .SetTotal1003 -> {
+            .total = 1003
+            .page = 1
+            var sl List = []
+            var i int = 0
+            for item in .all_items {
+                if i < 100 { sl.push(item) }
+                i = i + 1
+            }
+            .rows = sl
+            .showing = f"显示第 1 - 100 项 / 共 1003 项"
+        }
+        .ToggleHide -> { .hide_when_single = !.hide_when_single }
+        .ToggleSizeBar -> { .show_page_size = !.show_page_size }
+        .ToggleCompact -> { .compact = !.compact }
+        .ToggleDisabled -> { .disabled = !.disabled }
+    }
+}

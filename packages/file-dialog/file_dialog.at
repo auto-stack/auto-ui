@@ -3,7 +3,9 @@ use auto.json
 // Ordinary view state is a projection of the App-owned DialogModel. Selection,
 // filtering, validation and session lifetime have one owner in the runtime.
 widget FileDialog (open: bool = false, title: str = "选择文件", initialDirectory: str = "", selectionMode: str = "singleFile", filters: List = [], activeFilterId: str = "", acceptLabel: str = "打开", showHidden: bool = false) {
-    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, Up, Home, Refresh, Root(str), SetName(str), SetFilter(str), ToggleHidden, Clear, PreviousPage, NextPage, "accepted"(str), "cancelled", "error"(str) }
+    // PLAN-086：分页交互统一走官方 PaginationControl 包（兄弟目录，闭包随包交付）。
+    use { package: pagination from "../pagination" }
+    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, Up, Home, Refresh, Root(str), SetName(str), SetFilter(str), ToggleHidden, Clear, "accepted"(str), "cancelled", "error"(str) }
     model {
         var interval int = 50
         var fd_command str = ""
@@ -129,13 +131,9 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                         }
                         row (style: "w-full px-3 py-2 gap-2 items-center justify-between border-t border-border") {
                             checkbox { text: "显示隐藏文件", checked: .hidden, onclick: .ToggleHidden }
-                            if .pageCount > 1 {
-                                row (style: "gap-1 shrink-0 items-center") {
-                                    button (icon: "chevron-left", title: "上一页", onclick: .PreviousPage, disabled: .page == 0, style: "h-7 w-7 text-xs rounded-md border border-border text-muted-foreground") {}
-                                    text f"第 ${.displayPage} / ${.pageCount} 页" { style: "text-xs text-muted-foreground" }
-                                    button (icon: "chevron-right", title: "下一页", onclick: .NextPage, disabled: .page + 1 >= .pageCount, style: "h-7 w-7 text-xs rounded-md border border-border text-foreground") {}
-                                }
-                            }
+                            // PLAN-086：受控分页（公共1-based；host 0-based 适配在 PageRequested）。
+                            // 单页整组隐藏由组件 hideWhenSingle 默认语义承担（同旧 if .pageCount > 1）。
+                            PaginationControl (page: .displayPage, pageSize: 100, total: .visibleFiles, onchanged: .PageRequested($event)) {}
                         }
                     }
                 }
@@ -233,8 +231,7 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
         .SetFilter(id str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "filter", seq: .fd_seq, id: id}) }
         .ToggleHidden -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "hidden", seq: .fd_seq, value: !.hidden}) }
         .Clear -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "clear", seq: .fd_seq}) }
-        .PreviousPage -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "page", seq: .fd_seq, index: .page - 1}) }
-        .NextPage -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "page", seq: .fd_seq, index: .page + 1}) }
+        .PageRequested(ev str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "page", seq: .fd_seq, index: json.parse(ev).page - 1}) }
 
     }
 }

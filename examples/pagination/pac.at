@@ -1,0 +1,15 @@
+name: "pagination-demo"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "Pagination demo"
+title_zh: "分页演示"
+# PLAN-086：分页四状态（多页/首面/单页/空结果）+ 受控回路演示。
+# 产品门 verify_pagination.py 以本示例为夹具（隔离目录运行）。
+window: "fit"
+# PLAN-086：官方分页包 dep 根（vue 轨 Phase-1c 扫描发出 PaginationControl.vue；
+# native 轨由 widget 级 use 的 VM sweep 传递装载）。
+dep pagination {
+    path: "../../packages/pagination"
+}
+

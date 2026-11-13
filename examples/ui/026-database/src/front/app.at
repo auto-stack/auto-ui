@@ -13,19 +13,15 @@ use themes.themes: Auto, Solarized
 // 字面量——待框架修复后回迁（已知债，见 b4-evidence-summary）。
 widget App {
     use { package: official from "./components" }
+    // PLAN-086：分页交互统一走官方 PaginationControl 包（repo 内兄弟路径，1-based 受控）。
+    use { package: pagination from "../../../../../packages/pagination" }
     msg {
         Init,
         SelectTab(str),
         SelectTable(str),
         SelectView(str),
         SelectIndex(str),
-        NextPage,
-        PrevPage,
-        FirstPage,
-        LastPage,
-        SetPageSize10,
-        SetPageSize25,
-        SetPageSize50,
+        PageChanged(str),
         SortCol(str),
         SearchChanged(str),
         TreeFilterChanged(str),
@@ -501,165 +497,36 @@ widget App {
             .schemaDdl = f"CREATE INDEX ${idxName} ON orders (customer_id);"
         }
 
-        .NextPage -> {
-            if .page < .totalPages {
-                .page = .page + 1
-                var start = (.page - 1) * .pageSize
-                var end = start + .pageSize
-                var sl = []
-                var i = 0
-                if .activeTable == "customers" {
-                    for r in .customers {
-                        if i >= start && i < end { sl.push(r) }
-                        i = i + 1
-                    }
-                }
-                if .activeTable == "products" {
-                    for r in .products {
-                        if i >= start && i < end { sl.push(r) }
-                        i = i + 1
-                    }
-                }
-                if .activeTable == "audit_logs" {
-                    for r in .audit_logs {
-                        if i >= start && i < end { sl.push(r) }
-                        i = i + 1
-                    }
-                }
-                .activeRows = sl
-                var start1 = start + 1
-                var end1 = start + sl.len()
-                .showingText = f"Showing ${start1} - ${end1} of ${.totalRows} rows"
-            }
-        }
-
-        .PrevPage -> {
-            if .page > 1 {
-                .page = .page - 1
-                var start = (.page - 1) * .pageSize
-                var end = start + .pageSize
-                var sl = []
-                var i = 0
-                if .activeTable == "customers" {
-                    for r in .customers {
-                        if i >= start && i < end { sl.push(r) }
-                        i = i + 1
-                    }
-                }
-                if .activeTable == "products" {
-                    for r in .products {
-                        if i >= start && i < end { sl.push(r) }
-                        i = i + 1
-                    }
-                }
-                if .activeTable == "audit_logs" {
-                    for r in .audit_logs {
-                        if i >= start && i < end { sl.push(r) }
-                        i = i + 1
-                    }
-                }
-                .activeRows = sl
-                var start1 = start + 1
-                var end1 = start + sl.len()
-                .showingText = f"Showing ${start1} - ${end1} of ${.totalRows} rows"
-            }
-        }
-
-        .FirstPage -> {
-            .page = 1
+        // PLAN-086：统一受控分页入口——changed {page,pageSize} → 应用更新
+        // 受控值并按活动表重切片；显示页与真实行由同一 start/offset 推导。
+        .PageChanged(ev str) -> {
+            .page = json.parse(ev).page
+            .pageSize = json.parse(ev).pageSize
+            var start int = (.page - 1) * .pageSize
             var sl = []
-            var i = 0
             if .activeTable == "customers" {
+                var i = 0
                 for r in .customers {
-                    if i < .pageSize { sl.push(r) }
+                    if i >= start && i < start + .pageSize { sl.push(r) }
                     i = i + 1
                 }
             }
             if .activeTable == "products" {
+                var i2 = 0
                 for r in .products {
-                    if i < .pageSize { sl.push(r) }
-                    i = i + 1
+                    if i2 >= start && i2 < start + .pageSize { sl.push(r) }
+                    i2 = i2 + 1
                 }
             }
             if .activeTable == "audit_logs" {
+                var i3 = 0
                 for r in .audit_logs {
-                    if i < .pageSize { sl.push(r) }
-                    i = i + 1
+                    if i3 >= start && i3 < start + .pageSize { sl.push(r) }
+                    i3 = i3 + 1
                 }
             }
             .activeRows = sl
-            .showingText = f"Showing 1 - ${sl.len()} of ${.totalRows} rows"
-        }
-
-        .LastPage -> {
-            .page = .totalPages
-            var start = (.page - 1) * .pageSize
-            var sl = []
-            var i = 0
-            if .activeTable == "customers" {
-                for r in .customers {
-                    if i >= start { sl.push(r) }
-                    i = i + 1
-                }
-            }
-            if .activeTable == "products" {
-                for r in .products {
-                    if i >= start { sl.push(r) }
-                    i = i + 1
-                }
-            }
-            if .activeTable == "audit_logs" {
-                for r in .audit_logs {
-                    if i >= start { sl.push(r) }
-                    i = i + 1
-                }
-            }
-            .activeRows = sl
-            var start1 = start + 1
-            var end1 = start + sl.len()
-            .showingText = f"Showing ${start1} - ${end1} of ${.totalRows} rows"
-        }
-
-        .SetPageSize10 -> {
-            .pageSize = 10
-            .page = 1
-            .totalPages = 2
-            var sl = []
-            var i = 0
-            for r in .customers {
-                if i < 10 { sl.push(r) }
-                i = i + 1
-            }
-            .activeRows = sl
-            .showingText = f"Showing 1 - ${sl.len()} of ${.totalRows} rows"
-        }
-
-        .SetPageSize25 -> {
-            .pageSize = 25
-            .page = 1
-            .totalPages = 1
-            var sl = []
-            if .activeTable == "customers" {
-                for r in .customers { sl.push(r) }
-            } else {
-                for r in .products { sl.push(r) }
-            }
-            .activeRows = sl
-            .showingText = f"Showing 1 - ${sl.len()} of ${.totalRows} rows"
-        }
-
-        .SetPageSize50 -> {
-            .pageSize = 50
-            .page = 1
-            .totalPages = 1
-            var sl = []
-            if .activeTable == "customers" {
-                for r in .customers { sl.push(r) }
-            } else {
-                for r in .products { sl.push(r) }
-            }
-            .activeRows = sl
-            .showingText = f"Showing 1 - ${sl.len()} of ${.totalRows} rows"
+            .showingText = f"Showing ${start + 1} - ${start + sl.len()} of ${.filteredCount} rows"
         }
 
         .SortCol(col) -> {
@@ -983,19 +850,10 @@ widget App {
                                     }
                                 }
 
-                                // 分页（紧凑单行；pagination 组件族待 API 对齐后替换）
+                                // PLAN-086：受控分页统一组件（1-based；行切片/搜索/排序仍归应用）。
                                 row (style: "items-center gap-1.5 shrink-0 text-xs") {
                                     text .showingText { style: "text-[11px] text-muted-foreground whitespace-nowrap" }
-                                    button "‹‹" { onclick: .FirstPage, style: "h-7 w-7 p-0 rounded border bg-card hover:bg-accent text-foreground" }
-                                    button "‹" { onclick: .PrevPage, style: "h-7 w-7 p-0 rounded border bg-card hover:bg-accent text-foreground" }
-                                    text f"${.page} / ${.totalPages}" { style: "px-1 font-medium tabular-nums" }
-                                    button "›" { onclick: .NextPage, style: "h-7 w-7 p-0 rounded border bg-card hover:bg-accent text-foreground" }
-                                    button "››" { onclick: .LastPage, style: "h-7 w-7 p-0 rounded border bg-card hover:bg-accent text-foreground" }
-                                    row (style: "items-center gap-0.5 ml-1 text-[11px] text-muted-foreground") {
-                                        button "10" { onclick: .SetPageSize10, style: if .pageSize == 10 { "h-6 px-1.5 rounded bg-primary text-primary-foreground" } else { "h-6 px-1.5 rounded border" } }
-                                        button "25" { onclick: .SetPageSize25, style: if .pageSize == 25 { "h-6 px-1.5 rounded bg-primary text-primary-foreground" } else { "h-6 px-1.5 rounded border" } }
-                                        button "50" { onclick: .SetPageSize50, style: if .pageSize == 50 { "h-6 px-1.5 rounded bg-primary text-primary-foreground" } else { "h-6 px-1.5 rounded border" } }
-                                    }
+                                    PaginationControl (page: .page, pageSize: .pageSize, total: .filteredCount, hideWhenSingle: false, showPageSize: true, pageSizes: [10, 25, 50], onchanged: .PageChanged($event)) {}
                                 }
                             }
 

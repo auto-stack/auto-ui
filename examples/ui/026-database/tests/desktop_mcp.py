@@ -35,13 +35,21 @@ MCP_PORT_DEFAULT = 9326
 
 
 def pick_free_port(start=MCP_PORT_DEFAULT):
-    """First free port in [start, start+100) — stale-zombie immunity."""
+    """First bindable port in [start, start+100) — stale-zombie immunity +
+    Windows reserved-range immunity (PLAN-086: connect_ex misses Hyper-V/WSL
+    excluded ranges where bind fails with os error 10013; test an actual
+    bind and widen the scan when the whole window is excluded)."""
     import socket
-    for port in range(start, start + 100):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) != 0:
+    for base in (start, 47000, 24000, 12000):
+        for port in range(base, base + 100):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    s.bind(("127.0.0.1", port))
+                except OSError:
+                    continue
+            if socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex(("127.0.0.1", port)) != 0:
                 return port
-    raise RuntimeError(f"No free port in [{start}, {start + 100})")
+    raise RuntimeError(f"No bindable port in scanned windows")
 
 
 _AUTO_BIN = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..",
@@ -209,16 +217,26 @@ def run_suite(mcp):
         mcp.press(data_tab)
         time.sleep(0.3)
 
-    snap = mcp.snapshot()
-    # 现 UI 分页=unicode 细字形 ‹‹/‹/›/››（F-8 定位漂移修定）
-    next_btn = find_id(snap, r'button #(vnode_\d+) "›"')
+    # PLAN-086：分页统一为 PaginationControl（图标按钮带 tooltip 语义名）。
+    # 首帧树重建竞态：翻页按钮发现重试（同 toggle() 的 stale 重发现纪律）。
+    next_btn = None
+    for _ in range(6):
+        snap = mcp.snapshot()
+        next_btn = find_id(snap, r'button #(vnode_\d+) ".*?下一页.*?"')
+        if next_btn:
+            break
+        time.sleep(0.5)
+    result.check("T6 分页控件存在", next_btn is not None, "PaginationControl 下一页按钮")
     if next_btn:
         mcp.press(next_btn)
         time.sleep(0.3)
         st = mcp.state("page")
         result.check("T6 分页后翻至第 2 页", st.get("page") == "2", str(st))
+        snap = mcp.snapshot()
+        pager_txt = re.search(r'第 2 / (\d+) 页', snap)
+        result.check("T6 组件显示页=状态页", pager_txt is not None, f"component must show 第 2 / N 页; snapshot head: {snap[:200]}")
 
-    prev_btn = find_id(snap, r'button #(vnode_\d+) "‹"')
+    prev_btn = find_id(snap, r'button #(vnode_\d+) ".*?上一页.*?"')
     if prev_btn:
         mcp.press(prev_btn)
         time.sleep(0.3)

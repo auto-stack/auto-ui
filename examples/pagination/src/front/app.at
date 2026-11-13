@@ -1,0 +1,13 @@
+// PLAN-086 官方分页示例 — routes + outlet（file-dialog 例同形）。
+// 明暗切换走 runtime 惯例 dark_mode 字段（file-dialog 例同款）。
+widget App {
+    msg { ToggleTheme }
+    model { var dark_mode bool = false }
+    routes { "/" -> use demo }
+    view {
+        col (style: "w-full h-full bg-background text-foreground") {
+            outlet
+        }
+    }
+    on { .ToggleTheme -> { .dark_mode = !.dark_mode } }
+}

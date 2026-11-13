@@ -21,3 +21,9 @@ desktop: "true"
 dep themes {
     path: "../../../packages/themes"
 }
+
+# PLAN-086：官方分页包 dep 根（vue 轨 SFC 发出扫描；native 轨走 widget 级
+# use 的 VM sweep 传递装载）。
+dep pagination {
+    path: "../../../packages/pagination"
+}

@@ -39,6 +39,18 @@ fn project_request_loads_the_vendored_official_package_and_generates_its_compone
         std::fs::copy(package.join(name), components.join(name)).unwrap();
         assert_eq!(std::fs::read(package.join(name)).unwrap(), std::fs::read(components.join(name)).unwrap());
     }
+    // PLAN-086: the official package now imports the sibling pagination
+    // package (widget-level `use { package: pagination from "../pagination" }`
+    // resolved relative to the declaring file). The components layout must
+    // carry the full dependency closure: sibling dir for import resolution,
+    // plus a direct copy for the Phase-1b SFC emission scan.
+    let official_pagination = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/pagination");
+    let pagination_dir = front.join("pagination");
+    std::fs::create_dir_all(&pagination_dir).unwrap();
+    for name in ["package.at", "pac.at", "pagination_control.at"] {
+        std::fs::copy(official_pagination.join(name), pagination_dir.join(name)).unwrap();
+    }
+    std::fs::copy(official_pagination.join("pagination_control.at"), components.join("pagination_control.at")).unwrap();
     std::fs::write(root.join("pac.at"), "name: \"file-dialog-package-control\"\nscene: \"ui\"\nrender: \"vue\"\n").unwrap();
     std::fs::write(front.join("app.at"), format!(r#"
 widget App {{
@@ -60,6 +72,11 @@ widget App {{
     assert!(app.contains("FileDialog") && app.contains("@accepted") && app.contains("@cancelled"), "{app}");
     let component = std::fs::read_to_string(project.output_dir.join("src/components/FileDialog.vue")).expect("imported package must generate a usable component artifact");
     assert!(component.contains("defineProps") && component.contains("initialDirectory") && component.contains("显示隐藏文件"));
+    // PLAN-086: dependency closure emits the shared pagination component and
+    // the consumer references it from the dialog bottom bar.
+    let pager = std::fs::read_to_string(project.output_dir.join("src/components/PaginationControl.vue")).expect("pagination closure must emit its component");
+    assert!(pager.contains("changed") && pager.contains("pageSize"));
+    assert!(component.contains("PaginationControl"), "FileDialog must instantiate PaginationControl");
 }
 
 #[test]
@@ -74,7 +91,15 @@ fn declared_dependency_generates_the_same_official_component_without_unrelated_w
     for name in ["package.at", "pac.at", "file_dialog.at"] {
         std::fs::copy(official.join(name), vendor.join(name)).unwrap();
     }
-    std::fs::write(root.join("pac.at"), "name: \"file-dialog-dependency-control\"\nscene: \"ui\"\nrender: \"vue\"\ndep file_dialog { path: \"vendor/file-dialog\" }\n").unwrap();
+    // PLAN-086: vendored file-dialog imports ../pagination — vendor both
+    // packages (byte-equal closure) and declare both dep roots for the scan.
+    let vendor_pagination = root.join("vendor/pagination");
+    std::fs::create_dir_all(&vendor_pagination).unwrap();
+    let official_pagination = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/pagination");
+    for name in ["package.at", "pac.at", "pagination_control.at"] {
+        std::fs::copy(official_pagination.join(name), vendor_pagination.join(name)).unwrap();
+    }
+    std::fs::write(root.join("pac.at"), "name: \"file-dialog-dependency-control\"\nscene: \"ui\"\nrender: \"vue\"\ndep file_dialog { path: \"vendor/file-dialog\" }\ndep pagination { path: \"vendor/pagination\" }\n").unwrap();
     std::fs::write(front.join("app.at"), r#"
 widget App {
     use { package: file_dialog from "../../vendor/file-dialog" }
@@ -87,6 +112,9 @@ widget App {
     project.generate().unwrap();
     let component = std::fs::read_to_string(project.output_dir.join("src/components/FileDialog.vue")).unwrap();
     assert!(component.contains("initialDirectory") && component.contains("显示隐藏文件"));
+    let pager = std::fs::read_to_string(project.output_dir.join("src/components/PaginationControl.vue")).expect("vendored pagination closure must emit its component");
+    assert!(pager.contains("changed") && pager.contains("pageSize"));
+    assert_eq!(std::fs::read(official_pagination.join("pagination_control.at")).unwrap(), std::fs::read(vendor_pagination.join("pagination_control.at")).unwrap());
     for dependency in ["dialog", "checkbox"] {
         assert!(project.output_dir.join("src/components/ui").join(dependency).join("index.ts").exists(), "missing scaffold {dependency}");
     }
