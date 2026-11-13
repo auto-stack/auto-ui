@@ -2233,48 +2233,44 @@ fn run_session(
                         let cache_borrow = state.app.live_cache.borrow();
                         let vtree_src = vtree_borrow.as_ref().or(live_borrow.as_ref());
                         if let (Some(vtree), Some(cache)) = (vtree_src, cache_borrow.as_ref()) {
-                            let mut snap = crate::ui::mcp_server::StyledNodeSnapshot::from_live(
+                            // PLAN-081 T-04c-16: bounds 泵改**仅并入测量字段**——
+                            // 此前 from_live 整体替换 styled_vtree（computed 由
+                            // InspectorCache 重建），而 InspectorCache 对普通
+                            // Column 容器不记 events/raw_class/for_context →
+                            // 覆盖帧里 for 迭代行 onclick 消失（W-07 五叶
+                            // press_onclick 找不到行的机制；probe/vtree 路径
+                            // 错位单元复现 90719bc0）。修复=既有 styled 快照
+                            // （同步块 probe 系，vtree 与 shared.view 同帧）
+                            // 保持不动，仅把 from_live 的 measured
+                            // bounds/box_model/computed_style 并入对应
+                            // VNodeId；from_live 独有的节点（结构变化后的
+                            // 新节点）按缺省并入。共享 view 不动——
+                            // autoui_action 的 find_view_by_path 与快照
+                            // 恒同帧。
+                            let fresh = crate::ui::mcp_server::StyledNodeSnapshot::from_live(
                                 state.component.widget_name(),
                                 vtree,
                                 cache,
                             );
-                            // PLAN-081 T-04c-10: 合并语义——from_live 的
-                            // InspectorCache 面对普通 Column 容器不记
-                            // events/raw_class/for_context（button/input 族
-                            // 才记），整体覆盖会把同步块 probe 系 computed
-                            // 抹掉（W-07 迭代行 onclick 在覆盖帧消失实录，
-                            // harness press_onclick 因此找不到节点）。此处以
-                            // 既有 styled 快照（同步块 probe 系）补齐缺失
-                            // 元数据；measured bounds/box_model/computed_
-                            // style 仍以 from_live 新鲜值为准。vtree 同源
-                            // （mcp_sync_vtree），VNodeId 对齐，缺项跳过。
-                            if let Some(prev) = handle.clone_styled_vtree().as_ref() {
-                                if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
-                                    let prev_tap = prev.computed.values().any(|c| c.events.iter().any(|(_, h)| h.contains("TapParagraph")));
-                                    let snap_tap = snap.computed.values().any(|c| c.events.iter().any(|(_, h)| h.contains("TapParagraph")));
-                                    let n_prev = prev.computed.len();
-                                    let n_snap = snap.computed.len();
-                                    eprintln!(
-                                        "[MEMO-DIAG] bounds-merge prev_entries={n_prev} snap_entries={n_snap} prev_tap={prev_tap} snap_tap={snap_tap}"
-                                    );
+                            match handle.clone_styled_vtree().as_ref() {
+                                Some(prev) => {
+                                    let mut merged = (**prev).clone();
+                                    for (vid, fc) in fresh.computed.iter() {
+                                        let node = merged.computed.entry(*vid).or_default();
+                                        if fc.bounds.is_some() {
+                                            node.bounds = fc.bounds;
+                                        }
+                                        if fc.box_model.is_some() {
+                                            node.box_model = fc.box_model.clone();
+                                        }
+                                        if !fc.computed_style.is_empty() {
+                                            node.computed_style = fc.computed_style.clone();
+                                        }
+                                    }
+                                    handle.set_styled_vtree(merged);
                                 }
-                                for (vid, prev_c) in prev.computed.iter() {
-                                    let node = snap.computed.entry(*vid).or_default();
-                                    if node.events.is_empty() {
-                                        node.events = prev_c.events.clone();
-                                    }
-                                    if node.raw_class.is_none() {
-                                        node.raw_class = prev_c.raw_class.clone();
-                                    }
-                                    if node.for_context.is_none() {
-                                        node.for_context = prev_c.for_context.clone();
-                                    }
-                                    if node.source.is_none() {
-                                        node.source = prev_c.source.clone();
-                                    }
-                                }
+                                None => handle.set_styled_vtree(fresh),
                             }
-                            handle.set_styled_vtree(snap);
                         }
                     }
                 }
