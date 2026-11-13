@@ -49,3 +49,58 @@
   ag-examples DEBT-001（其 session-bundle 其余证据已齐）。若 AG026 改派发
   时机为 release-inside（方案 a）则与 canonical 冲突，需升格重验——不在
   本提示范围。
+
+## DEBT-003 daemon 生产就绪检查升级：health body interface 断言（PLAN-067 P-03）
+
+- **状态**：未立项（跨仓前置登记，来源：auto-os PLAN-067 T-02 P-03，2026-11-13）。
+- **动机**：`osconfig_daemon.rs:137 tcp_ping` 读首 128 字节、响应行 `HTTP/1.x 2xx`
+  前缀即算就绪，不解析 body——200 但 interface 错误的占用者会被
+  `ensure_generic_io:349` 零打扰复用为就绪。FeaturePack 契约（featurepack-v0
+  §2.2）要求 200 + body interface==`notes.fpack/1`；错版服务在位时 Reader/Notes
+  的 fp 调用全数失败且桌面徽标仍显 ready。反例已具名实测（PLAN-067 V1e）。
+- **提议形状**：`GenericDaemon` 增可选 `health_interface: Option<String>`
+  （manifest daemon 同名可选字段）；tcp_ping 读满 body（分块至 Content-Length
+  或连接关闭，超时上限）后 2xx ∧ interface 匹配才算 Running。无该字段的
+  daemon（autoos/musk/jade-garden）行为零变化（D4 零回归门同律）。
+- **边界**：改动面=本仓 runtime（osconfig_daemon.rs）+ compiler
+  （app_registry.rs ManifestDaemon）；测试脚本自有 health_ready
+  （auto-os verify_featurepack_host.py）不能替代生产检查。
+- **关闭条件**：①200+错 interface 占用者→拒复用、占用者存活、Offline 具名；
+  ②正确版本冷启与在位复用通过（含 spawn 后轮询期内 interface 不匹配不得
+  提前就绪）；③无声明字段 daemon 全族零行为差。消费：auto-os apps.manifest
+  notes daemon 加 `health_interface: "notes.fpack/1"`（交付后同批提交）。
+
+## DEBT-004 daemon env 传递面：每宿主凭据注入与客户端地址键消费（PLAN-067 P-05）
+
+- **状态**：未立项（跨仓前置登记，来源：auto-os PLAN-067 T-02 P-05，2026-11-13）。
+- **动机**：`ensure_generic_io:358` spawn env 仅 `[env_port_key]`；无每宿主
+  凭据/授权书注入。Notes 侧已交付受管 policy（服务私有
+  `<data>/fp-policy.json`，cred=256-bit hex；OS 供给入口
+  scripts/fp_provision_policy.{sh,ps1}），但宿主侧（Reader 后端）拿不到自身
+  cred（NOTES_FP_CRED）——生产 launch 后 fp 调用全拒绝。
+- **提议形状**：`GenericDaemon` 增可选 env 传递（如 `env: {KEY: VALUE}` 或
+  `env_file`），spawn env 与 launch 后 App 会话 env 双面注入（会话写点同
+  env_key 先例 `session.rs:4483` 单键短值）。地址键不改派生规则：客户端消费
+  键冻结为 `daemon_env_key(manifest id)`=`015_NOTES_DAEMON`（Reader 后端
+  fp_base() 增读该键，属 READER-013 T-02 消费面）。
+- **边界**：凭据生成/撤销/书籍范围授予 owner=auto-os（已交付 v0 脚本面）；
+  本仓只负责精确传递。
+- **关闭条件**：生产 launch 后 Reader 后端首请求携合法 cred→capture ok；
+  错书（scope 外）/撤销后拒绝；合法 receipt 跨重启可查。测试用非默认
+  端口/目录排除硬编码回退掩盖。
+
+## DEBT-005 daemon 跨进程单实例门（PLAN-067 P-06）
+
+- **状态**：未立项（跨仓前置登记，来源：auto-os PLAN-067 T-02 P-06，2026-11-13）。
+- **动机**：ensure 为 ping→spawn 无跨进程互斥；两独立宿主并发冷启在 ping
+  间隙可双 spawn。服务端 bind-fail 自然收敛已实测兜底（败者 exit 1、恰一
+  LISTENING，PLAN-067 V1d），但那是服务层兜底而非宿主门，且 detached
+  spawn 失败对用户不可见。
+- **提议形状**：spawn 前按 daemon id+数据根取进程间互斥（named mutex 或
+  等价），或在二次健康确认仍冲突时具名 Offline；`DID_SPAWN` 进程内标志
+  不升级为门。
+- **边界**：错误端口占用不杀占用者（既有语义保持）；关闭主窗口后另一宿主
+  可继续调用（detached 共享服务语义保持）。
+- **关闭条件**：两独立真实宿主（双桌面会话）同时冷启同一 manifest daemon→
+  全程恰一 LISTENING、归属同一 spawn；两宿主 App 会话均能完成业务调用。
+  验收编排归 auto-os PLAN-067 T-04（C-01）。
