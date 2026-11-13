@@ -446,7 +446,78 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   for_context，仅并入 measured bounds）；或 from_live 缺事件时保留
   原 computed。改后红→绿序：单测（from_live 合并锚）→ bookswitch
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
-- **worktree**：@ 最新干净（扩展诊断在册，门控）。
+- **worktree**：@ 最新干净（四重诊断+cond-loaded 在册，门控）。
+
+### T-04c-18 前置数据（2026-11-14，bookswitch-35）
+
+- **cond-loaded 诊断入册**（两条件臂，门控）+ **bookswitch-35 live 数据**：
+  阅读页 `if .loaded` 求值**真/假交替**（每腿 3 真窗夹假窗，与
+  tap/serve 翻转完全同步）——**翻帧在条件求值层直接观测**，构建树
+  逐帧重建时 `loaded` 读值交替（挂起/恢复窗内例程重放 vs 求值）。
+- **bookswitch-35 probe（tap_rows 版）三腿 tap_rows=2 全绿**——
+  **修复后快照侧多轮稳定**。
+- **五叶版 w07_probe 复跑被机器击杀**（boot 期 MCP 断窗，第 7 次
+  环境击杀）。
+- **T-04c-18 实施输入已备**：①cond-loaded 数据（条件读值翻转帧
+  序列）；②child-render 数据（state 恒定+loaded/paragraphs 恒缺的
+  形态对照）；③五点写侧/服务侧时间线。**修复实施 = 下一轮
+  首个动作**（稳定窗内：改条件读值源或实例重播种守卫），随后
+  w07_probe 五叶全绿 → 真 harness → T-05。
+
+### T-04c-17 第一性缺陷实证（2026-11-13 深夜，child-render 诊断）
+
+- **child-render 诊断入册**（child_widgets.rs，AUTO_MEMO_DIAG 门控）：
+  子件渲染入口打印 state_id/identity/loaded/paragraphs。
+- **bookswitch-32 实测（决定性）**：`child-render page=reading_page
+  state_id=4000031 identity=reading_page@/book/1/chapter/1
+  loaded=Bool(false) paragraphs=len=0` **连续数十帧不变**——
+  - **identity 恒定**（state_id 不变）——"identity 交替"假设**证伪**；
+  - **loaded 恒 false + paragraphs 恒空**——**阅读页路由参数
+    `book_id="1"`**（卡行点击发生于书架目录装载中途，A_cards_n=3=
+    部分渲染；Init 以参数取书失败→loaded 永 false）；
+  - **mount-once 语义下永不恢复**（Init 已跑不再重派）→ ¶ 行永缺 =
+    **原始 W-07 症状的第一性缺陷真身**——即 009 round26 具名的
+    "route_id 丢失→详情不可达"家族（round27 授权 ②A、round47 裁定
+    "T-00 有界定谳前不实施"的遗留项）。
+- **根因链全闭环**：harness 卡行点击（目录装载中途）→ 路由参数坏 →
+  Init 取书失败 → loaded=false 恒 → for 零迭代 → **probe 无行记录** →
+  computed join 无行键 → 快照无 onclick（tap=false 帧）；目录装载
+  完成后新点击 = 参数正确 = Init 成功 = tap=true 帧（bookswitch-30
+  三腿 tap_rows=2 实证）——**翻帧=不同质量点击的帧间混合**，非帧间
+  状态抖动。快照侧两修复（scroll 路径/bounds 泵）解决的是 join 层；
+  参数层修复 = T-04c-18。
+- **T-04c-18（下一轮）**：①reading 页 Init 的参数卫（param 空/非法
+  时重读或按 loaded=false 重派——runtime 层 route param 变更
+  → Init 重派语义，PLAN-712 已有代际机制）；②w07_probe 全五叶
+  复验（期望全绿）；③真 harness 复跑。
+- **worktree**：@ 最新干净（四重诊断在册：prepare/child-render/
+  同步块/serve+set，全门控）。
+
+### T-04c-16 第一性缺陷定谳：子实例 identity/状态 帧间失稳（2026-11-13 深夜）
+
+- **bounds-only 泵修复落地**（host.rs `__bounds_collected` 改仅并入
+  measured bounds/box_model/computed_style——既有 styled 快照的
+  vtree/events 探针字段不再被覆盖；Arc clone 语义修正）。plan081 三锚
+  全绿；工具部署。
+- **w07-probe-6 实测**：wait_snap 成功帧快照含 `onclick: .TapParagraph`
+  ×2（修复生效）；行按压仍 `View not found at path [1,0,2,0,0,1,1,0,0]`
+  ——walk-break diag：shared.view 的 depth-8 节点 **avail=0（无子）**
+  = **零迭代结构**；而服务快照 = 迭代结构（行内容+onclick 在场）。
+- **第一性缺陷定谳**：**子页实例的 loaded/paragraphs 在帧间被重置**
+  （零迭代构建 vs 迭代构建交替；每腿 Init 仅 1 次、无重挂载、无
+  handler 清写）→ 服务快照与 shared.view 分属两种结构的帧 →
+  (a) harness press_onclick 命中行帧后，MCP 派发按 shared.view（可能
+  已切到空帧）解析 → View not found → 五叶断链；(b) 快照 computed
+  翻转。候选机制=**outlet 页实例 identity 交替**（unkeyed site_seq
+  per-frame occurrence 计数在 App 结构抖动下翻双值→两状态对象交替）
+  或 `slot_resolution_override`/`override_state_obj_id` 的解析链在
+  scroll-pane 内层差异。
+- **修复方向（T-04c-17，独立专注轮）**：identity 稳定性——
+  `next_instance_site_seq`/`child_init_identity` 对 outlet 页的
+  帧间稳定性核对（route 装饰恒定、site_seq 归一）；或 outlet 子页
+  走 keyed 身份（`key:` 装饰）消除 occurrence 依赖。验证=四锚+
+  w07_probe（tap_rows 恒 2、press 派发、五叶全绿）。
+- **worktree**：@ 最新干净。
 
 ### T-04c-15 收口尝试与阻塞定谳（2026-11-13 深夜）
 
