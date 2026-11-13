@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-081
-status: executing
+status: review
 feature_name: S 区编辑链修复——路由/实例解析/派发域（READER-009 W-07 消费解除；r2 收窄）
 author: [relay/009-session]
 created_at: 2026-11-12T00:00:00Z
