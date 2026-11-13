@@ -4,7 +4,7 @@
 use auto.json
 
 widget demo {
-    msg { Init, SetTotal0, SetTotal1, SetTotal100, SetTotal1003, ToggleHide, ToggleSizeBar, ToggleCompact, ToggleDisabled, Apply(str) }
+    msg { Init, SetTotal0, SetTotal1, SetTotal100, SetTotal1003, ToggleHide, ToggleSizeBar, ToggleCompact, ToggleDisabled, Quit, Apply(str) }
     model {
         var total int = 1003
         var page int = 1
@@ -31,6 +31,7 @@ widget demo {
                 checkbox { text: "容量切换", checked: .show_page_size, onclick: .ToggleSizeBar }
                 checkbox { text: "紧凑", checked: .compact, onclick: .ToggleCompact }
                 checkbox { text: "禁用", checked: .disabled, onclick: .ToggleDisabled }
+                button "退出夹具" { onclick: .Quit, style: "px-2 py-1 text-xs rounded-md border border-border" }
             }
             row (style: "items-center gap-2") {
                 text .showing { style: "text-xs text-muted-foreground" }
@@ -123,6 +124,7 @@ widget demo {
             .rows = sl
             .showing = f"显示第 1 - 100 项 / 共 1003 项"
         }
+        .Quit -> { Process.exit(0) }
         .ToggleHide -> { .hide_when_single = !.hide_when_single }
         .ToggleSizeBar -> { .show_page_size = !.show_page_size }
         .ToggleCompact -> { .compact = !.compact }
