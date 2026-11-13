@@ -448,6 +448,32 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（扩展诊断在册，门控）。
 
+### T-04c-15 收口尝试与阻塞定谳（2026-11-13 深夜）
+
+- **修复回归清证**：全 lib 套件 delta（基线 vs 修复，全名对齐）——
+  f5_embedded×4=**基线既有红**（无修复也挂）；plan622_c2=顺序敏感
+  flaky（套件挂/单跑过）；其余差异=机器 flaky（双向翻转：修复"修好"
+  4 个又"弄坏"11 个）——**scroll 修复无稳定回归**。
+- **live 三阻塞叠加**（三次 harness 尝试 w07-run1/2/3）：
+  ①run1：batch 503 后 auto.exe main_err 后端死亡（exit-audit 实锤）；
+  ②run2：窗口零尺寸（minimized/not laid out——内核事件后窗口站异常）；
+  ③run3：同 ①。**batch 区后端死亡=已知具名域**（009 round47：995
+  漂移死亡家族，owner=auto-lang 995 后域+机器），非本计划范围，
+  但阻塞 W-07 段到达。
+- **for 构建帧数据**（bookswitch-31）：每腿 for 构建**仅一次**（Init
+  复得帧 len=2 ✓）；其后 tap=false 帧**无 for 构建行**=构建未达 for
+  （`loaded`/`is_real` 条件臂翻转或实例重分配——待活体甄别，probe
+  不 taskkill+挂起态抓线程栈的下轮预案不变）。
+- **work 阶段净状态**：三层修复全部落地+单元验证（四锚+一致性检查器
+  全绿）；快照侧 live 已闭环（三腿 tap_rows=2）；**W-07 五叶 live
+  复验与 press 派发确认被三重环境阻塞**（后端 main_err 死亡簇/窗口
+  零尺寸/内核事件——均非本计划缺陷）。
+- **解除条件**：机器重启（清内核事件余波）+ 无并行会话的稳定窗。
+  解除后：①真 harness 复跑（W-07 段到达即验收——快照 onclick 已
+  live 实证）；②若有残留 press 派发问题→T-04c-15 computed events
+  派发改造；③T-05 review 交棒。
+- **worktree**：@ 90719bc0+d2470ba6（诊断+dump 钩）干净。
+
 ### T-04c-14 快照侧闭环 + 按压侧新根因（2026-11-13，w07-probe-2）
 
 - **快照侧闭环（live 实证）**：w07-probe-1/2——**三腿 `tap_rows=2`、
