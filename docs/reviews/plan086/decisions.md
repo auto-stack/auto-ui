@@ -165,7 +165,8 @@ widget PaginationControl (
   全局快捷键（§5 语义）。
 - **修订绑定/身份**：MCP 元素身份=handler 绑定哈希（同 handler 持久合法）；卸载/隐藏后
   旧 id 拒绝实证（VNode not found）；双实例/嵌套实例路由独立（P2/P3）。
-- **依赖工作树组**：`.wt/ui-086/{auto-lang,auto-web,auto-down}`（master 检出）+
-  `.wt/ui-086/auto-man`（分支 `codex/ui-086-automan`，Cargo.toml 路径指向本组，仅构建
-  管道不入 auto-man 主线）；补丁版 auto.exe/auto-ui-tool.exe 由该组产出（T-05 产品门
-  使用，产物修订随本 Plan 记录）。
+- **依赖工作树组**：`.wt/ui-086/{auto-ui,auto-lang,auto-web,auto-down,auto-man}` 全为
+  master 检出、零源码改动——组内同级布局使各仓 master 相对 path 依赖原样解析（auto-man
+  根的 iced patch `../auto-lang` 与 crates 的 `../../../auto-ui` 在组内同深度成立）。
+  补丁版 auto.exe/auto-ui-tool.exe 由该组构建产出（T-05 产品门使用；产物含 T-03 eval
+  补丁，fingerprint 变化已触发 UI cache 失效并重建）。
