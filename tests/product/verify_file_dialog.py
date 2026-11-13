@@ -34,9 +34,9 @@ def processes():
     if os.name == 'nt':
         output = subprocess.check_output([
             'powershell.exe', '-NoProfile', '-Command',
-            'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name | ConvertTo-Json -Compress'
+            'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,@{Name="Started";Expression={$_.CreationDate.ToUniversalTime().Ticks}} | ConvertTo-Json -Compress'
         ], creationflags=subprocess.CREATE_NO_WINDOW)
-        return {int(p['ProcessId']): (int(p['ParentProcessId']), p['Name']) for p in json.loads(output)}
+        return {int(p['ProcessId']): (int(p['ParentProcessId']), p['Name'], int(p['Started'])) for p in json.loads(output)}
     result = {}
     for entry in Path('/proc').iterdir():
         if entry.name.isdecimal():
@@ -44,7 +44,7 @@ def processes():
                 stat = (entry/'stat').read_text()
                 rest = stat[stat.rfind(')')+2:].split()
                 if rest[0] != 'Z':
-                    result[int(entry.name)] = (int(rest[1]), stat[stat.find('(')+1:stat.rfind(')')])
+                    result[int(entry.name)] = (int(rest[1]), stat[stat.find('(')+1:stat.rfind(')')], int(rest[19]))
             except (OSError, IndexError):
                 pass
     return result
@@ -54,7 +54,10 @@ def owned_tree(pid):
     table = processes()
     owned = {pid}
     while True:
-        more = {p for p, (parent, _) in table.items() if parent in owned}
+        # Parent PIDs can be reused by this run while an older unrelated
+        # process still records that number. It cannot be our descendant.
+        more = {p for p, (parent, _, started) in table.items()
+                if parent in owned and parent in table and started >= table[parent][2]}
         if more <= owned:
             return {p: table[p] for p in owned if p in table}
         owned |= more
@@ -162,7 +165,14 @@ class Session:
         raise AssertionError(f'Native state timeout: {last[-4000:]}')
 
     def node(self, label, kind='button'):
-        matches = re.findall(r'\b'+kind+r' #((?:vnode|aura)_\d+) "'+re.escape(label)+r'"', self.snapshot())
+        matches = []
+        for node, raw in re.findall(r'\b'+kind+r' #((?:vnode|aura)_\d+) "([^"\n]*)"', self.snapshot()):
+            # Icon-only controls keep their accessible name in the ordinary
+            # tooltip metadata. Never depend on the icon glyph or node index.
+            visible, _, title = raw.partition('\uee03')
+            visible = visible.rsplit('\uee02', 1)[-1]
+            if visible == label or (not visible and title == label):
+                matches.append(node)
         require(len(matches) == 1, f'Expected one current {kind}: {label}; found {matches}')
         return matches[0]
 
@@ -229,6 +239,24 @@ class Session:
         require(target.stat().st_size > 1000, 'Empty native screenshot')
         return {'path':str(target), 'sha256':sha(target)}
 
+    def file_list_scroll(self):
+        # Discover the actual file-list viewport. The locations sidebar has
+        # its own scroll container and must not be mistaken for this list.
+        lines = self.snapshot().splitlines()
+        for index, line in enumerate(lines):
+            match = re.match(r'(\s*)scrollable #((?:vnode|aura)_\d+)', line)
+            if not match:
+                continue
+            indent = len(match[1])
+            block = []
+            for child in lines[index+1:]:
+                if child.strip() and len(child)-len(child.lstrip()) <= indent:
+                    break
+                block.append(child)
+            if any(re.search(r'checkbox #', child) for child in block):
+                return match[2]
+        raise AssertionError('No ordinary file-list scroll control')
+
     def system_accessibility(self):
         """Read the actual Windows provider and invoke one real Toggle action."""
         require(os.name == 'nt', 'Windows system tree requested on another platform')
@@ -270,6 +298,9 @@ $toggle.Toggle()
         (self.out/'system-tree.json').write_text(json.dumps(system,ensure_ascii=False,indent=2),encoding='utf-8')
         path = next(row for row in rows if row['role']=='ControlType.Edit' and row['name']=='目录路径')
         require(path['value'] and path['width'] > 0 and path['height'] > 0, path)
+        selection_cell = next(row for row in rows if row['role']=='ControlType.CheckBox' and row['name']=='a.txt')
+        require(selection_cell['width'] > 0 and abs(selection_cell['width']-selection_cell['height']) <= 2,
+                f'File checkbox must occupy a square selection cell: {selection_cell}')
         self.selected(1)
         require(self.count('底层次数') == 0,'System accessibility action escaped the modal boundary')
         self.toggle('a.txt'); self.selected(0)
@@ -375,11 +406,17 @@ def run(args):
         session = Session(args,app,out,1)
         record = {'command':session.command,'windows':session.windows,'pid':session.process.pid}
         session.open()
+        require('onclick: .PreviousPage' not in session.snapshot()
+                and 'onclick: .NextPage' not in session.snapshot(),
+                'Single-page results must hide the entire pagination control')
+        session.press('刷新')
+        session.wait(lambda tree:'"a.txt"' in tree and '载入中' not in tree)
+        session.press('上一级')
+        session.wait(lambda tree:'"a.txt"' not in tree and '载入中' not in tree)
+        session.navigate(fixture, '"a.txt"')
         if args.visual_only:
             record['initial_screenshot'] = session.screenshot('initial')
-            outer = re.search(r'scrollable #((?:vnode|aura)_\d+)',session.snapshot())
-            require(outer,'No modal body scroll control')
-            session.call('autoui_action',element_id=outer[1],action='scroll',value=500)
+            session.call('autoui_action',element_id=session.file_list_scroll(),action='scroll',value=500)
             session.toggle('a.txt'); session.selected(1)
             record['footer_screenshot'] = session.screenshot('footer')
             record['accepted'] = session.accepted([fixture/'a.txt'])
@@ -453,9 +490,7 @@ def run(args):
         require(seen == {path.name for path in large.iterdir()},'Paged visible set differs from independent directory')
         tail = large/'中文长文件名_1002_分页完整性.txt'
         session.toggle(tail.name); session.selected(1)
-        outer_scroll = re.search(r'scrollable #((?:vnode|aura)_\d+)', session.snapshot())
-        require(outer_scroll, 'Missing ordinary scrollable control')
-        session.call('autoui_action', element_id=outer_scroll[1], action='scroll', value=500)
+        session.call('autoui_action', element_id=session.file_list_scroll(), action='scroll', value=500)
         record['tail_screenshot'] = session.screenshot('tail')
         record['accepted_tail'] = session.accepted([tail])
         session.press('切换明暗')

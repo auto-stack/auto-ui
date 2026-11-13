@@ -117,9 +117,24 @@ fixture promise, not an arbitrary-size/network-directory latency guarantee.
 
 ## Modal, focus, and automation contract
 
-The dialog uses the current App theme, with a scrollable body and separate
-footer. Local roots can scroll horizontally. Narrow windows must retain
-reachable cancel/accept controls. Explicit-modal reopening resets retained
+The dialog uses the current App theme. Its content sets an 800px preferred
+width, clamped to the viewport, with a title, compact navigation/path toolbar,
+locations sidebar, and a main file list. Name/type filters sit above the list;
+hidden-file and paging controls sit below it. The file list and local roots
+scroll independently, while selection status and cancel/accept remain in a
+fixed footer. File rows show type icons, a theme-derived selected background,
+and readable B/KB/MB sizes. Checkboxes occupy their own fixed-width column;
+the filename remains their semantic name, and is drawn beside the file icon
+in the separate name column. Parent/refresh are icon-only buttons with named
+hover tooltips. Filename input and type-group buttons share one toolbar row.
+Hidden-file and pagination controls share one status row, with the entire
+pagination group absent when there is only one page (including empty results).
+A disabled accept button is visibly muted.
+The sidebar and list use compact dimensions below the small-screen breakpoint.
+Narrow windows must retain reachable cancel/accept controls.
+Native Dialog content `style`/`class` overrides its default panel chrome in
+both ordinary and tracked views; dialogs without an override keep their
+existing dimensions. Explicit-modal reopening resets retained
 content scroll/focus state so the initial path input is visible again.
 
 Opening focuses the path input. Tab/Shift+Tab traverse enabled inputs,

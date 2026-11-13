@@ -1818,7 +1818,12 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     checkbox_widget
                 };
 
-                // Apply text style to label
+                // A box-sized cell has room for the control only. Retain its
+                // semantic name in View/MCP/accessibility; consumers can draw
+                // the visible name in their table's adjacent column.
+                let control_only = iced_style.as_ref().is_some_and(|style|
+                    matches!(style.width, Some(IcedSize::Fixed(width)) if width <= cb_size));
+                // Apply text style to label.
                 let mut label_widget = text(label.clone());
                 if let Some(ref is) = iced_style {
                     if let Some(fs) = effective_font_size(is) {
@@ -1829,7 +1834,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     }
                 }
 
-                let el: iced::Element<'static, M> = if label.is_empty() {
+                let el: iced::Element<'static, M> = if label.is_empty() || control_only {
                     let mut cont = container(checkbox_with_handler)
                         .align_x(iced::alignment::Horizontal::Center)
                         .align_y(iced::alignment::Vertical::Center);

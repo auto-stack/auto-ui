@@ -1188,7 +1188,7 @@ impl<'a> AuraViewBuilder<'a> {
             children: panel_children,
             spacing: 0,
             padding: 0,
-            style: Style::parse(panel_chrome).ok(),
+            style: self.dialog_panel_style(content, bindings, panel_chrome),
             onclick: None,
             on_right_click: None,
         };
@@ -1223,6 +1223,24 @@ impl<'a> AuraViewBuilder<'a> {
             open,
             on_dismiss,
         }
+    }
+
+    /// The content owns panel sizing/chrome, just as it does on the web.
+    /// Keep the family defaults for dialogs without an explicit override.
+    fn dialog_panel_style(
+        &self,
+        content: Option<&AuraNode>,
+        bindings: &Bindings,
+        defaults: &str,
+    ) -> Option<Style> {
+        let custom = match content {
+            Some(AuraNode::Element { props, .. }) => self
+                .extract_string_with(props, "class", bindings)
+                .or_else(|| self.extract_string_with(props, "style", bindings))
+                .unwrap_or_default(),
+            _ => String::new(),
+        };
+        Style::parse(&format!("{defaults} {custom}")).ok()
     }
 
     /// convert_alert_dialog 的 tracked 镜像（D-GAP 规则）：trigger/content
@@ -1303,7 +1321,7 @@ impl<'a> AuraViewBuilder<'a> {
             children: panel_children,
             spacing: 0,
             padding: 0,
-            style: Style::parse(panel_chrome).ok(),
+            style: self.dialog_panel_style(content, bindings, panel_chrome),
             onclick: None,
             on_right_click: None,
         };

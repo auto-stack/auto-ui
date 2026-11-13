@@ -258,6 +258,7 @@ pub struct Row {
     pub path: String,
     pub is_dir: bool,
     pub size: u64,
+    pub size_label: String,
     pub selected: bool,
 }
 
@@ -690,6 +691,13 @@ impl DialogModel {
                     path: e.path.clone(),
                     is_dir: e.is_dir,
                     size: e.size,
+                    size_label: if e.size < 1024 {
+                        format!("{} B", e.size)
+                    } else if e.size < 1024 * 1024 {
+                        format!("{} KB", e.size / 1024)
+                    } else {
+                        format!("{} MB", e.size / (1024 * 1024))
+                    },
                     selected: self.selected.contains(&e.path),
                 })
                 .collect(),

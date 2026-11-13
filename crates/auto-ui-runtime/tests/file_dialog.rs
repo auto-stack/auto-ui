@@ -3,6 +3,30 @@ use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
 #[test]
+fn dialog_content_dimensions_reach_both_native_view_paths_without_changing_defaults() {
+    use auto_ui_runtime::{Component, ui::{interpreter::DynamicMessage, view::View, style::BoxLayout}};
+    fn panel(view: &View<DynamicMessage>) -> BoxLayout {
+        match view {
+            View::Popover { content, .. } => match &**content {
+                View::Column { style: Some(style), .. } => BoxLayout::from_style(style),
+                _ => panic!("dialog has no styled panel"),
+            },
+            View::Column { children, .. } if children.len() == 1 => panel(&children[0]),
+            _ => panic!("missing dialog: {view:?}"),
+        }
+    }
+    for (content_props, width, padding) in [("", 384.0, 24.0), ("(style: \"w-[800px] p-0\")", 800.0, 0.0), ("(class: \"w-[640px] p-2\")", 640.0, 8.0)] {
+        let source = format!("widget App {{ view {{ dialog (open: true) {{ dialog-content {content_props} {{ text \"content\" }} }} }} }}");
+        let app = auto_ui_runtime::build_dynamic_component(&source, None).unwrap();
+        for view in [app.view(), app.view_with_debug().0] {
+            let layout = panel(&view);
+            assert_eq!(layout.width.unwrap().to_pixels_f32(), width);
+            assert_eq!(layout.padding_left, Some(padding));
+        }
+    }
+}
+
+#[test]
 fn directory_identity_sorting_unicode_and_errors() {
     let temp = tempfile::tempdir().unwrap();
     std::fs::create_dir(temp.path().join("z directory")).unwrap();
@@ -160,9 +184,11 @@ fn package_fixture_builds_and_opens_a_real_component_instance() {
             _ => None,
         }
     }
-    for label in ["打开", "清空选择", "上一页", "下一页", "书籍"] {
+    for label in ["打开", "清空选择", "书籍"] {
         assert_eq!(disabled_button(&view, label), Some(true), "{label} must be disabled");
     }
+    let single_page = format!("{view:?}");
+    assert!(!single_page.contains("上一页") && !single_page.contains("下一页"), "single-page navigation should be absent");
     assert_eq!(disabled_button(&view, "图片"), Some(false));
     let mut actions = Vec::new();
     checkboxes(&view, &mut actions);

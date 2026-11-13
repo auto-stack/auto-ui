@@ -34,69 +34,124 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
     }
     view {
         dialog (open: .fd_active, onclose: .Cancel, closeOnOutside: false) {
-            dialog-content {
-                dialog-header {
-                    row (style: "justify-between items-center gap-2") {
-                        dialog-title .title
-                        button "关闭" { onclick: .Cancel }
+            dialog-content (style: "w-[800px] max-w-full p-0 gap-0 rounded-xl bg-background text-foreground") {
+                row (style: "px-5 py-3 gap-3 items-center justify-between border-b border-border w-full") {
+                    col (style: "gap-1 flex-1 min-w-0") {
+                        text .title { style: "text-lg font-semibold text-foreground" }
+                        if .selectionMode == "multipleFiles" { text "选择一个或多个文件" { style: "text-xs text-muted-foreground" } }
+                        if .selectionMode != "multipleFiles" { text "选择要打开的文件" { style: "text-xs text-muted-foreground" } }
                     }
+                    button "关闭" { onclick: .Cancel, style: "h-8 px-2 text-xs rounded-md text-muted-foreground hover:bg-muted" }
                 }
-                col (style: "gap-2 w-full min-w-0 max-h-80 overflow-y-auto") {
-                    row (style: "gap-2 items-center") {
-                        button "主目录" { onclick: .Home }
-                        button "上一级" { onclick: .Up, disabled: !.canUp }
-                        button "刷新" { onclick: .Refresh }
-                    }
-                    row (style: "gap-2 items-center w-full overflow-x-auto") {
-                        for root in .roots { if root != .homePath { button root { onclick: .Root(root) } } }
-                    }
-                    row (style: "gap-2 items-center w-full") {
-                        input (value: .pathInput, oninput: .SetPath, onenter: .Go, placeholder: "目录路径", style: "flex-1 min-w-0") {}
-                        button "转到" { onclick: .Go }
-                    }
-                    text .currentDirectory { style: "text-xs text-muted-foreground" }
-                    input (value: .nameQuery, oninput: .SetName, placeholder: "名称过滤", style: "w-full min-w-0") {}
-                    row (style: "gap-2 items-center flex-wrap") {
-                        for filter in .filters {
-                            button filter.label { onclick: .SetFilter(filter.id), disabled: .activeType == filter.id }
+                row (style: "px-4 py-3 gap-2 items-center w-full border-b border-border") {
+                    button (icon: "arrow-up", title: "上一级", onclick: .Up, disabled: !.canUp, style: "h-8 w-8 shrink-0 border border-border rounded-md bg-background text-foreground hover:bg-muted") {}
+                    button (icon: "refresh-cw", title: "刷新", onclick: .Refresh, style: "h-8 w-8 shrink-0 border border-border rounded-md bg-background text-foreground hover:bg-muted") {}
+                    input (value: .pathInput, oninput: .SetPath, onenter: .Go, placeholder: "目录路径", style: "flex-1 min-w-0 h-8 text-xs rounded-md bg-muted/40") {}
+                    button "转到" { onclick: .Go, style: "h-8 px-2 text-xs border border-border rounded-md bg-background text-foreground hover:bg-muted" }
+                }
+                row (style: "w-full gap-0 items-stretch") {
+                    col (style: "w-24 sm:w-32 shrink-0 p-2 sm:p-3 gap-2 bg-muted/40 border-r border-border") {
+                        text "位置" { style: "text-xs font-medium text-muted-foreground px-2" }
+                        button (onclick: .Home, style: "w-full h-9 px-2 text-xs rounded-md text-foreground hover:bg-muted") {
+                            row (style: "w-full gap-2 items-center justify-start") {
+                                icon (name: "home", size: 14) {}
+                                text "主目录" { style: "text-xs text-foreground" }
+                            }
                         }
-                    }
-                    checkbox { text: "显示隐藏文件", checked: .hidden, onclick: .ToggleHidden }
-                    text "切换目录或过滤条件会清空选择" { style: "text-xs text-muted-foreground" }
-                    if .loading { text "载入中" }
-                    if .errorMessage != "" {
-                        text .errorMessage { style: "text-sm text-destructive" }
-                        button "重试" { onclick: .Go }
-                    }
-                    if !.loading && .errorMessage == "" {
-                        if .totalEntries == 0 { text "空目录" }
-                        if .totalEntries > 0 && .visibleFiles == 0 { text "没有匹配的文件，目录仍可进入" }
-                    }
-                    col (style: "h-48 overflow-y-auto gap-1") {
-                        for entry in .entries {
-                            if entry.isDir {
-                                button (onclick: .Enter(entry.id)) { text f"进入 ${entry.name}" }
-                            } else {
-                                row (style: "gap-2 items-center") {
-                                    checkbox { text: entry.name, checked: entry.selected, onclick: .Choose(entry.id), disabled: .loading, style: "text-foreground" }
-                                    text f"${entry.size} B" { style: "text-xs text-muted-foreground" }
+                        text "本地磁盘" { style: "text-xs text-muted-foreground px-2 mt-2" }
+                        col (style: "gap-1 max-h-64 overflow-y-auto w-full") {
+                            for root in .roots {
+                                if root != .homePath {
+                                    button (onclick: .Root(root), style: "w-full h-8 px-2 text-xs rounded-md text-foreground hover:bg-muted") {
+                                        row (style: "w-full gap-2 items-center justify-start") {
+                                            icon (name: "hard-drive", size: 14) {}
+                                            text root { style: "text-xs text-foreground" }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                    row (style: "gap-2 items-center flex-wrap") {
-                        button "上一页" { onclick: .PreviousPage, disabled: .page == 0 }
-                        text f"第 ${.displayPage} / ${.pageCount} 页"
-                        button "下一页" { onclick: .NextPage, disabled: .page + 1 >= .pageCount }
-                    }
-                    row (style: "gap-2 items-center flex-wrap") {
-                        text f"已选 ${.selectedCount} 项"
-                        button "清空选择" { onclick: .Clear, disabled: .selectedCount == 0 }
+                    col (style: "flex-1 min-w-0 gap-0") {
+                        row (style: "px-3 py-2 gap-2 items-center w-full") {
+                            icon (name: "search", size: 14, style: "text-muted-foreground") {}
+                            input (value: .nameQuery, oninput: .SetName, placeholder: "名称过滤", style: "flex-1 min-w-0 max-w-[320px] h-8 text-xs rounded-md bg-muted/40") {}
+                            for filter in .filters {
+                                button filter.label {
+                                    onclick: .SetFilter(filter.id)
+                                    disabled: .activeType == filter.id
+                                    style: if .activeType == filter.id { "h-8 px-3 shrink-0 text-xs rounded-md bg-primary/10 text-primary border border-primary" } else { "h-8 px-3 shrink-0 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted" }
+                                }
+                            }
+                        }
+                        row (style: "w-full px-3 py-2 gap-2 bg-muted/40 border-y border-border items-center") {
+                            col (style: "w-5 shrink-0") {}
+                            text "名称" { style: "flex-1 text-xs font-medium text-muted-foreground" }
+                            text "大小" { style: "w-16 shrink-0 text-right text-xs font-medium text-muted-foreground" }
+                        }
+                        col (style: "h-40 sm:h-56 overflow-y-auto gap-0 w-full") {
+                            if .loading { text "载入中" { style: "px-4 py-6 text-sm text-muted-foreground" } }
+                            if .errorMessage != "" {
+                                col (style: "p-4 gap-2") {
+                                    text .errorMessage { style: "text-sm text-destructive" }
+                                    button "重试" { onclick: .Go, style: "h-8 px-3 text-xs border border-border rounded-md text-foreground" }
+                                }
+                            }
+                            if !.loading && .errorMessage == "" {
+                                if .totalEntries == 0 { text "空目录" { style: "p-6 text-sm text-muted-foreground" } }
+                                if .totalEntries > 0 && .visibleFiles == 0 { text "没有匹配的文件，目录仍可进入" { style: "p-4 text-xs text-muted-foreground" } }
+                            }
+                            for entry in .entries {
+                                if entry.isDir {
+                                    button (text: f"进入 ${entry.name}", onclick: .Enter(entry.id), style: "w-full h-9 px-3 rounded-none text-sm text-foreground hover:bg-muted") {
+                                        row (style: "w-full gap-2 items-center justify-start") {
+                                            col (style: "w-5 shrink-0") {}
+                                            row (style: "flex-1 min-w-0 gap-2 items-center") {
+                                                icon (name: "folder", size: 16, style: "text-amber-500") {}
+                                                text f"进入 ${entry.name}" { style: "text-sm text-foreground" }
+                                            }
+                                            text "—" { style: "w-16 shrink-0 text-right text-xs text-muted-foreground" }
+                                        }
+                                    }
+                                } else {
+                                    row (style: if entry.selected { "w-full px-3 py-2 gap-2 items-center bg-primary/10 hover:bg-primary/10" } else { "w-full px-3 py-2 gap-2 items-center bg-background hover:bg-muted/40" }) {
+                                        // Retain the checkbox's semantic name for MCP/accessibility;
+                                        // its visible filename is in the separate name column.
+                                        checkbox { text: entry.name, checked: entry.selected, onclick: .Choose(entry.id), disabled: .loading, style: "w-5 h-5 shrink-0" }
+                                        row (style: "flex-1 min-w-0 gap-2 items-center") {
+                                            icon (name: "file-text", size: 16, style: "text-muted-foreground shrink-0") {}
+                                            text entry.name { style: "text-sm text-foreground" }
+                                        }
+                                        text entry.sizeLabel { style: "w-16 shrink-0 text-right text-xs text-muted-foreground" }
+                                    }
+                                }
+                            }
+                        }
+                        row (style: "w-full px-3 py-2 gap-2 items-center justify-between border-t border-border") {
+                            checkbox { text: "显示隐藏文件", checked: .hidden, onclick: .ToggleHidden }
+                            if .pageCount > 1 {
+                                row (style: "gap-1 shrink-0 items-center") {
+                                    button (icon: "chevron-left", title: "上一页", onclick: .PreviousPage, disabled: .page == 0, style: "h-7 w-7 text-xs rounded-md border border-border text-muted-foreground") {}
+                                    text f"第 ${.displayPage} / ${.pageCount} 页" { style: "text-xs text-muted-foreground" }
+                                    button (icon: "chevron-right", title: "下一页", onclick: .NextPage, disabled: .page + 1 >= .pageCount, style: "h-7 w-7 text-xs rounded-md border border-border text-foreground") {}
+                                }
+                            }
+                        }
                     }
                 }
-                dialog-footer {
-                    button "取消" { onclick: .Cancel }
-                    button .acceptLabel { onclick: .Confirm, disabled: !.canAccept }
+                row (style: "w-full px-4 py-3 gap-2 items-center justify-between border-t border-border") {
+                    row (style: "gap-2 items-center") {
+                        text f"已选 ${.selectedCount} 项" { style: "text-xs text-muted-foreground" }
+                        button "清空选择" { onclick: .Clear, disabled: .selectedCount == 0, style: "h-8 px-2 text-xs rounded-md text-primary hover:bg-muted" }
+                    }
+                    row (style: "gap-2 items-center") {
+                        button "取消" { onclick: .Cancel, style: "h-9 px-4 text-sm rounded-md border border-border bg-background text-foreground hover:bg-muted" }
+                        button .acceptLabel {
+                            onclick: .Confirm
+                            disabled: !.canAccept
+                            style: if .canAccept { "h-9 px-5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90" } else { "h-9 px-5 text-sm font-medium rounded-md bg-muted text-muted-foreground border border-border" }
+                        }
+                    }
                 }
             }
         }
