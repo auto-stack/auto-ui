@@ -171,3 +171,19 @@
 - 一次性键入 = 整体替换该字段值（类型按字段现值保值），不做追加。
 - 永久反例：`crates/auto-ui-runtime/src/ui_tests/plan069_synthetic_input_tests.rs`
   （嵌套 store 绑定注册/写入、直 field 对照、二次键入替换、handler 读回同值）。
+
+## 9. 路由导航后的页实例重建与跨导航派发可达（PLAN-081 SD-03）
+
+- **路由导航（含 back/forward）后，routed 页实例完整重建**：导航提交即
+  解析目标 route_id 并以新参数发起页实例装载——不沿用旧实例的状态对象，
+  不容忍"参数丢失→Init 拉取失败→loaded=false 持久于稳定状态对象"的
+  mount-once 语义（T-04c-17 定谳：route param 丢失即永久空页，W-07 原始
+  症状）。装载参数守卫 + 失效重派发（T-04c-18）为最低要求。
+- **跨导航 handler 派发可达**：导航后的页内 handler（TapParagraph 等）
+  经 find_view_by_path 下降必须命中真实节点——视图投影中的锚点/标记件
+  （如 ScrollAnchorMark）在枚举层**透传展平**，不得占据子件层级使路径
+  下降断链（T-04c-19 四层根因：vnode_converter 与 view_to_vtree 双变体
+  对齐后，press 派发 ActionResult、①③⑤ 叶 live 打通）。
+- 永久锚点：`crates/auto-ui-runtime` 出口一致性检查器（probe/vtree 路径
+  一致）+ 009 消费回归真 harness W-07 五叶与 S06/S07 四叶（t05-run10：
+  全绿、零进程死亡，results.json auto sha256 8d7dc2cf…/tool b59d358f…）。
