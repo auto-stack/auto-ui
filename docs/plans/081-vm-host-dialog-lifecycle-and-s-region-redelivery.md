@@ -448,6 +448,19 @@ handler_codegen.rs 路由重写）、现有 `cargo t` 组 + reader-009 组 harne
   快照 `onclick: .TapParagraph` 在场 → W-07 五叶。
 - **worktree**：@ 最新干净（四重诊断+cond-loaded 在册，门控）。
 
+### T-04c-19b ②④ 真因 + probe 流程修复（2026-11-14）
+
+- **② edit-revisit 真因**：①保存链 `show_anns=true`（面板已开）→
+  probe 的 `✎ 注释` 按压 **toggle 翻转关面板** → 编辑按钮消失 →
+  step1_add_btn=false。**真 harness 的 W-07 流程同型同缺陷**
+  （`press_exact('✎ 注释'); press_exact('编辑')` 无条件翻转）。
+- **probe 流程修复已落**（w07_probe.py ②④）：面板标记（编辑/删除
+  按钮在场）则跳过翻转；④ 同型（删除按钮在场则直接删）。
+- **复跑两次被机器击杀**（bookswitch-16/17 序号后 probe-16 boot 期
+  ConnectionReset、probe-17 boot 期 Refused——第 8/9 次环境击杀）。
+- **五叶验证待稳定窗**：probe 流程修复已就位，复跑即验收。
+- **worktree**：@ 最新干净（probe 修复在 plan-artifacts，非仓库）。
+
 ### T-04c-19 第四层根因修复落地 + 核心链路 live 打通（2026-11-14）
 
 - **第四层根因（extract_children_ref/extract_children 缺 ScrollAnchorMark
