@@ -1,0 +1,4 @@
+name: "pagination"
+version: "0.1.0"
+namespace: "auto"
+description: "AutoUI controlled pagination component (PLAN-086)"

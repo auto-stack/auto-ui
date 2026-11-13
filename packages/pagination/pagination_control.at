@@ -1,0 +1,152 @@
+// packages/pagination/pagination_control.at — PaginationControl（PLAN-086）
+//
+// 统一受控分页组件：公共 1-based 页码；页数/边界/页容量/单页隐藏由单一
+// 受控算法派生（Init 逐帧重放、幂等），组件不持有第二份 page、不切片
+// 数据、不发业务请求。宿主数据变化后由消费方更新受控值，组件只投影。
+//
+// 事件契约（PLAN-086 T-01 冻结，探针实证）：
+// - `."changed"(json字符串)` 是唯一上行通道，载荷 `{"page":N,"pageSize":M}`；
+//   msg 变体必须带引号声明，vue 轨 emit 重写只识别引号变体。
+// - 一个用户操作最多一条 changed；边界/重复/disabled 零事件。
+// - 非法配置（pageSize<=0、total<0、页容量候选含非正数）＝具名配置错误：
+//   导航整组隐藏、错误文本可见可读（MCP snapshot/state），不刷回调。
+//   注：错误走渲染文本而非 error 事件——native 轨子件 Init 内 emit 不派发
+//   （P-probe 实证 probe:no-err），可见文本是双端一致的具名可观察面。
+// - hideWhenSingle=true 且 pageCount<=1 时整组（含容量按钮）不入树；
+//   需要空/单页仍改容量的消费者显式传 false。
+//
+// 页码语义：total 为条目数（非页数），total=0 是正常空结果（pageCount=1）；
+// 受控 page 越界只投影 clamp 值，不自发 changed、不改宿主状态。
+widget PaginationControl (page: int = 1, pageSize: int = 10, total: int = 0, hideWhenSingle: bool = true, compact: bool = false, disabled: bool = false, showPageSize: bool = false, pageSizes: List = [10, 25, 50]) {
+    msg { Init, First, Prev, Next, Last, SetSize(int), "changed"(str) }
+    model {
+        var page_count int = 1
+        var current int = 1
+        var group_visible bool = false
+        var can_prev bool = false
+        var can_next bool = false
+        var config_error str = ""
+        var size_candidates List = []
+    }
+    view {
+        col (style: "items-center gap-1 min-w-0") {
+            if .config_error != "" {
+                text .config_error { style: "text-xs text-destructive whitespace-nowrap" }
+            } else {
+                if .group_visible {
+                    row (style: "items-center gap-1 shrink-0 text-xs") {
+                        if !.compact {
+                            button (icon: "chevrons-left", title: "首页", onclick: .First, disabled: !.can_prev || .disabled) {}
+                        }
+                        button (icon: "chevron-left", title: "上一页", onclick: .Prev, disabled: !.can_prev || .disabled) {}
+                        text f"第 ${.current} / ${.page_count} 页" { style: "whitespace-nowrap text-muted-foreground px-1" }
+                        button (icon: "chevron-right", title: "下一页", onclick: .Next, disabled: !.can_next || .disabled) {}
+                        if !.compact {
+                            button (icon: "chevrons-right", title: "末页", onclick: .Last, disabled: !.can_next || .disabled) {}
+                        }
+                        if .showPageSize {
+                            row (style: "items-center gap-0.5 ml-1") {
+                                for size in .size_candidates {
+                                    button f"${size}" { onclick: .SetSize(size), disabled: .disabled || size == .pageSize, style: "px-2 py-0.5 text-xs rounded-md" }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .config_error = ""
+            if .pageSize <= 0 {
+                .config_error = f"pagination: pageSize must be > 0 (got ${.pageSize})"
+            }
+            if .total < 0 {
+                .config_error = f"pagination: total must be >= 0 (got ${.total})"
+            }
+            for size in .pageSizes {
+                if size <= 0 {
+                    .config_error = f"pagination: pageSizes entries must be > 0 (got ${size})"
+                }
+            }
+            if .config_error == "" {
+                // pageCount = ceil(total/pageSize)，防溢出形态（不用 total+pageSize-1）。
+                .page_count = .total / .pageSize
+                if .total % .pageSize > 0 {
+                    .page_count = .page_count + 1
+                }
+                if .page_count < 1 {
+                    .page_count = 1
+                }
+                .current = .page
+                if .current < 1 {
+                    .current = 1
+                }
+                if .current > .page_count {
+                    .current = .page_count
+                }
+                .can_prev = .current > 1
+                .can_next = .current < .page_count
+                .group_visible = .page_count > 1 || !.hideWhenSingle
+                // 容量候选：去重保序；当前 pageSize 不在候选时补入尾部
+                // （§5：当前值仍明确显示）。仅 showPageSize 时需要。
+                .size_candidates = []
+                if .showPageSize {
+                    for size in .pageSizes {
+                        var dup bool = false
+                        for s in .size_candidates {
+                            if s == size {
+                                dup = true
+                            }
+                        }
+                        if !dup {
+                            .size_candidates.push(size)
+                        }
+                    }
+                    var has_current bool = false
+                    for s in .size_candidates {
+                        if s == .pageSize {
+                            has_current = true
+                        }
+                    }
+                    if !has_current {
+                        .size_candidates.push(.pageSize)
+                    }
+                }
+            } else {
+                .page_count = 1
+                .current = 1
+                .can_prev = false
+                .can_next = false
+                .group_visible = false
+                .size_candidates = []
+            }
+        }
+        .First -> {
+            if .can_prev && !.disabled {
+                ."changed"(json.stringify({page: 1, pageSize: .pageSize}))
+            }
+        }
+        .Prev -> {
+            if .can_prev && !.disabled {
+                ."changed"(json.stringify({page: .current - 1, pageSize: .pageSize}))
+            }
+        }
+        .Next -> {
+            if .can_next && !.disabled {
+                ."changed"(json.stringify({page: .current + 1, pageSize: .pageSize}))
+            }
+        }
+        .Last -> {
+            if .can_next && !.disabled {
+                ."changed"(json.stringify({page: .page_count, pageSize: .pageSize}))
+            }
+        }
+        .SetSize(n int) -> {
+            if !.disabled && n > 0 && n != .pageSize {
+                ."changed"(json.stringify({page: 1, pageSize: n}))
+            }
+        }
+    }
+}
