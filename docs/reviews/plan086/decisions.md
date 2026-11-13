@@ -145,3 +145,27 @@ widget PaginationControl (
 | P2-neg 缺依赖（p2-neg, build + run -r vm） | build 轨具名失败；native 轨静默缺席（已记录） |
 
 复现命令与原始输出摘录见 `D:/autostack/plan-artifacts/plan-086/probes/*.log`。
+
+## 10. T-03 追加决议（2026-11-14，r2 实施中）
+
+- **派生架构定案**：Init 收敛挂载语义（PLAN-536 T3），受控投影改 **computed** 平铺派生
+  （无相互引用；computed 体求值无 computed 兜底，链式引用静默 None——P3 全组消失实录）。
+- **最小通用适配（eval.rs）**：视图/computed 快速路径 Bina 只有 Cmp/Logic/Add，
+  Sub/Mul/Div/Mod 缺臂 → ceil 派生静默 None。补臂（worktree `54712797`），与 Add 同构，
+  除零 → None。受影响面 = eval.rs 视图求值；P3 矩阵为定向回归；统一回归归 review/merge。
+- **双端整除一致性**：JS float 除使 `total/ps+1` 出 11.03（vue 实录）；
+  定案公式 `(total - total%ps)/ps + (total%ps > 0 ? 1 : 0)` 双轨整数精确。
+- **错误文本静态化**：vue 轨 computed 内 f-string 插值生成 undefined（生成器缺口），
+  错误文本改常量串（具名语义不变，值插值放弃）。
+- **Init 内 emit 不派发**（native 实证 probe:no-err）→ 错误走可见文本，error 事件不设。
+- **prop 字面量负数**：VM 轨 `total: -5` 静默失效（默认值），状态绑定 `.neg` 正常；
+  负例测试须状态绑定（真实消费形态）。
+- **键盘**：MCP keyboard（Tab/Enter/Space）在后台窗口探针中不触发激活；file-dialog 门的
+  键盘路径在同一基础设施下通过（模态焦点），产品门（T-05）按同条件复验；组件不注册
+  全局快捷键（§5 语义）。
+- **修订绑定/身份**：MCP 元素身份=handler 绑定哈希（同 handler 持久合法）；卸载/隐藏后
+  旧 id 拒绝实证（VNode not found）；双实例/嵌套实例路由独立（P2/P3）。
+- **依赖工作树组**：`.wt/ui-086/{auto-lang,auto-web,auto-down}`（master 检出）+
+  `.wt/ui-086/auto-man`（分支 `codex/ui-086-automan`，Cargo.toml 路径指向本组，仅构建
+  管道不入 auto-man 主线）；补丁版 auto.exe/auto-ui-tool.exe 由该组产出（T-05 产品门
+  使用，产物修订随本 Plan 记录）。
