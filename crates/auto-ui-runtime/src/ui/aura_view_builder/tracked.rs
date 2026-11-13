@@ -415,8 +415,26 @@ impl<'a> AuraViewBuilder<'a> {
         let state_name = iterable.strip_prefix('.').unwrap_or(iterable);
         let array: Vec<Value> = match self.resolve_for_iterable(iterable, state_name, bindings) {
             Some(v) => v,
-            None => return View::Empty,
+            None => {
+                if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1")
+                    && state_name == "paragraphs"
+                {
+                    eprintln!(
+                        "[MEMO-DIAG] for-unkeyed iterable=paragraphs RESOLVE=MISS tid={:?}",
+                        std::thread::current().id()
+                    );
+                }
+                return View::Empty;
+            }
         };
+        if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1")
+            && state_name == "paragraphs"
+        {
+            eprintln!(
+                "[MEMO-DIAG] for-unkeyed iterable=paragraphs len={}",
+                array.len()
+            );
+        }
         let child_views: Vec<View<DynamicMessage>> = array
             .iter()
             .enumerate()
