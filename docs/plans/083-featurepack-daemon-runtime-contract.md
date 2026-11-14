@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-083
-status: execution_done
+status: executing
 feature_name: FeaturePack daemon生产就绪、宿主配置与单实例
 author: [Codex]
 created_at: 2026-11-13
 updated_at: 2026-11-14
 plan_revision: 2
-current_step: 6
+current_step: 3
 total_steps: 8
 depends_on: []
 supersedes_spec_components: [docs/specs/build/desktop-api-surfaces.md]
@@ -274,6 +274,34 @@ T-04 回执:182 称「后端子进程 env 投递由 rust_ui::start_desktop_api_s
 **回归（b9999db9 上执行）**：`--lib osconfig_daemon` 40、`--lib daemon_instance` 8、`--test featurepack_daemon_hosting --test-threads=1` 5、`--test featurepack_daemon_launch --test-threads=1` 1、`--test featurepack_daemon_child_env --test-threads=1` 2、compiler `app_registry::tests` 34、tools `desktop_backends` 3+1 ignored。规范同步：SD-01 §3 旧语义措辞改为"只读状态行（不读 body/framing/预算；初始 503 不终局）"，SD-02 增"非共享声明 daemon 也在后端 spawn 前 ensure；Invalid 拒绝、Offline 具名降级"。未跑：`osconfig_integration`（材料缺席自跳过，不计通过）、真后端启动档、Notes 真实双窗口（OS 联合验收）。
 
 2026-11-14 · stage: goal | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | round: 5 | from: review（needs_fix） | to: review（T-06 第二次） | status: execution_done | outcome: pass（修复闭合） | worktree: D:/autostack/.wt/ui-083/auto-ui | commit: b9999db9 | next: review
+
+2026-11-14 · stage: review（第二次最终复审 / repair cycle 2 of 3） | review_scope: final | reviewer: plan083-reviewer（独立子代理会话，未参与实现） | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | outcome: needs_fix | worktree: D:/autostack/.wt/ui-083/auto-ui | branch: codex/plan-083-dev | reviewed_commit: b9999db9832ee8d12ce6d0ad8705db03a7f2937a | previous_reviewed_commit: 38ed6add332d184b70f28910b5a23b6f2a7c0157 | base_commit: a6f776c24a4ba98611849955edceb5a04edac969 | dependency_revisions: auto-lang e0cfa2d8c / auto-web 8b1742a0 / auto-down 58ea33f6 | spec_inputs: SD-01 sha256 0C88534A2E63EEDE31EA3A492CEDF4054C2BF09EB0534A5DECF8CF3A371931CA；SD-02 sha256 FFAEC4D98CC74E497D0B232CC7676BD88C06A5A4B55FE8F16B1AFE14562F950A（均 @b9999db9） | next_responsible_role: work（F-4 修复；T-02/T-03/T-05 重开）
+
+**绑定与清洁度**：worktree 干净，HEAD = b9999db9；修复 diff 仅 10 文件（+389/−48），未触无关行为；无 `.autoos/specs.json` 等台账写入；未创建 `docs/plans/attachments/083`（Test-Path=False）。复审探针源码运行后删除，树复检干净；日志 `D:/autostack/plan-artifacts/plan-083/review2/{tests,adversarial}.log`（随 merge 删除）。
+
+**独立复跑（均绑 b9999db9，0 failed）**：`--lib osconfig_daemon` **40**；`--lib daemon_instance` **8**；`--test featurepack_daemon_hosting -- --test-threads=1` **5**；`--test featurepack_daemon_launch` **1**；`--test featurepack_daemon_child_env -- --test-threads=1` **2**；compiler `app_registry::tests` **34**；tools `desktop_backends` **3 passed/1 ignored**。均与 R-1 回执一致。
+
+**首轮发现闭合判定**
+- **F-1 关闭**：`read_health_response` 在 `interface=None` 时于状态行/头部之后即返回（不读 body/framing/预算），`ensure_under_lock` 仅在有接口声明时把"占用不匹配"当终局，旧声明非 Ready 一律 spawn+轮询。我的新反例 N2（生产入口 `resolve_manifest_host_shared` + 真实 socket：旧声明 + 2xx/20KB body 且连接不关闭 → **Ready、spawn=0**；旧声明 + gzip TE → **Ready、spawn=0**）通过；R-1 的 `u01_legacy...503` 真夹具档亦通过。
+- **F-2 关闭（主体）**：非共享声明现在先 `resolve_manifest_host_shared` 再 spawn：Ready 投递、Offline 具名降级并继续、共享格不受影响（`continue` 在分支前）。SD-02 新增同义句。剩余口径差异见 F-4。
+- **F-3 关闭（主体）**：`apply_host_env` 单源 + `featurepack_daemon_child_env` 2 passed，实测两真子进程 A/B 互不可见、未投递键 `<unset>`、父进程 env 未改写。证据强度备注见 F-5。
+
+**F-4（阻塞；新回归，R-1 引入；AC-05 / SD-01 §2·§8 / SD-02:69-72）**
+违反规则：SD-01 §2「非法时具名拒绝，不退回旧探活」、SD-01 §8「字段解析错误明确拒绝」；R-1 新增 SD-02:69-72「非共享的声明 daemon 同样在后端 spawn 之前 ensure…声明非法 → 拒绝启动其后端」；代码注释 `desktop_backends.rs:192` 同此承诺。
+观测：`desktop_backends.rs:193` 用 **宽容** 的 `manifest_daemon_lookup`（`app_registry.rs:1036-1037` = `manifest_daemon_lookup_checked(..).ok().flatten()`，编译器用例 `:2327` 明确断言非法声明返回 `None`）作 `if declared.is_some()`（:197）的守卫。非法声明的 def 因此被折成 `None`，守卫为假 → 走 `else { None }`，`:207-215` 的 `Invalid → 拒绝启动` 臂**不可达**（只有两次查表之间 manifest 被改写的竞态才可能触发）。此前 38ed6add 用 `probe_manifest_host`（经 `lookup_checked`）在此处 `return Err`，故为修复引入的回归；`probe_manifest_host`（`osconfig_daemon.rs:983`）现已无生产调用方。
+可复跑反例 N1（`review2/adversarial.log`）：同一非法 manifest（`health_interface:"bogus"`）——`manifest_daemon_lookup` → **None**（守卫看不到声明），而受守卫保护的 `resolve_manifest_host_shared` → **Invalid("health_interface 须为 `<name>/<n>` 形态")**。即：该分支绝不会因非法声明返回 Err。
+后果：以 Notes 为例（`back_port == daemon.port`），声明一旦非法，共享判定退化为 NotShared → 端口已占用时得到误导性的 "backend port is already in use"，未占用时**启动自有后端**（正是本计划要消除的双后端），而非具名拒绝。覆盖边界：未跑真后端编译/启动档（`PLAN053_PROBE_DIR`），该反例是守卫级（两个被组合函数）的可执行演示 + 代码路径核对。
+要求：让非法声明在后端启动前被具名拒绝（例如改用 `manifest_daemon_lookup_checked`/无条件 `resolve` 并把 `Ok(None)` 映射为 None），使 `Invalid` 臂可达；同时保持非共享 Ready/Offline 现有语义。
+
+**F-5（非阻塞，证据强度；T-02/T-04 证据、`featurepack_daemon_child_env.rs:100-125`）**
+R-1 声称子进程用例断言「宿主陈旧同名值被剔除」；但用例的陈旧键 `FP083_ADDR/FP083_CRED` 同时是 `entries` 键，`Command::env` 本身即覆盖继承值。N3 实测：把 `apply_host_env` 的 `remove` 步骤去掉，该用例的陈旧值断言仍会通过（`remove_dropped` 输出与真实一致）；生产 `host_backend_env` 恒满足 `remove ⊆ entries`（N3 打印 `builder_remove_subset_of_entries=true`），故 `env_remove` 对当前投递键是冗余的。原语本身正确（remove-only 键实测被清除为 `<unset>`，去掉 remove 则泄漏 `stale-parent-083`）。要求：要么给门禁加一个"仅 remove、不投递"的键以真正钉住该步骤，要么把回执措辞降为"投递/隔离/不写全局已证；remove 步骤由原语实现、当前键集下冗余"。
+
+**残余观察 N5（非阻塞；SD-01 §3 措辞）**：SD-01 §3 写「只读状态行…与旧 tcp_ping 同义」。实测 N5：服务只发 `HTTP/1.1 200 OK\r\nServer: legacy\r\n` 而永不发头部终止符——`tcp_ping`=**true**，legacy probe=**BadBody(读取响应头失败 timed out)**，生产入口=**Offline（且 spawn=1）**。即实现是"状态行+完整头部块"，不是字面"仅状态行"；真实 HTTP 服务均会终止头部，故不阻塞，但措辞宜收窄为"不读 body（头部仍需完整）"，或在 `interface=None` 时于状态行后即短路。
+
+**规范增量判定**：R-1 对 SD-01 §3 的修改与代码 body 行为一致（除 N5 措辞）；SD-02:69-72 新增句的"Invalid 拒绝"与代码矛盾（F-4），故本次增量仍不通过，随 F-4 修复后复核。SD-01 §5/§11 边界措辞未变、与代码一致；未发现假装隔离。
+
+**pending_closeout_gates**：真实 Vue/Rust 后端构建启动与 Notes 双窗口 = OS 联合验收（保持）；统一回归门 = merge 所有；组内依赖树未改动。
+**next**：work 修 F-4（+F-5/N5 措辞或门禁补强），修复周期 2/3；T-02/T-03/T-05 重开、T-00/T-01/T-04 保持完成 → 3/8。在绑定新提交的第三次复审前不得给 pass。
 
 ## 10. 待澄清事项
 
