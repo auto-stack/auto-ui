@@ -592,6 +592,393 @@ pub fn probe_health(spec: &HealthSpec) -> HealthVerdict {
     HealthVerdict::Ready
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// PLAN-083 T-02：服务/宿主配置边界（D-03）——公开 manifest 只存非敏感
+// literal 与受管引用；服务进程配置随 spawn 投递；宿主后端配置（地址 +
+// literal + 受管凭据）只投递给**独立进程后端**（native exe / Rust API
+// launcher 子进程）。in-proc VM 的 `Env.get` 是进程全局（auto-lang
+// `a2r-std/src/env.rs`），凭据无法按宿主隔离——这是已记录的最小接口缺口，
+// 运行时不得用"轮流设置同名全局变量"冒充隔离。
+// ─────────────────────────────────────────────────────────────────────────
+
+use auto_ui_compiler::app_registry::{ManifestDaemon, ManifestDaemonCredential};
+
+/// 受管凭据引用（运行时形态）。值只在 [`ManagedCredentialRef::resolve`] 时
+/// 出现，永不进 Debug/日志/回执。
+#[derive(Clone, PartialEq, Eq)]
+pub struct ManagedCredentialRef {
+    /// 投递给宿主后端的 env 键（如 `NOTES_FP_CRED`）。
+    pub env_key: String,
+    /// 受管 policy 文件绝对/展开后路径。
+    pub path: PathBuf,
+    /// policy 主体（`entries[].principal`）。
+    pub principal: String,
+    /// 取值字段（缺省 `cred`）。
+    pub field: String,
+}
+
+impl ManagedCredentialRef {
+    /// manifest 引用 → 运行时引用（`path` 缺席 = `base_dir/fp-policy.json`；
+    /// `%VAR%`/`$VAR` 按当前进程环境展开）。
+    pub fn from_manifest(cred: &ManifestDaemonCredential, base_dir: &Path) -> Self {
+        let path = cred
+            .path
+            .as_deref()
+            .map(|raw| PathBuf::from(expand_env_path(raw)))
+            .unwrap_or_else(|| base_dir.join("fp-policy.json"));
+        Self {
+            env_key: cred.env.clone(),
+            path,
+            principal: cred.principal.clone(),
+            field: cred.field.clone(),
+        }
+    }
+
+    /// 解析受管配置（错误信息只含主体/路径身份，不含值）。
+    pub fn resolve(&self) -> Result<String, String> {
+        resolve_managed_credential(&self.path, &self.principal, &self.field)
+    }
+
+    /// 非敏感诊断串（主体 + 路径 + 字段；不含凭据值）。
+    pub fn diagnostic(&self) -> String {
+        format!(
+            "env={} principal={} field={} policy={}",
+            self.env_key,
+            self.principal,
+            self.field,
+            self.path.display()
+        )
+    }
+}
+
+impl std::fmt::Debug for ManagedCredentialRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ManagedCredentialRef({})", self.diagnostic())
+    }
+}
+
+/// 从 OS 签发的受管 policy 文件解析凭据（`entries[].principal` 命中后取
+/// `field`）。文件形态冻结为 `{"entries":[{principal,cred,operations,book_scopes}]}`
+/// （OS `scripts/fp_provision_policy`）；解析失败具名，不回显文件内容/值。
+pub fn resolve_managed_credential(
+    path: &Path,
+    principal: &str,
+    field: &str,
+) -> Result<String, String> {
+    let raw = std::fs::read_to_string(path).map_err(|err| {
+        format!(
+            "受管配置不可读（{}，principal={principal}）：{err}",
+            path.display()
+        )
+    })?;
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|err| format!("受管配置非合法 JSON（{}）：{err}", path.display()))?;
+    let entries = doc
+        .get("entries")
+        .and_then(|value| value.as_array())
+        .ok_or_else(|| format!("受管配置缺 entries 数组（{}）", path.display()))?;
+    let entry = entries
+        .iter()
+        .find(|entry| entry.get("principal").and_then(|v| v.as_str()) == Some(principal))
+        .ok_or_else(|| {
+            format!(
+                "受管配置无 principal `{principal}` 条目（{}）",
+                path.display()
+            )
+        })?;
+    let value = entry
+        .get(field)
+        .and_then(|v| v.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            format!(
+                "受管配置条目缺字段 `{field}`（{}，principal={principal}）",
+                path.display()
+            )
+        })?;
+    if value.chars().any(|c| c.is_control()) || value.chars().any(char::is_whitespace) {
+        return Err(format!(
+            "受管凭据形态非法（含空白/控制符；{} principal={principal}）",
+            path.display()
+        ));
+    }
+    if value.len() < 16 || value.len() > 512 {
+        return Err(format!(
+            "受管凭据长度非法（{} 字符；{} principal={principal}）",
+            value.len(),
+            path.display()
+        ));
+    }
+    Ok(value.to_string())
+}
+
+/// `%VAR%`（Windows 习惯）/`$VAR`/`${VAR}` 展开；未知变量原样保留（配置
+/// 诊断可见，不静默变空）。
+pub fn expand_env_path(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let chars: Vec<char> = raw.chars().collect();
+    let mut i = 0usize;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '%' {
+            if let Some(rel_end) = chars[i + 1..].iter().position(|ch| *ch == '%') {
+                let name: String = chars[i + 1..i + 1 + rel_end].iter().collect();
+                if let Ok(value) = std::env::var(&name) {
+                    out.push_str(&value);
+                    i = i + 1 + rel_end + 1;
+                    continue;
+                }
+            }
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        if c == '$' {
+            if i + 1 < chars.len() && chars[i + 1] == '{' {
+                if let Some(rel_end) = chars[i + 2..].iter().position(|ch| *ch == '}') {
+                    let name: String = chars[i + 2..i + 2 + rel_end].iter().collect();
+                    if let Ok(value) = std::env::var(&name) {
+                        out.push_str(&value);
+                        i = i + 2 + rel_end + 1;
+                        continue;
+                    }
+                }
+            } else {
+                let rest: String = chars[i + 1..].iter().take_while(|ch| ch.is_ascii_alphanumeric() || **ch == '_').collect();
+                if !rest.is_empty() {
+                    if let Ok(value) = std::env::var(&rest) {
+                        out.push_str(&value);
+                        i += 1 + rest.chars().count();
+                        continue;
+                    }
+                }
+            }
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
+/// 宿主后端 env（`<NAME>_DAEMON=url` + `host.env` literal + 受管凭据）。
+/// 凭据值只在 `entries` 内出现；Debug 对凭据键打码。
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct HostBackendEnv {
+    /// 要投递的键值（顺序稳定：地址 → literal（键排序）→ 凭据）。
+    pub entries: Vec<(String, String)>,
+    /// 子进程必须剔除的继承键（同一键在宿主进程的历史值不得泄漏/覆盖）。
+    pub remove: Vec<String>,
+    /// 承载凭据的键（诊断/打码用；`None` = 无凭据声明）。
+    pub credential_env: Option<String>,
+}
+
+impl HostBackendEnv {
+    /// 非凭据条目（可安全用于 in-proc 进程全局注入与日志）。
+    pub fn non_secret_entries(&self) -> impl Iterator<Item = (&str, &str)> {
+        let credential = self.credential_env.clone();
+        self.entries
+            .iter()
+            .filter(move |(key, _)| credential.as_deref() != Some(key.as_str()))
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+    }
+
+    pub fn has_credentials(&self) -> bool {
+        self.credential_env.is_some()
+    }
+
+    /// 是否为 key 设了值（投递断言用；不暴露值）。
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+}
+
+impl std::fmt::Debug for HostBackendEnv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let redacted: Vec<(String, String)> = self
+            .entries
+            .iter()
+            .map(|(key, value)| {
+                if self.credential_env.as_deref() == Some(key.as_str()) {
+                    (key.clone(), "<managed-credential>".to_string())
+                } else {
+                    (key.clone(), value.clone())
+                }
+            })
+            .collect();
+        f.debug_struct("HostBackendEnv")
+            .field("entries", &redacted)
+            .field("remove", &self.remove)
+            .field("credential_env", &self.credential_env)
+            .finish()
+    }
+}
+
+/// 组装宿主后端 env。`daemon_env_key` 由调用方按 manifest id 派生
+/// （[`daemon_env_key`]）；`base_dir` 是受管 policy 缺省基线（manifest 条目
+/// repo 目录）。
+pub fn host_backend_env(
+    daemon_env_key: &str,
+    daemon_url: &str,
+    def: &ManifestDaemon,
+    base_dir: &Path,
+) -> Result<HostBackendEnv, String> {
+    let mut entries: Vec<(String, String)> = vec![(daemon_env_key.to_string(), daemon_url.to_string())];
+    let mut remove: Vec<String> = vec![daemon_env_key.to_string()];
+    let mut credential_env: Option<String> = None;
+    if let Some(host) = &def.host {
+        for (key, value) in &host.env {
+            if key == daemon_env_key {
+                return Err(format!(
+                    "daemon.host.env.{key} 与地址键冲突（地址由运行时权威提供）"
+                ));
+            }
+            entries.push((key.clone(), value.clone()));
+            remove.push(key.clone());
+        }
+        if let Some(cred) = &host.credential {
+            let reference = ManagedCredentialRef::from_manifest(cred, base_dir);
+            let value = reference
+                .resolve()
+                .map_err(|err| format!("宿主凭据不可用（{}）：{err}", reference.diagnostic()))?;
+            entries.push((reference.env_key.clone(), value));
+            remove.push(reference.env_key.clone());
+            credential_env = Some(reference.env_key.clone());
+        }
+    }
+    Ok(HostBackendEnv {
+        entries,
+        remove,
+        credential_env,
+    })
+}
+
+/// 服务进程 env：声明 `daemon.env` literal + 端口覆盖键（端口以目标 url 为
+/// 权威，覆盖同名声明）。
+pub fn service_env(def: &ManifestDaemon, port: u16, env_port_key: &str) -> Vec<(String, String)> {
+    let mut env: Vec<(String, String)> = def
+        .env
+        .iter()
+        .filter(|(key, _)| key.as_str() != env_port_key)
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect();
+    env.push((env_port_key.to_string(), port.to_string()));
+    env
+}
+
+/// manifest 声明 → 运行时泛化定义（`bin` 按平台补 `.exe`）。
+pub fn generic_daemon_from_manifest(
+    name: &str,
+    repo_dir: &Path,
+    def: &ManifestDaemon,
+) -> GenericDaemon {
+    GenericDaemon {
+        name: name.to_string(),
+        url: format!("http://127.0.0.1:{}", def.port),
+        bin: def.bin.as_deref().map(|rel| {
+            let path = repo_dir.join(rel);
+            if cfg!(windows) && !path.is_file() {
+                PathBuf::from(format!("{}.exe", path.display()))
+            } else {
+                path
+            }
+        }),
+        env_key: daemon_env_key(name),
+        env_port_key: def.env_port.clone().unwrap_or_else(|| {
+            format!(
+                "{}_BACK_PORT",
+                daemon_env_key(name).trim_end_matches("_DAEMON")
+            )
+        }),
+        health_interface: def.health_interface.clone(),
+        ready_timeout: def.ready_timeout_ms.map(std::time::Duration::from_millis),
+        extra_env: def
+            .env
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect(),
+    }
+}
+
+/// [`resolve_manifest_host`] 的结果。
+#[derive(Debug, Clone)]
+pub enum ManifestHostResolution {
+    /// manifest 未声明该名（调用方按既有「未声明」诊断处理）。
+    NotDeclared,
+    /// 声明存在但可选能力非法（具名拒绝，不退回旧探活/不 spawn）。
+    Invalid(String),
+    /// 就绪且宿主配置已解析（`env` 可直接投递给独立进程后端）。
+    Ready { url: String, env: HostBackendEnv },
+    /// 拉起失败/就绪失败（原因具名，占用者存活）。
+    Offline(String),
+}
+
+/// 生产解析入口：manifest 查表 → ensure（同一 health/预算合同）→ 宿主 env。
+/// session 与桌面后端启动器共用；`parent` 语义同
+/// [`auto_ui_compiler::app_registry::manifest_daemon_lookup`]。
+pub fn resolve_manifest_host(
+    parent: &Path,
+    name: &str,
+    fallback_timeout: std::time::Duration,
+) -> ManifestHostResolution {
+    let (repo_dir, def) =
+        match crate::ui::app_registry::manifest_daemon_lookup_checked(parent, name) {
+            Ok(Some(found)) => found,
+            Ok(None) => return ManifestHostResolution::NotDeclared,
+            Err(reason) => return ManifestHostResolution::Invalid(reason),
+        };
+    let generic = generic_daemon_from_manifest(name, &repo_dir, &def);
+    match ensure_generic_io(&generic, &mut RealDaemonIo::new(), fallback_timeout) {
+        DaemonStatus::Running(url) => match host_backend_env(&generic.env_key, &url, &def, &repo_dir)
+        {
+            Ok(env) => ManifestHostResolution::Ready { url, env },
+            Err(err) => ManifestHostResolution::Offline(err),
+        },
+        DaemonStatus::Offline(reason) => ManifestHostResolution::Offline(reason),
+        DaemonStatus::Spawning => ManifestHostResolution::Offline("daemon 仍在拉起中".to_string()),
+    }
+}
+
+/// [`probe_manifest_host`] 的结果——只探不孵（不 spawn、不持锁）。
+#[derive(Debug, Clone)]
+pub enum ManifestHostProbe {
+    NotDeclared,
+    Invalid(String),
+    Ready { url: String, env: HostBackendEnv },
+    NotReady(String),
+}
+
+/// 只读探测入口：manifest 查表 → 健康核验（同一接口合同）→ 宿主 env。
+/// 未就绪返回 [`ManifestHostProbe::NotReady`]，调用方决定是否走
+/// [`resolve_manifest_host`] 的完整 ensure（拉起/复用）路径。
+pub fn probe_manifest_host(parent: &Path, name: &str) -> ManifestHostProbe {
+    let (repo_dir, def) =
+        match crate::ui::app_registry::manifest_daemon_lookup_checked(parent, name) {
+            Ok(Some(found)) => found,
+            Ok(None) => return ManifestHostProbe::NotDeclared,
+            Err(reason) => return ManifestHostProbe::Invalid(reason),
+        };
+    let generic = generic_daemon_from_manifest(name, &repo_dir, &def);
+    let spec = HealthSpec::declaring(
+        &generic.url,
+        generic.health_interface.as_deref(),
+        std::time::Duration::from_millis(800),
+    );
+    match probe_health(&spec) {
+        HealthVerdict::Ready => match host_backend_env(&generic.env_key, &generic.url, &def, &repo_dir)
+        {
+            Ok(env) => ManifestHostProbe::Ready {
+                url: generic.url,
+                env,
+            },
+            Err(err) => ManifestHostProbe::Invalid(err),
+        },
+        other => ManifestHostProbe::NotReady(other.reason()),
+    }
+}
+
 /// 桌面本会话是否拉起过 daemon（复用判定/UX 文案；detached 语义下不持
 /// Child——桌面退出不杀 daemon，句柄即刻放掉，只留"曾拉起"记录）。
 static DID_SPAWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -775,12 +1162,29 @@ pub struct GenericDaemon {
     pub health_interface: Option<String>,
     /// PLAN-083 T-01：声明就绪预算（`None` = 调用方缺省 5s）。
     pub ready_timeout: Option<std::time::Duration>,
+    /// PLAN-083 T-02：服务进程额外 env（manifest `daemon.env` 非敏感 literal；
+    /// 端口键由 [`GenericDaemon::spawn_env`] 追加并覆盖）。
+    pub extra_env: Vec<(String, String)>,
 }
 
 impl GenericDaemon {
     /// PLAN-083 T-01：本次就绪预算（manifest 声明优先于调用方缺省）。
     pub fn effective_ready_timeout(&self, fallback: std::time::Duration) -> std::time::Duration {
         self.ready_timeout.unwrap_or(fallback)
+    }
+
+    /// PLAN-083 T-02：spawn 投递 env（声明 literal + 端口覆盖键；端口以目标
+    /// url 为权威，同名声明被覆盖）。
+    pub fn spawn_env(&self) -> Vec<(String, String)> {
+        let port_key = self.env_port_key.as_str();
+        let mut env: Vec<(String, String)> = self
+            .extra_env
+            .iter()
+            .filter(|(key, _)| key != port_key)
+            .cloned()
+            .collect();
+        env.push((port_key.to_string(), port_of(&self.url).to_string()));
+        env
     }
 }
 
@@ -814,7 +1218,7 @@ pub fn ensure_generic_io(
             def.name, def.url
         ));
     };
-    let env = vec![(def.env_port_key.clone(), port_of(&def.url).to_string())];
+    let env = def.spawn_env();
     if let Err(err) = io.spawn(path, &env) {
         return DaemonStatus::Offline(format!(
             "daemon `{}` spawn {} 失败: {err}",
@@ -874,7 +1278,7 @@ pub fn ensure_generic_strict(
             def.name, def.url
         ));
     };
-    let env = vec![(def.env_port_key.clone(), port_of(&def.url).to_string())];
+    let env = def.spawn_env();
     if let Err(err) = io.spawn(path, &env) {
         return DaemonStatus::Offline(format!(
             "daemon `{}` spawn {} 失败: {err}",
@@ -1355,6 +1759,7 @@ mod tests {
             env_port_key: "MUSK_BACK_PORT".to_string(),
             health_interface: None,
             ready_timeout: None,
+            extra_env: Vec::new(),
         }
     }
 
@@ -1749,5 +2154,308 @@ mod tests {
             other => panic!("应 Offline，实际 {other:?}"),
         }
         assert_eq!(io.spawn_calls, 0);
+    }
+
+    // ─── PLAN-083 T-02：服务/宿主配置边界（D-03） ─────────────────────────
+
+    use auto_ui_compiler::app_registry::{
+        ManifestDaemon, ManifestDaemonCredential, ManifestDaemonHost,
+    };
+
+    fn temp_root(tag: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "autoui-083-t02-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    fn manifest_def(port: u16) -> ManifestDaemon {
+        ManifestDaemon {
+            port,
+            bin: Some("target/release/notes-service".to_string()),
+            env_port: Some("AUTO_HTTP_PORT".to_string()),
+            health_interface: Some("notes.fpack/1".to_string()),
+            ready_timeout_ms: None,
+            env: Default::default(),
+            host: None,
+        }
+    }
+
+    fn write_policy(dir: &Path, entries: &[(&str, &str)]) -> PathBuf {
+        let entries_json: Vec<String> = entries
+            .iter()
+            .map(|(principal, cred)| {
+                format!(
+                    r#"{{"principal":"{principal}","cred":"{cred}","operations":["read"],"book_scopes":[]}}"#
+                )
+            })
+            .collect();
+        let path = dir.join("fp-policy.json");
+        std::fs::write(
+            &path,
+            format!(r#"{{"entries":[{}]}}"#, entries_json.join(",")),
+        )
+        .unwrap();
+        path
+    }
+
+    #[test]
+    fn managed_credential_resolves_without_leaking_value() {
+        let root = temp_root("cred");
+        let cred = "ab".repeat(32);
+        let policy = write_policy(&root, &[("fp-reader", cred.as_str()), ("other", "cd")]);
+        let reference = ManagedCredentialRef {
+            env_key: "NOTES_FP_CRED".to_string(),
+            path: policy.clone(),
+            principal: "fp-reader".to_string(),
+            field: "cred".to_string(),
+        };
+        assert_eq!(reference.resolve().as_deref(), Ok(cred.as_str()));
+        assert!(
+            !reference.diagnostic().contains(cred.as_str()),
+            "诊断不含凭据值：{}",
+            reference.diagnostic()
+        );
+        assert!(
+            !format!("{reference:?}").contains(cred.as_str()),
+            "Debug 不含凭据值"
+        );
+        // 主体缺席：具名错误，回显主体/路径但不含任何凭据值。
+        let missing = ManagedCredentialRef {
+            principal: "no-such".to_string(),
+            ..reference.clone()
+        };
+        let err = missing.resolve().expect_err("缺主体必须失败");
+        assert!(err.contains("no-such") && err.contains("fp-policy.json"), "{err}");
+        assert!(!err.contains(cred.as_str()), "错误不回显凭据值: {err}");
+        // 文件不可读。
+        let absent = ManagedCredentialRef {
+            path: root.join("nope.json"),
+            ..reference.clone()
+        };
+        assert!(absent.resolve().is_err());
+        // 字段缺席。
+        let no_field = ManagedCredentialRef {
+            field: "nope".to_string(),
+            ..reference.clone()
+        };
+        assert!(no_field.resolve().is_err());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn host_backend_env_isolates_two_hosts() {
+        let root_a = temp_root("host-a");
+        let root_b = temp_root("host-b");
+        let cred_a = "11".repeat(32);
+        let cred_b = "22".repeat(32);
+        let policy_a = write_policy(&root_a, &[("fp-reader", cred_a.as_str())]);
+        let policy_b = write_policy(&root_b, &[("fp-reader", cred_b.as_str())]);
+
+        let mut def_a = manifest_def(17819);
+        def_a.host = Some(ManifestDaemonHost {
+            env: [("NOTES_RETRY".to_string(), "1".to_string())]
+                .into_iter()
+                .collect(),
+            credential: Some(ManifestDaemonCredential {
+                env: "NOTES_FP_CRED".to_string(),
+                path: Some(policy_a.to_string_lossy().to_string()),
+                principal: "fp-reader".to_string(),
+                field: "cred".to_string(),
+            }),
+        });
+        let mut def_b = manifest_def(17820);
+        def_b.host = Some(ManifestDaemonHost {
+            env: [("NOTES_RETRY".to_string(), "2".to_string())]
+                .into_iter()
+                .collect(),
+            credential: Some(ManifestDaemonCredential {
+                env: "NOTES_FP_CRED".to_string(),
+                path: Some(policy_b.to_string_lossy().to_string()),
+                principal: "fp-reader".to_string(),
+                field: "cred".to_string(),
+            }),
+        });
+
+        let env_a = host_backend_env(
+            "NOTES_DAEMON",
+            "http://127.0.0.1:17819",
+            &def_a,
+            &root_a,
+        )
+        .expect("A 宿主配置");
+        let env_b = host_backend_env(
+            "NOTES_DAEMON",
+            "http://127.0.0.1:17820",
+            &def_b,
+            &root_b,
+        )
+        .expect("B 宿主配置");
+
+        let get = |env: &HostBackendEnv, key: &str| {
+            env.entries
+                .iter()
+                .find(|(k, _)| k == key)
+                .map(|(_, v)| v.clone())
+        };
+        assert_eq!(get(&env_a, "NOTES_DAEMON").as_deref(), Some("http://127.0.0.1:17819"));
+        assert_eq!(get(&env_b, "NOTES_DAEMON").as_deref(), Some("http://127.0.0.1:17820"));
+        assert_eq!(get(&env_a, "NOTES_RETRY").as_deref(), Some("1"));
+        assert_eq!(get(&env_b, "NOTES_RETRY").as_deref(), Some("2"));
+        assert_eq!(get(&env_a, "NOTES_FP_CRED").as_deref(), Some(cred_a.as_str()));
+        assert_eq!(get(&env_b, "NOTES_FP_CRED").as_deref(), Some(cred_b.as_str()));
+        assert!(
+            !env_a.entries.iter().any(|(_, v)| v == &cred_b),
+            "A 不得看到 B 的凭据"
+        );
+        assert!(
+            !env_b.entries.iter().any(|(_, v)| v == &cred_a),
+            "B 不得看到 A 的凭据"
+        );
+        assert_eq!(env_a.credential_env.as_deref(), Some("NOTES_FP_CRED"));
+        // remove 覆盖全部投递键：子进程不得继承宿主同名历史值。
+        for key in ["NOTES_DAEMON", "NOTES_RETRY", "NOTES_FP_CRED"] {
+            assert!(env_a.remove.iter().any(|k| k == key), "remove 缺 {key}");
+            assert!(env_b.remove.iter().any(|k| k == key), "remove 缺 {key}");
+        }
+        // 非凭据条目可用于 in-proc 注入；凭据只走子进程。
+        let non_secret: Vec<(&str, &str)> = env_a.non_secret_entries().collect();
+        assert!(non_secret.iter().any(|(k, _)| *k == "NOTES_DAEMON"));
+        assert!(!non_secret.iter().any(|(k, _)| *k == "NOTES_FP_CRED"));
+        assert!(env_a.has_credentials());
+        assert!(!format!("{env_a:?}").contains(cred_a.as_str()), "Debug 打码凭据");
+        assert!(format!("{env_a:?}").contains("<managed-credential>"));
+        let _ = std::fs::remove_dir_all(&root_a);
+        let _ = std::fs::remove_dir_all(&root_b);
+    }
+
+    #[test]
+    fn host_backend_env_reports_missing_managed_config() {
+        let root = temp_root("host-missing");
+        let mut def = manifest_def(17819);
+        def.host = Some(ManifestDaemonHost {
+            env: Default::default(),
+            credential: Some(ManifestDaemonCredential {
+                env: "NOTES_FP_CRED".to_string(),
+                path: Some(root.join("absent.json").to_string_lossy().to_string()),
+                principal: "fp-reader".to_string(),
+                field: "cred".to_string(),
+            }),
+        });
+        let err = host_backend_env("NOTES_DAEMON", "http://127.0.0.1:17819", &def, &root)
+            .expect_err("受管配置缺席必须具名失败");
+        assert!(err.contains("fp-reader") && err.contains("absent.json"), "{err}");
+        // 无 host 声明：只有地址键，且无凭据。
+        let plain = manifest_def(17819);
+        let env = host_backend_env("NOTES_DAEMON", "http://127.0.0.1:17819", &plain, &root)
+            .expect("纯地址");
+        assert_eq!(env.entries.len(), 1);
+        assert!(!env.has_credentials());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn service_env_keeps_declared_config_and_port_authority() {
+        let mut def = manifest_def(17819);
+        def.env.insert("AUTO_HTTP_PORT".to_string(), "9999".to_string());
+        def.env.insert("NOTES_DATA_DIR".to_string(), "D:/data".to_string());
+        let generic = generic_daemon_from_manifest("015-notes", Path::new("Z:/repo"), &def);
+        let env = generic.spawn_env();
+        assert!(
+            env.iter().any(|(k, v)| k == "NOTES_DATA_DIR" && v == "D:/data"),
+            "声明服务配置随 spawn 投递: {env:?}"
+        );
+        assert_eq!(
+            env.iter().filter(|(k, _)| k == "AUTO_HTTP_PORT").count(),
+            1,
+            "端口键唯一"
+        );
+        assert_eq!(
+            env.iter()
+                .find(|(k, _)| k == "AUTO_HTTP_PORT")
+                .map(|(_, v)| v.as_str()),
+            Some("17819"),
+            "端口以目标 url 为权威（覆盖同名声明）"
+        );
+    }
+
+    #[test]
+    fn expand_env_path_expands_known_vars_and_keeps_unknown() {
+        std::env::set_var("PLAN083_TEST_HOME", "D:/autoui-home");
+        assert_eq!(
+            expand_env_path("%PLAN083_TEST_HOME%/data"),
+            "D:/autoui-home/data"
+        );
+        assert_eq!(
+            expand_env_path("$PLAN083_TEST_HOME/data"),
+            "D:/autoui-home/data"
+        );
+        assert_eq!(
+            expand_env_path("${PLAN083_TEST_HOME}/data"),
+            "D:/autoui-home/data"
+        );
+        assert_eq!(
+            expand_env_path("%PLAN083_NO_SUCH_VAR%/data"),
+            "%PLAN083_NO_SUCH_VAR%/data",
+            "未知变量原样保留"
+        );
+        std::env::remove_var("PLAN083_TEST_HOME");
+    }
+
+    #[test]
+    fn probe_manifest_host_reports_declared_shapes_without_spawning() {
+        // 未声明：临时 parent 下无 auto-os 清单；resolve 序会回落主检出
+        // `D:/autostack/auto-os`（真实清单），故用清单里不存在的名。
+        let parent = temp_root("probe-none");
+        assert!(matches!(
+            probe_manifest_host(&parent, "no-such-daemon-083"),
+            ManifestHostProbe::NotDeclared
+        ));
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // 声明非法：具名 Invalid（不 spawn）。
+        let parent = temp_root("probe-invalid");
+        let os_root = parent.join("auto-os");
+        std::fs::create_dir_all(&os_root).unwrap();
+        std::fs::write(
+            os_root.join("apps.manifest"),
+            r#"{"apps":[{"id":"015-notes","repo":"../auto-notes","daemon":{"port":17819,"health_interface":"bogus"}}]}"#,
+        )
+        .unwrap();
+        match probe_manifest_host(&parent, "015-notes") {
+            ManifestHostProbe::Invalid(reason) => {
+                assert!(reason.contains("health_interface"), "{reason}")
+            }
+            other => panic!("非法声明应 Invalid，实际 {other:?}"),
+        }
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // 声明合法但无监听：NotReady（只探不孵）。
+        let parent = temp_root("probe-notready");
+        let os_root = parent.join("auto-os");
+        std::fs::create_dir_all(&os_root).unwrap();
+        let dead = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = dead.local_addr().unwrap().port();
+        drop(dead);
+        std::fs::write(
+            os_root.join("apps.manifest"),
+            format!(
+                r#"{{"apps":[{{"id":"015-notes","repo":"../auto-notes","daemon":{{"port":{port},"health_interface":"notes.fpack/1"}}}}]}}"#
+            ),
+        )
+        .unwrap();
+        match probe_manifest_host(&parent, "015-notes") {
+            ManifestHostProbe::NotReady(reason) => {
+                assert!(reason.contains("无监听"), "{reason}")
+            }
+            other => panic!("无监听应 NotReady，实际 {other:?}"),
+        }
+        let _ = std::fs::remove_dir_all(&parent);
     }
 }

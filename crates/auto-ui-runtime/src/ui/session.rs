@@ -2763,6 +2763,17 @@ pub struct ShellRespawnState {
     pub window_start: std::time::Instant,
 }
 
+/// PLAN-083 T-02：daemon 环境投递模式。
+/// - `InProc`：应用在本进程解释执行——只能投递非敏感键（进程全局
+///   `Env.get`），凭据不写全局（具名接口缺口）。
+/// - `Child`：应用在独立进程（native exe / Rust API 后端）——地址、literal
+///   与受管凭据随子进程 spawn 精确投递，互不污染。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DaemonEnvDelivery {
+    InProc,
+    Child,
+}
+
 /// LaunchApp 的启动材料（单测内联注入；生产侧由 T7 注册表解析供给）。
 pub struct LaunchSpec {
     /// .at 源码（`auto run` 同管线编译装载）。
@@ -4095,14 +4106,27 @@ impl DesktopSession {
     /// （T-05 生成 main gate）：无 `run` 子命令、不注入 `AUTO_386_APP_ROOT`
     /// 解释根；参数面与解释态同形（`--app386=<dir>` 在 native 侧为 Hello
     /// app_name 覆盖——宿主认领按目录名匹配同源）。NEXTEST_* 剥除同款。
+    ///
+    /// PLAN-083 T-02：`host_env` 为已解析的宿主后端配置（地址/literal/受管
+    /// 凭据），在**子进程 spawn 时**精确投递，并剔除继承的同名键（避免宿主
+    /// 历史值泄漏或覆盖）；不写宿主进程全局。
     fn spawn_exe_child(
         exe: &std::path::Path,
         child_name: &str,
         broker_pipe: &str,
         render: Option<&str>,
+        host_env: Option<&crate::ui::osconfig_daemon::HostBackendEnv>,
     ) -> std::io::Result<std::process::Child> {
         let mut cmd = std::process::Command::new(exe);
         cmd.args(Self::spawn_exe_child_args(child_name, broker_pipe, render));
+        if let Some(env) = host_env {
+            for key in &env.remove {
+                cmd.env_remove(key);
+            }
+            for (key, value) in &env.entries {
+                cmd.env(key, value);
+            }
+        }
         // AUTO_OUTPROC_STDERR=1 诊断口：继承宿主 stderr（子进程 panic 可见）。
         let inherit = std::env::var("AUTO_OUTPROC_STDERR").is_ok();
         cmd.stdin(std::process::Stdio::null())
@@ -4283,7 +4307,7 @@ impl DesktopSession {
             .clone()
             .ok_or_else(|| "app registry unavailable".to_string())?;
         let spec = resolver(name).ok_or_else(|| format!("app not found: {name}"))?;
-        self.ensure_daemon_if_declared(&spec);
+        let _ = self.ensure_daemon_if_declared(&spec, DaemonEnvDelivery::InProc);
         // Plan 501：外部后端根（pac `back: { project }`）——`back.*` 模块
         // 链接式契约的解析根 + cdylib 桩桥装载（os-config 形态：本地
         // src/back/api.at 残缺、后端 api.at 为桩——#[api] 真身在 cdylib，
@@ -4405,20 +4429,28 @@ impl DesktopSession {
     }
 
     /// Plan 501：daemon 依赖 App（pac `daemon: <name>`）的宿主侧就绪序
-    /// （launch 两形态共用——env 进程级，outproc 子进程 spawn 继承）——
-    /// 检活/spawn/就绪轮询 + `<NAME>_DAEMON` env 注入；Offline 不阻断
-    /// launch，原因记 osconfig_status 供徽标。
+    /// （launch 两形态共用；Offline 不阻断 launch，原因记 osconfig_status
+    /// 供徽标）。
     ///
-    /// PLAN-013 T2：`autoos` 名走既有链（D4 零回归门）；其余名查
-    /// apps.manifest `daemon` 字段（懒读一次，不驻状态）——查无此名
-    /// Offline 有因（含 manifest 未声明情形），同样不阻断。
-    fn ensure_daemon_if_declared(&mut self, spec: &LaunchSpec) {
+    /// PLAN-013 T2：per-name manifest daemon 就绪序——apps.manifest 条目
+    /// `daemon: { port, bin?, env_port? }` 经运行时统一入口 ensure；Running 期
+    /// 按 [`DaemonEnvDelivery`] 投递环境（in-proc = 非敏感键进程全局注入，
+    /// 旧 `<NAME>_DAEMON=<url>` 语义保持；独立进程后端 = 随子进程 spawn 投递）。
+    ///
+    /// PLAN-083 T-01/T-02：`health_interface`/`ready_timeout_ms` 进入统一
+    /// ensure（缺席 = 旧 2xx 语义与 5s 预算）；声明非法/错版/占用者 → 具名
+    /// Offline。宿主配置（地址 literal + 受管凭据）只在子进程投递；in-proc
+    /// 拿不到凭据时记具名接口缺口，绝不把凭据写入进程全局。
+    fn ensure_daemon_if_declared(
+        &mut self,
+        spec: &LaunchSpec,
+        delivery: DaemonEnvDelivery,
+    ) -> Option<crate::ui::osconfig_daemon::HostBackendEnv> {
         let Some(name) = spec.daemon.as_deref() else {
-            return;
+            return None;
         };
         if name != "autoos" {
-            self.ensure_manifest_daemon(name);
-            return;
+            return self.ensure_manifest_daemon(name, delivery);
         }
         let status = match &self.desktop.osconfig_daemon_probe {
             Some(probe) => probe(),
@@ -4433,74 +4465,61 @@ impl DesktopSession {
             }
         }
         self.desktop.osconfig_status = status;
+        None
     }
 
-    /// PLAN-013 T2：per-name manifest daemon 就绪序——apps.manifest 条目
-    /// `daemon: { port, bin?, env_port? }` 组装 [`GenericDaemon`] 走泛化链；
-    /// Running 期注入 `<NAME>_DAEMON=<url>`（派生规则见
-    /// [`daemon_env_key`]，`autoos` 名与旧键恒等同构）。
-    ///
-    /// PLAN-083 T-01：`health_interface`/`ready_timeout_ms` 随声明进入
-    /// [`GenericDaemon`]（缺席 = 旧 2xx 语义与 5s 预算）；声明非法走具名
-    /// Offline，不退回旧探活。
-    fn ensure_manifest_daemon(&mut self, name: &str) {
-        use crate::ui::osconfig_daemon::{daemon_env_key, ensure_generic_io, GenericDaemon};
+    /// PLAN-083 T-02：manifest daemon 就绪 + 宿主后端 env 解析（统一入口，
+    /// 与桌面 Vue 后端启动器同源）。
+    fn ensure_manifest_daemon(
+        &mut self,
+        name: &str,
+        delivery: DaemonEnvDelivery,
+    ) -> Option<crate::ui::osconfig_daemon::HostBackendEnv> {
+        use crate::ui::osconfig_daemon::{DaemonStatus, ManifestHostResolution};
         // 解析序内建（resolve_os_manifest_root：AUTO_OS_ROOT env 权威 →
-        // 兄弟 ../auto-os → 主检出 D:/autostack/auto-os）——单次 lookup
+        // 兄弟 ../auto-os → 主检出 D:/autostack/auto-os）——单次入口
         // 即覆盖 desktop.sh 注入与开发机两形态，无需 session 侧再分臂。
-        let (repo_dir, def) =
-            match crate::ui::app_registry::manifest_daemon_lookup_checked(
-                std::path::Path::new(".."),
-                name,
-            ) {
-                Ok(Some(found)) => found,
-                Ok(None) => {
-                    self.desktop.osconfig_status = crate::ui::osconfig_daemon::DaemonStatus::Offline(
-                        format!("daemon `{name}` 未在 apps.manifest 声明（daemon 字段缺席或条目未登记）"),
-                    );
-                    return;
-                }
-                Err(reason) => {
-                    self.desktop.osconfig_status =
-                        crate::ui::osconfig_daemon::DaemonStatus::Offline(reason);
-                    return;
-                }
-            };
-        let generic = GenericDaemon {
-            name: name.to_string(),
-            url: format!("http://127.0.0.1:{}", def.port),
-            // Windows 平台补全：manifest bin 写平台中性相对路径（不带
-            // .exe），原路径不存在时追加扩展名（CreateProcess 语义对齐）。
-            bin: def.bin.as_deref().map(|rel| {
-                let p = repo_dir.join(rel);
-                if cfg!(windows) && !p.is_file() {
-                    std::path::PathBuf::from(format!("{}.exe", p.display()))
-                } else {
-                    p
-                }
-            }),
-            env_key: daemon_env_key(name),
-            env_port_key: def.env_port.clone().unwrap_or_else(|| {
-                format!(
-                    "{}_BACK_PORT",
-                    daemon_env_key(name).trim_end_matches("_DAEMON")
-                )
-            }),
-            health_interface: def.health_interface.clone(),
-            ready_timeout: def
-                .ready_timeout_ms
-                .map(std::time::Duration::from_millis),
-        };
-        let status = ensure_generic_io(
-            &generic,
-            &mut crate::ui::osconfig_daemon::RealDaemonIo::new(),
+        let resolution = crate::ui::osconfig_daemon::resolve_manifest_host(
+            std::path::Path::new(".."),
+            name,
             std::time::Duration::from_secs(5),
         );
-        if let crate::ui::osconfig_daemon::DaemonStatus::Running(url) = &status {
-            // 单键短值写，UI 线程唯一写点（同 autoos 臂约定）。
-            std::env::set_var(&generic.env_key, url);
+        match resolution {
+            ManifestHostResolution::NotDeclared => {
+                self.desktop.osconfig_status = DaemonStatus::Offline(format!(
+                    "daemon `{name}` 未在 apps.manifest 声明（daemon 字段缺席或条目未登记）"
+                ));
+                None
+            }
+            ManifestHostResolution::Invalid(reason) => {
+                self.desktop.osconfig_status = DaemonStatus::Offline(reason);
+                None
+            }
+            ManifestHostResolution::Offline(reason) => {
+                self.desktop.osconfig_status = DaemonStatus::Offline(reason);
+                None
+            }
+            ManifestHostResolution::Ready { url, env } => {
+                self.desktop.osconfig_status = DaemonStatus::Running(url);
+                match delivery {
+                    DaemonEnvDelivery::InProc => {
+                        for (key, value) in env.non_secret_entries() {
+                            std::env::set_var(key, value);
+                        }
+                        if env.has_credentials() {
+                            // R3：进程全局 Env.get 无法按宿主隔离凭据——
+                            // 只投递给独立进程后端，绝不写全局（不假装隔离）。
+                            eprintln!(
+                                "[plan083] daemon `{name}` 的宿主凭据无法投递给 in-proc 应用\
+                                 （Env.get 进程全局接口缺口）；仅独立进程后端持有凭据"
+                            );
+                        }
+                    }
+                    DaemonEnvDelivery::Child => {}
+                }
+                Some(env)
+            }
         }
-        self.desktop.osconfig_status = status;
     }
 
     /// Plan 508 G1：outproc 孵化臂——注册表校验（错误语义与 inproc 臂
@@ -4521,7 +4540,7 @@ impl DesktopSession {
             .clone()
             .ok_or_else(|| "app registry unavailable".to_string())?;
         let spec = resolver(name).ok_or_else(|| format!("app not found: {name}"))?;
-        self.ensure_daemon_if_declared(&spec);
+        let host_env = self.ensure_daemon_if_declared(&spec, DaemonEnvDelivery::Child);
         let (child_name, app_root) = Self::outproc_child_identity(&spec, name);
         // broker 管道：会话登记值（505）> 缺省常量——自定义管道桌面同链。
         let broker_pipe = self
@@ -4546,7 +4565,7 @@ impl DesktopSession {
                     "[session] launch_app(outproc-native) {name} <- {}",
                     exe.display()
                 );
-                Self::spawn_exe_child(exe, &child_name, &broker_pipe, spec.render_decl.as_deref())
+                Self::spawn_exe_child(exe, &child_name, &broker_pipe, spec.render_decl.as_deref(), host_env.as_ref())
                     .map_err(|e| format!("spawn outproc child: {e}"))?
             }
         };
@@ -7107,7 +7126,7 @@ impl DesktopSession {
         // 后端供给链与 launch_app 同序同源（daemon → 外部 back → proxy
         // 决策树）；失败降级语义两链一致（daemon Offline 不阻断、proxy
         // 懒启失败 degrade 继续孵化——前端拿可诊断的连接错误）。
-        self.ensure_daemon_if_declared(&spec);
+        let _ = self.ensure_daemon_if_declared(&spec, DaemonEnvDelivery::InProc);
         if let Some(back_root) = &spec.back_root {
             if back_root.is_dir() {
                 auto_lang_core::set_external_back_root(back_root.clone());

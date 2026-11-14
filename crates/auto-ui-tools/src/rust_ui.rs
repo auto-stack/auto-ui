@@ -7264,16 +7264,23 @@ fn start_api_server_fresh(project_dir: &Path) -> Result<Option<std::process::Chi
 }
 
 pub fn start_api_server(project_dir: &Path) -> Result<Option<std::process::Child>, String> {
-    start_api_server_inner(project_dir, true)
+    start_api_server_inner(project_dir, true, None)
 }
 
 /// Desktop apps never clear a port or reuse an unrelated listener. The
 /// generator and process ownership path is otherwise the single-app launcher.
-pub(crate) fn start_desktop_api_server(project_dir: &Path) -> Result<Option<std::process::Child>, String> {
-    start_api_server_inner(project_dir, false)
+pub(crate) fn start_desktop_api_server(
+    project_dir: &Path,
+    host_env: Option<&auto_ui_runtime::ui::osconfig_daemon::HostBackendEnv>,
+) -> Result<Option<std::process::Child>, String> {
+    start_api_server_inner(project_dir, false, host_env)
 }
 
-fn start_api_server_inner(project_dir: &Path, clear_port: bool) -> Result<Option<std::process::Child>, String> {
+fn start_api_server_inner(
+    project_dir: &Path,
+    clear_port: bool,
+    host_env: Option<&auto_ui_runtime::ui::osconfig_daemon::HostBackendEnv>,
+) -> Result<Option<std::process::Child>, String> {
     // daemon-ensure 语义（auto-os apps.manifest / pac.at back_port daemon 链）：
     // AUTO_REUSE_BACKEND=1 且端口已有活监听时直接复用——不杀（Plan 354 的
     // kill 会打断产品链先起好的真后端）、不重生成、不再 spawn 生成的
@@ -7411,9 +7418,19 @@ fn start_api_server_inner(project_dir: &Path, clear_port: bool) -> Result<Option
     let api_server: Result<Option<std::process::Child>, String> = if crate::proc_host::current()
         .is_some()
     {
-        let spec =
+        let mut spec =
             crate::proc_host::TrackedSpawn::new(executable.to_string_lossy().to_string(), vec![])
                 .with_cwd(project_dir);
+        // PLAN-083 T-02：宿主后端配置（地址/literal/受管凭据）随子进程
+        // 精确投递；先剔除继承的同名键，避免宿主历史值泄漏或覆盖身份。
+        if let Some(env) = host_env {
+            for key in &env.remove {
+                spec = spec.without_env(key);
+            }
+            for (key, value) in &env.entries {
+                spec = spec.with_env(key, value);
+            }
+        }
         match crate::proc_host::spawn_tracked(spec, "api-server") {
             Ok(child) => {
                 tracked = Some(child);
@@ -7422,11 +7439,20 @@ fn start_api_server_inner(project_dir: &Path, clear_port: bool) -> Result<Option
             Err(e) => Err(format!("Failed to start API server: {e}")),
         }
     } else {
-        std::process::Command::new(&executable)
-            .current_dir(project_dir)
+        let mut cmd = std::process::Command::new(&executable);
+        cmd.current_dir(project_dir)
             .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
-            .spawn()
+            .stderr(std::process::Stdio::inherit());
+        // PLAN-083 T-02：同一投递纪律（非托管路径也不能靠宿主全局 env）。
+        if let Some(env) = host_env {
+            for key in &env.remove {
+                cmd.env_remove(key);
+            }
+            for (key, value) in &env.entries {
+                cmd.env(key, value);
+            }
+        }
+        cmd.spawn()
             .map(Some)
             .map_err(|e| format!("Failed to start API server: {e}"))
     };

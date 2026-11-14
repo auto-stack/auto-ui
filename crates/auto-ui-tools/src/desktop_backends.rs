@@ -107,11 +107,38 @@ impl DesktopBackends {
                 )
                 .into());
             }
+            // PLAN-083 T-02：声明的 daemon 宿主配置（地址/literal/受管凭据）
+            // 必须在后端首次请求前可见——这里只探不孵（拉起/复用与跨进程
+            // 协调归共享 provider 路径），已就绪才投递；未就绪保持既有
+            // 语义（随后 app launch 的 ensure 负责拉起）。
+            let host_env = match auto_ui_runtime::ui::osconfig_daemon::probe_manifest_host(
+                std::path::Path::new(".."),
+                &app.id,
+            ) {
+                auto_ui_runtime::ui::osconfig_daemon::ManifestHostProbe::Ready { env, .. } => {
+                    Some(env)
+                }
+                auto_ui_runtime::ui::osconfig_daemon::ManifestHostProbe::Invalid(reason) => {
+                    eprintln!(
+                        "[plan083] desktop app {}: 声明能力非法，拒绝启动其后端——{reason}",
+                        app.id
+                    );
+                    return Err(format!("desktop app {}: {reason}", app.id).into());
+                }
+                auto_ui_runtime::ui::osconfig_daemon::ManifestHostProbe::NotReady(reason) => {
+                    eprintln!(
+                        "[plan083] desktop app {}: 声明 daemon 未就绪（{reason}），后端按既有链启动",
+                        app.id
+                    );
+                    None
+                }
+                auto_ui_runtime::ui::osconfig_daemon::ManifestHostProbe::NotDeclared => None,
+            };
             let old_port = std::env::var_os("AUTO_HTTP_PORT");
             let old_base = std::env::var_os("AUTO_HTTP_BASE");
             std::env::set_var("AUTO_HTTP_PORT", app.port.to_string());
             std::env::remove_var("AUTO_HTTP_BASE");
-            let launched = crate::rust_ui::start_desktop_api_server(&app.root);
+            let launched = crate::rust_ui::start_desktop_api_server(&app.root, host_env.as_ref());
             for (key, old) in [("AUTO_HTTP_PORT", old_port), ("AUTO_HTTP_BASE", old_base)] {
                 if let Some(value) = old {
                     std::env::set_var(key, value);

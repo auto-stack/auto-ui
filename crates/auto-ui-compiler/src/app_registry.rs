@@ -702,6 +702,47 @@ pub struct ManifestDaemon {
     /// 缺席 = 调用方缺省（UiSession 现行 5000ms）。
     #[serde(default)]
     pub ready_timeout_ms: Option<u64>,
+    /// PLAN-083 T-02：**服务进程**配置（spawn 时投递给 daemon 进程的
+    /// 非敏感 literal，如数据根/policy 路径）。键值都是公开声明——凭据一律
+    /// 走 [`ManifestDaemonHost::credential`] 的受管引用（[`ManifestDaemon::validate`]
+    /// 对疑似凭据键/值具名拒绝）。
+    #[serde(default)]
+    pub env: std::collections::BTreeMap<String, String>,
+    /// PLAN-083 T-02：**宿主后端**配置（公开声明与私有凭据引用的分界；只
+    /// 在独立进程后端投递——in-proc 进程全局 `Env.get` 是已记录的接口缺口）。
+    #[serde(default)]
+    pub host: Option<ManifestDaemonHost>,
+}
+
+/// PLAN-083 T-02：宿主后端声明——`env` 为非敏感 literal（地址/开关），
+/// `credential` 为受管凭据引用（值在运行时从 OS 签发文件解析，永不进
+/// manifest/日志）。
+#[derive(serde::Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct ManifestDaemonHost {
+    #[serde(default)]
+    pub env: std::collections::BTreeMap<String, String>,
+    #[serde(default)]
+    pub credential: Option<ManifestDaemonCredential>,
+}
+
+/// PLAN-083 T-02：受管凭据引用（OS 签发形态：`entries[].{principal,cred,...}`
+/// 的 policy 文件）。`path` 缺席 = 调用方基目录下 `fp-policy.json`。
+#[derive(serde::Deserialize, Clone, Debug, PartialEq)]
+pub struct ManifestDaemonCredential {
+    /// 投递给宿主后端的 env 键（如 `NOTES_FP_CRED`）。
+    pub env: String,
+    /// 受管 policy 文件路径（支持 `%VAR%`/`$VAR` 展开；缺席 = 基目录缺省）。
+    #[serde(default)]
+    pub path: Option<String>,
+    /// 凭据主体（policy `entries[].principal`，如 `fp-reader`）。
+    pub principal: String,
+    /// 取哪个字段（缺省 `cred`）。
+    #[serde(default = "os_manifest_default_credential_field")]
+    pub field: String,
+}
+
+fn os_manifest_default_credential_field() -> String {
+    "cred".to_string()
 }
 
 /// PLAN-083 T-01：`daemon.ready_timeout_ms` 下界（低于此值无法覆盖一次
@@ -712,8 +753,8 @@ pub const DAEMON_READY_TIMEOUT_MS_MIN: u64 = 200;
 pub const DAEMON_READY_TIMEOUT_MS_MAX: u64 = 60_000;
 
 impl ManifestDaemon {
-    /// PLAN-083 T-01：可选能力校验——新字段非法时给具名拒绝，由调用方映射
-    /// 为 Offline（不 spawn、不退回旧探活）。
+    /// PLAN-083 T-01/T-02：可选能力校验——新字段非法时给具名拒绝，由调用方映射
+    /// 为 Offline（不 spawn、不退回旧探活）；公开 manifest 不得携带明文凭据。
     pub fn validate(&self) -> Result<(), String> {
         if let Some(iface) = self.health_interface.as_deref() {
             validate_health_interface(iface)?;
@@ -726,8 +767,103 @@ impl ManifestDaemon {
                 ));
             }
         }
+        if let Some(key) = self.env_port.as_deref() {
+            validate_env_key("daemon.env_port", key)?;
+        }
+        validate_env_map("daemon.env", &self.env)?;
+        if let Some(host) = &self.host {
+            validate_env_map("daemon.host.env", &host.env)?;
+            if let Some(cred) = &host.credential {
+                validate_env_key("daemon.host.credential.env", &cred.env)?;
+                if cred.principal.trim().is_empty() {
+                    return Err("daemon.host.credential.principal 为空".to_string());
+                }
+                if cred.principal.chars().any(char::is_control) {
+                    return Err("daemon.host.credential.principal 含控制符".to_string());
+                }
+                if cred.field.trim().is_empty() {
+                    return Err("daemon.host.credential.field 为空".to_string());
+                }
+                if let Some(path) = &cred.path {
+                    if path.trim().is_empty() {
+                        return Err("daemon.host.credential.path 为空串".to_string());
+                    }
+                    if path.chars().any(char::is_control) {
+                        return Err("daemon.host.credential.path 含控制符".to_string());
+                    }
+                }
+                // 同一键不得既是 literal 又是凭据来源（身份不得被字面值覆盖）。
+                if self.env.contains_key(&cred.env) || host.env.contains_key(&cred.env) {
+                    return Err(format!(
+                        "daemon.host.credential.env `{}` 与声明的 literal env 冲突",
+                        cred.env
+                    ));
+                }
+            }
+        }
         Ok(())
     }
+}
+
+/// PLAN-083 T-02：env 键语法（`[A-Za-z_][A-Za-z0-9_]*`）。
+pub fn validate_env_key(scope: &str, key: &str) -> Result<(), String> {
+    let mut chars = key.chars();
+    let Some(first) = chars.next() else {
+        return Err(format!("{scope} 为空键"));
+    };
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return Err(format!("{scope} 键 `{key}` 须以字母/下划线开头"));
+    }
+    if !chars.all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(format!("{scope} 键 `{key}` 含非法字符"));
+    }
+    if key.len() > 128 {
+        return Err(format!("{scope} 键 `{key}` 超长"));
+    }
+    Ok(())
+}
+
+/// PLAN-083 T-02：公开 manifest 的 literal env 校验——键语法 + 非空 + 非凭据。
+fn validate_env_map(
+    scope: &str,
+    map: &std::collections::BTreeMap<String, String>,
+) -> Result<(), String> {
+    for (key, value) in map {
+        validate_env_key(&format!("{scope}.{key}"), key)?;
+        if value.is_empty() {
+            return Err(format!("{scope}.{key} 值为空"));
+        }
+        if value.chars().any(char::is_control) {
+            return Err(format!("{scope}.{key} 值含控制符"));
+        }
+        if looks_like_credential_key(key) {
+            return Err(format!(
+                "{scope}.{key} 疑似凭据键——公开 manifest 不得携带明文凭据，改用 daemon.host.credential 受管引用"
+            ));
+        }
+        if looks_like_credential_value(value) {
+            return Err(format!(
+                "{scope}.{key} 的值形似凭据（长 hex）——公开 manifest 不得携带明文凭据，改用 daemon.host.credential 受管引用"
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// 凭据类键名（大小写不敏感子串）：命中即拒绝写入公开 manifest。
+fn looks_like_credential_key(key: &str) -> bool {
+    let lower = key.to_ascii_lowercase();
+    ["cred", "token", "secret", "passwd", "password", "apikey", "api_key"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+}
+
+/// 长 hex（≥32 且偶数长度）= OS 签发凭据形态；literal 出现即拒绝。
+fn looks_like_credential_value(value: &str) -> bool {
+    let trimmed = value.trim();
+    trimmed.len() >= 32
+        && trimmed.len() % 2 == 0
+        && trimmed.chars().all(|c| c.is_ascii_hexdigit())
 }
 
 /// PLAN-083 T-01：接口版本声明语法冻结——`<name>/<digits>`，name 为
@@ -2174,5 +2310,108 @@ desktop_exe: \"target/release/native-app.exe\"
                 "应拒绝非法接口串: {bad:?}"
             );
         }
+    }
+
+    // ---- PLAN-083 T-02：服务/宿主配置分离与受管凭据引用 ----
+
+    #[test]
+    fn manifest_daemon_service_and_host_config_split() {
+        let (_, parent) = daemon_capability_fixture(
+            "hostsplit",
+            r#"{
+              "port": 17819,
+              "bin": "target/release/notes-service",
+              "env_port": "AUTO_HTTP_PORT",
+              "health_interface": "notes.fpack/1",
+              "env": { "NOTES_DATA_DIR": "%APPDATA%/auto-notes/data" },
+              "host": {
+                "env": { "NOTES_DAEMON_RETRY": "2" },
+                "credential": {
+                  "env": "NOTES_FP_CRED",
+                  "path": "%APPDATA%/auto-notes/data/fp-policy.json",
+                  "principal": "fp-reader"
+                }
+              }
+            }"#,
+        );
+        let (_, def) = manifest_daemon_lookup_checked(&parent, "015-notes")
+            .expect("合法声明")
+            .expect("命中");
+        assert_eq!(
+            def.env.get("NOTES_DATA_DIR").map(String::as_str),
+            Some("%APPDATA%/auto-notes/data"),
+            "服务进程配置进 daemon.env"
+        );
+        let host = def.host.as_ref().expect("宿主声明");
+        assert_eq!(host.env.get("NOTES_DAEMON_RETRY").map(String::as_str), Some("2"));
+        let cred = host.credential.as_ref().expect("受管凭据引用");
+        assert_eq!(cred.env, "NOTES_FP_CRED");
+        assert_eq!(cred.principal, "fp-reader");
+        assert_eq!(cred.field, "cred", "字段缺省 cred");
+        assert_eq!(
+            cred.path.as_deref(),
+            Some("%APPDATA%/auto-notes/data/fp-policy.json"),
+            "manifest 只存引用路径，不含凭据值"
+        );
+        assert_eq!(def.validate(), Ok(()));
+        let _ = std::fs::remove_dir_all(&parent);
+    }
+
+    #[test]
+    fn manifest_daemon_public_env_rejects_plaintext_credentials() {
+        // 疑似凭据键：具名拒绝并指向受管引用。
+        let (_, parent) = daemon_capability_fixture(
+            "credkey",
+            r#"{ "port": 17819, "env": { "NOTES_FP_CRED": "abc" } }"#,
+        );
+        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("凭据键必须拒绝");
+        assert!(err.contains("daemon.env.NOTES_FP_CRED"), "{err}");
+        assert!(err.contains("daemon.host.credential"), "拒绝须指向受管引用: {err}");
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // 长 hex 值（OS 凭据形态）：即使键名无害也拒绝。
+        let cred = "a".repeat(64);
+        let (_, parent) = daemon_capability_fixture(
+            "credval",
+            &format!(r#"{{ "port": 17819, "env": {{ "NOTES_DATA": "{cred}" }} }}"#),
+        );
+        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("hex 值必须拒绝");
+        assert!(err.contains("形似凭据"), "{err}");
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // host.env 同样受公开声明纪律约束。
+        let (_, parent) = daemon_capability_fixture(
+            "hostcred",
+            r#"{ "port": 17819, "host": { "env": { "NOTES_FP_TOKEN": "x" } } }"#,
+        );
+        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("host literal 凭据键拒绝");
+        assert!(err.contains("daemon.host.env"), "{err}");
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // 凭据 env 键与 literal 冲突：身份不得被字面值覆盖。
+        let (_, parent) = daemon_capability_fixture(
+            "credclash",
+            r#"{ "port": 17819,
+                 "host": { "env": { "NOTES_ADDR": "x" },
+                           "credential": { "env": "NOTES_ADDR", "principal": "fp-reader" } } }"#,
+        );
+        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("冲突必须拒绝");
+        assert!(err.contains("冲突"), "{err}");
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // env 键/凭据主体语法非法：具名拒绝。
+        let (_, parent) =
+            daemon_capability_fixture("badkey", r#"{ "port": 17819, "env": { "1BAD-KEY": "x" } }"#);
+        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("坏键名拒绝");
+        assert!(err.contains("1BAD-KEY"), "{err}");
+        let _ = std::fs::remove_dir_all(&parent);
+
+        let (_, parent) = daemon_capability_fixture(
+            "badprincipal",
+            r#"{ "port": 17819, "host": { "credential": { "env": "NOTES_FP_CRED", "principal": "  " } } }"#,
+        );
+        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("空 principal 拒绝");
+        assert!(err.contains("principal"), "{err}");
+        let _ = std::fs::remove_dir_all(&parent);
     }
 }
