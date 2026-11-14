@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-13
 updated_at: 2026-11-14
 plan_revision: 2
-current_step: 3
+current_step: 4
 total_steps: 8
 depends_on: []
 supersedes_spec_components: [docs/specs/build/desktop-api-surfaces.md]
@@ -151,6 +151,12 @@ T-00给支持边界，T-01～03补区分错误实现的反例，T-04在真实运
 
 2026-11-13 · stage: new（Reader交接次序澄清） · plan_revision: 2 · outcome: pass（草案） · next: work T-00照常推进。Reader013产品写入等待009交付；083自身接口/实现/验证无009终态前置，原任务/AC与0/8保持。
 
+2026-11-14 · stage: work | task: T-03 | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-083/auto-ui | branch: codex/plan-083-dev | code_commit: 93280912 | next_responsible_role: work T-04
+
+实现（U-03/U-04；"spawn 事件总数=1"而非 listener 个数）：compiler `ManifestDaemon` 增 `instance_key`（`[A-Za-z0-9._:-]`，≤96，具名拒绝）与 `data_root`（`%VAR%` 展开、空串/控制符拒绝）+ `manifest_daemon_lookup_in_root`（显式根查表，生产入口复用）。runtime 新模块 `daemon_instance.rs`：`InstanceIdentity`（user+instance_key+port+规范化 data_root → blake3 短哈希；仅靠路径文本别名或进程内 `DID_SPAWN` 不算身份）、`InstanceLock`（Windows `share_mode(0)` 独占打开=等价 named mutex，进程退出由 OS 释放；非 Windows `create_new`+TTL 回退）、`InstanceMarker`（就绪后写 pid/started_at；**按端口**定位 = 同端点唯一 owner，输家复用前核对身份）、`ensure_shared_io`（快路径复用 → 取锁 → 锁内二次探测 → 仅 NoListener 才 spawn → 同接口轮询到 Ready → 写标记 → 释放锁；取锁失败=输家在有界 `lock_wait` 内轮询复用，超时具名 Offline；失败回收标记并释放锁）。`osconfig_daemon::resolve_manifest_host_shared` 把 manifest/预算/宿主 env 接到该门；session 改用共享入口。tools `desktop_backends` 增 `shared_backend_decision`（pac `back_port` == manifest `daemon.port` → 共享 provider）：先解析/核验共享 provider（`resolve_manifest_host_shared`），启动期不再为其 spawn 第二份自有后端、不把 daemon 端口当"被占用"拒绝，routes 直接指向该 daemon（Notes 17819 主窗口/Vue 桌面 API 去重）；普通占用者仍拒绝。
+
+证据（当前 commit 上执行）：`cargo test -p auto-ui-runtime --lib daemon_instance` → 7 passed（身份规范化/别名、锁互斥+释放、标记往返+身份不匹配、已就绪零 spawn、身份冲突拒绝、冷启只 spawn 一次+写标记、错版占用不 spawn）；`cargo test -p auto-ui-runtime --test featurepack_daemon_hosting -- --test-threads=1` → **4 passed**（真多进程：两独立宿主同刻冷启 → 两者 `running` 同 url、spawn 日志恰 1 行、端点 LISTENING=1、宿主退出后 daemon 仍 ready；相同端点不同数据根 → 具名冲突；错版占用 → 不 spawn 且占用者存活）；`--lib osconfig_daemon` 39 passed（回归）；tools `desktop_backends` 3 passed/1 ignored（含共享判定与"共享端口不算占用"豁免）。夹具 `fp_daemon_fixture` 为测试专用 bin（无 `FP_FIXTURE_PORT` 即 exit 2），spawn 事件日志是唯一计数 oracle。既有 `AUTO_OS_ROOT` 并行 env 踩踏（app_registry 模块 6 个用例）加进程内串行锁后 6/6 并行运行绿；未跑：真 Vue/Rust 后端编译启动档（`PLAN053_PROBE_DIR` 门，T-04/OS 联合验收边界）。
+
 2026-11-14 · stage: work | task: T-02 | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | outcome: pass | worktree: D:/autostack/.wt/ui-083/auto-ui | branch: codex/plan-083-dev | code_commit: 34884f99 | next_responsible_role: work T-03
 
 实现（U-02、复用与冷启同律）：compiler `ManifestDaemon` 增 `env`（服务进程非敏感 literal）与 `host{env, credential{env,path,principal,field}}`；`validate` 增加 env 键语法/空值/控制符/疑似凭据键（cred|token|secret|passw|apikey）/长 hex 值拒绝、凭据键与 literal 冲突拒绝、principal/field/path 校验——公开 manifest 不可能携带明文凭据。runtime `osconfig_daemon.rs` 增 `ManagedCredentialRef`（`%VAR%`/`$VAR` 展开、policy `entries[].principal` 命中取值、长度/空白/控制符校验；Debug与诊断打码，错误只回显主体/路径）、`HostBackendEnv{entries,remove,credential_env}`（Debug 打码、`non_secret_entries`）、`host_backend_env`（地址 → literal（键排序）→ 受管凭据；`remove` 覆盖全部投递键）、`GenericDaemon::spawn_env`（声明服务 literal + 端口键权威覆盖）、`generic_daemon_from_manifest`/`resolve_manifest_host`/`probe_manifest_host`（session 与桌面启动器同源）。session 以 `DaemonEnvDelivery::{InProc,Child}` 区分：in-proc 只写非敏感键并对凭据记具名接口缺口（R3，不写全局）；独立进程（native exe / Rust API 后端）随 spawn 精确投递并剔除继承同名键。tools `desktop_backends` 在后端启动前 `probe_manifest_host`（只探不孵）：Ready 投递、Invalid 拒绝启动、NotReady 保持既有链；`rust_ui::start_desktop_api_server` 接收 `HostBackendEnv` 并在 `TrackedSpawn`（`with_env`/`without_env`）与裸 `Command` 两臂投递。
@@ -176,6 +182,8 @@ Notes 当前响应：`auto-notes/rust-workspace/auto-notes-30db9907-back/src/db.
 2026-11-14 · stage: goal | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | round: 1 | from: drafting | to: work（T-01） | status: executing | outcome: pass（T-00 合同冻结） | worktree: D:/autostack/.wt/ui-083/auto-ui | commit: a6f776c2 | next: work
 
 2026-11-14 · stage: goal | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | round: 2 | from: work（T-01/T-02） | to: work（T-03） | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-083/auto-ui | commit: 34884f99 | next: work（T-03 跨进程单实例与共享 provider）
+
+2026-11-14 · stage: goal | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | round: 3 | from: work（T-03） | to: work（T-04） | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-083/auto-ui | commit: 93280912 | next: work（T-04 真实 launch 路径汇总与旧门回归）
 
 ## 10. 待澄清事项
 
