@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-083
-status: executing
+status: execution_done
 feature_name: FeaturePack daemon生产就绪、宿主配置与单实例
 author: [Codex]
 created_at: 2026-11-13
 updated_at: 2026-11-14
 plan_revision: 2
-current_step: 2
+current_step: 6
 total_steps: 8
 depends_on: []
 supersedes_spec_components: [docs/specs/build/desktop-api-surfaces.md]
@@ -262,6 +262,18 @@ T-04 回执:182 称「后端子进程 env 投递由 rust_ui::start_desktop_api_s
 
 **pending_closeout_gates**：真实 Vue/Rust 后端构建启动与 Notes 双窗口 = OS 联合验收（保持）；统一回归门 = merge 所有；组内依赖树未改动。
 **next**：work 按 F-1/F-2/F-3 修复（T-01/T-02/T-04/T-05 重开；T-00/T-03 保持完成 → 2/8），再回 review T-06；在绑定新提交的复审前不得给 pass。
+
+2026-11-14 · stage: work（R-1 修复） | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | outcome: pass（F-1/F-2/F-3 关闭，回 review T-06） | worktree: D:/autostack/.wt/ui-083/auto-ui | branch: codex/plan-083-dev | base_commit: a6f776c2 | code_commit: b9999db9 | 修复周期: 1/3 | next_responsible_role: review T-06（第二次最终复审）
+
+**修复闭合行（finding → invariant → affected paths → fix/permanent cases → 当前结果 → 剩余缺口）**
+- **F-1 → 旧语义（无 `health_interface`）= 只看状态行，且在所有生产入口生效** · affected `osconfig_daemon.rs` `read_health_response`/`probe_health`、`daemon_instance.rs` `ensure_under_lock`、`session.rs:4482` 入口 · fix：①`read_health_response` 解析完状态行后，`interface=None` 立即返回（不读 body、不核 framing/预算，与 `tcp_ping` 逐字同义）；②共享门内旧声明除 `Ready` 外一律视为"未就绪→spawn/继续轮询"（初始 503 不再终局拒绝），只有声明了 interface 才保留"占用者不匹配→不 spawn"。permanent cases：`probe_health_legacy_reads_status_line_only`（20KB body/gzip TE/截断 body 均 Ready；声明时 BadBody）、`shared_ensure_legacy_waits_through_initial_503_and_spawns`、真夹具 `u01_legacy_declaration_converges_through_initial_503`（503×3→200，spawn=1，`tcp_ping` 观察就绪） · 结果：`--lib osconfig_daemon` **40 passed**、`--lib daemon_instance` **8 passed**、hosting 档 **5 passed** · 剩余缺口：无（`ensure_generic_io` 旧函数体未改，仍为无锁直接路径并保留测试）。
+- **F-2 → 任何声明 daemon 的宿主配置必须在后端首次请求前可见** · affected `desktop_backends.rs` 非共享 rust 应用分支 · fix：启动期对已声明 daemon 一律先 `resolve_manifest_host_shared`（ensure+身份核验）再 spawn，`Ready` 投递 env；`Invalid` 拒绝启动其后端；`Offline` 按既有"Offline 不阻断"语义启动但打印"后端在无宿主配置下启动"具名降级（不再静默 None）。permanent cases：`shared_backend_decision_matches_declared_daemon_port_only`（判定/端口豁免）+ 子进程投递门（F-3）+ SD-02 新增同义条款 · 结果：tools `desktop_backends` 3 passed/1 ignored；代码面 8 行顺序可核（ensure→resolve env→spawn） · 剩余缺口：真实 Rust 后端编译/启动档未跑（`PLAN053_PROBE_DIR` 门，OS 联合验收边界）——该格不因修复扩大承诺。
+- **F-3 → 宿主配置只经子进程精确投递、不写宿主全局，且有进程级 oracle** · affected `session.rs` `spawn_exe_child`、tools `rust_ui.rs` 两臂、`osconfig_daemon::apply_host_env`（新单源）、新档 `tests/featurepack_daemon_child_env.rs` · fix：投递逻辑收敛为 `apply_host_env(cmd, env)`（先 `env_remove` 同名继承键再写值），session 与桌面启动器共用。permanent cases：`child_env_delivery_is_per_child_and_never_global` —— 两个真子进程各带 A/B 地址+凭据；断言互不可见、宿主陈旧同名值被剔除、未投递键 `<unset>`、**父进程 env 未被改写**。 · 结果：`--test featurepack_daemon_child_env` **2 passed** · 剩余缺口：无。
+- **证据更正（append-only）**：T-04 回执中"子进程 env 用例"当时不存在（复审 F-3 指出）；现由 `featurepack_daemon_child_env` 2 passed 兑现，原文保留不改，以本行更正。
+
+**回归（b9999db9 上执行）**：`--lib osconfig_daemon` 40、`--lib daemon_instance` 8、`--test featurepack_daemon_hosting --test-threads=1` 5、`--test featurepack_daemon_launch --test-threads=1` 1、`--test featurepack_daemon_child_env --test-threads=1` 2、compiler `app_registry::tests` 34、tools `desktop_backends` 3+1 ignored。规范同步：SD-01 §3 旧语义措辞改为"只读状态行（不读 body/framing/预算；初始 503 不终局）"，SD-02 增"非共享声明 daemon 也在后端 spawn 前 ensure；Invalid 拒绝、Offline 具名降级"。未跑：`osconfig_integration`（材料缺席自跳过，不计通过）、真后端启动档、Notes 真实双窗口（OS 联合验收）。
+
+2026-11-14 · stage: goal | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | round: 5 | from: review（needs_fix） | to: review（T-06 第二次） | status: execution_done | outcome: pass（修复闭合） | worktree: D:/autostack/.wt/ui-083/auto-ui | commit: b9999db9 | next: review
 
 ## 10. 待澄清事项
 
