@@ -8,6 +8,7 @@ never create or modify bytes. No Env path shortcut participates
 (AUTO_SAVE_PATH / AUTO_OPEN_PATH are absent by construction and asserted).
 """
 import argparse
+import http.client
 import json
 import os
 from pathlib import Path
@@ -93,26 +94,37 @@ class ConsumerSession(vfd.Session):
 
     def dirt_by_cut(self):
         """The toolbar cut button is the documented dirty lever (its store
-        handler also re-syncs src_active); ids drift, so rediscover always."""
-        snapshot = self.snapshot()
-        match = re.search(r'button #((?:vnode|aura)_\d+) "[^"]*\uee01scissors\uee02[^"]*"', snapshot)
-        require(match, 'scissors toolbar button missing')
-        self.call('autoui_action', element_id=match[1], action='press')
-        deadline = time.monotonic() + 5
-        before = None
-        while time.monotonic() < deadline:
-            current = self.edits()
-            if current is not None and (before is None or current > before):
-                if before is not None:
+        handler also re-syncs src_active); ids drift, so rediscover always.
+        The baseline reads BEFORE pressing — the counter may rise quickly."""
+        before = self.edits()
+        if before is None:
+            before = 0
+        for attempt in range(2):
+            snapshot = self.snapshot()
+            match = re.search(r'button #((?:vnode|aura)_\d+) "[^"]*\uee01scissors\uee02[^"]*"', snapshot)
+            require(match, 'scissors toolbar button missing')
+            self.call('autoui_action', element_id=match[1], action='press')
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                current = self.edits()
+                if current is not None and current > before:
                     return current
-                before = current
-            time.sleep(0.05)
-        raise AssertionError('cut did not raise the edit counter')
+                time.sleep(0.05)
+            require(attempt == 0, 'cut did not raise the edit counter')
+        raise AssertionError('unreachable')
 
     def save_dialog(self):
         self.wait(lambda tree: '选择保存位置' in tree and '要保存的文件名' in tree)
         require('placeholder: "要保存的文件名"' in self.snapshot() or '要保存的文件名' in self.snapshot(),
                 'save dialog must expose its filename input')
+
+    def open_save_as(self):
+        """另存为 opens the dialog even for a named tab (Ctrl+S would write
+        directly); the prefilled draft is the current basename."""
+        self.press('文件')
+        self.wait(lambda tree: '另存为' in tree)
+        self.press('另存为…')
+        self.save_dialog()
 
     def type_and_confirm(self, name):
         self.input('要保存的文件名', name)
@@ -131,7 +143,13 @@ class ConsumerSession(vfd.Session):
         if self.process.poll() is None:
             tree = self.snapshot()
             if '不保存退出' in tree:
-                self.press('不保存退出')
+                try:
+                    # Process.exit can close the response socket before its
+                    # reply flushes (fixture gate precedent); CLI exit, reap
+                    # and port refusal below remain mandatory.
+                    self.press('不保存退出')
+                except (http.client.RemoteDisconnected, ConnectionResetError):
+                    self.trace.append({'documented_quit_response': 'connection closed during exit'})
             try:
                 code = self.process.wait(timeout=15)
             except subprocess.TimeoutExpired:
@@ -176,21 +194,24 @@ def run(args):
     readonly = app / '只读文档.md'
     readonly.write_text('consumer gate readonly bytes', encoding='utf-8')
     os.chmod(readonly, 0o444)
-    probe = readonly.open('a')
     try:
-        probe.write('x')
-        raise AssertionError('run this gate as a user that cannot bypass the read-only attribute')
+        # Windows raises at open; Unix at write. Either rejection proves this
+        # user cannot bypass the attribute.
+        probe = readonly.open('a')
+        try:
+            probe.write('x')
+            raise AssertionError('run this gate as a user that cannot bypass the read-only attribute')
+        finally:
+            probe.close()
     except PermissionError:
         pass
-    finally:
-        probe.close()
     readonly_bytes = readonly.read_bytes()
     existing_bytes = existing.read_bytes()
 
     report = {'platform': sys.platform, 'scope': 'file_dialog_modes_consumer',
               'auto': {'path': str(args.auto_bin), 'sha256': vfd.sha(args.auto_bin)},
               'ui_tool': {'path': str(args.ui_tool_bin), 'sha256': vfd.sha(args.ui_tool_bin)},
-              'workspace': str(app), 'checks': []}
+              'workspace': str(app), 'checks': [], 'sessions': []}
     session = None
 
     def check(name, condition, detail=''):
@@ -240,6 +261,7 @@ def run(args):
         check('original save untouched by 另存为', target.read_text(encoding='utf-8') == written, 'bytes changed')
         # ---- overwrite: Back keeps bytes, Replace hands the write to the app ----
         session.dirt_by_cut()
+        session.open_save_as()
         session.type_and_confirm('已有文档.md')
         session.wait(lambda tree: '替换现有文件?' in tree and '返回修改' in tree)
         require(existing.read_bytes() == existing_bytes, 'validation must not write')
@@ -257,14 +279,18 @@ def run(args):
         check('overwrite save clears dirty', session.dirty_marks() == 0, session.dirty_marks())
         # ---- cancel keeps the draft dirty and creates nothing ----
         session.dirt_by_cut()
-        session.type_and_confirm('取消文档.md')
+        session.open_save_as()
+        # Type only; the confirmation must NOT happen before cancelling.
+        session.input('要保存的文件名', '取消文档.md')
         session.press('取消')
         session.wait(lambda tree: '要保存的文件名' not in tree)
         require(not (app / '取消文档.md').exists(), 'cancellation must not create files')
         check('cancel keeps the dirty state', session.dirty_marks() >= 1, session.dirty_marks())
-        check('cancel keeps the store path', session.title() == '另存为版本.at', session.title())
+        check('cancel keeps the store path', session.title() == '已有文档.md',
+              f'{session.title()} (the overwrite save owns the active path; cancel must not change it)')
         # ---- read-only target: named recoverable failure, dirty retained ----
         session.dirt_by_cut()
+        session.open_save_as()
         session.type_and_confirm('只读文档.md')
         session.wait(lambda tree: '保存目标为只读' in tree)
         check('readonly target rejected by name', 'permission_denied' in session.console() or '保存目标为只读' in session.snapshot(),

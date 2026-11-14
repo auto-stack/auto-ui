@@ -321,7 +321,7 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
         .ToggleHidden -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "hidden", seq: .fd_seq, value: !.hidden}) }
         .Clear -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "clear", seq: .fd_seq}) }
         .SelectCurrent -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "selectCurrent", seq: .fd_seq}) }
-        .SetFileName(value str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "saveName", seq: .fd_seq, value: value}) }
+        .SetFileName(value str) -> { .saveName = value; .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "saveName", seq: .fd_seq, value: value}) }
         .ConfirmOverwrite -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "confirmOverwrite", seq: .fd_seq}) }
         .OverwriteBack -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "overwriteBack", seq: .fd_seq}) }
         .PageRequested(ev str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "page", seq: .fd_seq, index: json.parse(ev).page - 1}) }

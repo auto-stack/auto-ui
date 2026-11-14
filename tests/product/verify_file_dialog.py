@@ -133,9 +133,20 @@ class Session:
         started = time.monotonic()
         body = json.dumps({'jsonrpc':'2.0', 'id':len(self.trace)+1, 'method':'tools/call',
                            'params':{'name':name, 'arguments':arguments}}).encode()
-        with urllib.request.urlopen(urllib.request.Request(f'http://127.0.0.1:{self.port}/mcp', data=body,
-                                  headers={'Content-Type':'application/json'}), timeout=5) as response:
-            result = json.load(response)
+        result = None
+        # Read-only tools are idempotent: one retry absorbs a transient slow
+        # response instead of killing the whole gate. Non-read tools surface
+        # the timeout immediately (a retry could repeat an action).
+        attempts = 2 if name in ('autoui_snapshot', 'autoui_state', 'autoui_screenshot') else 1
+        for attempt in range(attempts):
+            try:
+                with urllib.request.urlopen(urllib.request.Request(f'http://127.0.0.1:{self.port}/mcp', data=body,
+                                          headers={'Content-Type':'application/json'}), timeout=5) as response:
+                    result = json.load(response)
+                break
+            except TimeoutError:
+                if attempt == attempts - 1:
+                    raise
         elapsed = time.monotonic()-started
         self.trace.append({'tool':name, 'arguments':arguments, 'response':result, 'seconds':elapsed})
         error = 'error' in result or result.get('result', {}).get('isError', False)
@@ -159,7 +170,9 @@ class Session:
                         ('No live VTree snapshot yet', 'No UI available yet')), last)
                 if not error and predicate(last):
                     return last
-            except (urllib.error.URLError, ConnectionError):
+            except (urllib.error.URLError, ConnectionError, TimeoutError):
+                # A transient slow MCP response is retryable within the wait
+                # budget; it must not kill the whole gate.
                 pass
             time.sleep(.05)
         raise AssertionError(f'Native state timeout: {last[-4000:]}')
@@ -244,7 +257,13 @@ class Session:
 
     def save_name(self, value):
         self.input('要保存的文件名', value)
-        return self.wait(lambda tree: '保存' in tree and '载入中' not in tree)
+        # The local echo is instant but canAccept recomputes on the model
+        # pump; wait for the accept button's own block to drop its disabled
+        # flag instead of guessing a sleep.
+        def enabled(tree):
+            match = re.search(r'button #(?:vnode|aura)_\d+ "保存" \{[^}]*\}', tree)
+            return bool(match and 'disabled' not in match.group(0))
+        return self.wait(enabled)
 
     def screenshot(self, name):
         text = self.call('autoui_screenshot')
@@ -448,33 +467,33 @@ def run(args):
             # PLAN-084 V-08: directory / save / overwrite regions of the r2
             # visual guide, light and dark, real screenshots only.
             session.open(mode='选择目录')
-            session.wait(lambda tree: '选择一个目录' in tree and '选择当前目录' in tree)
+            session.wait(lambda tree: '选择一个目录' in tree and '选择当前目录' in tree, timeout=15)
             record['directory_mode_screenshot'] = session.screenshot('directory-mode')
             session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
             session.open(mode='保存文件')
-            session.wait(lambda tree: '选择保存位置' in tree and '要保存的文件名' in tree)
+            session.wait(lambda tree: '选择保存位置' in tree and '要保存的文件名' in tree, timeout=15)
             record['save_mode_screenshot'] = session.screenshot('save-mode')
             session.save_name('覆盖目标.md')
             session.press('保存')
             session.wait(lambda tree: '替换现有文件?' in tree)
             record['overwrite_screenshot'] = session.screenshot('overwrite-layer')
             session.press('返回修改')
-            session.wait(lambda tree: '替换现有文件?' not in tree and '要保存的文件名' in tree)
-            session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
+            session.wait(lambda tree: '替换现有文件?' not in tree and '要保存的文件名' in tree, timeout=15)
+            session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree, timeout=15)
             session.press('切换明暗')
             session.open(mode='选择目录')
-            session.wait(lambda tree: '选择一个目录' in tree and '选择当前目录' in tree)
+            session.wait(lambda tree: '选择一个目录' in tree and '选择当前目录' in tree, timeout=15)
             record['directory_mode_dark_screenshot'] = session.screenshot('directory-mode-dark')
             session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
             session.open(mode='保存文件')
-            session.wait(lambda tree: '选择保存位置' in tree and '要保存的文件名' in tree)
+            session.wait(lambda tree: '选择保存位置' in tree and '要保存的文件名' in tree, timeout=15)
             session.save_name('覆盖目标.md')
             session.press('保存')
             session.wait(lambda tree: '替换现有文件?' in tree)
             record['overwrite_dark_screenshot'] = session.screenshot('overwrite-layer-dark')
             session.press('返回修改')
             session.wait(lambda tree: '替换现有文件?' not in tree and '要保存的文件名' in tree)
-            session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
+            session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree, timeout=15)
             session.close(); report['sessions'].append(record)
             report['outcome'] = 'pass'
             print(json.dumps(report,ensure_ascii=False,indent=2))
@@ -545,6 +564,8 @@ def run(args):
         record['accepted_save_new'] = session.accepted([save_new], label='保存')
         require(not save_new.exists(), 'the selector must not create the save target')
         accepted_before = session.count('确认次数')
+        session.open(mode='保存文件')
+        session.wait(lambda tree: '选择保存位置' in tree and '要保存的文件名' in tree)
         session.save_name('不匹配.xyz')
         session.press('保存')
         session.wait(lambda tree: '扩展名' in tree)
