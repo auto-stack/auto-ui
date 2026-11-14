@@ -17,6 +17,8 @@ pub enum SelectionMode {
     #[default]
     SingleFile,
     MultipleFiles,
+    SingleDirectory,
+    SaveFile,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
@@ -34,6 +36,24 @@ pub struct DialogConfig {
     pub filters: Vec<Filter>,
     pub active_filter_id: String,
     pub show_hidden: bool,
+    pub default_file_name: String,
+    pub default_extension: String,
+}
+
+/// A validated save destination. `identity` fingerprints an existing regular
+/// file so a confirmed overwrite can re-detect replacement; `Create` targets
+/// carry no identity because the path does not exist yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SaveTarget {
+    pub name: String,
+    pub path: String,
+    pub identity: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SaveDecision {
+    Create(SaveTarget),
+    Overwrite(SaveTarget),
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
@@ -70,6 +90,21 @@ pub trait FileSystem: Send + Sync + 'static {
         files: &[FileChoice],
         cancel: &AtomicBool,
     ) -> Result<Vec<FileChoice>, Failure>;
+    /// PLAN-084: resolve a save destination without creating, truncating or
+    /// renaming anything. Permission probing reads metadata only.
+    fn validate_save(
+        &self,
+        directory: &str,
+        file_name: &str,
+        cancel: &AtomicBool,
+    ) -> Result<SaveDecision, Failure>;
+    /// PLAN-084: recheck a directory candidate before acceptance (existence,
+    /// directory type, canonical identity, UTF-8 representability).
+    fn validate_directory(
+        &self,
+        path: &str,
+        cancel: &AtomicBool,
+    ) -> Result<FileChoice, Failure>;
 }
 
 #[derive(Default)]
@@ -212,11 +247,149 @@ impl FileSystem for LocalFileSystem {
         }
         Ok(out)
     }
+
+    fn validate_save(
+        &self,
+        directory: &str,
+        file_name: &str,
+        cancel: &AtomicBool,
+    ) -> Result<SaveDecision, Failure> {
+        if cancel.load(Ordering::Acquire) {
+            return Err(Failure::new("cancelled", "操作已取消", false));
+        }
+        let parent = std::fs::canonicalize(directory).map_err(|e| Failure::io(Path::new(directory), e))?;
+        if !std::fs::metadata(&parent)
+            .map_err(|e| Failure::io(&parent, e))?
+            .is_dir()
+        {
+            return Err(Failure::new("invalid_path", "保存目录不存在或不是目录", true));
+        }
+        let target = parent.join(file_name);
+        let decision = match std::fs::symlink_metadata(&target) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => SaveDecision::Create(SaveTarget {
+                name: file_name.to_owned(),
+                path: utf8(&target)?,
+                identity: String::new(),
+            }),
+            Err(error) => return Err(Failure::io(&target, error)),
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    return Err(Failure::new(
+                        "unsupported_path",
+                        format!("保存目标为符号链接: {}", target.display()),
+                        false,
+                    ));
+                }
+                if metadata.is_dir() {
+                    return Err(Failure::new(
+                        "invalid_path",
+                        format!("保存目标已是目录: {}", target.display()),
+                        true,
+                    ));
+                }
+                if !metadata.is_file() {
+                    return Err(Failure::new(
+                        "unsupported_path",
+                        format!("保存目标是特殊文件: {}", target.display()),
+                        false,
+                    ));
+                }
+                save_writable_probe(&metadata, &target)?;
+                SaveDecision::Overwrite(SaveTarget {
+                    name: file_name.to_owned(),
+                    path: utf8(&target)?,
+                    identity: save_identity(&metadata),
+                })
+            }
+        };
+        Ok(decision)
+    }
+
+    fn validate_directory(
+        &self,
+        path: &str,
+        cancel: &AtomicBool,
+    ) -> Result<FileChoice, Failure> {
+        if cancel.load(Ordering::Acquire) {
+            return Err(Failure::new("cancelled", "操作已取消", false));
+        }
+        let canonical = std::fs::canonicalize(path).map_err(|e| Failure::io(Path::new(path), e))?;
+        let metadata = std::fs::metadata(&canonical).map_err(|e| Failure::io(&canonical, e))?;
+        if !metadata.is_dir() {
+            return Err(Failure::new(
+                "invalid_path",
+                format!("{} 不是目录", canonical.display()),
+                true,
+            ));
+        }
+        let canonical_path = utf8(&canonical)?;
+        let name = Path::new(&canonical_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(str::to_owned)
+            .unwrap_or_else(|| canonical_path.clone());
+        Ok(FileChoice {
+            name,
+            path: canonical_path,
+        })
+    }
+}
+
+/// Read-only attributes only; the selector never creates a probe file. The
+/// final write permission and write result stay with the consumer app.
+fn save_writable_probe(metadata: &std::fs::Metadata, target: &Path) -> Result<(), Failure> {
+    let readonly = {
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            metadata.file_attributes() & 1 != 0
+        }
+        #[cfg(not(windows))]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o200 == 0
+        }
+    };
+    if readonly {
+        return Err(Failure::new(
+            "permission_denied",
+            format!("保存目标为只读: {}", target.display()),
+            true,
+        ));
+    }
+    Ok(())
+}
+
+/// Length + nanosecond modification time fingerprint. A replaced or renamed
+/// target between confirmation rounds changes this identity, so a confirmed
+/// overwrite cannot silently hit different bytes.
+fn save_identity(metadata: &std::fs::Metadata) -> String {
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("len:{}:mtime:{}", metadata.len(), modified)
+}
+
+/// Windows reserved device names, case-insensitive, with or without extension.
+#[cfg(windows)]
+fn save_name_is_windows_reserved(raw: &str) -> bool {
+    let stem = raw.split('.').next().unwrap_or("");
+    matches!(
+        stem.to_ascii_uppercase().as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "COM1" | "COM2" | "COM3" | "COM4" | "COM5" | "COM6"
+            | "COM7" | "COM8" | "COM9" | "LPT1" | "LPT2" | "LPT3" | "LPT4" | "LPT5" | "LPT6"
+            | "LPT7" | "LPT8" | "LPT9"
+    )
 }
 
 enum Completion {
     Navigated(Navigation),
     Validated(Vec<FileChoice>),
+    ValidatedSave(SaveDecision),
+    ValidatedDirectory(FileChoice),
 }
 struct Worker {
     cancelled: Arc<AtomicBool>,
@@ -262,6 +435,15 @@ pub struct Row {
     pub selected: bool,
 }
 
+/// PLAN-084: the visible overwrite-confirmation payload. The confirmed path
+/// is shown verbatim; identity stays model-side and never crosses the view.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OverwriteView {
+    pub name: String,
+    pub path: String,
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Projection {
@@ -285,6 +467,12 @@ pub struct Projection {
     pub selected_count: usize,
     pub selected_paths: Vec<String>,
     pub can_accept: bool,
+    /// PLAN-084: frozen session mode (one of the four selectionMode values).
+    pub mode: SelectionMode,
+    /// PLAN-084 save mode: the editable filename draft.
+    pub save_name: String,
+    /// PLAN-084: present while an overwrite confirmation owns the session.
+    pub overwrite: Option<OverwriteView>,
     pub error: Option<Failure>,
 }
 
@@ -296,6 +484,9 @@ pub struct DialogModel {
     active: bool,
     pending: Option<Worker>,
     validating: bool,
+    /// PLAN-084: the in-flight validation is a save-target resolution whose
+    /// directory/name inputs a draft edit may supersede.
+    validating_save: bool,
     listing: Option<Listing>,
     selected: HashSet<String>,
     path_input: String,
@@ -305,6 +496,15 @@ pub struct DialogModel {
     events: Vec<DialogEvent>,
     home: String,
     roots: Vec<String>,
+    /// PLAN-084 save-mode filename draft. Never trimmed or rewritten; the
+    /// completed extension only exists in the accepted result.
+    save_name: String,
+    /// Pending overwrite confirmation. Identity binds the confirmed bytes;
+    /// any session input change clears it.
+    overwrite: Option<SaveTarget>,
+    /// The first navigation of a save session may prefill the basename of an
+    /// initial complete file path; later navigations never rewrite user input.
+    save_prefilled: bool,
 }
 
 impl Default for DialogModel {
@@ -323,6 +523,7 @@ impl DialogModel {
             active: false,
             pending: None,
             validating: false,
+            validating_save: false,
             listing: None,
             selected: HashSet::new(),
             path_input: String::new(),
@@ -332,6 +533,9 @@ impl DialogModel {
             events: Vec::new(),
             home: String::new(),
             roots: Vec::new(),
+            save_name: String::new(),
+            overwrite: None,
+            save_prefilled: false,
         }
     }
 
@@ -364,6 +568,7 @@ impl DialogModel {
         self.active = true;
         self.pending = None;
         self.validating = false;
+        self.validating_save = false;
         self.home = dirs::home_dir()
             .and_then(|p| p.to_str().map(str::to_owned))
             .unwrap_or_default();
@@ -378,6 +583,17 @@ impl DialogModel {
         self.page = 0;
         self.error = None;
         self.events.clear();
+        // PLAN-084: mode props are frozen into this session's config; the
+        // save draft starts from the explicit default only. An initial
+        // complete file path prefills its basename after the first navigation
+        // confirms it is a file (worker result), never before.
+        self.save_name = if self.config.selection_mode == SelectionMode::SaveFile {
+            self.config.default_file_name.clone()
+        } else {
+            String::new()
+        };
+        self.overwrite = None;
+        self.save_prefilled = false;
         let initial = if self.config.initial_directory.is_empty() {
             dirs::home_dir()
                 .and_then(|p| p.to_str().map(str::to_owned))
@@ -401,6 +617,9 @@ impl DialogModel {
         }
         self.path_input = input.clone();
         self.validating = false;
+        self.validating_save = false;
+        // A directory change invalidates a pending overwrite confirmation.
+        self.overwrite = None;
         // Replacing the receiver invalidates even already-completed old work.
         self.pending = None;
         let fs = self.fs.clone();
@@ -471,6 +690,8 @@ impl DialogModel {
             self.validating = false;
         }
         self.selected.clear();
+        // Listing-state changes invalidate a pending overwrite confirmation.
+        self.overwrite = None;
         self.page = 0;
         self.revision += 1;
         self.error = None;
@@ -523,16 +744,26 @@ impl DialogModel {
         if !self.active || self.pending.is_some() {
             return false;
         }
+        // PLAN-084: while an overwrite confirmation owns the session, listing
+        // interactions are rejected at the model level in addition to the
+        // modal scope narrowing. Save mode has no selection at all.
+        if self.overwrite.is_some() || self.config.selection_mode == SelectionMode::SaveFile {
+            return false;
+        }
+        let want_dir = self.config.selection_mode == SelectionMode::SingleDirectory;
         let path = self
             .visible()
             .into_iter()
-            .find(|e| !e.is_dir && self.row_id(&e.path) == row_id)
+            .find(|e| e.is_dir == want_dir && self.row_id(&e.path) == row_id)
             .map(|e| e.path.clone());
         let Some(path) = path else {
             return false;
         };
         if !self.selected.remove(&path) {
-            if self.config.selection_mode == SelectionMode::SingleFile {
+            if matches!(
+                self.config.selection_mode,
+                SelectionMode::SingleFile | SelectionMode::SingleDirectory
+            ) {
                 self.selected.clear();
             }
             self.selected.insert(path);
@@ -543,6 +774,11 @@ impl DialogModel {
 
     pub fn enter(&mut self, row_id: &str) -> bool {
         if !self.active {
+            return false;
+        }
+        // An open overwrite confirmation owns the session; navigation must go
+        // through 返回修改 first.
+        if self.overwrite.is_some() {
             return false;
         }
         let path = self
@@ -563,9 +799,23 @@ impl DialogModel {
     }
 
     pub fn confirm(&mut self) -> bool {
-        if !self.active || self.pending.is_some() || self.selected.is_empty() {
+        if !self.active || self.pending.is_some() {
             return false;
         }
+        // A pending overwrite confirmation is settled only through
+        // confirm_overwrite; a stale footer confirm must not accept a
+        // changed target.
+        if self.overwrite.is_some() {
+            return false;
+        }
+        match self.config.selection_mode {
+            SelectionMode::SingleFile | SelectionMode::MultipleFiles => self.confirm_files(),
+            SelectionMode::SingleDirectory => self.confirm_directory(),
+            SelectionMode::SaveFile => self.confirm_save(),
+        }
+    }
+
+    fn confirm_files(&mut self) -> bool {
         let files = self
             .visible()
             .into_iter()
@@ -580,6 +830,7 @@ impl DialogModel {
         }
         let fs = self.fs.clone();
         self.validating = true;
+        self.validating_save = false;
         match Worker::spawn(move |flag| fs.validate(&files, flag).map(Completion::Validated)) {
             Ok(worker) => self.pending = Some(worker),
             Err(error) => {
@@ -589,6 +840,229 @@ impl DialogModel {
             }
         }
         true
+    }
+
+    fn confirm_directory(&mut self) -> bool {
+        let Some(path) = self.selected.iter().next().cloned() else {
+            return false;
+        };
+        let fs = self.fs.clone();
+        self.validating = true;
+        self.validating_save = false;
+        match Worker::spawn(move |flag| {
+            fs.validate_directory(&path, flag).map(Completion::ValidatedDirectory)
+        }) {
+            Ok(worker) => self.pending = Some(worker),
+            Err(error) => {
+                self.validating = false;
+                self.fail(error);
+                return false;
+            }
+        }
+        true
+    }
+
+    /// PLAN-084 save-mode confirm: resolve the destination on a worker.
+    /// Structural name/extension checks run here (pure logic); the existing
+    /// target and its writability are checked on the worker.
+    fn confirm_save(&mut self) -> bool {
+        let Some(directory) = self.listing.as_ref().map(|l| l.directory.clone()) else {
+            return false;
+        };
+        let raw = self.save_name.clone();
+        if raw.is_empty() {
+            return false;
+        }
+        let final_name = match self.resolve_save_name(&raw) {
+            Ok(name) => name,
+            Err(error) => {
+                self.fail(error);
+                return true;
+            }
+        };
+        let fs = self.fs.clone();
+        self.validating = true;
+        self.validating_save = true;
+        match Worker::spawn(move |flag| {
+            fs.validate_save(&directory, &final_name, flag)
+                .map(Completion::ValidatedSave)
+        }) {
+            Ok(worker) => self.pending = Some(worker),
+            Err(error) => {
+                self.validating = false;
+                self.validating_save = false;
+                self.fail(error);
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Filename constraints (basename only, no separators/dot entries/NUL)
+    /// and extension completion/mismatch rules. The draft input is never
+    /// rewritten; completion exists only in the returned name.
+    fn resolve_save_name(&self, raw: &str) -> Result<String, Failure> {
+        if raw.contains('\0') {
+            return Err(Failure::new("invalid_path", "文件名包含空字符", true));
+        }
+        if raw.contains('/') || raw.contains('\\') {
+            return Err(Failure::new(
+                "invalid_path",
+                "文件名不能包含路径分隔符",
+                true,
+            ));
+        }
+        if raw == "." || raw == ".." {
+            return Err(Failure::new("invalid_path", "文件名不能是 . 或 ..", true));
+        }
+        #[cfg(windows)]
+        if save_name_is_windows_reserved(raw) {
+            return Err(Failure::new(
+                "invalid_path",
+                format!("文件名是 Windows 保留设备名: {raw}"),
+                true,
+            ));
+        }
+        let explicit_extension = Path::new(raw)
+            .extension()
+            .and_then(|e| e.to_str())
+            .filter(|e| !e.is_empty())
+            .map(str::to_owned);
+        let default_extension = self.config.default_extension.trim().to_lowercase();
+        let active_group_extensions = self
+            .config
+            .filters
+            .iter()
+            .find(|f| f.id == self.config.active_filter_id)
+            .map(|f| f.extensions.clone())
+            .unwrap_or_default();
+        let group_allows = |extension: &str| {
+            active_group_extensions.is_empty()
+                || active_group_extensions
+                    .iter()
+                    .any(|e| e.eq_ignore_ascii_case(extension))
+        };
+        match explicit_extension {
+            Some(extension) => {
+                if !group_allows(&extension) {
+                    return Err(Failure::new(
+                        "invalid_path",
+                        format!("扩展名 .{extension} 与当前类型组不匹配"),
+                        true,
+                    ));
+                }
+                Ok(raw.to_owned())
+            }
+            None if !default_extension.is_empty() => {
+                if !group_allows(&default_extension) {
+                    return Err(Failure::new(
+                        "invalid_path",
+                        format!(
+                            "defaultExtension .{} 与当前类型组不兼容",
+                            self.config.default_extension
+                        ),
+                        false,
+                    ));
+                }
+                Ok(format!("{raw}.{default_extension}"))
+            }
+            None => Ok(raw.to_owned()),
+        }
+    }
+
+    /// PLAN-084: the filename draft setter. Typing invalidates a pending
+    /// overwrite confirmation and an in-flight save validation (the old
+    /// confirm must never accept a new name).
+    pub fn set_save_name(&mut self, value: String) {
+        if !self.active {
+            return;
+        }
+        if self.validating_save {
+            self.pending = None;
+            self.validating = false;
+            self.validating_save = false;
+        }
+        if self.save_name != value {
+            self.overwrite = None;
+        }
+        self.save_name = value;
+    }
+
+    /// PLAN-084 directory mode: select the currently listed directory (root
+    /// included). Selected rows and this share one selection slot.
+    pub fn select_current(&mut self) -> bool {
+        if !self.active || self.overwrite.is_some() || self.pending.is_some() {
+            return false;
+        }
+        let Some(directory) = self.listing.as_ref().map(|l| l.directory.clone()) else {
+            return false;
+        };
+        self.selected.clear();
+        self.selected.insert(directory);
+        self.error = None;
+        true
+    }
+
+    /// PLAN-084: 确认覆盖 — revalidate the same session target. Same
+    /// identity → accept; target vanished → accept (create); replaced or
+    /// retyped identity → re-present the layer for the new target; changed
+    /// kind → named error. Never accepts a target other than the one the
+    /// user confirmed.
+    pub fn confirm_overwrite(&mut self) -> bool {
+        if !self.active || self.pending.is_some() || self.overwrite.is_none() {
+            return false;
+        }
+        let Some(directory) = self.listing.as_ref().map(|l| l.directory.clone()) else {
+            return false;
+        };
+        let raw = self.save_name.clone();
+        if raw.is_empty() {
+            return false;
+        }
+        let final_name = match self.resolve_save_name(&raw) {
+            Ok(name) => name,
+            Err(error) => {
+                self.overwrite = None;
+                self.fail(error);
+                return true;
+            }
+        };
+        let fs = self.fs.clone();
+        self.validating = true;
+        self.validating_save = true;
+        match Worker::spawn(move |flag| {
+            fs.validate_save(&directory, &final_name, flag)
+                .map(Completion::ValidatedSave)
+        }) {
+            Ok(worker) => self.pending = Some(worker),
+            Err(error) => {
+                self.validating = false;
+                self.validating_save = false;
+                self.fail(error);
+                return false;
+            }
+        }
+        true
+    }
+
+    /// PLAN-084: 返回修改 — keep directory/name drafts and continue the
+    /// session.
+    pub fn overwrite_back(&mut self) -> bool {
+        if !self.active || self.overwrite.is_none() {
+            return false;
+        }
+        self.overwrite = None;
+        true
+    }
+
+    /// PLAN-084: Esc / explicit close path. An open overwrite confirmation
+    /// returns to the selector; otherwise the session cancels.
+    pub fn request_close(&mut self) -> bool {
+        if self.overwrite.is_some() {
+            self.overwrite = None;
+            return true;
+        }
+        self.cancel()
     }
 
     fn fail(&mut self, error: Failure) {
@@ -609,6 +1083,7 @@ impl DialogModel {
         };
         self.pending = None;
         self.validating = false;
+        self.validating_save = false;
         if !self.active {
             return false;
         }
@@ -619,11 +1094,26 @@ impl DialogModel {
                 self.roots = nav.roots;
                 self.path_input = self.listing.as_ref().unwrap().directory.clone();
                 self.selected.clear();
+                self.overwrite = None;
                 self.revision += 1;
                 self.page = 0;
                 self.error = None;
-                if let Some(path) = nav.preselect {
-                    if let Some(index) = self
+                let preselect = nav.preselect;
+                if let Some(path) = preselect {
+                    if self.config.selection_mode == SelectionMode::SaveFile {
+                        // PLAN-084: an initial complete file path prefills its
+                        // basename once per session and only into an empty
+                        // draft; later navigations never rewrite user input.
+                        if !self.save_prefilled && self.save_name.is_empty() {
+                            if let Some(name) = Path::new(&path)
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .map(str::to_owned)
+                            {
+                                self.save_name = name;
+                            }
+                        }
+                    } else if let Some(index) = self
                         .visible()
                         .iter()
                         .position(|e| !e.is_dir && e.path == path)
@@ -632,6 +1122,7 @@ impl DialogModel {
                         self.selected.insert(path);
                     }
                 }
+                self.save_prefilled = true;
             }
             Ok(Completion::Validated(files)) => {
                 if files.is_empty() {
@@ -639,6 +1130,41 @@ impl DialogModel {
                 } else {
                     self.active = false;
                     self.events.push(DialogEvent::Accepted(files));
+                }
+            }
+            Ok(Completion::ValidatedDirectory(choice)) => {
+                self.active = false;
+                self.events.push(DialogEvent::Accepted(vec![choice]));
+            }
+            Ok(Completion::ValidatedSave(decision)) => {
+                let confirmed = self.overwrite.take();
+                match decision {
+                    SaveDecision::Create(target) => {
+                        self.active = false;
+                        self.events.push(DialogEvent::Accepted(vec![FileChoice {
+                            name: target.name,
+                            path: target.path,
+                        }]));
+                    }
+                    SaveDecision::Overwrite(target) => match confirmed {
+                        Some(previous) if previous.identity == target.identity => {
+                            // Same bytes the user confirmed: accept.
+                            self.active = false;
+                            self.events.push(DialogEvent::Accepted(vec![FileChoice {
+                                name: target.name,
+                                path: target.path,
+                            }]));
+                        }
+                        Some(_) => {
+                            // Replaced/retyped target: the old confirmation is
+                            // void; re-present the layer for the new identity.
+                            self.overwrite = Some(target);
+                        }
+                        None => {
+                            // First validation found an existing file.
+                            self.overwrite = Some(target);
+                        }
+                    },
                 }
             }
             Err(error) => self.fail(error),
@@ -653,6 +1179,8 @@ impl DialogModel {
         self.active = false;
         self.pending = None;
         self.validating = false;
+        self.validating_save = false;
+        self.overwrite = None;
         self.events.push(DialogEvent::Cancelled);
         true
     }
@@ -712,7 +1240,24 @@ impl DialogModel {
                 .filter(|e| self.selected.contains(&e.path))
                 .map(|e| e.path.clone())
                 .collect(),
-            can_accept: self.active && self.pending.is_none() && !self.selected.is_empty(),
+            can_accept: match self.config.selection_mode {
+                SelectionMode::SaveFile => {
+                    self.active
+                        && self.pending.is_none()
+                        && self.listing.is_some()
+                        && !self.save_name.is_empty()
+                }
+                SelectionMode::SingleDirectory => {
+                    self.active && self.pending.is_none() && !self.selected.is_empty()
+                }
+                _ => self.active && self.pending.is_none() && !self.selected.is_empty(),
+            },
+            mode: self.config.selection_mode,
+            save_name: self.save_name.clone(),
+            overwrite: self.overwrite.as_ref().map(|target| OverwriteView {
+                name: target.name.clone(),
+                path: target.path.clone(),
+            }),
             error: self.error.clone(),
         }
     }

@@ -2,10 +2,13 @@ use auto.json
 
 // Ordinary view state is a projection of the App-owned DialogModel. Selection,
 // filtering, validation and session lifetime have one owner in the runtime.
-widget FileDialog (open: bool = false, title: str = "选择文件", initialDirectory: str = "", selectionMode: str = "singleFile", filters: List = [], activeFilterId: str = "", acceptLabel: str = "打开", showHidden: bool = false) {
+// PLAN-084: the four selectionMode values share this single view; directory
+// and save modes branch on the projected session mode, never on the parent
+// prop, so an open session keeps its frozen configuration.
+widget FileDialog (open: bool = false, title: str = "选择文件", initialDirectory: str = "", selectionMode: str = "singleFile", filters: List = [], activeFilterId: str = "", acceptLabel: str = "打开", showHidden: bool = false, defaultFileName: str = "", defaultExtension: str = "") {
     // PLAN-086：分页交互统一走官方 PaginationControl 包（兄弟目录，闭包随包交付）。
     use { package: pagination from "../pagination" }
-    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, Up, Home, Refresh, Root(str), SetName(str), SetFilter(str), ToggleHidden, Clear, "accepted"(str), "cancelled", "error"(str) }
+    msg { Tick, SetPath(str), Go, Enter(str), Choose(str), Confirm, Cancel, RequestClose, Up, Home, Refresh, Root(str), SetName(str), SetFilter(str), ToggleHidden, Clear, SelectCurrent, SetFileName(str), ConfirmOverwrite, OverwriteBack, "accepted"(str), "cancelled", "error"(str) }
     model {
         var interval int = 50
         var fd_command str = ""
@@ -33,15 +36,24 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
         var pageCount int = 1
         var totalEntries int = 0
         var visibleFiles int = 0
+        // PLAN-084：会话冻结模式与保存草稿的投影副本。
+        var fdMode str = "singleFile"
+        var saveName str = ""
+        var overwriteOpen bool = false
+        var overwriteName str = ""
+        var overwritePath str = ""
+        var focusSession int = 0
     }
     view {
-        dialog (open: .fd_active, onclose: .Cancel, closeOnOutside: false) {
+        dialog (open: .fd_active, onclose: .RequestClose, closeOnOutside: false) {
             dialog-content (style: "w-[800px] max-w-full p-0 gap-0 rounded-xl bg-background text-foreground") {
                 row (style: "px-5 py-3 gap-3 items-center justify-between border-b border-border w-full") {
                     col (style: "gap-1 flex-1 min-w-0") {
                         text .title { style: "text-lg font-semibold text-foreground" }
-                        if .selectionMode == "multipleFiles" { text "选择一个或多个文件" { style: "text-xs text-muted-foreground" } }
-                        if .selectionMode != "multipleFiles" { text "选择要打开的文件" { style: "text-xs text-muted-foreground" } }
+                        if .fdMode == "multipleFiles" { text "选择一个或多个文件" { style: "text-xs text-muted-foreground" } }
+                        if .fdMode == "singleFile" { text "选择要打开的文件" { style: "text-xs text-muted-foreground" } }
+                        if .fdMode == "singleDirectory" { text "选择一个目录" { style: "text-xs text-muted-foreground" } }
+                        if .fdMode == "saveFile" { text "选择保存位置" { style: "text-xs text-muted-foreground" } }
                     }
                     button "关闭" { onclick: .Cancel, style: "h-8 px-2 text-xs rounded-md text-muted-foreground hover:bg-muted" }
                 }
@@ -78,11 +90,13 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                         row (style: "px-3 py-2 gap-2 items-center w-full") {
                             icon (name: "search", size: 14, style: "text-muted-foreground") {}
                             input (value: .nameQuery, oninput: .SetName, placeholder: "名称过滤", style: "flex-1 min-w-0 max-w-[320px] h-8 text-xs rounded-md bg-muted/40") {}
-                            for filter in .filters {
-                                button filter.label {
-                                    onclick: .SetFilter(filter.id)
-                                    disabled: .activeType == filter.id
-                                    style: if .activeType == filter.id { "h-8 px-3 shrink-0 text-xs rounded-md bg-primary/10 text-primary border border-primary" } else { "h-8 px-3 shrink-0 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted" }
+                            if .fdMode != "singleDirectory" {
+                                for filter in .filters {
+                                    button filter.label {
+                                        onclick: .SetFilter(filter.id)
+                                        disabled: .activeType == filter.id
+                                        style: if .activeType == filter.id { "h-8 px-3 shrink-0 text-xs rounded-md bg-primary/10 text-primary border border-primary" } else { "h-8 px-3 shrink-0 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted" }
+                                    }
                                 }
                             }
                         }
@@ -105,31 +119,59 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                             }
                             for entry in .entries {
                                 if entry.isDir {
-                                    button (text: f"进入 ${entry.name}", onclick: .Enter(entry.id), style: "w-full h-9 px-3 rounded-none text-sm text-foreground hover:bg-muted") {
-                                        row (style: "w-full gap-2 items-center justify-start") {
-                                            col (style: "w-5 shrink-0") {}
-                                            row (style: "flex-1 min-w-0 gap-2 items-center") {
-                                                icon (name: "folder", size: 16, style: "text-amber-500") {}
-                                                text f"进入 ${entry.name}" { style: "text-sm text-foreground" }
+                                    if .fdMode == "singleDirectory" {
+                                        // PLAN-084：目录模式行选择与进入是两个动作。
+                                        row (style: if entry.selected { "w-full px-3 py-2 gap-2 items-center bg-primary/10 hover:bg-primary/10" } else { "w-full px-3 py-2 gap-2 items-center bg-background hover:bg-muted/40" }) {
+                                            button (text: f"选择 ${entry.name}", onclick: .Choose(entry.id), disabled: .loading, style: "flex-1 min-w-0 h-8 px-2 rounded-none text-sm text-foreground bg-transparent hover:bg-muted justify-start") {
+                                                row (style: "w-full gap-2 items-center justify-start") {
+                                                    icon (name: "folder", size: 16, style: "text-amber-500 shrink-0") {}
+                                                    text entry.name { style: "text-sm text-foreground" }
+                                                }
                                             }
-                                            text "—" { style: "w-16 shrink-0 text-right text-xs text-muted-foreground" }
+                                            button (icon: "chevron-right", title: f"进入 ${entry.name}", onclick: .Enter(entry.id), disabled: .loading, style: "h-8 w-8 shrink-0 border border-border rounded-md bg-background text-muted-foreground hover:bg-muted") {}
+                                        }
+                                    } else {
+                                        button (text: f"进入 ${entry.name}", onclick: .Enter(entry.id), style: "w-full h-9 px-3 rounded-none text-sm text-foreground hover:bg-muted") {
+                                            row (style: "w-full gap-2 items-center justify-start") {
+                                                col (style: "w-5 shrink-0") {}
+                                                row (style: "flex-1 min-w-0 gap-2 items-center") {
+                                                    icon (name: "folder", size: 16, style: "text-amber-500") {}
+                                                    text f"进入 ${entry.name}" { style: "text-sm text-foreground" }
+                                                }
+                                                text "—" { style: "w-16 shrink-0 text-right text-xs text-muted-foreground" }
+                                            }
                                         }
                                     }
                                 } else {
-                                    row (style: if entry.selected { "w-full px-3 py-2 gap-2 items-center bg-primary/10 hover:bg-primary/10" } else { "w-full px-3 py-2 gap-2 items-center bg-background hover:bg-muted/40" }) {
-                                        // Retain the checkbox's semantic name for MCP/accessibility;
-                                        // its visible filename is in the separate name column.
-                                        checkbox { text: entry.name, checked: entry.selected, onclick: .Choose(entry.id), disabled: .loading, style: "w-5 h-5 shrink-0" }
-                                        row (style: "flex-1 min-w-0 gap-2 items-center") {
-                                            icon (name: "file-text", size: 16, style: "text-muted-foreground shrink-0") {}
-                                            text entry.name { style: "text-sm text-foreground" }
+                                    if .fdMode == "singleFile" || .fdMode == "multipleFiles" {
+                                        row (style: if entry.selected { "w-full px-3 py-2 gap-2 items-center bg-primary/10 hover:bg-primary/10" } else { "w-full px-3 py-2 gap-2 items-center bg-background hover:bg-muted/40" }) {
+                                            // Retain the checkbox's semantic name for MCP/accessibility;
+                                            // its visible filename is in the separate name column.
+                                            checkbox { text: entry.name, checked: entry.selected, onclick: .Choose(entry.id), disabled: .loading, style: "w-5 h-5 shrink-0" }
+                                            row (style: "flex-1 min-w-0 gap-2 items-center") {
+                                                icon (name: "file-text", size: 16, style: "text-muted-foreground shrink-0") {}
+                                                text entry.name { style: "text-sm text-foreground" }
+                                            }
+                                            text entry.sizeLabel { style: "w-16 shrink-0 text-right text-xs text-muted-foreground" }
                                         }
-                                        text entry.sizeLabel { style: "w-16 shrink-0 text-right text-xs text-muted-foreground" }
+                                    } else {
+                                        // 目录/保存模式：文件行仅作上下文，不可选中。
+                                        row (style: "w-full px-3 py-2 gap-2 items-center bg-background") {
+                                            col (style: "w-5 shrink-0") {}
+                                            row (style: "flex-1 min-w-0 gap-2 items-center") {
+                                                icon (name: "file-text", size: 16, style: "text-muted-foreground shrink-0") {}
+                                                text entry.name { style: "text-sm text-muted-foreground" }
+                                            }
+                                            text entry.sizeLabel { style: "w-16 shrink-0 text-right text-xs text-muted-foreground" }
+                                        }
                                     }
                                 }
                             }
                         }
                         row (style: "w-full px-3 py-2 gap-2 items-center justify-between border-t border-border") {
+                            if .fdMode == "singleDirectory" {
+                                button (text: "选择当前目录", onclick: .SelectCurrent, disabled: .loading, style: "h-8 px-3 text-xs rounded-md border border-border text-foreground bg-background hover:bg-muted shrink-0") {}
+                            }
                             checkbox { text: "显示隐藏文件", checked: .hidden, onclick: .ToggleHidden }
                             // PLAN-086：受控分页（公共1-based；host 0-based 适配在 PageRequested）。
                             // 单页整组隐藏由组件 hideWhenSingle 默认语义承担（同旧 if .pageCount > 1）。
@@ -137,10 +179,18 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                         }
                     }
                 }
+                if .fdMode == "saveFile" {
+                    row (style: "w-full px-4 py-3 gap-2 items-center border-t border-border") {
+                        text "文件名" { style: "text-xs text-muted-foreground shrink-0" }
+                        input (value: .saveName, oninput: .SetFileName, onenter: .Confirm, placeholder: "要保存的文件名", style: "flex-1 min-w-0 h-8 text-sm rounded-md bg-muted/40") {}
+                    }
+                }
                 row (style: "w-full px-4 py-3 gap-2 items-center justify-between border-t border-border") {
                     row (style: "gap-2 items-center") {
-                        text f"已选 ${.selectedCount} 项" { style: "text-xs text-muted-foreground" }
-                        button "清空选择" { onclick: .Clear, disabled: .selectedCount == 0, style: "h-8 px-2 text-xs rounded-md text-primary hover:bg-muted" }
+                        if .fdMode != "saveFile" {
+                            text f"已选 ${.selectedCount} 项" { style: "text-xs text-muted-foreground" }
+                            button "清空选择" { onclick: .Clear, disabled: .selectedCount == 0, style: "h-8 px-2 text-xs rounded-md text-primary hover:bg-muted" }
+                        }
                     }
                     row (style: "gap-2 items-center") {
                         button "取消" { onclick: .Cancel, style: "h-9 px-4 text-sm rounded-md border border-border bg-background text-foreground hover:bg-muted" }
@@ -148,6 +198,20 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                             onclick: .Confirm
                             disabled: !.canAccept
                             style: if .canAccept { "h-9 px-5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90" } else { "h-9 px-5 text-sm font-medium rounded-md bg-muted text-muted-foreground border border-border" }
+                        }
+                    }
+                }
+                // PLAN-084：覆盖确认 = 同 App 内嵌套受控 modal。Esc/关闭路径
+                // 返回选择器（RequestClose→OverwriteBack），背景动作被 modal
+                // scope 收窄与模型层双重拒绝；Replace 只表达经重验的选择意图。
+                dialog (open: .overwriteOpen, onclose: .OverwriteBack, closeOnOutside: false) {
+                    dialog-content (style: "w-96 max-w-full p-6 gap-4 rounded-xl bg-background text-foreground") {
+                        text "替换现有文件?" { style: "text-base font-semibold text-foreground" }
+                        text f" ${.overwriteName} 已存在。" { style: "text-sm text-foreground" }
+                        text .overwritePath { style: "text-xs text-muted-foreground break-all" }
+                        row (style: "w-full justify-end gap-2") {
+                            button "返回修改" { onclick: .OverwriteBack, style: "h-9 px-4 text-sm rounded-md border border-border bg-background text-foreground hover:bg-muted" }
+                            button "确认覆盖" { onclick: .ConfirmOverwrite, style: "h-9 px-5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90" }
                         }
                     }
                 }
@@ -160,7 +224,7 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                 // A pending terminal event belongs to the previous session.
                 .fd_event = ""
                 .fd_seq = .fd_seq + 1
-                .fd_command = json.stringify({op: "open", seq: .fd_seq, config: {initialDirectory: .initialDirectory, selectionMode: .selectionMode, filters: .filters, activeFilterId: .activeFilterId, showHidden: .showHidden}})
+                .fd_command = json.stringify({op: "open", seq: .fd_seq, config: {initialDirectory: .initialDirectory, selectionMode: .selectionMode, filters: .filters, activeFilterId: .activeFilterId, showHidden: .showHidden, defaultFileName: .defaultFileName, defaultExtension: .defaultExtension}})
             }
             if !.open && .seen_open {
                 .fd_seq = .fd_seq + 1
@@ -188,7 +252,28 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                 .pageCount = data.pageCount
                 .totalEntries = data.totalEntries
                 .visibleFiles = data.visibleFileCount
+                .fdMode = data.mode
+                .saveName = data.saveName
+                if data.overwrite != nil {
+                    .overwriteOpen = true
+                    .overwriteName = data.overwrite.name
+                    .overwritePath = data.overwrite.path
+                } else {
+                    .overwriteOpen = false
+                    .overwriteName = ""
+                    .overwritePath = ""
+                }
                 if data.error != nil { .errorMessage = data.error.message } else { .errorMessage = "" }
+                // PLAN-084：每会话一次初始焦点——保存模式落文件名输入，
+                // 其余模式沿路径输入；消费既有 ui.focus 内建，不加新 API。
+                if .fd_active && .focusSession != data.session {
+                    .focusSession = data.session
+                    if .fdMode == "saveFile" {
+                        ui.focus(".SetFileName")
+                    } else {
+                        ui.focus(".SetPath")
+                    }
+                }
             }
             if .fd_event != "" {
                 let event = json.parse(.fd_event)
@@ -223,6 +308,10 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
             .fd_seq = .fd_seq + 1
             .fd_command = json.stringify({op: "cancel", seq: .fd_seq})
         }
+        .RequestClose -> {
+            .fd_seq = .fd_seq + 1
+            .fd_command = json.stringify({op: "requestClose", seq: .fd_seq})
+        }
         .Up -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "up", seq: .fd_seq}) }
         .Home -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "navigate", seq: .fd_seq, path: .homePath}) }
         .Refresh -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "refresh", seq: .fd_seq}) }
@@ -231,6 +320,10 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
         .SetFilter(id str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "filter", seq: .fd_seq, id: id}) }
         .ToggleHidden -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "hidden", seq: .fd_seq, value: !.hidden}) }
         .Clear -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "clear", seq: .fd_seq}) }
+        .SelectCurrent -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "selectCurrent", seq: .fd_seq}) }
+        .SetFileName(value str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "saveName", seq: .fd_seq, value: value}) }
+        .ConfirmOverwrite -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "confirmOverwrite", seq: .fd_seq}) }
+        .OverwriteBack -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "overwriteBack", seq: .fd_seq}) }
         .PageRequested(ev str) -> { .fd_seq = .fd_seq + 1; .fd_command = json.stringify({op: "page", seq: .fd_seq, index: json.parse(ev).page - 1}) }
 
     }

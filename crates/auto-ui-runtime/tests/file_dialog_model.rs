@@ -1,6 +1,6 @@
 use auto_ui_runtime::ui::file_dialog::{
     DialogConfig, DialogEvent, DialogModel, Entry, Failure, FileChoice, FileSystem, Filter,
-    Listing, Navigation, SelectionMode,
+    Listing, Navigation, SaveDecision, SelectionMode,
 };
 use std::collections::{HashMap, HashSet};
 use std::sync::{atomic::AtomicBool, mpsc, Arc, Mutex};
@@ -33,6 +33,8 @@ fn config(path: &std::path::Path) -> DialogConfig {
         ],
         active_filter_id: "books".into(),
         show_hidden: false,
+        default_file_name: String::new(),
+        default_extension: String::new(),
     }
 }
 
@@ -338,6 +340,28 @@ impl FileSystem for ControlledFs {
     ) -> Result<Vec<FileChoice>, Failure> {
         Ok(files.to_vec())
     }
+    fn validate_save(
+        &self,
+        _directory: &str,
+        file_name: &str,
+        _cancel: &AtomicBool,
+    ) -> Result<SaveDecision, Failure> {
+        Ok(SaveDecision::Create(auto_ui_runtime::ui::file_dialog::SaveTarget {
+            name: file_name.to_owned(),
+            path: format!("/{file_name}"),
+            identity: String::new(),
+        }))
+    }
+    fn validate_directory(
+        &self,
+        path: &str,
+        _cancel: &AtomicBool,
+    ) -> Result<FileChoice, Failure> {
+        Ok(FileChoice {
+            name: path.rsplit('/').next().unwrap_or(path).to_owned(),
+            path: path.to_owned(),
+        })
+    }
 }
 
 #[test]
@@ -497,6 +521,31 @@ impl FileSystem for ValidationGate {
         self.gate.lock().unwrap().recv().unwrap();
         self.finished.send(()).unwrap();
         Ok(files.to_vec())
+    }
+    fn validate_save(
+        &self,
+        _directory: &str,
+        file_name: &str,
+        _cancel: &AtomicBool,
+    ) -> Result<SaveDecision, Failure> {
+        self.started.send(()).unwrap();
+        self.gate.lock().unwrap().recv().unwrap();
+        self.finished.send(()).unwrap();
+        Ok(SaveDecision::Create(auto_ui_runtime::ui::file_dialog::SaveTarget {
+            name: file_name.to_owned(),
+            path: format!("/saved/{file_name}"),
+            identity: String::new(),
+        }))
+    }
+    fn validate_directory(
+        &self,
+        path: &str,
+        _cancel: &AtomicBool,
+    ) -> Result<FileChoice, Failure> {
+        Ok(FileChoice {
+            name: path.rsplit('/').next().unwrap_or(path).to_owned(),
+            path: path.to_owned(),
+        })
     }
 }
 
@@ -678,4 +727,551 @@ fn unix_non_utf8_names_broken_links_and_real_permissions_are_named() {
         .unwrap_err();
     assert_eq!(error.code, "permission_denied");
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+// ---- PLAN-084 V-01..04 counterexamples (AC-01..04) ----
+
+fn dir_config(path: &std::path::Path) -> DialogConfig {
+    DialogConfig {
+        selection_mode: SelectionMode::SingleDirectory,
+        initial_directory: path.to_str().unwrap().into(),
+        ..config(path)
+    }
+}
+
+fn save_config(
+    path: &std::path::Path,
+    default_file_name: &str,
+    default_extension: &str,
+) -> DialogConfig {
+    DialogConfig {
+        selection_mode: SelectionMode::SaveFile,
+        initial_directory: path.to_str().unwrap().into(),
+        default_file_name: default_file_name.into(),
+        default_extension: default_extension.into(),
+        ..config(path)
+    }
+}
+
+fn accepted_files(model: &mut DialogModel) -> Vec<FileChoice> {
+    let events = model.take_events();
+    let [DialogEvent::Accepted(files)] = events.as_slice() else {
+        panic!("expected exactly one accepted event: {events:?}");
+    };
+    files.clone()
+}
+
+/// V-01: directory mode returns exactly one revalidated directory; rows
+/// select independently of entering; files are never acceptable; the JSON
+/// container keeps the old shape with a single entry.
+#[test]
+fn directory_mode_selects_one_real_directory_and_rejects_files() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::create_dir(temp.path().join("sub 目录")).unwrap();
+    std::fs::write(temp.path().join("plain.txt"), "file").unwrap();
+    let mut model = DialogModel::default();
+    model.open(dir_config(temp.path()));
+    settle(&mut model);
+    // A file row cannot be toggled and a file cannot satisfy accept.
+    let file_row = model
+        .projection()
+        .entries
+        .iter()
+        .find(|e| e.name == "plain.txt")
+        .unwrap()
+        .id
+        .clone();
+    assert!(
+        !model.toggle(&file_row),
+        "files are not selectable in directory mode"
+    );
+    assert!(!model.confirm(), "no selection → no acceptance");
+    // Select the current directory (the fixture root itself).
+    assert!(model.select_current());
+    assert!(model.confirm());
+    settle(&mut model);
+    let files = accepted_files(&mut model);
+    assert_eq!(files.len(), 1, "exactly one entry: {files:?}");
+    assert_eq!(
+        files[0].path,
+        temp.path().canonicalize().unwrap().to_str().unwrap()
+    );
+    assert!(
+        std::path::Path::new(&files[0].path).is_dir(),
+        "a directory is returned as a directory"
+    );
+    // Rows select independently of entering; a child directory round-trips.
+    model.open(dir_config(temp.path()));
+    settle(&mut model);
+    let row = model
+        .projection()
+        .entries
+        .iter()
+        .find(|e| e.name == "sub 目录")
+        .unwrap()
+        .id
+        .clone();
+    assert!(model.toggle(&row));
+    assert_eq!(model.projection().selected_count, 1);
+    // Entering the same row navigates instead of selecting.
+    assert!(model.enter(&row));
+    settle(&mut model);
+    assert_eq!(model.projection().selected_count, 0, "navigation clears selection");
+    assert_eq!(model.projection().current_directory.ends_with("sub 目录"), true);
+    assert!(model.select_current(), "child directory selectable");
+    assert!(model.confirm());
+    settle(&mut model);
+    let files = accepted_files(&mut model);
+    assert_eq!(files.len(), 1);
+    assert!(files[0].path.ends_with("sub 目录"), "{:?}", files[0].path);
+    // An absent initial directory is still a named recoverable failure.
+    let mut fresh = DialogModel::default();
+    fresh.open(dir_config(&temp.path().join("absent-dir")));
+    settle(&mut fresh);
+    assert_eq!(fresh.projection().error.unwrap().code, "not_found");
+}
+
+/// V-02: save mode resolves names deterministically, never writes bytes, and
+/// every counterexample keeps the draft input alive with a named error.
+#[test]
+fn save_mode_resolves_names_without_writing_anything() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(temp.path().join("存在.txt"), "original bytes").unwrap();
+    let before = std::fs::read(temp.path().join("存在.txt")).unwrap();
+    let mut names_before: Vec<_> = std::fs::read_dir(temp.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    names_before.sort();
+    let mut model = DialogModel::default();
+    model.open(save_config(temp.path(), "", "md"));
+    settle(&mut model);
+    // Completion happens in the result only; the draft is never rewritten.
+    model.set_save_name("报告 v2".into());
+    assert_eq!(model.projection().save_name, "报告 v2");
+    assert!(model.confirm());
+    settle(&mut model);
+    let files = accepted_files(&mut model);
+    assert_eq!(files.len(), 1);
+    assert_eq!(
+        files[0].name, "报告 v2.md",
+        "default extension completes the result name"
+    );
+    assert!(files[0].path.ends_with("报告 v2.md"));
+    assert_eq!(model.projection().active, false);
+    // New session: explicit defaultFileName wins over a prefill file path.
+    let mut prefilled = DialogModel::default();
+    prefilled.open(DialogConfig {
+        initial_directory: temp.path().join("存在.txt").to_str().unwrap().into(),
+        ..save_config(temp.path(), "显式默认.md", "")
+    });
+    settle(&mut prefilled);
+    assert_eq!(prefilled.projection().save_name, "显式默认.md", "explicit defaultFileName wins");
+    // Without an explicit default, a complete initial file path prefills its
+    // basename into an empty draft.
+    let mut from_file = DialogModel::default();
+    from_file.open(DialogConfig {
+        initial_directory: temp.path().join("存在.txt").to_str().unwrap().into(),
+        ..save_config(temp.path(), "", "")
+    });
+    settle(&mut from_file);
+    assert_eq!(from_file.projection().save_name, "存在.txt");
+    // Spaces/Chinese names pass through byte-exact.
+    from_file.cancel();
+    from_file.open(save_config(temp.path(), "", ""));
+    settle(&mut from_file);
+    from_file.set_save_name("带 空格 的 名字 v3.txt".into());
+    assert!(from_file.confirm());
+    settle(&mut from_file);
+    let files = accepted_files(&mut from_file);
+    assert!(files[0].name.contains(' '));
+    assert!(files[0].path.ends_with("带 空格 的 名字 v3.txt"));
+    // Counterexamples keep the draft and never accept.
+    let mut model = DialogModel::default();
+    model.open(save_config(temp.path(), "", ""));
+    settle(&mut model);
+    for bad in ["a/b.txt", "a\\b.txt", "..", ".", "nul.txt"] {
+        model.set_save_name(bad.into());
+        assert!(model.projection().can_accept, "draft is editable: {bad}");
+        let _ = model.confirm();
+        settle(&mut model);
+        assert_eq!(model.projection().error.unwrap().code, "invalid_path", "{bad}");
+        assert!(
+            matches!(model.take_events().as_slice(), [DialogEvent::Error(_)]),
+            "named error for {bad}"
+        );
+    }
+    model.set_save_name("good.txt".into());
+    // An explicit extension outside the active group is a recoverable error.
+    model.set_filter("images");
+    assert!(model.confirm());
+    settle(&mut model);
+    assert_eq!(model.projection().error.unwrap().code, "invalid_path");
+    assert_eq!(model.projection().save_name, "good.txt", "input preserved");
+    model.take_events();
+    // defaultExtension incompatible with the active group is a config error.
+    let mut mismatch = DialogModel::default();
+    mismatch.open(save_config(temp.path(), "draft", "epub"));
+    settle(&mut mismatch);
+    assert!(mismatch.confirm());
+    settle(&mut mismatch);
+    let error = mismatch.projection().error.unwrap();
+    assert_eq!(error.code, "invalid_path");
+    assert!(!error.retryable, "configuration errors do not invite retry");
+    // A nonexistent save directory is a named error, not an empty success.
+    let error = auto_ui_runtime::ui::file_dialog::LocalFileSystem
+        .validate_save(
+            temp.path().join("absent-parent").to_str().unwrap(),
+            "x.txt",
+            &std::sync::atomic::AtomicBool::new(false),
+        )
+        .unwrap_err();
+    assert_eq!(error.code, "not_found");
+    // Nothing was created, truncated or renamed anywhere in the fixture.
+    assert_eq!(std::fs::read(temp.path().join("存在.txt")).unwrap(), before);
+    let mut names_after: Vec<_> = std::fs::read_dir(temp.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    names_after.sort();
+    assert_eq!(names_before, names_after, "no fixture entry appeared or vanished");
+}
+
+/// V-02 (unix): a symlinked save target is named unsupported_path and is
+/// never replaced by another destination.
+#[cfg(unix)]
+#[test]
+fn save_target_symlink_is_named_unsupported() {
+    use std::os::unix::fs::symlink;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(temp.path().join("real.txt"), "real").unwrap();
+    symlink(temp.path().join("real.txt"), temp.path().join("link.txt")).unwrap();
+    let error = auto_ui_runtime::ui::file_dialog::LocalFileSystem
+        .validate_save(
+            temp.path().to_str().unwrap(),
+            "link.txt",
+            &std::sync::atomic::AtomicBool::new(false),
+        )
+        .unwrap_err();
+    assert_eq!(error.code, "unsupported_path");
+    assert_eq!(std::fs::read(temp.path().join("real.txt")).unwrap(), b"real");
+}
+
+/// V-02 (unix): an unwritable existing target is a recoverable
+/// permission_denied; the test process proves the rejection itself.
+#[cfg(unix)]
+#[test]
+fn save_target_readonly_is_recoverable_permission_denied() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("locked.txt");
+    std::fs::write(&path, "locked").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o444)).unwrap();
+    let denied = std::fs::File::create(&path).unwrap_err();
+    assert_eq!(
+        denied.kind(),
+        std::io::ErrorKind::PermissionDenied,
+        "run this test as an unprivileged user"
+    );
+    let error = auto_ui_runtime::ui::file_dialog::LocalFileSystem
+        .validate_save(
+            temp.path().to_str().unwrap(),
+            "locked.txt",
+            &std::sync::atomic::AtomicBool::new(false),
+        )
+        .unwrap_err();
+    assert_eq!(error.code, "permission_denied");
+    assert!(error.retryable);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+}
+
+/// V-02 (windows): a read-only existing target is a recoverable
+/// permission_denied, proven by an actual OS attribute rejection.
+#[cfg(windows)]
+#[test]
+fn save_target_readonly_is_recoverable_permission_denied() {
+    use std::os::windows::{ffi::OsStrExt, fs::MetadataExt};
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn SetFileAttributesW(path: *const u16, attributes: u32) -> i32;
+    }
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("locked.txt");
+    std::fs::write(&path, "locked").unwrap();
+    let wide = path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    assert_ne!(unsafe { SetFileAttributesW(wide.as_ptr(), 1) }, 0);
+    assert_ne!(std::fs::metadata(&path).unwrap().file_attributes() & 1, 0);
+    let error = auto_ui_runtime::ui::file_dialog::LocalFileSystem
+        .validate_save(
+            temp.path().to_str().unwrap(),
+            "locked.txt",
+            &std::sync::atomic::AtomicBool::new(false),
+        )
+        .unwrap_err();
+    assert_eq!(error.code, "permission_denied");
+    assert!(error.retryable);
+    assert_eq!(std::fs::read(&path).unwrap(), b"locked");
+    assert_ne!(unsafe { SetFileAttributesW(wide.as_ptr(), 0) }, 0);
+}
+
+/// V-03: overwrite intent. Back keeps the drafts; Replace accepts only the
+/// identity the user confirmed; a replaced target voids the old confirmation;
+/// the selector itself never writes a byte.
+#[test]
+fn overwrite_confirm_binds_target_identity_and_back_keeps_drafts() {
+    let temp = tempfile::tempdir().unwrap();
+    let target = temp.path().join("笔记.md");
+    std::fs::write(&target, "round one").unwrap();
+    let mut model = DialogModel::default();
+    model.open(save_config(temp.path(), "笔记.md", ""));
+    settle(&mut model);
+    assert!(model.confirm());
+    settle(&mut model);
+    // Existing file → overwrite layer, no acceptance yet.
+    assert!(model.projection().active);
+    assert!(model.projection().overwrite.is_some());
+    assert!(model.take_events().is_empty(), "no accepted before confirmation");
+    assert!(!model.confirm(), "stale footer confirm cannot double-fire");
+    // Listing interactions are rejected while the layer owns the session.
+    let row = model.projection().entries[0].id.clone();
+    assert!(!model.toggle(&row));
+    assert!(!model.select_current());
+    // Back keeps the drafts and the session.
+    assert!(model.overwrite_back());
+    assert!(model.projection().overwrite.is_none());
+    assert!(model.projection().active);
+    assert_eq!(model.projection().save_name, "笔记.md");
+    assert!(model.take_events().is_empty());
+    // Replace accepts the confirmed identity; selector bytes unchanged.
+    assert!(model.confirm());
+    settle(&mut model);
+    assert!(model.projection().overwrite.is_some());
+    assert!(model.confirm_overwrite());
+    settle(&mut model);
+    let files = accepted_files(&mut model);
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].name, "笔记.md");
+    assert_eq!(std::fs::read(&target).unwrap(), b"round one");
+    // A replaced target voids the old confirmation: the second Replace hits
+    // the layer again with the new identity, never the old bytes.
+    let mut model = DialogModel::default();
+    model.open(save_config(temp.path(), "笔记.md", ""));
+    settle(&mut model);
+    assert!(model.confirm());
+    settle(&mut model);
+    assert!(model.projection().overwrite.is_some());
+    std::fs::write(&target, "round two — replaced").unwrap();
+    let replaced = std::fs::metadata(&target).unwrap().len();
+    assert!(model.confirm_overwrite());
+    settle(&mut model);
+    assert!(
+        model.projection().active && model.projection().overwrite.is_some(),
+        "identity change re-presents the confirmation"
+    );
+    assert!(
+        model.take_events().is_empty(),
+        "old confirm must not accept new bytes"
+    );
+    assert_eq!(std::fs::read(&target).unwrap(), "round two — replaced".as_bytes());
+    assert!(model.confirm_overwrite());
+    settle(&mut model);
+    let files = accepted_files(&mut model);
+    assert_eq!(files[0].name, "笔记.md");
+    assert_eq!(replaced, std::fs::metadata(&target).unwrap().len());
+    // Typing invalidates a pending confirmation before it can fire.
+    let mut model = DialogModel::default();
+    model.open(save_config(temp.path(), "笔记.md", ""));
+    settle(&mut model);
+    assert!(model.confirm());
+    settle(&mut model);
+    assert!(model.projection().overwrite.is_some());
+    model.set_save_name("笔记2.md".into());
+    assert!(model.projection().overwrite.is_none(), "draft change voids the layer");
+    assert!(!model.confirm_overwrite(), "voided confirm cannot fire");
+    assert!(model.take_events().is_empty());
+    // Navigating also voids it.
+    model.set_save_name("笔记.md".into());
+    assert!(model.confirm());
+    settle(&mut model);
+    assert!(model.projection().overwrite.is_some());
+    assert!(model.overwrite_back());
+    model.set_save_name("笔记.md".into());
+    assert!(model.confirm());
+    settle(&mut model);
+    assert!(model.projection().overwrite.is_some());
+    model.navigate(temp.path().to_str().unwrap().into());
+    settle(&mut model);
+    assert!(model.projection().overwrite.is_none());
+    assert!(!model.confirm_overwrite());
+}
+
+/// V-03 (controlled): a validation window race is deterministic — the first
+/// round sees identity A, the mutation lands, and the second round observes
+/// identity B, so the old confirmation cannot accept the new target.
+#[test]
+fn controlled_save_race_never_accepts_the_replaced_target() {
+    struct RaceFs {
+        rounds: std::sync::Mutex<Vec<String>>,
+    }
+    impl FileSystem for RaceFs {
+        fn navigate(
+            &self,
+            input: &str,
+            _current: Option<&str>,
+            _cancel: &AtomicBool,
+        ) -> Result<Navigation, Failure> {
+            Ok(Navigation {
+                listing: Listing {
+                    directory: input.into(),
+                    parent: None,
+                    entries: vec![Entry {
+                        name: "target.bin".into(),
+                        path: format!("{input}/target.bin"),
+                        is_dir: false,
+                        hidden: false,
+                        size: 1,
+                    }],
+                },
+                preselect: None,
+                home: "/".into(),
+                roots: vec!["/".into()],
+            })
+        }
+        fn validate(
+            &self,
+            files: &[FileChoice],
+            _cancel: &AtomicBool,
+        ) -> Result<Vec<FileChoice>, Failure> {
+            Ok(files.to_vec())
+        }
+        fn validate_save(
+            &self,
+            _directory: &str,
+            file_name: &str,
+            _cancel: &AtomicBool,
+        ) -> Result<SaveDecision, Failure> {
+            let mut rounds = self.rounds.lock().unwrap();
+            let round = rounds.len();
+            rounds.push(file_name.to_owned());
+            let identity = if round == 0 { "A" } else { "B" };
+            Ok(SaveDecision::Overwrite(
+                auto_ui_runtime::ui::file_dialog::SaveTarget {
+                    name: file_name.to_owned(),
+                    path: format!("/dir/{file_name}"),
+                    identity: identity.into(),
+                },
+            ))
+        }
+        fn validate_directory(
+            &self,
+            path: &str,
+            _cancel: &AtomicBool,
+        ) -> Result<FileChoice, Failure> {
+            Ok(FileChoice {
+                name: path.rsplit('/').next().unwrap_or(path).to_owned(),
+                path: path.to_owned(),
+            })
+        }
+    }
+    let fs = std::sync::Arc::new(RaceFs {
+        rounds: std::sync::Mutex::new(Vec::new()),
+    });
+    let mut model = DialogModel::with_fs(fs.clone());
+    // Filter-less config: the controlled race must exercise identity binding,
+    // not group-compatibility naming rules.
+    model.open(DialogConfig {
+        selection_mode: SelectionMode::SaveFile,
+        initial_directory: "/dir".into(),
+        default_file_name: "target.bin".into(),
+        ..Default::default()
+    });
+    settle(&mut model);
+    assert!(model.confirm());
+    settle(&mut model);
+    assert!(model.projection().overwrite.is_some());
+    // The target is replaced inside the confirmation window.
+    assert!(model.confirm_overwrite());
+    settle(&mut model);
+    assert!(
+        model.projection().active && model.projection().overwrite.is_some(),
+        "identity B re-presents the layer"
+    );
+    assert!(
+        model.take_events().is_empty(),
+        "no acceptance for the replaced identity"
+    );
+    // Confirming again accepts the identity the user actually saw.
+    assert!(model.confirm_overwrite());
+    settle(&mut model);
+    let files = accepted_files(&mut model);
+    assert_eq!(files[0].path, "/dir/target.bin");
+    assert_eq!(
+        fs.rounds.lock().unwrap().len(),
+        3,
+        "initial confirm + voided re-confirm + accepted re-confirm"
+    );
+}
+
+/// V-04: mode props freeze per session; stale save state and stale overwrite
+/// confirmations cannot cross a cancel/reopen boundary; terminal events stay
+/// single-shot.
+#[test]
+fn save_sessions_freeze_mode_and_reject_stale_state_across_reopen() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(temp.path().join("resume.txt"), "kept").unwrap();
+    // Pre-create the overwrite target for the first session.
+    std::fs::write(temp.path().join("草稿.md"), "existing").unwrap();
+    let mut model = DialogModel::default();
+    model.open(save_config(temp.path(), "草稿.md", ""));
+    settle(&mut model);
+    assert!(model.confirm());
+    settle(&mut model);
+    assert!(model.projection().overwrite.is_some());
+    // Cancel with the layer open: one Cancelled, layer state is gone.
+    assert!(model.cancel());
+    assert_eq!(model.take_events(), [DialogEvent::Cancelled]);
+    assert!(!model.cancel(), "cancelled is single-shot");
+    assert!(
+        !model.confirm_overwrite(),
+        "stale confirm cannot fire in a closed session"
+    );
+    assert!(model.take_events().is_empty());
+    // Reopen in a different mode: frozen props adopt the new mode and the old
+    // draft is gone.
+    model.open(dir_config(temp.path()));
+    settle(&mut model);
+    assert_eq!(model.projection().save_name, "", "new mode resets the save draft");
+    assert!(model.projection().overwrite.is_none());
+    assert!(!model.confirm_overwrite(), "old overwrite confirm is dead across reopen");
+    // Duplicate open preserves the current session (frozen props included).
+    let session = model.projection().session;
+    assert!(!model.open(save_config(temp.path(), "x.txt", "")));
+    assert_eq!(model.projection().session, session);
+    model.cancel();
+    // A fresh save session with a file-path initial directory prefills once;
+    // a later navigation into a file path never rewrites the draft.
+    model.open(DialogConfig {
+        initial_directory: temp.path().join("resume.txt").to_str().unwrap().into(),
+        ..save_config(temp.path(), "", "")
+    });
+    settle(&mut model);
+    assert_eq!(model.projection().save_name, "resume.txt");
+    model.navigate(temp.path().join("resume.txt").to_str().unwrap().into());
+    settle(&mut model);
+    assert_eq!(
+        model.projection().save_name, "resume.txt",
+        "later navigations never rewrite the user draft"
+    );
+    model.navigate(temp.path().to_str().unwrap().into());
+    settle(&mut model);
+    assert_eq!(model.projection().save_name, "resume.txt");
+    // Save with an empty draft is not confirmable and emits nothing.
+    model.set_save_name(String::new());
+    assert!(!model.projection().can_accept);
+    assert!(!model.confirm());
+    assert!(model.take_events().is_empty());
 }

@@ -12,7 +12,7 @@ use std::sync::{
 mod model;
 pub use model::{
     DialogConfig, DialogEvent, DialogModel, FileChoice, FileSystem, Filter, LocalFileSystem,
-    Navigation, Projection, Row, SelectionMode,
+    Navigation, OverwriteView, Projection, Row, SaveDecision, SaveTarget, SelectionMode,
 };
 
 #[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]

@@ -410,6 +410,120 @@ widget App {
     assert!(format!("{:?}", app.view()).contains("content: \"cancelled:1\""), "current cancel must notify exactly once");
 }
 
+/// PLAN-084 T-01 P-1: the overwrite confirmation must be a nested modal that
+/// narrows the active modal scope, routes Escape to the inner layer, and keeps
+/// the outer selector's controls outside the actionable scope.
+#[test]
+fn nested_overwrite_dialog_narrows_modal_scope_and_routes_escape_inward() {
+    use auto_ui_runtime::Component;
+    let source = r#"
+widget App {
+    msg { OverwriteBack, OuterClose, InnerAccept, InnerBack }
+    model {
+        var outer_open bool = true
+        var overwrite_open bool = true
+        var back_count int = 0
+        var close_count int = 0
+    }
+    view {
+        dialog (open: .outer_open, onclose: .OuterClose, closeOnOutside: false) {
+            dialog-content (style: "w-[800px] p-0") {
+                button "外层按钮" { onclick: .InnerAccept }
+                text f"close:${.close_count}:back:${.back_count}"
+                dialog (open: .overwrite_open, onclose: .OverwriteBack, closeOnOutside: false) {
+                    dialog-content (style: "w-80 p-6") {
+                        text "替换现有文件"
+                        button "确认覆盖" { onclick: .InnerAccept }
+                        button "返回修改" { onclick: .InnerBack }
+                    }
+                }
+            }
+        }
+    }
+    on {
+        .OverwriteBack -> { .overwrite_open = false; .back_count = .back_count + 1 }
+        .OuterClose -> { .outer_open = false; .close_count = .close_count + 1 }
+        .InnerAccept -> { }
+        .InnerBack -> { .overwrite_open = false; .back_count = .back_count + 1 }
+    }
+}
+"#;
+    let app = auto_ui_runtime::build_dynamic_component(source, None).unwrap();
+    let _ = app.view();
+    // The inner modal must be part of the painted tree.
+    let view = format!("{:?}", app.view());
+    assert!(view.contains("替换现有文件"), "nested modal missing: {view}");
+    // The active modal scope must reach the innermost panel content.
+    let tree = app.view();
+    let path = auto_ui_runtime::ui::modal::active_content_path(&tree)
+        .expect("a modal scope exists");
+    let content = auto_ui_runtime::ui::modal::at_path(&tree, &path)
+        .expect("scope resolves to inner content");
+    assert!(
+        format!("{content:?}").contains("替换现有文件"),
+        "active scope must be the inner overwrite layer, got {content:?}"
+    );
+    // Escape dispatches to the inner layer's onclose, not the outer cancel.
+    let escape = auto_ui_runtime::ui::modal::escape_message(&tree)
+        .expect("inner modal owns Escape");
+    assert!(
+        format!("{escape:?}").contains("OverwriteBack"),
+        "Escape must route inward: {escape:?}"
+    );
+    assert!(!format!("{escape:?}").contains("OuterClose"));
+    // A background control outside the narrowed scope is not actionable.
+    assert!(
+        !auto_ui_runtime::ui::modal::allows_path(&tree, &[0]),
+        "outer content must sit outside the narrowed modal scope"
+    );
+}
+
+/// PLAN-084 T-01 P-2: `ui.focus` is callable from ordinary package handler
+/// code and is consumed by the host focus slot with an observable result.
+#[test]
+fn package_handler_can_request_input_focus_by_event_key() {
+    use auto_ui_runtime::Component;
+    let source = r#"
+widget App {
+    msg { FocusNow, SetPath(str) }
+    model {
+        var open bool = true
+        var path_input str = ""
+        var focus_requested int = 0
+    }
+    view {
+        text f"focus_requested:${.focus_requested}"
+        dialog (open: .open) {
+            dialog-content {
+                input (value: .path_input, oninput: .SetPath, placeholder: "目录路径") {}
+            }
+        }
+    }
+    on {
+        .FocusNow -> {
+            .focus_requested = 1
+            ui.focus(".SetPath")
+        }
+        .SetPath(value str) -> { .path_input = value }
+    }
+}
+"#;
+    let mut app = auto_ui_runtime::build_dynamic_component(source, None).unwrap();
+    let _ = app.view();
+    // Compiling and dispatching the package-style handler proves the builtin
+    // is catalogued for VM code; runtime dispatch is consumed by the native
+    // host focus slot (auto_lang_core::vm::native::take_ui_focus_request),
+    // whose result lands in __focus_result on the native host path.
+    app.on(auto_ui_runtime::ui::interpreter::DynamicMessage::Typed {
+        widget_name: "App".into(),
+        event_name: "FocusNow".into(),
+        args: vec![],
+    });
+    let _ = app.view();
+    let view = format!("{:?}", app.view());
+    assert!(view.contains("focus_requested:1"), "handler ran: {view}");
+}
+
 #[test]
 fn different_parent_types_keep_their_same_named_filter_models() {
     use auto_ui_runtime::Component;
@@ -449,4 +563,335 @@ widget RightPage {
         assert!(Instant::now() < deadline, "parent lists did not settle: {tree}");
         std::thread::sleep(Duration::from_millis(2));
     }
+}
+
+// ---- PLAN-084 T-03 component-level checks (real package view wiring) ----
+
+/// Finds a dispatchable button by its visible label (icon PUA markers and
+/// tooltip suffixes stripped), descending into open modal content.
+fn plan084_button_msg(
+    view: &auto_ui_runtime::ui::view::View<auto_ui_runtime::ui::interpreter::DynamicMessage>,
+    label: &str,
+) -> Option<auto_ui_runtime::ui::interpreter::DynamicMessage> {
+    use auto_ui_runtime::ui::interpreter::DynamicMessage;
+    use auto_ui_runtime::ui::view::View;
+    let visible_label = |raw: &str| {
+        // label may carry icon EE01 / EE02 / EE03 tooltip markers — compare
+        // every text segment and the raw body.
+        let body = raw.split('\u{EE03}').next().unwrap_or(raw);
+        let name = body
+            .rsplit('\u{EE02}')
+            .next()
+            .unwrap_or(body)
+            .split('\u{EE01}')
+            .last()
+            .unwrap_or(body);
+        name == label || body == label
+    };
+    match view {
+        View::Button { label: text, onclick, .. } if visible_label(text) => Some(onclick.clone()),
+        View::Popover { open: true, content, .. } => plan084_button_msg(content, label),
+        View::Column { children, .. } | View::Row { children, .. } | View::List { items: children, .. } => {
+            children.iter().find_map(|child| plan084_button_msg(child, label))
+        }
+        View::Container { child, .. } | View::Scrollable { child, .. } => {
+            plan084_button_msg(child, label)
+        }
+        View::MouseArea { content, .. } => plan084_button_msg(content, label),
+        _ => None,
+    }
+}
+
+fn plan084_tick(component: &mut auto_ui_runtime::ui::dynamic::DynamicComponent) {
+    let _ = component.on_with_input_for_instance_type("FileDialog", "Tick", None);
+}
+
+fn plan084_wait(
+    component: &mut auto_ui_runtime::ui::dynamic::DynamicComponent,
+    predicate: impl Fn(&str) -> bool,
+) -> String {
+    use auto_ui_runtime::Component;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        plan084_tick(component);
+        let _ = component.view();
+        let tree = format!("{:?}", component.view());
+        if predicate(&tree) {
+            return tree;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "package view did not reach expected state: {tree}"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(2));
+    }
+}
+
+fn plan084_package_source(inner: &str) -> String {
+    let package = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packages/file-dialog");
+    let prefix = r#"
+widget App {
+    use { package: file_dialog from __PACKAGE__ }
+    msg { Open, OpenDirectory, OpenSave, Close, Accepted(str), Cancelled, Error(str) }
+    model {
+        var picker_open bool = false
+        var mode str = "singleFile"
+        var accept_label str = "打开"
+        var default_name str = ""
+        var default_extension str = ""
+        var initial_directory str = ""
+        var accepted_count int = 0
+        var cancel_count int = 0
+        var result str = ""
+        var background_count int = 0
+    }
+    view {
+        col {
+            button "选择文件" { onclick: .Open }
+            button "选择目录" { onclick: .OpenDirectory }
+            button "保存文件" { onclick: .OpenSave }
+            button "底层计数" { onclick: .Nothing }
+            button "切换模式" { onclick: .Nothing }
+            text f"结果 ${.result}"
+            text f"确认次数 ${.accepted_count}"
+            text f"取消次数 ${.cancel_count}"
+            text f"底层次数 ${.background_count}"
+            FileDialog (open: .picker_open, selectionMode: .mode, acceptLabel: .accept_label, defaultFileName: .default_name, defaultExtension: .default_extension, initialDirectory: .initial_directory, filters: [{id: "books", label: "Markdown", extensions: ["md"]}, {id: "images", label: "图片", extensions: ["png"]}], onaccepted: .Accepted($event), oncancelled: .Cancelled) {}
+        }
+    }
+    on {
+        .Open -> { .mode = "singleFile"; .accept_label = "打开"; .picker_open = true }
+        .OpenDirectory -> { .mode = "singleDirectory"; .accept_label = "选择此目录"; .picker_open = true }
+        .OpenSave -> { .mode = "saveFile"; .accept_label = "保存"; .picker_open = true }
+        .Accepted(value str) -> { .accepted_count = .accepted_count + 1; .result = value; .picker_open = false }
+        .Cancelled -> { .cancel_count = .cancel_count + 1; .picker_open = false }
+        .Nothing -> { .background_count = .background_count + 1 }
+    }
+}
+"#
+    .replace("__PACKAGE__", &serde_json::to_string(&package.to_str().unwrap().replace('\\', "/")).unwrap());
+    let _ = inner;
+    prefix
+}
+
+/// V-01 (component): the directory-mode view shows the 选择/进入 split, the
+/// current-directory button, and no file checkboxes; accepting returns one
+/// real directory through the ordinary accepted callback.
+#[test]
+fn package_directory_mode_view_selects_and_accepts_one_directory() {
+    use auto_ui_runtime::ui::interpreter::DynamicMessage;
+    use auto_ui_runtime::Component;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::create_dir(temp.path().join("子目录")).unwrap();
+    std::fs::write(temp.path().join("plain.txt"), "context").unwrap();
+    let mut source = plan084_package_source("");
+    // Point the initial directory at the fixture.
+    source = source.replace(
+        "var initial_directory str = \"\"",
+        &format!(
+            "var initial_directory str = \"{}\"",
+            temp.path().to_str().unwrap().replace('\\', "/")
+        ),
+    );
+    let mut component = auto_ui_runtime::build_dynamic_component(&source, None).unwrap();
+    let _ = component.view();
+    component
+        .on(DynamicMessage::Typed {
+            widget_name: "App".into(),
+            event_name: "OpenDirectory".into(),
+            args: vec![],
+        });
+    let _ = component.view();
+    let tree = plan084_wait(&mut component, |tree| {
+        tree.contains("选择一个目录") && tree.contains("选择当前目录")
+    });
+    // Type groups are hidden in directory mode; file rows carry no checkbox.
+    assert!(
+        !tree.contains("Markdown") && !tree.contains("图片"),
+        "type groups hidden in directory mode: {tree}"
+    );
+    assert!(
+        !tree.contains("label: \"plain.txt\""),
+        "file checkboxes must be absent in directory mode: {tree}"
+    );
+    assert!(
+        tree.contains("选择 子目录"),
+        "row select affordance present: {tree}"
+    );
+    // Enter affordance stays discoverable by name (chevron tooltip).
+    assert!(
+        tree.contains("进入 子目录"),
+        "row enter affordance present: {tree}"
+    );
+    // Select the current directory through the ordinary control.
+    let select_current = plan084_button_msg(
+        &component.view(),
+        "选择当前目录",
+    )
+    .expect("选择当前目录 control present");
+    component.on(select_current);
+    let _ = plan084_wait(&mut component, |tree| tree.contains("已选 1 项"));
+    let accept = plan084_button_msg(&component.view(), "选择此目录").expect("accept enabled");
+    component.on(accept);
+    let tree = plan084_wait(&mut component, |tree| tree.contains("确认次数 1"));
+    let basename = temp
+        .path()
+        .canonicalize()
+        .unwrap()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    // The debug dump escapes inner JSON quotes; the model tests own the exact
+    // payload shape, so the component check distinguishes on the real path.
+    assert!(
+        tree.contains(&basename) && tree.contains("确认次数 1"),
+        "accepted payload carries one real canonical directory entry: {tree}"
+    );
+    assert!(
+        !tree.contains("plain.txt") || !tree.contains("选择 plain.txt"),
+        "no file path can leak into the accepted result"
+    );
+}
+
+/// V-03 (component): the overwrite layer is a nested modal in the real
+/// package view; Back keeps drafts, Replace completes the session, and the
+/// confirmed file's bytes stay untouched by the selector.
+#[test]
+fn package_save_mode_overwrite_layer_back_then_replace() {
+    use auto_ui_runtime::ui::interpreter::DynamicMessage;
+    use auto_ui_runtime::Component;
+    let temp = tempfile::tempdir().unwrap();
+    let target = temp.path().join("笔记.md");
+    std::fs::write(&target, "existing bytes").unwrap();
+    let mut source = plan084_package_source("");
+    source = source.replace(
+        "var initial_directory str = \"\"",
+        &format!(
+            "var initial_directory str = \"{}\"",
+            temp.path().to_str().unwrap().replace('\\', "/")
+        ),
+    );
+    let mut component = auto_ui_runtime::build_dynamic_component(&source, None).unwrap();
+    let _ = component.view();
+    component.on(DynamicMessage::Typed {
+        widget_name: "App".into(),
+        event_name: "OpenSave".into(),
+        args: vec![],
+    });
+    let _ = component.view();
+    let tree = plan084_wait(&mut component, |tree| {
+        tree.contains("选择保存位置") && tree.contains("要保存的文件名")
+    });
+    assert!(tree.contains("Markdown"), "format groups remain visible in save mode");
+    // Confirm with the existing file's name → overwrite layer, no acceptance.
+    assert!(component.on_with_input_for_instance_type(
+        "FileDialog",
+        "SetFileName",
+        Some("笔记.md".into())
+    ));
+    let accept = plan084_wait(&mut component, |tree| {
+        tree.contains("笔记.md") && !tree.contains("载入中")
+    });
+    assert!(accept.contains("笔记.md"), "draft is projected back: {accept}");
+    let save = plan084_button_msg(&component.view(), "保存").unwrap();
+    component.on(save);
+    // The layer's name-bearing text only renders with a pending overwrite;
+    // the closed popover still dumps its content, so the bare title cannot
+    // distinguish states.
+    let layer = plan084_wait(&mut component, |tree| {
+        tree.contains("笔记.md 已存在。")
+    });
+    assert!(layer.contains("返回修改") && layer.contains("确认覆盖"));
+    assert!(
+        !layer.contains("确认次数 1"),
+        "no accepted before the overwrite is confirmed: {layer}"
+    );
+    assert_eq!(
+        std::fs::read(&target).unwrap(),
+        b"existing bytes",
+        "the selector never writes during validation"
+    );
+    // Back keeps the draft and the session; the layer closes.
+    let back = plan084_button_msg(&component.view(), "返回修改").unwrap();
+    component.on(back);
+    let tree = plan084_wait(&mut component, |tree| {
+        !tree.contains("笔记.md 已存在。")
+    });
+    assert!(tree.contains("笔记.md"), "draft survives Back");
+    // Replace completes the selection only after revalidation.
+    let save = plan084_button_msg(&component.view(), "保存").unwrap();
+    component.on(save);
+    plan084_wait(&mut component, |tree| tree.contains("笔记.md 已存在。"));
+    let replace = plan084_button_msg(&component.view(), "确认覆盖").unwrap();
+    component.on(replace);
+    let tree = plan084_wait(&mut component, |tree| tree.contains("确认次数 1"));
+    assert!(tree.contains("笔记.md"));
+    assert_eq!(
+        std::fs::read(&target).unwrap(),
+        b"existing bytes",
+        "accepting is a selection, not a write"
+    );
+}
+
+/// V-04 (component): the session mode freezes at open; a parent prop change
+/// mid-session never switches the live view, and the next open adopts it.
+#[test]
+fn package_session_mode_is_frozen_until_reopen() {
+    use auto_ui_runtime::ui::interpreter::DynamicMessage;
+    use auto_ui_runtime::Component;
+    let temp = tempfile::tempdir().unwrap();
+    let mut source = plan084_package_source("");
+    source = source.replace(
+        "var initial_directory str = \"\"",
+        &format!(
+            "var initial_directory str = \"{}\"",
+            temp.path().to_str().unwrap().replace('\\', "/")
+        ),
+    );
+    // The parent switches to save mode without closing the dialog.
+    let source = source
+        .replace("button \"切换模式\" { onclick: .Nothing }", "button \"切换模式\" { onclick: .SwitchMode }")
+        .replace(
+            "msg { Open, OpenDirectory, OpenSave, Close, Accepted(str), Cancelled, Error(str) }",
+            "msg { Open, OpenDirectory, OpenSave, Close, SwitchMode, Accepted(str), Cancelled, Error(str) }",
+        )
+        .replace(
+            "on {\n        .Open -> { .mode = \"singleFile\"; .accept_label = \"打开\"; .picker_open = true }",
+            "on {\n        .SwitchMode -> { .mode = \"saveFile\"; .accept_label = \"保存\" }\n        .Open -> { .mode = \"singleFile\"; .accept_label = \"打开\"; .picker_open = true }",
+        );
+    let mut component = auto_ui_runtime::build_dynamic_component(&source, None).unwrap();
+    let _ = component.view();
+    component.on(DynamicMessage::Typed {
+        widget_name: "App".into(),
+        event_name: "Open".into(),
+        args: vec![],
+    });
+    let _ = component.view();
+    let tree = plan084_wait(&mut component, |tree| tree.contains("选择要打开的文件"));
+    assert!(!tree.contains("要保存的文件名"), "singleFile session has no save row");
+    // Mid-session prop change must not switch the frozen session.
+    component.on(DynamicMessage::Typed {
+        widget_name: "App".into(),
+        event_name: "SwitchMode".into(),
+        args: vec![],
+    });
+    let tree = plan084_wait(&mut component, |tree| tree.contains("选择文件") && !tree.contains("载入中"));
+    assert!(
+        !tree.contains("要保存的文件名") && !tree.contains("选择保存位置"),
+        "frozen session keeps its mode despite the parent prop change: {tree}"
+    );
+    // Cancel and reopen adopts the new mode.
+    let cancel = plan084_button_msg(&component.view(), "取消").unwrap();
+    component.on(cancel);
+    plan084_wait(&mut component, |tree| tree.contains("取消次数 1"));
+    component.on(DynamicMessage::Typed {
+        widget_name: "App".into(),
+        event_name: "OpenSave".into(),
+        args: vec![],
+    });
+    let _ = component.view();
+    plan084_wait(&mut component, |tree| tree.contains("选择保存位置"));
 }

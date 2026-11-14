@@ -17,11 +17,21 @@ fn official_file_dialog_compiles_through_both_generators() {
     let rust = auto_ui_compiler::pipeline::ui_build(path, "ui", "rust", None).expect("official package Rust generation");
     assert!(rust.contains("pub struct FileDialog") && rust.contains("impl Component for FileDialog"));
     assert!(rust.contains("fd_command") && rust.contains("selectionMode"));
+    // PLAN-084: the four-mode contract reaches both generators with its new
+    // props and the overwrite/selection affordances as ordinary source.
+    assert!(rust.contains("defaultFileName") && rust.contains("defaultExtension"));
+    assert!(rust.contains("singleDirectory") && rust.contains("saveFile"));
+    assert!(rust.contains("ConfirmOverwrite") && rust.contains("RequestClose"));
+    assert!(rust.contains("替换现有文件?"));
     let vue = auto_ui_compiler::pipeline::ui_build(path, "ui", "vue", None).expect("official package Vue generation");
     assert!(vue.contains("<template>") && vue.contains("defineProps") && vue.contains("selectionMode"));
+    assert!(vue.contains("defaultFileName") && vue.contains("defaultExtension"));
     assert!(vue.contains("function accepted(arg0: any)") && vue.contains("emit('accepted', arg0)"));
     assert!(vue.contains("function cancelled()") && vue.contains("emit('cancelled')"));
     assert!(vue.contains("function error(arg0: any)") && vue.contains("emit('error', arg0)"));
+    // Vue generation carries the same modes without claiming native disk IO:
+    // no save/write builtin may leak into the generated component.
+    assert!(!vue.to_lowercase().contains("write_text"), "generated Vue must not claim file writes");
 }
 
 #[test]

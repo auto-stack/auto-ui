@@ -22,6 +22,14 @@ enum Command {
     Page { index: usize },
     Confirm,
     Cancel,
+    // PLAN-084: save/directory modes.
+    SaveName { value: String },
+    SelectCurrent,
+    ConfirmOverwrite,
+    OverwriteBack,
+    /// Esc/explicit-close path: an open overwrite layer returns to the
+    /// selector instead of cancelling the session.
+    RequestClose,
 }
 
 struct Instance {
@@ -139,6 +147,19 @@ impl ComponentIo {
                     }
                     Ok(Command::Cancel) => {
                         slot.model.cancel();
+                    }
+                    Ok(Command::SaveName { value }) => slot.model.set_save_name(value),
+                    Ok(Command::SelectCurrent) => {
+                        slot.model.select_current();
+                    }
+                    Ok(Command::ConfirmOverwrite) => {
+                        slot.model.confirm_overwrite();
+                    }
+                    Ok(Command::OverwriteBack) => {
+                        slot.model.overwrite_back();
+                    }
+                    Ok(Command::RequestClose) => {
+                        slot.model.request_close();
                     }
                     Err(error) => slot.events.push_back(error_event(Failure::new(
                         "invalid_path",

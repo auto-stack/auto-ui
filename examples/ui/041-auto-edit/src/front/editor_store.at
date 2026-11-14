@@ -56,6 +56,11 @@ print(add(1, 2))
         var ctx_open bool = false
         var ctx_x float = 0
         var ctx_y float = 0
+        // PLAN-084: 无路径保存/另存为的可见 FileDialog(保存模式专用实例,
+        // 实例在 app.at 根视图)。save_default_name 预填当前 basename 或
+        // untitled.at;实际写入与失败反馈由 store 持有(组件只返回选择)。
+        var save_open bool = false
+        var save_default_name str = ""
         // Plan 420 P2: 关闭脏 tab 的确认弹层状态
         var confirm_open bool = false
         var confirm_idx int = -1
@@ -91,7 +96,8 @@ print(add(1, 2))
         CloseTab(int), RemoveAt(int),
         ConfirmClose, ConfirmCancel, ConsoleClear, SyncCursor(str),
         EditorCtx(float, float), CtxClose, CtxCut, CtxCopy, CtxSelectAll,
-        ActNew, ActOpen, ActSave, ActQuit, ActUndo, ActRedo,
+        ActNew, ActOpen, ActSave, ActSaveAs, ActQuit, ActUndo, ActRedo,
+        SaveAccepted(str), SaveCancelled, SaveError(str),
         ActSelectAll, ActCut, ActCopy, ActPaste, ActConsole,
         ActSwitchTab, ActFold, ActAbout,
         TreeToggle(str), TreeSelect(str),
@@ -316,26 +322,61 @@ print(add(1, 2))
         .ActSave -> {
             if .tab_count > 0 {
                 if .path_active == "" {
-                    // Plan 420 P2: AUTO_SAVE_PATH 旁路(与 AUTO_OPEN_PATH 同型)。
-                    var p str = Env.get("AUTO_SAVE_PATH")
-                    if p == "" {
-                        p = dialog_save("untitled.at")
-                    }
-                    if p != "" {
-                        .path_active = p
-                        .tabs[.tab].path = p
-                        .title_active = file_basename(p)
-                        .tabs[.tab].title = file_basename(p)
-                    }
+                    // PLAN-084: 无路径保存打开可见 FileDialog(保存模式);
+                    // Plan 420 的 AUTO_SAVE_PATH Env 旁路随 dialog_save 退役,
+                    // 新验收无 Env 路径旁路(组件只返回选择,写入仍归 store)。
+                    .save_default_name = "untitled.at"
+                    .save_open = true
+                } else {
+                    store.WriteActive()
                 }
-                if .path_active != "" {
-                    File.write_text(.path_active, code_editor_text(.active_key))
+            }
+            .console = console_lines()
+        }
+        // PLAN-084: 实际写入臂——写后读回比对(file.write_text 返回 Void,
+        // 读回一致才清脏;失败保留脏状态并具名上屏)。
+        .WriteActive -> {
+            if .path_active != "" {
+                let src str = code_editor_text(.active_key)
+                File.write_text(.path_active, src)
+                let written str = File.read_text(.path_active)
+                if written == src {
                     .tabs[.tab].dirty = false
                     console_log("saved: " + .path_active)
                 } else {
-                    console_log("save: cancelled")
+                    console_log("save failed (verify mismatch): " + .path_active)
                 }
             }
+            .console = console_lines()
+        }
+        .ActSaveAs -> {
+            if .tab_count > 0 {
+                if .path_active != "" {
+                    .save_default_name = file_basename(.path_active)
+                } else {
+                    .save_default_name = "untitled.at"
+                }
+                .save_open = true
+            }
+            .console = console_lines()
+        }
+        .SaveAccepted(files str) -> {
+            .save_open = false
+            let p str = json.parse(files).files[0].path
+            .path_active = p
+            .tabs[.tab].path = p
+            .title_active = file_basename(p)
+            .tabs[.tab].title = file_basename(p)
+            store.WriteActive()
+        }
+        .SaveCancelled -> {
+            .save_open = false
+            console_log("save: cancelled")
+            .console = console_lines()
+        }
+        .SaveError(value str) -> {
+            // 可恢复错误:对话框保持打开,输入保留;取消/错误都不动文档状态。
+            console_log("save error: " + value)
             .console = console_lines()
         }
                 .ActUndo -> {

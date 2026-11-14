@@ -203,8 +203,10 @@ class Session:
             require('Stale action identity' in text and attempt < 3, text)
             time.sleep(.1)
 
-    def open(self, single=False):
-        self.press('单选文件' if single else '选择文件')
+    def open(self, single=False, mode=None):
+        # PLAN-084: one entry point per selectionMode button.
+        label = mode if mode else ('单选文件' if single else '选择文件')
+        self.press(label)
         return self.wait(lambda tree: 'placeholder: "目录路径"' in tree and '载入中' not in tree)
 
     def navigate(self, path, expected):
@@ -218,16 +220,31 @@ class Session:
     def selected(self, count):
         return self.wait(lambda tree: f'已选 {count} 项' in tree)
 
-    def accepted(self, expected):
+    def accepted(self, expected, label='打开'):
         before = self.count('确认次数')
         self.output.unlink(missing_ok=True)
-        self.press('打开')
+        self.press(label)
         self.wait(lambda tree: f'确认次数 {before+1}' in tree and 'placeholder: "目录路径"' not in tree)
         actual = json.loads(self.output.read_text(encoding='utf-8'))['files']
         require(len(actual) == len(expected), actual)
         for choice, path in zip(actual, expected):
-            require(choice['name'] == path.name and os.path.samefile(choice['path'], path), (actual, expected))
+            require(choice['name'] == path.name, (actual, expected))
+            # PLAN-084 save mode may return a not-yet-existing target; an
+            # existing candidate must still be identity-checked.
+            if os.path.exists(path) and os.path.exists(choice['path']):
+                require(os.path.samefile(choice['path'], path), (actual, expected))
+            else:
+                require(not os.path.exists(choice['path']), f'selector created bytes: {choice}')
+                # Windows canonical parents carry a \\?\ prefix; compare
+                # normalized path identity instead of raw strings.
+                left = choice['path'].replace('\\\\?\\', '')
+                require(os.path.normcase(os.path.normpath(left)) ==
+                        os.path.normcase(os.path.normpath(str(path))), (actual, expected))
         return actual
+
+    def save_name(self, value):
+        self.input('要保存的文件名', value)
+        return self.wait(lambda tree: '保存' in tree and '载入中' not in tree)
 
     def screenshot(self, name):
         text = self.call('autoui_screenshot')
@@ -385,6 +402,10 @@ def run(args):
     for name in ['a.txt','b.MD','other.epub','cover.png']:
         (fixture/name).write_text('independent input '+name,encoding='utf-8')
     (child/'a.txt').write_text('different parent identity',encoding='utf-8')
+    # PLAN-084 fixtures: an overwrite target with known bytes and a hash
+    # baseline proving the selector itself never writes any fixture bytes.
+    overwrite_target = fixture/'覆盖目标.md'
+    overwrite_target.write_text('plan084 overwrite target bytes',encoding='utf-8')
     large = out/'large'
     large.mkdir()
     for i in range(1003):
@@ -399,6 +420,7 @@ def run(args):
         # An existing local registry mirror supports offline CLI setup. This
         # is app-local configuration; do not rewrite the user's global config.
         (app/'am.at').write_text('index: { default: '+json.dumps(args.index_repo)+' }\n',encoding='utf-8')
+    baseline = {str(path.relative_to(fixture)): sha(path) for path in sorted(fixture.rglob('*')) if path.is_file()}
     report = {'platform':sys.platform, 'scope':'narrow_visual' if args.visual_only else 'full_native_vm', 'graphics_backend':os.environ.get('ICED_BACKEND','default'), 'auto':{'path':str(args.auto_bin),'sha256':sha(args.auto_bin)},
               'ui_tool':{'path':str(args.ui_tool_bin),'sha256':sha(args.ui_tool_bin)},'dependency_roots':dependency_roots,'sessions':[]}
     session = None
@@ -422,6 +444,36 @@ def run(args):
             record['accepted'] = session.accepted([fixture/'a.txt'])
             session.press('切换明暗'); session.open()
             record['alternate_theme_screenshot'] = session.screenshot('alternate-theme')
+            session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
+            # PLAN-084 V-08: directory / save / overwrite regions of the r2
+            # visual guide, light and dark, real screenshots only.
+            session.open(mode='选择目录')
+            session.wait(lambda tree: '选择一个目录' in tree and '选择当前目录' in tree)
+            record['directory_mode_screenshot'] = session.screenshot('directory-mode')
+            session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
+            session.open(mode='保存文件')
+            session.wait(lambda tree: '选择保存位置' in tree and '要保存的文件名' in tree)
+            record['save_mode_screenshot'] = session.screenshot('save-mode')
+            session.save_name('覆盖目标.md')
+            session.press('保存')
+            session.wait(lambda tree: '替换现有文件?' in tree)
+            record['overwrite_screenshot'] = session.screenshot('overwrite-layer')
+            session.press('返回修改')
+            session.wait(lambda tree: '替换现有文件?' not in tree and '要保存的文件名' in tree)
+            session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
+            session.press('切换明暗')
+            session.open(mode='选择目录')
+            session.wait(lambda tree: '选择一个目录' in tree and '选择当前目录' in tree)
+            record['directory_mode_dark_screenshot'] = session.screenshot('directory-mode-dark')
+            session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
+            session.open(mode='保存文件')
+            session.wait(lambda tree: '选择保存位置' in tree and '要保存的文件名' in tree)
+            session.save_name('覆盖目标.md')
+            session.press('保存')
+            session.wait(lambda tree: '替换现有文件?' in tree)
+            record['overwrite_dark_screenshot'] = session.screenshot('overwrite-layer-dark')
+            session.press('返回修改')
+            session.wait(lambda tree: '替换现有文件?' not in tree and '要保存的文件名' in tree)
             session.press('取消'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
             session.close(); report['sessions'].append(record)
             report['outcome'] = 'pass'
@@ -475,6 +527,56 @@ def run(args):
         session.toggle('a.txt'); session.selected(1)
         session.toggle('b.MD'); session.selected(1)
         record['accepted_single'] = session.accepted([fixture/'b.MD'])
+        # ---- PLAN-084 V-01: directory mode selects exactly one real directory ----
+        session.open(mode='选择目录')
+        session.wait(lambda tree: '选择一个目录' in tree and '选择当前目录' in tree)
+        require(not re.search(r'checkbox #[^ ]+ "a\.txt"', session.snapshot()),
+                'directory mode must not offer file selection')
+        session.press('选择当前目录'); session.selected(1)
+        record['accepted_directory'] = session.accepted([fixture], label='选择此目录')
+        session.open(mode='选择目录')
+        session.press("选择 中文 子目录'引号"); session.selected(1)
+        record['accepted_child_directory'] = session.accepted([child], label='选择此目录')
+        # ---- PLAN-084 V-02: save names, named errors, no-write boundary ----
+        session.open(mode='保存文件')
+        session.wait(lambda tree: '选择保存位置' in tree and '要保存的文件名' in tree)
+        save_new = fixture/'新报告 v084.txt'
+        session.save_name('新报告 v084.txt')
+        record['accepted_save_new'] = session.accepted([save_new], label='保存')
+        require(not save_new.exists(), 'the selector must not create the save target')
+        accepted_before = session.count('确认次数')
+        session.save_name('不匹配.xyz')
+        session.press('保存')
+        session.wait(lambda tree: '扩展名' in tree)
+        require(session.count('确认次数') == accepted_before, 'extension mismatch must not accept')
+        require('不匹配.xyz' in session.snapshot(), 'draft input must survive the error')
+        session.save_name('a/b.txt')
+        session.press('保存')
+        session.wait(lambda tree: '路径分隔符' in tree)
+        require(session.count('确认次数') == accepted_before, 'separator names must not accept')
+        record['save_named_errors'] = 'extension mismatch + path separator; draft preserved; no acceptance'
+        # ---- PLAN-084 V-03: overwrite intent, layer isolation, Esc-Back ----
+        before_background = session.count('底层次数')
+        session.output.unlink(missing_ok=True)
+        overwrite_bytes_before = overwrite_target.read_bytes()
+        session.save_name('覆盖目标.md')
+        session.press('保存')
+        session.wait(lambda tree: '替换现有文件?' in tree and '返回修改' in tree)
+        error, _ = session.call('autoui_action', allow_error=True, element_id=session.node('底层计数'), action='press')
+        require(error and session.count('底层次数') == before_background,
+                'overwrite layer must reject background actions')
+        session.key('Escape')
+        session.wait(lambda tree: '替换现有文件?' not in tree and '要保存的文件名' in tree)
+        require('覆盖目标.md' in session.snapshot(), 'Back must keep the draft')
+        session.press('保存')
+        session.wait(lambda tree: '替换现有文件?' in tree)
+        session.press('确认覆盖')
+        session.wait(lambda tree: f'确认次数 {accepted_before+1}' in tree and '要保存的文件名' not in tree)
+        record['accepted_overwrite'] = json.loads(session.output.read_text(encoding='utf-8'))['files']
+        require(overwrite_target.read_bytes() == overwrite_bytes_before,
+                'the selector never writes the confirmed target')
+        require(session.count('底层次数') == before_background,
+                'layer rejection left the background untouched')
         session.open()
         started = time.monotonic()
         session.navigate(large,'中文长文件名_0000_')
@@ -497,11 +599,29 @@ def run(args):
         session.open(); record['alternate_theme_screenshot'] = session.screenshot('alternate-theme')
         session.press('关闭'); session.wait(lambda tree:'placeholder: "目录路径"' not in tree)
         session.close(); report['sessions'].append(record)
+        # Fresh session with save knobs: an explicit defaultFileName wins over
+        # a file-path initialDirectory basename; a bare name completes with
+        # the default extension in the accepted result only.
+        os.environ['FILE_DIALOG_INITIAL_DIRECTORY'] = str(overwrite_target)
+        os.environ['FILE_DIALOG_DEFAULT_NAME'] = '显式默认.md'
+        os.environ['FILE_DIALOG_DEFAULT_EXT'] = 'md'
         session = Session(args,app,out,2)
         record = {'command':session.command,'windows':session.windows,'pid':session.process.pid}
         session.open(); session.toggle('a.txt'); session.selected(1)
         record['fresh_accepted'] = session.accepted([fixture/'a.txt'])
+        session.open(mode='保存文件')
+        session.wait(lambda tree: '选择保存位置' in tree)
+        require('显式默认.md' in session.snapshot(),
+                'explicit defaultFileName must win over the file-path basename')
+        session.save_name('补全测试')
+        record['accepted_save_completion'] = session.accepted([fixture/'补全测试.md'], label='保存')
+        require(not (fixture/'补全测试.md').exists(), 'the selector must not create the completed target')
         session.close(); report['sessions'].append(record)
+        # The whole campaign must leave every fixture byte untouched.
+        after = {str(path.relative_to(fixture)): sha(path) for path in sorted(fixture.rglob('*')) if path.is_file()}
+        require(after == baseline, 'fixture bytes changed during the campaign: ' +
+                str({key for key in set(after) | set(baseline) if after.get(key) != baseline.get(key)}))
+        report['fixture_byte_baseline'] = 'unchanged'
         report['outcome'] = 'pass'
     except Exception as error:
         report['outcome'] = 'fail'; report['failure'] = repr(error)
