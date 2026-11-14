@@ -334,8 +334,13 @@ required-features = ["ui-iced"]
 name = "ui_todos"
 required-features = ["ui-iced"]
 
-[dev-dependencies]
-# PLAN-060: exercise the actual WGPU canvas geometry backend without a device.
+# PLAN-083 T-03/T-04：**测试专用夹具**（多进程 spawn 计数 oracle）。不是产品
+# 入口：无 FP_FIXTURE_PORT 时打印用法并 exit 2；行为见该文件头注释。
+[[bin]]
+name = "fp_daemon_fixture"
+path = "tests/fixtures/fp_daemon_fixture.rs"
+
+[dev-dependencies]# PLAN-060: exercise the actual WGPU canvas geometry backend without a device.
 iced_wgpu = "0.14"
 # PLAN-018 T-03：iced_test 仅测试工具箱——自 optional+feature 门转 dev 依赖。
 iced_test = { version = "0.14" }

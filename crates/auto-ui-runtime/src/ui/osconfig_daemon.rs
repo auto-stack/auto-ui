@@ -983,6 +983,49 @@ pub fn probe_manifest_host(parent: &Path, name: &str) -> ManifestHostProbe {
 /// Child——桌面退出不杀 daemon，句柄即刻放掉，只留"曾拉起"记录）。
 static DID_SPAWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// PLAN-083 T-03：**共享 provider** ensure——跨进程单实例门（独占锁 +
+/// 锁内二次探测 + 实例身份标记）+ 输家有限等待复用。与
+/// [`resolve_manifest_host`] 的差别只在"谁可以 spawn"；健康/预算/接口合同
+/// 与宿主 env 组装完全复用。
+pub fn resolve_manifest_host_shared(
+    parent: &Path,
+    name: &str,
+    fallback_timeout: std::time::Duration,
+) -> ManifestHostResolution {
+    let (repo_dir, def) =
+        match crate::ui::app_registry::manifest_daemon_lookup_checked(parent, name) {
+            Ok(Some(found)) => found,
+            Ok(None) => return ManifestHostResolution::NotDeclared,
+            Err(reason) => return ManifestHostResolution::Invalid(reason),
+        };
+    let generic = generic_daemon_from_manifest(name, &repo_dir, &def);
+    let identity = crate::ui::daemon_instance::InstanceIdentity::from_declaration(
+        name,
+        def.port,
+        def.instance_key.as_deref(),
+        def.data_root.as_deref(),
+    );
+    let budget = generic.effective_ready_timeout(fallback_timeout);
+    let options = crate::ui::daemon_instance::SharedEnsureOptions {
+        budget,
+        lock_wait: budget,
+    };
+    match crate::ui::daemon_instance::ensure_shared_io(
+        &generic,
+        &identity,
+        &mut RealDaemonIo::new(),
+        &options,
+    ) {
+        DaemonStatus::Running(url) => match host_backend_env(&generic.env_key, &url, &def, &repo_dir)
+        {
+            Ok(env) => ManifestHostResolution::Ready { url, env },
+            Err(err) => ManifestHostResolution::Offline(err),
+        },
+        DaemonStatus::Offline(reason) => ManifestHostResolution::Offline(reason),
+        DaemonStatus::Spawning => ManifestHostResolution::Offline("daemon 仍在拉起中".to_string()),
+    }
+}
+
 /// 本会话是否曾 spawn daemon（T4 复用断言用）。
 
 /// 真实执行环境：std TCP ping + detached spawn。
@@ -2184,6 +2227,8 @@ mod tests {
             ready_timeout_ms: None,
             env: Default::default(),
             host: None,
+            instance_key: None,
+            data_root: None,
         }
     }
 

@@ -68,11 +68,81 @@ impl Drop for DesktopBackends {
     }
 }
 
+/// PLAN-083 T-03/D-04：声明 daemon 就是该应用后端时的共享判定。
+///
+/// 冻结规则：pac `back_port` == manifest `daemon.port` 且条目声明了 daemon →
+/// 共享 provider——不启动第二份自有后端、不复用/清理他人端口，路由到已核验
+/// 身份的 daemon；普通端口占用仍按既有规则拒绝。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SharedBackendDecision {
+    NotShared,
+    Shared { daemon_port: u16 },
+}
+
+pub(crate) fn shared_backend_decision(
+    app_port: u16,
+    declared: Option<&auto_ui_runtime::ui::app_registry::ManifestDaemon>,
+) -> SharedBackendDecision {
+    match declared {
+        Some(def) if def.port == app_port => SharedBackendDecision::Shared {
+            daemon_port: def.port,
+        },
+        _ => SharedBackendDecision::NotShared,
+    }
+}
+
 impl DesktopBackends {
     pub fn start(output: &Path) -> AutoResult<Self> {
         let entries: Vec<DesktopBackend> =
             serde_json::from_str(&fs::read_to_string(output.join("desktop-backends.json"))?)?;
-        validate_assignments(&entries)?;
+        // PLAN-083 T-03：先解析"声明 daemon 即本应用后端"的共享 provider
+        // （含跨进程单实例门与身份核对），再校验/启动其余自有后端——共享
+        // 端口不参与"已被占用"拒绝，也不允许悄悄起第二份后端。
+        let mut shared: std::collections::HashMap<
+            String,
+            (String, auto_ui_runtime::ui::osconfig_daemon::HostBackendEnv),
+        > = std::collections::HashMap::new();
+        let mut shared_ports: std::collections::HashSet<u16> = std::collections::HashSet::new();
+        for app in entries.iter().filter(|app| app.profile == "rust") {
+            let declared = auto_ui_runtime::ui::app_registry::manifest_daemon_lookup(
+                Path::new(".."),
+                &app.id,
+            );
+            let decision =
+                shared_backend_decision(app.port, declared.as_ref().map(|(_, def)| def));
+            if let SharedBackendDecision::Shared { daemon_port } = decision {
+                if daemon_port != app.port {
+                    continue;
+                }
+                match auto_ui_runtime::ui::osconfig_daemon::resolve_manifest_host_shared(
+                    Path::new(".."),
+                    &app.id,
+                    std::time::Duration::from_secs(5),
+                ) {
+                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Ready {
+                        url,
+                        env,
+                    } => {
+                        shared_ports.insert(app.port);
+                        shared.insert(app.id.clone(), (url, env));
+                    }
+                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Invalid(
+                        reason,
+                    )
+                    | auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Offline(
+                        reason,
+                    ) => {
+                        return Err(format!(
+                            "desktop app {}: 声明的共享 provider 无法就绪——{reason}",
+                            app.id
+                        )
+                        .into())
+                    }
+                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::NotDeclared => {}
+                }
+            }
+        }
+        validate_assignments(&entries, &shared_ports)?;
         let owns_io = if crate::proc_host::current().is_none() {
             crate::proc_host::install()
         } else {
@@ -96,6 +166,14 @@ impl DesktopBackends {
                     back_entry: auto_lang_core::config::resolve_back_api(&app.root)
                         .ok_or("missing VM backend contract")?,
                 });
+                continue;
+            }
+            // 共享 provider 应用：不起自有后端、不碰其端口，直接路由到
+            // 已核验身份的 daemon（Notes 主窗口 / Vue 桌面 API 去重）。
+            if let Some((url, _env)) = shared.get(&app.id) {
+                routes.push(
+                    serde_json::json!({"id": app.id, "target": url.clone(), "strip": true}),
+                );
                 continue;
             }
             // Never let the single-app launcher's legacy port cleanup kill a
@@ -179,9 +257,15 @@ impl DesktopBackends {
     }
 }
 
-fn validate_assignments(entries: &[DesktopBackend]) -> AutoResult<()> {
+fn validate_assignments(
+    entries: &[DesktopBackend],
+    shared_ports: &std::collections::HashSet<u16>,
+) -> AutoResult<()> {
     let mut ports = std::collections::HashSet::new();
-    for app in entries.iter().filter(|app| app.profile == "rust") {
+    for app in entries
+        .iter()
+        .filter(|app| app.profile == "rust" && !shared_ports.contains(&app.port))
+    {
         if !ports.insert(app.port) {
             return Err(format!(
                 "desktop backend port {} is assigned more than once",
@@ -279,15 +363,68 @@ mod tests {
         };
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
-        assert!(validate_assignments(&[app("busy", port)])
+        assert!(validate_assignments(&[app("busy", port)], &Default::default())
             .unwrap_err()
             .to_string()
             .contains("already in use"));
         drop(listener);
-        assert!(validate_assignments(&[app("a", port), app("b", port)])
-            .unwrap_err()
-            .to_string()
-            .contains("more than once"));
-        assert!(validate_assignments(&[app("a", port)]).is_ok());
+        assert!(
+            validate_assignments(&[app("a", port), app("b", port)], &Default::default())
+                .unwrap_err()
+                .to_string()
+                .contains("more than once")
+        );
+        assert!(validate_assignments(&[app("a", port)], &Default::default()).is_ok());
+    }
+
+    // ---- PLAN-083 T-03：共享 provider 判定（Notes 17819 双绑去重） ----
+
+    #[test]
+    fn shared_backend_decision_matches_declared_daemon_port_only() {
+        let def = |port: u16| auto_ui_runtime::ui::app_registry::ManifestDaemon {
+            port,
+            bin: None,
+            env_port: None,
+            health_interface: Some("notes.fpack/1".to_string()),
+            ready_timeout_ms: None,
+            env: Default::default(),
+            host: None,
+            instance_key: None,
+            data_root: None,
+        };
+        assert_eq!(
+            shared_backend_decision(17819, Some(&def(17819))),
+            SharedBackendDecision::Shared { daemon_port: 17819 },
+            "back_port 与声明 daemon 端口相同 = 共享 provider（不再起第二份后端）"
+        );
+        assert_eq!(
+            shared_backend_decision(17819, Some(&def(17820))),
+            SharedBackendDecision::NotShared,
+            "端口不同 = 自有后端（普通占用仍按既有规则拒绝）"
+        );
+        assert_eq!(
+            shared_backend_decision(17819, None),
+            SharedBackendDecision::NotShared,
+            "未声明 daemon = 零行为变化"
+        );
+        // 共享端口不参与"已被占用"拒绝；非共享端口仍拒绝。
+        let app = |id: &str, port| DesktopBackend {
+            id: id.into(),
+            root: PathBuf::new(),
+            profile: "rust".into(),
+            port,
+        };
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let shared: std::collections::HashSet<u16> = [port].into_iter().collect();
+        assert!(
+            validate_assignments(&[app("015-notes", port)], &shared).is_ok(),
+            "共享 provider 端口已被 daemon 持有不算冲突"
+        );
+        assert!(
+            validate_assignments(&[app("other", port)], &Default::default()).is_err(),
+            "普通占用者仍拒绝"
+        );
+        drop(listener);
     }
 }

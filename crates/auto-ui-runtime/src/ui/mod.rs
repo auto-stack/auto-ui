@@ -177,6 +177,10 @@ pub use auto_ui_compiler::app_registry;
 // 注入——外部仓 settings app 的宿主侧底座；纯逻辑全平台单测）。
 pub mod osconfig_daemon;
 
+// PLAN-083 T-03：声明 daemon 的跨进程启动协调（Windows 独占锁 + 身份
+// 标记 + 输家等待复用；共享 provider 生命周期不随任一主窗口）。
+pub mod daemon_instance;
+
 // Plan 504 S7：os-config 应用配置读取（~/.config/autoos/apps/<app>/config.at
 // 只读；run 臂优先级链 + desktop launch 播种两个消费点）。
 pub mod osconfig_apps;

@@ -712,6 +712,14 @@ pub struct ManifestDaemon {
     /// 在独立进程后端投递——in-proc 进程全局 `Env.get` 是已记录的接口缺口）。
     #[serde(default)]
     pub host: Option<ManifestDaemonHost>,
+    /// PLAN-083 T-03：受管实例键（跨进程启动协调的身份组成；缺席 = 条目
+    /// `id`）。不同实例键不得共享同一端点/数据根。
+    #[serde(default)]
+    pub instance_key: Option<String>,
+    /// PLAN-083 T-03：规范化数据根（身份组成；`%VAR%`/`$VAR` 展开；缺席 =
+    /// 未声明，身份只由实例键+端口构成）。相同端点不同数据根必须具名拒绝。
+    #[serde(default)]
+    pub data_root: Option<String>,
 }
 
 /// PLAN-083 T-02：宿主后端声明——`env` 为非敏感 literal（地址/开关），
@@ -771,9 +779,19 @@ impl ManifestDaemon {
             validate_env_key("daemon.env_port", key)?;
         }
         validate_env_map("daemon.env", &self.env)?;
+        if let Some(key) = self.instance_key.as_deref() {
+            validate_instance_key(key)?;
+        }
+        if let Some(root) = self.data_root.as_deref() {
+            if root.trim().is_empty() {
+                return Err("daemon.data_root 为空串".to_string());
+            }
+            if root.chars().any(char::is_control) {
+                return Err("daemon.data_root 含控制符".to_string());
+            }
+        }
         if let Some(host) = &self.host {
-            validate_env_map("daemon.host.env", &host.env)?;
-            if let Some(cred) = &host.credential {
+            validate_env_map("daemon.host.env", &host.env)?;            if let Some(cred) = &host.credential {
                 validate_env_key("daemon.host.credential.env", &cred.env)?;
                 if cred.principal.trim().is_empty() {
                     return Err("daemon.host.credential.principal 为空".to_string());
@@ -819,6 +837,26 @@ pub fn validate_env_key(scope: &str, key: &str) -> Result<(), String> {
     }
     if key.len() > 128 {
         return Err(format!("{scope} 键 `{key}` 超长"));
+    }
+    Ok(())
+}
+
+/// PLAN-083 T-03：受管实例键语法——`[A-Za-z0-9._:-]`、1..=96，用于跨进程
+/// 启动协调的身份组成（避免仅靠路径文本别名或进程内标记）。
+pub fn validate_instance_key(key: &str) -> Result<(), String> {
+    if key.is_empty() {
+        return Err("daemon.instance_key 为空".to_string());
+    }
+    if key.len() > 96 {
+        return Err("daemon.instance_key 超长（>96）".to_string());
+    }
+    if !key
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | ':' | '-'))
+    {
+        return Err(format!(
+            "daemon.instance_key `{key}` 含非法字符（允许 [A-Za-z0-9._:-]）"
+        ));
     }
     Ok(())
 }
@@ -972,7 +1010,16 @@ pub fn manifest_daemon_lookup_checked(
     let Some(root) = resolve_os_manifest_root(parent) else {
         return Ok(None);
     };
-    let Some((repo_dir, def)) = manifest_daemon_defs(&root)
+    manifest_daemon_lookup_in_root(&root, name)
+}
+
+/// PLAN-083 T-01/T-03：显式 manifest 根查表（不经过 env/兄弟探测序）——
+/// 生产入口与测试共用；`Err` = 已声明但可选能力非法（具名拒绝）。
+pub fn manifest_daemon_lookup_in_root(
+    root: &Path,
+    name: &str,
+) -> Result<Option<(PathBuf, ManifestDaemon)>, String> {
+    let Some((repo_dir, def)) = manifest_daemon_defs(root)
         .into_iter()
         .find(|(id, _, _)| id == name)
         .map(|(_, repo_dir, def)| (repo_dir, def))
@@ -1578,6 +1625,7 @@ mod tests {
     /// active / 未知 kind / repo 缺 pac.at 五形态 + 解析序定位。
     #[test]
     fn manifest_repo_roots_aggregation() {
+        let _env = env_lock(); // 进程级 AUTO_OS_ROOT 读写串行（并行测试防踩踏）
         std::env::remove_var("AUTO_OS_ROOT");
         let root = std::env::temp_dir().join(format!("autoui-586-manifest-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
@@ -1717,6 +1765,7 @@ mod tests {
     /// （ui-gallery → widgets-gallery 固定次序，id = 目录名）。
     #[test]
     fn gallery_extra_roots_probes_repo_galleries() {
+        let _env = env_lock(); // 进程级 AUTO_OS_ROOT 读写串行（并行测试防踩踏）
         std::env::remove_var("AUTO_OS_ROOT");
         let (Some(ui), Some(widgets)) = (
             resolve_os_top_dir(&repo_parent(), "ui-gallery"),
@@ -1741,6 +1790,7 @@ mod tests {
     /// 静默跳过。
     #[test]
     fn gallery_extra_roots_scan_galleries_off() {
+        let _env = env_lock(); // 进程级 AUTO_OS_ROOT 读写串行（并行测试防踩踏）
         std::env::remove_var("AUTO_OS_ROOT");
         let root =
             std::env::temp_dir().join(format!("autoui-008-galleries-{}", std::process::id()));
@@ -1778,6 +1828,7 @@ mod tests {
     /// 可见（零 pac `desktop:` 字段即上架）+ pac 展示字段取用（T1）。
     #[test]
     fn scan_gallery_roots_entries_visible() {
+        let _env = env_lock(); // 进程级 AUTO_OS_ROOT 读写串行（并行测试防踩踏）
         std::env::remove_var("AUTO_OS_ROOT");
         let (Some(ui), Some(widgets)) = (
             resolve_os_top_dir(&repo_parent(), "ui-gallery"),
@@ -1813,6 +1864,7 @@ mod tests {
     /// Vue 轨排除 / VM 轨收录；ui-gallery（vue 声明）双轨皆入。
     #[test]
     fn gallery_render_filter_matrix() {
+        let _env = env_lock(); // 进程级 AUTO_OS_ROOT 读写串行（并行测试防踩踏）
         std::env::remove_var("AUTO_OS_ROOT");
         let (Some(ui), Some(widgets)) = (
             resolve_os_top_dir(&repo_parent(), "ui-gallery"),
@@ -2165,6 +2217,7 @@ desktop_exe: \"target/release/native-app.exe\"
 
     #[test]
     fn manifest_daemon_lookup_via_sibling_probe() {
+        let _env = env_lock(); // 进程级 AUTO_OS_ROOT 读写串行（并行测试防踩踏）
         let (os_root, parent) = daemon_manifest_fixture();
         // 兄弟探测臂（parent/auto-os/apps.manifest）——不触 AUTO_OS_ROOT env
         //（env 权威臂已有 586 测试钉死先例，此处避免 env 污染并行测试）。
@@ -2194,10 +2247,21 @@ desktop_exe: \"target/release/native-app.exe\"
 
     // ---- PLAN-083 T-01：可选能力（health_interface / ready_timeout_ms） ----
 
+    /// 进程级 `AUTO_OS_ROOT` 的测试串行锁：同模块存在多个读写该 env 的用例，
+    /// 并行调度下会互相踩踏（既有 flake——gallery/注册表探测按 env 解析根）。
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        LOCK.lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     /// 单条目 manifest 夹具：`daemon` 值原样注入，返回 (os_root, parent)。
     fn daemon_capability_fixture(tag: &str, daemon_json: &str) -> (PathBuf, PathBuf) {
+        // 并行测试唯一化（时间戳在 Windows 上可同拍碰撞——进程内原子计数兜底）。
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let serial = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let parent = std::env::temp_dir().join(format!(
-            "autoui-083-cap-{tag}-{}-{}",
+            "autoui-083-cap-{tag}-{}-{serial}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -2223,7 +2287,7 @@ desktop_exe: \"target/release/native-app.exe\"
             "absent",
             r#"{ "port": 17819, "bin": "target/release/notes-service", "env_port": "AUTO_HTTP_PORT" }"#,
         );
-        let (_, def) = manifest_daemon_lookup_checked(&parent, "015-notes")
+        let (_, def) = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes")
             .expect("合法声明")
             .expect("声明命中");
         assert_eq!(def.health_interface, None, "缺席不改变就绪语义");
@@ -2236,7 +2300,7 @@ desktop_exe: \"target/release/native-app.exe\"
             "present",
             r#"{ "port": 17819, "health_interface": "notes.fpack/1", "ready_timeout_ms": 8000 }"#,
         );
-        let (_, def) = manifest_daemon_lookup_checked(&parent, "015-notes")
+        let (_, def) = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes")
             .unwrap()
             .unwrap();
         assert_eq!(def.health_interface.as_deref(), Some("notes.fpack/1"));
@@ -2253,7 +2317,7 @@ desktop_exe: \"target/release/native-app.exe\"
             "badiface",
             r#"{ "port": 17819, "health_interface": "notes.fpack" }"#,
         );
-        let err = manifest_daemon_lookup_checked(&parent, "015-notes")
+        let err = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes")
             .expect_err("非法接口串必须具名拒绝");
         assert!(
             err.contains("015-notes") && err.contains("health_interface"),
@@ -2270,7 +2334,7 @@ desktop_exe: \"target/release/native-app.exe\"
             "badbudget",
             r#"{ "port": 17819, "ready_timeout_ms": 600001 }"#,
         );
-        let err = manifest_daemon_lookup_checked(&parent, "015-notes")
+        let err = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes")
             .expect_err("越界预算必须具名拒绝");
         assert!(err.contains("ready_timeout_ms"), "{err}");
         let _ = std::fs::remove_dir_all(&parent);
@@ -2278,7 +2342,7 @@ desktop_exe: \"target/release/native-app.exe\"
         // 就绪预算越界（< 下界）。
         let (_, parent) =
             daemon_capability_fixture("toosmall", r#"{ "port": 17819, "ready_timeout_ms": 10 }"#);
-        assert!(manifest_daemon_lookup_checked(&parent, "015-notes").is_err());
+        assert!(manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes").is_err());
         let _ = std::fs::remove_dir_all(&parent);
     }
 
@@ -2334,7 +2398,7 @@ desktop_exe: \"target/release/native-app.exe\"
               }
             }"#,
         );
-        let (_, def) = manifest_daemon_lookup_checked(&parent, "015-notes")
+        let (_, def) = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes")
             .expect("合法声明")
             .expect("命中");
         assert_eq!(
@@ -2364,7 +2428,7 @@ desktop_exe: \"target/release/native-app.exe\"
             "credkey",
             r#"{ "port": 17819, "env": { "NOTES_FP_CRED": "abc" } }"#,
         );
-        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("凭据键必须拒绝");
+        let err = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes").expect_err("凭据键必须拒绝");
         assert!(err.contains("daemon.env.NOTES_FP_CRED"), "{err}");
         assert!(err.contains("daemon.host.credential"), "拒绝须指向受管引用: {err}");
         let _ = std::fs::remove_dir_all(&parent);
@@ -2375,7 +2439,7 @@ desktop_exe: \"target/release/native-app.exe\"
             "credval",
             &format!(r#"{{ "port": 17819, "env": {{ "NOTES_DATA": "{cred}" }} }}"#),
         );
-        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("hex 值必须拒绝");
+        let err = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes").expect_err("hex 值必须拒绝");
         assert!(err.contains("形似凭据"), "{err}");
         let _ = std::fs::remove_dir_all(&parent);
 
@@ -2384,7 +2448,7 @@ desktop_exe: \"target/release/native-app.exe\"
             "hostcred",
             r#"{ "port": 17819, "host": { "env": { "NOTES_FP_TOKEN": "x" } } }"#,
         );
-        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("host literal 凭据键拒绝");
+        let err = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes").expect_err("host literal 凭据键拒绝");
         assert!(err.contains("daemon.host.env"), "{err}");
         let _ = std::fs::remove_dir_all(&parent);
 
@@ -2395,14 +2459,14 @@ desktop_exe: \"target/release/native-app.exe\"
                  "host": { "env": { "NOTES_ADDR": "x" },
                            "credential": { "env": "NOTES_ADDR", "principal": "fp-reader" } } }"#,
         );
-        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("冲突必须拒绝");
+        let err = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes").expect_err("冲突必须拒绝");
         assert!(err.contains("冲突"), "{err}");
         let _ = std::fs::remove_dir_all(&parent);
 
         // env 键/凭据主体语法非法：具名拒绝。
         let (_, parent) =
             daemon_capability_fixture("badkey", r#"{ "port": 17819, "env": { "1BAD-KEY": "x" } }"#);
-        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("坏键名拒绝");
+        let err = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes").expect_err("坏键名拒绝");
         assert!(err.contains("1BAD-KEY"), "{err}");
         let _ = std::fs::remove_dir_all(&parent);
 
@@ -2410,8 +2474,48 @@ desktop_exe: \"target/release/native-app.exe\"
             "badprincipal",
             r#"{ "port": 17819, "host": { "credential": { "env": "NOTES_FP_CRED", "principal": "  " } } }"#,
         );
-        let err = manifest_daemon_lookup_checked(&parent, "015-notes").expect_err("空 principal 拒绝");
+        let err = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes").expect_err("空 principal 拒绝");
         assert!(err.contains("principal"), "{err}");
+        let _ = std::fs::remove_dir_all(&parent);
+    }
+
+    // ---- PLAN-083 T-03：受管实例键与数据根（身份组成） ----
+
+    #[test]
+    fn manifest_daemon_instance_identity_fields() {
+        let (_, parent) = daemon_capability_fixture(
+            "instance",
+            r#"{ "port": 17819, "instance_key": "notes:default",
+                 "data_root": "%APPDATA%/auto-notes/data" }"#,
+        );
+        let (_, def) = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes")
+            .expect("合法声明")
+            .expect("命中");
+        assert_eq!(def.instance_key.as_deref(), Some("notes:default"));
+        assert_eq!(def.data_root.as_deref(), Some("%APPDATA%/auto-notes/data"));
+        assert_eq!(def.validate(), Ok(()));
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // 实例键非法字符：具名拒绝（跨进程身份不得靠自由文本）。
+        for bad in ["has space", "a/b", "", "x?"] {
+            let (_, parent) = daemon_capability_fixture(
+                "instbad",
+                &format!(r#"{{ "port": 17819, "instance_key": "{bad}" }}"#),
+            );
+            let outcome = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes");
+            assert!(
+                outcome.is_err(),
+                "实例键 {bad:?} 必须拒绝（实际 {outcome:?}；parent={}；manifest={:?}）",
+                parent.display(),
+                std::fs::read_to_string(parent.join("auto-os").join("apps.manifest"))
+            );
+            let _ = std::fs::remove_dir_all(&parent);
+        }
+        // 数据根为空串：具名拒绝。
+        let (_, parent) =
+            daemon_capability_fixture("dataroot", r#"{ "port": 17819, "data_root": "   " }"#);
+        let err = manifest_daemon_lookup_in_root(&parent.join("auto-os"), "015-notes").expect_err("空数据根拒绝");
+        assert!(err.contains("data_root"), "{err}");
         let _ = std::fs::remove_dir_all(&parent);
     }
 }

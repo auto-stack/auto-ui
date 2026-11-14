@@ -4479,7 +4479,7 @@ impl DesktopSession {
         // 解析序内建（resolve_os_manifest_root：AUTO_OS_ROOT env 权威 →
         // 兄弟 ../auto-os → 主检出 D:/autostack/auto-os）——单次入口
         // 即覆盖 desktop.sh 注入与开发机两形态，无需 session 侧再分臂。
-        let resolution = crate::ui::osconfig_daemon::resolve_manifest_host(
+        let resolution = crate::ui::osconfig_daemon::resolve_manifest_host_shared(
             std::path::Path::new(".."),
             name,
             std::time::Duration::from_secs(5),
