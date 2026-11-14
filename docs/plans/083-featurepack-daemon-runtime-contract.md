@@ -1,6 +1,6 @@
 ---
 plan_id: auto-ui/PLAN-083
-status: execution_done
+status: reviewed
 feature_name: FeaturePack daemon生产就绪、宿主配置与单实例
 author: [Codex]
 created_at: 2026-11-13
@@ -324,6 +324,28 @@ R-1 声称子进程用例断言「宿主陈旧同名值被剔除」；但用例�
 **回归（cb8bfbce 上执行）**：`--lib osconfig_daemon` 42、`--lib daemon_instance` 8、`--test featurepack_daemon_hosting --test-threads=1` 5、`--test featurepack_daemon_launch --test-threads=1` 1、`--test featurepack_daemon_child_env --test-threads=1` 2、compiler `app_registry::tests` 34、tools `desktop_backends` 3+1 ignored。未跑：`osconfig_integration`（材料缺席自跳过，不计通过）、真后端启动档、Notes 真实双窗口（OS 联合验收）。
 
 2026-11-14 · stage: goal | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | round: 6 | from: review（needs_fix ×2） | to: review（T-06 第三次） | status: execution_done | outcome: pass（R-2 闭合 + 诊断） | worktree: D:/autostack/.wt/ui-083/auto-ui | commit: cb8bfbce | next: review
+
+2026-11-14 · stage: review（第三次最终复审 / final pass） | review_scope: final | reviewer: plan083-reviewer（独立子代理会话，未参与实现；Windows 本机，无真后端产物/双应用） | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | outcome: **pass** | worktree: D:/autostack/.wt/ui-083/auto-ui | branch: codex/plan-083-dev | reviewed_commit: cb8bfbcef187082a1128c9f1c5edac21bc22ca01 | previous_reviewed_commit: b9999db9832ee8d12ce6d0ad8705db03a7f2937a | base_commit: a6f776c24a4ba98611849955edceb5a04edac969 | dependency_revisions: auto-lang e0cfa2d8c / auto-web 8b1742a0 / auto-down 58ea33f6 | spec_inputs: SD-01 sha256 098C7F1907E92B750DC46B0F3EA1A001D832CD03269C967D2F62E0BF4DB42D02；SD-02 sha256 FFAEC4D98CC74E497D0B232CC7676BD88C06A5A4B55FE8F16B1AFE14562F950A（均 @cb8bfbce） | next_responsible_role: merge（T-07）
+
+**绑定与清洁度**：worktree 干净，HEAD = cb8bfbce；R-2 diff 仅 4 文件（+186/−42：runtime `osconfig_daemon`、child-env 测试、tools `desktop_backends`、SD-01），无无关行为改动；无 `.autoos/specs.json` 等台账写入；未创建 `docs/plans/attachments/083`（Test-Path=False）。复审探针源码运行后删除、树复检干净；日志 `D:/autostack/plan-artifacts/plan-083/review3/{tests,adversarial}.log`（随 merge 删除）。
+
+**独立复跑（均绑 cb8bfbce，0 failed）**：`--lib osconfig_daemon` **42**；`--lib daemon_instance` **8**；`--test featurepack_daemon_hosting -- --test-threads=1` **5**；`--test featurepack_daemon_launch` **1**；`--test featurepack_daemon_child_env -- --test-threads=1` **2**；compiler `app_registry::tests` **34**；tools `desktop_backends` **3 passed/1 ignored**。与 R-2 回执一致。
+
+**三处发现的闭合验证（按其不变量，非作者示例）**
+- **F-4 关闭**：新单源 `osconfig_daemon::resolve_declared_backend` 建在 `manifest_daemon_lookup_checked` 上（Err 不再折叠），`desktop_backends.rs:193-215` 只消费该四态，`Invalid → return Err` 分支可达。我的反例 P2：Notes 形态非法声明（daemon port 17819 == pac back_port）——宽松 `manifest_daemon_lookup` = **None**（旧守卫会跳过），门 = **Invalid（点名 health_interface）**；未声明 = NotDeclared；合法但可执行缺席 = Offline。故非法声明在 spawn 前被拒绝，不再退化为 NotShared/自有后端。（注意：`:181` 的既有端口占用检查在 daemon 运行时可能先报 "port in use"；结果同为拒绝、绝不起第二份后端，仅诊断措辞次序不同——不构成合同违背。）
+- **F-5 关闭**：门新增仅存在于 `remove`、不在 `entries` 的继承键 `FP083_STALE` 并断言 `<unset>`。我的反例 P3：真实 `apply_host_env` → `FP083_RV3_EXTRA=<unset>`；模拟"删掉 env_remove"的错误实现 → 泄漏 `parent-stale-only`，即该门对 remove 步骤承重（在投递原语层做等价变异验证，未改动仓库；原 readme 声称的变异结果成立）。
+- **N5 关闭**：旧语义就绪 = 状态行前缀 `HTTP/1.x 2`（不要求完整响应头）。我的反例 P1（比作者用例更苛刻）：状态行跨两个 TCP 分段到达、头块永不终止、连接保持——生产入口 `resolve_manifest_host_shared` **Ready（83ms）、spawn=0**。附带事实：`tcp_ping` 单次读取在该分段流上为 false，故实现是旧前缀判定的**严格超集**（更少误判），SD-01 §3 "首段字节前缀判定逐字同义"宜理解为语义等价方向，非阻塞。
+- **F-1/F-2/F-3 无回归**：R-2 未触 `daemon_instance`/`session`/`rust_ui`；旧声明 body 独立性、非共享 ensure-before-spawn（SD-02 条款现与代码一致）、`apply_host_env` 单源与子进程隔离均在本次 gate 中保持绿。
+
+**三次新反例结果**（`review3/adversarial.log`，4/4 通过）：P1 分段状态行 → **Ready、spawn=0**；P2 非法声明（共享端口）→ **Invalid（点名字段）**，宽松入口 None；P3 remove-only 键 → 真实现 `<unset>`、去掉 remove 则泄漏。
+
+**AC 结果**：AC-01 pass（健康合同/具名裁决/旧路径）；AC-02 pass（配置分界、A/B 子进程隔离、凭据不回显、首请求前可见——非共享路径 ensure 先于 spawn）；AC-03 pass（多进程 spawn=1、冲突/失败恢复）；AC-04 pass（共享生命周期与恢复；真实 Notes 双窗口为已记录 OS 边界）；AC-05 pass（旧声明兼容：前缀语义、字段解析非法具名拒绝）；AC-06 pass（SD-01/02 与 DEBT 映射/消费字段齐全）；AC-07 = 本回执；AC-08 待 merge。
+
+**规范增量判定：通过**。SD-01 add（`docs/specs/runtime/featurepack-daemon-hosting.md`，§3 本轮更新为状态行前缀语义，与代码一致）、SD-02 modify（`docs/specs/build/desktop-api-surfaces.md`，非共享声明 ensure-before-spawn / Invalid 拒绝 / Offline 具名降级，与代码一致）；路径、add/modify、rationale、AC 映射与 §5 表一致；§5 in-proc 凭据缺口与 §11 边界措辞如实；无索引/台账写入、无 attachments。
+
+**pending_closeout_gates（merge-owned）**：真实 Vue/Rust 后端构建启动与 Notes 双窗口联合验收归 OS-067（沿计划 §9 既有边界，不因本轮扩大承诺）；仓库统一回归门由 merge 按仓约定执行；受影响组已在冻结的 reviewed commit `cb8bfbce` 上全绿。
+
+**next**：merge T-07 —— 按精确提交落地 `cb8bfbce`、核对规范/归档/清理、把字段/兼容性/SHA 交付 OS-067 与 Reader-013。未合并、未清理任何 worktree。
 
 ## 10. 待澄清事项
 
