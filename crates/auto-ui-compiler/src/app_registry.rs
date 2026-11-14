@@ -678,6 +678,10 @@ struct OsManifestApp {
 /// per-name 探测/spawn 参数。健康探针契约固定 `GET /api/health`（osconfig
 /// 既有约定，各仓 back 对齐）；`bin` 缺席 = 只探不孵（Offline 有因，不阻断
 /// launch）；`env_port` 缺席 = spawn 期派生 `<NAME 大写蛇形>_BACK_PORT`。
+///
+/// PLAN-083 T-01（可选能力，D-01）：新增字段全部 `#[serde(default)]`——
+/// 缺席沿既有语义（2xx 即就绪，零回归）；存在时按下面的具名合同裁定，
+/// 非法值不默默退回旧探活（[`ManifestDaemon::validate`]）。
 #[derive(serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct ManifestDaemon {
     /// daemon API 口（url = `http://127.0.0.1:<port>`）。
@@ -688,6 +692,79 @@ pub struct ManifestDaemon {
     /// spawn 期端口覆盖 env 键（如 `JADE_GARDEN_PORT`）。
     #[serde(default)]
     pub env_port: Option<String>,
+    /// PLAN-083 T-01：声明接口版本（形态 `<name>/<n>`，如 `notes.fpack/1`）。
+    /// 存在 = 就绪必须为完整合法 health 响应且 `interface` 逐字相等；缺席 =
+    /// 既有 2xx 语义（只探不核 body）。错版/坏 body/占用者均拒绝复用。
+    #[serde(default)]
+    pub health_interface: Option<String>,
+    /// PLAN-083 T-01：就绪预算毫秒（含 spawn 前检查与 spawn 后轮询）。范围
+    /// [`DAEMON_READY_TIMEOUT_MS_MIN`]..=[`DAEMON_READY_TIMEOUT_MS_MAX`]；
+    /// 缺席 = 调用方缺省（UiSession 现行 5000ms）。
+    #[serde(default)]
+    pub ready_timeout_ms: Option<u64>,
+}
+
+/// PLAN-083 T-01：`daemon.ready_timeout_ms` 下界（低于此值无法覆盖一次
+/// loopback 连接+首段响应）。
+pub const DAEMON_READY_TIMEOUT_MS_MIN: u64 = 200;
+/// PLAN-083 T-01：`daemon.ready_timeout_ms` 上界（桌面 launch 前置不得持锁
+/// 无限等待；超预算一律 Offline 有因）。
+pub const DAEMON_READY_TIMEOUT_MS_MAX: u64 = 60_000;
+
+impl ManifestDaemon {
+    /// PLAN-083 T-01：可选能力校验——新字段非法时给具名拒绝，由调用方映射
+    /// 为 Offline（不 spawn、不退回旧探活）。
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(iface) = self.health_interface.as_deref() {
+            validate_health_interface(iface)?;
+        }
+        if let Some(ms) = self.ready_timeout_ms {
+            if !(DAEMON_READY_TIMEOUT_MS_MIN..=DAEMON_READY_TIMEOUT_MS_MAX).contains(&ms) {
+                return Err(format!(
+                    "ready_timeout_ms={ms} 越界（{}..={}）",
+                    DAEMON_READY_TIMEOUT_MS_MIN, DAEMON_READY_TIMEOUT_MS_MAX
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// PLAN-083 T-01：接口版本声明语法冻结——`<name>/<digits>`，name 为
+/// `[A-Za-z0-9._-]` 且首字符字母/数字，长度 1..=96；不含空白/控制符。
+/// 该串是 wire 门与健康探针的同一事实（auto-notes `fp_interface_version`）。
+pub fn validate_health_interface(iface: &str) -> Result<(), String> {
+    let s = iface.trim();
+    if s.is_empty() {
+        return Err("health_interface 为空".to_string());
+    }
+    if s.len() > 128 {
+        return Err("health_interface 超长（>128）".to_string());
+    }
+    if s.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("health_interface 含空白/控制符".to_string());
+    }
+    let Some((name, version)) = s.rsplit_once('/') else {
+        return Err("health_interface 须为 `<name>/<n>` 形态".to_string());
+    };
+    if name.is_empty() || name.len() > 96 {
+        return Err("health_interface name 长度非法".to_string());
+    }
+    let mut chars = name.chars();
+    let first = chars.next().unwrap_or(' ');
+    if !first.is_ascii_alphanumeric() {
+        return Err("health_interface name 须以字母/数字开头".to_string());
+    }
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+    {
+        return Err("health_interface name 含非法字符（允许 [A-Za-z0-9._-]）".to_string());
+    }
+    if version.is_empty() || !version.chars().all(|c| c.is_ascii_digit()) {
+        return Err("health_interface version 须为十进制数字".to_string());
+    }
+    Ok(())
 }
 
 fn os_manifest_default_kind() -> String {
@@ -748,12 +825,33 @@ pub fn manifest_daemon_defs(manifest_root: &Path) -> Vec<(String, PathBuf, Manif
 
 /// PLAN-013 T2：launch 期单名查表便捷形态——manifest 根解析 + defs 查找。
 /// `parent` 语义同 [`host_extra_roots`]（宿主 CWD 相对父目录）。
-pub fn manifest_daemon_lookup(parent: &Path, name: &str) -> Option<(PathBuf, ManifestDaemon)> {
-    let root = resolve_os_manifest_root(parent)?;
-    manifest_daemon_defs(&root)
+///
+/// PLAN-083 T-01：`Ok(None)` = 未声明；`Err(reason)` = 已声明但可选能力非法
+/// （具名拒绝，调用方不得回退旧探活）。兼容入口 [`manifest_daemon_lookup`]
+/// 把 Err 折叠为 None（既有调用方零改）。
+pub fn manifest_daemon_lookup_checked(
+    parent: &Path,
+    name: &str,
+) -> Result<Option<(PathBuf, ManifestDaemon)>, String> {
+    let Some(root) = resolve_os_manifest_root(parent) else {
+        return Ok(None);
+    };
+    let Some((repo_dir, def)) = manifest_daemon_defs(&root)
         .into_iter()
         .find(|(id, _, _)| id == name)
         .map(|(_, repo_dir, def)| (repo_dir, def))
+    else {
+        return Ok(None);
+    };
+    def.validate()
+        .map_err(|err| format!("daemon `{name}` 能力声明非法：{err}"))?;
+    Ok(Some((repo_dir, def)))
+}
+
+/// PLAN-013 T2：launch 期单名查表便捷形态——manifest 根解析 + defs 查找。
+/// `parent` 语义同 [`host_extra_roots`]（宿主 CWD 相对父目录）。
+pub fn manifest_daemon_lookup(parent: &Path, name: &str) -> Option<(PathBuf, ManifestDaemon)> {
+    manifest_daemon_lookup_checked(parent, name).ok().flatten()
 }
 
 /// PLAN-043 走查（2026-09-25）：per-app 主启动方式查表——launch 期单名
@@ -1956,5 +2054,125 @@ desktop_exe: \"target/release/native-app.exe\"
         std::fs::write(root.join("apps.manifest"), "{ not json").unwrap();
         assert!(manifest_daemon_defs(&root).is_empty(), "坏 JSON 宽容全跳");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // ---- PLAN-083 T-01：可选能力（health_interface / ready_timeout_ms） ----
+
+    /// 单条目 manifest 夹具：`daemon` 值原样注入，返回 (os_root, parent)。
+    fn daemon_capability_fixture(tag: &str, daemon_json: &str) -> (PathBuf, PathBuf) {
+        let parent = std::env::temp_dir().join(format!(
+            "autoui-083-cap-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let os_root = parent.join("auto-os");
+        std::fs::create_dir_all(&os_root).unwrap();
+        std::fs::write(
+            os_root.join("apps.manifest"),
+            format!(
+                r#"{{ "apps": [ {{ "id": "015-notes", "repo": "../auto-notes", "daemon": {daemon_json} }} ] }}"#
+            ),
+        )
+        .unwrap();
+        (os_root, parent)
+    }
+
+    #[test]
+    fn manifest_daemon_capability_fields_optional_and_parsed() {
+        // 缺席：沿用既有语义（字段 None，零回归）。
+        let (os_root, parent) = daemon_capability_fixture(
+            "absent",
+            r#"{ "port": 17819, "bin": "target/release/notes-service", "env_port": "AUTO_HTTP_PORT" }"#,
+        );
+        let (_, def) = manifest_daemon_lookup_checked(&parent, "015-notes")
+            .expect("合法声明")
+            .expect("声明命中");
+        assert_eq!(def.health_interface, None, "缺席不改变就绪语义");
+        assert_eq!(def.ready_timeout_ms, None, "缺席 = 调用方缺省预算");
+        assert_eq!(def.validate(), Ok(()));
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // 存在：逐字解析，校验通过。
+        let (_, parent) = daemon_capability_fixture(
+            "present",
+            r#"{ "port": 17819, "health_interface": "notes.fpack/1", "ready_timeout_ms": 8000 }"#,
+        );
+        let (_, def) = manifest_daemon_lookup_checked(&parent, "015-notes")
+            .unwrap()
+            .unwrap();
+        assert_eq!(def.health_interface.as_deref(), Some("notes.fpack/1"));
+        assert_eq!(def.ready_timeout_ms, Some(8000));
+        assert_eq!(def.validate(), Ok(()));
+        let _ = std::fs::remove_dir_all(&parent);
+        let _ = std::fs::remove_dir_all(&os_root);
+    }
+
+    #[test]
+    fn manifest_daemon_invalid_capability_is_named_rejection() {
+        // 接口串非法（无版本段）：具名拒绝，不悄悄退回旧探活。
+        let (_, parent) = daemon_capability_fixture(
+            "badiface",
+            r#"{ "port": 17819, "health_interface": "notes.fpack" }"#,
+        );
+        let err = manifest_daemon_lookup_checked(&parent, "015-notes")
+            .expect_err("非法接口串必须具名拒绝");
+        assert!(
+            err.contains("015-notes") && err.contains("health_interface"),
+            "拒绝原因须含名与字段: {err}"
+        );
+        assert!(
+            manifest_daemon_lookup(&parent, "015-notes").is_none(),
+            "兼容入口折叠为 None（调用方不得回退旧探活）"
+        );
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // 就绪预算越界（> 上界）。
+        let (_, parent) = daemon_capability_fixture(
+            "badbudget",
+            r#"{ "port": 17819, "ready_timeout_ms": 600001 }"#,
+        );
+        let err = manifest_daemon_lookup_checked(&parent, "015-notes")
+            .expect_err("越界预算必须具名拒绝");
+        assert!(err.contains("ready_timeout_ms"), "{err}");
+        let _ = std::fs::remove_dir_all(&parent);
+
+        // 就绪预算越界（< 下界）。
+        let (_, parent) =
+            daemon_capability_fixture("toosmall", r#"{ "port": 17819, "ready_timeout_ms": 10 }"#);
+        assert!(manifest_daemon_lookup_checked(&parent, "015-notes").is_err());
+        let _ = std::fs::remove_dir_all(&parent);
+    }
+
+    #[test]
+    fn health_interface_grammar_frozen() {
+        for ok in [
+            "notes.fpack/1",
+            "notes.fpack/12",
+            "a/1",
+            "auto-musk/1",
+            "x_1.2/3",
+        ] {
+            assert_eq!(validate_health_interface(ok), Ok(()), "合法: {ok}");
+        }
+        for bad in [
+            "",
+            " ",
+            "notes",
+            "notes/",
+            "/1",
+            "notes.fpack/",
+            "notes.fpack/v1",
+            "notes fpack/1",
+            ".notes/1",
+            "notes.fpack/1/2x",
+        ] {
+            assert!(
+                validate_health_interface(bad).is_err(),
+                "应拒绝非法接口串: {bad:?}"
+            );
+        }
     }
 }

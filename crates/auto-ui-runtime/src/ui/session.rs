@@ -4439,19 +4439,33 @@ impl DesktopSession {
     /// `daemon: { port, bin?, env_port? }` 组装 [`GenericDaemon`] 走泛化链；
     /// Running 期注入 `<NAME>_DAEMON=<url>`（派生规则见
     /// [`daemon_env_key`]，`autoos` 名与旧键恒等同构）。
+    ///
+    /// PLAN-083 T-01：`health_interface`/`ready_timeout_ms` 随声明进入
+    /// [`GenericDaemon`]（缺席 = 旧 2xx 语义与 5s 预算）；声明非法走具名
+    /// Offline，不退回旧探活。
     fn ensure_manifest_daemon(&mut self, name: &str) {
         use crate::ui::osconfig_daemon::{daemon_env_key, ensure_generic_io, GenericDaemon};
         // 解析序内建（resolve_os_manifest_root：AUTO_OS_ROOT env 权威 →
         // 兄弟 ../auto-os → 主检出 D:/autostack/auto-os）——单次 lookup
         // 即覆盖 desktop.sh 注入与开发机两形态，无需 session 侧再分臂。
-        let Some((repo_dir, def)) =
-            crate::ui::app_registry::manifest_daemon_lookup(std::path::Path::new(".."), name)
-        else {
-            self.desktop.osconfig_status = crate::ui::osconfig_daemon::DaemonStatus::Offline(
-                format!("daemon `{name}` 未在 apps.manifest 声明（daemon 字段缺席或条目未登记）"),
-            );
-            return;
-        };
+        let (repo_dir, def) =
+            match crate::ui::app_registry::manifest_daemon_lookup_checked(
+                std::path::Path::new(".."),
+                name,
+            ) {
+                Ok(Some(found)) => found,
+                Ok(None) => {
+                    self.desktop.osconfig_status = crate::ui::osconfig_daemon::DaemonStatus::Offline(
+                        format!("daemon `{name}` 未在 apps.manifest 声明（daemon 字段缺席或条目未登记）"),
+                    );
+                    return;
+                }
+                Err(reason) => {
+                    self.desktop.osconfig_status =
+                        crate::ui::osconfig_daemon::DaemonStatus::Offline(reason);
+                    return;
+                }
+            };
         let generic = GenericDaemon {
             name: name.to_string(),
             url: format!("http://127.0.0.1:{}", def.port),
@@ -4472,6 +4486,10 @@ impl DesktopSession {
                     daemon_env_key(name).trim_end_matches("_DAEMON")
                 )
             }),
+            health_interface: def.health_interface.clone(),
+            ready_timeout: def
+                .ready_timeout_ms
+                .map(std::time::Duration::from_millis),
         };
         let status = ensure_generic_io(
             &generic,
