@@ -55,3 +55,26 @@ Rust API launcher 先在 GeneratedBuildContext 的 workspace cwd/受管 flags/
 的配置隔离。相对资源（如 Reader src/assets/engine-assets）不依赖业务专属
 环境变量补丁。服务生命周期内保留 target lease，托管与 legacy 启动均执行
 同一构建/发布纪律。
+
+## 声明共享 daemon 时的后端归属与去重（PLAN-083 SD-02）
+
+- 应用的 pac `back_port` 与 `apps.manifest` 同名条目 `daemon.port` 相等时，
+  该 daemon **就是**本应用的后端：桌面启动器不为它启动第二份自有后端，也不
+  把该端口已有的监听视为"已被占用"而中止；路由（`desktop-proxies.json`）
+  直接指向经身份核验的 daemon，`strip: true`（前端 `/apps/<id>/api/...` 去掉
+  应用前缀后由 daemon 的 `/api/...` 承接）。
+- 该判定只在声明与身份校验之后发生：先按 `docs/specs/runtime/featurepack-daemon-hosting.md`
+  §6 取得/复用实例（跨进程单实例门、实例标记核对），失败即具名中止桌面后端
+  启动——不得悄悄退回"另起一份后端"。
+- 普通端口占用（未声明 daemon、或声明端口与应用 `back_port` 不同）保持既有
+  规则：具名拒绝，不为新桌面应用清理既有服务。
+- 后端配置归属：声明的宿主配置（地址键、`host.env` 非敏感 literal、受管
+  凭据引用）随该应用后端子进程 spawn 投递（剔除继承同名键）；共享 daemon
+  自身的服务配置只随 daemon spawn 投递。in-proc VM 宿主无法按宿主隔离凭据
+  （`Env.get` 进程全局），该缺口见 runtime 合同 §5，不得用运行期改写全局变量
+  假装隔离。
+- 生命周期：共享 daemon 独立于任一主窗口/宿主进程（detached，归属由实例标记
+  记录）；自有 Rust 后端仍由既有 owned-process 设施按原规则清理（退出/取消/
+  启动失败回收本次子进程树）。
+- 既有 Rust 服务构建/启动纪律（本页上文）不变；运行时资源与 cwd 语义不变。
+
