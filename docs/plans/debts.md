@@ -104,3 +104,29 @@
 - **关闭条件**：两独立真实宿主（双桌面会话）同时冷启同一 manifest daemon→
   全程恰一 LISTENING、归属同一 spawn；两宿主 App 会话均能完成业务调用。
   验收编排归 auto-os PLAN-067 T-04（C-01）。
+
+## DEBT-007 桌面 boot 启动器宿主 env 投递缺口：pac daemon 声明不进 desktop-backends.json（PLAN-067 T-02 编排发现）
+
+- **状态**：未立项（跨仓缺口登记，来源：auto-os PLAN-067 T-02 C-01/C-04 编排预备核查，2026-11-14）。
+- **证据（源码行级）**：①`auto-ui-tools/desktop_backends.rs:11-16` `DesktopBackend{id,root,profile,port}`
+  ——`DesktopBackend::read`（:18-53）读 pac.at 只取 `api`/`back_port`，**pac `daemon:` 声明被丢弃**；
+  ②boot 启动器非共享臂 `resolve_declared_backend(Path::new(".."), &app.id)`（:193）按 **app 自身 id**
+  查 manifest daemon 表——消费者 app（如 reader，pac `daemon: "015-notes"`）无自身 id 条目 →
+  `NotDeclared` → 后端子进程 spawn 时**无宿主 env**；③session 窗口 launch 臂为 InProc 投递
+  （session.rs:4305）——地址键写桌面进程全局（后端子进程已 spawn 读不到）、受管凭据按 SD-01 §5
+  合同不写进程全局（具名缺口诊断）。净效果：真实 Vue 桌面流里 Reader 后端 fp 调用地址靠
+  17819 硬编码回退侥幸命中、**凭据为空 → 全部 permission_denied**——Reader→Notes 产品链在
+  桌面装配层断裂。083 SD-01 §11 将"真 Vue/Rust 后端启动档"显式划归 OS-067 联合验收，
+  本缺口正在该被划出的面内。
+- **提议形状**：`DesktopBackend` 行增 `daemon: Option<String>`（`DesktopBackend::read` 从
+  pac `daemon:` 取值）；启动器非共享臂改为 `resolve_declared_backend(parent,
+  row.daemon.as_deref().unwrap_or(&app.id))`——pac 声明了 daemon 的消费者按**被声明名**查表
+  （reader → "015-notes" 条目 → 共享门 ensure → Ready(env) → `apply_host_env` 投递其
+  后端子进程），未声明者维持 app.id 语义零变化；`SharedBackendDecision`（共享 provider 判定）
+  不变。session InProc 臂不变。
+- **边界**：改动面=本仓 tools（desktop_backends.rs）+ 可能的 `vue.rs` 行生产处；运行时
+  osconfig_daemon 不动（resolve/apply 原语已就绪）；测试=启动器夹具行带 daemon 的投递断言
+  + 无声明行零变化。
+- **关闭条件**：真实桌面 boot 后 Reader 后端子进程 env 含 `015_NOTES_DAEMON`+`NOTES_FP_CRED`
+  （行为面：经 Reader 后端 fp 代理调用 Notes 成功；无声明 app 后端 env 零变化）。
+  消费：auto-os PLAN-067 T-02 C-01/C-04 桌面编排（凭据腿以此交付为前置）。
