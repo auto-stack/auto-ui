@@ -301,6 +301,17 @@ fn read_health_response(
     let mut chunk = [0u8; 1024];
     // 头部阶段：有界读取直到 \r\n\r\n。
     let head_end = loop {
+        // R-2/N5：旧语义（无 interface）= 与 `tcp_ping` 逐字同义——**状态行
+        // 前缀 `HTTP/1.x 2` 即就绪**，不要求完整响应头（头永不终止的 2xx 服务
+        // 在旧实现里同样算通）。声明 interface 时才必须拿到完整头+body。
+        if spec.interface.is_none() {
+            if let Some(status) = legacy_prefix_status(&buf) {
+                return Ok(RawHealthResponse {
+                    status,
+                    body: Vec::new(),
+                });
+            }
+        }
         if let Some(pos) = find_head_end(&buf) {
             break pos;
         }
@@ -494,6 +505,24 @@ fn read_health_response(
     Ok(RawHealthResponse {
         status,
         body: body_raw,
+    })
+}
+
+/// 旧语义前缀判定（R-2/N5）：与 [`tcp_ping`] 同义——首段字节以
+/// `HTTP/1.1 2` 或 `HTTP/1.0 2` 开头即 2xx。能解析出完整状态码就用它，
+/// 否则用 200（前缀本身已经证明 2xx）。
+fn legacy_prefix_status(buf: &[u8]) -> Option<u16> {
+    let text = std::str::from_utf8(buf).ok()?;
+    if !(text.starts_with("HTTP/1.1 2") || text.starts_with("HTTP/1.0 2")) {
+        return None;
+    }
+    let status = text
+        .split_whitespace()
+        .nth(1)
+        .and_then(|token| token.parse::<u16>().ok());
+    Some(match status {
+        Some(code) if (200..300).contains(&code) => code,
+        _ => 200,
     })
 }
 
@@ -975,6 +1004,41 @@ pub enum ManifestHostProbe {
     Invalid(String),
     Ready { url: String, env: HostBackendEnv },
     NotReady(String),
+}
+
+/// 桌面后端启动器的"声明 daemon"门（**单源**，R-2/F-4）：未声明 →
+/// [`DeclaredBackendConfig::NotDeclared`]；声明非法 → `Invalid`（启动器必须
+/// 拒绝启动其后端，不得悄悄退回"自有后端"）；就绪 → `Ready(env)`（spawn 前
+/// 投递）；否则 `Offline`（既有 "Offline 不阻断" 语义，由调用方具名降级）。
+///
+/// 注意：本函数用 [`manifest_daemon_lookup_checked`]（**不**折叠校验错误），
+/// 所以非法声明在这里一定可见——宽松入口
+/// [`auto_ui_compiler::app_registry::manifest_daemon_lookup`] 会把 Err 折成
+/// None，用它当守卫会让 Invalid 分支不可达。
+pub fn resolve_declared_backend(
+    parent: &Path,
+    app_id: &str,
+    fallback_timeout: std::time::Duration,
+) -> DeclaredBackendConfig {
+    match crate::ui::app_registry::manifest_daemon_lookup_checked(parent, app_id) {
+        Ok(None) => DeclaredBackendConfig::NotDeclared,
+        Err(reason) => DeclaredBackendConfig::Invalid(reason),
+        Ok(Some(_)) => match resolve_manifest_host_shared(parent, app_id, fallback_timeout) {
+            ManifestHostResolution::Ready { env, .. } => DeclaredBackendConfig::Ready(env),
+            ManifestHostResolution::Invalid(reason) => DeclaredBackendConfig::Invalid(reason),
+            ManifestHostResolution::Offline(reason) => DeclaredBackendConfig::Offline(reason),
+            ManifestHostResolution::NotDeclared => DeclaredBackendConfig::NotDeclared,
+        },
+    }
+}
+
+/// [`resolve_declared_backend`] 的结果。
+#[derive(Debug, Clone)]
+pub enum DeclaredBackendConfig {
+    NotDeclared,
+    Invalid(String),
+    Ready(HostBackendEnv),
+    Offline(String),
 }
 
 /// 只读探测入口：manifest 查表 → 健康核验（同一接口合同）→ 宿主 env。
@@ -2120,7 +2184,89 @@ mod tests {
         );
     }
 
-    /// PLAN-083 R-1/F-1：旧语义（无 interface）**只读状态行**——超大 body、
+    /// R-2/N5：旧语义与 `tcp_ping` 逐字节同义——**2xx 状态行前缀即就绪**，
+    /// 即使响应头永不终止（旧实现只读 128 字节核前缀，从不要求完整头）。
+    #[test]
+    fn probe_health_legacy_prefix_ready_without_complete_headers() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let (tx, rx) = std::sync::mpsc::channel::<()>();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut s = stream;
+                let mut buf = [0u8; 256];
+                let _ = s.read(&mut buf);
+                // 只发状态行 + 半个头，永不终止头块，并保持连接。
+                let _ = s.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: appl");
+                let _ = s.flush();
+                let _ = rx.recv(); // 由测试结束时 drop tx 释放
+            }
+        });
+        assert_eq!(
+            probe_health(&HealthSpec::legacy(
+                &url,
+                std::time::Duration::from_millis(500)
+            )),
+            HealthVerdict::Ready,
+            "旧语义：2xx 前缀即就绪（不等完整头/body）"
+        );
+        drop(tx);
+        // 声明 interface 时同一响应必须被判坏（没有完整头/body）。
+        let listener2 = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url2 = format!("http://127.0.0.1:{}", listener2.local_addr().unwrap().port());
+        std::thread::spawn(move || {
+            for stream in listener2.incoming().flatten() {
+                let mut s = stream;
+                let mut buf = [0u8; 256];
+                let _ = s.read(&mut buf);
+                let _ = s.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: appl");
+                let _ = s.flush();
+                std::thread::sleep(std::time::Duration::from_millis(400));
+            }
+        });
+        assert!(
+            !probe_health(&declaring_spec(&url2, "notes.fpack/1")).is_ready(),
+            "声明 interface 时无完整响应头的 2xx 不算就绪"
+        );
+    }
+
+    /// R-2/F-4：启动器"声明 daemon"门的三态（未声明/非法/降级）——非法
+    /// 声明必须可见（宽松入口会折成 None，导致无效分支不可达）。
+    #[test]
+    fn declared_backend_gate_sees_invalid_declaration() {
+        let root = temp_root("declared-gate");
+        let os_root = root.join("auto-os");
+        std::fs::create_dir_all(&os_root).unwrap();
+        std::fs::write(
+            os_root.join("apps.manifest"),
+            r#"{"apps":[
+                {"id":"015-notes","repo":"../auto-notes","daemon":{"port":17819,"health_interface":"bogus"}},
+                {"id":"other-app","repo":"../x","daemon":{"port":17999,"bin":"Z:/no-such.exe"}}
+            ]}"#,
+        )
+        .unwrap();
+        match resolve_declared_backend(&root, "015-notes", std::time::Duration::from_millis(200)) {
+            DeclaredBackendConfig::Invalid(reason) => {
+                assert!(reason.contains("health_interface"), "{reason}")
+            }
+            other => panic!("非法声明必须 Invalid（不可折成 NotDeclared），实际 {other:?}"),
+        }
+        assert!(matches!(
+            resolve_declared_backend(&root, "not-declared-at-all", std::time::Duration::from_millis(200)),
+            DeclaredBackendConfig::NotDeclared
+        ));
+        // 合法声明但可执行缺席：ensure 失败 → Offline（调用方按既有语义降级）。
+        match resolve_declared_backend(&root, "other-app", std::time::Duration::from_millis(500)) {
+            DeclaredBackendConfig::Offline(reason) => {
+                assert!(reason.contains("spawn") || reason.contains("不可复用") || reason.contains("无监听"), "{reason}")
+            }
+            other => panic!("可执行缺席应 Offline，实际 {other:?}"),
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// R-1/F-1：旧语义（无 interface）**只读状态行**——超大 body、
     /// 不支持的 framing、截断 body 都不影响 2xx 就绪；声明 interface 才拒绝。
     /// 与 `tcp_ping`（首 128 字节、状态前缀）逐字同义。
     #[test]

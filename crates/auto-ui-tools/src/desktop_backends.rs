@@ -190,45 +190,30 @@ impl DesktopBackends {
             // 就绪，之后再补投递不可行。daemon Offline 仍不阻断后端启动
             // （既有 "Offline 不阻断 launch" 语义），但要明确记录"后端在无
             // 宿主配置下启动"；声明非法直接拒绝。
-            let declared = auto_ui_runtime::ui::app_registry::manifest_daemon_lookup(
+            let host_env = match auto_ui_runtime::ui::osconfig_daemon::resolve_declared_backend(
                 Path::new(".."),
                 &app.id,
-            );
-            let host_env = if declared.is_some() {
-                match auto_ui_runtime::ui::osconfig_daemon::resolve_manifest_host_shared(
-                    Path::new(".."),
-                    &app.id,
-                    std::time::Duration::from_secs(5),
-                ) {
-                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Ready {
-                        env,
-                        ..
-                    } => Some(env),
-                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Invalid(
-                        reason,
-                    ) => {
-                        eprintln!(
-                            "[plan083] desktop app {}: 声明能力非法，拒绝启动其后端——{reason}",
-                            app.id
-                        );
-                        return Err(format!("desktop app {}: {reason}", app.id).into());
-                    }
-                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Offline(
-                        reason,
-                    ) => {
-                        eprintln!(
-                            "[plan083] desktop app {}: 声明 daemon 未就绪（{reason}）；\
-                             后端在无宿主配置下启动（既有 Offline 不阻断语义）",
-                            app.id
-                        );
-                        None
-                    }
-                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::NotDeclared => {
-                        None
-                    }
+                std::time::Duration::from_secs(5),
+            ) {
+                auto_ui_runtime::ui::osconfig_daemon::DeclaredBackendConfig::NotDeclared => None,
+                auto_ui_runtime::ui::osconfig_daemon::DeclaredBackendConfig::Ready(env) => {
+                    Some(env)
                 }
-            } else {
-                None
+                auto_ui_runtime::ui::osconfig_daemon::DeclaredBackendConfig::Invalid(reason) => {
+                    eprintln!(
+                        "[plan083] desktop app {}: 声明能力非法，拒绝启动其后端——{reason}",
+                        app.id
+                    );
+                    return Err(format!("desktop app {}: {reason}", app.id).into());
+                }
+                auto_ui_runtime::ui::osconfig_daemon::DeclaredBackendConfig::Offline(reason) => {
+                    eprintln!(
+                        "[plan083] desktop app {}: 声明 daemon 未就绪（{reason}）；\
+                         后端在无宿主配置下启动（既有 Offline 不阻断语义）",
+                        app.id
+                    );
+                    None
+                }
             };
             let old_port = std::env::var_os("AUTO_HTTP_PORT");
             let old_base = std::env::var_os("AUTO_HTTP_BASE");

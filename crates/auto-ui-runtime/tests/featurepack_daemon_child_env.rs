@@ -100,12 +100,19 @@ fn child_env_delivery_is_per_child_and_never_global() {
     // 宿主侧陈旧同名值：子进程必须看不到它。
     std::env::set_var("FP083_CRED", "stale-parent-value");
     std::env::set_var("FP083_ADDR", "http://stale");
+    // R-2/F-5：**只出现在 remove、不出现在 entries** 的陈旧键——让
+    // `env_remove` 成为承重步骤（否则 entries 覆盖会让 remove 可被删掉而不红）。
+    std::env::set_var("FP083_STALE", "parent-stale-only");
 
     let dump_a = root.join("a.env");
     let dump_b = root.join("b.env");
-    let keys = "FP083_ADDR,FP083_CRED,FP083_UNSET";
-    let child_a = spawn_dump_child(&host_env("http://127.0.0.1:17819", &cred_a), &dump_a, keys);
-    let child_b = spawn_dump_child(&host_env("http://127.0.0.1:17820", &cred_b), &dump_b, keys);
+    let keys = "FP083_ADDR,FP083_CRED,FP083_UNSET,FP083_STALE";
+    let mut env_a = host_env("http://127.0.0.1:17819", &cred_a);
+    env_a.remove.push("FP083_STALE".to_string());
+    let mut env_b = host_env("http://127.0.0.1:17820", &cred_b);
+    env_b.remove.push("FP083_STALE".to_string());
+    let child_a = spawn_dump_child(&env_a, &dump_a, keys);
+    let child_b = spawn_dump_child(&env_b, &dump_b, keys);
     wait_child(child_a);
     wait_child(child_b);
 
@@ -118,12 +125,18 @@ fn child_env_delivery_is_per_child_and_never_global() {
     assert!(!a.contains(&cred_b) && !b.contains(&cred_a), "A/B 凭据互不可见");
     assert!(!a.contains("stale-parent-value") && !b.contains("stale-parent-value"),
         "陈旧继承值必须被剔除（remove 生效）：A={a} B={b}");
-    assert!(!a.contains("#[") && a.contains("FP083_UNSET=<unset>"), "未投递键为空: {a}");
+    assert!(a.contains("FP083_UNSET=<unset>"), "未投递键为空: {a}");
+    assert!(
+        a.contains("FP083_STALE=<unset>") && b.contains("FP083_STALE=<unset>"),
+        "只在 remove 里的继承键必须被剔除（F-5 承重断言）：A={a} B={b}"
+    );
 
     // 宿主进程全局未被改写（隔离不是靠 set_var 全局冒充）。
     assert_eq!(std::env::var("FP083_CRED").as_deref(), Ok("stale-parent-value"));
     assert_eq!(std::env::var("FP083_ADDR").as_deref(), Ok("http://stale"));
+    assert_eq!(std::env::var("FP083_STALE").as_deref(), Ok("parent-stale-only"));
     std::env::remove_var("FP083_CRED");
     std::env::remove_var("FP083_ADDR");
+    std::env::remove_var("FP083_STALE");
     let _ = std::fs::remove_dir_all(&root);
 }

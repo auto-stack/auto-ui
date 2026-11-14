@@ -73,7 +73,7 @@ password|apikey|api_key`，大小写不敏感）或形似凭据的值（≥32 �
 - spawn 后按**同一接口**轮询：只有 `Ready` 结束；`WrongInterface` 立即拒绝；
   其余等到预算截止（2xx 早到不提前 ready）。就绪不推导数据库写成功，业务提交
   仍以服务回执为准。
-- **无 `health_interface` 声明**时保持既有语义：**只读状态行**——2xx 即就绪，不读 body、不核 framing/字节预算（与旧 `tcp_ping` 同义；超大/截断/怪 framing 的 body 不影响就绪）。spawn 后轮询同理：非 2xx 继续等，2xx 结束（HTTP 503 初始态不构成终局拒绝）。
+- **无 `health_interface` 声明**时保持既有语义：**只读状态行前缀 `HTTP/1.x 2`**——2xx 前缀即就绪，不读 body、不核 framing/字节预算、**不要求完整响应头**（与旧 `tcp_ping` 的"首段字节前缀判定"逐字同义；超大/截断/怪 framing body、头块永不终止均不影响就绪）。spawn 后轮询同理：非 2xx 继续等，2xx 结束（HTTP 503 初始态不构成终局拒绝）。
 
 ## 4. 服务进程配置（spawn env）
 
