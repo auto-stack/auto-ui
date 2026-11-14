@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-083
-status: executing
+status: execution_done
 feature_name: FeaturePack daemon生产就绪、宿主配置与单实例
 author: [Codex]
 created_at: 2026-11-13
 updated_at: 2026-11-14
 plan_revision: 2
-current_step: 3
+current_step: 6
 total_steps: 8
 depends_on: []
 supersedes_spec_components: [docs/specs/build/desktop-api-surfaces.md]
@@ -302,6 +302,28 @@ R-1 声称子进程用例断言「宿主陈旧同名值被剔除」；但用例�
 
 **pending_closeout_gates**：真实 Vue/Rust 后端构建启动与 Notes 双窗口 = OS 联合验收（保持）；统一回归门 = merge 所有；组内依赖树未改动。
 **next**：work 修 F-4（+F-5/N5 措辞或门禁补强），修复周期 2/3；T-02/T-03/T-05 重开、T-00/T-01/T-04 保持完成 → 3/8。在绑定新提交的第三次复审前不得给 pass。
+
+2026-11-14 · stage: work（R-2 修复；两次最终复审未过后按纪律先诊断） | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | outcome: pass（F-4/F-5/N5 关闭，回 review T-06 第三次） | worktree: D:/autostack/.wt/ui-083/auto-ui | branch: codex/plan-083-dev | base_commit: a6f776c2 | code_commit: cb8bfbce | 修复周期: 2/3 | next_responsible_role: review T-06（第三次最终复审）
+
+**诊断（连续两次最终复审 needs_fix 后，work 技能要求）**
+1. **仍在的不变量与为何前两轮检查漏掉**：
+   - 不变量「启动器对声明 daemon 的非法声明必须具名拒绝，不得退回自有后端」：R-1 的守卫用了**宽松**入口 `manifest_daemon_lookup`（校验 Err 折成 None），而紧随的 ensure 用**严格**入口；两个入口语义分裂，且没有用例以"启动器这条路径"为对象（此前只测过 `probe_manifest_host` 的 Invalid，而它在生产已无调用者）→ F-4 逃过两轮。
+   - 不变量「宿主配置只经子进程投递且继承同名键必须被剔除」：R-1 的门把陈旧键同时放进 `entries`，覆盖顺序让 `env_remove` 不承重 → 即使删掉 remove 步骤测试仍绿 → F-5 逃过。
+   - 不变量「旧语义与 `tcp_ping` 逐字同义」：R-1 只核到"2xx 状态行且不读 body"，却仍要求**完整响应头**；头块永不终止的 2xx 在旧实现算通、新实现 Offline 并 spawn 一次 → N5 逃过（措辞与语义都不精确）。
+2. **受影响路径/状态**：桌面后端启动器的声明门（含共享判定前置的宽松 lookup）、健康探测的"旧声明 + 不完整/不终止头"状态、子进程投递的"仅 remove"陈旧键状态。
+3. **设计与 oracle 调整（本轮已实现）**：
+   - 新单源 `resolve_declared_backend`（runtime）→ `NotDeclared/Invalid/Ready/Offline` 四态，内部用 `manifest_daemon_lookup_checked`；启动器只消费该结果，**Invalid 分支可达**。新增 `declared_backend_gate_sees_invalid_declaration`（非法→Invalid、未声明→NotDeclared、可执行缺席→Offline）。
+   - 旧语义就绪改为**状态行前缀 `HTTP/1.x 2`**（与 `tcp_ping` 的首段前缀判定逐字同义，不要求完整头/body）；新增 `probe_health_legacy_prefix_ready_without_complete_headers`（不终止头块：旧语义 Ready、声明 interface 时非 Ready）。
+   - 子进程投递门加入**只在 remove、不在 entries** 的继承键 `FP083_STALE`；并用受控变异（临时删掉 `env_remove` 步骤）实证该门会红、恢复后转绿——oracle 承重性有直接证据。
+
+**闭合行（finding → invariant → fix → permanent cases → 结果 → 剩余缺口）**
+- **F-4**：见上 · fix `desktop_backends.rs` 改调用 `resolve_declared_backend`；共享判定前置仍用宽松 lookup 但只决定"是否共享"，非法声明随后在启动器门具名拒绝 · permanent cases 上述 gate 用例 + SD-02 条款（现已与代码一致） · 结果 tools `desktop_backends` 3 passed/1 ignored；runtime 42 · 剩余缺口：真后端启动档（`PLAN053_PROBE_DIR`，OS 联合验收边界）。
+- **F-5**：见上 · fix 门加 remove-only 键 + 变异验证 · 结果 `--test featurepack_daemon_child_env` 2 passed（变异版 1 failed） · 剩余缺口：无。
+- **N5**：见上 · fix `legacy_prefix_status` 前缀判定 + SD-01 §3 措辞改为"只读状态行前缀 `HTTP/1.x 2`，不要求完整响应头" · permanent cases 上述前缀用例 · 结果 `--lib osconfig_daemon` 42 passed · 剩余缺口：无。
+
+**回归（cb8bfbce 上执行）**：`--lib osconfig_daemon` 42、`--lib daemon_instance` 8、`--test featurepack_daemon_hosting --test-threads=1` 5、`--test featurepack_daemon_launch --test-threads=1` 1、`--test featurepack_daemon_child_env --test-threads=1` 2、compiler `app_registry::tests` 34、tools `desktop_backends` 3+1 ignored。未跑：`osconfig_integration`（材料缺席自跳过，不计通过）、真后端启动档、Notes 真实双窗口（OS 联合验收）。
+
+2026-11-14 · stage: goal | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | round: 6 | from: review（needs_fix ×2） | to: review（T-06 第三次） | status: execution_done | outcome: pass（R-2 闭合 + 诊断） | worktree: D:/autostack/.wt/ui-083/auto-ui | commit: cb8bfbce | next: review
 
 ## 10. 待澄清事项
 
