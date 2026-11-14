@@ -23,9 +23,9 @@ scratch，merge 按政策清理）。本文只留可复核索引。
 | `cargo test -p auto-ui-tools --test file_dialog_component` | **3/3 pass**（双生成器 + 新 props defaultFileName/defaultExtension/覆盖层源断言 + 闭包） |
 | `python tests/product/verify_file_dialog.py --auto-bin … --ui-tool-bin … --out-dir …/vfd-full-win` | **outcome: pass**（900x700 全门：原 1003 项 11 页流/取消重开 10 次/焦点恢复/系统可达性 + PLAN-084 目录/保存/覆盖全流程、字节基线 unchanged、accepted_directory/accepted_child_directory/accepted_save_new/accepted_overwrite/save_named_errors/accepted_save_completion 全记录） |
 | 同上 `--window 420x560 --visual-only`（vfd-narrow-win） | **outcome: pass**（窄窗腿 + V-08 参考区截图：directory-mode[+dark]、save-mode、overwrite-layer[+dark]，footer 可达） |
-| `python tests/product/verify_file_dialog_modes_consumer.py …`（consumer-win） | 041 真实消费门（Ctrl+S 打开保存对话框→普通保存写入读回、另存为预填+新路径、覆盖 Back 保字节/Replace 应用写入、取消不建文件保脏、只读目标具名失败保脏），详见 report.json checks |
-| Linux native 轨 | runner 在位（WSL Ubuntu-22.04：cargo 1.97.1 + Xvfb + python3；`auto-ui-tool` Linux 版构建成功）。`auto` Linux 构建因 WSL→crates.io 网络间歇失败（curl error 7，IPv4 hosts 固定后仍间歇）多次重试未完成——**不记 pass**；Linux 门状态见 §9/§10（可补跑：网络恢复后在同组构建 auto 并跑三脚本） |
-| 统一回归 | 未在本阶段跑（owner=review/merge 按仓档位） |
+| `python tests/product/verify_file_dialog_modes_consumer.py …`（consumer-win） | **outcome: pass**（15/15 checks + 1 session：Ctrl+S 打开保存对话框→普通保存写入读回一致、另存为预填+新路径、覆盖 Back 保字节/Replace 应用写入清脏、取消不建文件保脏、只读目标具名失败保脏、documented quit 退出+端口回收） |
+| Linux native 轨 | **not_run（记录原因，不记 pass）**：runner 大部分在位——WSL Ubuntu-22.04 cargo 1.97.1、`auto-ui-tool` 与 `auto`（本组代码）均已构建成功（crates.io 网络间歇经 Windows registry 缓存离线拷贝绕过）、Xvfb/WSLg 显示在位、xwininfo/xprop 在位、python3 在位；但 `auto run -r vm` 在 WSLg 与 Xvfb 下均 `wgpu Surface::configure Invalid surface`（exit 101，session-1.log），WGPU_BACKEND=gl 同样失败——wgpu 表面创建在当前 WSL 图形栈不可用。补跑入口：真实 Linux 图形会话（或修复 wgpu 表面创建的 WSL 环境）后运行同三脚本（out-dir 换新目录）。**显式 pending closeout gate**（PLAN-086 先例：Linux leg 在 merge 记 pending） |
+| 统一回归 | 未在本阶段跑（owner=review/merge 按仓档位；显式 pending closeout gate） |
 
 ## 视觉证据与 Q-01（DEBT-006）
 
