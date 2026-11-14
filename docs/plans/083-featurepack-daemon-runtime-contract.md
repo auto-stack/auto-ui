@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-083
-status: execution_done
+status: executing
 feature_name: FeaturePack daemon生产就绪、宿主配置与单实例
 author: [Codex]
 created_at: 2026-11-13
 updated_at: 2026-11-14
 plan_revision: 2
-current_step: 6
+current_step: 2
 total_steps: 8
 depends_on: []
 supersedes_spec_components: [docs/specs/build/desktop-api-surfaces.md]
@@ -232,6 +232,36 @@ Notes 当前响应：`auto-notes/rust-workspace/auto-notes-30db9907-back/src/db.
 2026-11-14 · stage: goal | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | round: 3 | from: work（T-03） | to: work（T-04） | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-083/auto-ui | commit: 93280912 | next: work（T-04 真实 launch 路径汇总与旧门回归）
 
 2026-11-14 · stage: goal | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | round: 4 | from: work（T-04+T-05 收尾） | to: review（T-06） | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-083/auto-ui | commit: 38ed6add | next: review（T-06 同树独立上下文复审）
+
+2026-11-14 · stage: review | review_scope: final | reviewer: plan083-reviewer（独立子代理会话，未参与实现；Windows 本机，无真后端产物/双应用） | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | outcome: needs_fix | worktree: D:/autostack/.wt/ui-083/auto-ui | branch: codex/plan-083-dev | reviewed_commit: 38ed6add332d184b70f28910b5a23b6f2a7c0157 | base_commit: a6f776c24a4ba98611849955edceb5a04edac969 | dependency_revisions: auto-lang e0cfa2d8c / auto-web 8b1742a0 / auto-down 58ea33f6 | spec_inputs: SD-01 docs/specs/runtime/featurepack-daemon-hosting.md sha256 95C4F8753DFF67472A38164EECDDB69878BD1C3457F351F230BB0C6D1985F26E；SD-02 docs/specs/build/desktop-api-surfaces.md sha256 AB0246E557AEA4679D449799A940419794E73CDEFF94466FC0299F2CD4D110C3（均 @38ed6add） | next_responsible_role: work（T-01/T-02/T-04/T-05 修复）→ review T-06
+
+**绑定与清洁度**：worktree 干净（Cargo.lock 已随 38ed6add），HEAD = 38ed6add；base..HEAD 14 文件 +4279/−82。未发现 `.autoos/specs.json` 等索引/台账写入；未新建 `docs/plans/attachments/083`（该目录仅有 10-29/30 历史内容）。复审临时探针源码运行后已删除，工作树复检干净；原始日志 `D:/autostack/plan-artifacts/plan-083/review/{tests,adversarial,osconfig_integration}.log`（该 scope 随 merge 删除）。
+
+**独立复跑（均绑 38ed6add 字节，0 failed）**：`--lib osconfig_daemon` 39；`--lib daemon_instance` 7；`--test featurepack_daemon_hosting -- --test-threads=1` 4；`--test featurepack_daemon_launch -- --test-threads=1` 1；compiler `app_registry::tests` 34；tools `desktop_backends` 3 passed/1 ignored。另 `--test osconfig_integration` 报 "1 passed" 但材料缺席即早退、零断言（与 work 回执一致，不记旧链证据）。
+
+**AC 结果**：AC-01 pass（错版/坏 body/超时/占位监听者拒复用且不 spawn；反例 P2：2xx + `status:"degraded"` + interface 匹配 → Offline、spawn=0、占用者存活）。AC-02 **partial**（F-2/F-3：in-proc 地址/literal 注入与凭据不落全局已钉死；受管凭据 Debug/诊断/错误不回显经 P5 复核；独立进程投递无行为证据）。AC-03 pass（4/4 + P6：旧声明 3 宿主并发冷启 spawn=1 同 url；P3：spawn 失败后锁释放、重试冷启 spawn=1；P4：同端点不同 instance_key 具名冲突、不 spawn）。AC-04 pass（含已记录边界：宿主全退后服务存活；P8：杀服务→再 ensure 冷启一次恢复 Running，spawn=2；真实 Notes 双窗口归 OS）。AC-05 **fail**（F-1）。AC-06 partial（SD-01/SD-02 落地、add/modify 与 §5 表一致、无索引/attachments；但 §3/§8 与 SD-02 时序句须随 F-1/F-2 修正）。AC-07 = 本记录。AC-08 待 merge。
+
+**F-1（阻塞；AC-05，D-01；计划 §1:27、SD-01:76/141；T-01/T-03/T-04/T-05）**
+违反既有规则：§1:27「无扩展声明的既有autoos/musk/jade-garden路径保持现行行为」、D-01:64「缺席沿既有语义」、SD-01:76「无 health_interface 时 2xx 即就绪，不读 body」、SD-01:141「逐字不变」、T-04 回执:177「无新字段声明走 ensure_generic_io 旧路径」。
+观测：session.rs:4482 把每个非 autoos 的 manifest daemon 一律送 `resolve_manifest_host_shared` → `daemon_instance::ensure_shared_io` → `probe_health`（osconfig_daemon.rs:552）；后者在 interface 判断（562）之前已 `read_health_response`（553），把超预算/超时/不支持 framing 判成 BadBody；`ensure_generic_io` 旧分支（:1247）在生产已无调用方（仅测试与同样无人调用的 resolve_manifest_host:921）。
+可复跑反例（真实 socket/进程）：
+- P7：旧声明（无新字段）+ 服务前 3 次 503 后 200：旧规则 `ensure_generic_io` → Running（415ms、spawn=1）；生产入口 → Offline「不可复用：服务未就绪（HTTP 503）」（12ms、spawn=0）。
+- P1：旧声明 + 2xx 但 health body 9024B：`tcp_ping`=true（旧规则），legacy HealthSpec=BadBody（响应体超预算 9024>8192），生产入口=Offline、未 spawn。
+影响：旧 daemon 冷启/预热竞态由 Running 变 Offline 且不再拉起；大/慢 body 同理。旧链证据仅覆盖生产死路径的单测。
+要求：行为与合同一致——恢复无新字段声明时的既有行为；若确要收紧，须经计划修订显式变更该兼容格并同步 SD-01 §3/§8 与回执（仅改文案不足以放行）。
+
+**F-2（阻塞；AC-02/D-03；SD-02:72；T-02/T-05）**
+违反规则：D-03「私有配置必须在目标后端首次请求前可见」、AC-02「首请求前可见」、SD-02:72「声明的宿主配置随该应用后端子进程 spawn 投递」。
+观测：desktop_backends.rs:192 用 `probe_manifest_host`（只探不孵）；daemon 未就绪时 :206 分支令 host_env=None，:219 以 None 启动后端子进程——`<NAME>_DAEMON`、host literal、受管凭据均不投递；后续 session ensure 无法向已运行子进程补投（run_vue.rs:400 在 app launch 前启动后端）。仅共享格（`back_port == daemon.port`）做到先 resolve 后 spawn。
+可达性：当前清单无「独立 daemon 端口 + rust 后端」条目，属潜在但 AC 未限定的合同格。要求：对声明 daemon 的 app 在后端 spawn 前 ensure/解析，或如实记该格为缺口并修订 AC-02/SD-02（语义变更需新 revision）。
+
+**F-3（证据完整性；AC-02/U-02；T-02/T-04）**
+T-04 回执:182 称「后端子进程 env 投递由 rust_ui::start_desktop_api_server 接线 + T-02 子进程 env 用例证明」；实际无子进程投递用例：`host_backend_env_isolates_two_hosts` 只测 env bag/remove，`spawn_exe_child` 与 `start_desktop_api_server(host_env)` 无测试（仅定义/调用点）。U-02 的「两个不同宿主配置/凭据经生产后端初始化」未执行。要求：补真实子进程投递 oracle（如测试专用 env dump bin 走 native outproc/后端启动器），或按其它边界同样如实记为未证。
+
+**规范增量判定**：SD-01 新增（185 行/12 节）、SD-02 修改（+23 行）——add/modify、路径、rule change、rationale、AC 映射与设计表一致；§5（in-proc 凭据缺口）与 §11（真后端/Notes 双窗口）措辞与代码一致，未见假装隔离。但 §3:76 / §8:141 与实现矛盾（F-1），SD-02:72 为无条件承诺（F-2），故本次规范增量不通过，随修复更新后再验。
+
+**pending_closeout_gates**：真实 Vue/Rust 后端构建启动与 Notes 双窗口 = OS 联合验收（保持）；统一回归门 = merge 所有；组内依赖树未改动。
+**next**：work 按 F-1/F-2/F-3 修复（T-01/T-02/T-04/T-05 重开；T-00/T-03 保持完成 → 2/8），再回 review T-06；在绑定新提交的复审前不得给 pass。
 
 ## 10. 待澄清事项
 
