@@ -185,32 +185,50 @@ impl DesktopBackends {
                 )
                 .into());
             }
-            // PLAN-083 T-02：声明的 daemon 宿主配置（地址/literal/受管凭据）
-            // 必须在后端首次请求前可见——这里只探不孵（拉起/复用与跨进程
-            // 协调归共享 provider 路径），已就绪才投递；未就绪保持既有
-            // 语义（随后 app launch 的 ensure 负责拉起）。
-            let host_env = match auto_ui_runtime::ui::osconfig_daemon::probe_manifest_host(
-                std::path::Path::new(".."),
+            // PLAN-083 T-02/R-1（F-2）：声明的 daemon（非共享情形）必须在
+            // 后端 spawn **之前** ensure 并解析宿主配置——后端在桌面启动期
+            // 就绪，之后再补投递不可行。daemon Offline 仍不阻断后端启动
+            // （既有 "Offline 不阻断 launch" 语义），但要明确记录"后端在无
+            // 宿主配置下启动"；声明非法直接拒绝。
+            let declared = auto_ui_runtime::ui::app_registry::manifest_daemon_lookup(
+                Path::new(".."),
                 &app.id,
-            ) {
-                auto_ui_runtime::ui::osconfig_daemon::ManifestHostProbe::Ready { env, .. } => {
-                    Some(env)
+            );
+            let host_env = if declared.is_some() {
+                match auto_ui_runtime::ui::osconfig_daemon::resolve_manifest_host_shared(
+                    Path::new(".."),
+                    &app.id,
+                    std::time::Duration::from_secs(5),
+                ) {
+                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Ready {
+                        env,
+                        ..
+                    } => Some(env),
+                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Invalid(
+                        reason,
+                    ) => {
+                        eprintln!(
+                            "[plan083] desktop app {}: 声明能力非法，拒绝启动其后端——{reason}",
+                            app.id
+                        );
+                        return Err(format!("desktop app {}: {reason}", app.id).into());
+                    }
+                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Offline(
+                        reason,
+                    ) => {
+                        eprintln!(
+                            "[plan083] desktop app {}: 声明 daemon 未就绪（{reason}）；\
+                             后端在无宿主配置下启动（既有 Offline 不阻断语义）",
+                            app.id
+                        );
+                        None
+                    }
+                    auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::NotDeclared => {
+                        None
+                    }
                 }
-                auto_ui_runtime::ui::osconfig_daemon::ManifestHostProbe::Invalid(reason) => {
-                    eprintln!(
-                        "[plan083] desktop app {}: 声明能力非法，拒绝启动其后端——{reason}",
-                        app.id
-                    );
-                    return Err(format!("desktop app {}: {reason}", app.id).into());
-                }
-                auto_ui_runtime::ui::osconfig_daemon::ManifestHostProbe::NotReady(reason) => {
-                    eprintln!(
-                        "[plan083] desktop app {}: 声明 daemon 未就绪（{reason}），后端按既有链启动",
-                        app.id
-                    );
-                    None
-                }
-                auto_ui_runtime::ui::osconfig_daemon::ManifestHostProbe::NotDeclared => None,
+            } else {
+                None
             };
             let old_port = std::env::var_os("AUTO_HTTP_PORT");
             let old_base = std::env::var_os("AUTO_HTTP_BASE");

@@ -254,6 +254,68 @@ fn u03_two_hosts_concurrent_ensure_spawn_once() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
+/// U-01 反例（R-1/F-1）：**旧语义**（无 `health_interface`）声明遇到"已 bind
+/// 但先回 503、随后 200"的服务——必须像旧 `ensure_generic_io` 一样 spawn 并
+/// 轮询收敛到 Running，不能被初始 503 当终局拒绝，也不能因 body 预算/spawn
+/// 前探测改变旧行为。
+#[test]
+fn u01_legacy_declaration_converges_through_initial_503() {
+    let _guard = SCOPE_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = temp_root("legacy-503");
+    let scope = root.join("scope");
+    std::fs::create_dir_all(&scope).unwrap();
+    let port = free_port();
+    let log = root.join("spawn.log");
+    let data_root = root.join("data");
+    std::fs::create_dir_all(&data_root).unwrap();
+    // 注意：无 health_interface（旧声明）；fixture 先回 3 次 503。
+    let os_root = root.join("auto-os");
+    std::fs::create_dir_all(&os_root).unwrap();
+    std::fs::write(
+        os_root.join("apps.manifest"),
+        format!(
+            r#"{{"apps":[{{"id":"015-notes","repo":"../auto-notes","daemon":{{
+                "port": {port},
+                "bin": "{}",
+                "env_port": "FP_FIXTURE_PORT",
+                "ready_timeout_ms": 20000,
+                "instance_key": "notes-legacy",
+                "env": {{
+                    "FP_FIXTURE_LOG": "{}",
+                    "FP_FIXTURE_MODE": "flaky",
+                    "FP_FIXTURE_FLAKY_COUNT": "3",
+                    "FP_FIXTURE_IDLE_MS": "60000"
+                }}
+            }}}}]}}"#,
+            escape_json(Path::new(FIXTURE_EXE)),
+            escape_json(&log),
+        ),
+    )
+    .unwrap();
+    std::env::set_var("AUTO_UI_DAEMON_SCOPE_DIR", &scope);
+
+    let outcome = auto_ui_runtime::ui::osconfig_daemon::resolve_manifest_host_shared(
+        &root,
+        "015-notes",
+        Duration::from_secs(20),
+    );
+    std::env::remove_var("AUTO_UI_DAEMON_SCOPE_DIR");
+    let url = match outcome {
+        auto_ui_runtime::ui::osconfig_daemon::ManifestHostResolution::Ready { url, .. } => url,
+        other => panic!("旧语义声明应经初始 503 收敛到 ready，实际 {other:?}"),
+    };
+    assert_eq!(fixture_pids(&log).len(), 1, "旧语义冷启仍只 spawn 一次");
+    // 旧语义就绪判定 = 状态行 2xx（与 tcp_ping 同义）。
+    assert!(
+        auto_ui_runtime::ui::osconfig_daemon::tcp_ping(&url, Duration::from_millis(800)),
+        "旧语义就绪可被 tcp_ping 观察（2xx）"
+    );
+    let _ = http_get(&url, "/__fixture/exit");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 /// U-03 反例：相同端点、不同数据根 → 具名冲突拒绝（不得悄悄采用另一根的库）。
 #[test]
 fn u03_same_endpoint_different_data_root_is_rejected() {

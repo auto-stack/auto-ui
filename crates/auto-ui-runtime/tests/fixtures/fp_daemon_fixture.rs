@@ -29,6 +29,14 @@ fn main() {
     let interface =
         std::env::var("FP_FIXTURE_INTERFACE").unwrap_or_else(|_| "notes.fpack/1".to_string());
     let mode = std::env::var("FP_FIXTURE_MODE").unwrap_or_else(|_| "ready".to_string());
+    // `flaky`：前 N 次健康请求返回 503（模拟"已 bind、未 ready"的服务），
+    // 之后转 200——用于证明旧语义（无 interface）不被初始 503 误判为终局。
+    let flaky_remaining = std::env::var("FP_FIXTURE_FLAKY_COUNT")
+        .ok()
+        .and_then(|raw| raw.parse::<usize>().ok())
+        .unwrap_or(0)
+        .min(u32::MAX as usize) as u32;
+    let flaky_hits = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
     let idle_ms: u64 = std::env::var("FP_FIXTURE_IDLE_MS")
         .ok()
         .and_then(|raw| raw.parse().ok())
@@ -70,14 +78,20 @@ fn main() {
 
     let started = Instant::now();
     for stream in listener.incoming().flatten() {
-        serve(stream, &interface, &mode);
+        serve(stream, &interface, &mode, &flaky_hits, flaky_remaining);
         if started.elapsed() > Duration::from_millis(idle_ms) {
             break;
         }
     }
 }
 
-fn serve(mut stream: TcpStream, interface: &str, mode: &str) {
+fn serve(
+    mut stream: TcpStream,
+    interface: &str,
+    mode: &str,
+    flaky_hits: &std::sync::atomic::AtomicU32,
+    flaky_remaining: u32,
+) {
     let _ = stream.set_read_timeout(Some(Duration::from_millis(2000)));
     let mut buf = [0u8; 2048];
     let Ok(n) = stream.read(&mut buf) else {
@@ -96,6 +110,19 @@ fn serve(mut stream: TcpStream, interface: &str, mode: &str) {
         let _ = stream.write_all(body);
         let _ = stream.flush();
         std::process::exit(0);
+    }
+    if flaky_remaining > 0 {
+        let hit = flaky_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if hit < flaky_remaining {
+            let body = "{}";
+            let response = format!(
+                "HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+            return;
+        }
     }
     let (status_line, body) = match mode {
         "wrong_interface" => (

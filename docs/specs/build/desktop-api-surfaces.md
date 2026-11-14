@@ -66,6 +66,10 @@ Rust API launcher 先在 GeneratedBuildContext 的 workspace cwd/受管 flags/
 - 该判定只在声明与身份校验之后发生：先按 `docs/specs/runtime/featurepack-daemon-hosting.md`
   §6 取得/复用实例（跨进程单实例门、实例标记核对），失败即具名中止桌面后端
   启动——不得悄悄退回"另起一份后端"。
+- 非共享的声明 daemon（`back_port != daemon.port`）同样在**后端 spawn 之前**
+  ensure 并解析宿主配置：就绪即随后端子进程投递；声明非法 → 拒绝启动其后端；
+  daemon Offline 仍按既有"Offline 不阻断"语义启动后端，但明确记录"后端在无
+  宿主配置下启动"（运行后再补投递不可行）。
 - 普通端口占用（未声明 daemon、或声明端口与应用 `back_port` 不同）保持既有
   规则：具名拒绝，不为新桌面应用清理既有服务。
 - 后端配置归属：声明的宿主配置（地址键、`host.env` 非敏感 literal、受管

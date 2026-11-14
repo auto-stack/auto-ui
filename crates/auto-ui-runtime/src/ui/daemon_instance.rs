@@ -477,14 +477,21 @@ fn ensure_under_lock(
         }
         HealthVerdict::NoListener => {}
         other => {
-            // 锁内已确认占用者不是目标服务：不 spawn、不向其投递配置。
-            *last = other.clone();
-            return DaemonStatus::Offline(format!(
-                "daemon `{}` 端口 {} 不可复用：{}（占用者存活，未 spawn）",
-                generic.name,
-                identity.port,
-                other.reason()
-            ));
+            // R-1/F-1：**旧语义（无 interface 声明）**与 `ensure_generic_io`
+            // 同义——ping 不通就 spawn（2xx 之外的状态/端口占用都算"未就绪"，
+            // 由 spawn 后轮询收敛）。只有声明了 interface 才把"占用者不匹配"
+            // 当终局拒绝。
+            if generic.health_interface.is_some() {
+                // 锁内已确认占用者不是目标服务：不 spawn、不向其投递配置。
+                *last = other.clone();
+                return DaemonStatus::Offline(format!(
+                    "daemon `{}` 端口 {} 不可复用：{}（占用者存活，未 spawn）",
+                    generic.name,
+                    identity.port,
+                    other.reason()
+                ));
+            }
+            *last = other;
         }
     }
 
@@ -797,6 +804,29 @@ mod tests {
         assert_eq!(io.spawns, 1, "冷启只 spawn 一次");
         let marker = InstanceMarker::read(&identity).expect("就绪后写标记");
         assert!(marker.matches(&identity));
+    }
+
+    #[test]
+    fn shared_ensure_legacy_waits_through_initial_503_and_spawns() {
+        // R-1/F-1：无 interface 声明（旧语义）时 503/占用都不算终局——
+        // 与 ensure_generic_io 同义：未就绪就 spawn，spawn 后轮询到 2xx。
+        let (identity, _scope) = identity_fixture("legacy503");
+        let mut generic = generic_for(&identity, Some(PathBuf::from("D:/fixture.exe")));
+        generic.health_interface = None;
+        let mut io = ScriptedIo::new(vec![
+            HealthVerdict::NotReady { status: 503 }, // 快路径
+            HealthVerdict::NotReady { status: 503 }, // 锁内二次探测
+            HealthVerdict::NotReady { status: 503 }, // spawn 后首轮
+            HealthVerdict::Ready,
+        ]);
+        let status =
+            ensure_shared_io(&generic, &identity, &mut io, &SharedEnsureOptions::default());
+        assert_eq!(
+            status,
+            DaemonStatus::Running(generic.url.clone()),
+            "旧语义下 503 初始态仍应 spawn 并收敛到 ready"
+        );
+        assert_eq!(io.spawns, 1, "旧语义冷启 spawn 一次并按门协调");
     }
 
     #[test]

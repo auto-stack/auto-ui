@@ -359,6 +359,16 @@ fn read_health_response(
     let body_start = head_end + 4;
     let mut body_raw: Vec<u8> = buf[body_start..].to_vec();
 
+    // PLAN-083 R-1/F-1：**旧语义（无 interface 声明）= 只看状态行**——不读
+    // body、不核 framing/字节预算（与 `tcp_ping` 逐字同义：2xx 即就绪，body
+    // 再大/再慢/再怪都不影响）。声明了 interface 才进入下面的有界 body 路径。
+    if spec.interface.is_none() {
+        return Ok(RawHealthResponse {
+            status,
+            body: Vec::new(),
+        });
+    }
+
     // body 形态裁定：声明不支持的 framing 直接具名拒绝（不从任意 body 假定）。
     let chunked = header("transfer-encoding")
         .map(|v| v.to_ascii_lowercase().contains("chunked"))
@@ -868,6 +878,19 @@ pub fn service_env(def: &ManifestDaemon, port: u16, env_port_key: &str) -> Vec<(
     env
 }
 
+/// PLAN-083 T-02/R-1：把宿主后端 env 应用到**子进程命令**——先剔除同名
+/// 继承键（宿主历史值不得泄漏/覆盖身份），再写投递值。native exe 子进程与
+/// 桌面 Rust API 后端启动器共用本函数（"配置随子进程精确投递、不写宿主
+/// 进程全局"只有一处实现）。
+pub fn apply_host_env(cmd: &mut std::process::Command, env: &HostBackendEnv) {
+    for key in &env.remove {
+        cmd.env_remove(key);
+    }
+    for (key, value) in &env.entries {
+        cmd.env(key, value);
+    }
+}
+
 /// manifest 声明 → 运行时泛化定义（`bin` 按平台补 `.exe`）。
 pub fn generic_daemon_from_manifest(
     name: &str,
@@ -918,6 +941,10 @@ pub enum ManifestHostResolution {
 /// 生产解析入口：manifest 查表 → ensure（同一 health/预算合同）→ 宿主 env。
 /// session 与桌面后端启动器共用；`parent` 语义同
 /// [`auto_ui_compiler::app_registry::manifest_daemon_lookup`]。
+///
+/// **注意**：生产路径统一走 [`resolve_manifest_host_shared`]（带跨进程门与
+/// 身份核对）；本函数是"不取锁的直接 ensure"，只保留给不需要实例协调的
+/// 调用方/诊断，不构成生产入口。
 pub fn resolve_manifest_host(
     parent: &Path,
     name: &str,
@@ -2090,6 +2117,60 @@ mod tests {
                 std::time::Duration::from_millis(800)
             )),
             HealthVerdict::NotReady { status: 503 }
+        );
+    }
+
+    /// PLAN-083 R-1/F-1：旧语义（无 interface）**只读状态行**——超大 body、
+    /// 不支持的 framing、截断 body 都不影响 2xx 就绪；声明 interface 才拒绝。
+    /// 与 `tcp_ping`（首 128 字节、状态前缀）逐字同义。
+    #[test]
+    fn probe_health_legacy_reads_status_line_only() {
+        let mut huge = b"HTTP/1.1 200 OK\r\nContent-Length: 20000\r\n\r\n".to_vec();
+        huge.extend(std::iter::repeat(b'x').take(20000));
+        let url = scripted_health_server(huge);
+        assert_eq!(
+            probe_health(&HealthSpec::legacy(
+                &url,
+                std::time::Duration::from_millis(800)
+            )),
+            HealthVerdict::Ready,
+            "旧语义不看 body（20KB 仍 ready）"
+        );
+        assert!(
+            matches!(
+                probe_health(&declaring_spec(&url, "notes.fpack/1")),
+                HealthVerdict::BadBody(_)
+            ),
+            "声明 interface 时才按预算拒绝"
+        );
+
+        // 不支持的 framing：旧语义不读 body ⇒ 仍 ready；声明时具名拒绝。
+        let te = concat!(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\nContent-Length: 4\r\n\r\n",
+            "abcd"
+        );
+        let url = scripted_health_server(te.as_bytes().to_vec());
+        assert_eq!(
+            probe_health(&HealthSpec::legacy(
+                &url,
+                std::time::Duration::from_millis(800)
+            )),
+            HealthVerdict::Ready
+        );
+        assert!(matches!(
+            probe_health(&declaring_spec(&url, "notes.fpack/1")),
+            HealthVerdict::BadBody(_)
+        ));
+
+        // 截断 body：旧语义仍 ready（tcp_ping 从未读 body）。
+        let truncated = "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n{";
+        let url = scripted_health_server(truncated.as_bytes().to_vec());
+        assert_eq!(
+            probe_health(&HealthSpec::legacy(
+                &url,
+                std::time::Duration::from_millis(800)
+            )),
+            HealthVerdict::Ready
         );
     }
 

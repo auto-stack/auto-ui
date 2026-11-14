@@ -7430,7 +7430,7 @@ fn start_api_server_inner(
             for (key, value) in &env.entries {
                 spec = spec.with_env(key, value);
             }
-        }
+        } // TrackedSpawn 无 Command 句柄：保留逐键应用（与 apply_host_env 同序）
         match crate::proc_host::spawn_tracked(spec, "api-server") {
             Ok(child) => {
                 tracked = Some(child);
@@ -7445,12 +7445,7 @@ fn start_api_server_inner(
             .stderr(std::process::Stdio::inherit());
         // PLAN-083 T-02：同一投递纪律（非托管路径也不能靠宿主全局 env）。
         if let Some(env) = host_env {
-            for key in &env.remove {
-                cmd.env_remove(key);
-            }
-            for (key, value) in &env.entries {
-                cmd.env(key, value);
-            }
+            auto_ui_runtime::ui::osconfig_daemon::apply_host_env(&mut cmd, env);
         }
         cmd.spawn()
             .map(Some)

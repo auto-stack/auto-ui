@@ -4120,12 +4120,7 @@ impl DesktopSession {
         let mut cmd = std::process::Command::new(exe);
         cmd.args(Self::spawn_exe_child_args(child_name, broker_pipe, render));
         if let Some(env) = host_env {
-            for key in &env.remove {
-                cmd.env_remove(key);
-            }
-            for (key, value) in &env.entries {
-                cmd.env(key, value);
-            }
+            crate::ui::osconfig_daemon::apply_host_env(&mut cmd, env);
         }
         // AUTO_OUTPROC_STDERR=1 诊断口：继承宿主 stderr（子进程 panic 可见）。
         let inherit = std::env::var("AUTO_OUTPROC_STDERR").is_ok();
