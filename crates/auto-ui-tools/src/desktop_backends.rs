@@ -13,6 +13,13 @@ pub(crate) struct DesktopBackend {
     pub root: PathBuf,
     pub profile: String,
     pub port: u16,
+    /// DEBT-007（auto-os PLAN-067 C-01/C-04 编排发现）：pac `daemon:` 声明——
+    /// 消费者 app 经此把**被声明 daemon 名**带入 boot 启动器（此前该声明在
+    /// read 时被丢弃，非共享臂按 app 自身 id 查 manifest 恒 NotDeclared，
+    /// 消费者后端拿不到宿主 env：地址靠缺省端口回退、凭据为空）。
+    /// `None` = pac 未声明，查表名回退 app.id（既有语义零变化）。
+    #[serde(default)]
+    pub daemon: Option<String>,
 }
 
 impl DesktopBackend {
@@ -44,12 +51,25 @@ impl DesktopBackend {
                 format!("desktop app {id}: Rust backend requires a nonzero back_port").into(),
             );
         }
+        let daemon = {
+            let name = config.root.get_prop("daemon").to_astr().to_string();
+            (!name.is_empty()).then_some(name)
+        };
         Ok(Some(Self {
             id: id.into(),
             root: root.to_path_buf(),
             profile,
             port,
+            daemon,
         }))
+    }
+
+    /// DEBT-007：非共享臂 manifest daemon 查表名——pac `daemon:` 声明优先
+    /// （消费者按被声明名查，如 reader → "015-notes"），未声明回退 app.id
+    /// （既有语义；共享 provider 判定不受此影响——那边按 manifest 条目 id
+    /// 对齐，notes 行 id 即条目 id）。
+    pub(crate) fn declared_lookup_name(&self) -> &str {
+        self.daemon.as_deref().unwrap_or(&self.id)
     }
 }
 
@@ -104,12 +124,9 @@ impl DesktopBackends {
         > = std::collections::HashMap::new();
         let mut shared_ports: std::collections::HashSet<u16> = std::collections::HashSet::new();
         for app in entries.iter().filter(|app| app.profile == "rust") {
-            let declared = auto_ui_runtime::ui::app_registry::manifest_daemon_lookup(
-                Path::new(".."),
-                &app.id,
-            );
-            let decision =
-                shared_backend_decision(app.port, declared.as_ref().map(|(_, def)| def));
+            let declared =
+                auto_ui_runtime::ui::app_registry::manifest_daemon_lookup(Path::new(".."), &app.id);
+            let decision = shared_backend_decision(app.port, declared.as_ref().map(|(_, def)| def));
             if let SharedBackendDecision::Shared { daemon_port } = decision {
                 if daemon_port != app.port {
                     continue;
@@ -171,9 +188,8 @@ impl DesktopBackends {
             // 共享 provider 应用：不起自有后端、不碰其端口，直接路由到
             // 已核验身份的 daemon（Notes 主窗口 / Vue 桌面 API 去重）。
             if let Some((url, _env)) = shared.get(&app.id) {
-                routes.push(
-                    serde_json::json!({"id": app.id, "target": url.clone(), "strip": true}),
-                );
+                routes
+                    .push(serde_json::json!({"id": app.id, "target": url.clone(), "strip": true}));
                 continue;
             }
             // Never let the single-app launcher's legacy port cleanup kill a
@@ -190,9 +206,11 @@ impl DesktopBackends {
             // 就绪，之后再补投递不可行。daemon Offline 仍不阻断后端启动
             // （既有 "Offline 不阻断 launch" 语义），但要明确记录"后端在无
             // 宿主配置下启动"；声明非法直接拒绝。
+            // DEBT-007：查表名 = pac `daemon:` 声明（消费者按被声明名，如
+            // reader → "015-notes"）优先，未声明回退 app.id（零变化）。
             let host_env = match auto_ui_runtime::ui::osconfig_daemon::resolve_declared_backend(
                 Path::new(".."),
-                &app.id,
+                app.declared_lookup_name(),
                 std::time::Duration::from_secs(5),
             ) {
                 auto_ui_runtime::ui::osconfig_daemon::DeclaredBackendConfig::NotDeclared => None,
@@ -211,6 +229,19 @@ impl DesktopBackends {
                         "[plan083] desktop app {}: 声明 daemon 未就绪（{reason}）；\
                          后端在无宿主配置下启动（既有 Offline 不阻断语义）",
                         app.id
+                    );
+                    None
+                }
+                // DEBT-007：pac 声明了 daemon 但 manifest 无此名 = 装配误配置
+                // ——具名可见（行为不变：后端仍无宿主配置启动）。
+                auto_ui_runtime::ui::osconfig_daemon::DeclaredBackendConfig::NotDeclared
+                    if app.daemon.is_some() =>
+                {
+                    eprintln!(
+                        "[debt007] desktop app {}: pac 声明 daemon `{}` 未在 apps.manifest \
+                         登记——后端在无宿主配置下启动（具名误配置，非静默）",
+                        app.id,
+                        app.daemon.as_deref().unwrap_or_default()
                     );
                     None
                 }
@@ -301,27 +332,47 @@ mod tests {
         let reservation = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = reservation.local_addr().unwrap().port();
         fs::write(root.join("pac.at"), format!("name: \"desktop_api_probe\"\nversion: \"0.1.0\"\nscene: \"ui\"\nrender: \"vue\"\napi: \"rust\"\nback_port: {port}\n")).unwrap();
-        fs::write(root.join("src/back/api.at"), "#[api(method = \"GET\", path = \"/api/probe\")]\npub fn value() int { return 53 }\n").unwrap();
+        fs::write(
+            root.join("src/back/api.at"),
+            "#[api(method = \"GET\", path = \"/api/probe\")]\npub fn value() int { return 53 }\n",
+        )
+        .unwrap();
         let backend = DesktopBackend::read("probe", &root).unwrap().unwrap();
-        fs::write(root.join("host/desktop-backends.json"), serde_json::to_string(&vec![backend]).unwrap()).unwrap();
+        fs::write(
+            root.join("host/desktop-backends.json"),
+            serde_json::to_string(&vec![backend]).unwrap(),
+        )
+        .unwrap();
         drop(reservation);
         {
             let _owned = DesktopBackends::start(&root.join("host")).unwrap();
             let mut stream = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
-            stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
-            stream.write_all(b"GET /api/probe HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n").unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .unwrap();
+            stream
+                .write_all(
+                    b"GET /api/probe HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
+                )
+                .unwrap();
             let mut response = String::new();
             stream.read_to_string(&mut response).unwrap();
             let (headers, body) = response.split_once("\r\n\r\n").unwrap();
             assert!(headers.lines().next().unwrap().contains("200"), "{headers}");
             assert_eq!(body.trim(), "53");
-            let proxies: serde_json::Value = serde_json::from_str(&fs::read_to_string(root.join("host/desktop-proxies.json")).unwrap()).unwrap();
+            let proxies: serde_json::Value = serde_json::from_str(
+                &fs::read_to_string(root.join("host/desktop-proxies.json")).unwrap(),
+            )
+            .unwrap();
             assert_eq!(proxies[0]["id"], "probe");
             assert_eq!(proxies[0]["strip"], true);
         }
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
-            assert!(std::time::Instant::now() < deadline, "owned backend survived cleanup");
+            assert!(
+                std::time::Instant::now() < deadline,
+                "owned backend survived cleanup"
+            );
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
     }
@@ -342,6 +393,9 @@ mod tests {
         .unwrap();
         let app = DesktopBackend::read("a", temp.path()).unwrap().unwrap();
         assert_eq!((app.profile.as_str(), app.port), ("rust", 17801));
+        // DEBT-007：pac 无 daemon 声明 → None，查表名回退 app.id（零变化）。
+        assert_eq!(app.daemon, None);
+        assert_eq!(app.declared_lookup_name(), "a");
         fs::write(temp.path().join("pac.at"), "name: \"a\"\n").unwrap();
         assert_eq!(
             DesktopBackend::read("a", temp.path())
@@ -356,6 +410,37 @@ mod tests {
         assert!(DesktopBackend::read("a", temp.path()).is_err());
     }
 
+    /// DEBT-007：pac `daemon:` 声明进入行结构并驱动非共享臂查表名——
+    /// 消费者（reader 声明 "015-notes"）按**被声明名**查 manifest daemon，
+    /// 宿主 env（地址+受管凭据）才能在其后端 boot spawn 时投递。
+    #[test]
+    fn pac_daemon_declaration_drives_declared_lookup_name() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::create_dir_all(temp.path().join("src/back")).unwrap();
+        fs::write(
+            temp.path().join("src/back/api.at"),
+            "pub fn status() int { return 1 }",
+        )
+        .unwrap();
+        fs::write(
+            temp.path().join("pac.at"),
+            "name: \"book-reader\"\napi: \"rust\"\nback_port: 17825\ndaemon: \"015-notes\"\n",
+        )
+        .unwrap();
+        let app = DesktopBackend::read("018-book-reader", temp.path())
+            .unwrap()
+            .unwrap();
+        assert_eq!(app.daemon.as_deref(), Some("015-notes"));
+        assert_eq!(app.declared_lookup_name(), "015-notes");
+        // 旧 bundle JSON（无 daemon 字段）反序列化 → None（serde default，
+        // 未再生成的桌面包行为零变化）。
+        let legacy: DesktopBackend =
+            serde_json::from_str("{\"id\":\"x\",\"root\":\".\",\"profile\":\"rust\",\"port\":1}")
+                .unwrap();
+        assert_eq!(legacy.daemon, None);
+        assert_eq!(legacy.declared_lookup_name(), "x");
+    }
+
     #[test]
     fn desktop_refuses_duplicate_or_occupied_ports_before_starting_children() {
         let app = |id: &str, port| DesktopBackend {
@@ -363,13 +448,16 @@ mod tests {
             root: PathBuf::new(),
             profile: "rust".into(),
             port,
+            daemon: None,
         };
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
-        assert!(validate_assignments(&[app("busy", port)], &Default::default())
-            .unwrap_err()
-            .to_string()
-            .contains("already in use"));
+        assert!(
+            validate_assignments(&[app("busy", port)], &Default::default())
+                .unwrap_err()
+                .to_string()
+                .contains("already in use")
+        );
         drop(listener);
         assert!(
             validate_assignments(&[app("a", port), app("b", port)], &Default::default())
@@ -416,6 +504,7 @@ mod tests {
             root: PathBuf::new(),
             profile: "rust".into(),
             port,
+            daemon: None,
         };
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
