@@ -1,12 +1,12 @@
 ---
 plan_id: auto-ui/PLAN-083
-status: reviewed
+status: archived
 feature_name: FeaturePack daemon生产就绪、宿主配置与单实例
 author: [Codex]
 created_at: 2026-11-13
 updated_at: 2026-11-14
 plan_revision: 2
-current_step: 6
+current_step: 8
 total_steps: 8
 depends_on: []
 supersedes_spec_components: [docs/specs/build/desktop-api-surfaces.md]
@@ -18,9 +18,9 @@ touched_goals: []
 
 ## 0. 变更摘要
 
-合并承接DEBT-003/004/005，提供 [OS-067](../../../auto-os/docs/plans/067-notes-featurepack-product-closure.md) T-02的运行时前置。三项共用app_registry/session/osconfig_daemon调用链，由同一计划按健康检查、配置传递和单实例三个可验任务交付。当前drafting、0/8。
+合并承接DEBT-003/004/005，提供 [OS-067](../../../../auto-os/docs/plans/067-notes-featurepack-product-closure.md) T-02的运行时前置。三项共用app_registry/session/osconfig_daemon调用链，由同一计划按健康检查、配置传递和单实例三个可验任务交付。当前drafting、0/8。
 
-本计划提供公共宿主能力与运行时验证，OS拥有Notes发布、受管授权及真实双应用联合验收，Reader拥有启动声明和客户端消费。[Reader-013](../../../auto-reader/docs/plans/013-notes-featurepack-host.md) T-01/T-06可先只读准备，正式产品实现等待009交付交接。
+本计划提供公共宿主能力与运行时验证，OS拥有Notes发布、受管授权及真实双应用联合验收，Reader拥有启动声明和客户端消费。[Reader-013](../../../../auto-reader/docs/plans/013-notes-featurepack-host.md) T-01/T-06可先只读准备，正式产品实现等待009交付交接。
 
 ## 1. 目标
 
@@ -346,6 +346,24 @@ R-1 声称子进程用例断言「宿主陈旧同名值被剔除」；但用例�
 **pending_closeout_gates（merge-owned）**：真实 Vue/Rust 后端构建启动与 Notes 双窗口联合验收归 OS-067（沿计划 §9 既有边界，不因本轮扩大承诺）；仓库统一回归门由 merge 按仓约定执行；受影响组已在冻结的 reviewed commit `cb8bfbce` 上全绿。
 
 **next**：merge T-07 —— 按精确提交落地 `cb8bfbce`、核对规范/归档/清理、把字段/兼容性/SHA 交付 OS-067 与 Reader-013。未合并、未清理任何 worktree。
+
+2026-11-14 · stage: merge | plan_id: auto-ui/PLAN-083 | plan_revision: 2 | outcome: pass（delivered + cleaned） | delivery_commit: 8997393a（默认分支 tip = 交付提交，--ff-only，无 merge commit） | reviewed_commit: cb8bfbce → rebase 后 8997393a | review: 第三次最终复审 pass（main 5e44776b 回执） | next_responsible_role: merge（清理与落地观察项）
+
+**checkpoint: prepared** — 复审基线 `cb8bfbce`（plan_revision 2，第三次最终复审 pass），待落地规范增量 = SD-01 add `docs/specs/runtime/featurepack-daemon-hosting.md` + SD-02 modify `docs/specs/build/desktop-api-surfaces.md`；交付前默认分支已推进（plan-084 等 8 个计划/文档提交，tip `5e44776b`）。
+
+**checkpoint: landed** — 开发分支在 worktree 内 `git rebase master`（无冲突，8 提交 → 7：`c76994b1` lock 同步被丢弃，因 master 已含同一 lock 内容——`5e44776b:Cargo.lock` 已含 `ace-foreign-contract`，`9564` 行两侧一致）。哈希映射：`c9238191→36758239`、`34884f99→71f1e92d`、`93280912→12cf67a2`、`14539ae7→7e93da58`、`38ed6add→164d6a2d`、`b9999db9→d91ca8f8`、`cb8bfbce→8997393a`。`git range-diff a6f776c2..cb8bfbce 5e44776b..8997393a`：**7 个补丁全部 `=`**（唯一 `<` 为被丢弃的 lock 提交，patch 内容已在上游）→ 等价改写证明。main `git merge --ff-only codex/plan-083-dev` 成功，tip = `8997393a`（无 merge commit）。落地后 main 冒烟：`--lib osconfig_daemon` 42 passed、`--test featurepack_daemon_hosting --test-threads=1` 5 passed。
+
+**checkpoint: canonical_verified** — 落地提交含两份规范：`docs/specs/runtime/featurepack-daemon-hosting.md`（blob `ba57f484`，sha256 `098C7F1907E92B750DC46B0F3EA1A001D832CD03269C967D2F62E0BF4DB42D02`）与 `docs/specs/build/desktop-api-surfaces.md`（blob `b5fc6808`，sha256 `FFAEC4D98CC74E497D0B232CC7676BD88C06A5A4B55FE8F16B1AFE14562F950A`）；`git status docs/specs` 干净。无 index/ledger 写入；未创建 `docs/plans/attachments/`。
+
+**checkpoint: archived** — `git mv` 至 `docs/plans/archived/083-featurepack-daemon-runtime-contract.md`，`status: archived`；两条跨仓相对链接按归档层级上抬一级（`../../../auto-os|auto-reader` → `../../../../...`）；任务 ID/计数（6/8 work + T-06 review + T-07 merge）与回执一致，交付/复审/归档事实与上述提交绑定；规范知识条目仍指向 Specs（SD-01/SD-02），本页仅保留交付历史与证据摘要。
+
+**受影响门复跑（交付基线 `8997393a`，rebase 后）**：`--lib osconfig_daemon` 42、`--lib daemon_instance` 8、`--test featurepack_daemon_hosting` 5、`--test featurepack_daemon_launch` 1、`--test featurepack_daemon_child_env` 2、compiler `app_registry::tests` 34、tools `desktop_backends` 3(+1 ignored)。按计划 §6 的固定组选择口径，未重跑全仓 `cargo t`；已知既存环境依赖（`plan814_app_registry_launch_tests` 需要真实 `auto-os/apps.manifest` 的 013-todo 原生产物）不因本计划改变。
+
+**落地不等于部署（观察项，按 merge skill 第 5 条如实登记）**：本次为 runtime 源码 + 规范交付，未重建生产构件——① 后端 release 二进制、② 生成前端 bundle（`gen/front/vue/dist`）、③ 依赖仓 daemon 发布件均**未随本次合并重建**（保持合并前构建时间）；OS 联合验收（真实双应用 + 真后端启动）在其侧进行时须先按各自构建纪律重建。真 Vue/Rust 后端编译启动档与 Notes 双窗口仍归 OS-067 T-04 联合验收（本计划证据边界，见 SD-01 §11）。
+
+**checkpoint: cleaned** — `wt-guard.sh D:/autostack/.wt/ui-083/auto-ui` = **clean**（无 reparse point）；`git worktree remove` + `git branch -D codex/plan-083-dev`（was `8997393a`）；组内依赖工作树（auto-lang@e0cfa2d8c、auto-web@8b1742a0、auto-down@58ea33f6）按各自仓 `git worktree remove --force` + `prune` 移除，四仓 `git worktree list` 均无 `ui-083` 残留；空组目录 `D:/autostack/.wt/ui-083` 已删除。**plan-artifacts 处理**：`D:/autostack/plan-artifacts/plan-083/`（7 文件 / 6,052,575 字节）在把复审日志的尺寸与 sha256 前缀折入本页后**整 scope 删除**（2026-10-31 delete-at-merge 裁定）；日志清单：`review/tests.log` 1,351,277B `F4C07BB2C6B5D7D2`、`review/adversarial.log` 545,638B `957F3CF8CB4499C2`、`review/osconfig_integration.log` 180,772B `11CDB29C470B31C4`、`review2/tests.log` 1,533,077B `A8AC052349AC7177`、`review2/adversarial.log` 545,016B `72FEF9F40F128B2F`、`review3/tests.log` 1,532,540B `1D664AFB101BD7C6`、`review3/adversarial.log` 364,255B `5E1C56294CE95CB0`；无具名未解决持有。注册表 `D:/autostack/plan-artifacts/.retention/policy.json` 已追加 `auto-ui/PLAN-083` 的 `deleted-at-merge (no holds)` 记录（delivery_commit `8997393a`）。最终计数 **8/8**（T-00～T-07 全部完成）。
+
+**批次回归到期检查**：`auto-lang/docs/plans/.last-batch-regression.json` 最近覆盖 plan 1043（2026-11-13T19:30Z，verdict `known-reds-only`，只覆盖 language fixed groups）；本计划属 auto-ui、未向 auto-lang 合入任何计划，故语言批门不因本次合并到期。auto-ui 侧按计划 §6 的固定组选择口径（受影响组）执行，未跑全仓 `cargo t`；该全仓档与既存环境红（`plan814_app_registry_launch_tests` 需 013-todo 原生产物）如实记为观察项，不冒充通过。
 
 ## 10. 待澄清事项
 
