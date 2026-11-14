@@ -28,7 +28,9 @@ service; the delivered interactive selector host is native VM.
 | `open` | `false` | Parent-controlled visibility request |
 | `title` | `选择文件` | Visible dialog title |
 | `initialDirectory` | empty | Initial directory or complete file path; empty uses home |
-| `selectionMode` | `singleFile` | `singleFile` or `multipleFiles` |
+| `selectionMode` | `singleFile` | `singleFile`, `multipleFiles`, `singleDirectory`, or `saveFile`; unknown values are named errors and never fall back to an open mode; the mode freezes at session open and parent changes mid-session never switch the live session |
+| `defaultFileName` | empty | Save-mode initial filename draft; an explicit non-empty value wins over the basename prefill of a complete-file `initialDirectory` |
+| `defaultExtension` | empty | Dot-less; completes the accepted result name only when the draft lacks an extension; never rewrites the typed input; incompatible with the active group is a non-retryable configuration error |
 | `filters` | `[]` | Records `{id,label,extensions}`; extensions omit the dot |
 | `activeFilterId` | empty | Initial configured group, otherwise the first group |
 | `acceptLabel` | `打开` | Confirmation label |
@@ -39,7 +41,10 @@ bind them with `onaccepted`, `oncancelled`, and `onerror`.
 
 - `accepted` carries JSON `{"files":[{"name":"…","path":"…"}]}`. The
   array is nonempty, contains unique absolute OS paths, and follows stable
-  directory-list order. Accept closes the session.
+  directory-list order. Accept closes the session. Both new modes return
+  exactly one entry: directory mode returns the canonical directory (root
+  included) and save mode returns the exact target path, which may not exist
+  yet; Windows canonical parents may carry a `\\?\` prefix.
 - `cancelled` carries no data and closes the session. Cancel, close, Escape,
   and a parent closing an open request share the cancellation path.
 - `error` carries JSON `{code,message,retryable}`. Recoverable failures keep
@@ -74,6 +79,13 @@ filter changes, and refresh clear it; failed navigation preserves the previous
 valid directory and selection. Single mode retains at most one file. Multiple
 mode uses each row's checkbox and needs no keyboard modifier.
 
+In directory mode only directories are selectable: each directory row keeps
+its enter action separate from a select action, a dedicated control selects
+the currently listed directory (root included), file rows render as context
+without selection affordances, and the type-group buttons are hidden without
+excluding directories from name filters. In save mode nothing is selectable;
+the filename input is the draft.
+
 Accept is disabled without an eligible selection. Before emitting, a worker
 rechecks every selected path for existence, ordinary-file status, readability,
 active type eligibility, and canonical identity. One failure prevents the
@@ -86,6 +98,35 @@ cycle traversal occurs. Broken links are named failures. Unix non-UTF-8 names
 produce `unsupported_path`, rather than returning a different lossy path.
 UNC/network paths may be attempted through OS APIs; network discovery and
 timely completion of unreachable network operations are not promised.
+
+## Save-target rules
+
+The save-mode filename is a basename only: path separators, `.`/`..`, NUL,
+and Windows reserved device names are named recoverable `invalid_path`
+errors; the draft is never trimmed or rewritten and an empty name disables
+accept without an error event. Extension completion happens at confirm time
+in the accepted result only; an explicit extension outside the active group
+is a recoverable error and switching groups never rewrites the input.
+
+Destination resolution runs on a worker against the canonical parent
+directory and never creates, truncates, or renames anything, including
+permission probing: existing-target writability is read from metadata
+attributes only. A symlink target is `unsupported_path`; a directory target
+is a recoverable `invalid_path`; special files are `unsupported_path`; a
+read-only regular file is a recoverable `permission_denied`. The final write
+permission and the write itself stay with the consumer app.
+
+Overwrite confirmation always asks, shows the real target path, and binds
+the confirmed file identity (length + modification-time fingerprint).
+确认覆盖 revalidates the same session target: the same identity accepts, a
+vanished target accepts as a create, and a replaced or retyped identity
+re-presents the layer so an old confirmation can never hit different bytes.
+Back keeps the drafts and the session; any directory/name/listing change
+voids a pending confirmation. The layer is a nested controlled modal of the
+same app: Escape and the close path return to the selector, outside clicks
+are swallowed, and background actions are rejected at both the modal scope
+and the model. Acceptance is a selection and an intent only; TOCTOU handling
+stays with the consumer app.
 
 ## Ownership and asynchronous lifetime
 
@@ -147,7 +188,8 @@ both ordinary and tracked views; dialogs without an override keep their
 existing dimensions. Explicit-modal reopening resets retained
 content scroll/focus state so the initial path input is visible again.
 
-Opening focuses the path input. Tab/Shift+Tab traverse enabled inputs,
+Opening focuses the path input; save mode focuses the filename input, once
+per session through the shared focus builtin. Tab/Shift+Tab traverse enabled inputs,
 buttons, and checkboxes within the active modal and wrap at both ends. Enter
 performs the focused control's declared action; Space activates its bound
 button/checkbox handler. Escape cancels. Outside clicks do not close or reach
@@ -184,9 +226,21 @@ navigation, filtering, paging, refresh, or reopen.
   tool, discovers its owned native window, drives ordinary controls, checks
   durable callback identity, tests background/stale failures, single mode,
   1003 entries, themes, ten cancel/reopen cycles, process/port cleanup and a
-  fresh successful session. Run Windows and Linux separately; missing runners,
-  empty trees, missing windows, and timeouts are failures. Inspect captured
-  screenshots, including a narrow window, for actual visible footer/content.
+  fresh successful session, and covers all four modes: directory selection
+  (current and child, files rejected), save names with completion and named
+  errors, overwrite Back/Replace with byte baselines, and fixture bytes
+  unchanged for the whole campaign. Run Windows and Linux separately; missing
+  runners, empty trees, missing windows, and timeouts are failures, and a
+  missing Linux runner is recorded `not_run`, never a pass. Inspect captured
+  screenshots, including a narrow window, for actual visible footer/content
+  and single-line type groups.
+- `tests/product/verify_file_dialog_modes_consumer.py` consumes the dialog
+  from the real 041 editor through ordinary controls: Ctrl+S opens the save
+  dialog for an untitled tab, 另存为 prefills the current basename, the app
+  writes the accepted path and verifies the bytes read-back, cancel keeps the
+  dirty state without creating files, a read-only target is a named
+  recoverable failure, and quit goes through the documented confirm path with
+  no Env path shortcut present.
 - Consumer acceptance (Reader book/cover bytes, limits, database state and Vue
   authorization) remains in the consumer's own specification and product gate.
 
