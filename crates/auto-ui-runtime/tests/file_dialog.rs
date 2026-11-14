@@ -92,6 +92,37 @@ fn superseded_request_and_cancel_cannot_publish_old_results() {
     }
 }
 
+/// R-1: the type-group buttons must share one horizontal row (a stacking
+/// column that wraps 书籍/图片 into two lines is the defect).
+fn filter_buttons_share_one_row(
+    view: &auto_ui_runtime::ui::view::View<auto_ui_runtime::ui::interpreter::DynamicMessage>,
+) -> bool {
+    use auto_ui_runtime::ui::view::View;
+    match view {
+        View::Row { children, .. } => {
+            let books = children.iter().any(
+                |c| matches!(c, View::Button { label, .. } if label.contains("书籍")),
+            );
+            let images = children.iter().any(
+                |c| matches!(c, View::Button { label, .. } if label.contains("图片")),
+            );
+            if books && images {
+                return true;
+            }
+            children.iter().any(filter_buttons_share_one_row)
+        }
+        View::Popover { open: true, content, .. } => filter_buttons_share_one_row(content),
+        View::Column { children, .. } | View::List { items: children, .. } => {
+            children.iter().any(filter_buttons_share_one_row)
+        }
+        View::Container { child, .. } | View::Scrollable { child, .. } => {
+            filter_buttons_share_one_row(child)
+        }
+        View::MouseArea { content, .. } => filter_buttons_share_one_row(content),
+        _ => false,
+    }
+}
+
 #[test]
 fn package_fixture_builds_and_opens_a_real_component_instance() {
     use auto_ui_runtime::ui::dynamic::DynamicComponent;
@@ -162,6 +193,10 @@ fn package_fixture_builds_and_opens_a_real_component_instance() {
     component.drive_scheduler_to_quiescence(16);
     let view = wait(&mut component, modal_open);
     assert!(format!("{view:?}").contains("转到"));
+    assert!(
+        filter_buttons_share_one_row(&view),
+        "R-1: type-group buttons must share one horizontal row, not a stacking column"
+    );
     let files = tempfile::tempdir().unwrap();
     let selected = files.path().join("中文 book.txt");
     std::fs::write(&selected, "independent fixture").unwrap();
@@ -704,7 +739,9 @@ fn package_directory_mode_view_selects_and_accepts_one_directory() {
         });
     let _ = component.view();
     let tree = plan084_wait(&mut component, |tree| {
-        tree.contains("选择一个目录") && tree.contains("选择当前目录")
+        tree.contains("选择一个目录")
+            && tree.contains("选择当前目录")
+            && !tree.contains("载入中")
     });
     // Type groups are hidden in directory mode; file rows carry no checkbox.
     assert!(

@@ -89,13 +89,18 @@ widget FileDialog (open: bool = false, title: str = "选择文件", initialDirec
                     col (style: "flex-1 min-w-0 gap-0") {
                         row (style: "px-3 py-2 gap-2 items-center w-full") {
                             icon (name: "search", size: 14, style: "text-muted-foreground") {}
-                            input (value: .nameQuery, oninput: .SetName, placeholder: "名称过滤", style: "flex-1 min-w-0 max-w-[320px] h-8 text-xs rounded-md bg-muted/40") {}
+                            // R-1：右侧类型组固定宽度单行（shrink-0 嵌套行，
+                            // 不因窄宽换行堆叠）；中间 input 灵活伸缩承担
+                            // 全部剩余宽度（用户冻结方向）。
+                            input (value: .nameQuery, oninput: .SetName, placeholder: "名称过滤", style: "flex-1 min-w-0 h-8 text-xs rounded-md bg-muted/40") {}
                             if .fdMode != "singleDirectory" {
-                                for filter in .filters {
-                                    button filter.label {
-                                        onclick: .SetFilter(filter.id)
-                                        disabled: .activeType == filter.id
-                                        style: if .activeType == filter.id { "h-8 px-3 shrink-0 text-xs rounded-md bg-primary/10 text-primary border border-primary" } else { "h-8 px-3 shrink-0 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted" }
+                                row (style: "shrink-0 gap-2 items-center") {
+                                    for filter in .filters {
+                                        button filter.label {
+                                            onclick: .SetFilter(filter.id)
+                                            disabled: .activeType == filter.id
+                                            style: if .activeType == filter.id { "h-8 px-3 shrink-0 text-xs rounded-md bg-primary/10 text-primary border border-primary" } else { "h-8 px-3 shrink-0 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted" }
+                                        }
                                     }
                                 }
                             }
