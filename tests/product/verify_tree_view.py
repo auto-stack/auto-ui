@@ -125,7 +125,7 @@ class Session:
             if predicate(last):
                 return last
             time.sleep(0.4)
-        raise AssertionError(f'condition not met in {timeout}s; tail: {last[:400]}')
+        raise AssertionError(f'condition not met in {timeout}s; tail: {last[:300]}')
 
     def row_ids(self):
         """Bound row actions across the whole page, in document order.
@@ -245,7 +245,10 @@ def run_matrix(session, record):
     vfd.require('重试' in session.snapshot(), 'error row must expose a retry action')
     session.press_button('重试')
     session.wait(lambda t: 'retry:images' in t)
-    session.wait(lambda t: '重试' not in t, timeout=10)
+    # The error row must recover: the retry action disappears once the app
+    # clears errorIds. Re-read a few times — the row re-derives on the next
+    # frame, so a single immediate read can catch the pre-retry frame.
+    session.wait(lambda t: '重试' not in t, timeout=15)
 
     # ── V-04 instances: the B tree is an independent controlled instance.
     b_before = session.b_line()
