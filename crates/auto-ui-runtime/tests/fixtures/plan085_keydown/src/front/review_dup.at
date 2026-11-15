@@ -1,0 +1,27 @@
+// PLAN-085 review-repair fixture (F-04): duplicate node ids must be reported
+// and must not publish ambiguous actionable rows.
+widget reviewdup {
+    msg { Init, Toggle(str), Select(str) }
+    model {
+        var nodes List = []
+        var expanded List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .sel,
+                      on_toggle: .Toggle($event), on_select: .Select($event), on_retry: .Select($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            a.push({ id: "dup", label: "FIRST", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "dup", label: "SECOND", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        .Toggle(v str) -> { }
+        .Select(v str) -> { .sel = v }
+    }
+}

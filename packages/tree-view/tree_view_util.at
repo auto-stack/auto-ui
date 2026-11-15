@@ -126,23 +126,44 @@ pub fn tv_row_icon(nd_icon str, label str, kind str, has_kids bool, open bool, d
 /// 可见行派生。只展开 `expanded` 中的节点；`disabled` 行仍显示（供读屏/MCP
 /// 观察其存在）但 `focused` 恒 false 且不占键盘序号。
 /// 行记录 = {id, label, has_kids, open, disabled, selected, focused,
-/// loading, error, leaf, icon, badge}。
+/// loading, error, leaf, icon, badge, depth}。
 pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, loading List, error List, focus int, directory bool) List {
     var out List = []
-    var stack List = []
-    var i int = nodes.len()
-    while i > 0 {
-        i = i - 1
-        stack.push(nodes[i])
-    }
     var reachable int = 0
-    while stack.len() > 0 {
-        var top int = stack.len() - 1
-        var nd = stack[top]
-        stack.pop()
+    // Depth travels WITH each pending node — a parallel index array desynchronises
+    // as soon as children are pushed mid-walk (which was silently producing
+    // depth 0 for every row, review F-01). Each stack entry is a 2-element list
+    // [node, depth], the one pairing that cannot drift.
+    var dup bool = false
+    if tv_duplicate_id(nodes) != "" {
+        dup = true
+    }
+    var seed List = []
+    var si int = nodes.len()
+    while si > 0 {
+        si = si - 1
+        var root_nd = nodes[si]
+        var pair List = []
+        pair.push(root_nd)
+        pair.push(0)
+        seed.push(pair)
+    }
+    while seed.len() > 0 {
+        var stop int = seed.len() - 1
+        var entry = seed[stop]
+        seed.pop()
+        var nd = entry[0]
+        var lvl int = entry[1]
         var kids List = nd.children
         var leaf bool = nd.is_leaf == true
-        var has_kids bool = kids.len() > 0 && !leaf
+        // A directory with no children loaded YET is still expandable: it is
+        // not a leaf, so the app must be able to request expansion (lazy
+        // children arrive afterwards). Gating on kids.len() alone treated a
+        // not-yet-loaded directory as a leaf, which made `images` in the demo
+        // (kind "dir", children [], is_leaf false) un-expandable — Plan §5
+        // requires those to raise a request rather than be treated as leaves.
+        var is_dir_node bool = nd.kind == "dir"
+        var has_kids bool = !leaf && (kids.len() > 0 || is_dir_node)
         var dis bool = tv_member(disabled, nd.id)
         var op bool = false
         if has_kids {
@@ -162,12 +183,25 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
             }
         }
         var ic str = tv_row_icon(nd.icon, nd.label, nd.kind, has_kids, op, directory)
-        out.push({ id: nd.id, label: nd.label, has_kids: has_kids, open: op, disabled: dis, selected: sel, focused: ord == focus, loading: tv_member(loading, nd.id), error: tv_member(error, nd.id), leaf: !has_kids, icon: ic, badge: nd.badge })
+        // With a duplicate id present the tree is structurally invalid: emit the
+        // row as non-actionable metadata instead of publishing a second
+        // ambiguous target for the same id. The named error is raised
+        // separately; this keeps "report, do not publish ambiguous rows" true
+        // (review F-04, Plan §5).
+        var dis_row bool = dis
+        if dup {
+            dis_row = true
+        }
+        out.push({ id: nd.id, label: nd.label, has_kids: has_kids, open: op, disabled: dis_row, selected: sel, focused: ord == focus, loading: tv_member(loading, nd.id), error: tv_member(error, nd.id), leaf: !has_kids, icon: ic, badge: nd.badge, depth: lvl })
         if op {
             var j int = kids.len()
             while j > 0 {
                 j = j - 1
-                stack.push(kids[j])
+                var kid = kids[j]
+                var kid_pair List = []
+                kid_pair.push(kid)
+                kid_pair.push(lvl + 1)
+                seed.push(kid_pair)
             }
         }
     }

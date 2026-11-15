@@ -140,14 +140,29 @@ class Session:
             snap)
 
     def split_row_ids(self):
-        """(A rows, B rows) — the page renders the A block before the B block."""
+        """(A rows, B rows) — the page renders the A block before the B block.
+
+        Counts VISIBLE label rows, whether or not they are actionable: a
+        disabled row still renders (its state must be observable) but carries no
+        select handler, so filtering on WantSelect would silently undercount.
+        `inert_row_count()` exposes the non-actionable subset separately.
+        """
         snap = self.snapshot()
         b_pos = snap.find('"B 树 sel=')
         vfd.require(b_pos > 0, 'B tree summary line missing')
         head, tail = snap[:b_pos], snap[b_pos:]
-        pat = (r'row #(vnode_\d+) \{\s*\n\s*style: "[^"]*rounded-md[^"]*"\s*\n'
-               r'\s*onclick: \.WantSelect')
+        pat = r'row #(vnode_\d+) \{\s*\n\s*style: "[^"]*rounded-md[^"]*"'
         return re.findall(pat, head), re.findall(pat, tail)
+
+    def inert_row_count(self):
+        """Label rows that render but expose no select handler (disabled rows)."""
+        snap = self.snapshot()
+        all_rows = re.findall(
+            r'row #(vnode_\d+) \{\s*\n\s*style: "[^"]*rounded-md[^"]*"', snap)
+        actionable = re.findall(
+            r'row #(vnode_\d+) \{\s*\n\s*style: "[^"]*rounded-md[^"]*"\s*\n'
+            r'\s*onclick: \.WantSelect', snap)
+        return len(all_rows) - len(actionable)
 
     def press(self, element_id):
         return self.call('autoui_action', element_id=element_id, action='press')
@@ -241,10 +256,16 @@ def run_matrix(session, record):
     vfd.require(a[1] == '1', f'A tree must start with one expanded node, got {a[1]!r}')
 
     rows, rows_b = session.split_row_ids()
+    # Five VISIBLE rows in A: chapter-01, its child section-1.1, images, the
+    # disabled chapter-02 and notes. The disabled row is visible and its state is
+    # observable, but it must not be actionable — checked right below.
     vfd.require(len(rows) == 5,
-                f'A tree must render 5 rows (expanded chapter-01 + 3 more), got {len(rows)}')
+                f'A tree must render 5 visible rows, got {len(rows)}')
     vfd.require(len(rows_b) == 2,
                 f'B tree must render its 2 collapsed root rows, got {len(rows_b)}')
+    vfd.require(session.inert_row_count() == 1,
+                f'exactly the disabled row must be non-actionable, got '
+                f'{session.inert_row_count()} inert rows')
 
     # V-01: select carries exactly the target ID; the app echoes it back.
     session.press_row(0)
@@ -357,7 +378,7 @@ def run(args):
             # Reopen discipline: wait for the rows themselves, not just the
             # header — the tree derives on a later frame than the header text.
             session2.wait(lambda t: 'TreeView 受控演示' in t and 'A 树 sel=' in t)
-            session2.wait(lambda t: t.count('WantSelect') >= 7, timeout=20)
+            session2.wait(lambda t: len(session2.split_row_ids()[0]) == 5 and len(session2.split_row_ids()[1]) == 2, timeout=25)
             a_rows2, b_rows2 = session2.split_row_ids()
             vfd.require(
                 (len(a_rows2), len(b_rows2)) == (5, 2),
@@ -481,6 +502,17 @@ class Browser:
 
     def row_count(self):
         return self._row_locators().count()
+
+    def inert_row_count(self):
+        """Label rows that render but cannot be chosen (disabled rows).
+
+        The generated SFC marks a disabled row `cursor-not-allowed` and emits no
+        click handler for it, so the class is the stable, backend-independent
+        signal — the same intent the native side reads from a missing
+        `.WantSelect` handler.
+        """
+        return self.page.locator(
+            self.ROW_SEL + '[class*="cursor-not-allowed"]').count()
 
     def has_empty_state(self):
         return '空树无可操作行' in self.snapshot()
