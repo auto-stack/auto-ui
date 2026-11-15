@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-085
-status: executing
+status: reviewed
 feature_name: TreeView 正式组件与示例复用
 author: [Codex]
 created_at: 2026-11-13T00:00:00Z
@@ -243,7 +243,7 @@ T-01 关键机制结论（详见 `docs/reviews/plan085/decisions.md` §9，原�
 
 没有阻碍建计划的用户选择。T-01 有边界地解决节点字段兼容、disabled 子树展示、加载回调适配、键盘/语义接线能力、blueprint导入与代表规模可行性、Q-01归因和 runner。不得默默降为鼠标专用树或保留四套算法；超出现有授权范围的依赖/支持上限变更需提出具体合同差异。
 
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 1 | from: none | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 78e45127 | next: work (T-03)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 1 | from: none | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 78e45127 | next: work (T-03)
 
 Goal round 1 摘要（授权继承：`/goal 完成计划UI-085` 即 work→review→bounded
 repair→merge 全程授权，已记入本节与 decisions.md）：
@@ -271,7 +271,7 @@ repair→merge 全程授权，已记入本节与 decisions.md）：
   下一轮。AC-03 保持未关闭。
 - 任务计数 2/8；未改 canonical Specs，未写派生索引或 legacy ledger；
   plan-artifacts 原始探针待 merge 阶段整体清理。
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 55cdcf48 | next: work (T-03 续)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 2 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 55cdcf48 | next: work (T-03 续)
 
 Goal round 2 摘要（T-03 部分完成；上一轮的错误归因已修正）：
 
@@ -301,7 +301,7 @@ Goal round 2 摘要（T-03 部分完成；上一轮的错误归因已修正）�
   与本轮改动无关（主检出 `master` 上同样失败），记为环境性既存红。
 - 任务计数 2/8（T-01、T-02 完成；T-03 部分完成，故不计数）；未改 canonical
   Specs，未写派生索引或 legacy ledger。
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 0793ecf7 | next: work (T-04 阻塞解除)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 3 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 0793ecf7 | next: work (T-04 阻塞解除)
 
 Goal round 3 摘要（T-03 完成；T-04 受阻并回退）：
 
@@ -327,7 +327,7 @@ Goal round 3 摘要（T-03 完成；T-04 受阻并回退）：
   `ui::clipboard::tests::set_then_get_roundtrip` 在主检出同样失败。
 - 任务计数 **3/8**（T-01、T-02、T-03 完成；T-04 阻塞中）。未改 canonical
   Specs，未写派生索引或 legacy ledger。
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 4 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 73b1b522 | next: work (T-04 重做)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 4 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 73b1b522 | next: work (T-04 重做)
 
 Goal round 4 摘要（两条 T-04 阻塞全部证伪；迁移仍未宣布通过）：
 
@@ -350,7 +350,7 @@ Goal round 4 摘要（两条 T-04 阻塞全部证伪；迁移仍未宣布通过�
 - 既存红（非本计划）：`ui::clipboard::tests::set_then_get_roundtrip` 在主检出
   同样失败。
 - 任务计数 **3/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: ce3bacb6 | next: work (T-05)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 5 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: ce3bacb6 | next: work (T-05)
 
 Goal round 5 摘要（T-04 完成：两个真实消费者已迁移并验证）：
 
@@ -374,7 +374,7 @@ Goal round 5 摘要（T-04 完成：两个真实消费者已迁移并验证）�
 - 既存红（非本计划）：`ui::clipboard::tests::set_then_get_roundtrip` 主检出
   同样失败；041 桌面 shell 路径的树文本回落（库路径正常）记为具名既存缺口。
 - 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 6 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 018cc49a | next: work (T-05 native 全跑)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 6 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 018cc49a | next: work (T-05 native 全跑)
 
 Goal round 6 摘要（T-05 部分完成：tools 门绿；native 产品门未走通，不宣布通过）：
 
@@ -400,7 +400,7 @@ Goal round 6 摘要（T-05 部分完成：tools 门绿；native 产品门未走�
 - 回归：`tree_view_component` 2/2；此前 T-04 的 026 25/25×3、041 44p/9f
   （与基线同项）保持不变。
 - 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 7 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 552736a8 | next: work (T-05 iced 回路修复)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 7 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 552736a8 | next: work (T-05 iced 回路修复)
 
 Goal round 7 摘要（T-05 卡点从"未知"收窄到 iced 事件回路；仍未通过）：
 
@@ -429,7 +429,7 @@ Goal round 7 摘要（T-05 卡点从"未知"收窄到 iced 事件回路；仍未
 - **T-05 不宣布通过**：未为过门搬动夹具或删断言。下一步在 iced 回路里对照
   `WantSelect` 前后的 `dirty`/`child_instance_state_id`/`callback_parent_state`。
 - 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 8 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: cc74e201 | next: work (T-05 Vue 轨)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 8 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: cc74e201 | next: work (T-05 Vue 轨)
 
 Goal round 8 摘要（T-05 **native 门首次全绿**；Vue 轨显式 not_run）：
 
@@ -454,7 +454,7 @@ Goal round 8 摘要（T-05 **native 门首次全绿**；Vue 轨显式 not_run）
   `plan085_keydown_ownership` 5/5、`plan085_routed_callbacks` 2/2、
   `plan041` 4/4、`g16` 1/1，tools `tree_view_component` 2/2。
 - 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 8f36b9e3 | next: work (T-06)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 9 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 8f36b9e3 | next: work (T-06)
 
 Goal round 9 摘要（**T-05 完成：双端全绿**）：
 
@@ -480,7 +480,7 @@ Goal round 9 摘要（**T-05 完成：双端全绿**）：
 - 遗留（显式 pending closeout 门，非本轮义务）：Linux/WSL 腿（084 同一边界）、
   统一回归（review/merge 档位）。
 - 任务计数 **5/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
-2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 10 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: a348c487 | next: review (T-07)
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 10 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: a348c487 | next: review (T-07)
 
 Goal round 10 摘要（**T-06 完成**：包/示例文档 + 证据 + Spec delta 提案）：
 
@@ -517,7 +517,7 @@ Goal round 10 摘要（**T-06 完成**：包/示例文档 + 证据 + Spec delta 
 - **其它**：F-09 1000 节点/64 层无入库证据且窄窗无断言（实测窄窗文本裁切）；F-10 018/027 仍留未实例化副本，AC-05「四个示例单源」字面未达（正确处置是改 AC 措辞或删副本，不得虚构消费）；F-11 auto-man lock 脏与「只读零改动」表述不符；F-12 SD 编号与 Plan 表不一致；F-13 decisions 里「不得为过门搬回根 widget」禁令被 round 8 反转却未撤销。
 - **两个已知遗留的判定**：Linux `not_run` 合规（环境边界）；路由页形态差异合规但需一句批准（两个真实消费者与夹具均为根托管），问题只在 F-13 禁令未撤。
 - 结论：不 `needs_replan`——缺口可定位、修复局部（包内派生 + 行渲染 + 用例），不需改设计契约。
-2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 10 | from: review | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 6f0426c2 | next: work (F-05/F-06/F-07/F-08/F-09/F-10/F-12/F-13)
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 10 | from: review | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 6f0426c2 | next: work (F-05/F-06/F-07/F-08/F-09/F-10/F-12/F-13)
 
 Goal round 10 摘要（review needs_fix → **4 条 High 已修并回归**）：
 
@@ -551,7 +551,7 @@ Goal round 10 摘要（review needs_fix → **4 条 High 已修并回归**）：
   F-07 旧 `vnode_` 拒绝用例、F-08 role/level 语义、F-09 1000 节点/64 层与窄窗证据、
   F-10 018/027 副本处置、F-12 SD 编号对齐、F-13 decisions 禁令撤销。
 - 任务计数 **3/8**（T-02/T-03/T-05/T-06 重开中）。未改 canonical Specs。
-2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 11 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: (见下) | next: work (F-06/F-08/F-09)
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 11 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: (见下) | next: work (F-06/F-08/F-09)
 
 Goal round 11 摘要（review 修复续：F-05/F-07/F-10/F-12/F-13 已闭；F-06/F-08/F-09 留待）：
 
@@ -585,7 +585,7 @@ Goal round 11 摘要（review 修复续：F-05/F-07/F-10/F-12/F-13 已闭；F-06
   无 role/aria/level 支持**，属计划 §3「最小引擎扩展」，需较大改动）、F-09 1000 节点
   /64 层与窄窗证据未入库。
 - 任务计数 **3/8**（T-02/T-03/T-05/T-06 仍开着，因 F-06/F-08/F-09 未闭）。
-2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 12 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: b58099e5 | next: work (F-08/F-09)
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 12 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: b58099e5 | next: work (F-08/F-09)
 
 Goal round 12 摘要（**F-06 真实键盘已闭，并挖出两个真缺陷**）：
 
@@ -613,7 +613,7 @@ Goal round 12 摘要（**F-06 真实键盘已闭，并挖出两个真缺陷**）
 - **仍开**：F-08 role/level 语义（引擎无 role/aria/level，属计划 §3 允许的
   「最小引擎扩展」，需较大改动）、F-09 1000 节点/64 层与窄窗证据未入库。
 - 任务计数 **3/8**（T-02/T-03/T-05/T-06 仍开，只差 F-08/F-09）。
-2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 13 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: a44c2e0f | next: work (F-08 role/level) 或 review
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 13 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: a44c2e0f | next: work (F-08 role/level) 或 review
 
 Goal round 13 摘要（**F-09 已闭，并修掉一个真实的规模缺陷**）：
 
@@ -640,7 +640,7 @@ Goal round 13 摘要（**F-09 已闭，并修掉一个真实的规模缺陷**）
   需新增视图可访问性属性通道 + 快照输出 + 断言。下一轮评估实现或按合同
   提出具名收窄。
 - 任务计数 **3/8**（T-02/T-03/T-05/T-06 仍开，只差 F-08）。
-2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 14 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: cb81a203 | next: review (T-07 复核，F-01…F-13 全闭)
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 14 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: cb81a203 | next: review (T-07 复核，F-01…F-13 全闭)
 
 Goal round 14 摘要（**F-08 已闭；review 的 13 项全部闭合**）：
 
@@ -688,7 +688,7 @@ Goal round 14 摘要（**F-08 已闭；review 的 13 项全部闭合**）：
   产品门 native/vue/keyboard **三绿**（矩阵 `{a:5,b:2}`）。
 - 两个具名遗留判定**合规**：Linux `not_run`（环境边界）、路由页回调差异（未修复但
   不声称修复，由 `plan085_routed_callbacks` 2/2 守护，两真实消费者与夹具均根托管）。
-2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 15 | from: review | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 0ce2638f | next: work（F-04/F-05 复审缺陷修复后复核）
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 15 | from: review | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 0ce2638f | next: work（F-04/F-05 复审缺陷修复后复核）
 
 Goal round 15 摘要（T-07 复审 → needs_fix；本轮修掉复审指出的 2 个契约内缺陷 + 2 处残留）：
 
@@ -711,7 +711,7 @@ Goal round 15 摘要（T-07 复审 → needs_fix；本轮修掉复审指出的 2
   与提案/Plan 表对齐，并补 SD-02 验证面条目）。
 - 回归全绿 **28 项**；产品门 native 仍 pass（`{a:5,b:2}`、`stale_id_rejected: True`）。
 - **任务计数 7/8**；下一轮就 `0ce2638f` 再做一次定向复核（只验 F-04/F-05 两条）。
-2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 16 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 2ce11df0 | next: review（F-05/F-04 定向复核）
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 16 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 2ce11df0 | next: review（F-05/F-04 定向复核）
 
 Goal round 16 摘要（F-05 第二次修复——这次有**真正可判别**的 oracle）：
 
@@ -749,7 +749,7 @@ Goal round 16 摘要（F-05 第二次修复——这次有**真正可判别**的
     可操作行且无报告。
 - reviewer 判两个具名遗留仍**合规**；套件 27/27、tools 7/7、产品门 native pass；
   新用例耗时均 ≤10s。
-2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 17 | from: review | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 96554686 | next: work（N-02 需 O(n) id-set 原语）或 review
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 17 | from: review | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 96554686 | next: work（N-02 需 O(n) id-set 原语）或 review
 
 Goal round 17 摘要（定向复审：**F-05 真闭**；F-04 被查出 N-01/N-02 两个 High）：
 
@@ -773,7 +773,7 @@ Goal round 17 摘要（定向复审：**F-05 真闭**；F-04 被查出 N-01/N-02
   单用例耗时 n02 3.54s、n01 1.86s，均 <10s。
 - **任务计数 7/8**；下一轮需就 N-02 做决策：或引入 O(n) 原语（跨语言层，可能超本
   计划范围），或把该边界作为具名限制提交复审裁定。
-2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 18 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: caaf1326 | next: review（N-01/N-02 定向复核后 merge）
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 18 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: caaf1326 | next: review（N-01/N-02 定向复核后 merge）
 
 Goal round 18 摘要（**N-02 已作为契约闭合**，不需语言层改动）：
 
@@ -815,7 +815,7 @@ Goal round 18 摘要（**N-02 已作为契约闭合**，不需语言层改动）
   的 doc 被错接到 `tv_total_nodes`）。
 - 回归：runtime 29/29、tools 2/2、产品门 native PASS（`{a:5,b:2}`、
   `stale_id_rejected:true`）；n01 2.17s、n02 5.94s 均 <10s。
-2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 19 | from: review | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 517400ac | next: 需用户/计划裁定 N-02（跨语言层）
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 19 | from: review | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 517400ac | next: 需用户/计划裁定 N-02（跨语言层）
 
 Goal round 19 摘要（**N-01 真闭；N-02 我上一轮的"契约闭合"被推翻，已诚实撤回**）：
 
@@ -839,7 +839,7 @@ Goal round 19 摘要（**N-01 真闭；N-02 我上一轮的"契约闭合"被推�
 - 回归全绿 **31 项**；n02 用例体 4.68s < 10s。
 - **任务计数 7/8**；**N-02 是全计划唯一未解项，且在本计划范围内不可解**，需要
   跨语言层的 O(n) id 集合原语。下一轮应就此向用户/计划提出裁定，而非继续在包内绕。
-2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 20 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 09989578 | next: review（N-02 定向复核）→ merge
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 20 | from: work | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 09989578 | next: review（N-02 定向复核）→ merge
 
 Goal round 20 摘要（**N-02 真正闭合**——我前两轮的判断都错了）：
 
@@ -884,7 +884,7 @@ Goal round 20 摘要（**N-02 真正闭合**——我前两轮的判断都错了
 - reviewer 另指出：`n02_large_tree` 单例 7.75s，头部余量比"2.13s"（那是 f09）更薄；
   且 HEAD 在复审期间推进（`09989578`→`636947c6`），合并前需重新绑定修订。
 - 套件 26/26、tools 2/2、产品门 native pass。
-2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 21 | from: review | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 2fe5a536 | next: review（N-02a/b 定向复核）→ merge
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 21 | from: review | to: work | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 2fe5a536 | next: review（N-02a/b 定向复核）→ merge
 
 Goal round 21 摘要（N-02 扫描器复审 → 两个可达缺陷已修）：
 
@@ -933,3 +933,26 @@ Goal round 21 摘要（N-02 扫描器复审 → 两个可达缺陷已修）：
   具名字符串 `树结构非法:存在空节点 ID`。
 - 另一观察（未修，记录）：包与测试夹具的 `tree_view_util.at` 是两份拷贝，仅靠人工同步，
   无常驻守卫。
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 22 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 3eb1c617 | next: merge (T-08)
+
+Goal round 22 摘要（**复审 PASS，计划进入 reviewed，可合并**）：
+
+- **N-02a 闭**：空 id 具名上报（`树结构非法:存在空节点 ID`）、seed 改 `""` 不再中止扫描。
+  reviewer 自建 7 组用例（空 id 首/中/末/两个、空+真重复×2、合法无重复）全对；
+  破坏-恢复 → 目标用例 FAILED `left:3 right:0`。
+- **N-02b 闭**：已无任何回退分支（唯一按 id 操作是 `.replace`，每结点常数工作）。
+  reviewer **隔离扫描器单独计时**：plain 1000 = 200ms、pipe 1000 = 191ms、
+  **pipe 3000 = 197ms** —— 与 plain 同量级，确为原生路径；pipe id 中真重复仍被捕获。
+  它另诚实记录一次 25.69s 的测量，并查明是**并发 release 构建占 CPU**、plain 对照同样慢，
+  未据此误报。
+- **本轮我自己又抓到一个真实缺陷并修掉**：`|`→`!!` 转义**不是单射**——`a|b` 与 `a!!b`
+  撞同一 token，合法树被判重复、0 行（我先写用例证实，再改成 `!`→`!0`、`|`→`!1`）。
+  reviewer **穷举 {a,b,!,|} 长度≤5 共 1364 串零碰撞**独立确认，并证明新用例是**独立
+  判别器**（回归到 `|`→`!!` 时它 FAILED 而 pipe 用例仍 PASSED）。
+- **复审的两条非阻断发现，本轮已修**（`3eb1c617`）：README 伪代码仍写 `seen = "|"`
+  （正是 N-02a 的错误种子、且缺转义与空 id 处理）；空 id 用例只断"0 行"、未断具名错误。
+- 回归全绿 **37 项**；产品门 native pass（`{a:5,b:2}`、`stale_id_rejected: True`）；
+  单例均 <10s（n02_large 7.73–8.38s，余量偏薄已记录）。
+- **状态改为 `reviewed`**。F-01…F-13 + N-01 + N-02 + N-02a/b + 转义单射性**全部闭合**。
+- **下一轮：T-08 merge** —— 创建 `docs/specs/ui/tree-view.md`、修订
+  `docs/specs/ui/examples-ownership.md`、归档计划、清理工作树与 plan-artifacts。
