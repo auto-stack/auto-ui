@@ -400,3 +400,32 @@ Goal round 6 摘要（T-05 部分完成：tools 门绿；native 产品门未走�
 - 回归：`tree_view_component` 2/2；此前 T-04 的 026 25/25×3、041 44p/9f
   （与基线同项）保持不变。
 - 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 7 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 552736a8 | next: work (T-05 iced 回路修复)
+
+Goal round 7 摘要（T-05 卡点从"未知"收窄到 iced 事件回路；仍未通过）：
+
+- **对照矩阵**（同一组 `auto.exe`/`auto-ui-tool.exe`，今天逐条复现）：
+
+  | 形态 | 行渲染 | 按下写页面状态 |
+  |---|---|---|
+  | 树在 **App 根**（真实窗口） | 是 2 行 | **是**（`summary`+`selected` 均有 `state_changes`）|
+  | 树在 **路由页**（真实窗口） | 是 2 行 | **否**（无更新、无诊断）|
+  | 树在 **路由页**（库路径） | 是 2 行 | **是**（`sel= exp=1` → `sel=p1`）|
+  | `PaginationControl`（路由页+包，真实窗口） | 是 | **是**（既有门 pass）|
+  | 最小包组件（路由页、str prop、for-in） | 是 | **是** |
+
+  → 页面/包装配**本身没问题**；缺口只在「路由页内包子组件 + 三个 msg prop +
+  computed 派生」在 **iced 回路**下，`WantSelect` 能派发（handler 名与实例都
+  正确）却**不落到页面**，且无 `[VM-HANDLER]`/`[VM-INSTANCE]` 诊断。
+- **已排除**：下划线折叠、`.len()` 求值、双实例歧义（单实例同样复现）、
+  包路径深度、路由页形态本身、条件守卫、嵌套包内子组件。
+- **新增库级永久回归**（`4053f5b8`）：
+  `crates/auto-ui-runtime/tests/plan085_routed_callbacks.rs` **2/2 pass**
+  ——路由页包子组件确实收到 List prop 派生 2 行、按下确实写页面状态。该测试
+  是修复 iced 路径时必须保持绿的参照面。
+- 回归全绿：`plan085_routed_callbacks` 2/2、`plan085_tree_keyboard` 8/8、
+  `plan085_keydown_ownership` 5/5、`plan041` 4/4、tools
+  `tree_view_component` 2/2。
+- **T-05 不宣布通过**：未为过门搬动夹具或删断言。下一步在 iced 回路里对照
+  `WantSelect` 前后的 `dirty`/`child_instance_state_id`/`callback_parent_state`。
+- 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
