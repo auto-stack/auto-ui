@@ -1,0 +1,26 @@
+// PLAN-085 escaping-injectivity fixture: `|` escaped to `!!` collides with an id
+// that literally contains `!!` ("a|b" -> "a!!b" and "a!!b" -> "a!!b" produce the
+// same token => FALSE duplicate). This tree is VALID and must stay actionable.
+widget dupesc {
+    msg { Init, Select(str) }
+    model {
+        var nodes List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: [], selected: .sel,
+                      on_toggle: .Select($event), on_select: .Select($event), on_retry: .Select($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            a.push({ id: "a|b", label: "PIPE", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "a!!b", label: "BANGS", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        .Select(v str) -> { .sel = v }
+    }
+}

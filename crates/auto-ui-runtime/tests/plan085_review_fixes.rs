@@ -183,3 +183,18 @@ fn n02_empty_id_does_not_abort_duplicate_detection() {
         "with an empty id and a real duplicate present, no row may stay actionable"
     );
 }
+/// Escaping must be INJECTIVE: `a|b` must not collide with `a!!b`.
+///
+/// `|` -> `!!` alone is not injective — both ids escape to `a!!b`, producing the
+/// same token and reporting a duplicate for a perfectly valid tree. Escaping the
+/// escape character too (`!` -> `!0`, `|` -> `!1`) makes the mapping one-to-one.
+#[test]
+fn n02_escaping_is_injective_so_pipe_and_bang_ids_do_not_collide() {
+    let mut c = build("src/front/dup_esc.at");
+    let d = settle(&mut c);
+    assert_eq!(
+        d.matches("WantSelect").count(),
+        2,
+        "`a|b` and `a!!b` are DIFFERENT ids and both must stay actionable"
+    );
+}

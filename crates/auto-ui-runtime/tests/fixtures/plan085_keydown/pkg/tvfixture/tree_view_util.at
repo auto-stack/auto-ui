@@ -93,7 +93,12 @@ pub fn tv_duplicate_id(nodes List) str {
             // the caller sees a named error, not an empty result.
             return "<empty-id>"
         }
-        var esc str = nd.id.replace("|", "!!")
+        // Injective escaping, so two DIFFERENT ids can never produce the same
+        // token: `!` -> `!0` first, then `|` -> `!1`. Escaping `|` -> `!!` alone is
+        // NOT injective — an id literally containing `!!` escapes to the same token
+        // as an id containing `|`, which reported a false duplicate for a valid
+        // tree (measured: `a|b` + `a!!b` -> 0 actionable rows).
+        var esc str = nd.id.replace("!", "!0").replace("|", "!1")
         var token str = "|" + esc + "|"
         if seen.contains(token) {
             return nd.id
