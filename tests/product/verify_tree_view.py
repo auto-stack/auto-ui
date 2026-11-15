@@ -308,6 +308,26 @@ def run_matrix(session, record, backend="native"):
                 f'exactly the disabled row must be non-actionable, got '
                 f'{session.inert_row_count()} inert rows')
 
+    # ── F-08: node semantics must be observable through MCP.
+    #
+    # The runtime has no ARIA model, so the component states the two facts that
+    # were previously only inferable, on the surface MCP reads (the raw class in
+    # the snapshot): the root is a tree (`tv-tree`), each row carries its level
+    # (`tv-lvl-N`), and inert rows are marked (`tv-dis`). Names come from the row
+    # label text; selected/expanded/disabled/focused stay observable as before.
+    #
+    # Backend note: these markers live in the element class, which the native
+    # snapshot prints verbatim but the vue driver reads through inner_text (text
+    # only) - so the marker assertions are native-only, and the vue track relies
+    # on the behavioural assertions for the same facts. Recorded, not skipped.
+    if backend == 'native':
+        snap = session.snapshot()
+        vfd.require('tv-tree' in snap,
+                    'the tree root must be marked as a tree (tv-tree)')
+        vfd.require(bool(re.search(r'tv-lvl-\d|tv-lvl-deep', snap)),
+                    'rows must carry an explicit level marker (tv-lvl-N)')
+        vfd.require('tv-dis' in snap,
+                    'the disabled row must be marked (tv-dis)')
     # V-01: select carries exactly the target ID; the app echoes it back.
     session.press_row(0)
     session.wait(lambda t: 'select:chapter-01' in t)
@@ -559,6 +579,15 @@ class Browser:
     def press_row(self, index):
         self._row_locators().nth(index).click()
         self.page.wait_for_timeout(500)
+    def send_key(self, key):
+        """Send a real keyboard event on the vue track.
+
+        Playwright's key names differ from the MCP enum for arrows (ArrowDown
+        works for both, so the shared name is used directly).
+        """
+        self.page.keyboard.press(key)
+        self.page.wait_for_timeout(600)
+        return f'Key sent: {key}'
 
     def press_chevron(self, index=0):
         """Click the chevron of the index-th row that has one."""

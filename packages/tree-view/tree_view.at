@@ -64,7 +64,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
     }
 
     view {
-        col (style: "w-full text-sm") {
+        col (class: "w-full text-sm tv-tree") {
             onkeydown.down: .Down
             onkeydown.up: .Up
             onkeydown.home: .GoHome
@@ -92,19 +92,19 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
                         // class/width f-string does not interpolate loop fields
                         // on the VM track.
                         if r.depth == 1 {
-                            div (style: "w-4 shrink-0") {}
+                            div (class: "w-4 shrink-0 tv-lvl-1") {}
                         }
                         if r.depth == 2 {
-                            div (style: "w-8 shrink-0") {}
+                            div (class: "w-8 shrink-0 tv-lvl-2") {}
                         }
                         if r.depth == 3 {
-                            div (style: "w-12 shrink-0") {}
+                            div (class: "w-12 shrink-0 tv-lvl-3") {}
                         }
                         if r.depth == 4 {
-                            div (style: "w-16 shrink-0") {}
+                            div (class: "w-16 shrink-0 tv-lvl-4") {}
                         }
                         if r.depth > 4 {
-                            div (style: "w-20 shrink-0") {}
+                            div (class: "w-20 shrink-0 tv-lvl-deep") {}
                         }
                         if r.has_kids {
                             mouse-area (onclick: .WantToggle(r.id), style: "w-5 h-5 shrink-0 items-center justify-center cursor-pointer rounded hover:bg-accent/60") {
@@ -121,7 +121,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
                         // 标签命中区：四个字面量分支覆盖 disabled × (selected|focused)。
                         if r.disabled {
                             if r.selected {
-                                row (class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md opacity-50 bg-accent text-accent-foreground cursor-not-allowed") {
+                                row (class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md opacity-50 bg-accent text-accent-foreground cursor-not-allowed tv-dis tv-sel") {
                                     if r.icon != "" {
                                         TreeIcon (name: r.icon) {}
                                     }
@@ -131,7 +131,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
                                     }
                                 }
                             } else {
-                                row (class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md opacity-50 cursor-not-allowed") {
+                                row (class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md opacity-50 cursor-not-allowed tv-dis") {
                                     if r.icon != "" {
                                         TreeIcon (name: r.icon) {}
                                     }
