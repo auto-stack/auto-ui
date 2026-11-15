@@ -429,3 +429,28 @@ Goal round 7 摘要（T-05 卡点从"未知"收窄到 iced 事件回路；仍未
 - **T-05 不宣布通过**：未为过门搬动夹具或删断言。下一步在 iced 回路里对照
   `WantSelect` 前后的 `dirty`/`child_instance_state_id`/`callback_parent_state`。
 - 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 8 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: cc74e201 | next: work (T-05 Vue 轨)
+
+Goal round 8 摘要（T-05 **native 门首次全绿**；Vue 轨显式 not_run）：
+
+- **native 产品门 pass**：`tests/product/verify_tree_view.py --backend native`
+  outcome **pass**——2 会话、矩阵 `{a_tree_rows:5, b_tree_rows:2}`、真实窗口
+  标题「树形演示」、浅/深两张真实截图、`exit_code=0`、`port_rebinds=true`、
+  重开会话再选择成功。受控身份、chevron 展开、retry 恢复、空态、双实例隔离、
+  退出重开全部经真实 MCP 操作与页面状态读回交叉验证。
+- **修复的真缺陷（空状态）**：应用清空 `nodes` 后空态**永不出现**，而"第一帧
+  就空"的树**会**显示——实测 `nodes` 2→0→2→0 时 `rows` 每帧正确重派生
+  （行数 2,0,2,0），但 `is_empty` 分支一次没渲染，即 **computed 对 `.nodes`
+  变更保持陈旧**（PLAN-086 同族）。修复：空态改由 `tv_derive_rows` 产出哨兵行
+  承载（已证明 live 的派生），删除死掉的 `is_empty`。回归
+  `plan085_empty_state` 1/1，能区分修复前后。
+- **夹具形态**：树改为根 widget 托管（与 026/041 一致）；路由页回调差异仍由
+  `plan085_routed_callbacks` 2/2 在库级守着，不混入门内。
+- **门健壮性**：摘要正则容忍间距；隔离副本包路径随迁移；retry 等待 15s 复读；
+  重开按 A/B 分块断言行数。
+- **仍开**：**Vue 轨未跑通**——矩阵按 vnode id 驱动，Vue 轨无 vnode，需要标签
+  驱动的矩阵变体。按实际记为 **not_run**，未伪造通过，T-05 仍不宣布完成。
+- 回归全绿 23 项：`plan085_empty_state` 1/1、`plan085_tree_keyboard` 8/8、
+  `plan085_keydown_ownership` 5/5、`plan085_routed_callbacks` 2/2、
+  `plan041` 4/4、`g16` 1/1，tools `tree_view_component` 2/2。
+- 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
