@@ -156,7 +156,7 @@ python tests/product/verify_tree_view.py --auto-bin <auto-cli> --ui-tool-bin <bu
 |---|---|---|---|---|
 | T-01 | work / 无 | [x] 已完成。`docs/reviews/plan085/decisions.md` 冻结 props/禁用/懒加载/依赖解析/行状态渲染/键盘缺口/runner/规模；四例源摘要与 blueprint owner 复核入档 | 组内环境控制门 `verify_pagination.py --backend native` 复跑 pass；P-1…P-8 探针（包内导入、Init 构造、回调回送、行状态、子件键盘、1000 节点、MCP 行动作、双实例）结果见 §9 与 decisions §9 | 01…06 |
 | T-02 | work / T-01 | [x] 已完成。新 `packages/tree-view/{package.at,pac.at,tree_view.at,tree_view_util.at,tree_icon.at}`（`854b9b5f`）：受控 props（nodes/expanded/selected + disabledIds/loadingIds/errorIds）、chevron 与 label 兄弟命中区、独立重试、键盘动作、重复 ID 具名结构错误、空态；`tree_view_util.at` 只持 UI 交互投影，通用树工具仍归语言 blueprint | 真实 native 窗口（组内 `auto.exe` + 本树 `auto-ui-tool`）：包导入→渲染 4 行（P1/S1/P2/P3）；图标（folder/file-text/folder-open）、badge `3`、`加载中`、`重试`、disabled 删除线、focus ring 全部可见（截图 `plan-artifacts/plan-085/pkg-native-proof.png`，sha256 `19918B0D…F4D03AA`）；MCP `autoui_action press` 命中 chevron/行/重试并按 ID 派发（`retry:p2` 且 errorIds 清空）；`cargo test -p auto-ui-tools --test pagination_component` 2/2、`--test file_dialog_component` 3/3 未退化 | 01,02,04 |
-| T-03 | work / T-02 | 实例局部焦点、键盘和 MCP 行绑定/语义；仅在 T-01 已定位的 compiler/runtime 通用接线点作最小扩展 | V-03/04 的两端逐键/旧ID/双实例反例通过，当前新action正例可用 | 03,04 |
+| T-03 | work / T-02 | 部分完成。**已修**键归属不确定（`815fec34`：`registry.all()` 遍历 HashMap 且含未渲染导入 → 可抢走页面键，实测 `page_hits=0`；改为只扫本帧可挂载组件 + 路由目标，首现序传递）。**仍开**外部包组件 keydown 不派发（同文件子件 `hits=1` 控制 vs 包组件 `hits=0`），已由测试钉住 | `cargo test -p auto-ui-runtime --test plan085_keydown_ownership` **5/5 pass**（根/路由页共存、未渲染导入不抢键、已渲染子件贡献键、同文件控制派发、包组件缺口显式断言）；相关回归 `plan051*/plan041/g16/g11/plan068_routes/file_dialog` 全绿 | 03,04 |
 | T-04 | work / T-03 | 新 `examples/tree-view/`，四例组件导入/实际 pac 依赖迁移，移除旧 TreeView shadow，保留业务包装和结果 | 四例 `auto run -r vm` 与实际 Vue运行；V-05精确消费结果，移根解析通过 | 05 |
 | T-05 | work / T-04 | 新 tools测试和上述 product gate；落地 V-01…07，复用进程端口设施，运行 Win/Linux+Vue | §6命令及四消费者入口；每轨有真实窗口/事件/读回/关闭重开，不接受只编译；含r2 V-07的参考区域对照/真实状态截图 | 01…06 |
 | T-06 | work / T-05 | 正式包 README、示例说明、`docs/reviews/plan085/`证据，提出最终 Spec delta，strategy 实施摘要；包README链接本Plan视觉指南和对应区域 | 逐项证据/文件摘要可读回，Q-01受影响项关闭，否则保持 executing | 06 |
@@ -271,3 +271,33 @@ repair→merge 全程授权，已记入本节与 decisions.md）：
   下一轮。AC-03 保持未关闭。
 - 任务计数 2/8；未改 canonical Specs，未写派生索引或 legacy ledger；
   plan-artifacts 原始探针待 merge 阶段整体清理。
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 55cdcf48 | next: work (T-03 续)
+
+Goal round 2 摘要（T-03 部分完成；上一轮的错误归因已修正）：
+
+- **修正上一轮的错误结论**：上轮把「路由页 `onkeydown.*` 不进入收集面」记为
+  缺陷，实为**夹具布局错误**——路由页必须在 `src/front/pages/`；放进
+  `src/front/` 的页被静默忽略。改正后组件级诊断显示路由页的键**正常进入**
+  根组件收集面。该误导已写入 decisions.md 顶部与测试注释。
+- **已修（`815fec34`）键归属不确定**：`key_bindings` 子件半边来自
+  `registry.all()`，迭代 `HashMap` 且覆盖整个模块（含 import）→ 仅被 `use`
+  而从未渲染的组件可抢走页面键，按键静默失效（GUI 实证 `page_hits=0`），
+  且每轮赢家可能不同。修复 = 只扫本帧可挂载组件（view_tree 中解析为注册
+  组件的 tag + 路由目标）并按首现序**传递**其可挂载子件；根仍先扫保住自己
+  的键。GUI 复验 `one=1 two=1`（修复前 `one=0 two=0`）。
+- **仍开缺口（AC-03 未关闭）**：**外部包组件的 keydown 不派发**。同文件子件
+  控制组 `hits=1`；等价子件经 package `use` 到达时绑定**被正确收集**
+  （`key_bindings` 含 `ChildBox.Left`）但处理器**不执行**（`hits=0`）。已由
+  `plan085_external_package_child_keydown_dispatch_gap` 显式断言当前行为
+  （含「绑定确实存在」前置断言），修复落地时须与 V-03 证据一起翻转为 1。
+- 验证：`cargo test -p auto-ui-runtime --test plan085_keydown_ownership`
+  **5/5 pass**；相关回归 `plan041_instance_ownership` 4/4、
+  `g16_imported_sibling_vm_tests` 1/1、`g11_sibling_vm_tests` 4/4、
+  `plan068_routed_continuations` 14/14、`file_dialog` 13/13、
+  `auto-ui-tools` 的 `pagination_component` 2/2 与 `file_dialog_component`
+  3/3、lib 面 keydown/keyboard 子集 6/6 全绿。
+- **已知既存红（非本计划引入，主检出复现一致）**：
+  `ui::clipboard::tests::set_then_get_roundtrip` 在本机剪贴板环境下失败，
+  与本轮改动无关（主检出 `master` 上同样失败），记为环境性既存红。
+- 任务计数 2/8（T-01、T-02 完成；T-03 部分完成，故不计数）；未改 canonical
+  Specs，未写派生索引或 legacy ledger。
