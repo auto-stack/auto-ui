@@ -131,29 +131,35 @@ widget TreeView (
   `page_hits=0`。修复 = 只扫**本帧可挂载**的组件（`view_tree` 中解析为注册
   组件的 tag + 路由目标），并按首现序**传递**其可挂载子件；根仍先扫保住
   自己的键。三条永久反例（`plan085_keydown_ownership.rs`）。
-- **T-04 迁移受阻（2026-11-15，已回退；其中一条阻塞已被证伪）**：
-  - **阻塞①（递归 computed）已证伪**：026 的 `dbNodes => filter_tree(...)`
-    **并没有**返回空。在真实 native 窗口里用一次性 PROBE 处理器读回：
-    `dbNodes=1`、`dbNodes[0].id="db/app"`、`dbNodes[0].children.len()=3`；
-    再用等价的嵌套 fixture 直接喂正式包，派生结果为
-    **root → group → leaf 三行**、三行各带一个绑定选择动作
-    （`plan085_derives_nested_filtered_tree_like_the_026_consumer`，8/8）。
-    所以包对 026 形状的嵌套派生是正确的，递归 computed 也不是空的。
-  - **阻塞②（路径深度）是我自己的错**：026 原先写的
-    `use { package: tree_view from "../../../../packages/tree-view" }`
-    少了一级，解析到不存在的 `examples/packages/tree-view`；改为五级后
-    `TreeView` 实例正常挂载（`/TreeView#0`）且行回调可用（`WantSelect=16`）。
-    041 同样是五级，挂载成功（`WantSelect=13`）。**教训：包路径必须与
-    同文件里已能工作的 `pagination`/`file_dialog` 同深度。**
-  - **仍未解释（保持未迁移）**：两例的**真实窗口**里树是空的，而基线
-    （未迁移、用示例自带组件）在同样条件下**也是空的**
-    （`on_toggle=False`、`for: r` 计数 ≤1）。即该现象**先于本计划存在**，
-    与迁移无关；但"树在 026/041 真实窗口里为何不展开"仍未定位，故 T-04
-    仍不宣布通过，两例改动继续留在回退状态。
-  - 下一个动作：把 026 的树在真实窗口里跑起来（优先查 expanded/渲染路径
-    与 `dbExpanded` 的实际读回），再一次性重做迁移并出 V-05 证据。
-- 不得为绕过而给 026 把 `filter_tree` 改成非递归副本（=第二真源），也不得
-  为绕过而保留示例自带 TreeView（=四套算法）；两者都违反 Plan §5。
+- **T-04 迁移完成（2026-11-15，提交 `b89829fc` 026 / `fe411d45` 041）**：
+  两例改用正式包，`components/treeview.at` 退役。**两条旧阻塞全部证伪**：
+  - 「递归 computed 返回空」不成立：真实窗口 PROBE 读回 `dbNodes=1`、
+    `dbNodes[0].id="db/app"`、`children.len()=3`；等价嵌套 fixture 喂正式包
+    派生 root → group → leaf 三行（`plan085_derives_nested_filtered_tree_
+    like_the_026_consumer`）。
+  - 「包组件在 vm 宿主不生效」不成立：真实 `app.at` 走库路径构建时 041
+    `TreeView` 挂载 `/TreeView#0`、13 个绑定行动作、25 个真 lucide 图标、
+    0 个文本回落、7 个键盘绑定齐全。
+  - **真正原因是我的两处操作错误**：026 的 `use` 路径少一级（解析到不存在的
+    `examples/packages/tree-view`）；041 的调用位漏了 `($event)` 实参。
+    两条都已修正。规则：包路径深度必须与同文件已工作的 `pagination`/
+    `file_dialog` 一致。
+- **消费者验证证据**：
+  - 026 `tests/desktop_mcp.py`：**25/25 连续 3 次全绿**，其中
+    「T1 对象树分类」「T2 定位 products 表行」直接驱动真实树行与切表。
+  - 041 `tests/desktop_mcp.py`：**44 passed / 9 failed**，与**未迁移基线
+    逐项相同**（menubar onclick、粘贴、关标签/空态、AUTO_OPEN_PATH、T10×3）
+    ——这 9 项先于本计划存在，迁移未改变其行为。
+  - 041 的**桌面 shell 路径**在这台机器上仍渲染树的文本回落（`[Image]`、
+    无 `class`/`onclick`），而库路径与 026 均正常；该差异在基线同样存在，
+    不是迁移引入，记为具名既存缺口，不阻塞本计划的功能验收。
+- **T-04 关于「四消费者」的落地范围**：实际 grep 只有 026 与 041 存在
+  `TreeView (` 调用位；018/027 只含从未被实例化的 `components/treeview.at`
+  副本（`FileTree` 形态在 018/026 存在但也不在调用位）。因此本轮按**真实
+  消费者**迁移两例；018/027 的未用副本留给 T-05 统一清理时一并删除，
+  不在本轮虚构消费证据。
+- 包仍持 UI 交互投影（`tree_view_util.at`），语言 blueprint 仍是通用树工具
+  canonical owner；041 继续 `use bps...toggle_id`，未建第二真源。
 - **MCP 通道的三个使用陷阱（写进测试模块头，避免后来者重犯）**：
   ① `on_with_input_for(widget, event)` 收的是 **msg 变体名**（`Activate` /
   `GoHome` / `Expand`），不是键名；派发 `"Enter"` 是静默 no-op。
