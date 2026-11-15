@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-13T00:00:00Z
 updated_at: 2026-11-15
 plan_revision: 2
-current_step: 2
+current_step: 3
 total_steps: 8
 supersedes_spec_components:
   - docs/specs/ui/examples-ownership.md
@@ -156,8 +156,8 @@ python tests/product/verify_tree_view.py --auto-bin <auto-cli> --ui-tool-bin <bu
 |---|---|---|---|---|
 | T-01 | work / 无 | [x] 已完成。`docs/reviews/plan085/decisions.md` 冻结 props/禁用/懒加载/依赖解析/行状态渲染/键盘缺口/runner/规模；四例源摘要与 blueprint owner 复核入档 | 组内环境控制门 `verify_pagination.py --backend native` 复跑 pass；P-1…P-8 探针（包内导入、Init 构造、回调回送、行状态、子件键盘、1000 节点、MCP 行动作、双实例）结果见 §9 与 decisions §9 | 01…06 |
 | T-02 | work / T-01 | [x] 已完成。新 `packages/tree-view/{package.at,pac.at,tree_view.at,tree_view_util.at,tree_icon.at}`（`854b9b5f`）：受控 props（nodes/expanded/selected + disabledIds/loadingIds/errorIds）、chevron 与 label 兄弟命中区、独立重试、键盘动作、重复 ID 具名结构错误、空态；`tree_view_util.at` 只持 UI 交互投影，通用树工具仍归语言 blueprint | 真实 native 窗口（组内 `auto.exe` + 本树 `auto-ui-tool`）：包导入→渲染 4 行（P1/S1/P2/P3）；图标（folder/file-text/folder-open）、badge `3`、`加载中`、`重试`、disabled 删除线、focus ring 全部可见（截图 `plan-artifacts/plan-085/pkg-native-proof.png`，sha256 `19918B0D…F4D03AA`）；MCP `autoui_action press` 命中 chevron/行/重试并按 ID 派发（`retry:p2` 且 errorIds 清空）；`cargo test -p auto-ui-tools --test pagination_component` 2/2、`--test file_dialog_component` 3/3 未退化 | 01,02,04 |
-| T-03 | work / T-02 | 部分完成。**已修**键归属不确定（`815fec34`：`registry.all()` 遍历 HashMap 且含未渲染导入 → 可抢走页面键，实测 `page_hits=0`；改为只扫本帧可挂载组件 + 路由目标，首现序传递）。**仍开**外部包组件 keydown 不派发（同文件子件 `hits=1` 控制 vs 包组件 `hits=0`），已由测试钉住 | `cargo test -p auto-ui-runtime --test plan085_keydown_ownership` **5/5 pass**（根/路由页共存、未渲染导入不抢键、已渲染子件贡献键、同文件控制派发、包组件缺口显式断言）；相关回归 `plan051*/plan041/g16/g11/plan068_routes/file_dialog` 全绿 | 03,04 |
-| T-04 | work / T-03 | 新 `examples/tree-view/`，四例组件导入/实际 pac 依赖迁移，移除旧 TreeView shadow，保留业务包装和结果 | 四例 `auto run -r vm` 与实际 Vue运行；V-05精确消费结果，移根解析通过 | 05 |
+| T-03 | work / T-02 | [x] 已完成。**修复** `815fec34`：`key_bindings` 键归属不确定（`registry.all()` 遍历 HashMap 且含未渲染导入 → 可抢走页面键，GUI 实证 `page_hits=0`）；改为只扫本帧可挂载组件 + 路由目标，首现序传递。**键盘语义**（`ec1c16a6`）：焦点首个可达行、Down/Up 逐行且两端饱和、Home/End 首末、已展开父节点 Expand 进首子不重发、Enter 只选择、禁用行可见但跳过 | `plan085_keydown_ownership` **5/5**（根/路由页共存、未渲染导入不抢键、已渲染子件贡献键、同文件控制派发、外部包组件派发）+ `plan085_tree_keyboard` **7/7**；真实 native 窗复核 `P1→Down→S1→Home→P1→Enter→selected=p1`（截图 sha256 `4457C19C…DFF26813`）；回归 `plan041` 4/4、`g16` 1/1、tools `pagination` 2/2 与 `file_dialog` 3/3 全绿 | 03,04 |
+| T-04 | work / T-03 | 受阻（未提交，已回退）。迁移 026/041 到正式包后两例都不再渲染树行；定位到两条独立阻塞：①**递归 computed 静默空**（026 的 `dbNodes => filter_tree(...)`；同槽非递归 computed 出 2 行、递归出 0 行，无诊断）；②**`render:"vm"` 宿主上包组件行回调/样式未生效**（包本身实测装载正常：`load_package` 返回 TreeIcon+TreeView、零 warning）。两例改动已回退保持可用 | 阻塞解除前不迁移；不得用非递归副本或保留示例自带 TreeView 绕过（两者都建成第二真源） | 05 |
 | T-05 | work / T-04 | 新 tools测试和上述 product gate；落地 V-01…07，复用进程端口设施，运行 Win/Linux+Vue | §6命令及四消费者入口；每轨有真实窗口/事件/读回/关闭重开，不接受只编译；含r2 V-07的参考区域对照/真实状态截图 | 01…06 |
 | T-06 | work / T-05 | 正式包 README、示例说明、`docs/reviews/plan085/`证据，提出最终 Spec delta，strategy 实施摘要；包README链接本Plan视觉指南和对应区域 | 逐项证据/文件摘要可读回，Q-01受影响项关闭，否则保持 executing | 06 |
 | T-07 | review / T-06 | 同树独立复审源码和 SD，重放关键反例，不修实现 | 固定 reviewed commit、平台结果、AC verdict；未通过回同树work | 07 |
@@ -300,4 +300,30 @@ Goal round 2 摘要（T-03 部分完成；上一轮的错误归因已修正）�
   `ui::clipboard::tests::set_then_get_roundtrip` 在本机剪贴板环境下失败，
   与本轮改动无关（主检出 `master` 上同样失败），记为环境性既存红。
 - 任务计数 2/8（T-01、T-02 完成；T-03 部分完成，故不计数）；未改 canonical
+  Specs，未写派生索引或 legacy ledger。
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 0793ecf7 | next: work (T-04 阻塞解除)
+
+Goal round 3 摘要（T-03 完成；T-04 受阻并回退）：
+
+- **T-03 完成**（上一轮自报的「外部包组件 keydown 不派发」是**我的 oracle
+  假象**，已更正）：两条独立原因——①声明 `Init` 的子件在帧泵前渲染
+  `Loading… (<Name>)` 占位；②`View` 调试 dump 里 class 名解析为
+  `RingWidth(2.0)` 等结构类，`ring-2` 子串计数恒 0。改用「渲染文本变化」作
+  oracle 后同文件与包组件**都** `hits 0→1`。
+- 真正修复（`815fec34`）：键归属只扫本帧可挂载组件，首现序确定。
+- 键盘语义钉住（`ec1c16a6`，`plan085_tree_keyboard` **7/7**）：首个可达行起
+  焦点、Down/Up 饱和不回绕、Home/End 跳首末、已展开父节点 Expand 进首子不重
+  发、Enter 只选择、禁用行可见但跳过。`plan085_keydown_ownership` **5/5**。
+- 真实 native 窗复核：`P1→Down→S1→Home→P1→Enter→selected=p1`；截图
+  `plan-artifacts/plan-085/kbd-native-proof.png` sha256
+  `4457C19C24A478ECD0761AB384EEFCC8E0E103601D721B9B1D177E99DFF26813`。
+- **T-04 受阻（已回退，未提交）**：026/041 迁移后都不渲染树行。两条独立阻塞
+  ①递归 computed 静默空（026 `dbNodes => filter_tree(...)`：同槽非递归出 2
+  行、递归出 0 行，无诊断）②`render:"vm"` 宿主上包组件行回调/样式未生效
+  （包装载实测正常：`["TreeIcon","TreeView"]`、零 warning）。两例改动已
+  `git checkout` 回退，示例保持可用。
+- 回归：`plan041` 4/4、`g16` 1/1、tools `pagination` 2/2 与
+  `file_dialog` 3/3 全绿。既存红（非本计划）：
+  `ui::clipboard::tests::set_then_get_roundtrip` 在主检出同样失败。
+- 任务计数 **3/8**（T-01、T-02、T-03 完成；T-04 阻塞中）。未改 canonical
   Specs，未写派生索引或 legacy ledger。
