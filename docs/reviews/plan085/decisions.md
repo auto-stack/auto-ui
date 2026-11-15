@@ -131,6 +131,37 @@ widget TreeView (
   `page_hits=0`。修复 = 只扫**本帧可挂载**的组件（`view_tree` 中解析为注册
   组件的 tag + 路由目标），并按首现序**传递**其可挂载子件；根仍先扫保住
   自己的键。三条永久反例（`plan085_keydown_ownership.rs`）。
+- **T-05 native 门首次全绿（2026-11-15，提交 `b1c90bdd` / `326a3566`）**：
+  `tests/product/verify_tree_view.py --backend native` **outcome: pass**：2 个
+  会话、矩阵 `{a_tree_rows:5, b_tree_rows:2}`、真实窗口标题「树形演示」、
+  浅/深截图、`exit_code=0`、`port_rebinds=true`、重开会话再选择成功。
+  **修复的真缺陷（空状态）**：
+  - 症状：应用清空 `nodes` 后**空状态永不出现**；而"从第一帧就空"的树**会**
+    显示——即不是接线问题而是**陈旧**。
+  - 实测：`nodes` 2→0→2→0 时 `rows` 每帧都正确重派生（行数 2,0,2,0），而
+    `is_empty` 分支一次都没渲染。`is_empty => tv_count_rows(.nodes,…)==0` 在
+    VM 轨上对 `.nodes` 的变更**保持陈旧**（与 PLAN-086「链式 computed 静默置
+    None」同族）。
+  - 修复：把空态挂到**已证明 live** 的派生上——`tv_derive_rows` 为空时产出一条
+    哨兵行（`empty: true`、空 id、disabled），视图渲染其 label 作为弱化空态
+    文本；删除已无消费者的 `is_empty`，保证单一来源。
+  - 回归：`plan085_empty_state`（1/1）驱动 populated→empty→populated→empty，
+    断言空态文本**恰好一条且只在空时出现**；该用例能区分修复前后（修复前
+    第二/第四次转换必红）。
+- **夹具形态**：树改为**根 widget 托管**（`widget App`，无 routes），与两个
+  真实消费者（026/041）一致；路由页形态的回调差异仍由
+  `plan085_routed_callbacks`（2/2）在库级守着，不混入本门。
+- **门的健壮性修正**：摘要正则容忍夹具间距；隔离副本的包路径随示例迁移；
+  retry 恢复等待放宽到 15s 并复读（错误行在下一帧重派生）；重开后等**行**
+  而不是只等标题，且按 A/B 分块断言。
+- **仍开（不宣布 T-05 完成）**：**Vue 轨未跑通**——`verify_tree_view.py
+  --backend vue` 的矩阵仍按 vnode id 驱动，而 Vue 轨没有 vnode；`Browser`
+  需要一套标签驱动的矩阵变体。本轮按实际记为 **vue: not_run（矩阵未适配）**，
+  没有伪造通过。
+- 回归全绿：`plan085_empty_state` 1/1、`plan085_tree_keyboard` 8/8、
+  `plan085_keydown_ownership` 5/5、`plan085_routed_callbacks` 2/2、
+  `plan041` 4/4、`g16` 1/1、tools `tree_view_component` 2/2。
+
 - **T-05 卡点已收窄（2026-11-15，提交 `4053f5b8`）**：脚本化 native 全跑仍
   未走通，但缺口已定位到 **iced 事件回路**，不再是"不知道哪里不对"。
   今天逐条复现的对照矩阵（同一 `auto.exe` / `auto-ui-tool.exe`）：
