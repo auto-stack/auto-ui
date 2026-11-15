@@ -1,0 +1,32 @@
+// PLAN-085 T-05 fixture: toggles a controlled tree between populated and empty.
+// Used by plan085_empty_state.rs to prove the empty state tracks every
+// transition, not just a tree that was empty from the first frame.
+widget emptytoggle {
+    msg { Init, SetEmpty, SetFull, Got(str) }
+    model {
+        var nodes List = []
+        var expanded List = []
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: .expanded, selected: "", on_toggle: .Got($event), on_select: .Got($event), on_retry: .Got($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            a.push({ id: "n1", label: "ONE", children: [], kind: "dir", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "n2", label: "TWO", children: [], kind: "dir", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        .SetEmpty -> { .nodes = [] }
+        .SetFull -> {
+            var a List = []
+            a.push({ id: "n1", label: "ONE", children: [], kind: "dir", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "n2", label: "TWO", children: [], kind: "dir", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        .Got(v str) -> { }
+    }
+}

@@ -58,7 +58,6 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
     computed {
         rows => tv_derive_rows(.nodes, .expanded, .selected, .disabledIds, .loadingIds, .errorIds, .focus_index, .directory)
         reachable => tv_count_rows(.nodes, .expanded, .disabledIds)
-        is_empty => tv_count_rows(.nodes, .expanded, .disabledIds) == 0
     }
 
     view {
@@ -74,11 +73,15 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
             if .invalid != "" {
                 text .invalid { style: "text-xs text-destructive" }
             }
-            if .is_empty {
-                text "空树无可操作行" { style: "text-xs text-muted-foreground" }
-            }
             col (style: "w-full") {
                 for r in .rows {
+                    // An empty tree contributes one sentinel row (see
+                    // tv_derive_rows): the emptiness is carried on the same
+                    // derivation that produces real rows, because a separate
+                    // computed over `.nodes` stays stale on the VM track.
+                    if r.empty {
+                        text r.label { style: "text-xs text-muted-foreground" }
+                    } else {
                     row (style: "items-center") {
                         if r.has_kids {
                             mouse-area (onclick: .WantToggle(r.id), style: "w-5 h-5 shrink-0 items-center justify-center cursor-pointer rounded hover:bg-accent/60") {
@@ -157,6 +160,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
                         if r.error {
                             button "重试" { onclick: .WantRetry(r.id), style: "ml-auto shrink-0 px-1 py-0.5 text-xs rounded border border-border" }
                         }
+                    }
                     }
                 }
             }

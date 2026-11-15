@@ -171,6 +171,16 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
             }
         }
     }
+    // PLAN-085 T-05: an empty tree emits ONE sentinel row instead of relying on
+    // a separate `is_empty` computed. On the VM track a computed over `.nodes`
+    // (is_empty => tv_count_rows(...) == 0) stays stale after the app mutates
+    // nodes — it never flips true even though `rows` re-derives correctly every
+    // frame (measured: rows 2→0→2→0 while the empty branch never rendered).
+    // Emitting the sentinel from the same function that produces `rows` keeps
+    // the empty state on the one derivation path that is proven live.
+    if out.len() == 0 {
+        out.push({ id: "", label: "空树无可操作行", has_kids: false, open: false, disabled: true, selected: false, focused: false, loading: false, error: false, leaf: true, icon: "", badge: "", empty: true })
+    }
     return out
 }
 
