@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-13T00:00:00Z
 updated_at: 2026-11-15
 plan_revision: 2
-current_step: 1
+current_step: 2
 total_steps: 8
 supersedes_spec_components:
   - docs/specs/ui/examples-ownership.md
@@ -155,7 +155,7 @@ python tests/product/verify_tree_view.py --auto-bin <auto-cli> --ui-tool-bin <bu
 | 任务 | owner_stage / 依赖 | 路径与结果 | 验证入口 / 预期 | AC |
 |---|---|---|---|---|
 | T-01 | work / 无 | [x] 已完成。`docs/reviews/plan085/decisions.md` 冻结 props/禁用/懒加载/依赖解析/行状态渲染/键盘缺口/runner/规模；四例源摘要与 blueprint owner 复核入档 | 组内环境控制门 `verify_pagination.py --backend native` 复跑 pass；P-1…P-8 探针（包内导入、Init 构造、回调回送、行状态、子件键盘、1000 节点、MCP 行动作、双实例）结果见 §9 与 decisions §9 | 01…06 |
-| T-02 | work / T-01 | 新 `packages/tree-view/`，复用既有派生工具、TreeIcon，落实结构/加载/事件/身份合同；不写语言仓 | 官方包生成/模型正反例；V-01/02/04结果准确，无复制工具owner | 01,02,04 |
+| T-02 | work / T-01 | [x] 已完成。新 `packages/tree-view/{package.at,pac.at,tree_view.at,tree_view_util.at,tree_icon.at}`（`854b9b5f`）：受控 props（nodes/expanded/selected + disabledIds/loadingIds/errorIds）、chevron 与 label 兄弟命中区、独立重试、键盘动作、重复 ID 具名结构错误、空态；`tree_view_util.at` 只持 UI 交互投影，通用树工具仍归语言 blueprint | 真实 native 窗口（组内 `auto.exe` + 本树 `auto-ui-tool`）：包导入→渲染 4 行（P1/S1/P2/P3）；图标（folder/file-text/folder-open）、badge `3`、`加载中`、`重试`、disabled 删除线、focus ring 全部可见（截图 `plan-artifacts/plan-085/pkg-native-proof.png`，sha256 `19918B0D…F4D03AA`）；MCP `autoui_action press` 命中 chevron/行/重试并按 ID 派发（`retry:p2` 且 errorIds 清空）；`cargo test -p auto-ui-tools --test pagination_component` 2/2、`--test file_dialog_component` 3/3 未退化 | 01,02,04 |
 | T-03 | work / T-02 | 实例局部焦点、键盘和 MCP 行绑定/语义；仅在 T-01 已定位的 compiler/runtime 通用接线点作最小扩展 | V-03/04 的两端逐键/旧ID/双实例反例通过，当前新action正例可用 | 03,04 |
 | T-04 | work / T-03 | 新 `examples/tree-view/`，四例组件导入/实际 pac 依赖迁移，移除旧 TreeView shadow，保留业务包装和结果 | 四例 `auto run -r vm` 与实际 Vue运行；V-05精确消费结果，移根解析通过 | 05 |
 | T-05 | work / T-04 | 新 tools测试和上述 product gate；落地 V-01…07，复用进程端口设施，运行 Win/Linux+Vue | §6命令及四消费者入口；每轨有真实窗口/事件/读回/关闭重开，不接受只编译；含r2 V-07的参考区域对照/真实状态截图 | 01…06 |
@@ -170,7 +170,44 @@ python tests/product/verify_tree_view.py --auto-bin <auto-cli> --ui-tool-bin <bu
 
 2026-11-14：stage: new；PLAN-085 r2；outcome: pass（视觉交接可供执行，非组件通过）；next: work，T-01。新增§5图/指南引用及V-07，AC-06/T-05/06纳入；现有受控API、四消费者、8任务与0/8不变。未实现控件或运行拟产品门。
 
-2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | outcome: pass（T-01 完成，机制合同已冻结；非组件交付）| worktree: `D:/autostack/.wt/ui-085/auto-ui` | branch: `codex/ui-085-tree-view` | base_commit: `c78208de` | code_commit: 本 receipt 提交（`docs/reviews/plan085/decisions.md` 新增）| dependency_revisions: 组内 detached `auto-lang 86c7fd50b`、`auto-man 54fe407`、`auto-web 0adebc0`、`auto-down 5af11a3`（只读，零改动）| task_ids: T-01 | blockers: 无 | next_responsible_role: work（T-02）。
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | outcome: pass（T-02 完成；T-03 定位完成、实现留在下一轮）| worktree: `D:/autostack/.wt/ui-085/auto-ui` | branch: `codex/ui-085-tree-view` | base_commit: `c78208de` | code_commit: `854b9b5f`（T-02 包）+ 本 receipt 提交 | dependency_revisions: 组内 detached `auto-lang 86c7fd50b`、`auto-man 54fe407`、`auto-web 0adebc0`、`auto-down 5af11a3`（只读，零改动）| task_ids: T-02 | blockers: 无 | next_responsible_role: work（T-03）。
+
+T-02 交付与证据（原始探针在 `D:/autostack/plan-artifacts/plan-085/`）：
+
+- 新包 `packages/tree-view/`：`tree_view.at`（主 widget）、`tree_view_util.at`
+  （UI 交互投影：`tv_derive_rows`/`tv_count_rows`/`tv_focus_id`/
+  `tv_visible_parent`/`tv_repair_focus`/`tv_step_reachable`/`tv_ext_icon`）、
+  `tree_icon.at`（18 项调色板）、`package.at`、`pac.at`。
+- 公开 API 兼容四例既有 `(nodes, expanded, selected, on_toggle, on_select,
+  directory)`，新增 `disabledIds/loadingIds/errorIds/on_retry`；组件只持
+  `focus_index`/`invalid`/`focus_id` 三个实例局部字段，不复制业务状态。
+- 真实 native 验证（组内 detached `auto-man` 构建的 `auto.exe` + 本树
+  `auto-ui-tool.exe`，MCP 驱动）：包导入 → 4 行正确渲染；目录/文件图标、
+  badge、`加载中`、`重试`按钮、disabled 删除线、focus ring 全部真实可见
+  （`pkg-native-proof.png`，11×875 逻辑像素，sha256 `19918B0D…F4D03AA`）；
+  `autoui_action press` 命中 chevron（`toggle:`）/行（`select:p1`）/重试
+  （`retry:p2`）并按 ID 派发，errorIds 被消费方清除后行回落到正常态。
+- 未退化：`cargo test -p auto-ui-tools --test pagination_component` **2/2 pass**
+  （0.95s）、`--test file_dialog_component` **3/3 pass**（5.69s）。
+
+T-03 进展（定位完成，实现未提交）：
+
+- 新增组件级诊断夹具 `crates/auto-ui-runtime/tests/fixtures/plan085_keydown/`
+  与六行 GUI 判据矩阵（详见 decisions.md §5）。结论：
+  ①**路由页的 `onkeydown.*` 根本不进入根组件收集面**——
+  `build_dynamic_component(App).key_bindings()` 只有根自己的键，路由页声明的
+  第二键完全缺席；`registry.all()` 也不含路由页。
+  ②`registry.all()` 迭代 `HashMap`，同名键先到先得 → 未挂载的导入组件可抢走
+  键归属（GUI 实证 `page_hits=0`）。
+- 曾按方向 (a) 实现「只收本帧可挂载组件 + 路由目标」，实测路由页仍解析不到
+  （`get_by_route_module` 在根构建期未命中），说明路由页注册时机晚于根组件
+  构建，须与 outlet 装载路径同改。该改动影响所有 App 启动期键位，**已回退未
+  验证实现**，保持树绿（`git checkout` 后 `pagination_component`/
+  `file_dialog_component` 复跑仍绿）。
+- 下一步：T-03 从「路由页注册时机 + 实例限定键」两处继续；AC-03 保持未关闭。
+
+任务计数：T-01、T-02 完成，2/8；status `executing`。未改 canonical Specs，
+未写派生索引或 legacy ledger。
 
 T-01 关键机制结论（详见 `docs/reviews/plan085/decisions.md` §9，原始探针在
 `D:/autostack/plan-artifacts/plan-085/`）：
