@@ -517,3 +517,37 @@ Goal round 10 摘要（**T-06 完成**：包/示例文档 + 证据 + Spec delta 
 - **其它**：F-09 1000 节点/64 层无入库证据且窄窗无断言（实测窄窗文本裁切）；F-10 018/027 仍留未实例化副本，AC-05「四个示例单源」字面未达（正确处置是改 AC 措辞或删副本，不得虚构消费）；F-11 auto-man lock 脏与「只读零改动」表述不符；F-12 SD 编号与 Plan 表不一致；F-13 decisions 里「不得为过门搬回根 widget」禁令被 round 8 反转却未撤销。
 - **两个已知遗留的判定**：Linux `not_run` 合规（环境边界）；路由页形态差异合规但需一句批准（两个真实消费者与夹具均为根托管），问题只在 F-13 禁令未撤。
 - 结论：不 `needs_replan`——缺口可定位、修复局部（包内派生 + 行渲染 + 用例），不需改设计契约。
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 10 | from: review | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 6f0426c2 | next: work (F-05/F-06/F-07/F-08/F-09/F-10/F-12/F-13)
+
+Goal round 10 摘要（review needs_fix → **4 条 High 已修并回归**）：
+
+- **独立复审**（`plan085-reviewer`，独立上下文，自行 fresh out-dir 实跑）：**needs_fix**，
+  F-01…F-13，4 High。产品门双端确实 pass 且可复现（这部分成立），但 AC-02/03/06 有
+  在合同内的硬缺口。复审结论已按合同写入 Plan §9 并重开受影响任务
+  （T-02/T-03/T-05/T-06，`current_step` 6→3）。
+- **本轮修好 4 条 High**（`6f0426c2`，均有能区分修复前后的回归）：
+  - **F-01 层级丢失**：行无 `depth`，子行与父同列 → 行记录加 `depth`，视图按层渲染
+    字面量缩进单元。**踩坑**：首版用「与栈位置并行的 depths 数组」，一旦中途 push
+    子节点就错位，实测**每行 depth 恒为 0**；改为每栈项携带 `[node, depth]` 配对，
+    不可漂移。
+  - **F-02 懒加载目录不可展开**：`has_kids = kids.len() > 0 && !leaf` 把"未加载"当
+    叶节点 → 改为 `!leaf && (kids.len() > 0 || kind == "dir")`；实测按 `images` 的
+    chevron 后 emit `toggle:images` 且 `aExpanded` 增长。
+  - **F-03 错误态无文本**：只有「重试」按钮 → 加「加载失败」文本（destructive 色），
+    与「加载中」可区分。
+  - **F-04 重复 ID 仍发布歧义行**：修这条时挖出**更深原因**——禁用分支虽然视觉
+    disabled 却仍带 `onclick: .WantSelect`，所以"禁用"从未真正阻止选择。禁用行现在
+    **完全不带 select handler**，重复 ID 场景因此一并变为不可操作。
+- **产品门相应修正**：改为统计**可见行**（5/2）并**单独断言不可操作子集恰为 1 行**
+  （即禁用行），且该子集按后端各自取（native 看缺 `.WantSelect`，vue 看生成 SFC 的
+  `cursor-not-allowed` 类）。双端均 pass，矩阵一致 `{a:5, b:2}`。
+- **视觉确认**：截图 `plan-artifacts/plan-085/hier/src/front/tmp/autoui-screenshot-*.png`
+  ——`Section 1.1` 缩进在 `Chapter 01` 之下、`Images` 有 chevron、该行同时显示
+  「加载中」「加载失败」「重试」、`Chapter 02` 删除线禁用。
+- 回归：`plan085_review_fixes` **4/4**（新）、`plan085_empty_state` 1/1、
+  `plan085_tree_keyboard` 8/8、`plan085_keydown_ownership` 5/5、
+  `plan085_routed_callbacks` 2/2、`plan041` 4/4、tools `tree_view_component` 2/2。
+- **仍开**：F-05 焦点修复（`tv_repair_focus` 死代码）、F-06 真实键盘自动化、
+  F-07 旧 `vnode_` 拒绝用例、F-08 role/level 语义、F-09 1000 节点/64 层与窄窗证据、
+  F-10 018/027 副本处置、F-12 SD 编号对齐、F-13 decisions 禁令撤销。
+- 任务计数 **3/8**（T-02/T-03/T-05/T-06 重开中）。未改 canonical Specs。
