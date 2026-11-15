@@ -131,10 +131,28 @@ widget TreeView (
   `page_hits=0`。修复 = 只扫**本帧可挂载**的组件（`view_tree` 中解析为注册
   组件的 tag + 路由目标），并按首现序**传递**其可挂载子件；根仍先扫保住
   自己的键。三条永久反例（`plan085_keydown_ownership.rs`）。
-- **键盘语义已用组件自身回调钉住（`ec1c16a6`，7/7 pass）**：焦点从首个可达
-  行开始；Down 逐行前进且两端饱和（不回绕）；Home/End 跳首末；已展开父节点上
-  Expand 进入首个子节点且**不重发展开**；Enter 只请求选择、从不展开；禁用行
-  可见但被导航跳过。
+- **T-04 迁移受阻（2026-11-15，未提交，已回退）**：把 026/041 的 `TreeView`
+  改为导入正式包后，两例都**不再渲染任何树行**（026 状态里 `dbNodes` 整个
+  消失；041 树行无 `onclick`/无样式 = 走的是文本回退而非包组件）。已定位的
+  两条**独立**原因：
+  1. **递归 computed 静默返回空**（026 的真实阻塞）：`dbNodes =>
+     filter_tree(.dbNodesFull, .filter)` 里 `filter_tree` 是递归函数；组件级
+     探针实测**非递归 computed 正常产出 2 行、递归 computed 产出 0 行**，且
+     无错误无诊断。这与 T-01 记录的同族限制一致（VM 深帧/递归历史债），不是
+     本组件引入的。
+  2. **包组件在 `render: "vm"` 宿主的行回调/样式未生效**（041 的阻塞）：
+     包本身**能正确装载**（`ComponentRegistry::load_package` 实测返回
+     `widgets=["TreeIcon","TreeView"]`、`warnings=[]`、`full_widgets=2`，
+     路径 candidate[0] 也确实存在），但 041 视图里树行既无 `onclick` 也无
+     `class`，说明调用位没有走到包组件分支。同形态的**同文件**子件在 Rust
+     侧可正常派发（`WantSelect=1`），因此差异在「包装载 → 视图调用位解析」
+     这一段，尚未定位到具体分支。
+- 处理：**未提交**任何 026/041 改动（`git checkout` 回退到导入本地组件的
+  状态），保持示例可用；把 T-04 拆为「先解除上述两个阻塞再迁移」，不让
+  半迁移状态进入树。**下一个动作**：先给 (1) 补一条具名反例（递归 computed
+  产出空 → 显式断言当前行为），再定位 (2) 的调用位解析分支。
+- 不得为绕过而给 026 把 `filter_tree` 改成非递归副本（=第二真源），也不得
+  为绕过而保留示例自带 TreeView（=四套算法）；两者都违反 Plan §5。
 - **MCP 通道的三个使用陷阱（写进测试模块头，避免后来者重犯）**：
   ① `on_with_input_for(widget, event)` 收的是 **msg 变体名**（`Activate` /
   `GoHome` / `Expand`），不是键名；派发 `"Enter"` 是静默 no-op。
@@ -211,3 +229,8 @@ SD-01/SD-02 → 新 `docs/specs/ui/tree-view.md`：节点与受控状态、展�
 行状态以字面量分支渲染（f-string 循环字段限制）、代表规模与双端证据。
 SD-03 → `docs/specs/ui/examples-ownership.md`：四示例改由正式包单源，
 blueprint owner 不变，示例保留业务状态与读回。
+
+- **键盘语义已用组件自身回调钉住（`ec1c16a6`，7/7 pass）**：焦点从首个可达
+  行开始；Down 逐行前进且两端饱和（不回绕）；Home/End 跳首末；已展开父节点上
+  Expand 进入首个子节点且**不重发展开**；Enter 只请求选择、从不展开；禁用行
+  可见但被导航跳过。
