@@ -640,3 +640,31 @@ Goal round 13 摘要（**F-09 已闭，并修掉一个真实的规模缺陷**）
   需新增视图可访问性属性通道 + 快照输出 + 断言。下一轮评估实现或按合同
   提出具名收窄。
 - 任务计数 **3/8**（T-02/T-03/T-05/T-06 仍开，只差 F-08）。
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 14 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: cb81a203 | next: review (T-07 复核，F-01…F-13 全闭)
+
+Goal round 14 摘要（**F-08 已闭；review 的 13 项全部闭合**）：
+
+- **F-08 落地方式与边界（如实记录）**：runtime **完全没有可访问性模型**——view/
+  vnode/snapshot 三层都没有 role/aria/level 通道，DSL 里写 `role: "tree"` 会被
+  **静默接受后丢弃**（已直接探针验证）。完整 ARIA 通道要动 dialect/compiler/
+  runtime-snapshot/vue-generator 四层。因此本计划**不声称 ARIA 合规树**；改为把
+  两个此前只能"推断"的事实，写在 **MCP 真正读取的那一面**（快照里的 raw class），
+  复用 selected/focused/disabled 早已在用的同一通道：
+  - `tv-tree` 根标记｜`tv-lvl-N` 行层级（1..4，超 4 为 `tv-lvl-deep`）｜
+    `tv-dis` 惰性行｜`tv-sel` 禁用且选中行。
+  名称取行 label 文本；展开取 chevron 图标；selected/focused/loading/error 不变。
+- **两条 oracle 陷阱（本轮踩到并记录）**：
+  ① 这些标记会被**已解析的 debug View 丢弃**（样式解析只留认识的 token），但
+  **存在于 `raw_class`**——而快照正是打印它。拿 debug View 断言会得到**假阴性**
+  （与"数 `w-4` 而它解析成 `Width(Fixed(4))`"同一个坑）。
+  ② vue 驱动读 `inner_text`，看不到 class；故标记断言**仅 native 执行并显式注明**，
+  vue 轨用行为断言覆盖同一事实。**记录，不静默跳过**。
+- 门新增 `Browser.send_key`，真实键盘步骤在 vue 轨也跑。
+- 双端产品门均 pass（native 矩阵 `{a:5,b:2}` + `stale_id_rejected: True`；
+  vue 同矩阵）。回归全绿 **27 项**。
+- **F-01…F-13 全部闭合**：F-01 层级、F-02 懒加载目录、F-03 错误文本、F-04 重复 ID
+  与禁用真禁用、F-05 焦点修复、F-06 真实键盘（并新发现并修掉焦点坐标系与
+  选中丢环两个缺陷）、F-07 旧 id 拒绝、F-08 节点语义、F-09 规模（并修掉 O(n²)
+  预算耗尽与缩进分支）、F-10 死副本、F-11 依赖说明、F-12 SD 编号、F-13 决策反转。
+- **任务计数 7/8**（T-02/T-03/T-05/T-06 重开项已可收口，`current_step` 待复核确认）。
+- 下一轮：**T-07 独立复审**（对 `cb81a203` 这一修订重跑 review，验证 13 项闭环）。
