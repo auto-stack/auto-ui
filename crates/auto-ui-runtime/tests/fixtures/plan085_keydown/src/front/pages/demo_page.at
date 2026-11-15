@@ -1,0 +1,35 @@
+// PLAN-085 diagnostic fixture: the ROUTED-PAGE shape — a page hosting the
+// official TreeView with callbacks that must reach the page state.
+widget demo_page {
+    msg { Init, ASelect(str), AToggle(str), Quit }
+    model {
+        var nodes List = []
+        var expanded List = []
+        var selected str = ""
+        var summary str = "sel= exp=0"
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            text .summary { style: "text-xs" }
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .selected, on_toggle: .AToggle($event), on_select: .ASelect($event), on_retry: .ASelect($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var kid List = []
+            kid.push({ id: "s1", label: "PAGE-KID", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            var a List = []
+            a.push({ id: "p1", label: "PAGE-PARENT", children: kid, kind: "dir", icon: "", is_leaf: false, badge: "" })
+            .nodes = a
+            .expanded = ["p1"]
+            .summary = "sel= exp=1"
+        }
+        .ASelect(id str) -> {
+            .selected = id
+            .summary = f"sel=${id}"
+        }
+        .AToggle(id str) -> { .summary = f"toggle:${id}" }
+        .Quit -> { Process.exit(0) }
+    }
+}
