@@ -865,3 +865,22 @@ Goal round 20 摘要（**N-02 真正闭合**——我前两轮的判断都错了
 - 回归全绿 **31 项**；产品门 native pass（`{a:5,b:2}`、`stale_id_rejected: True`）。
 - **任务计数 7/8**；F-01…F-13 + N-01 + N-02 **全部真正闭合**。下一轮做 N-02 定向复核，
   通过后进 T-08 merge。
+2026-11-16：stage: review | review_scope: final（targeted：N-02 扫描器）| reviewer: plan085-n02-review（独立上下文）| plan_id: PLAN-085 | plan_revision: r2 | outcome: needs_fix | reviewed_commit: 636947c6 | worktree: D:/autostack/.wt/ui-085/auto-ui | branch: codex/ui-085-tree-view
+
+复审结论（核验新扫描器）：
+- **核心成立**：`contains` 确认下沉为原生 `({}).contains(&{})`（rust.rs:13772）；
+  `tv_total_nodes` **零调用方**（界限确已删除，`tv_derive_rows` 无条件调用）；
+  框架 `|id|` 在对抗用例下正确（`ab`+`b`、`a`+`aa` 均无误报，真重复可捕获）；
+  **嵌套重复**（root x 的 child y 与另一个 root y）正确检出。
+  reviewer 自做破坏-恢复（**行号插入**而非字符串替换，避免 CRLF 静默失效）：
+  → FAILED `left: 601, right: 0`。字节级恢复（含无尾换行）。
+- **但找到两个可达缺陷**：
+  - **N-02a（High）空 id 静默中止扫描**：`seen` 以 `"|"` 播种，首个 token 后
+    `||a|` 已含空 id 的 token `||`；空 id 返回 `""`＝"无重复"哨兵，扫描提前结束，
+    后续真重复漏检 → 实测 3 条可操作行、无报告。
+  - **N-02b（High）含 `|` 的 id 回退 O(n²) VM 循环**：实测量 600 → 14.89s、
+    1000 → 71.94s，预算耗尽且 **0 行**，正是 F-09/N-01 消除过的缺陷；
+    也使 README"成员检测原生"的说法失真。
+- reviewer 另指出：`n02_large_tree` 单例 7.75s，头部余量比"2.13s"（那是 f09）更薄；
+  且 HEAD 在复审期间推进（`09989578`→`636947c6`），合并前需重新绑定修订。
+- 套件 26/26、tools 2/2、产品门 native pass。
