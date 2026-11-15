@@ -131,6 +131,35 @@ widget TreeView (
   `page_hits=0`。修复 = 只扫**本帧可挂载**的组件（`view_tree` 中解析为注册
   组件的 tag + 路由目标），并按首现序**传递**其可挂载子件；根仍先扫保住
   自己的键。三条永久反例（`plan085_keydown_ownership.rs`）。
+- **T-05 卡点已收窄（2026-11-15，提交 `4053f5b8`）**：脚本化 native 全跑仍
+  未走通，但缺口已定位到 **iced 事件回路**，不再是"不知道哪里不对"。
+  今天逐条复现的对照矩阵（同一 `auto.exe` / `auto-ui-tool.exe`）：
+
+  | 形态 | 行渲染 | 按下后写页面状态 |
+  |---|---|---|
+  | 树挂在 **App 根**（真实窗口） | 是（2 行） | **是**（`summary` 与 `selected` 都出现 `state_changes`） |
+  | 树挂在 **路由页**（真实窗口） | 是（2 行） | **否**（无更新、**无任何错误输出**） |
+  | 树挂在 **路由页**（库路径 `build_dynamic_component`） | 是（2 行） | **是**（`sel= exp=1` → `sel=p1`） |
+  | `PaginationControl`（路由页 + 包，真实窗口） | 是 | **是**（既有产品门 pass） |
+  | 最小包组件（路由页、str prop、list for-in） | 是 | **是** |
+
+  → 结论：**页面/包装配本身没问题**；差异只在「路由页内的包子组件 +
+  `on_toggle`/`on_select`/`on_retry` 三 msg prop + computed 派生」这一组合在
+  iced 回路下，行的 `WantSelect` 能派发（handler 名与实例都正确）却**不落到
+  页面**，且无 `[VM-HANDLER]`/`[VM-INSTANCE]` 诊断。
+  - 已排除：下划线折叠（改 `ASelect` 无变化）、`.len()` 求值、双实例歧义
+    （单实例同样复现）、包路径深度、路由页形态本身、条件守卫
+    （`if !tv_member(...)` 去掉无变化）、嵌套包内子组件（`TreeIcon` 形态在
+    Mini 里正常）。
+  - **新增库级永久回归**：`plan085_routed_callbacks` **2/2 pass**——路由页包子
+    组件确实收到 List prop 并派生 2 行、按下确实写页面状态。该测试是修复
+    iced 路径时必须保持绿的参照面。
+  - **下一步**：在 iced 回路里对照 `WantSelect` 派发前后的
+    `dirty`/`child_instance_state_id` 解析，重点看路由页实例的
+    `callback_parent_state` 是否在 iced 帧里拿到正确父态。
+- 不得为过门而把夹具树搬回根 widget 掩盖缺陷，也不得删断言：回调必须
+  在夹具既有形态下真实可用。
+
 - **T-05 进行中（2026-11-15，提交 `ea4c825a`）**：
   - **tools 门已落并通过 2/2**：`crates/auto-ui-tools/tests/tree_view_component.rs`
     ——两个生成器都产出组件；Vue 面带引号 emit（`toggle`/`select`/`retry`，
