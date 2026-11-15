@@ -773,3 +773,25 @@ Goal round 17 摘要（定向复审：**F-05 真闭**；F-04 被查出 N-01/N-02
   单用例耗时 n02 3.54s、n01 1.86s，均 <10s。
 - **任务计数 7/8**；下一轮需就 N-02 做决策：或引入 O(n) 原语（跨语言层，可能超本
   计划范围），或把该边界作为具名限制提交复审裁定。
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 18 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: caaf1326 | next: review（N-01/N-02 定向复核后 merge）
+
+Goal round 18 摘要（**N-02 已作为契约闭合**，不需语言层改动）：
+
+- **N-02 找到不经语言改动的解**：我上一轮把它记为"需要 O(n) id 集合原语"的边界，
+  但这轮查明 `.Validate` **本来就是组件的公开 API 且无规模上限**——它会重算并置
+  `dupFlag`/`invalid`。缺口不是"检测不了"，而是"没人规定大树必须调它"。
+- **精确复现**：601 节点树（越过 512 阈值）注入重复 → **601 条可操作行、无报告**；
+  把 `.Validate` 派发到 **TreeView 实例** → 具名报 `树结构非法`、**可操作行归零**。
+- **又踩同一个坑（已记录）**：把 `"Validate"` 发给**页面名**只会命中页面空处理函数，
+  `tree.invalid` 仍为空，看起来像产品失败。**组件自己的 msg 必须派发到实例**——这
+  与花掉三次尝试的 F-05 是同一类错误。
+- **N-02 现在是契约不是缺口**：
+  - ≤512 总节点：每帧重校验（重复立即发现）；
+  - >512：消费者**必须**在受控更新后向树实例派发 `.Validate`。
+  `n02_large_trees_require_validate_after_controlled_updates` **同时钉住两半**——
+  不调时不复查（成本）、调了则歧义归零（契约）。README 写明规模表、义务与
+  实例派发要求。
+- 回归全绿 **31 项**；产品门 native pass（`{a:5,b:2}`、`stale_id_rejected: True`）；
+  单用例 n02 5.61s < 10s。
+- **任务计数 7/8**；F-01…F-13 + N-01 + N-02 全部闭合。下一轮：定向复核 N-01/N-02，
+  通过后进 T-08 merge。
