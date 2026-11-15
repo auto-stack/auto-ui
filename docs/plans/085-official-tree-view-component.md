@@ -374,3 +374,29 @@ Goal round 5 摘要（T-04 完成：两个真实消费者已迁移并验证）�
 - 既存红（非本计划）：`ui::clipboard::tests::set_then_get_roundtrip` 主检出
   同样失败；041 桌面 shell 路径的树文本回落（库路径正常）记为具名既存缺口。
 - 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 6 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 018cc49a | next: work (T-05 native 全跑)
+
+Goal round 6 摘要（T-05 部分完成：tools 门绿；native 产品门未走通，不宣布通过）：
+
+- **tools 门通过 2/2**（`ea4c825a`，`crates/auto-ui-tools/tests/tree_view_component.rs`）：
+  两个生成器都产出组件；Vue 面带引号 emit（`toggle`/`select`/`retry`——
+  不带引号不会被重写成 `emit`，回调会静默断链）、字面量 lucide chevron
+  分支、字面量行状态分支；**第二绝对根** vendor 闭包逐字节相同，删依赖后
+  strict 下是**具名失败**。
+- **已落夹具与产品门**：`examples/tree-view/`（受控展开/选择/禁用/加载中/
+  失败+重试、同页双实例、空树、浅深、文档化退出）与
+  `tests/product/verify_tree_view.py`（按 Plan 的 `--auto-bin/--ui-tool-bin/
+  --out-dir/--backend native|vue` 接口）。
+- **夹具构建中修好两处真 bug**：①handler 名不能带下划线（`child_emit` 折叠
+  下划线，`A_Select` 与包内派发键冲突，回调到不了页面）；②f-string 里对
+  列表参数取 `.len()` 在 VM 轨渲染为空（摘要改为显式 model 字段）。
+- **仍开**：脚本化 native 全跑未走通。回调在**库路径**已证明有效（对
+  `/TreeView#0` 派发 `WantSelect` → `aSummary` 变
+  `sel=chapter-01 ... select:chapter-01`），但真实窗口里按 `vnode` 行 id
+  后页面摘要不更新且**无错误输出**。已排除下划线折叠、`.len()`、双实例
+  歧义、包路径。**唯一未消除差异**：026 的树挂在 `App` 根（`DbSelect` 正常），
+  夹具挂在 `demo` 路由页。下一轮对比这两种挂载的回调路由。**T-05 不宣布
+  通过**，也未为过门搬动夹具或删断言。
+- 回归：`tree_view_component` 2/2；此前 T-04 的 026 25/25×3、041 44p/9f
+  （与基线同项）保持不变。
+- 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
