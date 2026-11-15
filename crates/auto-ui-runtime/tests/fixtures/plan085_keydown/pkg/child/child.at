@@ -1,8 +1,6 @@
 widget ChildBox (nodes: List = []) {
     msg { Init, Left, Right }
-    model {
-        var hits int = 0
-    }
+    model { var hits int = 0 }
     view {
         col (style: "w-full") {
             onkeydown.left: .Left

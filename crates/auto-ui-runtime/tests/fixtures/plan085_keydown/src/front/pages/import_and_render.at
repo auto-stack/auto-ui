@@ -1,0 +1,16 @@
+widget importrender {
+    msg { Init, One }
+    model { var one int = 0 }
+    use { package: child from "../../../pkg/child" }
+    view {
+        col (style: "p-4") {
+            onkeydown.down: .One
+            text "page with rendered child" { style: "text-xs" }
+            ChildBox (nodes: []) {}
+        }
+    }
+    on {
+        .Init -> { .one = 0 }
+        .One -> { .one = .one + 1 }
+    }
+}

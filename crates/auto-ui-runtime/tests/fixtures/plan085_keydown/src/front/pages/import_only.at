@@ -1,0 +1,20 @@
+widget importonly {
+    msg { Init, One, Two }
+    model {
+        var one int = 0
+        var two int = 0
+    }
+    use { package: child from "../../../pkg/child" }
+    view {
+        col (style: "p-4") {
+            onkeydown.down: .One
+            onkeydown.up: .Two
+            text "page body, child never rendered" { style: "text-xs" }
+        }
+    }
+    on {
+        .Init -> { .one = 0 }
+        .One -> { .one = .one + 1 }
+        .Two -> { .two = .two + 1 }
+    }
+}

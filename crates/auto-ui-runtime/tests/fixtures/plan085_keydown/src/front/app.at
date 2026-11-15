@@ -4,6 +4,7 @@ widget App {
     routes { "/" -> use page }
     view {
         col (style: "w-full h-full") {
+            onkeydown.down: .RootDown
             text "root" { style: "text-xs" }
             outlet
         }

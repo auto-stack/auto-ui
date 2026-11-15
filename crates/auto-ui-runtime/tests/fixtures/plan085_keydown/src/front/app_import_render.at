@@ -1,0 +1,8 @@
+widget AppImportRender {
+    routes { "/" -> use import_and_render }
+    view {
+        col (style: "w-full h-full") {
+            outlet
+        }
+    }
+}

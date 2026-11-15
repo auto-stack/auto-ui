@@ -566,10 +566,20 @@ impl DynamicComponent {
         let input_state_map = extract_input_state_map_with_registry(view.view_tree, &registry, &bridge);
 
         // EDGE-01: merge element-attribute onkeydown.* bindings into key_bindings.
+        // PLAN-085 T-03: routed pages mount through `outlet` and never appear as
+        // an element tag, so their module names are passed explicitly.
+        let route_modules: Vec<String> = widget
+            .routes
+            .as_ref()
+            .map(|r| r.routes.iter().map(|rt| rt.module.clone()).collect())
+            .unwrap_or_default();
         let mut key_bindings = view.key_bindings.clone();
-        for (k, v) in
-            collect_onkeydown_bindings_with_registry(view.view_tree, &registry, &widget_name)
-        {
+        for (k, v) in collect_onkeydown_bindings_with_registry(
+            view.view_tree,
+            &registry,
+            &widget_name,
+            &route_modules,
+        ) {
             key_bindings.entry(k).or_insert(v);
         }
 
@@ -711,10 +721,20 @@ impl DynamicComponent {
         }
 
         // EDGE-01: merge element-attribute onkeydown.* bindings into key_bindings.
+        // PLAN-085 T-03: routed page targets mount through `outlet` and never
+        // appear as an element tag, so pass their module names explicitly.
+        let route_modules: Vec<String> = view_widget
+            .routes
+            .as_ref()
+            .map(|r| r.routes.iter().map(|rt| rt.module.clone()).collect())
+            .unwrap_or_default();
         let mut key_bindings = view.key_bindings.clone();
-        for (k, v) in
-            collect_onkeydown_bindings_with_registry(view.view_tree, &registry, &widget_name)
-        {
+        for (k, v) in collect_onkeydown_bindings_with_registry(
+            view.view_tree,
+            &registry,
+            &widget_name,
+            &route_modules,
+        ) {
             key_bindings.entry(k).or_insert(v);
         }
 
@@ -4125,13 +4145,102 @@ fn collect_onkeydown_bindings_with_registry(
     view_tree: &auto_ui_compiler::aura::AuraNode,
     registry: &crate::ui::widget_registry::WidgetRegistry,
     root_widget_name: &str,
+    route_modules: &[String],
 ) -> HashMap<String, String> {
     let mut map = HashMap::new();
     scan_node_for_onkeydown(view_tree, root_widget_name, &mut map);
-    for child in registry.all() {
-        scan_node_for_onkeydown(&child.view_tree, &child.name, &mut map);
+    // PLAN-085 T-03: only widgets this view can actually mount may claim key
+    // ownership, and they must be scanned in a deterministic order.
+    //
+    // `registry.all()` iterates a `HashMap`, so before T-03 whichever registry
+    // entry happened to come first won a given key. The registry holds the
+    // whole module (imports included), so a merely-`use`d component the view
+    // never renders could take `onkeydown.*` ownership from the live page —
+    // the key then did nothing at all, with no error and no diagnostic
+    // (reproduced in T-01 P-5: import-only → page handler never ran).
+    //
+    // Fix: scan the components that can actually be mounted — element tags in
+    // the root view tree that resolve to a registered widget, plus routed page
+    // targets (mounted through `outlet`, so they never appear as a tag) — and
+    // follow their own mounted children transitively, in first-appearance
+    // order. The root is scanned first, so it keeps its own bindings, and
+    // first-match-wins is now stable.
+    let mut visited: Vec<String> = Vec::new();
+    let mut queue: Vec<String> = mounted_child_tags(view_tree, registry);
+    for module in route_modules {
+        if let Some(child) = registry.get_by_route_module(module) {
+            if !queue.iter().any(|n| n == &child.name) {
+                queue.push(child.name.clone());
+            }
+        }
+    }
+    while let Some(tag) = queue.pop() {
+        if visited.iter().any(|n| n == &tag) {
+            continue;
+        }
+        visited.push(tag.clone());
+        if let Some(child) = registry.get(&tag) {
+            let name = child.name.clone();
+            scan_node_for_onkeydown(&child.view_tree, &name, &mut map);
+            for nested in mounted_child_tags(&child.view_tree, registry) {
+                if !visited.iter().any(|n| n == &nested) {
+                    queue.push(nested);
+                }
+            }
+        }
     }
     map
+}
+
+/// PLAN-085 T-03: registered child widgets the root view can mount — element
+/// tags in `view_tree` that resolve to a registered widget. Deduplicated,
+/// first-appearance order.
+fn mounted_child_tags(
+    view_tree: &auto_ui_compiler::aura::AuraNode,
+    registry: &crate::ui::widget_registry::WidgetRegistry,
+) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    collect_mounted_child_tags(view_tree, registry, &mut out);
+    out
+}
+
+fn collect_mounted_child_tags(
+    node: &auto_ui_compiler::aura::AuraNode,
+    registry: &crate::ui::widget_registry::WidgetRegistry,
+    out: &mut Vec<String>,
+) {
+    match node {
+        auto_ui_compiler::aura::AuraNode::Element {
+            tag, children, ..
+        } => {
+            if registry.get(tag).is_some() && !out.iter().any(|n| n == tag) {
+                out.push(tag.clone());
+            }
+            for child in children {
+                collect_mounted_child_tags(child, registry, out);
+            }
+        }
+        auto_ui_compiler::aura::AuraNode::ForLoop { body, .. } => {
+            for child in body {
+                collect_mounted_child_tags(child, registry, out);
+            }
+        }
+        auto_ui_compiler::aura::AuraNode::Conditional {
+            then_body,
+            else_body,
+            ..
+        } => {
+            for child in then_body {
+                collect_mounted_child_tags(child, registry, out);
+            }
+            if let Some(else_children) = else_body {
+                for child in else_children {
+                    collect_mounted_child_tags(child, registry, out);
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 /// Normalize an onkeydown suffix (e.g. "up", "ctrl.r", "tab") to the key_str
