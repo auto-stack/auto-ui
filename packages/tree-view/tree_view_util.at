@@ -293,6 +293,47 @@ pub fn tv_visible_parent(nodes List, expanded List, target str) str {
     return parent
 }
 
+
+/// 结构父节点 ID（无论父节点当前是否展开）。
+///
+/// 与 `tv_visible_parent` 的区别：后者只沿**已展开**分支下钻，用于「左键回到
+/// 可见祖先」；本函数无条件下钻整棵树，用于**焦点修复**——父节点折叠后，被聚焦
+/// 的子节点已不在 expanded 集合里，若仍走可见祖先就会找不到 target 并返回空串，
+/// 使修复静默失效（re-review F-05 实测）。
+pub fn tv_struct_parent(nodes List, target str) str {
+    var parent str = ""
+    var found bool = false
+    var stack List = []
+    var parents List = []
+    var i int = nodes.len()
+    while i > 0 {
+        i = i - 1
+        stack.push(nodes[i])
+        parents.push("")
+    }
+    while stack.len() > 0 {
+        var top int = stack.len() - 1
+        var nd = stack[top]
+        var par str = parents[top]
+        stack.pop()
+        parents.pop()
+        if nd.id == target {
+            parent = par
+            found = true
+        }
+        var kids List = nd.children
+        var j int = kids.len()
+        while j > 0 {
+            j = j - 1
+            stack.push(kids[j])
+            parents.push(nd.id)
+        }
+    }
+    if !found {
+        return ""
+    }
+    return parent
+}
 /// 焦点修复：当前焦点 ID 仍可见则保留其序号；否则回落到最近可用可见祖先，
 /// 再否则首个可用行；无可用行返回 0。绝不改业务 `selected`。
 pub fn tv_repair_focus(rows List, nodes List, expanded List, focus_id str, fallback int) int {
@@ -312,7 +353,10 @@ pub fn tv_repair_focus(rows List, nodes List, expanded List, focus_id str, fallb
     // The focused node is gone (removed, filtered out, or its subtree collapsed):
     // fall back to the nearest still-visible ancestor so focus does not jump to
     // an unrelated row.
-    var anc str = tv_visible_parent(nodes, expanded, focus_id)
+    // Structural parent, NOT `tv_visible_parent`: after a collapse the focused
+    // child is gone from `expanded`, so the visibility-filtered walk cannot find
+    // it and the repair would silently do nothing (re-review F-05).
+    var anc str = tv_struct_parent(nodes, focus_id)
     if anc != "" {
         var j int = 0
         while j < rows.len() {

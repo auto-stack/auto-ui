@@ -81,3 +81,72 @@ fn f05_focus_repair_does_not_change_selected() {
         "shrinking the tree must not clear or change the business selection"
     );
 }
+
+/// F-05 DISCRIMINATOR: collapse the focused child's subtree and assert the
+/// component's OWN `focus_id` moved to the parent.
+///
+/// This reads the instance state rather than the rendered view, because the
+/// rendered view cannot distinguish "focus repaired to the parent" from "focus
+/// left at a stale index that happens to land somewhere visible" — the reason the
+/// earlier attempt at this test could not fail. It also drives the TREE's own
+/// handlers through the instance-scoped dispatch, not the page's no-op ones.
+///
+/// Rows while p1 is expanded: [p1, k1, k2, p2]. Move focus to k1, then collapse
+/// p1: rows become [p1, p2]. The stale index (1) would point at p2, so a correct
+/// repair must return the parent k1's parent — p1.
+#[test]
+fn f05_collapsing_the_focused_subtree_moves_focus_to_its_parent() {
+    let mut c = build("src/front/focus_repair.at");
+    settle(&mut c);
+    let tree = c
+        .bridge()
+        .child_instance_identities_of_type("TreeView")
+        .first()
+        .cloned()
+        .expect("tree instance mounted");
+
+    // Focus k1: rows are [p1, k1, k2, p2], so Down from index 0 lands on k1.
+    c.on_with_input_for_instance("TreeView", "Down", None, Some(&tree));
+    settle(&mut c);
+    let focused_after_down = c.bridge().read_instance_state(&tree, "focus_id");
+    assert_eq!(
+        format!("{focused_after_down:?}"),
+        "Ok(Str(\"k1\"))",
+        "Down must move focus onto the first child"
+    );
+
+    // Collapse p1 by removing it from `expanded` (the app's controlled update).
+    c.on_with_input_for("focusrepair", "CollapseP1", None);
+    settle(&mut c);
+
+    // The collapse itself hides k1, so the next keypress is what must heal focus.
+    // One ArrowUp is enough to trigger the repair; read the component's own
+    // focus_id immediately afterwards. Crucially NO extra navigation is done
+    // after the repair, because that would move focus again and mask which value
+    // the repair produced - the mistake that made the previous attempt unable to
+    // fail.
+    // Use Activate: it heals focus without moving it. Up/Down would both repair
+    // AND step, so the step alone could produce the expected row and hide a
+    // broken repair (measured: Up masked a disabled ancestor branch).
+    c.on_with_input_for_instance("TreeView", "Activate", None, Some(&tree));
+    // Poll until the repaired focus lands: the handler writes focus_id and the
+    // reader observes it after the frame that applies the write, so a single
+    // settle() can read the pre-repair value (measured: it did, which made this
+    // look like a failure when the repair was in fact working).
+    let mut repaired = c.bridge().read_instance_state(&tree, "focus_id");
+    for _ in 0..8 {
+        settle(&mut c);
+        repaired = c.bridge().read_instance_state(&tree, "focus_id");
+        if format!("{repaired:?}").contains("\"p1\"") {
+            break;
+        }
+    }
+    // rows are [p1, p2]. Repair from the vanished k1 must fall back to its
+    // visible PARENT p1 (index 0), not to the neighbour p2 (index 1).
+    assert_eq!(
+        format!("{repaired:?}"),
+        "Ok(Str(\"p1\"))",
+        "focus must fall back to the collapsed child's visible parent, not to a \
+         neighbour; got {repaired:?}"
+    );
+}
