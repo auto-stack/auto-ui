@@ -1,36 +1,44 @@
-//! PLAN-085 T-03 — `onkeydown.*` key ownership must follow what the view can
-//! actually mount.
+//! PLAN-085 T-03 — `onkeydown.*` coverage for widget key ownership and for the
+//! remaining external-package dispatch gap.
 //!
-//! `key_bindings` is a flat `normalized-key -> "Widget.Handler"` map built from
-//! the root view tree plus child widgets. Before T-03 the child half came from
-//! `registry.all()`, which iterates a `HashMap` over the *whole module* —
-//! imports included. Two consequences, both silent:
+//! Two independent surfaces are pinned here:
 //!
-//! 1. **Nondeterministic ownership**: a merely-`use`d component that the view
-//!    never renders could land its `onkeydown.*` entry first and take the key
-//!    from the live page. The page handler then never ran — no error, no
-//!    diagnostic (T-01 P-5 GUI matrix: import-only → `page_hits=0`).
-//! 2. **Unstable replay**: the winner could differ between runs.
+//! **A. Key ownership (fixed).** `key_bindings` is a flat
+//! `normalized-key -> "Widget.Handler"` map. The child half used to come from
+//! `registry.all()`, which iterates a `HashMap` over the whole module —
+//! imports included — so a merely-imported component the view never renders
+//! could win a key from the live page (the key then did nothing, with no error
+//! and no diagnostic), and the winner could differ between runs. T-03 scans
+//! only components the view can mount, in first-appearance order.
 //!
-//! T-03 restricts the scan to components the root view can mount: element tags
-//! resolving to a registered widget, plus routed page targets (mounted through
-//! `outlet`, so they never appear as a tag), in first-appearance order.
+//! **B. External-package dispatch gap (open, AC-03).** A child declared in the
+//! *same file* dispatches its `onkeydown.*` handler; a byte-equivalent child
+//! that arrives through a package `use` collects the same binding but the
+//! handler never runs. `plan085_external_package_child_keydown_dispatch_gap`
+//! records the current behaviour explicitly so it cannot regress silently, and
+//! `plan085_same_file_child_keydown_dispatches` is its required control.
 //!
-//! Fixtures: `tests/fixtures/plan085_keydown/`. Note routed pages live in
-//! `src/front/pages/` — a page in `src/front/` is silently not registered,
-//! which is how the first T-03 attempt mis-read this surface.
+//! Fixtures: `tests/fixtures/plan085_keydown/`. Routed pages live in
+//! `src/front/pages/` — a page placed in `src/front/` is silently not
+//! registered, which is how the first T-03 attempt mis-read this surface.
 
 use std::path::Path;
 
-fn build(rel: &str) -> auto_ui_runtime::ui::dynamic::DynamicComponent {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+fn fixture(rel: &str) -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/plan085_keydown")
-        .join(rel);
-    let code = std::fs::read_to_string(&fixture).unwrap_or_else(|e| panic!("{rel}: {e}"));
-    let fixture_str = fixture.to_string_lossy().to_string();
+        .join(rel)
+}
+
+fn build(rel: &str) -> auto_ui_runtime::ui::dynamic::DynamicComponent {
+    let path = fixture(rel);
+    let code = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{rel}: {e}"));
+    let fixture_str = path.to_string_lossy().to_string();
     auto_ui_runtime::build_dynamic_component(&code, Some(fixture_str.as_str()))
         .expect("fixture component builds")
 }
+
+// ── A. Key ownership ────────────────────────────────────────────────────────
 
 /// Root + routed page: the root keeps its own key, and the page contributes
 /// the key the root did not claim.
@@ -61,8 +69,7 @@ fn plan085_unrendered_import_does_not_steal_page_keys() {
     assert_eq!(
         bindings.get("ArrowDown").map(String::as_str),
         Some("importonly.One"),
-        "page's own onkeydown.down must stay bound; an unrendered import \
-         (ChildBox declares left/right only) must not interfere"
+        "page's own onkeydown.down must stay bound; the unrendered import must not interfere"
     );
     assert_eq!(
         bindings.get("ArrowUp").map(String::as_str),
@@ -98,5 +105,53 @@ fn plan085_rendered_child_contributes_its_keys() {
         bindings.get("ArrowRight").map(String::as_str),
         Some("ChildBox.Right"),
         "a rendered child's onkeydown.right must be bound to the child"
+    );
+}
+
+// ── B. Dispatch: same-file control vs external-package gap ──────────────────
+
+fn dispatch_and_read(rel: &str, widget: &str, event: &str, field: &str) -> i64 {
+    let mut comp = build(rel);
+    // Render once so child instances mount.
+    let (_, _, _) = comp.view_with_debug_gated(false);
+    comp.on_with_input_for(widget, event, None);
+    match comp.bridge().read_state(field) {
+        Ok(auto_val::Value::Int(v)) => i64::from(v),
+        other => panic!("{field} unreadable after dispatch: {other:?}"),
+    }
+}
+
+/// **Control (must stay green):** a same-file child's `onkeydown` handler runs.
+#[test]
+fn plan085_same_file_child_keydown_dispatches() {
+    let hits = dispatch_and_read("src/front/samefile_host.at", "SoloChild", "Down", "hits");
+    assert_eq!(
+        hits, 1,
+        "a same-file child's onkeydown must dispatch to that child's handler"
+    );
+}
+
+/// **Open gap (AC-03):** a byte-equivalent child arriving through a package
+/// `use` collects the binding but its handler does not run.
+///
+/// This asserts the CURRENT, incorrect behaviour so the gap is explicit and
+/// cannot silently change in either direction. When the routing fix lands this
+/// assertion must flip to `1` together with the V-03 keyboard evidence.
+#[test]
+fn plan085_external_package_child_keydown_dispatch_gap() {
+    let comp = build("src/front/pkg_host.at");
+    let bindings = comp.key_bindings();
+    assert_eq!(
+        bindings.get("ArrowLeft").map(String::as_str),
+        Some("ChildBox.Left"),
+        "precondition: the external package child's key IS collected"
+    );
+
+    let hits = dispatch_and_read("src/front/pkg_host.at", "ChildBox", "Left", "hits");
+    assert_eq!(
+        hits, 0,
+        "current known gap: an external-package child's onkeydown is collected \
+         but never dispatched (AC-03 open). If this now returns 1, the routing \
+         fix landed — flip this assertion and update the Plan receipt."
     );
 }
