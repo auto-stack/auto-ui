@@ -503,3 +503,17 @@ Goal round 10 摘要（**T-06 完成**：包/示例文档 + 证据 + Spec delta 
   两份文档已改为显式说明"Space 未绑定"，并在 Spec 提案里禁止在补绑定与用例
   之前声称 Space 可用。
 - 任务计数 **6/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
+2026-11-15：stage: review | review_scope: final | reviewer: plan085-reviewer（独立上下文，未参与实现）| plan_id: PLAN-085 | plan_revision: r2 | outcome: needs_fix | worktree: D:/autostack/.wt/ui-085/auto-ui | branch: codex/ui-085-tree-view | reviewed_commit: a348c487 | base_commit: c78208de | dependency_revisions: auto-lang 86c7fd50b / auto-web 0adebc0 / auto-down 5af11a3 clean；auto-man 54fe407 dirty(Cargo.lock) | spec_inputs: docs/specs/ui/tree-view.md 不存在；examples-ownership.md 未改；SD 提案 @ a348c487 | acceptance_results: AC-01 pass；AC-02 fail；AC-03 fail；AC-04 partial；AC-05 partial；AC-06 fail；AC-07 本记录；AC-08 pending | pending_closeout_gates: Linux/WSL native not_run；统一回归 pending | findings: F-01..F-13（High: F-01,F-02,F-03,F-04）| evidence: plan-artifacts/plan-085/{review-native,review-vue,review-native2,review-vue2,review-narrow,review-probe-dup} | next: work（T-02/T-03/T-05/T-06 受影响子项）
+
+复审要点（独立复算，产品门我未采信回执，由 reviewer 另起 fresh out-dir 实跑）：
+- **双端产品门确实 pass 且可复现**：native 两次（10.29s、矩阵 `{a:5,b:2}`、exit 0、端口回收、重开再选）、vue 两次（33.92s、真实 Chromium）。这部分成立。
+- **新用例耗时全部 ≤10s**（最大 2.68s），测试成本规则满足。
+- **但 4 条在合同内的硬缺口**：
+  - F-01 层级/缩进丢失：行记录无 `depth`/`guides`，`Section 1.1` 与父同列（旧组件每层渲 `w-4`）。
+  - F-02 懒加载目录不可展开：`has_kids = kids.len() > 0 && !leaf`，夹具 `images`（dir/children 空/非 leaf）无 chevron，与 §5「未加载目录可请求展开」冲突。
+  - F-03 错误态无文本：只有「重试」按钮，无「加载失败」；而 README/提案三处声称有 → 文档失真。
+  - F-04 重复 ID 仍发布歧义可操作行：实测 6 行、同 ID 可两次选中；且只在 `Init` 校验，`Validate` 无消费者。SD §2「不发布歧义可操作行」因此不成立。
+- **关键 oracle 无证据**：F-05 焦点修复未实现（`tv_repair_focus` 死代码）；F-06 真实键盘从未自动化（门内零键盘动作，`plan085_tree_keyboard` 派发的是 msg 变体名）；F-07 旧 `vnode_` 拒绝零用例；F-08 role/level 语义缺失。
+- **其它**：F-09 1000 节点/64 层无入库证据且窄窗无断言（实测窄窗文本裁切）；F-10 018/027 仍留未实例化副本，AC-05「四个示例单源」字面未达（正确处置是改 AC 措辞或删副本，不得虚构消费）；F-11 auto-man lock 脏与「只读零改动」表述不符；F-12 SD 编号与 Plan 表不一致；F-13 decisions 里「不得为过门搬回根 widget」禁令被 round 8 反转却未撤销。
+- **两个已知遗留的判定**：Linux `not_run` 合规（环境边界）；路由页形态差异合规但需一句批准（两个真实消费者与夹具均为根托管），问题只在 F-13 禁令未撤。
+- 结论：不 `needs_replan`——缺口可定位、修复局部（包内派生 + 行渲染 + 用例），不需改设计契约。
