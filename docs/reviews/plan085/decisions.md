@@ -111,36 +111,34 @@ widget TreeView (
   可复现规则：**同名键在页与包组件之间、或包组件多实例之间冲突时，派发丢失且
   无诊断**；键名不冲突时正常。这解释了四示例「只有鼠标」的历史状态——树组件的
   `down/up/enter/left/right` 一旦进入包注册表就会与其它组件同名键互撞。
-- **T-03 进一步定位（组件级诊断，`tests/fixtures/plan085_keydown/`）**：
-  `build_dynamic_component(App).key_bindings()` 实测——
-  - `App` 根声明 `down`+`up` → 映射含两键（`App.RootDown/RootUp`）。
-  - `App` 根只声明 `down`，路由页 `page` 声明 `down`+`up` → 映射**只有**
-    `ArrowDown -> App.RootDown`；页的 `ArrowUp` **完全缺席**。
-  → 结论：路由页（经 `outlet` 渲染，永不以元素 tag 出现）的
-  `onkeydown.*` **根本不进入根组件的收集面**；`registry.all()` 也不含它。
-  因此缺口有两层：
-  1. **路由页绑定缺失**：`collect_onkeydown_bindings_with_registry` 只扫
-     根 `view_tree` + `registry.all()`，路由页两条路径都不覆盖。
-  2. **归属不确定**：`registry.all()` 迭代 `HashMap`，同名键先到先得 →
-     未挂载的导入组件可抢走键归属（T-01 六行矩阵的 import-only 行）。
-- **T-03 最小修复点（冻结，含已验证方向与未验证部分）**：
-  (a) 收集面改为「本帧可挂载的组件」——根 `view_tree` 里解析为注册组件的
-  element tag + 路由目标（按 `route.module` 经 `get_by_route_module` 解析），
-  扫描顺序确定（首现序），不再遍历 `HashMap` 全体；
-  (b) 为命中键补**实例限定寻址**（复用既有 `TypedInst` identity 与
-  `call_handler_for(widget, event, state_obj_id)` receiver 参数化），使同页
-  多实例各自可达。
-  **本轮只完成定位与方向验证，未提交实现**：把 (a) 落到 `dynamic.rs` 后，
-  组件级诊断仍显示路由页绑定为 0（`registry.get_by_route_module("page")`
-  在 `App` 构建期也未命中），说明路由页的注册时机晚于根组件构建，仅改收集面
-  不够，需与 outlet 页装载路径一起改。该改动影响所有 App 的启动期键位，必须
-  单独验证，故**本轮已回退未验证实现**，保持树绿；T-03 下一轮从这一条继续。
-- 若上述接线在预算内不可行：按 Plan §5 **具名记录未闭项**，保持 AC-03 未关闭，
-  **不得**静默降级为鼠标专用树，也不得给四示例各留一份键盘算法。
-- 反例保留：上表六行即修复前后的判据，T-03/T-05 必须同时复跑；不得只留
-  「单实例正例」而丢掉多实例与未实例化导入两行。组件级诊断夹具
-  `crates/auto-ui-runtime/tests/fixtures/plan085_keydown/` 随 T-03 落地为永久
-  回归（根键 / 路由页键 / 未挂载导入键三者互不串扰）。
+- **T-03 结论（2026-11-15，已修正上一版的错误归因）**：
+  第一版把「路由页 `onkeydown.*` 缺失」当成缺陷，**那是夹具布局错误**——路由页
+  必须放在 `src/front/pages/`；放在 `src/front/` 的页会被静默忽略。改正后
+  `build_dynamic_component` 的组件级诊断显示路由页的键**正常进入**根组件收集面
+  （`App` 根声明的键 + 页声明的非冲突键并存）。该误导已写入本文件顶部与测试
+  注释，避免后来者重犯。
+- **真正修复的缺陷（已提交 `815fec34`）**：`key_bindings` 的**键归属不确定**。
+  子件半边来自 `registry.all()`，而它迭代 `HashMap` 且覆盖**整个模块**
+  （含 import）。后果：未被渲染、仅 `use` 进来的组件可以抢走页面的键——
+  此时按键什么都不发生，**无错误、无诊断**；且每轮赢家可能不同。GUI 实证
+  `page_hits=0`（T-01 P-5「import-only」行）。修复 = 只扫**本帧可挂载**的组件
+  （`view_tree` 中解析为注册组件的 tag + 路由目标，后者经 `outlet` 挂载故
+  永不以 tag 出现），并按首现序**传递**其可挂载子件；根仍先扫，保住自己的键。
+  永久反例 `crates/auto-ui-runtime/tests/plan085_keydown_ownership.rs` 三条
+  （根与路由页共存、未渲染导入不得抢键、已渲染子件贡献自己的键）全绿。
+- **仍开缺口（AC-03 未关闭，已用测试钉住）**：**外部包组件的 keydown 不派发**。
+  同文件子件的 `onkeydown` 正常派发（控制组 `hits=1`）；等价的子件经 package
+  `use` 到达时，绑定**被正确收集**（`key_bindings` 含 `ChildBox.Left`），但
+  处理器**不执行**（`hits=0`）。已由
+  `plan085_external_package_child_keydown_dispatch_gap` 显式断言当前行为
+  （含前置断言证明绑定确实存在），修复落地时必须与 V-03 证据一起翻转为 `1`，
+  不允许静默变化。
+- **下一步（T-03 续）**：定位 package 组件的实例/派发归属。已知线索：同文件
+  子件与包组件在 `child_instance_identities_of_type` 上的可见性差异；不含
+  `onkeydown` 的包实例（`ChildSolo` 同时存在时）能正常派发——说明这是**包内
+  键位绑定 + 实例解析**的交叉问题，而非组件 API 问题。不得为此给四示例各留
+  一份键盘算法，也不得降级为鼠标专用树。
+- 若上述接线在预算内不可行：按 Plan §5 **具名记录未闭项**，保持 AC-03 未关闭。
 - Tab 离开树：树容器不加入逐节点 Tab 序列（组件不产生 focusable 输入），
   沿用既有 `__focus_next_input` 焦点环；空树/全禁用树同样可离开。
 
@@ -184,7 +182,7 @@ widget TreeView (
 | P-2 Init 内构造节点树 | 受控 `nodes` 由 `Init` 里 `List.push(record)` 构造是否成立 | **pass**：`{id,label,children,is_leaf,badge}` 记录可构造、可嵌套、`len()`/索引/`for` 迭代均正常；`children` 内联字面量与先建子列表两形均可 |
 | P-3 回调回送 | 包组件 `on_toggle: msg` 是否可回送父 handler | **pass**：`handler: .TreeViewdemo@//TreeView#0.Togglesch1`，父状态 `expanded` 更新、行视图重派生 |
 | P-4 行状态渲染 | `class: f"…${r.state}"` 能否按行变化 | **fail→定案**：循环记录字段在 `class:` f-string 中渲染为空（`base  tail`），同记录 `text f"…"` 正常。改用字面量分支后 focused/selected/disabled/loading/error 全部正确可见 |
-| P-5 子件键盘 | 包组件内 `onkeydown.*` 是否派发 | **部分 pass + 缺口定案（六行判据）**：纯页/根页声明多键均 pass；页与已实例化子件声明同名键 pass；**仅 `use` 导入未实例化的包组件即让同名页键失效**（`page_hits=0`）；键名不冲突 pass；子件**双实例**同名键两者皆 `hits=0`。根因 = `key_bindings` 扁平键名表把未实例化 registry 子件也合并进来（`dynamic.rs:568-574`），且无实例归属键 |
+| P-5 子件键盘 | 包组件内 `onkeydown.*` 是否派发 | **已修正为两件事**：①**键归属不确定**（`registry.all()` 遍历 HashMap 且含未渲染导入，可抢走页面键，实测 `page_hits=0`）——已修复 `815fec34` + 三条永久反例；②**外部包组件 keydown 不派发**——同文件子件 `hits=1`（控制），包组件绑定已收集但 `hits=0`——**仍开**，已由 `plan085_external_package_child_keydown_dispatch_gap` 钉住 |
 | P-6 代表规模 | 1000 节点是否完整渲染 | **pass**：1000/1000 行，快照 458 273 字节，末行 `Node 1000` 在树内 |
 | P-7 MCP 行动作 | `autoui_action press` 是否命中行/chevron/重试并带正确 ID | **pass**：chevron→`toggle:ch1`、行→`select:p1`、重试→`retry:p2`（且 `errorIds` 清除）；真实 026 组件同形复跑通过 |
 | P-8 双实例 | 同 ID 两实例是否互不串扰 | **pass（可选面）**：两实例各自持 `focus_index`，父状态单源更新后两实例同步投影；不存在共享实例局部态 |
