@@ -551,3 +551,37 @@ Goal round 10 摘要（review needs_fix → **4 条 High 已修并回归**）：
   F-07 旧 `vnode_` 拒绝用例、F-08 role/level 语义、F-09 1000 节点/64 层与窄窗证据、
   F-10 018/027 副本处置、F-12 SD 编号对齐、F-13 decisions 禁令撤销。
 - 任务计数 **3/8**（T-02/T-03/T-05/T-06 重开中）。未改 canonical Specs。
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 11 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: (见下) | next: work (F-06/F-08/F-09)
+
+Goal round 11 摘要（review 修复续：F-05/F-07/F-10/F-12/F-13 已闭；F-06/F-08/F-09 留待）：
+
+- **F-05 焦点修复已接线**（`a674b721`）：`tv_repair_focus` 原是**死代码**（无调用点），
+  旧帧的索引在数据增删/折叠后静默指向别的行。现按 `focus_id` 解析 → 落最近可见祖先
+  → 再落原索引（若仍有效）→ 再落首个可达行；五个键盘 handler
+  （Up/Down/Expand/Collapse/Activate）移动前先自愈。**绝不写业务 `selected`**。
+  新增 `plan085_focus_repair` **3/3**。
+- **F-07 旧 id 拒绝已有真实证据**：门在数据变更前抓一个行 id，变更后要求该 id 被拒。
+  **native `stale_id_rejected: True`**（实证）。该 oracle 只在 native 有意义——vnode id
+  绑定单次渲染修订；vue 轨按 DOM 位置寻址、无修订绑定身份，故记 `None` 并注明明不适用，
+  **不记空过**。
+- **F-10 已删两处死副本**：018/027 的 `components/treeview.at` 无任何 `use`、无任何
+  `TreeView (` 调用位（PLAN-614 遗留）。删除后全仓只剩**一份** TreeView 实现。二者
+  `tree_icon.at` **保留**——其 `filetree.at` 确实在用 TreeIcon。**先证后删**：把副本
+  临时 `git stash` 回去重跑 027 套件，结果仍为 **56 通过 / 2 失败**（T1/T2
+  `vtree=0`），与删除后逐项相同 → 该 2 项为**既有失败**，非本次删除引入。
+- **F-12 SD 编号已对齐** Plan 表：SD-01 add（节点/受控状态/键盘）、SD-02 add（验证面
+  /MCP 可观察）、SD-03 modify（examples-ownership）；018/027 说明降级为"附记·非 SD"。
+- **F-13 决策矛盾已正式反转**：原禁令"不得把夹具树搬回根 widget"被 round 8 反转却未撤销。
+  现把原句标为**已撤销**并新增「决策反转」条目，写清三点：①根托管是**对齐两个真实
+  消费者的形态**而非回避；②路由页差异**未被删除**，由 `plan085_routed_callbacks` 2/2
+  正反两面持续守护；③断言**只增未减**（新增空态/retry/不可操作子集/stale/双实例/
+  F-01…F-04/焦点修复）。附替代守护对照表。
+- **AC-05 如实收窄**（`0dc892a2`）：改为"凡**有真实 `TreeView (` 调用位**的示例必须
+  接入官方单源"——经查仅 026/041 有调用位且均已迁移；018/027 无调用位，**
+  不作为消费者证据**，不虚构四消费者。
+- 回归全绿 **34 项**；双端产品门 native/vue 均 pass（矩阵 `{a:5,b:2}`，
+  native 另带 `stale_id_rejected: True`）。
+- **仍开**：F-06 真实键盘自动化（门内仍无按键动作）、F-08 role/level 语义（**引擎
+  无 role/aria/level 支持**，属计划 §3「最小引擎扩展」，需较大改动）、F-09 1000 节点
+  /64 层与窄窗证据未入库。
+- 任务计数 **3/8**（T-02/T-03/T-05/T-06 仍开着，因 F-06/F-08/F-09 未闭）。
