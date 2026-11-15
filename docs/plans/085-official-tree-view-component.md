@@ -795,3 +795,23 @@ Goal round 18 摘要（**N-02 已作为契约闭合**，不需语言层改动）
   单用例 n02 5.61s < 10s。
 - **任务计数 7/8**；F-01…F-13 + N-01 + N-02 全部闭合。下一轮：定向复核 N-01/N-02，
   通过后进 T-08 merge。
+2026-11-16：stage: review | review_scope: final（targeted：N-01/N-02）| reviewer: plan085-n-review（独立上下文）| plan_id: PLAN-085 | plan_revision: r2 | outcome: needs_fix | reviewed_commit: caaf1326 | worktree: D:/autostack/.wt/ui-085/auto-ui | branch: codex/ui-085-tree-view
+
+复审结论：
+- **N-01：真闭（已确认）**。reviewer 自验 `tv_total_nodes` 计所有层级、界限用总数；
+  **自做破坏-恢复**：改成 `nodes.len() >= 512` → n01 FAILED（0/1001 行、17.18s、
+  `WARN[budget] tv_member` 刷屏）；恢复 → PASS。**并自测界限上限**：1024 → 1000 平铺
+  用例 FAILED（0 行 / 17.26s）；5000 → n01 FAILED（18.04s）。成本曲线实测
+  256→1.81s、512→5.61s、700→9.78s、1000→17.2s，确为二次。**判定 512 站得住**，
+  并指出 512 是含边界，512 节点已耗 5.6s，余量偏薄（observation，非阻断）。
+- **N-02：未闭（缺陷仍在）**。reviewer 两条破坏-恢复都判别成功（空掉 `dup` →
+  "must report by name" 失败；只去掉 `dupFlag=true` → 601 行仍可操作）。**但关键
+  发现：我声称的"契约"不可履行**——`on_with_input_for_instance` 是 **Rust
+  `DynamicComponent` 方法**，全 auto-lang 仓 1859 个 `.rs` **零**处 `.at` 可达的
+  父→子派发原语（DSL 只有子→父 emit）。其独立复现：600 节点树不调 Validate →
+  601 条可操作行、无报告、`r0` 出现两次 = **N-02 本体**。
+- 新增 **N-03**（README 把 Rust-only API 写成消费者义务，N-02 假闭的根因）、
+  **N-04**（注释仍称 Validate "无派发方"，自相矛盾）、**N-05**（`tv_duplicate_id`
+  的 doc 被错接到 `tv_total_nodes`）。
+- 回归：runtime 29/29、tools 2/2、产品门 native PASS（`{a:5,b:2}`、
+  `stale_id_rejected:true`）；n01 2.17s、n02 5.94s 均 <10s。
