@@ -1,0 +1,30 @@
+// PLAN-085 F-09 fixture: 1000 flat nodes (wide sample).
+widget scalewide {
+    msg { Init, Toggle(str), Select(str), Retry(str) }
+    model {
+        var nodes List = []
+        var expanded List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .sel,
+                      on_toggle: .Toggle($event), on_select: .Select($event), on_retry: .Retry($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            var i int = 0
+            while i < 1000 {
+                a.push({ id: f"n${i}", label: f"Node ${i}", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+                i = i + 1
+            }
+            .nodes = a
+        }
+        .Toggle(v str) -> { }
+        .Select(v str) -> { .sel = v }
+        .Retry(v str) -> { }
+    }
+}

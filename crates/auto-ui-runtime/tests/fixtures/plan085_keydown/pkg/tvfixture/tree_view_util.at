@@ -127,17 +127,19 @@ pub fn tv_row_icon(nd_icon str, label str, kind str, has_kids bool, open bool, d
 /// 观察其存在）但 `focused` 恒 false 且不占键盘序号。
 /// 行记录 = {id, label, has_kids, open, disabled, selected, focused,
 /// loading, error, leaf, icon, badge, depth}。
-pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, loading List, error List, focus int, directory bool) List {
+pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, loading List, error List, focus int, directory bool, dupGuard bool) List {
     var out List = []
     var reachable int = 0
     // Depth travels WITH each pending node — a parallel index array desynchronises
     // as soon as children are pushed mid-walk (which was silently producing
     // depth 0 for every row, review F-01). Each stack entry is a 2-element list
     // [node, depth], the one pairing that cannot drift.
-    var dup bool = false
-    if tv_duplicate_id(nodes) != "" {
-        dup = true
-    }
+    // Structurally-invalid trees are flagged by the component on Init/Validate,
+    // which pass `dupGuard` in. Re-deriving duplicate ids here would rescan the
+    // whole tree on EVERY frame at O(n^2) — with 1000 nodes that exhausts the
+    // instruction budget and the tree never renders (measured: handler Init
+    // failed with "instruction budget exhausted" at 10M steps).
+    var dup bool = dupGuard
     var seed List = []
     var si int = nodes.len()
     while si > 0 {

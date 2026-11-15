@@ -52,12 +52,15 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
     model {
         var focus_index int = 0
         var invalid str = ""
+        // Structural validity, computed once per Init/Validate rather than on
+        // every derivation: rescanning for duplicates each frame is O(n^2) and
+        // blows the instruction budget on large trees.
+        var dupFlag bool = false
         var focus_id str = ""
     }
 
     computed {
-        rows => tv_derive_rows(.nodes, .expanded, .selected, .disabledIds, .loadingIds, .errorIds, .focus_index, .directory)
-        reachable => tv_count_rows(.nodes, .expanded, .disabledIds)
+        rows => tv_derive_rows(.nodes, .expanded, .selected, .disabledIds, .loadingIds, .errorIds, .focus_index, .directory, .dupFlag)
     }
 
     view {
@@ -88,7 +91,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
                         // right of its parent). Literal branches, because a
                         // class/width f-string does not interpolate loop fields
                         // on the VM track.
-                        if r.depth >= 1 {
+                        if r.depth == 1 {
                             div (style: "w-4 shrink-0") {}
                         }
                         if r.depth == 2 {
@@ -207,8 +210,10 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
             var dup str = tv_duplicate_id(.nodes)
             if dup != "" {
                 .invalid = f"树结构非法:重复节点 ID ${dup}"
+                .dupFlag = true
             } else {
                 .invalid = ""
+                .dupFlag = false
             }
         }
         // 结构校验可被消费者在 props 变化后主动触发（受控更新后复核）。
@@ -216,8 +221,10 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
             var dup str = tv_duplicate_id(.nodes)
             if dup != "" {
                 .invalid = f"树结构非法:重复节点 ID ${dup}"
+                .dupFlag = true
             } else {
                 .invalid = ""
+                .dupFlag = false
             }
         }
         .Down -> {
