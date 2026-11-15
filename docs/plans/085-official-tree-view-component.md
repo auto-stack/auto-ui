@@ -907,3 +907,29 @@ Goal round 21 摘要（N-02 扫描器复审 → 两个可达缺陷已修）：
   n02_pipe 2.76s、f09_deep 1.02s（均含 cargo 开销）。回归全绿 **34 项**；
   产品门 native pass（`{a:5,b:2}`、`stale_id_rejected: True`）。
 - **任务计数 7/8**；下一轮就 `2fe5a536` 做 N-02a/b 定向复核，通过后进 T-08 merge。
+2026-11-16：stage: review | review_scope: final（targeted：N-02a/N-02b/转义单射性）| reviewer: plan085-final-review（独立上下文）| plan_id: PLAN-085 | plan_revision: r2 | outcome: **pass** | reviewed_commit: 28568804 | followup_commit: 3eb1c617 | worktree: D:/autostack/.wt/ui-085/auto-ui | branch: codex/ui-085-tree-view
+
+复审结论（**pass**，附一条 docs-only 合并前置条件，已在本轮修掉）：
+- **N-02a 闭**：seed 为 `""`；空 id 返回 `"<empty-id>"`，与空串哨兵结构上可分；调用方
+  映射为具名错误。reviewer 自建 7 组用例（空 id 首/中/末/两个、空+真重复×2、合法无重复）
+  全部正确。**破坏-恢复**：seed 改回 `"|"` 且禁用空 id 检查 → 目标用例
+  **FAILED left:3 right:0**。
+- **N-02b 闭**：已无回退分支——唯一按 id 的操作是 `.replace(...)`（每结点常数工作），
+  无 `nd.id.contains("|")` 分支、无 `seenIds` 列表、无逐元素循环。reviewer **隔离扫描器
+  单独计时**：plain 1000 = 200ms、pipe 1000 = 191ms、**pipe 3000 = 197ms**（与 plain
+  同量级 ⇒ 确为原生）。pipe id 中的真重复仍被捕获（两个 `p|1` → 0 行 + 具名错误）。
+  并诚实说明：其早期一次 1000-pipe 探针测得 25.69s，但 plain 对照同样慢且当时有
+  并发 release 构建占 CPU ~90%，安静复测 ~2s —— **属机器争用非缺陷**，未据此报错。
+- **转义单射性**：在 `2fe5a536` 时冲突**真实存在**（`a|b` 与 `a!!b` 撞同一 token →
+  合法树 0 行）；在 `28568804` 已消除，reviewer 三重验证：结构归纳、**穷举 {a,b,!,|}
+  长度≤5 共 1364 个串零碰撞**、以及过 VM 的 6 组对抗对（含 `a!0b`、`a!1b`）全部保持
+  2 行。且**回归到 `|`→`!!` 时新用例 FAILED 而 pipe 用例仍 PASSED**，证明它是独立判别器。
+- 回归：runtime **33/33**、tools 2/2、产品门 native **pass**（`{a:5,b:2}`、
+  `stale_id_rejected:true`）。单例耗时全 <10s（n02_large 7.73–8.38s，余量偏薄已记录）。
+- **两条非阻断发现，本轮均已修**（`3eb1c617`）：
+  ① README 伪代码仍写 `seen = "|"`——正是 N-02a 的错误种子，且无转义、无空 id 处理
+  （散文部分已为真，只有代码块说谎）；
+  ② `n02_empty_id_...` 只断言"0 可操作行"，若空 id 退化为重复哨兵仍会通过；已加断言
+  具名字符串 `树结构非法:存在空节点 ID`。
+- 另一观察（未修，记录）：包与测试夹具的 `tree_view_util.at` 是两份拷贝，仅靠人工同步，
+  无常驻守卫。
