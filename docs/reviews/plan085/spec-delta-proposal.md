@@ -5,7 +5,7 @@ T-06 提出、T-08（merge）合入 canonical。**本轮不写 `docs/specs/`**�
 
 ---
 
-## SD-01 → 新建 `docs/specs/ui/tree-view.md`
+## SD-01 → add `docs/specs/ui/tree-view.md`（节点/受控状态/展开选择/加载错误/键盘语义；覆盖 AC-01, AC-02, AC-03）
 
 > 分类：feature ｜ 状态：active ｜ 来源计划：`docs/plans/085-official-tree-view-component.md`
 
@@ -102,7 +102,23 @@ T-06 提出、T-08（merge）合入 canonical。**本轮不写 `docs/specs/`**�
 
 ---
 
-## SD-02 → 修订 `docs/specs/ui/examples-ownership.md`
+
+## SD-02 → add `docs/specs/ui/tree-view.md`（验证面；覆盖 AC-03, AC-04, AC-06）
+
+验收与可观测面作为同一 Spec 文档的独立增补条目：
+
+- 双端验收：Windows native VM 与 Vue 必须同语义通过；Linux native 与统一回归按
+  各计划 closeout 门记录，缺环境记 `not_run`，**不得记 pass**。
+- MCP 稳定绑定：行/展开/重试动作按稳定 `vnode_` id 命中；`vnode_` 绑定当前渲染
+  修订，**数据变化后旧 id 必须被拒绝**，不得按位置重定向（实测 native
+  `stale_id_rejected: True`）。Vue 轨按 DOM 位置寻址，无修订绑定身份，该 oracle
+  在 Vue 轨不适用并显式记为不适用，不记空过。
+- 视觉证据：浅/深两套真实截图；空态、加载中、加载失败+重试、禁用、选中、焦点
+  在同一张图中可区分。
+- 代表规模与窄窗：1000 平铺 + 64 层嵌套的末行可达；窄窗下 label 不裁切或可滚动
+  （**本计划未入库该证据，作为显式 pending 门，不记 pass**）。
+- 验收不接受"只编译"或"只有截图"。
+## SD-03 → modify `docs/specs/ui/examples-ownership.md`（正式包单源/示例接入/blueprint owner 不变；覆盖 AC-05）
 
 在 §3 依赖定位之后追加一条：
 
@@ -119,7 +135,7 @@ T-06 提出、T-08（merge）合入 canonical。**本轮不写 `docs/specs/`**�
   - `TreeView` 托管在 **App 根 widget**（两消费者与示例的形态）；路由页形态
     的回调差异由 `plan085_routed_callbacks` 在库级守护，不在本 Spec 承诺。
 
-## SD-03 → 记录（不改 canonical）
+## 附记（非 SD，不改 canonical）
 
 - `examples/ui/018-book-reader` 与 `examples/ui/027-file-manager` **没有**
   `TreeView (` 调用位，其 `components/treeview.at` 是从未实例化的副本。
