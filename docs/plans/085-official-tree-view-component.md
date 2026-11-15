@@ -884,3 +884,26 @@ Goal round 20 摘要（**N-02 真正闭合**——我前两轮的判断都错了
 - reviewer 另指出：`n02_large_tree` 单例 7.75s，头部余量比"2.13s"（那是 f09）更薄；
   且 HEAD 在复审期间推进（`09989578`→`636947c6`），合并前需重新绑定修订。
 - 套件 26/26、tools 2/2、产品门 native pass。
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 21 | from: review | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 2fe5a536 | next: review（N-02a/b 定向复核）→ merge
+
+Goal round 21 摘要（N-02 扫描器复审 → 两个可达缺陷已修）：
+
+- **复审确认核心方案成立**：`contains` 确为原生下沉；界限确已删除（`tv_total_nodes`
+  零调用方）；`|id|` 框架在对抗用例下正确（`ab`+`b`、`a`+`aa` 无误报）；**嵌套重复**
+  正确检出；reviewer 自做破坏-恢复（用行号插入避开 CRLF 陷阱）→ 601 条可操作行。
+- **修掉 N-02a（High）空 id 静默中止扫描**：`seen` 原以 `"|"` 播种，首个 token 后
+  `||a|` 已含空 id 的 token `||`，空 id 返回 `""`（＝"无重复"哨兵）→ 扫描提前结束、
+  后续真重复漏检（实测 3 条可操作行）。现：`seen` 以 `""` 播种（首 token 为 `|a|`，
+  不可能含 `||`），且**空 id 作为独立具名错误**上报（`树结构非法:存在空节点 ID`），
+  不再混入 token 流。**判别力实证**：旧 seed → 3 行；修复后 → 0 行。
+- **修掉 N-02b（High）含 `|` 的 id 回退 O(n²)**：上一版对这类 id 回退到逐元素 VM 比较，
+  重演 F-09/N-01 已消除的缺陷（实测 600 → 14.89s、1000 → 71.94s，**0 行**）。
+  现改为**把 `|` 转义出 id**（`|`→`!!`），所有 id 都留在原生 `contains` 路径。
+  实测 1000 个含 `|` 的 id：**2.08s，全部 1000 行渲染**。
+- 这也恢复了 README"成员检测对所有 id 均为原生"的说法（上一版的 pipe 回退使其失真）。
+- 新增 `dup_empty.at` + `n02_empty_id_does_not_abort_duplicate_detection`、
+  `dup_pipe_large.at` + `n02_pipe_ids_stay_fast_and_fully_render`。
+- 单例耗时全部 <10s：f09_thousand 2.87s、n01 2.85s、n02_large 7.73s、
+  n02_pipe 2.76s、f09_deep 1.02s（均含 cargo 开销）。回归全绿 **34 项**；
+  产品门 native pass（`{a:5,b:2}`、`stale_id_rejected: True`）。
+- **任务计数 7/8**；下一轮就 `2fe5a536` 做 N-02a/b 定向复核，通过后进 T-08 merge。
