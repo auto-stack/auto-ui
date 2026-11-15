@@ -613,3 +613,30 @@ Goal round 12 摘要（**F-06 真实键盘已闭，并挖出两个真缺陷**）
 - **仍开**：F-08 role/level 语义（引擎无 role/aria/level，属计划 §3 允许的
   「最小引擎扩展」，需较大改动）、F-09 1000 节点/64 层与窄窗证据未入库。
 - 任务计数 **3/8**（T-02/T-03/T-05/T-06 仍开，只差 F-08/F-09）。
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 13 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: a44c2e0f | next: work (F-08 role/level) 或 review
+
+Goal round 13 摘要（**F-09 已闭，并修掉一个真实的规模缺陷**）：
+
+- **F-09 样本已入库**：`plan085_scale` **2/2**——1000 平铺（全部 1000 行派生、
+  `Node 999` 可达）与 64 层嵌套（64 行全出、`Deep 63` 存在、缩进封顶）。
+- **但样本先暴露了真缺陷，不是"缺样本"**：1000 节点时 **Init handler 直接
+  `instruction budget exhausted (10,000,000 steps)`，树渲染 0 行**。根因两条：
+  1. `tv_derive_rows` **每帧**都重扫整树查重复 ID，复杂度 O(n²)。现改为
+     **Init/Validate 算一次**并作为 `dupGuard` 传入（组件用 `dupFlag` 模型字段承载）。
+  2. 删掉一个**死 computed `reachable`**（每帧遍历整棵树，视图里无任何消费者）。
+  修后 1000 节点正常出 1000 行。
+- **顺带修掉缩进缺陷**：缩进分支里残留 `r.depth >= 1`，导致 1..4 每支都命中，
+  每行叠加 5 个缩进单元（截图实测 Deep 5 之后越缩越窄直至跑出画面）。改回
+  `r.depth == 1` 的互斥分支后，深行统一用封顶宽度。
+- **截图证据**：`plan-artifacts/plan-085/deep/src/front/tmp/autoui-screenshot-*.png`
+  ——420×560 窄窗下 64 层可读、缩进封顶、末层不再越界。
+- 回归全绿 **27 项**：`plan085_scale` 2/2、`plan085_focus_repair` 3/3、
+  `plan085_review_fixes` 4/4、`plan085_empty_state` 1/1、
+  `plan085_tree_keyboard` 8/8、`plan085_keydown_ownership` 5/5、
+  `plan085_routed_callbacks` 2/2、tools `tree_view_component` 2/2。
+  产品门 native 仍 pass（`{a:5,b:2}`、`stale_id_rejected: True`）。
+- **唯一仍开**：**F-08 role/level 语义**——引擎侧完全没有 role/aria/level 概念
+  （全仓无该能力），属计划 §3 允许的「最小引擎扩展」，是剩下最大的一项；
+  需新增视图可访问性属性通道 + 快照输出 + 断言。下一轮评估实现或按合同
+  提出具名收窄。
+- 任务计数 **3/8**（T-02/T-03/T-05/T-06 仍开，只差 F-08）。
