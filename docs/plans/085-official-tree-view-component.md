@@ -711,3 +711,25 @@ Goal round 15 摘要（T-07 复审 → needs_fix；本轮修掉复审指出的 2
   与提案/Plan 表对齐，并补 SD-02 验证面条目）。
 - 回归全绿 **28 项**；产品门 native 仍 pass（`{a:5,b:2}`、`stale_id_rejected: True`）。
 - **任务计数 7/8**；下一轮就 `0ce2638f` 再做一次定向复核（只验 F-04/F-05 两条）。
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 16 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 2ce11df0 | next: review（F-05/F-04 定向复核）
+
+Goal round 16 摘要（F-05 第二次修复——这次有**真正可判别**的 oracle）：
+
+- **第一次修复仍是错的，两个独立缺陷**：
+  1. `tv_visible_parent` 只沿**已展开**分支下钻。这对它自己的调用方（ArrowLeft
+     回**可见**祖先）是对的，但对焦点修复**完全无用**：父节点折叠后，被聚焦的
+     子节点已不在 `expanded` 里，walk 找不到它 → `found=false` → 返回 `""` →
+     修复静默跌回"陈旧索引"分支。**新增 `tv_struct_parent`**（无条件下钻整棵树）
+     供修复使用；`tv_visible_parent` 保留原语义给 ArrowLeft。
+  2. `tv_repair_focus` 仍带着上一次的**错参**调用。现签名
+     `rows, nodes, expanded, focus_id, fallback`，7 个调用点一致。
+- **F-05 能扛过两次失败尝试，是因为我的测试不会失败**，三个不同原因逐一修掉：
+  ①第一个测试按的是**页面**的 `Down`（空实现），不是树的；
+  ②第二个在 `Up` 之后读焦点，而 `Up` 既修复**又**步进，步进本身就能产生期望行；
+  ③第三个的 `Activate` 调用被一次坏编辑**吞进注释**，根本没派发。
+  现在：派发到树实例 → 用 `Activate` 触发修复（只修复不移动）→ 读组件自身
+  `focus_id` → 轮询等待写入生效。
+- **判别力已实证**：把祖先分支改成空串 stub 时测试报 **p2**（邻居）；分支在位时
+  报 **p1**（父节点）。这是本轮唯一可接受的"测试有效"证明。
+- 回归全绿 **27+2 项**；产品门 native pass（`{a:5,b:2}`、`stale_id_rejected: True`）。
+- **任务计数 7/8**；下一轮做 F-04/F-05 定向复核（只验这两条）。
