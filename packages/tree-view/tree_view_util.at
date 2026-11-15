@@ -131,26 +131,19 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
     var out List = []
     var reachable int = 0
     // Depth travels WITH each pending node — a parallel index array desynchronises
-    // as soon as children are pushed mid-walk (which was silently producing
-    // depth 0 for every row, review F-01). Each stack entry is a 2-element list
-    // [node, depth], the one pairing that cannot drift.
-    // Structurally-invalid trees are flagged by the component on Init/Validate,
-    // which pass `dupGuard` in. Re-deriving duplicate ids here would rescan the
-    // whole tree on EVERY frame at O(n^2) — with 1000 nodes that exhausts the
-    // instruction budget and the tree never renders (measured: handler Init
-    // failed with "instruction budget exhausted" at 10M steps).
-    // Duplicate ids must be detected on EVERY render, not only at Init: a
-    // controlled update can introduce a collision later (review F-04), and the
-    // only other check (.Validate) has no dispatcher.
+    // as soon as children are pushed mid-walk (silently producing depth 0 for every
+    // row, review F-01). Each stack entry is a [node, depth] pair, which cannot drift.
     //
-    // The scan is O(n^2) and there is no sort primitive to make it O(n log n), so
-    // it is BOUNDED rather than unconditional: below the threshold every render
-    // revalidates (the common case, and the one a controlled update realistically
-    // produces); above it, detection falls back to the Init/Validate flag, since
-    // rescanning a very large tree per frame is what previously exhausted the
-    // instruction budget and rendered nothing. The threshold is a documented
-    // cost/coverage trade, not a silent truncation - `dupGuard` still carries the
-    // Init verdict for big trees.
+    // Duplicate ids are revalidated here rather than only at Init: a controlled
+    // update can introduce a collision later (review F-04), and the only other
+    // check (.Validate) has no dispatcher anywhere in the runtime. The scan is
+    // O(n^2) and there is no sort primitive to make it O(n log n), so it is
+    // BOUNDED: at or below the threshold every render revalidates (the realistic
+    // update case); above it, detection falls back to the Init/Validate flag, since
+    // rescanning a very large tree per frame is exactly what previously exhausted
+    // the instruction budget and rendered nothing (handler Init died at 10M steps
+    // with 1000 nodes). A documented cost/coverage trade, not a silent truncation —
+    // `dupGuard` still carries the Init verdict for big trees.
     var dup bool = dupGuard
     if !dup {
         if nodes.len() <= 256 {
