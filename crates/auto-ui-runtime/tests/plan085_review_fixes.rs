@@ -164,3 +164,22 @@ fn n02_pipe_in_id_does_not_forge_a_false_duplicate() {
         "no duplicate may be reported for a valid tree whose ids merely contain `|`"
     );
 }
+/// N-02a: an empty id must not abort duplicate scanning.
+///
+/// The previous token framing seeded `seen` with "|", so after the first node the
+/// empty-id token "||" was already present. An empty id therefore returned the
+/// same "" used as the "no duplicate" sentinel, ending the scan early and letting
+/// a later real duplicate through — leaving two actionable rows for id `a`.
+///
+/// Now an empty id is reported as its own named error, and seeding with "" means
+/// the first token `|a|` cannot match `||`.
+#[test]
+fn n02_empty_id_does_not_abort_duplicate_detection() {
+    let mut c = build("src/front/dup_empty.at");
+    let d = settle(&mut c);
+    assert_eq!(
+        d.matches("WantSelect").count(),
+        0,
+        "with an empty id and a real duplicate present, no row may stay actionable"
+    );
+}

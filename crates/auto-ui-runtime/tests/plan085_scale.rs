@@ -139,3 +139,27 @@ fn n02_large_tree_duplicates_are_detected_at_any_size() {
     // the class would also be a false-negative trap: the debug view resolves
     // `opacity-50` to a structured value, exactly like `w-4` -> Width(Fixed(4)).
 }
+/// N-02b: ids that all contain the `|` delimiter must stay on the fast path.
+///
+/// The interim fix routed such ids to an exact-comparison VM loop, which is the
+/// same O(n^2) cost F-09/N-01 removed: measured 600 pipe-ids in 14.89s and 1000 in
+/// 71.94s, with the instruction budget exhausted and ZERO rows rendered. Escaping
+/// the delimiter into the token stream keeps them on native `contains`.
+#[test]
+fn n02_pipe_ids_stay_fast_and_fully_render() {
+    let started = std::time::Instant::now();
+    let mut c = build("src/front/dup_pipe_large.at");
+    let d = settle(&mut c);
+    let elapsed = started.elapsed();
+
+    assert_eq!(
+        d.matches("WantSelect").count(),
+        1000,
+        "all 1000 pipe-containing ids must render (a VM fallback renders 0)"
+    );
+    assert!(
+        elapsed.as_secs() < 10,
+        "1000 pipe-containing ids must not take {elapsed:?}; a per-element VM \
+         fallback for the delimiter is the likely cause"
+    );
+}

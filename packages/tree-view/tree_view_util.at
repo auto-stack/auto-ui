@@ -67,10 +67,17 @@ pub fn tv_total_nodes(nodes List) int {
 /// 要跑 len(seen) 次 VM 迭代（实测 1000 节点约 14s，耗尽预算并渲染 0 行）。
 /// id 两端包 `|`，避免 `ab` 误命中 `b` 之类的子串误报。
 pub fn tv_duplicate_id(nodes List) str {
-    var seen str = "|"
-    // Ids that contain the `|` delimiter would forge tokens ("a|b" -> "|a|b|"
-    // spuriously matches "|b|"), so they are collected here and compared exactly.
-    var seenIds List = []
+    // Token framing: escape `|` out of ids, then wrap each token as |id|. Two
+    // earlier bugs are avoided by doing it this way (review N-02a/b):
+    //   - dropping the `|`-fallback keeps every id on the native `contains` path,
+    //     so ids containing `|` no longer degrade to an O(n^2) VM loop (measured
+    //     71.9s / 0 rows at 1000 such ids);
+    //   - seeding `seen` with "" rather than "|" means the first token is `|a|`,
+    //     which does not contain the empty-id token `||`, so a mid-list empty id
+    //     can no longer abort the scan and return the same "" used for "no dup".
+    // An empty id is itself invalid input, so it is reported explicitly instead of
+    // being routed through the token stream at all.
+    var seen str = ""
     var stack List = []
     var i int = nodes.len()
     while i > 0 {
@@ -81,22 +88,17 @@ pub fn tv_duplicate_id(nodes List) str {
         var top int = stack.len() - 1
         var nd = stack[top]
         stack.pop()
-        if nd.id.contains("|") {
-            var e int = 0
-            while e < seenIds.len() {
-                if seenIds[e] == nd.id {
-                    return nd.id
-                }
-                e = e + 1
-            }
-            seenIds.push(nd.id)
-        } else {
-            var token str = "|" + nd.id + "|"
-            if seen.contains(token) {
-                return nd.id
-            }
-            seen = seen + token
+        if nd.id == "" {
+            // Distinguishable from the "no duplicate" sentinel by construction:
+            // the caller sees a named error, not an empty result.
+            return "<empty-id>"
         }
+        var esc str = nd.id.replace("|", "!!")
+        var token str = "|" + esc + "|"
+        if seen.contains(token) {
+            return nd.id
+        }
+        seen = seen + token
         var kids List = nd.children
         var k int = kids.len()
         while k > 0 {

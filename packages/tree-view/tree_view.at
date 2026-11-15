@@ -208,23 +208,33 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
             .focus_index = 0
             .focus_id = ""
             var dup str = tv_duplicate_id(.nodes)
-            if dup != "" {
-                .invalid = f"树结构非法:重复节点 ID ${dup}"
+            if dup == "<empty-id>" {
+                .invalid = "树结构非法:存在空节点 ID"
                 .dupFlag = true
             } else {
-                .invalid = ""
-                .dupFlag = false
+                if dup != "" {
+                    .invalid = f"树结构非法:重复节点 ID ${dup}"
+                    .dupFlag = true
+                } else {
+                    .invalid = ""
+                    .dupFlag = false
+                }
             }
         }
         // 结构校验可被消费者在 props 变化后主动触发（受控更新后复核）。
         .Validate -> {
             var dup str = tv_duplicate_id(.nodes)
-            if dup != "" {
-                .invalid = f"树结构非法:重复节点 ID ${dup}"
+            if dup == "<empty-id>" {
+                .invalid = "树结构非法:存在空节点 ID"
                 .dupFlag = true
             } else {
-                .invalid = ""
-                .dupFlag = false
+                if dup != "" {
+                    .invalid = f"树结构非法:重复节点 ID ${dup}"
+                    .dupFlag = true
+                } else {
+                    .invalid = ""
+                    .dupFlag = false
+                }
             }
         }
         .Down -> {

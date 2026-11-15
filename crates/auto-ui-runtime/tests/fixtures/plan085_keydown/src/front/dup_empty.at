@@ -1,0 +1,29 @@
+// PLAN-085 N-02a fixture: an EMPTY id in the middle of the list must not abort
+// duplicate scanning. The old code seeded `seen` with "|", so the empty-id token
+// "||" was already present after the first node, and the empty id returned the
+// same "" used for "no duplicate" - silently ending the scan so a later real
+// duplicate went unchecked.
+widget dupempty {
+    msg { Init, Select(str) }
+    model {
+        var nodes List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: [], selected: .sel,
+                      on_toggle: .Select($event), on_select: .Select($event), on_retry: .Select($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            a.push({ id: "a", label: "ROW-A", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "", label: "ROW-EMPTY", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "a", label: "ROW-A-AGAIN", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        .Select(v str) -> { .sel = v }
+    }
+}
