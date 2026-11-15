@@ -131,26 +131,27 @@ widget TreeView (
   `page_hits=0`。修复 = 只扫**本帧可挂载**的组件（`view_tree` 中解析为注册
   组件的 tag + 路由目标），并按首现序**传递**其可挂载子件；根仍先扫保住
   自己的键。三条永久反例（`plan085_keydown_ownership.rs`）。
-- **T-04 迁移受阻（2026-11-15，未提交，已回退）**：把 026/041 的 `TreeView`
-  改为导入正式包后，两例都**不再渲染任何树行**（026 状态里 `dbNodes` 整个
-  消失；041 树行无 `onclick`/无样式 = 走的是文本回退而非包组件）。已定位的
-  两条**独立**原因：
-  1. **递归 computed 静默返回空**（026 的真实阻塞）：`dbNodes =>
-     filter_tree(.dbNodesFull, .filter)` 里 `filter_tree` 是递归函数；组件级
-     探针实测**非递归 computed 正常产出 2 行、递归 computed 产出 0 行**，且
-     无错误无诊断。这与 T-01 记录的同族限制一致（VM 深帧/递归历史债），不是
-     本组件引入的。
-  2. **包组件在 `render: "vm"` 宿主的行回调/样式未生效**（041 的阻塞）：
-     包本身**能正确装载**（`ComponentRegistry::load_package` 实测返回
-     `widgets=["TreeIcon","TreeView"]`、`warnings=[]`、`full_widgets=2`，
-     路径 candidate[0] 也确实存在），但 041 视图里树行既无 `onclick` 也无
-     `class`，说明调用位没有走到包组件分支。同形态的**同文件**子件在 Rust
-     侧可正常派发（`WantSelect=1`），因此差异在「包装载 → 视图调用位解析」
-     这一段，尚未定位到具体分支。
-- 处理：**未提交**任何 026/041 改动（`git checkout` 回退到导入本地组件的
-  状态），保持示例可用；把 T-04 拆为「先解除上述两个阻塞再迁移」，不让
-  半迁移状态进入树。**下一个动作**：先给 (1) 补一条具名反例（递归 computed
-  产出空 → 显式断言当前行为），再定位 (2) 的调用位解析分支。
+- **T-04 迁移受阻（2026-11-15，已回退；其中一条阻塞已被证伪）**：
+  - **阻塞①（递归 computed）已证伪**：026 的 `dbNodes => filter_tree(...)`
+    **并没有**返回空。在真实 native 窗口里用一次性 PROBE 处理器读回：
+    `dbNodes=1`、`dbNodes[0].id="db/app"`、`dbNodes[0].children.len()=3`；
+    再用等价的嵌套 fixture 直接喂正式包，派生结果为
+    **root → group → leaf 三行**、三行各带一个绑定选择动作
+    （`plan085_derives_nested_filtered_tree_like_the_026_consumer`，8/8）。
+    所以包对 026 形状的嵌套派生是正确的，递归 computed 也不是空的。
+  - **阻塞②（路径深度）是我自己的错**：026 原先写的
+    `use { package: tree_view from "../../../../packages/tree-view" }`
+    少了一级，解析到不存在的 `examples/packages/tree-view`；改为五级后
+    `TreeView` 实例正常挂载（`/TreeView#0`）且行回调可用（`WantSelect=16`）。
+    041 同样是五级，挂载成功（`WantSelect=13`）。**教训：包路径必须与
+    同文件里已能工作的 `pagination`/`file_dialog` 同深度。**
+  - **仍未解释（保持未迁移）**：两例的**真实窗口**里树是空的，而基线
+    （未迁移、用示例自带组件）在同样条件下**也是空的**
+    （`on_toggle=False`、`for: r` 计数 ≤1）。即该现象**先于本计划存在**，
+    与迁移无关；但"树在 026/041 真实窗口里为何不展开"仍未定位，故 T-04
+    仍不宣布通过，两例改动继续留在回退状态。
+  - 下一个动作：把 026 的树在真实窗口里跑起来（优先查 expanded/渲染路径
+    与 `dbExpanded` 的实际读回），再一次性重做迁移并出 V-05 证据。
 - 不得为绕过而给 026 把 `filter_tree` 改成非递归副本（=第二真源），也不得
   为绕过而保留示例自带 TreeView（=四套算法）；两者都违反 Plan §5。
 - **MCP 通道的三个使用陷阱（写进测试模块头，避免后来者重犯）**：
