@@ -130,3 +130,27 @@
 - **关闭条件**：真实桌面 boot 后 Reader 后端子进程 env 含 `015_NOTES_DAEMON`+`NOTES_FP_CRED`
   （行为面：经 Reader 后端 fp 代理调用 Notes 成功；无声明 app 后端 env 零变化）。
   消费：auto-os PLAN-067 T-02 C-01/C-04 桌面编排（凭据腿以此交付为前置）。
+
+## DEBT-008 后端依赖不可达时 native UI 冻结（fp 流量 + notes kill，READER-013 T-08 复现）
+
+- **状态**：已确定性复现（3/3 轮同点位）、归因未定（2026-11-16）。来源：
+  READER-013 T-08 双端验收（证据包
+  auto-reader/plan-artifacts/plan-013/BACK-STALL-BLOCKER.md）。
+- **动机/症状**：`auto run -r vm --server vm` 原生窗口下，后端 HTTP 依赖
+  （notes 服务）被 kill 后，UI 在 fp 流量中（检查点 submit / 抽屉 list）
+  **整体失去响应**：后续所有 autoui 按压 30～120s 无投影、back 进程存活但
+  books GET 亦不响应（监视 DOWN）、整窗重启才恢复。同一流程 vue 轨全绿
+  （77/0/0 对照）——native 消息循环/同步 HTTP 语义与 vue 异步轨分歧。
+- **复现入口**：auto-reader 仓
+  `python tests/annotations/verify_featurepack_host.py --profile vm`
+  R03-U3a 腿（notes kill 后 UI submit），3/3 确定性；跑后 SQLite 直接可证
+  数据已提交、恢复意图恰好一条（产品合同满足，纯 UI 冻结）。
+- **提议形状**：定位 native 窗口 VM 消息循环中同步 HTTP 出站（fp POST/
+  GET）阻塞调度根因——候选：①出站无超时（后端依赖不可达时 handler 永久
+  pending）；②消息循环对 pending handler 的排队策略；③axum 工作线程与
+  VM owner 线程的交互。修复方向：出站超时 + 超时后 handler 可终止/降级
+  （错误投影已在 .at 层就绪：transport 分类 + 错误信封）。
+- **边界**：.at 层传输分类/错误投影/检查点恢复均已实现且 vue 轨验证
+  （READER-013 修复在案）；本债只覆盖 native 运行时的出站阻塞语义。
+- **关闭条件**：复现入口全绿（vm profile R-01～05 通过、无必需 skip），
+  且 notes kill 场景下 native UI 保持可交互（错误投影可见）。
