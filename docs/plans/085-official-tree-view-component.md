@@ -733,3 +733,19 @@ Goal round 16 摘要（F-05 第二次修复——这次有**真正可判别**的
   报 **p1**（父节点）。这是本轮唯一可接受的"测试有效"证明。
 - 回归全绿 **27+2 项**；产品门 native pass（`{a:5,b:2}`、`stale_id_rejected: True`）。
 - **任务计数 7/8**；下一轮做 F-04/F-05 定向复核（只验这两条）。
+2026-11-16：stage: review | review_scope: final（targeted：仅 F-04/F-05）| reviewer: plan085-f045-review（独立上下文）| plan_id: PLAN-085 | plan_revision: r2 | outcome: needs_fix | reviewed_commit: 7b9e781c | worktree: D:/autostack/.wt/ui-085/auto-ui | branch: codex/ui-085-tree-view
+
+复审结论（只验 F-04/F-05，其余不重复评估）：
+- **F-05：真闭**。reviewer 自验 arity（7 个调用点全 5 参）、`tv_struct_parent`
+  无条件下钻、`tv_visible_parent` **字节未变**（ArrowLeft 未受影响，修复是**新增**
+  兄弟函数而非改共享函数）。**并自行做破坏-恢复实验**：stub 掉祖先分支 → 测试报
+  `p2`（邻居）并 FAILED；恢复 → `p1`（父）并 PASSED。判定为**真判别器**。
+- **F-04：未闭**。≤256 **根**的场景确实修好且测试为真判别器；但界限量错了对象：
+  - **N-01（High）**：`nodes.len()` 只是**根数**，`tv_duplicate_id` 走**整棵树**。
+    "单根 + 1000 子节点"（根数 1）会每帧重扫 1001 节点 → 重新制造 F-09 移除的
+    O(n²)，实测 **0 行 / 16.7s / 预算耗尽**。`plan085_scale` 因夹具是 1000 **平铺根**
+    而未发现。
+  - **N-02（High）**：超阈值时受控更新引入的重复 id **不复查**，静默发布 2 条歧义
+    可操作行且无报告。
+- reviewer 判两个具名遗留仍**合规**；套件 27/27、tools 7/7、产品门 native pass；
+  新用例耗时均 ≤10s。
