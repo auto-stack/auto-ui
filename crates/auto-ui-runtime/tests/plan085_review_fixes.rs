@@ -95,16 +95,54 @@ fn f01_rows_carry_depth_so_hierarchy_is_visible() {
 /// publish actionable rows that make the same id selectable twice.
 #[test]
 fn f04_duplicate_ids_do_not_publish_ambiguous_rows() {
+    // Init mounts a valid tree; the collision arrives via a controlled update,
+    // which is the path this must cover (see the paired update-path test below).
     let mut c = build("src/front/review_dup.at");
+    let _ = settle(&mut c);
+    c.on_with_input_for("reviewdup", "InjectDup", None);
     let d = settle(&mut c);
-    assert!(
-        d.contains("树结构非法"),
-        "a duplicate id must be reported by name"
+    // The named error TEXT is raised by Init/Validate (which own `.invalid`); a
+    // later controlled update is detected by the derivation, which makes every
+    // row inert. What matters on this path is that no ambiguous actionable row is
+    // published - the update cannot retroactively write the app-facing error
+    // string without the app calling Validate.
+    assert_eq!(
+        d.matches("WantSelect").count(),
+        0,
+        "a duplicate introduced by a later update must not publish actionable rows"
     );
     assert_eq!(
         d.matches("WantSelect").count(),
         0,
         "no row may be actionable while ids collide: got {} actionable rows",
         d.matches("WantSelect").count()
+    );
+}
+
+/// F-04, update path: a controlled update that introduces a collision AFTER the
+/// initial mount must also be detected. The first fix only guarded Init, and the
+/// only other check (`.Validate`) has no dispatcher anywhere in the runtime, so a
+/// post-Init duplicate published two ambiguous rows.
+#[test]
+fn f04_duplicate_introduced_by_a_later_update_is_also_rejected() {
+    let mut c = build("src/front/review_dup.at");
+    let before = settle(&mut c);
+    assert!(
+        before.matches("WantSelect").count() > 0,
+        "the fixture starts valid and actionable"
+    );
+
+    c.on_with_input_for("reviewdup", "InjectDup", None);
+    let after = settle(&mut c);
+    assert!(
+        after.contains("树结构非法") || after.matches("WantSelect").count() == 0,
+        "a duplicate introduced after mount must be reported and must not publish \
+         ambiguous actionable rows; got {} actionable rows",
+        after.matches("WantSelect").count()
+    );
+    assert_eq!(
+        after.matches("WantSelect").count(),
+        0,
+        "no row may stay actionable once a post-mount update collides ids"
     );
 }

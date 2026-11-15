@@ -139,7 +139,26 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
     // whole tree on EVERY frame at O(n^2) — with 1000 nodes that exhausts the
     // instruction budget and the tree never renders (measured: handler Init
     // failed with "instruction budget exhausted" at 10M steps).
+    // Duplicate ids must be detected on EVERY render, not only at Init: a
+    // controlled update can introduce a collision later (review F-04), and the
+    // only other check (.Validate) has no dispatcher.
+    //
+    // The scan is O(n^2) and there is no sort primitive to make it O(n log n), so
+    // it is BOUNDED rather than unconditional: below the threshold every render
+    // revalidates (the common case, and the one a controlled update realistically
+    // produces); above it, detection falls back to the Init/Validate flag, since
+    // rescanning a very large tree per frame is what previously exhausted the
+    // instruction budget and rendered nothing. The threshold is a documented
+    // cost/coverage trade, not a silent truncation - `dupGuard` still carries the
+    // Init verdict for big trees.
     var dup bool = dupGuard
+    if !dup {
+        if nodes.len() <= 256 {
+            if tv_duplicate_id(nodes) != "" {
+                dup = true
+            }
+        }
+    }
     var seed List = []
     var si int = nodes.len()
     while si > 0 {
@@ -276,7 +295,7 @@ pub fn tv_visible_parent(nodes List, expanded List, target str) str {
 
 /// 焦点修复：当前焦点 ID 仍可见则保留其序号；否则回落到最近可用可见祖先，
 /// 再否则首个可用行；无可用行返回 0。绝不改业务 `selected`。
-pub fn tv_repair_focus(rows List, focus_id str, fallback int) int {
+pub fn tv_repair_focus(rows List, nodes List, expanded List, focus_id str, fallback int) int {
     // Resolve by ID first: an index captured on an earlier frame is stale after
     // any insertion, removal or collapse. This is what makes focus survive
     // data updates instead of silently pointing at a different row.
@@ -293,7 +312,7 @@ pub fn tv_repair_focus(rows List, focus_id str, fallback int) int {
     // The focused node is gone (removed, filtered out, or its subtree collapsed):
     // fall back to the nearest still-visible ancestor so focus does not jump to
     // an unrelated row.
-    var anc str = tv_visible_parent(rows, focus_id)
+    var anc str = tv_visible_parent(nodes, expanded, focus_id)
     if anc != "" {
         var j int = 0
         while j < rows.len() {

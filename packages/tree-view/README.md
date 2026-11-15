@@ -134,3 +134,25 @@ dep tree_view { path: "../../packages/tree-view" }
 
 自托管示例：[`examples/tree-view/`](../../examples/tree-view/)（受控四态 + 同页
 双实例 + 空树 + 浅深切换 + 文档化退出）。
+
+## 节点语义（MCP 可观察面）
+
+**本包不声称 ARIA 合规树**：runtime 没有 role/aria/level 通道（view/vnode/snapshot
+三层均无），DSL 里写 `role: "tree"` 会被静默接受后丢弃。因此本包把两个此前只能
+"推断"的事实，写在 **MCP 真正读取的那一面**（快照里的 `raw_class`），复用
+selected/focused/disabled 早已使用的同一通道：
+
+| 标记 | 位置 | 含义 |
+|---|---|---|
+| `tv-tree` | 树根容器 | 该子树是树（区别于普通列表） |
+| `tv-lvl-1` … `tv-lvl-4` | 每行缩进单元 | 该行层级 1–4 |
+| `tv-lvl-deep` | 每行缩进单元 | 层级 > 4（缩进封顶，不再累加） |
+| `tv-dis` | 行 | 禁用/惰性行（不可选择） |
+| `tv-sel` | 行 | 已选中（禁用与正常分支都带） |
+
+其余语义沿用既有表示：**名称**取行 label 文本；**展开**取 chevron 图标方向；
+**焦点**为 `ring-2`；**加载中/失败**为对应文本。
+
+> oracle 提示：这些标记会被**已解析的 debug View 丢弃**（样式解析只保留认识的
+> token），但存在于 `raw_class`——即快照打印的内容。拿 debug View 断言会得到
+> **假阴性**。另外 vue 轨读 `inner_text`，看不到 class，故标记断言仅 native 执行。

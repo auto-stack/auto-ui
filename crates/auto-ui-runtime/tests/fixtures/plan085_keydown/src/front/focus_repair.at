@@ -2,7 +2,7 @@
 // the nearest still-visible ancestor (or the first reachable row), and must not
 // touch the app's `selected`.
 widget focusrepair {
-    msg { Init, Down, Up, GoHome, GoEnd, Expand, Collapse, Activate, Shrink, Grow, Pick(str) }
+    msg { Init, Down, Up, GoHome, GoEnd, Expand, Collapse, Activate, Shrink, Grow, CollapseP1, Pick(str) }
     model {
         var nodes List = []
         var expanded List = []
@@ -27,6 +27,11 @@ widget focusrepair {
             .nodes = a
             .expanded = ["p1"]
         }
+        // Collapse the focused subtree: the focused child disappears but its
+        // parent stays visible, so focus MUST land on that parent - not on a
+        // neighbour at the old index. This is the discriminator the earlier
+        // test lacked (it accepted a stale-index fallback as success).
+        .CollapseP1 -> { .expanded = [] }
         // Shrink to a single root: the focused rows are gone entirely.
         .Shrink -> {
             var a List = []

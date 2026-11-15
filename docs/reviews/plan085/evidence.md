@@ -95,11 +95,19 @@ python tests/product/verify_tree_view.py \
 必须显式 `use`**；**行视觉状态用字面量分支**（`class:` f-string 不插值循环字段）；
 **空态由派生哨兵行承载**（`is_empty` 类 computed 在 VM 轨陈旧）。
 
-**SD-02 → `docs/specs/ui/examples-ownership.md`**：`packages/tree-view` 为
+**SD-02 → `docs/specs/ui/tree-view.md`（验证面）**：双端验收（Linux/统一回归按各
+计划 closeout 门记录，缺环境记 `not_run` 不记 pass）；MCP 稳定绑定（`vnode_` 绑定
+当前渲染修订，数据变化后旧 id 必须被拒绝——native 实测 `stale_id_rejected: True`；
+vue 按 DOM 位置寻址无修订身份，显式记不适用）；视觉证据；代表规模（1000 平铺 +
+64 层嵌套，末行可达）与窄窗可读。**节点语义的显式可观察面**：`tv-tree` 根标记、
+`tv-lvl-N` 行层级（1..4，超 4 为 `tv-lvl-deep`）、`tv-dis` 惰性行、`tv-sel` 选中行
+——均在快照 `raw_class` 中可读；**本计划不声称 ARIA 合规树**（runtime 无 role/aria
+通道），该缺口具名保留。
+**SD-03 → `docs/specs/ui/examples-ownership.md`**：`packages/tree-view` 为
 TreeView 单源；026/041 改用正式包并退役各自 `components/treeview.at`；示例保留
 自身业务代码（026 的 `tree_util.filter_tree`/`collect_ids`/`toggle_id`、041 的
 `editor_store` 与 `bps…toggle_id`）；语言 blueprint 仍是通用树工具 canonical
 owner；018/027 的未实例化副本属清理项（不虚构消费）。
 
-**SD-03**：018/027 无 `TreeView (` 调用位，仅在 `components/` 留有从未实例化的
+**附记（非 SD）**：018/027 无 `TreeView (` 调用位，仅在 `components/` 留有从未实例化的
 副本；正式包的验收不以它们为消费者证据，清理归后续（记录于此避免误读）。

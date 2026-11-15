@@ -1,7 +1,7 @@
 // PLAN-085 review-repair fixture (F-04): duplicate node ids must be reported
 // and must not publish ambiguous actionable rows.
 widget reviewdup {
-    msg { Init, Toggle(str), Select(str) }
+    msg { Init, Toggle(str), Select(str), InjectDup }
     model {
         var nodes List = []
         var expanded List = []
@@ -15,10 +15,20 @@ widget reviewdup {
         }
     }
     on {
+        // Init mounts a VALID tree; a later controlled update introduces the
+        // collision, so the update path is what must catch it.
         .Init -> {
             var a List = []
-            a.push({ id: "dup", label: "FIRST", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
-            a.push({ id: "dup", label: "SECOND", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "A1", label: "FIRST", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "A2", label: "SECOND", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        // Controlled update that introduces a collision AFTER Init: the update
+        // path must detect it, not just the initial mount.
+        .InjectDup -> {
+            var a List = []
+            a.push({ id: "A1", label: "FIRST", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "A1", label: "SECOND", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
             .nodes = a
         }
         .Toggle(v str) -> { }

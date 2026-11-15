@@ -144,7 +144,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
                         } else {
                             if r.selected {
                                 if r.focused {
-                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md bg-accent text-accent-foreground ring-2 ring-primary cursor-pointer") {
+                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md bg-accent text-accent-foreground ring-2 ring-primary cursor-pointer tv-sel") {
                                         if r.icon != "" {
                                             TreeIcon (name: r.icon) {}
                                         }
@@ -154,7 +154,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
                                         }
                                     }
                                 } else {
-                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md bg-accent text-accent-foreground cursor-pointer") {
+                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md bg-accent text-accent-foreground cursor-pointer tv-sel") {
                                         if r.icon != "" {
                                             TreeIcon (name: r.icon) {}
                                         }
@@ -228,21 +228,21 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
             }
         }
         .Down -> {
-            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
             .focus_id = tv_focus_id(.rows, .focus_index)
             var nxt int = tv_step_reachable(.rows, .focus_index, true)
             .focus_index = nxt
             .focus_id = tv_focus_id(.rows, nxt)
         }
         .Up -> {
-            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
             .focus_id = tv_focus_id(.rows, .focus_index)
             var prv int = tv_step_reachable(.rows, .focus_index, false)
             .focus_index = prv
             .focus_id = tv_focus_id(.rows, prv)
         }
         .GoHome -> {
-            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
             .focus_id = tv_focus_id(.rows, .focus_index)
             var first int = tv_first_reachable(.rows)
             if first >= 0 {
@@ -251,7 +251,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
             }
         }
         .GoEnd -> {
-            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
             .focus_id = tv_focus_id(.rows, .focus_index)
             var last int = tv_last_reachable(.rows)
             if last >= 0 {
@@ -262,7 +262,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
         // 右键：未展开则请求展开；已展开则进入首个可用子节点（焦点移动，
         // 不请求选择）。
         .Expand -> {
-            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
             .focus_id = tv_focus_id(.rows, .focus_index)
             var hit str = tv_focus_id(.rows, .focus_index)
             if hit != "" {
@@ -292,7 +292,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
         }
         // 左键：已展开则请求折叠；否则落到可见父节点（焦点移动）。
         .Collapse -> {
-            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
             .focus_id = tv_focus_id(.rows, .focus_index)
             var hit str = tv_focus_id(.rows, .focus_index)
             if hit != "" {
@@ -326,7 +326,7 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
         }
         // Enter/Space：只请求选择当前可用行，不改展开。
         .Activate -> {
-            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
             .focus_id = tv_focus_id(.rows, .focus_index)
             var hit str = tv_focus_id(.rows, .focus_index)
             if hit != "" {
