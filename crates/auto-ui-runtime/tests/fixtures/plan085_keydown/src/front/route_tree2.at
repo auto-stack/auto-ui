@@ -1,0 +1,8 @@
+widget routetree2 {
+    routes { "/" -> use tree_page2 }
+    view {
+        col (style: "w-full h-full") {
+            outlet
+        }
+    }
+}

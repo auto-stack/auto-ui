@@ -1,26 +1,32 @@
-//! PLAN-085 T-03 — `onkeydown.*` coverage for widget key ownership and for the
-//! remaining external-package dispatch gap.
+//! PLAN-085 T-03 — `onkeydown.*` key ownership and dispatch for child widgets.
 //!
-//! Two independent surfaces are pinned here:
+//! ## What was actually wrong
 //!
-//! **A. Key ownership (fixed).** `key_bindings` is a flat
-//! `normalized-key -> "Widget.Handler"` map. The child half used to come from
-//! `registry.all()`, which iterates a `HashMap` over the whole module —
-//! imports included — so a merely-imported component the view never renders
-//! could win a key from the live page (the key then did nothing, with no error
-//! and no diagnostic), and the winner could differ between runs. T-03 scans
-//! only components the view can mount, in first-appearance order.
+//! `key_bindings` is a flat `normalized-key -> "Widget.Handler"` map whose
+//! child half used to come from `registry.all()`. That iterates a `HashMap`
+//! over the **whole module**, imports included, so a merely-imported component
+//! that the view never renders could win a key from the live page — the key
+//! then did nothing at all, with no error and no diagnostic — and the winner
+//! could differ between runs. T-03 (commit 815fec34) scans only components the
+//! view can mount, in first-appearance order, so ownership is deterministic
+//! and unrendered imports cannot shadow live keys.
 //!
-//! **B. External-package dispatch gap (open, AC-03).** A child declared in the
-//! *same file* dispatches its `onkeydown.*` handler; a byte-equivalent child
-//! that arrives through a package `use` collects the same binding but the
-//! handler never runs. `plan085_external_package_child_keydown_dispatch_gap`
-//! records the current behaviour explicitly so it cannot regress silently, and
-//! `plan085_same_file_child_keydown_dispatches` is its required control.
+//! ## Two false leads, recorded so they are not re-derived
 //!
-//! Fixtures: `tests/fixtures/plan085_keydown/`. Routed pages live in
-//! `src/front/pages/` — a page placed in `src/front/` is silently not
-//! registered, which is how the first T-03 attempt mis-read this surface.
+//! 1. Routed pages live in `src/front/pages/`. A page placed in `src/front/`
+//!    is silently not registered — an early "routed pages are missing from
+//!    key collection" reading was this fixture bug, not a runtime defect.
+//! 2. A child widget that **declares `Init`** renders a
+//!    `Loading… (<Name>)` placeholder until the frame pump services the Init
+//!    demand. A view dump taken without pumping therefore contains no rows and
+//!    no text — which reads exactly like a failed dispatch. The dispatch
+//!    fixtures here declare no `Init` for that reason, and dispatch is
+//!    measured by the rendered text changing (see `dispatch_hits` below).
+//!
+//! External-package children dispatch correctly: `ChildBox` arrives through a
+//! package `use`, its `onkeydown.left` is bound to `ChildBox.Left`, and the
+//! handler runs (hits 0 → 1). `plan085_package_child_keydown_dispatches` pins
+//! that, with the same-file child as the control.
 
 use std::path::Path;
 
@@ -38,7 +44,33 @@ fn build(rel: &str) -> auto_ui_runtime::ui::dynamic::DynamicComponent {
         .expect("fixture component builds")
 }
 
-// ── A. Key ownership ────────────────────────────────────────────────────────
+fn view_text(comp: &mut auto_ui_runtime::ui::dynamic::DynamicComponent) -> String {
+    let (view, _, _) = comp.view_with_debug_gated(false);
+    format!("{view:?}")
+}
+
+/// The rendered `<marker>N` value, i.e. the child's `hits` as the view shows it.
+fn dispatch_hits(comp: &mut auto_ui_runtime::ui::dynamic::DynamicComponent, marker: &str) -> u32 {
+    let text = view_text(comp);
+    for part in text.split("content: ").skip(1) {
+        let body = part.trim_start_matches('"');
+        if let Some(rest) = body.strip_prefix(marker) {
+            let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            return digits.parse().unwrap_or(0);
+        }
+    }
+    panic!("marker {marker:?} absent from rendered view: {}", snip(&text));
+}
+
+fn snip(s: &str) -> String {
+    let mut out: String = s.chars().take(600).collect();
+    if out.len() < s.len() {
+        out.push('…');
+    }
+    out
+}
+
+// ── Key ownership ───────────────────────────────────────────────────────────
 
 /// Root + routed page: the root keeps its own key, and the page contributes
 /// the key the root did not claim.
@@ -59,8 +91,8 @@ fn plan085_root_and_routed_page_keys_coexist() {
     );
 }
 
-/// The regression: a component that is imported but never rendered must not
-/// take key ownership from the page that is on screen.
+/// The regression T-03 fixed: a component that is imported but never rendered
+/// must not take key ownership from the page that is on screen.
 #[test]
 fn plan085_unrendered_import_does_not_steal_page_keys() {
     let comp = build("src/front/app_import_only.at");
@@ -76,7 +108,6 @@ fn plan085_unrendered_import_does_not_steal_page_keys() {
         Some("importonly.Two"),
         "page's second key must also stay bound"
     );
-    // ChildBox is imported but never rendered, so its private keys are absent.
     for key in ["ArrowLeft", "ArrowRight"] {
         assert!(
             !bindings.contains_key(key),
@@ -108,50 +139,40 @@ fn plan085_rendered_child_contributes_its_keys() {
     );
 }
 
-// ── B. Dispatch: same-file control vs external-package gap ──────────────────
+// ── Dispatch ────────────────────────────────────────────────────────────────
 
-fn dispatch_and_read(rel: &str, widget: &str, event: &str, field: &str) -> i64 {
-    let mut comp = build(rel);
-    // Render once so child instances mount.
-    let (_, _, _) = comp.view_with_debug_gated(false);
-    comp.on_with_input_for(widget, event, None);
-    match comp.bridge().read_state(field) {
-        Ok(auto_val::Value::Int(v)) => i64::from(v),
-        other => panic!("{field} unreadable after dispatch: {other:?}"),
-    }
-}
-
-/// **Control (must stay green):** a same-file child's `onkeydown` handler runs.
+/// Control: a same-file child's `onkeydown` handler runs.
 #[test]
 fn plan085_same_file_child_keydown_dispatches() {
-    let hits = dispatch_and_read("src/front/samefile_host.at", "SoloChild", "Down", "hits");
+    let mut comp = build("src/front/samefile_diag.at");
+    assert_eq!(dispatch_hits(&mut comp, "solo hits="), 0, "baseline");
+    comp.on_with_input_for("SoloChildDiag", "Down", None);
     assert_eq!(
-        hits, 1,
+        dispatch_hits(&mut comp, "solo hits="),
+        1,
         "a same-file child's onkeydown must dispatch to that child's handler"
     );
 }
 
-/// **Open gap (AC-03):** a byte-equivalent child arriving through a package
-/// `use` collects the binding but its handler does not run.
-///
-/// This asserts the CURRENT, incorrect behaviour so the gap is explicit and
-/// cannot silently change in either direction. When the routing fix lands this
-/// assertion must flip to `1` together with the V-03 keyboard evidence.
+/// An external-package child dispatches exactly like a same-file child. This is
+/// the counterpart of the control above: the two differ only in where the
+/// widget is declared.
 #[test]
-fn plan085_external_package_child_keydown_dispatch_gap() {
-    let comp = build("src/front/pkg_host.at");
-    let bindings = comp.key_bindings();
-    assert_eq!(
-        bindings.get("ArrowLeft").map(String::as_str),
-        Some("ChildBox.Left"),
-        "precondition: the external package child's key IS collected"
-    );
+fn plan085_package_child_keydown_dispatches() {
+    let mut comp = build("src/front/pkg_host_diag.at");
 
-    let hits = dispatch_and_read("src/front/pkg_host.at", "ChildBox", "Left", "hits");
+    // The binding must be collected and point at the package widget.
     assert_eq!(
-        hits, 0,
-        "current known gap: an external-package child's onkeydown is collected \
-         but never dispatched (AC-03 open). If this now returns 1, the routing \
-         fix landed — flip this assertion and update the Plan receipt."
+        comp.key_bindings().get("ArrowLeft").map(String::as_str),
+        Some("ChildBox.Left"),
+        "the package child's onkeydown.left must be bound to the package widget"
+    );
+    assert_eq!(dispatch_hits(&mut comp, "child box hits="), 0, "baseline");
+
+    comp.on_with_input_for("ChildBox", "Left", None);
+    assert_eq!(
+        dispatch_hits(&mut comp, "child box hits="),
+        1,
+        "an external-package child's onkeydown must dispatch (same as a same-file child)"
     );
 }

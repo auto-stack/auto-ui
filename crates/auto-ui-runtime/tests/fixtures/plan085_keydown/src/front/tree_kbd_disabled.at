@@ -1,0 +1,48 @@
+// PLAN-085 T-03 keyboard fixture (root-level host).
+// Focus is proven through the component's own callbacks: Enter requests
+// selection of the focused row, so `selected` after a key sequence is exactly
+// the row focus reached. Nothing here mirrors the tree's private focus_index —
+// reading the page's own field for that would always read 0.
+widget treekbdd {
+    msg { Init, ToggleX(str), SelectX(str), RetryX(str) }
+    model {
+        var nodes List = []
+        var expanded List = []
+        var selected str = ""
+        var disabled List = ["p2"]
+        var toggles int = 0
+        var retries int = 0
+    }
+    use { package: tree_view from "../../pkg/tree-view" }
+    view {
+        col (style: "p-4") {
+            text f"sel=${.selected} exp=${.expanded.len()} tg=${.toggles} rt=${.retries}" { style: "text-xs" }
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .selected, disabledIds: .disabled, on_toggle: .ToggleX($event), on_select: .SelectX($event), on_retry: .RetryX($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            var k1 List = []
+            k1.push({ id: "s1", label: "S1", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "p1", label: "P1", children: k1, kind: "dir", icon: "", is_leaf: false, badge: "" })
+            a.push({ id: "p2", label: "P2", children: [], kind: "dir", icon: "", is_leaf: false, badge: "" })
+            .nodes = a
+            .expanded = ["p1"]
+        }
+        .ToggleX(id str) -> { .toggles = .toggles + 1; .expanded = tkp(.expanded, id) }
+        .SelectX(id str) -> { .selected = id }
+        .RetryX(id str) -> { .retries = .retries + 1 }
+    }
+}
+fn tkp(list List, id str) List {
+    var out List = []
+    var found bool = false
+    var i int = 0
+    while i < list.len() {
+        if list[i] == id { found = true } else { out.push(list[i]) }
+        i = i + 1
+    }
+    if !found { out.push(id) }
+    return out
+}

@@ -1,15 +1,19 @@
+// PLAN-085 T-03 fixture: package child WITHOUT an Init handler.
+// Dispatch oracles read the rendered view; a child that declares Init renders a
+// "Loading… (<Name>)" placeholder until the frame pump services the demand,
+// which would look like a dispatch failure. Keeping Init out makes the view the
+// direct oracle.
 widget ChildBox (nodes: List = []) {
-    msg { Init, Left, Right }
+    msg { Left, Right }
     model { var hits int = 0 }
     view {
         col (style: "w-full") {
             onkeydown.left: .Left
             onkeydown.right: .Right
-            text "child box" { style: "text-xs" }
+            text f"child box hits=${.hits}" { style: "text-xs" }
         }
     }
     on {
-        .Init -> { .hits = 0 }
         .Left -> { .hits = .hits + 1 }
         .Right -> { .hits = .hits + 1 }
     }
