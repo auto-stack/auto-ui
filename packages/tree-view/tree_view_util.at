@@ -271,6 +271,9 @@ pub fn tv_visible_parent(nodes List, expanded List, target str) str {
 /// 焦点修复：当前焦点 ID 仍可见则保留其序号；否则回落到最近可用可见祖先，
 /// 再否则首个可用行；无可用行返回 0。绝不改业务 `selected`。
 pub fn tv_repair_focus(rows List, focus_id str, fallback int) int {
+    // Resolve by ID first: an index captured on an earlier frame is stale after
+    // any insertion, removal or collapse. This is what makes focus survive
+    // data updates instead of silently pointing at a different row.
     var i int = 0
     while i < rows.len() {
         var r = rows[i]
@@ -281,13 +284,41 @@ pub fn tv_repair_focus(rows List, focus_id str, fallback int) int {
         }
         i = i + 1
     }
-    if fallback < 0 {
-        return 0
+    // The focused node is gone (removed, filtered out, or its subtree collapsed):
+    // fall back to the nearest still-visible ancestor so focus does not jump to
+    // an unrelated row.
+    var anc str = tv_visible_parent(rows, focus_id)
+    if anc != "" {
+        var j int = 0
+        while j < rows.len() {
+            var rj = rows[j]
+            if !rj.disabled {
+                if rj.id == anc {
+                    return j
+                }
+            }
+            j = j + 1
+        }
     }
-    if fallback >= rows.len() {
-        return 0
+    // Otherwise the previous index if it still exists, else the first reachable
+    // row, else 0 (no reachable row at all).
+    if fallback >= 0 {
+        if fallback < rows.len() {
+            var rf = rows[fallback]
+            if !rf.disabled {
+                return fallback
+            }
+        }
     }
-    return fallback
+    var k int = 0
+    while k < rows.len() {
+        var rk = rows[k]
+        if !rk.disabled {
+            return k
+        }
+        k = k + 1
+    }
+    return 0
 }
 
 /// 首/末可用行的键盘序号（无可用行返回 -1）。

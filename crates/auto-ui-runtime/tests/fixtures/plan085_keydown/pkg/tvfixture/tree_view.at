@@ -26,7 +26,7 @@
 //
 // ⚠ 包内模块文件不自动导入：本文件显式 `use tree_view_util: …`，
 //   `use tree_icon: TreeIcon`。删除任一 use 都会让派生静默变空列表。
-use tree_view_util: tv_member, tv_duplicate_id, tv_count_rows, tv_derive_rows, tv_focus_id, tv_visible_parent, tv_first_reachable, tv_last_reachable, tv_step_reachable
+use tree_view_util: tv_member, tv_duplicate_id, tv_count_rows, tv_derive_rows, tv_focus_id, tv_visible_parent, tv_first_reachable, tv_last_reachable, tv_step_reachable, tv_repair_focus
 use tree_icon: TreeIcon
 
 
@@ -209,11 +209,15 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
             }
         }
         .Down -> {
+            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
             var nxt int = tv_step_reachable(.rows, .focus_index, true)
             .focus_index = nxt
             .focus_id = tv_focus_id(.rows, nxt)
         }
         .Up -> {
+            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
             var prv int = tv_step_reachable(.rows, .focus_index, false)
             .focus_index = prv
             .focus_id = tv_focus_id(.rows, prv)
@@ -235,6 +239,8 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
         // 右键：未展开则请求展开；已展开则进入首个可用子节点（焦点移动，
         // 不请求选择）。
         .Expand -> {
+            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
             var hit str = tv_focus_id(.rows, .focus_index)
             if hit != "" {
                 if !tv_member(.disabledIds, hit) {
@@ -263,6 +269,8 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
         }
         // 左键：已展开则请求折叠；否则落到可见父节点（焦点移动）。
         .Collapse -> {
+            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
             var hit str = tv_focus_id(.rows, .focus_index)
             if hit != "" {
                 if !tv_member(.disabledIds, hit) {
@@ -295,6 +303,8 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
         }
         // Enter/Space：只请求选择当前可用行，不改展开。
         .Activate -> {
+            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
             var hit str = tv_focus_id(.rows, .focus_index)
             if hit != "" {
                 if !tv_member(.disabledIds, hit) {

@@ -167,6 +167,23 @@ class Session:
     def press(self, element_id):
         return self.call('autoui_action', element_id=element_id, action='press')
 
+    def press_expect_reject(self, element_id):
+        """Press a stale element id and report whether the runtime rejected it.
+
+        A vnode id belongs to a specific render revision: once the data changes
+        the old id must be refused rather than re-targeted at whatever now
+        happens to sit at that position (plan §5 / review F-07). Returns the
+        error text, or '' if the press was accepted (which would be a defect).
+        """
+        try:
+            out = self.call('autoui_action', element_id=element_id, action='press')
+        except Exception as e:  # transport-level refusal also counts as rejected
+            return repr(e)
+        text = out or ''
+        if 'error' in text.lower() or 'stale' in text.lower():
+            return text
+        return ''
+
     def a_line(self):
         m = re.search(r'A 树 sel=(\S*) exp=(\d+) ?([^"{\n]*)', self.snapshot())
         return m.groups() if m else None
@@ -248,7 +265,7 @@ def prepare(args, out, window):
     return app
 
 
-def run_matrix(session, record):
+def run_matrix(session, record, backend="native"):
     # ── V-01 controlled identity: the app seeds the expanded/disabled/error rows.
     a = session.a_line()
     vfd.require(a is not None, f'A tree summary line missing: {session.snapshot()[:300]}')
@@ -320,6 +337,9 @@ def run_matrix(session, record):
     vfd.require('select:' in b[2], f'B summary must carry only B events, got {b[2]!r}')
 
     # ── V-02 empty state: the tree reports empty, and the page recovers.
+    # Capture a row id from the CURRENT revision first: after the clear below it
+    # must be refused, not re-targeted at whatever now occupies that position.
+    stale_id = session.split_row_ids()[0][0]
     session.press_button('A 清空')
     session.wait(lambda t: 'cleared' in t)
     session.wait(lambda t: '空树无可操作行' in t, timeout=10)
@@ -328,7 +348,23 @@ def run_matrix(session, record):
                 f'clearing A must leave no A rows, got {len(a_rows_after)}')
     vfd.require(len(b_rows_after) == 2,
                 f'clearing A must not touch the B tree, got {len(b_rows_after)}')
-    return {'a_tree_rows': len(rows), 'b_tree_rows': len(rows_b)}
+
+    # F-07: the id bound to the pre-clear revision must be rejected now.
+    #
+    # This oracle is only meaningful on the native track: a vnode id is bound to
+    # one render revision, so reusing it after the data changed must be refused
+    # rather than re-targeted. The vue track addresses rows by DOM position, so
+    # there is no revision-bound identity to go stale — recording that honestly
+    # instead of scoring a vacuous pass.
+    stale_rejected = None
+    if backend == 'native':
+        stale_rejected = bool(session.press_expect_reject(stale_id))
+        vfd.require(
+            stale_rejected,
+            f'a row id from the previous revision must be refused after the data '
+            f'changed, but the press was accepted ({stale_id})')
+    return {'a_tree_rows': len(rows), 'b_tree_rows': len(rows_b),
+            'stale_id_rejected': stale_rejected}
 
 
 def run(args):
@@ -348,7 +384,7 @@ def run(args):
                   'backend': args.backend}
         if args.backend == 'native':
             record['windows'] = driver.windows
-        record['matrix'] = run_matrix(driver, record)
+        record['matrix'] = run_matrix(driver, record, args.backend)
 
         # ── V-06 visual: light + dark, real screenshots.
         record['light'] = driver.screenshot('light')
@@ -519,6 +555,25 @@ class Browser:
 
     def press(self, element_id):
         self.press_row(element_id)
+
+    def press_expect_reject(self, element_id):
+        """A vue row identity is its DOM node; once the page re-renders that node
+        is gone. Clicking the detached index must not silently act on whatever
+        now occupies that position, so this re-resolves by index and reports
+        whether the target no longer exists."""
+        rows = self._row_locators()
+        if element_id >= rows.count():
+            return 'stale: row index no longer exists in this revision'
+        # Re-resolve by index, then confirm the element is still attached; a
+        # detached node cannot receive the click and reports rejection.
+        target = rows.nth(element_id)
+        try:
+            if not target.is_visible():
+                return 'stale: target detached'
+            target.click(timeout=2000)
+        except Exception as e:
+            return f'stale: {e!r}'
+        return ''
 
     def a_line(self):
         m = re.search(r'A 树 sel=(\S*) exp=(\d+) ?([^"{\n]*)', self.snapshot())
