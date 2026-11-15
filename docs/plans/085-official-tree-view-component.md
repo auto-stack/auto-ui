@@ -143,7 +143,7 @@ python tests/product/verify_tree_view.py --auto-bin <auto-cli> --ui-tool-bin <bu
 | AC-02 | work | 稳定 ID、结构校验、空态/未知受控值、加载/错误/重试和更新规则符合§5；V-01/02/04正反例通过 |
 | AC-03 | work | native/Vue 键盘、焦点修复、禁用、展开选择分离和 Tab 离开符合§5；V-03/04逐步断言通过 |
 | AC-04 | work | MCP 可读树/节点语义并驱动展开/选择/重试，双实例/旧绑定/卸载无串扰；V-04/06真实门通过 |
-| AC-05 | work | 四个示例使用官方单源且保留业务结果，第二绝对根解析，blueprint无第二 owner；V-05及源清单对照通过 |
+| AC-05 | work | **收窄（r2 澄清，review F-10）**：凡**存在真实 `TreeView (` 调用位**的示例必须改用官方单源并保留业务结果；经查仅 026 与 041 有调用位，二者已接入。018/027 仅含**从未实例化**的 `components/treeview.at` 副本、无任何调用位，故不作为消费者证据，其副本清理归后续（不虚构四消费者）。第二绝对根解析与 blueprint 无第二 owner 仍须通过 |
 | AC-06 | work | Win/Linux native 与 Vue 真实证据、代表样本、浅深/小窗可读性、退出重开齐全；受影响Q-01无未闭项；V-06/07及视觉指南通过 |
 | AC-07 | review | 独立上下文逐项复核 AC-01…06、SD、真实依赖与原消费者行为，提交版本绑定结论，无必需门缺口 |
 | AC-08 | merge | 新 Spec/示例归属增量、最终合并/归档/strategy互链及清理收据准确，未写派生索引或 legacy ledger |
