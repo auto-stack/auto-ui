@@ -153,11 +153,11 @@ class Session:
         return self.call('autoui_action', element_id=element_id, action='press')
 
     def a_line(self):
-        m = re.search(r'"A 树 sel=(\S*) exp=(\d+) ([^"]*)"', self.snapshot())
+        m = re.search(r'"A 树 sel=(\S*) exp=(\d+) ?([^"]*)"', self.snapshot())
         return m.groups() if m else None
 
     def b_line(self):
-        m = re.search(r'"B 树 sel=(\S*) exp=(\d+) ([^"]*)"', self.snapshot())
+        m = re.search(r'"B 树 sel=(\S*) exp=(\d+) ?([^"]*)"', self.snapshot())
         return m.groups() if m else None
 
     def press_button(self, label):
@@ -191,10 +191,10 @@ def prepare(args, out, window):
                     ignore=shutil.ignore_patterns('deps', 'dist', 'gen', 'build'))
     # The isolated copy leaves the repo: point the package import and the dep
     # root at the producer checkout (same bytes, absolute closure root).
-    entry = app / 'src/front/pages/demo.at'
+    entry = app / 'src/front/app.at'
     entry.write_text(
         entry.read_text(encoding='utf-8').replace(
-            '../../../../../packages/tree-view', (ROOT / 'packages/tree-view').as_posix()),
+            '../../packages/tree-view', (ROOT / 'packages/tree-view').as_posix()),
         encoding='utf-8')
     pac = app / 'pac.at'
     pac.write_text(
@@ -239,7 +239,7 @@ def run_matrix(session, record):
     # Re-expand for later assertions.
     m = re.search(r'container #(vnode_\d+) \{\s*\n\s*style: "w-5 h-5 shrink-0[^"]*"\s*\n\s*onclick: \.WantToggle', session.snapshot())
     session.press(m.group(1))
-    session.wait(lambda t: re.search(r'"A 树 sel=\S* exp=1 ', t) is not None)
+    session.wait(lambda t: re.search(r'"A 树 sel=\S* exp=1', t) is not None)
 
     # ── V-01 retry: an error row exposes retry, and retrying clears it.
     vfd.require('重试' in session.snapshot(), 'error row must expose a retry action')
@@ -416,11 +416,11 @@ class Browser:
             'vue track has no vnode ids; row selection is driven by label below')
 
     def a_line(self):
-        m = re.search(r'A 树 sel=(\S*) exp=(\d+) ([^\n]*)', self.snapshot())
+        m = re.search(r'A 树 sel=(\S*) exp=(\d+) ?([^\n]*)', self.snapshot())
         return m.groups() if m else None
 
     def b_line(self):
-        m = re.search(r'B 树 sel=(\S*) exp=(\d+) ([^\n]*)', self.snapshot())
+        m = re.search(r'B 树 sel=(\S*) exp=(\d+) ?([^\n]*)', self.snapshot())
         return m.groups() if m else None
 
     def press_button(self, label):
