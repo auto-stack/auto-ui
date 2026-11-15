@@ -13,6 +13,7 @@ use themes.themes: Auto, Solarized
 // 字面量——待框架修复后回迁（已知债，见 b4-evidence-summary）。
 widget App {
     use { package: official from "./components" }
+    use { package: tree_view from "../../../../../packages/tree-view" }
     // PLAN-086：分页交互统一走官方 PaginationControl 包（repo 内兄弟路径，1-based 受控）。
     use { package: pagination from "../../../../../packages/pagination" }
     msg {
