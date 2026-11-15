@@ -208,8 +208,17 @@ async fn p971_lsp_cli_real_binary_roundtrip() {
         let range = &diagnostic["range"];
         let start = range["start"]["character"].as_u64().unwrap_or(u64::MAX);
         let end = range["end"]["character"].as_u64().unwrap_or(0);
+        let (start_line, end_line) = (
+            range["start"]["line"].as_u64().unwrap_or(u64::MAX),
+            range["end"]["line"].as_u64().unwrap_or(u64::MAX),
+        );
+        // The bad source is single-line ASCII: every diagnostic must sit
+        // on line 0 with a character range inside the document.
         assert!(
-            end <= BAD_SOURCE.len() as u64 && start <= end,
+            start_line == 0
+                && end_line == 0
+                && end <= BAD_SOURCE.len() as u64
+                && start <= end,
             "diagnostic range {range} must stay inside the opened document"
         );
     }
