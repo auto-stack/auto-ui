@@ -331,10 +331,15 @@ def run(args):
             report['sessions'].append(record)
 
             session2 = Session(args, app, out, 2)
-            session2.wait(lambda t: 'TreeView 受控演示' in t)
-            vfd.require(len(session2.row_ids()) == 5,
-                        'reopened session must render the A tree again')
-            session2.press(session2.row_ids()[0])
+            # Reopen discipline: wait for the rows themselves, not just the
+            # header — the tree derives on a later frame than the header text.
+            session2.wait(lambda t: 'TreeView 受控演示' in t and 'A 树 sel=' in t)
+            session2.wait(lambda t: t.count('WantSelect') >= 7, timeout=20)
+            a_rows2, b_rows2 = session2.split_row_ids()
+            vfd.require(
+                (len(a_rows2), len(b_rows2)) == (5, 2),
+                f'reopened session must render both trees again, got A={len(a_rows2)} B={len(b_rows2)}')
+            session2.press(a_rows2[0])
             session2.wait(lambda t: 'select:chapter-01' in t)
             report['sessions'].append({
                 'command': session2.command, 'pid': session2.process.pid,
