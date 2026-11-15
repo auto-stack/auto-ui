@@ -31,6 +31,34 @@ pub fn tv_member(list List, id str) bool {
 }
 
 /// 首个重复节点 ID（空串 = 无重复）。深度优先，遇到即返回，用于具名结构错误。
+/// 整棵树的总节点数（含所有层级的 children）。
+///
+/// 用于按**真实规模**给每帧校验设界：`nodes.len()` 只是根节点数，一棵"单根 +
+/// 1000 个子节点"的树根数是 1，若拿根数当规模就会每帧扫 1001 个节点，重新制造
+/// O(n^2) 的预算耗尽（实测 16.7s 且渲染 0 行）。
+pub fn tv_total_nodes(nodes List) int {
+    var n int = 0
+    var stack List = []
+    var i int = nodes.len()
+    while i > 0 {
+        i = i - 1
+        stack.push(nodes[i])
+    }
+    while stack.len() > 0 {
+        var top int = stack.len() - 1
+        var nd = stack[top]
+        stack.pop()
+        n = n + 1
+        var kids List = nd.children
+        var k int = kids.len()
+        while k > 0 {
+            k = k - 1
+            stack.push(kids[k])
+        }
+    }
+    return n
+}
+
 pub fn tv_duplicate_id(nodes List) str {
     var seen List = []
     var stack List = []
@@ -146,7 +174,12 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
     // `dupGuard` still carries the Init verdict for big trees.
     var dup bool = dupGuard
     if !dup {
-        if nodes.len() <= 256 {
+        // Bound on the TOTAL number of nodes, not `nodes.len()`: that is only the
+        // ROOT count, and a single project root with 1000 file children (root
+        // count 1) would then rescan 1001 nodes every frame, re-creating the
+        // O(n^2) blowup that renders zero rows (measured 16.7s + budget
+        // exhausted). Counting first is one cheap pass.
+        if tv_total_nodes(nodes) <= 512 {
             if tv_duplicate_id(nodes) != "" {
                 dup = true
             }

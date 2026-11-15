@@ -1,0 +1,44 @@
+// PLAN-085 N-02 fixture: a large tree (above the per-frame validation bound)
+// whose Init is VALID and whose later update introduces a duplicate id.
+// Pins the documented boundary: above the bound the per-frame duplicate
+// validator does not run, so the collision is not re-reported.
+widget scaleduplarge {
+    msg { Init, InjectDup, Toggle(str), Select(str), Retry(str) }
+    model {
+        var nodes List = []
+        var expanded List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .sel,
+                      on_toggle: .Toggle($event), on_select: .Select($event), on_retry: .Retry($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            var i int = 0
+            while i < 400 {
+                a.push({ id: f"r${i}", label: f"Row ${i}", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+                i = i + 1
+            }
+            .nodes = a
+        }
+        .InjectDup -> {
+            var a List = []
+            var i int = 0
+            while i < 400 {
+                a.push({ id: f"r${i}", label: f"Row ${i}", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+                i = i + 1
+            }
+            // Collide one id.
+            a.push({ id: "r0", label: "DUPLICATE", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        .Toggle(v str) -> { }
+        .Select(v str) -> { .sel = v }
+        .Retry(v str) -> { }
+    }
+}
