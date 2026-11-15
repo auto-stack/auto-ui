@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-13T00:00:00Z
 updated_at: 2026-11-15
 plan_revision: 2
-current_step: 3
+current_step: 4
 total_steps: 8
 supersedes_spec_components:
   - docs/specs/ui/examples-ownership.md
@@ -350,3 +350,27 @@ Goal round 4 摘要（两条 T-04 阻塞全部证伪；迁移仍未宣布通过�
 - 既存红（非本计划）：`ui::clipboard::tests::set_then_get_roundtrip` 在主检出
   同样失败。
 - 任务计数 **3/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: ce3bacb6 | next: work (T-05)
+
+Goal round 5 摘要（T-04 完成：两个真实消费者已迁移并验证）：
+
+- **两条旧阻塞全部证伪，真因是我的两处操作错误**：
+  ① 026 的 `use` 包路径少一级（解析到不存在的 `examples/packages/tree-view`）；
+  ② 041 的调用位漏 `($event)` 实参。两处均已修正。
+- **026 迁移**（`b89829fc`）：改用正式包，`components/treeview.at` 退役；
+  保留 `tree_util.at`（`filter_tree`/`collect_ids`/`toggle_id` 仍是业务代码）。
+  验证：`examples/ui/026-database/tests/desktop_mcp.py` **25/25 连续 3 次
+  全绿**，含「T1 对象树分类」「T2 定位 products 表行」真实树行与切表。
+- **041 迁移**（`fe411d45`）：同上；继续 `use bps...toggle_id`（blueprint 仍是
+  通用树工具 canonical owner）。验证：库路径构建真实 `app.at` 得
+  `TreeView` 挂载、**13 个绑定行动作、25 个真 lucide 图标、0 文本回落、
+  7 个键盘绑定**；其自身套件 **44 passed / 9 failed**，与**未迁移基线逐项
+  相同**（9 项先于本计划存在，迁移未改变行为）。
+- **范围如实**：实际只有 026/041 存在 `TreeView (` 调用位；018/027 只含从未
+  实例化的 `components/treeview.at` 副本。本轮只迁移有真实消费者的两例，
+  未用副本留给 T-05 清理，不虚构消费证据。
+- 回归：`plan085_tree_keyboard` 8/8、`plan085_keydown_ownership` 5/5、
+  `plan041` 4/4、`g16` 1/1、tools `pagination` 2/2 与 `file_dialog` 3/3。
+- 既存红（非本计划）：`ui::clipboard::tests::set_then_get_roundtrip` 主检出
+  同样失败；041 桌面 shell 路径的树文本回落（库路径正常）记为具名既存缺口。
+- 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
