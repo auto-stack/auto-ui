@@ -156,28 +156,35 @@ selected/focused/disabled 早已使用的同一通道：
 > oracle 提示：这些标记会被**已解析的 debug View 丢弃**（样式解析只保留认识的
 > token），但存在于 `raw_class`——即快照打印的内容。拿 debug View 断言会得到
 > **假阴性**。另外 vue 轨读 `inner_text`，看不到 class，故标记断言仅 native 执行。
-## 大树的结构校验契约（重要）
+## 大树的结构校验（已知限制）
 
-每帧重扫整棵树查重复 ID 是 O(n²)：1000 节点每帧约 50 万次比较，会耗尽指令预算并
-**渲染 0 行**（实测 16.7s）。因此校验是**分档**的：
+每帧重扫整棵树查重复 ID 是 O(n²)：实测 VM 约 3.5 万次比较/秒，1000 节点约 50 万次
+比较 = 14s+，会耗尽指令预算并**渲染 0 行**。因此校验分档：
 
-| 树的总节点数 | 每帧自动校验 |
+| 树的总节点数 | 受控更新后的重复 ID 检测 |
 |---|---|
-| ≤ 512 | 是——受控更新引入的重复 ID 会被立即发现，歧义行不再发布 |
-| > 512 | **否**——只能靠挂载期校验 |
+| ≤ 512 | 自动——每帧重校验，重复立即发现，歧义行不发布 |
+| > 512 | **不自动**——见下方限制 |
 
-**因此大树消费者有义务**：在受控更新（可能改动 `nodes`）之后，**显式向 TreeView
-实例派发 `.Validate`**：
+### 已知限制（OPEN，未解决）
 
-```auto
-// 应用更新 nodes 之后
-c.on_with_input_for_instance("TreeView", "Validate", None, Some(tree_instance));
-```
+**>512 节点的树，若受控更新引入重复 ID，组件不会发现，并会发布该 ID 的多条可操作行。**
 
-`.Validate` **没有规模上限**，会重算并置 `dupFlag`/`invalid`：重复 ID 时具名报错，
-且所有行变为不可操作（不发布歧义行）。
+这是**跨语言层的限制**，不在本包可解范围：
 
-> 注意：`.Validate` 是**组件自身**的 API，必须派发到 TreeView **实例**。发给页面名
-> 只会命中页面自己的同名（或空）处理函数，`invalid` 不会更新。
-> 回归：`plan085_scale::n02_large_trees_require_validate_after_controlled_updates`
-> 同时钉住两半——不调 Validate 时不复查（成本），调了则歧义行归零（契约）。
+- 每帧全量检测在 n=1000 时约 14s，不可接受。
+- 需要 **O(n)** 的 id 集合原语（hash/set）才能廉价检测；当前 `.at` 语言**没有**
+  set/dict/hash，也**没有 sort**（无法用邻接比较替代）。
+- 组件**收不到 props 变更回调**（computed 每帧重播种，无 props-changed 钩子），
+  也**没有父→子的 msg 派发原语**（DSL 只有子→父 `."msg"(v)` emit），
+  所以无法把校验推迟到"数据变了才跑"。
+
+**因此 `.Validate` 只对 Rust 宿主可用**（`DynamicComponent::on_with_input_for_instance`），
+**不是 `.at` 消费者能调用的 API**。此前的 README 把它写成消费者义务是**错误**的，
+已撤回。
+
+**消费方当前的可行做法**：把大树拆成多个 ≤512 节点的树，或在应用侧保证 `nodes`
+的 id 唯一（应用本来就知道自己生成了什么 id）。
+
+**回归**：`plan085_scale::n02_large_tree_duplicates_are_a_documented_limitation`
+钉住这个限制的**当前行为**（>512 时歧义行会发布），使其可见且可追踪；它不是通过项。
