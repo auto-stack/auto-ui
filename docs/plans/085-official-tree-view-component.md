@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-13T00:00:00Z
 updated_at: 2026-11-15
 plan_revision: 2
-current_step: 5
+current_step: 6
 total_steps: 8
 supersedes_spec_components:
   - docs/specs/ui/examples-ownership.md
@@ -159,7 +159,7 @@ python tests/product/verify_tree_view.py --auto-bin <auto-cli> --ui-tool-bin <bu
 | T-03 | work / T-02 | [x] 已完成。**修复** `815fec34`：`key_bindings` 键归属不确定（`registry.all()` 遍历 HashMap 且含未渲染导入 → 可抢走页面键，GUI 实证 `page_hits=0`）；改为只扫本帧可挂载组件 + 路由目标，首现序传递。**键盘语义**（`ec1c16a6`）：焦点首个可达行、Down/Up 逐行且两端饱和、Home/End 首末、已展开父节点 Expand 进首子不重发、Enter 只选择、禁用行可见但跳过 | `plan085_keydown_ownership` **5/5**（根/路由页共存、未渲染导入不抢键、已渲染子件贡献键、同文件控制派发、外部包组件派发）+ `plan085_tree_keyboard` **7/7**；真实 native 窗复核 `P1→Down→S1→Home→P1→Enter→selected=p1`（截图 sha256 `4457C19C…DFF26813`）；回归 `plan041` 4/4、`g16` 1/1、tools `pagination` 2/2 与 `file_dialog` 3/3 全绿 | 03,04 |
 | T-04 | work / T-03 | 受阻（未提交，已回退）。迁移 026/041 到正式包后两例都不再渲染树行；定位到两条独立阻塞：①**递归 computed 静默空**（026 的 `dbNodes => filter_tree(...)`；同槽非递归 computed 出 2 行、递归出 0 行，无诊断）；②**`render:"vm"` 宿主上包组件行回调/样式未生效**（包本身实测装载正常：`load_package` 返回 TreeIcon+TreeView、零 warning）。两例改动已回退保持可用 | 阻塞解除前不迁移；不得用非递归副本或保留示例自带 TreeView 绕过（两者都建成第二真源） | 05 |
 | T-05 | work / T-04 | [x] 已完成（`219f85d6`/`8f36b9e3`）。tools 门 + 新建 `examples/tree-view` 夹具 + `tests/product/verify_tree_view.py`。**双端全绿**：native（2 会话、真实窗口「树形演示」、浅/深截图、exit 0、端口回收、重开再选择）与 vue（真实 Chromium + 同一矩阵），矩阵同为 `{a:5,b:2}`。矩阵改为后端中立（vnode / `data-auto-*` 各自解析） | 修好两处真缺陷才达成：①空状态在 `nodes` 变更后不出现（`is_empty` computed 在 VM 轨陈旧；改由 `tv_derive_rows` 哨兵行承载，回归 `plan085_empty_state` 1/1）②vue 腿选择器双计/引号锚定/过度捕获三处（详见 decisions）。Linux/WSL 与统一回归为显式 pending closeout 门 | 01…06 |接受只编译；含r2 V-07的参考区域对照/真实状态截图 | 01…06 |
-| T-06 | work / T-05 | 正式包 README、示例说明、`docs/reviews/plan085/`证据，提出最终 Spec delta，strategy 实施摘要；包README链接本Plan视觉指南和对应区域 | 逐项证据/文件摘要可读回，Q-01受影响项关闭，否则保持 executing | 06 |
+| T-06 | work / T-05 | [x] 已完成（`a348c487`）。`packages/tree-view/README.md`（props/事件/节点 schema/键盘表/VM 渲染约束/MCP 可观察面/验收入口，并链本 Plan 与视觉指南 §2.2）、`examples/tree-view/README.md`、`docs/reviews/plan085/evidence.md`（逐任务锚点 + 双端门 + 回归表 + 具名遗留）、`docs/reviews/plan085/spec-delta-proposal.md`（SD-01 新 tree-view Spec、SD-02 改 examples-ownership、SD-03 记录 018/027 无调用位）。逐条回到代码核验，纠正了自己草稿里"Enter/Space"的错述（实际只绑 `enter`） | 证据/文件可读回；Q-01 受影响视觉断言不以本计划关闭（保持 executing 至 T-07/T-08） | 06 |
 | T-07 | review / T-06 | 同树独立复审源码和 SD，重放关键反例，不修实现 | 固定 reviewed commit、平台结果、AC verdict；未通过回同树work | 07 |
 | T-08 | merge / T-07 pass | 建 `docs/specs/ui/tree-view.md`，修示例归属Spec，合并/归档/strategy链接/实际清理 | 源版本、最终Spec及树状态准确，不拿merge替代功能验收 | 08 |
 
@@ -480,3 +480,26 @@ Goal round 9 摘要（**T-05 完成：双端全绿**）：
 - 遗留（显式 pending closeout 门，非本轮义务）：Linux/WSL 腿（084 同一边界）、
   统一回归（review/merge 档位）。
 - 任务计数 **5/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 10 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: a348c487 | next: review (T-07)
+
+Goal round 10 摘要（**T-06 完成**：包/示例文档 + 证据 + Spec delta 提案）：
+
+- **`packages/tree-view/README.md`**：props/事件（含载荷语义）、节点 schema
+  （全键书写、稳定 id、重复 id 具名错误）、展开与选择分离、禁用不可达但可见、
+  加载中 ≠ 失败、键盘表、**VM 渲染约束**（字面量 class 分支、字面量 icon 名、
+  空态由派生哨兵行承载）、MCP 可观察面、验收入口；链本 Plan 与视觉指南 §2.2。
+- **`examples/tree-view/README.md`**：夹具形态（树挂 App 根，与两真实消费者
+  一致）、区块、受控回路、种子数据、两轨运行方式。
+- **`docs/reviews/plan085/evidence.md`**：逐任务锚点、工具/依赖身份、双端产品门
+  实跑（矩阵 `{a:5,b:2}`、native 双会话 + 浅深 + exit 0 + 端口回收 + 重开、
+  vue 真实 Chromium）与本树 28 项回归、以及**具名遗留**（Linux/WSL `not_run`、
+  统一回归归 review/merge、041 既有 9 项失败、路由页形态差异、Q-01）。
+- **`docs/reviews/plan085/spec-delta-proposal.md`**：SD-01 新建
+  `docs/specs/ui/tree-view.md`；SD-02 修订 `examples-ownership.md`；SD-03 记录
+  018/027 **无** `TreeView (` 调用位（副本从未实例化），不作为消费者证据。
+  **本轮不写 `docs/specs/`**——canonical 落地属 T-08（merge）。
+- **自我纠错**：草稿键盘表写"Enter / Space"，回代码核验发现绑定面精确为
+  `onkeydown.{up,down,left,right,home,end,enter}`，`Space` 只出现在注释里；
+  两份文档已改为显式说明"Space 未绑定"，并在 Spec 提案里禁止在补绑定与用例
+  之前声称 Space 可用。
+- 任务计数 **6/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
