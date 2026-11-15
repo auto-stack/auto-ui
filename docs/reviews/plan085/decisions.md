@@ -111,16 +111,36 @@ widget TreeView (
   可复现规则：**同名键在页与包组件之间、或包组件多实例之间冲突时，派发丢失且
   无诊断**；键名不冲突时正常。这解释了四示例「只有鼠标」的历史状态——树组件的
   `down/up/enter/left/right` 一旦进入包注册表就会与其它组件同名键互撞。
-- **T-03 最小修复点（冻结）**：不改组件 API、不加测试专用入口，在既有
-  `key_bindings` 收集/派发面做两件事——(1) 收集时**跳过本帧未实例化的 registry
-  子件**（未挂载的组件不得参与键位归属）；(2) 为命中键补**实例限定寻址**
-  （复用既有 `TypedInst` identity 与 `call_handler_for(widget, event,
-  state_obj_id)` receiver 参数化路径），使同页多实例的 `onkeydown.*` 各自可达。
-  两条都要有永久反例（未实例化导入不复影、双实例各自命中、键名不冲突对照）。
+- **T-03 进一步定位（组件级诊断，`tests/fixtures/plan085_keydown/`）**：
+  `build_dynamic_component(App).key_bindings()` 实测——
+  - `App` 根声明 `down`+`up` → 映射含两键（`App.RootDown/RootUp`）。
+  - `App` 根只声明 `down`，路由页 `page` 声明 `down`+`up` → 映射**只有**
+    `ArrowDown -> App.RootDown`；页的 `ArrowUp` **完全缺席**。
+  → 结论：路由页（经 `outlet` 渲染，永不以元素 tag 出现）的
+  `onkeydown.*` **根本不进入根组件的收集面**；`registry.all()` 也不含它。
+  因此缺口有两层：
+  1. **路由页绑定缺失**：`collect_onkeydown_bindings_with_registry` 只扫
+     根 `view_tree` + `registry.all()`，路由页两条路径都不覆盖。
+  2. **归属不确定**：`registry.all()` 迭代 `HashMap`，同名键先到先得 →
+     未挂载的导入组件可抢走键归属（T-01 六行矩阵的 import-only 行）。
+- **T-03 最小修复点（冻结，含已验证方向与未验证部分）**：
+  (a) 收集面改为「本帧可挂载的组件」——根 `view_tree` 里解析为注册组件的
+  element tag + 路由目标（按 `route.module` 经 `get_by_route_module` 解析），
+  扫描顺序确定（首现序），不再遍历 `HashMap` 全体；
+  (b) 为命中键补**实例限定寻址**（复用既有 `TypedInst` identity 与
+  `call_handler_for(widget, event, state_obj_id)` receiver 参数化），使同页
+  多实例各自可达。
+  **本轮只完成定位与方向验证，未提交实现**：把 (a) 落到 `dynamic.rs` 后，
+  组件级诊断仍显示路由页绑定为 0（`registry.get_by_route_module("page")`
+  在 `App` 构建期也未命中），说明路由页的注册时机晚于根组件构建，仅改收集面
+  不够，需与 outlet 页装载路径一起改。该改动影响所有 App 的启动期键位，必须
+  单独验证，故**本轮已回退未验证实现**，保持树绿；T-03 下一轮从这一条继续。
 - 若上述接线在预算内不可行：按 Plan §5 **具名记录未闭项**，保持 AC-03 未关闭，
   **不得**静默降级为鼠标专用树，也不得给四示例各留一份键盘算法。
 - 反例保留：上表六行即修复前后的判据，T-03/T-05 必须同时复跑；不得只留
-  「单实例正例」而丢掉多实例与未实例化导入两行。
+  「单实例正例」而丢掉多实例与未实例化导入两行。组件级诊断夹具
+  `crates/auto-ui-runtime/tests/fixtures/plan085_keydown/` 随 T-03 落地为永久
+  回归（根键 / 路由页键 / 未挂载导入键三者互不串扰）。
 - Tab 离开树：树容器不加入逐节点 Tab 序列（组件不产生 focusable 输入），
   沿用既有 `__focus_next_input` 焦点环；空树/全禁用树同样可离开。
 

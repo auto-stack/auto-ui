@@ -1,0 +1,18 @@
+widget ChildBox (nodes: List = []) {
+    msg { Init, Left, Right }
+    model {
+        var hits int = 0
+    }
+    view {
+        col (style: "w-full") {
+            onkeydown.left: .Left
+            onkeydown.right: .Right
+            text "child box" { style: "text-xs" }
+        }
+    }
+    on {
+        .Init -> { .hits = 0 }
+        .Left -> { .hits = .hits + 1 }
+        .Right -> { .hits = .hits + 1 }
+    }
+}

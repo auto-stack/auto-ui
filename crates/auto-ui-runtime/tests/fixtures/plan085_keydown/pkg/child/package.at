@@ -1,0 +1,4 @@
+name: "child"
+version: "0.1.0"
+namespace: "auto"
+description: "PLAN-085 keydown fixture child package"

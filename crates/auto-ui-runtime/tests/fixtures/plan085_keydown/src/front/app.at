@@ -1,0 +1,15 @@
+widget App {
+    msg { Init, RootDown }
+    model { var root_hits int = 0 }
+    routes { "/" -> use page }
+    view {
+        col (style: "w-full h-full") {
+            text "root" { style: "text-xs" }
+            outlet
+        }
+    }
+    on {
+        .Init -> { .root_hits = 0 }
+        .RootDown -> { .root_hits = .root_hits + 1 }
+    }
+}
