@@ -1,0 +1,42 @@
+// PLAN-085 T-04 fixture: the REAL 026 node shape consumed by the official
+// package — a recursive filter producing nested children, an expanded list
+// holding root + group ids, and is_leaf flags. Pins that the package derives
+// the nested tree (not just a flat list), which is what the consumer
+// migration depends on.
+use db_shape_util: filter_tree
+
+widget dbshape {
+    msg { Init, TvToggle(str), TvSelect(str), Bump }
+    model {
+        var full List = []
+        var expanded List = []
+        var sel str = ""
+        var probe str = "?"
+    }
+    computed {
+        nodes => filter_tree(.full, "")
+    }
+    use { package: tree_view from "../../pkg/tree-view" }
+    view {
+        col (style: "p-4") {
+            text .probe { style: "text-xs" }
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .sel, on_toggle: .TvToggle($event), on_select: .TvSelect($event), on_retry: .Bump, directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var t1 List = []
+            t1.push({ id: "t/customers", label: "customers", kind: "file", icon: "table", is_leaf: false, badge: "91", children: [] })
+            var g1 List = []
+            g1.push({ id: "g/tables", label: "Tables", kind: "dir", icon: "table", is_leaf: false, badge: "7", children: t1 })
+            var root List = []
+            root.push({ id: "db/app", label: "app (SQLite)", kind: "dir", icon: "", is_leaf: false, badge: "", children: g1 })
+            .full = root
+            .expanded = ["db/app", "g/tables"]
+            .probe = f"full=${.full.len()}"
+        }
+        .TvToggle(id str) -> { .probe = f"toggle:${id}" }
+        .TvSelect(id str) -> { .sel = id }
+        .Bump -> { }
+    }
+}

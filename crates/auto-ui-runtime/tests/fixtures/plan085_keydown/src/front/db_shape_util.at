@@ -1,0 +1,17 @@
+// PLAN-085 T-04 fixture helper: real 026 shape — recursive filter over nested
+// children with is_leaf flags. Byte-equivalent in behaviour to 026's local
+// tree_util.filter_tree, which stays the example's own business code.
+pub fn filter_tree(nodes List, kw str) List {
+    var out List = []
+    var i int = 0
+    while i < nodes.len() {
+        var nd = nodes[i]
+        var fk List = filter_tree(nd.children, kw)
+        var selfHit bool = kw == "" || nd.label.contains(kw)
+        if selfHit || fk.len() > 0 {
+            out.push({ id: nd.id, label: nd.label, kind: nd.kind, icon: nd.icon, is_leaf: nd.is_leaf, badge: nd.badge, children: fk })
+        }
+        i = i + 1
+    }
+    return out
+}

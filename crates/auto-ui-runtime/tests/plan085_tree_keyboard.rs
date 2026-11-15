@@ -191,3 +191,38 @@ fn plan085_tree_skips_disabled_rows() {
         "GoEnd must stop at the last REACHABLE row, skipping disabled ones"
     );
 }
+
+// ── Nested-tree derivation (the 026 consumer shape) ─────────────────────────
+
+/// The package must derive a **nested** tree, not just a flat list: 026 feeds
+/// it a recursive `filter_tree` result whose children carry `is_leaf` flags,
+/// and expands the root plus a group. Rows must come out as root → group →
+/// leaf in that order, with the leaf's own children absent (it is expanded
+/// into none).
+#[test]
+fn plan085_derives_nested_filtered_tree_like_the_026_consumer() {
+    let mut comp = build("src/front/db_shape.at");
+    for _ in 0..6 {
+        comp.poll_frame_pump();
+        let _ = comp.view_with_debug_gated(false);
+    }
+    let (view, _, _) = comp.view_with_debug_gated(false);
+    let d = format!("{view:?}");
+
+    // Order matters: the root appears before its expanded group, which appears
+    // before the leaf it contains.
+    let root = d.find("app (SQLite)").expect("root row must render");
+    let group = d.find("Tables").expect("expanded group row must render");
+    let leaf = d.find("customers").expect("leaf row under the group must render");
+    assert!(
+        root < group && group < leaf,
+        "rows must derive root → group → leaf (got {root} / {group} / {leaf})"
+    );
+
+    // One bound selection handler per rendered row.
+    assert_eq!(
+        d.matches("WantSelect").count(),
+        3,
+        "exactly the three visible rows carry a bound selection action"
+    );
+}
