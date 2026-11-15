@@ -131,6 +131,33 @@ widget TreeView (
   `page_hits=0`。修复 = 只扫**本帧可挂载**的组件（`view_tree` 中解析为注册
   组件的 tag + 路由目标），并按首现序**传递**其可挂载子件；根仍先扫保住
   自己的键。三条永久反例（`plan085_keydown_ownership.rs`）。
+- **T-05 进行中（2026-11-15，提交 `ea4c825a`）**：
+  - **tools 门已落并通过 2/2**：`crates/auto-ui-tools/tests/tree_view_component.rs`
+    ——两个生成器都产出组件；Vue 面带引号 emit（`toggle`/`select`/`retry`，
+    不带引号的变体不会被重写成 `emit`，回调会静默断链）、字面量 lucide
+    chevron 分支、字面量行状态分支；第二绝对根 vendor 闭包**逐字节相同**，
+    删依赖后在 strict 下是**具名失败**。
+  - **示例与产品门已落**：`examples/tree-view/`（受控夹具：展开/选择/禁用/
+    加载中/失败+重试、同页双实例、空树、浅深切换、文档化退出）与
+    `tests/product/verify_tree_view.py`（`--auto-bin/--ui-tool-bin/--out-dir/
+    --backend native|vue`，覆盖受控身份、重试、实例隔离、空态、截图、
+    退出重开）。
+  - **夹具构建中踩到并修好的两个坑**（记录避免重犯）：
+    ① **handler 名不能带下划线**——`child_emit` 会折叠下划线，
+    `A_Select` 与包内派发键冲突，回调到不了页面；改成 `ASelect` 等。
+    ② **f-string 里对列表参数取 `.len()` 在 VM 轨渲染为空**——摘要行改为
+    显式 model 字段维护。
+  - **仍开的一条**：**脚本化 native 全跑尚未走通**。受控回调在**库路径**已被
+    证明有效（对 `/TreeView#0` 派发 `WantSelect` 后 `aSummary` 变为
+    `sel=chapter-01 ... select:chapter-01`），但真实窗口里用 `vnode` 行 id
+    按下后页面摘要不更新，且**无任何错误输出**。已排除：下划线折叠、
+    `.len()` 求值、双实例歧义（GUI 走 vnode 不受影响）、包路径。
+    **下一步**：对比「根 widget 内树」（026，`DbSelect` 正常）与「路由页内树」
+    （夹具）两种挂载的回调路由差异——这是目前唯一未消除的形态差异。
+    T-05 **不宣布通过**。
+- 不得为过门而把夹具树搬回根 widget 掩盖缺陷，也不得删断言：回调必须
+  在夹具既有形态下真实可用。
+
 - **T-04 迁移完成（2026-11-15，提交 `b89829fc` 026 / `fe411d45` 041）**：
   两例改用正式包，`components/treeview.at` 退役。**两条旧阻塞全部证伪**：
   - 「递归 computed 返回空」不成立：真实窗口 PROBE 读回 `dbNodes=1`、
