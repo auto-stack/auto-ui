@@ -171,11 +171,15 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
                 op = true
             }
         }
-        var ord int = -1
+        var ord int = reachable
         if !dis {
-            ord = reachable
             reachable = reachable + 1
         }
+        // `focus` is a ROW index (what tv_focus_id / tv_step_reachable use), not
+        // a reachable-code ordinal: comparing it against `reachable` silently
+        // disagreed whenever a disabled row preceded the focused one, so the
+        // focus ring landed on the wrong row. Track the row index itself.
+        var row_ix int = out.len()
         var sel bool = false
         if selected != "" {
             if selected == nd.id {
@@ -192,7 +196,7 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
         if dup {
             dis_row = true
         }
-        out.push({ id: nd.id, label: nd.label, has_kids: has_kids, open: op, disabled: dis_row, selected: sel, focused: ord == focus, loading: tv_member(loading, nd.id), error: tv_member(error, nd.id), leaf: !has_kids, icon: ic, badge: nd.badge, depth: lvl })
+        out.push({ id: nd.id, label: nd.label, has_kids: has_kids, open: op, disabled: dis_row, selected: sel, focused: row_ix == focus, loading: tv_member(loading, nd.id), error: tv_member(error, nd.id), leaf: !has_kids, icon: ic, badge: nd.badge, depth: lvl })
         if op {
             var j int = kids.len()
             while j > 0 {

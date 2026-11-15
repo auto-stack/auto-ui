@@ -140,13 +140,25 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
                             }
                         } else {
                             if r.selected {
-                                row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md bg-accent text-accent-foreground cursor-pointer") {
-                                    if r.icon != "" {
-                                        TreeIcon (name: r.icon) {}
+                                if r.focused {
+                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md bg-accent text-accent-foreground ring-2 ring-primary cursor-pointer") {
+                                        if r.icon != "" {
+                                            TreeIcon (name: r.icon) {}
+                                        }
+                                        text r.label { style: "text-sm" }
+                                        if r.badge != "" {
+                                            text r.badge { style: "ml-auto text-xs text-muted-foreground" }
+                                        }
                                     }
-                                    text r.label { style: "text-sm" }
-                                    if r.badge != "" {
-                                        text r.badge { style: "ml-auto text-xs text-muted-foreground" }
+                                } else {
+                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md bg-accent text-accent-foreground cursor-pointer") {
+                                        if r.icon != "" {
+                                            TreeIcon (name: r.icon) {}
+                                        }
+                                        text r.label { style: "text-sm" }
+                                        if r.badge != "" {
+                                            text r.badge { style: "ml-auto text-xs text-muted-foreground" }
+                                        }
                                     }
                                 }
                             } else {
@@ -223,6 +235,8 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
             .focus_id = tv_focus_id(.rows, prv)
         }
         .GoHome -> {
+            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
             var first int = tv_first_reachable(.rows)
             if first >= 0 {
                 .focus_index = first
@@ -230,6 +244,8 @@ widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disa
             }
         }
         .GoEnd -> {
+            .focus_index = tv_repair_focus(.rows, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
             var last int = tv_last_reachable(.rows)
             if last >= 0 {
                 .focus_index = last

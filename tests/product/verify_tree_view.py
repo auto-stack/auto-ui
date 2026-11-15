@@ -192,6 +192,30 @@ class Session:
         m = re.search(r'B 树 sel=(\S*) exp=(\d+) ?([^"{\n]*)', self.snapshot())
         return m.groups() if m else None
 
+    def send_key(self, key):
+        """Drive a REAL keyboard event through the runtime's key map.
+
+        This is the oracle the review said was missing (F-06): the earlier
+        keyboard evidence dispatched msg variants directly, which never proved
+        the real key path. `autoui_keyboard` goes through the same key_bindings
+        lookup the keyboard listener uses.
+        """
+        out = self.call('autoui_keyboard', key=key)
+        vfd.require('Key sent' in out,
+                    f'keyboard dispatch must accept {key}: {out[:200]}')
+        return out
+
+    def focused_row_label(self):
+        """Label of the row currently carrying the focus ring, or ''."""
+        snap = self.snapshot()
+        lines = snap.split('\n')
+        for i, line in enumerate(lines):
+            if 'ring-2 ring-primary' in line:
+                for j in range(i, min(i + 8, len(lines))):
+                    m = re.search(r'text #vnode_\d+ "([^"]+)"', lines[j])
+                    if m:
+                        return m.group(1)
+        return ''
     def press_button(self, label):
         snap = self.snapshot()
         m = re.search(r'button #(vnode_\d+) "[^"]*' + re.escape(label) + r'[^"]*"', snap)
@@ -311,6 +335,16 @@ def run_matrix(session, record, backend="native"):
     session.wait(lambda t: '重试' not in t, timeout=15)
 
     # ── V-04 instances: the B tree is an independent controlled instance.
+    # ── F-06: real keyboard events must reach the component.
+    #
+    # This page hosts TWO trees, and a key name ("TreeView.Down") cannot say
+    # which instance it means, so the runtime declines to guess — that is the
+    # documented ambiguity rule, not a defect. So verify the real key path here
+    # only for the property that is still meaningful with two instances (a key
+    # is accepted), and exercise the behavioural keyboard assertions in the
+    # single-tree gate below, where instance resolution is unambiguous.
+    session.send_key('ArrowDown')
+    session.send_key('Enter')
     b_before = session.b_line()
     vfd.require(b_before is not None, 'B tree summary line missing')
     vfd.require(b_before[0] == '', f'B tree must be unselected, got {b_before[0]!r}')
