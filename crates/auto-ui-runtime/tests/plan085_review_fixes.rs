@@ -182,6 +182,13 @@ fn n02_empty_id_does_not_abort_duplicate_detection() {
         0,
         "with an empty id and a real duplicate present, no row may stay actionable"
     );
+    // The named error must be the EMPTY-ID one, not a collapsed duplicate message:
+    // asserting only "0 rows" would still pass if the empty id regressed into the
+    // duplicate sentinel and the fixture had no further duplicate.
+    assert!(
+        d.contains("存在空节点 ID"),
+        "an empty id must raise its own named error, got none"
+    );
 }
 /// Escaping must be INJECTIVE: `a|b` must not collide with `a!!b`.
 ///
@@ -196,5 +203,29 @@ fn n02_escaping_is_injective_so_pipe_and_bang_ids_do_not_collide() {
         d.matches("WantSelect").count(),
         2,
         "`a|b` and `a!!b` are DIFFERENT ids and both must stay actionable"
+    );
+}
+/// Adversarial escaping pairs: four DISTINCT ids that are near-collisions under a
+/// naive escape must all stay actionable.
+#[test]
+fn n02_adversarial_escape_pairs_stay_distinct() {
+    let mut c = build("src/front/dup_enc2.at");
+    let d = settle(&mut c);
+    assert_eq!(
+        d.matches("WantSelect").count(),
+        4,
+        "a|b, a!!b, a!1b and ! are four distinct ids and must not collide"
+    );
+}
+
+/// But a REAL duplicate among escaped ids must still be caught.
+#[test]
+fn n02_real_duplicate_among_escaped_ids_is_still_caught() {
+    let mut c = build("src/front/dup_enc3.at");
+    let d = settle(&mut c);
+    assert_eq!(
+        d.matches("WantSelect").count(),
+        0,
+        "two ids that are genuinely equal must still be reported"
     );
 }

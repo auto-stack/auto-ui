@@ -1,0 +1,24 @@
+// PLAN-085: a REAL duplicate among ids that need escaping must still be caught.
+widget dupenc3 {
+    msg { Init, Select(str) }
+    model {
+        var nodes List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: [], selected: .sel,
+                      on_toggle: .Select($event), on_select: .Select($event), on_retry: .Select($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            a.push({ id: "p|1", label: "D1", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "p|1", label: "D2", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        .Select(v str) -> { .sel = v }
+    }
+}

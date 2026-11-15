@@ -1,0 +1,32 @@
+// PLAN-085: adversarial escaping pairs. All four ids are DISTINCT, so all four
+// rows must stay actionable. Escaping is ! -> !0 then | -> !1:
+//   "a|b"   -> "a!1b"
+//   "a!!b"  -> "a!0!0b"
+//   "a!1b"  -> "a!01b"
+//   "!"     -> "!0"
+// No two tokens may coincide.
+widget dupenc2 {
+    msg { Init, Select(str) }
+    model {
+        var nodes List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: [], selected: .sel,
+                      on_toggle: .Select($event), on_select: .Select($event), on_retry: .Select($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            a.push({ id: "a|b", label: "R1", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "a!!b", label: "R2", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "a!1b", label: "R3", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "!", label: "R4", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        .Select(v str) -> { .sel = v }
+    }
+}
