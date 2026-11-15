@@ -327,3 +327,26 @@ Goal round 3 摘要（T-03 完成；T-04 受阻并回退）：
   `ui::clipboard::tests::set_then_get_roundtrip` 在主检出同样失败。
 - 任务计数 **3/8**（T-01、T-02、T-03 完成；T-04 阻塞中）。未改 canonical
   Specs，未写派生索引或 legacy ledger。
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 4 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 73b1b522 | next: work (T-04 重做)
+
+Goal round 4 摘要（两条 T-04 阻塞全部证伪；迁移仍未宣布通过）：
+
+- **阻塞①「递归 computed 返回空」证伪**：真实 native 窗口内一次性 PROBE
+  处理器读回 `dbNodes=1`、`dbNodes[0].id="db/app"`、
+  `dbNodes[0].children.len()=3`——递归 `filter_tree` 并未返回空。再用等价
+  嵌套 fixture 直接喂正式包，派生 **root → group → leaf 三行**、每行一个
+  绑定选择动作（`plan085_derives_nested_filtered_tree_like_the_026_consumer`，
+  套件 **8/8**，提交 `775c1561`）。
+- **阻塞②是我的路径错**：026 的
+  `use { package: tree_view from "../../../../packages/tree-view" }` 少一级，
+  解析到不存在的 `examples/packages/tree-view`；改五级后 `TreeView` 正常挂载
+  （`/TreeView#0`、`WantSelect=16`）；041 同为五级亦挂载（`WantSelect=13`）。
+  规则：包路径必须与同文件已工作的 `pagination`/`file_dialog` 同深度。
+- **仍未解释（故不宣布 T-04 通过）**：两例**真实窗口**里树为空，而**未迁移
+  的基线同样为空**（`on_toggle=False`、`for: r` ≤1）——现象先于本计划存在，
+  与迁移无关，但成因未定位。026/041 改动继续留在回退状态。
+- 回归：`plan085_keydown_ownership` **5/5**、`plan085_tree_keyboard` **8/8**、
+  `plan041` 4/4、`g16` 1/1、tools `pagination` 2/2 与 `file_dialog` 3/3。
+- 既存红（非本计划）：`ui::clipboard::tests::set_then_get_roundtrip` 在主检出
+  同样失败。
+- 任务计数 **3/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
