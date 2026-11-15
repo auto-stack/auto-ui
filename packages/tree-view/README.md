@@ -156,3 +156,28 @@ selected/focused/disabled 早已使用的同一通道：
 > oracle 提示：这些标记会被**已解析的 debug View 丢弃**（样式解析只保留认识的
 > token），但存在于 `raw_class`——即快照打印的内容。拿 debug View 断言会得到
 > **假阴性**。另外 vue 轨读 `inner_text`，看不到 class，故标记断言仅 native 执行。
+## 大树的结构校验契约（重要）
+
+每帧重扫整棵树查重复 ID 是 O(n²)：1000 节点每帧约 50 万次比较，会耗尽指令预算并
+**渲染 0 行**（实测 16.7s）。因此校验是**分档**的：
+
+| 树的总节点数 | 每帧自动校验 |
+|---|---|
+| ≤ 512 | 是——受控更新引入的重复 ID 会被立即发现，歧义行不再发布 |
+| > 512 | **否**——只能靠挂载期校验 |
+
+**因此大树消费者有义务**：在受控更新（可能改动 `nodes`）之后，**显式向 TreeView
+实例派发 `.Validate`**：
+
+```auto
+// 应用更新 nodes 之后
+c.on_with_input_for_instance("TreeView", "Validate", None, Some(tree_instance));
+```
+
+`.Validate` **没有规模上限**，会重算并置 `dupFlag`/`invalid`：重复 ID 时具名报错，
+且所有行变为不可操作（不发布歧义行）。
+
+> 注意：`.Validate` 是**组件自身**的 API，必须派发到 TreeView **实例**。发给页面名
+> 只会命中页面自己的同名（或空）处理函数，`invalid` 不会更新。
+> 回归：`plan085_scale::n02_large_trees_require_validate_after_controlled_updates`
+> 同时钉住两半——不调 Validate 时不复查（成本），调了则歧义行归零（契约）。

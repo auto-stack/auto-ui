@@ -3,7 +3,7 @@
 // Pins the documented boundary: above the bound the per-frame duplicate
 // validator does not run, so the collision is not re-reported.
 widget scaleduplarge {
-    msg { Init, InjectDup, Toggle(str), Select(str), Retry(str) }
+    msg { Init, InjectDup, Validate, Toggle(str), Select(str), Retry(str) }
     model {
         var nodes List = []
         var expanded List = []
@@ -20,7 +20,7 @@ widget scaleduplarge {
         .Init -> {
             var a List = []
             var i int = 0
-            while i < 400 {
+            while i < 600 {
                 a.push({ id: f"r${i}", label: f"Row ${i}", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
                 i = i + 1
             }
@@ -29,7 +29,7 @@ widget scaleduplarge {
         .InjectDup -> {
             var a List = []
             var i int = 0
-            while i < 400 {
+            while i < 600 {
                 a.push({ id: f"r${i}", label: f"Row ${i}", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
                 i = i + 1
             }

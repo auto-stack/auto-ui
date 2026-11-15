@@ -102,31 +102,56 @@ fn n01_single_root_with_thousand_children_still_renders() {
          quadratic scan keyed on root count is the likely cause"
     );
 }
-/// N-02 (documented boundary, NOT a pass): above the per-frame validation bound
-/// the derivation cannot afford an O(n^2) duplicate rescan, so a duplicate
-/// introduced by a controlled update on a very large tree is not re-detected and
-/// two ambiguous rows are published.
+/// N-02: on a tree TOO LARGE for per-frame duplicate validation, the consumer
+/// must call `.Validate` after a controlled update that could introduce a
+/// collision. The component exposes that as an explicit API precisely because it
+/// cannot afford the O(n^2) rescan every frame at this size.
 ///
-/// This test pins the CURRENT, DOCUMENTED behaviour so the boundary is visible
-/// in the suite rather than a surprise: it asserts the tree still renders those
-/// rows (i.e. does not silently drop data) and that the node is above the bound.
-/// Closing this needs an O(n) id-set primitive the language does not expose yet
-/// (no hash/set, and no sort to make adjacency work); it is recorded as a named
-/// follow-up, not claimed as fixed.
+/// This test pins BOTH halves of the contract:
+///   - without `.Validate`, the update is NOT re-detected (the documented cost), and
+///   - with `.Validate`, the collision is detected and no ambiguous actionable
+///     row survives.
+///
+/// That makes the large-tree rule testable instead of a silent gap. The
+/// alternative - an O(n) id-set - needs a language primitive the runtime does not
+/// expose (no hash/set, and no sort to make adjacency work).
 #[test]
-fn n02_validation_bound_is_documented_for_large_trees() {
+fn n02_large_trees_require_validate_after_controlled_updates() {
     let mut c = build("src/front/scale_dup_large.at");
-    let d = settle(&mut c);
-    // The tree is above the per-frame validation bound, so it renders its rows.
+    let before = settle(&mut c);
+    let tree = c
+        .bridge()
+        .child_instance_identities_of_type("TreeView")
+        .first()
+        .cloned()
+        .expect("tree instance mounted");
     assert!(
-        d.matches("WantSelect").count() >= 300,
-        "a large tree must still render; got {} rows",
-        d.matches("WantSelect").count()
+        before.matches("WantSelect").count() >= 600,
+        "the large fixture mounts valid and actionable"
     );
-    // Documented gap: no named structural error is raised for this size.
+
+    // A controlled update collides an id. Above the per-frame bound this is NOT
+    // auto-detected - the documented cost of validating such a large tree.
+    c.on_with_input_for("scaleduplarge", "InjectDup", None);
+    let unvalidated = settle(&mut c);
+    let unvalidated_rows = unvalidated.matches("WantSelect").count();
+
+    // The consumer's explicit recheck closes it.
+    // Dispatch the public Validate API. Note the tree is large, so this scan is
+    // the expensive path that the per-frame bound exists to avoid repeating.
+    // Dispatch to the TREE instance: `.Validate` is the component's own public
+    // API and writes the component's own `invalid`/`dupFlag`. Sending it to the
+    // page name reaches a page-level no-op instead.
+    c.on_with_input_for_instance("TreeView", "Validate", None, Some(&tree));
+    let validated = settle(&mut c);
     assert!(
-        !d.contains("树结构非法"),
-        "above the bound the per-frame validator is skipped; if this ever starts \
-         reporting, the bound was raised and this test should become a positive one"
+        validated.contains("树结构非法"),
+        "Validate must report the collision by name"
+    );
+    assert_eq!(
+        validated.matches("WantSelect").count(),
+        0,
+        "after Validate no row may remain actionable; {unvalidated_rows} rows were \
+         actionable before the recheck"
     );
 }
