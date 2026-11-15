@@ -47,3 +47,7 @@ walkdir = "2"
 serde_json = { version = "1.0", features = ["preserve_order"] }
 # PLAN-031 T-04：正式主题包受管清单 sha256 校验（theme_package_manifest）。
 sha2 = "0.10"
+# PLAN-980 IF-980-FIELDS（B-DIALECT-V）：ui_domain_validation 消费共享字段级
+# 覆盖/清单机制（ace-core::source::field_manifest，接既有 mapping_complete/
+# component_coverage）；仅 dev/test 面，生产依赖闭包不变。
+ace-core = { path = "../../../auto-lang/experimental/ace/crates/core" }

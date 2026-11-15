@@ -69,6 +69,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ace-core"
+version = "0.1.0"
+dependencies = [
+ "ace-foreign-contract",
+ "ace-syntax-grammar",
+ "ace-syntax-runtime",
+ "anyhow",
+ "serde",
+ "serde_json",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "ace-foreign-contract"
 version = "0.1.0"
 dependencies = [
@@ -85,6 +98,23 @@ dependencies = [
  "blake3",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ace-syntax-grammar"
+version = "0.1.0"
+dependencies = [
+ "ace-syntax-runtime",
+ "auto-atom",
+ "auto-val",
+ "blake3",
+]
+
+[[package]]
+name = "ace-syntax-runtime"
+version = "0.1.0"
+dependencies = [
+ "blake3",
 ]
 
 [[package]]
@@ -925,6 +955,7 @@ dependencies = [
 name = "auto-ui-compiler"
 version = "0.1.0"
 dependencies = [
+ "ace-core",
  "auto-atom",
  "auto-generation-core",
  "auto-lang-core",
