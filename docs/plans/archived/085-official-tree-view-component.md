@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-085
-status: reviewed
+status: archived
 feature_name: TreeView 正式组件与示例复用
 author: [Codex]
 created_at: 2026-11-13T00:00:00Z
@@ -160,8 +160,8 @@ python tests/product/verify_tree_view.py --auto-bin <auto-cli> --ui-tool-bin <bu
 | T-04 | work / T-03 | 受阻（未提交，已回退）。迁移 026/041 到正式包后两例都不再渲染树行；定位到两条独立阻塞：①**递归 computed 静默空**（026 的 `dbNodes => filter_tree(...)`；同槽非递归 computed 出 2 行、递归出 0 行，无诊断）；②**`render:"vm"` 宿主上包组件行回调/样式未生效**（包本身实测装载正常：`load_package` 返回 TreeIcon+TreeView、零 warning）。两例改动已回退保持可用 | 阻塞解除前不迁移；不得用非递归副本或保留示例自带 TreeView 绕过（两者都建成第二真源） | 05 |
 | T-05 | work / T-04 | [x] **已收口（F-06/F-07/F-09 全闭）**（`219f85d6`/`8f36b9e3`）。tools 门 + 新建 `examples/tree-view` 夹具 + `tests/product/verify_tree_view.py`。**双端全绿**：native（2 会话、真实窗口「树形演示」、浅/深截图、exit 0、端口回收、重开再选择）与 vue（真实 Chromium + 同一矩阵），矩阵同为 `{a:5,b:2}`。矩阵改为后端中立（vnode / `data-auto-*` 各自解析） | 修好两处真缺陷才达成：①空状态在 `nodes` 变更后不出现（`is_empty` computed 在 VM 轨陈旧；改由 `tv_derive_rows` 哨兵行承载，回归 `plan085_empty_state` 1/1）②vue 腿选择器双计/引号锚定/过度捕获三处（详见 decisions）。Linux/WSL 与统一回归为显式 pending closeout 门 | 01…06 |接受只编译；含r2 V-07的参考区域对照/真实状态截图 | 01…06 |
 | T-06 | work / T-05 | [x] **已收口（F-03/F-10/F-12/F-13 全闭）**（`a348c487`）。`packages/tree-view/README.md`（props/事件/节点 schema/键盘表/VM 渲染约束/MCP 可观察面/验收入口，并链本 Plan 与视觉指南 §2.2）、`examples/tree-view/README.md`、`docs/reviews/plan085/evidence.md`（逐任务锚点 + 双端门 + 回归表 + 具名遗留）、`docs/reviews/plan085/spec-delta-proposal.md`（SD-01 新 tree-view Spec、SD-02 改 examples-ownership、SD-03 记录 018/027 无调用位）。逐条回到代码核验，纠正了自己草稿里"Enter/Space"的错述（实际只绑 `enter`） | 证据/文件可读回；Q-01 受影响视觉断言不以本计划关闭（保持 executing 至 T-07/T-08） | 06 |
-| T-07 | review / T-06 | 同树独立复审源码和 SD，重放关键反例，不修实现 | 固定 reviewed commit、平台结果、AC verdict；未通过回同树work | 07 |
-| T-08 | merge / T-07 pass | 建 `docs/specs/ui/tree-view.md`，修示例归属Spec，合并/归档/strategy链接/实际清理 | 源版本、最终Spec及树状态准确，不拿merge替代功能验收 | 08 |
+| T-07 | review / T-06 | [x] **已完成**（3 轮定向复审，末轮 `pass` @ `28568804`）。同树独立复审源码和 SD，重放关键反例，不修实现 | 固定 reviewed commit、平台结果、AC verdict；未通过回同树work | 07 |
+| T-08 | merge / T-07 pass | [x] **已完成**（`7827316c` 交付 / `bba86255` 归档）。建 `docs/specs/ui/tree-view.md`，修示例归属Spec，合并/归档/strategy链接/实际清理 | 源版本、最终Spec及树状态准确，不拿merge替代功能验收 | 08 |
 
 ## 9. 复审记录
 
@@ -956,3 +956,45 @@ Goal round 22 摘要（**复审 PASS，计划进入 reviewed，可合并**）：
 - **状态改为 `reviewed`**。F-01…F-13 + N-01 + N-02 + N-02a/b + 转义单射性**全部闭合**。
 - **下一轮：T-08 merge** —— 创建 `docs/specs/ui/tree-view.md`、修订
   `docs/specs/ui/examples-ownership.md`、归档计划、清理工作树与 plan-artifacts。
+2026-11-16：stage: merge | plan_id: PLAN-085 | plan_revision: r2 | reviewed_commit: 28568804 | followup: 3eb1c617 | delivery_commit: 7827316c | outcome: pass | completion_kind: delivered
+
+合并回执（PLAN-085:r2）：
+
+| checkpoint | evidence |
+|---|---|
+| `prepared` | reviewed 基线 `28568804`（复审 pass）+ `3eb1c617`（复审两条 docs-only 发现：README 伪代码、空 id 断言）。canonical diff：新增 `docs/specs/ui/tree-view.md`（8 节）、`examples-ownership.md` 增 §3.1（`95f5703d`→rebase 后 `7827316c`） |
+| `landed` | worktree `D:/autostack/.wt/ui-085/auto-ui`，wt-guard **clean**。dev 分支 `codex/ui-085-tree-view` rebase 到 master（46 commits，`95f5703d`→`7827316c`）；**`git range-diff` 全 46 对零差异**（`=`），即补丁等价；`git merge --ff-only` **无 merge commit**；master tip = `7827316c` |
+| `canonical_verified` | `docs/specs/ui/tree-view.md`（127 行，新增）、`docs/specs/ui/examples-ownership.md` §3.1 均在 `7827316c` 落地。核验：全仓 `treeview.at` **0 个**；文档键盘集 `up/down/left/right/home/end/enter` 与组件 `onkeydown.*` 逐一相符；026/041 均 `use package: tree_view` |
+| `archived` | 本文件迁入 `docs/plans/archived/`，`status: archived`；T-01…T-07 完成、T-08 完成于本次 |
+| `cleaned` | 见下条（worktree/branch 移除 + plan-artifacts 删除） |
+
+交付内容（全部经独立复审 pass）：`packages/tree-view/`（TreeView + TreeIcon +
+UI 投影）、`examples/tree-view/` 自托管演示、026/041 迁移、`tests/product/
+verify_tree_view.py`（native/vue 双端）+ `verify_tree_keyboard.py`（真实键盘 13 断言）、
+tools 门、以及 10 个 runtime 回归套件（`plan085_*`）。
+
+F-01…F-13 + N-01 + N-02 + N-02a/N-02b + 转义单射性**全部闭合**，每项均有能区分
+修复前后的回归或门断言。`plan085_scale` 单例耗时 n02_large 7.73–8.38s（约 10s 规则
+80%，余量偏薄，已记录为观察项而非通过依据）。
+
+具名遗留（不在本计划范围，已在 Spec 与 decisions 中记录）：
+- Linux/WSL native 腿 `not_run`（wgpu `Invalid surface`，与 PLAN-084 同边界）。
+- 路由页内包子组件回调不写父页面状态：未修复，由 `plan085_routed_callbacks` 2/2 守护。
+- 本组件**不声称 ARIA 合规树**（runtime 无 role/aria/level 通道）。
+### cleaned（2026-11-16 完成）
+
+- worktree `D:/autostack/.wt/ui-085/auto-ui`：**已移除**（移除前复查 `git status` 干净、
+  分支已全部在 master、`wt-guard` clean）。分支 `codex/ui-085-tree-view` **已删除**
+  （was `7827316c`）。build intermediates 随工作树一并消失，未回收。
+- **`plan-artifacts/plan-085/` 整个 scope 已删除**（199844 文件 / 13.96 GB，含全部探测
+  样本、截图、report.json、review 快照）。证据已折入本文件。
+- registry `D:/autostack/plan-artifacts/.retention/policy.json` 已登记本计划
+  `deleted-at-merge (no holds)`，JSON 校验通过。
+- **未删除（非本计划所有，fail-closed）**：组目录 `D:/autostack/.wt/ui-085/` 下仍有
+  `auto-lang`/`auto-web`/`auto-down`/`auto-man` 四个检出，其 `.git` 分别指向
+  **其他仓库** 的 worktree 注册（`auto-lang/.git/worktrees/auto-lang9` 等）。
+  本计划只读取它们、无所有权，故保留并在此明确记录，交由各自计划清理。
+- 最终计数：T-01…T-08 **8/8 完成**；F-01…F-13 + N-01 + N-02 + N-02a/b + 转义单射性
+  全部闭合。
+- **Landing is not deployment**：本计划交付的是包与规范文档，未触及生产二进制/前端
+  产物，故无 release 重建或服务重启；无陈旧产物需要登记。
