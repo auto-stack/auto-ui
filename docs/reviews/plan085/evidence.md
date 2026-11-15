@@ -13,7 +13,7 @@ merge 按政策清理）。本文只留可复核索引；实施决策见
 | 本树交付 commit | `8f36b9e3`（T-05 双端全绿）→ 后续 docs 提交 |
 | `auto.exe`（组内） | `D:/autostack/.wt/ui-085/auto-man/target/debug/auto.exe`，组内 detached `auto-man 54fe407`，相对 path 解析到本树 auto-ui |
 | `auto-ui-tool.exe`（本树） | `cargo build -p auto-ui-tools --bin auto-ui-tool` |
-| 依赖工作树组 | `.wt/ui-085/{auto-lang 86c7fd50b, auto-web 0adebc0, auto-down 5af11a3, auto-man 54fe407}` 全 detached 只读；本树零依赖仓改动 |
+| 依赖工作树组 | `.wt/ui-085/{auto-lang 86c7fd50b, auto-web 0adebc0, auto-down 5af11a3, auto-man 54fe407}` 全 detached。**本树（auto-ui）零依赖仓改动**，但 **`auto-man` 的 `Cargo.lock` 是 dirty 的**（`M Cargo.lock`，+11 行 `ace-foreign-contract` 包条目，来自其它计划的 SDK staging 工作，非本计划产生）。该差异不影响本计划取证：`auto.exe` 由该树的 `target/` 提供，path 依赖仍解析到本树 auto-ui；记录在此以免把"只读"误读为"全组 clean"。 |
 
 ## 阶段结果
 
