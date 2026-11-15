@@ -131,6 +131,30 @@ widget TreeView (
   `page_hits=0`。修复 = 只扫**本帧可挂载**的组件（`view_tree` 中解析为注册
   组件的 tag + 路由目标），并按首现序**传递**其可挂载子件；根仍先扫保住
   自己的键。三条永久反例（`plan085_keydown_ownership.rs`）。
+- **T-05 双端全绿（2026-11-15，提交 `219f85d6`）**：产品门在**两个后端**都通过，
+  同一矩阵 `{a_tree_rows:5, b_tree_rows:2}`：
+  - **native**：2 会话、真实窗口「树形演示」、浅/深截图、`exit_code=0`、
+    `port_rebinds=true`、重开会话再选择成功；
+  - **vue**：真实 Chromium 页面 + 截图 + **同一套行为断言**。
+  **矩阵改为后端中立**：`split_row_ids()` / `press_row()` / `press_chevron()` /
+  `row_count()` / `has_empty_state()`，各 driver 自行实现（native 解析 vnode
+  id，vue 解析生成 SFC 的 `data-auto-*` 标记）。这是让 vue 腿"真正跑起来且
+  有可比证据"的关键，而非仅让脚本不报错。
+  **为使 vue 腿有意义而修的三处**：
+  1. 生成 SFC 对**行容器与可点击标签行都打** `data-auto-tag="row"`，裸 tag
+     选择器双计（5 行数成 10）；选择器改为要求只有标签行才有的 `flex-1`。
+  2. 摘要正则原锚定 native 快照的引号形态（`"A 树 sel=…"`），vue 的
+     `inner_text` 没有引号；改为不依赖引号。
+  3. 仅改 2 会在 native 侧**过度捕获**（把行尾 `" {` 吃进 log 组），使本应为空
+     的 B 树日志看起来像串扰；捕获现止于引号/花括号/换行。
+- **两处遗留说明**：vue 腿只截浅色图（深色切换在 native 专属分支，属门内既有
+  结构，不额外造假）；`plan085_routed_callbacks` 仍守护路由页形态差异，与本门
+  分离。
+- 回归全绿 **28 项**：`plan085_empty_state` 1/1、`plan085_tree_keyboard` 8/8、
+  `plan085_keydown_ownership` 5/5、`plan085_routed_callbacks` 2/2、
+  `plan041` 4/4、`g16` 1/1、tools `tree_view_component` 2/2、
+  `pagination_component` 2/2、`file_dialog_component` 3/3。
+
 - **T-05 native 门首次全绿（2026-11-15，提交 `b1c90bdd` / `326a3566`）**：
   `tests/product/verify_tree_view.py --backend native` **outcome: pass**：2 个
   会话、矩阵 `{a_tree_rows:5, b_tree_rows:2}`、真实窗口标题「树形演示」、
