@@ -153,11 +153,11 @@ class Session:
         return self.call('autoui_action', element_id=element_id, action='press')
 
     def a_line(self):
-        m = re.search(r'"A 树 sel=(\S*) exp=(\d+) ?([^"]*)"', self.snapshot())
+        m = re.search(r'A 树 sel=(\S*) exp=(\d+) ?([^"{\n]*)', self.snapshot())
         return m.groups() if m else None
 
     def b_line(self):
-        m = re.search(r'"B 树 sel=(\S*) exp=(\d+) ?([^"]*)"', self.snapshot())
+        m = re.search(r'B 树 sel=(\S*) exp=(\d+) ?([^"{\n]*)', self.snapshot())
         return m.groups() if m else None
 
     def press_button(self, label):
@@ -165,6 +165,32 @@ class Session:
         m = re.search(r'button #(vnode_\d+) "[^"]*' + re.escape(label) + r'[^"]*"', snap)
         vfd.require(m, f'button {label!r} not found; head: {snap[:300]}')
         return self.press(m.group(1))
+
+    # ── Backend-neutral row API shared with Browser ──
+    # The matrix drives rows/chevron through these three instead of raw ids, so
+    # one matrix runs on both backends (native resolves vnode ids, vue resolves
+    # data-auto-* markers).
+
+    def press_row(self, index):
+        a, b = self.split_row_ids()
+        ids = a + b
+        vfd.require(0 <= index < len(ids), f'row index {index} out of range ({len(ids)} rows)')
+        self.press(ids[index])
+
+    def press_chevron(self, index=0):
+        snap = self.snapshot()
+        found = re.findall(
+            r'container #(vnode_\d+) \{\s*\n\s*style: "w-5 h-5 shrink-0[^"]*"\s*\n'
+            r'\s*onclick: \.WantToggle', snap)
+        vfd.require(found, 'no chevron toggle found in the native tree')
+        self.press(found[index])
+
+    def row_count(self):
+        a, b = self.split_row_ids()
+        return len(a) + len(b)
+
+    def has_empty_state(self):
+        return '空树无可操作行' in self.snapshot()
 
     def screenshot(self, name):
         text = self.call('autoui_screenshot')
@@ -221,25 +247,21 @@ def run_matrix(session, record):
                 f'B tree must render its 2 collapsed root rows, got {len(rows_b)}')
 
     # V-01: select carries exactly the target ID; the app echoes it back.
-    session.press(rows[0])
+    session.press_row(0)
     session.wait(lambda t: 'select:chapter-01' in t)
     a = session.a_line()
     vfd.require(a[0] == 'chapter-01', f'selection must be the pressed row, got {a[0]!r}')
 
     # V-01: chevron toggles expansion without selecting.
-    snap = session.snapshot()
-    m = re.search(r'container #(vnode_\d+) \{\s*\n\s*style: "w-5 h-5 shrink-0[^"]*"\s*\n\s*onclick: \.WantToggle', snap)
-    vfd.require(m, 'expanded row must expose a chevron toggle target')
-    session.press(m.group(1))
+    session.press_chevron(0)
     session.wait(lambda t: 'toggle:chapter-01' in t)
     a = session.a_line()
     vfd.require(a[1] == '0', f'toggling a parent closed must drop to 0 expanded, got {a[1]!r}')
     vfd.require(a[0] == 'chapter-01',
                 f'toggling must not change the selection, got {a[0]!r}')
     # Re-expand for later assertions.
-    m = re.search(r'container #(vnode_\d+) \{\s*\n\s*style: "w-5 h-5 shrink-0[^"]*"\s*\n\s*onclick: \.WantToggle', session.snapshot())
-    session.press(m.group(1))
-    session.wait(lambda t: re.search(r'"A 树 sel=\S* exp=1', t) is not None)
+    session.press_chevron(0)
+    session.wait(lambda t: re.search(r'A 树 sel=\S* exp=1', t) is not None)
 
     # ── V-01 retry: an error row exposes retry, and retrying clears it.
     vfd.require('重试' in session.snapshot(), 'error row must expose a retry action')
@@ -261,7 +283,8 @@ def run_matrix(session, record):
     # Selecting in B must not change A's selection (two controlled instances).
     _, rows_b = session.split_row_ids()
     vfd.require(len(rows_b) >= 1, 'B tree must expose its own row actions')
-    session.press(rows_b[0])
+    a_rows_now, _ = session.split_row_ids()
+    session.press_row(len(a_rows_now))
     deadline = time.time() + 12
     while time.time() < deadline:
         b = session.b_line()
@@ -416,19 +439,61 @@ class Browser:
     def state(self):
         return self.page.inner_text('body')
 
-    def row_ids(self):
-        return self.page.locator('[data-auto-tag="tree-view"] [data-row-id]').all_inner_texts()
+    # ── Label-driven row API (the vue track has no vnode ids) ──
+    #
+    # The generated SFC carries stable data-auto-* markers on every emitted
+    # element, so the same matrix runs on both backends: this class resolves
+    # rows and the chevron by DOM role, the native class by vnode id. Both
+    # expose split_row_ids()/press_row()/press_chevron().
+
+    # The generated SFC tags BOTH the per-row container and the clickable label
+    # row with data-auto-tag="row", so a bare tag selector double-counts. The
+    # label row is the one carrying flex-1 (the container is items-center).
+    ROW_SEL = ('[data-auto-tag="row"][data-auto-src="tree_view"]'
+               '[class*="flex-1"]')
+
+    def _row_locators(self):
+        return self.page.locator(self.ROW_SEL)
+
+    def split_row_ids(self):
+        """(A rows, B rows) by page order — the A block renders first."""
+        rows = self._row_locators()
+        labels = []
+        for i in range(rows.count()):
+            labels.append(rows.nth(i).inner_text().strip())
+        # The A tree renders before the B tree in the fixture's view.
+        split = next((i for i, t in enumerate(labels) if '(B)' in t), len(labels))
+        return list(range(split)), list(range(split, len(labels)))
+
+    def press_row(self, index):
+        self._row_locators().nth(index).click()
+        self.page.wait_for_timeout(500)
+
+    def press_chevron(self, index=0):
+        """Click the chevron of the index-th row that has one."""
+        chev = self.page.locator(
+            '[data-auto-src="tree_view"] [data-auto-tag="row"] >> xpath=..')
+        # The chevron is a sibling of the label row, inside the row container.
+        toggles = self.page.locator('[data-auto-src="tree_view"] div[class*="w-5 h-5"]')
+        vfd.require(toggles.count() > 0, 'no chevron toggle found on the vue page')
+        toggles.nth(index).click()
+        self.page.wait_for_timeout(500)
+
+    def row_count(self):
+        return self._row_locators().count()
+
+    def has_empty_state(self):
+        return '空树无可操作行' in self.snapshot()
 
     def press(self, element_id):
-        raise AssertionError(
-            'vue track has no vnode ids; row selection is driven by label below')
+        self.press_row(element_id)
 
     def a_line(self):
-        m = re.search(r'A 树 sel=(\S*) exp=(\d+) ?([^\n]*)', self.snapshot())
+        m = re.search(r'A 树 sel=(\S*) exp=(\d+) ?([^"{\n]*)', self.snapshot())
         return m.groups() if m else None
 
     def b_line(self):
-        m = re.search(r'B 树 sel=(\S*) exp=(\d+) ?([^\n]*)', self.snapshot())
+        m = re.search(r'B 树 sel=(\S*) exp=(\d+) ?([^"{\n]*)', self.snapshot())
         return m.groups() if m else None
 
     def press_button(self, label):
