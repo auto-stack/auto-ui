@@ -688,3 +688,26 @@ Goal round 14 摘要（**F-08 已闭；review 的 13 项全部闭合**）：
   产品门 native/vue/keyboard **三绿**（矩阵 `{a:5,b:2}`）。
 - 两个具名遗留判定**合规**：Linux `not_run`（环境边界）、路由页回调差异（未修复但
   不声称修复，由 `plan085_routed_callbacks` 2/2 守护，两真实消费者与夹具均根托管）。
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 15 | from: review | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 0ce2638f | next: work（F-04/F-05 复审缺陷修复后复核）
+
+Goal round 15 摘要（T-07 复审 → needs_fix；本轮修掉复审指出的 2 个契约内缺陷 + 2 处残留）：
+
+- **复审独立复验**：确认 F-01/02/03/06/07/09/10/11/12/13 **真闭**，其中 F-06 的两处
+  修复（焦点按行索引、选中+焦点组合分支）被判定为**真修复**；三套门 native/vue/
+  keyboard 由 reviewer 自行 fresh out-dir 实跑**全绿**；新用例耗时 ≤2.53s 满足 10s 规则。
+- **修掉 F-05（High，我引入的）**：`tv_repair_focus` 调 `tv_visible_parent(rows,
+  focus_id)` **只传 2 参**（函数需 3 参）且把 flat `rows` 当 `nodes`；本语言**缺参静默
+  绑 ""**，导致祖先分支**永不命中**。现签名加 `nodes`/`expanded` 并正确传入，7 个调用点
+  同步更新。
+- **修掉 F-04 更新路径**：重复 id 只在 Init 检测、`.Validate` 无派发方。现改为派生期
+  重校验，并按节点数**设界**（≤256 每帧校验；更大走 Init/Validate 标志）——因为 1000
+  节点每帧 O(n²) 正是先前**耗尽指令预算、渲染 0 行**的原因；该阈值是**文档化的
+  成本/覆盖权衡**，不是静默截断。新增更新路径用例。
+- **删掉一个不可判别的测试（自我纠错）**：我曾写"折叠焦点子树"用例，但它按的是
+  **页面**的 `Down` 空实现而非树自身，**禁用祖先分支时仍通过**——留着等于假绿。
+  已删除，并在回执里明说祖先分支**暂无单元级 oracle**，不拿绿测试充数。
+- 修 F-08 残留（`tv-sel` 原先只在禁用+选中分支；现两个分支都带）并把可观察面
+  **写进包 README**（表格 + 两条 oracle 提示）。修 F-12 残留（evidence 的 SD 编号
+  与提案/Plan 表对齐，并补 SD-02 验证面条目）。
+- 回归全绿 **28 项**；产品门 native 仍 pass（`{a:5,b:2}`、`stale_id_rejected: True`）。
+- **任务计数 7/8**；下一轮就 `0ce2638f` 再做一次定向复核（只验 F-04/F-05 两条）。
