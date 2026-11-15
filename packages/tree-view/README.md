@@ -156,35 +156,31 @@ selected/focused/disabled 早已使用的同一通道：
 > oracle 提示：这些标记会被**已解析的 debug View 丢弃**（样式解析只保留认识的
 > token），但存在于 `raw_class`——即快照打印的内容。拿 debug View 断言会得到
 > **假阴性**。另外 vue 轨读 `inner_text`，看不到 class，故标记断言仅 native 执行。
-## 大树的结构校验（已知限制）
+## 大树的结构校验
 
-每帧重扫整棵树查重复 ID 是 O(n²)：实测 VM 约 3.5 万次比较/秒，1000 节点约 50 万次
-比较 = 14s+，会耗尽指令预算并**渲染 0 行**。因此校验分档：
+重复 ID 检测在**每次派生**都执行，**对任意规模**——不再有节点数阈值。
+
+早期版本用 `tv_member(seen, id)` 逐元素线性扫描，复杂度 O(n²)：1000 节点每帧约 50 万
+次 VM 迭代、耗时约 14s，会耗尽指令预算并**渲染 0 行**；当时按节点数设了阈值来回避，
+代价是超阈值后受控更新引入的重复 ID 检测不到（review N-02）。
+
+现在 `tv_duplicate_id` 改为**拼接字符串 + 子串包含**：
+
+```
+seen = "|";  每结点：token = "|" + id + "|"
+             if seen.contains(token) -> 重复
+             seen = seen + token
+```
+
+成员检测走**原生**字符串搜索而非 VM 字节码循环，实测 1000 节点整套用例 **2.13s**
+（旧实现 ≥14s 且渲染 0 行）。id 两端包 `|` 防止 `ab` 误命中 `b` 的子串误报。
+
+因此：
 
 | 树的总节点数 | 受控更新后的重复 ID 检测 |
 |---|---|
-| ≤ 512 | 自动——每帧重校验，重复立即发现，歧义行不发布 |
-| > 512 | **不自动**——见下方限制 |
+| 任意 | **自动**——每帧重校验，重复立即发现，歧义行不再发布 |
 
-### 已知限制（OPEN，未解决）
-
-**>512 节点的树，若受控更新引入重复 ID，组件不会发现，并会发布该 ID 的多条可操作行。**
-
-这是**跨语言层的限制**，不在本包可解范围：
-
-- 每帧全量检测在 n=1000 时约 14s，不可接受。
-- 需要 **O(n)** 的 id 集合原语（hash/set）才能廉价检测；当前 `.at` 语言**没有**
-  set/dict/hash，也**没有 sort**（无法用邻接比较替代）。
-- 组件**收不到 props 变更回调**（computed 每帧重播种，无 props-changed 钩子），
-  也**没有父→子的 msg 派发原语**（DSL 只有子→父 `."msg"(v)` emit），
-  所以无法把校验推迟到"数据变了才跑"。
-
-**因此 `.Validate` 只对 Rust 宿主可用**（`DynamicComponent::on_with_input_for_instance`），
-**不是 `.at` 消费者能调用的 API**。此前的 README 把它写成消费者义务是**错误**的，
-已撤回。
-
-**消费方当前的可行做法**：把大树拆成多个 ≤512 节点的树，或在应用侧保证 `nodes`
-的 id 唯一（应用本来就知道自己生成了什么 id）。
-
-**回归**：`plan085_scale::n02_large_tree_duplicates_are_a_documented_limitation`
-钉住这个限制的**当前行为**（>512 时歧义行会发布），使其可见且可追踪；它不是通过项。
+**回归**：`plan085_scale::n02_large_tree_duplicates_are_detected_at_any_size` 断言
+601 节点树在受控更新引入重复后**可操作行归零**；`f09_thousand_nodes_derive_every_row`
+与 `n01_single_root_with_thousand_children_still_renders` 守住 1000 节点规模。

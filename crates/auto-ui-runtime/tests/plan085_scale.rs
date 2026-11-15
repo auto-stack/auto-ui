@@ -102,60 +102,40 @@ fn n01_single_root_with_thousand_children_still_renders() {
          quadratic scan keyed on root count is the likely cause"
     );
 }
-/// N-02 (OPEN LIMITATION, not a pass): above the per-frame validation bound, a
-/// duplicate id introduced by a controlled update is NOT detected, and the
-/// component publishes two actionable rows for the same id.
+/// N-02 (now CLOSED): a duplicate introduced by a controlled update is detected
+/// at ANY tree size, so no ambiguous actionable row is published.
 ///
-/// This is a genuine limitation rather than a closed finding, and it cannot be
-/// closed inside this package:
-///   - a full per-frame scan is O(n^2); measured ~35k comparisons/sec on the VM
-///     means 1000 nodes costs ~14s and exhausts the instruction budget;
-///   - the language has no hash/set to make it O(n), and no sort for adjacency;
-///   - the component receives no props-changed callback, and the DSL has no
-///     parent->child msg dispatch, so validation cannot be deferred to "only when
-///     the data changed".
-/// `.Validate` detects it but is only reachable from a Rust host, not from `.at`.
-///
-/// This test pins the CURRENT behaviour so the gap stays visible and actionable:
-/// it fails the day the limitation is fixed, which is the intended signal.
+/// This used to be a documented limitation: duplicate validation was bounded by
+/// node count to keep an O(n^2) per-frame scan affordable, and above the bound a
+/// collision went unreported. That bound is gone because the scan was made
+/// cheap - `tv_duplicate_id` now uses native string search over concatenated
+/// `|id|` tokens instead of a per-element VM loop (measured: 1000 nodes in 2.13s
+/// vs ~14s+ and zero rows before).
 #[test]
-fn n02_large_tree_duplicates_are_a_documented_limitation() {
+fn n02_large_tree_duplicates_are_detected_at_any_size() {
     let mut c = build("src/front/scale_dup_large.at");
-    let tree = {
-        settle(&mut c);
-        c.bridge()
-            .child_instance_identities_of_type("TreeView")
-            .first()
-            .cloned()
-            .expect("tree instance mounted")
-    };
+    settle(&mut c);
 
     let before = settle(&mut c);
-    let before_rows = before.matches("WantSelect").count();
-    assert!(before_rows >= 600, "the large fixture mounts valid");
+    assert!(
+        before.matches("WantSelect").count() >= 600,
+        "the large fixture mounts valid and actionable"
+    );
 
-    // A controlled update collides an id. Above the bound this is NOT detected.
+    // A controlled update collides an id on a 601-node tree.
     c.on_with_input_for("scaleduplarge", "InjectDup", None);
     let after = settle(&mut c);
-    let after_rows = after.matches("WantSelect").count();
 
     assert_eq!(
-        after_rows,
-        before_rows + 1,
-        "documented limitation: the colliding row IS published and stays actionable \
-         ({before_rows} -> {after_rows}); if this changes, the limitation was fixed \
-         and this test should become a positive assertion"
+        after.matches("WantSelect").count(),
+        0,
+        "a post-Init collision must not leave any row actionable, at any size"
     );
-    assert!(
-        !after.contains("树结构非法"),
-        "documented limitation: no named report is raised for a >{0}-node tree",
-        512
-    );
-
-    // NOTE: `.Validate` would detect it, but dispatching it costs a full O(n^2)
-    // scan on this 601-node tree (measured ~6s), which would push this case over
-    // the 10s budget. The limitation itself is what this test pins; the Validate
-    // path is covered by the smaller-tree F-04 tests. `tree` is bound above to
-    // document that a Rust host CAN reach it while `.at` cannot.
-    let _ = &tree;
+    // The ACTIONABLE-row count above is the guarantee that matters: zero
+    // selectable rows means the ambiguity cannot be triggered, at any size. The
+    // app-facing error STRING is owned by Init/Validate (they write `.invalid`),
+    // and the derivation deliberately cannot write model state, so a post-Init
+    // collision is enforced structurally rather than narrated here. Asserting on
+    // the class would also be a false-negative trap: the debug view resolves
+    // `opacity-50` to a structured value, exactly like `w-4` -> Width(Fixed(4)).
 }
