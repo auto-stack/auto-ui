@@ -585,3 +585,31 @@ Goal round 11 摘要（review 修复续：F-05/F-07/F-10/F-12/F-13 已闭；F-06
   无 role/aria/level 支持**，属计划 §3「最小引擎扩展」，需较大改动）、F-09 1000 节点
   /64 层与窄窗证据未入库。
 - 任务计数 **3/8**（T-02/T-03/T-05/T-06 仍开着，因 F-06/F-08/F-09 未闭）。
+2026-11-15：stage: work | plan_id: PLAN-085 | plan_revision: r2 | round: 12 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: b58099e5 | next: work (F-08/F-09)
+
+Goal round 12 摘要（**F-06 真实键盘已闭，并挖出两个真缺陷**）：
+
+- **F-06 已闭**：新增 `tests/product/verify_tree_keyboard.py`——用**真实
+  `autoui_keyboard` 事件**驱动（不是 msg 变体派发），13 条断言全绿：
+  初始焦点、ArrowDown/Up 行走、Home/End、两端**不回绕**、Enter 选中焦点行、
+  ArrowRight **进入子节点且不重复 toggle**、ArrowLeft 折叠/回父、以及
+  **键盘导航从不写 `selected`**。
+- 写这个门时挖出**两个用例级测试看不见的真缺陷**：
+  1. **焦点坐标系不一致**：`focused` 拿**可达序**与 `focus` 比较，而
+     `focus_index` 的所有写入方（`tv_focus_id`/`tv_step_reachable`/
+     `tv_repair_focus`）用的都是**行索引**。两者只在"焦点行之前没有禁用行"时
+     恰好相等，一旦有禁用行，**focus ring 就画在另一行上**，而按键作用在它以为
+     的那行。已改为比较行索引。
+  2. **选中行丢失 focus ring**：`r.selected` 分支先胜出且没有
+     selected+focused 组合分支，所以按下 Enter 后焦点环**消失**——键盘用户
+     当场失去位置感。已补组合分支（`bg-accent` + `ring-2`），选中与焦点同时可见。
+- **双树页只断言"键被接受"**：两个实例时键名无法指认是哪一个，这是既有
+  **歧义规则**（不猜），所以行为断言放在**单树门**里做。已在门内注明理由。
+- 回归全绿 **25 项**：`plan085_focus_repair` 3/3、`plan085_review_fixes` 4/4、
+  `plan085_empty_state` 1/1、`plan085_tree_keyboard` 8/8、
+  `plan085_keydown_ownership` 5/5、`plan085_routed_callbacks` 2/2、
+  tools `tree_view_component` 2/2。产品门 native 仍 pass
+  （`{a:5,b:2}`，`stale_id_rejected: True`）。
+- **仍开**：F-08 role/level 语义（引擎无 role/aria/level，属计划 §3 允许的
+  「最小引擎扩展」，需较大改动）、F-09 1000 节点/64 层与窄窗证据未入库。
+- 任务计数 **3/8**（T-02/T-03/T-05/T-06 仍开，只差 F-08/F-09）。
