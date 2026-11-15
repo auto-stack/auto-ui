@@ -68,6 +68,9 @@ pub fn tv_total_nodes(nodes List) int {
 /// id 两端包 `|`，避免 `ab` 误命中 `b` 之类的子串误报。
 pub fn tv_duplicate_id(nodes List) str {
     var seen str = "|"
+    // Ids that contain the `|` delimiter would forge tokens ("a|b" -> "|a|b|"
+    // spuriously matches "|b|"), so they are collected here and compared exactly.
+    var seenIds List = []
     var stack List = []
     var i int = nodes.len()
     while i > 0 {
@@ -78,11 +81,22 @@ pub fn tv_duplicate_id(nodes List) str {
         var top int = stack.len() - 1
         var nd = stack[top]
         stack.pop()
-        var token str = "|" + nd.id + "|"
-        if seen.contains(token) {
-            return nd.id
+        if nd.id.contains("|") {
+            var e int = 0
+            while e < seenIds.len() {
+                if seenIds[e] == nd.id {
+                    return nd.id
+                }
+                e = e + 1
+            }
+            seenIds.push(nd.id)
+        } else {
+            var token str = "|" + nd.id + "|"
+            if seen.contains(token) {
+                return nd.id
+            }
+            seen = seen + token
         }
-        seen = seen + token
         var kids List = nd.children
         var k int = kids.len()
         while k > 0 {

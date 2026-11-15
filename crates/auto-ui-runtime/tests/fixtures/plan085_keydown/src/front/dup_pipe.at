@@ -1,0 +1,29 @@
+// PLAN-085 N-02 fixture: ids containing the `|` delimiter must not forge tokens.
+//
+// "a|b" concatenated naively yields "|a|b|", which spuriously contains "|b|".
+// Ids with `|` therefore take the exact-comparison path. This tree is VALID
+// (no real duplicates), so nothing may be reported.
+widget duppipe {
+    msg { Init, Select(str) }
+    model {
+        var nodes List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: [], selected: .sel,
+                      on_toggle: .Select($event), on_select: .Select($event), on_retry: .Select($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            a.push({ id: "a|b", label: "A-PIPE-B", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "b", label: "PLAIN-B", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            a.push({ id: "ab", label: "PLAIN-AB", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            .nodes = a
+        }
+        .Select(v str) -> { .sel = v }
+    }
+}

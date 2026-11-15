@@ -146,3 +146,21 @@ fn f04_duplicate_introduced_by_a_later_update_is_also_rejected() {
         "no row may stay actionable once a post-mount update collides ids"
     );
 }
+/// N-02 framing: an id containing the `|` delimiter must not forge a token and
+/// raise a FALSE duplicate. Naively, "a|b" concatenates to "|a|b|", which
+/// contains "|b|" — so a valid tree holding both `a|b` and `b` would be wrongly
+/// rejected. Such ids take the exact-comparison path instead.
+#[test]
+fn n02_pipe_in_id_does_not_forge_a_false_duplicate() {
+    let mut c = build("src/front/dup_pipe.at");
+    let d = settle(&mut c);
+    assert!(
+        d.matches("WantSelect").count() == 3,
+        "a valid tree with `a|b`, `b` and `ab` must keep all three rows actionable, got {}",
+        d.matches("WantSelect").count()
+    );
+    assert!(
+        !d.contains("树结构非法"),
+        "no duplicate may be reported for a valid tree whose ids merely contain `|`"
+    );
+}
