@@ -668,3 +668,23 @@ Goal round 14 摘要（**F-08 已闭；review 的 13 项全部闭合**）：
   预算耗尽与缩进分支）、F-10 死副本、F-11 依赖说明、F-12 SD 编号、F-13 决策反转。
 - **任务计数 7/8**（T-02/T-03/T-05/T-06 重开项已可收口，`current_step` 待复核确认）。
 - 下一轮：**T-07 独立复审**（对 `cb81a203` 这一修订重跑 review，验证 13 项闭环）。
+2026-11-16：stage: review | review_scope: final（repair re-review）| reviewer: plan085-rereview（独立上下文）| plan_id: PLAN-085 | plan_revision: r2 | outcome: needs_fix | reviewed_commit: dfff8412 | worktree: D:/autostack/.wt/ui-085/auto-ui | branch: codex/ui-085-tree-view
+
+复审结论（对 `cb81a203`+`dfff8412` 修复面复验，产品门与套件由 reviewer 自行 fresh out-dir 实跑）：
+- **确认真闭**（reviewer 逐条复现）：F-01 层级、F-02 懒加载目录、F-03 错误文本、
+  F-06 真实键盘（13/13 步 pass，且确认我披露的两处修复是**真修复**：焦点改按行索引、
+  选中+焦点组合分支）、F-07 旧 id 拒绝（native True）、F-09 规模、F-10 死副本、
+  F-11 依赖说明、F-12 SD 编号、F-13 决策反转。
+- **未闭 2 项 + 2 残留**：
+  - **F-05（High，我自己引入）**：祖先回落是**死代码**——`tv_repair_focus` 调
+    `tv_visible_parent(rows, focus_id)` 只传 2 参（函数要 3 参），且拿 flat `rows`
+    当 `nodes`。本语言**缺参静默绑 ""**，故 `target` 恒 ""，祖先分支永不命中。
+  - **F-04（Medium-High）**：重复 id 只在 Init 检测，`.Validate` **全运行期无派发方**，
+    受控更新引入的冲突**不被发现**。
+  - F-08 残留：`tv-sel` 只在禁用+选中分支出现（正常选中行无标记，语义反了）；
+    且该可观察面**未写进 README/SD 提案**。
+  - F-12 残留：`evidence.md` 仍用旧 SD 编号，与提案/Plan 表冲突。
+- reviewer 实测新用例耗时全部 **≤2.53s**（10s 规则满足）；runtime 25/25、tools 7/7；
+  产品门 native/vue/keyboard **三绿**（矩阵 `{a:5,b:2}`）。
+- 两个具名遗留判定**合规**：Linux `not_run`（环境边界）、路由页回调差异（未修复但
+  不声称修复，由 `plan085_routed_callbacks` 2/2 守护，两真实消费者与夹具均根托管）。
