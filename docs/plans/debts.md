@@ -130,3 +130,25 @@
 - **关闭条件**：真实桌面 boot 后 Reader 后端子进程 env 含 `015_NOTES_DAEMON`+`NOTES_FP_CRED`
   （行为面：经 Reader 后端 fp 代理调用 Notes 成功；无声明 app 后端 env 零变化）。
   消费：auto-os PLAN-067 T-02 C-01/C-04 桌面编排（凭据腿以此交付为前置）。
+
+## DEBT-006 native 渲染器文字字形丢失（strategy Q-01，PLAN-084 复现）
+
+- **状态**：已复现、归因到公共渲染器文本路径；修复计划未立（2026-11-14）。
+  来源：[PLAN-084](084-file-dialog-folder-and-save-modes.md) T-01/T-05（策略
+  [component-library-extension-strategy Q-01](../design/autoui/component-library-extension-strategy.md)）。
+- **动机**：真实 native 窗口出现可见文字缺字/截断，而 MCP/state 文本完整
+  ——Reader009 首报，PLAN-084 在本仓 FileDialog 上双实例复现：①分页文本
+  `第 11 / 11 页` 渲染为 `第 11 /`（FileDialog 尾页实拍，截图
+  plan-artifacts/plan-084/q01-pagination-crop.png，源图 1-tail.png）；②路径
+  输入值（verbatim 前缀 `\\?\` + 盘符路径）渲染丢失 `D:` 后那个反斜杠字符
+  （源图 1-alternate-theme.png，裁 q01-pathinput-crop.png）。同帧其余中英文/数字
+  正常；MCP value 含完整字符。归因：渲染器文本 shaping/布局（input 与
+  text 两原语均现），FileDialog/分页包非肇事方。
+- **提议形状**：定位 iced 文本 shaping/测量/裁剪管路中丢字形簇的根因
+  （混合脚本行、`\` 与 CJK 相邻、页码 f-string 等触发面），补 renderer
+  级回归断言（渲染像素/字形计数对照 state 文本），全量 UI 门对照。
+- **边界**：组件包与消费方不做逐字形 workaround；MCP 文本完整性不作为
+  视觉通过依据（既有规则）。
+- **关闭条件**：两个复现实例在真实窗口字形完整（截图对照），且新增
+  renderer 回归门在 Win/Linux 通过；PLAN-084 受影响视觉 AC（AC-06 Q-01
+  项）随本债关闭。
