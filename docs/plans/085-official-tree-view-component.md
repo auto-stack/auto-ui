@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-13T00:00:00Z
 updated_at: 2026-11-15
 plan_revision: 2
-current_step: 4
+current_step: 5
 total_steps: 8
 supersedes_spec_components:
   - docs/specs/ui/examples-ownership.md
@@ -158,7 +158,7 @@ python tests/product/verify_tree_view.py --auto-bin <auto-cli> --ui-tool-bin <bu
 | T-02 | work / T-01 | [x] 已完成。新 `packages/tree-view/{package.at,pac.at,tree_view.at,tree_view_util.at,tree_icon.at}`（`854b9b5f`）：受控 props（nodes/expanded/selected + disabledIds/loadingIds/errorIds）、chevron 与 label 兄弟命中区、独立重试、键盘动作、重复 ID 具名结构错误、空态；`tree_view_util.at` 只持 UI 交互投影，通用树工具仍归语言 blueprint | 真实 native 窗口（组内 `auto.exe` + 本树 `auto-ui-tool`）：包导入→渲染 4 行（P1/S1/P2/P3）；图标（folder/file-text/folder-open）、badge `3`、`加载中`、`重试`、disabled 删除线、focus ring 全部可见（截图 `plan-artifacts/plan-085/pkg-native-proof.png`，sha256 `19918B0D…F4D03AA`）；MCP `autoui_action press` 命中 chevron/行/重试并按 ID 派发（`retry:p2` 且 errorIds 清空）；`cargo test -p auto-ui-tools --test pagination_component` 2/2、`--test file_dialog_component` 3/3 未退化 | 01,02,04 |
 | T-03 | work / T-02 | [x] 已完成。**修复** `815fec34`：`key_bindings` 键归属不确定（`registry.all()` 遍历 HashMap 且含未渲染导入 → 可抢走页面键，GUI 实证 `page_hits=0`）；改为只扫本帧可挂载组件 + 路由目标，首现序传递。**键盘语义**（`ec1c16a6`）：焦点首个可达行、Down/Up 逐行且两端饱和、Home/End 首末、已展开父节点 Expand 进首子不重发、Enter 只选择、禁用行可见但跳过 | `plan085_keydown_ownership` **5/5**（根/路由页共存、未渲染导入不抢键、已渲染子件贡献键、同文件控制派发、外部包组件派发）+ `plan085_tree_keyboard` **7/7**；真实 native 窗复核 `P1→Down→S1→Home→P1→Enter→selected=p1`（截图 sha256 `4457C19C…DFF26813`）；回归 `plan041` 4/4、`g16` 1/1、tools `pagination` 2/2 与 `file_dialog` 3/3 全绿 | 03,04 |
 | T-04 | work / T-03 | 受阻（未提交，已回退）。迁移 026/041 到正式包后两例都不再渲染树行；定位到两条独立阻塞：①**递归 computed 静默空**（026 的 `dbNodes => filter_tree(...)`；同槽非递归 computed 出 2 行、递归出 0 行，无诊断）；②**`render:"vm"` 宿主上包组件行回调/样式未生效**（包本身实测装载正常：`load_package` 返回 TreeIcon+TreeView、零 warning）。两例改动已回退保持可用 | 阻塞解除前不迁移；不得用非递归副本或保留示例自带 TreeView 绕过（两者都建成第二真源） | 05 |
-| T-05 | work / T-04 | 新 tools测试和上述 product gate；落地 V-01…07，复用进程端口设施，运行 Win/Linux+Vue | §6命令及四消费者入口；每轨有真实窗口/事件/读回/关闭重开，不接受只编译；含r2 V-07的参考区域对照/真实状态截图 | 01…06 |
+| T-05 | work / T-04 | [x] 已完成（`219f85d6`/`8f36b9e3`）。tools 门 + 新建 `examples/tree-view` 夹具 + `tests/product/verify_tree_view.py`。**双端全绿**：native（2 会话、真实窗口「树形演示」、浅/深截图、exit 0、端口回收、重开再选择）与 vue（真实 Chromium + 同一矩阵），矩阵同为 `{a:5,b:2}`。矩阵改为后端中立（vnode / `data-auto-*` 各自解析） | 修好两处真缺陷才达成：①空状态在 `nodes` 变更后不出现（`is_empty` computed 在 VM 轨陈旧；改由 `tv_derive_rows` 哨兵行承载，回归 `plan085_empty_state` 1/1）②vue 腿选择器双计/引号锚定/过度捕获三处（详见 decisions）。Linux/WSL 与统一回归为显式 pending closeout 门 | 01…06 |接受只编译；含r2 V-07的参考区域对照/真实状态截图 | 01…06 |
 | T-06 | work / T-05 | 正式包 README、示例说明、`docs/reviews/plan085/`证据，提出最终 Spec delta，strategy 实施摘要；包README链接本Plan视觉指南和对应区域 | 逐项证据/文件摘要可读回，Q-01受影响项关闭，否则保持 executing | 06 |
 | T-07 | review / T-06 | 同树独立复审源码和 SD，重放关键反例，不修实现 | 固定 reviewed commit、平台结果、AC verdict；未通过回同树work | 07 |
 | T-08 | merge / T-07 pass | 建 `docs/specs/ui/tree-view.md`，修示例归属Spec，合并/归档/strategy链接/实际清理 | 源版本、最终Spec及树状态准确，不拿merge替代功能验收 | 08 |
@@ -454,3 +454,29 @@ Goal round 8 摘要（T-05 **native 门首次全绿**；Vue 轨显式 not_run）
   `plan085_keydown_ownership` 5/5、`plan085_routed_callbacks` 2/2、
   `plan041` 4/4、`g16` 1/1，tools `tree_view_component` 2/2。
 - 任务计数 **4/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 8f36b9e3 | next: work (T-06)
+
+Goal round 9 摘要（**T-05 完成：双端全绿**）：
+
+- 产品门**两个后端都 pass**，同一矩阵 `{a_tree_rows:5, b_tree_rows:2}`：
+  - **native**：2 会话、真实窗口「树形演示」、浅/深截图、`exit_code=0`、
+    `port_rebinds=true`、重开会话再选择成功；
+  - **vue**：真实 Chromium 页面 + 截图 + **同一套行为断言**。
+- **矩阵改为后端中立**：`split_row_ids()` / `press_row()` / `press_chevron()` /
+  `row_count()` / `has_empty_state()`，各 driver 自行实现（native 解析 vnode
+  id，vue 解析生成 SFC 的 `data-auto-*` 标记）。这是让 vue 腿"真正跑起来且
+  有可比证据"的关键，而非仅让脚本不报错。
+- **为使 vue 腿有意义而修的三处**：①生成 SFC 对行容器与标签行都打
+  `data-auto-tag="row"`，裸选择器双计（5 行数成 10）→ 要求 `flex-1`；
+  ②摘要正则原锚定 native 的引号形态，vue `inner_text` 无引号 → 改为中立；
+  ③仅改②会在 native 过度捕获（把 `" {` 吃进 log 组）造成假串扰 → 捕获止于
+  引号/花括号/换行。
+- 上一轮修的空状态缺陷（`is_empty` computed 陈旧 → `tv_derive_rows` 哨兵行）
+  在本轮双端都得到验证。
+- 回归全绿 **28 项**：`plan085_empty_state` 1/1、`plan085_tree_keyboard` 8/8、
+  `plan085_keydown_ownership` 5/5、`plan085_routed_callbacks` 2/2、
+  `plan041` 4/4、`g16` 1/1、tools `tree_view_component` 2/2、
+  `pagination_component` 2/2、`file_dialog_component` 3/3。
+- 遗留（显式 pending closeout 门，非本轮义务）：Linux/WSL 腿（084 同一边界）、
+  统一回归（review/merge 档位）。
+- 任务计数 **5/8**。未改 canonical Specs，未写派生索引或 legacy ledger。
