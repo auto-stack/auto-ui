@@ -242,3 +242,32 @@ T-01 关键机制结论（详见 `docs/reviews/plan085/decisions.md` §9，原�
 ## 10. 待澄清事项
 
 没有阻碍建计划的用户选择。T-01 有边界地解决节点字段兼容、disabled 子树展示、加载回调适配、键盘/语义接线能力、blueprint导入与代表规模可行性、Q-01归因和 runner。不得默默降为鼠标专用树或保留四套算法；超出现有授权范围的依赖/支持上限变更需提出具体合同差异。
+
+2026-11-15：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 1 | from: none | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 78e45127 | next: work (T-03)
+
+Goal round 1 摘要（授权继承：`/goal 完成计划UI-085` 即 work→review→bounded
+repair→merge 全程授权，已记入本节与 decisions.md）：
+
+- 工作树与依赖组：`D:/autostack/.wt/ui-085/auto-ui`（branch
+  `codex/ui-085-tree-view`，base `c78208de`）；组内 detached 只读
+  `auto-lang 86c7fd50b` / `auto-man 54fe407` / `auto-web 0adebc0` /
+  `auto-down 5af11a3`。主检出仅计划簿记改动。
+- T-01 pass：`docs/reviews/plan085/decisions.md`（c60af8f1）冻结 props、
+  禁用/懒加载约定、依赖解析（blueprint 持通用树工具 canonical owner，包内
+  只持 UI 投影）、行状态渲染约束、键盘缺口、runner 与代表规模；
+  环境控制门 `verify_pagination.py --backend native` 复跑 exit 0。
+- T-02 pass：`packages/tree-view/`（854b9b5f）经真实 native 窗口验证——
+  包导入、4 行受控渲染、目录/文件图标、badge、加载中、重试按钮、disabled
+  删除线、focus ring 可见；MCP `autoui_action press` 按稳定 ID 命中
+  chevron/行/重试，`errorIds` 消费后回落。截图
+  `plan-artifacts/plan-085/pkg-native-proof.png` sha256
+  `19918B0D8A7FEB9F68A0870087E79DB2C67A15707564B6EC35B7F4853F4D03AA`。
+  tools 回归：`pagination_component` 2/2、`file_dialog_component` 3/3。
+- T-03 定位完成、实现未提交：路由页 `onkeydown.*` 不进入根组件收集面
+  （组件级 `key_bindings()` 实证只有根自己的键）；`registry.all()` 的
+  `HashMap` 迭代使同名键归属不确定，未挂载导入可抢键。候选修复实测仍未让
+  路由页解析到，已回退以保树绿；夹具
+  `crates/auto-ui-runtime/tests/fixtures/plan085_keydown/` 与六行判据保留给
+  下一轮。AC-03 保持未关闭。
+- 任务计数 2/8；未改 canonical Specs，未写派生索引或 legacy ledger；
+  plan-artifacts 原始探针待 merge 阶段整体清理。
