@@ -749,3 +749,27 @@ Goal round 16 摘要（F-05 第二次修复——这次有**真正可判别**的
     可操作行且无报告。
 - reviewer 判两个具名遗留仍**合规**；套件 27/27、tools 7/7、产品门 native pass；
   新用例耗时均 ≤10s。
+2026-11-16：stage: goal | plan_id: PLAN-085 | plan_revision: r2 | round: 17 | from: review | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-085/auto-ui | commit: 96554686 | next: work（N-02 需 O(n) id-set 原语）或 review
+
+Goal round 17 摘要（定向复审：**F-05 真闭**；F-04 被查出 N-01/N-02 两个 High）：
+
+- **F-05 已真闭**：reviewer 自验 7 个调用点全 5 参、`tv_struct_parent` 无条件下钻、
+  `tv_visible_parent` **字节未变**（ArrowLeft 未受影响）；并**自行做破坏-恢复实验**
+  ——stub 祖先分支 → 测试 FAILED 报 `p2`（邻居），恢复 → PASSED 报 `p1`（父）。
+  判定为真判别器。这轮我先前三次"通过"的教训被独立复核确认已纠正。
+- **N-01 已修**（本轮）：F-04 的界限量错了对象——`nodes.len()` 是**根数**，而
+  `tv_duplicate_id` 走整棵树。"单根 + 1000 子节点"根数为 1，于是每帧重扫 1001 节点，
+  **重新制造了 F-09 移除的 O(n²)**（实测 0 行 / 16.7s / 预算耗尽）。已新增
+  `tv_total_nodes`（一次廉价遍历）并按**总节点数**设界。
+  **判别力已实证**：根数界 → 新用例 FAILED（0 行 / 16.62s）；总节点界 → PASSED
+  （1001 行 / 1.86s）。界限定在 **512**，因为实测 1200 时 17.75s 且失败——512 是
+  可承受上限。新增 `scale_oneroot.at` 夹具正是 1000 平铺根夹具**无法覆盖**的形态。
+- **N-02 未修，如实记为边界不冒充通过**：超阈值时受控更新引入的重复 id 不被复查，
+  会静默发布 2 条歧义可执行行。闭合它需要**语言层 O(n) 的 id 集合原语**——当前
+  无 hash/set，也无 sort 可做邻接比较。已新增
+  `n02_validation_bound_is_documented_for_large_trees` 把当前行为**钉进套件**，让
+  缺口可见，并作为**具名后续项**，不记 pass。
+- 回归全绿 **31 项**；产品门 native pass（`{a:5,b:2}`、`stale_id_rejected: True`）；
+  单用例耗时 n02 3.54s、n01 1.86s，均 <10s。
+- **任务计数 7/8**；下一轮需就 N-02 做决策：或引入 O(n) 原语（跨语言层，可能超本
+  计划范围），或把该边界作为具名限制提交复审裁定。
