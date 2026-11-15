@@ -92,14 +92,35 @@ widget TreeView (
 
 - 上/下在可见可用行移动；Home/End 首末；右展开；左折叠；Enter 请求选择。
   焦点与选择分离；一次按键最多一个回调。
-- **已定位缺口（T-01 P-5）**：`onkeydown.*` 写在**页/根 widget** 上可派发
-  （实测 `page_hits=1`）；写在**子 widget（包组件）** 上不派发（同一
-  `ArrowDown`，子件 `hits=0`，无错误）。`collect_onkeydown_bindings_with_registry`
-  已遍历 registry 子件并按 `or_insert` 合并，疑似值被写成
-  `"<Widget>.<Handler>"` 但派发面在子件实例上无法解析（`instance=None` 且
-  无存活实例解析路径）。T-03 的最小修复点 = **子件 keydown 派发解析**，不新增
-  测试专用入口、不给每个示例各留一份键盘算法；若修复不可行则按 Plan §5 具名
-  记录未闭项，不静默降级为鼠标专用树。
+- **已定位缺口（T-01 P-5，已收敛到可复现矩阵）**：`onkeydown.*` 的派发在
+  存在**其它 widget 也声明同名键**时不可靠。`key_bindings` 是**按规范化键名的
+  扁平 `HashMap<String, String>`**（`dynamic.rs:568-574`：先 clone 根
+  `view.key_bindings`，再用 `collect_onkeydown_bindings_with_registry`
+  `or_insert` 合并 registry 全部子件——**包括本帧未实例化的包组件**）。实测
+  矩阵（同一 `ArrowDown`，同一个 `auto.exe`/`auto-ui-tool.exe`）：
+
+  | 场景 | 结果 |
+  |---|---|
+  | 纯页 `demo`（无包导入），页声明 `down`+`up` | **pass**（`one=1 two=1`，两键独立） |
+  | `App` 根声明 `down` | **pass**（`root_hits=1`） |
+  | 页声明 `down`，同树渲染同包组件（该组件也声明 `down`） | **pass**（`page_hits=1`） |
+  | 页声明 `down`，仅 `use` 导入包组件但**不实例化** | **fail**（`page_hits=0`，无错误） |
+  | 页声明 `space`+`tab`，同树渲染同包组件（该组件声明 `down/up/…`） | **pass**（`one=1`，键名不冲突） |
+  | 同包组件内声明 7 个键，页不声明任何键 | **partial**：单实例 `hits=1`；**两实例 `hits=0`** |
+
+  可复现规则：**同名键在页与包组件之间、或包组件多实例之间冲突时，派发丢失且
+  无诊断**；键名不冲突时正常。这解释了四示例「只有鼠标」的历史状态——树组件的
+  `down/up/enter/left/right` 一旦进入包注册表就会与其它组件同名键互撞。
+- **T-03 最小修复点（冻结）**：不改组件 API、不加测试专用入口，在既有
+  `key_bindings` 收集/派发面做两件事——(1) 收集时**跳过本帧未实例化的 registry
+  子件**（未挂载的组件不得参与键位归属）；(2) 为命中键补**实例限定寻址**
+  （复用既有 `TypedInst` identity 与 `call_handler_for(widget, event,
+  state_obj_id)` receiver 参数化路径），使同页多实例的 `onkeydown.*` 各自可达。
+  两条都要有永久反例（未实例化导入不复影、双实例各自命中、键名不冲突对照）。
+- 若上述接线在预算内不可行：按 Plan §5 **具名记录未闭项**，保持 AC-03 未关闭，
+  **不得**静默降级为鼠标专用树，也不得给四示例各留一份键盘算法。
+- 反例保留：上表六行即修复前后的判据，T-03/T-05 必须同时复跑；不得只留
+  「单实例正例」而丢掉多实例与未实例化导入两行。
 - Tab 离开树：树容器不加入逐节点 Tab 序列（组件不产生 focusable 输入），
   沿用既有 `__focus_next_input` 焦点环；空树/全禁用树同样可离开。
 
@@ -143,7 +164,7 @@ widget TreeView (
 | P-2 Init 内构造节点树 | 受控 `nodes` 由 `Init` 里 `List.push(record)` 构造是否成立 | **pass**：`{id,label,children,is_leaf,badge}` 记录可构造、可嵌套、`len()`/索引/`for` 迭代均正常；`children` 内联字面量与先建子列表两形均可 |
 | P-3 回调回送 | 包组件 `on_toggle: msg` 是否可回送父 handler | **pass**：`handler: .TreeViewdemo@//TreeView#0.Togglesch1`，父状态 `expanded` 更新、行视图重派生 |
 | P-4 行状态渲染 | `class: f"…${r.state}"` 能否按行变化 | **fail→定案**：循环记录字段在 `class:` f-string 中渲染为空（`base  tail`），同记录 `text f"…"` 正常。改用字面量分支后 focused/selected/disabled/loading/error 全部正确可见 |
-| P-5 子件键盘 | 包组件内 `onkeydown.down` 是否派发 | **gap**：子件 `hits=0`；同键写页根 `page_hits=1`。T-03 最小修复点已定位（子件 keydown 派发解析），不新增测试入口 |
+| P-5 子件键盘 | 包组件内 `onkeydown.*` 是否派发 | **部分 pass + 缺口定案（六行判据）**：纯页/根页声明多键均 pass；页与已实例化子件声明同名键 pass；**仅 `use` 导入未实例化的包组件即让同名页键失效**（`page_hits=0`）；键名不冲突 pass；子件**双实例**同名键两者皆 `hits=0`。根因 = `key_bindings` 扁平键名表把未实例化 registry 子件也合并进来（`dynamic.rs:568-574`），且无实例归属键 |
 | P-6 代表规模 | 1000 节点是否完整渲染 | **pass**：1000/1000 行，快照 458 273 字节，末行 `Node 1000` 在树内 |
 | P-7 MCP 行动作 | `autoui_action press` 是否命中行/chevron/重试并带正确 ID | **pass**：chevron→`toggle:ch1`、行→`select:p1`、重试→`retry:p2`（且 `errorIds` 清除）；真实 026 组件同形复跑通过 |
 | P-8 双实例 | 同 ID 两实例是否互不串扰 | **pass（可选面）**：两实例各自持 `focus_index`，父状态单源更新后两实例同步投影；不存在共享实例局部态 |
