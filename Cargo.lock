@@ -69,6 +69,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "ace-artifacts"
+version = "0.1.0"
+dependencies = [
+ "ace-core",
+ "auto-cache",
+ "auto-tool-execution",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "ace-av"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-av-core",
+ "ace-core",
+ "ace-lowering",
+ "ace-semantics-contract",
+ "ace-source-cte",
+ "ace-source-query",
+ "ace-syntax-core",
+ "ace-syntax-grammar",
+ "ace-syntax-runtime",
+ "auto-tool-execution",
+ "base64 0.22.1",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "ace-av-core"
+version = "0.1.0"
+dependencies = [
+ "ace-foreign-contract",
+ "serde_json",
+]
+
+[[package]]
 name = "ace-core"
 version = "0.1.0"
 dependencies = [
@@ -92,12 +137,80 @@ dependencies = [
 ]
 
 [[package]]
+name = "ace-lowering"
+version = "0.1.0"
+dependencies = [
+ "ace-av-core",
+ "ace-core",
+]
+
+[[package]]
+name = "ace-semantics"
+version = "0.1.0"
+dependencies = [
+ "ace-core",
+ "ace-semantics-contract",
+]
+
+[[package]]
 name = "ace-semantics-contract"
 version = "0.1.0"
 dependencies = [
  "blake3",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ace-source-cte"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-av-core",
+ "ace-core",
+ "ace-lowering",
+ "ace-semantics-contract",
+ "ace-source-query",
+ "blake3",
+]
+
+[[package]]
+name = "ace-source-query"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-core",
+ "ace-foreign-contract",
+ "ace-semantics",
+ "ace-semantics-contract",
+ "ace-syntax-artifacts",
+ "ace-syntax-runtime",
+ "blake3",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "ace-syntax-artifacts"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-syntax-grammar",
+ "ace-syntax-runtime",
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ace-syntax-core"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-core",
+ "ace-syntax-grammar",
+ "ace-syntax-runtime",
 ]
 
 [[package]]
@@ -995,6 +1108,7 @@ dependencies = [
  "a2r-std",
  "accesskit",
  "accesskit_windows",
+ "ace-av",
  "arboard",
  "auto-lang-core",
  "auto-media-core",

@@ -11,8 +11,8 @@
 pub use auto_val;
 
 pub mod component;
-pub mod modal;
 pub mod file_dialog;
+pub mod modal;
 
 // PLAN-716 组B: 帧时间戳观测通道（供②——AUTO_FRAME_BENCH 门控零开销；
 // VM 内建 9918/9919 + a2r 臂同源，SD-B 契约）。
@@ -144,6 +144,8 @@ pub mod selection;
 // 与 ui::dynamic 消费）——随 ui-interpreter 门（旧巨树 bare-ui 同为预存
 // 缺门，本批补齐声明面）。
 pub mod vm_bridge;
+// PLAN-980 B-STATE：ACE 状态执行桥（组件面消费端）。
+pub mod ace_state_bridge;
 // PLAN-045：VM 渲染组件级 memo（菜单族四件 + sidebar nav 块；opt-in，
 // 缺省原始路径逐字节不变）。类型面依赖 interpreter 的 View/DynamicMessage，
 // 同门控。
