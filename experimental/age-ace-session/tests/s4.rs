@@ -77,8 +77,9 @@ fn s4_stop_freezes_and_restart_resumes_same_pid() {
     assert!(s.is_stopped());
     assert_eq!(state(&s), 3, "stop freezes the last observation");
     assert!(s.tick(1).is_err(), "scheduling while stopped is rejected");
-    let gen = s.restart().expect("restart");
-    assert_eq!(gen, 2, "tick(3) is one generation, restart is the next");
+    let body_gen = s.restart().expect("restart");
+    assert_eq!(body_gen, 1, "restart bumps the body generation");
+    assert_eq!(s.generation(), 1, "dispatch count is tracked separately");
     assert!(!s.is_stopped());
     assert_eq!(s.pid(), pid, "restart keeps the logical identity");
     assert_eq!(state(&s), 0, "a restart re-runs Start from zero");
@@ -106,7 +107,11 @@ fn s4_exits_and_lifecycle_oracle_use_the_declared_exits() {
         "all declared exits are exposed"
     );
     let b = s.lifecycle(5, 2).expect("lifecycle oracle");
-    assert_eq!((b.starts, b.ticks, b.frames), (1, 5, 2), "exits do not scale counts");
+    assert_eq!(
+        (b.starts, b.ticks, b.frames),
+        (1, 5, 2),
+        "exits do not scale counts"
+    );
 }
 
 /// R64-1：被拒的调度必须**原子**——坏消息不能毒化后续 tick/send。
@@ -115,7 +120,11 @@ fn s4_rejected_dispatch_is_atomic() {
     let mut s = AgeSession::open(TICK, 1).expect("opens");
     let gen = s.generation();
     assert!(s.send("Nope").is_err(), "an undeclared message is rejected");
-    assert_eq!(s.generation(), gen, "a rejected dispatch does not bump the generation");
+    assert_eq!(
+        s.generation(),
+        gen,
+        "a rejected dispatch does not bump the generation"
+    );
     s.tick(1).expect("a later valid dispatch still works");
     assert_eq!(s.observe().unwrap().components[0].instance_states[0][0], 1);
     assert_eq!(s.generation(), gen + 1);
@@ -137,7 +146,11 @@ fn s4_multi_component_surface_and_layout() {
     let b = |s: &AgeSession| s.observe_component(1).unwrap().instance_states[0][0];
     assert_eq!((a(&s), b(&s)), (0, 0));
     s.tick_instance(0, 2).expect("two Ticks");
-    assert_eq!((a(&s), b(&s)), (2, 2), "the directed event reaches every declaring component");
+    assert_eq!(
+        (a(&s), b(&s)),
+        (2, 2),
+        "the directed event reaches every declaring component"
+    );
     // 逐组件布局与越界具名拒。
     let ui = AgeViewRequest::Ui {
         width: 800,

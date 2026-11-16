@@ -200,11 +200,19 @@ impl Session {
         }
     }
 
-    /// AGE Session 的逻辑身份与代数（同 PID 更新不换 pid）。
+    /// AGE Session 的逻辑身份与 **body 代数**（同 PID 更新不换 pid）。
     pub fn age_identity(&self) -> Result<(u64, u64), String> {
         self.age
             .as_ref()
-            .map(|a| (a.pid(), a.generation()))
+            .map(|a| (a.pid(), a.body_generation()))
+            .ok_or_else(|| "this session is not an AGE session".into())
+    }
+ 
+    /// 已应用的调度次数（tick/send）。
+    pub fn age_dispatches(&self) -> Result<u64, String> {
+        self.age
+            .as_ref()
+            .map(|a| a.generation())
             .ok_or_else(|| "this session is not an AGE session".into())
     }
 
