@@ -180,3 +180,37 @@
     （mcp-action-push→iced subscription→VM 会话派发）的丢失检测与重置；
     `AUTO_HTTP_STEP_BUDGET=1e9`/`AUTO_HTTP_REQUEST_TIMEOUT_MS=300000`
     （验收环境放大项）建议回设计值后复测。
+
+  - **2026-11-16 PLAN-098 修复关闭（本仓义务面，master@1b3a02b6）**：
+    三失效模式根修全落地——①vm-session 子进程默认 `WGPU_BACKEND=dx12`
+    （Vulkan ash 楔死栈证据；用户显式设置不覆盖）+ 帧心跳判定入口
+    （FRAME_SEQ + `[SCHED-DIAG] frame_seq` 签名）；②`crates/patches/
+    iced_wgpu`（非 panic uncaptured handler `[WGPU-DEGRADE]` + screenshot
+    零尺寸早退 + poll 2s 有界）+ snapshot 泵 in-flight 守卫；③事件注入
+    gate 化（rx 终生锁内永不搬走，take-once 死亡类结构上不可达）+
+    交付计数/停滞检测 + `ActionResult.delivery`。验证：gate 单测 4/4
+    （断口期零丢失区分器）+ mcp_server 41/41 + vm profile ×3（设计值
+    env）零冻结/零 panic/零事件丢失，cohort 旧链对照 R-03 boundary
+    直接崩 vs 新链全推过。判定 artifact：
+    docs/plans/evidence/plan-098-backend-decision.md；规范：
+    docs/specs/runtime/window-runtime-resilience.md（WRR-01..04）。
+    验收口径 r2（用户裁决）：「R-01～05 全绿」依赖仓外域
+    （WebView2 CDP 起动摇摆→DEBT-009；reader 恢复语义→READER-013/
+    auto-reader；notes read-snapshot stall→notes 仓 owner①），残红
+    在 cohort 旧链同样红、非本计划回归。
+    **状态：本仓义务关闭；G4 全绿门随仓外域修复另行收口。**
+
+## DEBT-009 doc-surface WebView2 CDP 起动摇摆（PLAN-098 T-06 甄别移交，本仓 doc-surface 域）
+
+- **状态**：已甄别、未修（2026-11-16）。来源：PLAN-098 T-06 vm profile
+  ×3 轮（plan-artifacts/plan-098/ 取证，判定 artifact 在
+  docs/plans/evidence/plan-098-backend-decision.md）。
+- **症状**：doc-surface 的 WebView2 调试口（`--remote-debugging-port`）
+  间歇性 180s 不可达（run2 首窗、run1 boundary 重启窗；run3 全通）——
+  `browserType.connectOverCDP: ECONNREFUSED`。窗口进程本身健康
+  （books GET 3-10ms、242 HTTP 行活跃）。同域既有不稳定：cohort 旧链
+  对照轮直接 `boundary re-enter failed` 崩溃。
+- **域**：auto-ui-runtime doc-surface（wry/WebView2 子表面生命周期）。
+  非 DEBT-008 三模式（渲染环/注入链与它无关——窗口日志零冻结零丢失）。
+- **关闭条件**：vm profile 连续 ≥3 轮 boundary 重启后 CDP 均可达，
+  或 doc-surface 起动失败有显式重试/降级投影。
