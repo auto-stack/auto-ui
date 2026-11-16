@@ -7,6 +7,10 @@ R65-7 之后本工具：
 - 刷新前要求 overlay 覆盖的路径在该检出里**干净**（`git status --porcelain` 为空），
   否则拒绝刷新——避免把工作树里的 CRLF/半成品写进“可复现”清单；
 - 写回 `sdk/overlay/overlay.json` 后调用 `apply_overlay.py` 物化并复核。
+
+注意：`prepare_sdk.py --verify-only` 只比较 `.sdk-source` 与 `source-lock.json` + 本清单，
+**不会**回查 stamp 对应的 git blob；要证明"清单字节 == 落主提交字节"，另跑逐 blob 保真核验
+（review-65 R65-7 / review-66 R65-7：1361/1361 对 `git cat-file blob <stamp>:<path>` 全等）。
 """
 import hashlib
 import json

@@ -1,5 +1,5 @@
 {
-  "source": "auto-lang 49409c6fb: experimental/ace + crates/auto-tool-execution + stdlib/ace",
+  "source": "auto-lang 862f8694e: experimental/ace + crates/auto-tool-execution + stdlib/ace",
   "files": {
     "crates/auto-tool-execution/Cargo.toml": "a5ede6f258251dbe670beac75cdbc571eeed61b46a0167b565aca2ae4498d42f",
     "crates/auto-tool-execution/src/bin/te-child.rs": "d53845c6093f04fee0f02846329a10f6ae7636f45ac804b2025ea287b3eaf602",
@@ -850,7 +850,7 @@
     "experimental/ace/crates/core/src/source/closures_context.rs": "85b46e6e19e52630ff32ccc57459aebe16872d79a7b74b3f487ec3560945606f",
     "experimental/ace/crates/core/src/source/closures_fn.rs": "fa7267b47cd0882d1d232aa4524d4508f27808516ae5bb618e1996ff18f404cd",
     "experimental/ace/crates/core/src/source/console.rs": "93c26a379a6c9e56ffed832a990cb5426b9d52f270ebba5da2fee8ccc755c51f",
-    "experimental/ace/crates/core/src/source/cst/frontdoor.rs": "76bd3abbb9e9ecba9a1512a154f38b01472b0cceddd0ed054f76e797e020eb49",
+    "experimental/ace/crates/core/src/source/cst/frontdoor.rs": "a23ebf0411e298fd928304ea197421642069a0397def272ce04952a17bd2120f",
     "experimental/ace/crates/core/src/source/cst/kinds.rs": "6989e0cbefdc4260c0b5b3429dd0e5a0a91d95a0ff5fdaee554259bf983bc0ae",
     "experimental/ace/crates/core/src/source/cst/lex.rs": "0f3211803314e9c01b450d984412bb026fd6c29b638e9f5233ddfd87c75939ae",
     "experimental/ace/crates/core/src/source/cst/mod.rs": "876c0b237da129bfb6363dceb13161ece887539288c4c20c14fbb5c75bcc8e03",
@@ -910,7 +910,7 @@
     "experimental/ace/crates/core/tests/cases/plan981_attr_shape.rs": "e2365ceb363489b30031fcf5c5e875c324d45bf29dd983dcaf70ee90f5bf43cb",
     "experimental/ace/crates/core/tests/cases/plan981_cpu_surface.rs": "a9f7f8d9c15d497b931a86d2148f7fdde907ac134d7089f27c4a41268c31a6c6",
     "experimental/ace/crates/core/tests/cases/plan981_design_slot.rs": "544e860e6a0dba7d0c5422a92e59ec932a99d9085cedbb81c0f2e6ec17441ba0",
-    "experimental/ace/crates/core/tests/cases/plan981_grammar_scope.rs": "4559bd6c100f5f1d333f63750d244f646e0308f621ffa5a1be8a0db4ff8af47a",
+    "experimental/ace/crates/core/tests/cases/plan981_grammar_scope.rs": "72a3fa908965e7f2a745ec7522e29d060c31795d3fe28ddb71697fd67043bedc",
     "experimental/ace/crates/core/tests/cases/plan981_lifecycle.rs": "ae210c73e63d9e3f7a1470cb75249e5d4d46472e636a58f9b6abc527f128412e",
     "experimental/ace/crates/core/tests/cases/plan981_members_slot.rs": "2fc6e1d94befc3408af01a71124ff3d1718488413a6ddc873773d73ce59c5dcd",
     "experimental/ace/crates/core/tests/cases/plan981_model3d.rs": "ad79b14df2d166d958c80bd143e678d35e37536574877d5608ae0f11e99798f4",
