@@ -32,13 +32,14 @@ for rel, want in files.items():
     if not src.is_file():
         problems.append(f"missing in source: {rel}")
         continue
-    got = hashlib.sha256(src.read_bytes()).hexdigest()
+    data = src.read_bytes().replace(b"\r\n", b"\n")
+    got = hashlib.sha256(data).hexdigest()
     if got != want:
         problems.append(f"hash mismatch: {rel}")
         continue
     dst = staging / rel
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dst)
+    dst.write_bytes(data)
 if problems:
     shutil.rmtree(staging, ignore_errors=True)
     print("FAIL overlay not applied:")
