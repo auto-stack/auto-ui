@@ -516,7 +516,11 @@ mod plan056_atomic_reload_tests {
             comp.check_reload().unwrap(),
             "同 mtime 改内容必须被内容 hash 检出"
         );
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(42), "检测不提交");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(42),
+            "检测不提交"
+        );
 
         match comp.try_reload() {
             crate::ui::dynamic::ReloadOutcome::Reloaded(report) => {
@@ -525,8 +529,16 @@ mod plan056_atomic_reload_tests {
             }
             other => panic!("同 mtime 编辑应原子提交，得到 {other:?}"),
         }
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(42), "提交后保值");
-        assert_eq!(comp.read_state("step").unwrap(), Value::Int(5), "新字段取默认");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(42),
+            "提交后保值"
+        );
+        assert_eq!(
+            comp.read_state("step").unwrap(),
+            Value::Int(5),
+            "新字段取默认"
+        );
         assert!(rendered(&mut comp).contains("step-v2"), "新视图生效");
         comp.on_with_input("Bump", None);
         assert_eq!(
@@ -542,8 +554,16 @@ mod plan056_atomic_reload_tests {
         let fx = write_twins();
         let mut comp = build_at(TWINS_ROOT_V1, &fx.root);
         comp.on_with_input("Bump", None);
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(1), "业务可运行");
-        assert_eq!(comp.read_state("total").unwrap(), Value::Int(1), "store 联动");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(1),
+            "业务可运行"
+        );
+        assert_eq!(
+            comp.read_state("total").unwrap(),
+            Value::Int(1),
+            "store 联动"
+        );
 
         std::fs::remove_file(&fx.store).unwrap();
         // 缺源：候选构建具名拒绝保旧（旧 bundle 继续服役）。check_reload
@@ -553,9 +573,17 @@ mod plan056_atomic_reload_tests {
             | crate::ui::dynamic::ReloadOutcome::Error(_) => {}
             other => panic!("缺源必须拒绝/报错保旧，得到 {other:?}"),
         }
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(1), "缺源后旧业务继续");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(1),
+            "缺源后旧业务继续"
+        );
         comp.on_with_input("Bump", None);
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(2), "旧桥 handler 仍可用");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(2),
+            "旧桥 handler 仍可用"
+        );
 
         // 恢复 = 内容变化（store 加字段）→ 检出并原子提交。
         std::fs::write(&fx.store, STORE_V2).unwrap();
@@ -565,14 +593,22 @@ mod plan056_atomic_reload_tests {
             crate::ui::dynamic::ReloadOutcome::Reloaded(_) => {}
             other => panic!("恢复后应原子提交，得到 {other:?}"),
         }
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(2), "提交后保值");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(2),
+            "提交后保值"
+        );
         assert_eq!(
             comp.read_state("touched").unwrap(),
             Value::Int(0),
             "新 store 字段默认"
         );
         comp.on_with_input("Bump", None);
-        assert_eq!(comp.read_state("touched").unwrap(), Value::Int(1), "新 store handler 生效");
+        assert_eq!(
+            comp.read_state("touched").unwrap(),
+            Value::Int(1),
+            "新 store handler 生效"
+        );
     }
 
     /// 坏候选不发布；合法下一编辑整包成功（不出现部分替换）。
@@ -590,9 +626,17 @@ mod plan056_atomic_reload_tests {
             crate::ui::dynamic::ReloadOutcome::Rejected(_) => {}
             other => panic!("坏源必须具名拒绝保旧，得到 {other:?}"),
         }
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(9), "坏源后旧值原样");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(9),
+            "坏源后旧值原样"
+        );
         comp.on_with_input("Bump", None);
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(10), "坏源后旧 handler 仍可用");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(10),
+            "坏源后旧 handler 仍可用"
+        );
 
         std::fs::write(&path, SOLO_V2).unwrap();
         set_forward(&path);
@@ -600,10 +644,18 @@ mod plan056_atomic_reload_tests {
             crate::ui::dynamic::ReloadOutcome::Reloaded(_) => {}
             other => panic!("下一次合法编辑应成功，得到 {other:?}"),
         }
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(10), "合法编辑保值");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(10),
+            "合法编辑保值"
+        );
         assert!(rendered(&mut comp).contains("step-v2"), "新视图生效");
         comp.on_with_input("Bump", None);
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(15), "新 handler 生效");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(15),
+            "新 handler 生效"
+        );
     }
 
     // ========================================================================
@@ -620,15 +672,24 @@ mod plan056_atomic_reload_tests {
         let _ = comp.view();
         let ids = comp.bridge().child_instance_identities();
         assert_eq!(ids.len(), 2, "两个 keyed Counter 实例");
-        let id_a = ids.iter().find(|i| i.ends_with("#a")).cloned().expect("key a");
-        let id_b = ids.iter().find(|i| i.ends_with("#b")).cloned().expect("key b");
+        let id_a = ids
+            .iter()
+            .find(|i| i.ends_with("#a"))
+            .cloned()
+            .expect("key a");
+        let id_b = ids
+            .iter()
+            .find(|i| i.ends_with("#b"))
+            .cloned()
+            .expect("key b");
         comp.bridge_mut()
             .write_instance_state(&id_a, "count", Value::Int(11))
             .expect("A=11");
         comp.bridge_mut()
             .write_instance_state(&id_b, "count", Value::Int(22))
             .expect("B=22");
-        comp.write_state("total", Value::Int(7)).expect("shared store total");
+        comp.write_state("total", Value::Int(7))
+            .expect("shared store total");
 
         std::fs::write(&fx.root, TWINS_ROOT_V2).unwrap();
         set_forward(&fx.root);
@@ -642,8 +703,16 @@ mod plan056_atomic_reload_tests {
         let _ = comp.view();
         let ids2 = comp.bridge().child_instance_identities();
         assert_eq!(ids2.len(), 2, "提交后同身份 keyed 实例集合不变");
-        let id_a2 = ids2.iter().find(|i| i.ends_with("#a")).cloned().expect("key a 仍存");
-        let id_b2 = ids2.iter().find(|i| i.ends_with("#b")).cloned().expect("key b 仍存");
+        let id_a2 = ids2
+            .iter()
+            .find(|i| i.ends_with("#a"))
+            .cloned()
+            .expect("key a 仍存");
+        let id_b2 = ids2
+            .iter()
+            .find(|i| i.ends_with("#b"))
+            .cloned()
+            .expect("key b 仍存");
         assert_eq!(
             comp.bridge().read_instance_state(&id_a2, "count").unwrap(),
             Value::Int(11),
@@ -654,8 +723,16 @@ mod plan056_atomic_reload_tests {
             Value::Int(22),
             "keyed 实例 B=22 跨 reload 保持"
         );
-        assert_eq!(comp.read_state("total").unwrap(), Value::Int(7), "store 共享值保持");
-        assert_eq!(comp.read_state("host_note").unwrap(), Value::str("n"), "新根字段默认");
+        assert_eq!(
+            comp.read_state("total").unwrap(),
+            Value::Int(7),
+            "store 共享值保持"
+        );
+        assert_eq!(
+            comp.read_state("host_note").unwrap(),
+            Value::str("n"),
+            "新根字段默认"
+        );
         assert!(rendered(&mut comp).contains("host-v2"), "新视图生效");
 
         // store 仍共享：Inc 经实例落到根 total。
@@ -769,9 +846,17 @@ mod plan056_atomic_reload_tests {
             }
             other => panic!("类型冲突必须整候选拒绝，得到 {other:?}"),
         }
-        assert_eq!(comp.read_state("total").unwrap(), Value::Int(5), "拒绝后 store 共享值原样");
+        assert_eq!(
+            comp.read_state("total").unwrap(),
+            Value::Int(5),
+            "拒绝后 store 共享值原样"
+        );
         comp.on_with_input_for_instance("Counter", "Inc", None, Some(&id_a));
-        assert_eq!(comp.read_state("total").unwrap(), Value::Int(6), "旧 handler 仍可用");
+        assert_eq!(
+            comp.read_state("total").unwrap(),
+            Value::Int(6),
+            "旧 handler 仍可用"
+        );
         // 旧实例值仍可读（拒绝未丢数据；Inc 已落 +1）。
         assert_eq!(
             comp.bridge().read_instance_state(&id_a, "count").unwrap(),
@@ -827,8 +912,14 @@ mod plan056_atomic_reload_tests {
         // 失败 1：坏源（截断）。
         std::fs::write(&fx.root, SOLO_BROKEN).unwrap();
         set_forward(&fx.root);
-        assert!(matches!(comp.try_reload(), crate::ui::dynamic::ReloadOutcome::Rejected(_)));
-        assert!(rendered(&mut comp).contains("host above counters"), "旧视图原版");
+        assert!(matches!(
+            comp.try_reload(),
+            crate::ui::dynamic::ReloadOutcome::Rejected(_)
+        ));
+        assert!(
+            rendered(&mut comp).contains("host above counters"),
+            "旧视图原版"
+        );
         assert_eq!(comp.read_state("count").unwrap(), Value::Int(1), "旧值原版");
         comp.on_with_input("Bump", None);
         assert_eq!(comp.read_state("count").unwrap(), Value::Int(2));
@@ -841,8 +932,14 @@ mod plan056_atomic_reload_tests {
         // 失败 2：类型冲突。
         std::fs::write(&fx.root, TWINS_ROOT_TYPECHANGE).unwrap();
         set_forward(&fx.root);
-        assert!(matches!(comp.try_reload(), crate::ui::dynamic::ReloadOutcome::Rejected(_)));
-        assert!(rendered(&mut comp).contains("host above counters"), "旧视图仍原版");
+        assert!(matches!(
+            comp.try_reload(),
+            crate::ui::dynamic::ReloadOutcome::Rejected(_)
+        ));
+        assert!(
+            rendered(&mut comp).contains("host above counters"),
+            "旧视图仍原版"
+        );
         comp.on_with_input_for_instance("Counter", "Inc", None, Some(&id_a));
         assert_eq!(
             comp.read_state("total").unwrap(),
@@ -886,7 +983,11 @@ mod plan056_atomic_reload_tests {
         let path = dir.path().join("init.at");
         std::fs::write(&path, INIT_V1).unwrap();
         let mut comp = build_at(INIT_V1, &path);
-        assert_eq!(comp.read_state("init_count").unwrap(), Value::Int(1), "装配 Init 一次");
+        assert_eq!(
+            comp.read_state("init_count").unwrap(),
+            Value::Int(1),
+            "装配 Init 一次"
+        );
 
         std::fs::write(&path, INIT_V2).unwrap();
         set_forward(&path);
@@ -926,7 +1027,11 @@ mod plan056_atomic_reload_tests {
             crate::ui::dynamic::ReloadOutcome::Busy => {}
             other => panic!("繁忙必须保旧 Busy，得到 {other:?}"),
         }
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(5), "繁忙期间旧值原样");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(5),
+            "繁忙期间旧值原样"
+        );
         assert!(comp.reload_pending(), "繁忙标记待重试");
 
         comp.bridge().clear_parked_for_test();
@@ -934,7 +1039,11 @@ mod plan056_atomic_reload_tests {
             crate::ui::dynamic::ReloadOutcome::Reloaded(_) => {}
             other => panic!("静止后重试应成功，得到 {other:?}"),
         }
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(5), "重试提交保值");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(5),
+            "重试提交保值"
+        );
     }
 
     /// 删实例只撤销 owner：tombstone 后迟到事件丢弃、不串新实例。
@@ -945,7 +1054,11 @@ mod plan056_atomic_reload_tests {
         let _ = comp.view();
         let ids = comp.bridge().child_instance_identities();
         assert_eq!(ids.len(), 2);
-        let id_a = ids.iter().find(|i| i.ends_with("#a")).cloned().expect("key a");
+        let id_a = ids
+            .iter()
+            .find(|i| i.ends_with("#a"))
+            .cloned()
+            .expect("key a");
 
         std::fs::write(&fx.root, TWINS_ROOT_NOCHILD).unwrap();
         set_forward(&fx.root);
@@ -964,7 +1077,10 @@ mod plan056_atomic_reload_tests {
             comp.bridge().child_instance_identities().is_empty(),
             "迟到事件不得复活/重定向实例"
         );
-        assert!(rendered(&mut comp).contains("host above counters"), "新视图正常渲染");
+        assert!(
+            rendered(&mut comp).contains("host above counters"),
+            "新视图正常渲染"
+        );
     }
 
     /// Tick 订阅表整体替换：新 tick_interval + 新 Tick handler 即刻生效。
@@ -988,7 +1104,11 @@ mod plan056_atomic_reload_tests {
             "新定义 tick_interval 整体替换旧订阅表"
         );
         comp.on_with_input("Tick", None);
-        assert_eq!(comp.read_state("n").unwrap(), Value::Int(10), "新 Tick handler 即刻生效");
+        assert_eq!(
+            comp.read_state("n").unwrap(),
+            Value::Int(10),
+            "新 Tick handler 即刻生效"
+        );
     }
 
     // ========================================================================
@@ -1021,9 +1141,9 @@ mod plan056_atomic_reload_tests {
                 .unwrap();
             let mut found = None;
             for stmt in ast.items() {
-                if let auto_parser_api::DomainStmt::Domain(
-                    auto_ui_dialect::UiStmt::WidgetDecl(decl),
-                ) = stmt
+                if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(
+                    decl,
+                )) = stmt
                 {
                     let w = auto_ui_compiler::aura::extract_widget_from_decl(decl).unwrap();
                     found = Some(comp.reload(&w).unwrap());
@@ -1042,11 +1162,18 @@ mod plan056_atomic_reload_tests {
         match comp.try_reload() {
             crate::ui::dynamic::ReloadOutcome::Reloaded(report) => {
                 assert_eq!(report.preserved, 2, "count/label 保值");
-                assert!(report.dropped_names.iter().any(|n| n == "step"), "step 删除具名");
+                assert!(
+                    report.dropped_names.iter().any(|n| n == "step"),
+                    "step 删除具名"
+                );
             }
             other => panic!("单文件同规则应提交，得到 {other:?}"),
         }
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(6), "单文件保值");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(6),
+            "单文件保值"
+        );
         assert!(rendered(&mut comp).contains("v3"), "V3 视图生效");
     }
 
@@ -1088,8 +1215,14 @@ mod plan056_atomic_reload_tests {
             crate::ui::dynamic::ReloadOutcome::Reloaded(_) => {}
             other => panic!("主题 App 合法候选应提交，得到 {other:?}"),
         }
-        assert!(comp.theme_scope().is_some(), "提交后主题 scope 保留（candidate 自带 scope）");
-        assert!(rendered(&mut comp).contains("t2"), "新视图在 scope 下正常渲染");
+        assert!(
+            comp.theme_scope().is_some(),
+            "提交后主题 scope 保留（candidate 自带 scope）"
+        );
+        assert!(
+            rendered(&mut comp).contains("t2"),
+            "新视图在 scope 下正常渲染"
+        );
     }
 
     /// root / import / child 各改真实生效（AC-05 主机面）。
@@ -1112,20 +1245,33 @@ mod plan056_atomic_reload_tests {
         // root 改 → 真实生效。
         std::fs::write(&fx.root, TWINS_ROOT_V2).unwrap();
         set_forward(&fx.root);
-        assert!(matches!(comp.try_reload(), crate::ui::dynamic::ReloadOutcome::Reloaded(_)));
+        assert!(matches!(
+            comp.try_reload(),
+            crate::ui::dynamic::ReloadOutcome::Reloaded(_)
+        ));
         assert!(rendered(&mut comp).contains("host-v2"), "root 改动真实生效");
 
         // import/store 改 → 真实生效。
         std::fs::write(&fx.store, STORE_V2).unwrap();
         set_forward(&fx.store);
-        assert!(matches!(comp.try_reload(), crate::ui::dynamic::ReloadOutcome::Reloaded(_)));
+        assert!(matches!(
+            comp.try_reload(),
+            crate::ui::dynamic::ReloadOutcome::Reloaded(_)
+        ));
         comp.on_with_input("Bump", None);
-        assert_eq!(comp.read_state("touched").unwrap(), Value::Int(1), "store 改动真实生效");
+        assert_eq!(
+            comp.read_state("touched").unwrap(),
+            Value::Int(1),
+            "store 改动真实生效"
+        );
 
         // child 改 → 真实生效（实例保值仍成立）。
         std::fs::write(&fx.root, TWINS_ROOT_CHILD_FIELD).unwrap();
         set_forward(&fx.root);
-        assert!(matches!(comp.try_reload(), crate::ui::dynamic::ReloadOutcome::Reloaded(_)));
+        assert!(matches!(
+            comp.try_reload(),
+            crate::ui::dynamic::ReloadOutcome::Reloaded(_)
+        ));
         let _ = comp.view();
         let id_a2 = comp
             .bridge()

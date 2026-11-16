@@ -324,8 +324,7 @@ pub enum FixtureAck {
 /// （DEBT-008 模式①：主循环卡 wgpu acquire_texture 时 view() 不再被
 /// 调用，而 MCP 线程/进程仍活——「渲染死、进程活」的分型证据）。
 pub static FRAME_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-pub static FRAME_LAST_TICK_MS: std::sync::atomic::AtomicU64 =
-    std::sync::atomic::AtomicU64::new(0);
+pub static FRAME_LAST_TICK_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// 渲染帧打点（view() 每帧调用）；返回累计 seq。
 pub fn frame_heartbeat_tick(now_ms: u64) -> u64 {
@@ -491,7 +490,8 @@ impl SharedState {
     /// suspended. Otherwise a name selector can find a closed instance first.
     pub(crate) fn retain_live_app_surfaces(&mut self, is_live: impl Fn(u64) -> bool) {
         self.app_surfaces.retain(|key, _| {
-            key.split_once(':').and_then(|(id, _)| id.parse::<u64>().ok())
+            key.split_once(':')
+                .and_then(|(id, _)| id.parse::<u64>().ok())
                 .is_some_and(&is_live)
         });
     }
@@ -759,13 +759,37 @@ impl SharedState {
                     // VTree 未 derive PartialEq——守卫走 Debug 串比较（冷路径：
                     // 仅新 computed 为空时触发；正常帧带属性恒放行）。
                     let same_tree = prev.vtree.nodes.len() == snap.vtree.nodes.len()
-                        && prev.vtree.nodes.iter().zip(&snap.vtree.nodes).all(|(a, b)|
-                            format!("{:?}", (a.kind, &a.props, &a.path, &a.source_span, &a.label))
-                            == format!("{:?}", (b.kind, &b.props, &b.path, &b.source_span, &b.label)));
-                    let same_actions = self.view.as_ref().map(|view| self.action_identities.iter().all(|(id, expected)|
-                        prev.vtree.get(*id).and_then(|node| find_view_by_path(view, &node.path)).and_then(action_identity).as_ref() == Some(expected)
-                    )).unwrap_or(true);
-                    if same_tree && same_actions { return; }
+                        && prev
+                            .vtree
+                            .nodes
+                            .iter()
+                            .zip(&snap.vtree.nodes)
+                            .all(|(a, b)| {
+                                format!(
+                                    "{:?}",
+                                    (a.kind, &a.props, &a.path, &a.source_span, &a.label)
+                                ) == format!(
+                                    "{:?}",
+                                    (b.kind, &b.props, &b.path, &b.source_span, &b.label)
+                                )
+                            });
+                    let same_actions = self
+                        .view
+                        .as_ref()
+                        .map(|view| {
+                            self.action_identities.iter().all(|(id, expected)| {
+                                prev.vtree
+                                    .get(*id)
+                                    .and_then(|node| find_view_by_path(view, &node.path))
+                                    .and_then(action_identity)
+                                    .as_ref()
+                                    == Some(expected)
+                            })
+                        })
+                        .unwrap_or(true);
+                    if same_tree && same_actions {
+                        return;
+                    }
                 }
             }
         }
@@ -790,15 +814,21 @@ impl SharedState {
                         let metadata = snap.computed.entry(node.id).or_default();
                         metadata.events.clear();
                         if let Some((_, event)) = message.and_then(extract_dyn_msg) {
-                            metadata.events.push((name.into(), format!(".{}", event.split('\u{1f}').next().unwrap_or(&event))));
+                            metadata.events.push((
+                                name.into(),
+                                format!(".{}", event.split('\u{1f}').next().unwrap_or(&event)),
+                            ));
                         }
                     }
                     if let View::Checkbox { on_toggle, .. } = target {
-                        snap.computed.entry(node.id).or_default().enabled = Some(on_toggle.is_some());
+                        snap.computed.entry(node.id).or_default().enabled =
+                            Some(on_toggle.is_some());
                     }
                     if let Some(identity) = action_identity(target) {
                         let mut id = crate::ui::vnode::id_from_path(&node.path);
-                        for byte in identity.as_bytes() { id = (id ^ *byte as u64).wrapping_mul(0x1000_0000_01b3); }
+                        for byte in identity.as_bytes() {
+                            id = (id ^ *byte as u64).wrapping_mul(0x1000_0000_01b3);
+                        }
                         let id = VNodeId::new(id.max(1));
                         remap.insert(node.id, id);
                         self.action_identities.insert(id, identity);
@@ -810,12 +840,20 @@ impl SharedState {
                 let is_root = Some(node.id) == old_root;
                 node.id = remap.get(&node.id).copied().unwrap_or(node.id);
                 node.parent = node.parent.map(|id| remap.get(&id).copied().unwrap_or(id));
-                for id in &mut node.children { *id = remap.get(id).copied().unwrap_or(*id); }
-                if is_root { tree.set_root(node); } else { tree.add_node(node); }
+                for id in &mut node.children {
+                    *id = remap.get(id).copied().unwrap_or(*id);
+                }
+                if is_root {
+                    tree.set_root(node);
+                } else {
+                    tree.add_node(node);
+                }
             }
             snap.vtree = tree;
-            snap.computed = std::mem::take(&mut snap.computed).into_iter()
-                .map(|(id, value)| (remap.get(&id).copied().unwrap_or(id), value)).collect();
+            snap.computed = std::mem::take(&mut snap.computed)
+                .into_iter()
+                .map(|(id, value)| (remap.get(&id).copied().unwrap_or(id), value))
+                .collect();
         }
         self.styled_vtree = Some(std::sync::Arc::new(snap));
         self.alias_action_bounds();
@@ -824,15 +862,26 @@ impl SharedState {
     pub(crate) fn take_action_focus(&self, widget: &str, event: &str) -> bool {
         let mut requests = self.action_focus_requests.lock().unwrap();
         if let Some(index) = requests.iter().position(|(w, e)| w == widget && e == event) {
-            requests.remove(index); true
-        } else { false }
+            requests.remove(index);
+            true
+        } else {
+            false
+        }
     }
 
     fn alias_action_bounds(&mut self) {
         if let Some(snapshot) = &self.styled_vtree {
             for node in &snapshot.vtree.nodes {
-                if let Some(bounds) = self.layout_bounds.get(&format!("vnode_{}", crate::ui::vnode::id_from_path(&node.path))).copied() {
-                    self.layout_bounds.insert(format!("vnode_{}", node.id.as_u64()), bounds);
+                if let Some(bounds) = self
+                    .layout_bounds
+                    .get(&format!(
+                        "vnode_{}",
+                        crate::ui::vnode::id_from_path(&node.path)
+                    ))
+                    .copied()
+                {
+                    self.layout_bounds
+                        .insert(format!("vnode_{}", node.id.as_u64()), bounds);
                 }
             }
         }
@@ -2079,7 +2128,9 @@ fn tool_action(shared_handle: &SharedStateHandle, args: serde_json::Value) -> se
 
     {
         let shared = shared_handle.lock().unwrap();
-        if let Err(error) = validate_modal_target(&shared, &element_id) { return error_result(error); }
+        if let Err(error) = validate_modal_target(&shared, &element_id) {
+            return error_result(error);
+        }
     }
 
     let action_type = match action_str {
@@ -3462,20 +3513,26 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
                 "middle" => crate::ui::desktop_protocol::message::MouseButton::Middle,
                 _ => crate::ui::desktop_protocol::message::MouseButton::Left,
             };
-            crate::ui::session::desktop_inject_push(
-                crate::ui::session::DesktopInject::Pointer {
-                    phase,
-                    x,
-                    y,
-                    button,
-                },
-            );
+            crate::ui::session::desktop_inject_push(crate::ui::session::DesktopInject::Pointer {
+                phase,
+                x,
+                y,
+                button,
+            });
             text_result(format!("queued pointer {phase:?} at ({x},{y})"))
         }
         // PLAN-060：消息注入（组件事件循环；VM 异步 API 正常挂起续跑）。
         "msg" => {
-            let app = args.get("app").and_then(|v| v.as_str()).unwrap_or_default().to_string();
-            let msg = args.get("msg").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+            let app = args
+                .get("app")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let msg = args
+                .get("msg")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
             if app.is_empty() || msg.is_empty() {
                 return error_result("action=msg requires app and msg".to_string());
             }
@@ -3486,24 +3543,43 @@ fn tool_desktop(_shared: &SharedStateHandle, args: serde_json::Value) -> serde_j
             crate::ui::session::desktop_inject_push(injection);
             text_result(format!("queued {app} msg: {msg}"))
         }
-        _ => error_result(format!("Unknown action: '{action}' (bus|handler|key|pointer|msg)")),
+        _ => error_result(format!(
+            "Unknown action: '{action}' (bus|handler|key|pointer|msg)"
+        )),
     }
 }
 
 // ── Tool: autoui_wait (Plan 299 Phase 2) ──
 
-fn parse_desktop_message_args(args: &serde_json::Value, app: String, msg: String) -> Result<crate::ui::session::DesktopInject, String> {
+fn parse_desktop_message_args(
+    args: &serde_json::Value,
+    app: String,
+    msg: String,
+) -> Result<crate::ui::session::DesktopInject, String> {
     use crate::ui::session::{desktop_message_scalar, DesktopInject};
     if let Some(values) = args.get("args") {
         if args.get("arg").is_some() {
             return Err("action=msg accepts either arg or args, not both".into());
         }
-        let values = values.as_array().ok_or_else(|| "message args must be an array".to_string())?;
-        for value in values { desktop_message_scalar(value)?; }
-        Ok(DesktopInject::MsgValues { app, msg, args: values.clone() })
+        let values = values
+            .as_array()
+            .ok_or_else(|| "message args must be an array".to_string())?;
+        for value in values {
+            desktop_message_scalar(value)?;
+        }
+        Ok(DesktopInject::MsgValues {
+            app,
+            msg,
+            args: values.clone(),
+        })
     } else {
         let arg = match args.get("arg") {
-            Some(value) => Some(value.as_str().ok_or_else(|| "message arg must be a string".to_string())?.to_string()),
+            Some(value) => Some(
+                value
+                    .as_str()
+                    .ok_or_else(|| "message arg must be a string".to_string())?
+                    .to_string(),
+            ),
             None => None,
         };
         Ok(DesktopInject::Msg { app, msg, arg })
@@ -3513,7 +3589,9 @@ fn parse_desktop_message_args(args: &serde_json::Value, app: String, msg: String
 #[cfg(test)]
 mod p060_scalar_message_tests {
     use super::*;
-    use crate::ui::session::{DesktopInject, DesktopSession, desktop_inject_push, desktop_inject_take};
+    use crate::ui::session::{
+        desktop_inject_push, desktop_inject_take, DesktopInject, DesktopSession,
+    };
 
     #[test]
     fn p060_closed_app_surface_cannot_shadow_reopened_instance() {
@@ -3524,17 +3602,29 @@ mod p060_scalar_message_tests {
         let old = session.allocate_app(crate::build_dynamic_component(source, None).unwrap());
         let observer = session.allocate_app(crate::build_dynamic_component(source, None).unwrap());
         let publish = |id: u64, label: &str, state: &str| {
-            shared.lock().unwrap().set_app_surface(format!("{id}:{label}"), AppSurface {
-                widget_name: label.into(), state_text: state.into(),
-                template_text: "text".into(), updated_ms: 1,
-            });
+            shared.lock().unwrap().set_app_surface(
+                format!("{id}:{label}"),
+                AppSurface {
+                    widget_name: label.into(),
+                    state_text: state.into(),
+                    template_text: "text".into(),
+                    updated_ms: 1,
+                },
+            );
         };
         publish(old.0, "auto-paint", "old-closed-value");
         publish(observer.0, "observer", "untouched");
         session.apps.remove(&old);
         session.prune_mcp_app_surfaces();
-        assert_eq!(tool_snapshot(&shared, json!({"app":"auto-paint"}))["isError"], true);
-        assert!(shared.lock().unwrap().find_app_surface(&old.0.to_string()).is_none());
+        assert_eq!(
+            tool_snapshot(&shared, json!({"app":"auto-paint"}))["isError"],
+            true
+        );
+        assert!(shared
+            .lock()
+            .unwrap()
+            .find_app_surface(&old.0.to_string())
+            .is_none());
         let reopened = session.allocate_app(crate::build_dynamic_component(source, None).unwrap());
         publish(reopened.0, "auto-paint", "new-live-value");
         session.prune_mcp_app_surfaces();
@@ -3542,23 +3632,34 @@ mod p060_scalar_message_tests {
         assert!(result.contains("new-live-value"));
         assert!(!result.contains("old-closed-value"));
         assert!(result.contains(&format!("{}:auto-paint", reopened.0)));
-        assert!(tool_snapshot(&shared, json!({"app":"observer"})).to_string().contains("untouched"));
+        assert!(tool_snapshot(&shared, json!({"app":"observer"}))
+            .to_string()
+            .contains("untouched"));
     }
 
     #[test]
     fn p060_scalar_message_parser_rejects_lossy_or_ambiguous_payloads() {
         for invalid in [
-            json!({"args": [null]}), json!({"args": [[1]]}),
-            json!({"args": [{}]}), json!({"args": [u64::MAX]}),
-            json!({"args": [i64::MAX]}), json!({"args": [i64::MIN]}),
+            json!({"args": [null]}),
+            json!({"args": [[1]]}),
+            json!({"args": [{}]}),
+            json!({"args": [u64::MAX]}),
+            json!({"args": [i64::MAX]}),
+            json!({"args": [i64::MIN]}),
             json!({"args": [1.0e300]}),
-            json!({"args": "17"}), json!({"args": [], "arg": "legacy"}),
+            json!({"args": "17"}),
+            json!({"args": [], "arg": "legacy"}),
             json!({"arg": 17}),
         ] {
             assert!(parse_desktop_message_args(&invalid, "paint".into(), "Paint".into()).is_err());
         }
-        assert!(matches!(parse_desktop_message_args(&json!({"arg":"中文"}), "paint".into(), "SetPath".into()).unwrap(), DesktopInject::Msg { arg: Some(value), .. } if value == "中文"));
-        assert!(matches!(crate::ui::session::desktop_message_scalar(&json!(true)).unwrap(), auto_val::Value::Bool(true)));
+        assert!(
+            matches!(parse_desktop_message_args(&json!({"arg":"中文"}), "paint".into(), "SetPath".into()).unwrap(), DesktopInject::Msg { arg: Some(value), .. } if value == "中文")
+        );
+        assert!(matches!(
+            crate::ui::session::desktop_message_scalar(&json!(true)).unwrap(),
+            auto_val::Value::Bool(true)
+        ));
     }
 
     #[test]
@@ -3580,9 +3681,17 @@ mod p060_scalar_message_tests {
             } }
         }"#;
         let mut session = DesktopSession::__test_session();
-        let selected = session.allocate_app(crate::build_dynamic_component(source, None).expect("selected component"));
-        let other = session.allocate_app(crate::build_dynamic_component(source, None).expect("other component"));
-        let injection = parse_desktop_message_args(&json!({"args":[17,"中文",true,54.25]}), "paint".into(), "Change".into()).unwrap();
+        let selected = session.allocate_app(
+            crate::build_dynamic_component(source, None).expect("selected component"),
+        );
+        let other = session
+            .allocate_app(crate::build_dynamic_component(source, None).expect("other component"));
+        let injection = parse_desktop_message_args(
+            &json!({"args":[17,"中文",true,54.25]}),
+            "paint".into(),
+            "Change".into(),
+        )
+        .unwrap();
         assert!(desktop_inject_take().is_empty());
         desktop_inject_push(injection);
         let mut queue = desktop_inject_take();
@@ -3590,37 +3699,68 @@ mod p060_scalar_message_tests {
         match queue.remove(0) {
             DesktopInject::MsgValues { app, msg, args } => {
                 assert_eq!(app, "paint");
-                session.dispatch_scalar_message(selected, msg, &args).unwrap();
+                session
+                    .dispatch_scalar_message(selected, msg, &args)
+                    .unwrap();
             }
             _ => panic!("typed injection lost"),
         }
         let target = &session.apps[&selected].component;
-        assert!(matches!(target.read_state("index").unwrap(), auto_val::Value::Int(17)));
+        assert!(matches!(
+            target.read_state("index").unwrap(),
+            auto_val::Value::Int(17)
+        ));
         assert_eq!(target.read_state("label").unwrap().as_str(), "中文");
         let enabled = target.read_state("enabled").unwrap();
         // The existing VM handler bridge encodes bool parameters as 0/1.
-        assert!(matches!(enabled, auto_val::Value::Bool(true) | auto_val::Value::Int(1)), "enabled: {enabled:?}");
+        assert!(
+            matches!(
+                enabled,
+                auto_val::Value::Bool(true) | auto_val::Value::Int(1)
+            ),
+            "enabled: {enabled:?}"
+        );
         let amount = target.read_state("amount").unwrap();
-        assert!(matches!(amount, auto_val::Value::Float(value) if value == 54.25), "amount: {amount:?}");
-        assert!(matches!(session.apps[&other].component.read_state("index").unwrap(), auto_val::Value::Int(0)));
+        assert!(
+            matches!(amount, auto_val::Value::Float(value) if value == 54.25),
+            "amount: {amount:?}"
+        );
+        assert!(matches!(
+            session.apps[&other].component.read_state("index").unwrap(),
+            auto_val::Value::Int(0)
+        ));
 
         // A broker-owned app must not execute its local placeholder or send
         // an incompatible typed-array wire message, even with a live peer.
         session.__test_open_desktop();
-        let wid = session.wm_add_win(selected, "paint".into(), iced::Rectangle::new(
-            iced::Point::ORIGIN, iced::Size::new(480.0, 320.0)));
-        use crate::ui::desktop_protocol::{transport, stage3::BrokerClient};
+        let wid = session.wm_add_win(
+            selected,
+            "paint".into(),
+            iced::Rectangle::new(iced::Point::ORIGIN, iced::Size::new(480.0, 320.0)),
+        );
+        use crate::ui::desktop_protocol::{stage3::BrokerClient, transport};
         let pipe = format!("p060-scalar-isolation-{}", std::process::id());
         let listener = transport::listen(&pipe).unwrap();
         let mut peer = transport::connect(&pipe, 2000).unwrap();
         let mut client = BrokerClient::new(pipe.clone(), listener.wait_connect().unwrap());
         client.wid = Some(wid);
         session.broker_clients.insert(pipe, client);
-        assert!(session.dispatch_scalar_message(selected, "Change".into(), &[
-            json!(99), json!("unsupported"), json!(false), json!(1.5),
-        ]).unwrap_err().contains("broker-owned"));
+        assert!(session
+            .dispatch_scalar_message(
+                selected,
+                "Change".into(),
+                &[json!(99), json!("unsupported"), json!(false), json!(1.5),]
+            )
+            .unwrap_err()
+            .contains("broker-owned"));
         assert!(peer.try_recv().is_none());
-        assert!(matches!(session.apps[&selected].component.read_state("index").unwrap(), auto_val::Value::Int(17)));
+        assert!(matches!(
+            session.apps[&selected]
+                .component
+                .read_state("index")
+                .unwrap(),
+            auto_val::Value::Int(17)
+        ));
     }
 }
 
@@ -3912,16 +4052,38 @@ fn tool_keyboard(shared_handle: &SharedStateHandle, args: serde_json::Value) -> 
 
     let shared = shared_handle.lock().unwrap();
     let widget_name = shared.widget_name.clone();
-    if key != "F12" && shared.view.as_ref().and_then(crate::ui::modal::active_content_path).is_some() {
+    if key != "F12"
+        && shared
+            .view
+            .as_ref()
+            .and_then(crate::ui::modal::active_content_path)
+            .is_some()
+    {
         let event = match key {
-            "Tab" if _modifiers.iter().any(|m| m.eq_ignore_ascii_case("shift")) => "__focus_prev_input",
+            "Tab" if _modifiers.iter().any(|m| m.eq_ignore_ascii_case("shift")) => {
+                "__focus_prev_input"
+            }
             "Tab" => "__focus_next_input",
             "Enter" | "Space" | " " => "__activate_focused_control",
             "Escape" => "__modal_escape",
-            _ => return error_result("Modal dialog owns keyboard input; background shortcuts are unavailable"),
+            _ => {
+                return error_result(
+                    "Modal dialog owns keyboard input; background shortcuts are unavailable",
+                )
+            }
         };
-        let message = ActionMessage { target: ActionTarget::Event { widget: String::new(), event: event.into() }, action: UiActionType::Press, value: Some(key.into()) };
-        return match shared.send_action(message) { Ok(()) => text_result(format!("Key sent in active modal: {key}")), Err(error) => error_result(error) };
+        let message = ActionMessage {
+            target: ActionTarget::Event {
+                widget: String::new(),
+                event: event.into(),
+            },
+            action: UiActionType::Press,
+            value: Some(key.into()),
+        };
+        return match shared.send_action(message) {
+            Ok(()) => text_result(format!("Key sent in active modal: {key}")),
+            Err(error) => error_result(error),
+        };
     }
 
     // Plan 371: F12 toggles DevTools directly (bypasses key_binding lookup).
@@ -4098,8 +4260,14 @@ fn find_first_input_vnode(shared: &SharedState) -> Option<VNodeId> {
     snap.vtree
         .nodes
         .iter()
-        .find(|n| matches!(n.kind, VNodeKind::Input | VNodeKind::Textarea)
-            && shared.view.as_ref().map(|v| crate::ui::modal::allows_path(v, &n.path)).unwrap_or(true))
+        .find(|n| {
+            matches!(n.kind, VNodeKind::Input | VNodeKind::Textarea)
+                && shared
+                    .view
+                    .as_ref()
+                    .map(|v| crate::ui::modal::allows_path(v, &n.path))
+                    .unwrap_or(true)
+        })
         .map(|n| n.id)
 }
 
@@ -4373,23 +4541,55 @@ enum ElementId {
 fn action_identity(view: &View<DynamicMessage>) -> Option<String> {
     match view {
         View::Button { onclick, .. } => Some(format!("button:{onclick:?}")),
-        View::Checkbox { on_toggle: Some(message), .. } => Some(format!("checkbox:{message:?}")),
+        View::Checkbox {
+            on_toggle: Some(message),
+            ..
+        } => Some(format!("checkbox:{message:?}")),
         _ => None,
     }
 }
 
 fn validate_modal_target(shared: &SharedState, target: &ElementId) -> Result<(), String> {
-    let Some(view) = shared.view.as_ref() else { return Ok(()); };
-    let Some(scope) = crate::ui::modal::active_content_path(view) else { return Ok(()); };
-    let allowed = match target {
-        ElementId::Vnode(id) => shared.styled_vtree.as_ref().and_then(|s| s.vtree.get(*id))
-            .map(|node| node.path.starts_with(&scope)).unwrap_or(false),
-        ElementId::Aura(id) => shared.id_map.as_ref().map(|map| {
-            let paths = map.snapshot_prefix(&[]).into_iter().filter(|(_, candidate)| candidate == id).collect::<Vec<_>>();
-            !paths.is_empty() && paths.iter().all(|(path, _)| path.iter().map(|n| *n as u16).collect::<Vec<_>>().starts_with(&scope))
-        }).unwrap_or(false),
+    let Some(view) = shared.view.as_ref() else {
+        return Ok(());
     };
-    if allowed { Ok(()) } else { Err("Modal dialog owns input; target is outside the active dialog or no longer exists".into()) }
+    let Some(scope) = crate::ui::modal::active_content_path(view) else {
+        return Ok(());
+    };
+    let allowed = match target {
+        ElementId::Vnode(id) => shared
+            .styled_vtree
+            .as_ref()
+            .and_then(|s| s.vtree.get(*id))
+            .map(|node| node.path.starts_with(&scope))
+            .unwrap_or(false),
+        ElementId::Aura(id) => shared
+            .id_map
+            .as_ref()
+            .map(|map| {
+                let paths = map
+                    .snapshot_prefix(&[])
+                    .into_iter()
+                    .filter(|(_, candidate)| candidate == id)
+                    .collect::<Vec<_>>();
+                !paths.is_empty()
+                    && paths.iter().all(|(path, _)| {
+                        path.iter()
+                            .map(|n| *n as u16)
+                            .collect::<Vec<_>>()
+                            .starts_with(&scope)
+                    })
+            })
+            .unwrap_or(false),
+    };
+    if allowed {
+        Ok(())
+    } else {
+        Err(
+            "Modal dialog owns input; target is outside the active dialog or no longer exists"
+                .into(),
+        )
+    }
 }
 
 /// Parse either `aura_N` or `vnode_N` from a string.
@@ -4534,14 +4734,10 @@ pub(crate) fn extract_action_from_view(
         | View::Container { onclick, .. }
             if action_name == "press" =>
         {
-            if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1")
-                && onclick.is_none()
-            {
+            if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") && onclick.is_none() {
                 let dbg = format!("{view:?}");
                 let head: String = dbg.chars().take(120).collect();
-                eprintln!(
-                    "[MEMO-DIAG] layout-press target WITHOUT onclick: {head}"
-                );
+                eprintln!("[MEMO-DIAG] layout-press target WITHOUT onclick: {head}");
             }
             onclick.as_ref().and_then(|m| extract_dyn_msg(m))
         }
@@ -4672,9 +4868,14 @@ fn execute_action_vnode(
         .ok_or_else(|| format!("VNode not found: vnode_{}", vnode_id.as_u64()))?;
 
     validate_modal_target(shared, &ElementId::Vnode(vnode_id))?;
-    if let (Some(expected), Some(view)) = (shared.action_identities.get(&vnode_id), shared.view.as_ref()) {
+    if let (Some(expected), Some(view)) = (
+        shared.action_identities.get(&vnode_id),
+        shared.view.as_ref(),
+    ) {
         let actual = find_view_by_path(view, &vnode.path).and_then(action_identity);
-        if actual.as_ref() != Some(expected) { return Err("Stale action identity; discover the current tree again".into()); }
+        if actual.as_ref() != Some(expected) {
+            return Err("Stale action identity; discover the current tree again".into());
+        }
     }
 
     // Validate action type by VNode kind (works for both VM and Rust mode)
@@ -4822,10 +5023,15 @@ fn execute_action_vnode(
         ActionTarget::Path { path } => format!("<path {:?}>", path),
         ActionTarget::Fixture { request_id } => format!("<fixture {}>", request_id),
     };
-    if matches!(action, UiActionType::Press | UiActionType::Toggle | UiActionType::TypeText | UiActionType::Clear) {
+    if matches!(
+        action,
+        UiActionType::Press | UiActionType::Toggle | UiActionType::TypeText | UiActionType::Clear
+    ) {
         if let ActionTarget::Event { widget, event } = &msg.target {
             let mut requests = shared.action_focus_requests.lock().unwrap();
-            if requests.len() >= 64 { requests.pop_front(); }
+            if requests.len() >= 64 {
+                requests.pop_front();
+            }
             requests.push_back((widget.clone(), event.clone()));
         }
     }
@@ -5410,7 +5616,11 @@ fn aura_vtree_node(
         &node.props,
         VNodeProps::Textarea { placeholder, .. } if !placeholder.is_empty()
     );
-    let prop_body = prop_body || matches!(&node.props, VNodeProps::Checkbox { .. } | VNodeProps::Button { disabled: true, .. });
+    let prop_body = prop_body
+        || matches!(
+            &node.props,
+            VNodeProps::Checkbox { .. } | VNodeProps::Button { disabled: true, .. }
+        );
     let has_body = !node.children.is_empty()
         || !events.is_empty()
         || raw_class.map_or(false, |c| !c.is_empty())
@@ -5520,7 +5730,11 @@ fn aura_vtree_node(
     }
 
     if let Some(enabled) = comp.and_then(|c| c.enabled) {
-        out.push_str(&format!("{}enabled: {}\n", "  ".repeat(indent + 1), enabled));
+        out.push_str(&format!(
+            "{}enabled: {}\n",
+            "  ".repeat(indent + 1),
+            enabled
+        ));
     }
 
     // events (sorted for determinism)
@@ -7662,7 +7876,11 @@ mod tests_plan069_f2 {
              parked guard 静默丢值）；实际 {} 条：{msgs:?}",
             msgs.len()
         );
-        assert_eq!(msgs[0].action, UiActionType::TypeText, "单派发必须是 TypeText");
+        assert_eq!(
+            msgs[0].action,
+            UiActionType::TypeText,
+            "单派发必须是 TypeText"
+        );
         assert_eq!(
             msgs[0].value.as_deref(),
             Some("reader-query"),
@@ -7707,8 +7925,6 @@ mod tests_plan069_f2 {
     }
 }
 
-
-
 #[cfg(test)]
 mod plan082_modal_tests {
     use super::*;
@@ -7716,25 +7932,59 @@ mod plan082_modal_tests {
     use crate::ui::vnode_converter::view_to_vtree_with_paths;
 
     fn message(event: &str) -> DynamicMessage {
-        DynamicMessage::Typed { widget_name: "Picker".into(), event_name: event.into(), args: vec![] }
+        DynamicMessage::Typed {
+            widget_name: "Picker".into(),
+            event_name: event.into(),
+            args: vec![],
+        }
     }
     fn button(label: &str, event: &str) -> View<DynamicMessage> {
-        View::Button { label: label.into(), onclick: message(event), style: None, on_right_click: None, content: None, disabled: false }
+        View::Button {
+            label: label.into(),
+            onclick: message(event),
+            style: None,
+            on_right_click: None,
+            content: None,
+            disabled: false,
+        }
     }
     fn column(children: Vec<View<DynamicMessage>>) -> View<DynamicMessage> {
-        View::Column { children, spacing: 0, padding: 0, style: None, onclick: None, on_right_click: None }
+        View::Column {
+            children,
+            spacing: 0,
+            padding: 0,
+            style: None,
+            onclick: None,
+            on_right_click: None,
+        }
     }
     fn tree_view(open: bool, row: &str) -> View<DynamicMessage> {
-        column(vec![button("behind", "Background"), View::Popover {
-            anchor: PopoverAnchor::Widget(Box::new(View::Empty)),
-            content: Box::new(column(vec![button("row", row)])),
-            placement: PopoverPlacement::Modal, open, on_dismiss: None,
-        }])
+        column(vec![
+            button("behind", "Background"),
+            View::Popover {
+                anchor: PopoverAnchor::Widget(Box::new(View::Empty)),
+                content: Box::new(column(vec![button("row", row)])),
+                placement: PopoverPlacement::Modal,
+                open,
+                on_dismiss: None,
+            },
+        ])
     }
     fn publish(state: &mut SharedState, view: View<DynamicMessage>) {
         let tree = view_to_vtree_with_paths(view.clone(), |_| None);
-        state.update(view, DebugIdMap::default(), HashMap::new(), HashMap::new(), None, HashMap::new());
-        state.set_styled_vtree(StyledNodeSnapshot::from_live("Picker", &tree, &InspectorCache::new()));
+        state.update(
+            view,
+            DebugIdMap::default(),
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            HashMap::new(),
+        );
+        state.set_styled_vtree(StyledNodeSnapshot::from_live(
+            "Picker",
+            &tree,
+            &InspectorCache::new(),
+        ));
     }
     fn id(state: &SharedState, label: &str) -> VNodeId {
         state.styled_vtree.as_ref().unwrap().vtree.nodes.iter().find(|node|
@@ -7750,13 +8000,20 @@ mod plan082_modal_tests {
         let inside = id(&state, "row");
         let rejected = execute_action_vnode(&state, behind, UiActionType::Press, None).unwrap_err();
         assert!(rejected.contains("Modal"));
-        assert!(rx.try_recv().is_err(), "background rejection must send no business event");
+        assert!(
+            rx.try_recv().is_err(),
+            "background rejection must send no business event"
+        );
         execute_action_vnode(&state, inside, UiActionType::Press, None).unwrap();
         let action = rx.try_recv().unwrap();
         assert!(matches!(action.target, ActionTarget::Event { event, .. } if event == "SelectA"));
         publish(&mut state, tree_view(false, "SelectA"));
-        assert!(!state.styled_vtree.as_ref().unwrap().vtree.nodes.iter().any(|node|
-            matches!(&node.props, VNodeProps::Button { label, .. } if label == "row")), "closed modal contents must not be actionable or discoverable");
+        assert!(
+            !state.styled_vtree.as_ref().unwrap().vtree.nodes.iter().any(
+                |node| matches!(&node.props, VNodeProps::Button { label, .. } if label == "row")
+            ),
+            "closed modal contents must not be actionable or discoverable"
+        );
         execute_action_vnode(&state, id(&state, "behind"), UiActionType::Press, None).unwrap();
     }
     #[test]
@@ -7767,47 +8024,106 @@ mod plan082_modal_tests {
         publish(&mut state, tree_view(true, "Choose-old-path"));
         let old = id(&state, "row");
         let mut stale_metadata = (**state.styled_vtree.as_ref().unwrap()).clone();
-        stale_metadata.computed.entry(old).or_default().events = vec![("onclick".into(), ".WrongNeighbour".into())];
+        stale_metadata.computed.entry(old).or_default().events =
+            vec![("onclick".into(), ".WrongNeighbour".into())];
         state.set_styled_vtree(stale_metadata);
-        assert_eq!(state.styled_vtree.as_ref().unwrap().computed[&old].events,
-            vec![("onclick".into(), ".Choose-old-path".into())], "snapshot metadata must describe the actual dispatched handler");
+        assert_eq!(
+            state.styled_vtree.as_ref().unwrap().computed[&old].events,
+            vec![("onclick".into(), ".Choose-old-path".into())],
+            "snapshot metadata must describe the actual dispatched handler"
+        );
         publish(&mut state, tree_view(true, "Choose-old-path"));
-        assert_eq!(id(&state, "row"), old, "unchanged action identity stays stable");
+        assert_eq!(
+            id(&state, "row"),
+            old,
+            "unchanged action identity stays stable"
+        );
         publish(&mut state, tree_view(true, "Choose-new-path"));
         let current = id(&state, "row");
-        assert_ne!(current, old, "same list position with a different payload is a different action");
+        assert_ne!(
+            current, old,
+            "same list position with a different payload is a different action"
+        );
         assert!(execute_action_vnode(&state, old, UiActionType::Press, None).is_err());
         assert!(rx.try_recv().is_err());
         execute_action_vnode(&state, current, UiActionType::Press, None).unwrap();
         let action = rx.try_recv().unwrap();
-        assert!(matches!(action.target, ActionTarget::Event { event, .. } if event == "Choose-new-path"));
-        let path = state.styled_vtree.as_ref().unwrap().vtree.get(current).unwrap().path.clone();
+        assert!(
+            matches!(action.target, ActionTarget::Event { event, .. } if event == "Choose-new-path")
+        );
+        let path = state
+            .styled_vtree
+            .as_ref()
+            .unwrap()
+            .vtree
+            .get(current)
+            .unwrap()
+            .path
+            .clone();
         let bounds = (10., 20., 80., 24.);
-        state.set_layout_bounds(HashMap::from([(format!("vnode_{}", crate::ui::vnode::id_from_path(&path)), bounds)]));
-        assert_eq!(state.get_layout_bounds().get(&format!("vnode_{}", current.as_u64())), Some(&bounds));
+        state.set_layout_bounds(HashMap::from([(
+            format!("vnode_{}", crate::ui::vnode::id_from_path(&path)),
+            bounds,
+        )]));
+        assert_eq!(
+            state
+                .get_layout_bounds()
+                .get(&format!("vnode_{}", current.as_u64())),
+            Some(&bounds)
+        );
         // Publication and view update may be observed separately by embedders;
         // do not dispatch a newly-bound handler under the old snapshot id.
         state.view = Some(tree_view(true, "Choose-third-path"));
-        assert!(execute_action_vnode(&state, current, UiActionType::Press, None).unwrap_err().contains("Stale"));
+        assert!(
+            execute_action_vnode(&state, current, UiActionType::Press, None)
+                .unwrap_err()
+                .contains("Stale")
+        );
     }
     #[test]
     fn modal_keyboard_cannot_dispatch_background_shortcuts() {
         let mut state = SharedState::new("Picker".into());
-        let (tx, rx) = mpsc::channel(); state.action_tx = Some(tx);
-        state.key_bindings.insert("Tab".into(), "Picker.Background".into());
-        state.key_bindings.insert("Ctrl+s".into(), "Picker.Save".into());
+        let (tx, rx) = mpsc::channel();
+        state.action_tx = Some(tx);
+        state
+            .key_bindings
+            .insert("Tab".into(), "Picker.Background".into());
+        state
+            .key_bindings
+            .insert("Ctrl+s".into(), "Picker.Save".into());
         publish(&mut state, tree_view(true, "SelectA"));
-        state.key_bindings.insert("Tab".into(), "Picker.Background".into());
-        state.key_bindings.insert("Ctrl+s".into(), "Picker.Save".into());
+        state
+            .key_bindings
+            .insert("Tab".into(), "Picker.Background".into());
+        state
+            .key_bindings
+            .insert("Ctrl+s".into(), "Picker.Save".into());
         let shared = Arc::new(Mutex::new(state));
-        assert!(!tool_keyboard(&shared, json!({"key":"Tab"}))["isError"].as_bool().unwrap());
-        assert!(matches!(rx.try_recv().unwrap().target, ActionTarget::Event { event, .. } if event=="__focus_next_input"));
-        assert!(tool_keyboard(&shared, json!({"key":"s", "modifiers":["Ctrl"]}))["isError"].as_bool().unwrap());
+        assert!(!tool_keyboard(&shared, json!({"key":"Tab"}))["isError"]
+            .as_bool()
+            .unwrap());
+        assert!(
+            matches!(rx.try_recv().unwrap().target, ActionTarget::Event { event, .. } if event=="__focus_next_input")
+        );
+        assert!(
+            tool_keyboard(&shared, json!({"key":"s", "modifiers":["Ctrl"]}))["isError"]
+                .as_bool()
+                .unwrap()
+        );
         assert!(rx.try_recv().is_err());
         publish(&mut shared.lock().unwrap(), tree_view(false, "SelectA"));
-        shared.lock().unwrap().key_bindings.insert("Ctrl+s".into(), "Picker.Save".into());
-        assert!(!tool_keyboard(&shared, json!({"key":"s", "modifiers":["Ctrl"]}))["isError"].as_bool().unwrap());
-        assert!(matches!(rx.try_recv().unwrap().target, ActionTarget::Event { event, .. } if event=="Save"));
+        shared
+            .lock()
+            .unwrap()
+            .key_bindings
+            .insert("Ctrl+s".into(), "Picker.Save".into());
+        assert!(
+            !tool_keyboard(&shared, json!({"key":"s", "modifiers":["Ctrl"]}))["isError"]
+                .as_bool()
+                .unwrap()
+        );
+        assert!(
+            matches!(rx.try_recv().unwrap().target, ActionTarget::Event { event, .. } if event=="Save")
+        );
     }
-
 }

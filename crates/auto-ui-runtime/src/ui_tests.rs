@@ -134,8 +134,6 @@ mod plan058_engine_gap_tests;
 // 一致——plan814_v02_api_pin 原 ui-iced 门保留，其余默认编译（原 facade
 // default=ui-iced 下同语义）。
 #[cfg(test)]
-mod plan814_v02_api_pin;
-#[cfg(test)]
 mod autodown_codegen_debts_tests;
 #[cfg(test)]
 mod back_proxy_tests;
@@ -195,6 +193,8 @@ mod plan808_terminal_domain;
 mod plan810_full_ui_grammar;
 #[cfg(test)]
 mod plan814_recipe_extraction_tests;
+#[cfg(test)]
+mod plan814_v02_api_pin;
 // auto-notes NOTES-004：`use` 模块自带 stylekit 命名导入经 collect_module_imports
 // 解析前的预注册（PLAN-668 A-02 的致命门控对应面）。
 #[cfg(test)]
@@ -208,9 +208,17 @@ mod vm_json_float_read_tests;
 
 // PLAN-900 T-05 补充批：lib.rs #[path] 门控 mod 与 tests.rs 剩余 UI 引用文件。
 #[cfg(test)]
+mod plan069_route_dispatch_tests;
+#[cfg(test)]
+mod plan069_synthetic_input_tests;
+#[cfg(test)]
 mod plan449_style_parity_tests;
 #[cfg(test)]
+mod plan499_engine_float_to_int_tests;
+#[cfg(test)]
 mod plan577_avatar_tests;
+#[cfg(test)]
+mod plan577_breadcrumb_cycle_tests;
 #[cfg(test)]
 mod plan593_theme_registry_tests;
 #[cfg(test)]
@@ -222,6 +230,10 @@ mod plan633_fullstack_embed_tests;
 #[cfg(test)]
 mod plan664_use_diag_tests;
 #[cfg(test)]
+mod plan712_back_prefix_route_fetch;
+#[cfg(test)]
+mod plan712_route_param_tests;
+#[cfg(test)]
 mod plan728_bench;
 #[cfg(test)]
 mod plan733_fn_call_semantics_tests;
@@ -229,15 +241,3 @@ mod plan733_fn_call_semantics_tests;
 mod plan748_breakpoint_probes;
 #[cfg(test)]
 mod plan749_read_semantics_tests;
-#[cfg(test)]
-mod plan069_synthetic_input_tests;
-#[cfg(test)]
-mod plan069_route_dispatch_tests;
-#[cfg(test)]
-mod plan712_route_param_tests;
-#[cfg(test)]
-mod plan499_engine_float_to_int_tests;
-#[cfg(test)]
-mod plan712_back_prefix_route_fetch;
-#[cfg(test)]
-mod plan577_breadcrumb_cycle_tests;

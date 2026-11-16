@@ -1445,7 +1445,12 @@ impl PopoverPlacement {
     pub fn is_modal_chrome(&self) -> bool {
         matches!(
             self,
-            Self::Modal | Self::ModalExplicit | Self::EdgeLeft | Self::EdgeRight | Self::EdgeTop | Self::EdgeBottom
+            Self::Modal
+                | Self::ModalExplicit
+                | Self::EdgeLeft
+                | Self::EdgeRight
+                | Self::EdgeTop
+                | Self::EdgeBottom
         )
     }
 }
@@ -1887,8 +1892,16 @@ impl<M: Clone + Debug> View<M> {
     /// Native generated row/column overflow lowering, after actual style evaluation.
     pub fn with_overflow_scroll(mut self) -> Self {
         let original = match &mut self {
-            View::Column { style: Some(style), .. } | View::Row { style: Some(style), .. }
-                if style.classes.iter().any(|c| matches!(c, StyleClass::OverflowYAuto | StyleClass::OverflowAuto)) => {
+            View::Column {
+                style: Some(style), ..
+            }
+            | View::Row {
+                style: Some(style), ..
+            } if style
+                .classes
+                .iter()
+                .any(|c| matches!(c, StyleClass::OverflowYAuto | StyleClass::OverflowAuto)) =>
+            {
                 let original = style.clone();
                 let (_, content) = split_scroll_visual_classes(&original);
                 *style = content;
@@ -1897,17 +1910,34 @@ impl<M: Clone + Debug> View<M> {
             _ => return self,
         };
         let (visual, _) = split_scroll_visual_classes(&original);
-        let scroll_style = if visual.is_some() { ensure_full_scroll_dims(&original) } else { original };
+        let scroll_style = if visual.is_some() {
+            ensure_full_scroll_dims(&original)
+        } else {
+            original
+        };
         let scroll = View::Scrollable {
-            child: Box::new(self), width: None, height: None, style: Some(scroll_style),
-            auto_scroll: false, offset: None, on_scroll: None,
+            child: Box::new(self),
+            width: None,
+            height: None,
+            style: Some(scroll_style),
+            auto_scroll: false,
+            offset: None,
+            on_scroll: None,
             axes: crate::ui::scroll::ScrollAxes::Y,
-            scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto, controller: None,
+            scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
+            controller: None,
         };
         match visual {
             Some(style) => View::Container {
-                child: Box::new(scroll), padding: 0, width: None, height: None,
-                center_x: false, center_y: false, style: Some(style), onclick: None, on_right_click: None,
+                child: Box::new(scroll),
+                padding: 0,
+                width: None,
+                height: None,
+                center_x: false,
+                center_y: false,
+                style: Some(style),
+                onclick: None,
+                on_right_click: None,
             },
             None => scroll,
         }
@@ -4230,25 +4260,67 @@ mod tests {
     #[test]
     fn p060_native_overflow_conversion_preserves_controls_and_viewport_paint() {
         for style in ["h-full", "overflow-hidden"] {
-            let v: View<()> = View::col().style(style).child(View::text("control")).build().with_overflow_scroll();
-            assert!(matches!(v, View::Column { .. }), "plain/hidden column changed kind");
+            let v: View<()> = View::col()
+                .style(style)
+                .child(View::text("control"))
+                .build()
+                .with_overflow_scroll();
+            assert!(
+                matches!(v, View::Column { .. }),
+                "plain/hidden column changed kind"
+            );
         }
-        let explicit: View<()> = View::scrollable(View::col().style("overflow-auto").build()).build().with_overflow_scroll();
-        assert!(matches!(explicit, View::Scrollable { child, .. } if matches!(*child, View::Column { .. })), "explicit scroll wrapped twice");
-        for style in ["h-full w-full bg-card rounded-xl overflow-y-auto", "overflow-auto bg-card w-full h-full rounded-xl"] {
-            let view: View<()> = View::col().style(style).spacing(7).padding(3).on_click(|_| ())
-                .child(View::text("content")).build().with_overflow_scroll();
-            let View::Container { child, style: Some(visual), .. } = view else { panic!("paint must stay on viewport"); };
+        let explicit: View<()> = View::scrollable(View::col().style("overflow-auto").build())
+            .build()
+            .with_overflow_scroll();
+        assert!(
+            matches!(explicit, View::Scrollable { child, .. } if matches!(*child, View::Column { .. })),
+            "explicit scroll wrapped twice"
+        );
+        for style in [
+            "h-full w-full bg-card rounded-xl overflow-y-auto",
+            "overflow-auto bg-card w-full h-full rounded-xl",
+        ] {
+            let view: View<()> = View::col()
+                .style(style)
+                .spacing(7)
+                .padding(3)
+                .on_click(|_| ())
+                .child(View::text("content"))
+                .build()
+                .with_overflow_scroll();
+            let View::Container {
+                child,
+                style: Some(visual),
+                ..
+            } = view
+            else {
+                panic!("paint must stay on viewport");
+            };
             assert!(visual.classes.iter().any(|c| c.is_visual_paint()));
-            let View::Scrollable { child, axes, .. } = *child else { panic!("missing scroll viewport"); };
+            let View::Scrollable { child, axes, .. } = *child else {
+                panic!("missing scroll viewport");
+            };
             assert_eq!(axes, crate::ui::scroll::ScrollAxes::Y);
-            let View::Column { children, style: Some(content), spacing, padding, onclick, .. } = *child else { panic!("lost column content"); };
-            assert_eq!((spacing,padding,children.len()), (7,3,1));
+            let View::Column {
+                children,
+                style: Some(content),
+                spacing,
+                padding,
+                onclick,
+                ..
+            } = *child
+            else {
+                panic!("lost column content");
+            };
+            assert_eq!((spacing, padding, children.len()), (7, 3, 1));
             assert!(onclick.is_some(), "column handler must survive");
-            assert!(!content.classes.iter().any(|c| c.is_visual_paint()), "paint duplicated in scrolling content");
+            assert!(
+                !content.classes.iter().any(|c| c.is_visual_paint()),
+                "paint duplicated in scrolling content"
+            );
         }
     }
-
 
     // ========== PLAN-641: TabsVariant 词表与 Builder 默认值 ==========
 
@@ -5577,7 +5649,10 @@ pub(crate) fn split_scroll_visual_classes(s: &Style) -> (Option<Style>, Style) {
         // on the same Shrink contract; uncapped panes still stretch as before.
         // The final effective cap wins: scan classes in reverse so a later
         // max-height override decides, matching build_scrollable's sizing.
-        let capped = s.classes.iter().rev()
+        let capped = s
+            .classes
+            .iter()
+            .rev()
             .find_map(|c| match c {
                 crate::ui::style::StyleClass::MaxHeight(px) => Some(*px > 0.0),
                 _ => None,

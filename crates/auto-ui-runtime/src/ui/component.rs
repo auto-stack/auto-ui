@@ -164,5 +164,3 @@ pub trait Component: Sized + Debug {
         std::collections::HashMap::new()
     }
 }
-
-

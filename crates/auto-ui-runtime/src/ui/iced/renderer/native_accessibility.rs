@@ -1,8 +1,8 @@
 //! Windows system accessibility for the production VM window.
 //! No VM object or debug/MCP tree crosses the platform adapter boundary.
 use super::{AbstractView, IcedMessage};
-use crate::ui::dynamic::DynamicComponent;
 use crate::ui::component::Component;
+use crate::ui::dynamic::DynamicComponent;
 use accesskit::{
     Action, ActionData, ActionHandler, ActionRequest, ActivationHandler, Node, NodeId, Rect, Role,
     Toggled, TreeId, TreeInfo, TreeUpdate,
@@ -347,8 +347,10 @@ pub(super) fn resolve(
         // Revalidate at consumption, including requests queued from semantics
         // published before a modal opened. No background system action may
         // bypass the same live scope used by native input and MCP.
-        if !entry.owner.alive(component) || !crate::ui::modal::allows_path(&current_view, &entry.path)
-            || crate::ui::modal::at_path(&current_view, &entry.path).is_none() {
+        if !entry.owner.alive(component)
+            || !crate::ui::modal::allows_path(&current_view, &entry.path)
+            || crate::ui::modal::at_path(&current_view, &entry.path).is_none()
+        {
             return None;
         }
         match envelope.action {
@@ -532,13 +534,32 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             build.modal_scope = crate::ui::modal::active_content_path(view);
         }
         let view_path: Vec<u16> = path.iter().map(|index| *index as u16).collect();
-        let modal_blocked = build.modal_scope.as_ref().is_some_and(|scope| !view_path.starts_with(scope));
-        let modal_ancestor = build.modal_scope.as_ref().is_some_and(|scope| scope.starts_with(&view_path));
+        let modal_blocked = build
+            .modal_scope
+            .as_ref()
+            .is_some_and(|scope| !view_path.starts_with(scope));
+        let modal_ancestor = build
+            .modal_scope
+            .as_ref()
+            .is_some_and(|scope| scope.starts_with(&view_path));
         let shared_action_focus = match view {
-            AbstractView::Button { onclick, disabled: false, .. } => Some(onclick),
-            AbstractView::Checkbox { on_toggle: Some(message), .. } => Some(message),
+            AbstractView::Button {
+                onclick,
+                disabled: false,
+                ..
+            } => Some(onclick),
+            AbstractView::Checkbox {
+                on_toggle: Some(message),
+                ..
+            } => Some(message),
             _ => None,
-        }.map(|message| iced::widget::Id::from(crate::ui::iced::focus_target::action_key(&message.widget, &message.event)));
+        }
+        .map(|message| {
+            iced::widget::Id::from(crate::ui::iced::focus_target::action_key(
+                &message.widget,
+                &message.event,
+            ))
+        });
         let (role, name, value, click, change, focus, disabled, toggled, selected, button_focus) =
             match view {
                 AbstractView::Button {
@@ -720,8 +741,10 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             };
         // Ancestors must stay enabled so the system does not inherit a disabled
         // state into the active modal; their own background actions are removed.
-        let disabled = disabled || (modal_blocked && !modal_ancestor
-            && (click.is_some() || change.is_some() || focus.is_some() || button_focus));
+        let disabled = disabled
+            || (modal_blocked
+                && !modal_ancestor
+                && (click.is_some() || change.is_some() || focus.is_some() || button_focus));
         let primary = click.or(change);
         let (owner, bound) = bind(build, primary);
         let owner_bound = primary.is_none() || bound.is_some();
@@ -840,10 +863,18 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             state: build.state.clone(),
             id,
             focus,
-            click: if disabled || modal_blocked { None } else { click },
+            click: if disabled || modal_blocked {
+                None
+            } else {
+                click
+            },
             // Button/Checkbox now expose their actual cross-platform widget
             // focus. Keep the legacy semantic focus owner only for other roles.
-            button_focus: button_focus && shared_action_focus.is_none() && !disabled && owner_bound && !modal_blocked,
+            button_focus: button_focus
+                && shared_action_focus.is_none()
+                && !disabled
+                && owner_bound
+                && !modal_blocked,
         })
     })
 }
@@ -1387,47 +1418,110 @@ widget App {
         let window = iced::window::Id::unique();
         render(window, &mut component, &HashMap::new());
         let named = |label: &str| {
-            let state = shared(window); let state = state.lock().unwrap();
-            *state.nodes.iter().find(|(_, entry)| entry.node.label() == Some(label)).unwrap().0
+            let state = shared(window);
+            let state = state.lock().unwrap();
+            *state
+                .nodes
+                .iter()
+                .find(|(_, entry)| entry.node.label() == Some(label))
+                .unwrap()
+                .0
         };
         let background = named("background");
         component.call_widget_handler("App", "Open", &[]).unwrap();
-        assert!(matches!(resolve(window, &component, &request(background, Requested::Click)), Some(Dispatch::Rejected)), "queued pre-modal semantics must not escape the live modal");
+        assert!(
+            matches!(
+                resolve(window, &component, &request(background, Requested::Click)),
+                Some(Dispatch::Rejected)
+            ),
+            "queued pre-modal semantics must not escape the live modal"
+        );
         render(window, &mut component, &HashMap::new());
-        assert!(shared(window).lock().unwrap().nodes[&background].node.is_disabled());
+        assert!(shared(window).lock().unwrap().nodes[&background]
+            .node
+            .is_disabled());
         let inside = named("inside");
         apply(window, &mut component, inside, Requested::Click);
-        assert!(matches!(resolve(window, &component, &request(inside, Requested::Click)), Some(Dispatch::Rejected)), "closed modal controls must reject old system actions");
+        assert!(
+            matches!(
+                resolve(window, &component, &request(inside, Requested::Click)),
+                Some(Dispatch::Rejected)
+            ),
+            "closed modal controls must reject old system actions"
+        );
         render(window, &mut component, &HashMap::new());
-        apply(window, &mut component, named("background"), Requested::Click);
-        assert_eq!(component.bridge().read_state("count").unwrap(), auto_val::Value::Int(1));
+        apply(
+            window,
+            &mut component,
+            named("background"),
+            Requested::Click,
+        );
+        assert_eq!(
+            component.bridge().read_state("count").unwrap(),
+            auto_val::Value::Int(1)
+        );
         remove(window);
     }
     #[test]
     fn plan082_action_focus_is_shared_with_system_semantics_and_activates_once() {
         use crate::ui::component::Component;
-        use iced_test::runtime::{core::{clipboard, renderer::Headless}, user_interface};
+        use iced_test::runtime::{
+            core::{clipboard, renderer::Headless},
+            user_interface,
+        };
         let window = iced::window::Id::unique();
         let mut component = fixture();
         prepare(window);
         let view = convert_view_messages(component.view());
-        let element = with_scope(window, &component, || super::super::devtools::render_dynamic_view(view, None, &mut vec![]));
-        let mut renderer = iced_test::futures::futures::executor::block_on(iced::Renderer::new(iced::Font::DEFAULT, 12.0_f32.into(), None)).unwrap();
-        let mut ui = user_interface::UserInterface::build(element, iced::Size::new(800., 700.), user_interface::Cache::default(), &mut renderer);
+        let element = with_scope(window, &component, || {
+            super::super::devtools::render_dynamic_view(view, None, &mut vec![])
+        });
+        let mut renderer = iced_test::futures::futures::executor::block_on(iced::Renderer::new(
+            iced::Font::DEFAULT,
+            12.0_f32.into(),
+            None,
+        ))
+        .unwrap();
+        let mut ui = user_interface::UserInterface::build(
+            element,
+            iced::Size::new(800., 700.),
+            user_interface::Cache::default(),
+            &mut renderer,
+        );
         for label in ["Toggle second instance", "Selected fixture"] {
             let (node, focus) = {
                 let state = shared(window);
                 let state = state.lock().unwrap();
-                let (node, entry) = state.nodes.iter().find(|(_, entry)| entry.node.label() == Some(label)).unwrap();
+                let (node, entry) = state
+                    .nodes
+                    .iter()
+                    .find(|(_, entry)| entry.node.label() == Some(label))
+                    .unwrap();
                 (*node, entry.focus.clone().unwrap())
             };
-            let mut operation = iced_test::runtime::core::widget::operation::focusable::focus::<()>(focus);
+            let mut operation =
+                iced_test::runtime::core::widget::operation::focusable::focus::<()>(focus);
             ui.operate(&mut renderer, &mut operation);
-            assert_eq!(shared(window).lock().unwrap().focus, NodeId(node), "native and system focus must identify the same control");
+            assert_eq!(
+                shared(window).lock().unwrap().focus,
+                NodeId(node),
+                "native and system focus must identify the same control"
+            );
             let mut messages = Vec::new();
-            let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Space, None).collect::<Vec<_>>();
-            ui.update(&keys, iced::mouse::Cursor::Unavailable, &mut renderer, &mut clipboard::Null, &mut messages);
-            assert_eq!(messages.len(), 1, "one key must not activate two focus owners");
+            let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Space, None)
+                .collect::<Vec<_>>();
+            ui.update(
+                &keys,
+                iced::mouse::Cursor::Unavailable,
+                &mut renderer,
+                &mut clipboard::Null,
+                &mut messages,
+            );
+            assert_eq!(
+                messages.len(),
+                1,
+                "one key must not activate two focus owners"
+            );
         }
         remove(window);
     }

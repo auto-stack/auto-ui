@@ -211,9 +211,8 @@ pub struct AuraViewBuilder<'a> {
     /// `Option<frame>`：带 `design:` 对象 = 继承最近祖先 frame + 本元素覆盖
     /// 后的合成 frame；无 design = None（避免祖先局部值绘制到未声明子件）。
     /// builder 每帧新建，栈随帧销毁；Drop guard 严格恢复（兄弟/嵌套不串）。
-    design_frames: RefCell<
-        Vec<Option<std::collections::BTreeMap<String, auto_lang_core::ast::Expr>>>,
-    >,
+    design_frames:
+        RefCell<Vec<Option<std::collections::BTreeMap<String, auto_lang_core::ast::Expr>>>>,
 }
 
 /// Plan 476: widget 调用位的 slot 填充集。
@@ -453,7 +452,6 @@ impl<'a> AuraViewBuilder<'a> {
     pub fn build(&self, node: &AuraNode) -> View<DynamicMessage> {
         self.convert_node_with(node, &Bindings::new())
     }
-
 }
 
 // PLAN-014 T-05：按职责家族拆分的 impl 子模块（原单文件 impl 块的纯移动）。
@@ -461,21 +459,20 @@ impl<'a> AuraViewBuilder<'a> {
 // ModalDialogFamily）、thread-locals 与 autodown 注册表、自由助手、
 // build/build_with_debug 入口、文件尾自由函数族与全部测试；
 // &VmBridge 仍由 builder 借用（owner=dynamic.rs），求值次序/guard/挂载身份零改。
-mod slots;
-mod eval;
-mod tracked;
-mod convert_element;
-mod nav_sidebar;
 mod child_widgets;
-mod tags_container;
-mod tags_panels;
-mod tags_controls;
+mod convert_element;
+mod eval;
 mod events;
+mod nav_sidebar;
 mod props;
 mod route_memo;
+mod slots;
+mod tags_container;
+mod tags_controls;
+mod tags_panels;
+mod tracked;
 
 impl<'a> AuraViewBuilder<'a> {
-
     /// Build a `View<DynamicMessage>` with debug sideband data (Plan 274 / 307 Task 9).
     ///
     /// Returns `(View, DebugIdMap, BuildProbe)` where:
@@ -547,9 +544,7 @@ impl<'a> AuraViewBuilder<'a> {
     ///   新 mode + 旧 family 的半套画面。
     fn eval_app_design(&self) {
         use auto_ui_compiler::design_tokens::registry;
-        use auto_ui_compiler::style::theme::{
-            self, HostResolution, ModeInput, ThemeCandidate,
-        };
+        use auto_ui_compiler::style::theme::{self, HostResolution, ModeInput, ThemeCandidate};
         // 宿主/受控输入（优先级最高；Blocked = 整帧拒绝且不回落）。
         let (host_family, host_mode) = match theme::host_theme_resolution() {
             HostResolution::Blocked(reason) => {
@@ -582,50 +577,50 @@ impl<'a> AuraViewBuilder<'a> {
         if !full_host && !entries.is_empty() {
             let bindings = Bindings::new();
             let mut failed = false;
-        for (key, expr) in &entries {
-            let value = match self.resolve_expr_to_value(expr, &bindings) {
-                Some(v) => v,
-                None => {
-                    eprintln!("[PLAN-031] design.{key} 求值失败——整候选拒绝，本帧保留旧设计");
-                    failed = true;
-                    continue;
-                }
-            };
-            let text = match &value {
-                auto_val::Value::Str(s) => Some(s.as_str().to_string()),
-                auto_val::Value::Bool(b) => Some(b.to_string()),
-                auto_val::Value::Int(i) => Some(i.to_string()),
-                _ => None,
-            };
-            match key.as_str() {
-                "theme" => match text {
-                    Some(t) => theme_name = Some(t),
+            for (key, expr) in &entries {
+                let value = match self.resolve_expr_to_value(expr, &bindings) {
+                    Some(v) => v,
                     None => {
-                        eprintln!("[PLAN-031] design.theme 值不是字符串——整候选拒绝（C-07）");
+                        eprintln!("[PLAN-031] design.{key} 求值失败——整候选拒绝，本帧保留旧设计");
                         failed = true;
+                        continue;
                     }
-                },
-                "mode" => match text {
-                    Some(t) => mode_str = Some(t),
-                    None => {
-                        eprintln!("[PLAN-031] design.mode 值不是字符串——整候选拒绝（C-07）");
-                        failed = true;
+                };
+                let text = match &value {
+                    auto_val::Value::Str(s) => Some(s.as_str().to_string()),
+                    auto_val::Value::Bool(b) => Some(b.to_string()),
+                    auto_val::Value::Int(i) => Some(i.to_string()),
+                    _ => None,
+                };
+                match key.as_str() {
+                    "theme" => match text {
+                        Some(t) => theme_name = Some(t),
+                        None => {
+                            eprintln!("[PLAN-031] design.theme 值不是字符串——整候选拒绝（C-07）");
+                            failed = true;
+                        }
+                    },
+                    "mode" => match text {
+                        Some(t) => mode_str = Some(t),
+                        None => {
+                            eprintln!("[PLAN-031] design.mode 值不是字符串——整候选拒绝（C-07）");
+                            failed = true;
+                        }
+                    },
+                    other => {
+                        eprintln!("[PLAN-031] design 槽 `{other}` 在试点支持面外（theme/mode）")
                     }
-                },
-                other => {
-                    eprintln!("[PLAN-031] design 槽 `{other}` 在试点支持面外（theme/mode）")
                 }
             }
-        }
-        if failed {
-            // 整候选拒绝：不写 family、不写 mode、不增 revision（R-02）。
-            crate::ui::theme_policy::note_scope_eval(
-                theme::theme_scope_identity(),
-                false,
-                "design 求值失败——整候选拒绝",
-            );
-            return;
-        }
+            if failed {
+                // 整候选拒绝：不写 family、不写 mode、不增 revision（R-02）。
+                crate::ui::theme_policy::note_scope_eval(
+                    theme::theme_scope_identity(),
+                    false,
+                    "design 求值失败——整候选拒绝",
+                );
+                return;
+            }
             // 宿主字段覆盖 App 默认（未给字段仍用 design；full_host 已跳过本段）。
             if host_family.is_some() {
                 theme_name = host_family.clone();
@@ -644,7 +639,9 @@ impl<'a> AuraViewBuilder<'a> {
             Some("system") => match crate::ui::system_theme::system_prefers_dark() {
                 Some(d) => Some(d),
                 None => {
-                    eprintln!("[PLAN-031] design.mode `system` 未取得 provider 结果——本帧不发布 mode");
+                    eprintln!(
+                        "[PLAN-031] design.mode `system` 未取得 provider 结果——本帧不发布 mode"
+                    );
                     crate::ui::theme_policy::note_scope_eval(
                         theme::theme_scope_identity(),
                         false,
@@ -654,7 +651,9 @@ impl<'a> AuraViewBuilder<'a> {
                 }
             },
             Some(other) => {
-                eprintln!("[PLAN-031] design.mode `{other}` 非 light|dark|system——整候选拒绝（C-07）");
+                eprintln!(
+                    "[PLAN-031] design.mode `{other}` 非 light|dark|system——整候选拒绝（C-07）"
+                );
                 crate::ui::theme_policy::note_scope_eval(
                     theme::theme_scope_identity(),
                     false,
@@ -702,7 +701,6 @@ impl<'a> AuraViewBuilder<'a> {
     // ========================================================================
     // Internal conversion
     // ========================================================================
-
 }
 
 // ============================================================================
@@ -723,7 +721,7 @@ fn first_meaningful_stmt(body: &auto_lang_core::ast::Body) -> Option<&auto_lang_
     })
 }
 
-use crate::ui::view::{split_scroll_visual_classes, ensure_full_scroll_dims};
+use crate::ui::view::{ensure_full_scroll_dims, split_scroll_visual_classes};
 
 /// PLAN-050 T7 (C5): 生产管线的 use.web component 名单（lib.rs 装载期从
 /// root+child decls 的 ext_imports 收集注册；每次装载整体替换）。builder
@@ -798,7 +796,6 @@ fn pascal_to_kebab_icon(name: &str) -> String {
 fn is_icon_component_tag(tag: &str) -> bool {
     tag.contains("icon") || crate::ui::iced::lucide_icon_known(&pascal_to_kebab_icon(tag))
 }
-
 
 /// PLAN-050 T9 (C7): 模板里的 `$t(KEY)` 标记 → i18n 查表替换（未命中回落
 /// key 本身）。提取侧对 `t("k")`/`i18n.t("k")` 文本产出该标记（见
@@ -9052,11 +9049,11 @@ mod plan080_rowclass_probe_tests {
     /// C=probe 记录（computed 面——快照 events 的来源）。
     #[test]
     fn plan081_reading_row_onclick_survives_projection_render_and_probe() {
-        use auto_ui_dialect::{UiCode, UiStmt};
         use auto_lang_core::parser::Parser;
         use auto_lang_core::session::CompilerSession;
         use auto_ui_compiler::aura::extract::extract_widget_from_decl;
         use auto_ui_compiler::aura::AuraNode;
+        use auto_ui_dialect::{UiCode, UiStmt};
 
         let src = concat!(
             "widget Reader081 {\n",
@@ -9222,8 +9219,10 @@ mod plan080_rowclass_probe_tests {
         // C：probe——computed 面（快照 events 的来源）记录该事件。
         let snap = probe.snapshot();
         assert!(
-            snap.values()
-                .any(|e| e.events.iter().any(|ev| ev.handler.contains("TapParagraph"))),
+            snap.values().any(|e| e
+                .events
+                .iter()
+                .any(|ev| ev.handler.contains("TapParagraph"))),
             "probe 必须记录 TapParagraph 事件（快照 computed 的来源）"
         );
     }
@@ -9232,10 +9231,10 @@ mod plan080_rowclass_probe_tests {
     /// （Init park ~16s），行在后续帧出现——帧 2 的 probe 记录是否仍然完整。
     #[test]
     fn plan081_reading_row_probe_survives_two_frame_timeline() {
-        use auto_ui_dialect::{UiCode, UiStmt};
         use auto_lang_core::parser::Parser;
         use auto_lang_core::session::CompilerSession;
         use auto_ui_compiler::aura::extract::extract_widget_from_decl;
+        use auto_ui_dialect::{UiCode, UiStmt};
 
         let src = concat!(
             "widget Reader081b {
@@ -9310,8 +9309,10 @@ mod plan080_rowclass_probe_tests {
             let (_v, _im, probe1) = builder.build_with_debug(&widget.view_tree);
             let s1 = probe1.snapshot();
             assert!(
-                !s1.values()
-                    .any(|e| e.events.iter().any(|ev| ev.handler.contains("TapParagraph"))),
+                !s1.values().any(|e| e
+                    .events
+                    .iter()
+                    .any(|ev| ev.handler.contains("TapParagraph"))),
                 "帧 1 无行=无事件记录（前置一致性）"
             );
         }
@@ -9341,8 +9342,10 @@ mod plan080_rowclass_probe_tests {
             let (_v, _im, probe2) = builder.build_with_debug(&widget.view_tree);
             let s2 = probe2.snapshot();
             assert!(
-                s2.values()
-                    .any(|e| e.events.iter().any(|ev| ev.handler.contains("TapParagraph"))),
+                s2.values().any(|e| e
+                    .events
+                    .iter()
+                    .any(|ev| ev.handler.contains("TapParagraph"))),
                 "帧 2 probe 必须记录行事件（两帧时序下不得丢失）"
             );
         }
@@ -9353,10 +9356,10 @@ mod plan080_rowclass_probe_tests {
     /// 帧 2（段落就位）命中/重建后的 probe 记录必须完整。
     #[test]
     fn plan081_outlet_page_for_rows_survive_memo_two_frame_timeline() {
-        use auto_ui_dialect::{UiCode, UiStmt};
         use auto_lang_core::parser::Parser;
         use auto_lang_core::session::CompilerSession;
         use auto_ui_compiler::aura::extract::extract_widget_from_decl;
+        use auto_ui_dialect::{UiCode, UiStmt};
 
         let src = concat!(
             "widget App081 {
@@ -9527,10 +9530,11 @@ mod plan080_rowclass_probe_tests {
         let mut bridge = VmBridge::new(&app).unwrap();
 
         fn tap_records(probe: &crate::ui::debug::BuildProbe) -> bool {
-            probe
-                .snapshot()
-                .values()
-                .any(|e| e.events.iter().any(|ev| ev.handler.contains("TapParagraph")))
+            probe.snapshot().values().any(|e| {
+                e.events
+                    .iter()
+                    .any(|ev| ev.handler.contains("TapParagraph"))
+            })
         }
 
         // 帧 1：paragraphs 空（live Init park 形态）。子页模型字段经
@@ -9549,13 +9553,10 @@ mod plan080_rowclass_probe_tests {
         );
         bridge.ensure_child_state("reader081", &[], &seed);
         {
-            let builder = AuraViewBuilder::with_registry(&bridge, "App081", &registry)
-                .with_routes(&routes);
+            let builder =
+                AuraViewBuilder::with_registry(&bridge, "App081", &registry).with_routes(&routes);
             let (_v, _im, probe1) = builder.build_with_debug(&app.view_tree);
-            assert!(
-                !tap_records(&probe1),
-                "帧 1 段落空=无行事件（前置一致性）"
-            );
+            assert!(!tap_records(&probe1), "帧 1 段落空=无行事件（前置一致性）");
         }
 
         // 段落就位（=live Init 复得写状态，seq 抬升）。写目标=子页实例
@@ -9573,8 +9574,7 @@ mod plan080_rowclass_probe_tests {
         };
         let (child_state_id, _ident, _ip) = {
             let builder0 =
-                AuraViewBuilder::with_registry(&bridge, "App081", &registry)
-                    .with_routes(&routes);
+                AuraViewBuilder::with_registry(&bridge, "App081", &registry).with_routes(&routes);
             // 与渲染路径同身份：outlet 渲染期的 OUTLET_INIT_IDENTITY
             // thread-local（OutletInitIdentityGuard）是装饰输入——测试直调
             // 必须套同一守卫，否则 child_init_identity 返回未装饰名。
@@ -9595,9 +9595,7 @@ mod plan080_rowclass_probe_tests {
             builder0.instance_identity_override.set(None);
             out
         };
-        println!(
-            "plan081-diag: prepare child_state_id={child_state_id} identity={_ident}"
-        );
+        println!("plan081-diag: prepare child_state_id={child_state_id} identity={_ident}");
         // live 写穿语义：子字段持有根数组 VmRef（prepare 实测 4000001）——
         // 原地改根数组（非替换子字段），对齐 VM SET_FIELD 穿引用语义。
         // loaded=true（live Init 完成序列：先 loaded 后 paragraphs）。
@@ -9620,7 +9618,9 @@ mod plan080_rowclass_probe_tests {
                     .and_then(|o| {
                         let g = o.read().unwrap();
                         let inst = g.as_any().downcast_ref::<GenericInstanceData>()?;
-                        inst.field_names.iter().position(|n| n == "paragraphs")
+                        inst.field_names
+                            .iter()
+                            .position(|n| n == "paragraphs")
                             .and_then(|i| inst.fields.get(i))
                             .cloned()
                     })
@@ -9630,7 +9630,10 @@ mod plan080_rowclass_probe_tests {
                     other => panic!("paragraphs not VmRef: {other:?}"),
                 }
             };
-            let obj = bridge.vm().get_heap_object(array_id).expect("backing array");
+            let obj = bridge
+                .vm()
+                .get_heap_object(array_id)
+                .expect("backing array");
             let mut g = obj.write().unwrap();
             let list = g
                 .as_any_mut()
@@ -9645,7 +9648,9 @@ mod plan080_rowclass_probe_tests {
             let back = bridge.vm().get_heap_object(child_state_id).and_then(|o| {
                 let g = o.read().unwrap();
                 let inst = g.as_any().downcast_ref::<GenericInstanceData>()?;
-                inst.field_names.iter().position(|n| n == "paragraphs")
+                inst.field_names
+                    .iter()
+                    .position(|n| n == "paragraphs")
                     .and_then(|i| inst.fields.get(i))
                     .map(|v| format!("{v:?}"))
             });
@@ -9654,8 +9659,8 @@ mod plan080_rowclass_probe_tests {
 
         // 帧 2：memo 判定（命中重放 vs 重建）——行事件记录必须在。
         {
-            let builder = AuraViewBuilder::with_registry(&bridge, "App081", &registry)
-                .with_routes(&routes);
+            let builder =
+                AuraViewBuilder::with_registry(&bridge, "App081", &registry).with_routes(&routes);
             let (view2, _im, probe2) = builder.build_with_debug(&app.view_tree);
             if !tap_records(&probe2) {
                 let vtxt = format!("{view2:.1200?}");
@@ -9665,7 +9670,10 @@ mod plan080_rowclass_probe_tests {
                 for (pp, e) in probe2.snapshot().iter() {
                     println!("plan081-diag: probe path={pp:?} events={}", e.events.len());
                 }
-                println!("plan081-diag: probe2 empty={}", probe2.snapshot().is_empty());
+                println!(
+                    "plan081-diag: probe2 empty={}",
+                    probe2.snapshot().is_empty()
+                );
             }
             assert!(
                 tap_records(&probe2),
@@ -9673,8 +9681,12 @@ mod plan080_rowclass_probe_tests {
             );
             fn has_tap(view: &View<DynamicMessage>) -> bool {
                 match view {
-                    View::Column { onclick, children, .. }
-                    | View::Row { onclick, children, .. } => {
+                    View::Column {
+                        onclick, children, ..
+                    }
+                    | View::Row {
+                        onclick, children, ..
+                    } => {
                         if matches!(onclick.as_ref(),
                             Some(m)
                             if matches!(m, DynamicMessage::Typed { event_name, .. } | DynamicMessage::TypedInst { event_name, .. } if event_name == "TapParagraph"))
@@ -9702,10 +9714,8 @@ mod plan080_rowclass_probe_tests {
             // 一致性检查器：probe 记录路径 → id_from_path 必须命中 vtree
             // 节点集（生产 computed join 的键一致性——错位即快照丢 computed
             // 的直接机制）。
-            let vtree = crate::ui::vnode_converter::view_to_vtree_with_paths(
-                view2.clone(),
-                |_| None,
-            );
+            let vtree =
+                crate::ui::vnode_converter::view_to_vtree_with_paths(view2.clone(), |_| None);
             let mut vtree_ids = std::collections::HashSet::new();
             if let Some(root) = vtree.root() {
                 let mut stack = vec![root.id];
@@ -9748,7 +9758,10 @@ mod plan080_rowclass_probe_tests {
                 println!("plan081 vtree path={path:?} id={id}");
             }
             for (path, ev) in mismatches.iter() {
-                println!("plan081 probe path={path:?} ev={:?}", ev.iter().map(|e| &e.handler).collect::<Vec<_>>());
+                println!(
+                    "plan081 probe path={path:?} ev={:?}",
+                    ev.iter().map(|e| &e.handler).collect::<Vec<_>>()
+                );
             }
             assert!(
                 mismatches.is_empty(),

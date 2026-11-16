@@ -119,20 +119,19 @@ on {
         crate::build_dynamic_component(&code, app_path.to_str()).expect("routes app 必须能编译")
     };
 
-
-/// PLAN-041 T-02: page model fields are instance-owned — poll/read through
-/// the page's outlet instance (root no longer carries child model fields).
-fn page_field(
-    dc: &crate::ui::dynamic::DynamicComponent,
-    field: &str,
-) -> Option<auto_val::Value> {
-    let identity = dc
-        .bridge()
-        .child_instance_identities()
-        .into_iter()
-        .find(|id| id.contains("detail") || id.contains("home"))?;
-    dc.bridge().read_instance_state(&identity, field).ok()
-}
+    /// PLAN-041 T-02: page model fields are instance-owned — poll/read through
+    /// the page's outlet instance (root no longer carries child model fields).
+    fn page_field(
+        dc: &crate::ui::dynamic::DynamicComponent,
+        field: &str,
+    ) -> Option<auto_val::Value> {
+        let identity = dc
+            .bridge()
+            .child_instance_identities()
+            .into_iter()
+            .find(|id| id.contains("detail") || id.contains("home"))?;
+        dc.bridge().read_instance_state(&identity, field).ok()
+    }
 
     // ④ 驱动 Init（页 Init 是 demand 制——**先渲染**：outlet 挂载路由页
     //    时才登记页 Init demand（437 同款），再泵驱动；parked fetch 由

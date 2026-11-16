@@ -122,7 +122,10 @@ fn render_composed(
     let mut sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
         iced::Size::new(W, H),
-        crate::ui::iced::broker_surface::displaylist_element::<()>(&painted, super::rq_probe::SIMULATOR_SCALE),
+        crate::ui::iced::broker_surface::displaylist_element::<()>(
+            &painted,
+            super::rq_probe::SIMULATOR_SCALE,
+        ),
     );
     let req = out.join(format!("{name}-replay.png"));
     let _ = std::fs::remove_file(&req);
@@ -182,8 +185,8 @@ where
         rqhost::RqServe::start(&wellknown).map_err(|e| format!("rqserve start: {e:?}"))?;
 
     // ① 产者采纳（RqServe 的 serve 线程应答 rendezvous，不在本线程）。
-    let (_, end) = rqhost::adopt(&wellknown, "plan062-wire", 5000)
-        .map_err(|e| format!("adopt: {e:?}"))?;
+    let (_, end) =
+        rqhost::adopt(&wellknown, "plan062-wire", 5000).map_err(|e| format!("adopt: {e:?}"))?;
     // ② 建泵即发 Hello（落在管道缓冲里，宿主稍后读）。
     let mut pump = ClientPump::new(end, source, client_config(), None);
     pump.set_v2(true);
@@ -391,14 +394,22 @@ enum CaseBody {
 
 fn wire_cases() -> Vec<(&'static str, CaseBody)> {
     vec![
-        ("path_mesh", CaseBody::Rust(super::rq_seams::canvas_scene_view())),
+        (
+            "path_mesh",
+            CaseBody::Rust(super::rq_seams::canvas_scene_view()),
+        ),
         ("svg_icon", CaseBody::Rust(View::image("lucide:bell"))),
-        ("text_cjk", CaseBody::Rust(View::text("中文路径客户数据库混排 ABC"))),
+        (
+            "text_cjk",
+            CaseBody::Rust(View::text("中文路径客户数据库混排 ABC")),
+        ),
         (
             "gradient_border_shadow",
             CaseBody::Rust(
                 View::container(View::text("渐变边框阴影"))
-                    .style("p-4 rounded-xl bg-gradient-to-r from-blue-500 to-red-500 border shadow-lg")
+                    .style(
+                        "p-4 rounded-xl bg-gradient-to-r from-blue-500 to-red-500 border shadow-lg",
+                    )
                     .build(),
             ),
         ),
@@ -494,9 +505,12 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
         let direct_view = match body.direct_view() {
             Ok(v) => v,
             Err(err) => {
-                println!("[RQWIRE] {}", serde_json::json!({
-                    "tag": "failed", "case": case, "stage": "direct_view", "error": err,
-                }));
+                println!(
+                    "[RQWIRE] {}",
+                    serde_json::json!({
+                        "tag": "failed", "case": case, "stage": "direct_view", "error": err,
+                    })
+                );
                 rows.push(serde_json::json!({
                     "producer": pname, "case": case, "status": "failed", "error": err,
                 }));
@@ -506,9 +520,12 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
         let gold = match direct_gold(direct_view, &out, case) {
             Ok(p) => p,
             Err(err) => {
-                println!("[RQWIRE] {}", serde_json::json!({
-                    "tag": "failed", "case": case, "stage": "direct_gold", "error": err,
-                }));
+                println!(
+                    "[RQWIRE] {}",
+                    serde_json::json!({
+                        "tag": "failed", "case": case, "stage": "direct_gold", "error": err,
+                    })
+                );
                 rows.push(serde_json::json!({
                     "producer": pname, "case": case, "status": "failed", "error": err,
                 }));
@@ -535,9 +552,12 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
             let list = match composed {
                 Ok(list) => list,
                 Err(err) => {
-                    println!("[RQWIRE] {}", serde_json::json!({
-                        "tag": "failed", "cell": cell, "case": case, "stage": "wire", "error": err,
-                    }));
+                    println!(
+                        "[RQWIRE] {}",
+                        serde_json::json!({
+                            "tag": "failed", "cell": cell, "case": case, "stage": "wire", "error": err,
+                        })
+                    );
                     rows.push(serde_json::json!({
                         "producer": pname, "cell": cell, "case": case, "host": host,
                         "status": "wire_failed", "error": err,
@@ -551,8 +571,7 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
                     // >0.1% 行的像素级残差报告（PLAN-073 T-03 关闭依据）；
                     // 界与行门同表（阴影 1.5%、GlyphRun 文本 1%、余 0.1%）。
                     let residual = (diff > 0.001).then(|| {
-                        let rep =
-                            super::rq_probe::analyze_residual_pair(&gold, &png, backdrop);
+                        let rep = super::rq_probe::analyze_residual_pair(&gold, &png, backdrop);
                         let bound = if matches!(case, "gradient_border_shadow") {
                             0.015
                         } else {
@@ -564,9 +583,12 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
                     (diff, residual)
                 }
                 Err(err) => {
-                    println!("[RQWIRE] {}", serde_json::json!({
-                        "tag": "failed", "cell": cell, "case": case, "stage": "replay", "error": err,
-                    }));
+                    println!(
+                        "[RQWIRE] {}",
+                        serde_json::json!({
+                            "tag": "failed", "cell": cell, "case": case, "stage": "replay", "error": err,
+                        })
+                    );
                     rows.push(serde_json::json!({
                         "producer": pname, "cell": cell, "case": case, "host": host,
                         "status": "replay_failed", "error": err,
@@ -575,11 +597,14 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
                 }
             };
             let inv = inventory(&list);
-            println!("[RQWIRE] {}", serde_json::json!({
-                "tag": "cell", "producer": pname, "cell": cell, "case": case, "host": host,
-                "inventory": inv, "pixel_diff_vs_direct": diff,
-                "residual": residual.as_ref().map(|r| r.to_json()),
-            }));
+            println!(
+                "[RQWIRE] {}",
+                serde_json::json!({
+                    "tag": "cell", "producer": pname, "cell": cell, "case": case, "host": host,
+                    "inventory": inv, "pixel_diff_vs_direct": diff,
+                    "residual": residual.as_ref().map(|r| r.to_json()),
+                })
+            );
             rows.push(serde_json::json!({
                 "producer": pname, "cell": cell, "case": case, "host": host,
                 "status": "ok", "inventory": inv, "pixel_diff_vs_direct": diff,
@@ -602,7 +627,10 @@ fn rq_cells_t05_wire_producers_through_two_hosts() {
     .expect("write wire report");
 
     let cells = report["rows"].as_array().unwrap();
-    assert!(!cells.is_empty(), "wire 格必须有结果（空表 = 驱动失效，不是通过）");
+    assert!(
+        !cells.is_empty(),
+        "wire 格必须有结果（空表 = 驱动失效，不是通过）"
+    );
     for row in cells {
         assert_eq!(
             row["status"], "ok",
@@ -761,10 +789,7 @@ impl Component for MediaStreamView {
             "T-02 海报重发布失败"
         );
         if let Some(ledger) = &self.publish_ledger {
-            ledger
-                .lock()
-                .unwrap()
-                .push((self.frame_no, Instant::now()));
+            ledger.lock().unwrap().push((self.frame_no, Instant::now()));
         }
     }
 
@@ -853,10 +878,8 @@ impl WireCell {
 
     /// 只泵宿主，返回连接是否仍存活。
     fn pump_host(&mut self) -> bool {
-        let (_events, alive) = crate::ui::desktop_protocol::rqhost::pump_client(
-            &mut self.client,
-            &mut self.ids,
-        );
+        let (_events, alive) =
+            crate::ui::desktop_protocol::rqhost::pump_client(&mut self.client, &mut self.ids);
         alive
     }
 
@@ -898,9 +921,7 @@ struct ReadyGateTransport {
 }
 
 impl ReadyGateTransport {
-    fn flush(
-        &mut self,
-    ) -> Result<(), crate::ui::desktop_protocol::transport::TransportError> {
+    fn flush(&mut self) -> Result<(), crate::ui::desktop_protocol::transport::TransportError> {
         for m in self.held.drain(..) {
             self.inner.send(&m)?;
         }
@@ -921,9 +942,8 @@ impl crate::ui::desktop_protocol::transport::Transport for ReadyGateTransport {
             if self.ready_count == 1 {
                 if let Some(g) = self.duplicate_first_with_gen.take() {
                     let mut clone = msg.clone();
-                    if let ProtocolMsg::Frame(FrameMsg::BitmapReadyGen {
-                        generation: cg, ..
-                    }) = &mut clone
+                    if let ProtocolMsg::Frame(FrameMsg::BitmapReadyGen { generation: cg, .. }) =
+                        &mut clone
                     {
                         *cg = g;
                     }
@@ -952,9 +972,7 @@ impl crate::ui::desktop_protocol::transport::Transport for ReadyGateTransport {
 
     fn try_recv(
         &mut self,
-    ) -> Option<
-        Result<ProtocolMsg, crate::ui::desktop_protocol::codec::CodecError>,
-    > {
+    ) -> Option<Result<ProtocolMsg, crate::ui::desktop_protocol::codec::CodecError>> {
         if !self.hold.load(std::sync::atomic::Ordering::Relaxed) {
             let _ = self.flush();
         }
@@ -978,8 +996,7 @@ impl crate::ui::desktop_protocol::transport::Transport for ReadyGateTransport {
 #[test]
 fn p073_t04_resource_reorder_reference_late_and_close_identity() {
     use crate::ui::desktop_protocol::rqhost::{
-        self, adopt_one, attach_window_for_test, composed_v2, daemon_for_test, rq_update,
-        RqMessage,
+        self, adopt_one, attach_window_for_test, composed_v2, daemon_for_test, rq_update, RqMessage,
     };
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
@@ -1050,9 +1067,7 @@ fn p073_t04_resource_reorder_reference_late_and_close_identity() {
         list.ops
             .iter()
             .filter_map(|op| match op {
-                DisplayOp::Image { src, .. } if src.starts_with("bitmap://") => {
-                    Some(src.clone())
-                }
+                DisplayOp::Image { src, .. } if src.starts_with("bitmap://") => Some(src.clone()),
                 _ => None,
             })
             .collect()
@@ -1166,8 +1181,7 @@ fn p073_t04_resource_reorder_reference_late_and_close_identity() {
                 let refs = image_refs(list);
                 if refs.len() == 1 {
                     let r = refs[0].clone();
-                    if crate::ui::iced::broker_surface::resolve_drawlist_image(&r, 16, 16)
-                        .is_some()
+                    if crate::ui::iced::broker_surface::resolve_drawlist_image(&r, 16, 16).is_some()
                     {
                         break r;
                     }
@@ -1196,8 +1210,7 @@ fn p073_t04_resource_reorder_reference_late_and_close_identity() {
     );
     // 旁观 App 资源不受 A 的回收影响（分账逐出）。
     assert!(
-        crate::ui::iced::broker_surface::resolve_drawlist_image(&bystander_ref, 16, 16)
-            .is_some(),
+        crate::ui::iced::broker_surface::resolve_drawlist_image(&bystander_ref, 16, 16).is_some(),
         "旁观 App 资源不得被 A 的断连回收波及"
     );
     let _ = bystander_exit; // B 线程随进程收尾（不 join——守护端不关其管道）
@@ -1335,8 +1348,11 @@ fn rq_wire_stale_ack_does_not_break_slot_accounting() {
     use crate::ui::desktop_protocol::message::{FrameMsg, ProtocolMsg};
 
     let canvas = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let mut cell = WireCell::start("stale-ack", switching_source(std::sync::Arc::clone(&canvas)))
-        .expect("stale ack cell");
+    let mut cell = WireCell::start(
+        "stale-ack",
+        switching_source(std::sync::Arc::clone(&canvas)),
+    )
+    .expect("stale ack cell");
 
     let deadline = Instant::now() + Duration::from_secs(3);
     while Instant::now() < deadline && cell.client.frames < 2 {
@@ -1391,9 +1407,12 @@ fn rq_wire_old_host_rejects_v3_frames_and_recovers_on_v2() {
     let mut cell = WireCell::start("old-host", switching_source(std::sync::Arc::clone(&canvas)))
         .expect("old host cell");
     // 旧宿主能力面：只有 glyphrun，没有 pathfill —— v3 Path 帧必须被拒。
-    cell.client.inner.surfaces.set_capabilities(CapabilitySet::parse(&[
-        "optional:fidelity/glyphrun/1".to_string(),
-    ]));
+    cell.client
+        .inner
+        .surfaces
+        .set_capabilities(CapabilitySet::parse(&[
+            "optional:fidelity/glyphrun/1".to_string()
+        ]));
 
     let start = Instant::now();
     let mut alive = true;
@@ -1483,8 +1502,7 @@ fn rq_wire_generation_capability_is_negotiated_and_applied() {
     .expect("generation cell");
     // HostCaps 与 Welcome 一起排队，产者要吃下一拍才更新 peer_caps——等它落地。
     let caps_deadline = Instant::now() + Duration::from_secs(3);
-    while Instant::now() < caps_deadline
-        && !cell.pump.peer_caps().supports(CAP_RESOURCE_GENERATION)
+    while Instant::now() < caps_deadline && !cell.pump.peer_caps().supports(CAP_RESOURCE_GENERATION)
     {
         cell.pump_both();
         std::thread::sleep(Duration::from_millis(2));
@@ -1534,8 +1552,8 @@ fn rq_wire_child_body() {
     };
     let app = std::env::var("AUTO_RQ062_CHILD_APP").unwrap_or_else(|_| "plan062-child".into());
     let mode = std::env::var("AUTO_RQ062_CHILD_MODE").unwrap_or_else(|_| "v3".into());
-    let (_, end) = crate::ui::desktop_protocol::rqhost::adopt(&wellknown, &app, 15_000)
-        .expect("子进程采纳");
+    let (_, end) =
+        crate::ui::desktop_protocol::rqhost::adopt(&wellknown, &app, 15_000).expect("子进程采纳");
     let view = if mode == "v3" {
         super::rq_seams::canvas_scene_view()
     } else {
@@ -1567,8 +1585,9 @@ fn rq_wire_two_process_v2_v3_pairing() {
     use crate::ui::desktop_protocol::rqhost;
 
     let wellknown = format!("plan062-two-proc-{}", std::process::id());
-    let (serve, claim) =
-        rqhost::RqServe::start(&wellknown).map_err(|e| format!("rqserve: {e:?}")).expect("serve");
+    let (serve, claim) = rqhost::RqServe::start(&wellknown)
+        .map_err(|e| format!("rqserve: {e:?}"))
+        .expect("serve");
 
     let exe = std::env::current_exe().expect("current_exe");
     let mut children = Vec::new();
@@ -1603,10 +1622,7 @@ fn rq_wire_two_process_v2_v3_pairing() {
     }
     assert_eq!(clients.len(), 2, "两个独立子进程必须都被接纳");
     // 两条连接必须来自两个不同 app（独立进程各自的 Hello 凭据）。
-    let mut names: Vec<&str> = clients
-        .iter()
-        .map(|c| c.app_name.as_str())
-        .collect();
+    let mut names: Vec<&str> = clients.iter().map(|c| c.app_name.as_str()).collect();
     names.sort_unstable();
     assert_eq!(
         names,
@@ -1641,7 +1657,10 @@ fn rq_wire_two_process_v2_v3_pairing() {
             // PLAN-073 T-03（A1）：文本承载随协商翻转（glyphrun 声明 →
             // GlyphRun；旧/未协商 → TextStyled）。判据 = 文本有承载。
             let has_text = list.ops.iter().any(|op| {
-                matches!(op, DisplayOp::TextStyled { .. } | DisplayOp::GlyphRun { .. })
+                matches!(
+                    op,
+                    DisplayOp::TextStyled { .. } | DisplayOp::GlyphRun { .. }
+                )
             });
             if has_path && list.requires_v3() {
                 v3_ok = true;
@@ -1727,7 +1746,10 @@ fn rq_wire_media_poster_frame_crosses_the_wire() {
         std::thread::sleep(Duration::from_millis(2));
     }
     let (image_src, _list) = hit.expect("海报帧必须经真实管道到达宿主合成面");
-    assert!(image_src.starts_with("bitmap://"), "引用必须是资源身份: {image_src}");
+    assert!(
+        image_src.starts_with("bitmap://"),
+        "引用必须是资源身份: {image_src}"
+    );
     // 宿主缓存命中 = 位图段载荷真的到了（不只是帧里有个 src 字符串）。
     // 注意：上传可能先被 per-App 8 MiB/s 预算延期（`Backpressure` + 帧重试），
     // 所以这里给到期限内的收敛时间，而不是要求“首帧即命中”——延期不丢内容
@@ -1832,10 +1854,8 @@ fn t01_absorb_composed(
                     // 身份必须留待后续合成重查（此前先入 seen 锁死 = 宿主
                     // 侧稍慢即整批永久误计 0，负载敏感假红）。
                     if !received.contains(src)
-                        && crate::ui::iced::broker_surface::resolve_drawlist_image(
-                            src, 1920, 1080,
-                        )
-                        .is_some()
+                        && crate::ui::iced::broker_surface::resolve_drawlist_image(src, 1920, 1080)
+                            .is_some()
                     {
                         received.insert(src.clone());
                     }
@@ -2011,17 +2031,21 @@ fn p073_t03_svg_produce_warm_renderer_reuse() {
 /// 「线上未声明」臂需 pre-activation 能力装配，具名为 harness 边界。
 #[test]
 fn p073_t03_glyphrun_negotiation_drives_default_path_vocabulary() {
-    use crate::ui::desktop_protocol::message::{CAP_GLYPH_RUN, CapabilitySet};
+    use crate::ui::desktop_protocol::message::{CapabilitySet, CAP_GLYPH_RUN};
 
     let mut cell = WireCell::start(
         "a1-glyph",
-        switching_source(std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false))),
+        switching_source(std::sync::Arc::new(std::sync::atomic::AtomicBool::new(
+            false,
+        ))),
     )
     .expect("a1 glyph cell");
     cell.client
         .inner
         .surfaces
-        .set_capabilities(CapabilitySet::parse(&["optional:fidelity/glyphrun/1".to_string()]));
+        .set_capabilities(CapabilitySet::parse(&[
+            "optional:fidelity/glyphrun/1".to_string()
+        ]));
     let deadline = Instant::now() + Duration::from_secs(6);
     let mut negotiated_frame_seen = false;
     while Instant::now() < deadline {
@@ -2035,7 +2059,10 @@ fn p073_t03_glyphrun_negotiation_drives_default_path_vocabulary() {
                 {
                     // 协商后的当前帧：不得再含 TextStyled 字符串面。
                     assert!(
-                        !list.ops.iter().any(|op| matches!(op, DisplayOp::TextStyled { .. })),
+                        !list
+                            .ops
+                            .iter()
+                            .any(|op| matches!(op, DisplayOp::TextStyled { .. })),
                         "协商成立后的帧不得再出 TextStyled（A1 重排面关闭）"
                     );
                     negotiated_frame_seen = true;
@@ -2115,7 +2142,11 @@ fn p073_t02_frozen_poster_fake_discriminated() {
     let mut frozen_received = std::collections::HashSet::new();
     while start.elapsed() < Duration::from_secs(3) {
         frozen.pump_both();
-        t01_absorb_composed(&frozen, &mut std::collections::HashSet::new(), &mut frozen_received);
+        t01_absorb_composed(
+            &frozen,
+            &mut std::collections::HashSet::new(),
+            &mut frozen_received,
+        );
         std::thread::sleep(Duration::from_millis(2));
     }
     println!(
@@ -2190,11 +2221,24 @@ fn p073_t02_seek_pause_no_backfill() {
         }
         for id in &seen_now {
             if pre_seek.contains(id) {
-                eprintln!("[T02DBG] VIOLATION at t={:.3}s offending={id}", start.elapsed().as_secs_f64());
+                eprintln!(
+                    "[T02DBG] VIOLATION at t={:.3}s offending={id}",
+                    start.elapsed().as_secs_f64()
+                );
                 for (t, ids) in &seq {
                     eprintln!("[T02DBG] t={t:.3}s ids={ids:?}");
                 }
-                eprintln!("[T02DBG] current composed={:?}", cell.composed().map(|l| l.ops.iter().filter_map(|op| match op { DisplayOp::Image { src, .. } => Some(src.clone()), _ => None }).collect::<Vec<_>>()));
+                eprintln!(
+                    "[T02DBG] current composed={:?}",
+                    cell.composed().map(|l| l
+                        .ops
+                        .iter()
+                        .filter_map(|op| match op {
+                            DisplayOp::Image { src, .. } => Some(src.clone()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>())
+                );
                 panic!("seek 落地后旧 generation 身份不得倒灌：{id}");
             }
         }

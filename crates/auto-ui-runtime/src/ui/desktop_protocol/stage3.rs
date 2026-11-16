@@ -127,20 +127,27 @@ impl BrokerClient {
 
     /// Named root messages are an optional protocol extension. An old peer
     /// must receive no unknown tag (which would otherwise disconnect it).
-    pub fn send_named_action(&mut self, wid: Wid, name: &str, arg: Option<&str>) -> Result<(), String> {
+    pub fn send_named_action(
+        &mut self,
+        wid: Wid,
+        name: &str,
+        arg: Option<&str>,
+    ) -> Result<(), String> {
         if !self.owns_wid(wid) {
             return Err("action window is not owned by this client".into());
         }
         if !self.theme_caps.iter().any(|cap| cap == "input-action/1") {
             return Err("unsupported: peer has no input-action/1 capability".into());
         }
-        self.end.send(&super::message::ProtocolMsg::Input(
-            super::message::InputMsg::Action {
-                wid: wid.0,
-                name: name.to_string(),
-                arg: arg.map(str::to_string),
-            },
-        )).map_err(|error| format!("action transport failed: {error:?}"))
+        self.end
+            .send(&super::message::ProtocolMsg::Input(
+                super::message::InputMsg::Action {
+                    wid: wid.0,
+                    name: name.to_string(),
+                    arg: arg.map(str::to_string),
+                },
+            ))
+            .map_err(|error| format!("action transport failed: {error:?}"))
     }
 
     /// 该 client 的像素前缓冲（v1.3 渲染臂/测试断言口）。
@@ -303,27 +310,55 @@ mod tests {
     #[cfg(windows)]
     fn p060_named_action_requires_negotiated_capability_and_owned_window() {
         use crate::ui::desktop_protocol::message::{InputMsg, ProtocolMsg};
-        let pipe = format!("p060-action-{}-{:?}", std::process::id(), std::thread::current().id());
+        let pipe = format!(
+            "p060-action-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        );
         let listener = transport::listen(&pipe).unwrap();
         let mut peer = transport::connect(&pipe, 2000).unwrap();
         let host = listener.wait_connect().unwrap();
         let mut client = BrokerClient::new("p060-negotiation".into(), Box::new(host));
         client.wid = Some(Wid(7));
-        assert!(client.send_named_action(Wid(7), "NextMonth", None).unwrap_err().contains("unsupported"));
-        assert_eq!(peer.pending(), 0, "legacy peer must see no unknown input tag");
+        assert!(client
+            .send_named_action(Wid(7), "NextMonth", None)
+            .unwrap_err()
+            .contains("unsupported"));
+        assert_eq!(
+            peer.pending(),
+            0,
+            "legacy peer must see no unknown input tag"
+        );
         client.theme_caps.push("input-action/1".into());
         assert!(client.send_named_action(Wid(8), "NextMonth", None).is_err());
-        assert_eq!(peer.pending(), 0, "a different window cannot receive this action");
-        client.send_named_action(Wid(7), "FormTitle", Some("中文输入")).unwrap();
-        assert_eq!(peer.recv_wait(2000).unwrap().unwrap(), ProtocolMsg::Input(InputMsg::Action {
-            wid: 7, name: "FormTitle".into(), arg: Some("中文输入".into()),
-        }));
+        assert_eq!(
+            peer.pending(),
+            0,
+            "a different window cannot receive this action"
+        );
+        client
+            .send_named_action(Wid(7), "FormTitle", Some("中文输入"))
+            .unwrap();
+        assert_eq!(
+            peer.recv_wait(2000).unwrap().unwrap(),
+            ProtocolMsg::Input(InputMsg::Action {
+                wid: 7,
+                name: "FormTitle".into(),
+                arg: Some("中文输入".into()),
+            })
+        );
         assert_eq!(peer.pending(), 0);
         // Refusing the extension must not break old pointer/keyboard traffic.
         client.theme_caps.clear();
         assert!(client.send_named_action(Wid(7), "NextMonth", None).is_err());
-        client.end.send(&ProtocolMsg::Input(InputMsg::CharTyped { wid: 7, ch: 'x' })).unwrap();
-        assert_eq!(peer.recv_wait(2000).unwrap().unwrap(), ProtocolMsg::Input(InputMsg::CharTyped { wid: 7, ch: 'x' }));
+        client
+            .end
+            .send(&ProtocolMsg::Input(InputMsg::CharTyped { wid: 7, ch: 'x' }))
+            .unwrap();
+        assert_eq!(
+            peer.recv_wait(2000).unwrap().unwrap(),
+            ProtocolMsg::Input(InputMsg::CharTyped { wid: 7, ch: 'x' })
+        );
     }
     use crate::ui::desktop_protocol::broker;
     use crate::ui::desktop_protocol::client_runtime::{ClientConfig, ReconnectPolicy};
@@ -438,10 +473,7 @@ mod tests {
     /// 018/021/024/041 的组件/页面引用需合体解析；仪器 native_flip_
     /// coverage_data_row 同径）。
     fn example_source_all(dir: &str) -> String {
-        let base = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/ui/"
-        );
+        let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/");
         let front = format!("{base}{dir}/src/front");
         let mut srcs: Vec<std::path::PathBuf> = std::fs::read_dir(&front)
             .unwrap_or_else(|e| panic!("read {front}: {e}"))
@@ -678,10 +710,7 @@ mod tests {
         if mode == "native-full" || mode == "native-auto-full" {
             // 生产同型装载：单 app.at + path 上下文（`use` 模块声明由
             // loader 按 path 兄弟文件解析——018 book_store/021 页组件）。
-            let base = concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../examples/ui/"
-            );
+            let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/");
             let path = format!("{base}{app}/src/front/app.at");
             let src = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
             let component = crate::build_dynamic_component(&src, Some(&path))
@@ -3199,8 +3228,9 @@ mod tests {
         // 尺寸，可用区钳制后与子面实际视口分岔（点击坐标系统性错位）。
         // 点击换算补 `+TITLEBAR_H`（`broker_command_pointer_local` 减
         // 宿主标题栏——chrome 实装后窗内容原点 = rect.y + 36）。
-        let twins: std::sync::Mutex<Vec<(String, RqProjector<crate::ui::dynamic::DynamicComponent>)>> =
-            std::sync::Mutex::new(Vec::new());
+        let twins: std::sync::Mutex<
+            Vec<(String, RqProjector<crate::ui::dynamic::DynamicComponent>)>,
+        > = std::sync::Mutex::new(Vec::new());
 
         let mut children: Vec<std::process::Child> = names
             .iter()
@@ -3250,22 +3280,32 @@ mod tests {
             }
         }
         let twin_hit = |app: &str, needle: &str| -> Option<(f32, f32)> {
-            twins.lock().unwrap().iter().find(|(n, _)| n == app).and_then(|(_, p)| {
-                p.hit_regions()
-                    .into_iter()
-                    .find(|(_, k)| k.contains(needle))
-                    .map(|(r, _)| (r.x + r.w / 2.0, r.y + r.h / 2.0))
-            })
+            twins
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|(n, _)| n == app)
+                .and_then(|(_, p)| {
+                    p.hit_regions()
+                        .into_iter()
+                        .find(|(_, k)| k.contains(needle))
+                        .map(|(r, _)| (r.x + r.w / 2.0, r.y + r.h / 2.0))
+                })
         };
         /// 命中区序选（row 内第 idx 个匹配；002 的 "+" 是第三个按钮）。
         let twin_hit_nth = |app: &str, needle: &str, idx: usize| -> Option<(f32, f32)> {
-            twins.lock().unwrap().iter().find(|(n, _)| n == app).and_then(|(_, p)| {
-                p.hit_regions()
-                    .into_iter()
-                    .filter(|(_, k)| k.contains(needle))
-                    .nth(idx)
-                    .map(|(r, _)| (r.x + r.w / 2.0, r.y + r.h / 2.0))
-            })
+            twins
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|(n, _)| n == app)
+                .and_then(|(_, p)| {
+                    p.hit_regions()
+                        .into_iter()
+                        .filter(|(_, k)| k.contains(needle))
+                        .nth(idx)
+                        .map(|(r, _)| (r.x + r.w / 2.0, r.y + r.h / 2.0))
+                })
         };
 
         // ---- 逐示例交互闭环（坐标 = 孪生命中区中心 + 窗原点 + 标题栏）。----
@@ -3370,12 +3410,11 @@ mod tests {
                 twin_hit_nth("002-counter", "button:", 2).expect("002 孪生按钮坐标（+ 为第三个）");
             let (ox, oy) = origin_of(&session, "002-counter").expect("002 窗原点");
             assert!(
-                session
-                    .broker_pointer_down(
-                        ox + hx,
-                        oy + crate::ui::iced::virtual_window::TITLEBAR_H + hy,
-                        MouseButton::Left,
-                    ),
+                session.broker_pointer_down(
+                    ox + hx,
+                    oy + crate::ui::iced::virtual_window::TITLEBAR_H + hy,
+                    MouseButton::Left,
+                ),
                 "002 点击路由"
             );
             assert!(
@@ -3421,7 +3460,11 @@ mod tests {
         {
             let (hx, hy) = twin_hit("005-login", "input:email").expect("005 email 坐标");
             let (ox, oy) = origin_of(&session, "005-login").expect("005 窗原点");
-            assert!(session.broker_pointer_down(ox + hx, oy + crate::ui::iced::virtual_window::TITLEBAR_H + hy, MouseButton::Left));
+            assert!(session.broker_pointer_down(
+                ox + hx,
+                oy + crate::ui::iced::virtual_window::TITLEBAR_H + hy,
+                MouseButton::Left
+            ));
             let wid = session
                 .broker_clients
                 .values()
@@ -4632,8 +4675,7 @@ mod tests {
         // 生产 spawner 的测试镜像：exe = 真 auto 二进制（与 spawn_outproc_child
         // 唯一差异 = broker 管道名测试隔离）。
         let exe = auto_exe();
-        let app_root =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
+        let app_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
         let pipe_for_spawn = broker_pipe.clone();
         session.desktop.outproc_spawner = Some(std::sync::Arc::new(move |child_name| {
             let mut cmd = std::process::Command::new(&exe);
@@ -5767,10 +5809,7 @@ mod tests {
         ///（truncate/codeeditor）——queue 门 ensure_covered 拒绝退出，
         /// 缺项载荷逐字断言（I3/AC-04 纪律的 e2e 面）。
         {
-            let base = concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../examples/ui/"
-            );
+            let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/");
             for (name, want) in [
                 ("018-book-reader", "style:truncate"),
                 ("041-auto-edit", "tag:codeeditor"),

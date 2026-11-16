@@ -50,7 +50,8 @@ fn t02_literal_form_wins_over_variant() {
         std::fs::write(base.join(dir).join("mod.at"), "// fixture\n").unwrap();
     }
 
-    let hit = auto_lang_core::resolve_module_path(&base, "foo_bar").expect("literal directory must resolve");
+    let hit = auto_lang_core::resolve_module_path(&base, "foo_bar")
+        .expect("literal directory must resolve");
     assert!(
         hit.parent().is_some_and(|p| p.ends_with("foo_bar")),
         "literal form must win when both spellings exist; got {hit:?}"

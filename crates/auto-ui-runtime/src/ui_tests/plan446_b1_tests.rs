@@ -15,7 +15,8 @@ mod plan446_b1_store_loop {
     use crate::plan370_test_support::build_component_from_app;
 
     fn locate_corpus() -> Option<std::path::PathBuf> {
-        let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan446_b1_store_loop/src/front/app.at";
+        let rel =
+            "../../../auto-lang/crates/auto-lang/test/ui/plan446_b1_store_loop/src/front/app.at";
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

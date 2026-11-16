@@ -214,7 +214,8 @@ fn widget_tick(
 /// `AUTOUI_PANIC_PROBE=1` 时，demo 的 `.panic_probe` 事件在 update 边界
 /// panic（落 catch_unwind），并记录肇事 App —— 其后的 view 出口仅对该
 /// App 持续 panic（落崩溃页元素），另一窗口不受影响。非 demo 运行零影响。
-pub(super) static PANIC_PROBE_CRASHED_APP: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub(super) static PANIC_PROBE_CRASHED_APP: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 pub(super) fn panic_probe_enabled() -> bool {
     std::env::var("AUTOUI_PANIC_PROBE")
@@ -737,7 +738,8 @@ pub(super) fn build_toast_layer(toasts: &[ToastReq]) -> iced::Element<'static, I
 /// `__media_tick` only when it advanced (idle = zero messages, no update
 /// storm); the per-app awaiting gate tick continues from there.
 static MEDIA_WAKE_SEEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-pub(super) static MEDIA_SWEEP_SEEN_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub(super) static MEDIA_SWEEP_SEEN_GEN: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 fn poll_media_wake() -> Option<IcedMessage> {
     let gen = auto_media_core::image_pipeline::media_change_generation();
@@ -776,7 +778,10 @@ pub(super) fn mcp_noop_with_ack(ack: Option<u64>) -> IcedMessage {
 /// PLAN-737：合成动作 ack 回执（无 noop 臂的臂尾直执回执点；noop 臂由
 /// noop 消费臂回执——见 `__noop|ack=` 消费处）。复用 fixture 回执表
 ///（同 id 空间、同容量纪律；Applied 空载荷 = 纯栅栏语义）。
-pub(super) fn mcp_ack_apply(mcp_shared: &Option<crate::ui::mcp_server::SharedStateHandle>, ack: Option<u64>) {
+pub(super) fn mcp_ack_apply(
+    mcp_shared: &Option<crate::ui::mcp_server::SharedStateHandle>,
+    ack: Option<u64>,
+) {
     if let (Some(id), Some(mcp)) = (ack, mcp_shared) {
         mcp.lock().unwrap().finish_fixture(
             id,
@@ -869,7 +874,10 @@ impl iced_futures::subscription::Recipe for McpPushRecipe {
 /// 过冲累积漂移，末 2ms 自旋兜精度）；动作经 `SharedState::send_action`
 /// 异步直推（与 MCP 工具同一 action 通道；**无 applied 栅栏**——栅栏会
 /// 把驱动闭成「应用率」回路，破坏吞吐勘定语义）。
-pub(super) fn spawn_drive_probe(mcp_shared: crate::ui::mcp_server::SharedStateHandle, trigger_file: String) {
+pub(super) fn spawn_drive_probe(
+    mcp_shared: crate::ui::mcp_server::SharedStateHandle,
+    trigger_file: String,
+) {
     std::thread::spawn(move || {
         let mut consumed_offset: u64 = 0;
         loop {
@@ -1210,9 +1218,7 @@ impl iced_futures::futures::Stream for McpActionStream {
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     return std::task::Poll::Ready(None)
                 }
-                Err(std::sync::mpsc::TryRecvError::Empty) => {
-                    return std::task::Poll::Pending
-                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => return std::task::Poll::Pending,
             }
         }
     }
@@ -1231,7 +1237,8 @@ impl iced_futures::futures::Stream for McpActionStream {
 /// stays fully idle.
 /// Plan 423 P1: update 闭包的热重载传播状态 —— 已见过的配置 generation
 /// (swap 比较)与上次 mtime 轮询时刻(500ms 节流)。
-pub(super) static CONFIG_GEN_SEEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub(super) static CONFIG_GEN_SEEN: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 pub(super) static CONFIG_MTIME_POLL: std::sync::Mutex<Option<std::time::Instant>> =
     std::sync::Mutex::new(None);
 
@@ -2250,7 +2257,8 @@ pub(super) fn keyboard_subscription_ext(
 /// execute_wallpaper_pick 置位、close/return 复位。picker 开时 ←/→/Esc 消费
 /// 为 picker 导航；负一屏无文本焦点窗，吞键无副作用。关态不拦截，App 文本
 /// 编辑不受影响）。
-pub(super) static PICKER_KEYS_OPEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub(super) static PICKER_KEYS_OPEN: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// Plan 463 T3/T6：桌面级热键订阅（单份，按宿主窗过滤；App 焦点无关，
 /// R12 桌面层路由的键盘半边）。
@@ -2292,7 +2300,9 @@ pub(super) fn desktop_hotkey_subscription(
 /// PLAN-019 v1.7：picker 键 → 消息的纯函数（订阅闭包可测化内核，
 /// desktop_hotkey_message 同型）。←/→ = 导航，Esc = 逐级退回链；其余
 /// 键 None（穿透热键表）。
-pub(super) fn picker_key_message(key: &iced::keyboard::Key) -> Option<crate::ui::session::DesktopMessage> {
+pub(super) fn picker_key_message(
+    key: &iced::keyboard::Key,
+) -> Option<crate::ui::session::DesktopMessage> {
     use crate::ui::session::DesktopEvent as DE;
     use crate::ui::session::DesktopMessage as DM;
     use iced::keyboard::{key::Named, Key};
@@ -2941,4 +2951,3 @@ mod plan098_gate_tests {
         }
     }
 }
-

@@ -311,8 +311,8 @@ impl<S: FrameSource> AppEndpoint<S> {
     fn take_frame_slot(&mut self) -> Result<u8, ProtocolError> {
         let slot = if let Some(slot) = self.free_slots.pop() {
             slot
-        } else if let Some(slot) = (0..self.slot_count.max(2))
-            .find(|slot| !self.used_slots.contains(slot))
+        } else if let Some(slot) =
+            (0..self.slot_count.max(2)).find(|slot| !self.used_slots.contains(slot))
         {
             slot
         } else {
@@ -337,8 +337,8 @@ impl<S: FrameSource> AppEndpoint<S> {
     fn take_bitmap_slot(&mut self) -> Result<u8, ProtocolError> {
         let slot = if let Some(slot) = self.bm_free_slots.pop() {
             slot
-        } else if let Some(slot) = (0..self.slot_count.max(2))
-            .find(|slot| !self.bm_used_slots.contains(slot))
+        } else if let Some(slot) =
+            (0..self.slot_count.max(2)).find(|slot| !self.bm_used_slots.contains(slot))
         {
             slot
         } else {
@@ -395,10 +395,7 @@ impl<S: FrameSource> AppEndpoint<S> {
                 // PLAN-062 T-04：本 producer 会发 v3 `Path`（mesh/canvas），
                 // 因此把 `fidelity/pathfill/1` 作为**必需**能力声明；glyph run
                 // 是 opt-in，按 optional 声明。
-                caps.push(format!(
-                    "required:{}",
-                    super::message::CAP_PATH_FILL
-                ));
+                caps.push(format!("required:{}", super::message::CAP_PATH_FILL));
                 caps.push(format!("optional:{}", super::message::CAP_GLYPH_RUN));
                 // 声明“我会读宿主的能力声明”，宿主才会在 Welcome 之后补发。
                 caps.push(format!("optional:{}", super::message::CAP_WELCOME_CAPS));
@@ -539,31 +536,33 @@ impl<S: FrameSource> AppEndpoint<S> {
         // generation（会话内单调）；未声明 = 旧宿主，仍发 tag 10 字节不变。
         self.bitmap_generation += 1;
         let generation = self.bitmap_generation;
-        Ok(ProtocolMsg::Frame(if self
-            .peer_caps
-            .supports(super::message::CAP_RESOURCE_GENERATION)
-        {
-            super::message::FrameMsg::BitmapReadyGen {
-                wid: self.wid.expect("Active 即有 wid"),
-                id: up.id.clone(),
-                slot,
-                w: up.w,
-                h: up.h,
-                stride: up.stride,
-                len: up.rgba.len() as u32,
-                generation,
-            }
-        } else {
-            super::message::FrameMsg::BitmapReady {
-                wid: self.wid.expect("Active 即有 wid"),
-                id: up.id.clone(),
-                slot,
-                w: up.w,
-                h: up.h,
-                stride: up.stride,
-                len: up.rgba.len() as u32,
-            }
-        }))
+        Ok(ProtocolMsg::Frame(
+            if self
+                .peer_caps
+                .supports(super::message::CAP_RESOURCE_GENERATION)
+            {
+                super::message::FrameMsg::BitmapReadyGen {
+                    wid: self.wid.expect("Active 即有 wid"),
+                    id: up.id.clone(),
+                    slot,
+                    w: up.w,
+                    h: up.h,
+                    stride: up.stride,
+                    len: up.rgba.len() as u32,
+                    generation,
+                }
+            } else {
+                super::message::FrameMsg::BitmapReady {
+                    wid: self.wid.expect("Active 即有 wid"),
+                    id: up.id.clone(),
+                    slot,
+                    w: up.w,
+                    h: up.h,
+                    stride: up.stride,
+                    len: up.rgba.len() as u32,
+                }
+            },
+        ))
     }
 
     /// 产一帧像素变体（v1.3 independent 臂）：RGBA 写 `shm` 的 `slot` 槽
@@ -613,13 +612,15 @@ impl<S: FrameSource> AppEndpoint<S> {
             .supports(super::message::CAP_RESOURCE_RELEASE)
         {
             return Err(ProtocolError::Admission(
-                "unsupported: resource/release/1".to_string()
+                "unsupported: resource/release/1".to_string(),
             ));
         }
-        Ok(ProtocolMsg::Frame(super::message::FrameMsg::ResourceRelease {
-            wid: self.wid.expect("Active 即有 wid"),
-            srcs,
-        }))
+        Ok(ProtocolMsg::Frame(
+            super::message::FrameMsg::ResourceRelease {
+                wid: self.wid.expect("Active 即有 wid"),
+                srcs,
+            },
+        ))
     }
 
     /// app 主动请求退出：Active → Closing，产出 ExitRequest。
@@ -636,7 +637,6 @@ impl<S: FrameSource> AppEndpoint<S> {
         }))
     }
 
-
     /// glyphrun 协商 opt-in（PLAN-073 T-03）：false = v2 字符串钉面，
     /// HostCaps 到达也不切换文本词汇（Hello 的 optional 声明保留——
     /// optional 非承诺，客户端保留钉面决定权）。
@@ -648,10 +648,7 @@ impl<S: FrameSource> AppEndpoint<S> {
         use AppState::*;
         match (&self.state, msg) {
             // --- 握手 ---
-            (
-                Handshaking | Active,
-                ProtocolMsg::Handshake(HandshakeMsg::HostCaps { caps }),
-            ) => {
+            (Handshaking | Active, ProtocolMsg::Handshake(HandshakeMsg::HostCaps { caps })) => {
                 // PLAN-062 T-04：宿主能力声明（App 未声明 `welcome-caps/1` 时
                 // 宿主不会发这条；收到即记入 peer_caps 供 producer 决策）。
                 self.peer_caps = super::message::CapabilitySet::parse(&caps);
@@ -744,15 +741,27 @@ impl<S: FrameSource> AppEndpoint<S> {
                 self.slot_count = slots;
                 Ok(vec![])
             }
-            (Active, ProtocolMsg::Frame(super::message::FrameMsg::Resize { surface, width, height })) => {
-                if self.surface == Some(surface) && width.is_finite() && height.is_finite()
-                    && width > 0.0 && height > 0.0
+            (
+                Active,
+                ProtocolMsg::Frame(super::message::FrameMsg::Resize {
+                    surface,
+                    width,
+                    height,
+                }),
+            ) => {
+                if self.surface == Some(surface)
+                    && width.is_finite()
+                    && height.is_finite()
+                    && width > 0.0
+                    && height > 0.0
                     && (self.width, self.height) != (width, height)
                 {
                     self.width = width;
                     self.height = height;
                     self.session.on_control(&ControlMsg::Resize {
-                        wid: self.wid.expect("Active 即有 wid"), width, height,
+                        wid: self.wid.expect("Active 即有 wid"),
+                        width,
+                        height,
                     });
                 }
                 Ok(vec![])
@@ -781,8 +790,13 @@ impl<S: FrameSource> AppEndpoint<S> {
             // Frames sent before Close can still be acknowledged while the
             // ExitRequest is in flight. They must not turn a clean close into
             // a disconnect/reconnect before BufferRelease arrives.
-            (Closing, ProtocolMsg::Frame(super::message::FrameMsg::FrameAck { .. }
-                | super::message::FrameMsg::BitmapAck { .. })) => Ok(vec![]),
+            (
+                Closing,
+                ProtocolMsg::Frame(
+                    super::message::FrameMsg::FrameAck { .. }
+                    | super::message::FrameMsg::BitmapAck { .. },
+                ),
+            ) => Ok(vec![]),
             (Closing, ProtocolMsg::Frame(super::message::FrameMsg::BufferRelease { .. })) => {
                 self.state = Detached;
                 self.slot_count = 0;
@@ -954,13 +968,9 @@ impl HostEndpoint {
     }
 
     /// 收窄宿主声明支持的能力（负控/受限宿主用）。
-    pub fn set_supported(
-        &mut self,
-        caps: super::message::CapabilitySet,
-    ) {
+    pub fn set_supported(&mut self, caps: super::message::CapabilitySet) {
         self.supported = caps;
     }
-
 
     /// Hello 声明的必需能力是否全部被宿主支持（否则具名拒绝）。
     fn admit_hello(&self) -> Result<(), ProtocolError> {
@@ -1506,7 +1516,8 @@ mod tests {
     #[test]
     fn p060_app_hello_advertises_action_decoder_capability() {
         let mut app = AppEndpoint::new(StubSource::new(), "counter", "c", 480.0, 320.0);
-        let ProtocolMsg::Handshake(HandshakeMsg::Hello { theme_caps, .. }) = app.connect().unwrap() else {
+        let ProtocolMsg::Handshake(HandshakeMsg::Hello { theme_caps, .. }) = app.connect().unwrap()
+        else {
             panic!("expected Hello");
         };
         assert!(theme_caps.iter().any(|cap| cap == "input-action/1"));
@@ -1623,9 +1634,7 @@ mod tests {
 
         // 负控：App 声明宿主不支持的必需能力 → 激活被具名拒绝，且不进入 Active。
         let mut host = HostEndpoint::listen();
-        host.set_supported(CapabilitySet::parse(&[format!(
-            "optional:{CAP_PATH_FILL}"
-        )]));
+        host.set_supported(CapabilitySet::parse(&[format!("optional:{CAP_PATH_FILL}")]));
         let hello = ProtocolMsg::Handshake(HandshakeMsg::Hello {
             version: 1,
             app_name: "cap-probe".to_string(),
@@ -1640,7 +1649,13 @@ mod tests {
         let actions = host.on_message(hello).expect("Hello 合法");
         assert!(matches!(actions[0], HostAction::ResolveAndAttach { .. }));
         let err = host
-            .activate(1, 3, 42, WRect::new(0.0, 0.0, 320.0, 200.0), FrameMode::Commands)
+            .activate(
+                1,
+                3,
+                42,
+                WRect::new(0.0, 0.0, 320.0, 200.0),
+                FrameMode::Commands,
+            )
             .expect_err("缺必需能力必须拒绝激活");
         assert_eq!(err, ProtocolError::Admission(CAP_GLYPH_RUN.to_string()));
         assert_eq!(host.state, HostState::Listening, "拒绝后保持在监听态");
@@ -1660,9 +1675,18 @@ mod tests {
         });
         host.on_message(hello).expect("Hello 合法");
         let welcome = host
-            .activate(1, 3, 42, WRect::new(0.0, 0.0, 320.0, 200.0), FrameMode::Commands)
+            .activate(
+                1,
+                3,
+                42,
+                WRect::new(0.0, 0.0, 320.0, 200.0),
+                FrameMode::Commands,
+            )
             .expect("能力齐备应激活");
-        assert!(matches!(welcome, ProtocolMsg::Handshake(HandshakeMsg::Welcome { .. })));
+        assert!(matches!(
+            welcome,
+            ProtocolMsg::Handshake(HandshakeMsg::Welcome { .. })
+        ));
         assert_eq!(host.state, HostState::Active);
 
         // 真实 App 端点声明的必需能力必须被默认宿主接受（默认全能力）。
@@ -1671,10 +1695,7 @@ mod tests {
         let _ = activate_pair(&mut app, &mut host);
         assert_eq!(app.state, AppState::Active);
         assert!(
-            host.app_caps
-                .required
-                .iter()
-                .any(|c| c == CAP_PATH_FILL),
+            host.app_caps.required.iter().any(|c| c == CAP_PATH_FILL),
             "App 必须把 pathfill 作为必需能力声明"
         );
     }
@@ -1700,7 +1721,13 @@ mod tests {
 
         host.on_message(hello).expect("Hello 合法");
         let welcome = host
-            .activate(1, 3, 42, WRect::new(0.0, 0.0, 480.0, 320.0), FrameMode::Commands)
+            .activate(
+                1,
+                3,
+                42,
+                WRect::new(0.0, 0.0, 480.0, 320.0),
+                FrameMode::Commands,
+            )
             .expect("能力齐备");
         app.on_message(welcome).unwrap();
         assert!(
@@ -1717,11 +1744,7 @@ mod tests {
             app.peer_caps.supports(CAP_PATH_FILL),
             "HostCaps 之后 peer_caps 必须反映宿主能力"
         );
-        assert_eq!(
-            app.state,
-            AppState::Active,
-            "HostCaps 不得改变会话状态"
-        );
+        assert_eq!(app.state, AppState::Active, "HostCaps 不得改变会话状态");
     }
 
     #[test]
@@ -1779,7 +1802,10 @@ mod tests {
         app.peer_caps = CapabilitySet::default();
         match app.produce_resource_release(vec!["bitmap://a".into()]) {
             Err(ProtocolError::Admission(reason)) => {
-                assert!(reason.contains("resource/release/1"), "具名拒绝原因: {reason}")
+                assert!(
+                    reason.contains("resource/release/1"),
+                    "具名拒绝原因: {reason}"
+                )
             }
             other => panic!("未协商时不得产释放消息，实得 {other:?}"),
         }
@@ -1856,7 +1882,11 @@ mod tests {
             app.on_message(ProtocolMsg::Frame(FrameMsg::BitmapAck { wid: 3, slot }))
                 .expect("ack");
         }
-        assert_eq!(gens, vec![2, 3], "generation 会话内单调（旧 tag 那次也计数）");
+        assert_eq!(
+            gens,
+            vec![2, 3],
+            "generation 会话内单调（旧 tag 那次也计数）"
+        );
     }
 
     #[test]
@@ -1895,7 +1925,14 @@ mod tests {
             replies,
             vec![ProtocolMsg::Control(ControlMsg::ExitRequest { wid: 3 })]
         );
-        for ack in [FrameMsg::FrameAck { wid: 3, frame_id: 1, slot: 0 }, FrameMsg::BitmapAck { wid: 3, slot: 0 }] {
+        for ack in [
+            FrameMsg::FrameAck {
+                wid: 3,
+                frame_id: 1,
+                slot: 0,
+            },
+            FrameMsg::BitmapAck { wid: 3, slot: 0 },
+        ] {
             assert!(app.on_message(ProtocolMsg::Frame(ack)).unwrap().is_empty());
             assert_eq!(app.state, AppState::Closing);
         }
@@ -2090,8 +2127,7 @@ mod tests {
             height: 10.0,
             fonts: vec![],
             surfaces: Vec::new(),
-                theme_caps: Vec::new(),
-
+            theme_caps: Vec::new(),
         }));
         assert_eq!(mismatch, Err(ProtocolError::VersionMismatch(99)));
     }

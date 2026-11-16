@@ -298,7 +298,7 @@ impl<'a> AuraViewBuilder<'a> {
                             eprintln!("[MEMO-DIAG] site={site} HIT version-fast");
                         }
                         self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
-                return MemoGateBegin::Hit {
+                        return MemoGateBegin::Hit {
                             product,
                             probe_replay,
                             idmap_replay,
@@ -334,7 +334,7 @@ impl<'a> AuraViewBuilder<'a> {
                             eprintln!("[MEMO-DIAG] site={site} HIT slow");
                         }
                         self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
-                return MemoGateBegin::Hit {
+                        return MemoGateBegin::Hit {
                             product,
                             probe_replay,
                             idmap_replay,
@@ -365,7 +365,7 @@ impl<'a> AuraViewBuilder<'a> {
                                 eprintln!("[MEMO-DIAG] site={site} HIT slow");
                             }
                             self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
-                return MemoGateBegin::Hit {
+                            return MemoGateBegin::Hit {
                                 product,
                                 probe_replay,
                                 idmap_replay,

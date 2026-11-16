@@ -253,7 +253,10 @@ pub fn validate_fields(
         return Err("主题包目录不可用（包缺席或校验失败）——候选拒绝".to_string());
     };
     let Some(info) = cat.family(family) else {
-        return Err(format!("未知主题 family {family:?}（目录含 {} 个 family）", cat.families.len()));
+        return Err(format!(
+            "未知主题 family {family:?}（目录含 {} 个 family）",
+            cat.families.len()
+        ));
     };
     let version = version.map(str::trim).filter(|v| !v.is_empty());
     if version != Some(cat.version.as_str()) {
@@ -268,10 +271,16 @@ pub fn validate_fields(
         return Err("内容 digest 不符（候选与目录快照不一致）——候选拒绝".to_string());
     }
     let Some(mode) = mode.map(str::trim).filter(|m| !m.is_empty()) else {
-        return Err(format!("mode 缺失/坏值（family {family:?} 支持 {:?}）", info.modes));
+        return Err(format!(
+            "mode 缺失/坏值（family {family:?} 支持 {:?}）",
+            info.modes
+        ));
     };
     if !info.modes.iter().any(|m| m == mode) {
-        return Err(format!("mode {mode:?} 未被 family {family:?} 声明（支持 {:?}）", info.modes));
+        return Err(format!(
+            "mode {mode:?} 未被 family {family:?} 声明（支持 {:?}）",
+            info.modes
+        ));
     }
     Ok(HostPolicy {
         family: family.to_string(),
@@ -305,14 +314,15 @@ pub fn stage_candidate(cfg: &mut DesktopConfig) -> PolicyOutcome {
     // 全等判定**不含 rev**（新候选 rev 恒 0；语义同一 = family/version/digest/mode）。
     let (unchanged, last_rev) = with_state(|st| {
         (
-            st.policy.as_ref().map(|p| {
-                (&p.family, &p.version, &p.digest, &p.mode)
-            }) == Some((
-                &candidate.family,
-                &candidate.version,
-                &candidate.digest,
-                &candidate.mode,
-            )),
+            st.policy
+                .as_ref()
+                .map(|p| (&p.family, &p.version, &p.digest, &p.mode))
+                == Some((
+                    &candidate.family,
+                    &candidate.version,
+                    &candidate.digest,
+                    &candidate.mode,
+                )),
             st.policy.as_ref().map(|p| p.rev).unwrap_or(0),
         )
     });
@@ -399,7 +409,11 @@ pub fn init_catalog_from_discovery() -> String {
     }
     if let Ok(root) = std::env::var("AUTO_UI_ROOT") {
         if !root.trim().is_empty() {
-            candidates.push(std::path::PathBuf::from(root).join("packages").join("themes"));
+            candidates.push(
+                std::path::PathBuf::from(root)
+                    .join("packages")
+                    .join("themes"),
+            );
         }
     }
     // PLAN-053/V-08：**无主检出 fallback**——managed channel 缺席 = 降级
@@ -472,8 +486,7 @@ pub fn init_catalog_from_discovery() -> String {
 // 入口）喂本进程组件的 031 端口。env 缺席 = 零开销零行为差。
 // ---------------------------------------------------------------------------
 
-static STANDALONE_FOLLOW: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static STANDALONE_FOLLOW: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// standalone 跟随武装（run_file_dynamic_ui_inner 入口调用；幂等）。
 pub fn arm_standalone_follow() {
@@ -614,7 +627,10 @@ mod tests {
         init_catalog(Some(catalog()));
         with_state(|st| st.policy = None);
         let mut cfg = candidate("Auto", "sepia");
-        assert!(matches!(stage_candidate(&mut cfg), PolicyOutcome::Rejected(_)));
+        assert!(matches!(
+            stage_candidate(&mut cfg),
+            PolicyOutcome::Rejected(_)
+        ));
         let mut cfg = candidate("Auto", "system");
         match stage_candidate(&mut cfg) {
             PolicyOutcome::Rejected(r) => assert!(r.contains("未被 family"), "reason={r}"),
@@ -687,7 +703,10 @@ mod tests {
         assert_eq!(current().unwrap().rev, 1);
         // family 未选 → Unchanged（v1 无 un-select）。
         let mut cfg = DesktopConfig::default();
-        assert!(matches!(stage_candidate(&mut cfg), PolicyOutcome::Unchanged));
+        assert!(matches!(
+            stage_candidate(&mut cfg),
+            PolicyOutcome::Unchanged
+        ));
     }
 
     #[test]
@@ -701,9 +720,7 @@ mod tests {
         // 坏盘面（mode 未声明）→ boot 具名拒绝保 None。
         with_state(|st| st.policy = None);
         let bad = candidate("Auto", "system");
-        assert!(boot_from_config(&bad)
-            .unwrap_err()
-            .contains("未被 family"));
+        assert!(boot_from_config(&bad).unwrap_err().contains("未被 family"));
         assert!(current().is_none());
         // 包缺席（宿主降级）→ boot 拒绝保 None + 具名。
         init_catalog(None);

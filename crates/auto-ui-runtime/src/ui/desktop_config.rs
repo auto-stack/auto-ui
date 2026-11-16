@@ -248,7 +248,10 @@ pub fn parse_config(src: &str) -> DesktopConfig {
             cfg.theme_mode = Some(t.to_string());
         }
     }
-    if let Some(v) = f.get("theme_rev").and_then(|v| v.trim().parse::<u64>().ok()) {
+    if let Some(v) = f
+        .get("theme_rev")
+        .and_then(|v| v.trim().parse::<u64>().ok())
+    {
         cfg.theme_rev = v;
     }
     cfg

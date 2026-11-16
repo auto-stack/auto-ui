@@ -164,16 +164,15 @@ mod dialog_parent {
                 if std::env::var_os("AUTO_DIALOG_DIAG").is_some() {
                     let h = hwnd.get();
                     let mut buf = [0u16; 128];
-                    let n = unsafe { GetWindowTextW(h, buf.as_mut_ptr(), buf.len() as i32) }
-                        .max(0) as usize;
+                    let n = unsafe { GetWindowTextW(h, buf.as_mut_ptr(), buf.len() as i32) }.max(0)
+                        as usize;
                     let title = String::from_utf16_lossy(&buf[..n]);
                     let mut cls = [0u16; 64];
-                    let cn = unsafe { GetClassNameW(h, cls.as_mut_ptr(), cls.len() as i32) }
-                        .max(0) as usize;
+                    let cn = unsafe { GetClassNameW(h, cls.as_mut_ptr(), cls.len() as i32) }.max(0)
+                        as usize;
                     let class = String::from_utf16_lossy(&cls[..cn]);
                     let mut pid = 0u32;
-                    let owner_tid =
-                        unsafe { GetWindowThreadProcessId(h, &mut pid) };
+                    let owner_tid = unsafe { GetWindowThreadProcessId(h, &mut pid) };
                     let cur_tid = unsafe { GetCurrentThreadId() };
                     let owner = unsafe { GetWindow(h, GW_OWNER) };
                     let owner_desc = if owner == 0 {
@@ -294,9 +293,7 @@ mod diag_probe {
     static INSTALLED: AtomicBool = AtomicBool::new(false);
 
     fn ms() -> u128 {
-        T0.with(|t| {
-            t.get().map_or(0, |t0| t0.elapsed().as_millis())
-        })
+        T0.with(|t| t.get().map_or(0, |t0| t0.elapsed().as_millis()))
     }
 
     fn diag(tag: &str, body: &str) {
@@ -353,9 +350,8 @@ mod diag_probe {
             T0.with(|t| t.set(Some(std::time::Instant::now())));
             DLG_HWND.store(0, Ordering::Relaxed);
             OLD_PROC.store(0, Ordering::Relaxed);
-            let hook = unsafe {
-                SetWindowsHookExW(WH_CBT, cbt_proc, 0, unsafe { GetCurrentThreadId() })
-            };
+            let hook =
+                unsafe { SetWindowsHookExW(WH_CBT, cbt_proc, 0, unsafe { GetCurrentThreadId() }) };
             if hook == 0 {
                 INSTALLED.store(false, Ordering::Relaxed);
                 diag("install", "CBT hook FAILED");
@@ -413,12 +409,19 @@ mod diag_probe {
                         "hwnd={hwnd:#x} class={} title={} deact={deact:#x}({})",
                         hwnd_class(hwnd),
                         hwnd_title(hwnd),
-                        if deact == 0 { "none".to_string() } else { hwnd_class(deact) }
+                        if deact == 0 {
+                            "none".to_string()
+                        } else {
+                            hwnd_class(deact)
+                        }
                     ),
                 );
             }
             HCBT_SYSCOMMAND => {
-                diag("syscommand", &format!("cmd={:#x} hwnd={:#x}", wparam, lparam));
+                diag(
+                    "syscommand",
+                    &format!("cmd={:#x} hwnd={:#x}", wparam, lparam),
+                );
             }
             _ => {}
         }
@@ -434,7 +437,11 @@ mod diag_probe {
                     "wm_close",
                     &format!(
                         "hwnd={hwnd:#x} fg={fg:#x}({}) uia={}",
-                        if fg == 0 { "none".to_string() } else { hwnd_class(fg) },
+                        if fg == 0 {
+                            "none".to_string()
+                        } else {
+                            hwnd_class(fg)
+                        },
                         unsafe { UiaClientsAreListening() }
                     ),
                 );
@@ -449,7 +456,10 @@ mod diag_probe {
                 if id == 1 || id == 2 {
                     diag(
                         "wm_command",
-                        &format!("id={id} ({}) hwnd={hwnd:#x}", if id == 1 { "IDOK" } else { "IDCANCEL" }),
+                        &format!(
+                            "id={id} ({}) hwnd={hwnd:#x}",
+                            if id == 1 { "IDOK" } else { "IDCANCEL" }
+                        ),
                     );
                 }
             }
@@ -507,7 +517,11 @@ fn os_open(attach_parent: bool, filter: &str) -> String {
     if attach_parent {
         dialog = attach(dialog);
     }
-    let _probe = if diag { diag_probe::Probe::install() } else { None };
+    let _probe = if diag {
+        diag_probe::Probe::install()
+    } else {
+        None
+    };
     let out: String = dialog
         .pick_file()
         .map(|p| p.to_string_lossy().to_string())
@@ -543,7 +557,11 @@ fn os_open_files(attach_parent: bool, filter: &str) -> Vec<String> {
     if attach_parent {
         dialog = attach(dialog);
     }
-    let _probe = if diag { diag_probe::Probe::install() } else { None };
+    let _probe = if diag {
+        diag_probe::Probe::install()
+    } else {
+        None
+    };
     let out: Vec<String> = dialog
         .pick_files()
         .unwrap_or_default()

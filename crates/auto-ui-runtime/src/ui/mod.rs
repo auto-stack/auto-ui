@@ -143,16 +143,19 @@ pub mod selection;
 // PLAN-814 R9-03：vm_bridge 类型面依赖 interpreter（dynamic/memo 字段族
 // 与 ui::dynamic 消费）——随 ui-interpreter 门（旧巨树 bare-ui 同为预存
 // 缺门，本批补齐声明面）。
-pub mod vm_bridge;
 #[cfg(feature = "ace-bridge")]
-// PLAN-980 B-STATE：ACE 状态执行桥（组件面消费端）。
-pub mod ace_state_bridge;
+// PLAN-980 RUST（AXR0）：AGE→A2R 文件集发射桥（真编译归显式构建道）。
+pub mod ace_a2r_bridge;
 #[cfg(feature = "ace-bridge")]
 // PLAN-980 HELLO：首个 ACE AGE Node 文字窗口的最小接入桥。
 pub mod ace_hello;
 #[cfg(feature = "ace-bridge")]
-// PLAN-980 RUST（AXR0）：AGE→A2R 文件集发射桥（真编译归显式构建道）。
-pub mod ace_a2r_bridge;
+// PLAN-980 NATIVE：ACE 原生 run 通道（001 形源/状态写主题翻转）。
+pub mod ace_native;
+#[cfg(feature = "ace-bridge")]
+// PLAN-980 B-STATE：ACE 状态执行桥（组件面消费端）。
+pub mod ace_state_bridge;
+pub mod vm_bridge;
 // PLAN-045：VM 渲染组件级 memo（菜单族四件 + sidebar nav 块；opt-in，
 // 缺省原始路径逐字节不变）。类型面依赖 interpreter 的 View/DynamicMessage，
 // 同门控。

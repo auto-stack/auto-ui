@@ -21,7 +21,7 @@
 use crate::ui::component::Component;
 use crate::ui::desktop_protocol::message::{
     BorderSpec, ControlMsg, DisplayList, DisplayOp, DrawList, DrawOp, Fill, ImeReq, PathSeg, Rgba8,
-    ShadowSpec, WirePath, WireStroke, WRect,
+    ShadowSpec, WRect, WirePath, WireStroke,
 };
 use crate::ui::iced::renderer::IntoIcedElement;
 
@@ -1249,51 +1249,62 @@ pub(crate) fn input_to_iced_events(
             let Some(iced_key) = vk_to_iced_key(*key) else {
                 return vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods))];
             };
-            vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods)), iced::Event::Keyboard(KeyEvent::KeyPressed {
-                key: iced_key.clone(),
-                modified_key: iced_key,
-                physical_key: vk_to_code(*key)
-                    .map(iced::keyboard::key::Physical::Code)
-                    .unwrap_or(iced::keyboard::key::Physical::Unidentified(
-                        iced::keyboard::key::NativeCode::Unidentified,
-                    )),
-                location: iced::keyboard::Location::Standard,
-                modifiers: mods,
-                text: None,
-                repeat: false,
-            })]
+            vec![
+                iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods)),
+                iced::Event::Keyboard(KeyEvent::KeyPressed {
+                    key: iced_key.clone(),
+                    modified_key: iced_key,
+                    physical_key: vk_to_code(*key)
+                        .map(iced::keyboard::key::Physical::Code)
+                        .unwrap_or(iced::keyboard::key::Physical::Unidentified(
+                            iced::keyboard::key::NativeCode::Unidentified,
+                        )),
+                    location: iced::keyboard::Location::Standard,
+                    modifiers: mods,
+                    text: None,
+                    repeat: false,
+                }),
+            ]
         }
         InputMsg::KeyReleased { key, modifiers, .. } => {
             let mods = wire_mods_to_iced(*modifiers);
             let Some(iced_key) = vk_to_iced_key(*key) else {
                 return vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods))];
             };
-            vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods)), iced::Event::Keyboard(KeyEvent::KeyReleased {
-                key: iced_key.clone(),
-                modified_key: iced_key,
-                physical_key: vk_to_code(*key)
-                    .map(iced::keyboard::key::Physical::Code)
-                    .unwrap_or(iced::keyboard::key::Physical::Unidentified(
-                        iced::keyboard::key::NativeCode::Unidentified,
-                    )),
-                location: iced::keyboard::Location::Standard,
-                modifiers: mods,
-            })]
+            vec![
+                iced::Event::Keyboard(KeyEvent::ModifiersChanged(mods)),
+                iced::Event::Keyboard(KeyEvent::KeyReleased {
+                    key: iced_key.clone(),
+                    modified_key: iced_key,
+                    physical_key: vk_to_code(*key)
+                        .map(iced::keyboard::key::Physical::Code)
+                        .unwrap_or(iced::keyboard::key::Physical::Unidentified(
+                            iced::keyboard::key::NativeCode::Unidentified,
+                        )),
+                    location: iced::keyboard::Location::Standard,
+                    modifiers: mods,
+                }),
+            ]
         }
         InputMsg::CharTyped { ch, .. } => {
             let text: String = ch.to_string();
             let key = Key::Character(iced_widget::core::SmolStr::new(&text));
-            vec![iced::Event::Keyboard(KeyEvent::ModifiersChanged(iced::keyboard::Modifiers::empty())), iced::Event::Keyboard(KeyEvent::KeyPressed {
-                key: key.clone(),
-                modified_key: key,
-                physical_key: iced::keyboard::key::Physical::Unidentified(
-                    iced::keyboard::key::NativeCode::Unidentified,
-                ),
-                location: iced::keyboard::Location::Standard,
-                modifiers: iced::keyboard::Modifiers::empty(),
-                text: Some(iced_widget::core::SmolStr::new(&text)),
-                repeat: false,
-            })]
+            vec![
+                iced::Event::Keyboard(KeyEvent::ModifiersChanged(
+                    iced::keyboard::Modifiers::empty(),
+                )),
+                iced::Event::Keyboard(KeyEvent::KeyPressed {
+                    key: key.clone(),
+                    modified_key: key,
+                    physical_key: iced::keyboard::key::Physical::Unidentified(
+                        iced::keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: iced::keyboard::Location::Standard,
+                    modifiers: iced::keyboard::Modifiers::empty(),
+                    text: Some(iced_widget::core::SmolStr::new(&text)),
+                    repeat: false,
+                }),
+            ]
         }
         InputMsg::Scroll { dx, dy, .. } => vec![iced::Event::Mouse(mouse::Event::WheelScrolled {
             delta: iced::mouse::ScrollDelta::Pixels { x: *dx, y: *dy },
@@ -1407,9 +1418,15 @@ where
 /// PLAN-060 诊断：帧产出计数（env AUTO_PLAN060_DIAG 同路径）。
 #[cfg(debug_assertions)]
 pub(crate) fn plan060_frame_diag(rev: u64) {
-    let Ok(path) = std::env::var("AUTO_PLAN060_DIAG") else { return };
+    let Ok(path) = std::env::var("AUTO_PLAN060_DIAG") else {
+        return;
+    };
     use std::io::Write;
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
         let _ = writeln!(f, "FRAME rev={rev}");
     }
 }
@@ -1421,9 +1438,15 @@ pub(crate) fn plan060_diag<T: std::fmt::Debug>(
     input: &crate::ui::desktop_protocol::message::InputMsg,
     messages: &[T],
 ) {
-    let Ok(path) = std::env::var("AUTO_PLAN060_DIAG") else { return };
+    let Ok(path) = std::env::var("AUTO_PLAN060_DIAG") else {
+        return;
+    };
     use std::io::Write;
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
         let _ = writeln!(f, "{input:?} -> {messages:?}");
     }
 }
@@ -1895,11 +1918,7 @@ fn lower_layers_v2(
 /// v3 几何原语（mesh/canvas/path）：`Primitive::Fill/Stroke` 的 tiny_skia 路径
 /// 与 paint 逐段过线（坐标已由 iced geometry 层烘焙变换——061 T-02 实测），
 /// 记录端不再丢弃 mesh。组项携带的 clip_bounds 以 Scissor 包络保序。
-fn lower_primitives_v3(
-    layer: &Layer,
-    ops: &mut Vec<DisplayOp>,
-    observations: &mut Vec<String>,
-) {
+fn lower_primitives_v3(layer: &Layer, ops: &mut Vec<DisplayOp>, observations: &mut Vec<String>) {
     for item in &layer.primitives {
         let clip = item.clip_bounds();
         let clip_set = clip.width.is_finite()
@@ -2125,10 +2144,18 @@ impl ResourceCache {
         let b = quad.bounds;
         let mut hasher = blake3::Hasher::new();
         for v in [
-            b.x, b.y, b.width, b.height, scale,
-            quad.shadow.blur_radius, quad.shadow.offset.x, quad.shadow.offset.y,
-            quad.border.radius.top_left, quad.border.radius.top_right,
-            quad.border.radius.bottom_right, quad.border.radius.bottom_left,
+            b.x,
+            b.y,
+            b.width,
+            b.height,
+            scale,
+            quad.shadow.blur_radius,
+            quad.shadow.offset.x,
+            quad.shadow.offset.y,
+            quad.border.radius.top_left,
+            quad.border.radius.top_right,
+            quad.border.radius.bottom_right,
+            quad.border.radius.bottom_left,
         ] {
             hasher.update(&v.to_le_bytes());
         }
@@ -2218,12 +2245,7 @@ fn rasterize_shadow(
             rgba.extend_from_slice(&[color.r, color.g, color.b, a]);
         }
     }
-    Some((
-        WRect::new(x0, y0, w as f32, h as f32),
-        w,
-        h,
-        rgba,
-    ))
+    Some((WRect::new(x0, y0, w as f32, h as f32), w, h, rgba))
 }
 
 /// iced_wgpu `rounded_box_sdf`（shader 同式；`p` 已是相对中心的 2 倍坐标）。
@@ -2309,7 +2331,11 @@ fn shape_cached_text_glyph_runs(
     ops: &mut Vec<DisplayOp>,
     observations: &mut Vec<String>,
 ) {
-    let lh = if line_height > 0.0 { line_height } else { size * 1.3 };
+    let lh = if line_height > 0.0 {
+        line_height
+    } else {
+        size * 1.3
+    };
     // 锁作用域仅限整形；Buffer 自持整形行数据，锁释放后提取安全
     // （lower_glyph_run 内部再取写锁——先释放防重入死锁）。
     let family = match &font.family {
@@ -2323,8 +2349,7 @@ fn shape_cached_text_glyph_runs(
     let buffer = {
         let system = font_system();
         let mut fonts = system.write().expect("Write font system");
-        let mut buffer =
-            cosmic_text::Buffer::new(fonts.raw(), cosmic_text::Metrics::new(size, lh));
+        let mut buffer = cosmic_text::Buffer::new(fonts.raw(), cosmic_text::Metrics::new(size, lh));
         buffer.set_text(
             fonts.raw(),
             content,
@@ -2543,23 +2568,30 @@ fn lower_text_v2(
                 // TextStyled 兜底承担（V-02 永不静默丢字口径不变）。
                 if glyph_runs {
                     shape_cached_text_glyph_runs(
-                        content, size.0, line_height.0, font, x, bounds.y, *color, ops,
+                        content,
+                        size.0,
+                        line_height.0,
+                        font,
+                        x,
+                        bounds.y,
+                        *color,
+                        ops,
                         observations,
                     );
                 } else {
-                ops.push(DisplayOp::TextStyled {
-                    x,
-                    y: bounds.y,
-                    size: size.0,
-                    line_height: line_height.0,
-                    color: to_rgba8(*color),
-                    weight: iced_weight_u16(font.weight),
-                    italic: matches!(
-                        font.style,
-                        iced::font::Style::Italic | iced::font::Style::Oblique
-                    ),
-                    text: content.clone(),
-                });
+                    ops.push(DisplayOp::TextStyled {
+                        x,
+                        y: bounds.y,
+                        size: size.0,
+                        line_height: line_height.0,
+                        color: to_rgba8(*color),
+                        weight: iced_weight_u16(font.weight),
+                        italic: matches!(
+                            font.style,
+                            iced::font::Style::Italic | iced::font::Style::Oblique
+                        ),
+                        text: content.clone(),
+                    });
                 }
             }
             GfxText::Raw { raw, .. } => {
@@ -2702,10 +2734,7 @@ fn load_image_handle(
                 }
             },
             Err(err) => {
-                observations.push(format!(
-                    "路径图像不可读：{}（{err}）",
-                    path.display()
-                ));
+                observations.push(format!("路径图像不可读：{}（{err}）", path.display()));
                 None
             }
         },
@@ -2749,8 +2778,12 @@ fn rasterize_svg(
     let mut hasher = blake3::Hasher::new();
     hasher.update(&bytes);
     let tint = svg.color.map(to_rgba8);
-    hasher.update(&[tint.map(|c| c.r).unwrap_or(0), tint.map(|c| c.g).unwrap_or(0),
-        tint.map(|c| c.b).unwrap_or(0), tint.map(|c| c.a).unwrap_or(0)]);
+    hasher.update(&[
+        tint.map(|c| c.r).unwrap_or(0),
+        tint.map(|c| c.g).unwrap_or(0),
+        tint.map(|c| c.b).unwrap_or(0),
+        tint.map(|c| c.a).unwrap_or(0),
+    ]);
     hasher.update(&w.to_le_bytes());
     hasher.update(&h.to_le_bytes());
     let key = *hasher.finalize().as_bytes();
@@ -2814,13 +2847,13 @@ fn decode_image_rgba(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
 
 // PLAN-061 T-01: direct 基线 + RQ 产帧计时/计数探针（test-only）。
 #[cfg(test)]
-mod rq_probe;
-#[cfg(test)]
-mod rq_seams;
-#[cfg(test)]
 mod rq_matrix;
 #[cfg(test)]
+mod rq_probe;
+#[cfg(test)]
 mod rq_repair;
+#[cfg(test)]
+mod rq_seams;
 // PLAN-062 T-02: v3 无损原语线合同探针（test-only）。
 #[cfg(test)]
 mod rq_lossless;
@@ -2844,19 +2877,34 @@ mod tests {
     fn p060_wrapped_text_emits_only_each_visual_run() {
         let mut fonts = cosmic_text::FontSystem::new();
         for content in ["ABCDEFGHIJKLMNO", "中文路径客户数据库", "first\nsecond"] {
-            let mut buffer = cosmic_text::Buffer::new(
-                &mut fonts, cosmic_text::Metrics::new(16.0, 20.0),
-            );
+            let mut buffer =
+                cosmic_text::Buffer::new(&mut fonts, cosmic_text::Metrics::new(16.0, 20.0));
             buffer.set_size(&mut fonts, Some(45.0), Some(500.0));
-            buffer.set_text(&mut fonts, content, &cosmic_text::Attrs::new(), cosmic_text::Shaping::Advanced, None);
+            buffer.set_text(
+                &mut fonts,
+                content,
+                &cosmic_text::Attrs::new(),
+                cosmic_text::Shaping::Advanced,
+                None,
+            );
             buffer.shape_until_scroll(&mut fonts, false);
             let mut runs = Vec::new();
-            buffer_runs(&buffer, iced::Point::ORIGIN, iced::Color::BLACK, iced::Vector::ZERO,
-                |_, y, _, _, _, _, text| runs.push((y, text)));
+            buffer_runs(
+                &buffer,
+                iced::Point::ORIGIN,
+                iced::Color::BLACK,
+                iced::Vector::ZERO,
+                |_, y, _, _, _, _, text| runs.push((y, text)),
+            );
             assert!(runs.len() > 1, "fixture must wrap: {content:?}");
             assert!(runs.windows(2).all(|pair| pair[0].0 < pair[1].0));
-            assert_eq!(runs.iter().map(|(_, text)| text.as_str()).collect::<String>(), content.replace('\n', ""),
-                "visual runs must partition source rather than repeat the entire logical line");
+            assert_eq!(
+                runs.iter()
+                    .map(|(_, text)| text.as_str())
+                    .collect::<String>(),
+                content.replace('\n', ""),
+                "visual runs must partition source rather than repeat the entire logical line"
+            );
         }
     }
 
@@ -2872,17 +2920,24 @@ mod tests {
 
     #[test]
     fn p060_native_scroll_retains_styled_bubble_paint() {
-        #[derive(Debug)] struct Paint(bool);
+        #[derive(Debug)]
+        struct Paint(bool);
         impl Component for Paint {
             type Msg = ();
             fn on(&mut self, _: ()) {}
             fn view(&self) -> crate::ui::View<()> {
                 use crate::ui::View;
                 let content = View::col()
-                    .child(View::text_styled("BUBBLE", "bg-red-500 text-black rounded-xl px-4 py-2"))
+                    .child(View::text_styled(
+                        "BUBBLE",
+                        "bg-red-500 text-black rounded-xl px-4 py-2",
+                    ))
                     .build();
-                if self.0 { View::scrollable(content).style("h-full w-full").build() }
-                else { content }
+                if self.0 {
+                    View::scrollable(content).style("h-full w-full").build()
+                } else {
+                    content
+                }
             }
         }
         for scrolling in [false, true] {
@@ -2892,7 +2947,11 @@ mod tests {
                 DisplayOp::Quad { fill: Fill::Color(c), .. } if c.r > 200 && c.g < 100 && c.b < 100
             )).count();
             println!("scrolling={scrolling} red_quads={red}");
-            assert!(red > 0, "styled bubble background lost: scrolling={scrolling}; {:?}", list.ops);
+            assert!(
+                red > 0,
+                "styled bubble background lost: scrolling={scrolling}; {:?}",
+                list.ops
+            );
         }
     }
 
@@ -2902,15 +2961,28 @@ mod tests {
         struct ScrollPage(usize, bool);
         impl Component for ScrollPage {
             type Msg = ();
-            fn on(&mut self, _: ()) { self.0 += 1; }
+            fn on(&mut self, _: ()) {
+                self.0 += 1;
+            }
             fn view(&self) -> View<()> {
                 let content = View::col()
-                    .style(if self.1 { "h-full w-full overflow-y-auto" } else { "" })
-                    .children((0..40).map(|index| View::text(format!("ROW{index}"))).collect::<Vec<_>>())
+                    .style(if self.1 {
+                        "h-full w-full overflow-y-auto"
+                    } else {
+                        ""
+                    })
+                    .children(
+                        (0..40)
+                            .map(|index| View::text(format!("ROW{index}")))
+                            .collect::<Vec<_>>(),
+                    )
                     .child(View::button("BOTTOM").on_click(|_| ()).build())
                     .build();
-                if self.1 { content.with_overflow_scroll() }
-                else { View::scrollable(content).style("h-full w-full").build() }
+                if self.1 {
+                    content.with_overflow_scroll()
+                } else {
+                    View::scrollable(content).style("h-full w-full").build()
+                }
             }
         }
         fn bottom(list: &DisplayList) -> Option<(f32, f32)> {
@@ -3035,7 +3107,16 @@ mod tests {
         };
         let mut cache = ResourceCache::default();
         let mut bms = Vec::new();
-        let replayed = lower_layers_v2(layers, &mut Vec::new(), &mut cache, &mut bms, false, false, 2.0, 2.0);
+        let replayed = lower_layers_v2(
+            layers,
+            &mut Vec::new(),
+            &mut cache,
+            &mut bms,
+            false,
+            false,
+            2.0,
+            2.0,
+        );
         let replay = bottom(&replayed).expect("bottom text survives host replay");
         assert!(
             (replay.0 - x - 5.0).abs() < 0.1 && (replay.1 - y - 7.0).abs() < 0.1,
@@ -3057,22 +3138,46 @@ mod tests {
 
     #[test]
     fn p060_native_headless_ctrl_a_replaces_existing_input() {
-        use crate::ui::desktop_protocol::{endpoint::FrameSource, message::{InputMsg, MouseButton}};
+        use crate::ui::desktop_protocol::{
+            endpoint::FrameSource,
+            message::{InputMsg, MouseButton},
+        };
         use crate::ui::View;
         #[derive(Debug)]
         struct NativeInput(String);
         impl Component for NativeInput {
             type Msg = ();
-            fn on(&mut self, _: ()) { self.0 = crate::ui::iced::last_input_text(); }
+            fn on(&mut self, _: ()) {
+                self.0 = crate::ui::iced::last_input_text();
+            }
             fn view(&self) -> View<()> {
-                View::input("title").value(self.0.clone()).on_change(()).build()
+                View::input("title")
+                    .value(self.0.clone())
+                    .on_change(())
+                    .build()
             }
         }
         let mut source = HeadlessFrameSource::new(NativeInput("before".into()), 320.0, 100.0);
         source.render_frame();
-        source.on_input(&InputMsg::PointerPressed { wid: 1, button: MouseButton::Left, x: 20.0, y: 15.0, modifiers: 0 });
-        source.on_input(&InputMsg::PointerReleased { wid: 1, button: MouseButton::Left, x: 20.0, y: 15.0, modifiers: 0 });
-        source.on_input(&InputMsg::KeyPressed { wid: 1, key: 0x41, modifiers: 2 });
+        source.on_input(&InputMsg::PointerPressed {
+            wid: 1,
+            button: MouseButton::Left,
+            x: 20.0,
+            y: 15.0,
+            modifiers: 0,
+        });
+        source.on_input(&InputMsg::PointerReleased {
+            wid: 1,
+            button: MouseButton::Left,
+            x: 20.0,
+            y: 15.0,
+            modifiers: 0,
+        });
+        source.on_input(&InputMsg::KeyPressed {
+            wid: 1,
+            key: 0x41,
+            modifiers: 2,
+        });
         source.on_input(&InputMsg::CharTyped { wid: 1, ch: 'x' });
         assert_eq!(source.component().0, "x");
     }
@@ -3086,11 +3191,18 @@ mod tests {
         struct NativeLabel(String);
         impl Component for NativeLabel {
             type Msg = String;
-            fn on(&mut self, msg: String) { self.0 = msg; }
-            fn view(&self) -> View<String> { View::text(self.0.clone()) }
+            fn on(&mut self, msg: String) {
+                self.0 = msg;
+            }
+            fn view(&self) -> View<String> {
+                View::text(self.0.clone())
+            }
             fn dispatch_named(&mut self, name: &str, arg: Option<&str>) -> bool {
                 match (name, arg) {
-                    ("SetLabel", Some(value)) => { self.on(value.to_string()); true }
+                    ("SetLabel", Some(value)) => {
+                        self.on(value.to_string());
+                        true
+                    }
                     _ => false,
                 }
             }
@@ -3098,11 +3210,19 @@ mod tests {
         let mut source = HeadlessFrameSource::new(NativeLabel("before".into()), 320.0, 200.0);
         let revision = source.revision();
         for (name, arg) in [("Unknown", Some("wrong")), ("SetLabel", None)] {
-            source.on_input(&InputMsg::Action { wid: 1, name: name.into(), arg: arg.map(str::to_string) });
+            source.on_input(&InputMsg::Action {
+                wid: 1,
+                name: name.into(),
+                arg: arg.map(str::to_string),
+            });
             assert_eq!(source.revision(), revision);
             assert_eq!(source.surface.component.0, "before");
         }
-        source.on_input(&InputMsg::Action { wid: 1, name: "SetLabel".into(), arg: Some("after".into()) });
+        source.on_input(&InputMsg::Action {
+            wid: 1,
+            name: "SetLabel".into(),
+            arg: Some("after".into()),
+        });
         assert_eq!(source.revision(), revision + 1);
         assert_eq!(source.surface.component.0, "after");
         assert!(source.render_frame().ops.iter().any(|op| matches!(

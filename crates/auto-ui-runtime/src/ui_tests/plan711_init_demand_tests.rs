@@ -87,7 +87,8 @@ fn extract_widget(source: &str, name: &str) -> auto_ui_compiler::aura::AuraWidge
     for stmt in ast.domain_stmts() {
         if let auto_ui_dialect::UiStmt::WidgetDecl(decl) = stmt {
             if decl.name.to_string() == name {
-                return auto_ui_compiler::aura::extract_widget_from_decl(decl).expect("extract widget");
+                return auto_ui_compiler::aura::extract_widget_from_decl(decl)
+                    .expect("extract widget");
             }
         }
     }

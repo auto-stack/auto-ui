@@ -341,7 +341,6 @@ pub fn is_display_list_payload(kind: u8) -> bool {
     matches!(kind, 2 | 3)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,32 +357,37 @@ mod tests {
     #[test]
     fn display_list_payload_kinds_cover_v2_and_v3() {
         assert!(is_display_list_payload(2), "v2 载荷必须走 DisplayList 分派");
-        assert!(is_display_list_payload(3), "v3 超集载荷必须走 DisplayList 分派");
+        assert!(
+            is_display_list_payload(3),
+            "v3 超集载荷必须走 DisplayList 分派"
+        );
         assert!(!is_display_list_payload(1), "v1 DrawList 不得误入 v2 分派");
         assert!(!is_display_list_payload(0), "空槽/未知载荷不得进入合成");
 
         // 真实编码帧的首字节就是 DisplayList tag：v3 帧（含 Path）必为 3。
         let v3 = crate::ui::desktop_protocol::message::DisplayList {
             clear: None,
-            ops: vec![
-                crate::ui::desktop_protocol::message::DisplayOp::Path {
-                    path: crate::ui::desktop_protocol::message::WirePath {
-                        segs: vec![
-                            crate::ui::desktop_protocol::message::PathSeg::MoveTo(0.0, 0.0),
-                            crate::ui::desktop_protocol::message::PathSeg::LineTo(4.0, 4.0),
-                        ],
-                    },
-                    fill: Some(crate::ui::desktop_protocol::message::Fill::Color(Rgba8::new(
-                        0, 0, 0, 255,
-                    ))),
-                    even_odd: false,
-                    stroke: None,
+            ops: vec![crate::ui::desktop_protocol::message::DisplayOp::Path {
+                path: crate::ui::desktop_protocol::message::WirePath {
+                    segs: vec![
+                        crate::ui::desktop_protocol::message::PathSeg::MoveTo(0.0, 0.0),
+                        crate::ui::desktop_protocol::message::PathSeg::LineTo(4.0, 4.0),
+                    ],
                 },
-            ],
+                fill: Some(crate::ui::desktop_protocol::message::Fill::Color(
+                    Rgba8::new(0, 0, 0, 255),
+                )),
+                even_odd: false,
+                stroke: None,
+            }],
         };
         let mut bytes = Vec::new();
         v3.encode(&mut bytes);
-        assert_eq!(frame_payload_kind(&bytes), 3, "v3 帧首字节 = DisplayList tag 3");
+        assert_eq!(
+            frame_payload_kind(&bytes),
+            3,
+            "v3 帧首字节 = DisplayList tag 3"
+        );
         assert!(
             is_display_list_payload(frame_payload_kind(&bytes)),
             "v3 帧必须被槽分派接受（否则宿主静默丢帧）"

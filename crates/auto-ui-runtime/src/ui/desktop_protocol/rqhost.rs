@@ -155,8 +155,7 @@ pub fn resolve_auto_cli() -> Option<std::path::PathBuf> {
         }
     }
     // ③ PATH（SDK/用户安装形态）。
-    std::env::split_paths(&std::env::var_os("PATH")?)
-        .find_map(|d| find_auto_in(&d))
+    std::env::split_paths(&std::env::var_os("PATH")?).find_map(|d| find_auto_in(&d))
 }
 
 fn rqhost_auto_binary() -> std::io::Result<std::path::PathBuf> {
@@ -579,7 +578,7 @@ fn apply_actions(
                 ..
             } => {
                 if let Some(freed) = client.inner.surfaces.compose(surface, slot, payload) {
-                                client.frames += 1;
+                    client.frames += 1;
                     note_revision(client, revision);
                     to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                         wid,
@@ -647,7 +646,7 @@ fn apply_actions(
                         .and_then(|payload| super::shm::draw_list_from_slot_payload(payload).ok());
                     if let Some(payload) = ready {
                         if let Some(freed) = client.inner.surfaces.compose(surface, slot, payload) {
-                                client.frames += 1;
+                            client.frames += 1;
                             note_revision(client, revision);
                             to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                 wid,
@@ -677,7 +676,7 @@ fn apply_actions(
                     payload,
                 ) {
                     Ok((Some(freed), _)) => {
-                                client.frames += 1;
+                        client.frames += 1;
                         note_revision(client, revision);
                         to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                             wid,
@@ -1311,12 +1310,7 @@ fn pump_one_client(
                     client.ime_applied = enabled.clone();
                     if let Some(window) = client.window {
                         let scale = client.scale;
-                        tasks.push(apply_ime_request(
-                            window,
-                            enabled,
-                            scale,
-                            &client.app_name,
-                        ));
+                        tasks.push(apply_ime_request(window, enabled, scale, &client.app_name));
                     }
                 }
             }
@@ -1337,7 +1331,6 @@ fn pump_one_client(
     }
     alive
 }
-
 
 /// PLAN-063 T-04（P-03）：事件臂后联——目标窗客户端即时泵（输入/焦点/
 /// resize → 帧合成同拍返回，无 15ms 档等待；readiness 输入半边。空闲
@@ -1515,10 +1508,7 @@ pub(crate) fn rq_update(state: &mut RqDaemon, msg: RqMessage) -> iced::Task<RqMe
         }
         // PLAN-063 T-03（G-05）：焦点进出下发（ControlMsg::Focus 首个
         // 生产者——客户端 iced focus/blur 沿与 direct 同律）。
-        RqMessage::WindowFocus {
-            window,
-            focused,
-        } => {
+        RqMessage::WindowFocus { window, focused } => {
             if let Some(client) = state.client_of(window) {
                 if let Some(wid) = client.inner.wid.map(|w| w.0) {
                     let msg = ProtocolMsg::Control(ControlMsg::Focus { wid, focused });
@@ -1666,8 +1656,7 @@ fn rq_subscription(state: &RqDaemon) -> iced::Subscription<RqMessage> {
     let active = state.clients.iter().any(|c| c.window.is_some());
     let interval_ms: u64 = if active { 15 } else { 250 };
     iced::Subscription::batch(vec![
-        iced::time::every(std::time::Duration::from_millis(interval_ms))
-            .map(|_| RqMessage::Tick),
+        iced::time::every(std::time::Duration::from_millis(interval_ms)).map(|_| RqMessage::Tick),
         iced::event::listen_with(|e, status, window_id| match e {
             iced::Event::Window(iced::window::Event::Resized(size)) => {
                 Some(RqMessage::WindowResized {
@@ -1681,18 +1670,14 @@ fn rq_subscription(state: &RqDaemon) -> iced::Subscription<RqMessage> {
             }
             // PLAN-063 T-03（G-05）：焦点进出 → ControlMsg::Focus（客户端
             // focus/blur 沿此前无事件；不门控——Captured 态焦点变化同报）。
-            iced::Event::Window(iced::window::Event::Focused) => {
-                Some(RqMessage::WindowFocus {
-                    window: window_id,
-                    focused: true,
-                })
-            }
-            iced::Event::Window(iced::window::Event::Unfocused) => {
-                Some(RqMessage::WindowFocus {
-                    window: window_id,
-                    focused: false,
-                })
-            }
+            iced::Event::Window(iced::window::Event::Focused) => Some(RqMessage::WindowFocus {
+                window: window_id,
+                focused: true,
+            }),
+            iced::Event::Window(iced::window::Event::Unfocused) => Some(RqMessage::WindowFocus {
+                window: window_id,
+                focused: false,
+            }),
             // PLAN-063 T-03（G-03）：修饰键态事实源（指针事件 modifiers
             // 字节来源；不带 Ignored 门——修饰变化无 widget 消费语义）。
             iced::Event::Keyboard(iced::keyboard::Event::ModifiersChanged(m)) => {
@@ -2048,10 +2033,7 @@ mod tests {
             resolve_vm_rq_base(Some("desktop"), Some("desk-pipe-1"), wk, app).unwrap();
         assert!(remote);
         match target {
-            ClientTarget::Desktop {
-                endpoint,
-                app_name,
-            } => {
+            ClientTarget::Desktop { endpoint, app_name } => {
                 assert_eq!(endpoint, "desk-pipe-1");
                 assert_eq!(app_name, app);
             }
@@ -2065,7 +2047,10 @@ mod tests {
             Err(e) => e,
             Ok(_) => panic!("desktop 缺端点应报错"),
         };
-        assert!(err.contains("--desktop-endpoint") && err.contains("虚拟桌面"), "{err}");
+        assert!(
+            err.contains("--desktop-endpoint") && err.contains("虚拟桌面"),
+            "{err}"
+        );
         let err = match resolve_vm_rq_base(Some("desktop"), Some("  "), wk, app) {
             Err(e) => e,
             Ok(_) => panic!("desktop 空白端点应报错"),
@@ -2078,7 +2063,10 @@ mod tests {
             assert!(target_of(&target, wk));
         }
         let (remote, target) = resolve_vm_rq_base(None, None, wk, app).unwrap();
-        assert!(!remote && target_of(&target, wk), "缺席 = legacy queue 既有行为");
+        assert!(
+            !remote && target_of(&target, wk),
+            "缺席 = legacy queue 既有行为"
+        );
         // 空串 = 未声明（同缺席）。
         let (remote, _) = resolve_vm_rq_base(Some(""), None, wk, app).unwrap();
         assert!(!remote);
@@ -2119,7 +2107,6 @@ mod tests {
             fonts: vec![],
             surfaces: Vec::new(),
             theme_caps: Vec::new(),
-
         })
     }
 
@@ -2661,10 +2648,7 @@ mod tests {
         let _ = app_end.recv_wait(500);
 
         // 修饰态落簿 → 按下携带真修饰位（此前恒 0）。
-        let _ = rq_update(
-            &mut state,
-            RqMessage::ModifiersChanged { modifiers: 3 },
-        );
+        let _ = rq_update(&mut state, RqMessage::ModifiersChanged { modifiers: 3 });
         let _ = rq_update(
             &mut state,
             RqMessage::PointerPressed {
@@ -2695,7 +2679,9 @@ mod tests {
         // 按序断言：press(modifiers=3) → KeyReleased(3) → Focus(true)。
         let got = app_end.recv_wait(2000).expect("press").expect("解码");
         match got {
-            ProtocolMsg::Input(InputMsg::PointerPressed { wid: w, modifiers, .. }) => {
+            ProtocolMsg::Input(InputMsg::PointerPressed {
+                wid: w, modifiers, ..
+            }) => {
                 assert_eq!(w, wid);
                 assert_eq!(modifiers, 3, "修饰位应真实携带（非恒 0）");
             }
@@ -2703,7 +2689,11 @@ mod tests {
         }
         let got = app_end.recv_wait(2000).expect("key release").expect("解码");
         match got {
-            ProtocolMsg::Input(InputMsg::KeyReleased { wid: w, key, modifiers }) => {
+            ProtocolMsg::Input(InputMsg::KeyReleased {
+                wid: w,
+                key,
+                modifiers,
+            }) => {
                 assert_eq!(w, wid);
                 assert_eq!(key, 13);
                 assert_eq!(modifiers, 3);
@@ -2892,15 +2882,11 @@ mod tests {
         let m02_p50 = intervals[intervals.len() / 2];
 
         // M-05：测试进程 working set（守护+客户端 in-proc 合并口径）。
-        let mem = crate::ui::desktop_protocol::stage3::sample_process_memory(
-            std::process::id(),
-        )
-        .map(|m| m.working_set)
-        .unwrap_or(0);
+        let mem = crate::ui::desktop_protocol::stage3::sample_process_memory(std::process::id())
+            .map(|m| m.working_set)
+            .unwrap_or(0);
 
-        println!(
-            "[p063-m06] cold(first-frame)={cold_ms:.1}ms hot={hot_ms:.1}ms (守护已热)"
-        );
+        println!("[p063-m06] cold(first-frame)={cold_ms:.1}ms hot={hot_ms:.1}ms (守护已热)");
         println!(
             "[p063-m07] light-under-heavy(032 timer 250ms stream): p50={light_p50:.3} p95={light_p95:.3} ms (n=20; gate p95<=100)"
         );
@@ -2939,8 +2925,7 @@ mod tests {
         let (serve, _claim) = start_serve(&pipe);
         let fork_pipe = pipe.clone();
         let app = std::thread::spawn(move || {
-            let comp =
-                crate::build_dynamic_component(&src, Some(src_path)).expect("build 032");
+            let comp = crate::build_dynamic_component(&src, Some(src_path)).expect("build 032");
             run_vm_rqhost_client(comp, &fork_pipe)
         });
         let mut state = RqDaemon {

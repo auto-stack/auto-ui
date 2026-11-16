@@ -6,8 +6,8 @@
 //! 生产 import 新建 Parser（with_session 默认装配，真实被导入文件）、
 //! Core 护栏（fn/on 体同名词不拦截）、未知注解错误文本冻结。
 
-use auto_lang_core::session::{CompilerSession, Scenario};
 use auto_lang_core::parser::Parser;
+use auto_lang_core::session::{CompilerSession, Scenario};
 use auto_ui_dialect::UiStmt as Stmt;
 
 fn ui_parse(code: &str) -> auto_lang_core::error::AutoResult<auto_ui_dialect::UiCode> {
@@ -181,7 +181,14 @@ fn default_grammar_rejects_bare_field() {
 
 /// 公开面探针（与复审 review-r2-probes.rs 同构）：parse 后取
 /// result/errors/take_docs/peek 四元组。
-fn msg_probe(src: &str) -> (String, Vec<String>, Option<String>, auto_lang_core::token::TokenKind) {
+fn msg_probe(
+    src: &str,
+) -> (
+    String,
+    Vec<String>,
+    Option<String>,
+    auto_lang_core::token::TokenKind,
+) {
     let session = CompilerSession::new(Scenario::UI);
     let mut p = Parser::from(src).with_session(session);
     let result = {
@@ -272,8 +279,14 @@ fn r2_port_probe_next_kind_success_path_is_side_effect_free() {
     let mut p = Parser::from("value : str").with_session(session);
     // cur = value(Ident)；peek 两次结果一致且游标不动。
     let mut b = auto_lang_core::parser_bridge::ParserBridge::new(&mut p);
-    assert_eq!(b.probe_next_kind(), Some(auto_lang_core::token::TokenKind::Colon));
-    assert_eq!(b.probe_next_kind(), Some(auto_lang_core::token::TokenKind::Colon));
+    assert_eq!(
+        b.probe_next_kind(),
+        Some(auto_lang_core::token::TokenKind::Colon)
+    );
+    assert_eq!(
+        b.probe_next_kind(),
+        Some(auto_lang_core::token::TokenKind::Colon)
+    );
     assert_eq!(b.cur_kind(), auto_lang_core::token::TokenKind::Ident);
     drop(b);
     assert!(p.errors.is_empty());
@@ -360,7 +373,10 @@ fn r3_probe_advancing_failure_char_literal_variant() {
     let mut p = Parser::from("value 'ab' : int").with_session(session);
     let mut b = auto_lang_core::parser_bridge::ParserBridge::new(&mut p);
     assert_eq!(b.probe_next_kind(), None);
-    assert_eq!(b.probe_next_kind(), Some(auto_lang_core::token::TokenKind::Ident));
+    assert_eq!(
+        b.probe_next_kind(),
+        Some(auto_lang_core::token::TokenKind::Ident)
+    );
     drop(b);
     let tok = p.next().clone();
     assert_eq!(tok.kind, auto_lang_core::token::TokenKind::Ident);
@@ -393,8 +409,14 @@ fn r3_probe_doc_comment_not_collected_and_plain_ident_idempotent() {
 
     let mut p2 = Parser::from("value style {").with_session(CompilerSession::new(Scenario::UI));
     let mut b2 = auto_lang_core::parser_bridge::ParserBridge::new(&mut p2);
-    assert_eq!(b2.probe_next_kind(), Some(auto_lang_core::token::TokenKind::Ident));
-    assert_eq!(b2.probe_next_kind(), Some(auto_lang_core::token::TokenKind::Ident));
+    assert_eq!(
+        b2.probe_next_kind(),
+        Some(auto_lang_core::token::TokenKind::Ident)
+    );
+    assert_eq!(
+        b2.probe_next_kind(),
+        Some(auto_lang_core::token::TokenKind::Ident)
+    );
     assert_eq!(b2.cur_text(), "value");
 }
 

@@ -34,8 +34,7 @@ mod plan042_reload_readiness_tests {
         );
         let mut decls: Vec<auto_ui_dialect::WidgetDecl> = vec![];
         for s in &ast.0.items {
-            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = s
-            {
+            if let auto_parser_api::DomainStmt::Domain(auto_ui_dialect::UiStmt::WidgetDecl(d)) = s {
                 decls.push(d.clone());
             }
         }
@@ -149,11 +148,18 @@ mod plan042_reload_readiness_tests {
             .expect("widget extracted");
 
         assert_eq!(comp.read_state("count").unwrap(), Value::Int(42), "保值");
-        assert_eq!(comp.read_state("step").unwrap(), Value::Int(5), "新字段默认");
+        assert_eq!(
+            comp.read_state("step").unwrap(),
+            Value::Int(5),
+            "新字段默认"
+        );
         assert_eq!(report.preserved, 2, "count+label preserved");
         assert_eq!(report.added, 1, "step added");
         assert!(
-            !report.dropped_names.iter().any(|n| n == "count" || n == "label"),
+            !report
+                .dropped_names
+                .iter()
+                .any(|n| n == "count" || n == "label"),
             "用户字段不得出现在 dropped：{:?}",
             report.dropped_names
         );
@@ -290,7 +296,11 @@ mod plan042_reload_readiness_tests {
         pump_try_reload(&mut comp, COUNTER_V2)
             .expect("reload ok")
             .expect("extracted");
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(7), "恢复后保值");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(7),
+            "恢复后保值"
+        );
     }
 
     /// 泵链失败保旧 + 合法恢复：非法编辑该拍被跳过（且 last_modified 已推进），
@@ -337,7 +347,11 @@ mod plan042_reload_readiness_tests {
         pump_try_reload(&mut comp, &code)
             .expect("reload ok")
             .expect("extracted");
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(11), "恢复后保值");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(11),
+            "恢复后保值"
+        );
         assert_eq!(comp.read_state("step").unwrap(), Value::Int(5));
     }
 
@@ -393,7 +407,11 @@ mod plan042_reload_readiness_tests {
         pump_try_reload(&mut comp, &code)
             .expect("reload ok")
             .expect("extracted");
-        assert_eq!(comp.read_state("count").unwrap(), Value::Int(11), "恢复后保值");
+        assert_eq!(
+            comp.read_state("count").unwrap(),
+            Value::Int(11),
+            "恢复后保值"
+        );
         assert_eq!(comp.read_state("step").unwrap(), Value::Int(5));
     }
 
@@ -429,8 +447,7 @@ mod plan042_reload_readiness_tests {
                         auto_ui_dialect::UiStmt::WidgetDecl(decl),
                     ) = stmt
                     {
-                        extracted =
-                            Some(auto_ui_compiler::aura::extract_widget_from_decl(decl));
+                        extracted = Some(auto_ui_compiler::aura::extract_widget_from_decl(decl));
                         break;
                     }
                 }
@@ -544,10 +561,9 @@ mod plan042_reload_readiness_tests {
     fn t03_multi_file_content_change_detected_and_atomic_reload() {
         let fx = write_multi_file_fixture();
         let code = std::fs::read_to_string(&fx.root).unwrap();
-        let mut comp = crate::dynamic_build::build_dynamic_component(&code, Some(
-            fx.root.to_str().unwrap(),
-        ))
-        .expect("multi-file build");
+        let mut comp =
+            crate::dynamic_build::build_dynamic_component(&code, Some(fx.root.to_str().unwrap()))
+                .expect("multi-file build");
 
         // 业务可运行： Bump + store.Add 派发成功。
         comp.on_with_input("Bump", None);
@@ -728,7 +744,9 @@ mod plan042_reload_readiness_tests {
         let ids2 = comp.bridge().child_instance_identities();
         assert_eq!(ids2.len(), 1, "下一帧重建同身份实例");
         assert_eq!(
-            comp.bridge().read_instance_state(&ids2[0], "label").unwrap(),
+            comp.bridge()
+                .read_instance_state(&ids2[0], "label")
+                .unwrap(),
             Value::str("b"),
             "重建实例回 model 默认，custom/flipped 均丢失"
         );
@@ -741,10 +759,9 @@ mod plan042_reload_readiness_tests {
     fn t04_forced_reload_on_store_app_loses_store_handlers() {
         let fx = write_multi_file_fixture();
         let code = std::fs::read_to_string(&fx.root).unwrap();
-        let mut comp = crate::dynamic_build::build_dynamic_component(&code, Some(
-            fx.root.to_str().unwrap(),
-        ))
-        .expect("multi-file build");
+        let mut comp =
+            crate::dynamic_build::build_dynamic_component(&code, Some(fx.root.to_str().unwrap()))
+                .expect("multi-file build");
 
         comp.on_with_input("Bump", None);
         assert_eq!(comp.read_state("count").unwrap(), Value::Int(1));

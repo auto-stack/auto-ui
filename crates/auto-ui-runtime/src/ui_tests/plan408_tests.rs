@@ -43,14 +43,15 @@ mod plan408_tests {
         )
         .unwrap();
 
-        let (vue_code, widgets, _stores) = auto_ui_compiler::pipeline::ui_build_shadcn_with_widgets_and_stores(
-            at_path.to_str().unwrap(),
-            Some(tmp.to_str().unwrap()),
-            None,
-            None,
-            None,
-        )
-        .expect("legacy entry must compile component fn source");
+        let (vue_code, widgets, _stores) =
+            auto_ui_compiler::pipeline::ui_build_shadcn_with_widgets_and_stores(
+                at_path.to_str().unwrap(),
+                Some(tmp.to_str().unwrap()),
+                None,
+                None,
+                None,
+            )
+            .expect("legacy entry must compile component fn source");
 
         // The component fn is synthesized to its own SFC on disk.
         let card_vue = std::fs::read_to_string(tmp.join("Card.vue"))
@@ -1093,14 +1094,15 @@ mod plan408_tests {
         .unwrap();
 
         // shadcn mode (real build path).
-        let (vue_code, _widgets, _stores) = auto_ui_compiler::pipeline::ui_build_shadcn_with_widgets_and_stores(
-            at_path.to_str().unwrap(),
-            None,
-            None,
-            None,
-            None,
-        )
-        .expect("native table case must compile");
+        let (vue_code, _widgets, _stores) =
+            auto_ui_compiler::pipeline::ui_build_shadcn_with_widgets_and_stores(
+                at_path.to_str().unwrap(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("native table case must compile");
 
         // Native `<table>`, not shadcn <Table>.
         assert!(

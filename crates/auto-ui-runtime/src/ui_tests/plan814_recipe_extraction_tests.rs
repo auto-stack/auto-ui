@@ -2,11 +2,11 @@
 //! design_tokens/recipe.rs（迁移后归 auto-lang-core），因横跨上层 aura/ui_gen
 //! 域上移至本 crate；被测公共面不变（load_and_validate_style_recipes 等 pub）。
 use auto_lang_core::ast::Expr;
+use auto_lang_core::parser::Parser;
 use auto_ui_compiler::design_tokens::recipe::{
     clear_style_recipes, load_and_validate_style_recipes,
     load_and_validate_style_recipes_with_imports, prepare_style_recipe_imports, StyleRecipeError,
 };
-use auto_lang_core::parser::Parser;
 
 fn test_style_recipe_in_widget_extraction() {
     clear_style_recipes();
@@ -206,7 +206,9 @@ fn test_plan635_vue_chain_expands_imported_recipe() {
     "#,
     )
     .unwrap();
-    let sfc = auto_ui_compiler::pipeline::ui_build_shadcn(base.join("app.at").to_str().unwrap(), None).unwrap();
+    let sfc =
+        auto_ui_compiler::pipeline::ui_build_shadcn(base.join("app.at").to_str().unwrap(), None)
+            .unwrap();
     assert!(
         sfc.contains("rounded-full px-4 py-2 shadow-sm"),
         "SFC should contain imported recipe classes: {}",

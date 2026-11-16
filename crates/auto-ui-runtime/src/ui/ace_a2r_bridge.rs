@@ -50,8 +50,8 @@ pub fn component_a2r_fileset(
     })?;
     let view = SemanticView::from_checked(&compiled.checked)
         .map_err(|e| format!("semantic view: {e:?}"))?;
-    let program = ace_a2x_rust::lower_program(&view, "__age_drive")
-        .map_err(|e| format!("lower: {e:?}"))?;
+    let program =
+        ace_a2x_rust::lower_program(&view, "__age_drive").map_err(|e| format!("lower: {e:?}"))?;
     let set = ace_a2x_rust::assemble_record_text_file_set(
         &view,
         &program,
@@ -137,9 +137,7 @@ pub fn f0_a2r_fileset(
             ("generated.rs".to_string(), generated),
         ],
         provider_cdylib: build.cdylib.clone(),
-        provider_import_lib: build
-            .cdylib
-            .with_file_name("f0_text_provider.dll.lib"),
+        provider_import_lib: build.cdylib.with_file_name("f0_text_provider.dll.lib"),
     })
 }
 

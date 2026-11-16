@@ -14,14 +14,14 @@
 //! T-03 修复时在本文件基础上固化红相矩阵（命名切 plan748_*_tests）。
 
 #[cfg(test)]
-
 use auto_lang_core::vm::engine::SegmentOutcome;
 use auto_lang_core::vm::task::AutoTask;
 
 // ═══════════ 断点①②：fn 段驱动（与 handler 段同一 engine 段机制）═══════════
 
 fn p748_compile(code: &str) -> auto_lang_core::vm::engine::AutoVM {
-    let (vm, _stdout, _entry, _object_type) = auto_lang_core::create_vm_from_source(code).expect("compile");
+    let (vm, _stdout, _entry, _object_type) =
+        auto_lang_core::create_vm_from_source(code).expect("compile");
     vm
 }
 
@@ -65,7 +65,10 @@ fn p748_spawn_server(body: &'static str) -> (std::thread::JoinHandle<()>, u16) {
 }
 
 /// 段驱动到 Parked(HttpRequest)，等结果就绪后 resume，返回续体终态与返回串。
-fn p748_drive_park_resume(vm: &auto_lang_core::vm::engine::AutoVM, name: &str) -> Result<String, String> {
+fn p748_drive_park_resume(
+    vm: &auto_lang_core::vm::engine::AutoVM,
+    name: &str,
+) -> Result<String, String> {
     let mut task = AutoTask::new(0, 65536, 0);
     let outcome = vm.call_fn_by_name_segment(&mut task, name, 0);
     let seg = match &outcome {

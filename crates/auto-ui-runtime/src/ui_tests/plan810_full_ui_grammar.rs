@@ -18,9 +18,9 @@
 //! 继续作为旧 oracle（本文件不重复其断言，只补交叉/事务/端口性差异面）。
 
 use auto_lang_core::ast::Stmt as CoreStmt;
+use auto_lang_core::parser::Parser;
 use auto_lang_core::parser_bridge::ParserBridge;
 use auto_lang_core::session::{CompilerSession, Scenario};
-use auto_lang_core::parser::Parser;
 use auto_parser_api::DomainParseContext;
 use auto_ui_dialect::ast::WidgetDecl;
 use auto_ui_dialect::UiStmt as Stmt;
@@ -96,7 +96,10 @@ literal => { "k": 1 } }
     assert_eq!(computed.properties[0].name.as_str(), "doubled");
     // object 臂成功路径：dict 字面量保持 Expr::Object（投机事务不误伤）。
     assert!(
-        matches!(&computed.properties[1].expr, auto_lang_core::ast::Expr::Object(_)),
+        matches!(
+            &computed.properties[1].expr,
+            auto_lang_core::ast::Expr::Object(_)
+        ),
         "literal computed should stay an object literal"
     );
 
@@ -245,7 +248,10 @@ fn v02_computed_body_fallback_rolls_back_speculative_diagnostics() {
     let w = first_widget(&ast);
     let computed = w.computed.expect("computed");
     assert!(
-        matches!(&computed.properties[0].expr, auto_lang_core::ast::Expr::Block(_)),
+        matches!(
+            &computed.properties[0].expr,
+            auto_lang_core::ast::Expr::Block(_)
+        ),
         "multi-statement computed stays a block body"
     );
 }
@@ -763,7 +769,9 @@ arg
         !bridge.in_on_body(),
         "on-body flag restored even on Err path"
     );
-    while !bridge.is_kind(auto_lang_core::token::TokenKind::EOF) && bridge.cur_text().as_str() != "arg" {
+    while !bridge.is_kind(auto_lang_core::token::TokenKind::EOF)
+        && bridge.cur_text().as_str() != "arg"
+    {
         bridge.advance();
     }
     assert_eq!(

@@ -18,7 +18,11 @@ impl<'a> AuraViewBuilder<'a> {
     /// and encodes integer parameters into the event_name using `name:idx`
     /// format (e.g., `"SelectNote:2"`), leveraging the existing indexed event
     /// dispatch in the iced renderer.
-    pub(super) fn event_to_message_with(&self, event: &AuraEvent, bindings: &Bindings) -> DynamicMessage {
+    pub(super) fn event_to_message_with(
+        &self,
+        event: &AuraEvent,
+        bindings: &Bindings,
+    ) -> DynamicMessage {
         let event_name = extract_handler_name(&event.handler).to_string();
         // Resolve each declared parameter. A param can be:
         //   - a loop-variable reference (e.g. `i`, `note.id`) → resolve from
@@ -130,7 +134,11 @@ impl<'a> AuraViewBuilder<'a> {
         Some(val)
     }
 
-    pub(super) fn event_to_message_impl(&self, handler: &str, _bindings: &Bindings) -> DynamicMessage {
+    pub(super) fn event_to_message_impl(
+        &self,
+        handler: &str,
+        _bindings: &Bindings,
+    ) -> DynamicMessage {
         let handler_name = extract_handler_name(handler);
         // PLAN-041 T-02: 同 event_to_message_with——实例子树带身份。
         match &self.instance_identity {
@@ -566,7 +574,11 @@ impl<'a> AuraViewBuilder<'a> {
     /// `if .dVisible { path … }` 一类条件包裹的数据 path 整体不出现在
     /// svgdoc 文档 → VM 轨 bar/line/area 图表区无数据，只有字面量
     /// 网格/轴线；runtime SVGDOC 打印实锤）。
-    pub(super) fn serialize_svg_children(&self, children: &[AuraNode], bindings: &Bindings) -> String {
+    pub(super) fn serialize_svg_children(
+        &self,
+        children: &[AuraNode],
+        bindings: &Bindings,
+    ) -> String {
         let mut inner = String::new();
         for child in children {
             match child {
@@ -641,5 +653,4 @@ impl<'a> AuraViewBuilder<'a> {
         }
         inner
     }
-
 }

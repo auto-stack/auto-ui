@@ -1103,5 +1103,4 @@ impl<'a> AuraViewBuilder<'a> {
             on_right_click: None,
         }
     }
-
 }

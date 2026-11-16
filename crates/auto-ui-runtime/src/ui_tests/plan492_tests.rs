@@ -121,12 +121,7 @@ widget W {
                 .child_instance_identities()
                 .into_iter()
                 .find(|id| {
-                    id.rsplit('/')
-                        .next()
-                        .unwrap_or(id)
-                        .split('#')
-                        .next()
-                        == Some(widget_type)
+                    id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget_type)
                 })
                 .ok_or_else(|| format!("no live instance of {widget_type}"))?;
             dc.bridge()
@@ -425,22 +420,25 @@ mod m1_pkg_fstr {
     use super::pkg_harness::{build_patched_gallery, prepare_patched_gallery, render_dump};
     use crate::ui::vm_bridge::InitDemandPhase;
 
-        /// PLAN-041 T-02: init records are keyed by instance identity —
-        /// resolve a widget type's first live instance's phase.
-        fn instance_phase(dc: &crate::ui::dynamic::DynamicComponent, widget_type: &str) -> Option<crate::ui::vm_bridge::InitDemandPhase> {
-            let identity = dc
-                .bridge()
-                .child_instance_identities()
-                .into_iter()
-                .find(|id| {
-                    id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget_type)
-                })?;
-            dc.bridge().init_demand_phase(&identity)
-        }
+    /// PLAN-041 T-02: init records are keyed by instance identity —
+    /// resolve a widget type's first live instance's phase.
+    fn instance_phase(
+        dc: &crate::ui::dynamic::DynamicComponent,
+        widget_type: &str,
+    ) -> Option<crate::ui::vm_bridge::InitDemandPhase> {
+        let identity = dc
+            .bridge()
+            .child_instance_identities()
+            .into_iter()
+            .find(|id| {
+                id.rsplit('/').next().unwrap_or(id).split('#').next() == Some(widget_type)
+            })?;
+        dc.bridge().init_demand_phase(&identity)
+    }
 
-        /// dollar-brace 直写(M6 后组件原生形态,无补丁): 几何+band 全存活。
-        #[test]
-        fn pkg_init_fstr_dollar_bracket_keeps_geometry() {
+    /// dollar-brace 直写(M6 后组件原生形态,无补丁): 几何+band 全存活。
+    #[test]
+    fn pkg_init_fstr_dollar_bracket_keeps_geometry() {
         let (mut dc, _) = build_patched_gallery("m1-dollar", &[]);
         let dump = render_dump(&mut dc);
         assert!(
@@ -531,9 +529,7 @@ mod m1_pkg_fstr {
             .bridge()
             .child_instance_identities()
             .into_iter()
-            .find(|id| {
-                id.rsplit('/').next().unwrap_or(id).split('#').next() == Some("BarChart")
-            })
+            .find(|id| id.rsplit('/').next().unwrap_or(id).split('#').next() == Some("BarChart"))
             .expect("BarChart instance live");
         let bar_obj = dc
             .bridge()

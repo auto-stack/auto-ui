@@ -1,8 +1,8 @@
 //! PLAN-014 T-06：样式/widget 构建责任（viewport 改写、容器/按钮/行/滚动构建、焦点收集与网格、内嵌 plan732/737/plan095 测试）（自 iced/renderer.rs 原样收编）。
 //! 消息序/active判据/last-owner exit/纹理与external pin寿命零改——纯移动。
-use super::*;
 use super::devtools::*;
 use super::host::*;
+use super::*;
 
 /// Trait for converting abstract View<M> into Iced Element
 ///
@@ -474,7 +474,10 @@ pub(super) fn build_container_style(is: &IcedStyle) -> iced::widget::container::
 /// Plan 442 A6: a known lang (codeblock 的 lang-<token> class)改走 syntect
 /// highlight-only API——与 code_editor 同引擎同主题(musk-038 T16 决策 (a));
 /// 无 lang 的 mono 文本保持共享手写 tokenizer(shell show payload 等)。
-pub(super) fn highlight_code(code: &str, lang: Option<&str>) -> Vec<iced::widget::text::Span<'static, ()>> {
+pub(super) fn highlight_code(
+    code: &str,
+    lang: Option<&str>,
+) -> Vec<iced::widget::text::Span<'static, ()>> {
     use iced::widget::text::Span;
     let colored: Vec<(String, Option<(u8, u8, u8)>)> = match lang {
         Some(l) if !l.is_empty() => {
@@ -1190,7 +1193,9 @@ fn apply_column_style<M: Clone + Debug + 'static>(
 ///             CSS space-around)
 ///   evenly  → n+1 equal spacers including both edges → each = W/(n+1) = d
 ///             (exactly CSS space-evenly)
-pub(super) fn row_justify_spacers(j: Option<IcedJustify>) -> (Option<u16>, Option<u16>, Option<u16>) {
+pub(super) fn row_justify_spacers(
+    j: Option<IcedJustify>,
+) -> (Option<u16>, Option<u16>, Option<u16>) {
     match j {
         Some(IcedJustify::Center) => (Some(1), None, Some(1)),
         Some(IcedJustify::End) => (Some(1), None, None),
@@ -2232,10 +2237,7 @@ pub(super) fn build_input_shape<M: Clone + Debug + 'static>(
                 .unwrap_or(iced::Color::from_rgba(0.6, 0.6, 0.6, 0.7))
         });
         // F-02：禁用态整体降透明（值/占位/边框），与 Vue 原生 disabled 外观同向。
-        let dim = |c: iced::Color| iced::Color {
-            a: c.a * 0.45,
-            ..c
-        };
+        let dim = |c: iced::Color| iced::Color { a: c.a * 0.45, ..c };
         let (value_color, placeholder_color) = if disabled {
             (dim(value_color), dim(placeholder_color))
         } else {
@@ -2671,19 +2673,53 @@ pub(crate) struct FocusableInput {
     pub event: String,
 }
 
-pub(super) fn collect_focusable_inputs(view: &AbstractView<IcedMessage>, out: &mut Vec<FocusableInput>) {
+pub(super) fn collect_focusable_inputs(
+    view: &AbstractView<IcedMessage>,
+    out: &mut Vec<FocusableInput>,
+) {
     if let Some(path) = crate::ui::modal::active_content_path(view) {
-        if let Some(content) = crate::ui::modal::at_path(view, &path) { collect_focusable_controls(content, out, true); }
-    } else { collect_focusable_controls(view, out, false); }
+        if let Some(content) = crate::ui::modal::at_path(view, &path) {
+            collect_focusable_controls(content, out, true);
+        }
+    } else {
+        collect_focusable_controls(view, out, false);
+    }
 }
 
-pub(super) fn collect_focusable_controls(view: &AbstractView<IcedMessage>, out: &mut Vec<FocusableInput>, actions: bool) {
+pub(super) fn collect_focusable_controls(
+    view: &AbstractView<IcedMessage>,
+    out: &mut Vec<FocusableInput>,
+    actions: bool,
+) {
     match view {
-        AbstractView::Button { onclick: message, disabled: false, .. } if actions => {
-            out.push(FocusableInput { id: iced::widget::Id::from(crate::ui::iced::focus_target::action_key(&message.widget, &message.event)), widget: message.widget.clone(), event: message.event.clone(), is_input: false });
+        AbstractView::Button {
+            onclick: message,
+            disabled: false,
+            ..
+        } if actions => {
+            out.push(FocusableInput {
+                id: iced::widget::Id::from(crate::ui::iced::focus_target::action_key(
+                    &message.widget,
+                    &message.event,
+                )),
+                widget: message.widget.clone(),
+                event: message.event.clone(),
+                is_input: false,
+            });
         }
-        AbstractView::Checkbox { on_toggle: Some(message), .. } if actions => {
-            out.push(FocusableInput { id: iced::widget::Id::from(crate::ui::iced::focus_target::action_key(&message.widget, &message.event)), widget: message.widget.clone(), event: message.event.clone(), is_input: false });
+        AbstractView::Checkbox {
+            on_toggle: Some(message),
+            ..
+        } if actions => {
+            out.push(FocusableInput {
+                id: iced::widget::Id::from(crate::ui::iced::focus_target::action_key(
+                    &message.widget,
+                    &message.event,
+                )),
+                widget: message.widget.clone(),
+                event: message.event.clone(),
+                is_input: false,
+            });
         }
         AbstractView::Input {
             placeholder,
@@ -2725,7 +2761,12 @@ pub(super) fn collect_focusable_controls(view: &AbstractView<IcedMessage>, out: 
                 .as_ref()
                 .map(|m| (m.widget.clone(), m.event.clone()))
                 .unwrap_or_default();
-            out.push(FocusableInput { id, widget, event, is_input: true });
+            out.push(FocusableInput {
+                id,
+                widget,
+                event,
+                is_input: true,
+            });
         }
         AbstractView::Column { children, .. }
         | AbstractView::Row { children, .. }
@@ -2736,14 +2777,21 @@ pub(super) fn collect_focusable_controls(view: &AbstractView<IcedMessage>, out: 
                 collect_focusable_controls(child, out, actions);
             }
         }
-        AbstractView::MouseArea { content, .. } => collect_focusable_controls(content, out, actions),
+        AbstractView::MouseArea { content, .. } => {
+            collect_focusable_controls(content, out, actions)
+        }
         AbstractView::Popover {
-            anchor, content, open, ..
+            anchor,
+            content,
+            open,
+            ..
         } => {
             if let crate::ui::view::PopoverAnchor::Widget(w) = anchor {
                 collect_focusable_controls(w, out, actions);
             }
-            if *open { collect_focusable_controls(content, out, actions); }
+            if *open {
+                collect_focusable_controls(content, out, actions);
+            }
         }
         AbstractView::Container { child, .. } | AbstractView::Scrollable { child, .. } => {
             collect_focusable_controls(child, out, actions);
@@ -3240,12 +3288,32 @@ pub(crate) fn layout_style_fn(
     }
 }
 
-
-pub(super) fn modal_input_submits(view: &AbstractView<IcedMessage>, out: &mut std::collections::HashMap<iced::widget::Id, IcedMessage>) {
-    if let AbstractView::Input { placeholder, on_change, on_submit: Some(message), width, password, value, .. } = view {
-        let primary = on_change.as_ref().map(|m| (m.widget.as_str(), m.event.as_str())).or(Some((message.widget.as_str(), message.event.as_str())));
-        let mut message = message.clone(); message.input_value = Some(value.clone());
-        out.insert(derive_input_id(primary, placeholder, *width, *password), message);
+pub(super) fn modal_input_submits(
+    view: &AbstractView<IcedMessage>,
+    out: &mut std::collections::HashMap<iced::widget::Id, IcedMessage>,
+) {
+    if let AbstractView::Input {
+        placeholder,
+        on_change,
+        on_submit: Some(message),
+        width,
+        password,
+        value,
+        ..
+    } = view
+    {
+        let primary = on_change
+            .as_ref()
+            .map(|m| (m.widget.as_str(), m.event.as_str()))
+            .or(Some((message.widget.as_str(), message.event.as_str())));
+        let mut message = message.clone();
+        message.input_value = Some(value.clone());
+        out.insert(
+            derive_input_id(primary, placeholder, *width, *password),
+            message,
+        );
     }
-    for child in crate::ui::vnode_converter::extract_children_ref(view) { modal_input_submits(child, out); }
+    for child in crate::ui::vnode_converter::extract_children_ref(view) {
+        modal_input_submits(child, out);
+    }
 }

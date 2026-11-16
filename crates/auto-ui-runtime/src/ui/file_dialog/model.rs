@@ -100,11 +100,7 @@ pub trait FileSystem: Send + Sync + 'static {
     ) -> Result<SaveDecision, Failure>;
     /// PLAN-084: recheck a directory candidate before acceptance (existence,
     /// directory type, canonical identity, UTF-8 representability).
-    fn validate_directory(
-        &self,
-        path: &str,
-        cancel: &AtomicBool,
-    ) -> Result<FileChoice, Failure>;
+    fn validate_directory(&self, path: &str, cancel: &AtomicBool) -> Result<FileChoice, Failure>;
 }
 
 #[derive(Default)]
@@ -257,20 +253,27 @@ impl FileSystem for LocalFileSystem {
         if cancel.load(Ordering::Acquire) {
             return Err(Failure::new("cancelled", "操作已取消", false));
         }
-        let parent = std::fs::canonicalize(directory).map_err(|e| Failure::io(Path::new(directory), e))?;
+        let parent =
+            std::fs::canonicalize(directory).map_err(|e| Failure::io(Path::new(directory), e))?;
         if !std::fs::metadata(&parent)
             .map_err(|e| Failure::io(&parent, e))?
             .is_dir()
         {
-            return Err(Failure::new("invalid_path", "保存目录不存在或不是目录", true));
+            return Err(Failure::new(
+                "invalid_path",
+                "保存目录不存在或不是目录",
+                true,
+            ));
         }
         let target = parent.join(file_name);
         let decision = match std::fs::symlink_metadata(&target) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => SaveDecision::Create(SaveTarget {
-                name: file_name.to_owned(),
-                path: utf8(&target)?,
-                identity: String::new(),
-            }),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                SaveDecision::Create(SaveTarget {
+                    name: file_name.to_owned(),
+                    path: utf8(&target)?,
+                    identity: String::new(),
+                })
+            }
             Err(error) => return Err(Failure::io(&target, error)),
             Ok(metadata) => {
                 if metadata.file_type().is_symlink() {
@@ -305,11 +308,7 @@ impl FileSystem for LocalFileSystem {
         Ok(decision)
     }
 
-    fn validate_directory(
-        &self,
-        path: &str,
-        cancel: &AtomicBool,
-    ) -> Result<FileChoice, Failure> {
+    fn validate_directory(&self, path: &str, cancel: &AtomicBool) -> Result<FileChoice, Failure> {
         if cancel.load(Ordering::Acquire) {
             return Err(Failure::new("cancelled", "操作已取消", false));
         }
@@ -379,9 +378,28 @@ fn save_name_is_windows_reserved(raw: &str) -> bool {
     let stem = raw.split('.').next().unwrap_or("");
     matches!(
         stem.to_ascii_uppercase().as_str(),
-        "CON" | "PRN" | "AUX" | "NUL" | "COM1" | "COM2" | "COM3" | "COM4" | "COM5" | "COM6"
-            | "COM7" | "COM8" | "COM9" | "LPT1" | "LPT2" | "LPT3" | "LPT4" | "LPT5" | "LPT6"
-            | "LPT7" | "LPT8" | "LPT9"
+        "CON"
+            | "PRN"
+            | "AUX"
+            | "NUL"
+            | "COM1"
+            | "COM2"
+            | "COM3"
+            | "COM4"
+            | "COM5"
+            | "COM6"
+            | "COM7"
+            | "COM8"
+            | "COM9"
+            | "LPT1"
+            | "LPT2"
+            | "LPT3"
+            | "LPT4"
+            | "LPT5"
+            | "LPT6"
+            | "LPT7"
+            | "LPT8"
+            | "LPT9"
     )
 }
 
@@ -737,7 +755,12 @@ impl DialogModel {
     fn row_id(&self, path: &str) -> String {
         // Tokens cross the shared typed-message framing. Keep raw filesystem
         // control characters out of that framing, without changing the path.
-        format!("{}:{}:{}", self.session, self.revision, serde_json::to_string(path).expect("UTF-8 path JSON encoding"))
+        format!(
+            "{}:{}:{}",
+            self.session,
+            self.revision,
+            serde_json::to_string(path).expect("UTF-8 path JSON encoding")
+        )
     }
 
     pub fn toggle(&mut self, row_id: &str) -> bool {
@@ -850,7 +873,8 @@ impl DialogModel {
         self.validating = true;
         self.validating_save = false;
         match Worker::spawn(move |flag| {
-            fs.validate_directory(&path, flag).map(Completion::ValidatedDirectory)
+            fs.validate_directory(&path, flag)
+                .map(Completion::ValidatedDirectory)
         }) {
             Ok(worker) => self.pending = Some(worker),
             Err(error) => {
@@ -1263,7 +1287,6 @@ impl DialogModel {
     }
 }
 
-
 #[cfg(test)]
 mod message_identity_tests {
     use super::*;
@@ -1272,11 +1295,20 @@ mod message_identity_tests {
         let model = DialogModel::default();
         let id = model.row_id("/directory/prefix\u{1f}suffix.txt");
         let other = model.row_id("/directory/prefix");
-        let wire = crate::ui::mcp_types::encode_payload("Choose", &[auto_val::Value::str(id.clone())]);
+        let wire =
+            crate::ui::mcp_types::encode_payload("Choose", &[auto_val::Value::str(id.clone())]);
         let (event, args) = crate::ui::dynamic::decode_payload(&wire);
         assert_eq!(event, "Choose");
         assert_eq!(args.len(), 1);
-        assert_ne!(args[0], auto_val::Value::str(other), "a separator in one filename must not select a different file");
-        assert_eq!(args[0], auto_val::Value::str(id), "the real shared message codec must preserve the whole row identity");
+        assert_ne!(
+            args[0],
+            auto_val::Value::str(other),
+            "a separator in one filename must not select a different file"
+        );
+        assert_eq!(
+            args[0],
+            auto_val::Value::str(id),
+            "the real shared message codec must preserve the whole row identity"
+        );
     }
 }

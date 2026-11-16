@@ -28,7 +28,11 @@ fn fixture_app_at() -> Option<PathBuf> {
 }
 
 /// Collect every tag + literal text in the template (structure snapshot walk).
-fn collect_snapshot(node: &auto_ui_compiler::aura::AuraNode, tags: &mut Vec<String>, texts: &mut Vec<String>) {
+fn collect_snapshot(
+    node: &auto_ui_compiler::aura::AuraNode,
+    tags: &mut Vec<String>,
+    texts: &mut Vec<String>,
+) {
     use auto_lang_core::ast::Expr;
     match node {
         auto_ui_compiler::aura::AuraNode::Element {
@@ -47,7 +51,9 @@ fn collect_snapshot(node: &auto_ui_compiler::aura::AuraNode, tags: &mut Vec<Stri
                 collect_snapshot(c, tags, texts);
             }
         }
-        auto_ui_compiler::aura::AuraNode::Text(auto_ui_compiler::aura::AuraTextContent::Literal(s)) => {
+        auto_ui_compiler::aura::AuraNode::Text(
+            auto_ui_compiler::aura::AuraTextContent::Literal(s),
+        ) => {
             texts.push(s.to_string());
         }
         auto_ui_compiler::aura::AuraNode::ForLoop { body, .. } => {

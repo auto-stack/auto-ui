@@ -146,7 +146,6 @@ pub struct ChildInstanceRecord {
     widget_name: String,
 }
 
-
 /// PLAN-041 T-02: push the `__auto_root` self-reference onto a root state
 /// object. See the call sites in `new_with_children` / `new_from_decls`.
 /// PLAN-041 T-02: short deterministic token for an instance identity — used
@@ -173,9 +172,12 @@ fn install_root_self_ref(vm: &mut AutoVM, state_obj_id: u64) {
         return;
     };
     if let Some(idx) = inst.field_names.iter().position(|n| n == "__auto_root") {
-        let _ = inst.set_field(idx, auto_val::Value::VmRef(auto_val::VmRef {
-            id: state_obj_id as usize,
-        }));
+        let _ = inst.set_field(
+            idx,
+            auto_val::Value::VmRef(auto_val::VmRef {
+                id: state_obj_id as usize,
+            }),
+        );
     }
 }
 
@@ -221,7 +223,9 @@ pub struct VmBridge {
     /// RefCell for the same render-path interior-mutability reason as
     /// `child_state_map`.
     child_instances: std::cell::RefCell<std::collections::HashMap<String, ChildInstanceRecord>>,
-    instance_callback_routes: std::cell::RefCell<std::collections::HashMap<(u64, String), crate::ui::child_emit::ParentRoute>>,
+    instance_callback_routes: std::cell::RefCell<
+        std::collections::HashMap<(u64, String), crate::ui::child_emit::ParentRoute>,
+    >,
 
     /// PLAN-041 T-02: instance identities seen during the current / previous
     /// view build frame. An identity registered last frame but absent this
@@ -718,7 +722,9 @@ impl Drop for VmBridge {
 }
 
 impl VmBridge {
-    pub(crate) fn host_owner_id(&self) -> u64 { self.host_owner_id }
+    pub(crate) fn host_owner_id(&self) -> u64 {
+        self.host_owner_id
+    }
     /// Audit B12(b): declared parameter count per `(widget, event)` handler.
     /// Dispatch sites use this to avoid pushing a phantom string argument at
     /// a NO-param handler (mcp submit/type pass the input text as
@@ -1071,7 +1077,8 @@ impl VmBridge {
             field_values.push(eval_expr_to_value(&field.init, &mut vm));
         }
 
-        let mut root_parent_fields: std::collections::HashSet<String> = field_names.iter().cloned().collect();
+        let mut root_parent_fields: std::collections::HashSet<String> =
+            field_names.iter().cloned().collect();
         for child in child_decls.iter().filter(|d| d.view.is_none()) {
             if let Some(model) = &child.model {
                 root_parent_fields.extend(model.fields.iter().map(|f| f.name.to_string()));
@@ -1241,15 +1248,25 @@ impl VmBridge {
     }
 
     pub(crate) fn note_legacy_root_receiver(&self, widget: &str) {
-        self.legacy_root_receivers.borrow_mut().insert(widget.to_string());
+        self.legacy_root_receivers
+            .borrow_mut()
+            .insert(widget.to_string());
     }
 
     /// Implicit inheritance uses declared parent channels. An explicit legacy
     /// type-only dispatch may still seed its target from its root receiver;
     /// unrelated child defaults never become parent channels merely by name.
-    pub(crate) fn read_root_parent_state(&self, widget: &str, name: &str) -> Result<auto_val::Value> {
-        if !self.root_parent_fields.contains(name) && !self.legacy_root_receivers.borrow().contains(widget) {
-            return Err(VmBridgeError::InvalidState(format!("root parent does not declare {name}")));
+    pub(crate) fn read_root_parent_state(
+        &self,
+        widget: &str,
+        name: &str,
+    ) -> Result<auto_val::Value> {
+        if !self.root_parent_fields.contains(name)
+            && !self.legacy_root_receivers.borrow().contains(widget)
+        {
+            return Err(VmBridgeError::InvalidState(format!(
+                "root parent does not declare {name}"
+            )));
         }
         self.read_state(name)
     }
@@ -1353,10 +1370,7 @@ impl VmBridge {
         // 否则按下标错位写坏相邻字段（plan051 inbody 实录：draft 写进
         // 实例其他槽、draft 保持空）。
         let obj = self.vm.get_heap_object(target_obj_id).ok_or_else(|| {
-            VmBridgeError::InvalidState(format!(
-                "state heap object {} not found",
-                target_obj_id
-            ))
+            VmBridgeError::InvalidState(format!("state heap object {} not found", target_obj_id))
         })?;
         let field_index = {
             let guard = obj.read().unwrap();
@@ -1384,15 +1398,9 @@ impl VmBridge {
         };
 
         // Access the heap object with write access
-        let obj = self
-            .vm
-            .get_heap_object_mut(target_obj_id)
-            .ok_or_else(|| {
-                VmBridgeError::InvalidState(format!(
-                    "state heap object {} not found",
-                    target_obj_id
-                ))
-            })?;
+        let obj = self.vm.get_heap_object_mut(target_obj_id).ok_or_else(|| {
+            VmBridgeError::InvalidState(format!("state heap object {} not found", target_obj_id))
+        })?;
 
         let mut guard = obj.write().unwrap();
         let instance = guard
@@ -2180,10 +2188,9 @@ impl VmBridge {
                         if let Some(idx) =
                             inst.field_names.iter().position(|n| n == "__auto_parent")
                         {
-                            let storable =
-                                auto_val::Value::VmRef(auto_val::VmRef {
-                                    id: parent_state_id as usize,
-                                });
+                            let storable = auto_val::Value::VmRef(auto_val::VmRef {
+                                id: parent_state_id as usize,
+                            });
                             let _ = inst.set_field(idx, storable);
                             self.vm.bump_path(rec.state_obj_id, Some("__auto_parent"));
                         }
@@ -2272,20 +2279,41 @@ impl VmBridge {
     /// PLAN-041 T-02: current state object id for an instance identity.
     /// Callback ownership follows the actual child instance, including routed
     /// parents. Type-wide process routes are only a legacy root-state fallback.
-    pub(crate) fn record_instance_callback(&self, child: u64, key: &str, route: crate::ui::child_emit::ParentRoute) {
-        self.instance_callback_routes.borrow_mut().insert((child, key.to_lowercase().replace('_', "")), route);
+    pub(crate) fn record_instance_callback(
+        &self,
+        child: u64,
+        key: &str,
+        route: crate::ui::child_emit::ParentRoute,
+    ) {
+        self.instance_callback_routes
+            .borrow_mut()
+            .insert((child, key.to_lowercase().replace('_', "")), route);
     }
 
-    pub(crate) fn instance_callback(&self, child: u64, widget: &str, key: &str) -> Option<crate::ui::child_emit::ParentRoute> {
+    pub(crate) fn instance_callback(
+        &self,
+        child: u64,
+        widget: &str,
+        key: &str,
+    ) -> Option<crate::ui::child_emit::ParentRoute> {
         if child == self.state_obj_id {
             return crate::ui::child_emit::lookup_route(widget, key);
         }
-        self.instance_callback_routes.borrow().get(&(child, key.to_lowercase().replace('_', ""))).cloned()
+        self.instance_callback_routes
+            .borrow()
+            .get(&(child, key.to_lowercase().replace('_', "")))
+            .cloned()
     }
 
     pub(crate) fn callback_parent_state(&self, child: u64) -> Option<u64> {
-        if child == self.state_obj_id { return Some(child); }
-        self.child_instances.borrow().values().find(|record| record.state_obj_id == child).map(|record| record.parent_state_id)
+        if child == self.state_obj_id {
+            return Some(child);
+        }
+        self.child_instances
+            .borrow()
+            .values()
+            .find(|record| record.state_obj_id == child)
+            .map(|record| record.parent_state_id)
     }
 
     pub fn child_instance_state_id(&self, identity: &str) -> Option<u64> {
@@ -2391,11 +2419,7 @@ impl VmBridge {
     /// PLAN-041 T-02: read a field from an instance's own state object
     /// (oracle channel; no parent-chain fallback — use the root read for
     /// shared/store fields).
-    pub fn read_instance_state(
-        &self,
-        identity: &str,
-        field_name: &str,
-    ) -> Result<auto_val::Value> {
+    pub fn read_instance_state(&self, identity: &str, field_name: &str) -> Result<auto_val::Value> {
         let id = self
             .child_instance_state_id(identity)
             .ok_or_else(|| VmBridgeError::InvalidState(format!("no instance `{identity}`")))?;
@@ -2541,9 +2565,8 @@ impl VmBridge {
                 for el in arr.values.iter() {
                     elems.push(self.rematerialize_from_old(el, old)?);
                 }
-                Ok(self.materialize_init_value(&auto_val::Value::Array(
-                    auto_val::Array::from(elems),
-                )))
+                Ok(self
+                    .materialize_init_value(&auto_val::Value::Array(auto_val::Array::from(elems))))
             }
             auto_val::Value::Obj(obj) => {
                 let mut pairs: Vec<(auto_val::ValueKey, auto_val::Value)> = Vec::new();
@@ -2570,12 +2593,17 @@ impl VmBridge {
                     for el in elems.iter() {
                         out.push(self.rematerialize_from_old(el, old)?);
                     }
-                    Ok(self.materialize_init_value(&auto_val::Value::Array(
-                        auto_val::Array::from(out),
-                    )))
+                    Ok(
+                        self.materialize_init_value(&auto_val::Value::Array(
+                            auto_val::Array::from(out),
+                        )),
+                    )
                 } else if let Some(o) = guard.as_any().downcast_ref::<ObjectData>() {
-                    let fields: Vec<(auto_val::ValueKey, auto_val::Value)> =
-                        o.fields.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                    let fields: Vec<(auto_val::ValueKey, auto_val::Value)> = o
+                        .fields
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect();
                     drop(guard);
                     let mut obj = auto_val::Obj::new();
                     for (k, v) in fields {
@@ -2583,7 +2611,9 @@ impl VmBridge {
                     }
                     Ok(self.materialize_init_value(&auto_val::Value::Obj(Box::new(obj))))
                 } else {
-                    Err(format!("opaque heap object {id}: cannot migrate across bridges"))
+                    Err(format!(
+                        "opaque heap object {id}: cannot migrate across bridges"
+                    ))
                 }
             }
             // Plan 289 convention: compiled `[...]` literals store the heap
@@ -2672,9 +2702,7 @@ impl VmBridge {
         if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
             for identity in &sweep {
                 if identity.starts_with("reading_page") || identity.starts_with("bookshelf") {
-                    eprintln!(
-                        "[MEMO-DIAG] instance-frame sweep RELEASE identity={identity}"
-                    );
+                    eprintln!("[MEMO-DIAG] instance-frame sweep RELEASE identity={identity}");
                 }
             }
         }
@@ -2697,7 +2725,9 @@ impl VmBridge {
         let Some(rec) = self.child_instances.borrow_mut().remove(identity) else {
             return;
         };
-        self.instance_callback_routes.borrow_mut().retain(|(child, _), _| *child != rec.state_obj_id);
+        self.instance_callback_routes
+            .borrow_mut()
+            .retain(|(child, _), _| *child != rec.state_obj_id);
         // Cancel by the original receiver before releasing its fields. A late
         // HTTP/CPU continuation must never mutate the surviving App root or
         // a fresh instance with the same textual key.
@@ -3625,10 +3655,7 @@ impl VmBridge {
             if !demand.props.is_empty() {
                 let props_map: std::collections::HashMap<String, auto_val::Value> =
                     demand.props.iter().cloned().collect();
-                let target = if self
-                    .child_instance_identity_of(state_obj_id)
-                    .is_some()
-                {
+                let target = if self.child_instance_identity_of(state_obj_id).is_some() {
                     state_obj_id
                 } else {
                     self.ensure_child_state(&demand.widget_name, &[], &props_map)
@@ -4276,14 +4303,7 @@ impl VmBridge {
             }
             SegmentOutcome::Parked { wait, seg } => {
                 // parked 段的栈份额随 task 存活——不得中途清账（T-02）。
-                self.register_parked(
-                    task,
-                    seg,
-                    wait,
-                    event_name.to_string(),
-                    true,
-                    state_obj_id,
-                );
+                self.register_parked(task, seg, wait, event_name.to_string(), true, state_obj_id);
                 Ok(())
             }
             SegmentOutcome::Runnable { .. } => {
@@ -4331,14 +4351,7 @@ impl VmBridge {
                 })
             }
             SegmentOutcome::Parked { wait, seg } => {
-                self.register_parked(
-                    task,
-                    seg,
-                    wait,
-                    event_name.to_string(),
-                    true,
-                    state_obj_id,
-                );
+                self.register_parked(task, seg, wait, event_name.to_string(), true, state_obj_id);
                 Ok(())
             }
             SegmentOutcome::Runnable { seg } => {
@@ -4389,11 +4402,9 @@ impl VmBridge {
             // handler，如 TreeView.Toggle/Select——父路由回送由 dynamic
             // 派发链照常执行）的 HandlerNotFound 同为常态，降 debug
             //（041 树点击实机：功能正常，仅此前刷 stderr 噪音）。
-            let _emit_route_hit = crate::ui::child_emit::lookup_route(
-                widget_name,
-                &format!("on{}", event_name),
-            )
-            .is_some();
+            let _emit_route_hit =
+                crate::ui::child_emit::lookup_route(widget_name, &format!("on{}", event_name))
+                    .is_some();
             if event_name.starts_with("__") || _emit_route_hit {
                 log::debug!(
                     "[CALL_HANDLER_FOR_NOT_FOUND] fn_name={} not in exports (probe/emit-child)",
@@ -4598,7 +4609,10 @@ impl VmBridge {
 
         eprintln!(
             "[CALL_HANDLER] widget={} event_name={} fn_name={} argc={}",
-            self.widget_name, event_name, fn_name, args.len()
+            self.widget_name,
+            event_name,
+            fn_name,
+            args.len()
         );
 
         // PLAN-702 T-04: parked 段在途的重入默认忽略（同 call_handler_for）。
@@ -7510,8 +7524,7 @@ widget Store {
 
         // 两实例 A/B 同 widget 类型、不同身份（路由装饰身份）——
         // 同名 handler 是跨实例常态。
-        let fn_name =
-            crate::ui::handler_codegen::namespaced_handler_fn_name("BookShelf", "Load");
+        let fn_name = crate::ui::handler_codegen::namespaced_handler_fn_name("BookShelf", "Load");
         let a_id = bridge.ensure_child_instance(
             "BookShelf",
             "BookShelf@/book/A/chapter/1",
@@ -7735,12 +7748,7 @@ widget Store {
             &empty_names,
             &page_props(false).into_iter().collect(),
         );
-        bridge.register_init_demand(
-            "reading_page",
-            identity2,
-            page2,
-            page_props(false),
-        );
+        bridge.register_init_demand("reading_page", identity2, page2, page_props(false));
         bridge.dispatch_pending_inits(CpuSliceBudget::d2_default());
         assert_eq!(
             bridge.read_child_state(page2, "dark_mode").unwrap(),
@@ -7759,12 +7767,7 @@ widget Store {
             &empty_names,
             &page_props(false).into_iter().collect(),
         );
-        bridge.register_init_demand(
-            "reading_page",
-            identity3,
-            page3,
-            page_props(false),
-        );
+        bridge.register_init_demand("reading_page", identity3, page3, page_props(false));
         bridge.dispatch_pending_inits(CpuSliceBudget::d2_default());
         assert_eq!(
             bridge.read_child_state(page3, "dark_mode").unwrap(),
@@ -7783,12 +7786,7 @@ widget Store {
             &empty_names,
             &HashMap::from([("theme".to_string(), Value::str("light"))]),
         );
-        bridge.register_init_demand(
-            "plain_page",
-            "plain_page@/x",
-            plain,
-            Vec::new(),
-        );
+        bridge.register_init_demand("plain_page", "plain_page@/x", plain, Vec::new());
         bridge.dispatch_pending_inits(CpuSliceBudget::d2_default());
         assert!(
             bridge.read_child_state(plain, "dark_mode").is_err(),
@@ -8156,9 +8154,7 @@ widget Child(data: List) {{
             .find(|id| id.contains("Child"))
             .expect("Child instance live");
         assert_eq!(
-            dc.bridge()
-                .read_instance_state(&child_id, "done")
-                .unwrap(),
+            dc.bridge().read_instance_state(&child_id, "done").unwrap(),
             Value::Bool(true)
         );
         dc.bridge().vm().reap_all();

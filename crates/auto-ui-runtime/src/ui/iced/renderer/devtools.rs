@@ -1,10 +1,10 @@
 //! PLAN-014 T-06：devtools/typed-component 宿主责任（devtools 面板、render_dynamic_view、ComponentIced/TickWrap/DevToolsState/Wrapper、NativePixelsHost）（自 iced/renderer.rs 原样收编）。
 //! 消息序/active判据/last-owner exit/纹理与external pin寿命零改——纯移动。
-use super::*;
 use super::host::*;
 use super::media::*;
 use super::style_widgets::*;
 use super::subscriptions::*;
+use super::*;
 use iced::widget::column;
 
 /// PLAN-646: marquee 框选蒙层绘制程序——半透明填充 + 边框，纯绘制不捕获
@@ -2085,7 +2085,8 @@ pub(super) struct DebugRenderCtx {
     /// AuraNodeId → debug element id (reverse).
     pub(super) aura_to_id: std::cell::RefCell<std::collections::HashMap<AuraNodeId, String>>,
     /// Style metadata per element: id -> (kind, props, span).
-    pub(super) element_styles: std::cell::RefCell<std::collections::HashMap<String, DebugElementInfo>>,
+    pub(super) element_styles:
+        std::cell::RefCell<std::collections::HashMap<String, DebugElementInfo>>,
     /// Component tree stack: tracks parent-child relationships during DFS traversal.
     pub(super) tree_stack: std::cell::RefCell<Vec<DebugTreeNode>>,
     /// The final component tree root, set after rendering completes.
@@ -2773,7 +2774,9 @@ pub(super) fn build_code_editor_generic<M: Clone + Debug + 'static>(
 }
 
 /// Extract style reference from any AbstractView variant.
-pub(super) fn extract_view_style<M: Clone + std::fmt::Debug>(view: &AbstractView<M>) -> Option<&Style> {
+pub(super) fn extract_view_style<M: Clone + std::fmt::Debug>(
+    view: &AbstractView<M>,
+) -> Option<&Style> {
     match view {
         AbstractView::Empty => None,
         // PLAN-066: Custom 自带 style（与内置变体同待遇）。
@@ -2947,8 +2950,10 @@ fn view_kind<M: Clone + std::fmt::Debug>(view: &AbstractView<M>) -> &'static str
 /// 此寻址「当前视图的首个 input」——取代共享字面量 prompt_input 的盲聚焦。
 pub(super) fn collect_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<iced::widget::Id>) {
     if crate::ui::modal::active_content_path(view).is_some() {
-        let mut controls = Vec::new(); collect_focusable_inputs(view, &mut controls);
-        out.extend(controls.into_iter().map(|control| control.id)); return;
+        let mut controls = Vec::new();
+        collect_focusable_inputs(view, &mut controls);
+        out.extend(controls.into_iter().map(|control| control.id));
+        return;
     }
     match view {
         AbstractView::Input {
@@ -2985,14 +2990,21 @@ pub(super) fn collect_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<
         // PLAN-013 W2：MouseArea/Popover 容器穿透——launcher search input
         // 包在 scrim mouse-area 内，缺臂使收集器永远到不了它（派生 None →
         // 回退 prompt_input 死 Id → 不聚焦+无法输入的真根因）。
-        AbstractView::MouseArea { content, .. } => { collect_input_ids(content, out); }
+        AbstractView::MouseArea { content, .. } => {
+            collect_input_ids(content, out);
+        }
         AbstractView::Popover {
-            anchor, content, open, ..
+            anchor,
+            content,
+            open,
+            ..
         } => {
             if let crate::ui::view::PopoverAnchor::Widget(w) = anchor {
                 collect_input_ids(w, out);
             }
-            if *open { collect_input_ids(content, out); }
+            if *open {
+                collect_input_ids(content, out);
+            }
         }
         AbstractView::Container { child, .. } | AbstractView::Scrollable { child, .. } => {
             collect_input_ids(child, out);
@@ -3007,12 +3019,17 @@ pub(super) fn collect_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<
             collect_input_ids(content, out);
         }
         AbstractView::Popover {
-            anchor, content, open, ..
+            anchor,
+            content,
+            open,
+            ..
         } => {
             if let crate::ui::view::PopoverAnchor::Widget(w) = anchor {
                 collect_input_ids(w, out);
             }
-            if *open { collect_input_ids(content, out); }
+            if *open {
+                collect_input_ids(content, out);
+            }
         }
         _ => {}
     }
@@ -3367,15 +3384,27 @@ pub(super) fn render_dynamic_view(
     #[cfg(windows)]
     let ticket = super::native_accessibility::enter(&view, path);
     let activation = match &view {
-        AbstractView::Button { onclick, disabled: false, .. } => Some(onclick.clone()),
-        AbstractView::Checkbox { on_toggle: Some(message), .. } => Some(message.clone()),
+        AbstractView::Button {
+            onclick,
+            disabled: false,
+            ..
+        } => Some(onclick.clone()),
+        AbstractView::Checkbox {
+            on_toggle: Some(message),
+            ..
+        } => Some(message.clone()),
         _ => None,
     };
     let element = render_dynamic_view_inner(view, debug_ctx, path);
     let element = if let Some(message) = activation {
-        let id = iced::widget::Id::from(crate::ui::iced::focus_target::action_key(&message.widget, &message.event));
+        let id = iced::widget::Id::from(crate::ui::iced::focus_target::action_key(
+            &message.widget,
+            &message.event,
+        ));
         crate::ui::iced::focus_target::FocusTarget::new(element, id, message).into()
-    } else { element };
+    } else {
+        element
+    };
     #[cfg(windows)]
     return super::native_accessibility::wrap(ticket, element);
     #[cfg(not(windows))]
@@ -3847,8 +3876,16 @@ fn render_dynamic_view_inner(
                 .anchor_is_empty(anchor_is_empty);
             if placement.is_modal_chrome() {
                 p = p.tab_handlers(
-                    IcedMessage { widget: String::new(), event: "__focus_next_input".into(), input_value: None },
-                    IcedMessage { widget: String::new(), event: "__focus_prev_input".into(), input_value: None },
+                    IcedMessage {
+                        widget: String::new(),
+                        event: "__focus_next_input".into(),
+                        input_value: None,
+                    },
+                    IcedMessage {
+                        widget: String::new(),
+                        event: "__focus_prev_input".into(),
+                        input_value: None,
+                    },
                 );
             }
             if let Some((x, y)) = anchor_point {
@@ -4574,11 +4611,20 @@ fn render_dynamic_view_inner(
             }
         }
 
-        AbstractView::List { items, spacing, style } => {
+        AbstractView::List {
+            items,
+            spacing,
+            style,
+        } => {
             let eff_spacing = effective_spacing(spacing, style.as_ref(), false);
-            let eff_padding = style.as_ref().and_then(|style| IcedStyle::from_style(style).padding).unwrap_or(0.0);
+            let eff_padding = style
+                .as_ref()
+                .and_then(|style| IcedStyle::from_style(style).padding)
+                .unwrap_or(0.0);
             let mut list = iced::widget::column([]).spacing(eff_spacing);
-            if eff_padding > 0.0 { list = list.padding(eff_padding); }
+            if eff_padding > 0.0 {
+                list = list.padding(eff_padding);
+            }
             for (index, item) in items.into_iter().enumerate() {
                 path.push(index);
                 list = list.push(render_dynamic_view(item, debug_ctx, path));
@@ -4606,14 +4652,28 @@ fn render_dynamic_view_inner(
 
 /// Instance-bound text caches include the original receiver id so same-type
 /// siblings and a later mount with the same key cannot inherit each other's text.
-pub(crate) fn input_cache_key(component: &DynamicComponent, widget: &str, event: &str) -> Option<String> {
-    let Some((widget, identity)) = widget.split_once('\u{1}') else { return Some(event.to_string()); };
-    let receiver = component.bridge().child_instance_state_id(identity).or_else(|| {
-        if component.bridge().child_instance_was_released(identity) { return None; }
-        // PLAN-069 F3: 类型按注册记录精确匹配（身份含 outlet 路由装饰）。
-        let candidates = component.bridge().child_instance_identities_of_type(widget);
-        match candidates.as_slice() { [only] => component.bridge().child_instance_state_id(only), _ => None }
-    })?;
+pub(crate) fn input_cache_key(
+    component: &DynamicComponent,
+    widget: &str,
+    event: &str,
+) -> Option<String> {
+    let Some((widget, identity)) = widget.split_once('\u{1}') else {
+        return Some(event.to_string());
+    };
+    let receiver = component
+        .bridge()
+        .child_instance_state_id(identity)
+        .or_else(|| {
+            if component.bridge().child_instance_was_released(identity) {
+                return None;
+            }
+            // PLAN-069 F3: 类型按注册记录精确匹配（身份含 outlet 路由装饰）。
+            let candidates = component.bridge().child_instance_identities_of_type(widget);
+            match candidates.as_slice() {
+                [only] => component.bridge().child_instance_state_id(only),
+                _ => None,
+            }
+        })?;
     Some(format!("{receiver}\u{1}{event}"))
 }
 
@@ -4637,13 +4697,25 @@ pub(crate) fn retain_input_values_after_handler(
     event_name: &str,
 ) {
     let input_map = component.input_state_map().clone();
-    let live = component.bridge().child_instance_identities().into_iter()
-        .filter_map(|id| component.bridge().child_instance_state_id(&id)).collect::<std::collections::HashSet<_>>();
+    let live = component
+        .bridge()
+        .child_instance_identities()
+        .into_iter()
+        .filter_map(|id| component.bridge().child_instance_state_id(&id))
+        .collect::<std::collections::HashSet<_>>();
     input_values.retain(|key, _| {
         let base = if let Some((receiver, event)) = key.split_once('\u{1}') {
-            if !receiver.parse::<u64>().ok().is_some_and(|receiver| live.contains(&receiver)) { return false; }
+            if !receiver
+                .parse::<u64>()
+                .ok()
+                .is_some_and(|receiver| live.contains(&receiver))
+            {
+                return false;
+            }
             event
-        } else { key.as_str() };
+        } else {
+            key.as_str()
+        };
         key == event_name || !input_map.contains_key(base)
     });
 }
@@ -4707,8 +4779,17 @@ fn patch_input_values_owned(
                     }
                 };
                 let key = match msg {
-                    DynamicMessage::TypedInst { widget_name, instance, .. } => component.and_then(|component|
-                        input_cache_key(component, &format!("{widget_name}\u{1}{instance}"), &clean_name)),
+                    DynamicMessage::TypedInst {
+                        widget_name,
+                        instance,
+                        ..
+                    } => component.and_then(|component| {
+                        input_cache_key(
+                            component,
+                            &format!("{widget_name}\u{1}{instance}"),
+                            &clean_name,
+                        )
+                    }),
                     _ => Some(clean_name),
                 };
                 if let Some(text) = key.as_ref().and_then(|key| input_values.get(key)) {
@@ -4775,7 +4856,10 @@ pub(super) fn iced_length(size: &IcedSize) -> iced::Length {
 /// 均无才落历史缺省 30px。此前 style 高度不消费:input-compose 容器经
 /// min-h 消费后有 80px 可见框,而内部 editor 恒 30px 悬在顶部——用户点
 /// 击框中下部全部落在容器上,无光标无输入(musk chats composer 现场)。
-pub(super) fn textarea_editor_height(height_prop: Option<u16>, style: Option<&Style>) -> iced::Length {
+pub(super) fn textarea_editor_height(
+    height_prop: Option<u16>,
+    style: Option<&Style>,
+) -> iced::Length {
     if let Some(h) = height_prop {
         return iced::Length::Fixed(h as f32);
     }
@@ -6104,32 +6188,32 @@ where
         // PLAN-098 T-02：gate 非阻塞消费（rx 终生锁内；try_recv 计交付）。
         let gate = MCP_ACTION_GATE.get()?;
         match gate.try_recv() {
-                Ok(action) => {
-                    let value_str = action.value.unwrap_or_default();
-                    let payload = match action.target {
-                        crate::ui::mcp_server::ActionTarget::Event { widget, event } => {
-                            format!("__mcp_action|{}.{}|{}", widget, event, value_str)
-                        }
-                        crate::ui::mcp_server::ActionTarget::Path { path } => {
-                            let path_str = path
-                                .iter()
-                                .map(|n| n.to_string())
-                                .collect::<Vec<_>>()
-                                .join(",");
-                            format!(
-                                "__mcp_action_path|{}|{}|{}",
-                                path_str, action.action, value_str
-                            )
-                        }
-                        crate::ui::mcp_server::ActionTarget::Fixture { .. } => {
-                            // VM-only test fixtures are rejected by the MCP
-                            // tool before reaching the Rust DevTools path.
-                            return None;
-                        }
-                    };
-                    Some(WrapperMsg::<C>::Debug(payload))
-                }
-                Err(_) => None,
+            Ok(action) => {
+                let value_str = action.value.unwrap_or_default();
+                let payload = match action.target {
+                    crate::ui::mcp_server::ActionTarget::Event { widget, event } => {
+                        format!("__mcp_action|{}.{}|{}", widget, event, value_str)
+                    }
+                    crate::ui::mcp_server::ActionTarget::Path { path } => {
+                        let path_str = path
+                            .iter()
+                            .map(|n| n.to_string())
+                            .collect::<Vec<_>>()
+                            .join(",");
+                        format!(
+                            "__mcp_action_path|{}|{}|{}",
+                            path_str, action.action, value_str
+                        )
+                    }
+                    crate::ui::mcp_server::ActionTarget::Fixture { .. } => {
+                        // VM-only test fixtures are rejected by the MCP
+                        // tool before reaching the Rust DevTools path.
+                        return None;
+                    }
+                };
+                Some(WrapperMsg::<C>::Debug(payload))
+            }
+            Err(_) => None,
         }
     });
     let f12 = iced::event::listen_with(|event, _status, _window_id| {
@@ -7139,4 +7223,3 @@ fn format_insets(ei: &crate::ui::debug::EdgeInsets) -> String {
         ei.top, ei.right, ei.bottom, ei.left
     )
 }
-

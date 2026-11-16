@@ -1149,65 +1149,67 @@ pub fn store_input_text(text: &str) {
     INPUT_TEXT.with(|t| *t.borrow_mut() = text.to_string());
 }
 
-
 // PLAN-014 T-06：按职责家族拆分的子模块（原单文件条目的纯移动）。
 // mod.rs 保留：文件头助手与 thread-locals/statics（INPUT_TEXT/
 // INSPECT_CAPTURE/TEXTAREA_CONTENTS/P725_INPUT_BINDINGS/SpanHighlighter/
 // IntoIcedElement trait）、IcedMessage 与 convert_view_messages、全部测试。
 // 消息序/active 判据/last-owner exit/纹理与 external pin 寿命零改。
-mod style_widgets;
+mod host;
 mod media;
 #[cfg(windows)]
 mod native_accessibility;
 mod projection;
-mod host;
+mod style_widgets;
 mod subscriptions;
 
 // PLAN-014 T-06：公开面恢复——外部经 `ui::iced::renderer::X` 的路径与拆分前逐名一致。
-pub use devtools::{
-    ComponentIced, DevToolsWrapper, NativePixelsMsg, find_view_by_path_generic, run_app,
-    run_app_devtools, run_app_with_task, run_app_with_task_devtools, run_app_with_title,
-    run_native_iced_pixels,
-};
-pub use host::{
-    DesktopOptions, RunMode, extract_root_view_fit_size, run_dynamic_desktop,
-    run_dynamic_desktop_fullscreen, run_dynamic_desktop_with_options, run_dynamic_iced,
-    run_dynamic_iced_multi, run_dynamic_iced_pixels, startup_window_fit, startup_window_hidden,
-    startup_window_level, startup_window_position, startup_window_size, window_title,
-};
-pub use style_widgets::{
-    GridCellSpec, INTER_FONT, INTER_FONT_MEDIUM, INTER_FONT_REGULAR, INTER_FONT_SEMIBOLD,
-    IntoIcedElement, WALLPAPER_INKWASH, WALLPAPER_RICEPAPER,
-};
-pub use subscriptions::{
-    host_exit_generation, host_exit_window_begin, inject_shell_event, request_host_exit,
-};
 use devtools::*;
+pub use devtools::{
+    find_view_by_path_generic, run_app, run_app_devtools, run_app_with_task,
+    run_app_with_task_devtools, run_app_with_title, run_native_iced_pixels, ComponentIced,
+    DevToolsWrapper, NativePixelsMsg,
+};
 use host::*;
+pub use host::{
+    extract_root_view_fit_size, run_dynamic_desktop, run_dynamic_desktop_fullscreen,
+    run_dynamic_desktop_with_options, run_dynamic_iced, run_dynamic_iced_multi,
+    run_dynamic_iced_pixels, startup_window_fit, startup_window_hidden, startup_window_level,
+    startup_window_position, startup_window_size, window_title, DesktopOptions, RunMode,
+};
 use media::*;
 use projection::*;
 use shell_state::*;
 use style_widgets::*;
+pub use style_widgets::{
+    GridCellSpec, IntoIcedElement, INTER_FONT, INTER_FONT_MEDIUM, INTER_FONT_REGULAR,
+    INTER_FONT_SEMIBOLD, WALLPAPER_INKWASH, WALLPAPER_RICEPAPER,
+};
 use subscriptions::*;
+pub use subscriptions::{
+    host_exit_generation, host_exit_window_begin, inject_shell_event, request_host_exit,
+};
 
-pub(crate) use devtools::{DebugElementInfo, DebugTreeNode, retain_input_values_after_handler, track_input_text};
-pub(crate) use style_widgets::{build_column, dynamic_abs_layer_position, layout_hover_flag, wrap_layout_events};
 pub(crate) use devtools::column_layer_partition;
 #[cfg(test)]
 pub(crate) use devtools::patch_input_values;
+pub(crate) use devtools::{
+    retain_input_values_after_handler, track_input_text, DebugElementInfo, DebugTreeNode,
+};
+pub(crate) use media::{load_image_bytes, lucide_svg_doc_with, shadcn_theme};
 pub(crate) use shell_state::{
     build_dashboard_snapshot, build_desktop_surface_snapshot, build_launcher_snapshot,
     build_notes_snapshot, build_shell_projection, build_switcher_snapshot, drain_desktop_bus_inbox,
-    push_switcher_snapshot,
-    push_dashboard_snapshot, push_launcher_snapshot, push_notes_snapshot,
-    push_desktop_surface_outproc, push_shell_projection_outproc, summon_launcher,
+    push_dashboard_snapshot, push_desktop_surface_outproc, push_launcher_snapshot,
+    push_notes_snapshot, push_shell_projection_outproc, push_switcher_snapshot, summon_launcher,
 };
-    pub(crate) use media::{load_image_bytes, lucide_svg_doc_with, shadcn_theme};
-    pub(crate) use style_widgets::rewrite_viewport_units;
 pub(crate) use shell_state::{InspectorSections, ToastReq};
+pub(crate) use style_widgets::rewrite_viewport_units;
+pub(crate) use style_widgets::{
+    build_column, dynamic_abs_layer_position, layout_hover_flag, wrap_layout_events,
+};
 pub(crate) use subscriptions::{DevToolsTab, InspectorSubTab};
-mod shell_state;
 mod devtools;
+mod shell_state;
 
 /// Sentinel event name for hot-reload tick messages.
 const HOT_RELOAD_EVENT: &str = "__hot_reload";
@@ -2279,7 +2281,12 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
         // 坑），doc-surface 等外部原生组件在 VM 动态路径整体不可见（永远
         // 到不了 into_iced）。events 消息经 IcedMessage::from_dynamic 转换
         // （Button onclick 同式）。
-        AbstractView::Custom { name, props, events, style } => AbstractView::Custom {
+        AbstractView::Custom {
+            name,
+            props,
+            events,
+            style,
+        } => AbstractView::Custom {
             name,
             props,
             events: events
@@ -3346,8 +3353,7 @@ mod tests {
     fn t540_resolver_session() -> crate::ui::session::DesktopSession {
         let mut ds = t3_session_with_shell();
         // PLAN-007 T-03：注册表语料扫本仓 examples/ui。
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../examples/ui");
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
         let apps = std::sync::Arc::new(crate::ui::app_registry::scan_apps(
             &root,
             &crate::ui::app_registry::ScanOptions::default(),
@@ -9154,7 +9160,7 @@ mod line_edit_tests {
 
     /// 双 input 列(VM 主路径同构输入)。on_change 挂 IcedMessage,
     /// widget/event 对齐 042 example 的 LoginChild/UserChanged|PassChanged。
-        fn p483_two_input_view() -> AbstractView<IcedMessage> {
+    fn p483_two_input_view() -> AbstractView<IcedMessage> {
         let user = AbstractView::Input {
             placeholder: "Enter username".to_string(),
             value: String::new(),
@@ -9167,7 +9173,7 @@ mod line_edit_tests {
             width: None,
             password: false,
             style: None,
-           disabled: false,
+            disabled: false,
         };
         let pass = AbstractView::Input {
             placeholder: "Enter password".to_string(),
@@ -9181,7 +9187,7 @@ mod line_edit_tests {
             width: None,
             password: true,
             style: None,
-           disabled: false,
+            disabled: false,
         };
         AbstractView::Column {
             children: vec![user, pass],
@@ -9195,7 +9201,7 @@ mod line_edit_tests {
 
     /// derive_input_id 契约:主键唯一性 + 跨调用稳定性 + 三元组兜底。
     #[test]
-        fn p483_derive_input_id_unique_and_stable() {
+    fn p483_derive_input_id_unique_and_stable() {
         let a = derive_input_id(
             Some(("LoginChild", "UserChanged")),
             "Enter username",
@@ -9236,7 +9242,7 @@ mod line_edit_tests {
     /// 键盘事件随之双投递(042 evidence r4/r5:username="adminadmin")。
     /// 现状(红):两 input 同为 "prompt_input"(13700 整体覆盖)。
     #[test]
-        fn p483_vm_two_inputs_have_distinct_iced_ids() {
+    fn p483_vm_two_inputs_have_distinct_iced_ids() {
         use iced::Rectangle;
         use iced_test::selector::{Candidate, Selector};
 
@@ -9272,7 +9278,7 @@ mod line_edit_tests {
     /// view_with_debug_gated→render_dynamic_view VM 主路径)。镜像
     /// tests::plan437_child_init_tests::build_inline 的生产构建路径;子 widget
     /// 以 kebab tag 直接实例化(免 use 导入),根 widget 持 .authed 条件。
-        fn p483_build_login_shape() -> crate::ui::dynamic::DynamicComponent {
+    fn p483_build_login_shape() -> crate::ui::dynamic::DynamicComponent {
         use auto_lang_core::ast::Stmt;
         let src = r##"
 widget App {
@@ -9383,7 +9389,7 @@ widget LoginChild {
     /// 非零高——重叠则一次点击落双框(双双 is_focused=Some),静态树即
     /// 双投递;这也直接复现/排除「子 widget 拼接形态布局塌陷」。
     #[test]
-        fn p483_login_shape_inputs_disjoint_and_delivery_single() {
+    fn p483_login_shape_inputs_disjoint_and_delivery_single() {
         use iced_test::selector::Bounded;
 
         let comp = p483_build_login_shape();
@@ -9426,7 +9432,7 @@ widget LoginChild {
     /// 断言:点击 password→键 a→重建(pass="a" 形态)→键 d,全程仅
     /// PassChanged 消息;若 UserChanged 混入=双投递在重建路径复现。
     #[test]
-        fn p483_rebuild_between_keystrokes_keeps_single_delivery() {
+    fn p483_rebuild_between_keystrokes_keeps_single_delivery() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::renderer::Headless;
         use iced_test::runtime::core::{Event, Size};
@@ -9518,7 +9524,7 @@ widget LoginChild {
     /// UserChanged 与 PassChanged 齐发(= musk "adminadmin" 双投递)。
     /// 修复后(绿):各框唯一 Id → 聚焦首个 input 的 Id 仅命中一个框。
     #[test]
-        fn p483_focus_op_then_typing_stays_single_delivery() {
+    fn p483_focus_op_then_typing_stays_single_delivery() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::renderer::Headless;
         use iced_test::runtime::core::{Event, Size};
@@ -9580,7 +9586,7 @@ widget LoginChild {
     /// 控制组(修复前后都须绿):静态树内点击第二个 input 后键入文本,
     /// 仅聚焦框的 on_change 触发——锁定正常单投递不回归。
     #[test]
-        fn p483_click_and_type_delivers_to_focused_input_only() {
+    fn p483_click_and_type_delivers_to_focused_input_only() {
         let el = render_dynamic_view(p483_two_input_view(), None, &mut Vec::new());
         let mut ui = iced_test::simulator(el);
 
@@ -9608,7 +9614,7 @@ widget LoginChild {
 
     /// 未捕获 Tab/Shift+Tab 键盘事件(对齐产线订阅喂给
     /// keyboard_event_message 的形状;status 由调用方传 Ignored)。
-        fn p491_tab_event(shift: bool) -> iced::Event {
+    fn p491_tab_event(shift: bool) -> iced::Event {
         iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
             key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
             modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
@@ -9627,7 +9633,7 @@ widget LoginChild {
     }
 
     /// 042 双 input 形态的登记表快照(DFS 序 = 视觉树序:user 在前)。
-        fn p491_registry() -> Vec<iced::widget::Id> {
+    fn p491_registry() -> Vec<iced::widget::Id> {
         let mut ids = Vec::new();
         collect_input_ids(&p483_two_input_view(), &mut ids);
         ids
@@ -9635,7 +9641,7 @@ widget LoginChild {
 
     /// 测试侧聚焦探针:读当前实际持焦 widget 的 Id(与产线
     /// FindFocusedInput 同逻辑;点击直聚的焦点同样可见)。
-        fn p491_probe_focus(
+    fn p491_probe_focus(
         ui: &mut iced_test::runtime::user_interface::UserInterface<
             '_,
             IcedMessage,
@@ -9672,7 +9678,7 @@ widget LoginChild {
 
     /// 端到端遍历链复刻:探针读当前聚焦(含点击直聚)→ focus_traverse
     /// 按登记表求址 → 内建 focus operation 置焦;返回目标 Id。
-        fn p491_apply_traversal(
+    fn p491_apply_traversal(
         ui: &mut iced_test::runtime::user_interface::UserInterface<
             '_,
             IcedMessage,
@@ -9694,7 +9700,7 @@ widget LoginChild {
     /// 建无头 UserInterface 并点击指定 placeholder 的 input(真实点击直聚)。
     /// `view` 以闭包供给(探针侧与主 UI 各建一份实例);返回 (ui, renderer),
     /// 键入消息由调用方收集。
-        fn p491_ui_and_click(
+    fn p491_ui_and_click(
         view: impl Fn() -> AbstractView<IcedMessage>,
         placeholder: &str,
         msgs: &mut Vec<IcedMessage>,
@@ -9757,7 +9763,7 @@ widget LoginChild {
     /// 键入只进 PassChanged。旧状(红):分派为 `__focus_prompt` 且无
     /// focus_traverse。
     #[test]
-        fn p491_tab_next() {
+    fn p491_tab_next() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::Event;
 
@@ -9840,7 +9846,7 @@ widget LoginChild {
     /// (旧:Named 臂不加修饰前缀,与 Tab 同臂当前进处理=bug);求址 pass →
     /// user;端到端:点击 pass → 反向遍历 → user 持焦。
     #[test]
-        fn p491_shift_tab_prev() {
+    fn p491_shift_tab_prev() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::Event;
 
@@ -9913,7 +9919,7 @@ widget LoginChild {
     /// T1 红③(转绿于 T2):回环求址——Tab 尾→首,Shift+Tab 首→尾;端到端
     /// 双向实证(点击 pass → 前进回环 user;点击 user → 后退回环 pass)。
     #[test]
-        fn p491_wrap() {
+    fn p491_wrap() {
         let ids = p491_registry();
         let user = derive_input_id(
             Some(("LoginChild", "UserChanged")),
@@ -9963,7 +9969,7 @@ widget LoginChild {
     /// 结构实证——UserInterface::operate 收 dyn Operation<()>,typed
     /// 产线探针不可直穿,以同逻辑孪生代验,产线侧由 T6 实机代验)。
     #[test]
-        fn p491_find_focused_probe() {
+    fn p491_find_focused_probe() {
         // (a) 恒出值
         match iced::advanced::widget::Operation::finish(&FindFocusedInput::new()) {
             iced::advanced::widget::operation::Outcome::Some(None) => {}
@@ -9992,7 +9998,7 @@ widget LoginChild {
     /// 但无聚焦求址两者皆首项；端到端无点击直聚 → 遍历 → 首框持焦，
     /// 键入只进 UserChanged（兼锁 483 单投递）。
     #[test]
-        fn p491_unfocused_fallback() {
+    fn p491_unfocused_fallback() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::renderer::Headless;
         use iced_test::runtime::core::{Event, Size};
@@ -10084,7 +10090,7 @@ widget LoginChild {
     }
 
     /// 单 input 视图(遍历环长度 1:自环即旧行为,防漂移)。
-        fn p491_single_input_view() -> AbstractView<IcedMessage> {
+    fn p491_single_input_view() -> AbstractView<IcedMessage> {
         AbstractView::Input {
             placeholder: "Only box".to_string(),
             value: String::new(),
@@ -10104,7 +10110,7 @@ widget LoginChild {
     /// T4 边界锚:单 input 场景 next/prev 取模回环到自身——行为=旧
     /// fallback(聚焦不变),不失焦、不漂移;键入照常单投递。
     #[test]
-        fn p491_single_input() {
+    fn p491_single_input() {
         use iced_test::runtime::core::clipboard;
         use iced_test::runtime::core::Event;
 
@@ -10160,7 +10166,7 @@ widget LoginChild {
     /// (onkeydown.tab)是 Captured 事件——根本到不了未捕获 fallback,
     /// Tab/Shift+Tab 遍历臂与 prompt 编辑器捕获路径零交集。
     #[test]
-        fn p491_prompt_tab_captured_not_fallback() {
+    fn p491_prompt_tab_captured_not_fallback() {
         for shift in [false, true] {
             let msg = keyboard_event_message(
                 p491_tab_event(shift),
@@ -10184,7 +10190,7 @@ widget LoginChild {
 
     /// G4 测试载体：for-loop 行（launcher 形态）+ 无 onclick 锚行 + col/div
     /// 三形态。msg 声明/带参 handler/on 块全沿 028 真实形态。
-        fn p490_build_click_shape() -> crate::ui::dynamic::DynamicComponent {
+    fn p490_build_click_shape() -> crate::ui::dynamic::DynamicComponent {
         use auto_lang_core::ast::Stmt;
         let src = r##"
 widget ClickApp {
@@ -10262,7 +10268,7 @@ widget ClickApp {
     }
 
     /// G4 构建并点击指定文本（点击落在其父布局件的矩形上）→ 收集消息。
-        fn p490_click_collect(placeholder: &str) -> Vec<IcedMessage> {
+    fn p490_click_collect(placeholder: &str) -> Vec<IcedMessage> {
         let comp = p490_build_click_shape();
         let (view, _ids, _probe) = comp.view_with_debug_gated(false);
         let view = convert_view_messages(view);
@@ -10275,7 +10281,7 @@ widget ClickApp {
     /// T4 红①：row 挂 onclick（for-loop 形态，028 候选行同构）——
     /// 点击必须发射 .Pick(it) 消息。现状（红）：零消息。
     #[test]
-        fn p490_row_onclick_fires() {
+    fn p490_row_onclick_fires() {
         let msgs = p490_click_collect("alpha");
         assert!(
             msgs.iter()
@@ -10286,7 +10292,7 @@ widget ClickApp {
 
     /// T4 红②：col 挂 onclick——点击发射 .Pick("col")。
     #[test]
-        fn p490_col_onclick_fires() {
+    fn p490_col_onclick_fires() {
         let msgs = p490_click_collect("colbox");
         assert!(
             msgs.iter()
@@ -10298,7 +10304,7 @@ widget ClickApp {
     /// T4 红③：div（=Container）挂 onclick（musk specs 树形态）——
     /// 点击必须发射 .Pick("div")。
     #[test]
-        fn p490_container_div_onclick_fires() {
+    fn p490_container_div_onclick_fires() {
         let msgs = p490_click_collect("divbox");
         assert!(
             msgs.iter()
@@ -10309,7 +10315,7 @@ widget ClickApp {
 
     /// T4 锚（绿）：无 onclick 的布局行点击零消息——不引入误触发。
     #[test]
-        fn p490_layout_without_onclick_inert() {
+    fn p490_layout_without_onclick_inert() {
         let msgs = p490_click_collect("gamma");
         assert!(
             msgs.is_empty(),
@@ -10321,7 +10327,7 @@ widget ClickApp {
     /// .Launch(r.name)}，对象列表带参派发）——点击 Notes 行必须发射
     /// .Launch("notes")。
     #[test]
-        fn p490_launcher_row_launches() {
+    fn p490_launcher_row_launches() {
         let msgs = p490_click_collect("Notes");
         assert!(
             msgs.iter()
@@ -10396,7 +10402,7 @@ mod plan080_uat_cjk_bubble_tests {
 
     /// F-UAT-2 探针：Rich 段落布局尺寸（容器包 Rich，dump 容器 bounds）。
     #[test]
-        fn plan080_uat_fuat2_rich_layout_bounds() {
+    fn plan080_uat_fuat2_rich_layout_bounds() {
         for (label, spans) in [
             (
                 "latin-rich",
@@ -10459,7 +10465,7 @@ mod plan080_uat_cjk_bubble_tests {
     /// 读法用闭包收集器（不走 text 选择器——见模块头②）。    /// 回归钉：pct-hug 路径 CJK 测宽必须与 latin 同量级（全角 ≈ 2× 半角）。
     /// 读法用闭包收集器（不走 text 选择器——见模块头②）。
     #[test]
-        fn plan080_uat_cjk_bubble_hug_width_not_collapsed() {
+    fn plan080_uat_cjk_bubble_hug_width_not_collapsed() {
         for (label, floor) in [("你好世界早上好", 100.0f32), ("hello world!", 50.0f32)] {
             let el = render_dynamic_view(bubble_view(label), None, &mut Vec::new());
             let mut ui = iced_test::simulator(el);
@@ -10632,7 +10638,7 @@ This is a **bold** and *italic* paragraph with `code` and [link](https://x).
     /// （cell 用 Text——autodown 链的 cell 是 Rich，iced_test 候选盲区，
     /// 见模块头②；本钉断言 lowering 层的几何）。
     #[test]
-        fn plan082_table_columns_align_across_rows() {
+    fn plan082_table_columns_align_across_rows() {
         let cell = |s: &str| AbstractView::Text {
             content: s.to_string(),
             style: None,
@@ -10699,7 +10705,7 @@ This is a **bold** and *italic* paragraph with `code` and [link](https://x).
     /// 文档化（无断言）：MaxWidthPct 子树 text 节点对 Find 操作不可见、
     /// container 可见——见模块头②。
     #[test]
-        fn plan080_uat_max_width_pct_operation_visibility_bisect() {
+    fn plan080_uat_max_width_pct_operation_visibility_bisect() {
         for (outer, expect_text) in [("flex flex-col", true), ("max-w-[70%]", false)] {
             let el = render_dynamic_view(
                 AbstractView::Column {
@@ -10739,57 +10745,190 @@ This is a **bold** and *italic* paragraph with `code` and [link](https://x).
 #[cfg(test)]
 mod plan082_focus_tests {
     use super::*;
-    use iced::advanced::widget::Operation;
-    use iced_test::runtime::{core::{clipboard, renderer::Headless, Size}, user_interface};
     use crate::ui::view::{PopoverAnchor, PopoverPlacement};
-    fn msg(event: &str) -> IcedMessage { IcedMessage { widget: "Picker".into(), event: event.into(), input_value: None } }
+    use iced::advanced::widget::Operation;
+    use iced_test::runtime::{
+        core::{clipboard, renderer::Headless, Size},
+        user_interface,
+    };
+    fn msg(event: &str) -> IcedMessage {
+        IcedMessage {
+            widget: "Picker".into(),
+            event: event.into(),
+            input_value: None,
+        }
+    }
     fn column(children: Vec<AbstractView<IcedMessage>>) -> AbstractView<IcedMessage> {
-        AbstractView::Column { children, spacing: 6, padding: 6, style: None, onclick: None, on_right_click: None }
+        AbstractView::Column {
+            children,
+            spacing: 6,
+            padding: 6,
+            style: None,
+            onclick: None,
+            on_right_click: None,
+        }
     }
     fn button(event: &str, disabled: bool) -> AbstractView<IcedMessage> {
-        AbstractView::Button { label: event.into(), onclick: msg(event), style: None, on_right_click: None, content: None, disabled }
+        AbstractView::Button {
+            label: event.into(),
+            onclick: msg(event),
+            style: None,
+            on_right_click: None,
+            content: None,
+            disabled,
+        }
     }
     fn input() -> AbstractView<IcedMessage> {
-        AbstractView::Input { placeholder: "Path".into(), value: String::new(), on_change: Some(msg("PathChanged")), on_submit: Some(msg("Navigate")), width: None, password: false, style: None, disabled: false }
+        AbstractView::Input {
+            placeholder: "Path".into(),
+            value: String::new(),
+            on_change: Some(msg("PathChanged")),
+            on_submit: Some(msg("Navigate")),
+            width: None,
+            password: false,
+            style: None,
+            disabled: false,
+        }
     }
     fn view(open: bool) -> AbstractView<IcedMessage> {
-        column(vec![button("Trigger", false), AbstractView::Popover {
-            anchor: PopoverAnchor::Widget(Box::new(AbstractView::Empty)),
-            content: Box::new(column(vec![input(), AbstractView::Checkbox { is_checked: false, label: "book.txt".into(), on_toggle: Some(msg("Choose")), style: None }, button("Unavailable", true), button("Cancel", false)])),
-            placement: PopoverPlacement::ModalExplicit, open, on_dismiss: Some(msg("Cancel")),
-        }])
+        column(vec![
+            button("Trigger", false),
+            AbstractView::Popover {
+                anchor: PopoverAnchor::Widget(Box::new(AbstractView::Empty)),
+                content: Box::new(column(vec![
+                    input(),
+                    AbstractView::Checkbox {
+                        is_checked: false,
+                        label: "book.txt".into(),
+                        on_toggle: Some(msg("Choose")),
+                        style: None,
+                    },
+                    button("Unavailable", true),
+                    button("Cancel", false),
+                ])),
+                placement: PopoverPlacement::ModalExplicit,
+                open,
+                on_dismiss: Some(msg("Cancel")),
+            },
+        ])
     }
     #[test]
     fn modal_focus_registry_wraps_actions_and_native_keys_use_the_same_handler() {
         let mut controls = Vec::new();
         collect_focusable_inputs(&view(true), &mut controls);
-        assert_eq!(controls.iter().map(|c| c.event.as_str()).collect::<Vec<_>>(), ["PathChanged", "Choose", "Cancel"]);
-        let mut ids = Vec::new(); collect_input_ids(&view(true), &mut ids);
-        assert_eq!(ids, controls.iter().map(|c| c.id.clone()).collect::<Vec<_>>());
+        assert_eq!(
+            controls
+                .iter()
+                .map(|c| c.event.as_str())
+                .collect::<Vec<_>>(),
+            ["PathChanged", "Choose", "Cancel"]
+        );
+        let mut ids = Vec::new();
+        collect_input_ids(&view(true), &mut ids);
+        assert_eq!(
+            ids,
+            controls.iter().map(|c| c.id.clone()).collect::<Vec<_>>()
+        );
         assert_eq!(focus_traverse(&ids, ids.last(), true), Some(ids[0].clone()));
-        assert_eq!(focus_traverse(&ids, ids.first(), false), Some(ids[2].clone()));
-        let mut renderer = iced_test::futures::futures::executor::block_on(iced::Renderer::new(iced::Font::DEFAULT, 12.0_f32.into(), None)).unwrap();
+        assert_eq!(
+            focus_traverse(&ids, ids.first(), false),
+            Some(ids[2].clone())
+        );
+        let mut renderer = iced_test::futures::futures::executor::block_on(iced::Renderer::new(
+            iced::Font::DEFAULT,
+            12.0_f32.into(),
+            None,
+        ))
+        .unwrap();
         let el = render_dynamic_view(view(true), None, &mut Vec::new());
-        let mut ui = user_interface::UserInterface::build(el, Size::new(800.0,700.0), user_interface::Cache::default(), &mut renderer);
+        let mut ui = user_interface::UserInterface::build(
+            el,
+            Size::new(800.0, 700.0),
+            user_interface::Cache::default(),
+            &mut renderer,
+        );
         let mut messages = Vec::new();
-        let mut operation = iced_test::runtime::core::widget::operation::focusable::focus::<()>(ids[1].clone());
+        let mut operation =
+            iced_test::runtime::core::widget::operation::focusable::focus::<()>(ids[1].clone());
         ui.operate(&mut renderer, &mut operation);
-        let mut activation = crate::ui::iced::focus_target::ActivateFocused::<IcedMessage>::default();
-        ui.operate(&mut renderer, &mut iced::advanced::widget::operation::black_box::<_, ()>(&mut activation));
-        assert!(matches!(activation.finish(), iced::advanced::widget::operation::Outcome::Some((Some(id),Some(message))) if id==ids[1] && message.event=="Choose"));
-        let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Space, None).collect::<Vec<_>>();
-        ui.update(&keys, iced::mouse::Cursor::Unavailable, &mut renderer, &mut clipboard::Null, &mut messages);
-        assert_eq!(messages.iter().map(|m| m.event.as_str()).collect::<Vec<_>>(), ["Choose"]);
+        let mut activation =
+            crate::ui::iced::focus_target::ActivateFocused::<IcedMessage>::default();
+        ui.operate(
+            &mut renderer,
+            &mut iced::advanced::widget::operation::black_box::<_, ()>(&mut activation),
+        );
+        assert!(
+            matches!(activation.finish(), iced::advanced::widget::operation::Outcome::Some((Some(id),Some(message))) if id==ids[1] && message.event=="Choose")
+        );
+        let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Space, None)
+            .collect::<Vec<_>>();
+        ui.update(
+            &keys,
+            iced::mouse::Cursor::Unavailable,
+            &mut renderer,
+            &mut clipboard::Null,
+            &mut messages,
+        );
+        assert_eq!(
+            messages
+                .iter()
+                .map(|m| m.event.as_str())
+                .collect::<Vec<_>>(),
+            ["Choose"]
+        );
         messages.clear();
-        let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Tab, None).collect::<Vec<_>>();
-        ui.update(&keys, iced::mouse::Cursor::Unavailable, &mut renderer, &mut clipboard::Null, &mut messages);
-        assert_eq!(messages.iter().map(|m| m.event.as_str()).collect::<Vec<_>>(), ["__focus_next_input"]);
+        let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Tab, None)
+            .collect::<Vec<_>>();
+        ui.update(
+            &keys,
+            iced::mouse::Cursor::Unavailable,
+            &mut renderer,
+            &mut clipboard::Null,
+            &mut messages,
+        );
+        assert_eq!(
+            messages
+                .iter()
+                .map(|m| m.event.as_str())
+                .collect::<Vec<_>>(),
+            ["__focus_next_input"]
+        );
         messages.clear();
-        let outside = [iced::Event::Mouse(iced::mouse::Event::CursorMoved { position: iced::Point::new(1.,1.) }), iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)), iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left))];
-        ui.update(&outside, iced::mouse::Cursor::Available(iced::Point::new(1.,1.)), &mut renderer, &mut clipboard::Null, &mut messages);
-        assert!(messages.is_empty(), "outside clicks neither dismiss nor activate background controls");
-        let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Escape, None).collect::<Vec<_>>();
-        ui.update(&keys, iced::mouse::Cursor::Unavailable, &mut renderer, &mut clipboard::Null, &mut messages);
-        assert_eq!(messages.iter().map(|m| m.event.as_str()).collect::<Vec<_>>(), ["Cancel"]);
+        let outside = [
+            iced::Event::Mouse(iced::mouse::Event::CursorMoved {
+                position: iced::Point::new(1., 1.),
+            }),
+            iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+            iced::Event::Mouse(iced::mouse::Event::ButtonReleased(
+                iced::mouse::Button::Left,
+            )),
+        ];
+        ui.update(
+            &outside,
+            iced::mouse::Cursor::Available(iced::Point::new(1., 1.)),
+            &mut renderer,
+            &mut clipboard::Null,
+            &mut messages,
+        );
+        assert!(
+            messages.is_empty(),
+            "outside clicks neither dismiss nor activate background controls"
+        );
+        let keys = iced_test::simulator::tap_key(iced::keyboard::key::Named::Escape, None)
+            .collect::<Vec<_>>();
+        ui.update(
+            &keys,
+            iced::mouse::Cursor::Unavailable,
+            &mut renderer,
+            &mut clipboard::Null,
+            &mut messages,
+        );
+        assert_eq!(
+            messages
+                .iter()
+                .map(|m| m.event.as_str())
+                .collect::<Vec<_>>(),
+            ["Cancel"]
+        );
     }
 }

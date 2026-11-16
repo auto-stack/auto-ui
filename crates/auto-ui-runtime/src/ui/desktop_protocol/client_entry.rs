@@ -370,8 +370,8 @@ mod tests {
         // 内构建（DynamicComponent 非 Send——真实 CLI 形态即进程内装载）。
         let client_thread = std::thread::spawn(move || {
             let client_src = r#"widget t { view { text "p074 attach probe" } }"#;
-                    let component = crate::build_dynamic_component(client_src, None).expect("build");
-                    let opts = ClientOpts {
+            let component = crate::build_dynamic_component(client_src, None).expect("build");
+            let opts = ClientOpts {
                 app_name: "p074attach".to_string(),
                 title: "p074".to_string(),
                 width: 480.0,
@@ -401,10 +401,7 @@ mod tests {
         let client = session.broker_clients.values().next().unwrap();
         assert!(client.wid.is_some(), "attach 必须开虚拟窗");
         assert!(
-            client
-                .endpoint
-                .state
-                == crate::ui::desktop_protocol::endpoint::HostState::Active,
+            client.endpoint.state == crate::ui::desktop_protocol::endpoint::HostState::Active,
             "端点必须达 Active（宿主必须收到客户端 Hello 后续握手）"
         );
 
@@ -459,27 +456,19 @@ mod tests {
                     None
                 }
             }));
-            session
-                .enable_broker(&broker_pipe, std::sync::Arc::new(AtomicBool::new(false)));
+            session.enable_broker(&broker_pipe, std::sync::Arc::new(AtomicBool::new(false)));
             let bp = broker_pipe.clone();
             let cli = std::thread::spawn(move || {
                 let render = broker::RequestedRender {
                     mode: FrameMode::Commands,
                     auto_downgraded: false,
                 };
-                let (_name, mut end) = broker::request_incubation_render(
-                    &bp,
-                    "p075",
-                    render,
-                    3000,
-                )
-                .expect("incubate");
+                let (_name, mut end) =
+                    broker::request_incubation_render(&bp, "p075", render, 3000).expect("incubate");
                 std::thread::sleep(Duration::from_millis(delay_ms));
-                let src = crate::build_dynamic_component(
-                    r#"widget t { view { text "p075" } }"#,
-                    None,
-                )
-                .expect("build");
+                let src =
+                    crate::build_dynamic_component(r#"widget t { view { text "p075" } }"#, None)
+                        .expect("build");
                 let mut app = crate::ui::desktop_protocol::endpoint::AppEndpoint::new(
                     crate::ui::desktop_protocol::headless::HeadlessFrameSource::new(
                         src, 480.0, 320.0,

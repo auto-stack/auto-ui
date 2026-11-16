@@ -6,9 +6,7 @@ use super::*;
 /// PLAN-031 T-03（V-04）：元素 design 帧 guard——Drop 弹出本元素 frame；
 /// 嵌套构建、转换失败与兄弟分支都恢复上一作用域。
 pub(super) struct DesignScopeGuard<'a> {
-    frames: &'a RefCell<
-        Vec<Option<std::collections::BTreeMap<String, auto_lang_core::ast::Expr>>>,
-    >,
+    frames: &'a RefCell<Vec<Option<std::collections::BTreeMap<String, auto_lang_core::ast::Expr>>>>,
 }
 
 impl Drop for DesignScopeGuard<'_> {
@@ -59,17 +57,17 @@ impl<'a> AuraViewBuilder<'a> {
     }
 
     /// design 对象键 → 槽名（AST Key 的 Display 带 `(name …)` 包装，不能直接用）。
-fn design_key_text(key: &auto_parser_api::ast::Key) -> String {
-    use auto_parser_api::ast::Key;
-    match key {
-        Key::NamedKey(name) => name.to_string(),
-        Key::StrKey(s) => s.to_string(),
-        Key::IntKey(i) => i.to_string(),
-        Key::BoolKey(b) => b.to_string(),
+    fn design_key_text(key: &auto_parser_api::ast::Key) -> String {
+        use auto_parser_api::ast::Key;
+        match key {
+            Key::NamedKey(name) => name.to_string(),
+            Key::StrKey(s) => s.to_string(),
+            Key::IntKey(i) => i.to_string(),
+            Key::BoolKey(b) => b.to_string(),
+        }
     }
-}
 
-/// 本元素（且仅本元素声明了 design）的合成 frame；未声明返回 None。
+    /// 本元素（且仅本元素声明了 design）的合成 frame；未声明返回 None。
     pub(super) fn current_design_frame(
         &self,
     ) -> Option<std::collections::BTreeMap<String, auto_lang_core::ast::Expr>> {
@@ -78,7 +76,11 @@ fn design_key_text(key: &auto_parser_api::ast::Key) -> String {
 }
 
 impl<'a> AuraViewBuilder<'a> {
-    pub(super) fn extract_string(&self, props: &HashMap<String, AuraPropValue>, key: &str) -> Option<String> {
+    pub(super) fn extract_string(
+        &self,
+        props: &HashMap<String, AuraPropValue>,
+        key: &str,
+    ) -> Option<String> {
         self.extract_string_with(props, key, &Bindings::new())
     }
 
@@ -92,7 +94,11 @@ impl<'a> AuraViewBuilder<'a> {
     ///   button { row { text note.title } text note.time }
     /// yields "Welcome\nJust now" (newline-separated), so the iced renderer
     /// can render title and time on separate lines with different styling.
-    pub(super) fn extract_children_text(&self, children: &[AuraNode], bindings: &Bindings) -> Option<String> {
+    pub(super) fn extract_children_text(
+        &self,
+        children: &[AuraNode],
+        bindings: &Bindings,
+    ) -> Option<String> {
         let parts: Vec<String> = children
             .iter()
             .filter_map(|c| match c {
@@ -198,7 +204,11 @@ impl<'a> AuraViewBuilder<'a> {
 
     /// Extract a u16 property from AuraNode props.
     /// PLAN-018 D10:int(scheme)字面量提取(负值合法:哨兵 -1 跟随主题)。
-    pub(super) fn extract_i32_prop(&self, props: &HashMap<String, AuraPropValue>, key: &str) -> Option<i32> {
+    pub(super) fn extract_i32_prop(
+        &self,
+        props: &HashMap<String, AuraPropValue>,
+        key: &str,
+    ) -> Option<i32> {
         match props.get(key)? {
             AuraPropValue::Expr(expr) => match expr {
                 Expr::Int(i) => Some(*i),
@@ -222,7 +232,11 @@ impl<'a> AuraViewBuilder<'a> {
         Some(val.as_int())
     }
 
-    pub(super) fn extract_u16(&self, props: &HashMap<String, AuraPropValue>, key: &str) -> Option<u16> {
+    pub(super) fn extract_u16(
+        &self,
+        props: &HashMap<String, AuraPropValue>,
+        key: &str,
+    ) -> Option<u16> {
         match props.get(key)? {
             AuraPropValue::Expr(expr) => match expr {
                 Expr::Int(i) => {
@@ -273,7 +287,11 @@ impl<'a> AuraViewBuilder<'a> {
     }
 
     /// Extract a bool property from AuraNode props.
-    pub(super) fn extract_bool(&self, props: &HashMap<String, AuraPropValue>, key: &str) -> Option<bool> {
+    pub(super) fn extract_bool(
+        &self,
+        props: &HashMap<String, AuraPropValue>,
+        key: &str,
+    ) -> Option<bool> {
         match props.get(key)? {
             AuraPropValue::Expr(Expr::Bool(b)) => Some(*b),
             _ => None,
@@ -281,7 +299,11 @@ impl<'a> AuraViewBuilder<'a> {
     }
 
     /// Extract a float property from AuraNode props (supports StateRef resolution).
-    pub(super) fn extract_f64(&self, props: &HashMap<String, AuraPropValue>, key: &str) -> Option<f64> {
+    pub(super) fn extract_f64(
+        &self,
+        props: &HashMap<String, AuraPropValue>,
+        key: &str,
+    ) -> Option<f64> {
         let empty_bindings = HashMap::new();
         self.extract_f64_with(props, key, &empty_bindings)
     }
@@ -453,10 +475,7 @@ fn apply_design_values(
 }
 
 /// design 值解析：点链/裸名 → 当前主题+模式的槽值；字面量 → 原样。
-fn resolve_design_value(
-    expr: &auto_lang_core::ast::Expr,
-    bindings: &Bindings,
-) -> Option<String> {
+fn resolve_design_value(expr: &auto_lang_core::ast::Expr, bindings: &Bindings) -> Option<String> {
     use auto_ui_compiler::design_tokens::theme_tree;
     match expr {
         auto_lang_core::ast::Expr::Str(s) => Some(s.to_string()),
@@ -510,9 +529,7 @@ fn merge_design_classes(
     let has_border = extra
         .iter()
         .any(|c| matches!(c, StyleClass::BorderColor(_)));
-    let has_ring = extra
-        .iter()
-        .any(|c| matches!(c, StyleClass::RingColor(_)));
+    let has_ring = extra.iter().any(|c| matches!(c, StyleClass::RingColor(_)));
     let has_placeholder = extra
         .iter()
         .any(|c| matches!(c, StyleClass::PlaceholderColor(_)));

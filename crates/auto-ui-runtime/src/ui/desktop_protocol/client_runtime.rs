@@ -724,9 +724,7 @@ impl<S: FrameSource> ClientPump<S> {
         if app.state != AppState::Active {
             return;
         }
-        let supported = app
-            .peer_caps
-            .supports(super::message::CAP_RESOURCE_RELEASE);
+        let supported = app.peer_caps.supports(super::message::CAP_RESOURCE_RELEASE);
         // 未协商也要排水并丢弃：否则 producer 侧释放队列在旧宿主连线上无界增长
         // （复审 F-04；旧宿主本来就不认这个 tag）。
         let srcs = app.session.drain_resource_releases();
@@ -737,7 +735,10 @@ impl<S: FrameSource> ClientPump<S> {
             Ok(msg) => {
                 let _ = self.app_end.send(&msg);
             }
-            Err(e) => eprintln!("[rq-client] 资源释放弃置（{}）：{e:?}", self.config.app_name),
+            Err(e) => eprintln!(
+                "[rq-client] 资源释放弃置（{}）：{e:?}",
+                self.config.app_name
+            ),
         }
     }
 

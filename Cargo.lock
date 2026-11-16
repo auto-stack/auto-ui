@@ -1224,6 +1224,7 @@ dependencies = [
  "ace-a2x-rust",
  "ace-abi",
  "ace-av",
+ "ace-core",
  "ace-foreign-contract",
  "ace-source-query",
  "arboard",

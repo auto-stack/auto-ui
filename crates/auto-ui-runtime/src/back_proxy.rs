@@ -1434,7 +1434,10 @@ fn load_back_session(app_id: &str, back_entry: &std::path::Path) -> Result<Sessi
     }
     for stmt in &import_stmts {
         if let Stmt::Store(s) = stmt {
-            if matches!(s.kind, auto_lang_core::ast::StoreKind::Var | auto_lang_core::ast::StoreKind::Const) {
+            if matches!(
+                s.kind,
+                auto_lang_core::ast::StoreKind::Var | auto_lang_core::ast::StoreKind::Const
+            ) {
                 codegen.global_vars.insert(s.name.to_string());
             }
         }
@@ -1778,13 +1781,16 @@ impl SessionRuntime {
             // Same legacy single-string body contract as the standalone HTTP
             // binder: named path/body/query values win, otherwise pass the
             // complete body, including parseable objects and JSON string shells.
-            if param_sigs.len() == 1 && !req.body.is_empty()
+            if param_sigs.len() == 1
+                && !req.body.is_empty()
                 && auto_lang_core::api::contract::ParamKind::from_param_string(&sig.ty, &[])
                     == auto_lang_core::api::contract::ParamKind::Str
             {
                 let raw = match std::str::from_utf8(&req.body) {
                     Ok(raw) => raw.to_string(),
-                    Err(_) => return ProxyReply::json(400, error_json("back-proxy: body is not UTF-8")),
+                    Err(_) => {
+                        return ProxyReply::json(400, error_json("back-proxy: body is not UTF-8"))
+                    }
                 };
                 bound.push(serde_json::Value::String(raw.clone()));
                 arg_srcs.push(ArgSrc::TypedString(sig.clone(), raw));

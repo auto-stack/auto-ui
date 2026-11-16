@@ -1,9 +1,9 @@
 //! PLAN-014 T-06：桌面 shell 状态变更责任（toast/notes/通知、switcher/launcher/dashboard、壁纸/dock/图标栅格/dnd/主题执行族）（自 iced/renderer.rs 原样收编）。
 //! 消息序/active判据/last-owner exit/纹理与external pin寿命零改——纯移动。
-use super::*;
 use super::devtools::*;
 use super::media::*;
 use super::subscriptions::*;
+use super::*;
 
 impl Default for InspectorSubTab {
     fn default() -> Self {
@@ -370,7 +370,11 @@ pub(super) fn syslog_inject_tick(state: &mut crate::ui::session::DesktopSession)
     }
 }
 
-pub(super) fn push_notification(state: &mut crate::ui::session::DesktopSession, kind: &str, msg: &str) {
+pub(super) fn push_notification(
+    state: &mut crate::ui::session::DesktopSession,
+    kind: &str,
+    msg: &str,
+) {
     // Plan 487 M4 + Plan 540 T2：通知持久化开关门控（479 消费链单点）——
     // 单源 `config.notes_enabled`（设置窗写经宿主臂收口落 config.at），
     // false = 关：notify 动词全链路（入史 + toast + 未读 + 落盘）短路。
@@ -1658,7 +1662,9 @@ pub(super) fn dashboard_hatched_tick_allowed(
 /// view 侧 faces 清单（装配层消费）——只读面板注入的平行快照（零源
 /// 扫描/零文件 IO），重构 DashFace 供 [`dashboard_layout`] 同算式复算
 /// 格位。面板未挂载/快照空 → 空。
-pub(super) fn dashboard_faces_for_view(state: &crate::ui::session::DesktopSession) -> Vec<DashFace> {
+pub(super) fn dashboard_faces_for_view(
+    state: &crate::ui::session::DesktopSession,
+) -> Vec<DashFace> {
     // PLAN-036 T-06（D1 修订）：outproc 轨读宿主缓存（push 时写入）。
     if state.desktop.shell_pipe.is_some() {
         let cache = state.desktop.dashboard_face_cache.borrow();
@@ -2629,9 +2635,7 @@ pub(super) fn execute_desktop_commands(
             // PLAN-601 T-05：命名主题热切换（set_theme 未知名解析期已拒）。
             DC::SetThemeName(name) => execute_set_theme_name(state, &name.clone()),
             // PLAN-053 T-02：宿主主题策略选择（策略核心单点执行臂）。
-            DC::SetThemePolicy(family, mode) => {
-                execute_set_theme_policy(state, &family, &mode)
-            }
+            DC::SetThemePolicy(family, mode) => execute_set_theme_policy(state, &family, &mode),
         }
     }
     (false, tasks)
@@ -2718,11 +2722,7 @@ fn execute_set_theme_policy(
 /// `dark_mode` 状态回写；有主题 scope 的 App（themes dep 采纳者）经
 /// `set_host_theme_inputs` 喂宿主完整快照（失败保旧由 031 publish 层保证，
 /// 本臂不逐 App 试错）。全场快照撤 + view_dirty 双路径共用（P041 等价）。
-fn apply_theme_policy_effect(
-    state: &mut crate::ui::session::DesktopSession,
-    mode: &str,
-    rev: u64,
-) {
+fn apply_theme_policy_effect(state: &mut crate::ui::session::DesktopSession, mode: &str, rev: u64) {
     let _ = rev;
     let resolved = crate::ui::theme_policy::resolved_dark(mode);
     if let Some(dark) = resolved {
@@ -2773,8 +2773,7 @@ pub(crate) fn sync_theme_shell_state(
         .host
         .as_ref()
         .map(|h| {
-            h.wm
-                .wins
+            h.wm.wins
                 .iter()
                 .filter_map(|(_wid, w)| w.registry_id.clone().map(|id| (w.app.0, id)))
                 .collect()
@@ -2787,8 +2786,10 @@ pub(crate) fn sync_theme_shell_state(
             .unwrap_or_else(|| format!("app-{}", id.0));
         match app.component.theme_scope() {
             Some(scope) => {
-                let status = match (&policy, crate::ui::theme_policy::last_scope_eval(scope.id()))
-                {
+                let status = match (
+                    &policy,
+                    crate::ui::theme_policy::last_scope_eval(scope.id()),
+                ) {
                     (Some(p), _) if scope.family_name() == p.family => "applied".to_string(),
                     (Some(_), Some((false, reason))) => format!("rejected: {reason}"),
                     (Some(_), _) => "pending".to_string(),
@@ -2810,13 +2811,7 @@ pub(crate) fn sync_theme_shell_state(
     rows.dedup();
     // 摘要头（family@mode rev=N）+ 每应用状态行；未激活 = 仅行集（恒空串）。
     let status = if policy.is_some() {
-        format!(
-            "{}@{} rev{}; {}",
-            family,
-            mode,
-            rev,
-            rows.join(", ")
-        )
+        format!("{}@{} rev{}; {}", family, mode, rev, rows.join(", "))
     } else {
         rows.join(", ")
     };
@@ -2852,10 +2847,9 @@ pub(crate) fn sync_theme_shell_state(
             let _ = app
                 .component
                 .write_state("__theme_status", auto_val::Value::str(&status));
-            let _ = app.component.write_state(
-                "__theme_error",
-                auto_val::Value::str(error.unwrap_or("")),
-            );
+            let _ = app
+                .component
+                .write_state("__theme_error", auto_val::Value::str(error.unwrap_or("")));
             *app.state.view_dirty.borrow_mut() = true;
             // PLAN-053 T-05：pending 行自续拍（eval 落定在帧构建路径——
             // 晚于本 sync；有待定行 = 下拍再查，落定即停，稳态零成本）。
@@ -3309,9 +3303,9 @@ pub(super) fn apply_external_config_diff(
                 candidate.theme_family_digest = None;
             }
         }
-    match crate::ui::theme_policy::stage_candidate(&mut candidate) {
-        crate::ui::theme_policy::PolicyOutcome::Staged(staged) => {
-            state.desktop.config = candidate.clone();
+        match crate::ui::theme_policy::stage_candidate(&mut candidate) {
+            crate::ui::theme_policy::PolicyOutcome::Staged(staged) => {
+                state.desktop.config = candidate.clone();
                 if crate::ui::desktop_config::save(&state.desktop.config).is_ok() {
                     let mode = candidate.theme_mode.clone().unwrap_or_default();
                     let rev = crate::ui::theme_policy::publish_staged(staged);
@@ -4617,7 +4611,9 @@ pub(super) fn decide_fit_resize(
 /// Plan 504：发起一次 fit 内容测量。LayoutCollector 操作布全窗口树
 /// （daemon 下 Action::Widget 遍历所有界面），回执 `__fit_measured`
 /// 路由到 `win` 所在 DM::Window 臂。
-pub(super) fn fit_measure_task(win: iced::window::Id) -> iced::Task<crate::ui::session::DesktopMessage> {
+pub(super) fn fit_measure_task(
+    win: iced::window::Id,
+) -> iced::Task<crate::ui::session::DesktopMessage> {
     iced::advanced::widget::operate(crate::ui::iced::LayoutCollector::new()).map(move |bounds| {
         crate::ui::session::DesktopMessage::Window(
             win,
@@ -5928,7 +5924,9 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                         .or_else(|| state.hatched_mini_of(which)),
                 };
                 let Some(app_id) = app_id else { continue };
-                if let Some(result) = state.broker_named_action(app_id, &handler, arg.as_deref(), widget.as_deref()) {
+                if let Some(result) =
+                    state.broker_named_action(app_id, &handler, arg.as_deref(), widget.as_deref())
+                {
                     if let Err(error) = result {
                         eprintln!("[desktop-input] handler {handler}: {error}");
                     }
@@ -5966,11 +5964,17 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                 let app_id = if app == "shell" {
                     state.desktop.shell_app
                 } else {
-                    state.host.as_ref().and_then(|host| {
-                        host.wm.wins.values()
-                            .find(|window| window.registry_id.as_deref() == Some(app.as_str()))
-                            .map(|window| window.app)
-                    }).or_else(|| state.hatched_mini_of(&app))
+                    state
+                        .host
+                        .as_ref()
+                        .and_then(|host| {
+                            host.wm
+                                .wins
+                                .values()
+                                .find(|window| window.registry_id.as_deref() == Some(app.as_str()))
+                                .map(|window| window.app)
+                        })
+                        .or_else(|| state.hatched_mini_of(&app))
                 };
                 if let Some(app_id) = app_id {
                     if let Err(error) = state.dispatch_scalar_message(app_id, msg, &args) {
@@ -6003,32 +6007,48 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                         .map(|h| {
                             h.wm.wins
                                 .iter()
-                                .map(|(w, v)| format!("{}:app={}:reg={:?}", w.0, v.app.0, v.registry_id))
+                                .map(|(w, v)| {
+                                    format!("{}:app={}:reg={:?}", w.0, v.app.0, v.registry_id)
+                                })
                                 .collect()
                         })
                         .unwrap_or_default();
                     let clients: Vec<String> = state
                         .broker_clients
                         .values()
-                        .map(|c| format!("wid={:?} surfaces={:?} name={:?}", c.wid, c.wid_surface.keys().collect::<Vec<_>>(), c.app_name))
+                        .map(|c| {
+                            format!(
+                                "wid={:?} surfaces={:?} name={:?}",
+                                c.wid,
+                                c.wid_surface.keys().collect::<Vec<_>>(),
+                                c.app_name
+                            )
+                        })
                         .collect();
-                    eprintln!("[plan060] action {msg} app_id={} wins={wins:?} clients={clients:?}", app_id.0);
+                    eprintln!(
+                        "[plan060] action {msg} app_id={} wins={wins:?} clients={clients:?}",
+                        app_id.0
+                    );
                 }
-                if let Some(result) = state.broker_named_action(app_id, &msg, arg.as_deref(), None) {
+                if let Some(result) = state.broker_named_action(app_id, &msg, arg.as_deref(), None)
+                {
                     if let Err(error) = result {
                         eprintln!("[desktop-input] message {msg}: {error}");
                     }
                     continue;
                 }
-                let Some(sess) = state.apps.get_mut(&app_id) else { continue };
+                let Some(sess) = state.apps.get_mut(&app_id) else {
+                    continue;
+                };
                 let args = arg
                     .map(|a| vec![auto_val::Value::str(&a)])
                     .unwrap_or_default();
-                sess.component.on(crate::ui::interpreter::DynamicMessage::Typed {
-                    widget_name: "App".to_string(),
-                    event_name: msg,
-                    args,
-                });
+                sess.component
+                    .on(crate::ui::interpreter::DynamicMessage::Typed {
+                        widget_name: "App".to_string(),
+                        event_name: msg,
+                        args,
+                    });
                 *sess.state.view_dirty.borrow_mut() = true;
             }
             // PLAN-060：验收通道指针注入——走真实指针消费臂
@@ -6042,7 +6062,10 @@ pub(crate) fn apply_desktop_injects(state: &mut crate::ui::session::DesktopSessi
                 use crate::ui::session::PointerPhase;
                 // PLAN-060 诊断：命中窗与本臂返回（验收通道排障用，稳态保留）。
                 let __hit = state.host.as_ref().and_then(|h| h.wm.hit_test(x, y));
-                eprintln!("[plan060] pointer {:?} ({:.1},{:.1}) hit={:?}", phase, x, y, __hit);
+                eprintln!(
+                    "[plan060] pointer {:?} ({:.1},{:.1}) hit={:?}",
+                    phase, x, y, __hit
+                );
                 match phase {
                     PointerPhase::Down => {
                         state.broker_pointer_down(x, y, button);
@@ -6716,10 +6739,3 @@ pub(super) fn publish_workspace_previews(state: &mut crate::ui::session::Desktop
         wallpaper_src: state.desktop.desktop_wallpaper.clone(),
     });
 }
-
-
-
-
-
-
-

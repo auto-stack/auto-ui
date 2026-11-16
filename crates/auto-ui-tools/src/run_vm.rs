@@ -56,6 +56,16 @@ pub fn run_entry_file(path: &str) -> auto_lang_core::AutoResult<String> {
 /// 执行动态 UI 入口：托管时交宿主主线程，未托管在当前线程（= CLI 的
 /// OS 主线程，迁移前行为）。
 fn execute_vm_entry(code: &str, path: Option<&str>) -> auto_lang_core::AutoResult<String> {
+    // PLAN-980 NATIVE：`AUTO_UI_ENGINE=ace` → ACE 原生通道（真实源经组件面
+    // 免驱动/带驱动编译 + AV 真值 + run_app 真窗）；出面外源由 ACE 面**具名
+    // 拒绝**（不静默回退旧 VM）。旧 vm 通道（含托管 hook）不受影响。
+    if std::env::var("AUTO_UI_ENGINE").ok().as_deref() == Some("ace") {
+        let path = path.unwrap_or("ui.at");
+        return auto_ui_runtime::run_ace_native_entry(code, path).map_err(|e| {
+            let err: auto_lang_core::AutoError = format!("ace native lane: {e}").into();
+            err
+        });
+    }
     match proc_host::vm_main_hook() {
         Some(hook) => hook(code, path),
         None => auto_ui_runtime::run_file_dynamic_ui(code, path),

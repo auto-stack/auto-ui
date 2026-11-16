@@ -257,7 +257,11 @@ impl InstancePath {
 
     /// 解析出的 widget 类型名（`@` 前缀段）。
     pub fn widget_type(&self) -> &str {
-        let head = self.0.split_once('\u{1}').map(|(widget, _)| widget).unwrap_or(self.0.as_str());
+        let head = self
+            .0
+            .split_once('\u{1}')
+            .map(|(widget, _)| widget)
+            .unwrap_or(self.0.as_str());
         match head.split_once('@') {
             Some((w, _)) => w,
             None => head,
@@ -498,10 +502,7 @@ impl DynamicComponent {
             mount_type_seq: std::cell::RefCell::new(HashMap::new()),
             framework_clock_wanted: std::cell::Cell::new(false),
             framework_clock_scanned: std::cell::Cell::new(false),
-            last_schema: std::collections::HashMap::from([(
-                widget.name.clone(),
-                widget.clone(),
-            )]),
+            last_schema: std::collections::HashMap::from([(widget.name.clone(), widget.clone())]),
             source_snapshot: None,
             reload_pending: std::cell::Cell::new(false),
         })
@@ -563,7 +564,8 @@ impl DynamicComponent {
         let widget_name = _logic.name.to_string();
 
         // 3. Extract input-to-state mapping for text input handling
-        let input_state_map = extract_input_state_map_with_registry(view.view_tree, &registry, &bridge);
+        let input_state_map =
+            extract_input_state_map_with_registry(view.view_tree, &registry, &bridge);
 
         // EDGE-01: merge element-attribute onkeydown.* bindings into key_bindings.
         // PLAN-085 T-03: routed pages mount through `outlet` and never appear as
@@ -697,7 +699,8 @@ impl DynamicComponent {
         let view = view_widget.view_data();
         let view_template = view.view_tree.clone();
         let widget_name = view_widget.name.clone();
-        let input_state_map = extract_input_state_map_with_registry(view.view_tree, &registry, &bridge);
+        let input_state_map =
+            extract_input_state_map_with_registry(view.view_tree, &registry, &bridge);
 
         // PLAN-048 L1 (musk auth gate): merge store-as-child computeds into
         // the root computed table. Store fields are merged into root state as
@@ -1147,8 +1150,12 @@ impl DynamicComponent {
                 if !identities.is_empty() {
                     for identity in identities {
                         out.push(InstanceTimeSource {
-                            path: InstancePath(format!("{}\u{1}{}", s.widget, identity)), kind: s.kind,
-                            widget: s.widget.clone(), event: s.event.clone(), every_ms: s.every_ms, when: s.when.clone(),
+                            path: InstancePath(format!("{}\u{1}{}", s.widget, identity)),
+                            kind: s.kind,
+                            widget: s.widget.clone(),
+                            event: s.event.clone(),
+                            every_ms: s.every_ms,
+                            when: s.when.clone(),
                         });
                     }
                     continue;
@@ -1608,9 +1615,7 @@ impl DynamicComponent {
     }
 
     /// PLAN-031 T-03：本组件（App/窗口）的主题作用域；`None` = legacy 全局槽。
-    pub fn theme_scope(
-        &self,
-    ) -> Option<std::rc::Rc<auto_ui_compiler::style::theme::ThemeScope>> {
+    pub fn theme_scope(&self) -> Option<std::rc::Rc<auto_ui_compiler::style::theme::ThemeScope>> {
         self.theme_scope.clone()
     }
 
@@ -1685,9 +1690,7 @@ impl DynamicComponent {
     }
 
     /// 读回当前 scope 的宿主输入（未设置 = None）。
-    pub fn host_theme_inputs(
-        &self,
-    ) -> Option<auto_ui_compiler::style::theme::HostThemeInputs> {
+    pub fn host_theme_inputs(&self) -> Option<auto_ui_compiler::style::theme::HostThemeInputs> {
         self.theme_scope.as_ref().map(|s| s.host_inputs())
     }
 
@@ -1697,7 +1700,9 @@ impl DynamicComponent {
         &self,
     ) -> Option<std::rc::Rc<auto_ui_compiler::style::theme::ThemeScope>> {
         let parent = self.theme_scope.as_ref()?;
-        Some(auto_ui_compiler::style::theme::ThemeScope::preview_child(parent))
+        Some(auto_ui_compiler::style::theme::ThemeScope::preview_child(
+            parent,
+        ))
     }
 
     /// Plan 559 W7: dispatch a handler into a named sub-widget's handler
@@ -2416,8 +2421,11 @@ impl DynamicComponent {
             .map(|(n, v)| (n.clone(), v.clone()))
             .collect();
         self.widget_name = new_widget.name.clone();
-        self.input_state_map =
-            extract_input_state_map_with_registry(&new_widget.view_tree, &self.widget_registry, &self.bridge);
+        self.input_state_map = extract_input_state_map_with_registry(
+            &new_widget.view_tree,
+            &self.widget_registry,
+            &self.bridge,
+        );
         self.tick_interval = new_widget.tick_interval;
         self.span_map = new_widget.span_map.clone();
         self.dirty = true;
@@ -2502,9 +2510,8 @@ impl DynamicComponent {
                 }
             }
         }
-        let code = std::fs::read_to_string(&path).map_err(|e| {
-            format!("cannot read root source {}: {}", path.display(), e)
-        })?;
+        let code = std::fs::read_to_string(&path)
+            .map_err(|e| format!("cannot read root source {}: {}", path.display(), e))?;
         let current = crate::ui::reload_bundle::collect_source_snapshot(&path, &code)?;
         let changed = match &self.source_snapshot {
             None => false, // 登记基线拍
@@ -2544,13 +2551,10 @@ impl DynamicComponent {
             Ok(c) => c,
             Err(e) => return ReloadOutcome::Rejected(format!("cannot read root source: {e}")),
         };
-        let candidate =
-            match crate::dynamic_build::build_reload_candidate(&code, path.to_str()) {
-                Ok(c) => c,
-                Err(e) => {
-                    return ReloadOutcome::Rejected(format!("candidate build rejected: {e}"))
-                }
-            };
+        let candidate = match crate::dynamic_build::build_reload_candidate(&code, path.to_str()) {
+            Ok(c) => c,
+            Err(e) => return ReloadOutcome::Rejected(format!("candidate build rejected: {e}")),
+        };
         // AC-01：候选构建期间来源变化（快照失配）→ 具名拒绝保旧。
         if let Err(e) = self.verify_snapshot_stable() {
             return ReloadOutcome::Rejected(e);
@@ -2603,11 +2607,8 @@ impl DynamicComponent {
                 .map_err(|e| format!("root field `{k}`: {e}"))?;
             old_root_new.insert(k.clone(), nv);
         }
-        let old_defs = flattened_state_defs(
-            self.last_schema
-                .values()
-                .flat_map(|w| w.state_vars.iter()),
-        );
+        let old_defs =
+            flattened_state_defs(self.last_schema.values().flat_map(|w| w.state_vars.iter()));
         let new_defs = flattened_state_defs(
             candidate
                 .last_schema
@@ -2636,7 +2637,9 @@ impl DynamicComponent {
         for identity in &old_identities {
             // PLAN-069 F3: 类型取注册记录（身份含 outlet 路由装饰，字符串后缀
             // 拆解在 `@/book/7/chapter/1` 形态下会取到路由尾段）。
-            let widget_type = old_bridge.child_instance_widget_name(identity).unwrap_or_default();
+            let widget_type = old_bridge
+                .child_instance_widget_name(identity)
+                .unwrap_or_default();
             let fields = old_bridge
                 .read_instance_state_all(identity)
                 .map_err(|e| format!("instance `{identity}`: {e}"))?;
@@ -2663,12 +2666,10 @@ impl DynamicComponent {
                 let new_defs = flattened_state_defs(nw.state_vars.iter());
                 let (mut migrated, _) = match migrate_state_typed(&fields_new, &old_defs, &new_defs)
                 {
-                    MigrationOutcome::Reject(names) => {
-                        return Err(format!(
-                            "instance `{identity}` schema conflict — candidate rejected (keep old): {}",
-                            names.join(", ")
-                        ))
-                    }
+                    MigrationOutcome::Reject(names) => return Err(format!(
+                        "instance `{identity}` schema conflict — candidate rejected (keep old): {}",
+                        names.join(", ")
+                    )),
                     MigrationOutcome::Ok(m, r) => (m, r),
                 };
                 // 新 model 字段按新 schema 默认补位（"新增用默认"；prop 由
@@ -2762,7 +2763,6 @@ pub enum ReloadOutcome {
     Error(String),
 }
 
-
 // ============================================================================
 // Component trait implementation
 // ============================================================================
@@ -2816,7 +2816,9 @@ impl Component for DynamicComponent {
         } = &msg
         {
             match self.bridge.child_instance_state_id(instance) {
-                Some(id) => match self.bridge.call_handler_for(widget_name, event_name, id, args)
+                Some(id) => match self
+                    .bridge
+                    .call_handler_for(widget_name, event_name, id, args)
                 {
                     Ok(()) => self.dirty = true,
                     Err(e) => {
@@ -2824,10 +2826,7 @@ impl Component for DynamicComponent {
                             "[VM-HANDLER] {}<{}>.{} failed: {}",
                             widget_name, instance, event_name, e
                         );
-                        if !matches!(
-                            e,
-                            crate::ui::vm_bridge::VmBridgeError::HandlerNotFound(_)
-                        ) {
+                        if !matches!(e, crate::ui::vm_bridge::VmBridgeError::HandlerNotFound(_)) {
                             self.dirty = true;
                         }
                     }
@@ -3032,7 +3031,9 @@ impl DynamicComponent {
         route: &crate::ui::child_emit::ParentRoute,
         payload: auto_val::Value,
     ) {
-        let Some(state_id) = self.bridge.callback_parent_state(child_state_id) else { return; };
+        let Some(state_id) = self.bridge.callback_parent_state(child_state_id) else {
+            return;
+        };
         // 趋同修复汇流（PLAN-059 T9 musk DeleteConfirmDialog + auto-down
         // PLAN-051 T11 demo SettingsPopover.Close 双实证）：零参父 handler
         // 不得塞 Nil 载荷——调用帧从 [self] 变 [self, Nil],handler 体内
@@ -3376,7 +3377,8 @@ impl DynamicComponent {
                         (false, [only]) => {
                             name_only_instance = only.clone();
                             instance = Some(name_only_instance.as_str());
-                            self.bridge.child_instance_state_id(name_only_instance.as_str())
+                            self.bridge
+                                .child_instance_state_id(name_only_instance.as_str())
                         }
                         (false, _) => {
                             instance = None;
@@ -3414,8 +3416,7 @@ impl DynamicComponent {
                 // store 绑定写到实例上因 FieldNotFound 静默失败 → 键入值不达。
                 if let Some(id) = instance_state_id {
                     let instance_write =
-                        self.bridge
-                            .write_state_onto(id, state_field, value.clone());
+                        self.bridge.write_state_onto(id, state_field, value.clone());
                     if instance_write.is_err() {
                         let _ = self.bridge.write_state(state_field, value);
                     }
@@ -3550,8 +3551,12 @@ impl DynamicComponent {
         let mut stripped_payloads: Vec<(String, auto_val::Value)> =
             Vec::with_capacity(stripped_calls.len());
         for sc in &stripped_calls {
-            let payload =
-                eval_stripped_arg(&self.bridge, sc.arg.as_deref(), &param_bindings, instance_state_id);
+            let payload = eval_stripped_arg(
+                &self.bridge,
+                sc.arg.as_deref(),
+                &param_bindings,
+                instance_state_id,
+            );
 
             stripped_payloads.push((sc.callback.clone(), payload));
         }
@@ -3651,7 +3656,10 @@ impl DynamicComponent {
                             .bridge
                             .write_state("__emit_msg", auto_val::Value::str(""));
                         let emit_key = format!("on{}", pending_msg);
-                        match self.bridge.instance_callback(state_obj_id, &emit_widget, &emit_key) {
+                        match self
+                            .bridge
+                            .instance_callback(state_obj_id, &emit_widget, &emit_key)
+                        {
                             Some(route) => {
                                 if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
                                     eprintln!(
@@ -3679,7 +3687,10 @@ impl DynamicComponent {
                 // `on<name>` 绑定（musk `send(str)` + `onsend: .SendInput($event)`
                 // 形态；载荷 = 子 handler 收到的首实参，无实参回落输入值）。
                 let emit_key = format!("on{}", clean_name);
-                match self.bridge.instance_callback(state_obj_id, &emit_widget, &emit_key) {
+                match self
+                    .bridge
+                    .instance_callback(state_obj_id, &emit_widget, &emit_key)
+                {
                     Some(route) => {
                         if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
                             eprintln!(
@@ -3697,7 +3708,13 @@ impl DynamicComponent {
                             .cloned()
                             .or_else(|| input_value.clone().map(|t| auto_val::Value::Str(t.into())))
                             .unwrap_or(auto_val::Value::Nil);
-                        self.dispatch_parent_route(&emit_widget, state_obj_id, &clean_name, &route, payload);
+                        self.dispatch_parent_route(
+                            &emit_widget,
+                            state_obj_id,
+                            &clean_name,
+                            &route,
+                            payload,
+                        );
                     }
                     None => {
                         // 非错：未绑定回调的子 msg 不回送（vue 同语义）。
@@ -3707,9 +3724,18 @@ impl DynamicComponent {
                 // 快照实参回送（017-chat DoSend → on_send(.draft) →
                 // App.SendMessage(text) 形态）。
                 for (callback, payload) in stripped_payloads {
-                    match self.bridge.instance_callback(state_obj_id, &emit_widget, &callback) {
+                    match self
+                        .bridge
+                        .instance_callback(state_obj_id, &emit_widget, &callback)
+                    {
                         Some(route) => {
-                            self.dispatch_parent_route(&emit_widget, state_obj_id, &clean_name, &route, payload);
+                            self.dispatch_parent_route(
+                                &emit_widget,
+                                state_obj_id,
+                                &clean_name,
+                                &route,
+                                payload,
+                            );
                         }
                         None => {
                             eprintln!(
@@ -3812,7 +3838,8 @@ impl DynamicComponent {
                     // 回落输入值）。
                     let emit_key = format!("on{}", clean_name);
                     if let Some(route) =
-                        self.bridge.instance_callback(state_obj_id, &emit_widget, &emit_key)
+                        self.bridge
+                            .instance_callback(state_obj_id, &emit_widget, &emit_key)
                     {
                         let payload = args
                             .first()
@@ -3825,7 +3852,13 @@ impl DynamicComponent {
                                 emit_widget, clean_name, route.parent_widget, route.handler
                             );
                         }
-                        self.dispatch_parent_route(&emit_widget, state_obj_id, &clean_name, &route, payload);
+                        self.dispatch_parent_route(
+                            &emit_widget,
+                            state_obj_id,
+                            &clean_name,
+                            &route,
+                            payload,
+                        );
                         self.dirty = true;
                     }
                 }
@@ -4210,9 +4243,7 @@ fn collect_mounted_child_tags(
     out: &mut Vec<String>,
 ) {
     match node {
-        auto_ui_compiler::aura::AuraNode::Element {
-            tag, children, ..
-        } => {
+        auto_ui_compiler::aura::AuraNode::Element { tag, children, .. } => {
             if registry.get(tag).is_some() && !out.iter().any(|n| n == tag) {
                 out.push(tag.clone());
             }
@@ -4621,11 +4652,7 @@ mod tests {
         // PLAN-041 R-1: `draft` is Composer51a's instance-owned model field.
         let composer_obj = r1_instance_obj(&comp, "Composer51a");
         comp.bridge_mut()
-            .write_state_onto(
-                composer_obj,
-                "draft",
-                auto_val::Value::str("hello plan051"),
-            )
+            .write_state_onto(composer_obj, "draft", auto_val::Value::str("hello plan051"))
             .unwrap();
         comp.on_with_input_for("Composer51a", "DoSend", None);
         assert_eq!(
@@ -6837,9 +6864,7 @@ widget TimerChild652 {
                 .into_iter()
                 .find(|id| id.contains("DemoClock652"))
                 .expect("DemoClock652 live");
-            dc.bridge()
-                .read_instance_state(&identity, f)
-                .expect(f)
+            dc.bridge().read_instance_state(&identity, f).expect(f)
         };
         let w0 = r652(&comp, "w_tick").as_int();
         comp.on_with_input_for("DemoClock652", "Tick", None);
@@ -7370,5 +7395,3 @@ widget Helper654 {
         assert!(comp.read_state(DynamicComponent::CLOCK_SEC_FIELD).is_ok());
     }
 }
-
-

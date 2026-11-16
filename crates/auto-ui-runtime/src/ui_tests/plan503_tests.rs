@@ -81,8 +81,9 @@ mod vue_loop_member_class {
     fn vue_loop_member_class_parts_split() {
         let s = "h-10 w-10 rounded-[10px] ${r.chip}";
         // 静态段原样保留;表达式段 = v-for 成员点路径。
-        let (statics, expr) = auto_ui_compiler::ui_gen::vue::VueGenerator::interpolated_class_parts(s)
-            .expect("loop-member interpolation must split");
+        let (statics, expr) =
+            auto_ui_compiler::ui_gen::vue::VueGenerator::interpolated_class_parts(s)
+                .expect("loop-member interpolation must split");
         assert_eq!(statics, vec!["h-10 w-10 rounded-[10px]".to_string()]);
         assert_eq!(expr, "'h-10 w-10 rounded-[10px]' + r.chip");
     }
@@ -90,9 +91,10 @@ mod vue_loop_member_class {
     /// 既有 `${.field}` 形态不回归。
     #[test]
     fn vue_state_field_class_parts_no_regress() {
-        let (_, expr) =
-            auto_ui_compiler::ui_gen::vue::VueGenerator::interpolated_class_parts("w-full ${.chip}")
-                .expect("state interpolation must split");
+        let (_, expr) = auto_ui_compiler::ui_gen::vue::VueGenerator::interpolated_class_parts(
+            "w-full ${.chip}",
+        )
+        .expect("state interpolation must split");
         assert_eq!(expr, "'w-full' + chip");
     }
 }
@@ -145,7 +147,6 @@ mod launcher_rewrite {
             rendered
         );
     }
-
 
     /// PLAN-867 T-12：oracle 对齐 launcher app.at 现行形态。空查询分支的
     /// quicklinks（provider="quicklinks"，category="link"）不做分类过滤

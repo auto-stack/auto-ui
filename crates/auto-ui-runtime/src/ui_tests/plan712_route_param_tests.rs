@@ -76,13 +76,9 @@ widget detail {
     dir.path().join("app.at")
 }
 
-
 /// PLAN-041 T-02: page model fields are instance-owned — read through the
 /// page's outlet instance (root no longer carries child model fields).
-fn page_field(
-    dc: &crate::ui::dynamic::DynamicComponent,
-    field: &str,
-) -> Option<auto_val::Value> {
+fn page_field(dc: &crate::ui::dynamic::DynamicComponent, field: &str) -> Option<auto_val::Value> {
     let identity = dc
         .bridge()
         .child_instance_identities()

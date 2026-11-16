@@ -11,10 +11,10 @@
 //! `cargo test -p auto-lang --features ui-iced,iced-layout-tests --lib layout_tests`
 #![cfg(test)]
 
-use auto_ui_dialect::{UiCode, UiStmt};
 use crate::ui::iced::renderer::IntoIcedElement;
 use crate::ui::style::Style;
 use crate::ui::view::{PopoverAnchor, PopoverPlacement, View};
+use auto_ui_dialect::{UiCode, UiStmt};
 use iced_test::selector::Bounded;
 use iced_test::simulator;
 

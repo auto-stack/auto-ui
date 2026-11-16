@@ -394,10 +394,7 @@ fn f3_page_transition_keeps_root_state_alive() {
     dc.drive_scheduler_to_quiescence(10_000);
 
     let root = dc.bridge().state_obj_id();
-    assert!(
-        dc.bridge().rc_count(root) > 0,
-        "根态初始 RC 必须 > 0"
-    );
+    assert!(dc.bridge().rc_count(root) > 0, "根态初始 RC 必须 > 0");
 
     for i in 0..8 {
         dc.on_with_input_for("home2", "Go\u{1F}i\u{1F}1", None);
@@ -544,7 +541,9 @@ fn f3_reload_releases_identity_not_remounted_by_new_view() {
     let _ = dc.view_with_debug_gated(true);
     dc.drive_scheduler_to_quiescence(10_000);
     assert_eq!(
-        dc.bridge().child_instance_identities_of_type("Counter069").len(),
+        dc.bridge()
+            .child_instance_identities_of_type("Counter069")
+            .len(),
         1,
         "迟到事件不得复活已 tombstone 的 b 身份"
     );

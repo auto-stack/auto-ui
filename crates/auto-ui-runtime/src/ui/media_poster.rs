@@ -79,12 +79,7 @@ pub fn frame(key: &str) -> Option<PosterFrame> {
 
 /// 当前代次（未发布 = 0）。
 pub fn generation(key: &str) -> u64 {
-    generations()
-        .lock()
-        .unwrap()
-        .get(key)
-        .copied()
-        .unwrap_or(0)
+    generations().lock().unwrap().get(key).copied().unwrap_or(0)
 }
 
 /// 撤下某媒体键的帧（媒体关闭/换源）。

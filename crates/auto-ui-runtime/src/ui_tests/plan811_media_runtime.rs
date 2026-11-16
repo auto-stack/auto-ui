@@ -38,7 +38,8 @@ fn task_vm() -> (AutoTask, AutoVM) {
 
 #[test]
 fn media_consumers_have_no_ui_path_references() {
-    let stdlib_rs = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/ffi/stdlib.rs");
+    let stdlib_rs =
+        include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/ffi/stdlib.rs");
     assert!(
         !stdlib_rs.contains("ui::image_pipeline"),
         "vm/ffi/stdlib.rs 不得再含 ui::image_pipeline 直引形态（PLAN-811 \
@@ -51,8 +52,7 @@ fn media_consumers_have_no_ui_path_references() {
         "back_proxy.rs 不得再含 ui:: 媒体直引形态（PLAN-811 剪断）"
     );
     // PLAN-014 T-06：renderer.rs 拆分为 renderer/ 目录后，源内容守卫随 owner 扫描全部家族文件；断言本体（禁止 crate::ui::image_pipeline 直引）零改。
-    let renderer_rs = include_str!("../ui/iced/renderer/mod.rs")
-        .to_string()
+    let renderer_rs = include_str!("../ui/iced/renderer/mod.rs").to_string()
         + include_str!("../ui/iced/renderer/style_widgets.rs")
         + include_str!("../ui/iced/renderer/media.rs")
         + include_str!("../ui/iced/renderer/projection.rs")

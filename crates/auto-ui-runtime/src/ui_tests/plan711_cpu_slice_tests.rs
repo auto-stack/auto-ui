@@ -209,7 +209,8 @@ fn pump_bridge() -> crate::ui::vm_bridge::VmBridge {
         .expect("parse widget source");
     for stmt in ast.domain_stmts() {
         if let auto_ui_dialect::UiStmt::WidgetDecl(decl) = stmt {
-            let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl).expect("extract widget");
+            let widget =
+                auto_ui_compiler::aura::extract_widget_from_decl(decl).expect("extract widget");
             return crate::ui::vm_bridge::VmBridge::new(&widget).expect("bridge");
         }
     }

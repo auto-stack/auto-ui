@@ -45,7 +45,9 @@ pub fn collect_source_snapshot(
     entries.sort_by(|a, b| a.path.cmp(&b.path));
     let root = entries
         .iter()
-        .find(|e| e.path == std::fs::canonicalize(root_path).unwrap_or_else(|_| root_path.to_path_buf()))
+        .find(|e| {
+            e.path == std::fs::canonicalize(root_path).unwrap_or_else(|_| root_path.to_path_buf())
+        })
         .map(|e| e.path.clone())
         .unwrap_or_else(|| root_path.to_path_buf());
     Ok(SourceSnapshot { root, entries })
@@ -140,7 +142,9 @@ fn read_entry(canon: &Path, display: &Path) -> Result<SourceEntry, String> {
             display.display()
         )
     })?;
-    let mtime = std::fs::metadata(canon).ok().and_then(|m| m.modified().ok());
+    let mtime = std::fs::metadata(canon)
+        .ok()
+        .and_then(|m| m.modified().ok());
     Ok(SourceEntry {
         path: canon.to_path_buf(),
         mtime,
@@ -154,7 +158,9 @@ fn read_entry(canon: &Path, display: &Path) -> Result<SourceEntry, String> {
 /// [`snapshot_changed`] (content hashes — same-mtime edits are detectable).
 pub fn mtimes_unchanged(snapshot: &SourceSnapshot) -> bool {
     for entry in &snapshot.entries {
-        let now = std::fs::metadata(&entry.path).ok().and_then(|m| m.modified().ok());
+        let now = std::fs::metadata(&entry.path)
+            .ok()
+            .and_then(|m| m.modified().ok());
         if now != entry.mtime {
             return false;
         }

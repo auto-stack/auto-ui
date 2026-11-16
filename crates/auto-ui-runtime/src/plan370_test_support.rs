@@ -49,14 +49,12 @@ pub(crate) fn locate_example_app_at(example: &str) -> Option<PathBuf> {
     // 顶层画廊（charts-gallery 等，未随 ui 迁移）仍属语言仓——组内兄弟臂
     // （组根/auto-lang，组布局与平铺主检出双形态可解析）。
     let lang_top = |sub: String| {
-        std::env::var("CARGO_MANIFEST_DIR")
-            .ok()
-            .map(|d| {
-                PathBuf::from(d)
-                    .join("../../..")
-                    .join("auto-lang")
-                    .join(sub)
-            })
+        std::env::var("CARGO_MANIFEST_DIR").ok().map(|d| {
+            PathBuf::from(d)
+                .join("../../..")
+                .join("auto-lang")
+                .join(sub)
+        })
     };
     let candidates = [
         own_examples(rel.clone()),
@@ -255,8 +253,8 @@ pub(crate) fn build_component_from_app_mode(
                                 ext_imports: Vec::new(),
                                 watch: Vec::new(),
                                 expose: Vec::new(),
-                                                            design: None,
-                                });
+                                design: None,
+                            });
                         }
                     }
                 }
@@ -406,7 +404,7 @@ pub(crate) fn build_component_from_app_mode(
                     ext_imports: Vec::new(),
                     watch: Vec::new(),
                     expose: Vec::new(),
-                design: None,
+                    design: None,
                 });
             }
         }
