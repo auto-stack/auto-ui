@@ -161,3 +161,23 @@ fn s4_multi_component_surface_and_layout() {
     assert!(s.observe_component(9).is_err());
     assert!(s.exits_of(9).is_err());
 }
+
+/// R64-10：多轮 Run/Stop 之后账面净归零（runs == stops），且重新 Run 后仍可观察。
+#[test]
+fn s4_multi_run_stop_balance_is_net_zero() {
+    let mut s = AgeSession::open(TICK, 1).expect("opens");
+    assert_eq!(s.run_stop_balance(), (1, 0, true), "open counts as the first Run");
+    s.stop().expect("stop");
+    assert_eq!(s.run_stop_balance(), (1, 1, false));
+    s.run().expect("second run");
+    assert_eq!(s.run_stop_balance(), (2, 1, true));
+    s.tick(2).expect("tick after re-run");
+    assert_eq!(s.observe().unwrap().components[0].instance_states[0][0], 2);
+    s.stop().expect("stop again");
+    assert_eq!(s.run_stop_balance(), (2, 2, false), "no dangling running handle");
+    // run() 在运行中不重复计数。
+    assert_eq!(s.run().expect("third run"), 3, "run returns the run count");
+    assert_eq!(s.run_stop_balance(), (3, 2, true));
+    s.stop().expect("stop the third run");
+    assert_eq!(s.run_stop_balance(), (3, 3, false), "balanced again");
+}

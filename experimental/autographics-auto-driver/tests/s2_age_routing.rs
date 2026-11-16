@@ -178,3 +178,18 @@ fn s2_multi_component_surface_is_reachable_from_the_driver() {
     );
     assert!(s.age_observe_component(9).is_err());
 }
+
+/// R64-10：多轮 Run/Stop 的账面净归零在 driver 层也可达。
+#[test]
+fn s2_multi_run_stop_balance_is_reachable() {
+    const TICK: &str = "node Counter {\n    model { count int = 0 }\n    on Tick { count = count + 1 }\n    view {\n        text \"t\" {}\n    }\n}\n";
+    let mut s = Session::new(TICK).expect("opens");
+    assert_eq!(s.age_run_stop_balance().unwrap(), (1, 0, true));
+    s.age_stop().unwrap();
+    assert_eq!(s.age_run_stop_balance().unwrap(), (1, 1, false));
+    assert_eq!(s.age_run().unwrap(), 2);
+    s.age_tick(1).unwrap();
+    assert_eq!(s.age_observe().unwrap().components[0].instance_states[0][0], 1);
+    s.age_stop().unwrap();
+    assert_eq!(s.age_run_stop_balance().unwrap(), (2, 2, false));
+}

@@ -27,6 +27,10 @@ pub struct AgeSession {
     dispatches: u64,
     /// body 代数（成功 update_body / restart 递增；与调度计数分开，避免混用）。
     body_generation: u64,
+    /// R64-10：Run/Stop 计数——多轮 Run/Stop 之后必须净归零（runs == stops）。
+    runs: u64,
+    stops: u64,
+    active: bool,
     pid: u64,
 }
 
@@ -55,6 +59,9 @@ impl AgeSession {
             pid: NEXT_PID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             dispatches: 0,
             body_generation: 0,
+            runs: 1,
+            stops: 0,
+            active: true,
         })
     }
 
@@ -137,14 +144,33 @@ impl AgeSession {
         select_exit(&declared, request)
     }
 
+    /// R64-10：显式 Run（`open` 已经算第一次 Run）。停止后再次 Run 会重新开始。
+    pub fn run(&mut self) -> Result<u64, Vec<String>> {
+        if self.active {
+            return Ok(self.runs);
+        }
+        // run() 的返回值就是 Run 计数（与 body 代数分开）。
+        self.restart()?;
+        self.runs += 1;
+        self.active = true;
+        Ok(self.runs)
+    }
+
     /// 停止：冻结最后观察值（停止期间的调度/编辑都被拒）。
     pub fn stop(&mut self) -> Result<(), String> {
-        if self.stopped {
+        if !self.active {
             return Ok(());
         }
         self.last_observed = Some(self.observe()?);
         self.stopped = true;
+        self.active = false;
+        self.stops += 1;
         Ok(())
+    }
+
+    /// R64-10：Run/Stop 账面（`runs == stops` 表示没有悬挂的运行中句柄）。
+    pub fn run_stop_balance(&self) -> (u64, u64, bool) {
+        (self.runs, self.stops, self.active)
     }
 
     /// 恢复：同一 PID 重新启动（Start 再次为 1），generation 递增。
@@ -153,6 +179,7 @@ impl AgeSession {
         self.compiled = next;
         self.ops.clear();
         self.stopped = false;
+        self.active = true;
         self.last_observed = None;
         self.body_generation += 1;
         Ok(self.body_generation)
