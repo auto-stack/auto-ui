@@ -448,6 +448,17 @@ oracle 是 §7 各 AC 的可观测行为。
   修复在 master，用户日常工具链（钉死 debug 11-14 / cohort）为旧构建，
   需重建重部署后日常才生效（验收已在 ui-098 构建上完成）| 测试面：无新
   cargo 用例（复用终审复跑证据）；主检出 smoke check 提交后记录`。
+  **landed/canonical_verified/archived/cleaned 全链核过**：master tip=
+  1b3a02b6（ff-only 无合并提交）；canonical 两文件 HEAD 读取在案；
+  归档提交 40c06eb5（status: archived + debts DEBT-008 关闭注记 +
+  DEBT-009 立债 + evidence artifact 入仓）；主检出 smoke check
+  `cargo check -p auto-ui-runtime` Finished dev 9m05s exit 0；
+  ui-098 组五树（auto-ui + 四依赖兄弟）guard-clean 全拆、组目录删除、
+  plan-098-dev 分支删除（was 1b3a02b6）；plan-artifacts/plan-098/
+  1.5MB 整删（durable 证据在归档计划 + 仓内 artifact）、registry 刷新
+  （deleted-at-merge no holds；fix-debt008-diag 释放建议已记录）。
+  completion_kind: delivered。最终任务计数：T-01..T-08 全部完成
+  （T-07 review pass r2、T-08 merge pass），current_step=8/8。
 
 ## 10. 待澄清事项
 
