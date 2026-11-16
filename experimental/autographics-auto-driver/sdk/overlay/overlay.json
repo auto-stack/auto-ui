@@ -1,5 +1,5 @@
 {
-  "source": "auto-lang 75015a49b: experimental/ace + crates/auto-tool-execution + stdlib/ace",
+  "source": "auto-lang 3b9b3f8c5: experimental/ace + crates/auto-tool-execution + stdlib/ace",
   "files": {
     "crates/auto-tool-execution/Cargo.toml": "a5ede6f258251dbe670beac75cdbc571eeed61b46a0167b565aca2ae4498d42f",
     "crates/auto-tool-execution/src/bin/te-child.rs": "d53845c6093f04fee0f02846329a10f6ae7636f45ac804b2025ea287b3eaf602",
@@ -501,7 +501,7 @@
     "experimental/ace/crates/av/tests/cases/plan979_age_component_cpu.rs": "535a0020d73c9f9d75e920f8b9888250e0217593f6acf05f8ec89f210e23f857",
     "experimental/ace/crates/av/tests/cases/plan979_age_h0_cpu.rs": "5f56992f55156f52b5cad1234b3942099a14b660f9e4befddd6d3fac4b0cea88",
     "experimental/ace/crates/av/tests/cases/plan980_state_face.rs": "b9902a9c5c5a059821360eab50b6b50069b320671d08a72a82b3a5a5181cdf03",
-    "experimental/ace/crates/av/tests/cases/plan981_age_package_av.rs": "df1a3f01e7989097d925b805ecbf6cab0c456fc2c5977b24d4ede5fea9c2298f",
+    "experimental/ace/crates/av/tests/cases/plan981_age_package_av.rs": "4a337579de0f4ea07b1241f50552f0e20987dd642f8f6ba1ec5a5e9523f4bfe0",
     "experimental/ace/crates/av/tests/cases/platform_io_1039.rs": "7df8b05fb6a56f6ef39ab56016f39e41251e5c4cccece83389d07a46b50e8101",
     "experimental/ace/crates/av/tests/cases/probe972.rs": "54dea0cfb05cbadd458d67ca3350c54d71daa6da71b5d9198aa3594554faf1e5",
     "experimental/ace/crates/av/tests/cases/redis_975.rs": "c9c3920ce5b37a498d548341afedc795e4c4f2c505fbf7325bc7d46e82a4e468",
