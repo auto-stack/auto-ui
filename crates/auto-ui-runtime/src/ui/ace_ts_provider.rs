@@ -257,6 +257,24 @@ fn _value_kind(v: &AceStateValue) -> &'static str {
 // 状态函数 HIR（**原源 span**）→ 按表达式源 span 精确定位发射。
 // ---------------------------------------------------------------------------
 
+/// 行首槽位 `state`→`model` 同长归一化（5↔5 字节，span 稳定；仅行首
+/// trimmed 以 `state {`/`state{` 开头的行——字符串/注释/标识符使用不碰）。
+fn normalize_state_slots(src: &str) -> String {
+    src.lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("state {") || trimmed.starts_with("state{") {
+                let indent_len = line.len() - trimmed.len();
+                format!("{}model {}", &line[..indent_len], &trimmed[5..])
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + if src.ends_with('\n') { "\n" } else { "" }
+}
+
 /// 一次组件面编译承载的 fragment lane（owned 编译结果；view 按调用借用）。
 /// **span 坐标基准 = f-string 脱糖后源**（组件面入口统一脱糖——DIALECT
 /// 批口径；无 f-string 源时与原源一致）。lane 持有脱糖源供定位。
@@ -280,7 +298,11 @@ impl ComponentFragmentLane {
     pub fn compile(src: &str, path: &str, handler_msgs: &[&str]) -> Result<Self, String> {
         // 坐标基准：入口统一 f-string 脱糖（与组件面编译同一脱糖——
         // `ace_core::source::fstr::desugar_fstrings_widget`，公共出口）。
-        let ds_src = ace_core::source::fstr::desugar_fstrings_widget(src)
+        // 前置归一化：行首 `state {`→`model {`（组件面槽位语法；state/model
+        // 同为 5 字节——**span 零位移**；真语料主导形态，vue_capabilities
+        // 双轨实测发现的 face 槽位别名缺口，UI 侧同长归一化承载）。
+        let src_norm = normalize_state_slots(src);
+        let ds_src = ace_core::source::fstr::desugar_fstrings_widget(&src_norm)
             .map_err(|e| format!("fstr desugar: {e}"))?;
         let src = ds_src.as_str();
         let caps = ["ac.runtime.text.v1".to_string()];

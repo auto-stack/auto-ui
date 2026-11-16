@@ -808,3 +808,57 @@ fn p980_web_unified_entry_census_v2() {
         );
     }
 }
+
+/// WEB 切片 #6g：**全量双轨普查（冻结聚合表）**——vue_capabilities 全部
+/// 源语料（文件级提取 r#"…"#）经 `generate_sfc_with_lane` 的聚合结果。
+/// 双轨期合同：absent=旧道。表变化须具名修订（防静默漂移）。
+#[test]
+fn p980_web_full_dual_track_census() {
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+    let vc_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/vue_capabilities.rs");
+    let vc = std::fs::read_to_string(&vc_path).expect("vue_capabilities source readable");
+    let mut corpus: Vec<&str> = Vec::new();
+    let mut rest = vc.as_str();
+    while let Some(i) = rest.find("r#\"") {
+        let after = &rest[i + 3..];
+        match after.find("\"#") {
+            Some(j) => {
+                corpus.push(&after[..j]);
+                rest = &after[j + 2..];
+            }
+            None => break,
+        }
+    }
+    assert!(
+        corpus.len() >= 80,
+        "corpus extraction sanity: {}",
+        corpus.len()
+    );
+    let mut ok = 0usize;
+    let mut err = 0usize;
+    let mut spliced = 0usize;
+    let mut absent = 0usize;
+    for src in &corpus {
+        match generate_sfc_with_lane(src, "p980-dual.at") {
+            Ok((_sfc, bodies, abs)) => {
+                ok += 1;
+                spliced += bodies.len();
+                absent += abs.len();
+            }
+            Err(_) => err += 1,
+        }
+    }
+    // 冻结聚合（2026-11-16 实测；变化须具名修订）：
+    // ok=72（含 state-slot 归一化），err=11（2 store+其余=vue 10 预存红
+    // 同族解析错误——"duplicate view block"族，master 预存，KNOWN-DEBT
+    // 在案归 triage），spliced=0/absent=23：**真语料主导形态=具名
+    // `msg Msg {...}`/带参 handler/铸造 lambda——组件面语法域外**（语言侧
+    // 前置×3：ScenarioOp 无 payload、具名 msg 语法、参数绑定面）。
+    assert_eq!(corpus.len(), 83, "corpus size frozen");
+    assert_eq!(
+        (ok, err, spliced, absent),
+        (72, 11, 0, 23),
+        "dual-track aggregates frozen"
+    );
+}
