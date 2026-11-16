@@ -333,3 +333,74 @@ fn p980_web_component_face_entry_fragments() {
         String::from_utf8_lossy(&out.stderr)
     );
 }
+
+/// WEB 切片 #4：**逐 handler 精确定位（O-C3 解除）**。状态函数 HIR 的
+/// expr span=原源坐标；同 span 多 expr 时索引序大者=组合形——`!on` 的 NOT
+/// 保留（`(!l1___age_s_0_on)`），纯读形在后。host 映射后真 node 取反执行。
+#[test]
+fn p980_web_handler_precise_location() {
+    use auto_ui_runtime::ui::ace_ts_provider::ComponentFragmentLane;
+    let src = "widget Counter {\n    msg { Inc, Toggle }\n\n    model {\n        var count int = 0\n        var on bool = false\n    }\n\n    view {\n        col { text \"C\" }\n    }\n\n    on {\n        .Inc -> { .count += 1 }\n        .Toggle -> { .on = !.on }\n    }\n}\n";
+    let lane = ComponentFragmentLane::compile(src, "p980-locate.at", &["Inc", "Toggle"])
+        .expect("lane compiles");
+
+    // Toggle handler：`.on`（`!` 的操作数 span——NOT 组合形同 span 在后）。
+    let on_span = {
+        let pos = src.find("!.on").expect("`!` present");
+        pos + 1..pos + 4
+    };
+    let not = lane
+        .emit_expr_at_span("__age_state_0_on", on_span)
+        .expect("NOT-composed fragment locates precisely");
+    let joined = not.text.join("\n");
+    assert!(
+        joined.contains("(!"),
+        "negation semantics preserved: {joined}"
+    );
+    assert!(
+        joined.contains("___age_s_0_on") || joined.contains("___age_state_0_on"),
+        "state-ref form: {joined}"
+    );
+    // 宿主映射（发射局部名 → reactive 值）+ 真 node：!false === true。
+    let mapped = joined.replace("l1___age_s_0_on", "on.value");
+    let expr = not.expr.clone().expect("expr body");
+    let driver = format!(
+        "const on = {{ value: false }};\n{mapped}\nconst t = {expr};\nif (!(t === true)) {{ throw new Error(\"FRAG_ASSERT_FAILED\"); }}\nconsole.log(\"FRAG_OK\");\n"
+    );
+    let dir = std::env::temp_dir().join(format!("p980-locate-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("host.mjs"), driver).unwrap();
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg("host.mjs")
+        .current_dir(&dir)
+        .output()
+        .expect("node spawn");
+    let stdout = string_from_utf8lossy_fix(&out.stdout);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("FRAG_OK"),
+        "node: {stdout} / {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // Inc handler：`1`（复合赋值右操作数）精确 span 定位（不同 handler 区）。
+    let one_pos = src.find("+= 1").expect("inc handler");
+    let lit = lane
+        .emit_expr_at_span("__age_state_0_count", one_pos + 3..one_pos + 4)
+        .expect("literal fragment in the OTHER handler region");
+    assert_eq!(
+        lit.expr.as_deref(),
+        Some("1"),
+        "literal located: {:?}",
+        lit.text
+    );
+    // 越界/无命中=具名拒。
+    assert!(lane.emit_expr_at_span("__age_state_0_count", 0..1).is_err());
+    assert!(lane.emit_expr_at_span("__age_state_9_x", 0..1).is_err());
+}
+
+fn string_from_utf8lossy_fix(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).to_string()
+}

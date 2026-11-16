@@ -251,3 +251,105 @@ fn _value_kind(v: &AceStateValue) -> &'static str {
         AceStateValue::Str(_) => "str",
     }
 }
+
+// ---------------------------------------------------------------------------
+// 组件面 fragment lane（切片 #4）：生产形态源 → 组件面编译（一次性）→
+// 状态函数 HIR（**原源 span**）→ 按表达式源 span 精确定位发射。
+// ---------------------------------------------------------------------------
+
+/// 一次组件面编译承载的 fragment lane（owned 编译结果；view 按调用借用）。
+pub struct ComponentFragmentLane {
+    src_len: usize,
+    checked: ace_core::verify::CheckedModule,
+}
+
+/// 状态函数内按**源 span** 定位的发射结果（raw 面；宿主映射由调用方做）。
+pub struct LocatedFragment {
+    pub text: Vec<String>,
+    pub expr: Option<String>,
+    pub helpers: Vec<String>,
+}
+
+impl ComponentFragmentLane {
+    /// 生产形态源（`!`/str/bool/比较——Core profile 拒的形态）经组件面
+    /// states-only 编译。实例 1、ops=**待定位 handler 的 msg 重放**（状态
+    /// 函数体含 handler 效果表达式，`__age_state_<i>_<field>`，span=原源
+    /// 坐标——ops 空则 handler 体缺席，切片#4 探针实证）。
+    pub fn compile(src: &str, path: &str, handler_msgs: &[&str]) -> Result<Self, String> {
+        let caps = ["ac.runtime.text.v1".to_string()];
+        let ops = handler_msgs
+            .iter()
+            .map(|m| ace_av::age_component::ScenarioOp::Send {
+                instance: 0,
+                msg: (*m).to_string(),
+            })
+            .collect();
+        let compiled = ace_av::age_component::compile_component_scenario_states(
+            src,
+            path,
+            ace_av::age_component::LegacyWidgetAlias::Accept,
+            &caps,
+            &ace_av::age_component::ComponentScenario { instances: 1, ops },
+            &ace_av::age_component::ComponentInitials {
+                per_instance: vec![Vec::new()],
+            },
+        )
+        .map_err(|ds| {
+            ds.iter()
+                .map(|d| format!("{}: {}", d.code, d.message))
+                .collect::<Vec<_>>()
+                .join("; ")
+        })?;
+        let src_len = src.len();
+        Ok(Self {
+            src_len,
+            checked: compiled.checked,
+        })
+    }
+
+    /// 状态函数内、**精确落在 `span`** 的表达式发射。同 span 多表达式时
+    /// 取**索引序最大**者（组合形——如 `!on` 的 NOT——排在纯读形之后，
+    /// 切片#4 探针实证）；span 越界/无命中=具名拒。
+    #[allow(clippy::needless_range_loop)]
+    pub fn emit_expr_at_span(
+        &self,
+        state_fn: &str,
+        span: std::ops::Range<usize>,
+    ) -> Result<LocatedFragment, String> {
+        use ace_a2x_ts::{emit_expr_fragment, FragmentProgramContext, ScriptLang};
+        if span.start >= span.end || span.end > self.src_len {
+            return Err(format!(
+                "span [{})..{}) is outside the source (len {})",
+                span.start, span.end, self.src_len
+            ));
+        }
+        let view = ace_a2x_core::SemanticView::from_checked(&self.checked)
+            .map_err(|e| format!("semantic view: {e:?}"))?;
+        let facts = view
+            .functions()
+            .iter()
+            .find(|f| f.source_name == state_fn)
+            .ok_or_else(|| format!("state fn `{state_fn}` not in the view"))?;
+        let mut best: Option<(usize, ace_core::hir::ExprId)> = None;
+        for (i, e) in facts.body.exprs.iter().enumerate() {
+            if e.span.start == span.start && e.span.end == span.end {
+                // 同 span 取索引最大（组合形在后）。
+                best = Some((i, ace_core::hir::ExprId(i as u32)));
+            }
+        }
+        let (_, expr_id) = best.ok_or_else(|| {
+            format!(
+                "no HIR expression with the exact span [{})..{}) in `{state_fn}`",
+                span.start, span.end
+            )
+        })?;
+        let ctx = FragmentProgramContext::from_view(&view);
+        let raw = emit_expr_fragment(ScriptLang::TypeScript, &view, facts, expr_id, &ctx)
+            .map_err(|e| format!("expr fragment: {e:?}"))?;
+        Ok(LocatedFragment {
+            text: raw.text,
+            expr: raw.expr,
+            helpers: raw.helpers,
+        })
+    }
+}
