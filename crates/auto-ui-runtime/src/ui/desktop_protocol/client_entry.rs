@@ -159,7 +159,7 @@ pub fn run_dynamic_client(
                 .filter(|v| !v.is_empty())
                 .and_then(|v| v.parse::<u16>().ok());
             if let Some(port) = mcp_port {
-                let (mcp_shared, mcp_rx) = crate::ui::mcp_server::start_mcp_server(
+                let (mcp_shared, mcp_action_gate) = crate::ui::mcp_server::start_mcp_server(
                     component.widget_name().to_string(),
                     port,
                 );
@@ -173,7 +173,7 @@ pub fn run_dynamic_client(
                     opts.width,
                     opts.height,
                     mcp_shared,
-                    mcp_rx,
+                    mcp_action_gate,
                 );
                 let (exit, source) =
                     client_runtime::run_client_session_v2(app_end, source, config, reconnect);

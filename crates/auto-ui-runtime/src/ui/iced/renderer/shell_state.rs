@@ -144,6 +144,18 @@ pub(super) fn service_snapshot_requests(
     if !host_ok {
         return None;
     }
+    // PLAN-098 T-03：在途守卫——上轮 screenshot Task 未回（teardown/
+    // 重配竞态下 Task 可能丢失）则本轮不重复发起；10s 过期自愈（防
+    // Task 永失把泵锁死——过期重发按丢一帧处理）。SnapshotShot 回调
+    // 清零。与 iced_wgpu 补丁（零尺寸早退/有界 poll）共同收敛 Mode ②
+    // 的触发窗口。
+    let now_ms = crate::ui::dynamic::sched_diag_t0().elapsed().as_millis() as u64;
+    if let Some(since) = state.desktop.snapshot_inflight_since.get() {
+        if now_ms.saturating_sub(since) < 10_000 {
+            return None;
+        }
+    }
+    state.desktop.snapshot_inflight_since.set(Some(now_ms));
     state.desktop.snapshot_pending_wids.replace(wids);
     Some(iced::window::screenshot(host_window).map(|ss| {
         crate::ui::session::DesktopMessage::Desktop(crate::ui::session::DesktopEvent::SnapshotShot(

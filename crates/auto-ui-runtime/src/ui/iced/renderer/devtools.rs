@@ -5149,17 +5149,15 @@ impl Default for DevToolsState {
         // Plan 371 Task 11: start MCP server for rust mode
         let port = crate::ui::mcp_server::mcp_port();
         let widget_name = "App".to_string();
-        let (mcp_shared, mcp_action_rx) =
+        let (mcp_shared, mcp_action_gate) =
             crate::ui::mcp_server::start_mcp_server(widget_name.clone(), port);
         mcp_shared
             .lock()
             .unwrap()
             .set_backend_kind(crate::ui::mcp_server::BackendKind::Rust);
-        // Store the action receiver in the global for devtools_subscription to drain
-        {
-            let guard = MCP_ACTION_RX.get_or_init(|| std::sync::Mutex::new(None));
-            *guard.lock().unwrap() = Some(mcp_action_rx);
-        }
+        // PLAN-098 T-02: gate 装全局（唯一 rx 终生锁内）——devtools 16ms
+        // tick 与 iced push 订阅共用同一队列，消费方不再持有所有权。
+        let _ = MCP_ACTION_GATE.set(mcp_action_gate);
         DevToolsState {
             debug_mode: false,
             devtools_open: std::cell::RefCell::new(false),
@@ -6103,10 +6101,9 @@ where
     // the typed View<C::Msg> to the exact node and extracts its handler,
     // replacing the old Debug-substring heuristic.
     let mcp = iced::time::every(std::time::Duration::from_millis(16)).filter_map(|_| {
-        let guard = MCP_ACTION_RX.get_or_init(|| std::sync::Mutex::new(None));
-        let mut lock = guard.lock().unwrap();
-        if let Some(rx) = lock.as_mut() {
-            match rx.try_recv() {
+        // PLAN-098 T-02：gate 非阻塞消费（rx 终生锁内；try_recv 计交付）。
+        let gate = MCP_ACTION_GATE.get()?;
+        match gate.try_recv() {
                 Ok(action) => {
                     let value_str = action.value.unwrap_or_default();
                     let payload = match action.target {
@@ -6133,9 +6130,6 @@ where
                     Some(WrapperMsg::<C>::Debug(payload))
                 }
                 Err(_) => None,
-            }
-        } else {
-            None
         }
     });
     let f12 = iced::event::listen_with(|event, _status, _window_id| {

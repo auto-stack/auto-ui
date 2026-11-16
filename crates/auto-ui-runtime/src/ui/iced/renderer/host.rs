@@ -515,7 +515,7 @@ fn run_session(
         .unwrap_or_default();
 
     // Start MCP UI server in background thread (Plan 278)
-    let (mcp_shared, mcp_action_rx) = crate::ui::mcp_server::start_mcp_server(
+    let (mcp_shared, mcp_action_gate) = crate::ui::mcp_server::start_mcp_server(
         widget_name.clone(),
         crate::ui::mcp_server::mcp_port(),
     );
@@ -523,12 +523,9 @@ fn run_session(
         .lock()
         .unwrap()
         .set_backend_kind(crate::ui::mcp_server::BackendKind::Vm);
-    // Store the action receiver in a global for the subscription to poll
-    {
-        let guard = MCP_ACTION_RX.get_or_init(|| std::sync::Mutex::new(None));
-        let mut lock = guard.lock().unwrap();
-        *lock = Some(mcp_action_rx);
-    }
+    // PLAN-098 T-02：gate 装全局（唯一 rx 终生锁内，永不搬走——订阅
+    // 身份漂移只换 poll 方，注入链不再随重订阅死亡）。
+    let _ = MCP_ACTION_GATE.set(mcp_action_gate);
 
     // PLAN-740 T-00（batch-drive 勘定通道——test-only）：AUTOUI_DRIVE_PROBE
     // =触发文件路径时 spawn 常驻探针线程；触发文件每追加一行
@@ -5156,6 +5153,8 @@ fn run_session(
                     // dirty（行 fallback → 真缩略升级；dock/pager hover 面
                     // 同随 dirty 重建）。
                     DesktopEvent::SnapshotShot(ss) => {
+                        // PLAN-098 T-03：在途标记清零（screenshot Task 已回）。
+                        state.desktop.snapshot_inflight_since.set(None);
                         // PLAN-040 F3：裁剪判定前现算冻结态——入队到回调
                         // 之间窗可能刚最小化/被遮挡（400ms sync 未及），
                         // 用最新可见性裁决，杜绝污染帧入库。
@@ -6315,6 +6314,35 @@ fn run_session(
         window: iced::window::Id,
     ) -> iced::Element<'_, crate::ui::session::DesktopMessage> {
         use crate::ui::session::DesktopMessage as DM;
+        // PLAN-098 T-05: 帧心跳——每渲染帧打点（全局原子，零锁——view()
+        // 在 UI 线程，不得与 MCP 线程争 SharedState 锁）。楔死判定入口：
+        // frame_seq 停增 ≥30s = 渲染环停摆（GPU fence 楔死，DEBT-008
+        // 模式①——主循环卡 acquire_texture 时 view() 不再被调用）。
+        // AUTO_SCHED_DIAG 门控下每秒一行 `[SCHED-DIAG] frame_seq`（诊断
+        // 轨日志签名，watch3/5 探针同轴）。
+        {
+            let now_ms = crate::ui::dynamic::sched_diag_t0()
+                .elapsed()
+                .as_millis() as u64;
+            let seq = crate::ui::mcp_server::frame_heartbeat_tick(now_ms);
+            static LAST_EMIT_MS: std::sync::atomic::AtomicU64 =
+                std::sync::atomic::AtomicU64::new(0);
+            if crate::ui::sched_diag::enabled() {
+                let last = LAST_EMIT_MS.load(std::sync::atomic::Ordering::Relaxed);
+                if now_ms.saturating_sub(last) >= 1000
+                    && LAST_EMIT_MS
+                        .compare_exchange(
+                            last,
+                            now_ms,
+                            std::sync::atomic::Ordering::Relaxed,
+                            std::sync::atomic::Ordering::Relaxed,
+                        )
+                        .is_ok()
+                {
+                    eprintln!("[SCHED-DIAG] frame_seq t={now_ms}ms seq={seq}");
+                }
+            }
+        }
         // Plan 462：desktop 模式 —— 宿主窗渲染 WM z-stack（背景 + N 个
         // VirtualWindow 层），每层复用同一 per-App 视图管线（dynamic_view +
         // panic 边界 + DM::App 打标），仅外层组装按配置分叉（I3）。

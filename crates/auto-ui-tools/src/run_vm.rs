@@ -410,6 +410,14 @@ pub fn run_vm_ui_flow(
             .to_string();
             session_env.push(("AUTO_UI_TOOL_VM_THEME_DECL".to_string(), json));
         }
+        // PLAN-098 T-04（DEBT-008 模式①，后端决策候选 A）：vm-session 子
+        // 进程默认走 dx12——停摆态栈实锤楔死发生在 Vulkan 路径（ash
+        // wait_for_fences ← wgpu acquire_texture，栈转储 44964）；dx12 是
+        // 最小改动预防面（仅本子进程 env，不污染全局/其它工作负载）。
+        // 用户显式设置时尊重之（不覆盖）。
+        if std::env::var_os("WGPU_BACKEND").is_none() {
+            session_env.push(("WGPU_BACKEND".to_string(), "dx12".to_string()));
+        }
         proc_host::set_vm_session_env(session_env);
     } else if !split_mode {
         match source.external_backend(project_dir) {

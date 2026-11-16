@@ -1613,7 +1613,8 @@ pub struct McpHeadlessSource {
     width: f32,
     height: f32,
     mcp: crate::ui::mcp_server::SharedStateHandle,
-    rx: std::sync::mpsc::Receiver<crate::ui::mcp_server::ActionMessage>,
+    /// PLAN-098 T-02：动作注入门（唯一 rx 终生锁内；source 仅非阻塞消费）。
+    gate: std::sync::Arc<crate::ui::mcp_server::ActionGate>,
 }
 
 impl McpHeadlessSource {
@@ -1622,7 +1623,7 @@ impl McpHeadlessSource {
         width: f32,
         height: f32,
         mcp: crate::ui::mcp_server::SharedStateHandle,
-        rx: std::sync::mpsc::Receiver<crate::ui::mcp_server::ActionMessage>,
+        gate: std::sync::Arc<crate::ui::mcp_server::ActionGate>,
     ) -> Self {
         Self {
             surface: HeadlessSurface::new(component, width, height),
@@ -1631,7 +1632,7 @@ impl McpHeadlessSource {
             width,
             height,
             mcp,
-            rx,
+            gate,
         }
     }
 
@@ -1784,7 +1785,8 @@ impl super::endpoint::FrameSource for McpHeadlessSource {
             }
         }
         let mut acted = false;
-        while let Ok(action) = self.rx.try_recv() {
+        // PLAN-098 T-02：gate 非阻塞消费（rx 终生锁内；try_recv 计交付）。
+        while let Ok(action) = self.gate.try_recv() {
             if let crate::ui::mcp_server::ActionTarget::Event { widget, event } = action.target {
                 if event.starts_with("__mcp_") {
                     // 合成坐标通道不在 headless 臂派发（协议 InputMsg 为真实

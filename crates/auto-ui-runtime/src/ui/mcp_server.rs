@@ -156,6 +156,16 @@ pub struct SharedState {
     /// Channel to inject IcedMessages into the iced event loop.
     /// MCP thread sends, iced subscription receives.
     action_tx: Option<mpsc::Sender<ActionMessage>>,
+    /// PLAN-098 T-02: 动作注入门（唯一 rx 锁内 + 唤醒 + 交付计数；见
+    /// [`ActionGate`] 文档）。`start_mcp_server` 装配；直构 SharedState
+    /// 的测试/非服务路径保持 None（tick 轨消费不依赖唤醒）。
+    action_gate: Option<std::sync::Arc<ActionGate>>,
+    /// PLAN-098 T-01/T-02: 注入 seq——`send_action` 成功即 +1。与
+    /// [`ActionGate::delivered`] 的差值 = 已受理未交付（含 map 丢弃）。
+    action_sent: std::sync::atomic::AtomicU64,
+    /// PLAN-098 T-02: 交付停滞标志（applied 栅栏超时且未交付置位，交付
+    /// 追平即清）。仅诊断面，不改变投递语义。
+    injection_stale: std::sync::atomic::AtomicBool,
     /// Original AuraNode view template (Plan 279).
     /// Used for AURA source-style snapshots with full original info.
     view_template: Option<SendViewTemplate>,
@@ -309,6 +319,136 @@ pub enum FixtureAck {
     },
 }
 
+/// PLAN-098 T-05: 帧心跳——iced `view()` 每渲染帧打点（全局原子，零锁；
+/// MCP 面只读）。楔死判定入口：`frame_seq` 停增 ≥30s = 渲染环停摆
+/// （DEBT-008 模式①：主循环卡 wgpu acquire_texture 时 view() 不再被
+/// 调用，而 MCP 线程/进程仍活——「渲染死、进程活」的分型证据）。
+pub static FRAME_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub static FRAME_LAST_TICK_MS: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+/// 渲染帧打点（view() 每帧调用）；返回累计 seq。
+pub fn frame_heartbeat_tick(now_ms: u64) -> u64 {
+    let seq = FRAME_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    FRAME_LAST_TICK_MS.store(now_ms, std::sync::atomic::Ordering::Relaxed);
+    seq
+}
+
+/// MCP 面只读快照 `(seq, last_tick_ms)`。
+pub fn frame_heartbeat() -> (u64, u64) {
+    (
+        FRAME_SEQ.load(std::sync::atomic::Ordering::Relaxed),
+        FRAME_LAST_TICK_MS.load(std::sync::atomic::Ordering::Relaxed),
+    )
+}
+
+/// PLAN-098 T-02：动作注入门——DEBT-008 事件注入丢失（楔死形态③）的
+/// 结构性根修。旧形态：`run_dynamic_iced` 把 rx 放进全局槽，
+/// `McpPushRecipe::stream()` **take-once** 搬走（subscriptions.rs 旧
+/// `MCP_ACTION_RX`），rx 所有权随第一次 stream() 迁出；订阅身份漂移
+/// （primary AppId 变化 / App 增删 / 订阅表重建）令 iced 弃旧 stream →
+/// 转发线程死亡、rx 随闭包 drop → 新 stream() 拿 None → 空流兜底，
+/// 此后所有按压**静默丢失**（进程 OS 层全空闲，与 run4/5 楔死签名
+/// 吻合）。
+///
+/// 新形态：**唯一 rx 终生锁在 gate 内、永不搬走**；消费方一律经
+/// [`ActionGate::try_recv`] 非阻塞取（iced push 订阅 / devtools 16ms
+/// tick / headless source 共用同一队列）；订阅身份漂移只影响"谁来
+/// poll"，断口期消息天然滞留队列，重挂即续——take-once 死亡类在
+/// 结构上不可达。
+///
+/// 唤醒：`send_action` 在 **rx 锁内** send+notify（与 poll 侧"持锁
+/// 登记 waker → condvar wait 原子放锁"同锁序），无丢唤醒窗口；
+/// watcher 线程（`start_mcp_server` 旁 spawn）200ms 兜底心跳唤醒，
+/// 覆盖 notify 与 waker 登记交错的极端序列。
+pub struct ActionGate {
+    rx: std::sync::Mutex<mpsc::Receiver<ActionMessage>>,
+    cv: std::sync::Condvar,
+    waker: std::sync::Mutex<Option<std::task::Waker>>,
+    /// PLAN-098 T-01/T-02: 交付计数——消息被消费方（iced poll/devtools/
+    /// headless）取走即 +1（map 丢弃计入 [`Self::mapped_none`]）。
+    pub delivered: std::sync::atomic::AtomicU64,
+    /// map 丢弃计数（Path 臂/不支持 target）——丢弃必须可见。
+    pub mapped_none: std::sync::atomic::AtomicU64,
+}
+
+impl ActionGate {
+    /// 测试与同 crate 装配点（`start_mcp_server`）使用；watcher 需显式
+    /// 启动（[`Self::heartbeat_watch`]）。
+    pub(crate) fn new(rx: mpsc::Receiver<ActionMessage>) -> Arc<Self> {
+        Arc::new(Self {
+            rx: std::sync::Mutex::new(rx),
+            cv: std::sync::Condvar::new(),
+            waker: std::sync::Mutex::new(None),
+            delivered: std::sync::atomic::AtomicU64::new(0),
+            mapped_none: std::sync::atomic::AtomicU64::new(0),
+        })
+    }
+
+    /// send 侧唤醒：持 rx 锁 notify——poll 侧登记 waker 也在 rx 锁内，
+    /// condvar 的 wait(锁) 原子放锁保证 notify 要么在登记前（wait 前
+    /// 兜底心跳/后续 notify 追上）要么在登记后（立即唤醒）。
+    pub fn notify_after_send(&self) {
+        let _guard = self.rx.lock().unwrap();
+        self.cv.notify_all();
+    }
+
+    /// 非阻塞消费：rx 终生在锁内，消费方永不取得所有权。
+    pub fn try_recv(&self) -> Result<ActionMessage, mpsc::TryRecvError> {
+        let msg = self.rx.lock().unwrap().try_recv()?;
+        self.delivered
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(msg)
+    }
+
+    /// push 订阅 poll 骨架：取到消息返回 `Ok(Some(msg))`；Empty 时在
+    /// rx 锁内登记 waker 并返回 `Ok(None)`（调用方转 Pending）；断连
+    /// 返回 `Err(Disconnected)`。
+    pub fn poll_recv(
+        &self,
+        cx: &mut std::task::Context<'_>,
+    ) -> Result<Option<ActionMessage>, mpsc::TryRecvError> {
+        let msg = {
+            let rx = self.rx.lock().unwrap();
+            match rx.try_recv() {
+                Ok(msg) => msg,
+                Err(e @ mpsc::TryRecvError::Disconnected) => return Err(e),
+                Err(e @ mpsc::TryRecvError::Empty) => {
+                    // 持 rx 锁登记 waker（与 notify_after_send 同锁序，
+                    // 无丢唤醒窗口；watcher 200ms 心跳兜底交错序列）。
+                    *self.waker.lock().unwrap() = Some(cx.waker().clone());
+                    return Err(e);
+                }
+            }
+        };
+        self.delivered
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(Some(msg))
+    }
+
+    /// watcher 心跳：无条件唤醒已登记 waker（覆盖 notify/登记交错
+    /// 窗口——那时槽位为空，下一次登记前不再有 notify）。
+    /// `start_mcp_server` 装配即启动；测试用例按需自启。
+    pub(crate) fn heartbeat_watch(self: &Arc<Self>) {
+        let gate = self.clone();
+        std::thread::Builder::new()
+            .name("mcp-action-gate-watch".to_string())
+            .spawn(move || loop {
+                let _idle = gate
+                    .cv
+                    .wait_timeout(
+                        gate.rx.lock().unwrap(),
+                        std::time::Duration::from_millis(200),
+                    )
+                    .unwrap();
+                if let Some(w) = gate.waker.lock().unwrap().take() {
+                    w.wake();
+                }
+            })
+            .expect("spawn mcp-action-gate-watch");
+    }
+}
+
 impl SharedState {
     pub fn new(widget_name: String) -> Self {
         Self {
@@ -318,6 +458,9 @@ impl SharedState {
             widget_name,
             input_state_map: HashMap::new(),
             action_tx: None,
+            action_gate: None,
+            action_sent: std::sync::atomic::AtomicU64::new(0),
+            injection_stale: std::sync::atomic::AtomicBool::new(false),
             view_template: None,
             window_size: None,
             layout_bounds: HashMap::new(),
@@ -402,13 +545,50 @@ impl SharedState {
     }
 
     /// Try to send an action message to the iced event loop.
+    ///
+    /// PLAN-098 T-02：成功即计 seq（[`Self::action_sent`]）并经 gate 持
+    /// rx 锁 notify 唤醒 push 订阅（`notify_after_send` 与 poll 侧 waker
+    /// 登记同锁序——无丢唤醒窗口）。gate 不在场（直构测试路径）时仅
+    /// 入队，tick 轨消费者照常。
     pub fn send_action(&self, msg: ActionMessage) -> Result<(), String> {
         match &self.action_tx {
-            Some(tx) => tx
-                .send(msg)
-                .map_err(|e| format!("Channel send error: {}", e)),
+            Some(tx) => {
+                tx.send(msg)
+                    .map_err(|e| format!("Channel send error: {}", e))?;
+                self.action_sent
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if let Some(gate) = &self.action_gate {
+                    // 交付追平即清停滞标志（上一轮 stalled 已恢复）。
+                    let sent = self.action_sent.load(std::sync::atomic::Ordering::Relaxed);
+                    if gate.delivered.load(std::sync::atomic::Ordering::Relaxed) >= sent {
+                        self.injection_stale
+                            .store(false, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    gate.notify_after_send();
+                }
+                Ok(())
+            }
             None => Err("No action channel available".to_string()),
         }
+    }
+
+    /// PLAN-098 T-02: 交付快照 `(sent, delivered)`。MCP action 工具响应
+    /// 据此附 `delivered` 语义——「socket 写成功」单独不再暗示投递。
+    pub fn delivery_snapshot(&self) -> (u64, u64) {
+        (
+            self.action_sent.load(std::sync::atomic::Ordering::Relaxed),
+            self.action_gate
+                .as_ref()
+                .map(|g| g.delivered.load(std::sync::atomic::Ordering::Relaxed))
+                .unwrap_or(self.action_sent.load(std::sync::atomic::Ordering::Relaxed)),
+        )
+    }
+
+    /// PLAN-098 T-02: 注入链停滞判定（诊断面）。sent > delivered 且
+    /// applied 栅栏已置停滞标志。
+    pub fn injection_stale(&self) -> bool {
+        self.injection_stale
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// PLAN-737：合成动作「已应用」栅栏发送。`__mcp_*` 合成事件在 event 尾
@@ -438,11 +618,29 @@ impl SharedState {
         if let Some(id) = ack_id {
             let deadline =
                 std::time::Instant::now() + std::time::Duration::from_millis(ACTION_ACK_TIMEOUT_MS);
+            let mut acked = false;
             while std::time::Instant::now() < deadline {
                 if shared.lock().unwrap().take_fixture_ack(id).is_some() {
+                    acked = true;
                     break;
                 }
                 std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            // PLAN-098 T-02：栅栏超时不再纯静默——区分「已交付未应用
+            // （应用侧慢，动作仍会级联）」与「未交付（注入链停滞）」。
+            // 后者置停滞标志 + 诊断行：DEBT-008 楔死形态③的可检测化。
+            if !acked {
+                let (sent, delivered) = shared.lock().unwrap().delivery_snapshot();
+                if delivered < sent {
+                    eprintln!(
+                        "[PLAN098] mcp action ack timeout AND undelivered: sent={sent} delivered={delivered} (injection chain stale)"
+                    );
+                    shared
+                        .lock()
+                        .unwrap()
+                        .injection_stale
+                        .store(true, std::sync::atomic::Ordering::Relaxed);
+                }
             }
         }
         Ok(())
@@ -480,6 +678,12 @@ impl SharedState {
 
     pub fn take_fixture_ack(&mut self, request_id: u64) -> Option<FixtureAck> {
         self.fixture_acks.remove(&request_id)
+    }
+
+    /// PLAN-098 T-02: 装配注入门（`start_mcp_server` 同模块直设；此入口
+    /// 供测试/非标装配路径复用）。
+    pub(crate) fn set_action_gate(&mut self, gate: std::sync::Arc<ActionGate>) {
+        self.action_gate = Some(gate);
     }
 
     /// Set the window size (Plan 281).
@@ -4140,6 +4344,7 @@ fn execute_action_on_shared(
         action: action.to_string(),
         handler: Some(format!(".{}", handler)),
         state_changes: vec![], // Real state changes happen in iced update, visible on next snapshot
+        delivery: Some(shared.delivery_snapshot()),
     })
 }
 
@@ -4632,6 +4837,7 @@ fn execute_action_vnode(
         action: action.to_string(),
         handler: Some(format!(".{}", handler_label)),
         state_changes: vec![],
+        delivery: Some(shared.delivery_snapshot()),
     })
 }
 
@@ -5787,11 +5993,16 @@ fn error_result(msg: impl Into<String>) -> serde_json::Value {
 pub fn start_mcp_server(
     widget_name: String,
     port: u16,
-) -> (SharedStateHandle, mpsc::Receiver<ActionMessage>) {
+) -> (SharedStateHandle, std::sync::Arc<ActionGate>) {
     let (action_tx, action_rx) = mpsc::channel::<ActionMessage>();
 
     let mut shared_state = SharedState::new(widget_name);
     shared_state.set_action_tx(action_tx);
+    // PLAN-098 T-02：唯一 rx 装入 gate（终生锁内不搬走）；watcher 心跳
+    // 线程随 gate 存活（进程生命周期）。rx 所有权不再交付任何调用方
+    // ——take-once 死亡类结构上不可达。
+    let gate = ActionGate::new(action_rx);
+    shared_state.action_gate = Some(gate.clone());
     let shared = Arc::new(Mutex::new(shared_state));
 
     let server = McpUiServer::new(shared.clone(), port);
@@ -5799,8 +6010,9 @@ pub fn start_mcp_server(
     std::thread::spawn(move || {
         server.run();
     });
+    gate.heartbeat_watch();
 
-    (shared, action_rx)
+    (shared, gate)
 }
 
 /// Get the MCP port from environment variable or use default.

@@ -472,6 +472,11 @@ pub struct DesktopState {
     /// 排空 request_capture 队列时记录；SnapshotShot 回调消费清空）。
     /// 一次整窗截图服务全部请求（裁剪按各窗 rect 分发）。
     pub snapshot_pending_wids: RefCell<Vec<Wid>>,
+    /// PLAN-098 T-03：整窗 screenshot 在途标记（发起时刻，sched_diag
+    /// 毫秒轴）。Task 未回（teardown/重配竞态下可能丢失）不重复发起
+    /// ——收敛重配窗口的 screenshot 竞态面；10s 过期自愈（防 Task
+    /// 永失把泵锁死）。SnapshotShot 回调清零。
+    pub snapshot_inflight_since: std::cell::Cell<Option<u64>>,
     /// Plan 501：最近一次 os-config daemon 检活结果（launch 声明
     /// `daemon: autoos` 的 App 时更新；boot 不预检）。settings 入口徽标
     ///（offline 置灰/提示，T5）消费。
@@ -600,6 +605,7 @@ impl DesktopState {
             date_text: RefCell::new(String::new()),
             notify_source: RefCell::new(None),
             snapshot_pending_wids: RefCell::new(Vec::new()),
+            snapshot_inflight_since: std::cell::Cell::new(None),
             shell_app: None,
             app_resolver: None,
             shell_fields: ShellFields::default(),
