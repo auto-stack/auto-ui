@@ -1,4 +1,3 @@
-
 //! Rust UI (ICED/GPUI) project generation utilities
 //!
 //! This module generates Rust code from AURA widget definitions,
@@ -276,7 +275,8 @@ fn register_api_typed_fns_for(project_dir: &Path) {
             .map(|e| e.fn_name.clone())
             .collect();
         // PLAN-052：实体型名集 + 字段型表注册（typed 投影判定面消费）。
-        let names: std::collections::HashSet<String> = known.iter().map(|s| s.to_string()).collect();
+        let names: std::collections::HashSet<String> =
+            known.iter().map(|s| s.to_string()).collect();
         let fields: std::collections::HashMap<String, std::collections::HashMap<String, String>> =
             module
                 .types
@@ -298,12 +298,7 @@ fn register_api_typed_fns_for(project_dir: &Path) {
         let ret_types: std::collections::HashMap<String, String> = module
             .endpoints
             .iter()
-            .map(|e| {
-                (
-                    e.fn_name.clone(),
-                    auto_type_to_rust(e.return_type.trim()),
-                )
-            })
+            .map(|e| (e.fn_name.clone(), auto_type_to_rust(e.return_type.trim())))
             .collect();
         primer.register_api_fn_ret_types(ret_types);
     }
@@ -1246,12 +1241,9 @@ fn compile_at_file(
                 .last()
                 .map(|p| p.as_str().to_string())
                 .or_else(|| {
-                    u.module_path.as_ref().and_then(|mp| {
-                        mp.display()
-                            .rsplit('.')
-                            .next()
-                            .map(|s| s.to_string())
-                    })
+                    u.module_path
+                        .as_ref()
+                        .and_then(|mp| mp.display().rsplit('.').next().map(|s| s.to_string()))
                 })
                 .unwrap_or_default();
             for item in &u.items {
@@ -1509,7 +1501,9 @@ fn parse_db_fn_sigs(code: &str) -> Vec<DbFnSig> {
     let mut out = Vec::new();
     for line in code.lines() {
         let t = line.trim_start();
-        let Some(rest) = t.strip_prefix("pub fn ") else { continue };
+        let Some(rest) = t.strip_prefix("pub fn ") else {
+            continue;
+        };
         let Some(open) = rest.find('(') else { continue };
         let name = rest[..open].trim().to_string();
         let mut depth = 0i32;
@@ -1562,10 +1556,17 @@ fn parse_db_fn_sigs(code: &str) -> Vec<DbFnSig> {
             .into_iter()
             .filter_map(|p| {
                 let (n, ty) = p.split_once(':')?;
-                Some((n.trim().trim_start_matches("mut ").to_string(), ty.trim().to_string()))
+                Some((
+                    n.trim().trim_start_matches("mut ").to_string(),
+                    ty.trim().to_string(),
+                ))
             })
             .collect();
-        out.push(DbFnSig { name, params: parsed, ret });
+        out.push(DbFnSig {
+            name,
+            params: parsed,
+            ret,
+        });
     }
     out
 }
@@ -1594,7 +1595,10 @@ fn crate_refs(code: &str) -> std::collections::BTreeSet<String> {
     out
 }
 
-fn merged_absorb(project_dir: &Path, module: &auto_lang_core::api::ApiModule) -> Option<MergedAbsorb> {
+fn merged_absorb(
+    project_dir: &Path,
+    module: &auto_lang_core::api::ApiModule,
+) -> Option<MergedAbsorb> {
     // Full module absorption supplies structural API return types. Scalar-only
     // contracts retain the established db-first/explicit demo fallback path.
     if module.types.is_empty() {
@@ -1630,12 +1634,15 @@ fn merged_absorb(project_dir: &Path, module: &auto_lang_core::api::ApiModule) ->
             continue;
         }
         let path = back.join(format!("{name}.at"));
-        let Ok(content) = std::fs::read_to_string(&path) else { continue };
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
         let Ok((rs, _)) = auto_api_gen::api_gen::transpile_back_module_to_rs_with_proofs(
             &name,
             &content,
             Some(back.clone()),
-        ).map_err(|error| eprintln!("[merged-back] companion {name} transpilation failed: {error}")) else {
+        )
+        .map_err(|error| eprintln!("[merged-back] companion {name} transpilation failed: {error}")) else {
             return None;
         };
         let rs = auto_api_gen::api_gen::post_process_companion_rs(rs);
@@ -1666,24 +1673,26 @@ fn merged_absorb(project_dir: &Path, module: &auto_lang_core::api::ApiModule) ->
     .ok()?;
     // db 同款后处理：去掉转译器对结构返回型的 `impl ` 前缀（companion 版不带）。
     // a2r 对 api 接口形态的返回型加 `impl ` 前缀（接口语义）；内嵌实现不需要。
-    let api_impl_code = auto_api_gen::api_gen::post_process_db_rs(api_impl_rs)
-        .replace(" -> impl ", " -> ");
-    let api_impl_code = auto_api_gen::api_gen::promote_api_types_in_companion(&api_impl_code, &module.types);
+    let api_impl_code =
+        auto_api_gen::api_gen::post_process_db_rs(api_impl_rs).replace(" -> impl ", " -> ");
+    let api_impl_code =
+        auto_api_gen::api_gen::promote_api_types_in_companion(&api_impl_code, &module.types);
     let api_impl_fns = parse_db_fn_sigs(&api_impl_code);
     modules.push((
         "api_impl".to_string(),
         format!("use crate::types::*;\n{api_impl_code}"),
     ));
-    let companions_for_rewrite: Vec<(String, String)> = modules
-        .iter()
-        .filter(|(n, _)| n != "db")
-        .cloned()
-        .collect();
+    let companions_for_rewrite: Vec<(String, String)> =
+        modules.iter().filter(|(n, _)| n != "db").cloned().collect();
     let mut db_code = db_code;
     rewrite_companion_str_args(&mut db_code, &companions_for_rewrite);
     let db_fns = parse_db_fn_sigs(&db_code);
     modules.push(("db".to_string(), db_code));
-    Some(MergedAbsorb { modules, db_fns, api_impl_fns })
+    Some(MergedAbsorb {
+        modules,
+        db_fns,
+        api_impl_fns,
+    })
 }
 
 /// api.at 的 `pub fn f(args) RetType {` 无 `->`（back 生成器特化语法）；
@@ -1832,12 +1841,21 @@ fn split_top_level_args(s: &str) -> Vec<String> {
 /// 生成双向转换，避免污染 UI 侧处处 as。
 fn merged_shim_fns(module: &auto_lang_core::api::ApiModule) -> String {
     let mut code = String::new();
-    let known: std::collections::HashSet<&str> = module.types.iter().map(|t| t.name.as_str()).collect();
-    let field_conv = |tname: &str, field: &str, to_ui: bool, known: &std::collections::HashSet<&str>| -> Option<String> {
+    let known: std::collections::HashSet<&str> =
+        module.types.iter().map(|t| t.name.as_str()).collect();
+    let field_conv = |tname: &str,
+                      field: &str,
+                      to_ui: bool,
+                      known: &std::collections::HashSet<&str>|
+     -> Option<String> {
         let ty = ty_of_field(module, tname, field)?;
         let base = ty.trim().trim_start_matches("[]").trim_start_matches('?');
         if ty.trim() == "int" {
-            return Some(if to_ui { format!("x.{field} as i32") } else { format!("x.{field} as i64") });
+            return Some(if to_ui {
+                format!("x.{field} as i32")
+            } else {
+                format!("x.{field} as i64")
+            });
         }
         if ty.trim().starts_with("[]") {
             if known.contains(base) {
@@ -1881,7 +1899,11 @@ fn merged_shim_fns(module: &auto_lang_core::api::ApiModule) -> String {
     code
 }
 
-fn ty_of_field<'a>(module: &'a auto_lang_core::api::ApiModule, tname: &str, field: &str) -> Option<&'a str> {
+fn ty_of_field<'a>(
+    module: &'a auto_lang_core::api::ApiModule,
+    tname: &str,
+    field: &str,
+) -> Option<&'a str> {
     module
         .types
         .iter()
@@ -1900,11 +1922,23 @@ fn merged_db_delegate_typed(
     module: &auto_lang_core::api::ApiModule,
     endpoint: &auto_lang_core::api::ApiEndpoint,
 ) -> Option<String> {
-    let (target_mod, sig) = if let Some(s) = absorb.api_impl_fns.iter().find(|f| f.name == endpoint.fn_name) { ("api_impl", s) } else { ("db", absorb.db_fns.iter().find(|f| f.name == endpoint.fn_name)?) };
+    let (target_mod, sig) = if let Some(s) = absorb
+        .api_impl_fns
+        .iter()
+        .find(|f| f.name == endpoint.fn_name)
+    {
+        ("api_impl", s)
+    } else {
+        (
+            "db",
+            absorb.db_fns.iter().find(|f| f.name == endpoint.fn_name)?,
+        )
+    };
     if sig.params.len() != endpoint.params.len() {
         return None;
     }
-    let known: std::collections::HashSet<&str> = module.types.iter().map(|t| t.name.as_str()).collect();
+    let known: std::collections::HashSet<&str> =
+        module.types.iter().map(|t| t.name.as_str()).collect();
     let mut ui_params = Vec::new();
     let mut call_args = Vec::new();
     for (p, (_, db_ty)) in endpoint.params.iter().zip(sig.params.iter()) {
@@ -1960,7 +1994,8 @@ fn merged_db_delegate_typed(
         call_expr
     ))
 }
-fn merged_db_impl(    project_dir: &Path,
+fn merged_db_impl(
+    project_dir: &Path,
     module: &auto_lang_core::api::ApiModule,
 ) -> Option<MergedDbImpl> {
     let db_file = project_dir.join("src").join("back").join("db.at");
@@ -2099,7 +2134,9 @@ fn generate_api_client(project_dir: &Path, api_imports: &[String]) -> String {
     // 进程内直调:凡 db.at 可吸收(全部端点有同名 db fn 且标量面)一律
     // 优先走 merged 直调;吸收不可用才回落 split-HTTP。
     if let Some(module) = &api_module {
-        if merged_db_impl(project_dir, module).is_some() || merged_absorb(project_dir, module).is_some() {
+        if merged_db_impl(project_dir, module).is_some()
+            || merged_absorb(project_dir, module).is_some()
+        {
             return generate_merged_api_client(module, project_dir, &api_type_structs);
         }
     }
@@ -2650,7 +2687,10 @@ fn generate_merged_api_client(
             if name == "db" {
                 continue;
             }
-            code.push_str(&format!("pub mod {} {{\n#![allow(unused)]\n{}\n}}\n\n", name, src));
+            code.push_str(&format!(
+                "pub mod {} {{\n#![allow(unused)]\n{}\n}}\n\n",
+                name, src
+            ));
         }
         if let Some((_, db_src)) = a.modules.iter().find(|(n, _)| n == "db") {
             code.push_str("pub mod db {\n#![allow(unused)]\n");
@@ -2661,7 +2701,11 @@ fn generate_merged_api_client(
         code.push_str(api_type_structs);
     }
 
-    let db_impl = if absorb.is_none() { merged_db_impl(project_dir, module) } else { None };
+    let db_impl = if absorb.is_none() {
+        merged_db_impl(project_dir, module)
+    } else {
+        None
+    };
     if let Some(db) = &db_impl {
         code.push_str(
             "\n// PLAN-013 T2: db.at 吸收(转译嵌入)——merged 模式的后端真实现;勿手改\npub mod db {\n#![allow(unused)]\n",
@@ -3159,13 +3203,18 @@ fn adapt_merged_string_index(code: &str) -> String {
     let mut out = String::with_capacity(code.len());
     let mut cursor = 0;
     for (offset, _) in code.match_indices(CALL) {
-        if mask[offset..offset + CALL.len()].iter().all(|is_code| *is_code) {
+        if mask[offset..offset + CALL.len()]
+            .iter()
+            .all(|is_code| *is_code)
+        {
             out.push_str(&code[cursor..offset]);
             out.push_str("crate::__merged_str_find_from(");
             cursor = offset + CALL.len();
         }
     }
-    if cursor == 0 { return code.to_string(); }
+    if cursor == 0 {
+        return code.to_string();
+    }
     out.push_str(&code[cursor..]);
     out.push_str(include_str!("merged_string_index.rs"));
     out
@@ -3471,9 +3520,7 @@ fn wrap_example(
         match embed_theme_package_data(project_dir, &main_widget) {
             Ok(pair) => pair,
             Err(e) => (
-                format!(
-                    "compile_error!(\"PLAN-055: 官方主题包嵌入失败: {e}\");"
-                ),
+                format!("compile_error!(\"PLAN-055: 官方主题包嵌入失败: {e}\");"),
                 format!("{main_widget}::default()"),
             ),
         };
@@ -3870,10 +3917,7 @@ fn embed_theme_package_data(
                     .ok_or_else(|| format!("族 {name} modes 含非串项"))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let def = f
-            .get("default")
-            .and_then(|v| v.as_str())
-            .unwrap_or("light");
+        let def = f.get("default").and_then(|v| v.as_str()).unwrap_or("light");
         fam_parts.push(format!(
             "(\"{name}\", &[{}], \"{def}\")",
             mode_parts.join(", ")
@@ -3913,7 +3957,8 @@ static __EMBEDDED_THEME_PKG: auto_ui_runtime::ui::desktop_protocol::native_theme
 
 /// Extract the main widget name from generated components.
 /// Looks for "App" struct first, then falls back to the first `pub struct` found.
-fn extract_main_widget(components: &str) -> String {    // Look for "pub struct App"
+fn extract_main_widget(components: &str) -> String {
+    // Look for "pub struct App"
     for line in components.lines() {
         let trimmed = line.trim();
         if trimmed == "pub struct App {" {
@@ -4923,7 +4968,10 @@ pub fn generate_shell_pack_lib_sources(pack_dir: &Path) -> AutoResult<(String, S
     lib.push_str("use auto_ui_runtime::ui::{Component, View};\n");
     lib.push_str("use auto_ui_runtime::ui::desktop_protocol::shell_client::{FaceProjector, ShellStateAccess, ShellSurface};\n\n");
     if cleaned.contains("native_http::") {
-        lib.push_str(&format!("const __AT_HTTP_BASE: &str = {:?};\n", crate::util::http_base_url()));
+        lib.push_str(&format!(
+            "const __AT_HTTP_BASE: &str = {:?};\n",
+            crate::util::http_base_url()
+        ));
     }
     lib.push_str(&cleaned);
     lib.push_str("\n// —— SHELL_MANIFEST（shell_projection 同形装配清单——D5）——\n");
@@ -5166,6 +5214,10 @@ const DELIVERY_ROOT_INPUTS: [&str; 7] = [
 /// （编辑计数 ≠ spec 全量）与幂等（再交付零编辑）按各自 spec 判定。
 struct DeliveryProjectionSpec {
     strip_deps: &'static [&'static str],
+    /// PLAN-980 RUST：交付剥离的 `[dev-dependencies]` 行（交付包不跑测试；
+    /// dev-only 跨仓 path（如 UI 面 980 验证用的 ace-core）不进受管闭包）。
+    /// 三态幂等语义与 strip_deps 同（原形在/投影形缺/结构漂移红）。
+    strip_dev_deps: &'static [&'static str],
     feature_rewrites: &'static [(&'static str, &'static str)],
     // Supported intermediate forms produced by the managed installer.
     installed_rewrites: &'static [(&'static str, &'static str)],
@@ -5190,6 +5242,7 @@ const PROJECTION_AUTO_LANG: DeliveryProjectionSpec = DeliveryProjectionSpec {
     // installed 中间形态的 test-cases 转发行不再被投影改写——重交付以
     // producer 新清单整树覆盖（receipt verify_tree 钉树身份）。
     strip_deps: &[],
+    strip_dev_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
     dep_rewrites: &[],
@@ -5210,6 +5263,7 @@ const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpe
     strip_deps: &[
         "autodown-core = { path = \"../../../auto-down/autodown/packages/engine/rust\", optional = true }",
     ],
+    strip_dev_deps: &[],
     // PLAN-018 T-04：ui-iced 拍平后 runtime 的 autodown feature 定义为
     // `["dep:autodown-core"]`（原 `["ui-iced", "dep:autodown-core"]`）——
     // 剥除 autodown-core 路径行后转发引用须同步摘除（保留 feature 名）。
@@ -5231,6 +5285,7 @@ const PROJECTION_AUTO_LANG_CORE: DeliveryProjectionSpec = DeliveryProjectionSpec
     // §5.5：Core 对 web 仓 auto-web-contract 的硬 path 依赖（890 谱系）
     // → 交付根包内兄弟。
     strip_deps: &[],
+    strip_dev_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
     dep_rewrites: &[],
@@ -5243,6 +5298,23 @@ const PROJECTION_AUTO_LANG_CORE: DeliveryProjectionSpec = DeliveryProjectionSpec
 /// auto-ui-tools 的 autodown feature 请求剥除另见 PROJECTION_AUTO_UI_TOOLS。
 const PROJECTION_AUTO_UI_CRATE: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
+    strip_dev_deps: &[],
+    feature_rewrites: &[],
+    installed_rewrites: &[],
+    dep_rewrites: &[],
+    path_rewrites: &[
+        ("../../../auto-lang/crates/", "../"),
+        ("../../../auto-web/crates/", "../"),
+    ],
+};
+
+/// PLAN-980 RUST（AXR0 驱动发现）：auto-ui-compiler 专用投影——在通用 UI
+/// crate 投影之上剥除 dev-only 的 ace-core 跨仓依赖（DIALECT 批的
+/// ui_domain_validation 消费面；交付闭包不含测试，`experimental/ace` 树不随
+/// 包 vendored，该 path 越根必须在投影段剥除——原为交付生成具名拒的根因）。
+const PROJECTION_AUTO_UI_COMPILER: DeliveryProjectionSpec = DeliveryProjectionSpec {
+    strip_deps: &[],
+    strip_dev_deps: &["ace-core"],
     feature_rewrites: &[],
     installed_rewrites: &[],
     dep_rewrites: &[],
@@ -5260,6 +5332,7 @@ const PROJECTION_AUTO_UI_CRATE: DeliveryProjectionSpec = DeliveryProjectionSpec 
 /// 一致）。原形恰一行、投影形恰一行（幂等），漂移判红。
 const PROJECTION_AUTO_UI_TOOLS: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
+    strip_dev_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
     dep_rewrites: &[(
@@ -5276,6 +5349,7 @@ const PROJECTION_AUTO_UI_TOOLS: DeliveryProjectionSpec = DeliveryProjectionSpec 
 /// （`../auto-generation-core` 等），仅 auto-web 跨仓前缀需改写。
 const PROJECTION_AUTO_API_GEN: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
+    strip_dev_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
     dep_rewrites: &[],
@@ -5287,6 +5361,7 @@ const PROJECTION_AUTO_API_GEN: DeliveryProjectionSpec = DeliveryProjectionSpec {
 /// 同构（web 仓与交付根 crates/ 布局一致），零改写。
 const PROJECTION_AUTO_WEB: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
+    strip_dev_deps: &[],
     feature_rewrites: &[],
     installed_rewrites: &[],
     dep_rewrites: &[],
@@ -5859,6 +5934,8 @@ fn delivery_apply_projection(
         features: std::collections::BTreeMap<String, toml::Spanned<toml::Value>>,
         #[serde(default)]
         dependencies: std::collections::BTreeMap<String, toml::Spanned<toml::Value>>,
+        #[serde(default, rename = "dev-dependencies")]
+        dev_dependencies: std::collections::BTreeMap<String, toml::Spanned<toml::Value>>,
     }
     let tables: ProjectionTables =
         toml::from_str(&text).map_err(|e| format!("delivery: producer manifest TOML 无效: {e}"))?;
@@ -5881,6 +5958,17 @@ fn delivery_apply_projection(
             tables.dependencies.get(key)
         })
         .collect();
+    let dev_dependency_items: Vec<_> = spec
+        .strip_dev_deps
+        .iter()
+        .map(|expected| {
+            let key = expected
+                .split_once('=')
+                .map(|(key, _)| key.trim())
+                .unwrap_or("");
+            tables.dev_dependencies.get(key)
+        })
+        .collect();
     let feature_items: Vec<_> = spec
         .feature_rewrites
         .iter()
@@ -5895,11 +5983,16 @@ fn delivery_apply_projection(
     let valid_dependencies = dependency_items
         .iter()
         .zip(spec.strip_deps)
-        .all(|(item, expected)| item.is_none_or(|item| source_line(item).contains(expected)));
+        .all(|(item, expected)| item.is_none_or(|item| source_line(item).contains(expected)))
+        && dev_dependency_items
+            .iter()
+            .zip(spec.strip_dev_deps)
+            .all(|(item, expected)| item.is_none_or(|item| source_line(item).contains(expected)));
     let all_features = feature_items.iter().all(|item| item.is_some());
     let original = valid_dependencies
         && all_features
         && dependency_items.iter().all(|item| item.is_some())
+        && dev_dependency_items.iter().all(|item| item.is_some())
         && feature_items
             .iter()
             .zip(spec.feature_rewrites)
@@ -5909,6 +6002,7 @@ fn delivery_apply_projection(
         && !spec.installed_rewrites.is_empty()
         && spec.installed_rewrites.len() == spec.feature_rewrites.len()
         && dependency_items.iter().all(|item| item.is_none())
+        && dev_dependency_items.iter().all(|item| item.is_none())
         && feature_items
             .iter()
             .zip(spec.installed_rewrites)
@@ -5916,6 +6010,7 @@ fn delivery_apply_projection(
     let projected = valid_dependencies
         && all_features
         && dependency_items.iter().all(|item| item.is_none())
+        && dev_dependency_items.iter().all(|item| item.is_none())
         && feature_items
             .iter()
             .zip(spec.feature_rewrites)
@@ -5943,6 +6038,7 @@ fn delivery_apply_projection(
         if original
             && dependency_items
                 .iter()
+                .chain(dev_dependency_items.iter())
                 .flatten()
                 .any(|item| line_index(item) == index)
         {
@@ -6880,7 +6976,11 @@ fn generate_rust_ui_delivery_inner(
             // PLAN-930 T-04：tools 专用投影（通用前缀改写 + autodown feature
             // 请求剥除——036 V05a 根因闭合）。
             edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_TOOLS)?;
-        } else if matches!(name, "auto-ui-dialect" | "auto-ui-compiler" | "shell-pack") {
+        } else if name == "auto-ui-compiler" {
+            // PLAN-980 RUST：compiler 专用投影（剥 dev-only ace-core，见 spec 注记）。
+            edits =
+                delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_COMPILER)?;
+        } else if matches!(name, "auto-ui-dialect" | "shell-pack") {
             // PLAN-831 T-06：UI 仓侧受管 crate——跨仓语言基础 path 前缀投影
             // （PLAN-901 r2：spec 内补 web 仓前缀改写）。
             edits = delivery_apply_projection(&dst.join("Cargo.toml"), &PROJECTION_AUTO_UI_CRATE)?;
@@ -6930,10 +7030,9 @@ fn generate_rust_ui_delivery_inner(
     for (src_rel, dst_rel) in DELIVERY_VENDOR_TREES {
         let src = producer_root.join(src_rel);
         if !src.is_dir() {
-            return Err(format!(
-                "delivery: producer 缺受管 vendor 树（{src_rel}）——受管判红"
-            )
-            .into());
+            return Err(
+                format!("delivery: producer 缺受管 vendor 树（{src_rel}）——受管判红").into(),
+            );
         }
         let dst = delivery_root.join(dst_rel);
         let copied = delivery_copy_dir(&src, &dst, &DELIVERY_COPY_SKIP_DIRS)?;
@@ -7028,7 +7127,8 @@ fn generate_rust_ui_delivery_inner(
         .parent()
         .and_then(Path::parent)
         .ok_or("delivery: producer UI owner 根无效")?;
-    let (pins, multi_slot) = delivery_pins(&producer_root, Some(ui_root), installed_receipt.as_ref())?;
+    let (pins, multi_slot) =
+        delivery_pins(&producer_root, Some(ui_root), installed_receipt.as_ref())?;
 
     // 应用 member（main.rs 与开发模式同一编译相位产物）
     let app_dir = delivery_root.join("app");
@@ -7319,10 +7419,16 @@ fn start_api_server_inner(
     // 旧主检出预生成工作区成员兜底，新检出（示例归 auto-ui 后）纯前端
     // app 全数误败。有契约的 app 走下方 ensure + generate 常规链。
     if auto_lang_core::config::resolve_back_api(project_dir).is_none() {
-        eprintln!("[PLAN-007-DBG] no back contract under {} — skipping backend", project_dir.display());
+        eprintln!(
+            "[PLAN-007-DBG] no back contract under {} — skipping backend",
+            project_dir.display()
+        );
         return Ok(None);
     }
-    eprintln!("[PLAN-007-DBG] back contract = {:?}", auto_lang_core::config::resolve_back_api(project_dir));
+    eprintln!(
+        "[PLAN-007-DBG] back contract = {:?}",
+        auto_lang_core::config::resolve_back_api(project_dir)
+    );
     // Backend lives in the resolved workspace ({name}-{id8}-back/ member;
     // Stage B P-2 landing + PLAN-910 collision-free identity).
     // 示例归 auto-ui 后新检出/组树不再有预生成 rust-workspace——服务成员
@@ -7742,8 +7848,11 @@ fn front_input_hashes(
     for file in collect_at_files(&back_dir)? {
         let digest = file_sha256(&file)
             .map_err(|e| format!("native backend input unreadable ({}): {e}", file.display()))?;
-        let key = file.strip_prefix(project_dir).unwrap_or(&file)
-            .to_string_lossy().replace('\\', "/");
+        let key = file
+            .strip_prefix(project_dir)
+            .unwrap_or(&file)
+            .to_string_lossy()
+            .replace('\\', "/");
         inputs.insert(key, digest);
     }
     for (key, digest) in theme_input_entries(project_dir)? {
@@ -7756,7 +7865,10 @@ fn front_input_hashes(
 
 fn native_http_profile_input(base: &str) -> (String, String) {
     use sha2::{Digest, Sha256};
-    ("profile/http-base".into(), format!("{:x}", Sha256::digest(base.as_bytes())))
+    (
+        "profile/http-base".into(),
+        format!("{:x}", Sha256::digest(base.as_bytes())),
+    )
 }
 
 /// PLAN-036 T-04：外部官方主题包闭包——统一输入身份作为必需生成输入。
@@ -8519,17 +8631,15 @@ fn generate_module_fn_rust(
     // Vec<Value> E0308 株）。无 return 的 Unknown fn 保持通配 Value
     // （调用点赋值兼容，行为零变）；显式 Void 维持无注解。
     let ret = match &fn_decl.ret {
-        t @ (Type::Void | Type::Unknown) => {
-            infer_module_fn_ret(fn_decl)
-                .map(|k| format!(" -> {}", k))
-                .unwrap_or_else(|| {
-                    if matches!(t, Type::Unknown) {
-                        " -> serde_json::Value".to_string()
-                    } else {
-                        String::new()
-                    }
-                })
-        }
+        t @ (Type::Void | Type::Unknown) => infer_module_fn_ret(fn_decl)
+            .map(|k| format!(" -> {}", k))
+            .unwrap_or_else(|| {
+                if matches!(t, Type::Unknown) {
+                    " -> serde_json::Value".to_string()
+                } else {
+                    String::new()
+                }
+            }),
         t => format!(" -> {}", type_to_rust_str(t)),
     };
     // PLAN-052b：尾表达式体补 return——is_leap `(a && b) || c` 株：
@@ -8543,9 +8653,8 @@ fn generate_module_fn_rust(
             *body_stmts.last_mut().unwrap() = Stmt::Return(Box::new(e));
         }
     }
-    let body = generator.generate_handler_body(&auto_ui_compiler::aura::LogicPayload::AstStmts(
-        body_stmts,
-    ));
+    let body = generator
+        .generate_handler_body(&auto_ui_compiler::aura::LogicPayload::AstStmts(body_stmts));
     format!(
         "#[allow(unused)]\nfn {}({}){} {{\n    {}\n}}\n",
         fn_decl.name.as_str(),
@@ -8554,7 +8663,6 @@ fn generate_module_fn_rust(
         body
     )
 }
-
 
 /// PLAN-052：模块 fn 返回型微型推断——首条 `return expr` 的类型解析：
 /// 字面量直判；标识符/索引查体局部声明表（`var x = []` → Vec<Value>、
@@ -8623,7 +8731,10 @@ fn expr_ret_type(
         Expr::Int(_) => "i32".to_string(),
         Expr::Bool(_) => "bool".to_string(),
         Expr::Str(_) | Expr::CStr(_) | Expr::FStr(_) => "String".to_string(),
-        Expr::Ident(n) => locals.get(n.as_str()).cloned().unwrap_or_else(|| "String".to_string()),
+        Expr::Ident(n) => locals
+            .get(n.as_str())
+            .cloned()
+            .unwrap_or_else(|| "String".to_string()),
         Expr::Index(target, _) => {
             let t = match target.as_ref() {
                 Expr::Ident(n) => locals.get(n.as_str()).cloned(),
@@ -8694,38 +8805,62 @@ mod tests {
         fs::create_dir_all(&app).unwrap();
         fs::write(member.join("Cargo.toml"),
             "[package]\nname=\"api-start-fixture\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[workspace]\n").unwrap();
-        fs::write(member.join("src/main.rs"),
-            "fn main(){ println!(\"{}\",std::fs::read_to_string(\"app.marker\").unwrap()); }").unwrap();
+        fs::write(
+            member.join("src/main.rs"),
+            "fn main(){ println!(\"{}\",std::fs::read_to_string(\"app.marker\").unwrap()); }",
+        )
+        .unwrap();
         fs::write(app.join("app.marker"), "application-root").unwrap();
         let target = dir.path().join("target");
         let context = GeneratedBuildContext {
             mode: auto_api_gen::generated_build::ContextMode::Explicit {
-                root: target.clone(), owner: "PLAN-956-fixture".into(),
+                root: target.clone(),
+                owner: "PLAN-956-fixture".into(),
             },
-            producer_root: dir.path().to_path_buf(), target_root: target,
-            context_id: "fixture956".into(), managed_rustflags: None,
-            user_flags_override: None, toolchain: "fixture".into(),
+            producer_root: dir.path().to_path_buf(),
+            target_root: target,
+            context_id: "fixture956".into(),
+            managed_rustflags: None,
+            user_flags_override: None,
+            toolchain: "fixture".into(),
             producer_origin: "test".into(),
-            debug_policy: "c".into(), debug_policy_source: "test".into(),
+            debug_policy: "c".into(),
+            debug_policy_source: "test".into(),
         };
         let executable = build_api_executable(&context, &member, &member).unwrap();
         assert!(executable.starts_with(member.join("bin")));
         let before = fs::read(&executable).unwrap();
-        let output = std::process::Command::new(&executable).current_dir(&app).output().unwrap();
+        let output = std::process::Command::new(&executable)
+            .current_dir(&app)
+            .output()
+            .unwrap();
         assert!(output.status.success());
-        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "application-root");
-        fs::write(member.join("src/main.rs"), "compile_error!(\"backend must fail\"); fn main(){}\n").unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            "application-root"
+        );
+        fs::write(
+            member.join("src/main.rs"),
+            "compile_error!(\"backend must fail\"); fn main(){}\n",
+        )
+        .unwrap();
         let error = build_api_executable(&context, &member, &member).unwrap_err();
         assert!(error.contains("build failed"), "{error}");
-        assert_eq!(fs::read(&executable).unwrap(), before, "failed build must not publish or return the old image");
+        assert_eq!(
+            fs::read(&executable).unwrap(),
+            before,
+            "failed build must not publish or return the old image"
+        );
     }
 
     /// Compile and run production-generated coalescing expressions with the
     /// production shim and JSON helpers, independently of an iced window.
     #[test]
     fn p060_coalesced_indices_execute_safe_fallbacks() {
-        use auto_ui_compiler::{aura::extract::extract_widget_from_decl,
-            ui_gen::{BackendGenerator, RustGenerator}};
+        use auto_ui_compiler::{
+            aura::extract::extract_widget_from_decl,
+            ui_gen::{BackendGenerator, RustGenerator},
+        };
         let mut methods = String::new();
         let mut checks = String::new();
         let mut count = 0;
@@ -8734,20 +8869,30 @@ mod tests {
                 for shape in ["present", "empty", "missing"] {
                     let empty = shape == "empty";
                     let items = match (root, shape) {
-                        (_, "empty") => "[]", (_, "missing") => "[{ other: 54 }]",
+                        (_, "empty") => "[]",
+                        (_, "missing") => "[{ other: 54 }]",
                         ("mixed", _) => "[{ cells: [{ id: \"u-54\" }] }]",
                         _ => "[{ id: \"u-54\" }]",
                     };
                     let prefix = if root == "store" {
                         format!("store ProbeStore {{ model {{ var rows List = {items} }} msg {{ Noop }} on {{ .Noop -> {{ }} }} }}")
-                    } else { String::new() };
-                    let model = if root == "model" { format!("var rows List = {items}") } else { String::new() };
+                    } else {
+                        String::new()
+                    };
+                    let model = if root == "model" {
+                        format!("var rows List = {items}")
+                    } else {
+                        String::new()
+                    };
                     let (declarations, base) = match root {
                         "local" => (format!("var rows List = {items}"), "rows"),
                         "model" => (String::new(), ".rows"),
                         "store" => (String::new(), ".store.rows"),
                         "mixed" => (format!("var rows List = {items}"), "rows[0].cells"),
-                        _ => (format!("var doc = json.to_value({{ rows: {items} }})"), "doc.rows"),
+                        _ => (
+                            format!("var doc = json.to_value({{ rows: {items} }})"),
+                            "doc.rows",
+                        ),
                     };
                     let source = format!("{prefix}\nwidget Probe {{ model {{ var text str = \"\"\n{model} }} msg {{ Load }} view {{ text .text }} on {{ .Load -> {{ {declarations}\n.text = {base}[{index}].id ?? \"fallback\" }} }} }}");
                     let ast = auto_ui_compiler::parse_ui(&source).expect("parse fixture");
@@ -8761,26 +8906,42 @@ mod tests {
                                 generator.prime_store_field_types(store);
                             }
                             auto_ui_dialect::UiStmt::WidgetDecl(decl) => {
-                                code = generator.generate(&extract_widget_from_decl(decl).unwrap()).unwrap();
+                                code = generator
+                                    .generate(&extract_widget_from_decl(decl).unwrap())
+                                    .unwrap();
                             }
                             _ => {}
                         }
                     }
-                    let expr = code.split("self.text = ").nth(1).expect("generated assignment")
-                        .split(';').next().unwrap();
+                    let expr = code
+                        .split("self.text = ")
+                        .nth(1)
+                        .expect("generated assignment")
+                        .split(';')
+                        .next()
+                        .unwrap();
                     // Fail safely before executing an unsafe generated subscript.
                     if root != "nested" {
                         assert!(expr.contains("__at_idx"), "{root}/{index}/{empty}: {expr}");
                     }
                     let value = match (root, shape) {
-                        (_, "empty") => "vec![]", (_, "missing") => "vec![serde_json::json!({\"other\":54})]",
+                        (_, "empty") => "vec![]",
+                        (_, "missing") => "vec![serde_json::json!({\"other\":54})]",
                         ("mixed", _) => "vec![serde_json::json!({\"cells\":[{\"id\":\"u-54\"}]})]",
                         _ => "vec![serde_json::json!({\"id\":\"u-54\"})]",
                     };
                     let setup = format!("let rows: Vec<serde_json::Value> = {value}; self.rows=rows.clone(); self.store.rows=rows.clone(); let doc=serde_json::json!({{\"rows\":rows}});");
-                    methods.push_str(&format!("fn case_{count}(&mut self) -> String {{ {setup} ({expr}).to_string() }}\n"));
-                    let expected = if shape != "present" { "fallback" } else { expected };
-                    checks.push_str(&format!("assert_eq!(probe.case_{count}(), {expected:?}, {root:?});\n"));
+                    methods.push_str(&format!(
+                        "fn case_{count}(&mut self) -> String {{ {setup} ({expr}).to_string() }}\n"
+                    ));
+                    let expected = if shape != "present" {
+                        "fallback"
+                    } else {
+                        expected
+                    };
+                    checks.push_str(&format!(
+                        "assert_eq!(probe.case_{count}(), {expected:?}, {root:?});\n"
+                    ));
                     count += 1;
                 }
             }
@@ -8791,15 +8952,28 @@ mod tests {
             view { text .text } on { .Load -> { var rows List = [{ id: "u-54" }]
             .text = rows[next_index()].id ?? "fallback" } } }"#;
         let ast = auto_ui_compiler::parse_ui(source).unwrap();
-        let decl = ast.domain_stmts().find_map(|s| match s {
-            auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d), _ => None,
-        }).unwrap();
-        let code = RustGenerator::new().generate(&extract_widget_from_decl(decl).unwrap()).unwrap();
-        let expr = code.split("self.text = ").nth(1).unwrap().split(';').next().unwrap();
+        let decl = ast
+            .domain_stmts()
+            .find_map(|s| match s {
+                auto_ui_dialect::UiStmt::WidgetDecl(d) => Some(d),
+                _ => None,
+            })
+            .unwrap();
+        let code = RustGenerator::new()
+            .generate(&extract_widget_from_decl(decl).unwrap())
+            .unwrap();
+        let expr = code
+            .split("self.text = ")
+            .nth(1)
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap();
         assert!(expr.contains("__at_idx"), "{expr}");
         assert_eq!(expr.matches("next_index()").count(), 1, "{expr}");
         methods.push_str(&format!("fn once(&self) -> String {{ let rows=vec![serde_json::json!({{\"id\":\"u-54\"}})]; ({expr}).to_string() }}"));
-        let program = format!(r#"
+        let program = format!(
+            r#"
 {shims}
 struct Store {{ rows: Vec<serde_json::Value> }}
 struct Probe {{ rows: Vec<serde_json::Value>, store: Store }}
@@ -8812,7 +8986,9 @@ fn main() {{
     assert_eq!(probe.once(),"fallback");
     assert_eq!(CALLS.load(std::sync::atomic::Ordering::SeqCst),1);
 }}
-"#, shims=super::AT_BUILTIN_METHOD_SHIMS);
+"#,
+            shims = super::AT_BUILTIN_METHOD_SHIMS
+        );
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("coalesce.rs");
         std::fs::write(&path, program).unwrap();
@@ -8820,51 +8996,117 @@ fn main() {{
         let deps = test_exe.parent().unwrap();
         let fingerprints = deps.parent().unwrap().join(".fingerprint");
         let binary = test_exe.file_stem().unwrap().to_str().unwrap();
-        let test_hash = binary.strip_prefix("auto_ui_tools-").expect("Cargo test binary identity");
-        let manifest: serde_json::Value = serde_json::from_slice(&std::fs::read(
-            fingerprints.join(format!("auto-ui-tools-{test_hash}/test-lib-auto_ui_tools.json"))
-        ).expect("current Cargo test fingerprint")).unwrap();
+        let test_hash = binary
+            .strip_prefix("auto_ui_tools-")
+            .expect("Cargo test binary identity");
+        let manifest: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(fingerprints.join(format!(
+                "auto-ui-tools-{test_hash}/test-lib-auto_ui_tools.json"
+            )))
+            .expect("current Cargo test fingerprint"),
+        )
+        .unwrap();
         let library = |name: &str, package: &str| -> std::path::PathBuf {
-            let identity = manifest["deps"].as_array().unwrap().iter()
-                .find(|d| d[1].as_str() == Some(name)).unwrap()[3].as_u64().unwrap();
-            let identity = identity.to_le_bytes().iter().map(|b| format!("{b:02x}")).collect::<String>();
-            let matches: Vec<_> = std::fs::read_dir(&fingerprints).unwrap().filter_map(Result::ok)
-                .filter(|e| e.file_name().to_string_lossy().starts_with(&format!("{package}-")))
-                .filter(|e| std::fs::read_to_string(e.path().join(format!("lib-{name}")))
-                    .is_ok_and(|s| s.trim() == identity))
-                .map(|e| deps.join(format!("lib{name}-{}.rlib",
-                    e.file_name().to_str().unwrap().strip_prefix(&format!("{package}-")).unwrap())))
-                .filter(|p| p.is_file()).collect();
+            let identity = manifest["deps"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|d| d[1].as_str() == Some(name))
+                .unwrap()[3]
+                .as_u64()
+                .unwrap();
+            let identity = identity
+                .to_le_bytes()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>();
+            let matches: Vec<_> = std::fs::read_dir(&fingerprints)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|e| {
+                    e.file_name()
+                        .to_string_lossy()
+                        .starts_with(&format!("{package}-"))
+                })
+                .filter(|e| {
+                    std::fs::read_to_string(e.path().join(format!("lib-{name}")))
+                        .is_ok_and(|s| s.trim() == identity)
+                })
+                .map(|e| {
+                    deps.join(format!(
+                        "lib{name}-{}.rlib",
+                        e.file_name()
+                            .to_str()
+                            .unwrap()
+                            .strip_prefix(&format!("{package}-"))
+                            .unwrap()
+                    ))
+                })
+                .filter(|p| p.is_file())
+                .collect();
             assert_eq!(matches.len(), 1, "resolve exact current dependency: {name}");
             matches[0].clone()
         };
         let core = library("auto_lang_core", "auto-lang-core");
         let serde = library("serde_json", "serde_json");
-        let exe = tmp.path().join(if cfg!(windows) { "coalesce.exe" } else { "coalesce" });
+        let exe = tmp.path().join(if cfg!(windows) {
+            "coalesce.exe"
+        } else {
+            "coalesce"
+        });
         let mut native_paths = Vec::new();
         if cfg!(windows) {
-            let cargo_home = std::env::var_os("CARGO_HOME").map(std::path::PathBuf::from)
-                .unwrap_or_else(|| std::path::PathBuf::from(std::env::var_os("USERPROFILE").expect("user profile")).join(".cargo"));
-            let registry=cargo_home.join("registry/src");
-            for registry in std::fs::read_dir(registry).expect("Cargo registry").filter_map(Result::ok) {
-                for package in std::fs::read_dir(registry.path()).unwrap().filter_map(Result::ok) {
-                    let prefix=format!("windows_{}_msvc-",std::env::consts::ARCH);
+            let cargo_home = std::env::var_os("CARGO_HOME")
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| {
+                    std::path::PathBuf::from(std::env::var_os("USERPROFILE").expect("user profile"))
+                        .join(".cargo")
+                });
+            let registry = cargo_home.join("registry/src");
+            for registry in std::fs::read_dir(registry)
+                .expect("Cargo registry")
+                .filter_map(Result::ok)
+            {
+                for package in std::fs::read_dir(registry.path())
+                    .unwrap()
+                    .filter_map(Result::ok)
+                {
+                    let prefix = format!("windows_{}_msvc-", std::env::consts::ARCH);
                     if package.file_name().to_string_lossy().starts_with(&prefix) {
                         native_paths.push(package.path().join("lib"));
                     }
                 }
             }
         }
-        let mut command=std::process::Command::new("rustc");
-        command.arg("--edition=2021").arg(&path).arg("-o").arg(&exe)
-            .arg("-L").arg(format!("dependency={}",deps.display()))
-            .arg("--extern").arg(format!("auto_lang_core={}",core.display()))
-            .arg("--extern").arg(format!("serde_json={}",serde.display()));
-        for native in &native_paths { command.arg("-L").arg(format!("native={}",native.display())); }
-        let output=command.output().expect("rustc link");
-        assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
-        let output=std::process::Command::new(exe).output().unwrap();
-        assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+        let mut command = std::process::Command::new("rustc");
+        command
+            .arg("--edition=2021")
+            .arg(&path)
+            .arg("-o")
+            .arg(&exe)
+            .arg("-L")
+            .arg(format!("dependency={}", deps.display()))
+            .arg("--extern")
+            .arg(format!("auto_lang_core={}", core.display()))
+            .arg("--extern")
+            .arg(format!("serde_json={}", serde.display()));
+        for native in &native_paths {
+            command
+                .arg("-L")
+                .arg(format!("native={}", native.display()));
+        }
+        let output = command.output().expect("rustc link");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let output = std::process::Command::new(exe).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     /// T-07 子批3（F-815-T07-B2-R1-03）`external_backend` 字段消费钉：
@@ -9428,43 +9670,91 @@ pub fn answer() int { return 42 }
         let first = front_input_hashes(root, &PacSource::legacy()).unwrap();
         let managed = resolve_managed_front(root).unwrap();
         fs::create_dir_all(managed.member_dir.join("src")).unwrap();
-        fs::write(managed.member_dir.join("Cargo.toml"), generate_cargo_toml("backend-inputs", root, &PacSource::legacy())).unwrap();
-        fs::write(managed.member_dir.join("src/main.rs"), "// freshness fixture\n").unwrap();
+        fs::write(
+            managed.member_dir.join("Cargo.toml"),
+            generate_cargo_toml("backend-inputs", root, &PacSource::legacy()),
+        )
+        .unwrap();
+        fs::write(
+            managed.member_dir.join("src/main.rs"),
+            "// freshness fixture\n",
+        )
+        .unwrap();
         write_front_receipt(root, &managed, &PacSource::legacy(), None).unwrap();
-        assert_eq!(front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(), (false, false), "the unchanged receipt is an accepted control");
+        assert_eq!(
+            front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(),
+            (false, false),
+            "the unchanged receipt is an accepted control"
+        );
         let receipt_path = managed.member_dir.join("generation.json");
         for stale in ["front-layout/v13", "front-layout/v14"] {
-            let mut old_receipt: serde_json::Value = serde_json::from_str(&fs::read_to_string(&receipt_path).unwrap()).unwrap();
-            let identity = old_receipt["generator"].as_str().unwrap().replace(FRONT_LAYOUT_VERSION, stale);
+            let mut old_receipt: serde_json::Value =
+                serde_json::from_str(&fs::read_to_string(&receipt_path).unwrap()).unwrap();
+            let identity = old_receipt["generator"]
+                .as_str()
+                .unwrap()
+                .replace(FRONT_LAYOUT_VERSION, stale);
             assert_ne!(identity, old_receipt["generator"].as_str().unwrap());
             old_receipt["generator"] = identity.into();
             fs::write(&receipt_path, serde_json::to_vec(&old_receipt).unwrap()).unwrap();
-            assert_eq!(front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(), (false, true), "stale native generation {stale} must rebuild with unchanged app input");
+            assert_eq!(
+                front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(),
+                (false, true),
+                "stale native generation {stale} must rebuild with unchanged app input"
+            );
             write_front_receipt(root, &managed, &PacSource::legacy(), None).unwrap();
         }
 
         fs::write(&chosen, "pub fn value() int { 2 }\n").unwrap();
         let changed = front_input_hashes(root, &PacSource::legacy()).unwrap();
-        assert_ne!(first, changed, "back-only content changes must invalidate a native artifact");
-        assert_eq!(front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(), (false, true), "the actual managed reuse gate must request code regeneration");
-        assert!(!changed.contains_key("back/db.at"), "src/back must win like parse_api_module");
+        assert_ne!(
+            first, changed,
+            "back-only content changes must invalidate a native artifact"
+        );
+        assert_eq!(
+            front_needs_regeneration(root, &managed, &PacSource::legacy()).unwrap(),
+            (false, true),
+            "the actual managed reuse gate must request code regeneration"
+        );
+        assert!(
+            !changed.contains_key("back/db.at"),
+            "src/back must win like parse_api_module"
+        );
         fs::write(root.join("README.md"), "unrelated\n").unwrap();
-        assert_eq!(changed, front_input_hashes(root, &PacSource::legacy()).unwrap());
+        assert_eq!(
+            changed,
+            front_input_hashes(root, &PacSource::legacy()).unwrap()
+        );
         let extra = root.join("src/back/companion.at");
         fs::write(&extra, "pub fn extra() int { 3 }\n").unwrap();
-        assert_ne!(changed, front_input_hashes(root, &PacSource::legacy()).unwrap());
+        assert_ne!(
+            changed,
+            front_input_hashes(root, &PacSource::legacy()).unwrap()
+        );
         fs::remove_file(&extra).unwrap();
-        assert_eq!(changed, front_input_hashes(root, &PacSource::legacy()).unwrap());
+        assert_eq!(
+            changed,
+            front_input_hashes(root, &PacSource::legacy()).unwrap()
+        );
         fs::remove_file(&chosen).unwrap();
-        assert_ne!(changed, front_input_hashes(root, &PacSource::legacy()).unwrap());
+        assert_ne!(
+            changed,
+            front_input_hashes(root, &PacSource::legacy()).unwrap()
+        );
         fs::remove_file(root.join("src/back/api.at")).unwrap();
         fs::remove_dir(root.join("src/back")).unwrap();
         let fallback = front_input_hashes(root, &PacSource::legacy()).unwrap();
-        assert!(fallback.contains_key("back/db.at"), "legacy back directory must also be tracked");
+        assert!(
+            fallback.contains_key("back/db.at"),
+            "legacy back directory must also be tracked"
+        );
         fs::remove_file(root.join("back/db.at")).unwrap();
         fs::remove_dir(root.join("back")).unwrap();
         fs::write(root.join("back"), "not a readable backend directory").unwrap();
-        assert!(front_input_hashes(root, &PacSource::legacy()).is_err(), "backend input read failure cannot issue a reduced receipt");
+        assert!(
+            front_input_hashes(root, &PacSource::legacy()).is_err(),
+            "backend input read failure cannot issue a reduced receipt"
+        );
     }
 
     #[test]
@@ -9472,12 +9762,25 @@ pub fn answer() int { return 42 }
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("pac.at"), "name: \"http-profile\"\n").unwrap();
         let base = crate::util::http_base_url();
-        let generated = wrap_example("http-profile", "pub struct App {}", tmp.path(), &PacSource::legacy());
+        let generated = wrap_example(
+            "http-profile",
+            "pub struct App {}",
+            tmp.path(),
+            &PacSource::legacy(),
+        );
         assert!(generated.contains(&format!("const __AT_HTTP_BASE: &str = {base:?};")));
         let inputs = front_input_hashes(tmp.path(), &PacSource::legacy()).unwrap();
         let (key, digest) = native_http_profile_input(&base);
-        assert_eq!(inputs.get(&key), Some(&digest), "the profile baked into main must participate in cache identity");
-        assert_ne!(native_http_profile_input("http://127.0.0.1:17823"), native_http_profile_input("http://127.0.0.1:17824"), "changing the selected backend must invalidate reuse");
+        assert_eq!(
+            inputs.get(&key),
+            Some(&digest),
+            "the profile baked into main must participate in cache identity"
+        );
+        assert_ne!(
+            native_http_profile_input("http://127.0.0.1:17823"),
+            native_http_profile_input("http://127.0.0.1:17824"),
+            "changing the selected backend must invalidate reuse"
+        );
     }
 
     /// PLAN-693 T-01/T-03：生成 main 的三模式 CLI 臂在场——`--render-mode`/
@@ -9868,7 +10171,11 @@ pub fn ping() int {
         )
         .unwrap();
         let module = super::parse_api_module(tmp.path()).expect("api module parses");
-        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
+        let code = super::generate_merged_api_client(
+            &module,
+            tmp.path(),
+            &super::generate_api_type_structs(&module),
+        );
         assert!(
             code.contains("db::ping"),
             "absorption arm should delegate ping to db::ping, got:\n{}",
@@ -9927,7 +10234,11 @@ pub fn create_item(name str) str {
         )
         .unwrap();
         let module = super::parse_api_module(tmp.path()).expect("api module parses");
-        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
+        let code = super::generate_merged_api_client(
+            &module,
+            tmp.path(),
+            &super::generate_api_type_structs(&module),
+        );
         assert!(
             code.contains("static API_DATA"),
             "CRUD fallback must keep the API_DATA scaffold, got:\n{}",
@@ -9996,7 +10307,11 @@ pub fn create_item(name str) str {
         )
         .unwrap();
         let module = super::parse_api_module(tmp.path()).expect("api module parses");
-        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
+        let code = super::generate_merged_api_client(
+            &module,
+            tmp.path(),
+            &super::generate_api_type_structs(&module),
+        );
         assert!(
             code.contains("pub mod api_impl"),
             "route A 内嵌端点体模块在案, got:\n{}",
@@ -10042,7 +10357,11 @@ pub fn list_items() []str {
         .unwrap();
         std::fs::write(back.join("broken.at"), "pub fn broken( {\n").unwrap();
         let module = super::parse_api_module(tmp.path()).expect("api module parses");
-        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
+        let code = super::generate_merged_api_client(
+            &module,
+            tmp.path(),
+            &super::generate_api_type_structs(&module),
+        );
         assert!(
             code.contains("⚠ route A inactive"),
             "转译失败停用必须在生成物留标记, got:\n{}",
@@ -10065,7 +10384,9 @@ pub fn list_items() []str {
         let tmp = tempfile::tempdir().unwrap();
         let back = tmp.path().join("src/back");
         std::fs::create_dir_all(&back).unwrap();
-        std::fs::write(back.join("api.at"), r#"
+        std::fs::write(
+            back.join("api.at"),
+            r#"
 pub type Work = {
     title: str
 }
@@ -10075,19 +10396,38 @@ pub fn create_work(title str) Work {
     if title == "" { return Work { title: "untitled" } }
     return db.create_work(title)
 }
-"#).unwrap();
-        std::fs::write(back.join("db.at"), r#"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            back.join("db.at"),
+            r#"
 use api: Work
 pub fn create_work(title str) Work {
     let result Work = Work { title: title }
     return result
 }
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let module = super::parse_api_module(tmp.path()).unwrap();
-        let code = super::generate_merged_api_client(&module, tmp.path(), &super::generate_api_type_structs(&module));
-        assert!(code.contains("pub mod api_impl"), "typed endpoint bodies must remain real implementations: {code}");
-        assert!(code.contains("__db2ui_Work(api_impl::create_work("), "endpoint must delegate to the real body: {code}");
-        assert!(!code.contains("Work::default()"), "declared return types cannot hide failed backend absorption");
+        let code = super::generate_merged_api_client(
+            &module,
+            tmp.path(),
+            &super::generate_api_type_structs(&module),
+        );
+        assert!(
+            code.contains("pub mod api_impl"),
+            "typed endpoint bodies must remain real implementations: {code}"
+        );
+        assert!(
+            code.contains("__db2ui_Work(api_impl::create_work("),
+            "endpoint must delegate to the real body: {code}"
+        );
+        assert!(
+            !code.contains("Work::default()"),
+            "declared return types cannot hide failed backend absorption"
+        );
     }
 
     #[test]
@@ -10096,7 +10436,10 @@ pub fn create_work(title str) Work {
         for text in ["abcabc", "中文路径中文", ""] {
             for needle in ["a", "文", "", "missing"] {
                 for start in [-2, 0, 1, 4, 100] {
-                    assert_eq!(find(text, needle, i64::from(start)), auto_lang_core::a2r_std::str_find_from(text, needle, start));
+                    assert_eq!(
+                        find(text, needle, i64::from(start)),
+                        auto_lang_core::a2r_std::str_find_from(text, needle, start)
+                    );
                 }
             }
         }
@@ -10111,7 +10454,12 @@ pub fn create_work(title str) Work {
         let adapted = super::adapt_merged_string_index(source);
         assert!(adapted.starts_with(source.split("let n = ").next().unwrap()));
         assert!(adapted.contains("let n = crate::__merged_str_find_from(text, needle, start);"));
-        assert_eq!(adapted.matches("pub(crate) fn __merged_str_find_from").count(), 1);
+        assert_eq!(
+            adapted
+                .matches("pub(crate) fn __merged_str_find_from")
+                .count(),
+            1
+        );
     }
 
     /// Stage B P-2 V4：仓外项目完整生成链——member 落 project-local，框架
@@ -10152,15 +10500,15 @@ pub fn create_work(title str) Work {
                 fs::read_to_string(e.path().join("member.json"))
                     .ok()
                     .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
-                    .and_then(|v| {
-                        v.get("role")
-                            .and_then(|r| r.as_str())
-                            .map(|s| s == "front")
-                    })
+                    .and_then(|v| v.get("role").and_then(|r| r.as_str()).map(|s| s == "front"))
                     .unwrap_or(false)
             })
             .collect();
-        assert_eq!(members.len(), 1, "front 成员恰一（910 id8 登记）: {members:?}");
+        assert_eq!(
+            members.len(),
+            1,
+            "front 成员恰一（910 id8 登记）: {members:?}"
+        );
         let member = members[0].path();
         assert!(
             member.join("Cargo.toml").exists(),
@@ -10649,7 +10997,10 @@ pub fn create_work(title str) Work {
         assert!(!pins.iter().any(|(n, _)| n == "windows-core"));
 
         let missing = dir.path().join("absent");
-        assert!(delivery_pins(&missing, None, None).is_err(), "锁缺失受管判红");
+        assert!(
+            delivery_pins(&missing, None, None).is_err(),
+            "锁缺失受管判红"
+        );
     }
 
     /// PLAN-1003 复审 R1（F-1003-R1-03）：交付清单的策略记录只描述随包静态
@@ -10754,171 +11105,182 @@ pub fn create_work(title str) Work {
     }
 
     /// PLAN-792：投影修剪——恒等/幂等合同。PLAN-901（Design 52 计划B）：语言仓
-/// 测试 feature 拍平后 AUTO_LANG/CORE spec 收敛为恒等投影——新形态
-/// （常驻 auto-test-case 依赖、无 test-cases feature 行）零编辑、原文
-/// 保真、幂等；runtime 臂（autodown-core 剥除/改写）保持 PLAN-815 T-05
-/// 原语义：剥除+改写+幂等+漂移判红。
-#[test]
-fn delivery_projection_strip_and_idempotent() {
-    let dir = tempfile::tempdir().unwrap();
-    let m = dir.path().join("Cargo.toml");
-    // PLAN-901 新 producer 形态：TestCase 常驻依赖在清单，无测试 feature。
-    let original = "[features]
+    /// 测试 feature 拍平后 AUTO_LANG/CORE spec 收敛为恒等投影——新形态
+    /// （常驻 auto-test-case 依赖、无 test-cases feature 行）零编辑、原文
+    /// 保真、幂等；runtime 臂（autodown-core 剥除/改写）保持 PLAN-815 T-05
+    /// 原语义：剥除+改写+幂等+漂移判红。
+    #[test]
+    fn delivery_projection_strip_and_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        let m = dir.path().join("Cargo.toml");
+        // PLAN-901 新 producer 形态：TestCase 常驻依赖在清单，无测试 feature。
+        let original = "[features]
              mem-profile = [\"auto-lang-core/mem-profile\"]
 
              [dependencies]
              auto-test-case = { path = \"../auto-test-case\" }
              auto-val = { path = \"../auto-val\" }
 ";
-    std::fs::write(&m, original).unwrap();
-    let edits = delivery_apply_projection(&m, &PROJECTION_AUTO_LANG).unwrap();
-    assert!(edits.is_empty(), "恒等投影零编辑（PLAN-901）: {edits:?}");
-    let text = std::fs::read_to_string(&m).unwrap();
-    assert_eq!(text, original, "原文逐字节保真");
-    assert!(
-        text.contains("auto-test-case = { path = \"../auto-test-case\" }"),
-        "常驻 TestCase 依赖随包保留"
-    );
-    assert!(!text.contains("test-cases"), "无测试 feature 面");
-    delivery_apply_projection(&m, &PROJECTION_AUTO_LANG).unwrap();
-    assert_eq!(std::fs::read_to_string(&m).unwrap(), original, "幂等");
-    // Core spec：同恒等语义。
-    let core = dir.path().join("core.toml");
-    let core_input = "[dependencies]
+        std::fs::write(&m, original).unwrap();
+        let edits = delivery_apply_projection(&m, &PROJECTION_AUTO_LANG).unwrap();
+        assert!(edits.is_empty(), "恒等投影零编辑（PLAN-901）: {edits:?}");
+        let text = std::fs::read_to_string(&m).unwrap();
+        assert_eq!(text, original, "原文逐字节保真");
+        assert!(
+            text.contains("auto-test-case = { path = \"../auto-test-case\" }"),
+            "常驻 TestCase 依赖随包保留"
+        );
+        assert!(!text.contains("test-cases"), "无测试 feature 面");
+        delivery_apply_projection(&m, &PROJECTION_AUTO_LANG).unwrap();
+        assert_eq!(std::fs::read_to_string(&m).unwrap(), original, "幂等");
+        // Core spec：同恒等语义。
+        let core = dir.path().join("core.toml");
+        let core_input = "[dependencies]
 auto-test-case = { path = \"../auto-test-case\" }
 ";
-    std::fs::write(&core, core_input).unwrap();
-    assert!(
-        delivery_apply_projection(&core, &PROJECTION_AUTO_LANG_CORE)
+        std::fs::write(&core, core_input).unwrap();
+        assert!(delivery_apply_projection(&core, &PROJECTION_AUTO_LANG_CORE)
             .unwrap()
-            .is_empty()
-    );
-    assert_eq!(std::fs::read_to_string(&core).unwrap(), core_input, "Core 恒等幂等");
-    // PLAN-815 T-05: runtime spec — cross-repo autodown-core strip + feature
-    // rewrite (the shape moved over from auto-lang by 814-T-04), idempotent,
-    // drift-red, each holding on its own.
-    let rt = dir.path().join("runtime.toml");
-    // PLAN-018 T-04：ui-iced 拍平后 producer 的 autodown feature 为
-    // `["dep:autodown-core"]`——投影剥跨仓 dep 行并同步摘 dep: 转发
-    //（feature 名保留，空表体）。
-    std::fs::write(
-        &rt,
-        "[features]
+            .is_empty());
+        assert_eq!(
+            std::fs::read_to_string(&core).unwrap(),
+            core_input,
+            "Core 恒等幂等"
+        );
+        // PLAN-815 T-05: runtime spec — cross-repo autodown-core strip + feature
+        // rewrite (the shape moved over from auto-lang by 814-T-04), idempotent,
+        // drift-red, each holding on its own.
+        let rt = dir.path().join("runtime.toml");
+        // PLAN-018 T-04：ui-iced 拍平后 producer 的 autodown feature 为
+        // `["dep:autodown-core"]`——投影剥跨仓 dep 行并同步摘 dep: 转发
+        //（feature 名保留，空表体）。
+        std::fs::write(
+            &rt,
+            "[features]
 autodown = [\"dep:autodown-core\"]
 
 [dependencies]
 # comment
 autodown-core = { path = \"../../../auto-down/autodown/packages/engine/rust\", optional = true }
 ",
-    )
-    .unwrap();
-    let rt_edits = delivery_apply_projection(&rt, &PROJECTION_AUTO_UI_RUNTIME).unwrap();
-    assert_eq!(rt_edits.len(), 2, "1 strip + 1 rewrite");
-    let rt_text = std::fs::read_to_string(&rt).unwrap();
-    assert!(
-        !rt_text.contains("autodown-core"),
-        "cross-repo optional dep stripped"
-    );
-    assert!(
-        rt_text.contains("autodown = []"),
-        "feature name kept, dep forwarding dropped"
-    );
-    let rt_stripped = std::fs::read_to_string(&rt).unwrap();
-    delivery_apply_projection(&rt, &PROJECTION_AUTO_UI_RUNTIME).unwrap();
-    assert_eq!(std::fs::read_to_string(&rt).unwrap(), rt_stripped);
-    let rt_drift = dir.path().join("runtime-drift.toml");
-    std::fs::write(
-        &rt_drift,
-        "[dependencies]
+        )
+        .unwrap();
+        let rt_edits = delivery_apply_projection(&rt, &PROJECTION_AUTO_UI_RUNTIME).unwrap();
+        assert_eq!(rt_edits.len(), 2, "1 strip + 1 rewrite");
+        let rt_text = std::fs::read_to_string(&rt).unwrap();
+        assert!(
+            !rt_text.contains("autodown-core"),
+            "cross-repo optional dep stripped"
+        );
+        assert!(
+            rt_text.contains("autodown = []"),
+            "feature name kept, dep forwarding dropped"
+        );
+        let rt_stripped = std::fs::read_to_string(&rt).unwrap();
+        delivery_apply_projection(&rt, &PROJECTION_AUTO_UI_RUNTIME).unwrap();
+        assert_eq!(std::fs::read_to_string(&rt).unwrap(), rt_stripped);
+        let rt_drift = dir.path().join("runtime-drift.toml");
+        std::fs::write(
+            &rt_drift,
+            "[dependencies]
 auto-val = { path = \"../auto-val\" }
 ",
-    )
-    .unwrap();
-    assert!(delivery_apply_projection(&rt_drift, &PROJECTION_AUTO_UI_RUNTIME).is_err());
-}
+        )
+        .unwrap();
+        assert!(delivery_apply_projection(&rt_drift, &PROJECTION_AUTO_UI_RUNTIME).is_err());
+    }
 
-/// PLAN-930 T-04：tools 投影依赖行改写——producer 原形
-/// `auto-ui-runtime = { path = "../auto-ui-runtime", features = ["autodown"] }`
-/// → 投影形剥 feature 请求（bundle 内 runtime 的 autodown 已投影为空
-/// feature，重开即复编 cfg 模块并 E0433——036 V05a 根因）；幂等、漂移
-/// 判红、合法零影响。
-#[test]
-fn plan930_tools_dep_rewrite_strips_autodown_feature_request() {
-    let dir = tempfile::tempdir().unwrap();
-    let m = dir.path().join("tools.toml");
-    let original = "[dependencies]
+    /// PLAN-930 T-04：tools 投影依赖行改写——producer 原形
+    /// `auto-ui-runtime = { path = "../auto-ui-runtime", features = ["autodown"] }`
+    /// → 投影形剥 feature 请求（bundle 内 runtime 的 autodown 已投影为空
+    /// feature，重开即复编 cfg 模块并 E0433——036 V05a 根因）；幂等、漂移
+    /// 判红、合法零影响。
+    #[test]
+    fn plan930_tools_dep_rewrite_strips_autodown_feature_request() {
+        let dir = tempfile::tempdir().unwrap();
+        let m = dir.path().join("tools.toml");
+        let original = "[dependencies]
 auto-ui-runtime = { path = \"../auto-ui-runtime\", features = [\"autodown\"] }
 ";
-    std::fs::write(&m, original).unwrap();
-    let edits = delivery_apply_projection(&m, &PROJECTION_AUTO_UI_TOOLS).unwrap();
-    assert_eq!(edits.len(), 1, "恰一次依赖行改写: {edits:?}");
-    assert!(edits[0].starts_with("rewrite dep: "), "{edits:?}");
-    let text = std::fs::read_to_string(&m).unwrap();
-    assert!(
-        text.contains("auto-ui-runtime = { path = \"../auto-ui-runtime\" }"),
-        "feature 请求剥除: {text}"
-    );
-    assert!(!text.contains("autodown"), "bundle 内不得残留 autodown feature 请求: {text}");
-    // 幂等：已投影形态再投影零编辑、原文不变。
-    let projected_text = std::fs::read_to_string(&m).unwrap();
-    assert!(
-        delivery_apply_projection(&m, &PROJECTION_AUTO_UI_TOOLS)
-            .unwrap()
-            .is_empty(),
-        "投影形幂等"
-    );
-    assert_eq!(std::fs::read_to_string(&m).unwrap(), projected_text);
-    // 漂移（既非原形也非投影形的第三形态）→ 判红。
-    let drift = dir.path().join("tools-drift.toml");
-    std::fs::write(
-        &drift,
-        "[dependencies]
+        std::fs::write(&m, original).unwrap();
+        let edits = delivery_apply_projection(&m, &PROJECTION_AUTO_UI_TOOLS).unwrap();
+        assert_eq!(edits.len(), 1, "恰一次依赖行改写: {edits:?}");
+        assert!(edits[0].starts_with("rewrite dep: "), "{edits:?}");
+        let text = std::fs::read_to_string(&m).unwrap();
+        assert!(
+            text.contains("auto-ui-runtime = { path = \"../auto-ui-runtime\" }"),
+            "feature 请求剥除: {text}"
+        );
+        assert!(
+            !text.contains("autodown"),
+            "bundle 内不得残留 autodown feature 请求: {text}"
+        );
+        // 幂等：已投影形态再投影零编辑、原文不变。
+        let projected_text = std::fs::read_to_string(&m).unwrap();
+        assert!(
+            delivery_apply_projection(&m, &PROJECTION_AUTO_UI_TOOLS)
+                .unwrap()
+                .is_empty(),
+            "投影形幂等"
+        );
+        assert_eq!(std::fs::read_to_string(&m).unwrap(), projected_text);
+        // 漂移（既非原形也非投影形的第三形态）→ 判红。
+        let drift = dir.path().join("tools-drift.toml");
+        std::fs::write(
+            &drift,
+            "[dependencies]
 auto-ui-runtime = { path = \"../auto-ui-runtime\", features = [] }
 ",
-    )
-    .unwrap();
-    assert!(delivery_apply_projection(&drift, &PROJECTION_AUTO_UI_TOOLS).is_err());
-    // 无关依赖/其他 feature 请求零影响（合法共存面）。
-    let unrelated = dir.path().join("tools-unrelated.toml");
-    let unrelated_input = "[dependencies]
+        )
+        .unwrap();
+        assert!(delivery_apply_projection(&drift, &PROJECTION_AUTO_UI_TOOLS).is_err());
+        // 无关依赖/其他 feature 请求零影响（合法共存面）。
+        let unrelated = dir.path().join("tools-unrelated.toml");
+        let unrelated_input = "[dependencies]
 auto-ui-runtime = { path = \"../auto-ui-runtime\", features = [\"autodown\"] }
 auto-lang-core = { path = \"../auto-lang-core\", features = [\"code-editor\"] }
 ";
-    std::fs::write(&unrelated, unrelated_input).unwrap();
-    let u_edits = delivery_apply_projection(&unrelated, &PROJECTION_AUTO_UI_TOOLS).unwrap();
-    assert_eq!(u_edits.len(), 1, "仅 runtime feature 请求被改写: {u_edits:?}");
-    let u_text = std::fs::read_to_string(&unrelated).unwrap();
-    assert!(
-        u_text.contains("auto-lang-core = { path = \"../auto-lang-core\", features = [\"code-editor\"] }"),
-        "无关依赖原样保留: {u_text}"
-    );
-}
+        std::fs::write(&unrelated, unrelated_input).unwrap();
+        let u_edits = delivery_apply_projection(&unrelated, &PROJECTION_AUTO_UI_TOOLS).unwrap();
+        assert_eq!(
+            u_edits.len(),
+            1,
+            "仅 runtime feature 请求被改写: {u_edits:?}"
+        );
+        let u_text = std::fs::read_to_string(&unrelated).unwrap();
+        assert!(
+            u_text.contains(
+                "auto-lang-core = { path = \"../auto-lang-core\", features = [\"code-editor\"] }"
+            ),
+            "无关依赖原样保留: {u_text}"
+        );
+    }
 
     /// PLAN-901：恒等投影合同（原 plan842 installed 状态机退役）。语言仓
-/// 测试 feature 拍平后 AUTO_LANG/CORE spec 无 strip/rewrite 面：
-/// · 新 producer 形态与任意结构清单 → 恒等（零编辑、零改写）；
-/// · 旧 installed 中间形态的 test-cases 转发行不再被改写——重交付以
-///   producer 新清单整树覆盖（receipt verify_tree 钉树身份），受管
-///   消费根 fresh metadata 不再出现旧转发行；
-/// · 无关 metadata 键不受投影影响（保 PLAN-842 免疫语义）。
-#[test]
-fn plan842_installed_projection_accepts_only_exact_supported_states() {
-    let dir = tempfile::tempdir().unwrap();
-    let manifest = dir.path().join("Cargo.toml");
-    // 新 producer 形态：恒等。
-    let fresh = "[features]
+    /// 测试 feature 拍平后 AUTO_LANG/CORE spec 无 strip/rewrite 面：
+    /// · 新 producer 形态与任意结构清单 → 恒等（零编辑、零改写）；
+    /// · 旧 installed 中间形态的 test-cases 转发行不再被改写——重交付以
+    ///   producer 新清单整树覆盖（receipt verify_tree 钉树身份），受管
+    ///   消费根 fresh metadata 不再出现旧转发行；
+    /// · 无关 metadata 键不受投影影响（保 PLAN-842 免疫语义）。
+    #[test]
+    fn plan842_installed_projection_accepts_only_exact_supported_states() {
+        let dir = tempfile::tempdir().unwrap();
+        let manifest = dir.path().join("Cargo.toml");
+        // 新 producer 形态：恒等。
+        let fresh = "[features]
 mem-profile = []
 
 [dependencies]
 auto-test-case = { path = \"../auto-test-case\" }
 ";
-    std::fs::write(&manifest, fresh).unwrap();
-    assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
-        .unwrap()
-        .is_empty());
-    assert_eq!(std::fs::read_to_string(&manifest).unwrap(), fresh);
-    // 旧 installed 中间形态：恒等保留原文（不再改写；整树重覆盖负责收敛）。
-    let installed = "[features]
+        std::fs::write(&manifest, fresh).unwrap();
+        assert!(delivery_apply_projection(&manifest, &PROJECTION_AUTO_LANG)
+            .unwrap()
+            .is_empty());
+        assert_eq!(std::fs::read_to_string(&manifest).unwrap(), fresh);
+        // 旧 installed 中间形态：恒等保留原文（不再改写；整树重覆盖负责收敛）。
+        let installed = "[features]
 test-cases = [\"auto-lang-core/test-cases\"]
 
 [dependencies]
@@ -12062,20 +12424,3 @@ mod plan036_theme_input_tests {
         );
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

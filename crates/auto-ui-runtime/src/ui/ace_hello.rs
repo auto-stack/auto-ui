@@ -85,6 +85,23 @@ impl HelloSession {
         })
     }
 
+    /// AXR0 模式（PLAN-980 RUST）：窗口文本来自**新 A2R 产物 exe 的真实
+    /// stdout**（非 AV/旧 VM）——由窗口进程派生并显示其输出行。
+    pub fn from_a2r_output(stdout_line: &str, source_path: &str) -> Self {
+        Self {
+            src: String::new(),
+            evidence: HelloEvidence {
+                source_path: source_path.to_string(),
+                node_name: "A2R".to_string(),
+                head_role: "a2r".to_string(),
+                grammar_id: String::new(),
+                av_text: stdout_line.to_string(),
+                f0: None,
+            },
+            frames: std::sync::Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
     /// F0 受检调用：合成 TextRecord 源把**同一 AV 文本字节**交给 967 冻结
     /// provider（`text_byte_len`），经 969 E0 门面分派并核对计数。
     pub fn run_f0(&mut self, provider: &str) -> Result<(), String> {
@@ -119,7 +136,7 @@ impl HelloSession {
         }
         let src = format!(
             "use.rs f0_text\nfn main() int {{ return text_byte_len({}) }}",
-            escape_auto_string(&self.evidence.av_text)
+            escape_auto_string_for_source(&self.evidence.av_text)
         );
         let mut request = auto_lang_core::AceRequest::simple(&src);
         request.provider = Some(provider);
@@ -159,8 +176,8 @@ pub fn stable_f0_root() -> PathBuf {
     p.join("ace-hello-f0")
 }
 
-/// Auto 源字符串字面量转义（文本经源码字面量进入 F0 车道）。
-fn escape_auto_string(s: &str) -> String {
+/// Auto 源字符串字面量转义（文本经源码字面量进入 F0/A2R 车道）。
+pub(crate) fn escape_auto_string_for_source(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
     for c in s.chars() {

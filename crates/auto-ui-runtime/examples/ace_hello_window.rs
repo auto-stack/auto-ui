@@ -28,6 +28,7 @@ fn main() {
     let mut min_frames: usize = 2;
     let mut provider: Option<String> = None;
     let mut prep_only = false;
+    let mut a2r_run: Option<String> = None;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -37,6 +38,7 @@ fn main() {
             "--min-frames" => min_frames = args.next().and_then(|v| v.parse().ok()).unwrap_or(2),
             "--provider" => provider = args.next(),
             "--prep-only" => prep_only = true,
+            "--a2r-run" => a2r_run = args.next(),
             other => {
                 eprintln!("ace_hello_window: unknown arg `{other}`");
                 std::process::exit(2);
@@ -53,6 +55,56 @@ fn main() {
         auto_lang_ace_host::build_f0_text_provider(provider, &stable_f0_root())
             .expect("f0 provider prebuilt");
         println!("f0 provider prebuilt at {}", stable_f0_root().display());
+        return;
+    }
+
+    // AXR0 模式：源=fixture 路径（证据记账），文本=A2R 产物 exe 的真实输出。
+    if let Some(a2r_exe) = a2r_run {
+        let source_path = source.clone().unwrap_or_else(|| a2r_exe.clone());
+        let run = std::process::Command::new(&a2r_exe)
+            .current_dir(std::path::Path::new(&a2r_exe).parent().unwrap_or(std::path::Path::new(".")))
+            .output()
+            .unwrap_or_else(|e| panic!("a2r run failed: {e}"));
+        assert!(run.status.success(), "a2r exe failed: {}", String::from_utf8_lossy(&run.stderr));
+        let line = String::from_utf8_lossy(&run.stdout).trim().to_string();
+        assert!(line.starts_with("value:"), "a2r stdout protocol: {line}");
+        let session = auto_ui_runtime::ui::ace_hello::HelloSession::from_a2r_output(
+            &format!("A2R {line}"),
+            &source_path,
+        );
+        let frames = session.frames.clone();
+        let mut ev2 = session.evidence.clone();
+        ev2.f0 = None;
+        let ev2json = serde_json::json!({
+            "mode": "a2r",
+            "source_path": ev2.source_path,
+            "av_text": ev2.av_text,
+            "frames_rendered": frames.load(std::sync::atomic::Ordering::Relaxed),
+            "a2r_stdout": line,
+            "f0_root": auto_ui_runtime::ui::ace_hello::stable_f0_root().display().to_string(),
+            "window_result": "closed",
+        });
+        let evidence_path = evidence_path.expect("--evidence <out.json> is required");
+        if auto_ui_runtime::ui::ace_hello::install_hello_session(session).is_err() {
+            std::process::exit(6);
+        }
+        std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_millis(hold_ms.max(300));
+            while Instant::now() < deadline {
+                if frames.load(std::sync::atomic::Ordering::Relaxed) >= min_frames {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            let mut j = ev2json;
+            j["frames_rendered"] = serde_json::json!(frames.load(std::sync::atomic::Ordering::Relaxed));
+            let _ = std::fs::write(&evidence_path, serde_json::to_string_pretty(&j).unwrap());
+            std::process::exit(0);
+        });
+        if let Err(e) = auto_ui_runtime::ui::iced::run_app::<AceHelloWindow>() {
+            eprintln!("ace_hello_window: window run failed: {e:?}");
+            std::process::exit(7);
+        }
         return;
     }
 

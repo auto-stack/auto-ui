@@ -90,6 +90,12 @@ auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
 ace-av = { path = "../../../auto-lang/experimental/ace/crates/av" }
 # PLAN-980 HELLO：E0 门面宿主安装与 F0 provider 注册（Windows 门在源 crate 内）。
 auto-lang-ace-host = { path = "../../../auto-lang/crates/auto-lang-ace-host" }
+# PLAN-980 RUST（AXR0）：A2R 生成面（组件场景 fileset + F0×A2R 链接 fileset）。
+ace-abi = { path = "../../../auto-lang/experimental/ace/crates/abi" }
+ace-a2x-core = { path = "../../../auto-lang/experimental/ace/crates/a2x-core" }
+ace-a2x-rust = { path = "../../../auto-lang/experimental/ace/crates/a2x-rust" }
+ace-source-query = { path = "../../../auto-lang/experimental/ace/crates/source-query" }
+ace-foreign-contract = { path = "../../../auto-lang/experimental/ace/crates/foreign-contract" }
 # PLAN-900 T-03：UiCompatInstaller 进程期自注册（原 auto-lang facade 迁入）。
 inventory = "0.3"
 auto-ui-compiler = { path = "../auto-ui-compiler" }
