@@ -216,6 +216,68 @@ impl Session {
             .observe()
     }
 
+    /// R63-1：追加 Tick 调度（进程内重跑受检场景，无工具链）。
+    pub fn age_tick(&mut self, n: u32) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .tick(n)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// R63-1：投递作者消息，触发 `on <Msg>` 回调。
+    pub fn age_send(&mut self, msg: &str) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .send(msg)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// R63-1：资源事实（名字/端口/模块）。
+    pub fn age_resources(&self) -> Result<Vec<(String, String, String)>, String> {
+        self.age
+            .as_ref()
+            .map(|a| a.resources())
+            .ok_or_else(|| "this session is not an AGE session".to_string())
+    }
+
+    /// R63-1：按已声明出口回答布局请求（不兼容具名拒）。
+    pub fn age_request_layout(
+        &self,
+        request: ace_core::source::age_package::AgeViewRequest,
+    ) -> Result<ace_core::source::age_package::AgeViewExit, String> {
+        self.age
+            .as_ref()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .request_layout(request)
+            .map_err(|e| format!("{}: {}", e.code, e.message))
+    }
+
+    /// R63-1：停止（冻结最后观察值）。
+    pub fn age_stop(&mut self) -> Result<(), String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .stop()
+    }
+
+    /// R63-1：恢复（同 PID，Start 重新为 1）。
+    pub fn age_restart(&mut self) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .restart()
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// R63-1：Session 是否处于停止态。
+    pub fn age_is_stopped(&self) -> Result<bool, String> {
+        self.age
+            .as_ref()
+            .map(|a| a.is_stopped())
+            .ok_or_else(|| "this session is not an AGE session".to_string())
+    }
     /// 主组件的呈现出口。
     pub fn age_exit(&self) -> Result<ace_core::source::age_package::AgeViewExit, String> {
         self.age

@@ -106,3 +106,34 @@ fn s2_age_api_on_scalar_session_is_named_rejected() {
     assert!(s.age_observe().is_err());
     assert!(s.age_identity().is_err());
 }
+
+/// R63-1：driver 层也暴露调度/回调/布局/停止恢复，且行为与 bridge 一致。
+#[test]
+fn s2_session_i_obligations_are_reachable_from_the_driver() {
+    const TICK: &str = "node Counter {\n    model { count int = 0 }\n    on Tick { count = count + 1 }\n    view {\n        text \"t\" {}\n    }\n}\n";
+    let mut s = Session::new(TICK).expect("opens");
+    let pid = s.age_identity().unwrap().0;
+    let st = |s: &Session| s.age_observe().unwrap().components[0].instance_states[0][0];
+    assert_eq!(st(&s), 0);
+    s.age_tick(4).expect("tick");
+    assert_eq!(st(&s), 4);
+    s.age_send("Tick").expect("send Tick");
+    assert_eq!(st(&s), 5);
+
+    let err = s
+        .age_request_layout(ace_core::source::age_package::AgeViewRequest::Scene2d)
+        .expect_err("a UI-only node cannot serve a 2D scene request");
+    assert!(err.contains("source.age.exit-unavailable"), "{err}");
+
+    s.age_stop().expect("stop");
+    assert!(s.age_is_stopped().unwrap());
+    assert_eq!(st(&s), 5, "stop freezes the observed value");
+    s.age_restart().expect("restart");
+    assert!(!s.age_is_stopped().unwrap());
+    assert_eq!(
+        s.age_identity().unwrap().0,
+        pid,
+        "restart keeps the identity"
+    );
+    assert_eq!(st(&s), 0, "restart re-runs Start");
+}
