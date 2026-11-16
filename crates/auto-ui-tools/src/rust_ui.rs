@@ -5168,7 +5168,7 @@ pub const DELIVERY_CRATES: [&str; 28] = [
 /// PLAN-901：随包交付的 producer 仓根级树（源=语言仓相对路径 → 交付根
 /// 同形路径；auto-test-case 的 ../../vendor/autodown-test-parser 依赖在
 /// 交付根 crates/auto-test-case 处自然解析到本拷贝，零 path 改写）。
-const DELIVERY_VENDOR_TREES: [(&str, &str); 2] = [
+const DELIVERY_VENDOR_TREES: [(&str, &str); 3] = [
     ("vendor/autodown-test-parser", "vendor/autodown-test-parser"),
     // PLAN-1003 T-03（关闭 D-942-P1，受限修复）：auto-lang-core 自 PLAN-944
     // 起非 optional 依赖 ace-semantics-contract（叶子 crate，仅 registry 依赖、
@@ -5179,6 +5179,13 @@ const DELIVERY_VENDOR_TREES: [(&str, &str); 2] = [
         "experimental/ace/crates/semantics-contract",
         "experimental/ace/crates/semantics-contract",
     ),
+    // PLAN-980 RUST（driver V01 显形，非 980 引入）：auto-bindgen 自 967/973
+    // 起非 optional 依赖 ace-foreign-contract（叶子 crate，依赖=已随包的
+    // semantics-contract + registry）——同形镜像随包，bindgen 的
+    // `../../experimental/...` 相对依赖零改写。
+    (
+        "experimental/ace/crates/foreign-contract",
+        "experimental/ace/crates/foreign-contract",    ),
 ];
 
 /// 随包发行的本地 patch（相对 crates/patches/）。
