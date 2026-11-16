@@ -193,3 +193,34 @@ fn s2_multi_run_stop_balance_is_reachable() {
     s.age_stop().unwrap();
     assert_eq!(s.age_run_stop_balance().unwrap(), (2, 2, false));
 }
+
+/// PLAN-981 IF-981-EVENT-A：payload 投递在宿主层**具名拒**且零效果。
+#[test]
+fn s2_payload_dispatch_is_named_rejected_with_zero_effect() {
+    const SRC: &str = "node M {\n    msg Msg {\n        Add(str)\n    }\n    on {\n        .Add -> {\n            .count = count + 1\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
+    let mut s = Session::new(SRC).expect("a payload declaration compiles");
+    let before = s.age_observe().expect("observes");
+    let before_count = before.components[0].instance_states[0][0];
+    match s.age_send("Add") {
+        Ok(_) => panic!("a payload dispatch without its value must be rejected"),
+        Err(e) => assert!(
+            e.contains("event-payload-unsupported"),
+            "the rejection is named: {e}"
+        ),
+    }
+    let after = s.age_observe().expect("still observes");
+    assert_eq!(
+        after.components[0].instance_states[0][0], before_count,
+        "a rejected dispatch has zero state effect"
+    );
+    assert_eq!(s.age_dispatches().unwrap(), 0, "no dispatch was recorded");
+}
+
+/// 同一宿主上的 unit 消息投递仍然成功（负控的另一半）。
+#[test]
+fn s2_unit_dispatch_still_runs_next_to_payload_sources() {
+    const SRC: &str = "node M {\n    msg {\n        Inc\n    }\n    on {\n        .Inc -> {\n            .count = count + 1\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
+    let mut s = Session::new(SRC).expect("opens");
+    s.age_send("Inc").expect("unit dispatch runs");
+    assert_eq!(s.age_observe().unwrap().components[0].instance_states[0][0], 1);
+}
