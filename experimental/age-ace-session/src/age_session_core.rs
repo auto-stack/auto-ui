@@ -30,6 +30,8 @@ pub struct AgeSession {
 static NEXT_PID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 impl AgeSession {
+    /// `instances = 0` 表示"只编译、按默认单实例观察"（`observe()` 仍给 1 个实例
+    /// 的值），不是"没有实例可观察"；需要多实例时给 >0 的实例数。
     pub fn open(src: &str, instances: usize) -> Result<Self, Vec<String>> {
         Self::open_with(src, instances, Vec::new())
     }
@@ -199,6 +201,7 @@ impl AgeSession {
         &self.compiled
     }
 
+    /// 主出口（首个声明），保留兼容；多出口请用 [`Self::exits`]。
     pub fn exit(&self) -> AgeViewExit {
         self.compiled
             .description
@@ -208,8 +211,26 @@ impl AgeSession {
             .unwrap_or(AgeViewExit::View)
     }
 
+    /// 该 Session 主组件声明的全部出口（按声明序，去重）。
+    pub fn exits(&self) -> Vec<AgeViewExit> {
+        self.compiled
+            .description
+            .components
+            .first()
+            .map(|c| c.exits.clone())
+            .unwrap_or_default()
+    }
+
     pub fn lifecycle(&self, ticks: u32, frames: u32) -> Result<AgeLifecycleBudget, String> {
-        lifecycle_budget(ticks, frames, self.compiled.description.components.len())
-            .map_err(|e| e.message)
+        // R63-8: 第三参是**出口数**（不是组件数）——这样"0 出口"在宿主 API 上也
+        // 会命中 oracle 的具名拒绝，而不是永远传 ≥1。
+        let exits = self
+            .compiled
+            .description
+            .components
+            .first()
+            .map(|c| c.exits.len())
+            .unwrap_or(0);
+        lifecycle_budget(ticks, frames, exits).map_err(|e| e.message)
     }
 }

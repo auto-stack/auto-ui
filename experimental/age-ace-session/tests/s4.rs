@@ -93,3 +93,18 @@ fn s4_open_time_ops_and_later_ticks_compose() {
     s.tick(1).expect("tick");
     assert_eq!(state(&s), 6);
 }
+
+/// R63-11/R63-8：多出口 Session 暴露全部出口；生命周期计数用**出口数**回答，
+/// 但仍不乘出口数（Tick/Frame 保持调度给定值）。
+#[test]
+fn s4_exits_and_lifecycle_oracle_use_the_declared_exits() {
+    let src = "node M {\n    model { count int = 0 }\n    view {\n        text \"u\" {}\n    }\n    view-portrait {\n        text \"p\" {}\n    }\n}\n";
+    let s = AgeSession::open(src, 0).expect("opens with two exits");
+    assert_eq!(
+        s.exits(),
+        vec![AgeViewExit::View, AgeViewExit::ViewPortrait],
+        "all declared exits are exposed"
+    );
+    let b = s.lifecycle(5, 2).expect("lifecycle oracle");
+    assert_eq!((b.starts, b.ticks, b.frames), (1, 5, 2), "exits do not scale counts");
+}

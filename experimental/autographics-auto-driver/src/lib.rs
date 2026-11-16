@@ -79,14 +79,10 @@ impl Session {
                         yielded: 0,
                     });
                 }
-                Err(ds) => {
-                    // AGE 形状但 AGE 编译失败：若旧 parser 也解析不了，就报共享
-                    // verify 的具名诊断（比 "expected fn" 更准确）；否则说明这是
-                    // 旧路径能接的源（例如模块级 `var` 的宿主脚本），保持旧路径。
-                    let legacy_ok = auto_lang_core::parser::Parser::from(source).parse().is_ok();
-                    if !legacy_ok {
-                        return Err(ds.join("; "));
-                    }
+                Err(_) => {
+                    // R63-7：AGE 编译失败时**不**替换旧路径的诊断——按词元/子串
+                    // 判"AGE 形状"会把注释里含 `node` 的旧源误判，改变其错误消息。
+                    // 旧 parser/VM 的诊断是该面的合同。
                 }
             }
         }
