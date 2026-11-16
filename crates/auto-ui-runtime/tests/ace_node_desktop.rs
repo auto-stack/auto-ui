@@ -309,6 +309,55 @@ fn p980_node_desktop_byte_len_lane_is_not_ui_dispatch() {
 /// 坏权限：provider 撤权后请求在分派前拒（零 UI 效果）；复权后同一公开门
 /// 恢复（exact-fix 先例）。
 #[test]
+/// 复核反例（B-NATIVE-R authored）：work 用例未覆盖的三个纪律面——
+/// ① 车道标签：错 op tag / 负打包值具名拒（BAD_OP/BAD_SLOT），零 UI 效果；
+/// ② 跨 session 队列隔离：显式句柄 poll 只见本 session 队列（不偷当前
+///    session 的事件）；③ 双重 close 同句柄 → stale 具名拒（不复活）。
+#[test]
+fn p980_node_desktop_lane_tag_queue_isolation_and_double_close() {
+    let (src, path) = counter_fixture();
+    let mut bridge = NodeDesktopBridge::load(&src, &path, 1).expect("loads");
+    let s1 = bridge.open().expect("open s1");
+    let before = host_session_stats(s1).unwrap();
+
+    // ① 错标签（大小写差一位）→ BAD_OP；负打包值 → BAD_SLOT；均零 UI 效果。
+    assert_eq!(
+        raw_ui980_call("ui_apply_int(\"apply-BOOL\", 0, 5)"),
+        ui980_status::BAD_OP
+    );
+    assert_eq!(
+        raw_ui980_call("ui_apply_int(\"apply-int\", -1, 5)"),
+        ui980_status::BAD_SLOT
+    );
+    assert_eq!(
+        host_session_stats(s1).unwrap().applies,
+        before.applies,
+        "lane-discipline refusals leave zero UI effects"
+    );
+
+    // ② 第二个 live session：current 切到 s2，s1 存活但非当前。
+    let s2 = bridge.open().expect("open s2");
+    assert_ne!(s1, s2);
+    push_event(0, TARGET_INC); // 落入当前 session（s2）的 typed 队列
+    assert_eq!(
+        raw_poll(s1),
+        0,
+        "explicit-handle poll must not dequeue another session's events"
+    );
+    assert_eq!(
+        host_session_stats(s2).unwrap().polled,
+        0,
+        "s2 not polled by s1's poll"
+    );
+    // s2 自己的 poll 取到事件编码：(0+1)*1000+(TARGET_INC+1)=1003。
+    assert_eq!(raw_poll(s2), 1003);
+    assert_eq!(host_session_stats(s2).unwrap().polled, 1);
+
+    // ③ 显式 close 存活的非当前 session → 0；同句柄再 close → -2（不复活）。
+    assert_eq!(raw_close(s1), ui980_status::OK);
+    assert_eq!(raw_close(s1), ui980_status::SESSION_CLOSED);
+}
+
 fn p980_node_desktop_permission_revocation_refuses_before_dispatch() {
     ensure_ui980_provider().expect("provider ready");
     let (src, path) = counter_fixture();
