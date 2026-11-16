@@ -171,3 +171,4 @@ T-01/T-02 实证后的合同修订（详见 [decisions §4/§8](../reviews/plan0
 - 统一回归：本仓无 .last-batch-regression 收据文件（该约定属 auto-lang），按工作流归仓库既有批次门；本次受影响面冻结 union = auto-ui-compiler（ts_adapter/shadcn_attrs 30/20 用例）+ auto-ui-tools（numeric_fields_component 2 用例）+ 双轨产品门（41 用例），全部在评审/合并期重跑通过；无待红。
 completion_kind: delivered。
 2026-11-16：cleaned 核对——worktree/分支已移除（wt-guard 全 clean，含四个依赖兄弟与组目录）；plan-artifacts/plan-087 全删（29,418 文件 402,734,702B，证据折叠于本文件与仓内 docs/reviews/plan087/）；registry 已刷新（deleted-at-merge，无具名持有）；T-07/T-08 经复审与合并收据闭环，任务计数 8/8；landing 观察已在合并收据（无生产消费者，无 release 重建义务）；批次回归收据文件在本仓不存在（auto-lang 约定），受影响面 union 已在评审/合并期全部重跑通过，无待红。
+2026-11-16：stage: goal | plan_id: PLAN-087 | plan_revision: r3 | round: 1 | from: merge | to: done | status: archived | outcome: pass | worktree: （已移除） | commit: 45a80058(landed)+70877de2(archived)+0829cf35(cleaned) | next: done
