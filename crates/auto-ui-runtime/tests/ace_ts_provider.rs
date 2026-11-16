@@ -653,3 +653,91 @@ fn p980_web_route_b_handler_bodies() {
         "theme literal body: {theme_text}"
     );
 }
+
+/// WEB 切片 #6d：**SFC 拼接**——真实管线（parse→extract→VueGenerator SFC）
+/// + lane 体 → splice：002 五 handler 函数体替换为 lane 派生体；锚外段落
+/// 字节不变（对账：非 handler 部分前后一致）；Inc 体含 reactive 语义。
+#[test]
+fn p980_web_sfc_splice() {
+    use auto_ui_compiler::ui_gen::BackendGenerator;
+    use auto_ui_dialect::UiStmt;
+    use auto_ui_runtime::ui::ace_vue_script::{lane_handler_bodies, splice_lane_handler_bodies};
+
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let at = manifest.join("../../examples/ui/002-counter/src/front/app.at");
+    let src = std::fs::read_to_string(&at).unwrap_or_else(|e| panic!("002: {e}"));
+
+    // 真实编译器管线出 SFC。
+    let session = auto_parser_api::session::CompilerSession::ui();
+    let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
+    let ast = parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+        .expect("002 parses");
+    let decl = ast
+        .domain_stmts()
+        .find_map(|s| match s {
+            UiStmt::WidgetDecl(d) => Some(d),
+            _ => None,
+        })
+        .unwrap();
+    let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl).expect("extract");
+    let sfc = auto_ui_compiler::ui_gen::VueGenerator::new()
+        .generate_sfc(&widget)
+        .expect("SFC");
+
+    // lane 体 + 拼接。
+    let (bodies, absent) = lane_handler_bodies(
+        &src,
+        "p980-splice.at",
+        &[
+            ".Inc",
+            ".Dec",
+            ".Reset",
+            ".UseAuto",
+            ".UseSolarized",
+            ".ToggleMode",
+        ],
+    )
+    .expect("bodies");
+    assert!(absent.is_empty(), "absent: {absent:?}");
+    let spliced = splice_lane_handler_bodies(&sfc, &bodies).expect("splice");
+
+    // ①Inc 体=lane 派生（reactive 语义）。
+    let inc = bodies.iter().find(|b| b.pattern == ".Inc").unwrap();
+    let inc_fn_start = spliced.find("function Inc(): void {").unwrap();
+    let inc_fn = &spliced[inc_fn_start..inc_fn_start + 200];
+    assert!(
+        inc_fn.contains("count.value = ") && (inc_fn.contains("a2x_add") || inc_fn.contains("+ 1")),
+        "spliced Inc body carries lane semantics: {inc_fn}"
+    );
+    assert_eq!(inc.field, "count");
+
+    // ②非 handler 段落字节不变：模板/样式/状态声明区（splice 前后对账）。
+    fn template_on(s: &str) -> &str {
+        let t = s.find("<template>").unwrap();
+        &s[t..]
+    }
+    assert_eq!(
+        template_on(&spliced),
+        template_on(&sfc),
+        "template section byte-identical"
+    );
+    fn state_decl_on(s: &str) -> &str {
+        let t = s.find("const count = ref").unwrap();
+        &s[..t]
+    }
+    assert_eq!(
+        state_decl_on(&spliced),
+        state_decl_on(&sfc),
+        "pre-state script section byte-identical"
+    );
+
+    // ③ToggleMode 体=取反；锚精确（不含相邻函数）。
+    let tm_start = spliced.find("function ToggleMode(): void {").unwrap();
+    let tm_fn = &spliced[tm_start..tm_start + 160];
+    assert!(
+        tm_fn.contains("dark_mode.value = ") && tm_fn.contains('!'),
+        "ToggleMode negation: {tm_fn}"
+    );
+}

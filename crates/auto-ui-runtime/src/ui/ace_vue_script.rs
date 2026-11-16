@@ -169,3 +169,46 @@ pub fn lane_handler_bodies(
     }
     Ok((bodies, absent))
 }
+
+/// 切片 #6d：**SFC 拼接**——lane 派生体替换编译器 SFC 内对应 handler 函数
+/// 体（锚=`function <Variant>(): void {`…配对 `}`；pattern 去点=Variant）。
+/// 只动 handler 函数体；其余段落字节不变。Variant 缺席/锚未命中=具名拒。
+pub fn splice_lane_handler_bodies(sfc: &str, bodies: &[LaneHandlerBody]) -> Result<String, String> {
+    let mut out = sfc.to_string();
+    for b in bodies {
+        let variant = b.pattern.trim_start_matches('.');
+        let anchor = format!("function {variant}(): void {{");
+        let start = out
+            .find(&anchor)
+            .ok_or_else(|| format!("handler fn `{variant}` not found in the SFC"))?;
+        let open = start + anchor.len();
+        // 括号配对找函数体闭括号。
+        let bytes = out.as_bytes();
+        let mut depth = 1usize;
+        let mut i = open;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        if depth != 0 {
+            return Err(format!("unbalanced braces in `{variant}` fn"));
+        }
+        let body_text = b
+            .lines
+            .iter()
+            .map(|l| format!("  {l}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        out.replace_range(open..i, format!("\n{body_text}\n").as_str());
+    }
+    Ok(out)
+}
