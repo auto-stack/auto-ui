@@ -74,3 +74,37 @@
 - **T-02** 放行：按 §3 表示/算法与 §5 接口实现 `packages/numeric-fields/`（NumericField/UnitField + 计算模块），探针结论作硬约束（精确整除形、引号事件、Init 自含、错误走文本）。
 - **T-03** 放行（依赖 T-02）：草稿/提交/取消/Tick 失效接线；键盘按 §4 边界。
 - r3 合同修订项（§4 三条）随 T-02 提交一并落入 Plan revision（不改变目标/验收范围，仅平台边界显形）。
+
+## 8. T-02/T-03 追加决议（2026-11-16，实施实证）
+
+- **VM `substr` 语义 = (start, length)**（与 runtime eval.rs 视图快速路径的
+  `[start, end)` 不同）：单字符提取须 `substr(i, 1)`。实证："16.00".substr(1,2)
+  → "6."（probe v2/诊断）。引擎已按此编写；engine 内避免在 range 边界里调
+  `.len()`（a2ts range 路径无 .len→length 映射——"digits.len is not a function"
+  实录），先用局部变量承接。
+- **提交时序重写绑定 state**：native submit 派发会把 input 绑定 state 重写为
+  float 值（16.30 → "16.299999237060547"，f32 往返实录）——OnEnter 一律消费
+  OnInput 保存的精确分量（ok_s/ok_ip/ok_f6），不重读 .draft。file-dialog 类
+  非数值路径未受影响（解析失败保持字符串）。
+- **vue 轨模块 fn 形参名 ≠ 消费方 state 名**：ts_adapter 对 state 名统一加
+  `.value`，fn 形参同名会被误写（`p`/`klog` 实录为 undefined）→ 引擎形参定名
+  `pfix`/`u_shift` 等低碰撞名；widget state `prec`。编译器级形参遮蔽修复记为
+  通用债务（不在本 Plan 内改 ts_adapter 绑定语义）。
+- **编译器最小适配（本 Plan 落地，仓库代码）**：
+  1. `ts_adapter.rs` AuraTsContext.used_range 聚合 + finalize_with_range 内联
+     range 助手（修复 vue 轨子件 Init ReferenceError——按钮全禁/单位表空实录）；
+  2. `shadcn_attrs.rs` base_event_to_dom 从原始 base 剥 `on` 前缀（修复
+     camelCase 事件名失配——`@unitchanged` vs emit('unitChanged') 实录）。
+  回归：ts_adapter 30/30、shadcn_attrs 20/20、双轨产品门全绿。
+- **多实例键盘路由**：EDGE-01 键绑定按 widget 声明级收集（实例不区分）——
+  双 NumericField 实例下 Escape 派发到非预期实例（t02 实录），单实例正常
+  （t03 实录：草稿恢复 5.00）。箭头键（会发 committed）不绑定；Escape 保留
+  绑定并按"绑定归属实例"语义文档化。V-03 的 Escape 用例在 vue 轨逐元素验收。
+- **MCP 非首字段提交**：`autoui_keyboard Enter` 恒路由第一个 input 声明
+  （enter_dispatch_for_input）——多字段表单用 `autoui_action action='submit'`
+  按元素提交（实证 .NumericField#1.OnEnter 正确路由）。
+- **example 业务拒绝夹具**：演示窗「业务拒绝模式」= 业务侧受理暂停（无条件
+  拒绝）——baseRevision 恒等于当前修订，"过期"判据永远不触发（首版演示逻辑
+  缺陷已修）。
+- **tool host 启动抖动**：门驱动在机器负载下偶发 "tool host closed the
+  control stream"（启动期，与夹具无关）——Session/Browser 增加一次重启重试。
