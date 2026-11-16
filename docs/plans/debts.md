@@ -154,3 +154,29 @@
   （READER-013 修复在案）；本债只覆盖 native 运行时的出站阻塞语义。
 - **关闭条件**：复现入口全绿（vm profile R-01～05 通过、无必需 skip），
   且 notes kill 场景下 native UI 保持可交互（错误投影可见）。
+- **2026-11-16 engine 线诊断落点（归因修正，5 轮复现 + 停摆态线程栈；
+  全文见 auto-reader plan-artifacts/plan-013/BACK-STALL-BLOCKER.md 末节；
+  栈/dump/日志在 D:/autostack/plan-artifacts/fix-debt008-diag/，登记在
+  .retention/policy.json）**：
+  - **原候选①「出站无超时」排除**：引擎出站三重防御实锤（post_json 异步
+    live-op + 共享 client 30s + 执行器 total_timeout + 非阻塞准入），且 UI
+    失败期间 back 实测 0.02s 应答、front handler park/resume 毫秒级正常。
+    原候选②③的「VM owner 线程排队/axum 交互」亦无栈证据。
+  - **真根因 = 本仓窗口进程（auto-ui-tool vm-session 子进程）三失效模式**：
+    1. iced 主循环卡 `wgpu acquire_texture`/GPU fence 30~120s（停摆态栈
+       main 帧；**扰动即解冻**——1s 调试器挂起即可恢复，复发条件为连续
+       执行窗）；
+    2. `iced_wgpu.offscreen.source_texture` 无效 → wgpu Validation Error
+       → 主线程 panic = 「进程静默退出」（panic 日志在案；iced 0.14 +
+       wgpu 27.0.1）；
+    3. 事件注入丢失：handler park 线停 + 按压被吞，但渲染活/back 健康，
+       楔死态双进程栈显示**OS 层完全空闲**（无 VM 帧/锁/GPU 等待）——
+       事件在 MCP→iced→VM 派发链路丢失（会话管道/订阅 desync 类）。
+  - **触发器修正**：UI 侧重渲染搅动（抽屉 ToggleFp/错误横幅）即触发，
+    notes kill 非必要（run5 R-01 U2a 未杀 notes 即复现）；vue 轨绿 =
+    浏览器渲染无此三模式。
+  - **修复面（拟）**：渲染环 wgpu 错误处理改非 panic（device-lost/offscreen
+    texture 生命周期与重建）、acquire/帧等待加超时与恢复、事件注入链路
+    （mcp-action-push→iced subscription→VM 会话派发）的丢失检测与重置；
+    `AUTO_HTTP_STEP_BUDGET=1e9`/`AUTO_HTTP_REQUEST_TIMEOUT_MS=300000`
+    （验收环境放大项）建议回设计值后复测。
