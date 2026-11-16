@@ -152,3 +152,29 @@ fn s2_age_diagnostics_and_legacy_sources_coexist() {
     let s = Session::new(legacy).expect("a legacy source with `node` in a comment still opens");
     assert!(!s.is_age(), "comment text must not route to the AGE host");
 }
+
+/// R64-3：driver 层也暴露多组件选择器/逐组件观察与布局。
+#[test]
+fn s2_multi_component_surface_is_reachable_from_the_driver() {
+    let src = "node A {\n    model { a int = 0 }\n    on Tick { a = a + 1 }\n    view {\n        text \"a\" {}\n    }\n}\nnode B {\n    model { b int = 0 }\n    on Tick { b = b + 1 }\n    view {\n        text \"b\" {}\n    }\n}\n";
+    let mut s = Session::new(src).expect("opens two components");
+    assert_eq!(s.age_component_count().unwrap(), 2);
+    assert_eq!(
+        s.age_component_names().unwrap(),
+        vec!["A".to_string(), "B".to_string()]
+    );
+    s.age_tick_instance(0, 2).expect("two Ticks");
+    let a = s.age_observe_component(0).unwrap().instance_states[0][0];
+    let b = s.age_observe_component(1).unwrap().instance_states[0][0];
+    assert_eq!((a, b), (2, 2), "both declaring components receive the directed event");
+    let ui = ace_core::source::age_package::AgeViewRequest::Ui {
+        width: 800,
+        height: 600,
+        widget_host: false,
+    };
+    assert_eq!(
+        s.age_request_layout_for(1, ui).unwrap(),
+        ace_core::source::age_package::AgeViewExit::View
+    );
+    assert!(s.age_observe_component(9).is_err());
+}
