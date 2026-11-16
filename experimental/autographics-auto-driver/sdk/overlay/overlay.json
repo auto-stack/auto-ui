@@ -1,5 +1,5 @@
 {
-  "source": "auto-lang 24b4ba4a7: experimental/ace + crates/auto-tool-execution + stdlib/ace",
+  "source": "auto-lang 75015a49b: experimental/ace + crates/auto-tool-execution + stdlib/ace",
   "files": {
     "crates/auto-tool-execution/Cargo.toml": "a5ede6f258251dbe670beac75cdbc571eeed61b46a0167b565aca2ae4498d42f",
     "crates/auto-tool-execution/src/bin/te-child.rs": "d53845c6093f04fee0f02846329a10f6ae7636f45ac804b2025ea287b3eaf602",
