@@ -23,9 +23,7 @@ fn s1_age_session_observes_av_values() {
 fn s1_ticks_advance_the_state_through_av() {
     use ace_core::source::age_component::ScenarioOp;
     let src = "node Counter {\n    model {\n        count int = 0\n    }\n    on Life.Tick {\n        count = count + 1\n    }\n    view {\n        text \"c\" {}\n    }\n}\n";
-    let ops: Vec<ScenarioOp> = (0..5)
-        .map(|_| ScenarioOp::Tick { instance: 0 })
-        .collect();
+    let ops: Vec<ScenarioOp> = (0..5).map(|_| ScenarioOp::Tick { instance: 0 }).collect();
     let s = AgeSession::open_with(src, 1, ops).expect("a Tick handler compiles");
     let observed = s.observe().expect("AV observation succeeds");
     assert_eq!(

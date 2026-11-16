@@ -83,8 +83,7 @@ impl Session {
                     // AGE 形状但 AGE 编译失败：若旧 parser 也解析不了，就报共享
                     // verify 的具名诊断（比 "expected fn" 更准确）；否则说明这是
                     // 旧路径能接的源（例如模块级 `var` 的宿主脚本），保持旧路径。
-                    let legacy_ok =
-                        auto_lang_core::parser::Parser::from(source).parse().is_ok();
+                    let legacy_ok = auto_lang_core::parser::Parser::from(source).parse().is_ok();
                     if !legacy_ok {
                         return Err(ds.join("; "));
                     }
@@ -160,6 +159,27 @@ impl Session {
         self.age.is_some()
     }
 
+    /// 打开一个带**场景**（Tick/消息）与实例数的 AGE Session（driver 内部/测试用）。
+    pub fn new_age_with(
+        source: &str,
+        instances: usize,
+        ops: Vec<ace_core::source::age_component::ScenarioOp>,
+    ) -> Result<Self, String> {
+        let now = Instant::now();
+        let age = AgeSession::open_with(source, instances, ops).map_err(|ds| ds.join("; "))?;
+        Ok(Self {
+            signatures: Default::default(),
+            vm: None,
+            task: None,
+            pending: None,
+            age: Some(age),
+            compile_us: now.elapsed().as_micros(),
+            max_call_steps: 0,
+            max_call_slices: 0,
+            calls: 0,
+            yielded: 0,
+        })
+    }
     /// 同 PID 的 AGE body 更新（成功才递增 generation；坏编辑保留旧代）。
     pub fn update_age_body(&mut self, source: &str) -> Result<u64, String> {
         match self.age.as_mut() {
@@ -177,7 +197,11 @@ impl Session {
     }
 
     /// 生命周期 oracle（Tick/Frame 不随出口倍增）。
-    pub fn age_lifecycle(&self, ticks: u32, frames: u32) -> Result<ace_core::source::age_package::AgeLifecycleBudget, String> {
+    pub fn age_lifecycle(
+        &self,
+        ticks: u32,
+        frames: u32,
+    ) -> Result<ace_core::source::age_package::AgeLifecycleBudget, String> {
         self.age
             .as_ref()
             .ok_or_else(|| "this session is not an AGE session".to_string())?
@@ -205,6 +229,13 @@ impl Session {
         args: &[Scalar],
         kind: ResultKind,
     ) -> Result<Progress, String> {
+        // R63-4: an AGE session has no scalar `main`; reject by name and keep
+        // the session open (the old path used to fall through and close it).
+        if self.age.is_some() {
+            return Err(
+                "this is an AGE session; use age_observe/age_lifecycle/update_age_body".into(),
+            );
+        }
         if self.closed() {
             return Err("closed".into());
         }

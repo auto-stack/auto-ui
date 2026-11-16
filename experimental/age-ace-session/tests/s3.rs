@@ -37,8 +37,16 @@ fn s3_bad_edit_keeps_the_old_generation_then_recovers() {
         Err(ds) => ds,
     };
     assert!(ds.iter().any(|d| d.starts_with("source.")), "{ds:?}");
-    assert_eq!(s.generation(), 0, "a failed edit does not advance the generation");
-    assert_eq!(observed_count(&s), before, "the old generation stays observable");
+    assert_eq!(
+        s.generation(),
+        0,
+        "a failed edit does not advance the generation"
+    );
+    assert_eq!(
+        observed_count(&s),
+        before,
+        "the old generation stays observable"
+    );
     s.update_body(V1).expect("a fixed body is accepted");
     assert_eq!(observed_count(&s), 1, "the fixed body takes effect");
 }

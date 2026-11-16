@@ -1,7 +1,9 @@
 //! PLAN-981（B-SESSION-I，S2）：driver `Session` 的 AGE 路由与同 PID 更新。
 //!
 //! 这组用例只覆盖 **typed 宿主适配**这一层：AGE 源经共享 compile/verify/AV 跑，
-//! 非 AGE 源保持旧路径；同 PID body 更新成功才递增代数、坏编辑保留旧代。
+//! 非 AGE 源保持旧路径；同 PID body 更新成功才递增代数、坏编辑保留旧代。断言
+//! 读**真实 AV 观察值**（文本/状态），不是"没有 panic"——更新若没替换受检结果，
+//! 这里必须变红。
 use autographics_auto_driver::Session;
 
 const GOOD_V1: &str = "node Counter {\n    model { count int = 0 }\n    on Life.Tick { count = count + 1 }\n    view {\n        text \"v1\" {}\n    }\n}\n";
@@ -9,6 +11,10 @@ const GOOD_V1: &str = "node Counter {\n    model { count int = 0 }\n    on Life.
 const GOOD_V2: &str = "node Counter {\n    model { count int = 0 }\n    on Life.Tick { count = count + 1 }\n    view {\n        text \"v2\" {}\n    }\n}\n";
 
 const BAD: &str = "node Counter {\n    view {\n        text nosuch_fn() {}\n    }\n}\n";
+
+fn texts(s: &Session) -> Vec<String> {
+    s.age_observe().expect("AV observation").components[0].instance_texts[0].clone()
+}
 
 /// AGE 源走 typed 宿主；普通 scalar 源保持旧路径（互斥）。
 #[test]
@@ -22,14 +28,18 @@ fn s2_age_source_routes_to_the_typed_host() {
     // 5 次 Tick、1 帧：Start=1、Tick=5、Frame=1（不随出口倍增）。
     let b = s.age_lifecycle(5, 1).expect("lifecycle oracle");
     assert_eq!((b.starts, b.ticks, b.frames), (1, 5, 1));
-    let observed = s.age_observe().expect("AV observation");
-    assert_eq!(observed.components.len(), 1);
+    assert_eq!(
+        texts(&s),
+        vec!["v1".to_string()],
+        "real AV values, not a shape check"
+    );
 
     let scalar = Session::new("fn main() int { return 1 }").expect("a scalar source opens");
     assert!(!scalar.is_age(), "non-AGE source keeps the legacy path");
 }
 
-/// 同 PID body 更新：成功递增 generation，pid 不变；坏编辑拒绝且旧代保留。
+/// 同 PID body 更新：成功递增 generation，pid 不变，**观察值真的变化**；
+/// 坏编辑拒绝且旧代旧值保留。
 #[test]
 fn s2_same_pid_update_keeps_identity_and_old_generation() {
     let mut s = Session::new(GOOD_V1).expect("opens");
@@ -40,14 +50,52 @@ fn s2_same_pid_update_keeps_identity_and_old_generation() {
     let (pid1, gen1b) = s.age_identity().unwrap();
     assert_eq!(pid1, pid0, "same-PID update keeps the identity");
     assert_eq!(gen1b, 1);
+    assert_eq!(
+        texts(&s),
+        vec!["v2".to_string()],
+        "the update replaced the checked body"
+    );
 
     let err = s.update_age_body(BAD).expect_err("a bad edit is rejected");
-    assert!(err.contains("source."), "diagnostics keep their codes: {err}");
+    assert!(
+        err.contains("source."),
+        "diagnostics keep their codes: {err}"
+    );
     let (pid2, gen2) = s.age_identity().unwrap();
     assert_eq!(pid2, pid0);
     assert_eq!(gen2, 1, "a rejected edit must not bump the generation");
-    let observed = s.age_observe().expect("the old generation stays observable");
-    assert_eq!(observed.components.len(), 1);
+    assert_eq!(
+        texts(&s),
+        vec!["v2".to_string()],
+        "the old generation stays observable"
+    );
+}
+
+/// R63-3：更新必须保留打开时的场景（5 次 Tick 不能变成 0 次）。
+#[test]
+fn s2_update_preserves_the_open_time_scenario() {
+    let ops = (0..5)
+        .map(|_| ace_core::source::age_component::ScenarioOp::Tick { instance: 0 })
+        .collect();
+    let mut s = Session::new_age_with(GOOD_V1, 1, ops).expect("opens with a 5-Tick scenario");
+    let state = s.age_observe().expect("observe").components[0].instance_states[0][0];
+    assert_eq!(state, 5, "five Ticks ran before the update");
+    s.update_age_body(GOOD_V2).expect("update applies");
+    let state_after = s.age_observe().expect("observe").components[0].instance_states[0][0];
+    assert_eq!(state_after, 5, "the update keeps the open-time scenario");
+    assert_eq!(texts(&s), vec!["v2".to_string()]);
+}
+
+/// R63-4：AGE 会话上调用 scalar VM API 是具名拒绝，且**不关闭会话**。
+#[test]
+fn s2_scalar_api_on_age_session_is_named_rejected_and_keeps_it_open() {
+    let mut s = Session::new(GOOD_V1).expect("opens");
+    let err = s
+        .start("main", &[], autographics_auto_driver::ResultKind::Unit)
+        .expect_err("an AGE session has no scalar main");
+    assert!(err.contains("AGE session"), "{err}");
+    assert!(!s.closed(), "the session must stay open");
+    assert_eq!(texts(&s), vec!["v1".to_string()]);
 }
 
 /// 非 AGE Session 上的 AGE API 是具名拒绝，不是 panic/静默。

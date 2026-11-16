@@ -61,5 +61,14 @@ if not a.verify_only:
   (sdk/'Cargo.lock').write_bytes(lock)
 assert not any(v.is_symlink() or v.is_junction() for v in sdk.rglob('*')),'links forbidden'
 actual={v.relative_to(sdk).as_posix():hashlib.sha256(v.read_bytes()).hexdigest() for v in sdk.rglob('*') if v.is_file() and 'target' not in v.relative_to(sdk).parts}
-assert actual==expected,'SDK file set/hash mismatch: '+str(set(actual)^set(expected))
-print(f'PASS pinned SDK: {len(actual)} files; 17 local packages; UI/Man/old package absent')
+# PLAN-981 SESSION S2: the snapshot has TWO layers — the pinned base (681 files,
+# research/source-lock.json) and a declared overlay (sdk/overlay/overlay.json:
+# ACE crates + auto-tool-execution + stdlib/ace, vendored from the auto-lang
+# checkout named there). Both are verified; an unknown extra file still fails.
+overlay_manifest=root/'sdk'/'overlay'/'overlay.json'
+overlay=json.loads(overlay_manifest.read_text())['files'] if overlay_manifest.is_file() else {}
+base=dict(actual)
+for relative,digest in overlay.items():
+ assert base.pop(relative,None)==digest,'overlay mismatch: '+relative
+assert base==expected,'SDK file set/hash mismatch: '+str(set(base)^set(expected))
+print(f'PASS pinned SDK: {len(expected)} base files + {len(overlay)} overlay files; 17 local packages; UI/Man/old package absent')
