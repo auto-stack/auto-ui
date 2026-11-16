@@ -862,3 +862,56 @@ fn p980_web_full_dual_track_census() {
         "dual-track aggregates frozen"
     );
 }
+
+/// WEB 切片 #6h：**浏览器挂载档**——lane 派生 handler 体在真实浏览器
+/// reactive 宿主中的执行验证（013/017 playwright 先例）。产物：
+/// index.html（计数显示+按钮，挂 lane 体+a2x_rt helper 内联）→ 无头
+/// chromium 点击 → 计数 41→42（lane 体浏览器语义正确）。
+#[test]
+fn p980_web_lane_browser_mount() {
+    if std::env::var("AUTO_UI_ACE_WEB_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "p980_web_lane_browser_mount: not scheduled (set AUTO_UI_ACE_WEB_E2E=1; \
+             browser tier, playwright required)"
+        );
+        return;
+    }
+    use auto_ui_runtime::ui::ace_vue_script::lane_handler_bodies;
+
+    // lane 体（002 真源 Inc handler——已由 #6c node 档验证语义）。
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let at = manifest.join("../../examples/ui/002-counter/src/front/app.at");
+    let src = std::fs::read_to_string(&at).unwrap_or_else(|e| panic!("002: {e}"));
+    let (bodies, absent) = lane_handler_bodies(&src, "p980-browser.at", &[".Inc"]).expect("bodies");
+    assert!(absent.is_empty(), "Inc handler lane-derived");
+    let inc = bodies.iter().find(|b| b.pattern == ".Inc").unwrap();
+    let body_js = inc.lines.join("\n");
+
+    // a2x_rt helper 内联——ES module 源不能直接入 `<script>`（export 非法
+    // +多行签名）；Inc 只需 a2x_add（checked-add），按 rt_body 冻结语义
+    // 手写内联（与 a2x-ts runtime/body.js 同式）。
+    let rt_inline = "function a2x_add(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a + b)) throw new RangeError('a2x_add overflow');\n  return a + b;\n}\n";
+    let html = format!(
+        "<!DOCTYPE html>\n<html><body>\n<div id=\"count\">41</div>\n<button id=\"inc\" onclick=\"Inc()\">+</button>\n<script>\n{rt_inline}\nconst count = {{ value: 41, notify() {{ document.getElementById('count').textContent = String(this.value); }} }};\nfunction Inc() {{\n{body_js}\ncount.notify();\n}}\n</script>\n</body></html>\n"
+    );
+    let dir = std::env::temp_dir().join(format!("p980-browser-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.html"), html).unwrap();
+
+    // 跑浏览器档脚本。
+    let test_mjs = manifest.join("../../examples/ui/ace-web-lane/tests/test_lane_browser.mjs");
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg(test_mjs.to_str().unwrap())
+        .arg(dir.to_str().unwrap())
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("LANE_BROWSER_OK"),
+        "browser: {stdout} / {stderr}"
+    );
+}
