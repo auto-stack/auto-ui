@@ -212,3 +212,51 @@ pub fn splice_lane_handler_bodies(sfc: &str, bodies: &[LaneHandlerBody]) -> Resu
     }
     Ok(out)
 }
+
+/// 切片 #6e：**一体化入口**——源文本 → lane SFC（编译器管线 SFC + lane
+/// handler 体拼接）。返回 `(sfc, lane_bodies, absent)`：absent 中的 handler
+/// 保持编译器旧道体（双轨期合同——缺席不拒绝，产品默认道仍为编译器）。
+pub fn generate_sfc_with_lane(
+    src: &str,
+    path: &str,
+) -> Result<(String, Vec<LaneHandlerBody>, Vec<String>), String> {
+    use auto_ui_compiler::ui_gen::BackendGenerator;
+    use auto_ui_dialect::UiStmt;
+    // 真实编译器管线。
+    let session = auto_parser_api::session::CompilerSession::ui();
+    let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+    let ast = parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+        .map_err(|e| format!("parse: {e:?}"))?;
+    let decl = ast
+        .domain_stmts()
+        .find_map(|s| match s {
+            UiStmt::WidgetDecl(d) => Some(d),
+            _ => None,
+        })
+        .ok_or_else(|| "no widget decl".to_string())?;
+    let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl)
+        .map_err(|e| format!("extract: {e:?}"))?;
+    let sfc = auto_ui_compiler::ui_gen::VueGenerator::new()
+        .generate_sfc(&widget)
+        .map_err(|e| format!("SFC: {e:?}"))?;
+    // lane 体（patterns=widget handler 键去参段——` .AddItem(text)` 形取
+    // `.AddItem`；缺席者保旧道）。
+    let patterns: Vec<String> = widget
+        .handlers
+        .keys()
+        .map(|k| k.split('(').next().unwrap_or(k).to_string())
+        .collect();
+    let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
+    let (bodies, absent) = match lane_handler_bodies(src, path, &pattern_refs) {
+        Ok(v) => v,
+        Err(_) => (Vec::new(), patterns.clone()),
+    };
+    let spliced = if bodies.is_empty() {
+        sfc
+    } else {
+        splice_lane_handler_bodies(&sfc, &bodies)?
+    };
+    Ok((spliced, bodies, absent))
+}

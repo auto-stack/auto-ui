@@ -741,3 +741,61 @@ fn p980_web_sfc_splice() {
         "ToggleMode negation: {tm_fn}"
     );
 }
+
+/// WEB 切片 #6e：**一体化入口 + 覆盖普查 v2（冻结表）**——代表性能力族
+/// 语料经 `generate_sfc_with_lane` 的结果分类（spliced 数 / absent=旧道
+/// 保持 / 编译具名拒）。双轨期合同：absent 不拒绝；表变化须具名修订。
+#[test]
+fn p980_web_unified_entry_census_v2() {
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+
+    let corpus: &[(&str, &str)] = &[
+        (
+            "counter-3h",
+            "widget Counter {\n    msg { Inc, Dec, Reset }\n\n    model {\n        var count int = 0\n    }\n\n    view {\n        col { text \"C\" button \"+\" { onclick: .Inc } }\n    }\n\n    on {\n        .Inc -> { .count += 1 }\n        .Dec -> { .count -= 1 }\n        .Reset -> { .count = 0 }\n    }\n}\n",
+        ),
+        (
+            "str-field",
+            "widget Theme {\n    msg { UseAuto }\n\n    model {\n        var theme str = \"Auto\"\n    }\n\n    view {\n        col { text \"T\" }\n    }\n\n    on {\n        .UseAuto -> { .theme = \"Auto\" }\n    }\n}\n",
+        ),
+        (
+            "no-on",
+            "widget Plain {\n    model {\n        var n int = 1\n    }\n    view {\n        text \"P\"\n    }\n}\n",
+        ),
+        (
+            "watch-only",
+            "widget W {\n    model {\n        var n int = 0\n    }\n    watch {\n        .n -> { .n = 1 }\n    }\n    view {\n        text \"W\"\n    }\n}\n",
+        ),
+        (
+            "param-handler",
+            "widget L {\n    msg { Add(text) }\n    model {\n        var n int = 0\n    }\n    view {\n        text \"L\"\n    }\n    on {\n        .Add(t) -> { .n = 1 }\n    }\n}\n",
+        ),
+    ];
+
+    // 冻结表（2026-11-16 实测；变化须具名修订）：
+    // counter-3h=3 spliced；str-field=1；no-on/watch-only=0（passthrough）；
+    // param-handler=absent（参数化 handler 体 lane 未覆盖——旧道保持，#6f 面）。
+    let expect: &[(&str, usize, bool)] = &[
+        ("counter-3h", 3, false),
+        ("str-field", 1, false),
+        ("no-on", 0, false),
+        ("watch-only", 0, false),
+        ("param-handler", 0, true),
+    ];
+    for ((name, src), (exp_name, spliced, has_absent)) in corpus.iter().zip(expect) {
+        assert_eq!(name, exp_name);
+        let (sfc, bodies, absent) =
+            generate_sfc_with_lane(src, "p980-census-v2.at").expect("{name} derives");
+        assert!(sfc.contains("<script"), "{name}: SFC produced");
+        assert_eq!(
+            bodies.len(),
+            *spliced,
+            "{name}: spliced count (frozen census v2)"
+        );
+        assert_eq!(
+            !absent.is_empty(),
+            *has_absent,
+            "{name}: absent presence (frozen census v2): {absent:?}"
+        );
+    }
+}
