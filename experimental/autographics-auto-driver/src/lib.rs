@@ -60,10 +60,21 @@ impl Session {
         let now = Instant::now();
         // S2：先试 AGE 面（`node …` 声明）。成功即 typed 宿主；普通 scalar 源
         // 照旧走旧 parser/VM 路径。
-        let age_shape = source
-            .split(|c: char| c.is_whitespace() || c == '{' || c == '}')
-            .any(|w| w == "node");
-        if age_shape || source.contains("node ") {
+        // R64-2：AGE 形状 = 行首 `node <Ident>`（注释/字符串里的 `node` 不算），
+        // 这样坏 AGE 源仍能拿到共享 verify 的具名诊断，而旧源（模块级 `var`
+        // 宿主脚本、注释含 `node`）不会被误判。
+        let age_shape = source.lines().any(|line| {
+            let trimmed = line.trim_start();
+            let Some(rest) = trimmed.strip_prefix("node ") else {
+                return false;
+            };
+            let head = rest.trim_start();
+            head.chars()
+                .next()
+                .map(|c| c.is_ascii_alphabetic() || c == '_')
+                .unwrap_or(false)
+        });
+        if age_shape {
             match AgeSession::open(source, 0) {
                 Ok(age) => {
                     return Ok(Self {
@@ -79,10 +90,15 @@ impl Session {
                         yielded: 0,
                     });
                 }
-                Err(_) => {
-                    // R63-7：AGE 编译失败时**不**替换旧路径的诊断——按词元/子串
-                    // 判"AGE 形状"会把注释里含 `node` 的旧源误判，改变其错误消息。
-                    // 旧 parser/VM 的诊断是该面的合同。
+                Err(ds) => {
+                    // R63-7 + R64-2：AGE 形状的源若旧 parser 也解析不了，就报共享
+                    // verify 的具名诊断（`source.module-symbol` 等）；旧 parser 能
+                    // 解析的源（例如模块级 `var` 的宿主脚本）保持旧路径。
+                    let legacy_ok =
+                        auto_lang_core::parser::Parser::from(source).parse().is_ok();
+                    if !legacy_ok {
+                        return Err(ds.join("; "));
+                    }
                 }
             }
         }

@@ -97,8 +97,12 @@ impl AgeSession {
                 "source.session.stopped: restart the session before scheduling".into(),
             ]);
         }
-        self.ops.extend(extra);
-        let next = Self::compile(&self.source, self.instances, self.ops.clone())?;
+        // R64-1: the request must be atomic — a rejected dispatch may not poison
+        // the session's schedule (compile the tentative ops first, commit after).
+        let mut next_ops = self.ops.clone();
+        next_ops.extend(extra);
+        let next = Self::compile(&self.source, self.instances, next_ops.clone())?;
+        self.ops = next_ops;
         self.compiled = next;
         self.generation += 1;
         Ok(self.generation)
