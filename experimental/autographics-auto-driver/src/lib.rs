@@ -291,6 +291,22 @@ impl Session {
             .map_err(|ds| ds.join("; "))
     }
 
+    /// R64-10：显式 Run（open 算第一次）；返回 Run 计数。
+    pub fn age_run(&mut self) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .run()
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// R64-10：Run/Stop 账面（runs == stops 表示没有悬挂运行句柄）。
+    pub fn age_run_stop_balance(&self) -> Result<(u64, u64, bool), String> {
+        self.age
+            .as_ref()
+            .map(|a| a.run_stop_balance())
+            .ok_or_else(|| "this session is not an AGE session".to_string())
+    }
     /// R63-1：Session 是否处于停止态。
     pub fn age_is_stopped(&self) -> Result<bool, String> {
         self.age
