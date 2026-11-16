@@ -239,3 +239,31 @@ fn s2_real_a_counter_source_exposes_view_events() {
     );
     assert!(events.iter().all(|(_, _, s)| s.1 > s.0), "bindings carry real spans");
 }
+
+/// R65-8/R65-11：带参 handler 在宿主层派发时具名拒，零状态/零 dispatch。
+#[test]
+fn s2_param_handler_dispatch_is_rejected_with_zero_effect() {
+    const SRC: &str = "node M {\n    msg Msg {\n        Add\n    }\n    on {\n        .Add(t) -> {\n            .count = count + 1\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
+    let mut s = Session::new(SRC).expect("a parameterised handler parses");
+    let before = s.age_observe().unwrap().components[0].instance_states[0][0];
+    match s.age_send("Add") {
+        Ok(_) => panic!("dispatching a parameterised handler must be rejected"),
+        Err(e) => assert!(e.contains("event-params-unsupported"), "named rejection: {e}"),
+    }
+    assert_eq!(s.age_observe().unwrap().components[0].instance_states[0][0], before);
+    assert_eq!(s.age_dispatches().unwrap(), 0);
+}
+
+/// R65-11：实例定向派发到未知消息具名拒，零 dispatch。
+#[test]
+fn s2_send_to_unknown_message_is_rejected() {
+    const SRC: &str = "node M {\n    msg {\n        Inc\n    }\n    on {\n        .Inc -> {\n            .count = count + 1\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
+    let mut s = Session::new(SRC).expect("opens");
+    match s.age_send_to(0, "Nope") {
+        Ok(_) => panic!("an unknown message dispatch must be rejected"),
+        Err(e) => assert!(!e.is_empty(), "named rejection"),
+    }
+    assert_eq!(s.age_dispatches().unwrap(), 0);
+    s.age_send_to(0, "Inc").expect("the declared message still dispatches");
+    assert_eq!(s.age_observe().unwrap().components[0].instance_states[0][0], 1);
+}
