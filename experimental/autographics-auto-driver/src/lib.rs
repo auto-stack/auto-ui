@@ -307,6 +307,17 @@ impl Session {
             .map(|a| a.run_stop_balance())
             .ok_or_else(|| "this session is not an AGE session".to_string())
     }
+    /// PLAN-981（B-LANGUAGE-V）：某组件 view 事件绑定事实 `(key, msg, span)`。
+    pub fn age_view_events(
+        &self,
+        component: usize,
+    ) -> Result<Vec<(String, String, (usize, usize))>, String> {
+        self.age
+            .as_ref()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .view_events_of(component)
+    }
+
     /// R63-1：Session 是否处于停止态。
     pub fn age_is_stopped(&self) -> Result<bool, String> {
         self.age

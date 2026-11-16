@@ -279,6 +279,23 @@ impl AgeSession {
     }
 
     /// 指定组件的已声明出口。
+    /// PLAN-981（B-LANGUAGE-V）：view 属性里的**事件绑定**事实
+    /// `(属性键, 消息名, (start, end))`——`onclick: .Inc` 这类真实 A 源形态。
+    /// 绑定事实给 980/AV 消费；点击→dispatch 的宿主行为不在本切片。
+    pub fn view_events_of(&self, index: usize) -> Result<Vec<(String, String, (usize, usize))>, String> {
+        self.compiled
+            .description
+            .components
+            .get(index)
+            .map(|c| {
+                c.view_events
+                    .iter()
+                    .map(|(k, m, s)| (k.clone(), m.clone(), (s.start, s.end)))
+                    .collect()
+            })
+            .ok_or_else(|| format!("no component at index {index}"))
+    }
+
     pub fn exits_of(&self, index: usize) -> Result<Vec<AgeViewExit>, String> {
         self.compiled
             .description
