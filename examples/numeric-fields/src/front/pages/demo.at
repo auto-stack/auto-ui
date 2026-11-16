@@ -2,11 +2,11 @@ use auto.json
 
 // PLAN-087 演示页 — 普通设置表单：受控回路（committed → 应用校验/接受 →
 // value/revision 原子推进 → 字段 Tick 重投影）与独立结果日志。
-// 业务拒绝路径：「业务拒绝模式」开启后，所有 committed 以修订过期为由拒绝
+// 业务拒绝路径：「业务拒绝模式」开启后，所有 committed 一律业务拒绝
 // （value/revision 不变、errorMessage 显示业务错误）——验证组件不把请求当
-// 成功、正式值不被覆盖。handler 内不做跨 handler 调用（T-01 P8 实证）。
+// 成功、正式值不被覆盖、草稿保留。handler 内不做跨 handler 调用（T-01 P8 实证）。
 widget demo {
-    msg { Init, SizeCommitted(str), SizeErr(str), ZoomCommitted(str), ZoomErr(str), LenCommitted(str), LenUnit(str), LenErr(str), DurCommitted(str), DurUnit(str), DurErr(str), ToggleRules, ClearLog, Quit }
+    msg { Init, SizeCommitted(str), SizeErr(str), ZoomCommitted(str), ZoomErr(str), LenCommitted(str), LenUnit(str), LenErr(str), DurCommitted(str), DurUnit(str), DurErr(str), StepCommitted(str), StepErr(str), CapCommitted(str), CapErr(str), RoundCommitted(str), RoundErr(str), EdgeCommitted(str), EdgeErr(str), ToggleRules, SetStepExt, ClearLog, Quit }
     model {
         // 受控状态（应用所有）
         var font_size str = "16.00"
@@ -29,6 +29,15 @@ widget demo {
         var seq_log int = 0
         // 业务拒绝演示开关
         var strict bool = false
+        // V-01/V-06 边界夹具（普通设置语义）
+        var step_v str = "1.20"
+        var step_rev int = 1
+        var cap_v str = "0.50"
+        var cap_rev int = 1
+        var round_v str = "1.00"
+        var round_rev int = 1
+        var edge_v str = "1.00"
+        var edge_rev int = 1
     }
     use { package: numeric_fields from "../../../../../packages/numeric-fields" }
     view {
@@ -44,6 +53,13 @@ widget demo {
                     NumericField (value: .zoom, revision: .zoom_rev, precision: 2, min: "0.50", max: "3.00", step: "0.10", label: "缩放 (0.50-3.00)", oncommitted: .ZoomCommitted($event), onerror: .ZoomErr($event), errorMessage: .zoom_err) {}
                     UnitField (value: .width_mm, revision: .width_rev, precision: 2, min: "10", max: "1000", step: "1", label: "页面宽度", unitGroup: "length", unit: .width_unit, oncommitted: .LenCommitted($event), onunitChanged: .LenUnit($event), onerror: .LenErr($event), errorMessage: .width_err) {}
                     UnitField (value: .timeout_ms, revision: .timeout_rev, precision: 2, min: "100", step: "1", label: "超时时长", unitGroup: "time", unit: .timeout_unit, oncommitted: .DurCommitted($event), onunitChanged: .DurUnit($event), onerror: .DurErr($event), errorMessage: .timeout_err) {}
+                }
+                col (style: "gap-3 min-w-80 flex-1") {
+                    text "边界夹具" { style: "text-xs font-medium text-muted-foreground" }
+                    NumericField (value: .step_v, revision: .step_rev, precision: 2, step: "0.10", label: "步进演示", oncommitted: .StepCommitted($event), onerror: .StepErr($event)) {}
+                    NumericField (value: .cap_v, revision: .cap_rev, precision: 2, max: "1", label: "上限1", oncommitted: .CapCommitted($event), onerror: .CapErr($event)) {}
+                    NumericField (value: .round_v, revision: .round_rev, precision: 2, label: "舍入演示", oncommitted: .RoundCommitted($event), onerror: .RoundErr($event)) {}
+                    NumericField (value: .edge_v, revision: .edge_rev, precision: 6, label: "边界演示", oncommitted: .EdgeCommitted($event), onerror: .EdgeErr($event)) {}
                 }
                 col (style: "gap-2 min-w-80 flex-1") {
                     text "当前值（受控真源）" { style: "text-xs font-medium text-muted-foreground" }
@@ -63,6 +79,7 @@ widget demo {
                 }
             }
             row (style: "items-center gap-2 border-t border-border pt-2") {
+                button "外部置值" { onclick: .SetStepExt, title: "外部更新步进演示字段（撤销其未提交草稿）", style: "px-2 py-0.5 text-xs rounded-md border border-border" }
                 button "清空日志" { onclick: .ClearLog, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
                 button "退出" { onclick: .Quit, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
             }
@@ -75,8 +92,8 @@ widget demo {
         }
         .SizeCommitted(ev str) -> {
             var req = json.parse(ev)
-            if .strict && req.baseRevision != .font_rev {
-                .font_err = f"字号提交被业务拒绝（修订 ${req.baseRevision}）"
+            if .strict {
+                .font_err = f"字号提交被业务拒绝（受理暂停）"
                 .seq_log = .seq_log + 1
                 .events.push(f"[${.seq_log}] font 拒绝 ${ev}")
             } else {
@@ -93,8 +110,8 @@ widget demo {
         }
         .ZoomCommitted(ev str) -> {
             var req = json.parse(ev)
-            if .strict && req.baseRevision != .zoom_rev {
-                .zoom_err = f"缩放提交被业务拒绝（修订 ${req.baseRevision}）"
+            if .strict {
+                .zoom_err = f"缩放提交被业务拒绝（受理暂停）"
                 .seq_log = .seq_log + 1
                 .events.push(f"[${.seq_log}] zoom 拒绝 ${ev}")
             } else {
@@ -111,8 +128,8 @@ widget demo {
         }
         .LenCommitted(ev str) -> {
             var req = json.parse(ev)
-            if .strict && req.baseRevision != .width_rev {
-                .width_err = f"宽度提交被业务拒绝（修订 ${req.baseRevision}）"
+            if .strict {
+                .width_err = f"宽度提交被业务拒绝（受理暂停）"
                 .seq_log = .seq_log + 1
                 .events.push(f"[${.seq_log}] width 拒绝 ${ev}")
             } else {
@@ -134,8 +151,8 @@ widget demo {
         }
         .DurCommitted(ev str) -> {
             var req = json.parse(ev)
-            if .strict && req.baseRevision != .timeout_rev {
-                .timeout_err = f"超时提交被业务拒绝（修订 ${req.baseRevision}）"
+            if .strict {
+                .timeout_err = f"超时提交被业务拒绝（受理暂停）"
                 .seq_log = .seq_log + 1
                 .events.push(f"[${.seq_log}] timeout 拒绝 ${ev}")
             } else {
@@ -154,6 +171,57 @@ widget demo {
         .DurErr(ev str) -> {
             .seq_log = .seq_log + 1
             .events.push(f"[${.seq_log}] timeout 错误 ${ev}")
+        }
+        .StepCommitted(ev str) -> {
+            var req = json.parse(ev)
+            .step_v = req.value
+            .step_rev = .step_rev + 1
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] step 接受 ${req.value}")
+        }
+        .StepErr(ev str) -> {
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] step 错误 ${ev}")
+        }
+        .CapCommitted(ev str) -> {
+            var req = json.parse(ev)
+            .cap_v = req.value
+            .cap_rev = .cap_rev + 1
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] cap 接受 ${req.value}")
+        }
+        .CapErr(ev str) -> {
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] cap 错误 ${ev}")
+        }
+        .RoundCommitted(ev str) -> {
+            var req = json.parse(ev)
+            .round_v = req.value
+            .round_rev = .round_rev + 1
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] round 接受 ${req.value}")
+        }
+        .RoundErr(ev str) -> {
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] round 错误 ${ev}")
+        }
+        .EdgeCommitted(ev str) -> {
+            var req = json.parse(ev)
+            .edge_v = req.value
+            .edge_rev = .edge_rev + 1
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] edge 接受 ${req.value}")
+        }
+        .EdgeErr(ev str) -> {
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] edge 错误 ${ev}")
+        }
+        .SetStepExt -> {
+            // 外部受控更新：value/revision 原子推进；字段的未提交草稿按合同撤销。
+            .step_v = "2.00"
+            .step_rev = .step_rev + 1
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] 外部置值 step=2.00")
         }
         .ToggleRules -> {
             .strict = !.strict
