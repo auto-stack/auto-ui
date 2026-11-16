@@ -27,10 +27,18 @@ use ace_core::source::packages::{PackageModuleInput, PACKAGES_CAPABILITY};
 pub use ace_av::age_package::{ObservedAgeComponent, ObservedAgePackage};
 
 /// 一个已打开（已受检）的 AGE Session。
+///
+/// `pid` 是同一逻辑进程内的 Session 身份（同 PID 编辑/更新不换身份）；
+/// `generation` 每次**成功**的 body 更新递增（失败不递增，旧代保持可用）。
 pub struct AgeSession {
     compiled: AgePackageCompilation,
     instances: usize,
+    pid: u64,
+    generation: u64,
 }
+
+/// 进程内 Session 身份计数器（同进程内的"PID"）。
+static NEXT_PID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 impl AgeSession {
     /// 打开一个单模块（`app::main`）的 AGE 源。
@@ -47,6 +55,41 @@ impl AgeSession {
         instances: usize,
         ops: Vec<ace_core::source::age_component::ScenarioOp>,
     ) -> Result<Self, Vec<String>> {
+        let compiled = Self::compile(src, instances, ops)?;
+        Ok(Self {
+            compiled,
+            instances,
+            pid: NEXT_PID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            generation: 0,
+        })
+    }
+
+    /// 同 PID 的 body 更新：成功则替换受检结果并递增 generation；失败**保留旧代**
+    /// （观测值、出口、生命周期都不变），错误以 `code: message` 返回。
+    ///
+    /// 全过程只调用 ACE 的**进程内**编译/检查路径，不执行 cargo/rustc。
+    pub fn update_body(&mut self, src: &str) -> Result<u64, Vec<String>> {
+        let next = Self::compile(src, self.instances, Vec::new())?;
+        self.compiled = next;
+        self.generation += 1;
+        Ok(self.generation)
+    }
+
+    /// 逻辑 Session 身份（同 PID 更新不改变它）。
+    pub fn pid(&self) -> u64 {
+        self.pid
+    }
+
+    /// 已成功应用的 body 代数（初始 0）。
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    fn compile(
+        src: &str,
+        instances: usize,
+        ops: Vec<ace_core::source::age_component::ScenarioOp>,
+    ) -> Result<AgePackageCompilation, Vec<String>> {
         let scenario = ComponentScenario { instances, ops };
         let inputs = [PackageModuleInput {
             package: "app".into(),
@@ -55,7 +98,7 @@ impl AgeSession {
             source: src.into(),
             provider: None,
         }];
-        let compiled = compile_age_package_with_scenario(
+        compile_age_package_with_scenario(
             &inputs,
             "app::main",
             LegacyWidgetAlias::Reject,
@@ -66,10 +109,8 @@ impl AgeSession {
             ds.iter()
                 .map(|d| format!("{}: {}", d.code, d.message))
                 .collect::<Vec<_>>()
-        })?;
-        Ok(Self { compiled, instances })
+        })
     }
-
     /// 受检编译结果（只读：消费者按 def id/描述面取事实）。
     pub fn compiled(&self) -> &AgePackageCompilation {
         &self.compiled
