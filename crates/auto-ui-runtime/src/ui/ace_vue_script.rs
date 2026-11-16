@@ -71,7 +71,16 @@ fn handler_body_region(ds: &str, pattern: &str) -> Result<std::ops::Range<usize>
         let pos = search_from + rel;
         let after = &ds[pos + pattern.len()..];
         let trimmed = after.trim_start();
-        if trimmed.starts_with("->") {
+        // #6i：带参 handler——跳过 `(param, …)` 段后再查箭头。
+        let after_params = if trimmed.starts_with('(') {
+            match trimmed.find(')') {
+                Some(close) => trimmed[close + 1..].trim_start(),
+                None => trimmed,
+            }
+        } else {
+            trimmed
+        };
+        if after_params.starts_with("->") {
             p_pos = Some(pos);
             break;
         }
@@ -177,11 +186,18 @@ pub fn splice_lane_handler_bodies(sfc: &str, bodies: &[LaneHandlerBody]) -> Resu
     let mut out = sfc.to_string();
     for b in bodies {
         let variant = b.pattern.trim_start_matches('.');
-        let anchor = format!("function {variant}(): void {{");
-        let start = out
-            .find(&anchor)
+        // #6i：带参 SFC 函数 `function Add(t: string): void {`——锚=
+        // `function <Variant>(`，再找 `): void {`（零参 `(): void {` 同形）。
+        let fn_prefix = format!("function {variant}(");
+        let fn_start = out
+            .find(&fn_prefix)
             .ok_or_else(|| format!("handler fn `{variant}` not found in the SFC"))?;
-        let open = start + anchor.len();
+        let brace_after = out[fn_start..]
+            .find("): void {")
+            .map(|b| fn_start + b + "): void {".len())
+            .ok_or_else(|| format!("handler fn `{variant}` signature tail not found"))?;
+        let start = fn_start;
+        let open = brace_after;
         // 括号配对找函数体闭括号。
         let bytes = out.as_bytes();
         let mut depth = 1usize;

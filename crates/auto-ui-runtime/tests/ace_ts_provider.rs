@@ -778,17 +778,17 @@ fn p980_web_unified_entry_census_v2() {
         ),
     ];
 
-    // 冻结表（2026-11-16 实测；变化须具名修订）：
-    // counter-3h=3 spliced；str-field=1；no-on/watch-only=0（passthrough）；
-    // param-handler=absent（**组件面域缺口**：ScenarioOp::Send 无 payload
-    // ——参数化事件不可场景重放，语言侧后继义务，非 UI 适配器可闭合）；
-    // inline-lambda-only=absent（铸造 handler 无源锚，同族域缺口）。
+    // 冻结表（2026-11-16 实测；#6i 语法扩展后修订——具名 msg+带参 handler
+    // 现在可拼接：grammar opt msg_name + opt params + splice `): void {` 锚）：
+    // counter-3h=3；str-field=1；param-handler=**1**（语法扩展生效）；
+    // no-on/watch-only=0（passthrough）；inline-lambda-only=absent（铸造
+    // handler 无源锚——唯一剩余域缺口）。
     let expect: &[(&str, usize, bool)] = &[
         ("counter-3h", 3, false),
         ("str-field", 1, false),
         ("no-on", 0, false),
         ("watch-only", 0, false),
-        ("param-handler", 0, true),
+        ("param-handler", 1, false),
         ("inline-lambda-only", 0, true),
     ];
     for ((name, src), (exp_name, spliced, has_absent)) in corpus.iter().zip(expect) {
