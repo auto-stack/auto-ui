@@ -433,3 +433,73 @@ fn get_r_shadow() int {return r_shadow}
 
 
 
+
+#[test]
+fn v04_age_author_chain_drives_gpu_light() {
+    // T-04 V-01/V-04 作者整链：普通 Node 源经 AGE 前门（979/981 A 切片）
+    // 编译 → AV 观察 model 状态 → 冻结 LightParams 端口（int 缩放表达
+    // 0..10 → 0.0..1.0，因 av.owned/1 当前不持有 F32）→ 真实 GPU 像素。
+    // 同源修改（on 改 energy）→ 重新观察 → 像素变化。
+    use autographics_auto_driver::Session;
+
+    // 普通 Node：model 灯参数（energy/shadow 为 int 缩放）+ view 文本叶。
+    let src = "node Main {\n    model {\n        energy int = 5\n        shadow int = 0\n    }\n    on Life.Tick { energy = energy + 1 }\n    view {\n        text \"receiver\" {}\n    }\n}\n";
+    let mut s = Session::new(src).expect("AGE source opens");
+    assert!(s.is_age(), "author source must route to the AGE typed host");
+
+    // AV 观察：读取 model 状态（能量 5 → 0.5，shadow 0 → off）。
+    let o = s.age_observe().expect("AV observe");
+    let states = &o.components[0].instance_states[0];
+    assert_eq!(states, &[5, 0], "author model state flows out of AGE");
+
+    // 冻结端口准入（int 缩放）：energy=5/10 → 0.5，dir +Z。
+    let light = LightParams {
+        dir_to_light: Vec3::Z,
+        color: [1., 1., 1.],
+        energy: states[0] as f32 / 10.0,
+        shadow_enabled: states[1] != 0,
+        center: Vec3::ZERO,
+        radius: 1.0,
+        near: 0.0,
+        far: 1.0,
+        bias: 0.0005,
+    };
+    let l = light.admit().expect("admit author light");
+
+    // GPU 呈现：能量 0.5 → lit = 0.25 + 0.5 = 0.75。
+    let g = GpuDevice::new().unwrap();
+    let mut store = MeshStore::default();
+    let recv = quad("receiver", 0.95, 0.3);
+    store.get_or_upload(&g, &recv, 0).unwrap();
+    let mut p = MeshPipeline::new(&g, OffscreenTarget::FORMAT).unwrap();
+    let r = MeshInstance {
+        mesh: ("receiver".into(), "quad".into()),
+        model: Mat4::IDENTITY,
+    };
+    let im0 = draw(&g, &mut p, &store, &[r.clone()], &l, false, 128);
+    expect_pixel(px(&im0, 128, 83, 64), 0.75);
+
+    // 同源修改：Tick 使 energy 5→6（0.6）→ 重新观察 → 像素变化。
+    // （AV 宿主 dispatch 真实执行作者 Life.Tick 逻辑。）
+    s.age_tick(1).expect("tick");
+    let o1 = s.age_observe().expect("re-observe");
+    let states1 = &o1.components[0].instance_states[0];
+    assert_eq!(states1[0], 6, "author Tick mutated the light energy");
+    let l1 = LightParams {
+        dir_to_light: Vec3::Z,
+        color: [1., 1., 1.],
+        energy: states1[0] as f32 / 10.0,
+        shadow_enabled: states1[1] != 0,
+        center: Vec3::ZERO,
+        radius: 1.0,
+        near: 0.0,
+        far: 1.0,
+        bias: 0.0005,
+    }
+    .admit()
+    .expect("admit updated light");
+    let im1 = draw(&g, &mut p, &store, &[r.clone()], &l1, false, 128);
+    expect_pixel(px(&im1, 128, 83, 64), 0.25 + 0.6);
+    // 像素确实变化（同源修改改变了生成后执行结果）。
+    assert_ne!(px(&im0, 128, 83, 64), px(&im1, 128, 83, 64));
+}
