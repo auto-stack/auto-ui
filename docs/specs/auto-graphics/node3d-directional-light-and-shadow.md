@@ -1,10 +1,9 @@
 # AutoGraphics 正式 Node 方向光、硬阴影与公共宿主端口（auto-ui PLAN-080 SD-01 候选）
 
-Status: candidate（auto-ui PLAN-080 T-02/T-03 中立实测 + T-04 作者整链
-实测交付；979/981 A 切片已落主。本稿为 docs/specs/auto-graphics/
-node3d-directional-light-and-shadow.md 的 SD-01 候选文本，merge 阶段按收据
-落位。只描述实际交付并验证的能力，不声称任何未实现的 979/981 接口或
-完整 three.js 覆盖。）
+Status: delivered（auto-ui PLAN-080 正式交付：T-02/T-03 中立实测 + T-04 作者整链
+实测；979/981 A 切片已落主，merge 落位。本稿为 docs/specs/auto-graphics/
+node3d-directional-light-and-shadow.md 的 SD-01 正式文本。只描述实际交付并
+验证的能力，不声称任何未实现的 979/981 接口或完整 three.js 覆盖。）
 
 ## 0. 范围
 
