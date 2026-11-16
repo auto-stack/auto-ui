@@ -120,3 +120,31 @@ fn s4_rejected_dispatch_is_atomic() {
     assert_eq!(s.observe().unwrap().components[0].instance_states[0][0], 1);
     assert_eq!(s.generation(), gen + 1);
 }
+
+/// R64-3：多组件宿主面——组件选择器/逐组件观察与布局可达。场景 op 目前是
+/// **实例级**（不是组件级）：同一次 Tick 会推进所有声明了该 handler 的组件，
+/// 所以"两个组件各自 2:1 收事件"仍要 ACE 场景扩展（见 D-981-SESSION-MULTI ①）。
+#[test]
+fn s4_multi_component_surface_and_layout() {
+    let src = "node A {\n    model { a int = 0 }\n    on Tick { a = a + 1 }\n    view {\n        text \"a\" {}\n    }\n}\nnode B {\n    model { b int = 0 }\n    on Tick { b = b + 1 }\n    view {\n        text \"b\" {}\n    }\n}\n";
+    let mut s = AgeSession::open(src, 1).expect("opens two components");
+    assert_eq!(s.component_names(), vec!["A".to_string(), "B".to_string()]);
+    assert_eq!(s.component_count(), 2);
+    assert_eq!(s.exits_of(0).unwrap(), vec![AgeViewExit::View]);
+    assert_eq!(s.exits_of(1).unwrap(), vec![AgeViewExit::View]);
+
+    let a = |s: &AgeSession| s.observe_component(0).unwrap().instance_states[0][0];
+    let b = |s: &AgeSession| s.observe_component(1).unwrap().instance_states[0][0];
+    assert_eq!((a(&s), b(&s)), (0, 0));
+    s.tick_instance(0, 2).expect("two Ticks");
+    assert_eq!((a(&s), b(&s)), (2, 2), "the directed event reaches every declaring component");
+    // 逐组件布局与越界具名拒。
+    let ui = AgeViewRequest::Ui {
+        width: 800,
+        height: 600,
+        widget_host: false,
+    };
+    assert_eq!(s.request_layout_for(1, ui).unwrap(), AgeViewExit::View);
+    assert!(s.observe_component(9).is_err());
+    assert!(s.exits_of(9).is_err());
+}

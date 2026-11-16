@@ -290,6 +290,69 @@ impl Session {
             .map(|a| a.is_stopped())
             .ok_or_else(|| "this session is not an AGE session".to_string())
     }
+    // ---- R64-3：多组件宿主面 ----
+
+    pub fn age_component_count(&self) -> Result<usize, String> {
+        self.age
+            .as_ref()
+            .map(|a| a.component_count())
+            .ok_or_else(|| "this session is not an AGE session".to_string())
+    }
+
+    pub fn age_component_names(&self) -> Result<Vec<String>, String> {
+        self.age
+            .as_ref()
+            .map(|a| a.component_names())
+            .ok_or_else(|| "this session is not an AGE session".to_string())
+    }
+
+    pub fn age_observe_component(
+        &self,
+        index: usize,
+    ) -> Result<age_session::ObservedAgeComponent, String> {
+        self.age
+            .as_ref()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .observe_component(index)
+    }
+
+    pub fn age_exits_of(
+        &self,
+        index: usize,
+    ) -> Result<Vec<ace_core::source::age_package::AgeViewExit>, String> {
+        self.age
+            .as_ref()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .exits_of(index)
+    }
+
+    pub fn age_request_layout_for(
+        &self,
+        index: usize,
+        request: ace_core::source::age_package::AgeViewRequest,
+    ) -> Result<ace_core::source::age_package::AgeViewExit, String> {
+        self.age
+            .as_ref()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .request_layout_for(index, request)
+            .map_err(|e| format!("{}: {}", e.code, e.message))
+    }
+
+    pub fn age_tick_instance(&mut self, instance: usize, n: u32) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .tick_instance(instance, n)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    pub fn age_send_to(&mut self, instance: usize, msg: &str) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .send_to(instance, msg)
+            .map_err(|ds| ds.join("; "))
+    }
     /// 主组件的呈现出口。
     pub fn age_exit(&self) -> Result<ace_core::source::age_package::AgeViewExit, String> {
         self.age

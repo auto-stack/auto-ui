@@ -215,6 +215,68 @@ impl AgeSession {
             .unwrap_or(AgeViewExit::View)
     }
 
+    // ---- R64-3：多组件宿主面（组件选择器/逐组件观察与布局） ----
+
+    /// 本 Session 的组件数（按声明序）。
+    pub fn component_count(&self) -> usize {
+        self.compiled.description.components.len()
+    }
+
+    /// 组件名（按声明序）。
+    pub fn component_names(&self) -> Vec<String> {
+        self.compiled
+            .description
+            .components
+            .iter()
+            .map(|c| c.name.clone())
+            .collect()
+    }
+
+    /// 逐组件观察（`None` 表示越界，不静默取首组件）。
+    pub fn observe_component(&self, index: usize) -> Result<ObservedAgeComponent, String> {
+        let all = self.observe()?;
+        all.components
+            .into_iter()
+            .nth(index)
+            .ok_or_else(|| format!("no component at index {index}"))
+    }
+
+    /// 指定组件的已声明出口。
+    pub fn exits_of(&self, index: usize) -> Result<Vec<AgeViewExit>, String> {
+        self.compiled
+            .description
+            .components
+            .get(index)
+            .map(|c| c.exits.clone())
+            .ok_or_else(|| format!("no component at index {index}"))
+    }
+
+    /// 用指定组件的出口回答布局请求（选择序/不兼容拒绝与单组件一致）。
+    pub fn request_layout_for(
+        &self,
+        index: usize,
+        request: AgeViewRequest,
+    ) -> Result<AgeViewExit, AgeSelectionError> {
+        let declared = self.exits_of(index).unwrap_or_default();
+        select_exit(&declared, request)
+    }
+
+    /// 只给某个实例追加 Tick（双组件 2:1 事件归属）。
+    pub fn tick_instance(&mut self, instance: usize, n: u32) -> Result<u64, Vec<String>> {
+        self.schedule(
+            (0..n)
+                .map(|_| ace_core::source::age_component::ScenarioOp::Tick { instance })
+                .collect(),
+        )
+    }
+
+    /// 只给某个实例投递消息。
+    pub fn send_to(&mut self, instance: usize, msg: &str) -> Result<u64, Vec<String>> {
+        self.schedule(vec![ace_core::source::age_component::ScenarioOp::Send {
+            instance,
+            msg: msg.to_string(),
+        }])
+    }
     /// 该 Session 主组件声明的全部出口（按声明序，去重）。
     pub fn exits(&self) -> Vec<AgeViewExit> {
         self.compiled
