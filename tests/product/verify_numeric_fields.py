@@ -218,11 +218,24 @@ class Session:
         if m:
             error, text = self.call('autoui_action', allow_error=True,
                                     element_id=m.group(0).split()[1].lstrip('#'), action='press')
+        # 先收集子进程（tool host 等）再退出——只杀父进程会泄漏
+        # auto-ui-tool 子进程，占住控制流/端口并让后续会话启动抖动。
+        children = set()
+        try:
+            children = set(vfd.owned_tree(self.process.pid)) - {self.process.pid}
+        except Exception:
+            pass
         self.process.terminate()
         try:
             self.process.wait(timeout=10)
         except Exception:
             self.process.kill()
+        for pid in children:
+            try:
+                subprocess.run(['taskkill', '/F', '/PID', str(pid)], capture_output=True,
+                               creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            except Exception:
+                pass
         return self.process.poll()
 
     def cleanup_failure(self):
@@ -334,11 +347,22 @@ class Browser:
     def quit_and_wait(self):
         self._browser.close()
         self._pw.stop()
+        children = set()
+        try:
+            children = set(vfd.owned_tree(self.process.pid)) - {self.process.pid}
+        except Exception:
+            pass
         self.process.terminate()
         try:
             self.process.wait(timeout=10)
         except Exception:
             self.process.kill()
+        for pid in children:
+            try:
+                subprocess.run(['taskkill', '/F', '/PID', str(pid)], capture_output=True,
+                               creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            except Exception:
+                pass
         return self.process.poll()
 
 
