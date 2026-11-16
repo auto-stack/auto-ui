@@ -497,4 +497,25 @@ mod p980_ace_state {
             Some(AceStateValue::Int(3))
         );
     }
+    /// 复核反例（B-STATE-R）：异步完成不可伪造——任务源在 ACE 内真实失败
+    /// （未知 task 名，968 具名拒）时 `await_async` 必须报错，而不是把
+    /// "完成"伪造成 Completed/Dropped；实例状态保持未被写入。
+    #[test]
+    fn p980_state_async_task_failure_surfaces_not_fabricated() {
+        const BAD_TASK: &str = "fn main() {
+    let h = Task.spawn(\"Nope\", 16)
+}
+";
+        let mut e = engine_002();
+        e.mount("/x#a", vec![]).unwrap();
+        let t = e.spawn_async("/x#a", "Inc", BAD_TASK).unwrap();
+        // 真实失败在 ACE 段具名拒（本例为编译段 bind 拒；运行段失败则报
+        // "async task did not succeed"）——两形都不得伪造成完成。
+        let err = e.await_async(t).unwrap_err();
+        assert!(
+            err.contains("no task named `Nope`") || err.contains("async task did not succeed"),
+            "{err}"
+        );
+        assert_eq!(e.read_state("/x#a", "count"), Some(AceStateValue::Int(0)));
+    }
 }
