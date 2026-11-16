@@ -5314,7 +5314,7 @@ const PROJECTION_AUTO_UI_CRATE: DeliveryProjectionSpec = DeliveryProjectionSpec 
 /// 包 vendored，该 path 越根必须在投影段剥除——原为交付生成具名拒的根因）。
 const PROJECTION_AUTO_UI_COMPILER: DeliveryProjectionSpec = DeliveryProjectionSpec {
     strip_deps: &[],
-    strip_dev_deps: &["ace-core"],
+    strip_dev_deps: &["ace-core = { path = \"../../../auto-lang/experimental/ace/crates/core\" }"],
     feature_rewrites: &[],
     installed_rewrites: &[],
     dep_rewrites: &[],
@@ -8795,6 +8795,44 @@ fn type_to_rust_str(ty: &auto_lang_core::ast::Type) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// PLAN-980 RUST：交付投影剥 dev-only 跨仓依赖（DIALECT 批 ace-core
+    /// dev-dep 越根致交付生成具名拒的回归面）。原形剥除、投影形幂等。
+    #[test]
+    fn p980_delivery_projection_strips_compiler_dev_only_ace_core() {
+        use super::{delivery_apply_projection, fs, PROJECTION_AUTO_UI_COMPILER};
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let live = manifest_dir
+            .parent()
+            .unwrap()
+            .join("auto-ui-compiler/Cargo.toml");
+        let text = fs::read_to_string(&live).expect("compiler manifest readable");
+        assert!(
+            text.contains("ace-core"),
+            "producer manifest carries the dev-only ace-core dep (fixture premise)"
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let staged = dir.path().join("Cargo.toml");
+        fs::write(&staged, &text).unwrap();
+        let edits = delivery_apply_projection(&staged, &PROJECTION_AUTO_UI_COMPILER)
+            .expect("original strips");
+        assert!(
+            edits.iter().any(|e| e.contains("strip dep: ace-core =")),
+            "dev-only dep stripped with an edit record: {edits:?}"
+        );
+        let after = fs::read_to_string(&staged).unwrap();
+        assert!(
+            !after.contains("ace-core"),
+            "staged manifest carries no ace-core path"
+        );
+        // 幂等：投影形二次运行零剥除（三态 projected 分支）。
+        let edits2 = delivery_apply_projection(&staged, &PROJECTION_AUTO_UI_COMPILER)
+            .expect("projected idempotent");
+        assert!(
+            !edits2.iter().any(|e| e.contains("strip dep")),
+            "second run strips nothing: {edits2:?}"
+        );
+    }
+
     #[test]
     fn native_backend_build_publishes_its_image_and_rejects_stale_success() {
         use super::{build_api_executable, fs, GeneratedBuildContext};
