@@ -563,3 +563,93 @@ fn p980_web_extraction_carried_spans_feed_lane() {
     let joined = frag.text.join("\n");
     assert!(joined.contains("(!"), "negation preserved: {joined}");
 }
+
+/// WEB 切片 #6c（路线 B 核心）：**lane 派生 handler 函数体**（002 真源）。
+/// 逐 handler：区间最宽 RHS 发射→reactive 映射→`field.value = rhs;` 组装；
+/// Inc 体真 node 语义验证（41→42）；写目标字段自动推导；缺席清单可辨。
+#[test]
+fn p980_web_route_b_handler_bodies() {
+    use auto_ui_runtime::ui::ace_vue_script::lane_handler_bodies;
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let at = manifest.join("../../examples/ui/002-counter/src/front/app.at");
+    let src = std::fs::read_to_string(&at).unwrap_or_else(|e| panic!("002: {e}"));
+
+    let (bodies, absent) = lane_handler_bodies(
+        &src,
+        "p980-routeb.at",
+        &[".Inc", ".Dec", ".Reset", ".ToggleMode", ".UseAuto"],
+    )
+    .expect("route-B bodies derive");
+    assert!(
+        absent.is_empty(),
+        "002 五 handler 均命中: absent={absent:?}"
+    );
+    let by_field = |f: &str| {
+        bodies
+            .iter()
+            .find(|b| b.field == f)
+            .unwrap_or_else(|| panic!("field {f}"))
+    };
+
+    // Inc：count.value = count.value + 1（helper const + 赋值行）。
+    let inc = by_field("count");
+    assert_eq!(inc.pattern, ".Inc");
+    let inc_text = inc.lines.join("\n");
+    assert!(
+        inc_text.contains("count.value = "),
+        "assignment line present: {inc_text}"
+    );
+    assert!(
+        inc_text.contains("count.value")
+            && (inc_text.contains("a2x_add") || inc_text.contains("+ 1")),
+        "increment semantics (add helper or infix): {inc_text}"
+    );
+
+    // 真 node：Inc 体在 reactive 宿主上执行（41→42；a2x_rt helper 就位）。
+    let body_js = inc.lines.join("\n");
+    let driver = format!(
+        "import {{ a2x_add }} from \"./a2x_rt.mjs\";\nconst count = {{ value: 41 }};\n{body_js}\nif (!(count.value === 42)) {{ throw new Error(\"FRAG_ASSERT_FAILED\"); }}\nconsole.log(\"FRAG_OK\");\n"
+    );
+    let dir = std::env::temp_dir().join(format!("p980-routeb-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("a2x_rt.mjs"),
+        ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]),
+    )
+    .unwrap();
+    std::fs::write(dir.join("host.mjs"), driver).unwrap();
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg("host.mjs")
+        .current_dir(&dir)
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("FRAG_OK"),
+        "node Inc body: {stdout} / {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // ToggleMode：dark_mode 取反；UseAuto：theme_name 字符串字面量。
+    let toggle_text = bodies
+        .iter()
+        .find(|b| b.field == "dark_mode")
+        .map(|b| b.lines.join("\n"))
+        .expect("ToggleMode body");
+    assert!(
+        toggle_text.contains("dark_mode.value = !") || toggle_text.contains("!"),
+        "negation body: {toggle_text}"
+    );
+    let theme_text = bodies
+        .iter()
+        .find(|b| b.field == "theme_name")
+        .map(|b| b.lines.join("\n"))
+        .expect("UseAuto body");
+    assert!(
+        theme_text.contains("theme_name.value = ") && theme_text.contains("Auto"),
+        "theme literal body: {theme_text}"
+    );
+}

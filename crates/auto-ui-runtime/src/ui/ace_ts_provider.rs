@@ -366,6 +366,62 @@ impl ComponentFragmentLane {
         &self.ds_src
     }
 
+    /// checked 模块（view 构建用；调用方自建 SemanticView）。
+    pub fn checked_module(&self) -> &ace_core::verify::CheckedModule {
+        &self.checked
+    }
+
+    /// 实例 0 的状态函数名清单（`__age_state_0_<field>`；字段名=后缀）。
+    pub fn state_fns(&self) -> Vec<String> {
+        ace_a2x_core::SemanticView::from_checked(&self.checked)
+            .map(|v| {
+                v.functions()
+                    .iter()
+                    .filter(|f| f.source_name.starts_with("__age_state_0_"))
+                    .map(|f| f.source_name.to_string())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// 区间内**最宽**表达式发射（span ⊆ region；同宽取索引最大=组合形）。
+    /// 区间无表达式 → None（调用方判缺席）。具名拒：状态函数不在视图。
+    pub fn widest_expr_in(
+        &self,
+        state_fn: &str,
+        region: std::ops::Range<usize>,
+    ) -> Result<Option<LocatedFragment>, String> {
+        use ace_a2x_ts::{emit_expr_fragment, FragmentProgramContext, ScriptLang};
+        let view = ace_a2x_core::SemanticView::from_checked(&self.checked)
+            .map_err(|e| format!("semantic view: {e:?}"))?;
+        let facts = view
+            .functions()
+            .iter()
+            .find(|f| f.source_name == state_fn)
+            .ok_or_else(|| format!("state fn `{state_fn}` not in the view"))?;
+        let mut best: Option<(usize, usize, ace_core::hir::ExprId)> = None; // (width, idx, id)
+        for (i, e) in facts.body.exprs.iter().enumerate() {
+            if region.start <= e.span.start && e.span.end <= region.end {
+                let width = e.span.end.saturating_sub(e.span.start);
+                match best {
+                    Some((w, _, _)) if w > width => {}
+                    _ => best = Some((width, i, ace_core::hir::ExprId(i as u32))),
+                }
+            }
+        }
+        let Some((_, _, expr_id)) = best else {
+            return Ok(None);
+        };
+        let ctx = FragmentProgramContext::from_view(&view);
+        let raw = emit_expr_fragment(ScriptLang::TypeScript, &view, facts, expr_id, &ctx)
+            .map_err(|e| format!("expr fragment: {e:?}"))?;
+        Ok(Some(LocatedFragment {
+            text: raw.text,
+            expr: raw.expr,
+            helpers: raw.helpers,
+        }))
+    }
+
     /// 按**源文本锚**定位发射：`needle` 在脱糖源中的第 `nth` 处（0 起），
     /// 取 span **包含**该位置的最内层表达式（同 span 组合形在前——索引
     /// 序最大优先）。适配器合同：持有源文本即可定位，无预知 span。
