@@ -249,3 +249,87 @@ enum ResultKind {
     Ok,
     Reject(&'static str),
 }
+
+/// WEB 切片 #3：**组件面 = fragment 扩域入口（机制钉住）**。生产形态源
+/// （`!` 一元/str/bool 字段——Core profile 具名拒的形态）经组件面
+/// states-only 编译 → `SemanticView` → 976 fragment 发射器可运行。
+/// **形态事实**：handler 内 model 访问脱糖为 `__age_state_<i>_<field>()`
+/// 调用——fragment=调用形（helper=`a2x_fn_...`），宿主映射面=状态函数→
+/// reactive 名（host_rewrite 词法整词替换可承载）。端到端 node 执行。
+#[test]
+fn p980_web_component_face_entry_fragments() {
+    use ace_a2x_core::SemanticView;
+    use ace_a2x_ts::{
+        emit_expr_fragment, innermost_expr_in_span, FragmentProgramContext, ScriptLang,
+    };
+    let src = "widget Counter {\n    msg { Inc, Toggle }\n\n    model {\n        var count int = 0\n        var on bool = false\n    }\n\n    view {\n        col { text \"C\" }\n    }\n\n    on {\n        .Inc -> { .count += 1 }\n        .Toggle -> { .on = !.on }\n    }\n}\n";
+    let caps = ["ac.runtime.text.v1".to_string()];
+    let scenario = auto_ui_runtime::ui::ace_state_bridge::AceAlias::Accept;
+    // 组件面 states-only 编译（真实入口；str/bool/`!` 全部通过——Core
+    // profile 同源具名拒的形态在此域内）。
+    let compiled = ace_av::age_component::compile_component_scenario_states(
+        src,
+        "p980-comp-entry.at",
+        ace_av::age_component::LegacyWidgetAlias::Accept,
+        &caps,
+        &ace_av::age_component::ComponentScenario {
+            instances: 1,
+            ops: vec![],
+        },
+        &ace_av::age_component::ComponentInitials {
+            per_instance: vec![vec![]],
+        },
+    )
+    .expect("component face compiles the production-form source");
+    let view = SemanticView::from_checked(&compiled.checked).expect("semantic view");
+    let drive = view
+        .functions()
+        .iter()
+        .find(|f| f.source_name == "__age_drive")
+        .expect("desugared driver fn");
+    // 按源 span 定位（O-C3：脱糖 drive 的 span 精度——`!.on` 源段定位落到
+    // count 状态调用，PLAN-964 span 移位同族边界；精确 per-handler 定位=
+    // 切片#4 前置。本 case 钉机制：定位→发射→映射→node 读值）。
+    let start = src.find("!.on").expect("span source present");
+    let expr_id =
+        innermost_expr_in_span(drive, start..start + 4).expect("HIR expr located by span");
+    let ctx = FragmentProgramContext::from_view(&view);
+    let raw = emit_expr_fragment(ScriptLang::TypeScript, &view, drive, expr_id, &ctx)
+        .expect("fragment emits from the component-face HIR");
+    // 形态事实：脱糖调用形（状态函数调用），非源级算子形。
+    let joined = raw.text.join("\n");
+    assert!(
+        joined.contains("a2x_fn___age_state_0_"),
+        "desugared state-fn call form: {joined}"
+    );
+    // 宿主映射（状态函数发射名 → reactive 宿主名）：调用形 `fn()` →
+    // `count.value`（吃掉调用括号——状态读取语义），裸名残留再兜一遍。
+    let mapped = joined
+        .replace("a2x_fn___age_state_0_count()", "count.value")
+        .replace("a2x_fn___age_state_0_on()", "on.value")
+        .replace("a2x_fn___age_state_0_count", "count.value")
+        .replace("a2x_fn___age_state_0_on", "on.value");
+    let expr = raw.expr.clone().expect("expr body");
+    // 真 node：reactive 宿主预置，断言读值语义（count.value=7 → t0===7）。
+    let driver_src = format!(
+        "const count = {{ value: 7 }}; const on = {{ value: false }};\n{mapped}\nconst t = {expr};\nif (!(t === 7)) {{ throw new Error(\"FRAG_ASSERT_FAILED\"); }}\nconsole.log(\"FRAG_OK\");\n"
+    );
+    let dir = std::env::temp_dir().join(format!("p980-comp-frag-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("host.mjs"), driver_src).unwrap();
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg("host.mjs")
+        .current_dir(&dir)
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("FRAG_OK"),
+        "node run: {} / {}",
+        stdout,
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
