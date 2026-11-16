@@ -258,8 +258,10 @@ fn _value_kind(v: &AceStateValue) -> &'static str {
 // ---------------------------------------------------------------------------
 
 /// 一次组件面编译承载的 fragment lane（owned 编译结果；view 按调用借用）。
+/// **span 坐标基准 = f-string 脱糖后源**（组件面入口统一脱糖——DIALECT
+/// 批口径；无 f-string 源时与原源一致）。lane 持有脱糖源供定位。
 pub struct ComponentFragmentLane {
-    src_len: usize,
+    ds_src: String,
     checked: ace_core::verify::CheckedModule,
 }
 
@@ -276,6 +278,11 @@ impl ComponentFragmentLane {
     /// 函数体含 handler 效果表达式，`__age_state_<i>_<field>`，span=原源
     /// 坐标——ops 空则 handler 体缺席，切片#4 探针实证）。
     pub fn compile(src: &str, path: &str, handler_msgs: &[&str]) -> Result<Self, String> {
+        // 坐标基准：入口统一 f-string 脱糖（与组件面编译同一脱糖——
+        // `ace_core::source::fstr::desugar_fstrings_widget`，公共出口）。
+        let ds_src = ace_core::source::fstr::desugar_fstrings_widget(src)
+            .map_err(|e| format!("fstr desugar: {e}"))?;
+        let src = ds_src.as_str();
         let caps = ["ac.runtime.text.v1".to_string()];
         let ops = handler_msgs
             .iter()
@@ -300,9 +307,8 @@ impl ComponentFragmentLane {
                 .collect::<Vec<_>>()
                 .join("; ")
         })?;
-        let src_len = src.len();
         Ok(Self {
-            src_len,
+            ds_src,
             checked: compiled.checked,
         })
     }
@@ -317,10 +323,12 @@ impl ComponentFragmentLane {
         span: std::ops::Range<usize>,
     ) -> Result<LocatedFragment, String> {
         use ace_a2x_ts::{emit_expr_fragment, FragmentProgramContext, ScriptLang};
-        if span.start >= span.end || span.end > self.src_len {
+        if span.start >= span.end || span.end > self.ds_src.len() {
             return Err(format!(
-                "span [{})..{}) is outside the source (len {})",
-                span.start, span.end, self.src_len
+                "span [{})..{}) is outside the desugared source (len {})",
+                span.start,
+                span.end,
+                self.ds_src.len()
             ));
         }
         let view = ace_a2x_core::SemanticView::from_checked(&self.checked)
@@ -341,6 +349,69 @@ impl ComponentFragmentLane {
             format!(
                 "no HIR expression with the exact span [{})..{}) in `{state_fn}`",
                 span.start, span.end
+            )
+        })?;
+        let ctx = FragmentProgramContext::from_view(&view);
+        let raw = emit_expr_fragment(ScriptLang::TypeScript, &view, facts, expr_id, &ctx)
+            .map_err(|e| format!("expr fragment: {e:?}"))?;
+        Ok(LocatedFragment {
+            text: raw.text,
+            expr: raw.expr,
+            helpers: raw.helpers,
+        })
+    }
+
+    /// 脱糖源（span 坐标基准；适配器定位/映射用）。
+    pub fn desugared_source(&self) -> &str {
+        &self.ds_src
+    }
+
+    /// 按**源文本锚**定位发射：`needle` 在脱糖源中的第 `nth` 处（0 起），
+    /// 取 span **包含**该位置的最内层表达式（同 span 组合形在前——索引
+    /// 序最大优先）。适配器合同：持有源文本即可定位，无预知 span。
+    pub fn emit_expr_at_text(
+        &self,
+        state_fn: &str,
+        needle: &str,
+        nth: usize,
+    ) -> Result<LocatedFragment, String> {
+        let mut hit: Option<std::ops::Range<usize>> = None;
+        let mut from = 0usize;
+        let mut seen = 0usize;
+        while let Some(pos) = self.ds_src[from..].find(needle) {
+            if seen == nth {
+                hit = Some(from + pos..from + pos + needle.len());
+                break;
+            }
+            seen += 1;
+            from = from + pos + needle.len();
+        }
+        let range = hit.ok_or_else(|| {
+            format!("needle {needle:?} (nth {nth}) not found in the desugared source")
+        })?;
+        // 包含 range 起点的最内层 expr；同 span 取索引最大（组合形）。
+        let view = ace_a2x_core::SemanticView::from_checked(&self.checked)
+            .map_err(|e| format!("semantic view: {e:?}"))?;
+        use ace_a2x_ts::{emit_expr_fragment, FragmentProgramContext, ScriptLang};
+        let facts = view
+            .functions()
+            .iter()
+            .find(|f| f.source_name == state_fn)
+            .ok_or_else(|| format!("state fn `{state_fn}` not in the view"))?;
+        let mut best: Option<(usize, ace_core::hir::ExprId)> = None;
+        for (i, e) in facts.body.exprs.iter().enumerate() {
+            if e.span.start <= range.start && range.start < e.span.end {
+                let width = e.span.end.saturating_sub(e.span.start);
+                match best {
+                    Some((w, _)) if w < width => {}
+                    _ => best = Some((width, ace_core::hir::ExprId(i as u32))),
+                }
+            }
+        }
+        let (_, expr_id) = best.ok_or_else(|| {
+            format!(
+                "no HIR expression covers {needle:?} at [{})..{}) in `{state_fn}`",
+                range.start, range.end
             )
         })?;
         let ctx = FragmentProgramContext::from_view(&view);

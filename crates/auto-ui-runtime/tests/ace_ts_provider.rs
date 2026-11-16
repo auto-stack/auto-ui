@@ -404,3 +404,93 @@ fn p980_web_handler_precise_location() {
 fn string_from_utf8lossy_fix(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).to_string()
 }
+
+/// WEB 切片 #5：**lane 直接消费真实生产 002 源**（适配器合同证明——
+/// 适配器持有 widget 源文本，线程化=把源+span 送到 lane 的管道工程）。
+/// 002 全源（msg 6 变体/model 3 字段/design/f-string/内联 lambda）经
+/// states-only 组件面编译；ToggleMode 的 `!.dark_mode` NOT 组合形按**原源
+/// span** 精确定位发射；宿主 reactive 映射后真 node 取反执行。
+#[test]
+fn p980_web_lane_consumes_production_002_source() {
+    use auto_ui_runtime::ui::ace_ts_provider::ComponentFragmentLane;
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let at = manifest.join("../../examples/ui/002-counter/src/front/app.at");
+    let src = std::fs::read_to_string(&at).unwrap_or_else(|e| panic!("002 fixture: {e}"));
+
+    let lane = ComponentFragmentLane::compile(
+        &src,
+        "p980-002.at",
+        &[
+            "Inc",
+            "Dec",
+            "Reset",
+            "UseAuto",
+            "UseSolarized",
+            "ToggleMode",
+        ],
+    )
+    .expect("production 002 source compiles through the lane");
+
+    // ToggleMode handler：`.dark_mode = !.dark_mode`——坐标基准=脱糖源
+    //（f-string 脱糖位移；lane 暴露基准源），`!` 操作数 span 精确定位，
+    // NOT 与纯读同 span=操作数——组合形胜出。
+    let ds = lane.desugared_source();
+    let bang = ds.find("!.dark_mode").expect("`!` in the desugared source");
+    let frag = lane
+        .emit_expr_at_span("__age_state_0_dark_mode", bang + 1..bang + 11)
+        .expect("NOT-composed fragment locates in the production source");
+    let joined = frag.text.join("\n");
+    assert!(
+        joined.contains("(!"),
+        "negation preserved from 002: {joined}"
+    );
+    assert!(
+        joined.contains("___age_s_0_dark_mode"),
+        "state ref form: {joined}"
+    );
+    // 宿主 reactive 映射（002 局部索引 l2——字段序 count/theme_name/dark_mode）
+    // + 真 node：!false === true。
+    let mapped = joined
+        .replace("l2___age_s_0_dark_mode", "dark_mode.value")
+        .replace("l1___age_s_0_dark_mode", "dark_mode.value");
+    let expr = frag.expr.clone().expect("expr body");
+    let driver = format!(
+        "const dark_mode = {{ value: false }};\n{mapped}\nconst t = {expr};\nif (!(t === true)) {{ throw new Error(\"FRAG_ASSERT_FAILED\"); }}\nconsole.log(\"FRAG_OK\");\n"
+    );
+    let dir = std::env::temp_dir().join(format!("p980-002-lane-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("host.mjs"), driver).unwrap();
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg("host.mjs")
+        .current_dir(&dir)
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("FRAG_OK"),
+        "node: {stdout} / {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // Inc handler 在同一 lane 的 count 状态函数内定位（多 handler 区分）。
+    // 002 的 `.count += 1` 首现于 **view 内联 lambda**（不进状态函数）——
+    // 从 on 块起推导 handler 区 occurrence（脱糖源坐标）。
+    let on_pos = ds.find("on {").expect("on block");
+    let rel = ds[on_pos..]
+        .find(".count += 1")
+        .expect("Inc handler in the on block");
+    let inc_start = on_pos + rel;
+    let inc = lane
+        .emit_expr_at_span("__age_state_0_count", inc_start..inc_start + 11)
+        .expect("Inc handler locates in the count state fn");
+    let inc_joined = inc.text.join("\n");
+    assert!(
+        inc_joined.contains("___age_s_0_count")
+            || inc.expr.as_deref().is_some_and(|e| e.contains("count")),
+        "count state reference emitted: {inc_joined} / {:?}",
+        inc.expr
+    );
+}
