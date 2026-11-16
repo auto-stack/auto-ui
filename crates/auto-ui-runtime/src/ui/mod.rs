@@ -155,6 +155,9 @@ pub mod ace_native;
 #[cfg(feature = "ace-bridge")]
 // PLAN-980 B-STATE：ACE 状态执行桥（组件面消费端）。
 pub mod ace_state_bridge;
+#[cfg(feature = "ace-bridge")]
+// PLAN-980 WEB：976 TS/JS provider 的 fragment 消费切片。
+pub mod ace_ts_provider;
 pub mod vm_bridge;
 // PLAN-045：VM 渲染组件级 memo（菜单族四件 + sidebar nav 块；opt-in，
 // 缺省原始路径逐字节不变）。类型面依赖 interpreter 的 View/DynamicMessage，
