@@ -132,6 +132,7 @@ pub const P980_CONSTRUCTS: &[&str] = &[
     "widget.on",
     "widget.on.handler",
     "widget.on.handler.stream",
+    "widget.on.handler.span",
     "widget.bind",
     "widget.bind.key",
     "widget.prop",
@@ -464,6 +465,9 @@ impl Walker {
                         self.push("widget.on.handler", None)?;
                         if h.stream.is_some() {
                             self.push("widget.on.handler.stream", None)?;
+                        }
+                        if h.span.is_some() {
+                            self.push("widget.on.handler.span", None)?;
                         }
                     }
                 }
@@ -799,6 +803,7 @@ pub fn widget_field_manifest() -> Vec<WidgetFieldRow> {
         row("widget.on", "widget", "on block", required("002-counter"), "WidgetDecl.on", HANDOFF_CHECK, "980/STATE"),
         row("widget.on.handler", "widget.on", "pattern => body", required("002-counter"), "OnBlock.handlers", HANDOFF_CHECK, "980/STATE"),
         row("widget.on.handler.stream", "widget.on.handler", "on stream sse(url) subscription", optional("stream handlers"), "OnHandler.stream", HANDOFF_CHECK, "980/WEB"),
+        row("widget.on.handler.span", "widget.on.handler", "handler source span (byte_offset,len) — PLAN-980 WEB lane locator anchor", optional("on handlers"), "OnHandler.span", HANDOFF_CHECK, "980/WEB"),
         row("widget.bind", "widget", "bind block (key bindings)", optional("bind blocks"), "WidgetDecl.bind", HANDOFF_CHECK, "980/NATIVE"),
         row("widget.bind.key", "widget.bind", "\"key\" -> .Handler", optional("bind blocks"), "BindBlock.bindings", HANDOFF_CHECK, "980/NATIVE"),
         row("widget.prop", "widget.head.params", "prop decl name ty [= default]", optional("reusable components"), "WidgetDecl.props", HANDOFF_CHECK, "980/DIALECT"),

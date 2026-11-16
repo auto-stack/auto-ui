@@ -247,10 +247,11 @@ fn p980_required_fields_handoff() {
         ("widget.design", 1),
         ("widget.design.entry", 2), // theme + mode
         ("widget.on", 1),
-        ("widget.on.handler", 9),  // 6 声明 + 3 铸造
-        ("view.node.element", 10), // col + text + 2×row + 6×button
-        ("view.prop", 11),         // col.style + text.text + 3×1 + 3×2
-        ("view.event", 6),         // 6 onclick（3 个内联 lambda 在 parse 期铸造为 __evt handler）
+        ("widget.on.handler", 9),      // 6 声明 + 3 铸造
+        ("widget.on.handler.span", 6), // PLAN-980 WEB 切片#6：on 块解析捕获（铸造形无 span）
+        ("view.node.element", 10),     // col + text + 2×row + 6×button
+        ("view.prop", 11),             // col.style + text.text + 3×1 + 3×2
+        ("view.event", 6), // 6 onclick（3 个内联 lambda 在 parse 期铸造为 __evt handler）
     ];
     for (id, expected) in facts {
         assert_eq!(count(&occ, id), *expected, "occurrence count for {id}");

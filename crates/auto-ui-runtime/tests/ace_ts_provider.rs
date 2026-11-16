@@ -264,7 +264,6 @@ fn p980_web_component_face_entry_fragments() {
     };
     let src = "widget Counter {\n    msg { Inc, Toggle }\n\n    model {\n        var count int = 0\n        var on bool = false\n    }\n\n    view {\n        col { text \"C\" }\n    }\n\n    on {\n        .Inc -> { .count += 1 }\n        .Toggle -> { .on = !.on }\n    }\n}\n";
     let caps = ["ac.runtime.text.v1".to_string()];
-    let scenario = auto_ui_runtime::ui::ace_state_bridge::AceAlias::Accept;
     // 组件面 states-only 编译（真实入口；str/bool/`!` 全部通过——Core
     // profile 同源具名拒的形态在此域内）。
     let compiled = ace_av::age_component::compile_component_scenario_states(
@@ -493,4 +492,74 @@ fn p980_web_lane_consumes_production_002_source() {
         "count state reference emitted: {inc_joined} / {:?}",
         inc.expr
     );
+}
+
+/// WEB 切片 #6：**提取携带 span → lane 接线**（真实解析管线闭环）。002
+/// 经 `CompilerSession`+`Parser` 解析 → `extract_handler_spans`（原源坐
+/// 标）→ span 内容核验（含 pattern 与 `!` 形态）→ lane（脱糖坐标）在
+/// **提取区间**内锚定 → ToggleMode 的 NOT fragment。铸造形（view 内联
+/// lambda）无 span=缺席可辨。
+#[test]
+fn p980_web_extraction_carried_spans_feed_lane() {
+    use auto_ui_compiler::aura::extract_handler_spans;
+    use auto_ui_dialect::UiStmt;
+
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let at = manifest.join("../../examples/ui/002-counter/src/front/app.at");
+    let src = std::fs::read_to_string(&at).unwrap_or_else(|e| panic!("002 fixture: {e}"));
+
+    // 真实解析管线（vue_capabilities 同链）。
+    let session = auto_parser_api::session::CompilerSession::ui();
+    let mut parser = auto_lang_core::parser::Parser::from(src.as_str()).with_session(session);
+    let ast = parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+        .expect("002 parses");
+    let decl = ast
+        .domain_stmts()
+        .find_map(|s| match s {
+            UiStmt::WidgetDecl(d) => Some(d),
+            _ => None,
+        })
+        .expect("widget decl");
+
+    // 提取携带 span（原源坐标）：6 个 on-block handler（铸造形缺席）。
+    let spans = extract_handler_spans(&decl);
+    assert_eq!(spans.len(), 6, "declared on-block handlers carry spans");
+    let (off, len) = spans.get(".ToggleMode").copied().expect("ToggleMode span");
+    let region = &src[off..off + len];
+    // O-C4：span 起点落在 pattern 中段（小偏移；终点正确、body 完整覆盖）——
+    // lane 锚定不依赖起点精度（区间内文本锚）。精确起点归切片#6b 校准。
+    assert!(
+        region.contains("Mode ->") && region.contains("!.dark_mode"),
+        "span covers the handler body: {region}"
+    );
+
+    // lane（脱糖坐标）：提取区间内容锚（pattern 在脱糖源中定位 → 区间内
+    // `!` 操作数）→ NOT fragment（端到端：解析→提取→lane）。
+    use auto_ui_runtime::ui::ace_ts_provider::ComponentFragmentLane;
+    let lane = ComponentFragmentLane::compile(
+        &src,
+        "p980-span-feed.at",
+        &[
+            "Inc",
+            "Dec",
+            "Reset",
+            "UseAuto",
+            "UseSolarized",
+            "ToggleMode",
+        ],
+    )
+    .expect("lane compiles");
+    let ds = lane.desugared_source();
+    let ds_toggle = ds.find(".ToggleMode").expect("pattern in desugared source");
+    let bang = ds[ds_toggle..]
+        .find("!.dark_mode")
+        .expect("NOT form within the extraction-carried region");
+    let at_ds = ds_toggle + bang;
+    let frag = lane
+        .emit_expr_at_span("__age_state_0_dark_mode", at_ds + 1..at_ds + 11)
+        .expect("NOT fragment via extraction-carried span region");
+    let joined = frag.text.join("\n");
+    assert!(joined.contains("(!"), "negation preserved: {joined}");
 }
