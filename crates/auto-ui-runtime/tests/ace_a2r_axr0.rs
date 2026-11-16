@@ -10,7 +10,7 @@
 //! - 窗口腿（`AUTO_UI_ACE_HELLO_E2E=1` 排窗）：窗口进程派生 A2R 产物 exe、
 //!   显示其真实 stdout（零 AV/旧 VM）。
 
-#![cfg(all(windows, feature = "ui-interpreter"))]
+#![cfg(all(windows, feature = "ace-bridge"))]
 
 use auto_ui_runtime::ui::ace_a2r_bridge::{
     component_a2r_fileset, f0_a2r_fileset, f0_text_source,

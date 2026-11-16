@@ -260,6 +260,7 @@ fn snip(s: &str) -> String {
 // store handler 经 ACE 执行。旧链 4 case（上方）保持不动、两路并存。
 // ============================================================================
 
+#[cfg(feature = "ace-bridge")]
 mod p980_ace_state {
     use auto_ui_runtime::ui::ace_state_bridge::{
         AceAlias, AceInitialValue, AceStateEngine, AceStateValue, AsyncOutcome, DispatchOutcome,

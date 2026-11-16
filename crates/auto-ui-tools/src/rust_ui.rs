@@ -5260,17 +5260,32 @@ const PROJECTION_AUTO_UI_RUNTIME: DeliveryProjectionSpec = DeliveryProjectionSpe
     // 原样承接：剥 autodown-core 路径行，autodown 特征改写为无 dep: 形态。
     // PLAN-901 r2/§5.5：runtime 对 web 仓 auto-web 的硬 path 依赖（890
     // 谱系）→ 交付根包内兄弟。
+    // PLAN-980（STATE/HELLO/RUST）：ACE 桥 optional 依赖（默认关的
+    // ace-bridge feature）同样剥除——experimental/ace 树不进 792 受管
+    // 交付闭包，feature 改写为空（autodown-core 同型先例）。
     strip_deps: &[
         "autodown-core = { path = \"../../../auto-down/autodown/packages/engine/rust\", optional = true }",
+        "ace-av = { path = \"../../../auto-lang/experimental/ace/crates/av\", optional = true }",
+        "auto-lang-ace-host = { path = \"../../../auto-lang/crates/auto-lang-ace-host\", optional = true }",
+        "ace-abi = { path = \"../../../auto-lang/experimental/ace/crates/abi\", optional = true }",
+        "ace-a2x-core = { path = \"../../../auto-lang/experimental/ace/crates/a2x-core\", optional = true }",
+        "ace-a2x-rust = { path = \"../../../auto-lang/experimental/ace/crates/a2x-rust\", optional = true }",
+        "ace-source-query = { path = \"../../../auto-lang/experimental/ace/crates/source-query\", optional = true }",
+        "ace-foreign-contract = { path = \"../../../auto-lang/experimental/ace/crates/foreign-contract\", optional = true }",
     ],
-    strip_dev_deps: &[],
+    strip_dev_deps: &[
+        "ace-av = { path = \"../../../auto-lang/experimental/ace/crates/av\" }",
+    ],
     // PLAN-018 T-04：ui-iced 拍平后 runtime 的 autodown feature 定义为
     // `["dep:autodown-core"]`（原 `["ui-iced", "dep:autodown-core"]`）——
     // 剥除 autodown-core 路径行后转发引用须同步摘除（保留 feature 名）。
-    feature_rewrites: &[(
-        "autodown = [\"dep:autodown-core\"]",
-        "autodown = []",
-    )],
+    feature_rewrites: &[
+        ("autodown = [\"dep:autodown-core\"]", "autodown = []"),
+        (
+            "ace-bridge = [\"dep:ace-av\", \"dep:auto-lang-ace-host\", \"dep:ace-abi\", \"dep:ace-a2x-core\", \"dep:ace-a2x-rust\", \"dep:ace-source-query\", \"dep:ace-foreign-contract\"]",
+            "ace-bridge = []",
+        ),
+    ],
     installed_rewrites: &[],
     dep_rewrites: &[],
     path_rewrites: &[

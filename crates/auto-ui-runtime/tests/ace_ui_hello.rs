@@ -15,7 +15,7 @@
 //!   AUTO_UI_ACE_HELLO_E2E=1 cargo test -p auto-ui-runtime --test ace_ui_hello \
 //!       -- --test-threads=1
 
-#![cfg(all(windows, feature = "ui-interpreter"))]
+#![cfg(all(windows, feature = "ace-bridge"))]
 
 use auto_ui_runtime::ui::ace_hello::{stable_f0_root, HelloSession};
 

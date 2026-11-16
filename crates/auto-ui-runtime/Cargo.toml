@@ -12,6 +12,10 @@ keywords = ["ui", "runtime", "renderer", "desktop"]
 # 默认重后端"，§5.7）。
 [features]
 default = ["ui-iced"]
+# PLAN-980（STATE/HELLO/RUST）：ACE 桥接线（组件面状态执行/首窗/A2R AXR0）。
+# 默认关闭——交付闭包（792 受管 bundle）不含 experimental/ace 树；交付投影
+# 剥除这些 optional path 行并把本 feature 改写为空（autodown-core 同型先例）。
+ace-bridge = ["dep:ace-av", "dep:auto-lang-ace-host", "dep:ace-abi", "dep:ace-a2x-core", "dep:ace-a2x-rust", "dep:ace-source-query", "dep:ace-foreign-contract"]
 ui = ["auto-ui-compiler/ui"]
 # PLAN-018（Design52 D）：稳定UI基线（解释器/image-pipeline/code-editor/
 # 剪贴板/对话框/native-dock/clipboard + iced后端依赖）恒在——deps非optional、
@@ -87,15 +91,15 @@ auto-web = { version = "=0.1.0", path = "../../../auto-web/crates/auto-web" }
 auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
 # PLAN-980 B-STATE：ACE 状态执行桥消费组件面（场景脱糖→共享 verify→AV）与
 # scheduler 一次性执行入口（异步宿主）。经组内兄弟树解析（../auto-lang）。
-ace-av = { path = "../../../auto-lang/experimental/ace/crates/av" }
+ace-av = { path = "../../../auto-lang/experimental/ace/crates/av", optional = true }
 # PLAN-980 HELLO：E0 门面宿主安装与 F0 provider 注册（Windows 门在源 crate 内）。
-auto-lang-ace-host = { path = "../../../auto-lang/crates/auto-lang-ace-host" }
+auto-lang-ace-host = { path = "../../../auto-lang/crates/auto-lang-ace-host", optional = true }
 # PLAN-980 RUST（AXR0）：A2R 生成面（组件场景 fileset + F0×A2R 链接 fileset）。
-ace-abi = { path = "../../../auto-lang/experimental/ace/crates/abi" }
-ace-a2x-core = { path = "../../../auto-lang/experimental/ace/crates/a2x-core" }
-ace-a2x-rust = { path = "../../../auto-lang/experimental/ace/crates/a2x-rust" }
-ace-source-query = { path = "../../../auto-lang/experimental/ace/crates/source-query" }
-ace-foreign-contract = { path = "../../../auto-lang/experimental/ace/crates/foreign-contract" }
+ace-abi = { path = "../../../auto-lang/experimental/ace/crates/abi", optional = true }
+ace-a2x-core = { path = "../../../auto-lang/experimental/ace/crates/a2x-core", optional = true }
+ace-a2x-rust = { path = "../../../auto-lang/experimental/ace/crates/a2x-rust", optional = true }
+ace-source-query = { path = "../../../auto-lang/experimental/ace/crates/source-query", optional = true }
+ace-foreign-contract = { path = "../../../auto-lang/experimental/ace/crates/foreign-contract", optional = true }
 # PLAN-900 T-03：UiCompatInstaller 进程期自注册（原 auto-lang facade 迁入）。
 inventory = "0.3"
 auto-ui-compiler = { path = "../auto-ui-compiler" }
@@ -352,6 +356,8 @@ name = "fp_daemon_fixture"
 path = "tests/fixtures/fp_daemon_fixture.rs"
 
 [dev-dependencies]# PLAN-060: exercise the actual WGPU canvas geometry backend without a device.
+# PLAN-980：集成测试直用组件面类型（feature 门下编译，不进交付闭包；交付投影剥除）。
+ace-av = { path = "../../../auto-lang/experimental/ace/crates/av" }
 iced_wgpu = "0.14"
 # PLAN-018 T-03：iced_test 仅测试工具箱——自 optional+feature 门转 dev 依赖。
 iced_test = { version = "0.14" }
@@ -364,3 +370,12 @@ resvg = "0.45"
 tiny-skia = "0.11"
 tempfile = "3"
 png = "0.18"
+
+# PLAN-980：ACE 桥窗口/构建道 example 需要 ace-bridge。
+[[example]]
+name = "ace_hello_window"
+required-features = ["ace-bridge"]
+
+[[example]]
+name = "ace_a2r_axr0_build"
+required-features = ["ace-bridge"]
