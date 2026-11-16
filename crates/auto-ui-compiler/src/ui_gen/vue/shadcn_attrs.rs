@@ -4432,8 +4432,11 @@ impl VueGenerator {
             "ondragenter" => "dragenter",
             "ondragleave" => "dragleave",
             "ondrop" => "drop",
-            // Fallback: strip a single leading "on" (onupdate → update, etc.)
-            other => other.strip_prefix("on").unwrap_or(other),
+            // Fallback: strip a single leading "on" (onupdate → update, etc.).
+            // PLAN-087：从原始 base 剥前缀——下方 match 先 to_ascii_lowercase，
+            // 用小写副本剥前缀会把 camelCase 事件名（onunitChanged →
+            // unitchanged）打回全小写，与子件 emit('unitChanged') 失配。
+            other => base.strip_prefix("on").unwrap_or(other),
         }
         .to_string()
     }

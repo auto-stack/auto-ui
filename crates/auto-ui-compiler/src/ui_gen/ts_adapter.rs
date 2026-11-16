@@ -53,6 +53,9 @@ pub struct AuraTsContext {
     /// PLAN-048 (auto-musk A 线): deps[1..] 的跨 store facade 映射
     /// (store 真名 → facade 变量,如 "ForgeStore" → "forgeStore")。
     pub store_facades: std::collections::HashMap<String, String>,
+    /// 任一 a2ts fragment 使用了 Range（ts_expr needs_range）——函数体收尾
+    /// 时据此注入内联 range 助手（PLAN-087）。
+    pub used_range: std::cell::Cell<bool>,
     /// Plan 559 W2: qualified-call heads that emit BARE (`Collection.Select`
     /// → `Select(...)`) instead of a facade var — the store-composable
     /// self-qualification contract (vm A1): the sibling's action is a local
@@ -157,6 +160,10 @@ impl AuraTsContext {
             used_state_aliases: Default::default(),
             debounce_seq_var: None,
             warnings: std::cell::RefCell::new(Vec::new()),
+            // PLAN-087 T-02：a2ts Range 臂发射 range(start,end) 调用并把
+            // needs_range 留在丢弃的 fragment trans 上——本 ctx 聚合该信号，
+            // 由函数体收尾注入内联 range 助手（SFC 内联，无外部 runtime import）。
+            used_range: std::cell::Cell::new(false),
         }
     }
 
@@ -646,7 +653,8 @@ pub fn transpile_handler_body(stmts: &[Stmt], ctx: &AuraTsContext) -> String {
             writeln!(out).ok();
         }
     }
-    String::from_utf8(out).unwrap_or_default()
+    let body = String::from_utf8(out).unwrap_or_default();
+    finalize_with_range(ctx, body)
 }
 
 /// Render a statement list for use as the **body of an IIFE that must produce a
@@ -685,7 +693,26 @@ pub fn transpile_body_as_return(stmts: &[Stmt], ctx: &AuraTsContext) -> String {
             writeln!(out).ok();
         }
     }
-    String::from_utf8(out).unwrap_or_default()
+    let body = String::from_utf8(out).unwrap_or_default();
+    finalize_with_range(ctx, body)
+}
+
+/// PLAN-087：a2ts 的 Range 表达式引用 `range(start, end[, eq])` 运行时助手，
+/// 但 SFC 内联发射没有 runtime import（needs_range 留在丢弃的 fragment
+/// trans 上）。检测到使用的函数体顶部注入一份内联助手——每函数体恰一份
+/// （同一函数体同时显式声明 `range` fn 的形态不支持，属病名冲突）。
+fn finalize_with_range(ctx: &AuraTsContext, body: String) -> String {
+    if !ctx.used_range.get() {
+        return body;
+    }
+    let helper = "function range(start: number, end: number, eq?: boolean): any[] {
+  const out: any[] = [];
+  const stop = eq ? end + 1 : end;
+  for (let i = start; i < stop; i++) { out.push(i); }
+  return out;
+}
+";
+    format!("{}{}", helper, body)
 }
 
 // ---------------------------------------------------------------------------
@@ -858,6 +885,9 @@ fn transpile_stmt(stmt: &Stmt, ctx: &AuraTsContext, out: &mut Vec<u8>) {
             let mut ts = TypeScriptTrans::new("fragment".into());
             let mut sink = Sink::new("fragment".into());
             let _ = ts.stmt(stmt, &mut sink);
+            if ts.needs_range {
+                ctx.used_range.set(true);
+            }
             let _ = out.write_all(&sink.body);
         }
     }
@@ -2454,10 +2484,13 @@ fn builtin_type_annotation(ty: &Type) -> Option<String> {
 
 /// Handles: literals, arrays, objects, lambdas, closures, f-strings,
 /// indexing, ranges, tag construction, etc.
-fn delegate_expr(expr: &Expr, _ctx: &AuraTsContext, out: &mut Vec<u8>) {
+fn delegate_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
     let mut ts = TypeScriptTrans::new("fragment".into());
     let mut sink = Sink::new("fragment".into());
     let _ = ts.expr(expr, &mut sink);
+    if ts.needs_range {
+        ctx.used_range.set(true);
+    }
     let _ = out.write_all(&sink.body);
 }
 
