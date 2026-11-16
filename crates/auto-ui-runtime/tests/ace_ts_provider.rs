@@ -26,7 +26,7 @@ fn p980_web_expr_fragment_binds_and_maps_reactive_names() {
     let frag = emit_ui_expr_fragment(
         body,
         "count + 1",
-        &["count"],
+        &[("count", "int")],
         &[("count".into(), "count.value".into())],
     )
     .expect("binding-shape expression fragment emits");
@@ -67,8 +67,13 @@ fn p980_web_stmt_fragment_assigns_and_runs() {
     let body = "var sum = 40
 sum = sum + item";
     // 第 3 条语句（idx 2）是赋值本体。
-    let frag = emit_ui_stmt_fragment(body, 1, &["item"], &[("sum".into(), "sum.value".into())])
-        .expect("assignment stmt fragment emits");
+    let frag = emit_ui_stmt_fragment(
+        body,
+        1,
+        &[("item", "int")],
+        &[("sum".into(), "sum.value".into())],
+    )
+    .expect("assignment stmt fragment emits");
     let joined = frag.lines.join("\n");
     assert!(joined.contains('='), "assignment kept: {joined}");
     assert!(
@@ -89,12 +94,12 @@ sum = sum + item";
 #[test]
 fn p980_web_fragment_uncovered_shapes_refuse_by_name() {
     let body = "return count";
-    let err = emit_ui_expr_fragment(body, "not_in_source", &["count"], &[])
+    let err = emit_ui_expr_fragment(body, "not_in_source", &[("count", "int")], &[])
         .expect_err("absent expression source refuses");
     assert!(err.contains("not found in the wrapper source"), "{err}");
 
-    let err2 =
-        emit_ui_stmt_fragment(body, 99, &["count"], &[]).expect_err("out-of-range stmt refuses");
+    let err2 = emit_ui_stmt_fragment(body, 99, &[("count", "int")], &[])
+        .expect_err("out-of-range stmt refuses");
     assert!(
         err2.contains("a2ts.fragment") || err2.contains("fragment"),
         "named fragment rejection: {err2}"
@@ -112,4 +117,135 @@ fn p980_web_fragment_source_errors_carry_ace_codes() {
         err.contains("source."),
         "ACE diagnostic code present: {err}"
     );
+}
+
+/// WEB 切片 #2：**车道覆盖普查（冻结表）**——生产 UI 表达式/语句形态经
+/// 976 fragment 新车道（Core profile 编译入口）的逐形态结果。本表=适配器
+/// 切换的可测分母：OK 形态即今日可切换面；具名拒形态=切换前须先扩
+/// profile/入口（976 后继或 richer entry），**不是** ts_adapter 线程化能
+/// 解决的。表变化须具名修订（防静默漂移）。
+#[test]
+fn p980_web_lane_census_frozen_forms() {
+    use auto_ui_runtime::ui::ace_ts_provider::{emit_ui_expr_fragment, emit_ui_stmt_fragment};
+    // (形态名, 体, 定位, 参数, 期望: Ok 或含具名码的 Err 子串)
+    let cases: &[(&str, &str, Option<&str>, &[(&str, &str)], ResultKind)] = &[
+        // —— OK 面（round 23 已证 + 本轮复核）——
+        (
+            "int-arith-return",
+            "return count + 1",
+            Some("count + 1"),
+            &[("count", "int")],
+            ResultKind::Ok,
+        ),
+        (
+            "int-assign-stmt",
+            "var sum = 40\nsum = sum + item",
+            None,
+            &[("item", "int")],
+            ResultKind::Ok,
+        ),
+        // O-C2（形状缺口）：非字面 var-init（参数引用/表达式初始化）在
+        // block-graph 校验拒——字面初始化的两步赋值形态 OK（见上）。
+        (
+            "bool-assign-stmt",
+            "var f2 = flag\nf2 = false\nreturn 0",
+            None,
+            &[("flag", "bool")],
+            ResultKind::Reject("verify.block-structure"),
+        ),
+        // —— 具名拒面（profile 域缺口——切换前置义务，非线程化可解）——
+        (
+            "cmp-gt",
+            "var ok = count > 1\nreturn 0",
+            Some("count > 1"),
+            &[("count", "int")],
+            ResultKind::Reject("operator `>` is not part of this source profile"),
+        ),
+        (
+            "cmp-eq",
+            "var ok = count == 1\nreturn 0",
+            Some("count == 1"),
+            &[("count", "int")],
+            ResultKind::Reject("operator `==` is not part of this source profile"),
+        ),
+        (
+            "bool-not",
+            "var f2 = !flag\nreturn 0",
+            Some("!flag"),
+            &[("flag", "bool")],
+            ResultKind::Reject("unary `!` is not part of this source profile"),
+        ),
+        (
+            "bool-logic",
+            "var f2 = flag && ok\nreturn 0",
+            Some("flag && ok"),
+            &[("flag", "bool"), ("ok", "bool")],
+            ResultKind::Reject("operator `&&` is not part of this source profile"),
+        ),
+        (
+            "str-type",
+            "var t = name\nreturn 0",
+            Some("name"),
+            &[("name", "str")],
+            ResultKind::Reject("type `str` is not part of this source profile"),
+        ),
+        (
+            "if-stmt-cmp",
+            "if count > 1 { var t = 2 } else { var t = 3 }\nreturn 0",
+            None,
+            &[("count", "int")],
+            ResultKind::Reject("operator `>` is not part of this source profile"),
+        ),
+        (
+            "interp-fstr",
+            "var s = `x${count}`\nreturn 0",
+            Some("`x${count}`"),
+            &[("count", "int")],
+            ResultKind::Reject("source.lex"),
+        ),
+        (
+            "multi-fn-helper",
+            "fn h() int { return 3 }",
+            None,
+            &[],
+            ResultKind::Reject("source.syntax"),
+        ),
+        // —— 形状拒（同入口的可分辨行为；O-C1：var-init+return 形状的
+        //    block-structure 拒——赋值两步形态 OK，见上）——
+        (
+            "var-init-dead-local",
+            "var t = 40\nreturn 0",
+            None,
+            &[("count", "int")],
+            ResultKind::Reject("verify.block-structure"),
+        ),
+    ];
+    for (name, body, locator, params, expect) in cases {
+        let r = match locator {
+            Some(expr) => emit_ui_expr_fragment(body, expr, params, &[]),
+            None => emit_ui_stmt_fragment(body, 0, params, &[]),
+        };
+        match (expect, &r) {
+            (ResultKind::Ok, Ok(_)) => {}
+            (ResultKind::Reject(want), Err(e)) => {
+                assert!(
+                    e.contains(want),
+                    "census[{name}]: {e}\n expected named rejection containing {want:?}"
+                )
+            }
+            (ResultKind::Ok, Err(e)) => {
+                panic!("census[{name}]: expected OK, got {e}（表须具名修订）")
+            }
+            (ResultKind::Reject(want), Ok(f)) => panic!(
+                "census[{name}]: expected rejection {want:?}, got OK {:?}（表须具名修订）",
+                f.lines
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ResultKind {
+    Ok,
+    Reject(&'static str),
 }

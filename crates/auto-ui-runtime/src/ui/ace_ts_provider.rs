@@ -28,14 +28,15 @@ pub struct UiFragment {
     pub locals: Vec<(usize, String, String)>,
 }
 
-/// 合成包装源并编译为语义视图所需的最小闭包（core 面：int 域，语句面=
-/// 初始化/赋值/return/条件——与 976 tsfrag 同形）。**宿主状态建模为参数**
-///（`p<i>_<name>` 发射名即 reactive 宿主映射源），`host_map` 的源名即参数名。
-fn wrapper_source(body_source: &str, params: &[&str]) -> String {
-    // 参数表：`a int, b int`（宿主状态=参数，见函数注记）。
+/// 合成包装源并编译为语义视图所需的最小闭包（core 面：int/bool/str 域，
+/// 语句面=初始化/赋值/return/条件——与 976 tsfrag 同形；类型域=切片 #2 扩
+/// 面）。**宿主状态建模为参数**（`p<i>_<name>` 发射名即 reactive 宿主映射
+/// 源），`host_map` 的源名即参数名。
+fn wrapper_source(body_source: &str, params: &[(&str, &str)]) -> String {
+    // 参数表：`a int, b bool, c str`（宿主状态=参数，见函数注记）。
     let decl = params
         .iter()
-        .map(|p| format!("{p} int"))
+        .map(|(name, ty)| format!("{name} {ty}"))
         .collect::<Vec<_>>()
         .join(", ");
     // 体已含 return（表达式住 return/赋值/条件）时不补尾 return——避免
@@ -61,7 +62,7 @@ return 0"
 pub fn emit_ui_expr_fragment(
     body_source: &str,
     expr_source: &str,
-    params: &[&str],
+    params: &[(&str, &str)],
     host_map: &[(String, String)],
 ) -> Result<UiFragment, String> {
     let out = emit_fragment(
@@ -76,7 +77,7 @@ pub fn emit_ui_expr_fragment(
 pub fn emit_ui_stmt_fragment(
     body_source: &str,
     stmt_idx: usize,
-    params: &[&str],
+    params: &[(&str, &str)],
     host_map: &[(String, String)],
 ) -> Result<UiFragment, String> {
     let source = wrapper_source(body_source, params);
