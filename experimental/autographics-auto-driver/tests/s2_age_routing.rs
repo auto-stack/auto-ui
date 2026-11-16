@@ -359,11 +359,14 @@ fn s2_send_to_unknown_message_is_rejected() {
     );
 }
 
-/// B-SESSION-V：真实 980/A Counter 源 + 两实例 2:1 定向事件、停/重启恢复。
+/// B-SESSION-V[A]：真实 980/A Counter 源（canonical 文件）的两实例轨迹与停/重启恢复。
+///
+/// 这是 A 子面的**轨迹**证据（含 Reset 归零）；隔离断言在
+/// `s2_real_a_counter_two_instance_isolation`。R68-1：源不再手抄，直接读 examples。
 #[test]
-fn s2_real_a_counter_dual_instance_2_to_1() {
+fn s2_real_a_counter_trajectory_and_restart() {
     use ace_core::source::age_component::ScenarioOp;
-    const SRC: &str = "// PLAN-980 MIN-A-UI（B-NATIVE-I）：由 002-counter 原计数业务派生的最小 Node\n// Counter——msg Inc/Dec/Reset + model count int + on 复合赋值（轨迹 0→1→0→0、\n// 两实例定向 2:1 的业务面与 002 同源）。002 完整主题/design/f-string/内联\n// lambda 归 W1 B-AV；本 fixture 是 MIN-A-UI 的第三类源（Node 计数业务）。\nnode Counter {\n    msg { Inc, Dec, Reset }\n\n    model {\n        var count int = 0\n    }\n\n    view {\n        col {\n            text \"Counter\"\n            row {\n                button \"-\" { onclick: .Dec }\n                button \"Reset\" { onclick: .Reset }\n                button \"+\" { onclick: .Inc }\n            }\n        }\n    }\n\n    on {\n        .Inc -> { .count += 1 }\n        .Dec -> { .count -= 1 }\n        .Reset -> { .count = 0 }\n    }\n}\n";
+    const SRC: &str = include_str!("../../../examples/ui/ace-node-counter/src/front/app.at");
     let mut s = Session::new_age_with(
         SRC,
         2,
@@ -390,17 +393,32 @@ fn s2_real_a_counter_dual_instance_2_to_1() {
     let o = s.age_observe().expect("observes");
     assert_eq!(o.components.len(), 1, "one component, two instances");
     assert_eq!(o.components[0].instance_states, vec![vec![2], vec![0]]);
-    // 继续在实例 1 上定向到 1，实例 0 不动。
+    // Reset 归零轨迹（A 子面唯一覆盖）：实例 1 → 1 → Reset → 0；实例 0 不受影响。
     s.age_send_to(1, "Inc").unwrap();
-    s.age_send_to(1, "Inc").unwrap();
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states,
+        vec![vec![2], vec![1]]
+    );
     s.age_send_to(1, "Reset").unwrap();
-    let o = s.age_observe().unwrap();
-    assert_eq!(o.components[0].instance_states, vec![vec![2], vec![0]]);
-    // Stop → Restart：状态从初值重来，PID 不变。
-    let (pid, _gen) = s.age_identity().unwrap();
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states,
+        vec![vec![2], vec![0]]
+    );
+    // Stop → Restart：状态回初值；逻辑 session id 稳定、generation 递增。
+    let (session_id, generation) = s.age_identity().unwrap();
     s.age_stop().unwrap();
     s.age_restart().unwrap();
-    assert_eq!(s.age_identity().unwrap().0, pid);
-    let o = s.age_observe().unwrap();
-    assert_eq!(o.components[0].instance_states, vec![vec![0], vec![0]]);
+    assert_eq!(
+        s.age_identity().unwrap().0,
+        session_id,
+        "logical session id is stable"
+    );
+    assert!(
+        s.age_identity().unwrap().1 > generation,
+        "restart bumps the generation"
+    );
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states,
+        vec![vec![0], vec![0]]
+    );
 }
