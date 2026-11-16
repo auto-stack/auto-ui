@@ -768,19 +768,28 @@ fn p980_web_unified_entry_census_v2() {
         ),
         (
             "param-handler",
-            "widget L {\n    msg { Add(text) }\n    model {\n        var n int = 0\n    }\n    view {\n        text \"L\"\n    }\n    on {\n        .Add(t) -> { .n = 1 }\n    }\n}\n",
+            "widget L {\n    msg Msg { Add(str) }\n\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"L\" }\n    }\n\n    on {\n        .Add(t) -> { .n = 1 }\n    }\n}\n",
+        ),
+        (
+            // 内联 lambda 铸造形（view onclick 无 on 块）：铸造 handler 无源
+            // span/场景面不可重放（与参数化同族域缺口）→ 旧道。
+            "inline-lambda-only",
+            "widget B {\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { button \"+\" { onclick: () => { .n += 1 } } }\n    }\n}\n",
         ),
     ];
 
     // 冻结表（2026-11-16 实测；变化须具名修订）：
     // counter-3h=3 spliced；str-field=1；no-on/watch-only=0（passthrough）；
-    // param-handler=absent（参数化 handler 体 lane 未覆盖——旧道保持，#6f 面）。
+    // param-handler=absent（**组件面域缺口**：ScenarioOp::Send 无 payload
+    // ——参数化事件不可场景重放，语言侧后继义务，非 UI 适配器可闭合）；
+    // inline-lambda-only=absent（铸造 handler 无源锚，同族域缺口）。
     let expect: &[(&str, usize, bool)] = &[
         ("counter-3h", 3, false),
         ("str-field", 1, false),
         ("no-on", 0, false),
         ("watch-only", 0, false),
         ("param-handler", 0, true),
+        ("inline-lambda-only", 0, true),
     ];
     for ((name, src), (exp_name, spliced, has_absent)) in corpus.iter().zip(expect) {
         assert_eq!(name, exp_name);
