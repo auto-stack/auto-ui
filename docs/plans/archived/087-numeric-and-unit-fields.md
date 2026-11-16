@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-16
 plan_revision: 3
-current_step: 6
+current_step: 8
 total_steps: 8
 supersedes_spec_components: []  # 无退役项
 new_spec_components: [docs/specs/ui/numeric-fields.md]  # 已随交付 45a80058 落主
@@ -170,3 +170,4 @@ T-01/T-02 实证后的合同修订（详见 [decisions §4/§8](../reviews/plan0
 - landing 观察（landing≠deployment）：.wt/ui-087 组 debug auto.exe/auto-ui-tool.exe 为计划验证构建，随 worktree 删除；主仓既有产物与本 Plan 无生产消费者（纯包/示例/测试/文档变更），无 release 重建义务——如需产品化由后续流程重建。
 - 统一回归：本仓无 .last-batch-regression 收据文件（该约定属 auto-lang），按工作流归仓库既有批次门；本次受影响面冻结 union = auto-ui-compiler（ts_adapter/shadcn_attrs 30/20 用例）+ auto-ui-tools（numeric_fields_component 2 用例）+ 双轨产品门（41 用例），全部在评审/合并期重跑通过；无待红。
 completion_kind: delivered。
+2026-11-16：cleaned 核对——worktree/分支已移除（wt-guard 全 clean，含四个依赖兄弟与组目录）；plan-artifacts/plan-087 全删（29,418 文件 402,734,702B，证据折叠于本文件与仓内 docs/reviews/plan087/）；registry 已刷新（deleted-at-merge，无具名持有）；T-07/T-08 经复审与合并收据闭环，任务计数 8/8；landing 观察已在合并收据（无生产消费者，无 release 重建义务）；批次回归收据文件在本仓不存在（auto-lang 约定），受影响面 union 已在评审/合并期全部重跑通过，无待红。
