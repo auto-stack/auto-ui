@@ -6,6 +6,9 @@ use auto_lang_core::{
     },
 };
 use std::time::{Duration, Instant};
+
+pub mod age_session;
+use age_session::AgeSession;
 #[derive(Clone, Copy, Debug)]
 pub enum Scalar {
     Int(i32),
@@ -34,6 +37,9 @@ struct Pending {
 pub struct Session {
     signatures: std::collections::BTreeMap<String, (Vec<Option<ResultKind>>, Option<ResultKind>)>,
     vm: Option<AutoVM>,
+    /// PLAN-981（S2）：AGE 源走 typed 宿主适配；普通 scalar 源 `vm` 有效、
+    /// 这里为 None（两者互斥）。
+    age: Option<AgeSession>,
     task: Option<AutoTask>,
     pending: Option<Pending>,
     pub compile_us: u128,
@@ -52,6 +58,34 @@ impl Session {
         map: impl Fn(&str, &auto_lang_core::error::AutoError) -> String,
     ) -> Result<Self, String> {
         let now = Instant::now();
+        // S2：先试 AGE 面（`node …` 声明）。成功即 typed 宿主；普通 scalar 源
+        // 照旧走旧 parser/VM 路径。
+        let age_shape = source
+            .split(|c: char| c.is_whitespace() || c == '{' || c == '}')
+            .any(|w| w == "node");
+        if age_shape || source.contains("node ") {
+            match AgeSession::open(source, 0) {
+                Ok(age) => {
+                    return Ok(Self {
+                        signatures: Default::default(),
+                        vm: None,
+                        task: None,
+                        pending: None,
+                        age: Some(age),
+                        compile_us: now.elapsed().as_micros(),
+                        max_call_steps: 0,
+                        max_call_slices: 0,
+                        calls: 0,
+                        yielded: 0,
+                    });
+                }
+                Err(_) => {
+                    // R63-7：AGE 编译失败时**不**替换旧路径的诊断——按词元/子串
+                    // 判"AGE 形状"会把注释里含 `node` 的旧源误判，改变其错误消息。
+                    // 旧 parser/VM 的诊断是该面的合同。
+                }
+            }
+        }
         use auto_lang_core::{
             ast::{Stmt, Type},
             parser::Parser,
@@ -87,6 +121,7 @@ impl Session {
         Ok(Self {
             signatures,
             vm: Some(vm),
+            age: None,
             task: Some(AutoTask::new(1, 65536, 0)),
             pending: None,
             compile_us: now.elapsed().as_micros(),
@@ -105,13 +140,146 @@ impl Session {
         }
     }
     pub fn closed(&self) -> bool {
-        self.vm.is_none()
+        self.vm.is_none() && self.age.is_none()
     }
     pub fn close(&mut self) {
         self.signatures.clear();
         self.pending = None;
         self.task = None;
         self.vm = None;
+        self.age = None;
+    }
+
+    /// PLAN-981（S2）：本 Session 是否是 AGE typed 宿主。
+    pub fn is_age(&self) -> bool {
+        self.age.is_some()
+    }
+
+    /// 打开一个带**场景**（Tick/消息）与实例数的 AGE Session（driver 内部/测试用）。
+    pub fn new_age_with(
+        source: &str,
+        instances: usize,
+        ops: Vec<ace_core::source::age_component::ScenarioOp>,
+    ) -> Result<Self, String> {
+        let now = Instant::now();
+        let age = AgeSession::open_with(source, instances, ops).map_err(|ds| ds.join("; "))?;
+        Ok(Self {
+            signatures: Default::default(),
+            vm: None,
+            task: None,
+            pending: None,
+            age: Some(age),
+            compile_us: now.elapsed().as_micros(),
+            max_call_steps: 0,
+            max_call_slices: 0,
+            calls: 0,
+            yielded: 0,
+        })
+    }
+    /// 同 PID 的 AGE body 更新（成功才递增 generation；坏编辑保留旧代）。
+    pub fn update_age_body(&mut self, source: &str) -> Result<u64, String> {
+        match self.age.as_mut() {
+            Some(a) => a.update_body(source).map_err(|ds| ds.join("; ")),
+            None => Err("this session is not an AGE session".into()),
+        }
+    }
+
+    /// AGE Session 的逻辑身份与代数（同 PID 更新不换 pid）。
+    pub fn age_identity(&self) -> Result<(u64, u64), String> {
+        self.age
+            .as_ref()
+            .map(|a| (a.pid(), a.generation()))
+            .ok_or_else(|| "this session is not an AGE session".into())
+    }
+
+    /// 生命周期 oracle（Tick/Frame 不随出口倍增）。
+    pub fn age_lifecycle(
+        &self,
+        ticks: u32,
+        frames: u32,
+    ) -> Result<ace_core::source::age_package::AgeLifecycleBudget, String> {
+        self.age
+            .as_ref()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .lifecycle(ticks, frames)
+    }
+
+    /// 按实例观察真实值（AV 执行链，不手写玩法）。
+    pub fn age_observe(&self) -> Result<age_session::ObservedAgePackage, String> {
+        self.age
+            .as_ref()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .observe()
+    }
+
+    /// R63-1：追加 Tick 调度（进程内重跑受检场景，无工具链）。
+    pub fn age_tick(&mut self, n: u32) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .tick(n)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// R63-1：投递作者消息，触发 `on <Msg>` 回调。
+    pub fn age_send(&mut self, msg: &str) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .send(msg)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// R63-1：资源事实（名字/端口/模块）。
+    pub fn age_resources(&self) -> Result<Vec<(String, String, String)>, String> {
+        self.age
+            .as_ref()
+            .map(|a| a.resources())
+            .ok_or_else(|| "this session is not an AGE session".to_string())
+    }
+
+    /// R63-1：按已声明出口回答布局请求（不兼容具名拒）。
+    pub fn age_request_layout(
+        &self,
+        request: ace_core::source::age_package::AgeViewRequest,
+    ) -> Result<ace_core::source::age_package::AgeViewExit, String> {
+        self.age
+            .as_ref()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .request_layout(request)
+            .map_err(|e| format!("{}: {}", e.code, e.message))
+    }
+
+    /// R63-1：停止（冻结最后观察值）。
+    pub fn age_stop(&mut self) -> Result<(), String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .stop()
+    }
+
+    /// R63-1：恢复（同 PID，Start 重新为 1）。
+    pub fn age_restart(&mut self) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .restart()
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// R63-1：Session 是否处于停止态。
+    pub fn age_is_stopped(&self) -> Result<bool, String> {
+        self.age
+            .as_ref()
+            .map(|a| a.is_stopped())
+            .ok_or_else(|| "this session is not an AGE session".to_string())
+    }
+    /// 主组件的呈现出口。
+    pub fn age_exit(&self) -> Result<ace_core::source::age_package::AgeViewExit, String> {
+        self.age
+            .as_ref()
+            .map(|a| a.exit())
+            .ok_or_else(|| "this session is not an AGE session".into())
     }
     pub fn start(
         &mut self,
@@ -119,6 +287,13 @@ impl Session {
         args: &[Scalar],
         kind: ResultKind,
     ) -> Result<Progress, String> {
+        // R63-4: an AGE session has no scalar `main`; reject by name and keep
+        // the session open (the old path used to fall through and close it).
+        if self.age.is_some() {
+            return Err(
+                "this is an AGE session; use age_observe/age_lifecycle/update_age_body".into(),
+            );
+        }
         if self.closed() {
             return Err("closed".into());
         }
