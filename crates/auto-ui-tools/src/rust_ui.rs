@@ -5185,7 +5185,8 @@ const DELIVERY_VENDOR_TREES: [(&str, &str); 3] = [
     // `../../experimental/...` 相对依赖零改写。
     (
         "experimental/ace/crates/foreign-contract",
-        "experimental/ace/crates/foreign-contract",    ),
+        "experimental/ace/crates/foreign-contract",
+    ),
 ];
 
 /// 随包发行的本地 patch（相对 crates/patches/）。
@@ -8852,6 +8853,59 @@ mod tests {
         assert!(
             !edits2.iter().any(|e| e.contains("strip dep")),
             "second run strips nothing: {edits2:?}"
+        );
+    }
+
+    /// 复核反例（B-RUST-R）：runtime 投影剥全部 ACE 桥 optional 依赖 + dev
+    /// ace-av + feature 改写为空（792 闭包保持的直接 oracle——删任一 strip
+    /// 行或 feature 改写即红）。
+    #[test]
+    fn p980_delivery_projection_strips_runtime_ace_bridge() {
+        use super::{delivery_apply_projection, fs, PROJECTION_AUTO_UI_RUNTIME};
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let live = manifest_dir
+            .parent()
+            .unwrap()
+            .join("auto-ui-runtime/Cargo.toml");
+        let text = fs::read_to_string(&live).expect("runtime manifest readable");
+        assert!(text.contains("ace-av") && text.contains("ace-bridge"));
+        let dir = tempfile::tempdir().unwrap();
+        let staged = dir.path().join("Cargo.toml");
+        fs::write(&staged, &text).unwrap();
+        let edits = delivery_apply_projection(&staged, &PROJECTION_AUTO_UI_RUNTIME)
+            .expect("original strips");
+        assert!(
+            edits
+                .iter()
+                .filter(|e| e.contains("strip dep: ace-"))
+                .count()
+                >= 7,
+            "all seven optional ace deps stripped: {edits:?}"
+        );
+        assert!(
+            edits
+                .iter()
+                .any(|e| e.contains("rewrite feature: ace-bridge")),
+            "feature rewritten to empty: {edits:?}"
+        );
+        let after = fs::read_to_string(&staged).unwrap();
+        assert!(
+            !after.contains("= { path = \"../../../auto-lang/experimental/ace"),
+            "no ace path dep line survives (comments may mention the tree): {after}"
+        );
+        assert!(
+            !after.contains("crates/auto-lang-ace-host"),
+            "host dep stripped"
+        );
+        assert!(
+            after.contains("ace-bridge = []"),
+            "feature name preserved empty"
+        );
+        let edits2 =
+            delivery_apply_projection(&staged, &PROJECTION_AUTO_UI_RUNTIME).expect("idempotent");
+        assert!(
+            !edits2.iter().any(|e| e.contains("strip dep: ace-")),
+            "second run clean"
         );
     }
 
