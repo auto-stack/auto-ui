@@ -47,6 +47,8 @@ pub struct HelloEvidence {
 /// HELLO 会话（源装载 + AV 观察 + F0 受检调用）。
 #[derive(Debug)]
 pub struct HelloSession {
+    /// 装载时的源文本（分派时重观察，防快照漂移）。
+    src: String,
     pub evidence: HelloEvidence,
     /// iced view() 渲染计数（真实窗口渲染的观察面）。
     pub frames: std::sync::Arc<AtomicUsize>,
@@ -70,6 +72,7 @@ impl HelloSession {
             .first()
             .ok_or_else(|| "the AGE node has no text leaf".to_string())?;
         Ok(Self {
+            src: src.to_string(),
             evidence: HelloEvidence {
                 source_path: source_path.to_string(),
                 node_name: node.name.clone(),
@@ -85,6 +88,27 @@ impl HelloSession {
     /// F0 受检调用：合成 TextRecord 源把**同一 AV 文本字节**交给 967 冻结
     /// provider（`text_byte_len`），经 969 E0 门面分派并核对计数。
     pub fn run_f0(&mut self, provider: &str) -> Result<(), String> {
+        // 分派时重观察：快照与新鲜 AV 真值必须逐字节一致（防会话陈旧/漂移），
+        // provider 收到的字节据此核验——等式两侧不同源（T-HELLO-R 反例修复）。
+        let fresh = ace_av::age_h0::observe_age_h0(
+            &self.src,
+            &self.evidence.source_path,
+            ace_av::age_component::LegacyWidgetAlias::Reject,
+        )
+        .map_err(|e| format!("re-observe before dispatch: {e}"))?;
+        let fresh_text = fresh
+            .nodes
+            .first()
+            .and_then(|n| n.view.texts.first())
+            .map(|t| t.value.clone())
+            .ok_or_else(|| "re-observe found no text leaf".to_string())?;
+        if fresh_text != self.evidence.av_text {
+            return Err(format!(
+                "AV text drifted since load: snapshot {:?} vs fresh {:?} bytes",
+                self.evidence.av_text.len(),
+                fresh_text.len()
+            ));
+        }
         auto_lang_ace_host::install().map_err(|e| format!("ace host install: {e}"))?;
         let root = stable_f0_root();
         if let Err(e) = auto_lang_ace_host::build_f0_text_provider(provider, &root) {

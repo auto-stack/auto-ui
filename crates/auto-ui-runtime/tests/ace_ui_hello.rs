@@ -233,3 +233,55 @@ fn p980_hello_window_e2e_text_body_and_f0() {
     }
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// 复核反例（T-HELLO-R）：F0 分派的字节等式是逐次核验的，不是装样子——
+/// AV 文本与分派载荷错配（漂移注入）必须在当次分派具名红。
+#[test]
+fn p980_hello_f0_bytes_drift_must_refuse() {
+    let (src, path) = fixture("app.at");
+    let mut s = HelloSession::load(&src, &path).expect("load");
+    // 漂移注入：证据文本被改（模拟上游不同步），分派载荷仍按证据走。
+    s.evidence.av_text = "HelloX".to_string();
+    auto_lang_ace_host::install().expect("host installs");
+    let root = stable_f0_root();
+    if let Err(e) = auto_lang_ace_host::build_f0_text_provider("p980_hello_drift", &root) {
+        assert!(e.contains("already registered"), "{e}");
+    }
+    let err = s
+        .run_f0("p980_hello_drift")
+        .expect_err("drifted bytes must refuse");
+    assert!(err.contains("drifted"), "{err}");
+}
+
+/// 复核反例（T-HELLO-R）：窗口 exe 的证据不可伪造——坏源在开窗前具名退出
+/// （exit 4），不产出证据文件。
+#[test]
+fn p980_hello_window_exe_bad_source_exits_named() {
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let exe = manifest.join("../../target/debug/examples/ace_hello_window.exe");
+    let Ok(exe) = exe.canonicalize() else {
+        panic!("preparation failure: window exe not built (prep stage first)");
+    };
+    let tmp = std::env::temp_dir().join(format!("p980-hello-bad-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
+    let bad = tmp.join("bad.at");
+    std::fs::write(
+        &bad,
+        "fn main() int { return 1 }
+",
+    )
+    .unwrap();
+    let ev = tmp.join("ev.json");
+    let out = std::process::Command::new(&exe)
+        .arg("--source")
+        .arg(&bad)
+        .arg("--evidence")
+        .arg(&ev)
+        .current_dir(&tmp)
+        .output()
+        .expect("spawn");
+    assert_eq!(out.status.code(), Some(4), "AGE load failure exit code");
+    assert!(!ev.is_file(), "no evidence for a failed load");
+    let _ = std::fs::remove_dir_all(&tmp);
+}
