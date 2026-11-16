@@ -1,0 +1,9 @@
+fn hello_text() str {
+    return "你好 Auto"
+}
+
+node HelloBody {
+    view {
+        text hello_text() {}
+    }
+}

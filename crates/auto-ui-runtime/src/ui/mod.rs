@@ -146,6 +146,8 @@ pub mod selection;
 pub mod vm_bridge;
 // PLAN-980 B-STATE：ACE 状态执行桥（组件面消费端）。
 pub mod ace_state_bridge;
+// PLAN-980 HELLO：首个 ACE AGE Node 文字窗口的最小接入桥。
+pub mod ace_hello;
 // PLAN-045：VM 渲染组件级 memo（菜单族四件 + sidebar nav 块；opt-in，
 // 缺省原始路径逐字节不变）。类型面依赖 interpreter 的 View/DynamicMessage，
 // 同门控。
