@@ -224,3 +224,18 @@ fn s2_unit_dispatch_still_runs_next_to_payload_sources() {
     s.age_send("Inc").expect("unit dispatch runs");
     assert_eq!(s.age_observe().unwrap().components[0].instance_states[0][0], 1);
 }
+
+/// PLAN-981（B-LANGUAGE-V）：真实 980/A Counter 源在宿主上可编译，事件绑定可读取。
+#[test]
+fn s2_real_a_counter_source_exposes_view_events() {
+    const SRC: &str = "// PLAN-980 MIN-A-UI（B-NATIVE-I）：由 002-counter 原计数业务派生的最小 Node\n// Counter——msg Inc/Dec/Reset + model count int + on 复合赋值（轨迹 0→1→0→0、\n// 两实例定向 2:1 的业务面与 002 同源）。002 完整主题/design/f-string/内联\n// lambda 归 W1 B-AV；本 fixture 是 MIN-A-UI 的第三类源（Node 计数业务）。\nnode Counter {\n    msg { Inc, Dec, Reset }\n\n    model {\n        var count int = 0\n    }\n\n    view {\n        col {\n            text \"Counter\"\n            row {\n                button \"-\" { onclick: .Dec }\n                button \"Reset\" { onclick: .Reset }\n                button \"+\" { onclick: .Inc }\n            }\n        }\n    }\n\n    on {\n        .Inc -> { .count += 1 }\n        .Dec -> { .count -= 1 }\n        .Reset -> { .count = 0 }\n    }\n}\n";
+    let s = Session::new(SRC).expect("the delivered counter source opens");
+    assert_eq!(s.age_component_names().unwrap(), vec!["Counter".to_string()]);
+    let events = s.age_view_events(0).unwrap();
+    let pairs: Vec<(&str, &str)> = events.iter().map(|(k, m, _)| (k.as_str(), m.as_str())).collect();
+    assert_eq!(
+        pairs,
+        vec![("onclick", "Dec"), ("onclick", "Reset"), ("onclick", "Inc")]
+    );
+    assert!(events.iter().all(|(_, _, s)| s.1 > s.0), "bindings carry real spans");
+}
