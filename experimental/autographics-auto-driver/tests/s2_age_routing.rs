@@ -137,3 +137,18 @@ fn s2_session_i_obligations_are_reachable_from_the_driver() {
     );
     assert_eq!(st(&s), 0, "restart re-runs Start");
 }
+
+/// R64-2：坏 AGE 源保留共享 verify 的具名诊断；注释里含 `node` 的旧源不受影响。
+#[test]
+fn s2_age_diagnostics_and_legacy_sources_coexist() {
+    let bad = "node M {\n    view {\n        text nosuch_fn() {}\n    }\n}\n";
+    let err = match Session::new(bad) {
+        Ok(_) => panic!("a bad AGE source must be rejected"),
+        Err(e) => e,
+    };
+    assert!(err.contains("source."), "AGE named diagnostics are kept: {err}");
+
+    let legacy = "// node here in a comment\nvar x int = 0\nfn main() int { return 1 }\n";
+    let s = Session::new(legacy).expect("a legacy source with `node` in a comment still opens");
+    assert!(!s.is_age(), "comment text must not route to the AGE host");
+}

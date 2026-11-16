@@ -108,3 +108,15 @@ fn s4_exits_and_lifecycle_oracle_use_the_declared_exits() {
     let b = s.lifecycle(5, 2).expect("lifecycle oracle");
     assert_eq!((b.starts, b.ticks, b.frames), (1, 5, 2), "exits do not scale counts");
 }
+
+/// R64-1：被拒的调度必须**原子**——坏消息不能毒化后续 tick/send。
+#[test]
+fn s4_rejected_dispatch_is_atomic() {
+    let mut s = AgeSession::open(TICK, 1).expect("opens");
+    let gen = s.generation();
+    assert!(s.send("Nope").is_err(), "an undeclared message is rejected");
+    assert_eq!(s.generation(), gen, "a rejected dispatch does not bump the generation");
+    s.tick(1).expect("a later valid dispatch still works");
+    assert_eq!(s.observe().unwrap().components[0].instance_states[0][0], 1);
+    assert_eq!(s.generation(), gen + 1);
+}
