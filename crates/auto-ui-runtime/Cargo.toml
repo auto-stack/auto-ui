@@ -388,3 +388,8 @@ required-features = ["ace-bridge"]
 [[example]]
 name = "ace_native_window"
 required-features = ["ace-bridge"]
+
+# PLAN-980 NATIVE r13：MIN-A-UI 通用 Node 桌面入口 e2e（UI-FFI 实效果+typed 事件）。
+[[example]]
+name = "ace_node_desktop_window"
+required-features = ["ace-bridge"]

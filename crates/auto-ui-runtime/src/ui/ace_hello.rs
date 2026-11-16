@@ -177,7 +177,7 @@ pub fn stable_f0_root() -> PathBuf {
 }
 
 /// Auto 源字符串字面量转义（文本经源码字面量进入 F0/A2R 车道）。
-pub(crate) fn escape_auto_string_for_source(s: &str) -> String {
+pub fn escape_auto_string_for_source(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
     for c in s.chars() {
