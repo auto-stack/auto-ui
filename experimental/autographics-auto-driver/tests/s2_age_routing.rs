@@ -146,7 +146,10 @@ fn s2_age_diagnostics_and_legacy_sources_coexist() {
         Ok(_) => panic!("a bad AGE source must be rejected"),
         Err(e) => e,
     };
-    assert!(err.contains("source."), "AGE named diagnostics are kept: {err}");
+    assert!(
+        err.contains("source."),
+        "AGE named diagnostics are kept: {err}"
+    );
 
     let legacy = "// node here in a comment\nvar x int = 0\nfn main() int { return 1 }\n";
     let s = Session::new(legacy).expect("a legacy source with `node` in a comment still opens");
@@ -166,7 +169,11 @@ fn s2_multi_component_surface_is_reachable_from_the_driver() {
     s.age_tick_instance(0, 2).expect("two Ticks");
     let a = s.age_observe_component(0).unwrap().instance_states[0][0];
     let b = s.age_observe_component(1).unwrap().instance_states[0][0];
-    assert_eq!((a, b), (2, 2), "both declaring components receive the directed event");
+    assert_eq!(
+        (a, b),
+        (2, 2),
+        "both declaring components receive the directed event"
+    );
     let ui = ace_core::source::age_package::AgeViewRequest::Ui {
         width: 800,
         height: 600,
@@ -189,7 +196,10 @@ fn s2_multi_run_stop_balance_is_reachable() {
     assert_eq!(s.age_run_stop_balance().unwrap(), (1, 1, false));
     assert_eq!(s.age_run().unwrap(), 2);
     s.age_tick(1).unwrap();
-    assert_eq!(s.age_observe().unwrap().components[0].instance_states[0][0], 1);
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states[0][0],
+        1
+    );
     s.age_stop().unwrap();
     assert_eq!(s.age_run_stop_balance().unwrap(), (2, 2, false));
 }
@@ -222,24 +232,95 @@ fn s2_unit_dispatch_still_runs_next_to_payload_sources() {
     const SRC: &str = "node M {\n    msg {\n        Inc\n    }\n    on {\n        .Inc -> {\n            .count = count + 1\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
     let mut s = Session::new(SRC).expect("opens");
     s.age_send("Inc").expect("unit dispatch runs");
-    assert_eq!(s.age_observe().unwrap().components[0].instance_states[0][0], 1);
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states[0][0],
+        1
+    );
 }
 
-/// PLAN-981（B-LANGUAGE-V）：真实 980/A Counter 源在宿主上可编译，事件绑定可读取。
+/// PLAN-981（B-LANGUAGE-V）：真实 980/A Counter 源（**canonical 文件**，非手抄）在宿主上
+/// 可编译，事件绑定可读取（R67-5：直接读 examples 源，避免字面量漂移）。
 #[test]
 fn s2_real_a_counter_source_exposes_view_events() {
-    const SRC: &str = "// PLAN-980 MIN-A-UI（B-NATIVE-I）：由 002-counter 原计数业务派生的最小 Node\n// Counter——msg Inc/Dec/Reset + model count int + on 复合赋值（轨迹 0→1→0→0、\n// 两实例定向 2:1 的业务面与 002 同源）。002 完整主题/design/f-string/内联\n// lambda 归 W1 B-AV；本 fixture 是 MIN-A-UI 的第三类源（Node 计数业务）。\nnode Counter {\n    msg { Inc, Dec, Reset }\n\n    model {\n        var count int = 0\n    }\n\n    view {\n        col {\n            text \"Counter\"\n            row {\n                button \"-\" { onclick: .Dec }\n                button \"Reset\" { onclick: .Reset }\n                button \"+\" { onclick: .Inc }\n            }\n        }\n    }\n\n    on {\n        .Inc -> { .count += 1 }\n        .Dec -> { .count -= 1 }\n        .Reset -> { .count = 0 }\n    }\n}\n";
+    const SRC: &str = include_str!("../../../examples/ui/ace-node-counter/src/front/app.at");
     let s = Session::new(SRC).expect("the delivered counter source opens");
-    assert_eq!(s.age_component_names().unwrap(), vec!["Counter".to_string()]);
+    assert_eq!(
+        s.age_component_names().unwrap(),
+        vec!["Counter".to_string()]
+    );
     let events = s.age_view_events(0).unwrap();
-    let pairs: Vec<(&str, &str)> = events.iter().map(|(k, m, _)| (k.as_str(), m.as_str())).collect();
+    let pairs: Vec<(&str, &str)> = events
+        .iter()
+        .map(|(k, m, _)| (k.as_str(), m.as_str()))
+        .collect();
     assert_eq!(
         pairs,
         vec![("onclick", "Dec"), ("onclick", "Reset"), ("onclick", "Inc")]
     );
-    assert!(events.iter().all(|(_, _, s)| s.1 > s.0), "bindings carry real spans");
+    assert!(
+        events.iter().all(|(_, _, s)| s.1 > s.0),
+        "bindings carry real spans"
+    );
 }
 
+/// B-SESSION-V：真实 980/A Counter 源 + 两实例 2:1 定向事件、实例隔离、停/重启恢复。
+///
+/// R67-3：隔离断言必须能因"实例 1 的派发被丢弃"而失败——第一次 `send_to(1, Inc)` 后
+/// 立刻观察 `[2, 1]`，结束值保持非零（1），而不是回到 0。
+#[test]
+fn s2_real_a_counter_two_instance_isolation() {
+    use ace_core::source::age_component::ScenarioOp;
+    const SRC: &str = include_str!("../../../examples/ui/ace-node-counter/src/front/app.at");
+    let mut s = Session::new_age_with(
+        SRC,
+        2,
+        vec![
+            ScenarioOp::Send {
+                instance: 0,
+                msg: "Inc".into(),
+            },
+            ScenarioOp::Send {
+                instance: 0,
+                msg: "Inc".into(),
+            },
+            ScenarioOp::Send {
+                instance: 1,
+                msg: "Inc".into(),
+            },
+            ScenarioOp::Send {
+                instance: 1,
+                msg: "Dec".into(),
+            },
+        ],
+    )
+    .expect("the delivered counter source opens with two instances");
+    let o = s.age_observe().expect("observes");
+    assert_eq!(o.components.len(), 1, "one component, two instances");
+    assert_eq!(o.components[0].instance_states, vec![vec![2], vec![0]]);
+    // 实例 1 再 Inc 一次：立刻能看到 1（若该派发被丢弃，这里会保持 0）。
+    s.age_send_to(1, "Inc").unwrap();
+    let o = s.age_observe().unwrap();
+    assert_eq!(o.components[0].instance_states, vec![vec![2], vec![1]]);
+    // 实例 0 不受影响；再给实例 1 一次 Inc，结束值 2。
+    s.age_send_to(1, "Inc").unwrap();
+    let o = s.age_observe().unwrap();
+    assert_eq!(o.components[0].instance_states, vec![vec![2], vec![2]]);
+    // Stop → Restart：状态从初值重来（同一逻辑 session id），body 代数递增。
+    let (session_id, generation) = s.age_identity().unwrap();
+    s.age_stop().unwrap();
+    s.age_restart().unwrap();
+    assert_eq!(
+        s.age_identity().unwrap().0,
+        session_id,
+        "logical session id is stable"
+    );
+    assert!(
+        s.age_identity().unwrap().1 > generation,
+        "restart bumps the generation"
+    );
+    let o = s.age_observe().unwrap();
+    assert_eq!(o.components[0].instance_states, vec![vec![0], vec![0]]);
+}
 /// R65-8/R65-11：带参 handler 在宿主层派发时具名拒，零状态/零 dispatch。
 #[test]
 fn s2_param_handler_dispatch_is_rejected_with_zero_effect() {
@@ -248,9 +329,15 @@ fn s2_param_handler_dispatch_is_rejected_with_zero_effect() {
     let before = s.age_observe().unwrap().components[0].instance_states[0][0];
     match s.age_send("Add") {
         Ok(_) => panic!("dispatching a parameterised handler must be rejected"),
-        Err(e) => assert!(e.contains("event-params-unsupported"), "named rejection: {e}"),
+        Err(e) => assert!(
+            e.contains("event-params-unsupported"),
+            "named rejection: {e}"
+        ),
     }
-    assert_eq!(s.age_observe().unwrap().components[0].instance_states[0][0], before);
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states[0][0],
+        before
+    );
     assert_eq!(s.age_dispatches().unwrap(), 0);
 }
 
@@ -264,8 +351,12 @@ fn s2_send_to_unknown_message_is_rejected() {
         Err(e) => assert!(!e.is_empty(), "named rejection"),
     }
     assert_eq!(s.age_dispatches().unwrap(), 0);
-    s.age_send_to(0, "Inc").expect("the declared message still dispatches");
-    assert_eq!(s.age_observe().unwrap().components[0].instance_states[0][0], 1);
+    s.age_send_to(0, "Inc")
+        .expect("the declared message still dispatches");
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states[0][0],
+        1
+    );
 }
 
 /// B-SESSION-V：真实 980/A Counter 源 + 两实例 2:1 定向事件、停/重启恢复。
@@ -277,10 +368,22 @@ fn s2_real_a_counter_dual_instance_2_to_1() {
         SRC,
         2,
         vec![
-            ScenarioOp::Send { instance: 0, msg: "Inc".into() },
-            ScenarioOp::Send { instance: 0, msg: "Inc".into() },
-            ScenarioOp::Send { instance: 1, msg: "Inc".into() },
-            ScenarioOp::Send { instance: 1, msg: "Dec".into() },
+            ScenarioOp::Send {
+                instance: 0,
+                msg: "Inc".into(),
+            },
+            ScenarioOp::Send {
+                instance: 0,
+                msg: "Inc".into(),
+            },
+            ScenarioOp::Send {
+                instance: 1,
+                msg: "Inc".into(),
+            },
+            ScenarioOp::Send {
+                instance: 1,
+                msg: "Dec".into(),
+            },
         ],
     )
     .expect("the delivered counter source opens with two instances");
