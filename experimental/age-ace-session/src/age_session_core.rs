@@ -23,8 +23,11 @@ pub struct AgeSession {
     /// R63-1：stop 后的最后观察值（停止期间不受编辑/调度影响）。
     last_observed: Option<ObservedAgePackage>,
     stopped: bool,
+    /// 已应用的调度次数（tick/send；被拒的调度不计数）。
+    dispatches: u64,
+    /// body 代数（成功 update_body / restart 递增；与调度计数分开，避免混用）。
+    body_generation: u64,
     pid: u64,
-    generation: u64,
 }
 
 static NEXT_PID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -50,7 +53,8 @@ impl AgeSession {
             last_observed: None,
             stopped: false,
             pid: NEXT_PID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-            generation: 0,
+            dispatches: 0,
+            body_generation: 0,
         })
     }
 
@@ -65,8 +69,8 @@ impl AgeSession {
         let next = Self::compile(src, self.instances, self.ops.clone())?;
         self.compiled = next;
         self.source = src.to_string();
-        self.generation += 1;
-        Ok(self.generation)
+        self.body_generation += 1;
+        Ok(self.body_generation)
     }
 
     // ---- R63-1：SESSION I 的调度/回调/资源/停止恢复/布局义务 ----
@@ -104,8 +108,8 @@ impl AgeSession {
         let next = Self::compile(&self.source, self.instances, next_ops.clone())?;
         self.ops = next_ops;
         self.compiled = next;
-        self.generation += 1;
-        Ok(self.generation)
+        self.dispatches += 1;
+        Ok(self.dispatches)
     }
 
     /// 已声明的资源行（端口/模块/名字），按声明序——资源由共享语义判定。
@@ -150,8 +154,8 @@ impl AgeSession {
         self.ops.clear();
         self.stopped = false;
         self.last_observed = None;
-        self.generation += 1;
-        Ok(self.generation)
+        self.body_generation += 1;
+        Ok(self.body_generation)
     }
 
     pub fn is_stopped(&self) -> bool {
@@ -170,8 +174,14 @@ impl AgeSession {
         self.pid
     }
 
+    /// 已应用的调度次数（tick/send）。
     pub fn generation(&self) -> u64 {
-        self.generation
+        self.dispatches
+    }
+
+    /// body 代数（成功 update_body / restart）。
+    pub fn body_generation(&self) -> u64 {
+        self.body_generation
     }
 
     fn compile(
