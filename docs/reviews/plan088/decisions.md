@@ -1,0 +1,138 @@
+# PLAN-088 T-01 决策记录 — ColorPicker 与 ColorDialog
+
+status: work-in-progress（T-01 探针进行中；本文件随探针结论更新）
+plan: docs/plans/088-color-picker-and-dialog.md（r2）
+owner: work stage（PLAN-088 goal session）
+
+## 1. baseline
+
+- 树：`D:/autostack/.wt/ui-088/auto-ui`，分支 `codex/ui-088-color-picker`，
+  base commit `2f42d6613c6b1d0f24f7bd5679979ae42601d0aa`（master @ 2026-11-17）。
+- 组内 sibling（detached @ master）：`auto-lang` c2f3b2aa9、`auto-web` bdc48e8、
+  `auto-down` 5af11a3、`auto-man` 11fe79c（`auto` CLI，path-dep 回本树 auto-ui）。
+- 相关既有面（已读）：
+  - `crates/auto-ui-compiler/src/style/color.rs`：`Color::from_hex` 接受
+    #RGB/#RGBA/#RRGGBB/#RRGGBBAA（8 位 → `Hex(u32)`=0xRRGGBBAA）；`from_css`
+    接受 rgb()/rgba()；style class 解析（bg-[#hex] 等）与本计划无关，不改。
+  - canvas 场景契约（PLAN-563/661）：`canvas { scene: .p }` 读状态平行串表
+    `<p>_pts/_meta/_nodes/_edges/_labels`；nodes 项
+    `"id,x,y,shape,color[,w|h]"`（rect 中心+宽高，坐标 f32）；edges 项
+    `"x1,y1,x2,y2[,color[,width]]"`；pen 事件
+    `onpenstart/onpenmove/onpenend` 回调 (x:float,y:float)（coords "WxH"
+    逻辑值域；move 仅 pen-down 期，≤30Hz，离界收笔）；`onhit(id str)`
+    pointer 命中 nodes（声明序 topmost）。双端各自绘制，共享数据契约。
+  - `dialog`/`dialog-content` builtin（file-dialog 既有用法）：`open`/
+    `onclose`/`closeOnOutside`，modal 隔离由 `View::Popover` Modal placement
+    承载；初始焦点走既有 `ui.focus(...)`。
+  - PLAN-087 交付（archived，45a80058 落主）：`packages/numeric-fields`
+    NumericField（precision=0 用于 0..255/0..360 通道输入）；引擎 fn 全部
+    自含（包模块直引 fn 才注册裸名，内部互调失链——本包沿用该形态）。
+  - `.at` 语言事实（087 决议 + 024-charts/031-paint 实证）：int=i32、无
+    浮点 state 桥；vue widget 轨 `/` 为浮点（精确整除形
+    `(a - a % b) / b`）；fn 单返回值、无状态访问；handler 不可互调（状态
+    变更内联）；`f"${expr}"` 插值支持表达式；`.to(int)` 数字桥仅对已验证
+    数字串；List 有 push/split/len/索引。
+
+## 2. public interface（对照 r2 §5 表）
+
+- ColorPicker props：`value="#000000FF"`、`revision=0`、`showAlpha=true`、
+  `palette=[]`、`disabled/readOnly=false`；ColorDialog 增 `open=false`、
+  `title="选择颜色"`。
+- 事件：`preview(str)`/`committed(str)`/`cancelled`/`error(str)`，载荷
+  `{seq, baseRevision, value, source}`，source ∈
+  hex/rgb/hsv/palette/surface/confirm。
+- 错误码：`invalid_color/invalid_channel/invalid_config`。
+- 数值规则：RGBA 通道整数 0..255；H 0..360（360≡0）、S/V 0..100；RGB 输出
+  大写 8 位 HEX；`#3974E6CC` ⇒ RGBA(57,116,230,204)；half-up 舍入；
+  HSV 灰/黑保留最近有效 H（编辑器草稿级）。
+- fixture：T-02/T-03 落 `packages/color-picker/`（本节随实现补真实路径与
+  生成命令）。
+
+## 3. mechanism probe
+
+### 3.1 色面渲染：canvas 场景 + 8 位 hex alpha 分层（选定）
+
+**发现的原生缺口（本计划最小适配，已完成）**：iced 侧
+`canvas_css_color`（`crates/auto-ui-runtime/src/ui/iced/renderer/subscriptions.rs`）
+原实现 `from_hex → to_rgb8 → from_rgb8`：8 位 hex 被解析为 0xRRGGBBAA 后
+`to_rgb8` 只读低 24 位——通道错乱且 alpha 恒丢；vue 侧同一 CSS 串透传
+`fillStyle` 本就半透明。软栅格孪生 `css_color_tiny`
+（`crates/auto-ui-runtime/src/ui/desktop_protocol/native_projector.rs`）只认
+6 位且强制 alpha=255。两处已按位取 RR/GG/BB/AA 修复：6 位路径逐字节不变，
+8 位起 alpha 生效；canvas 场景色串之外（style class 解析）不经过这两处，
+零外溢。修复前仓库内无任何 `.at` 使用 canvas 场景（grep 实证），无回归面。
+
+**SV 方面合成（免网格、免逐像素）**：白底 + 24 列 hue 色 alpha=s_i +
+24 行黑 alpha=(1-v_j)。alpha 合成下 result = v·[(1−s)·W + s·H] ≡ 精确
+hsv(h,s,v)（逐通道恒等式，非近似）。仅 hue 变化重建列层（24 串）；S/V
+拖动只动光标（2 条 edge）与 alpha 条/预览（~26 串/30Hz 节流）。
+
+**透明预览**：棋盘 nodes（#ffffff/#c8c8c8）+ 整块 color8 覆盖 rect；
+alpha 条同构（棋盘 + 当前色 24 级 alpha 段）。不用黑底伪装。
+
+### 3.2 坐标 → 通道量化（选定，无 float→int 桥）
+
+pen 回调给 float 逻辑坐标；语言无 floor/float→int 桥（stdlib math 无
+floor；`.to(int)` 仅数字串）。选定：`f"${xf * k}"`（k=100/W 等）得十进制
+串 → 整数部解析（nd_ip 同型）→ 夹取。值域 [0..360)+0.001，双轨均为十进制
+短表示（JS <1e-6 才转指数，Rust Display 恒小数），无格式分叉面。边界
+（恰好整数）由 +0.001 底噪偏置，量化稳定；MCP 精确通道编辑走
+NumericField，不依赖像素精度。
+
+### 3.3 HSV↔RGB 引擎（选定，纯整数 half-up）
+
+`hsv→rgb`：sector=(h−h%60)/60、f=h%60，t/q/p 以
+half-up(a·num,den)=((2a+num)−(2a+num)%(2num))/(2num)（精确整除形）。
+`rgb→hsv`：max/min/delta 整数运算；delta=0（灰/黑）时 H 交由模型保留
+最近有效值（r2 规则）。全部中间量 <2^31。单返回值限制：多分量经编码
+int（r·65536+g·256+b 等）或直接返回 HEX 串。
+
+### 3.4 色板：canvas nodes + onhit（选定）
+
+palette 由应用传入（任意 CSS 串）。chip 不能用动态 `bg-[…]` class
+（vue Tailwind JIT 扫不到运行时拼接类——031-paint 头注实证）；选定
+canvas nodes + `onhit(id)`（PLAN-661 命中契约，双端交付）。选中态用
+第二轮描边节点（labels/edges 组合）表达。
+
+### 3.5 通道输入：PLAN-087 NumericField（依赖已交付）
+
+precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
+已归档（r3 双轨全绿），无 stub。
+
+### 3.6 探针执行记录
+
+- 探针工程：`examples/ui/088-probe/`（临时，验证后删除；不属交付面）。
+- 探针内容：SV 面/色相条/alpha 条/预览/色板/dialog 内 canvas，pen 三事件、
+  onhit、8 位 hex 分层渲染。
+- native：待填（auto.exe 构建中）。
+- vue：待填。
+
+## 4. dependencies
+
+| 依赖 | 状态 | 证据 |
+|---|---|---|
+| PLAN-087 numeric-fields（评审交付+固定版本） | 已归档交付 | `docs/plans/archived/087-numeric-and-unit-fields.md` r3（T-01…T-08 全闭环，native 20+1not_run / vue 21 绿；Spec 45a80058 落主） |
+| canvas 场景契约（PLAN-563/661 已合并） | 在库 | `crates/auto-ui-runtime/src/ui/view.rs` Canvas/MouseArea；`aura_view_builder/mod.rs` parse_canvas_* |
+| runtime 最小适配（本计划） | 已实施待验证 | subscriptions.rs `canvas_css_color`、native_projector.rs `css_color_tiny` 8 位 hex alpha |
+| `auto` CLI（auto-man @ 11fe79c） | 组内构建 | `.wt/ui-088/auto-man/target/debug/auto.exe`（构建中） |
+
+## 5. runners
+
+- native（Windows）：`auto.exe run -r vm`（组内 `.wt/ui-088/auto-man` debug
+  构建）+ `auto-ui-tool.exe`（`.wt/ui-088/auto-ui/target/debug/`），MCP 驱动
+  （`autoui_snapshot/type/action/keyboard/screenshot`），门脚本沿
+  `--auto-bin/--ui-tool-bin/--out-dir/--backend native` 接口（T-05 落地
+  `tests/product/verify_color_picker.py`）。
+- vue（Windows）：同示例 `auto run` + Playwright（真实浏览器拖拽/截图）。
+- Linux 轨：本会话 Windows 主机，Linux 门在合并后回归批执行（not_run 如实
+  记录，不视为已验收）。
+- 占用观察：构建期间另代理在 `experimental/ace` 跑 release 构建（独立
+  target 目录，无锁冲突）；已记录，不影响本计划 debug 轨。
+
+## 6. next
+
+- T-01 剩余：探针双轨实跑 + 截图证据 → 本文件 3.6 回填 → 删除探针目录。
+- 放行 T-02（颜色模型引擎 `packages/color-picker/color_model.at`，自含
+  fn 形态）→ T-03（ColorPicker/ColorDialog widget）。
+- 未决机制：无（canvas 渲染/量化/引擎路径全部选定；dialog 内 canvas 待
+  探针确认）。

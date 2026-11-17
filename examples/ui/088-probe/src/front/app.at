@@ -1,0 +1,463 @@
+use auto.json
+
+// PLAN-088 T-01 探针（临时，不是交付示例）——验证色面可行路径：
+// 1. canvas 场景 8 位 hex alpha 分层渲染（hue-alpha 列 + 黑 alpha 行合成
+//    SV 方面；棋盘 + color8 覆盖 = 透明预览）——native 侧依赖本计划对
+//    canvas_css_color / css_color_tiny 的最小适配。
+// 2. pen 事件逻辑坐标 → 通道量化（字符串整数部取整，无 float→int 桥）。
+// 3. onhit 色板命中（palette chips 为 canvas nodes）。
+// 4. canvas 在 dialog 内的渲染（modal 隔离）。
+// 引擎 fn 全部自含（087 实录：包模块直引 fn 才注册裸名，内部互调失链）。
+// 结论写入 docs/reviews/plan088/decisions.md；验证后删除本目录。
+widget App {
+    msg { Init, SurfDown(float, float), SurfMove(float, float), SurfUp(float, float), HueDown(float, float), HueMove(float, float), HueUp(float, float), AlphaDown(float, float), AlphaMove(float, float), AlphaUp(float, float), SwatchHit(str), ToggleDlg, DlgClose, Quit }
+    model {
+        var hue int = 217
+        var s int = 76
+        var v int = 90
+        var a int = 204
+        var cur_hex8 str = "#3974E6CC"
+        var cur_rgb6 str = "#3974E6"
+        var last_xy str = "-"
+        var last_evt str = "-"
+        var picked_pal str = "-"
+        var log List = []
+        var seq int = 0
+        var dlg bool = false
+        var surf_pts List = []
+        var surf_meta List = []
+        var surf_nodes List = []
+        var surf_edges List = []
+        var hue_pts List = []
+        var hue_nodes List = []
+        var alph_pts List = []
+        var alph_nodes List = []
+        var sw_nodes List = []
+        var pal_pts List = []
+        var pal_nodes List = []
+        var dbg_pts List = []
+        var dbg_nodes List = []
+        var palette List = ["#ef4444", "#22c55e", "#3b82f6", "#eab308", "#a855f7", "#14b8a6", "#f97316", "#111827"]
+        var checker_bar str = ""
+        var checker_sw str = ""
+    }
+    view {
+        col (style: "w-full h-full bg-background text-foreground gap-2 p-4") {
+            text f"h=${.hue} s=${.s} v=${.v} a=${.a} hex=${.cur_hex8}" { style: "text-sm font-medium" }
+            text f"last=${.last_xy} evt=${.last_evt} pal=${.picked_pal}" { style: "text-xs text-muted-foreground" }
+            row (style: "items-start gap-4") {
+                col (style: "gap-2") {
+                    canvas (scene: .surf, coords: "192x192", clear: "#ffffff", onpenstart: .SurfDown, onpenmove: .SurfMove, onpenend: .SurfUp, style: "w-48 h-48 rounded border border-border") {}
+                    row (style: "items-center gap-2") {
+                        col (style: "gap-1") {
+                            canvas (scene: .hue, coords: "192x12", onpenstart: .HueDown, onpenmove: .HueMove, onpenend: .HueUp, style: "w-48 h-3 rounded") {}
+                            canvas (scene: .alph, coords: "192x12", onpenstart: .AlphaDown, onpenmove: .AlphaMove, onpenend: .AlphaUp, style: "w-48 h-3 rounded") {}
+                        }
+                        canvas (scene: .sw, coords: "96x48", style: "w-24 h-12 rounded border border-border") {}
+                    }
+                    canvas (scene: .pal, coords: "192x28", onhit: .SwatchHit, style: "w-48 h-7 rounded border border-border") {}
+                    canvas (scene: .dbg, coords: "64x64", clear: "#ff00ff", style: "w-16 h-16 rounded border border-border") {}
+                }
+                col (style: "gap-1 max-w-72") {
+                    text "事件日志" { style: "text-xs font-medium text-muted-foreground" }
+                    col (style: "gap-0.5 max-h-40 overflow-y-auto") {
+                        for line in .log {
+                            text line { style: "text-xs text-muted-foreground break-all" }
+                        }
+                    }
+                    button "开关 Dialog" { onclick: .ToggleDlg, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                    button "退出" { onclick: .Quit, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                }
+            }
+            dialog (open: .dlg, onclose: .DlgClose, closeOnOutside: false) {
+                dialog-content (style: "w-[520px] max-w-full p-4 gap-3 rounded-xl bg-background text-foreground") {
+                    text "Dialog 内色面探针" { style: "text-sm font-medium" }
+                    text f"dialog 内 hex=${.cur_hex8}" { style: "text-xs" }
+                    canvas (scene: .surf, coords: "192x192", clear: "#ffffff", onpenstart: .SurfDown, onpenmove: .SurfMove, onpenend: .SurfUp, style: "w-48 h-48 rounded border border-border") {}
+                    button "关闭" { onclick: .DlgClose, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .log = []
+            .seq = 0
+            .surf_pts = []
+            .surf_meta = []
+            .hue_pts = []
+            .alph_pts = []
+            .pal_pts = []
+            .dbg_pts = []
+            .dbg_nodes = "red,32,32,rect,#ff0000,64,64".split("|")
+            .checker_bar = pp_checker(24, 1, 8, 12)
+            .checker_sw = pp_checker(8, 4, 12, 12)
+            .surf_nodes = pp_surf_scene(.hue).split("|")
+            .hue_nodes = pp_hue_strips().split("|")
+            .cur_rgb6 = pp_hsv_hex(.hue, .s, .v)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .alph_nodes = pp_alpha_scene(.cur_rgb6, .checker_bar).split("|")
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+            .pal_nodes = pp_palette(.palette).split("|")
+            .surf_edges = pp_cursor_sv(.s, .v).split("|")
+        }
+        .SurfDown(x, y) -> {
+            .last_evt = "surf-down"
+            var xf float = x
+            var yf float = y
+            var sdec str = f"${xf * 0.5208333}"
+            var vdec str = f"${(192.0 - yf) * 0.5208333}"
+            .s = pp_floor_clamp(sdec, 0, 100)
+            .v = pp_floor_clamp(vdec, 0, 100)
+            .last_xy = f"(${sdec},${vdec})"
+            .cur_rgb6 = pp_hsv_hex(.hue, .s, .v)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .alph_nodes = pp_alpha_scene(.cur_rgb6, .checker_bar).split("|")
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+            .surf_edges = pp_cursor_sv(.s, .v).split("|")
+        }
+        .SurfMove(x, y) -> {
+            .last_evt = "surf-move"
+            var xf float = x
+            var yf float = y
+            var sdec str = f"${xf * 0.5208333}"
+            var vdec str = f"${(192.0 - yf) * 0.5208333}"
+            .s = pp_floor_clamp(sdec, 0, 100)
+            .v = pp_floor_clamp(vdec, 0, 100)
+            .last_xy = f"(${sdec},${vdec})"
+            .cur_rgb6 = pp_hsv_hex(.hue, .s, .v)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .alph_nodes = pp_alpha_scene(.cur_rgb6, .checker_bar).split("|")
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+            .surf_edges = pp_cursor_sv(.s, .v).split("|")
+        }
+        .SurfUp(x, y) -> {
+            .last_evt = "surf-up"
+            var xf float = x
+            var yf float = y
+            var sdec str = f"${xf * 0.5208333}"
+            var vdec str = f"${(192.0 - yf) * 0.5208333}"
+            .s = pp_floor_clamp(sdec, 0, 100)
+            .v = pp_floor_clamp(vdec, 0, 100)
+            .last_xy = f"(${sdec},${vdec})"
+            .cur_rgb6 = pp_hsv_hex(.hue, .s, .v)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .alph_nodes = pp_alpha_scene(.cur_rgb6, .checker_bar).split("|")
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+            .surf_edges = pp_cursor_sv(.s, .v).split("|")
+            .seq = .seq + 1
+            .log.push(f"[${.seq}] surf s=${.s} v=${.v} hex=${.cur_hex8}")
+        }
+        .HueDown(x, y) -> {
+            .last_evt = "hue-down"
+            var xf float = x
+            var hdec str = f"${xf * 1.875}"
+            .hue = pp_clamp(pp_ip(hdec), 0, 360)
+            if .hue >= 360 {
+                .hue = 0
+            }
+            .cur_rgb6 = pp_hsv_hex(.hue, .s, .v)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .surf_nodes = pp_surf_scene(.hue).split("|")
+            .alph_nodes = pp_alpha_scene(.cur_rgb6, .checker_bar).split("|")
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+        }
+        .HueMove(x, y) -> {
+            .last_evt = "hue-move"
+            var xf float = x
+            var hdec str = f"${xf * 1.875}"
+            .hue = pp_clamp(pp_ip(hdec), 0, 360)
+            if .hue >= 360 {
+                .hue = 0
+            }
+            .cur_rgb6 = pp_hsv_hex(.hue, .s, .v)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .surf_nodes = pp_surf_scene(.hue).split("|")
+            .alph_nodes = pp_alpha_scene(.cur_rgb6, .checker_bar).split("|")
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+        }
+        .HueUp(x, y) -> {
+            .last_evt = "hue-up"
+            var xf float = x
+            var hdec str = f"${xf * 1.875}"
+            .hue = pp_clamp(pp_ip(hdec), 0, 360)
+            if .hue >= 360 {
+                .hue = 0
+            }
+            .cur_rgb6 = pp_hsv_hex(.hue, .s, .v)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .surf_nodes = pp_surf_scene(.hue).split("|")
+            .alph_nodes = pp_alpha_scene(.cur_rgb6, .checker_bar).split("|")
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+            .seq = .seq + 1
+            .log.push(f"[${.seq}] hue h=${.hue} hex=${.cur_hex8}")
+        }
+        .AlphaDown(x, y) -> {
+            .last_evt = "alpha-down"
+            var xf float = x
+            var adec str = f"${xf * 1.328125}"
+            .a = pp_floor_clamp(adec, 0, 255)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+        }
+        .AlphaMove(x, y) -> {
+            .last_evt = "alpha-move"
+            var xf float = x
+            var adec str = f"${xf * 1.328125}"
+            .a = pp_floor_clamp(adec, 0, 255)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+        }
+        .AlphaUp(x, y) -> {
+            .last_evt = "alpha-up"
+            var xf float = x
+            var adec str = f"${xf * 1.328125}"
+            .a = pp_floor_clamp(adec, 0, 255)
+            .cur_hex8 = .cur_rgb6 + pp_hex2(.a)
+            .sw_nodes = pp_swatch_scene(.cur_hex8, .checker_sw).split("|")
+            .seq = .seq + 1
+            .log.push(f"[${.seq}] alpha a=${.a} hex=${.cur_hex8}")
+        }
+        .SwatchHit(id) -> {
+            var idx int = id.substr(1, id.len()).to(int)
+            var top int = .palette.len() - 1
+            var i int = pp_clamp(idx, 0, top)
+            var pv str = .palette[i]
+            .picked_pal = f"${id}=${pv}"
+            .seq = .seq + 1
+            .log.push(f"[${.seq}] hit ${.picked_pal}")
+        }
+        .ToggleDlg -> {
+            .dlg = !.dlg
+        }
+        .DlgClose -> {
+            .dlg = false
+            .seq = .seq + 1
+            .log.push(f"[${.seq}] dialog close")
+        }
+        .Quit -> {
+            ui.close()
+        }
+    }
+}
+
+// ───────────────────── 探针引擎（每个 fn 自含，内部互调已内联） ─────────────────────
+
+/// 正整数 half-up 舍入除法 a/b（精确整除形，双轨一致；vue widget 轨 `/`
+/// 为浮点——PLAN-086 实录）。
+fn pp_half_up(a int, b int) int {
+    var n int = a * 2 + b
+    var d int = b * 2
+    return (n - n % d) / d
+}
+
+/// 0..15 → 一位大写 HEX 字符。
+fn pp_hex1(d int) str {
+    var hex str = "0123456789ABCDEF"
+    return hex.substr(d, 1)
+}
+
+/// 0..255 → 两位大写 HEX。
+fn pp_hex2(v int) str {
+    var hi int = (v - v % 16) / 16
+    var lo int = v % 16
+    return pp_hex1(hi) + pp_hex1(lo)
+}
+
+/// HSV(h 0..360,s 0..100,v 0..100) → "#RRGGBB"（half-up；360→0 由调用方
+/// 规范化）。
+fn pp_hsv_hex(h int, s int, v int) str {
+    var hh int = h
+    if hh >= 360 { hh = hh - 360 }
+    var vv int = pp_half_up(v * 255, 100)
+    var sector int = (hh - hh % 60) / 60
+    var f int = hh % 60
+    var t int = pp_half_up(vv * (6000 - s * 60 + s * f), 6000)
+    var q int = pp_half_up(vv * (6000 - s * f), 6000)
+    var p int = pp_half_up(vv * (100 - s), 100)
+    var r int = vv
+    var g int = vv
+    var b int = vv
+    if sector == 0 {
+        g = t
+        b = p
+    }
+    if sector == 1 {
+        r = q
+        b = p
+    }
+    if sector == 2 {
+        r = p
+        b = t
+    }
+    if sector == 3 {
+        r = p
+        g = q
+    }
+    if sector == 4 {
+        r = t
+        g = p
+    }
+    if sector == 5 {
+        g = p
+        b = q
+    }
+    return "#" + pp_hex2(r) + pp_hex2(g) + pp_hex2(b)
+}
+
+/// 十进制串整数部（pen 坐标量化：f"${xf}" 整数部；探针值域 ≥0 且
+/// <1000，两轨均十进制短表示，无指数形态）。
+fn pp_ip(dec str) int {
+    var n int = dec.len()
+    var end int = n
+    for i in 0..n {
+        if dec.substr(i, 1) == "." {
+            end = i
+        }
+    }
+    var v int = 0
+    for i in 0..end {
+        var d int = 0 - 1
+        var ch str = dec.substr(i, 1)
+        if ch == "0" { d = 0 }
+        if ch == "1" { d = 1 }
+        if ch == "2" { d = 2 }
+        if ch == "3" { d = 3 }
+        if ch == "4" { d = 4 }
+        if ch == "5" { d = 5 }
+        if ch == "6" { d = 6 }
+        if ch == "7" { d = 7 }
+        if ch == "8" { d = 8 }
+        if ch == "9" { d = 9 }
+        if d < 0 { return 0 }
+        v = v * 10 + d
+    }
+    return v
+}
+
+/// 夹取。
+fn pp_clamp(x int, lo int, hi int) int {
+    if x < lo { return lo }
+    if x > hi { return hi }
+    return x
+}
+
+/// 整数部 + 夹取（量化主路径）。
+fn pp_floor_clamp(dec str, lo int, hi int) int {
+    var v int = pp_ip(dec)
+    if v < lo { return lo }
+    if v > hi { return hi }
+    return v
+}
+
+/// SV 面完整节点层 = hue 列（s 轴，24 列 8px）+ 黑 alpha 行（v 轴，
+/// 24 行 8px）。列 i 代表点 s_i = half_up((i*8+4)*100,192)；行 j 代表点
+/// v_j = 100 - half_up((j*8+4)*100,192)。合成恒等式：列(s alpha) 叠
+/// 行(1-v alpha) 于白底 = 精确 hsv(h,s,v)（decisions.md §渲染）。
+fn pp_surf_scene(hue int) str {
+    var huehex str = pp_hsv_hex(hue, 100, 100)
+    var out str = ""
+    for i in 0..24 {
+        var x int = i * 8 + 4
+        var si int = pp_half_up(x * 100, 192)
+        var aj int = pp_half_up(si * 255, 100)
+        var a2 str = pp_hex2(aj)
+        var item str = f"c${i},${x},96,rect,${huehex}${a2},8,192"
+        if i > 0 { out = out + "|" }
+        out = out + item
+    }
+    for j in 0..24 {
+        var y int = j * 8 + 4
+        var vj int = 100 - pp_half_up(y * 100, 192)
+        var aj2 int = 255 - pp_half_up(vj * 255, 100)
+        var b2 str = pp_hex2(aj2)
+        var item2 str = f"r${j},96,${y},rect,#000000${b2},192,8"
+        out = out + "|" + item2
+    }
+    return out
+}
+
+/// 光标十字（s,v → 逻辑 x,y；白十字线 1px）。
+fn pp_cursor_sv(s int, v int) str {
+    var x int = pp_half_up(s * 192, 100)
+    var y int = pp_half_up((100 - v) * 192, 100)
+    var x0 int = x - 5
+    var x1 int = x + 5
+    var y0 int = y - 5
+    var y1 int = y + 5
+    var xs str = f"${x}"
+    var ys str = f"${y}"
+    var xs0 str = f"${x0}"
+    var xs1 str = f"${x1}"
+    var ys0 str = f"${y0}"
+    var ys1 str = f"${y1}"
+    return f"${xs},${ys0},${xs},${ys1},#ffffff,1|${xs0},${ys},${xs1},${ys},#ffffff,1"
+}
+
+/// hue 条 24 段静态（段代表点 h_i = half_up((i*8+4)*360,192)）。
+fn pp_hue_strips() str {
+    var out str = ""
+    for i in 0..24 {
+        var x int = i * 8 + 4
+        var hi int = pp_half_up(x * 360, 192)
+        var col str = pp_hsv_hex(hi, 100, 100)
+        var item str = f"h${i},${x},6,rect,${col},8,12"
+        if i > 0 { out = out + "|" }
+        out = out + item
+    }
+    return out
+}
+
+/// alpha 条 = 棋盘 + 当前色 24 级 alpha 段（a_i = half_up(x*255,192)）。
+fn pp_alpha_scene(rgb6 str, checker str) str {
+    var out str = checker
+    for i in 0..24 {
+        var x int = i * 8 + 4
+        var ai int = pp_half_up(x * 255, 192)
+        var a2 str = pp_hex2(ai)
+        var item str = f"a${i},${x},6,rect,${rgb6}${a2},8,12"
+        out = out + "|" + item
+    }
+    return out
+}
+
+/// 棋盘（cols×rows 格，格 cw×ch；(r+c) 奇偶异色）。
+fn pp_checker(cols int, rows int, cw int, ch int) str {
+    var out str = ""
+    var k int = 0
+    for r in 0..rows {
+        for c in 0..cols {
+            var x int = c * cw + pp_half_up(cw, 2)
+            var y int = r * ch + pp_half_up(ch, 2)
+            var tone str = "#ffffff"
+            var m int = (r + c) % 2
+            if m == 1 { tone = "#c8c8c8" }
+            var item str = f"c${r}_${c},${x},${y},rect,${tone},${cw},${ch}"
+            if k > 0 { out = out + "|" }
+            out = out + item
+            k = k + 1
+        }
+    }
+    return out
+}
+
+/// 预览 = 棋盘 + 整块 color8 覆盖。
+fn pp_swatch_scene(hex8 str, checker str) str {
+    var ov str = f"ov,48,24,rect,${hex8},96,48"
+    return checker + "|" + ov
+}
+
+/// 色板 chips（24px 步进，id p<i> 供 onhit）。
+fn pp_palette(colors List) str {
+    var out str = ""
+    var n int = colors.len()
+    for i in 0..n {
+        var x int = i * 24 + 12
+        var col str = colors[i]
+        var item str = f"p${i},${x},14,rect,${col},24,28"
+        if i > 0 { out = out + "|" }
+        out = out + item
+    }
+    return out
+}
+

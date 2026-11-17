@@ -1,0 +1,11 @@
+name: "plan088-probe"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "PLAN-088 probe"
+title_zh: "PLAN-088 色面探针"
+# PLAN-088 T-01 临时探针（不是交付示例）：验证 canvas 场景 8 位 hex alpha
+# 渲染、pen 坐标→通道量化、onhit 色板命中。结论写入
+# docs/reviews/plan088/decisions.md 后本目录删除。
+window: "980x720"
+front_port: 4398
