@@ -266,3 +266,31 @@ precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
     2 passed（7.02s）。
   - 视觉抽检：色面二维梯度（白→色→黑）、alpha 条棋盘→实色、色板/预览
     正常；窄窗（640x560）通道标签与输入可达。
+
+## 9. 终审 needs_fix（F-01…F-11）修复与复验（2026-11-17，实现 `a49f88de`，门硬化 `282dfb3d`）
+
+独立终审给 needs_fix（F-01…F-11，记录见 Plan §9）。本轮逐项修复并以产品门/工具门复验；
+终审后的门硬化（输入读数/HEX 提交/对话框关闭收敛的稳健性）单列提交 `282dfb3d`。
+
+| 发现 | 处置（文件） | 复验 |
+|---|---|---|
+| F-01 Paint 像素 oracle | Paint 例子新增常显 `px42=${.px[42]}` 读数与 `painted px${i}=...` 状态（`examples/ui/031-paint/src/front/app.at`）；门 V-04 改选 p7=#3B82F6FF → 断言 px42/status → Undo #EF4444FF → Save/New/Load #3B82F6FF | native 门 V-04 pass |
+| F-02 V-01/V-06 oracle 缺口 | 门新增 case_hex（#F00→#FF0000FF；#3974E6CC 经 autoui_inspect 读 57/116/230/204；同值零提交；#GG0000→error(invalid_color) 且零提交）与 case_alpha（隐藏 alpha 时 A 输入消失、surface 提交仍 …CC、恢复 A）；vue 增短 HEX/通道读数/深浅对照 | native 门 hex/alpha pass；vue pass |
+| F-03 #RGBA | `color_model.at` cp_hex_norm：n==4 不再追加 FF（四位展开即 #RRGGBBAA） | 门 hex 用例覆盖；工具门 2/2 |
+| F-04 色面端点 | `color_picker.at`：surface 量化改整数 floor `(x*100)/192`、`((192-y)*100)/192`（x=192→100、y=0→100，floor 语义保持） | known_colors 精确值不变 |
+| F-05 取消双发 | `color_dialog.at`：`cancel_guard`，按钮/onclose/内部取消共用一次性 emit，重开复位 | 门 dialog 取消零正式提交 + 单次 |
+| F-06 错误残留 | `color_picker.at`：27 个变更 handler 入口清 ch_err/hex_err | 门 hex 非法后色面成功提交无残留 |
+| F-07 初始焦点 | 不改包：既有 modal 焦点事务（`host.rs:4290-4319`）打开时聚焦 modal 内容首个 input；本包视图首输入为 HEX；vue 打开态截图显示 HEX 获焦（文本选中） | `vue-dialog.png`；native 结构断言（取消/确认/footer） |
+| F-08 视觉证据 | vue 增 `vue-dialog.png`/`vue-dark.png`；native 模态期间截图工具报零尺寸（平台限制，结构断言替代）；swatch 移至条列下方 → picker 最小宽约 364；420×560 vue 通道不再裁切 | `vue-narrow.png`；native 窄窗 640×560 |
+| F-09 收据 | 门报告 revision 3 + commit SHA + input_hashes（4 文件 sha256 前缀）；README 支持矩阵按实际覆盖限定；§8 引用改 r3t/r3g | `report-native.json`/`report-vue.json` |
+| F-10 清理 | 删 5 张已跟踪 paint tmp 截图与 `examples/ui/088-probe/`；`.gitignore` 增 `examples/**/src/front/tmp/` | `git status` 干净 |
+| F-11 卫生 | `ch_rev` 全删（30 写 0 读）；demo 重置按钮 title 移除；invalid_config 注释改为可见文本；picker/dialog Tick 对非法外部值置可见 cfg_err、恢复合法时清除并重基线 | 工具门无 S001；Tick 行为在案 |
+
+复验（commit `282dfb3d`，`git status --porcelain` 空）：
+- native 门 `gate-native-r5a`：`result: pass`，10 用例 + reopen + 3 截图；报告记 commit 与输入 hash。
+- vue 门 `gate-vue-r5a`：`pass`，4 截图（light/narrow/dark/dialog）。
+- 工具门：`cargo test -p auto-ui-tools --test color_picker_component` → 2 passed（6.00s，单用例 <10s）。
+- 输入 hash：picker `81b7ac97`、model `62561f3e`、dialog `fa079179`、gate `fdab2346`。
+
+未覆盖/边界：Linux not_run；native 模态期间截图不可用（平台）；Paint 例子主题由 pac 固定（内容色
+不变性由 demo 深浅用例覆盖）；VM 整型字段写可见性债仍登记（当前设计不再依赖）。
