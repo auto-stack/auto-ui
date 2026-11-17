@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-088
-status: drafting
+status: execution_done
 feature_name: ColorPicker 与 ColorDialog 通用选色器
 author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-17
 plan_revision: 3
-current_step: 2
+current_step: 6
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/color-picker.md]
@@ -162,6 +162,10 @@ T-04新建`examples/color-picker/`，并迁移Paint普通选色流程；T-05新�
 
 2026-11-17（work，进行中）：T-01 ✅。树 `.wt/ui-088/auto-ui`@`codex/ui-088-color-picker`（base 2f42d661；T-01 提交 aaf43e8c+cb8fd0cb，087 依赖已归档交付）。探针双轨 PASS：native MCP pen 选色逐字节对齐预计算引擎值（#405980CC/#805040CC/#8050407F）、onhit 色板、dialog 内嵌；vue Playwright 真实拖拽/点击/棋盘 alpha 渲染。平台缺陷发现与处置（runtime 最小适配 2 文件已修：canvas 8 位 hex alpha 按串长判别；`.split()` List 债与 vue 形参 `.value` 债以 .at 侧规约规避）详见 `docs/reviews/plan088/decisions.md` §3。当前 1/8，next T-02。
 
+2026-11-17（goal）：stage: goal | plan_id: PLAN-088 | plan_revision: r3 | round: 1 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-088/auto-ui | commit: 32f59993 | next: review——T-05/T-06 收口，native+vue 产品门绿，进入独立复审。
+
+2026-11-17（work，r3 续跑 → execution_done）：stage: work；PLAN-088 r3；outcome: pass；worktree `.wt/ui-088/auto-ui`；branch `codex/ui-088-color-picker`；commits `32f59993`（实现+README+产品门）/`433f5cfe`（decisions §8）；task_ids T-03✅（内置 input 通道；V-01 通道 #4074E6CC + invalid_channel 事件）、T-04✅（示例/Paint 消费门沿旧）、T-05✅（native `gate-native-r3t` 8 用例 + reopen + 640x560 窄窗浅深截图；vue `gate-vue-r3g` pass；`cargo test -p auto-ui-tools --test color_picker_component` 2 passed 7.02s；Linux not_run 如实记录）、T-06✅（`packages/color-picker/README.md` + decisions §8 证据/边界）；evidence `plan-artifacts/plan-088/gate-native-r3t/report-native.json`、`gate-vue-r3g/report-vue.json`、decisions §7.2/§8；实现要点：串字段单一真源（d_hex/ch_*/h_hold）+ 每 handler 入口解码（不再有跨 handler 整型草稿状态；VM 整型字段写可见性债未宣称修复但不再在关键路径）、HSV 解码饱和度系数 ×10 修正（51 处）、行/alpha 条高位半字节 `/16`、rgb6 `substr(1,6)`（28 处）、ColorDialog 补外向事件声明（preview/committed/cancelled/error）、通道错误渲染+error 事件、vue 第二解码块改赋值（重复 let）、示例窄窗堆叠与输入列 min-w-40；残余边界：初始焦点无平台 autofocus 通道、Linux not_run；§10 阻塞撤销；next: review（T-07 独立上下文）。
+
 ## 10. 待澄清事项
 
 r2已固定公共消息、通道范围/舍入、HSV灰黑边界和Dialog提交规则；T-01验证动态色面/计算复用、Paint历史适配与runner。尚无阻碍立项的用户决策；实际需要修改语言仓、扩大色彩管理范围或删除双端验收时须提出具体差异，不能自行回落系统弹窗。
@@ -169,3 +173,5 @@ r2已固定公共消息、通道范围/舍入、HSV灰黑边界和Dialog提交�
 阻塞（2026-11-17，work r3 实测，待用户决策）：通道输入（AC-02 的编辑入口之一）在两套设计下均被平台缺口挡住——(a) 内嵌 NumericField：depth-3 实例 Tick/状态缺口（decisions §7）；(b) 内置 input：native 实例 handler 状态读出别名值、vue 提交路径 codegen 'length' 错（本轮 §9 blocked 收据）。核心选色链（palette/色面/色相/alpha/HEX/dialog）双轨全绿。请裁定：①先立 VM runtime 修复计划（实例作用域 handler 状态一致性 + depth-3 实例语义），本计划挂起等其交付；或 ②通道入口验收降域至「Vue 轨待 runtime 小修后补证 + native 记债」，先复审已交付的其余面。裁定前本计划挂起（executing）。
 
 修订待决（2026-11-17 work 提出 → r3 已裁定采纳）：通道输入由「内嵌 PLAN-087 NumericField」改为「内置 input + cp 引擎夹取校验（Enter 提交一次/同值零事件/非法具名拒绝）」。依据：depth-3 组件实例 Tick/状态解析缺口（VM runtime 债，实证 decisions §7——App→ColorPicker→NumericField 每 100ms 根态崩溃，087 depth-2 对照零失败）。AC-01「087依赖真实导入」措辞随之改为「官方包真实导入运行；087 为语义基准（不引入其实例）」——该措辞修订请复审确认。同目标、同验收实质（V-01 通道精确编辑经 MCP type+submit 等价路径）、同仓集。
+
+撤销（2026-11-17 goal 续跑，裁定路径已由 work 在计划范围内解决，无需用户二选一）：通道输入阻塞解除——draft 改为串字段单一真源（d_hex/ch_*/h_hold）+ 每 handler 入口解码，并修复 4 类自含实现缺陷（HSV 解码饱和度 ×10、行/alpha 条高位半字节缺 /16、rgb6 substr 7→6、ColorDialog 外向事件声明缺失）与 2 类呈现缺陷（通道错误文本/error 事件、vue 重复 let）。native 通道/alpha 证据成立：gate-native-r3t 8 用例 pass、gate-vue-r3g pass、工具门 2/2。VM 整型字段写可见性缺口仍登记为债（访问面已移除，不宣称修复）；Linux 轨 not_run 如实记录。详见 docs/reviews/plan088/decisions.md §8。
