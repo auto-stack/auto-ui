@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-088
-status: reviewed
+status: archived
 feature_name: ColorPicker 与 ColorDialog 通用选色器
 author: [Codex]
 created_at: 2026-11-14
@@ -17,7 +17,7 @@ touched_goals: []
 
 ## 0. 变更摘要
 
-将路线CL-08提前立项：提供内嵌ColorPicker及组合ColorDialog，用于笔记/文字/画笔/主题预览等通用选色。复用现有Dialog、Slider、色板和087数值输入，不调用系统颜色窗口。见[组件库strategy](../design/autoui/component-library-extension-strategy.md)。本轮仅建计划。
+将路线CL-08提前立项：提供内嵌ColorPicker及组合ColorDialog，用于笔记/文字/画笔/主题预览等通用选色。复用现有Dialog、Slider、色板和087数值输入，不调用系统颜色窗口。见[组件库strategy](../../design/autoui/component-library-extension-strategy.md)。本轮仅建计划。
 
 r3（2026-11-17 有界修订）：通道输入由「内嵌 PLAN-087 NumericField」改为「内置 input + cp 引擎夹取校验」——depth-3 组件实例（App→ColorPicker→NumericField）Tick/实例状态解析缺口阻塞内嵌方案（实证 decisions §7，VM runtime 债）。087 保留为语义基准（Enter 提交一次/同值零事件/非法具名拒绝/夹取），不再引入其实例。目标、验收实质、仓集不变；AC-01 措辞随依赖面修订（请复审确认）。
 
@@ -64,7 +64,7 @@ sRGB普通颜色、透明度、HEX/RGB/HSV输入、色板、当前/新颜色预�
 
 ### r2 执行接口与样例
 
-按用户2026-11-14再次审核和生成样式参考要求补齐。先读[执行与视觉指南](../design/autoui/common-components-execution-and-visual-guide.md)，图中088是色面/通道/透明度/底栏关系；可切RGB/HSV通道组，不要求将两组全部挤进图中的一行。
+按用户2026-11-14再次审核和生成样式参考要求补齐。先读[执行与视觉指南](../../design/autoui/common-components-execution-and-visual-guide.md)，图中088是色面/通道/透明度/底栏关系；可切RGB/HSV通道组，不要求将两组全部挤进图中的一行。
 
 | 接口 | r2合同 |
 |---|---|
@@ -150,7 +150,7 @@ r9 复审（2026-11-17，§9 末条）final pass：T-05/T-06 关闭，T-07 完�
 
 2026-11-14：stage: new；PLAN-088 r1；outcome: pass（规划可交接）；next: work，从T-01开始，T-03等087。新增T-01…08、AC-01…08、SD-01/02，0/8；本轮未实现或运行产品测试。
 
-2026-11-14修订交接：stage: new；PLAN-088 r2；outcome: pass（合同可进入T-01，非实施后独立复审通过）；next: work。依据[本轮复核记录](../reviews/component-plans-087-093-2026-11-14/README.md)处理F-01/F-03/F-09/F-10，补§5接口/数据/状态、§6 V-06及视觉交接，AC-06同步加强；T-01/02/03/05/06执行仍按原8任务计数，当前0/8。Spec增量沿SD-01/02并纳入r2细节。本轮只读源码并修订计划/设计/图片资产，未运行产品门。
+2026-11-14修订交接：stage: new；PLAN-088 r2；outcome: pass（合同可进入T-01，非实施后独立复审通过）；next: work。依据[本轮复核记录](../../reviews/component-plans-087-093-2026-11-14/README.md)处理F-01/F-03/F-09/F-10，补§5接口/数据/状态、§6 V-06及视觉交接，AC-06同步加强；T-01/02/03/05/06执行仍按原8任务计数，当前0/8。Spec增量沿SD-01/02并纳入r2细节。本轮只读源码并修订计划/设计/图片资产，未运行产品门。
 
 2026-11-17（goal，终诊轮）：outcome: blocked（维持）| 终诊证据：索引修正后 hue+surface 精确通过，alpha/channel 的失败稳定复现——前一个实例作用域 handler 的整型字段写对后一个 handler 不可见（d_s 读 0、d_g 读 d_b；串字段 d_hex 写可见）——nanbox/绑定腐化家族，VM runtime 债（decisions §7.1 终诊段，提交 63034852）。§10 二选一仍待裁定；不可达验收（AC-02 native 通道证据、AC-06 native 完整性）在 VM 修复前无法诚实出具。
 
@@ -316,6 +316,8 @@ AC 结论：AC-01 pass；AC-02 pass（F-19 为门/收据低项）；AC-03 pass�
 AC 结论：AC-01 pass；AC-02 pass（F-20 low 非阻断）；AC-03 pass（F-05 平台边界）；AC-04 pass（F-17 边界 + stale-element 实证）；AC-05 pass（F-18）；AC-06 partial（Win native/vue、浅深、窄窗、重开 pass；Linux not_run 待 merge 批、Paint 主题 pac 边界）；AC-07 pass；AC-08 pending（merge）。
 
 未检查/假设边界：vue 门未重跑（r9a 输入 hash 与当前一致、截图已抽检）；Linux 无 runner 未跑（merge 批补）；未复验 087/auto-lang/auto-man 依赖修订；未跑全局回归；F-05 包级双发与 F-17 焦点恢复为已记录平台边界，未再复验；F-20 的断言特异性仅为门质量建议，不影响本轮行为验收。
+
+2026-11-17（merge）：stage: merge | plan_id: PLAN-088 | plan_revision: 3 | outcome: pass | delivery_commit: `35a0b67d`（ff-only 落主；reviewed 实现 `a10d181c`/`c5bd2d52` rebase 后为 `f09b12c3`/`ee3d2dc7`，`git range-diff` 21/21 等价，唯一差异为 Cargo.lock 与 master 的上下文对齐后逐字节一致） | canonical_specs: `docs/specs/ui/color-picker.md`（sha256 `57A8E581A962350C537B1B66BDEC56E7BDB508755E0E804D43680309AFBC49CC`，与工作树逐字节一致） | archive_path: `docs/plans/archived/088-color-picker-and-dialog.md` | cleanup: worktree/branch removed after guard clean; `plan-artifacts/plan-088/` deleted after folding; registry refreshed | checkpoints: prepared（reviewed r3，reviewed_commit a10d181c，worktree `git status` 空，guard clean）→ landed（master 7953ce1b → 35a0b67d，ff-only，无 merge commit）→ canonical_verified（spec 目标已落主 + packages/examples/tests 落地；hash 一致）→ archived（本文件，status archived，相对链接按 archived 父目录修正）→ cleaned（待执行并回填） | pending_merge_gates: Linux native 轨 not_run（AC-06；merge 批回归/runner 就绪后补证，不冒 pass）；strategy CL-08/Q-01 链接陈述——strategy 文档（docs/design/autoui/component-library-extension-strategy.md）在主树为未跟踪 WIP，非 canonical 交付面，链接保留在计划与包 README，待该文档入库时互链；F-20（门可见错误断言可被日志回显满足）非阻塞 follow-up；批回归 due-check 见 `docs/plans/.last-batch-regression.json`。 | evidence: `plan-artifacts/plan-088/gate-native-r9a|r9b`、`gate-vue-r9a`、`docs/reviews/plan088/decisions.md` §8–§11（folded）。
 
 ## 10. 待澄清事项
 
