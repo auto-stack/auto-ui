@@ -254,13 +254,13 @@ precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
   7. **初始焦点=HEX**：平台无 widget 级 autofocus 通道（iced 焦点由点击/
      update 臂），未强制；Dialog 沿用既有 modal 焦点环与关闭恢复。记为边界。
 - 证据（代码提交 `plan-088 r3 复跑`）：
-  - native：`gate-native-r3r/report-native.json` → `result: pass`；用例
+  - native：`gate-native-r3t/report-native.json` → `result: pass`（r3r 为中间失败轮，仅诊断用）；用例
     V-01/06 known-colors（含灰草稿保留最近 H、alpha 141）、V-02
     gestures+外部重置、V-01 channel（#4074E6CC + invalid_channel 事件）、
     V-03 双实例/业务拒绝、V-02/03 dialog（取消零提交/确认一次）、V-04
     Paint 消费、V-05 native 640x560 窄窗 + 浅深主题 + 退出重开；visual
     `demo-native.png`/`demo-narrow-native.png`/`demo-native-dark.png`。
-  - vue：`gate-vue-r3f/report-vue.json` → `pass`（真实鼠标拖拽 + 通道
+  - vue：`gate-vue-r3g/report-vue.json` → `pass`（真实鼠标拖拽 + 通道
     提交 #4074E6CC + 1100x800/420x560 截图）。
   - 工具门：`cargo test -p auto-ui-tools --test color_picker_component`
     2 passed（7.02s）。

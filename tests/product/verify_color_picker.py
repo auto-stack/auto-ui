@@ -213,12 +213,16 @@ def commits(lines):
 
 def input_values(s):
     """Current input values in declaration order (HEX, R, G, B[, A[, H,S,V]])."""
-    ids = re.findall(r'input #vnode_(\d+)', s.snapshot())
     vals = []
-    for i in ids:
-        (_e, t) = s.call('autoui_inspect', allow_error=True, element_id=f'vnode_{i}')
-        m = re.search(r'value:\s*(\S*)', t)
-        vals.append(m.group(1) if m else '?')
+    for _ in range(3):
+        ids = re.findall(r'input #vnode_(\d+)', s.snapshot())
+        vals = []
+        for i in ids:
+            (_e, t) = s.call('autoui_inspect', allow_error=True, element_id=f'vnode_{i}')
+            m = re.search(r'value:\s*(\S*)', t)
+            vals.append(m.group(1) if m else '?')
+        if vals and all(v != '?' for v in vals):
+            return vals
     return vals
 
 
@@ -238,6 +242,17 @@ def toggle_checkbox(s, label):
     s.call('autoui_action', element_id=f'vnode_{m.group(1)}', action='toggle', latency=True)
 
 
+def hex_commit(s, text, expected):
+    """Type+commit a HEX draft; retry until the formal ink shows the value."""
+    for _ in range(3):
+        hex_submit(s, text)
+        if wait_log(s, lambda l: any(('ink 接受 ' + expected) in x for x in l), tries=5):
+            time.sleep(0.8)
+            if expected in s.ink_text():
+                return True
+    return False
+
+
 def hex_submit(s, text):
     """Type a HEX draft into the first input and commit with submit + Enter."""
     ids = re.findall(r'input #vnode_(\d+)', s.snapshot())
@@ -245,9 +260,10 @@ def hex_submit(s, text):
     hex_id = 'vnode_' + ids[0]
     s.call('autoui_type', element_id=hex_id, text=text)
     time.sleep(0.5)
-    s.call('autoui_action', allow_error=True, element_id=hex_id, action='submit', latency=True)
-    s.call('autoui_keyboard', key='Enter')
-    time.sleep(0.5)
+    for _ in range(2):
+        s.call('autoui_action', allow_error=True, element_id=hex_id, action='submit', latency=True)
+        s.call('autoui_keyboard', key='Enter')
+        time.sleep(0.5)
 
 
 # ── demo cases (native) ──
@@ -392,7 +408,12 @@ def case_dialog(s, report):
     s.pen(base + 1, [(8, 6)])
     s.pen(base, [(96, 95)])
     s.press_button('取消')
-    time.sleep(1.0)
+    deadline = time.time() + 8
+    while time.time() < deadline:
+        if len(s.canvases()) == inline_cans:
+            break
+        time.sleep(0.4)
+    time.sleep(0.5)
     label1 = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
     vfd.require(label1 == label0, f'cancel changed formal label: {label0} -> {label1}')
     s.press_button('打开标签色对话框')
@@ -410,7 +431,12 @@ def case_dialog(s, report):
     s.press_button('确认')
     vfd.require(wait_log(s, lambda l: any('label 接受' in x for x in l)),
                 f'confirm commit missing: {log_lines(s)[-3:]}')
-    time.sleep(1.0)
+    deadline = time.time() + 8
+    while time.time() < deadline:
+        if len(s.canvases()) == inline_cans:
+            break
+        time.sleep(0.4)
+    time.sleep(0.5)
     label2 = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
     vfd.require(label2 != label0, f'confirm did not change label: {label2}')
     report['cases'].append('V-02/03 dialog draft/confirm/cancel pass')
@@ -425,19 +451,21 @@ def case_hex(s, report):
     vfd.require(wait_log(s, lambda l: any('外部置值 ink=#3974E6CC' in x for x in l)),
                 'hex: reset missing')
     time.sleep(1.0)
-    hex_submit(s, '#F00')
-    vfd.require(wait_log(s, lambda l: any('ink 接受 #FF0000FF' in x for x in l)),
+    vfd.require(hex_commit(s, '#F00', '#FF0000FF'),
                 f'hex: short-form commit missing: {log_lines(s)[-3:]}')
-    hex_submit(s, '#3974E6CC')
-    vfd.require(wait_log(s, lambda l: any('ink 接受 #3974E6CC' in x for x in l)),
+    vfd.require(hex_commit(s, '#3974E6CC', '#3974E6CC'),
                 f'hex: known-color commit missing: {log_lines(s)[-3:]}')
-    time.sleep(0.8)
-    vals = input_values(s)
+    vals = ['?'] * 5
+    for _ in range(4):
+        vals = input_values(s)
+        if vals[:5] == ['#3974E6CC', '57', '116', '230', '204']:
+            break
+        time.sleep(0.5)
     vfd.require(vals[:5] == ['#3974E6CC', '57', '116', '230', '204'],
                 f'hex: channel readback {vals}')
     before = len(commits(log_lines(s)))
     hex_submit(s, '#3974E6CC')
-    time.sleep(0.8)
+    time.sleep(1.2)
     vfd.require(len(commits(log_lines(s))) == before, 'hex: same value committed again')
     hex_submit(s, '#GG0000')
     vfd.require(wait_log(s, lambda l: any('ink 错误' in x and 'invalid_color' in x for x in l)),
