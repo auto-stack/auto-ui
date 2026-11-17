@@ -1,6 +1,7 @@
 // 031-image-viewer front UI (Plan 547 Tasks 29 and 33).
 // The model is metadata and transform state only; pixels stay behind the
 // shared media route and ImageSurface renderer.
+use auto.json
 use back.api: open_file, open_directory, current_uri, names, request_view, close_session, image_stats, navigate
 
 use stylekit.styles: caption_text
@@ -9,6 +10,7 @@ use stylekit.styles: caption_text
 // 绑定；模式由 dark_mode 承担，首帧 true = pac 显式 theme: "dark" 默认保留）。
 // 会话/URI/视图 revision/媒体管线业务零改动——换肤不重建 session。
 use themes.themes: Auto, Solarized
+
 style ctrl_size = "w-8 h-7"
 style tool_sm = "px-2.5 py-1.5 text-xs"
 style tool_xs = "px-2 text-xs"
@@ -17,29 +19,20 @@ style stage_row = "items-center justify-center gap-2"
 style content_col = "flex-1 min-h-0"
 
 widget App {
+    // PLAN-089：查看区消费正式包（widget 内 use；局部 shadow 已移除；
+    // media 会话/索引/导航业务仍归本应用与 back 服务）。
+    use { package: image_viewer from "../../../../../packages/image-viewer" }
     msg {
         Init,
         OpenFile,
         OpenDirectory,
         SelectImage(int),
-        ZoomIn,
-        ZoomOut,
-        FitContain,
-        FitWidth,
-        OneToOne,
-        RotateLeft,
-        RotateRight,
-        PanLeft,
-        PanRight,
-        NextImage,
-        PrevImage,
         RefreshStats,
         ToggleFullscreen,
-        ImageLoaded,
-        ImageFailed,
-        Wheel,
-        Pan,
-        DoubleClick,
+        ImageLoaded(str),
+        ImageError(str),
+        ApplyView(str),
+        DoNavigate(str),
         SettleTick,
         Close
     }
@@ -62,6 +55,10 @@ widget App {
         var fit_mode str = "contain"
         var is_fullscreen bool = false
         var revision int = 0
+        // PLAN-089：媒体资源修订（换图即增；组件按 (resourceId, resourceRevision)
+        // 判定换代并捕获该图初始基线）。
+        var media_rev str = "0"
+        var media_rev_seq int = 0
         // PLAN-016 T-08：桌面 open_with 接收面（host write_state 写路径，
         // SettleTick 消费一次；open_consumed 防重放）。
         var auto_open_path str = ""
@@ -134,20 +131,8 @@ widget App {
 
                 col {
                     style: "flex-1 min-w-0 min-h-0"
-                    row {
-                        style: "h-10 shrink-0 items-center justify-center gap-1 border-b border-border"
-                        button "◀" { onclick: .PrevImage, style: ctrl_size }
-                        button "▶" { onclick: .NextImage, style: ctrl_size }
-                        button "−" { onclick: .ZoomOut, style: ctrl_size }
-                        text "Zoom" { style: "text-xs text-muted-foreground px-2" }
-                        button "+" { onclick: .ZoomIn, style: ctrl_size }
-                        button "Fit" { onclick: .FitContain, style: tool_xs }
-                        button "Width" { onclick: .FitWidth, style: tool_xs }
-                        button "1:1" { onclick: .OneToOne, style: tool_xs }
-                        button "↺" { onclick: .RotateLeft, style: ctrl_size }
-                        button "↻" { onclick: .RotateRight, style: ctrl_size }
-                    }
-
+                    // PLAN-089：变换/导航工具栏由 ImageViewport 自带（受控请求
+                    // 经 ApplyView 接受；收藏/目录/会话业务仍归本应用）。
                     col {
                         style: "flex-1 min-h-0 items-center justify-center p-3 bg-muted/20"
                         if .view_state == "empty" {
@@ -165,20 +150,23 @@ widget App {
                                 button "Retry" { onclick: .OpenFile, style: "px-3 py-1.5 text-xs" }
                             }
                         } else {
-                            image_surface (
+                            ImageViewport (
                                 src: .media_src,
                                 alt: .media_alt,
+                                resourceId: .selected_name,
+                                resourceRevision: .media_rev,
+                                revision: .revision,
                                 fit: .fit_mode,
                                 zoom: .zoom,
-                                offset_x: .offset_x,
-                                offset_y: .offset_y,
+                                offsetX: .offset_x,
+                                offsetY: .offset_y,
                                 rotation: .rotation,
-                                onload: .ImageLoaded,
-                                onerror: .ImageFailed,
-                                onwheel: .Wheel,
-                                onpan: .Pan,
-                                ondblclick: .DoubleClick,
-                                style: "w-full h-full"
+                                canPrevious: .selected_index > 0,
+                                canNext: .selected_index + 1 < .image_count,
+                                onviewRequested: .ApplyView($event),
+                                onloaded: .ImageLoaded($event),
+                                onerror: .ImageError($event),
+                                onnavigateRequested: .DoNavigate($event)
                             ) {}
                         }
                     }
@@ -193,21 +181,11 @@ widget App {
         }
     }
 
+    // PLAN-089：变换类快捷键随工具栏迁入组件（v1 无外部动作通道，工具栏
+    // 按钮/MCP 即操作面）；本应用仅保留应用级键。
     bind {
-        "ArrowLeft" -> .RotateLeft
-        "ArrowRight" -> .RotateRight
-        "a" -> .PanLeft
-        "A" -> .PanLeft
-        "d" -> .PanRight
-        "D" -> .PanRight
         "s" -> .RefreshStats
         "S" -> .RefreshStats
-        "n" -> .NextImage
-        "p" -> .PrevImage
-        "+" -> .ZoomIn
-        "-" -> .ZoomOut
-        "0" -> .FitContain
-        "1" -> .OneToOne
         "F" -> .ToggleFullscreen
         "Escape" -> .Close
     }
@@ -232,6 +210,13 @@ widget App {
             .image_count = 1
             .thumbnails = [{ id: 0, name: "rgb-1x1.png", src: "" }]
             .selected_index = 0
+            .fit_mode = "contain"
+            .zoom = 1.0
+            .offset_x = 0.0
+            .offset_y = 0.0
+            .rotation = 0
+            .media_rev_seq = .media_rev_seq + 1
+            .media_rev = f"r${.media_rev_seq}"
             .revision = .revision + 1
         }
         .OpenDirectory -> {
@@ -246,6 +231,13 @@ widget App {
             .media_alt = "Selected image"
             .selected_name = "Opening directory…"
             .selected_path = "tests/fixtures"
+            .fit_mode = "contain"
+            .zoom = 1.0
+            .offset_x = 0.0
+            .offset_y = 0.0
+            .rotation = 0
+            .media_rev_seq = .media_rev_seq + 1
+            .media_rev = f"r${.media_rev_seq}"
             .revision = .revision + 1
         }
         .SelectImage(i) -> {
@@ -256,38 +248,68 @@ widget App {
                 .status = "Queued rendition"
             }
             .view_state = "loading"
+            // 新图初始基线（组件换代即捕获）：contain/1/0/0/0 + 资源修订递增。
+            .fit_mode = "contain"
+            .zoom = 1.0
+            .offset_x = 0.0
+            .offset_y = 0.0
+            .rotation = 0
+            .media_rev_seq = .media_rev_seq + 1
+            .media_rev = f"r${.media_rev_seq}"
             .revision = .revision + 1
         }
-        .ZoomIn -> {
-            .zoom = .zoom + 0.1
-            .fit_mode = "free"
-        }
-        .ZoomOut -> {
-            if .zoom > 0.2 { .zoom = .zoom - 0.1 }
-            .fit_mode = "free"
-        }
-        .FitContain -> { .fit_mode = "contain"; .zoom = 1.0; .offset_x = 0.0; .offset_y = 0.0 }
-        .FitWidth -> { .fit_mode = "width"; .zoom = 1.0 }
-        .OneToOne -> { .fit_mode = "one-to-one"; .zoom = 1.0 }
-        .RotateLeft -> { .rotation = (.rotation + 270) % 360 }
-        .RotateRight -> { .rotation = (.rotation + 90) % 360 }
-        .NextImage -> {
-            if .session_id != "" {
-                if .selected_index + 1 < .image_count {
-                    let _nav = navigate(.session_id, 1)
-                    .selected_index = .selected_index + 1
-                    .media_src = current_uri(.session_id)
-                    .status = "Next"
-                }
+        // PLAN-089：受控接受——baseRevision 校验后一次性赋值并增 revision；
+        // 拒绝 = 保持原视图（组件请求不作成功论）。
+        .ApplyView(ev str) -> {
+            let req = json.parse(ev)
+            if req.baseRevision == .revision {
+                .fit_mode = req.view.fit
+                .zoom = req.view.zoom
+                .offset_x = req.view.offsetX
+                .offset_y = req.view.offsetY
+                .rotation = req.view.rotation
+                .revision = .revision + 1
+                .status = "视图已接受"
+            } else {
+                .status = "视图请求已过期"
             }
         }
-        .PrevImage -> {
-            if .session_id != "" {
-                if .selected_index > 0 {
-                    let _nav = navigate(.session_id, -1)
-                    .selected_index = .selected_index - 1
-                    .media_src = current_uri(.session_id)
-                    .status = "Prev"
+        // 前后张：组件只发方向请求；集合/顺序/媒体查询仍归本应用。
+        .DoNavigate(ev str) -> {
+            let req = json.parse(ev)
+            if req.direction == "next" {
+                if .session_id != "" {
+                    if .selected_index + 1 < .image_count {
+                        let _nav = navigate(.session_id, 1)
+                        .selected_index = .selected_index + 1
+                        .media_src = current_uri(.session_id)
+                        .fit_mode = "contain"
+                        .zoom = 1.0
+                        .offset_x = 0.0
+                        .offset_y = 0.0
+                        .rotation = 0
+                        .media_rev_seq = .media_rev_seq + 1
+                        .media_rev = f"r${.media_rev_seq}"
+                        .revision = .revision + 1
+                        .status = "Next"
+                    }
+                }
+            } else {
+                if .session_id != "" {
+                    if .selected_index > 0 {
+                        let _nav = navigate(.session_id, -1)
+                        .selected_index = .selected_index - 1
+                        .media_src = current_uri(.session_id)
+                        .fit_mode = "contain"
+                        .zoom = 1.0
+                        .offset_x = 0.0
+                        .offset_y = 0.0
+                        .rotation = 0
+                        .media_rev_seq = .media_rev_seq + 1
+                        .media_rev = f"r${.media_rev_seq}"
+                        .revision = .revision + 1
+                        .status = "Prev"
+                    }
                 }
             }
         }
@@ -295,17 +317,14 @@ widget App {
         .PanLeft -> { .offset_x = .offset_x - 40.0; .fit_mode = "free" }
         .PanRight -> { .offset_x = .offset_x + 40.0; .fit_mode = "free" }
         .ToggleFullscreen -> { .is_fullscreen = !.is_fullscreen }
-        .ImageLoaded -> { .view_state = "ready"; .status = "Ready" }
+        .ImageLoaded(ev str) -> { .view_state = "ready"; .status = "Ready" }
         // A media ticket can briefly be 503 while the bounded worker publishes
         // its rendition. Keep the viewport mounted so the browser can retry
         // the opaque URI; only an empty URI is a terminal error.
-        .ImageFailed -> {
+        .ImageError(ev str) -> {
             .status = "Waiting for image worker…"
             if .media_src == "" { .view_state = "error"; .status = "Image failed to load" }
         }
-        .Wheel -> { .zoom = .zoom + 0.1; .fit_mode = "free" }
-        .Pan -> { .offset_x = .offset_x + 8.0; .offset_y = .offset_y + 4.0 }
-        .DoubleClick -> { .fit_mode = "one-to-one"; .zoom = 1.0 }
         .SettleTick -> {
             // PLAN-016 T-08：桌面 open_with 消费臂——路径来自宿主执行臂
             // write_state（未运行启动 / 已运行聚焦），同 OpenFile 流程打开。
@@ -328,6 +347,13 @@ widget App {
                     .image_count = 1
                     .thumbnails = [{ id: 0, name: p, src: "" }]
                     .selected_index = 0
+                    .fit_mode = "contain"
+                    .zoom = 1.0
+                    .offset_x = 0.0
+                    .offset_y = 0.0
+                    .rotation = 0
+                    .media_rev_seq = .media_rev_seq + 1
+                    .media_rev = f"r${.media_rev_seq}"
                     .revision = .revision + 1
                 }
             }

@@ -16,12 +16,14 @@
 // （上一张/下一张/收藏）。收藏 id 落 app Storage（photo-gallery.favs），
 // 重开保留。
 
+use auto.json
 use stylekit.styles: caption_text
 
 // PLAN-046 T-03：接入官方主题包（Auto/Solarized 两族；family 经
 // theme_name + design 绑定，dark_mode/accent_color 契约变量与
 // ToggleDark/SetAccent 原 handler 全保留；scan/thumb/full 与收藏业务零改动）。
 use themes.themes: Auto, Solarized
+
 style label_xs_medium = "text-xs font-medium"
 style emoji_count = "text-[11px] ml-1.5 opacity-60"
 style img_fill = "w-full h-full"
@@ -35,12 +37,16 @@ style group_card = "group rounded-2xl overflow-hidden bg-card border border-bord
 style meta_col = "flex-1 min-w-0 pr-2"
 
 widget App {
+    // PLAN-089：查看区（原图展示）消费正式包（widget 内 use；收藏/目录/
+    // 扫描业务仍归 Gallery，029 网格保留给 PLAN-091 后续重基线）。
+    use { package: image_viewer from "../../../../../packages/image-viewer" }
     msg {
         Init,
         SelectAlbum(str), SetSearch(str), ApplyFilter,
         NavigateDir(str), GoUp, ReloadDir,
         ToggleSort, SetDensity(int),
         OpenPhoto(str), PrevPhoto, NextPhoto, BackToGrid,
+        ApplyView(str),
         ToggleFav(str),
         LoadMore,
         ToggleDark, SetAccent(str)
@@ -92,6 +98,14 @@ widget App {
         var cur_title str = ""
         var cur_meta str = ""
         var cur_full str = ""
+        // PLAN-089：受控视图状态（查看区组件的调用方所有）。
+        var view_rev int = 0
+        var view_fit str = "contain"
+        var view_zoom float = 1.0
+        var view_ox float = 0.0
+        var view_oy float = 0.0
+        var view_rot int = 0
+        var view_events int = 0
         var prev_id str = ""
         var next_id str = ""
         var fav_label str = "♡ 收藏"
@@ -398,12 +412,27 @@ widget App {
                         }
                     }
 
-                    // 主图展示区（无损原图直显，contain 完整视口呈现）
+                    // 主图展示区（PLAN-089：通用受控视口；缩放/平移/旋转/
+                    // 重置动作由组件工具栏提供，请求经 ApplyView 接受）
                     col {
-                        style: "flex-1 min-h-0 flex items-center justify-center p-4 relative"
-                        image (src: .cur_full, alt: .cur_title, fit: "contain") {
-                            style: "max-w-full max-h-full"
-                        }
+                        style: "flex-1 min-h-0 relative"
+                        ImageViewport (
+                            src: .cur_full,
+                            alt: .cur_title,
+                            resourceId: .cur_id,
+                            resourceRevision: .cur_id,
+                            revision: .view_rev,
+                            fit: .view_fit,
+                            zoom: .view_zoom,
+                            offsetX: .view_ox,
+                            offsetY: .view_oy,
+                            rotation: .view_rot,
+                            showToolbar: true,
+                            onviewRequested: .ApplyView($event),
+                            onloaded: .ViewEvent($event),
+                            onerror: .ViewEvent($event),
+                            onnavigateRequested: .ViewEvent($event)
+                        ) {}
                     }
 
                     // 移动端风格悬浮胶囊控制底栏 (Floating Navigation Capsule)
@@ -702,6 +731,13 @@ widget App {
                     .cur_full = .photos[si].full
                     .cur_meta = .photos[si].meta
                     .is_cur_fav = .photos[si].fav
+                    // 新图初始基线：contain/1/0/0/0（组件换代即捕获）。
+                    .view_fit = "contain"
+                    .view_zoom = 1.0
+                    .view_ox = 0.0
+                    .view_oy = 0.0
+                    .view_rot = 0
+                    .view_rev = .view_rev + 1
                     if .is_cur_fav {
                         .fav_label = "❤ 已收藏"
                     } else {
@@ -713,6 +749,22 @@ widget App {
 
         .PrevPhoto -> { .OpenPhoto(.prev_id) }
         .NextPhoto -> { .OpenPhoto(.next_id) }
+        // PLAN-089：受控接受（唯一业务 view 写点；拒绝 = 保持原视图）。
+        .ApplyView(ev str) -> {
+            let req = json.parse(ev)
+            if req.baseRevision == .view_rev {
+                .view_fit = req.view.fit
+                .view_zoom = req.view.zoom
+                .view_ox = req.view.offsetX
+                .view_oy = req.view.offsetY
+                .view_rot = req.view.rotation
+                .view_rev = .view_rev + 1
+            }
+        }
+        // 组件 loaded/error/navigate 事件在 029 仅计数观察（导航走胶囊按钮）。
+        .ViewEvent(ev str) -> {
+            .view_events = .view_events + 1
+        }
         .BackToGrid -> { .mode = "grid" }
 
         // ---- 收藏：photos 翻标 + fav_records 增删（跨目录全局）+ 持久化 ----

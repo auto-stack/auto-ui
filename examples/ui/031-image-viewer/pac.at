@@ -31,3 +31,8 @@ dep stylekit {
 dep themes {
     path: "../../../packages/themes"
 }
+
+# PLAN-089：查看区迁正式 image-viewer 包。
+dep image_viewer {
+    path: "../../../packages/image-viewer"
+}
