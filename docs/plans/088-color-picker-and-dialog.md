@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-088
-status: execution_done
+status: reviewed
 feature_name: ColorPicker 与 ColorDialog 通用选色器
 author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-17
 plan_revision: 3
-current_step: 6
+current_step: 7
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/color-picker.md]
@@ -143,6 +143,8 @@ r3 复审（2026-11-17，§9 末条）重开 T-02/T-03/T-04/T-05/T-06；current_
 r5 复审（2026-11-17，§9 末条）重开 T-03/T-05/T-06；current_step 按完成数重算为 3/8（T-01/T-02/T-04 保持完成）。
 
 r6 复审（2026-11-17，§9 末条）重开 T-05/T-06；current_step 按完成数重算为 4/8（T-01…T-04 保持完成）。
+
+r9 复审（2026-11-17，§9 末条）final pass：T-05/T-06 关闭，T-07 完成，current_step 7/8（待 T-08 merge；Linux/Spec 等 merge-owned 门未消）。
 
 ## 9. 复审记录
 
@@ -287,6 +289,33 @@ AC 结论：AC-01 pass；AC-02 pass（F-19 为门/收据低项）；AC-03 pass�
 2026-11-17（goal）：stage: goal | plan_id: PLAN-088 | plan_revision: r3 | round: 4 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-088/auto-ui | commit: a10d181c | next: review——第三次终审 F-18/F-19 断言补齐，native 双跑 + vue 单跑 pass。
 
 2026-11-17（work，第三次终审修复）：stage: work；PLAN-088 r3；outcome: pass；worktree `.wt/ui-088/auto-ui`；branch `codex/ui-088-color-picker`；commits `c5bd2d52`（F-18/F-19 断言 + 确定性开关）/`a10d181c`（通道输入校验/取消计数口径）/`33f8e633`（decisions §11）；task_ids T-05✅/T-06✅（重开并关闭）；evidence `gate-native-r9a`/`gate-native-r9b`/`gate-vue-r9a`（均 pass；commit a10d181c；输入 hash picker 73542e36、model 62561f3e、dialog b96ac6da、gate 54630179）；F-18：Paint `picker cancelled` 可见标记 + 门断言取消不改像素/不改历史深度（Load+paint 两次 push，后续 Undo 报空）；F-19：门断言非法 HEX 可见标签；确定性：strict/alpha 开关改带状态标签按钮、palette 命中用末 canvas 下标、通道提交前 inspect 校验、取消断言接受已文档化的平台双发（只要求路径发生 + 正式值不变）；next: review（final，独立上下文）。
+
+2026-11-17（review，final 复评 #3，独立上下文）：stage: review | review_scope: final（repair re-review #3） | reviewer_identity: 独立子代理 reviewer-088（与实现者上下文分离；会话未暴露模型 ID） | plan_id: PLAN-088 | plan_revision: 3 | outcome: pass（final；T-07 关闭，F-20 记 low 非阻断） | worktree_path: D:/autostack/.wt/ui-088/auto-ui | branch: codex/ui-088-color-picker | reviewed_commit: c5bd2d52（F-18/F-19 断言 + 确定性开关）+ a10d181c（通道输入校验/取消计数口径）；HEAD 33f8e633 为 docs-only；`git status --porcelain` 空 | base_commit: 2f42d661 | dependency_revisions: PLAN-087 归档 45a80058（沿 decisions §4，未复验）；auto-lang/auto-man 组构建（未复验） | spec_inputs: docs/specs/ui/*.md；docs/specs/ui/color-picker.md 主树/工作树仍不存在（SD-01/02 待 merge 落文）；r9a/r9b 报告 input_hashes 与当前 HEAD 文件逐一相同（picker 73542e36…、model 62561f3e…、dialog b96ac6da…、gate 54630179…，本地重算一致） | acceptance_results: AC-01 pass；AC-02 pass（F-20 low：门的可见错误断言非特异，行为已由复审探针独立验证）；AC-03 pass（F-05 平台边界已文档化）；AC-04 pass（F-17 边界 + stale-element 反例）；AC-05 pass（F-18 取消/历史 oracle 落地并复验）；AC-06 partial（Win native/vue、浅深/窄窗/重开 pass；Linux not_run 待 merge 批；Paint 主题 pac 固定边界）；AC-07 pass（本复审）；AC-08 pending（merge） | pending_closeout_gates: Linux native 轨（merge 批）；docs/specs/ui/color-picker.md 落文（SD-01/02）；strategy CL-08/Q-01 互链与关闭陈述；merge 归档/清理；F-20 可在 merge 后首个触点收紧（非阻断） | findings: F-18 闭；F-19 行为闭（F-20 low 非阻断：门 `'invalid hex color' in snapshot` 同时被 demo 错误日志回声满足，去掉可见 label 仍会通过；建议精确匹配 label 文本节点并排除 `ink 错误`）；F-05/F-17 边界维持；其余 F-01…F-16 闭 | next: merge（T-08）；Linux/Spec/strategy 等 merge-owned 门仍待，F-20 非阻断。
+
+复评执行与证据（可复核）：
+- baseline/输入：`git -C <tree> log --oneline a6924d8c..HEAD` = c5bd2d52/a10d181c/33f8e633；`git status --porcelain` 空；包/引擎三文件 sha256 与 r6d 完全相同（本轮只改 demo/paint 例子与门），r9a/r9b 报告 revision 3、commit a10d181c、gate hash 54630179 与当前文件一致。
+- 门复跑：native `gate-native-review6` 独立复跑 **pass**（63.7s，10 用例 + reopen + 3 截图；commit a10d181c、head 33f8e633、input_hashes 同上）；连同 r9a/r9b 为同 hash 三次 pass。工具门复跑 2 passed / 5.77s，无 S001。vue r9a（5 截图）沿用并抽检 `vue-light.png`：新的 `业务拒绝：关`/`隐藏 alpha` 状态按钮在位，通道与 HEX 正常。
+- F-18（闭）：`examples/ui/031-paint` 的 `.PickCancelled` 置可见 `picker cancelled`；门 V-04 在 p7 绘制后输入非法 HEX + Escape，断言取消路径发生、`px42` 不变、Undo 深度不变（Load+paint 两次 push → 第三次 Undo 报 `nothing to undo`），随后重绘 + Save/New/Load 断言像素保留。复审独立探针（`probe-f18-replay`）：paint 后 `px42=#EF4444FF` → 非法 HEX + Escape → 标记出现、`px42` 不变 → Undo#1 回白、Undo#2 `nothing to undo`（取消未增历史）。行为与 oracle 均成立。
+- F-19（行为闭 + F-20 low）：`probe-f19-lines` 在非法 HEX Enter 后快照同时含 **LABEL** `text #vnode_… "color-picker: invalid hex color (invalid_color)"` 与 **LOG** `text #vnode_… "[n] ink 错误 {…invalid hex color…}"`；可见错误行为正确。但门断言 `'invalid hex color' in s.snapshot()` 被日志回声满足——若可见 label 再次消失，该断言仍通过（正是 F-13 要防的回归）。故 F-19 的行为闭，门的断言不够特异 → F-20（low，非阻断；建议匹配 label 文本节点并排除 `ink 错误`）。
+- 确定性追加：demo 的 strict/alpha 改为带状态标签按钮（`业务拒绝：开/关`、`隐藏/显示 alpha`），门按标签 press；palette 命中改为末 canvas 下标（showAlpha 开关均正确）；通道提交前 `autoui_inspect` 校验 R 输入为 64 再 Enter；取消断言改为「路径发生 + 正式值不变」（接受已文档化平台双发）。三次 native pass + 一次 vue pass 支撑。
+- F-05/F-17 边界：沿用第三次复审记录（包级 cancelled 仍可能两次、消费方按会话去重；旧 action 以 stale-element 拒绝为证、焦点恢复为 `modal_restore` 平台边界）；README/§10 已披露，不再重复复验。
+- 视觉/边界：`vue-light.png`（新状态按钮、#3974E6CC/57/116/230/204）、`vue-dialog-narrow.png`（420×560 footer 取消/确认、HEX 获焦）沿用 r6b/r9a；native 模态截图零尺寸为平台限制（结构断言替代）；Paint 主题 pac 固定（内容色不变性由 demo 深浅用例覆盖）；Linux not_run。
+
+| 范围 | 入口 | 结果 | 时间 |
+|---|---|---|---|
+| 工具门（2 用例） | 预编译 `color_picker_component-6f39…exe` | 2 passed / exit 0，无 S001 | 5.77s |
+| native 门独立复跑 | `verify_color_picker.py --backend native`（隔离 out-dir） | pass（10 用例 + reopen + 3 截图） | 63.7s |
+| native r9a/r9b（复用） | 同门 | pass ×2 | 作者记录 |
+| vue 门 r9a（复用） | `verify_color_picker.py --backend vue` | pass（5 截图） | 未在本轮观测 |
+| 定向探针 | f18-replay / f19-lines | 见上 | 各 20–35s |
+
+发现（severity｜AC｜task｜证据｜修法）：
+- F-20（low｜AC-02｜T-05｜**非阻断**）门的可见 `invalid_color` 断言非特异：`verify_color_picker.py:505` 用 `'invalid hex color' in s.snapshot()`，而 demo 的 `InlineError`（`examples/color-picker/src/front/pages/demo.at:100-102`）把 `ink 错误 {…message…}` 写进日志，同一字符串也出现在日志行；去掉可见 label 断言仍通过。行为已由 `probe-f19-lines` 独立验证（LABEL 文本节点在）。修（建议 merge 后首个触点或后续小任务）：匹配 `text #vnode_N "color-picker: invalid hex color (invalid_color)"` 且排除 `ink 错误`，或在 demo 侧用带序号的 label 文本；不阻塞本计划交付。
+- 关闭：F-18（Paint 取消/历史 oracle 落地并复验）；F-19 行为（可见错误持久）；F-11/F-12/F-13/F-14/F-16 沿第三次复审；F-05/F-17 边界维持。
+
+AC 结论：AC-01 pass；AC-02 pass（F-20 low 非阻断）；AC-03 pass（F-05 平台边界）；AC-04 pass（F-17 边界 + stale-element 实证）；AC-05 pass（F-18）；AC-06 partial（Win native/vue、浅深、窄窗、重开 pass；Linux not_run 待 merge 批、Paint 主题 pac 边界）；AC-07 pass；AC-08 pending（merge）。
+
+未检查/假设边界：vue 门未重跑（r9a 输入 hash 与当前一致、截图已抽检）；Linux 无 runner 未跑（merge 批补）；未复验 087/auto-lang/auto-man 依赖修订；未跑全局回归；F-05 包级双发与 F-17 焦点恢复为已记录平台边界，未再复验；F-20 的断言特异性仅为门质量建议，不影响本轮行为验收。
 
 ## 10. 待澄清事项
 
