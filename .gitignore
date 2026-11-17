@@ -48,3 +48,5 @@ examples/**/rust-workspace/
 examples/**/.auto/
 examples/**/.am/
 __pycache__/
+
+examples/**/src/front/tmp/

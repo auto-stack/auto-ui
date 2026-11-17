@@ -67,6 +67,8 @@ vue 轨消费需在 `pac.at` 声明 `dep color_picker { path: "<本包目录>" }
 
 - canonical 为规范化 8 位 `#RRGGBBAA`；输出大写 8 位 HEX。
 - 通道：RGB/alpha 整数 0…255；HSV 为 H 0…360、S/V 0…100；360 等价 0。
+- 输入兼容 `#RGB` / `#RGBA` / `#RRGGBB` / `#RRGGBBAA`（`#RGBA` 按位展开为 8 位），
+  输出固定 8 位；非法文本保留草稿并具名错误，不发有效 preview/commit。
 - 转 8 位按最近整数、恰好一半向上；`#3974E6CC` ⇒ RGBA(57,116,230,204)。
 - HSV 在当前草稿变灰/黑时保留最近有效 H（`h_hold` 串字段，跨 handler 可靠）；
   打开灰/黑初始值（Init 或外部重基线）则 H=0。
@@ -101,19 +103,21 @@ vue 轨消费需在 `pac.at` 声明 `dep color_picker { path: "<本包目录>" }
 
 - native `input` 无 `onblur`：提交统一走 Enter / 手势收笔 / 色板命中；
   Escape 绑定在 HEX 输入上，不绑全局键。
-- 初始焦点：平台无 widget 级 autofocus 通道（iced 焦点由点击/update 臂），
-  Dialog 复用既有 modal 焦点环；未强制 HEX 自动置焦（T-01 decisions 边界）。
+- 初始焦点：Dialog 打开时由既有 modal 焦点事务聚焦内容区首个输入（本包视图
+  首输入为 HEX），关闭后恢复打开前的焦点；包内不另发 `ui.focus`。
 - canvas 8 位 HEX alpha 由 runtime 按**串长**判别（`#RRGGBBAA` 不被
   `Color::Hex(u32)` 丢 alpha）；行/条半字节与 rgb6 截取已在包内修正。
-- 组件最小布局宽约 516px（色面列约 296 + 间隙 + 通道列 ≥160 + 页面 padding）；
-  更窄视口由调用方页面负责横向滚动或改为堆叠（示例页在窄窗改为纵向堆叠）。
+- 组件最小布局宽约 364px（色面/条列 192 + 间隙 + 通道列 ≥160）；示例页在窄窗
+  纵向堆叠两个区段，640x560 native 与 420x560 vue 均可读（产品门在案）。
 
 ## 运行与验证
 
 - 示例：`examples/color-picker/`（Inline ColorPicker + ColorDialog 双实例）。
 - 产品门：`tests/product/verify_color_picker.py --auto-bin <cli> --ui-tool-bin
   <tool> --out-dir <isolated> --backend native|vue`；工具门：
-  `cargo test -p auto-ui-tools --test color_picker_component`。
+  `cargo test -p auto-ui-tools --test color_picker_component`。报告记录
+  提交 SHA 与被测 .at/门脚本的 sha256 前缀；native 覆盖 HEX 短形式/精确通道/
+  同值零事件/非法错误、showAlpha 保 alpha、Paint 像素读回、窄窗浅深与重开。
 - 证据与决策：`docs/reviews/plan088/decisions.md`；原始 gate 输出在
   `D:/autostack/plan-artifacts/plan-088/`。
 
@@ -121,5 +125,5 @@ vue 轨消费需在 `pac.at` 声明 `dep color_picker { path: "<本包目录>" }
 
 | 轨 | Windows | Linux | macOS |
 |---|---|---|---|
-| native VM | ✅ 产品门通过（V-01…V-06、窄窗浅深、退出重开） | not_run（本组无 Linux runner，不冒 pass） | 不宣称 |
-| vue（浏览器） | ✅ 产品门通过（playwright chromium） | not_run | 不宣称 |
+| native VM | ✅ Windows 产品门通过（HEX/RGB/HSV/alpha、手势/对话框、Paint 像素、窄窗浅深、退出重开） | not_run（本组无 Linux runner，不冒 pass） | 不宣称 |
+| vue（浏览器） | ✅ Windows 产品门通过（拖拽/HEX/通道/浅深/窄窗截图；playwright chromium） | not_run | 不宣称 |

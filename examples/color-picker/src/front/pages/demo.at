@@ -5,7 +5,7 @@ use auto.json
 // 一律拒绝并保留正式值；取消零业务修改）。Inline ColorPicker 与
 // ColorDialog 同页消费，第二实例验证实例隔离。
 widget demo {
-    msg { Init, InlinePreview(str), InlineCommitted(str), InlineCancelled, InlineError(str), ToggleDlg, DlgPreview(str), DlgCommitted(str), DlgCancelled, DlgError(str), ToggleStrict, ResetInk, Quit }
+    msg { Init, InlinePreview(str), InlineCommitted(str), InlineCancelled, InlineError(str), ToggleDlg, DlgPreview(str), DlgCommitted(str), DlgCancelled, DlgError(str), ToggleStrict, ToggleAlpha, ResetInk, Quit }
     model {
         // 受控真源（应用所有；canonical #RRGGBBAA）
         var ink str = "#3974E6CC"
@@ -15,6 +15,7 @@ widget demo {
         var dlg_open bool = false
         // 业务拒绝演示开关
         var strict bool = false
+        var show_alpha bool = true
         // 结果日志
         var events List = []
         var seq_log int = 0
@@ -27,11 +28,12 @@ widget demo {
                 text "选色设置表单" { style: "text-sm font-medium" }
                 row (style: "flex-1") {}
                 checkbox { text: "业务拒绝模式", checked: .strict, onclick: .ToggleStrict }
+                checkbox { text: "隐藏 alpha", checked: !.show_alpha, onclick: .ToggleAlpha }
             }
             col (style: "items-start gap-6 w-full") {
                 col (style: "gap-3 min-w-80 flex-1") {
                     text "Inline 选色器（画笔颜色）" { style: "text-xs font-medium text-muted-foreground" }
-                    ColorPicker (value: .ink, revision: .ink_rev, palette: .palette, onpreview: .InlinePreview($event), oncommitted: .InlineCommitted($event), oncancelled: .InlineCancelled, onerror: .InlineError($event)) {}
+                    ColorPicker (value: .ink, revision: .ink_rev, showAlpha: .show_alpha, palette: .palette, onpreview: .InlinePreview($event), oncommitted: .InlineCommitted($event), oncancelled: .InlineCancelled, onerror: .InlineError($event)) {}
                     text f"当前画笔 ${.ink}" { style: "text-xs" }
                 }
                 col (style: "gap-3 min-w-80 flex-1") {
@@ -41,7 +43,7 @@ widget demo {
                 }
             }
             row (style: "items-center gap-2 border-t border-border pt-2") {
-                button "重置画笔" { onclick: .ResetInk, title: "外部置值（撤销未提交草稿）", style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                button "重置画笔" { onclick: .ResetInk, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
                 button "退出" { onclick: .Quit, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
             }
             col (style: "gap-1") {
@@ -55,7 +57,7 @@ widget demo {
                     }
                 }
             }
-            ColorDialog (value: .label, revision: .label_rev, open: .dlg_open, title: "选择标签颜色", palette: .palette, onpreview: .DlgPreview($event), oncommitted: .DlgCommitted($event), oncancelled: .DlgCancelled, onerror: .DlgError($event)) {}
+            ColorDialog (value: .label, revision: .label_rev, showAlpha: .show_alpha, open: .dlg_open, title: "选择标签颜色", palette: .palette, onpreview: .DlgPreview($event), oncommitted: .DlgCommitted($event), oncancelled: .DlgCancelled, onerror: .DlgError($event)) {}
         }
     }
     on {
@@ -119,6 +121,9 @@ widget demo {
         }
         .ToggleStrict -> {
             .strict = !.strict
+        }
+        .ToggleAlpha -> {
+            .show_alpha = !.show_alpha
         }
         .ResetInk -> {
             .ink = "#3974E6CC"

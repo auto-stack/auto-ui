@@ -112,7 +112,7 @@ fn cp_hex_norm(phex str) str {
             out = out + up
         }
     }
-    if n <= 4 { out = out + "FF" }
+    if n == 3 { out = out + "FF" }
     if n == 6 { out = out + "FF" }
     return out
 }

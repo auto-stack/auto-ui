@@ -17,6 +17,7 @@ run in the merge-owned regression batch (not_run here is recorded, not
 silently dropped).
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -164,7 +165,12 @@ class Session:
         return m.group(0)
 
     def screenshot(self, name):
-        shot = self.call('autoui_screenshot')
+        shot = ''
+        for _ in range(4):
+            (_se, shot) = self.call('autoui_screenshot', allow_error=True)
+            if re.search(r'(\S+\.(?:png|jpg))', shot):
+                break
+            time.sleep(0.6)
         m = re.search(r'(\S+\.(?:png|jpg))', shot)
         vfd.require(m, f'screenshot failed: {shot[:160]}')
         src = Path(m.group(1))
@@ -205,6 +211,45 @@ def commits(lines):
     return [l for l in lines if 'ink 接受' in l]
 
 
+def input_values(s):
+    """Current input values in declaration order (HEX, R, G, B[, A[, H,S,V]])."""
+    ids = re.findall(r'input #vnode_(\d+)', s.snapshot())
+    vals = []
+    for i in ids:
+        (_e, t) = s.call('autoui_inspect', allow_error=True, element_id=f'vnode_{i}')
+        m = re.search(r'value:\s*(\S*)', t)
+        vals.append(m.group(1) if m else '?')
+    return vals
+
+
+def wait_snapshot(s, pred, tries=12, wait=0.4):
+    snap = ''
+    for _ in range(tries):
+        snap = s.snapshot()
+        if pred(snap):
+            return True
+        time.sleep(wait)
+    return False
+
+
+def toggle_checkbox(s, label):
+    m = re.search(r'checkbox #vnode_(\d+) "[^"]*' + re.escape(label), s.snapshot())
+    vfd.require(m, f'checkbox {label!r} not found')
+    s.call('autoui_action', element_id=f'vnode_{m.group(1)}', action='toggle', latency=True)
+
+
+def hex_submit(s, text):
+    """Type a HEX draft into the first input and commit with submit + Enter."""
+    ids = re.findall(r'input #vnode_(\d+)', s.snapshot())
+    vfd.require(ids, 'hex input missing')
+    hex_id = 'vnode_' + ids[0]
+    s.call('autoui_type', element_id=hex_id, text=text)
+    time.sleep(0.5)
+    s.call('autoui_action', allow_error=True, element_id=hex_id, action='submit', latency=True)
+    s.call('autoui_keyboard', key='Enter')
+    time.sleep(0.5)
+
+
 # ── demo cases (native) ──
 
 def case_known_colors(s, report):
@@ -239,8 +284,7 @@ def case_known_colors(s, report):
 def case_gestures(s, report):
     """V-02: one gesture = one commit; preview carries surface source; external
     reset revokes drafts."""
-    before = len(log_lines(s))
-    time.sleep(1.0)
+    time.sleep(1.5)
     before = len(log_lines(s))
     before_commits = len(commits(log_lines(s)))
     s.pen(0, [(30, 30), (60, 120)])
@@ -327,17 +371,24 @@ def case_business_reject(s, report):
 def case_dialog(s, report):
     """V-02/03: dialog draft/confirm-once/cancel-zero; dialog pen scoping."""
     label0 = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
+    inline_cans = len(s.canvases())
+    vfd.require(inline_cans >= 4, f'inline canvases missing: {inline_cans}')
     s.press_button('打开标签色对话框')
     cans = []
     deadline = time.time() + 10
     while time.time() < deadline:
         cans = s.canvases()
-        if len(cans) >= 10:
+        if len(cans) == inline_cans * 2:
             break
         time.sleep(0.4)
-    vfd.require(len(cans) >= 10, f'dialog canvases missing: {len(cans)}')
-    # dialog picker canvases are the last 5: [surf, hue, alpha, sw, pal]
-    base = len(cans) - 5
+    vfd.require(len(cans) == inline_cans * 2,
+                f'dialog canvases missing: {len(cans)} (inline {inline_cans})')
+    # native window capture is unavailable while the modal is active (the
+    # capture reports a zero-size window); the dialog-open state is asserted
+    # structurally here and captured in the vue track (vue-dialog.png).
+    vfd.require('取消' in s.snapshot() and '确认' in s.snapshot(), 'dialog footer missing')
+    # dialog picker canvases are the last inline_cans: [surf, hue, (alpha), sw, pal]
+    base = len(cans) - inline_cans
     s.pen(base + 1, [(8, 6)])
     s.pen(base, [(96, 95)])
     s.press_button('取消')
@@ -348,11 +399,12 @@ def case_dialog(s, report):
     deadline = time.time() + 10
     while time.time() < deadline:
         cans = s.canvases()
-        if len(cans) >= 10:
+        if len(cans) == inline_cans * 2:
             break
         time.sleep(0.4)
-    vfd.require(len(cans) >= 10, f'dialog canvases missing on reopen: {len(cans)}')
-    base = len(cans) - 5
+    vfd.require(len(cans) == inline_cans * 2,
+                f'dialog canvases missing on reopen: {len(cans)}')
+    base = len(cans) - inline_cans
     s.pen(base + 1, [(8, 6)])
     s.pen(base, [(96, 95)])
     s.press_button('确认')
@@ -362,6 +414,63 @@ def case_dialog(s, report):
     label2 = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
     vfd.require(label2 != label0, f'confirm did not change label: {label2}')
     report['cases'].append('V-02/03 dialog draft/confirm/cancel pass')
+
+
+# ── hex / alpha oracles (native) ──
+
+def case_hex(s, report):
+    """V-01/06: short HEX, exact known color + channel readback, same-value
+    zero event, invalid text -> named error without commit."""
+    s.press_button('重置画笔')
+    vfd.require(wait_log(s, lambda l: any('外部置值 ink=#3974E6CC' in x for x in l)),
+                'hex: reset missing')
+    time.sleep(1.0)
+    hex_submit(s, '#F00')
+    vfd.require(wait_log(s, lambda l: any('ink 接受 #FF0000FF' in x for x in l)),
+                f'hex: short-form commit missing: {log_lines(s)[-3:]}')
+    hex_submit(s, '#3974E6CC')
+    vfd.require(wait_log(s, lambda l: any('ink 接受 #3974E6CC' in x for x in l)),
+                f'hex: known-color commit missing: {log_lines(s)[-3:]}')
+    time.sleep(0.8)
+    vals = input_values(s)
+    vfd.require(vals[:5] == ['#3974E6CC', '57', '116', '230', '204'],
+                f'hex: channel readback {vals}')
+    before = len(commits(log_lines(s)))
+    hex_submit(s, '#3974E6CC')
+    time.sleep(0.8)
+    vfd.require(len(commits(log_lines(s))) == before, 'hex: same value committed again')
+    hex_submit(s, '#GG0000')
+    vfd.require(wait_log(s, lambda l: any('ink 错误' in x and 'invalid_color' in x for x in l)),
+                'hex: invalid_color error event missing')
+    time.sleep(0.6)
+    vfd.require(len(commits(log_lines(s))) == before, 'hex: invalid text committed')
+    vfd.require(s.ink_text() == '当前画笔 #3974E6CC',
+                f'hex: invalid text changed ink: {s.ink_text()}')
+    report['cases'].append('V-01/06 HEX exact + invalid + same-value pass')
+
+
+def case_alpha(s, report):
+    """V-06: showAlpha=false hides editing but must not drop the existing alpha."""
+    s.press_button('重置画笔')
+    vfd.require(wait_log(s, lambda l: any('外部置值 ink=#3974E6CC' in x for x in l)),
+                'alpha: reset missing')
+    time.sleep(1.0)
+    toggle_checkbox(s, '隐藏 alpha')
+    shown = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 4)
+    if not shown:
+        toggle_checkbox(s, '隐藏 alpha')
+        shown = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 4)
+    vfd.require(shown, 'alpha: A input still shown after hiding alpha')
+    s.pen(0, [(96, 95)])
+    vfd.require(wait_log(s, lambda l: any(re.search(r'ink 接受 #[0-9A-F]{6}CC', x) for x in l)),
+                f'alpha: hidden alpha dropped the value: {log_lines(s)[-3:]}')
+    toggle_checkbox(s, '隐藏 alpha')
+    back = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 5)
+    if not back:
+        toggle_checkbox(s, '隐藏 alpha')
+        back = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 5)
+    vfd.require(back, 'alpha: A input did not come back')
+    report['cases'].append('V-06 showAlpha retention pass')
 
 
 # ── paint consumption (native) ──
@@ -441,21 +550,30 @@ def case_paint(args, out, report):
         time.sleep(1.0)
         st = re.search(r'text #vnode_\d+ "(loaded|no saved canvas|bad save data)"', paint.snapshot())
         vfd.require(st and st.group(1) == 'loaded', f'legacy load failed: {st.group(1) if st else "?"}')
-        # picker palette p1 (#EF4444FF) then paint cell 42 through canvas onhit
-        paint.hit(6, 'p1')
+        # legacy load already migrated every cell to #EF4444FF
+        vfd.require('px42=#EF4444FF' in paint.snapshot(), 'paint: legacy px42 readback missing')
+        # picker palette p7 (#3B82F6FF) then paint cell 42 through canvas onhit
+        paint.hit(6, 'p7')
         time.sleep(1.0)
         paint.hit(0, 'px42')
-        time.sleep(1.0)
+        time.sleep(1.2)
+        snap = paint.snapshot()
+        vfd.require('px42=#3B82F6FF' in snap, 'paint: painted pixel color mismatch (V-04)')
+        vfd.require('painted px42=#3B82F6FF' in snap, 'paint: commit status mismatch (V-04)')
         # undo restores the pre-paint state (cell 42 back to legacy red)
         paint.press_button('Undo')
-        time.sleep(1.0)
-        # save/load round-trip in the new format
+        time.sleep(1.2)
+        vfd.require('px42=#EF4444FF' in paint.snapshot(), 'paint: undo did not restore px42')
+        # save/load round-trip in the new format keeps the picked color
+        paint.hit(0, 'px42')
+        time.sleep(1.2)
         paint.press_button('Save')
         paint.press_button('New')
         paint.press_button('Load')
-        time.sleep(1.0)
+        time.sleep(1.2)
         st = re.search(r'text #vnode_\d+ "(loaded|no saved canvas|bad save data)"', paint.snapshot())
         vfd.require(st and st.group(1) == 'loaded', f'round-trip load failed')
+        vfd.require('px42=#3B82F6FF' in paint.snapshot(), 'paint: save/load lost the pixel color')
         paint.screenshot('paint-native.png')
         report['cases'].append('V-04 paint consumption pass')
     finally:
@@ -520,6 +638,35 @@ def run_vue(args, out, report):
             time.sleep(1.5)
             body3 = page.evaluate('document.body.innerText')
             vfd.require('#4074E6CC' in body3, f'vue channel commit missing: {body3[:240]}')
+            # vue equivalent of native case_hex: short HEX + exact channel readback
+            page.locator('input').nth(0).fill('#F00')
+            time.sleep(0.4)
+            page.keyboard.press('Enter')
+            time.sleep(1.5)
+            body_hex = page.evaluate('document.body.innerText')
+            vfd.require('#FF0000FF' in body_hex, f'vue short-hex commit missing: {body_hex[:200]}')
+            page.locator('input').nth(0).fill('#3974E6CC')
+            time.sleep(0.4)
+            page.keyboard.press('Enter')
+            time.sleep(1.5)
+            vals = page.evaluate('Array.from(document.querySelectorAll("input")).map(i=>i.value)')
+            vfd.require(vals[:5] == ['#3974E6CC', '57', '116', '230', '204'],
+                        f'vue channel readback {vals}')
+            # dialog-open state (native capture is zero-size under a modal)
+            page.get_by_role('button', name=re.compile('打开标签色对话框')).click()
+            time.sleep(1.2)
+            body_dlg = page.evaluate('document.body.innerText')
+            vfd.require('选择标签颜色' in body_dlg and '确认' in body_dlg,
+                        'vue dialog state missing')
+            page.screenshot(path=str(out / 'vue-dialog.png'), full_page=True)
+            page.get_by_role('button', name=re.compile('取消')).click()
+            time.sleep(0.8)
+            # dark theme: content color must stay identical
+            page.get_by_role('button', name=re.compile('切换明暗')).click()
+            time.sleep(1.0)
+            body_dark = page.evaluate('document.body.innerText')
+            vfd.require('#3974E6CC' in body_dark, 'vue dark theme changed content color')
+            page.screenshot(path=str(out / 'vue-dark.png'), full_page=True)
             page.screenshot(path=str(out / 'vue-light.png'), full_page=True)
             page2 = browser.new_page(viewport={'width': 420, 'height': 560})
             page2.goto(url, timeout=30000)
@@ -550,7 +697,7 @@ def main():
         'demo_app': str(DEMO_APP), 'paint_app': str(PAINT_APP),
     }, indent=2))
 
-    report = {'plan': '088', 'revision': 2, 'backend': args.backend,
+    report = {'plan': '088', 'revision': 3, 'backend': args.backend,
               'platform': 'windows' if os.name == 'nt' else 'linux',
               'source': {}, 'tools': {}, 'cases': [], 'visual': [],
               'cleanup': {}, 'reopen': {}, 'result': 'not_run'}
@@ -563,6 +710,8 @@ def main():
             for name, fn in [('known_colors', case_known_colors),
                              ('gestures', case_gestures),
                              ('channel', case_channel),
+                             ('hex', case_hex),
+                             ('alpha', case_alpha),
                              ('two_instances', case_two_instances),
                              ('business_reject', case_business_reject),
                              ('dialog', case_dialog)]:
@@ -597,10 +746,23 @@ def main():
     else:
         try:
             run_vue(args, out, report)
-            report['visual'] += ['vue-light.png', 'vue-narrow.png']
+            report['visual'] += ['vue-light.png', 'vue-narrow.png', 'vue-dark.png', 'vue-dialog.png']
         except AssertionError as e:
             failures.append(f'vue: {e}')
 
+    try:
+        report['commit'] = subprocess.check_output(
+            ['git', '-C', str(REPO), 'rev-parse', 'HEAD'], text=True).strip()
+    except Exception:
+        report['commit'] = ''
+    hashed = {}
+    for rel in ('packages/color-picker/color_picker.at',
+                'packages/color-picker/color_model.at',
+                'packages/color-picker/color_dialog.at',
+                'tests/product/verify_color_picker.py'):
+        fp = REPO / rel
+        hashed[rel] = hashlib.sha256(fp.read_bytes()).hexdigest()[:16] if fp.exists() else 'missing'
+    report['input_hashes'] = hashed
     binaries = {'auto': str(args.auto_bin), 'ui_tool': str(args.ui_tool_bin)}
     report['tools'] = {k: v for k, v in binaries.items()}
     if failures:

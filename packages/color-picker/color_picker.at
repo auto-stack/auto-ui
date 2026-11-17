@@ -11,7 +11,7 @@ use color_model: cp_alpha_item, cp_channel_of, cp_ip, cp_text_int, cp_checker_it
 // 载荷 JSON {seq, baseRevision, value, source}，source ∈
 // hex/rgb/hsv/palette/surface/confirm；同值提交零事件；一次手势最多一次
 // commit；外部 value/revision 变化经 Tick（interval 100ms）重基线草稿并
-// 失效旧手势；非法 props 以 cfg_err + error(invalid_config) 呈现，不回落
+// 失效旧手势；非法 props 以可见 cfg_err（invalid_config）呈现，不回落
 // 黑色假成功。RGB/HSV 通道组可切换；HEX 输入兼容 #RGB/#RGBA/#RRGGBB/
 // #RRGGBBAA（输出固定 8 位大写）；非法 HEX 文本保留草稿并具名报错，不发
 // 有效事件。HSV 草稿变灰/黑时保留最近有效 H（编辑器草稿级，不改
@@ -52,7 +52,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         var ch_h str = "0"
         var ch_s str = "0"
         var ch_v str = "0"
-        var ch_rev int = 1
         var ch_err str = ""
         // ── 场景表（每 canvas 前缀五表；vue canvas 脚本全表引用）──
         var surf_pts List = []
@@ -96,15 +95,13 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             row (style: "items-start gap-3 w-full min-w-0") {
                 col (style: "gap-2") {
                     canvas (scene: .surf, coords: "192x192", clear: "#ffffff", onpenstart: .SurfDown, onpenmove: .SurfMove, onpenend: .SurfUp, style: "w-48 h-48 rounded border border-border") {}
-                    row (style: "items-center gap-2") {
-                        col (style: "gap-1") {
-                            canvas (scene: .hue, coords: "192x12", onpenstart: .HueDown, onpenmove: .HueMove, onpenend: .HueUp, style: "w-48 h-3 rounded") {}
-                            if .showAlpha {
-                                canvas (scene: .alph, coords: "192x12", onpenstart: .AlphaDown, onpenmove: .AlphaMove, onpenend: .AlphaUp, style: "w-48 h-3 rounded") {}
-                            }
+                    col (style: "gap-1") {
+                        canvas (scene: .hue, coords: "192x12", onpenstart: .HueDown, onpenmove: .HueMove, onpenend: .HueUp, style: "w-48 h-3 rounded") {}
+                        if .showAlpha {
+                            canvas (scene: .alph, coords: "192x12", onpenstart: .AlphaDown, onpenmove: .AlphaMove, onpenend: .AlphaUp, style: "w-48 h-3 rounded") {}
                         }
-                        canvas (scene: .sw, coords: "96x48", style: "w-24 h-12 rounded border border-border") {}
                     }
+                    canvas (scene: .sw, coords: "96x48", style: "w-24 h-12 rounded border border-border") {}
                     canvas (scene: .pal, coords: "192x28", onhit: .SwatchHit, style: "w-48 h-7 rounded border border-border") {}
                 }
                 col (style: "gap-2 min-w-40 flex-1") {
@@ -252,7 +249,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .hue_nodes = []
             var hi int = 0
             while hi < 24 {
@@ -318,7 +314,11 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             if .revision != .seen_rev || .value != .seen_val {
                 .seen_rev = .revision
                 .seen_val = .value
+                if cp_hex_valid(.value) != 0 {
+                    .cfg_err = "color-picker: value is not a valid hex color (invalid_config)"
+                }
                 if cp_hex_valid(.value) == 0 {
+                    .cfg_err = ""
                     .h_hold = "0"
                     .d_hex = cp_hex_norm(.value)
             var ld_r int = cp_channel_of(.d_hex, 0)
@@ -357,7 +357,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -408,6 +407,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .SurfDown(x, y) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
 
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -438,8 +439,12 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var xf float = x
             var yf float = y
-            var sdec str = f"${xf * 0.5208333}"
-            var vdec str = f"${(192.0 - yf) * 0.5208333}"
+            var xs str = f"${xf}"
+            var ys str = f"${yf}"
+            var xi int = cp_ip(xs)
+            var yi int = cp_ip(ys)
+            var sdec str = f"${(xi * 100) / 192}"
+            var vdec str = f"${((192 - yi) * 100) / 192}"
             ld_sat = cp_floor_clamp(sdec, 0, 100)
             ld_v = cp_floor_clamp(vdec, 0, 100)
             .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
@@ -479,7 +484,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -519,6 +523,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .SurfMove(x, y) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
 
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -549,8 +555,12 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var xf float = x
             var yf float = y
-            var sdec str = f"${xf * 0.5208333}"
-            var vdec str = f"${(192.0 - yf) * 0.5208333}"
+            var xs str = f"${xf}"
+            var ys str = f"${yf}"
+            var xi int = cp_ip(xs)
+            var yi int = cp_ip(ys)
+            var sdec str = f"${(xi * 100) / 192}"
+            var vdec str = f"${((192 - yi) * 100) / 192}"
             ld_sat = cp_floor_clamp(sdec, 0, 100)
             ld_v = cp_floor_clamp(vdec, 0, 100)
             .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
@@ -590,7 +600,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -630,6 +639,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .SurfUp(x, y) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
 
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -660,8 +671,12 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var xf float = x
             var yf float = y
-            var sdec str = f"${xf * 0.5208333}"
-            var vdec str = f"${(192.0 - yf) * 0.5208333}"
+            var xs str = f"${xf}"
+            var ys str = f"${yf}"
+            var xi int = cp_ip(xs)
+            var yi int = cp_ip(ys)
+            var sdec str = f"${(xi * 100) / 192}"
+            var vdec str = f"${((192 - yi) * 100) / 192}"
             ld_sat = cp_floor_clamp(sdec, 0, 100)
             ld_v = cp_floor_clamp(vdec, 0, 100)
             .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
@@ -701,7 +716,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -743,6 +757,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .HueDown(x, y) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
 
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -815,7 +831,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -868,6 +883,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .HueMove(x, y) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
 
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -940,7 +957,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -993,6 +1009,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .HueUp(x, y) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
 
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -1065,7 +1083,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -1120,6 +1137,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .AlphaDown(x, y) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
 
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -1188,7 +1207,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -1223,6 +1241,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .AlphaMove(x, y) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
 
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -1291,7 +1311,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -1326,6 +1345,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .AlphaUp(x, y) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
 
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -1394,7 +1415,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -1431,6 +1451,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .SwatchHit(id) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 var idx int = id.substr(1, id.len()).to(int)
                 var top int = .pal_norm.len() - 1
                 var i int = cp_clamp(idx, 0, top)
@@ -1473,7 +1495,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -1528,6 +1549,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .HexInput(v) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .hex_text = v
                 if cp_hex_valid(v) != 0 {
                     .hex_err = "color-picker: invalid hex color (invalid_color)"
@@ -1570,7 +1593,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -1624,6 +1646,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .HexEnter -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 if cp_hex_valid(.hex_text) != 0 {
                     ."error"(json.stringify({code: "invalid_color", message: "color-picker: invalid hex color (invalid_color)"}))
                 }
@@ -1664,7 +1688,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -1719,6 +1742,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .HexEscape -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 if .hex_text != .d_hex || .hex_err != "" {
                     .hex_text = .d_hex
                     .hex_err = ""
@@ -1728,6 +1753,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .RPreview(v str) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -1798,7 +1825,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -1845,6 +1871,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .GPreview(v str) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -1915,7 +1943,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -1962,6 +1989,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .BPreview(v str) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -2032,7 +2061,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -2079,6 +2107,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .APreview(v str) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -2149,7 +2179,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -2196,6 +2225,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .HPreview(v str) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -2269,7 +2300,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -2329,6 +2359,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .SPreview(v str) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -2399,7 +2431,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -2459,6 +2490,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .VPreview(v str) -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -2529,7 +2562,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -2589,6 +2621,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .RCommitted() -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -2660,7 +2694,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -2707,6 +2740,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .GCommitted() -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -2778,7 +2813,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -2825,6 +2859,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .BCommitted() -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -2896,7 +2932,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -2943,6 +2978,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .ACommitted() -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -3014,7 +3051,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
             while ai < 24 {
@@ -3061,6 +3097,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .HCommitted() -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -3135,7 +3173,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -3195,6 +3232,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .SCommitted() -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -3266,7 +3305,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -3326,6 +3364,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .VCommitted() -> {
             if !.c_locked {
+                .ch_err = ""
+                .hex_err = ""
                 .ch_err = ""
             var ld_r int = cp_channel_of(.d_hex, 0)
             var ld_g int = cp_channel_of(.d_hex, 1)
@@ -3397,7 +3437,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .ch_h = f"${ld_h}"
             .ch_s = f"${ld_sat}"
             .ch_v = f"${ld_v}"
-            .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
@@ -3458,7 +3497,6 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .ToggleHsv -> {
             if !.c_locked {
                 .hsv_mode = !.hsv_mode
-                .ch_rev = .ch_rev + 1
             }
         }
     }

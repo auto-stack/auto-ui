@@ -136,6 +136,7 @@ widget App {
                 button "Save" { onclick: .Save, style: "px-3 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground" }
                 button "Load" { onclick: .Load, style: "px-3 py-1.5 text-sm rounded-lg bg-primary/15 text-primary" }
                 text .status { style: "ml-auto text-xs text-muted-foreground" }
+                text f"px42=${.px[42]}" { style: "text-xs text-muted-foreground" }
             }
         }
     }
@@ -287,6 +288,7 @@ widget App {
                     .PushUndo()
                     .SetPx(i, .cur)
                     .RebuildCells()
+                    .status = f"painted px${i}=${.px[i]}"
                 }
             }
             if .tool == "eraser" {

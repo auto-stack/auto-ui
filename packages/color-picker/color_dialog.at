@@ -23,6 +23,7 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         var seen_rev int = 0
         var seen_val str = "#000000FF"
         var seen_open bool = false
+        var cancel_guard bool = false
         var cfg_err str = ""
         var seq int = 0
         var dlg_hex str = "#000000FF"
@@ -70,12 +71,19 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             // open 镜像先行（vue dialog v-model 绑模型镜像——r3 实录）
             if .open != .dlg_open {
                 .dlg_open = .open
+                if .open {
+                    .cancel_guard = false
+                }
             }
             if .revision != .seen_rev || .value != .seen_val || .open != .seen_open {
                 .seen_rev = .revision
                 .seen_val = .value
                 .seen_open = .open
+                if cp_hex_valid(.value) != 0 {
+                    .cfg_err = "color-dialog: value is not a valid hex color (invalid_config)"
+                }
                 if cp_hex_valid(.value) == 0 {
+                    .cfg_err = ""
                     // 外部推进/重新打开：草稿重基线（旧手势随 Picker 修订失效）
                     .dlg_hex = cp_hex_norm(.value)
                     .dlg_rev = .dlg_rev + 1
@@ -90,11 +98,13 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             ."error"(ev)
         }
         .PickCancelled -> {
-            // 取消：结束预览；草稿重基线到外部正式值（不改正式值）
+            // 取消：结束预览；草稿重基线到外部正式值（不改正式值）。
+            // cancel_guard 去重：随后的 open→false onclose 不再二次 emit。
             if cp_hex_valid(.value) == 0 {
                 .dlg_hex = cp_hex_norm(.value)
                 .dlg_rev = .dlg_rev + 1
             }
+            .cancel_guard = true
             ."cancelled"()
         }
         .PickCommitted(ev str) -> {
@@ -114,11 +124,14 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
         }
         .Cancelled -> {
-            if cp_hex_valid(.value) == 0 {
-                .dlg_hex = cp_hex_norm(.value)
-                .dlg_rev = .dlg_rev + 1
+            if !.cancel_guard {
+                .cancel_guard = true
+                if cp_hex_valid(.value) == 0 {
+                    .dlg_hex = cp_hex_norm(.value)
+                    .dlg_rev = .dlg_rev + 1
+                }
+                ."cancelled"()
             }
-            ."cancelled"()
         }
     }
 }
