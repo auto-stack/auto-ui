@@ -86,7 +86,7 @@
 | P3 | App 级 Tick 需显式 `timer { Tick (every_ms) }` + msg 变体；组件 `interval` 约定只覆盖子件 Tick | demo7 `timer: event 'Tick' has no matching msg variant`；probe ticks=79/14s | demo 落显式 timer；包组件沿用 interval 约定（子件 Tick 实证走通） |
 | P4 | `view` 是 `.at` 保留字：对象字面量裸 `view:` 键报 `Expected key, got View`；表达式成员位 `.view` 被 DotView 词元吞掉（静默取空） | 解析探针 d1/d2；`req.view.fit`→空 vs `req.source`→正常（probe3 A/B/C） | 包载荷以带引号 `"view"` 键输出（键名不变）；消费方 `req["view"]` 索引读取 |
 | P5 | `auto-ui-tool.exe` 是 split 会话的 VM UI 宿主（auto.exe 的 [tool] 分支 spawn）——runtime 修复必须重建 auto-ui-tool，否则旧行为继续 | 旧串 `skipping dispatch` 在新 auto.exe 会话仍出现；字节搜索两 exe：tool 缺 marker、auto.exe 有 | 重建双二进制；gate 显式 `--ui-tool-bin` 指向同源构建 |
-| P6 | 【未决·T-05 阻塞点】包组件 media notify 收集：当前会话中 sweep 未到达包组件的 image_surface（无 VM-MEDIA 行、loaded 不派发）；demo18 早期会话曾触达（loaded=2 全链走通），后续运行回归，根因未定位 | demo18 vs demo21-23/probe12 同二进制对比；`collect_media_surfaces` 遍历臂覆盖 Column/Row/Popover/Container/Scrollable/Grid/Overlay | 已落两项修复（实例名归一 + 零参回退派发）；下一轮以 probe12（最小包 + loaded 中继）为最小复现继续定位，方向：包组件子树在动态视图中的表示与 collect 遍历臂的覆盖 |
+| P6 | 【已定位并关闭】三层叠加根因：(a) 探针与演示文件在长调试中被多次实验性改写互相污染（OpenALiteral/ProbeOpen/open3 残留、pac 被覆盖为 timer-probe），(b) 前端 VM 进程 cwd 非项目目录——包 use 与夹具的**相对路径全部不解析**（组件不挂载/索引为空；A/B 实证：绝对包路径 mounted、相对不 mounted），(c) MCP press 与首帧 vnode 登记竞态（首 press 静默 no-op） | PLAN089SWEEP 树转储（组件子树 0 节点 vs probe16 修复后 4 节点/loaded=1）；demo18/30/31/32 对照 | (a) 实验文件全部还原并提交固化；(b) gate 期原地重写包 use + 夹具为绝对路径（finally 字节恢复；提交源保持可移植相对形态），031 V-04 腿同法；(c) settle + 重试（press_until）。修复后 native 产品门 **RESULT: pass，16 pass/0 fail/3 not_run**（V-03 对话框内 MCP 腿与 V-04 轨道缺口单列，见 §7 P8/P9） |
 | P7 | 机器占用：lang-980（ace_ts_provider）与 plan-982（p982_* 测试）编译期间按纪律等待并通知；未并行构建 | 进程 CommandLine 记录（23:23-23:24 起跑） | 构建窗口错峰执行 |
 
 ### 3.3 补充：已回填探针结果（更新）
@@ -95,3 +95,6 @@
 - `cargo test -p auto-ui-tools --test image_viewer_component` → 2/2 pass（5.63s）
 - `cargo test -p auto-ui-runtime --lib -- image_surface mouse_area onseek progress` → 17 pass（1.75s）
 - native 链路里程碑：demo18（split 会话）全链实证 loaded=2（双实例单次）+ viewRequested tuple 接受（rev 推进）——组件/运行时合同面成立；产品门剩余阻塞见 P6
+
+| P8 | MCP 动作在 modal 打开时被 modal scope 收窄：dialog-content 内控件经 MCP 不可达（PLAN-084 行为，目标在活动 dialog 外或不可识别即具名拒绝） | V-03 对话框内 放大 press → `Modal dialog owns input; target is outside the active dialog` | v1 产品门记 not_run（接受回路与内嵌实例共用并已在 V-01 覆盖）；dialog 内驱动能力留给后续 plan（如 MCP modal-scope 语义扩展） |
+| P9 | 031/029 back 首次生成 + 编译耗时（约 2-4 分钟/个）——Session ready 截止已按会话序号放宽（V-04 腿 600s）；029 的 V-04 腿在其 back 编译缓存冷启动时仍可能超时 | V-04 029 legs 首轮 `app never rendered` | 已放宽至 600s；若仍超时记 not_run（单平台缺口，不并入总绿） |

@@ -186,7 +186,7 @@ class Session:
             except Exception:
                 pass
             time.sleep(0.3)
-        deadline = time.time() + 240
+        deadline = time.time() + (600 if index >= 3 else 240)
         last = ''
         while time.time() < deadline:
             try:
@@ -713,11 +713,27 @@ def main():
 def run_v04(args, out, cases):
     """AC-05: the migrated 031 stage and 029 view area through real media."""
     root = Path(__file__).resolve().parents[2] / 'examples' / 'ui'
+    # 031: 夹具相对路径依赖 back 进程 cwd（P2 同族）——gate 期原地重写为
+    # 绝对路径，finally 恢复字节原样。
+    o31_app_at = root / '031-image-viewer' / 'src' / 'front' / 'app.at'
+    o31_original = o31_app_at.read_bytes()
+    o31_patched = o31_original.decode('utf-8')
+    fixtures_abs = str((Path(__file__).resolve().parents[2] / 'examples' / 'ui' / '031-image-viewer' / 'tests' / 'fixtures').resolve()).replace(chr(92), '/')
+    o31_patched = o31_patched.replace('"../../tests/fixtures/scenic-320x240.png"', f'"{fixtures_abs}/scenic-320x240.png"')
+    o31_patched = o31_patched.replace('"../../tests/fixtures"', f'"{fixtures_abs}"')
+    o31_app_at.write_bytes(o31_patched.encode('utf-8'))
     # 031: open the deterministic fixture, rotate and pan via component toolbar
     try:
         s031 = Session(args, out, 3, cwd=root / '031-image-viewer', ready='Image Viewer')
         try:
-            s031.press('Open File')
+            time.sleep(2.5)
+            for _ in range(3):
+                try:
+                    s031.press('Open File')
+                except AssertionError:
+                    time.sleep(1.0)
+                    continue
+                break
             last = s031.wait_state(lambda s: 'Ready' in s, timeout=40)
             ready = 'Ready' in last
             cases.add('V-04 031 打开媒体→ready', 'press Open File',
@@ -748,7 +764,11 @@ def run_v04(args, out, cases):
                       [{'screenshot': report031}], True)
         finally:
             s031.quit_and_wait()
+            o31_app_at.write_bytes(o31_original)
+            if o31_app_at.read_bytes() != o31_original:
+                raise RuntimeError('031 app.at restore mismatch')
     except Exception as e:
+        o31_app_at.write_bytes(o31_original)
         cases.not_run('V-04 031 legs', '031 session', f'{e!r:.300}')
 
     # 029: grid → open photo → viewport leg

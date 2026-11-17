@@ -50,14 +50,15 @@ widget Gallery {
         .OpenPreview -> { .open = true }
         .ClosePreview -> { .open = false }
         // 唯一业务 view 写点：按 baseRevision 校验后一次性赋值并增 revision。
+        // 平面别名键读取（req.fit 等）——见事件表 `viewRequested` 行说明。
         .ApplyView(ev str) -> {
             let req = json.parse(ev)
             if req.baseRevision == .rev {
-                .fit = req.view.fit
-                .zoom = req.view.zoom
-                .ox = req.view.offsetX
-                .oy = req.view.offsetY
-                .rot = req.view.rotation
+                .fit = req.fit
+                .zoom = req.zoom
+                .ox = req.offsetX
+                .oy = req.offsetY
+                .rot = req.rotation
                 .rev = .rev + 1
             }
         }
@@ -97,7 +98,7 @@ widget Gallery {
 
 | 事件 | 载荷 | 说明 |
 |---|---|---|
-| `viewRequested` | `{seq, baseRevision, resourceId, resourceRevision, view:{fit,zoom,offsetX,offsetY,rotation}, source}` | `source ∈ zoom\|pan\|fit\|rotate\|reset\|gesture`；一次一条完整 tuple |
+| `viewRequested` | `{seq, baseRevision, resourceId, resourceRevision, view:{fit,zoom,offsetX,offsetY,rotation}, fit, zoom, offsetX, offsetY, rotation, source}` | `source ∈ zoom\|pan\|fit\|rotate\|reset\|gesture`；一次一条完整 tuple。冻结的 `view` 对象之外另附**平面别名键**（`fit/zoom/offsetX/offsetY/rotation` 与 view 内同值）——`.at` 消费方在成员位读 `view` 键受 DotView 词元解析缺口影响（decisions.md §7 P4），平面键为语言缺口的适配通道；非 `.at` 消费方用 `view` 对象。**两处数值恒等，接受回路的唯一写点语义不变** |
 | `loaded` | `{resourceId, resourceRevision}` | 当前资源加载完成（最小体，不捏造元数据） |
 | `error` | `{code, message, resourceId, resourceRevision}` | `code ∈ load_failed\|invalid_view`；损坏/失效 URI 是 error |
 | `navigateRequested` | `{seq, baseRevision, resourceId, resourceRevision, direction}` | `direction ∈ previous\|next`；只请求，集合/顺序归应用 |

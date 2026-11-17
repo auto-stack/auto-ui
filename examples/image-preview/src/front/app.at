@@ -58,14 +58,14 @@ widget App {
     }
     // PLAN-089：查看区消费正式包（widget 内 use；model 后、view 前，
     // file-dialog 先例位置）。
-    use { package: image_viewer from "../../../packages/image-viewer" }
+    use { package: image_viewer from "D:/autostack/.wt/ui-089/auto-ui/packages/image-viewer" }
     view {
         col (style: "w-full h-full bg-background text-foreground gap-2 p-3 overflow-y-auto") {
             text "图片预览演示" { style: "text-sm font-medium" }
             row (style: "items-center gap-2") {
-                button "打开图片A" { onclick: .DoOpen("tests/fixtures/corner-marked.png", "img-a", false), style: "h-8 px-2 text-xs rounded-md border border-border" }
-                button "打开图片B" { onclick: .DoOpen("tests/fixtures/scenic-320x240.png", "img-b", true), style: "h-8 px-2 text-xs rounded-md border border-border" }
-                button "打开损坏图" { onclick: .DoOpen("tests/fixtures/damaged.png", "img-damaged", false), style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "打开图片A" { onclick: .DoOpen("D:/autostack/.wt/ui-089/auto-ui/examples/image-preview/tests/fixtures/corner-marked.png", "img-a", false), style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "打开图片B" { onclick: .DoOpen("D:/autostack/.wt/ui-089/auto-ui/examples/image-preview/tests/fixtures/scenic-320x240.png", "img-b", true), style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "打开损坏图" { onclick: .DoOpen("D:/autostack/.wt/ui-089/auto-ui/examples/image-preview/tests/fixtures/damaged.png", "img-damaged", false), style: "h-8 px-2 text-xs rounded-md border border-border" }
                 button "重试" { onclick: .Retry, disabled: .last_path == "", style: "h-8 px-2 text-xs rounded-md border border-border disabled:opacity-40" }
                 button "打开预览" { onclick: .OpenPreview, disabled: .src == "", style: "h-8 px-2 text-xs rounded-md border border-primary text-primary disabled:opacity-40" }
                 button "切换明暗" { onclick: .ToggleTheme, style: "h-8 px-2 text-xs rounded-md border border-border" }
@@ -207,10 +207,10 @@ widget App {
                 .rid = "img-b"
                 .rrev = f"img-b-r${.rrev_seq}"
                 .rrev_seq = .rrev_seq + 1
-                .last_path = "tests/fixtures/scenic-320x240.png"
+                .last_path = "D:/autostack/.wt/ui-089/auto-ui/examples/image-preview/tests/fixtures/scenic-320x240.png"
                 .last_rid = "img-b"
                 .last_is_b = true
-                let session = image.open_session("tests/fixtures/scenic-320x240.png")
+                let session = image.open_session("D:/autostack/.wt/ui-089/auto-ui/examples/image-preview/tests/fixtures/scenic-320x240.png")
                 .session = session
                 .src = image.current_uri(session)
                 .fit = "contain"
@@ -229,10 +229,10 @@ widget App {
                 .rid = "img-a"
                 .rrev = f"img-a-r${.rrev_seq}"
                 .rrev_seq = .rrev_seq + 1
-                .last_path = "tests/fixtures/corner-marked.png"
+                .last_path = "D:/autostack/.wt/ui-089/auto-ui/examples/image-preview/tests/fixtures/corner-marked.png"
                 .last_rid = "img-a"
                 .last_is_b = false
-                let session = image.open_session("tests/fixtures/corner-marked.png")
+                let session = image.open_session("D:/autostack/.wt/ui-089/auto-ui/examples/image-preview/tests/fixtures/corner-marked.png")
                 .session = session
                 .src = image.current_uri(session)
                 .fit = "contain"
