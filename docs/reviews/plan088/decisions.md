@@ -226,3 +226,43 @@ precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
   TypedInst 基座坐标/ID 追加 + MCP press/pen 按元素解析组件作用域派发
   （此前嵌套组件合成动作静默丢弃）；canvas 场景 8 位 hex alpha 按**串
   长**判别（Hex(u32) 丢形态信息）。
+
+## 8. r3 解除阻塞（2026-11-17，goal 续跑；撤回 §10 二选一）
+
+- 裁定路径：不立 VM runtime 修复计划、不降低验收域。做法是在计划范围内
+  以「串字段单一真源 + 每 handler 入口解码」替代跨 handler 整型草稿状态
+  （draft 不再有 `d_r…d_v` 整型字段；`d_hex`/`ch_*`/`h_hold` 串字段跨
+  handler 可靠），并修复下列自含实现缺陷后，native 通道/alpha 证据成立。
+  §7.1 的整型字段写可见性观察随之不再位于关键路径（债仍登记，未宣称修复）。
+- 实测根因（native 黑块/别名值的直接原因，均已在包内修正）：
+  1. **HSV 解码饱和度系数 ×10**：`((hsvv - hsvv%1000)/1000) -
+     ((hsvv - hsvv%100000)/100000) * 1000` 应为 `* 100`（51 处）。h≥1 时
+     `ld_sat` 为负 → `cp_hsv_hex` 夹到 0 → 灰度提交（H=15 提交 #E6E6E6）。
+  2. **行/alpha 条高位半字节缺 `/16`**（`cp_row_item`/`cp_alpha_item`）：
+     aj/ai≥0xA0 时输出 7 位色串（如 `#000000A`），runtime 的 8 位 alpha
+     判别回退 `BLACK` → 色面下行全黑、alpha 条右半黑。
+  3. **rgb6 截取**：`d_hex.substr(1, 7)`（7 字符）→ 9 位色串非法 → 黑；
+     改 `substr(1, 6)`（28 处）。
+  4. **ColorDialog 缺外向事件声明**：msg 未声明 `"preview"/"committed"/
+     "cancelled"/"error"`，handler 内 `."cancelled"()` 未被改写为 emit 桥，
+     落 `CALL_SPEC no function 'App.cancelled'`（取消不关闭、父 handler
+     不触发）；补声明后 dialog 取消/确认/关闭/重开全通。
+  5. **通道错误呈现**：补 `.ch_err` 文本节点；committed 错误路径发
+     `error(invalid_channel)`，HEX Enter 非法发 `error(invalid_color)`。
+  6. **vue 轨重复 `let`**：同一 handler 第二解码块与首块同名声明（23 处）
+     → `Identifier 'ld_r' has already been declared`；第二块改赋值。
+  7. **初始焦点=HEX**：平台无 widget 级 autofocus 通道（iced 焦点由点击/
+     update 臂），未强制；Dialog 沿用既有 modal 焦点环与关闭恢复。记为边界。
+- 证据（代码提交 `plan-088 r3 复跑`）：
+  - native：`gate-native-r3r/report-native.json` → `result: pass`；用例
+    V-01/06 known-colors（含灰草稿保留最近 H、alpha 141）、V-02
+    gestures+外部重置、V-01 channel（#4074E6CC + invalid_channel 事件）、
+    V-03 双实例/业务拒绝、V-02/03 dialog（取消零提交/确认一次）、V-04
+    Paint 消费、V-05 native 640x560 窄窗 + 浅深主题 + 退出重开；visual
+    `demo-native.png`/`demo-narrow-native.png`/`demo-native-dark.png`。
+  - vue：`gate-vue-r3f/report-vue.json` → `pass`（真实鼠标拖拽 + 通道
+    提交 #4074E6CC + 1100x800/420x560 截图）。
+  - 工具门：`cargo test -p auto-ui-tools --test color_picker_component`
+    2 passed（7.02s）。
+  - 视觉抽检：色面二维梯度（白→色→黑）、alpha 条棋盘→实色、色板/预览
+    正常；窄窗（640x560）通道标签与输入可达。
