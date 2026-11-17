@@ -1,5 +1,5 @@
 {
-  "source": "auto-lang a5e6642e0: experimental/ace + crates/auto-tool-execution + stdlib/ace",
+  "source": "auto-lang 0520c7f3b: experimental/ace + crates/auto-tool-execution + stdlib/ace",
   "files": {
     "crates/auto-tool-execution/Cargo.toml": "a5ede6f258251dbe670beac75cdbc571eeed61b46a0167b565aca2ae4498d42f",
     "crates/auto-tool-execution/src/bin/te-child.rs": "d53845c6093f04fee0f02846329a10f6ae7636f45ac804b2025ea287b3eaf602",
@@ -948,7 +948,7 @@
     "experimental/ace/crates/core/tests/cases/plan981_multimodule_identity.rs": "af4b1c2c67059b86486f365965a74c81170fef92cd04d357f05ca3ddf504455e",
     "experimental/ace/crates/core/tests/cases/plan981_original_g01.rs": "d6053e2ba213bd0ed8e9f9546a3f953196bcab13e28777e1e0d9471332867c29",
     "experimental/ace/crates/core/tests/cases/plan981_param_ports.rs": "428f24dc41d2701251e742e48bee564ee621a8f7eab36d7a4eac6f215d983d28",
-    "experimental/ace/crates/core/tests/cases/plan981_proof_a.rs": "41fae8117e86a17494609784dad7428efc68afe617d0d48207fc19bd9da8b99a",
+    "experimental/ace/crates/core/tests/cases/plan981_proof_a.rs": "f7543a924ccd083eab15345d2dd1d1c8f4b52e526d2617f744c8b88d68a6a373",
     "experimental/ace/crates/core/tests/cases/plan981_ref_aggregation.rs": "5690ce11820a573fb54de0a8895ac7c0e907538ec116fafe814d279fa5bdc29c",
     "experimental/ace/crates/core/tests/cases/plan981_resource_identity.rs": "2fe169e15a1422b37e40089c029732ac2b31e860b2db954c2962ccb285d53650",
     "experimental/ace/crates/core/tests/cases/plan981_resource_refs.rs": "2c0c1faaf0de1471875eed04e3401687d3d37ba360269a6f2f11e10b88ce67f6",
@@ -1004,7 +1004,7 @@
     "experimental/ace/crates/core/tests/fixtures_g01/shapes.at": "dbdc5243ec590dab4fdd3dd7349860297a5dfd90962442b34d5e3ea1c6284d96",
     "experimental/ace/crates/core/tests/fixtures_ma/ace_hello_minimal.at": "7f9f79a7714a3fb587ccf42c37ba9deb21e6d9481a3adb641e574002da5e6706",
     "experimental/ace/crates/core/tests/fixtures_ma/ace_node_counter.at": "6016eb863f94499e50ffa95d25f693d84c36f7ba638e3758f890f1761c4d78a9",
-    "experimental/ace/crates/core/tests/fixtures_proof/g08_3d_cylinders.at": "f8aa18ce7200b7cf0cab919197d12e232c59e822151899b35b98027de8fe2ccb",
+    "experimental/ace/crates/core/tests/fixtures_proof/g08_3d_cylinders.at": "1b369a8d6158b8fd73755d97a34b69c9d0c183272cb3f9d1bb89144930796476",
     "experimental/ace/crates/data-runtime/Cargo.toml": "05e73e342c7fb181627d4ea76c05ee45354d4f32d8bb8a45358307c0fbebc8df",
     "experimental/ace/crates/data-runtime/src/lib.rs": "4c2327b22406e09b24f46edadcf1b1deb1f5fa95db9de980c283470d948d5226",
     "experimental/ace/crates/foreign-contract/Cargo.toml": "798a1150e49d9018467de428529ba36334719522f8c419e2871fce778c6fd2f2",
