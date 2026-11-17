@@ -338,3 +338,18 @@ r2已固定公共消息、通道范围/舍入、HSV灰黑边界和Dialog提交�
 裁定（2026-11-17 第二次终审修复）：F-17（V-03 旧 action 拒绝 / 关闭后焦点恢复）记为平台边界——`baseRevision` 在每个 preview/committed 载荷中携带（消费方可校验），但演示 UI 无法在 preview→commit 之间异步推进外部 revision 构造 stale action；关闭后焦点恢复由既有 `modal_restore`（`crates/auto-ui-runtime/src/ui/iced/renderer/host.rs`）提供，native 无读取当前焦点的 MCP 探针，故不单列断言。
 
 复审确认（2026-11-17 第三次终审）：F-17 的旧 action 安全以具体探针补证——关闭对话框后向旧 dialog canvas vnode 发 press 得到 `VNode not found`、状态不变、无新 accept（`plan-artifacts/plan-088/review-tools/probe_f13_f17.py`），故 AC-04 该子项按「旧元素/旧绑定被拒」记录；焦点恢复仍为 `modal_restore` 平台边界。F-05 接受「消费方按打开会话去重」为已文档化平台边界：包级 `cancelled` 仍可能两次（未去重 consumer 副本 2/2 轮实证），`cancel_guard`（串字段）只保证同实例内一次，跨实例由消费方去重；README 已披露平台额外 onclose 与示例去重，demo 去重后门断言单条。后续消费者不得宣称包级单发；包级单发需 platform/VM 修复并登记债。
+
+## 11. 交付证据汇总（merge fold，2026-11-17）
+
+- **交付**：`35a0b67d`（ff-only 落主）。rebase 映射：`a10d181c`→`f09b12c3`、`c5bd2d52`→`ee3d2dc7`、spec `aaf74a0e`→`35a0b67d` 等共 21 提交；`git range-diff` 21/21 等价（唯一差异为 Cargo.lock 与 master 上下文对齐，落主后逐字节一致）。
+- **规范**：`docs/specs/ui/color-picker.md`，sha256 `57A8E581A962350C537B1B66BDEC56E7BDB508755E0E804D43680309AFBC49CC`（主树与工作树一致）。
+- **门（原始报告随 plan-artifacts 删除；摘要如下，运行时间含真实窗口启动）**：
+  - native `gate-native-r9a`/`r9b`：PASS，10 用例 + reopen + 3 截图，单次 ~65s——V-01/06 known-colors（色面端点 S=V=100、灰草稿保留最近 H、alpha 141）、V-02 gestures+外部重置、V-01 channel（R=64 精确 #4074E6CC + invalid_channel）、V-01/06 HEX（#F00 短形式、#3974E6CC 精确通道 57/116/230/204、同值零提交、#GG0000 可见错误且零提交）、V-06 showAlpha 保 alpha、V-03 双实例/业务拒绝、V-02/03 dialog（取消零正式提交、确认一次、取消事件单条消费）、V-04 Paint（px42 像素读回、取消不改文档/历史、Undo 深度、保存/读回）、V-05 窄窗 640×560 浅深。
+  - vue `gate-vue-r9a`：PASS（真实拖拽、通道、短 HEX、通道读数、浅/深、420×560 窄窗、对话框含窄窗 footer）5 截图。
+  - 工具门：`cargo test -p auto-ui-tools --test color_picker_component` 2 passed（5.77–6.00s，单用例 <10s）。
+  - 输入 hash：picker `73542e36`、model `62561f3e`、dialog `b96ac6da`、gate `54630179`（r9a/r9b 一致）。
+- **T-01 探针**（decisions §3，随工作树删除）：native MCP pen 选色逐字节对齐预计算引擎值（`#405980CC`/`#805040CC`/`#8050407F`）、onhit 色板、dialog 内嵌；vue Playwright 真实拖拽/点击/棋盘 alpha 渲染，PASS 13/13。
+- **实现要点**（详见 §9 复审收据与 decisions §8–§11）：串字段单一真源（`d_hex`/`ch_*`/`h_hold`/`g_hue`）+ 每 handler 入口解码；HSV 解码饱和度 ×10、行/alpha 条半字节 `/16`、rgb6 `substr(1,6)`、ColorDialog 外向事件声明、取消按打开会话去重、surface `g_hue` 携带、`#RGBA` 展开；示例窄窗堆叠与 364px 最小布局宽。
+- **平台债/边界**：VM 实例作用域整型字段写可见性（当前设计不依赖，未宣称修复）；package 级取消可能双发（消费方按会话去重，README 记录）；native 模态期间截图零尺寸；Linux `not_run`（无 runner，不冒 pass）。
+- **清理**：工作树 `D:/autostack/.wt/ui-088/auto-ui` 在 wt-guard clean 后移除（含删除临时 `examples/ui/088-probe` 与生成 `examples/color-picker/gen` 中的 724 个 pnpm junction 链接）；分支 `codex/ui-088-color-picker` 已删除；`plan-artifacts/plan-088/` 删除；retention registry 已更新。
+
