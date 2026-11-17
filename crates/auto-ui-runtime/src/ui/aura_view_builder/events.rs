@@ -314,15 +314,6 @@ impl<'a> AuraViewBuilder<'a> {
             .read_state_as_vec(&format!("{prefix}_labels"))
             .unwrap_or_default();
         let _ = bindings;
-        // PLAN-088 T-01 临时探针输出（提交前移除）：观察场景表读取。
-        eprintln!(
-            "[plan088-probe] scene prefix={prefix} pts={} meta={} nodes={} edges={} labels={}",
-            pts.len(),
-            meta.len(),
-            nodes.len(),
-            edges.len(),
-            labels.len()
-        );
         let mut scene = parse_canvas_scene(&pts, &meta);
         scene.nodes = parse_canvas_nodes(&nodes);
         scene.edges = parse_canvas_edges(&edges);

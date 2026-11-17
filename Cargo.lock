@@ -1362,6 +1362,9 @@ name = "auto-web"
 version = "0.1.0"
 dependencies = [
  "a2r-std",
+ "ace-a2x-core",
+ "ace-a2x-rust",
+ "ace-core",
  "auto-generation-core",
  "auto-lang-core",
  "auto-media-core",

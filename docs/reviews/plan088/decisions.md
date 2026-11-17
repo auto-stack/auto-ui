@@ -99,13 +99,47 @@ canvas nodes + `onhit(id)`（PLAN-661 命中契约，双端交付）。选中态
 precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
 已归档（r3 双轨全绿），无 stub。
 
-### 3.6 探针执行记录
+### 3.6 探针执行记录（结论：双轨全通过，色面可行）
 
-- 探针工程：`examples/ui/088-probe/`（临时，验证后删除；不属交付面）。
-- 探针内容：SV 面/色相条/alpha 条/预览/色板/dialog 内 canvas，pen 三事件、
-  onhit、8 位 hex 分层渲染。
-- native：待填（auto.exe 构建中）。
-- vue：待填。
+探针工程：`examples/ui/088-probe/`（临时，T-04 前删除；不属交付面）。
+驱动脚本：`D:/autostack/plan-artifacts/plan-088/probe_native.py`（scratch）。
+
+**native（Windows，auto.exe -r vm + MCP，RESULT: PASS 13/13）**：
+- `pen` 合成动作（`App␟SurfDown␟SurfMove␟SurfUp␟x,y`）驱动三画布：
+  surf (96,95)⇒ s=50 v=50 hex=#405980CC；hue (8,6)⇒ h=15 hex=#805040CC；
+  alpha (96,6)⇒ a=127 hex=#8050407F——与预计算 half-up 引擎值逐字节一致。
+- 色板 `press value=p0` ⇒ `p0=#ef4444`（onhit 命中）。
+- Dialog 开合渲染 canvas 内容正常；截图
+  `plan-artifacts/plan-088/probe-out/probe-native-final.png`。
+
+**vue（Windows，vite + Playwright 真实鼠标）**：
+- 5 画布渲染正确（SV 面/色相条/棋盘 alpha 条/棋盘预览/色板），CSS 8 位
+  hex 半透明在棋盘上正确透出；截图 `probe-vue.png`。
+- 真实鼠标拖拽 SV 面 ⇒ s/v/hex 更新 + surf-up + 日志；点击色板 ⇒
+  `pal=p0=#ef4444`（`probe-vue-interact.png`）。
+
+**探针期发现并处置的平台缺陷/约束（全部有实证）**：
+1. canvas 场景色串 8 位 hex alpha 双缺陷——已修（§3.1，两处）。根因补充：
+   `Color::Hex(u32)` 丢失 6/8 位形态信息（"#00000005"≡"#000005"），修复
+   必须按**串长**判别，不能基于 u32 值域；首轮 u32 值域判别版被探针像素
+   采样（行色 rgb(0,0,alpha) 不透明）证伪后改为串长判别。
+2. `.split()` 产 List<Str> 经 `read_state_as_vec` 读回为垃圾
+   `Value::Int`（VM 堆 List 债，P553-D1 同族；探针 §5 输出
+   `pn first=Int(-156)` 实证）——**场景表一律 push 构建**（push 项以 Str
+   读回，实证在案）；`.at` 侧规避，运行时根修留登记簿债务（owner: VM
+   runtime，本计划不改 split 语义）。
+3. vue 生成器对与 widget state 同名的模块 fn 形参/局部误加 `.value`
+   （087 已录同类债务）：引擎 fn 形参/局部一律 `p` 前缀（`ph/psc/pv`…）
+   规避；探针 `h=217 s=76 v=90 a=204 hex=#377AE6CC` 修复前后对照在案。
+4. vue canvas 脚本无条件引用 `<prefix>_meta` 等全部五表——包/示例必须
+   为每个 canvas 前缀声明 pts/meta/nodes/edges/labels 五表（native 侧
+   meta/labels 可缺省）。进入 T-02/T-03 widget 设计约束。
+5. `canvas` 场景此前无任何 `.at` 消费者（grep 实证）；本探针为首个真实
+   整链样例（源→生成/解释→场景→渲染→事件→消费）。
+
+**颜色语义注记**：hsv(217,76,90)=#377AE6（引擎逐字节核对）；计划示例色
+#3974E6CC⇒RGBA(57,116,230,204) 属 hex 解析方向（V-06），由 hex 解析器
+直接保证，与 HSV 引擎初值选样无关（r2 无矛盾）。
 
 ## 4. dependencies
 
@@ -131,8 +165,12 @@ precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
 
 ## 6. next
 
-- T-01 剩余：探针双轨实跑 + 截图证据 → 本文件 3.6 回填 → 删除探针目录。
-- 放行 T-02（颜色模型引擎 `packages/color-picker/color_model.at`，自含
-  fn 形态）→ T-03（ColorPicker/ColorDialog widget）。
-- 未决机制：无（canvas 渲染/量化/引擎路径全部选定；dialog 内 canvas 待
-  探针确认）。
+- T-01 关闭：双轨探针 PASS（§3.6），放行 T-02。
+- T-02：颜色模型引擎 `packages/color-picker/color_model.at`——自含 fn
+  形态、形参 p 前缀、无 `.split()`、HSV 灰黑保留最近 H 的草稿规则由
+  widget 层承载。
+- T-03：ColorPicker/ColorDialog widget——每 canvas 前缀声明五表；
+  NumericField 通道输入（087 已归档）；跨包嵌套（package 内
+  `use { package: numeric_fields from "../numeric-fields" }`）须以真实
+  生成验证，失败即回退同型内嵌 input 并升级重审。
+- 未决机制：无阻塞；跨包 widget 嵌套为 T-03 首项探针。
