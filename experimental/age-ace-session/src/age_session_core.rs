@@ -30,8 +30,28 @@ pub struct AgeSession {
     /// R64-10：Run/Stop 计数——多轮 Run/Stop 之后必须净归零（runs == stops）。
     runs: u64,
     stops: u64,
+    /// PLAN-981 B-W1（R64-10 异步面）：异步票账面（spawned / settled）——
+    /// 多轮 Run/Stop 后必须净归零（spawned == settled，无悬挂票）。
+    async_spawned: u64,
+    async_settled: u64,
     active: bool,
     pid: u64,
+}
+
+/// PLAN-981 B-W1（R64-10 异步面）：AGE 会话的异步票（spawn 时钉住身份）。
+#[derive(Clone, Debug)]
+pub struct AgeAsyncTicket {
+    pub pid: u64,
+    pub generation: u64,
+    pub completion_msg: String,
+    pub task_src: String,
+}
+
+/// 异步等待结果：完成（回写后的调度计数）或具名丢弃原因。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AgeAsyncOutcome {
+    Completed(u64),
+    Dropped(&'static str),
 }
 
 static NEXT_PID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -61,6 +81,8 @@ impl AgeSession {
             body_generation: 0,
             runs: 1,
             stops: 0,
+            async_spawned: 0,
+            async_settled: 0,
             active: true,
         })
     }
@@ -128,6 +150,109 @@ impl AgeSession {
                 instance, msg, args, anchor,
             ),
         ])
+    }
+
+    /// PLAN-981 B-W1（D-981-SESSION-MULTI ①余量）：**组件级**定向——把 unit
+    /// 消息发给包内第 `node` 个组件的 `instance` 实例（`ForNode` 场景扩展）。
+    pub fn send_to_component(
+        &mut self,
+        node: usize,
+        instance: usize,
+        msg: &str,
+    ) -> Result<u64, Vec<String>> {
+        self.schedule(vec![ace_core::source::age_component::ScenarioOp::ForNode {
+            node,
+            op: Box::new(ace_core::source::age_component::ScenarioOp::Send {
+                instance,
+                msg: msg.to_string(),
+            }),
+        }])
+    }
+
+    /// PLAN-981 B-W1：组件级**带载荷**定向（同 [`Self::send_args_to`] 的语义，
+    /// 加组件限定）。
+    pub fn send_args_to_component(
+        &mut self,
+        node: usize,
+        instance: usize,
+        msg: &str,
+        args: &[ace_core::source::age_component::InitialValue],
+    ) -> Result<u64, Vec<String>> {
+        let anchor = ace_core::atom_text::Span {
+            start: 0,
+            end: self.source.len(),
+        };
+        self.schedule(vec![ace_core::source::age_component::ScenarioOp::ForNode {
+            node,
+            op: Box::new(
+                ace_core::source::age_component::ScenarioOp::send_args_from_values(
+                    instance, msg, args, anchor,
+                ),
+            ),
+        }])
+    }
+
+    /// PLAN-981 B-W1（R64-10 异步面）：AGE 异步票——完成消息 + 任务源，钉住
+    /// `(pid, body_generation)`（与 bridge 的 AsyncTicket 同一代际纪律）。
+    pub fn spawn_async(
+        &mut self,
+        completion_msg: &str,
+        task_src: &str,
+    ) -> Result<AgeAsyncTicket, Vec<String>> {
+        if self.stopped {
+            return Err(vec![
+                "source.session.stopped: restart the session before scheduling".into(),
+            ]);
+        }
+        self.async_spawned += 1;
+        Ok(AgeAsyncTicket {
+            pid: self.pid,
+            generation: self.body_generation,
+            completion_msg: completion_msg.to_string(),
+            task_src: task_src.to_string(),
+        })
+    }
+
+    /// 等待异步完成：任务源先在 ACE scheduler **真实执行**到静止（968 面），
+    /// 随后按代际纪律回写——只有未停止、同 pid 且同 body 世代的会话收到
+    /// 完成消息；过期票具名丢弃（计数入 settled，不悬挂）。
+    pub fn await_async(&mut self, ticket: AgeAsyncTicket) -> Result<AgeAsyncOutcome, Vec<String>> {
+        // 真实异步执行先行（无论回写是否会被丢弃，任务本身必须真实跑过）。
+        let run = ace_av::scheduler_run::run_task_source(
+            &ticket.task_src,
+            &format!("{}.task.at", self.source.len()),
+        )
+        .map_err(|e| vec![e])?;
+        if !run.success {
+            return Err(vec![format!(
+                "async task did not succeed: {} (stdout: {})",
+                run.outcome_debug, run.stdout
+            )]);
+        }
+        self.async_settled += 1;
+        // 丢弃原因按**精确度**排序：跨会话/跨世代的票即使将来 restart 也永远
+        // 不可投递（stale），先于"当前停止"（停止只是暂时不可投递）。
+        if ticket.pid != self.pid {
+            return Ok(AgeAsyncOutcome::Dropped("session"));
+        }
+        if ticket.generation != self.body_generation {
+            return Ok(AgeAsyncOutcome::Dropped("stale-generation"));
+        }
+        if self.stopped {
+            return Ok(AgeAsyncOutcome::Dropped("stopped"));
+        }
+        let dispatches = self.send(&ticket.completion_msg)?;
+        Ok(AgeAsyncOutcome::Completed(dispatches))
+    }
+
+    /// R64-10：异步票账面（spawned / settled / 悬挂数）——多轮 Run/Stop 后
+    /// 必须净归零（pending == 0）。
+    pub fn async_balance(&self) -> (u64, u64, u64) {
+        (
+            self.async_spawned,
+            self.async_settled,
+            self.async_spawned - self.async_settled,
+        )
     }
 
     fn schedule(

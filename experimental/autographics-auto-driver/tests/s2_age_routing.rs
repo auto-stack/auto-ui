@@ -4,6 +4,7 @@
 //! 非 AGE 源保持旧路径；同 PID body 更新成功才递增代数、坏编辑保留旧代。断言
 //! 读**真实 AV 观察值**（文本/状态），不是"没有 panic"——更新若没替换受检结果，
 //! 这里必须变红。
+use autographics_auto_driver::age_session::AgeAsyncOutcome as AsyncOutcome;
 use autographics_auto_driver::Session;
 
 const GOOD_V1: &str = "node Counter {\n    model { count int = 0 }\n    on Life.Tick { count = count + 1 }\n    view {\n        text \"v1\" {}\n    }\n}\n";
@@ -553,4 +554,115 @@ fn s2_proof_a_event_update_close_and_recovery() {
     s.age_restart().expect("restart");
     let seen = s.age_observe().unwrap();
     assert_eq!(seen.components[0].instance_states, vec![vec![0]]);
+}
+
+/// PLAN-981 B-W1（D-981-SESSION-MULTI ①余量收口）：**永久双组件 2:1** 用例——
+/// 同一宿主队列上组件 A 收 2 次、组件 B 收 1 次（`ForNode` 场景扩展经
+/// `age_send_to_component`），组件级带载荷定向正交可用；未包裹投递的
+/// 全组件重放语义由对照断言兜住。
+#[test]
+fn s2_dual_component_two_to_one_via_host_queue() {
+    use ace_core::source::age_component::InitialValue;
+    const SRC: &str = "node A {\n    msg {\n        Inc\n    }\n    msg Msg { Add(int) }\n    on {\n        .Inc -> {\n            .count += 1\n        }\n        .Add(d) -> {\n            .count += d\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"a\" {}\n    }\n}\nnode B {\n    msg {\n        Inc\n    }\n    msg Msg { Add(int) }\n    on {\n        .Inc -> {\n            .count += 1\n        }\n        .Add(d) -> {\n            .count += d\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"b\" {}\n    }\n}\n";
+    let mut s = Session::new_age_with(SRC, 1, Vec::new()).expect("two components open");
+    s.age_send_to_component(0, 0, "Inc").unwrap();
+    s.age_send_to_component(0, 0, "Inc").unwrap();
+    s.age_send_to_component(1, 0, "Inc").unwrap();
+    let a = s.age_observe_component(0).unwrap();
+    let b = s.age_observe_component(1).unwrap();
+    assert_eq!(a.instance_states, vec![vec![2]], "component A: two events");
+    assert_eq!(b.instance_states, vec![vec![1]], "component B: exactly one");
+    // 组件级带载荷：只给 B 定向 +5。
+    s.age_send_args_to_component(1, 0, "Add", &[InitialValue::Int(5)])
+        .unwrap();
+    assert_eq!(
+        s.age_observe_component(0).unwrap().instance_states,
+        vec![vec![2]],
+        "A untouched by B's typed event"
+    );
+    assert_eq!(
+        s.age_observe_component(1).unwrap().instance_states,
+        vec![vec![6]]
+    );
+    // 对照：未包裹投递重放到两个组件（旧语义不回退）。
+    s.age_send_to(0, "Inc").unwrap();
+    assert_eq!(
+        s.age_observe_component(0).unwrap().instance_states,
+        vec![vec![3]]
+    );
+    assert_eq!(
+        s.age_observe_component(1).unwrap().instance_states,
+        vec![vec![7]]
+    );
+}
+
+/// PLAN-981 B-W1（R64-10 异步面收口）：AGE 会话异步——完成回写真执行
+/// （ACE scheduler）；stop 后拒绝 spawn；多轮 Run/Stop 后**票账净归零**
+/// （spawned == settled、无悬挂），过期票按代际具名丢弃且零调度。
+#[test]
+fn s2_async_roundtrip_and_net_zero_across_run_stop() {
+    const SRC: &str = "node M {\n    msg {\n        Inc\n    }\n    on {\n        .Inc -> {\n            .count += 1\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"m\" {}\n    }\n}\n";
+    const TASK: &str = "fn main() {\n    go worker()\n    print(\"start\")\n}\nfn worker() {\n    sleep(50)\n    print(\"done\")\n}\n";
+    let mut s = Session::new(SRC).expect("opens");
+    // 第一轮：异步完成真实回写（调度 +1）。
+    let t = s.age_spawn_async("Inc", TASK).expect("spawn while running");
+    match s.age_await_async(t).expect("task runs to quiescence") {
+        AsyncOutcome::Completed(_) => {}
+        other => panic!("live-session ticket must complete: {other:?}"),
+    }
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states[0][0],
+        1,
+        "the completion message dispatched"
+    );
+    let (spawned, settled, pending) = s.age_async_balance().unwrap();
+    assert_eq!((spawned, settled, pending), (1, 1, 0));
+    // Stop：spawn 具名拒；已 spawn 的票在 stop/restart 后按代际丢弃。
+    s.age_stop().unwrap();
+    match s.age_spawn_async("Inc", TASK) {
+        Ok(_) => panic!("a stopped session must refuse spawning"),
+        Err(e) => assert!(e.contains("source.session.stopped"), "{e}"),
+    }
+    // 真正的**跨世代**票：运行中取票 → stop → restart（body 代数递增）→
+    // 等待——票的世代已过期，任务仍真实执行，回写按世代丢弃。
+    s.age_run().unwrap();
+    let stale = s.age_spawn_async("Inc", TASK).expect("spawn while running");
+    s.age_stop().unwrap();
+    // run() = restart + Run 计数：既抬 body 代数（票过期）又保账面成对。
+    s.age_run().unwrap();
+    let dispatches_before = s.age_dispatches().unwrap();
+    match s.age_await_async(stale).expect("task still runs for real") {
+        AsyncOutcome::Dropped(reason) => assert_eq!(reason, "stale-generation"),
+        other => panic!("a pre-restart ticket must drop by generation: {other:?}"),
+    }
+    assert_eq!(
+        s.age_dispatches().unwrap(),
+        dispatches_before,
+        "a dropped ticket schedules nothing"
+    );
+    // 多轮 Run/Stop 后净归零：票账 spawned == settled、pending 0；Run/Stop 平衡。
+    for _ in 0..3 {
+        s.age_run().unwrap();
+        let t = s.age_spawn_async("Inc", TASK).unwrap();
+        s.age_stop().unwrap();
+        s.age_await_async(t).unwrap();
+    }
+    let (spawned, settled, pending) = s.age_async_balance().unwrap();
+    assert_eq!(pending, 0, "no hanging tickets after the cycles");
+    assert_eq!(
+        spawned, settled,
+        "async ledger nets to zero: {spawned} vs {settled}"
+    );
+    let (runs, stops, active) = s.age_run_stop_balance().unwrap();
+    assert_eq!(runs, stops, "run/stop ledger nets to zero");
+    assert!(!active);
+    // 恢复后同入口可用。
+    s.age_restart().unwrap();
+    let t = s.age_spawn_async("Inc", TASK).unwrap();
+    match s.age_await_async(t).unwrap() {
+        AsyncOutcome::Completed(_) => {}
+        other => panic!("post-restart ticket must complete: {other:?}"),
+    }
+    let (.., pending) = s.age_async_balance().unwrap();
+    assert_eq!(pending, 0);
 }
