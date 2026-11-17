@@ -402,6 +402,70 @@ impl Session {
             .map_err(|ds| ds.join("; "))
     }
 
+    /// PLAN-981 B-W1（组件级调度）：把 unit 消息定向到**第 `node` 个组件**的
+    /// 指定实例（`ForNode` 场景扩展；双组件 2:1 由宿主队列表达）。
+    pub fn age_send_to_component(
+        &mut self,
+        node: usize,
+        instance: usize,
+        msg: &str,
+    ) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .send_to_component(node, instance, msg)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// PLAN-981 B-W1：组件级**带载荷**定向（同 [`Self::age_send_to_component`]
+    /// 加 typed 载荷）。
+    pub fn age_send_args_to_component(
+        &mut self,
+        node: usize,
+        instance: usize,
+        msg: &str,
+        args: &[ace_core::source::age_component::InitialValue],
+    ) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .send_args_to_component(node, instance, msg, args)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// PLAN-981 B-W1（R64-10 异步面）：启动 AGE 异步（票钉住 pid + body 代数）。
+    pub fn age_spawn_async(
+        &mut self,
+        completion_msg: &str,
+        task_src: &str,
+    ) -> Result<age_session::AgeAsyncTicket, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .spawn_async(completion_msg, task_src)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// PLAN-981 B-W1：等待异步完成（ACE scheduler 真实执行 + 代际纪律回写）。
+    pub fn age_await_async(
+        &mut self,
+        ticket: age_session::AgeAsyncTicket,
+    ) -> Result<age_session::AgeAsyncOutcome, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .await_async(ticket)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// PLAN-981 B-W1（R64-10）：异步票账面（spawned / settled / pending）。
+    pub fn age_async_balance(&self) -> Result<(u64, u64, u64), String> {
+        self.age
+            .as_ref()
+            .map(|a| a.async_balance())
+            .ok_or_else(|| "this session is not an AGE session".to_string())
+    }
+
     /// PLAN-981 B-W1：定向实例的带载荷投递（同 [`Self::age_send_args`]）。
     pub fn age_send_args_to(
         &mut self,
