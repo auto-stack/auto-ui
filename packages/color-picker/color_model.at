@@ -1,0 +1,631 @@
+// packages/color-picker/color_model.at — PLAN-088 颜色模型引擎。
+//
+// 纯整数语义（VM int = i32，无浮点）：
+//   颜色以 8 位 HEX 串 "#RRGGBBAA" 为 canonical（大写输出）；
+//   RGB/alpha 通道整数 0..255；H 0..360（360 规范化 0）、S/V 0..100；
+//   舍入一律 half-up（恰好一半向上），除法用精确整除形
+//   (2a+b)/(2b) 内联展开（vue widget 轨 `/` 为浮点——PLAN-086 实录）。
+//
+// 包内模块链接形态约束（PLAN-087 T-02 实证 + 088 T-02 工具门实证）：消费方
+// `use color_model: …` 只把**直引 fn**注册/内联进消费方模块；引擎内部互调
+// 失链——本库**每个 fn 自含**（HEX 解码/编码、half-up 舍入、hsv→rgb 在各
+// fn 内内联展开），不做引擎内互调；版本内一致性由本文件单源维护。
+//
+// 形参/局部命名约束（PLAN-087 决议 + 088 探针实证）：vue 生成器对与消费方
+// widget state 同名的标识符误加 `.value`——本库形参与局部一律 `p`/复合
+// 前缀（ph/psc/pv/pdec/pxx…），不使用与 widget state 撞名的裸名。
+//
+// 场景表建造 fn（cp_*_item）供 widget 用 push 装表（`.split()` 产的
+// List<Str> 经 read_state_as_vec 读回为垃圾 Int——VM 堆 List 债 P553-D1
+// 同族，088 T-01 实证；一律 push 构建）。
+
+/// HEX 文本校验（输入兼容 #RGB/#RGBA/#RRGGBB/#RRGGBBAA，# 可省略）。
+/// 返回 int：0=合法；1=形态非法（前缀/长度）；2=含非 HEX 字符。（自含。）
+fn cp_hex_valid(phex str) int {
+    var t str = phex
+    if t.starts_with("#") { t = t.substr(1, t.len()) }
+    var n int = t.len()
+    if n != 3 {
+        if n != 4 {
+            if n != 6 {
+                if n != 8 { return 1 }
+            }
+        }
+    }
+    var alphabet str = "0123456789ABCDEFabcdef"
+    for i in 0..n {
+        var ch str = t.substr(i, 1)
+        var dv int = 0 - 1
+        var zi int = 0
+        for zi in 0..22 {
+            if alphabet.substr(zi, 1) == ch {
+                if zi < 16 {
+                    dv = zi
+                } else {
+                    dv = zi - 6
+                }
+            }
+        }
+        if dv < 0 { return 2 }
+    }
+    return 0
+}
+
+/// 两位 HEX（自 pstart 起）→ 0..255；含非 HEX 字符 → -1。（自含。）
+fn cp_hex2_val(phex str, pstart int) int {
+    var alphabet str = "0123456789ABCDEFabcdef"
+    var c1 str = phex.substr(pstart, 1)
+    var d1 int = 0 - 1
+    var i1 int = 0
+    for i1 in 0..22 {
+        if alphabet.substr(i1, 1) == c1 {
+            if i1 < 16 {
+                d1 = i1
+            } else {
+                d1 = i1 - 6
+            }
+        }
+    }
+    if d1 < 0 { return 0 - 1 }
+    var c2 str = phex.substr(pstart + 1, 1)
+    var d2 int = 0 - 1
+    var i2 int = 0
+    for i2 in 0..22 {
+        if alphabet.substr(i2, 1) == c2 {
+            if i2 < 16 {
+                d2 = i2
+            } else {
+                d2 = i2 - 6
+            }
+        }
+    }
+    if d2 < 0 { return 0 - 1 }
+    return d1 * 16 + d2
+}
+
+/// HEX 文本 → canonical "#RRGGBBAA"（短形态位展开）；非法 → ""。（自含。）
+fn cp_hex_norm(phex str) str {
+    if cp_hex_valid(phex) != 0 { return "" }
+    var t str = phex
+    if t.starts_with("#") { t = t.substr(1, t.len()) }
+    var n int = t.len()
+    if n == 6 { return "#" + t + "FF" }
+    if n == 8 { return "#" + t }
+    var r str = ""
+    var count int = 0
+    if n == 3 { count = 3 }
+    if n == 4 { count = 4 }
+    for i in 0..count {
+        var ch str = t.substr(i, 1)
+        r = r + ch + ch
+    }
+    if n == 3 { r = r + "FF" }
+    return "#" + r
+}
+
+/// canonical 8 位 HEX → 通道分量（pchn: 0=R 1=G 2=B 3=A）；非法 → -1。
+/// （自含：内联两位解码。）
+fn cp_channel_of(phex8 str, pchn int) int {
+    var t str = phex8
+    if t.starts_with("#") { t = t.substr(1, t.len()) }
+    if t.len() != 8 { return 0 - 1 }
+    if pchn < 0 { return 0 - 1 }
+    if pchn > 3 { return 0 - 1 }
+    var alphabet str = "0123456789ABCDEFabcdef"
+    var base int = pchn * 2
+    var c1 str = t.substr(base, 1)
+    var d1 int = 0 - 1
+    var i1 int = 0
+    for i1 in 0..22 {
+        if alphabet.substr(i1, 1) == c1 {
+            if i1 < 16 {
+                d1 = i1
+            } else {
+                d1 = i1 - 6
+            }
+        }
+    }
+    if d1 < 0 { return 0 - 1 }
+    var c2 str = t.substr(base + 1, 1)
+    var d2 int = 0 - 1
+    var i2 int = 0
+    for i2 in 0..22 {
+        if alphabet.substr(i2, 1) == c2 {
+            if i2 < 16 {
+                d2 = i2
+            } else {
+                d2 = i2 - 6
+            }
+        }
+    }
+    if d2 < 0 { return 0 - 1 }
+    return d1 * 16 + d2
+}
+
+/// RGB 三分量 + alpha → canonical "#RRGGBBAA"（分量越界夹取）。
+/// （自含：内联两位编码与夹取。）
+fn cp_rgb_hex8(pr int, pg int, pb int, pa int) str {
+    var hexd str = "0123456789ABCDEF"
+    var r int = pr
+    var g int = pg
+    var b int = pb
+    var a int = pa
+    if r < 0 { r = 0 }
+    if r > 255 { r = 255 }
+    if g < 0 { g = 0 }
+    if g > 255 { g = 255 }
+    if b < 0 { b = 0 }
+    if b > 255 { b = 255 }
+    if a < 0 { a = 0 }
+    if a > 255 { a = 255 }
+    return "#" + (hexd.substr((r) - (r) % 16, 1) + hexd.substr((r) % 16, 1)) + (hexd.substr((g) - (g) % 16, 1) + hexd.substr((g) % 16, 1)) + (hexd.substr((b) - (b) % 16, 1) + hexd.substr((b) % 16, 1)) + (hexd.substr((a) - (a) % 16, 1) + hexd.substr((a) % 16, 1))
+}
+/// HSV → canonical "#RRGGBBAA"（pa=alpha 0..255；half-up；ph 360→0 由本
+/// fn 规范化；psc 0..100、pv 0..100 越界夹取）。自含：内联 half-up 与两位
+/// 编码。sector 公式：v255=half(pv*255/100)；t=half(v255*(6000-psc*60+
+/// psc*f)/6000)；q=half(v255*(6000-psc*f)/6000)；p=half(v255*(100-psc)/100)。
+fn cp_hsv_hex(ph int, psc int, pv int, pa int) str {
+    var hexd str = "0123456789ABCDEF"
+    var hh int = ph
+    if hh >= 360 { hh = hh - 360 }
+    var sc int = psc
+    if sc < 0 { sc = 0 }
+    if sc > 100 { sc = 100 }
+    var vi int = pv
+    if vi < 0 { vi = 0 }
+    if vi > 100 { vi = 100 }
+    var a int = pa
+    if a < 0 { a = 0 }
+    if a > 255 { a = 255 }
+    var vn int = ((2 * (vi * 255) + (100)) - (2 * (vi * 255) + (100)) % (2 * (100))) / (2 * (100))
+    var sector int = (hh - hh % 60) / 60
+    var f int = hh % 60
+    var tn int = ((2 * (vn * (6000 - sc * 60 + sc * f)) + (6000)) - (2 * (vn * (6000 - sc * 60 + sc * f)) + (6000)) % (2 * (6000))) / (2 * (6000))
+    var qn int = ((2 * (vn * (6000 - sc * f)) + (6000)) - (2 * (vn * (6000 - sc * f)) + (6000)) % (2 * (6000))) / (2 * (6000))
+    var pnn int = ((2 * (vn * (100 - sc)) + (100)) - (2 * (vn * (100 - sc)) + (100)) % (2 * (100))) / (2 * (100))
+    var r int = vn
+    var g int = vn
+    var b int = vn
+    if sector == 0 {
+        g = tn
+        b = pnn
+    }
+    if sector == 1 {
+        r = qn
+        b = pnn
+    }
+    if sector == 2 {
+        r = pnn
+        b = tn
+    }
+    if sector == 3 {
+        r = pnn
+        g = qn
+    }
+    if sector == 4 {
+        r = tn
+        g = pnn
+    }
+    if sector == 5 {
+        g = pnn
+        b = qn
+    }
+    return "#" + (hexd.substr((r) - (r) % 16, 1) + hexd.substr((r) % 16, 1)) + (hexd.substr((g) - (g) % 16, 1) + hexd.substr((g) % 16, 1)) + (hexd.substr((b) - (b) % 16, 1) + hexd.substr((b) % 16, 1)) + (hexd.substr((a) - (a) % 16, 1) + hexd.substr((a) % 16, 1))
+}
+/// canonical 8 位 HEX → HSV 编码（ph*100000 + psc*1000 + pv；ph 0..359，
+/// psc/pv 0..100）。饱和度/明度 half-up；色相按最近整数（截断除法余数对
+/// 称进位——i32 与 JS 截断/取模符号一致，双轨同律）。灰/黑（mx==mn）→
+/// -1（调用方按 r2 规则保留最近有效 H）；非法输入 → -2。自含。
+fn cp_hsv_of(phex8 str) int {
+    var t str = phex8
+    if t.starts_with("#") { t = t.substr(1, t.len()) }
+    if t.len() != 8 { return 0 - 2 }
+    var alphabet str = "0123456789ABCDEFabcdef"
+    var c0a str = t.substr(0, 1)
+    var d0a int = 0 - 1
+    var z0a int = 0
+    for z0a in 0..22 {
+        if alphabet.substr(z0a, 1) == c0a {
+            if z0a < 16 {
+                d0a = z0a
+            } else {
+                d0a = z0a - 6
+            }
+        }
+    }
+    var c0b str = t.substr(1, 1)
+    var d0b int = 0 - 1
+    var z0b int = 0
+    for z0b in 0..22 {
+        if alphabet.substr(z0b, 1) == c0b {
+            if z0b < 16 {
+                d0b = z0b
+            } else {
+                d0b = z0b - 6
+            }
+        }
+    }
+    if d0a < 0 { return 0 - 2 }
+    if d0b < 0 { return 0 - 2 }
+    var r int = d0a * 16 + d0b
+    var c1a str = t.substr(2, 1)
+    var d1a int = 0 - 1
+    var z1a int = 0
+    for z1a in 0..22 {
+        if alphabet.substr(z1a, 1) == c1a {
+            if z1a < 16 {
+                d1a = z1a
+            } else {
+                d1a = z1a - 6
+            }
+        }
+    }
+    var c1b str = t.substr(3, 1)
+    var d1b int = 0 - 1
+    var z1b int = 0
+    for z1b in 0..22 {
+        if alphabet.substr(z1b, 1) == c1b {
+            if z1b < 16 {
+                d1b = z1b
+            } else {
+                d1b = z1b - 6
+            }
+        }
+    }
+    if d1a < 0 { return 0 - 2 }
+    if d1b < 0 { return 0 - 2 }
+    var g int = d1a * 16 + d1b
+    var c2a str = t.substr(4, 1)
+    var d2a int = 0 - 1
+    var z2a int = 0
+    for z2a in 0..22 {
+        if alphabet.substr(z2a, 1) == c2a {
+            if z2a < 16 {
+                d2a = z2a
+            } else {
+                d2a = z2a - 6
+            }
+        }
+    }
+    var c2b str = t.substr(5, 1)
+    var d2b int = 0 - 1
+    var z2b int = 0
+    for z2b in 0..22 {
+        if alphabet.substr(z2b, 1) == c2b {
+            if z2b < 16 {
+                d2b = z2b
+            } else {
+                d2b = z2b - 6
+            }
+        }
+    }
+    if d2a < 0 { return 0 - 2 }
+    if d2b < 0 { return 0 - 2 }
+    var b int = d2a * 16 + d2b
+    var mx int = r
+    if g > mx { mx = g }
+    if b > mx { mx = b }
+    var mn int = r
+    if g < mn { mn = g }
+    if b < mn { mn = b }
+    if mx == mn { return 0 - 1 }
+    var delta int = mx - mn
+    var v int = ((2 * (mx * 100) + (255)) - (2 * (mx * 100) + (255)) % (2 * (255))) / (2 * (255))
+    var sc int = ((2 * (delta * 100) + (mx)) - (2 * (delta * 100) + (mx)) % (2 * (mx))) / (2 * (mx))
+    var h int = 0
+    if mx == r {
+        var n60 int = (g - b) * 60
+        var q60 int = (n60 - n60 % delta) / delta
+        var r60 int = n60 % delta
+        if r60 < 0 { r60 = 0 - r60 }
+        if r60 * 2 >= delta {
+            if n60 < 0 { q60 = q60 - 1 } else { q60 = q60 + 1 }
+        }
+        h = q60
+    }
+    if mx == g {
+        var n60 int = (b - r) * 60
+        var q60 int = (n60 - n60 % delta) / delta
+        var r60 int = n60 % delta
+        if r60 < 0 { r60 = 0 - r60 }
+        if r60 * 2 >= delta {
+            if n60 < 0 { q60 = q60 - 1 } else { q60 = q60 + 1 }
+        }
+        h = 120 + q60
+    }
+    if mx == b {
+        var n60 int = (r - g) * 60
+        var q60 int = (n60 - n60 % delta) / delta
+        var r60 int = n60 % delta
+        if r60 < 0 { r60 = 0 - r60 }
+        if r60 * 2 >= delta {
+            if n60 < 0 { q60 = q60 - 1 } else { q60 = q60 + 1 }
+        }
+        h = 240 + q60
+    }
+    if h < 0 { h = h + 360 }
+    if h >= 360 { h = h - 360 }
+    return h * 100000 + sc * 1000 + v
+}
+/// canonical 8 位 HEX → S/V 编码（psc*1000 + pv；psc/pv 0..100，half-up；
+/// 灰/黑时 psc=0）。不返回色相——灰黑保留最近 H 是 widget 草稿规则。自含。
+fn cp_sv_of(phex8 str) int {
+    var t str = phex8
+    if t.starts_with("#") { t = t.substr(1, t.len()) }
+    if t.len() != 8 { return 0 - 1 }
+    var alphabet str = "0123456789ABCDEFabcdef"
+    var c0a str = t.substr(0, 1)
+    var d0a int = 0 - 1
+    var z0a int = 0
+    for z0a in 0..22 {
+        if alphabet.substr(z0a, 1) == c0a {
+            if z0a < 16 {
+                d0a = z0a
+            } else {
+                d0a = z0a - 6
+            }
+        }
+    }
+    var c0b str = t.substr(1, 1)
+    var d0b int = 0 - 1
+    var z0b int = 0
+    for z0b in 0..22 {
+        if alphabet.substr(z0b, 1) == c0b {
+            if z0b < 16 {
+                d0b = z0b
+            } else {
+                d0b = z0b - 6
+            }
+        }
+    }
+    if d0a < 0 { return 0 - 2 }
+    if d0b < 0 { return 0 - 2 }
+    var r int = d0a * 16 + d0b
+    var c1a str = t.substr(2, 1)
+    var d1a int = 0 - 1
+    var z1a int = 0
+    for z1a in 0..22 {
+        if alphabet.substr(z1a, 1) == c1a {
+            if z1a < 16 {
+                d1a = z1a
+            } else {
+                d1a = z1a - 6
+            }
+        }
+    }
+    var c1b str = t.substr(3, 1)
+    var d1b int = 0 - 1
+    var z1b int = 0
+    for z1b in 0..22 {
+        if alphabet.substr(z1b, 1) == c1b {
+            if z1b < 16 {
+                d1b = z1b
+            } else {
+                d1b = z1b - 6
+            }
+        }
+    }
+    if d1a < 0 { return 0 - 2 }
+    if d1b < 0 { return 0 - 2 }
+    var g int = d1a * 16 + d1b
+    var c2a str = t.substr(4, 1)
+    var d2a int = 0 - 1
+    var z2a int = 0
+    for z2a in 0..22 {
+        if alphabet.substr(z2a, 1) == c2a {
+            if z2a < 16 {
+                d2a = z2a
+            } else {
+                d2a = z2a - 6
+            }
+        }
+    }
+    var c2b str = t.substr(5, 1)
+    var d2b int = 0 - 1
+    var z2b int = 0
+    for z2b in 0..22 {
+        if alphabet.substr(z2b, 1) == c2b {
+            if z2b < 16 {
+                d2b = z2b
+            } else {
+                d2b = z2b - 6
+            }
+        }
+    }
+    if d2a < 0 { return 0 - 2 }
+    if d2b < 0 { return 0 - 2 }
+    var b int = d2a * 16 + d2b
+    var mx int = r
+    if g > mx { mx = g }
+    if b > mx { mx = b }
+    var mn int = r
+    if g < mn { mn = g }
+    if b < mn { mn = b }
+    var v int = ((2 * (mx * 100) + (255)) - (2 * (mx * 100) + (255)) % (2 * (255))) / (2 * (255))
+    var sc int = 0
+    if mx > 0 {
+        var delta int = mx - mn
+        sc = ((2 * (delta * 100) + (mx)) - (2 * (delta * 100) + (mx)) % (2 * (mx))) / (2 * (mx))
+    }
+    return sc * 1000 + v
+}
+/// pen 坐标十进制串整数部 + 夹取（量化主路径；值域 [0..360)+0.001 双轨
+/// 均十进制短表示，无指数形态）。
+fn cp_floor_clamp(pdec str, plo int, phi int) int {
+    var n int = pdec.len()
+    var end int = n
+    for i in 0..n {
+        if pdec.substr(i, 1) == "." {
+            end = i
+        }
+    }
+    var v int = 0
+    for i in 0..end {
+        var d int = 0 - 1
+        var ch str = pdec.substr(i, 1)
+        if ch == "0" { d = 0 }
+        if ch == "1" { d = 1 }
+        if ch == "2" { d = 2 }
+        if ch == "3" { d = 3 }
+        if ch == "4" { d = 4 }
+        if ch == "5" { d = 5 }
+        if ch == "6" { d = 6 }
+        if ch == "7" { d = 7 }
+        if ch == "8" { d = 8 }
+        if ch == "9" { d = 9 }
+        if d < 0 { return plo }
+        v = v * 10 + d
+    }
+    if v < plo { return plo }
+    if v > phi { return phi }
+    return v
+}
+
+/// 整数夹取。
+fn cp_clamp(pxx int, plo int, phi int) int {
+    if pxx < plo { return plo }
+    if pxx > phi { return phi }
+    return pxx
+}
+/// SV 面列 pi 节点（hue 色 alpha=s_i；8px 列，中心 x=pi*8+4）。
+/// 自含：hsv(hue,100,100)——vn=255、t=half(255*f/60)、q=half(255*(60-f)/60)、
+/// p=0；sector 0..5 → (v,t,p)/(q,v,p)/(p,v,t)/(p,q,v)/(t,p,v)/(v,p,q)。
+fn cp_surf_col_item(phue int, pi int) str {
+    var hexd str = "0123456789ABCDEF"
+    var hh int = phue
+    if hh >= 360 { hh = hh - 360 }
+    var x int = pi * 8 + 4
+    var si int = ((2 * (x * 100) + (192)) - (2 * (x * 100) + (192)) % (2 * (192))) / (2 * (192))
+    var aj int = ((2 * (si * 255) + (100)) - (2 * (si * 255) + (100)) % (2 * (100))) / (2 * (100))
+    var f int = hh % 60
+    var tn int = ((2 * (255 * f) + (60)) - (2 * (255 * f) + (60)) % (2 * (60))) / (2 * (60))
+    var qn int = ((2 * (255 * (60 - f)) + (60)) - (2 * (255 * (60 - f)) + (60)) % (2 * (60))) / (2 * (60))
+    var sector int = (hh - hh % 60) / 60
+    var r int = 255
+    var g int = 255
+    var b int = 255
+    if sector == 0 {
+        g = tn
+        b = 0
+    }
+    if sector == 1 {
+        r = qn
+        b = 0
+    }
+    if sector == 2 {
+        r = 0
+        b = tn
+    }
+    if sector == 3 {
+        r = 0
+        g = qn
+    }
+    if sector == 4 {
+        r = tn
+        g = 0
+    }
+    if sector == 5 {
+        g = 0
+        b = qn
+    }
+    var col str = "#" + (hexd.substr((r) - (r) % 16, 1) + hexd.substr((r) % 16, 1)) + (hexd.substr((g) - (g) % 16, 1) + hexd.substr((g) % 16, 1)) + (hexd.substr((b) - (b) % 16, 1) + hexd.substr((b) % 16, 1)) + (hexd.substr((aj) - (aj) % 16, 1) + hexd.substr((aj) % 16, 1))
+    return f"c${pi},${x},96,rect,${col},8,192"
+}
+/// SV 面行 pj 节点（黑 alpha=1-v_j；8px 行，中心 y=pj*8+4）。
+fn cp_surf_row_item(pj int) str {
+    var hexd str = "0123456789ABCDEF"
+    var y int = pj * 8 + 4
+    var vj int = 100 - ((2 * (y * 100) + (192)) - (2 * (y * 100) + (192)) % (2 * (192))) / (2 * (192))
+    var aj int = 255 - ((2 * (vj * 255) + (100)) - (2 * (vj * 255) + (100)) % (2 * (100))) / (2 * (100))
+    var a2 str = (hexd.substr((aj) - (aj) % 16, 1) + hexd.substr((aj) % 16, 1))
+    return f"r${pj},96,${y},rect,#000000${a2},192,8"
+}
+/// 色相条段 pi 节点（hsv(h_i,100,100) 不透明；h_i=half((pi*8+4)*360/192)）。
+fn cp_hue_item(pi int) str {
+    var hexd str = "0123456789ABCDEF"
+    var x int = pi * 8 + 4
+    var hi int = ((2 * (x * 360) + (192)) - (2 * (x * 360) + (192)) % (2 * (192))) / (2 * (192))
+    if hi >= 360 { hi = hi - 360 }
+    var f int = hi % 60
+    var tn int = ((2 * (255 * f) + (60)) - (2 * (255 * f) + (60)) % (2 * (60))) / (2 * (60))
+    var qn int = ((2 * (255 * (60 - f)) + (60)) - (2 * (255 * (60 - f)) + (60)) % (2 * (60))) / (2 * (60))
+    var sector int = (hi - hi % 60) / 60
+    var r int = 255
+    var g int = 255
+    var b int = 255
+    if sector == 0 {
+        g = tn
+        b = 0
+    }
+    if sector == 1 {
+        r = qn
+        b = 0
+    }
+    if sector == 2 {
+        r = 0
+        b = tn
+    }
+    if sector == 3 {
+        r = 0
+        g = qn
+    }
+    if sector == 4 {
+        r = tn
+        g = 0
+    }
+    if sector == 5 {
+        g = 0
+        b = qn
+    }
+    var col str = "#" + (hexd.substr((r) - (r) % 16, 1) + hexd.substr((r) % 16, 1)) + (hexd.substr((g) - (g) % 16, 1) + hexd.substr((g) % 16, 1)) + (hexd.substr((b) - (b) % 16, 1) + hexd.substr((b) % 16, 1))
+    return f"h${pi},${x},6,rect,${col},8,12"
+}
+/// alpha 条段 pi 节点（当前 rgb6 + 段代表 alpha；a_i=half(x*255/192)）。
+fn cp_alpha_item(prgb6 str, pi int) str {
+    var hexd str = "0123456789ABCDEF"
+    var x int = pi * 8 + 4
+    var ai int = ((2 * (x * 255) + (192)) - (2 * (x * 255) + (192)) % (2 * (192))) / (2 * (192))
+    var a2 str = (hexd.substr((ai) - (ai) % 16, 1) + hexd.substr((ai) % 16, 1))
+    return f"a${pi},${x},6,rect,${prgb6}${a2},8,12"
+}
+/// 棋盘格 (pr,pc) 节点（格 pcw×pch；(pr+pc) 奇偶异色）。
+fn cp_checker_item(pr int, pc int, pcw int, pch int) str {
+    var x int = pc * pcw + ((2 * (pcw) + (2)) - (2 * (pcw) + (2)) % (2 * (2))) / (2 * (2))
+    var y int = pr * pch + ((2 * (pch) + (2)) - (2 * (pch) + (2)) % (2 * (2))) / (2 * (2))
+    var tone str = "#ffffff"
+    var m int = (pr + pc) % 2
+    if m == 1 { tone = "#c8c8c8" }
+    return f"c${pr}_${pc},${x},${y},rect,${tone},${pcw},${pch}"
+}
+/// 预览覆盖节点（整块 color8）。
+fn cp_sw_item(phex8 str) str {
+    return f"ov,48,24,rect,${phex8},96,48"
+}
+/// 色板 chip pi 节点（id p<pi> 供 onhit；24px 步进）。
+fn cp_pal_item(pcolors List, pi int) str {
+    var x int = pi * 24 + 12
+    var col str = pcolors[pi]
+    return f"p${pi},${x},14,rect,${col},24,28"
+}
+/// 光标水平 edge（ps,pv → 逻辑坐标，白 1px；y=(100-pv)*192/100）。
+fn cp_cursor_edge_h(ps int, pv int) str {
+    var x int = ((2 * (ps * 192) + (100)) - (2 * (ps * 192) + (100)) % (2 * (100))) / (2 * (100))
+    var y int = ((2 * ((100 - pv) * 192) + (100)) - (2 * ((100 - pv) * 192) + (100)) % (2 * (100))) / (2 * (100))
+    var y0 int = y - 5
+    var y1 int = y + 5
+    var xs str = f"${x}"
+    var ys0 str = f"${y0}"
+    var ys1 str = f"${y1}"
+    return f"${xs},${ys0},${xs},${ys1},#ffffff,1"
+}
+/// 光标垂直 edge。
+fn cp_cursor_edge_v(ps int, pv int) str {
+    var x int = ((2 * (ps * 192) + (100)) - (2 * (ps * 192) + (100)) % (2 * (100))) / (2 * (100))
+    var y int = ((2 * ((100 - pv) * 192) + (100)) - (2 * ((100 - pv) * 192) + (100)) % (2 * (100))) / (2 * (100))
+    var x0 int = x - 5
+    var x1 int = x + 5
+    var ys str = f"${y}"
+    var xs0 str = f"${x0}"
+    var xs1 str = f"${x1}"
+    return f"${xs0},${ys},${xs1},${ys},#ffffff,1"
+}

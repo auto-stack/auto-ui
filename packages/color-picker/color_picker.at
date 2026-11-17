@@ -1,0 +1,2367 @@
+use auto.json
+
+// 模块链接按名直引（PLAN-087 T-02 实证：只注册直引 fn 裸名；引擎已按
+// 自含形态编写，无引擎内互调）。
+use color_model: cp_alpha_item, cp_channel_of, cp_checker_item, cp_clamp, cp_cursor_edge_h, cp_cursor_edge_v, cp_floor_clamp, cp_hex_norm, cp_hex_valid, cp_hsv_hex, cp_hsv_of, cp_hue_item, cp_pal_item, cp_rgb_hex8, cp_row_item, cp_surf_col_item, cp_sw_item, cp_sv_of
+
+// PLAN-088 ColorPicker — 内嵌通用选色器（受控模式）。
+//
+// 合同（Plan §5 r2 表）：value/revision 受控（canonical "#RRGGBBAA"）；
+// 预览/提交/取消分立——preview(str)/committed(str)/cancelled/error(str)，
+// 载荷 JSON {seq, baseRevision, value, source}，source ∈
+// hex/rgb/hsv/palette/surface/confirm；同值提交零事件；一次手势最多一次
+// commit；外部 value/revision 变化经 Tick（interval 100ms）重基线草稿并
+// 失效旧手势；非法 props 以 cfg_err + error(invalid_config) 呈现，不回落
+// 黑色假成功。RGB/HSV 通道组可切换；HEX 输入兼容 #RGB/#RGBA/#RRGGBB/
+// #RRGGBBAA（输出固定 8 位大写）；非法 HEX 文本保留草稿并具名报错，不发
+// 有效事件。HSV 草稿变灰/黑时保留最近有效 H（编辑器草稿级，不改
+// canonical 颜色）。showAlpha=false 仅隐藏 alpha 编辑，不丢传入 alpha。
+//
+// 平台边界（088 T-01 探针实证，decisions.md §3）：
+// - 场景表全部 push 构建（.split() 产 List 落堆读回为垃圾 Int——VM 债
+//   P553-D1 同族）；每个 canvas 前缀声明 pts/meta/nodes/edges/labels 五表
+//   （vue canvas 脚本无条件引用全部表）。
+// - 引擎 fn 形参/局部避开 widget state 同名（vue 生成器误加 .value——087
+//   同款债务）；本 widget 的引擎调用全部经 color_model 自含 fn。
+// - native input 无 onblur：提交路径 = Enter / 手势收笔 / 色板命中；
+//   Escape 绑定在 HEX 输入上（撤销当前草稿），不绑全局（087 EDGE-01）。
+// - SV 面 coords "192x192"：x→S、y→V（y 向下 V 递减，越界夹取）；色相条
+//   左 0 右 360；alpha 条左 0 右 255。数值框/键盘/手势共同调用同一量化。
+widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool = true, palette: List = [], disabled: bool = false, readOnly: bool = false) {
+    msg { Init, Tick, SurfDown(float, float), SurfMove(float, float), SurfUp(float, float), HueDown(float, float), HueMove(float, float), HueUp(float, float), AlphaDown(float, float), AlphaMove(float, float), AlphaUp(float, float), SwatchHit(str), HexInput(str), HexEnter, HexEscape, RPreview(str), GPreview(str), BPreview(str), APreview(str), HPreview(str), SPreview(str), VPreview(str), RCommitted(str), GCommitted(str), BCommitted(str), ACommitted(str), HCommitted(str), SCommitted(str), VCommitted(str), ToggleHsv, "preview"(str), "committed"(str), "cancelled", "error"(str) }
+    model {
+        var interval int = 100
+        // ── 受控基线 ──
+        var seen_rev int = 0
+        var seen_val str = "#000000FF"
+        var cfg_err str = ""
+        var seq int = 0
+        // ── 草稿（编辑器局部；canonical 由 d_hex 承载）──
+        var d_hex str = "#000000FF"
+        var d_r int = 0
+        var d_g int = 0
+        var d_b int = 0
+        var d_a int = 255
+        var d_h int = 0
+        var d_s int = 0
+        var d_v int = 0
+        var hsv_mode bool = false
+        // ── HEX 文本草稿 ──
+        var hex_text str = "#000000FF"
+        var hex_err str = ""
+        // ── 通道框（NumericField 受控串 + 共享修订）──
+        var ch_r str = "0"
+        var ch_g str = "0"
+        var ch_b str = "0"
+        var ch_a str = "255"
+        var ch_h str = "0"
+        var ch_s str = "0"
+        var ch_v str = "0"
+        var ch_rev int = 1
+        // ── 场景表（每 canvas 前缀五表；vue canvas 脚本全表引用）──
+        var surf_pts List = []
+        var surf_meta List = []
+        var surf_nodes List = []
+        var surf_edges List = []
+        var surf_labels List = []
+        var hue_pts List = []
+        var hue_meta List = []
+        var hue_nodes List = []
+        var hue_edges List = []
+        var hue_labels List = []
+        var alph_pts List = []
+        var alph_meta List = []
+        var alph_nodes List = []
+        var alph_edges List = []
+        var alph_labels List = []
+        var sw_pts List = []
+        var sw_meta List = []
+        var sw_nodes List = []
+        var sw_edges List = []
+        var sw_labels List = []
+        var pal_pts List = []
+        var pal_meta List = []
+        var pal_nodes List = []
+        var pal_edges List = []
+        var pal_labels List = []
+        var pal_norm List = []
+    }
+    // 通道输入依赖 PLAN-087 已归档交付（docs/plans/archived/087-numeric-and-unit-fields.md，
+    // Spec docs/specs/ui/numeric-fields.md）；包内嵌套消费 NumericField（R/G/B/A/H/S/V）。
+    use { package: numeric_fields from "../numeric-fields" }
+    computed {
+        c_locked => .disabled || .readOnly || .cfg_err != ""
+        c_dim => .disabled || .readOnly
+    }
+    view {
+        col (style: "items-start gap-2 min-w-0") {
+            if .cfg_err != "" {
+                text .cfg_err { style: "text-xs text-destructive" }
+            }
+            row (style: "items-start gap-3 w-full min-w-0") {
+                col (style: "gap-2") {
+                    canvas (scene: .surf, coords: "192x192", clear: "#ffffff", onpenstart: .SurfDown, onpenmove: .SurfMove, onpenend: .SurfUp, style: "w-48 h-48 rounded border border-border") {}
+                    row (style: "items-center gap-2") {
+                        col (style: "gap-1") {
+                            canvas (scene: .hue, coords: "192x12", onpenstart: .HueDown, onpenmove: .HueMove, onpenend: .HueUp, style: "w-48 h-3 rounded") {}
+                            if .showAlpha {
+                                canvas (scene: .alph, coords: "192x12", onpenstart: .AlphaDown, onpenmove: .AlphaMove, onpenend: .AlphaUp, style: "w-48 h-3 rounded") {}
+                            }
+                        }
+                        canvas (scene: .sw, coords: "96x48", style: "w-24 h-12 rounded border border-border") {}
+                    }
+                    canvas (scene: .pal, coords: "192x28", onhit: .SwatchHit, style: "w-48 h-7 rounded border border-border") {}
+                }
+                col (style: "gap-2 min-w-44 flex-1") {
+                    row (style: "items-center gap-2") {
+                        text "HEX" { style: "text-xs text-muted-foreground" }
+                        input (value: .hex_text, oninput: .HexInput, onenter: .HexEnter, onkeydown.escape.prevent: .HexEscape, disabled: .c_locked, style: "flex-1 min-w-0 h-8 text-sm rounded-md bg-muted/40") {}
+                    }
+                    if .hex_err != "" {
+                        text .hex_err { style: "text-xs text-destructive" }
+                    }
+                    button "RGB/HSV" { onclick: .ToggleHsv, disabled: .c_locked, title: "切换通道组", style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                    if !.hsv_mode {
+                        NumericField (value: .ch_r, revision: .ch_rev, precision: 0, min: "0", max: "255", step: "1", label: "R", disabled: .c_dim, onpreview: .RPreview($event), oncommitted: .RCommitted($event)) {}
+                        NumericField (value: .ch_g, revision: .ch_rev, precision: 0, min: "0", max: "255", step: "1", label: "G", disabled: .c_dim, onpreview: .GPreview($event), oncommitted: .GCommitted($event)) {}
+                        NumericField (value: .ch_b, revision: .ch_rev, precision: 0, min: "0", max: "255", step: "1", label: "B", disabled: .c_dim, onpreview: .BPreview($event), oncommitted: .BCommitted($event)) {}
+                        if .showAlpha {
+                            NumericField (value: .ch_a, revision: .ch_rev, precision: 0, min: "0", max: "255", step: "1", label: "A", disabled: .c_dim, onpreview: .APreview($event), oncommitted: .ACommitted($event)) {}
+                        }
+                    }
+                    if .hsv_mode {
+                        NumericField (value: .ch_h, revision: .ch_rev, precision: 0, min: "0", max: "360", step: "1", label: "H", disabled: .c_dim, onpreview: .HPreview($event), oncommitted: .HCommitted($event)) {}
+                        NumericField (value: .ch_s, revision: .ch_rev, precision: 0, min: "0", max: "100", step: "1", label: "S", disabled: .c_dim, onpreview: .SPreview($event), oncommitted: .SCommitted($event)) {}
+                        NumericField (value: .ch_v, revision: .ch_rev, precision: 0, min: "0", max: "100", step: "1", label: "V", disabled: .c_dim, onpreview: .VPreview($event), oncommitted: .VCommitted($event)) {}
+                    }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .surf_pts = []
+            .surf_meta = []
+            .surf_nodes = []
+            .surf_edges = []
+            .surf_labels = []
+            .hue_pts = []
+            .hue_meta = []
+            .hue_nodes = []
+            .hue_edges = []
+            .hue_labels = []
+            .alph_pts = []
+            .alph_meta = []
+            .alph_nodes = []
+            .alph_edges = []
+            .alph_labels = []
+            .sw_pts = []
+            .sw_meta = []
+            .sw_nodes = []
+            .sw_edges = []
+            .sw_labels = []
+            .pal_pts = []
+            .pal_meta = []
+            .pal_nodes = []
+            .pal_edges = []
+            .pal_labels = []
+            .cfg_err = ""
+            .seq = 0
+            if cp_hex_valid(.value) != 0 {
+                .cfg_err = "color-picker: value is not a valid hex color (invalid_config)"
+                .d_hex = "#000000FF"
+            } else {
+                .d_hex = cp_hex_norm(.value)
+            }
+            .seen_rev = .revision
+            .seen_val = .value
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .hex_text = .d_hex
+            .hex_err = ""
+            .pal_norm = []
+            var pn int = .palette.len()
+            var pi int = 0
+            while pi < pn {
+                var raw str = .palette[pi]
+                var norm str = cp_hex_norm(raw)
+                if norm != "" {
+                    var dup int = 0
+                    var had int = .pal_norm.len()
+                    var k int = 0
+                    while k < had {
+                        var got str = .pal_norm[k]
+                        if got == norm { dup = 1 }
+                        k = k + 1
+                    }
+                    if dup == 0 {
+                        .pal_norm.push(norm)
+                    }
+                }
+                pi = pi + 1
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .hue_nodes = []
+            var hi int = 0
+            while hi < 24 {
+                var hit str = cp_hue_item(hi)
+                .hue_nodes.push(hit)
+                hi = hi + 1
+            }
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .pal_nodes = []
+            var pn int = .pal_norm.len()
+            var pi int = 0
+            while pi < pn {
+                var pit str = cp_pal_item(.pal_norm, pi)
+                .pal_nodes.push(pit)
+                pi = pi + 1
+            }
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+        }
+        .Tick -> {
+            if .revision != .seen_rev || .value != .seen_val {
+                .seen_rev = .revision
+                .seen_val = .value
+                if cp_hex_valid(.value) == 0 {
+                    .d_hex = cp_hex_norm(.value)
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+                    .hex_text = .d_hex
+                    .hex_err = ""
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                }
+            }
+        }
+        .SurfDown(x, y) -> {
+            if !.c_locked {
+            var xf float = x
+            var yf float = y
+            var sdec str = f"${xf * 0.5208333}"
+            var vdec str = f"${(192.0 - yf) * 0.5208333}"
+            .d_s = cp_floor_clamp(sdec, 0, 100)
+            .d_v = cp_floor_clamp(vdec, 0, 100)
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+            .seq = .seq + 1
+            ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "surface"}))
+            }
+        }
+
+        .SurfMove(x, y) -> {
+            if !.c_locked {
+            var xf float = x
+            var yf float = y
+            var sdec str = f"${xf * 0.5208333}"
+            var vdec str = f"${(192.0 - yf) * 0.5208333}"
+            .d_s = cp_floor_clamp(sdec, 0, 100)
+            .d_v = cp_floor_clamp(vdec, 0, 100)
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+            .seq = .seq + 1
+            ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "surface"}))
+            }
+        }
+
+        .SurfUp(x, y) -> {
+            if !.c_locked {
+            var xf float = x
+            var yf float = y
+            var sdec str = f"${xf * 0.5208333}"
+            var vdec str = f"${(192.0 - yf) * 0.5208333}"
+            .d_s = cp_floor_clamp(sdec, 0, 100)
+            .d_v = cp_floor_clamp(vdec, 0, 100)
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+            if .d_hex != cp_hex_norm(.value) {
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "surface"}))
+            }
+            }
+        }
+
+        .HueDown(x, y) -> {
+            if !.c_locked {
+            var xf float = x
+            var hdec str = f"${xf * 1.875}"
+            .d_h = cp_floor_clamp(hdec, 0, 360)
+            if .d_h >= 360 {
+                .d_h = 0
+            }
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+            .seq = .seq + 1
+            ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "surface"}))
+            }
+        }
+
+        .HueMove(x, y) -> {
+            if !.c_locked {
+            var xf float = x
+            var hdec str = f"${xf * 1.875}"
+            .d_h = cp_floor_clamp(hdec, 0, 360)
+            if .d_h >= 360 {
+                .d_h = 0
+            }
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+            .seq = .seq + 1
+            ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "surface"}))
+            }
+        }
+
+        .HueUp(x, y) -> {
+            if !.c_locked {
+            var xf float = x
+            var hdec str = f"${xf * 1.875}"
+            .d_h = cp_floor_clamp(hdec, 0, 360)
+            if .d_h >= 360 {
+                .d_h = 0
+            }
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+            if .d_hex != cp_hex_norm(.value) {
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "surface"}))
+            }
+            }
+        }
+
+        .AlphaDown(x, y) -> {
+            if !.c_locked {
+            var xf float = x
+            var adec str = f"${xf * 1.328125}"
+            .d_a = cp_floor_clamp(adec, 0, 255)
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .seq = .seq + 1
+            ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "surface"}))
+            }
+        }
+
+        .AlphaMove(x, y) -> {
+            if !.c_locked {
+            var xf float = x
+            var adec str = f"${xf * 1.328125}"
+            .d_a = cp_floor_clamp(adec, 0, 255)
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .seq = .seq + 1
+            ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "surface"}))
+            }
+        }
+
+        .AlphaUp(x, y) -> {
+            if !.c_locked {
+            var xf float = x
+            var adec str = f"${xf * 1.328125}"
+            .d_a = cp_floor_clamp(adec, 0, 255)
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            if .d_hex != cp_hex_norm(.value) {
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "surface"}))
+            }
+            }
+        }
+
+        .SwatchHit(id) -> {
+            if !.c_locked {
+                var idx int = id.substr(1, id.len()).to(int)
+                var top int = .pal_norm.len() - 1
+                var i int = cp_clamp(idx, 0, top)
+                var col str = .pal_norm[i]
+                if col != .d_hex {
+                    .d_hex = col
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+                    .hex_text = .d_hex
+                    .hex_err = ""
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                    if .d_hex != cp_hex_norm(.value) {
+                        .seq = .seq + 1
+                        ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "palette"}))
+                    }
+                }
+            }
+        }
+        .HexInput(v) -> {
+            if !.c_locked {
+                .hex_text = v
+                if cp_hex_valid(v) != 0 {
+                    .hex_err = "color-picker: invalid hex color (invalid_color)"
+                } else {
+                    .hex_err = ""
+                    var norm str = cp_hex_norm(v)
+                    if norm != .d_hex {
+                        .d_hex = norm
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hex"}))
+                    }
+                }
+            }
+        }
+        .HexEnter -> {
+            if !.c_locked {
+                if cp_hex_valid(.hex_text) == 0 {
+                    .hex_err = ""
+                    .d_hex = cp_hex_norm(.hex_text)
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                    if .d_hex != cp_hex_norm(.value) {
+                        .seq = .seq + 1
+                        ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hex"}))
+                    }
+                }
+            }
+        }
+        .HexEscape -> {
+            if !.c_locked {
+                if .hex_text != .d_hex || .hex_err != "" {
+                    .hex_text = .d_hex
+                    .hex_err = ""
+                    ."cancelled"()
+                }
+            }
+        }
+        .RPreview(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_r = nv
+                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+            }
+        }
+        .GPreview(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_g = nv
+                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+            }
+        }
+        .BPreview(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_b = nv
+                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+            }
+        }
+        .APreview(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_a = nv
+                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+            }
+        }
+        .HPreview(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_h = nv
+                if .d_h >= 360 {
+                .d_h = 0
+            }
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+            }
+        }
+        .SPreview(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_s = nv
+                .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+            }
+        }
+        .VPreview(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_v = nv
+                .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+            }
+        }
+        .RCommitted(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_r = nv
+                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+            }
+        }
+        .GCommitted(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_g = nv
+                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+            }
+        }
+        .BCommitted(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_b = nv
+                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+            }
+        }
+        .ACommitted(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_a = nv
+                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+            }
+        }
+        .HCommitted(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_h = nv
+                if .d_h >= 360 {
+                .d_h = 0
+            }
+            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+            }
+        }
+        .SCommitted(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_s = nv
+                .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+            }
+        }
+        .VCommitted(ev str) -> {
+            if !.c_locked {
+                var req = json.parse(ev)
+                var nv int = req.value.to(int)
+                .d_v = nv
+                .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                .hex_text = .d_hex
+                .hex_err = ""
+            var rgbv int = cp_rgb_of(.d_hex)
+            .d_r = (rgbv - rgbv % 65536) / 65536
+            .d_g = ((rgbv - rgbv % 256) / 256) - ((rgbv - rgbv % 65536) / 65536) * 256
+            .d_b = rgbv % 256
+            .d_a = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            if hsvv >= 0 {
+                .d_h = (hsvv - hsvv % 100000) / 100000
+                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
+                .d_v = hsvv % 1000
+            } else {
+                if svv >= 0 {
+                    .d_s = (svv - svv % 1000) / 1000
+                    .d_v = svv % 1000
+                }
+            }
+            .ch_r = f"${.d_r}"
+            .ch_g = f"${.d_g}"
+            .ch_b = f"${.d_b}"
+            .ch_a = f"${.d_a}"
+            .ch_h = f"${.d_h}"
+            .ch_s = f"${.d_s}"
+            .ch_v = f"${.d_v}"
+            .ch_rev = .ch_rev + 1
+            .surf_nodes = []
+            var si int = 0
+            while si < 24 {
+                var sit str = cp_surf_col_item(.d_h, si)
+                .surf_nodes.push(sit)
+                si = si + 1
+            }
+            var sj int = 0
+            while sj < 24 {
+                var sjt str = cp_row_item(sj)
+                .surf_nodes.push(sjt)
+                sj = sj + 1
+            }
+            .alph_nodes = []
+            var ai int = 0
+            while ai < 24 {
+                var cit str = cp_checker_item(0, ai, 8, 12)
+                .alph_nodes.push(cit)
+                ai = ai + 1
+            }
+            var aj int = 0
+            while aj < 24 {
+                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var ait str = cp_alpha_item(rgb6, aj)
+                .alph_nodes.push(ait)
+                aj = aj + 1
+            }
+            .sw_nodes = []
+            var wr int = 0
+            while wr < 4 {
+                var wc int = 0
+                while wc < 8 {
+                    var swt str = cp_checker_item(wr, wc, 12, 12)
+                    .sw_nodes.push(swt)
+                    wc = wc + 1
+                }
+                wr = wr + 1
+            }
+            var ovt str = cp_sw_item(.d_hex)
+            .sw_nodes.push(ovt)
+            .surf_edges = []
+            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
+            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            .surf_edges.push(e1)
+            .surf_edges.push(e2)
+                .seq = .seq + 1
+                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+            }
+        }
+        .ToggleHsv -> {
+            if !.c_locked {
+                .hsv_mode = !.hsv_mode
+                .ch_rev = .ch_rev + 1
+            }
+        }
+    }
+}

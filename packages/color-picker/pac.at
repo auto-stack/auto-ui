@@ -1,0 +1,8 @@
+name: "color_picker"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "ColorPicker"
+title_zh: "选色器"
+# PLAN-088：ColorPicker/ColorDialog 通用选色包。dep 根供 vue 轨物化扫描；
+# native 轨由 widget 级 use 传递装载。

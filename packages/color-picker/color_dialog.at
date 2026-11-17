@@ -1,0 +1,117 @@
+use auto.json
+
+// 模块链接按名直引（引擎自含，无内部互调）。
+use color_model: cp_hex_norm, cp_hex_valid
+
+// PLAN-088 ColorDialog — 组合 ColorPicker 的模态选色对话框（受控）。
+//
+// 合同（Plan §5 r2）：open/正式 value 由调用方持有，Dialog 只持草稿；
+// 打开以当前受控值建草稿；子 Picker 的 committed 拦截为本地草稿更新，
+// preview/error/cancelled 原样转发（取消通知结束预览，不改正式值）；只有
+// 底栏确认向父提交一次（source="confirm"，与外部同值零提交）；取消/关闭
+// （onclose/Esc/外部 closeOnOutside=false）不提交并结束预览；外部
+// value/revision 变化经 Tick 重基线草稿（旧手势失效）。确认栏固定可达，
+// 窄窗正文可竖向滚动（视觉指南 §3.1 088 行）。
+//
+// 平台边界（decisions.md §3）：场景表/引擎约束由 ColorPicker 承载；本
+// widget 不新增 canvas。native input 无 onblur——Escape 经 builtin dialog
+// onclose 语义（dismiss）走取消路径。
+widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool = true, palette: List = [], disabled: bool = false, readOnly: bool = false, open: bool = false, title: str = "选择颜色") {
+    msg { Init, Tick, PickPreview(str), PickCommitted(str), PickCancelled, PickError(str), Confirm, Cancelled }
+    model {
+        var interval int = 100
+        var seen_rev int = 0
+        var seen_val str = "#000000FF"
+        var seen_open bool = false
+        var cfg_err str = ""
+        var seq int = 0
+        var dlg_hex str = "#000000FF"
+        var dlg_rev int = 1
+    }
+    computed {
+        c_locked => .disabled || .readOnly || .cfg_err != ""
+    }
+    view {
+        dialog (open: .open, onclose: .Cancelled, closeOnOutside: false) {
+            dialog-content (style: "w-[480px] max-w-full p-4 gap-3 rounded-xl bg-background text-foreground max-h-[86vh]") {
+                text .title { style: "text-sm font-medium" }
+                if .cfg_err != "" {
+                    text .cfg_err { style: "text-xs text-destructive" }
+                }
+                col (style: "gap-3 overflow-y-auto min-h-0") {
+                    ColorPicker (value: .dlg_hex, revision: .dlg_rev, showAlpha: .showAlpha, palette: .palette, disabled: .disabled, readOnly: .readOnly, onpreview: .PickPreview($event), oncommitted: .PickCommitted($event), oncancelled: .PickCancelled, onerror: .PickError($event)) {}
+                }
+                row (style: "items-center justify-end gap-2 border-t border-border pt-2") {
+                    button "取消" { onclick: .Cancelled, disabled: .c_locked, style: "px-3 py-1.5 text-sm rounded-md border border-border" }
+                    button "确认" { onclick: .Confirm, disabled: .c_locked, style: "px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground" }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .cfg_err = ""
+            .seq = 0
+            if cp_hex_valid(.value) != 0 {
+                .cfg_err = "color-dialog: value is not a valid hex color (invalid_config)"
+                .dlg_hex = "#000000FF"
+            } else {
+                .dlg_hex = cp_hex_norm(.value)
+            }
+            .seen_rev = .revision
+            .seen_val = .value
+            .seen_open = .open
+            .dlg_rev = .dlg_rev + 1
+        }
+        .Tick -> {
+            if .revision != .seen_rev || .value != .seen_val || .open != .seen_open {
+                .seen_rev = .revision
+                .seen_val = .value
+                .seen_open = .open
+                if cp_hex_valid(.value) == 0 {
+                    // 外部推进/重新打开：草稿重基线（旧手势随 Picker 修订失效）
+                    .dlg_hex = cp_hex_norm(.value)
+                    .dlg_rev = .dlg_rev + 1
+                }
+            }
+        }
+        .PickPreview(ev str) -> {
+            // 子 Picker 预览原样转发（载荷 baseRevision 即本 props 修订）
+            ."preview"(ev)
+        }
+        .PickError(ev str) -> {
+            ."error"(ev)
+        }
+        .PickCancelled -> {
+            // 取消：结束预览；草稿重基线到外部正式值（不改正式值）
+            if cp_hex_valid(.value) == 0 {
+                .dlg_hex = cp_hex_norm(.value)
+                .dlg_rev = .dlg_rev + 1
+            }
+            ."cancelled"()
+        }
+        .PickCommitted(ev str) -> {
+            // 拦截子 Picker 提交：仅更新本地草稿，不向父提交
+            var req = json.parse(ev)
+            if cp_hex_valid(req.value) == 0 {
+                .dlg_hex = cp_hex_norm(req.value)
+                .dlg_rev = .dlg_rev + 1
+            }
+        }
+        .Confirm -> {
+            if !.c_locked {
+                if .dlg_hex != cp_hex_norm(.value) {
+                    .seq = .seq + 1
+                    ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .dlg_hex, source: "confirm"}))
+                }
+            }
+        }
+        .Cancelled -> {
+            if cp_hex_valid(.value) == 0 {
+                .dlg_hex = cp_hex_norm(.value)
+                .dlg_rev = .dlg_rev + 1
+            }
+            ."cancelled"()
+        }
+    }
+}

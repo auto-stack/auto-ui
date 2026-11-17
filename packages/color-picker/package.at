@@ -1,0 +1,4 @@
+name: "color-picker"
+version: "0.1.0"
+namespace: "auto"
+description: "AutoUI color picker surface and dialog (PLAN-088)"
