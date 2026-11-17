@@ -99,6 +99,37 @@ impl AgeSession {
         }])
     }
 
+    /// PLAN-981 B-W1（IF-981-EVENT-PAYLOAD-B）：带载荷投递——typed 值抬升为
+    /// 字面量候选表达式，与作者源同走唯一 verify（声明→typed 参数→一次求值、
+    /// 按位绑定）。载荷变体必须带值派发（空 `send` 是 arity 域错误）；错
+    /// type/arity 在效果前拒且不毒化调度（R64-1 原子性沿旧路径）。宿主值没有
+    /// 作者 span——anchor 取整源区间（arity/unsupported 诊断本就指向变体声明）。
+    pub fn send_args(
+        &mut self,
+        msg: &str,
+        args: &[ace_core::source::age_component::InitialValue],
+    ) -> Result<u64, Vec<String>> {
+        self.send_args_to(0, msg, args)
+    }
+
+    /// 同 [`Self::send_args`]，定向到指定实例。
+    pub fn send_args_to(
+        &mut self,
+        instance: usize,
+        msg: &str,
+        args: &[ace_core::source::age_component::InitialValue],
+    ) -> Result<u64, Vec<String>> {
+        let anchor = ace_core::atom_text::Span {
+            start: 0,
+            end: self.source.len(),
+        };
+        self.schedule(vec![
+            ace_core::source::age_component::ScenarioOp::send_args_from_values(
+                instance, msg, args, anchor,
+            ),
+        ])
+    }
+
     fn schedule(
         &mut self,
         extra: Vec<ace_core::source::age_component::ScenarioOp>,
@@ -282,7 +313,10 @@ impl AgeSession {
     /// PLAN-981（B-LANGUAGE-V）：view 属性里的**事件绑定**事实
     /// `(属性键, 消息名, (start, end))`——`onclick: .Inc` 这类真实 A 源形态。
     /// 绑定事实给 980/AV 消费；点击→dispatch 的宿主行为不在本切片。
-    pub fn view_events_of(&self, index: usize) -> Result<Vec<(String, String, (usize, usize))>, String> {
+    pub fn view_events_of(
+        &self,
+        index: usize,
+    ) -> Result<Vec<(String, String, (usize, usize))>, String> {
         self.compiled
             .description
             .components

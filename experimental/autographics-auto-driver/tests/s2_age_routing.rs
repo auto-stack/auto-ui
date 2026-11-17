@@ -204,26 +204,46 @@ fn s2_multi_run_stop_balance_is_reachable() {
     assert_eq!(s.age_run_stop_balance().unwrap(), (2, 2, false));
 }
 
-/// PLAN-981 IF-981-EVENT-A：payload 投递在宿主层**具名拒**且零效果。
+/// PLAN-981 B-W1（IF-981-EVENT-PAYLOAD-B）：`Send` 恒等价空载荷——向载荷变体
+/// **不带值**派发是 arity 域错误（零效果、零 dispatch）；带值派发真实执行
+/// （A 期的 `event-payload-unsupported` 具名拒由此被真实语义取代）；错 type
+/// 在效果前拒且不毒化调度。
 #[test]
-fn s2_payload_dispatch_is_named_rejected_with_zero_effect() {
-    const SRC: &str = "node M {\n    msg Msg {\n        Add(str)\n    }\n    on {\n        .Add -> {\n            .count = count + 1\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
+fn s2_payload_dispatch_requires_its_value_zero_effect() {
+    use ace_core::source::age_component::InitialValue;
+    const SRC: &str = "node M {\n    msg Msg {\n        Add(int)\n    }\n    on {\n        .Add(delta) -> {\n            .count += delta\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
     let mut s = Session::new(SRC).expect("a payload declaration compiles");
-    let before = s.age_observe().expect("observes");
-    let before_count = before.components[0].instance_states[0][0];
+    // 空 Send：arity 域错误（不是 A 期的 unsupported）。
     match s.age_send("Add") {
         Ok(_) => panic!("a payload dispatch without its value must be rejected"),
         Err(e) => assert!(
-            e.contains("event-payload-unsupported"),
-            "the rejection is named: {e}"
+            e.contains("component-event") && e.contains("payload slot"),
+            "the rejection is the arity domain error: {e}"
         ),
     }
-    let after = s.age_observe().expect("still observes");
     assert_eq!(
-        after.components[0].instance_states[0][0], before_count,
+        s.age_observe().unwrap().components[0].instance_states[0][0],
+        0,
         "a rejected dispatch has zero state effect"
     );
     assert_eq!(s.age_dispatches().unwrap(), 0, "no dispatch was recorded");
+    // 错 type：效果前拒（唯一 verify 的类型诊断），状态不变、不计数。
+    match s.age_send_args("Add", &[InitialValue::Bool(true)]) {
+        Ok(_) => panic!("a bool value for an int payload must be rejected"),
+        Err(e) => assert!(e.contains("type-mismatch"), "typed rejection: {e}"),
+    }
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states[0][0],
+        0
+    );
+    assert_eq!(s.age_dispatches().unwrap(), 0);
+    // 带值派发真实执行：count = 5（typed 值经唯一 verify、按位绑定）。
+    s.age_send_args("Add", &[InitialValue::Int(5)]).unwrap();
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states[0][0],
+        5
+    );
+    assert_eq!(s.age_dispatches().unwrap(), 1);
 }
 
 /// 同一宿主上的 unit 消息投递仍然成功（负控的另一半）。
@@ -321,24 +341,78 @@ fn s2_real_a_counter_two_instance_isolation() {
     let o = s.age_observe().unwrap();
     assert_eq!(o.components[0].instance_states, vec![vec![0], vec![0]]);
 }
-/// R65-8/R65-11：带参 handler 在宿主层派发时具名拒，零状态/零 dispatch。
+/// PLAN-981 B-W1（IF-981-PARAMS-B）：unit 变体 + 带参 handler 是**声明级**域
+/// 错误（会话都开不了——取代 A 期“解析保留、派发拒”）；形参数与载荷槽一致
+/// 的源照常开、带值派发执行。
 #[test]
-fn s2_param_handler_dispatch_is_rejected_with_zero_effect() {
-    const SRC: &str = "node M {\n    msg Msg {\n        Add\n    }\n    on {\n        .Add(t) -> {\n            .count = count + 1\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
-    let mut s = Session::new(SRC).expect("a parameterised handler parses");
-    let before = s.age_observe().unwrap().components[0].instance_states[0][0];
-    match s.age_send("Add") {
-        Ok(_) => panic!("dispatching a parameterised handler must be rejected"),
+fn s2_param_handler_declaration_must_match_payload_slots() {
+    use ace_core::source::age_component::InitialValue;
+    const BAD: &str = "node M {\n    msg Msg {\n        Add\n    }\n    on {\n        .Add(t) -> {\n            .count = count + 1\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
+    match Session::new(BAD) {
+        Ok(_) => panic!("a unit variant with a parameterised handler must not open"),
         Err(e) => assert!(
-            e.contains("event-params-unsupported"),
-            "named rejection: {e}"
+            e.contains("component-event") && e.contains("payload slot"),
+            "declaration-level binding error: {e}"
         ),
     }
+    const OK: &str = "node M {\n    msg Msg {\n        Add(int)\n    }\n    on {\n        .Add(t) -> {\n            .count += t\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
+    let mut s = Session::new(OK).expect("a matching binder opens");
+    s.age_send_args("Add", &[InitialValue::Int(4)]).unwrap();
     assert_eq!(
         s.age_observe().unwrap().components[0].instance_states[0][0],
-        before
+        4
     );
-    assert_eq!(s.age_dispatches().unwrap(), 0);
+    assert_eq!(s.age_dispatches().unwrap(), 1);
+}
+
+/// PLAN-981 B-W1（SESSION typed 队列）：两实例定向带值事件 (i0,+3),(i1,+5),(i0,+4)
+/// → **[7,5]**（宿主队列重放同一场景模型；改任一实参只改目标实例）。
+#[test]
+fn s2_typed_events_two_instances_independent_values() {
+    use ace_core::source::age_component::InitialValue;
+    const SRC: &str = "node Counter {\n    msg Msg { Add(int) }\n    on {\n        .Add(delta) -> {\n            .count += delta\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"c\" {}\n    }\n}\n";
+    let mut s = Session::new_age_with(SRC, 2, Vec::new()).expect("opens two instances");
+    s.age_send_args_to(0, "Add", &[InitialValue::Int(3)])
+        .unwrap();
+    let o = s.age_observe().unwrap();
+    assert_eq!(o.components[0].instance_states, vec![vec![3], vec![0]]);
+    s.age_send_args_to(1, "Add", &[InitialValue::Int(5)])
+        .unwrap();
+    s.age_send_args_to(0, "Add", &[InitialValue::Int(4)])
+        .unwrap();
+    let o = s.age_observe().unwrap();
+    assert_eq!(
+        o.components[0].instance_states,
+        vec![vec![7], vec![5]],
+        "i0 = 3+4, i1 = 5 — the typed queue replays each instance independently"
+    );
+    assert_eq!(s.age_dispatches().unwrap(), 3);
+}
+
+/// PLAN-981 B-W1：停止会话拒收带值派发（`source.session.stopped`），重启后
+/// 同入口从初值恢复（调度历史清零、typed 值重新可用）。
+#[test]
+fn s2_stopped_session_rejects_typed_dispatch_until_restart() {
+    use ace_core::source::age_component::InitialValue;
+    const SRC: &str = "node M {\n    msg Msg { Add(int) }\n    on {\n        .Add(delta) -> {\n            .count += delta\n        }\n    }\n    model {\n        count int = 0\n    }\n    view {\n        text \"t\" {}\n    }\n}\n";
+    let mut s = Session::new(SRC).expect("opens");
+    s.age_send_args("Add", &[InitialValue::Int(2)]).unwrap();
+    s.age_stop().unwrap();
+    match s.age_send_args("Add", &[InitialValue::Int(1)]) {
+        Ok(_) => panic!("a stopped session must reject scheduling"),
+        Err(e) => assert!(e.contains("source.session.stopped"), "named: {e}"),
+    }
+    s.age_restart().unwrap();
+    let o = s.age_observe().unwrap();
+    assert_eq!(
+        o.components[0].instance_states[0][0], 0,
+        "restart replays from the initial values"
+    );
+    s.age_send_args("Add", &[InitialValue::Int(9)]).unwrap();
+    assert_eq!(
+        s.age_observe().unwrap().components[0].instance_states[0][0],
+        9
+    );
 }
 
 /// R65-11：实例定向派发到未知消息具名拒，零 dispatch。
@@ -432,7 +506,10 @@ fn s2_proof_a_event_update_close_and_recovery() {
     s.age_send("Inc").expect("one event");
     let seen = s.age_observe().unwrap();
     assert_eq!(seen.components[0].instance_states, vec![vec![1]]);
-    assert_eq!(seen.components[0].instance_texts, vec![vec!["ui".to_string()]]);
+    assert_eq!(
+        seen.components[0].instance_texts,
+        vec![vec!["ui".to_string()]]
+    );
 
     // 坏编辑：具名拒且保旧（状态与文本都不变）。
     let bad = UI.replace("text \"ui\" {}", "text \"ui\" {");
@@ -445,13 +522,19 @@ fn s2_proof_a_event_update_close_and_recovery() {
     }
     let seen = s.age_observe().unwrap();
     assert_eq!(seen.components[0].instance_states, vec![vec![1]]);
-    assert_eq!(seen.components[0].instance_texts, vec![vec!["ui".to_string()]]);
+    assert_eq!(
+        seen.components[0].instance_texts,
+        vec![vec!["ui".to_string()]]
+    );
 
     // 修复：同一入口恢复，文本随 body 更新，状态保留。
     let fixed = UI.replace("\"ui\"", "\"ui2\"");
     s.update_age_body(&fixed).expect("the fixed body applies");
     let seen = s.age_observe().unwrap();
-    assert_eq!(seen.components[0].instance_texts, vec![vec!["ui2".to_string()]]);
+    assert_eq!(
+        seen.components[0].instance_texts,
+        vec![vec!["ui2".to_string()]]
+    );
     assert_eq!(seen.components[0].instance_states, vec![vec![1]]);
 
     // 关闭/重启：停止后冻结观察，重启回初值。
@@ -462,7 +545,10 @@ fn s2_proof_a_event_update_close_and_recovery() {
     assert_eq!(frozen.components[0].instance_states, vec![vec![1]]);
     match s.age_send("Inc") {
         Ok(_) => panic!("a stopped session must reject dispatch"),
-        Err(e) => assert!(e.contains("source.session.stopped"), "stopped dispatch is named: {e}"),
+        Err(e) => assert!(
+            e.contains("source.session.stopped"),
+            "stopped dispatch is named: {e}"
+        ),
     }
     s.age_restart().expect("restart");
     let seen = s.age_observe().unwrap();
