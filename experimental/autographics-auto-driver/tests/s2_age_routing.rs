@@ -462,7 +462,7 @@ fn s2_proof_a_event_update_close_and_recovery() {
     assert_eq!(frozen.components[0].instance_states, vec![vec![1]]);
     match s.age_send("Inc") {
         Ok(_) => panic!("a stopped session must reject dispatch"),
-        Err(_) => {}
+        Err(e) => assert!(e.contains("source.session.stopped"), "stopped dispatch is named: {e}"),
     }
     s.age_restart().expect("restart");
     let seen = s.age_observe().unwrap();
