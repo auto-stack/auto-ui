@@ -904,10 +904,16 @@ fn p980_web_full_dual_track_census() {
     // [18]/[59] $event 绑定源——含括号属性形）；absent-3。grammar-id 仅
     // age-component/age-package 两值漂移（具名重基线，981 grammar_scope
     // 测试内注明），其余 13 profile 逐字节不变。
+    // **2026-11-18 具名修订 #6（切片#6n：③ node 选择器——多 widget 源逐节
+    // 点编译/聚合）**：(75,8,4,24)→**(75, 8, 4, 26)**——absent+2=[65][66]
+    // 第二 widget（空体 handler `.DeleteBlock(id) -> { }`）经选择器进入分
+    // 母（无可发射语句=缺席，语义正确）；两源第一 widget（载荷声明+参数
+    // handler）**仍缺**：widget 头参数表（`widget N(props)`）+ ④ 调用体/`;
+    // ` 分隔=下一层收敛（§13.15 边界）。
     assert_eq!(corpus.len(), 83, "corpus size frozen");
     assert_eq!(
         (ok, err, spliced, absent),
-        (75, 8, 4, 24),
+        (75, 8, 4, 26),
         "dual-track aggregates frozen"
     );
 }
@@ -1550,4 +1556,65 @@ fn p980_web_event_arg_forms() {
     }
 }
 
+/// WEB 切片#6n（③ 双 widget 源·node 选择器）：多 widget 同文件源按声明
+/// 序逐节点编译/lane 拼接并**聚合**（语言面 `compile_component_scenario_
+/// states_at`——"选一编译"，无组合/跨引用语义=IF-981-MODULE 域边界保持）。
+/// 负控：越界 node_index=编译期具名拒。
+#[test]
+fn p980_web_multi_widget_node_selector() {
+    use auto_ui_runtime::ui::ace_ts_provider::ComponentFragmentLane;
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
 
+    let src = "widget A {
+    msg Msg { Go }
+    model { var x int = 0 }
+    view { col { text \"a\" button \"go\" { onclick: .Go } } }
+    on { .Go -> { .x = 1 } }
+}
+
+widget B {
+    msg Msg { Run }
+    model { var y int = 0 }
+    view { col { text \"b\" button \"run\" { onclick: .Run } } }
+    on { .Run -> { .y = 2 } }
+}
+";
+
+    // ① lane 逐节点：node0 的 handler 体发射 x；node1 发射 y（选择器正确
+    // 分离同形规则）。
+    let l0 = ComponentFragmentLane::compile_at(src, "p980-6n.at", &["Go"], 0)
+        .unwrap_or_else(|e| panic!("node0: {e}"));
+    let r0 = l0
+        .stmt_fragments_in("__age_state_0_x", {
+            let ds = l0.desugared_source();
+            let a = ds.find(".Go ->").expect("go arrow");
+            let o = ds[a..].find('{').unwrap() + a;
+            o..ds[o..].find('}').unwrap() + o + 1
+        })
+        .expect("node0 stmts");
+    assert!(!r0.is_empty(), "node0 .Go assigns emitted");
+    let l1 = ComponentFragmentLane::compile_at(src, "p980-6n.at", &["Run"], 1)
+        .unwrap_or_else(|e| panic!("node1: {e}"));
+    let r1 = l1
+        .stmt_fragments_in("__age_state_0_y", {
+            let ds = l1.desugared_source();
+            let a = ds.find(".Run ->").expect("run arrow");
+            let o = ds[a..].find('{').unwrap() + a;
+            o..ds[o..].find('}').unwrap() + o + 1
+        })
+        .expect("node1 stmts");
+    assert!(!r1.is_empty(), "node1 .Run assigns emitted");
+
+    // ② 一体化入口聚合：双 widget 各自 handler 全 lane 派生。
+    let (_sfc, bodies, absent) = generate_sfc_with_lane(src, "p980-6n.at").expect("multi derives");
+    assert!(absent.is_empty(), "both widgets lane-derived: {absent:?}");
+    assert_eq!(bodies.len(), 2, "aggregated across nodes");
+    assert!(bodies.iter().any(|b| b.field == "x") && bodies.iter().any(|b| b.field == "y"));
+
+    // ③ 负控：越界 node_index=具名拒。
+    let err = match ComponentFragmentLane::compile_at(src, "p980-6n.at", &[], 2) {
+        Err(e) => e,
+        Ok(_) => panic!("out-of-range node index must be a named rejection"),
+    };
+    assert!(err.contains("node index 2"), "named: {err}");
+}

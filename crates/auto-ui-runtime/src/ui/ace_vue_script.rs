@@ -220,6 +220,16 @@ pub fn lane_handler_bodies_spec(
     path: &str,
     specs: &[LaneHandlerSpec<'_>],
 ) -> Result<(Vec<LaneHandlerBody>, Vec<String>), String> {
+    lane_handler_bodies_spec_at(src, path, specs, 0)
+}
+
+/// 切片#6n：node 选择器形态（多 widget 源——lane `compile_at`）。
+pub fn lane_handler_bodies_spec_at(
+    src: &str,
+    path: &str,
+    specs: &[LaneHandlerSpec<'_>],
+    node_index: usize,
+) -> Result<(Vec<LaneHandlerBody>, Vec<String>), String> {
     // ops 只含 unit handler（msg 无点前缀，ScenarioOp::Send 合同——载荷
     // 变体的空 Send 是 981 arity 域错误，不进重放；lambda 形不是 on 块
     // handler，同样不进 ops）。
@@ -228,7 +238,7 @@ pub fn lane_handler_bodies_spec(
         .filter(|s| s.params.is_empty() && s.lambda_region.is_none())
         .map(|s| s.pattern.trim_start_matches('.'))
         .collect();
-    let lane = ComponentFragmentLane::compile(src, path, &msgs)?;
+    let lane = ComponentFragmentLane::compile_at(src, path, &msgs, node_index)?;
     let ds = lane.desugared_source().to_string();
     let state_fns = lane.state_fns();
 
@@ -401,20 +411,56 @@ pub fn generate_sfc_with_lane(
 ) -> Result<(String, Vec<LaneHandlerBody>, Vec<String>), String> {
     use auto_ui_compiler::ui_gen::BackendGenerator;
     use auto_ui_dialect::UiStmt;
-    // 真实编译器管线。
+    // 真实编译器管线。切片#6n：**多 widget 同文件源**——按声明序逐 widget
+    // 生成并聚合（lane 经 node 选择器 `compile_at(i)`；单 widget 源行为不
+    // 变）。返回值=首个 SFC + 全部 widget 的 bodies/absent 聚合。
     let session = auto_parser_api::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
     let ast = parser
         .parse_domain(&auto_ui_dialect::UiDialect)
         .map(auto_ui_dialect::UiCode)
         .map_err(|e| format!("parse: {e:?}"))?;
-    let decl = ast
+    let decls: Vec<&auto_ui_dialect::ast::WidgetDecl> = ast
         .domain_stmts()
-        .find_map(|s| match s {
+        .filter_map(|s| match s {
             UiStmt::WidgetDecl(d) => Some(d),
             _ => None,
         })
-        .ok_or_else(|| "no widget decl".to_string())?;
+        .collect();
+    if decls.is_empty() {
+        return Err("no widget decl".to_string());
+    }
+    let (mut all_bodies, mut all_absent): (Vec<LaneHandlerBody>, Vec<String>) =
+        (Vec::new(), Vec::new());
+    let mut first_sfc: Option<String> = None;
+    for (wi, decl) in decls.iter().enumerate() {
+        let (sfc_w, bodies_w, absent_w) = generate_widget_with_lane(decl, src, path, wi)?;
+        if first_sfc.is_none() {
+            first_sfc = Some(sfc_w);
+        }
+        all_bodies.extend(bodies_w);
+        all_absent.extend(absent_w);
+    }
+    let _ = &decls;
+    return Ok((first_sfc.expect("non-empty"), all_bodies, all_absent));
+
+    #[allow(unreachable_code)]
+    {
+        let decl = decls[0];
+        let _ = decl;
+        unreachable!("multi-widget path returns above")
+    }
+}
+
+/// 切片#6n：单 widget 生成（`generate_sfc_with_lane` 的逐节点体——SFC 管
+/// 线 + lane 体，node 选择器=decls 中的声明序）。
+fn generate_widget_with_lane(
+    decl: &auto_ui_dialect::ast::WidgetDecl,
+    src: &str,
+    path: &str,
+    node_index: usize,
+) -> Result<(String, Vec<LaneHandlerBody>, Vec<String>), String> {
+    use auto_ui_dialect::UiStmt;
     let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl)
         .map_err(|e| format!("extract: {e:?}"))?;
     let sfc = auto_ui_compiler::ui_gen::VueGenerator::new()
@@ -456,7 +502,9 @@ pub fn generate_sfc_with_lane(
     // 区间、跳过=旧道）。计数失配（区间数 ≠ 带体 handler 数）=全体缺席
     //（fail-closed，不猜测配对）。
     let specs = pair_lambda_regions(src, &widget, specs);
-    let (bodies, absent) = match lane_handler_bodies_spec(src, path, &specs) {
+    // 切片#6n：node 选择器——lane 编译选本 widget（多 widget 源非本节点
+    // handler 的 ops/区间自然落空=缺席）。
+    let (bodies, absent) = match lane_handler_bodies_spec_at(src, path, &specs, node_index) {
         Ok(v) => v,
         Err(_) => (Vec::new(), patterns.clone()),
     };

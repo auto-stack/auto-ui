@@ -312,6 +312,18 @@ impl ComponentFragmentLane {
     /// 函数体含 handler 效果表达式，`__age_state_<i>_<field>`，span=原源
     /// 坐标——ops 空则 handler 体缺席，切片#4 探针实证）。
     pub fn compile(src: &str, path: &str, handler_msgs: &[&str]) -> Result<Self, String> {
+        Self::compile_at(src, path, handler_msgs, 0)
+    }
+
+    /// 切片#6n：node 选择器形态（多 widget 同文件源——语言面
+    /// `compile_component_scenario_states_at`；`node_index` 越界=编译期具
+    /// 名拒上抛）。
+    pub fn compile_at(
+        src: &str,
+        path: &str,
+        handler_msgs: &[&str],
+        node_index: usize,
+    ) -> Result<Self, String> {
         // 坐标基准：入口统一 f-string 脱糖（与组件面编译同一脱糖——
         // `ace_core::source::fstr::desugar_fstrings_widget`，公共出口）。
         // 前置归一化：行首 `state {`→`model {`（组件面槽位语法；state/model
@@ -329,7 +341,7 @@ impl ComponentFragmentLane {
                 msg: (*m).to_string(),
             })
             .collect();
-        let compiled = ace_av::age_component::compile_component_scenario_states(
+        let compiled = ace_av::age_component::compile_component_scenario_states_at(
             src,
             path,
             ace_av::age_component::LegacyWidgetAlias::Accept,
@@ -338,6 +350,7 @@ impl ComponentFragmentLane {
             &ace_av::age_component::ComponentInitials {
                 per_instance: vec![Vec::new()],
             },
+            node_index,
         )
         .map_err(|ds| {
             ds.iter()
