@@ -310,3 +310,14 @@ precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
 复验（`693fd916`，`git status --porcelain` 空）：native `gate-native-r6d` pass（10 用例 + reopen + 3 截图）；
 vue `gate-vue-r6b` pass（5 截图）；工具门 2 passed 6.00s。输入 hash：picker `73542e36`、model `62561f3e`、
 dialog `b96ac6da`、gate `1cb7eb94`。重跑三连（r6b/r6c/r6d，同 hash）native 均 pass。
+
+## 11. 第三次终审（F-18/F-19）断言补齐（实现 `c5bd2d52` + `a10d181c`）
+
+| 发现 | 处置 | 复验 |
+|---|---|---|
+| F-18 V-04 取消 oracle | Paint 例子 `.PickCancelled` 置可见状态 `picker cancelled`；门 V-04 在 p7 绘制后输入非法 HEX + Escape → 断言取消标记可见、`px42` 未变、Undo 深度不变（Load+paint 两次 push → 再 Undo 报 `nothing to undo`）；随后重绘 + Save/New/Load 断言像素保留 | native 门 V-04 pass |
+| F-19 非法 HEX 可见标签 | 门 `case_hex` 在非法 Enter 后断言快照含 `invalid hex color`（不再只断言事件） | native 门 hex pass |
+| 门确定性追加 | demo 的 strict/alpha 开关改为**带状态标签的按钮**（`业务拒绝：开/关`、`隐藏/显示 alpha`），门按标签 press；palette 命中用最后一个 canvas 下标（showAlpha 开关均正确）；通道提交前用 `autoui_inspect` 校验 R 输入为 64；取消断言接受**已文档化的平台双发**（只要求取消路径发生 + 正式值不变） | 同 hash native 连续 2 次 + vue 1 次 pass（r9a/r9b/r9a） |
+
+复验（`a10d181c`，`git status --porcelain` 空）：native `gate-native-r9a`/`r9b` pass（10 用例 + reopen + 3 截图）；
+vue `gate-vue-r9a` pass（5 截图）；输入 hash：picker `73542e36`、model `62561f3e`、dialog `b96ac6da`、gate `54630179`。
