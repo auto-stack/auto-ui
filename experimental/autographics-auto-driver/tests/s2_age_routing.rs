@@ -422,3 +422,39 @@ fn s2_real_a_counter_trajectory_and_restart() {
         vec![vec![0], vec![0]]
     );
 }
+
+/// B-PROOF-V[A]（宿主腿）：一次事件 → 更新 → 坏编辑保旧 → 修复恢复 → 关闭/重启。
+#[test]
+fn s2_proof_a_event_update_close_and_recovery() {
+    const UI: &str = "node Ui {\n    model { count int = 0 }\n    on Inc { count = count + 1 }\n    view {\n        text \"ui\" {}\n    }\n}\n";
+    let mut s = Session::new(UI).expect("the MIN-A UI node opens");
+    assert!(s.is_age());
+    s.age_send("Inc").expect("one event");
+    let seen = s.age_observe().unwrap();
+    assert_eq!(seen.components[0].instance_states, vec![vec![1]]);
+    assert_eq!(seen.components[0].instance_texts, vec![vec!["ui".to_string()]]);
+
+    // 坏编辑：具名拒且保旧（状态与文本都不变）。
+    let bad = UI.replace("text \"ui\" {}", "text \"ui\" {");
+    match s.update_age_body(&bad) {
+        Ok(_) => panic!("a malformed body edit must be rejected"),
+        Err(e) => assert!(!e.is_empty(), "named rejection"),
+    }
+    let seen = s.age_observe().unwrap();
+    assert_eq!(seen.components[0].instance_states, vec![vec![1]]);
+    assert_eq!(seen.components[0].instance_texts, vec![vec!["ui".to_string()]]);
+
+    // 修复：同一入口恢复，文本随 body 更新，状态保留。
+    let fixed = UI.replace("\"ui\"", "\"ui2\"");
+    s.update_age_body(&fixed).expect("the fixed body applies");
+    let seen = s.age_observe().unwrap();
+    assert_eq!(seen.components[0].instance_texts, vec![vec!["ui2".to_string()]]);
+    assert_eq!(seen.components[0].instance_states, vec![vec![1]]);
+
+    // 关闭/重启：停止后冻结观察，重启回初值。
+    s.age_stop().expect("stop");
+    assert!(s.age_is_stopped().unwrap());
+    s.age_restart().expect("restart");
+    let seen = s.age_observe().unwrap();
+    assert_eq!(seen.components[0].instance_states, vec![vec![0]]);
+}
