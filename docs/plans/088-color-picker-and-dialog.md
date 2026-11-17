@@ -144,6 +144,8 @@ T-04新建`examples/color-picker/`，并迁移Paint普通选色流程；T-05新�
 
 2026-11-14修订交接：stage: new；PLAN-088 r2；outcome: pass（合同可进入T-01，非实施后独立复审通过）；next: work。依据[本轮复核记录](../reviews/component-plans-087-093-2026-11-14/README.md)处理F-01/F-03/F-09/F-10，补§5接口/数据/状态、§6 V-06及视觉交接，AC-06同步加强；T-01/02/03/05/06执行仍按原8任务计数，当前0/8。Spec增量沿SD-01/02并纳入r2细节。本轮只读源码并修订计划/设计/图片资产，未运行产品门。
 
+2026-11-17（goal，终诊轮）：outcome: blocked（维持）| 终诊证据：索引修正后 hue+surface 精确通过，alpha/channel 的失败稳定复现——前一个实例作用域 handler 的整型字段写对后一个 handler 不可见（d_s 读 0、d_g 读 d_b；串字段 d_hex 写可见）——nanbox/绑定腐化家族，VM runtime 债（decisions §7.1 终诊段，提交 63034852）。§10 二选一仍待裁定；不可达验收（AC-02 native 通道证据、AC-06 native 完整性）在 VM 修复前无法诚实出具。
+
 2026-11-17（goal，等待轮 3 → blocked）：stage: goal | round: 4 | outcome: blocked | §10 复读：仍无裁定。连续三轮等待，按协议标记 goal blocked。精确待决问题：通道输入（AC-02 编辑入口之一）在两套设计下均被 VM runtime 缺口阻塞——(a) 内嵌 NumericField：depth-3 实例 Tick/状态解析缺口；(b) 内置 input：Tick 重基线后实例 handler 字段读错位（native）+ 提交路径 codegen 'length' 错（vue）。二选一：①先立 VM runtime 修复计划（实例作用域 handler 状态一致性 + depth-3 实例语义），PLAN-088 挂起等其交付；或 ②通道入口验收降域（native 记债、Vue 轨补证——需先修 vue 提交 'length' 小错），随后继续 T-05 剩余门与 T-06..T-08。已交付并验证：T-01/T-02、T-04（Paint 消费门 V-04）、T-05 工具门 2/2、核心选色链双轨、vue V-05。恢复动作：回复 ① 或 ②。
 
 2026-11-17（goal，等待轮 2）：stage: goal | round: 3 | outcome: waiting | §10 复读：无裁定答案；无阶段工作、无检查。等待轮计数 2/3。
