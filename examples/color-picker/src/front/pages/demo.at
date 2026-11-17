@@ -30,8 +30,16 @@ widget demo {
             row (style: "items-center gap-2") {
                 text "选色设置表单" { style: "text-sm font-medium" }
                 row (style: "flex-1") {}
-                checkbox { text: "业务拒绝模式", checked: .strict, onclick: .ToggleStrict }
-                checkbox { text: "隐藏 alpha", checked: !.show_alpha, onclick: .ToggleAlpha }
+                if .strict {
+                    button "业务拒绝：开" { onclick: .ToggleStrict, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                } else {
+                    button "业务拒绝：关" { onclick: .ToggleStrict, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                }
+                if .show_alpha {
+                    button "隐藏 alpha" { onclick: .ToggleAlpha, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                } else {
+                    button "显示 alpha" { onclick: .ToggleAlpha, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                }
             }
             col (style: "items-start gap-6 w-full") {
                 col (style: "gap-3 min-w-80 flex-1") {

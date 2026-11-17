@@ -378,7 +378,7 @@ def case_channel(s, report):
 
 def case_two_instances(s, report):
     """V-03: inline picker palette commits ink; dialog label independent."""
-    s.hit(4, 'p0')
+    s.hit(len(s.canvases()) - 1, 'p0')
     vfd.require(wait_log(s, lambda l: any('ink 接受 #EF4444FF' in x for x in l)),
                 f'inline palette p0 commit missing: {log_lines(s)[-3:]}')
     label = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
@@ -391,18 +391,17 @@ def case_business_reject(s, report):
     ink0 = s.ink_text()
 
     def toggle_strict():
-        snap = s.snapshot()
-        m = re.search(r'checkbox #vnode_(\d+) "[^"]*业务拒绝模式', snap)
-        vfd.require(m, 'strict checkbox not found')
-        s.call('autoui_action', element_id=f'vnode_{m.group(1)}', action='toggle', latency=True)
+        s.press_button('业务拒绝：关')
 
     toggle_strict()
-    s.hit(4, 'p1')
+    wait_snapshot(s, lambda snap: '业务拒绝：开' in snap)
+    s.hit(len(s.canvases()) - 1, 'p1')
     vfd.require(wait_log(s, lambda l: any('ink 拒绝' in x for x in l)),
                 f'strict reject not logged: {log_lines(s)[-3:]}')
     time.sleep(1.0)
     vfd.require(s.ink_text() == ink0, f'business reject changed formal ink: {ink0} -> {s.ink_text()}')
-    toggle_strict()
+    s.press_button('业务拒绝：开')
+    wait_snapshot(s, lambda snap: '业务拒绝：关' in snap)
     report['cases'].append('V-03 business-reject pass')
 
 
@@ -498,6 +497,8 @@ def case_hex(s, report):
     vfd.require(wait_log(s, lambda l: any('ink 错误' in x and 'invalid_color' in x for x in l)),
                 'hex: invalid_color error event missing')
     time.sleep(0.6)
+    vfd.require('invalid hex color' in s.snapshot(),
+                'hex: visible invalid_color label missing (F-13/F-19)')
     vfd.require(len(commits(log_lines(s))) == before, 'hex: invalid text committed')
     vfd.require(s.ink_text() == '当前画笔 #3974E6CC',
                 f'hex: invalid text changed ink: {s.ink_text()}')
@@ -510,20 +511,14 @@ def case_alpha(s, report):
     vfd.require(wait_log(s, lambda l: any('外部置值 ink=#3974E6CC' in x for x in l)),
                 'alpha: reset missing')
     time.sleep(1.0)
-    toggle_checkbox(s, '隐藏 alpha')
-    shown = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 4)
-    if not shown:
-        toggle_checkbox(s, '隐藏 alpha')
-        shown = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 4)
+    s.press_button('隐藏 alpha')
+    shown = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 4, tries=20)
     vfd.require(shown, 'alpha: A input still shown after hiding alpha')
     s.pen(0, [(96, 95)])
     vfd.require(wait_log(s, lambda l: any(re.search(r'ink 接受 #[0-9A-F]{6}CC', x) for x in l)),
                 f'alpha: hidden alpha dropped the value: {log_lines(s)[-3:]}')
-    toggle_checkbox(s, '隐藏 alpha')
-    back = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 5)
-    if not back:
-        toggle_checkbox(s, '隐藏 alpha')
-        back = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 5)
+    s.press_button('显示 alpha')
+    back = wait_snapshot(s, lambda snap: len(re.findall(r'input #vnode_', snap)) == 5, tries=20)
     vfd.require(back, 'alpha: A input did not come back')
     report['cases'].append('V-06 showAlpha retention pass')
 
@@ -615,10 +610,36 @@ def case_paint(args, out, report):
         snap = paint.snapshot()
         vfd.require('px42=#3B82F6FF' in snap, 'paint: painted pixel color mismatch (V-04)')
         vfd.require('painted px42=#3B82F6FF' in snap, 'paint: commit status mismatch (V-04)')
-        # undo restores the pre-paint state (cell 42 back to legacy red)
+        # V-04 cancel oracle: a picker draft cancelled with Escape changes no
+        # document pixel and adds no history entry.
+        pids = re.findall(r'input #vnode_(\d+)', paint.snapshot())
+        vfd.require(pids, 'paint: picker HEX input missing')
+        paint.call('autoui_type', element_id=f'vnode_{pids[0]}', text='#ZZZZZZ')
+        time.sleep(0.5)
+        paint.call('autoui_keyboard', key='Escape')
+        ok = False
+        for _ in range(10):
+            if 'picker cancelled' in paint.snapshot():
+                ok = True
+                break
+            time.sleep(0.4)
+        vfd.require(ok, 'paint: picker cancel path did not run')
+        vfd.require('px42=#3B82F6FF' in paint.snapshot(),
+                    'paint: cancel changed the document pixel')
+        # undo history: Load pushed one snapshot, the paint pushed one. The
+        # cancelled picker must not push. So: undo -> legacy red, undo -> the
+        # pre-load canvas, undo -> empty history.
         paint.press_button('Undo')
         time.sleep(1.2)
         vfd.require('px42=#EF4444FF' in paint.snapshot(), 'paint: undo did not restore px42')
+        paint.press_button('Undo')
+        time.sleep(1.2)
+        # exactly two pushes exist (Load + the paint); a cancelled picker draft
+        # must not add a third, so the next undo reports an empty history.
+        paint.press_button('Undo')
+        time.sleep(1.2)
+        vfd.require('nothing to undo' in paint.snapshot(),
+                    'paint: cancel added an unexpected history entry')
         # save/load round-trip in the new format keeps the picked color
         paint.hit(0, 'px42')
         time.sleep(1.2)

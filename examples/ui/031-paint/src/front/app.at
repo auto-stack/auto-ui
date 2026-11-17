@@ -195,8 +195,8 @@ widget App {
             .SetCur(req.value)
         }
         .PickCancelled -> {
-            // 取消：零业务修改、不增历史
-            .status = ""
+            // 取消：零业务修改、不增历史（可见标记供 V-04 oracle 断言）
+            .status = "picker cancelled"
         }
         .PickError(ev str) -> {
             .status = f"picker error"
