@@ -551,6 +551,36 @@ fn cp_text_int(pdec str) int {
     return v
 }
 
+/// 十进制串整数部（pen 坐标/色相条量化：值域 [0..360)+0.001 双轨均十进制
+/// 短表示；非数字字符返回 0）。自含。
+fn cp_ip(pdec str) int {
+    var n int = pdec.len()
+    var end int = n
+    for i in 0..n {
+        if pdec.substr(i, 1) == "." {
+            end = i
+        }
+    }
+    var v int = 0
+    for i in 0..end {
+        var d int = 0 - 1
+        var ch str = pdec.substr(i, 1)
+        if ch == "0" { d = 0 }
+        if ch == "1" { d = 1 }
+        if ch == "2" { d = 2 }
+        if ch == "3" { d = 3 }
+        if ch == "4" { d = 4 }
+        if ch == "5" { d = 5 }
+        if ch == "6" { d = 6 }
+        if ch == "7" { d = 7 }
+        if ch == "8" { d = 8 }
+        if ch == "9" { d = 9 }
+        if d < 0 { return 0 }
+        v = v * 10 + d
+    }
+    return v
+}
+
 /// 整数夹取。
 fn cp_clamp(pxx int, plo int, phi int) int {
     if pxx < plo { return plo }
@@ -615,7 +645,7 @@ fn cp_row_item(pj int) str {
     var y int = pj * 8 + 4
     var vj int = 100 - ((2 * (y * 100) + (192)) - (2 * (y * 100) + (192)) % (2 * (192))) / (2 * (192))
     var aj int = 255 - ((2 * (vj * 255) + (100)) - (2 * (vj * 255) + (100)) % (2 * (100))) / (2 * (100))
-    var a2 str = (hexd.substr((aj) - (aj) % 16, 1) + hexd.substr((aj) % 16, 1))
+    var a2 str = (hexd.substr(((aj) - (aj) % 16) / 16, 1) + hexd.substr((aj) % 16, 1))
     return f"r${pj},96,${y},rect,#000000${a2},192,8"
 }
 /// 色相条段 pi 节点（hsv(h_i,100,100) 不透明；h_i=half((pi*8+4)*360/192)）。
@@ -669,7 +699,7 @@ fn cp_alpha_item(prgb6 str, pi int) str {
     var hexd str = "0123456789ABCDEF"
     var x int = pi * 8 + 4
     var ai int = ((2 * (x * 255) + (192)) - (2 * (x * 255) + (192)) % (2 * (192))) / (2 * (192))
-    var a2 str = (hexd.substr((ai) - (ai) % 16, 1) + hexd.substr((ai) % 16, 1))
+    var a2 str = (hexd.substr(((ai) - (ai) % 16) / 16, 1) + hexd.substr((ai) % 16, 1))
     return f"a${pi},${x},6,rect,${prgb6}${a2},8,12"
 }
 /// 棋盘格 (pr,pc) 节点（格 pcw×pch；(pr+pc) 奇偶异色）。

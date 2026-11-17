@@ -28,7 +28,7 @@ widget demo {
                 row (style: "flex-1") {}
                 checkbox { text: "业务拒绝模式", checked: .strict, onclick: .ToggleStrict }
             }
-            row (style: "items-start gap-6 flex-wrap w-full") {
+            col (style: "items-start gap-6 w-full") {
                 col (style: "gap-3 min-w-80 flex-1") {
                     text "Inline 选色器（画笔颜色）" { style: "text-xs font-medium text-muted-foreground" }
                     ColorPicker (value: .ink, revision: .ink_rev, palette: .palette, onpreview: .InlinePreview($event), oncommitted: .InlineCommitted($event), oncancelled: .InlineCancelled, onerror: .InlineError($event)) {}

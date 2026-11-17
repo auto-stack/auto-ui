@@ -2,7 +2,7 @@ use auto.json
 
 // 模块链接按名直引（PLAN-087 T-02 实证：只注册直引 fn 裸名；引擎已按
 // 自含形态编写，无引擎内互调）。
-use color_model: cp_alpha_item, cp_channel_of, cp_text_int, cp_checker_item, cp_clamp, cp_cursor_edge_h, cp_cursor_edge_v, cp_floor_clamp, cp_hex_norm, cp_hex_valid, cp_hsv_hex, cp_hsv_of, cp_hue_item, cp_pal_item, cp_rgb_hex8, cp_row_item, cp_surf_col_item, cp_sw_item, cp_sv_of
+use color_model: cp_alpha_item, cp_channel_of, cp_ip, cp_text_int, cp_checker_item, cp_clamp, cp_cursor_edge_h, cp_cursor_edge_v, cp_floor_clamp, cp_hex_norm, cp_hex_valid, cp_hsv_hex, cp_hsv_of, cp_hue_item, cp_pal_item, cp_rgb_hex8, cp_row_item, cp_surf_col_item, cp_sw_item, cp_sv_of
 
 // PLAN-088 ColorPicker — 内嵌通用选色器（受控模式）。
 //
@@ -38,18 +38,13 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         var seq int = 0
         // ── 草稿（编辑器局部；canonical 由 d_hex 承载）──
         var d_hex str = "#000000FF"
-        var d_r int = 0
-        var d_g int = 0
-        var d_b int = 0
-        var d_a int = 255
-        var d_h int = 0
-        var d_s int = 0
-        var d_v int = 0
+        // 最近有效色相（草稿级；灰/黑时保留，串字段跨 handler 可靠）
+        var h_hold str = "0"
         var hsv_mode bool = false
         // ── HEX 文本草稿 ──
         var hex_text str = "#000000FF"
         var hex_err str = ""
-        // ── 通道框（NumericField 受控串 + 共享修订）──
+        // ── 通道框（内置 input 受控串 + 共享修订；r3 不嵌 NumericField）──
         var ch_r str = "0"
         var ch_g str = "0"
         var ch_b str = "0"
@@ -87,9 +82,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         var pal_labels List = []
         var pal_norm List = []
     }
-    // 通道输入依赖 PLAN-087 已归档交付（docs/plans/archived/087-numeric-and-unit-fields.md，
-    // Spec docs/specs/ui/numeric-fields.md）；包内嵌套消费 NumericField（R/G/B/A/H/S/V）。
-    use { package: numeric_fields from "../numeric-fields" }
+    // 通道输入自 r3 起为内置 input + cp 引擎夹取校验（语义基准 PLAN-087，
+    // 不引入其实例：depth-3 实例 Tick/状态缺口见 decisions §7）。
     computed {
         c_locked => .disabled || .readOnly || .cfg_err != ""
         c_dim => .disabled || .readOnly
@@ -113,7 +107,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                     }
                     canvas (scene: .pal, coords: "192x28", onhit: .SwatchHit, style: "w-48 h-7 rounded border border-border") {}
                 }
-                col (style: "gap-2 min-w-44 flex-1") {
+                col (style: "gap-2 min-w-40 flex-1") {
                     row (style: "items-center gap-2") {
                         text "HEX" { style: "text-xs text-muted-foreground" }
                         input (value: .hex_text, oninput: .HexInput, onenter: .HexEnter, onkeydown.escape.prevent: .HexEscape, disabled: .c_locked, style: "flex-1 min-w-0 h-8 text-sm rounded-md bg-muted/40") {}
@@ -156,12 +150,16 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                             input (value: .ch_v, oninput: .VPreview, onenter: .VCommitted, disabled: .c_locked, style: "flex-1 min-w-0 h-7 text-sm rounded-md bg-muted/40") {}
                         }
                     }
+                    if .ch_err != "" {
+                        text .ch_err { style: "text-xs text-destructive" }
+                    }
                 }
             }
         }
     }
     on {
         .Init -> {
+            .h_hold = "0"
             .surf_pts = []
             .surf_meta = []
             .surf_nodes = []
@@ -197,20 +195,31 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             .seen_rev = .revision
             .seen_val = .value
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
             .hex_text = .d_hex
@@ -236,13 +245,13 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 }
                 pi = pi + 1
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .hue_nodes = []
             var hi int = 0
@@ -254,7 +263,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -273,7 +282,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -300,8 +309,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 pi2 = pi2 + 1
             }
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
         }
@@ -310,37 +319,49 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 .seen_rev = .revision
                 .seen_val = .value
                 if cp_hex_valid(.value) == 0 {
+                    .h_hold = "0"
                     .d_hex = cp_hex_norm(.value)
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
                     .hex_text = .d_hex
                     .hex_err = ""
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -359,7 +380,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -378,8 +399,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                 }
@@ -387,38 +408,77 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .SurfDown(x, y) -> {
             if !.c_locked {
+
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
             var xf float = x
             var yf float = y
             var sdec str = f"${xf * 0.5208333}"
             var vdec str = f"${(192.0 - yf) * 0.5208333}"
-            .d_s = cp_floor_clamp(sdec, 0, 100)
-            .d_v = cp_floor_clamp(vdec, 0, 100)
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            ld_sat = cp_floor_clamp(sdec, 0, 100)
+            ld_v = cp_floor_clamp(vdec, 0, 100)
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
             .hex_text = .d_hex
             .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -429,7 +489,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -448,8 +508,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
             .seq = .seq + 1
@@ -459,38 +519,77 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .SurfMove(x, y) -> {
             if !.c_locked {
+
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
             var xf float = x
             var yf float = y
             var sdec str = f"${xf * 0.5208333}"
             var vdec str = f"${(192.0 - yf) * 0.5208333}"
-            .d_s = cp_floor_clamp(sdec, 0, 100)
-            .d_v = cp_floor_clamp(vdec, 0, 100)
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            ld_sat = cp_floor_clamp(sdec, 0, 100)
+            ld_v = cp_floor_clamp(vdec, 0, 100)
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
             .hex_text = .d_hex
             .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -501,7 +600,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -520,8 +619,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
             .seq = .seq + 1
@@ -531,38 +630,77 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .SurfUp(x, y) -> {
             if !.c_locked {
+
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
             var xf float = x
             var yf float = y
             var sdec str = f"${xf * 0.5208333}"
             var vdec str = f"${(192.0 - yf) * 0.5208333}"
-            .d_s = cp_floor_clamp(sdec, 0, 100)
-            .d_v = cp_floor_clamp(vdec, 0, 100)
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            ld_sat = cp_floor_clamp(sdec, 0, 100)
+            ld_v = cp_floor_clamp(vdec, 0, 100)
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
             .hex_text = .d_hex
             .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -573,7 +711,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -592,8 +730,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
             if .d_hex != cp_hex_norm(.value) {
@@ -605,43 +743,83 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .HueDown(x, y) -> {
             if !.c_locked {
-            var xf float = x
-            var hdec str = f"${xf * 1.875}"
-            .d_h = cp_floor_clamp(hdec, 0, 360)
-            if .d_h >= 360 {
-                .d_h = 0
-            }
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-            .hex_text = .d_hex
-            .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            var xf float = x
+            var hdec str = f"${xf * 1.875}"
+            var lh int = cp_ip(hdec)
+            ld_h = cp_clamp(lh, 0, 360)
+            if ld_h >= 360 {
+                ld_h = 0
+            }
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -660,7 +838,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -679,8 +857,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
             .seq = .seq + 1
@@ -690,43 +868,83 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .HueMove(x, y) -> {
             if !.c_locked {
-            var xf float = x
-            var hdec str = f"${xf * 1.875}"
-            .d_h = cp_floor_clamp(hdec, 0, 360)
-            if .d_h >= 360 {
-                .d_h = 0
-            }
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-            .hex_text = .d_hex
-            .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            var xf float = x
+            var hdec str = f"${xf * 1.875}"
+            var lh int = cp_ip(hdec)
+            ld_h = cp_clamp(lh, 0, 360)
+            if ld_h >= 360 {
+                ld_h = 0
+            }
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -745,7 +963,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -764,8 +982,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
             .seq = .seq + 1
@@ -775,43 +993,83 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .HueUp(x, y) -> {
             if !.c_locked {
-            var xf float = x
-            var hdec str = f"${xf * 1.875}"
-            .d_h = cp_floor_clamp(hdec, 0, 360)
-            if .d_h >= 360 {
-                .d_h = 0
-            }
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-            .hex_text = .d_hex
-            .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            var xf float = x
+            var hdec str = f"${xf * 1.875}"
+            var lh int = cp_ip(hdec)
+            ld_h = cp_clamp(lh, 0, 360)
+            if ld_h >= 360 {
+                ld_h = 0
+            }
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -830,7 +1088,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -849,8 +1107,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
             if .d_hex != cp_hex_norm(.value) {
@@ -862,35 +1120,74 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .AlphaDown(x, y) -> {
             if !.c_locked {
-            var xf float = x
-            var adec str = f"${xf * 1.328125}"
-            .d_a = cp_floor_clamp(adec, 0, 255)
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-            .hex_text = .d_hex
-            .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            var xf float = x
+            var adec str = f"${xf * 1.328125}"
+            ld_a = cp_floor_clamp(adec, 0, 255)
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -901,7 +1198,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -926,35 +1223,74 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .AlphaMove(x, y) -> {
             if !.c_locked {
-            var xf float = x
-            var adec str = f"${xf * 1.328125}"
-            .d_a = cp_floor_clamp(adec, 0, 255)
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-            .hex_text = .d_hex
-            .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            var xf float = x
+            var adec str = f"${xf * 1.328125}"
+            ld_a = cp_floor_clamp(adec, 0, 255)
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -965,7 +1301,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -990,35 +1326,74 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
 
         .AlphaUp(x, y) -> {
             if !.c_locked {
-            var xf float = x
-            var adec str = f"${xf * 1.328125}"
-            .d_a = cp_floor_clamp(adec, 0, 255)
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-            .hex_text = .d_hex
-            .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            var xf float = x
+            var adec str = f"${xf * 1.328125}"
+            ld_a = cp_floor_clamp(adec, 0, 255)
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
+            .hex_text = .d_hex
+            .hex_err = ""
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -1029,7 +1404,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1062,36 +1437,47 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 var col str = .pal_norm[i]
                 if col != .d_hex {
                     .d_hex = col
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
                     .hex_text = .d_hex
                     .hex_err = ""
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -1110,7 +1496,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1129,8 +1515,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if .d_hex != cp_hex_norm(.value) {
@@ -1150,34 +1536,45 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                     var norm str = cp_hex_norm(v)
                     if norm != .d_hex {
                         .d_hex = norm
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -1196,7 +1593,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1215,8 +1612,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                         .seq = .seq + 1
@@ -1227,37 +1624,51 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .HexEnter -> {
             if !.c_locked {
+                if cp_hex_valid(.hex_text) != 0 {
+                    ."error"(json.stringify({code: "invalid_color", message: "color-picker: invalid hex color (invalid_color)"}))
+                }
                 if cp_hex_valid(.hex_text) == 0 {
                     .hex_err = ""
                     .d_hex = cp_hex_norm(.hex_text)
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
             var hsvv int = cp_hsv_of(.d_hex)
             var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -1276,7 +1687,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1295,8 +1706,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if .d_hex != cp_hex_norm(.value) {
@@ -1318,37 +1729,75 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .RPreview(v str) -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(v)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
-                    .d_r = nv
-                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    ld_r = nv
+                    .d_hex = cp_rgb_hex8(ld_r, ld_g, ld_b, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -1359,7 +1808,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1378,8 +1827,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "preview" == "committed" {
@@ -1397,37 +1846,75 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .GPreview(v str) -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(v)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
-                    .d_g = nv
-                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    ld_g = nv
+                    .d_hex = cp_rgb_hex8(ld_r, ld_g, ld_b, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -1438,7 +1925,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1457,8 +1944,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "preview" == "committed" {
@@ -1476,37 +1963,75 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .BPreview(v str) -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(v)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
-                    .d_b = nv
-                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    ld_b = nv
+                    .d_hex = cp_rgb_hex8(ld_r, ld_g, ld_b, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -1517,7 +2042,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1536,8 +2061,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "preview" == "committed" {
@@ -1555,37 +2080,75 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .APreview(v str) -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(v)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
-                    .d_a = nv
-                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    ld_a = nv
+                    .d_hex = cp_rgb_hex8(ld_r, ld_g, ld_b, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -1596,7 +2159,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1615,8 +2178,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "preview" == "committed" {
@@ -1634,45 +2197,83 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .HPreview(v str) -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(v)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
-                    .d_h = nv
-                    if .d_h >= 360 {
-                .d_h = 0
+                    ld_h = nv
+                    if ld_h >= 360 {
+                ld_h = 0
             }
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -1691,7 +2292,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1710,8 +2311,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "preview" == "committed" {
@@ -1729,42 +2330,80 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .SPreview(v str) -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(v)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
-                    .d_s = nv
-                    .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                    ld_sat = nv
+                    .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -1783,7 +2422,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1802,8 +2441,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "preview" == "committed" {
@@ -1821,42 +2460,80 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .VPreview(v str) -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(v)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
-                    .d_v = nv
-                    .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                    ld_v = nv
+                    .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -1875,7 +2552,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1894,8 +2571,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "preview" == "committed" {
@@ -1913,37 +2590,76 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .RCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(.ch_r)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
+                    ."error"(json.stringify({code: "invalid_channel", message: .ch_err}))
                 } else {
-                    .d_r = nv
-                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    ld_r = nv
+                    .d_hex = cp_rgb_hex8(ld_r, ld_g, ld_b, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -1954,7 +2670,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -1973,8 +2689,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "committed" == "committed" {
@@ -1992,37 +2708,76 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .GCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(.ch_g)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
+                    ."error"(json.stringify({code: "invalid_channel", message: .ch_err}))
                 } else {
-                    .d_g = nv
-                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    ld_g = nv
+                    .d_hex = cp_rgb_hex8(ld_r, ld_g, ld_b, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -2033,7 +2788,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -2052,8 +2807,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "committed" == "committed" {
@@ -2071,37 +2826,76 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .BCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(.ch_b)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
+                    ."error"(json.stringify({code: "invalid_channel", message: .ch_err}))
                 } else {
-                    .d_b = nv
-                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    ld_b = nv
+                    .d_hex = cp_rgb_hex8(ld_r, ld_g, ld_b, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -2112,7 +2906,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -2131,8 +2925,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "committed" == "committed" {
@@ -2150,37 +2944,76 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .ACommitted() -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(.ch_a)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
+                    ."error"(json.stringify({code: "invalid_channel", message: .ch_err}))
                 } else {
-                    .d_a = nv
-                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    ld_a = nv
+                    .d_hex = cp_rgb_hex8(ld_r, ld_g, ld_b, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .alph_nodes = []
             var ai int = 0
@@ -2191,7 +3024,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -2210,8 +3043,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "committed" == "committed" {
@@ -2229,45 +3062,84 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .HCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(.ch_h)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
+                    ."error"(json.stringify({code: "invalid_channel", message: .ch_err}))
                 } else {
-                    .d_h = nv
-                    if .d_h >= 360 {
-                .d_h = 0
+                    ld_h = nv
+                    if ld_h >= 360 {
+                ld_h = 0
             }
-            .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+            .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -2286,7 +3158,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -2305,8 +3177,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "committed" == "committed" {
@@ -2324,42 +3196,81 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .SCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(.ch_s)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
+                    ."error"(json.stringify({code: "invalid_channel", message: .ch_err}))
                 } else {
-                    .d_s = nv
-                    .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                    ld_sat = nv
+                    .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -2378,7 +3289,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -2397,8 +3308,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "committed" == "committed" {
@@ -2416,42 +3327,81 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         .VCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
+            var ld_r int = cp_channel_of(.d_hex, 0)
+            var ld_g int = cp_channel_of(.d_hex, 1)
+            var ld_b int = cp_channel_of(.d_hex, 2)
+            var ld_a int = cp_channel_of(.d_hex, 3)
+            var hsvv int = cp_hsv_of(.d_hex)
+            var svv int = cp_sv_of(.d_hex)
+            var ld_h int = 0
+            var ld_sat int = 0
+            var ld_v int = 0
+            if hsvv >= 0 {
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
+            } else {
+                if svv >= 0 {
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
+                }
+            }
                 var nv int = cp_text_int(.ch_v)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
+                    ."error"(json.stringify({code: "invalid_channel", message: .ch_err}))
                 } else {
-                    .d_v = nv
-                    .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                    ld_v = nv
+                    .d_hex = cp_hsv_hex(ld_h, ld_sat, ld_v, ld_a)
                     .hex_text = .d_hex
                     .hex_err = ""
-            .d_r = cp_channel_of(.d_hex, 0)
-            .d_g = cp_channel_of(.d_hex, 1)
-            .d_b = cp_channel_of(.d_hex, 2)
-            .d_a = cp_channel_of(.d_hex, 3)
-            var hsvv int = cp_hsv_of(.d_hex)
-            var svv int = cp_sv_of(.d_hex)
+            ld_r = cp_channel_of(.d_hex, 0)
+            ld_g = cp_channel_of(.d_hex, 1)
+            ld_b = cp_channel_of(.d_hex, 2)
+            ld_a = cp_channel_of(.d_hex, 3)
+            hsvv = cp_hsv_of(.d_hex)
+            svv = cp_sv_of(.d_hex)
+            ld_h = 0
+            ld_sat = 0
+            ld_v = 0
             if hsvv >= 0 {
-                .d_h = (hsvv - hsvv % 100000) / 100000
-                .d_s = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 1000
-                .d_v = hsvv % 1000
+                ld_h = (hsvv - hsvv % 100000) / 100000
+                ld_sat = ((hsvv - hsvv % 1000) / 1000) - ((hsvv - hsvv % 100000) / 100000) * 100
+                ld_v = hsvv % 1000
+                .h_hold = f"${ld_h}"
             } else {
                 if svv >= 0 {
-                    .d_s = (svv - svv % 1000) / 1000
-                    .d_v = svv % 1000
+                    ld_sat = (svv - svv % 1000) / 1000
+                    ld_v = svv % 1000
+                }
+                ld_h = cp_text_int(.h_hold)
+                if ld_h >= 360 {
+                    ld_h = 0
+                }
+                if ld_h < 0 {
+                    ld_h = 0
                 }
             }
-            .ch_r = f"${.d_r}"
-            .ch_g = f"${.d_g}"
-            .ch_b = f"${.d_b}"
-            .ch_a = f"${.d_a}"
-            .ch_h = f"${.d_h}"
-            .ch_s = f"${.d_s}"
-            .ch_v = f"${.d_v}"
+            .ch_r = f"${ld_r}"
+            .ch_g = f"${ld_g}"
+            .ch_b = f"${ld_b}"
+            .ch_a = f"${ld_a}"
+            .ch_h = f"${ld_h}"
+            .ch_s = f"${ld_sat}"
+            .ch_v = f"${ld_v}"
             .ch_rev = .ch_rev + 1
             .surf_nodes = []
             var si int = 0
             while si < 24 {
-                var sit str = cp_surf_col_item(.d_h, si)
+                var sit str = cp_surf_col_item(ld_h, si)
                 .surf_nodes.push(sit)
                 si = si + 1
             }
@@ -2470,7 +3420,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
             var aj int = 0
             while aj < 24 {
-                var rgb6 str = "#" + .d_hex.substr(1, 7)
+                var rgb6 str = "#" + .d_hex.substr(1, 6)
                 var ait str = cp_alpha_item(rgb6, aj)
                 .alph_nodes.push(ait)
                 aj = aj + 1
@@ -2489,8 +3439,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .surf_edges = []
-            var e1 str = cp_cursor_edge_h(.d_s, .d_v)
-            var e2 str = cp_cursor_edge_v(.d_s, .d_v)
+            var e1 str = cp_cursor_edge_h(ld_sat, ld_v)
+            var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
                     if "committed" == "committed" {

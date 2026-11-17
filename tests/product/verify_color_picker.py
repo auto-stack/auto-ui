@@ -189,8 +189,8 @@ class Session:
 def log_lines(s):
     snap = s.snapshot()
     i = snap.find('提交日志')
-    block = snap[i:i + 6000] if i >= 0 else ''
-    return re.findall(r'"(\[\d+\][^"]*)"', block)
+    block = snap[i:i + 8000] if i >= 0 else ''
+    return re.findall(r'^\s*text #vnode_\d+ "(\[\d+\].*)"\s*$', block, re.M)
 
 
 def wait_log(s, pred, tries=14, wait=0.7):
@@ -225,6 +225,14 @@ def case_known_colors(s, report):
     s.pen(0, [(96, 95)])
     vfd.require(wait_log(s, lambda l: any('ink 接受 #8040407F' in x for x in l)),
                 f'hue-edge commit missing: {log_lines(s)[-3:]}')
+    # r2 rule: a gray draft keeps the last valid hue (S=0 drag then back)
+    s.pen(1, [(8, 6)])      # H=15, S/V from #8040407F (S=50,V=50)
+    s.pen(0, [(0, 95)])     # S=0 -> gray #8080807F
+    vfd.require(wait_log(s, lambda l: any('ink 接受 #8080807F' in x for x in l)),
+                f'gray draft commit missing: {log_lines(s)[-3:]}')
+    s.pen(0, [(96, 95)])    # S/V back; H must still be 15 -> #8050407F
+    vfd.require(wait_log(s, lambda l: any('ink 接受 #8050407F' in x for x in l)),
+                f'held-hue commit missing: {log_lines(s)[-3:]}')
     report['cases'].append('V-01/06 known-colors pass')
 
 
@@ -232,9 +240,12 @@ def case_gestures(s, report):
     """V-02: one gesture = one commit; preview carries surface source; external
     reset revokes drafts."""
     before = len(log_lines(s))
-    s.pen(0, [(30, 30), (96, 95)])
-    vfd.require(wait_log(s, lambda l: len(commits(l)) >= before and len(
-        [x for x in l if 'ink 接受' in x]) >= 1), 'gesture did not commit')
+    time.sleep(1.0)
+    before = len(log_lines(s))
+    before_commits = len(commits(log_lines(s)))
+    s.pen(0, [(30, 30), (60, 120)])
+    vfd.require(wait_log(s, lambda l: len(commits(l)) > before_commits),
+                'gesture did not commit')
     lines = log_lines(s)
     new_commits = [x for x in lines[before:] if 'ink 接受' in x]
     vfd.require(len(new_commits) == 1, f'one gesture must commit once, got {new_commits}')
@@ -257,17 +268,28 @@ def case_channel(s, report):
     inputs = re.findall(r'input #vnode_(\d+)', snap)
     vfd.require(len(inputs) >= 5, f'channel inputs missing: {len(inputs)}')
     r_id = 'vnode_' + inputs[1]  # inputs[0] = HEX; inputs[1] = R
-    s.call('autoui_type', element_id=r_id, text='64')
-    time.sleep(0.4)
-    s.call('autoui_action', element_id=r_id, action='submit', latency=True)
-    vfd.require(wait_log(s, lambda l: any('ink 接受 #4074E6CC' in x for x in l)),
-                f'channel commit missing: {log_lines(s)[-3:]}')
-    s.call('autoui_type', element_id=r_id, text='abc')
-    time.sleep(0.4)
-    s.call('autoui_action', element_id=r_id, action='submit')
-    time.sleep(1.0)
-    snap2 = s.snapshot()
-    vfd.require('invalid_channel' in snap2, 'invalid channel error missing')
+    committed = False
+    for _ in range(3):
+        s.call('autoui_type', element_id=r_id, text='64')
+        time.sleep(0.5)
+        s.call('autoui_action', element_id=r_id, action='submit', latency=True)
+        if wait_log(s, lambda l: any('ink 接受 #4074E6CC' in x for x in l), tries=5):
+            committed = True
+            break
+    vfd.require(committed, f'channel commit missing: {log_lines(s)[-3:]}')
+    invalid_ok = False
+    for _ in range(3):
+        s.call('autoui_type', element_id=r_id, text='abc')
+        time.sleep(0.5)
+        s.call('autoui_action', element_id=r_id, action='submit')
+        time.sleep(0.6)
+        snap2 = s.snapshot()
+        if 'invalid_channel' in snap2:
+            invalid_ok = True
+            break
+    vfd.require(invalid_ok, 'invalid channel error missing')
+    vfd.require(wait_log(s, lambda l: any('ink 错误' in x and 'invalid_channel' in x for x in l)),
+                'invalid channel error event missing')
     vfd.require(s.ink_text() == '当前画笔 #4074E6CC', f'invalid channel changed ink: {s.ink_text()}')
     report['cases'].append('V-01 channel entry pass')
 
@@ -277,7 +299,7 @@ def case_two_instances(s, report):
     s.hit(4, 'p0')
     vfd.require(wait_log(s, lambda l: any('ink 接受 #EF4444FF' in x for x in l)),
                 f'inline palette p0 commit missing: {log_lines(s)[-3:]}')
-    label = re.search(r'当前标签色 (\S+?)"?', s.snapshot()).group(1)
+    label = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
     vfd.require(label != '#EF4444FF', f'label leaked inline color: {label}')
     report['cases'].append('V-03 two-instance isolation pass')
 
@@ -304,31 +326,102 @@ def case_business_reject(s, report):
 
 def case_dialog(s, report):
     """V-02/03: dialog draft/confirm-once/cancel-zero; dialog pen scoping."""
-    label0 = re.search(r'当前标签色 (\S+?)"?', s.snapshot()).group(1)
+    label0 = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
     s.press_button('打开标签色对话框')
-    cans = s.canvases()
+    cans = []
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        cans = s.canvases()
+        if len(cans) >= 10:
+            break
+        time.sleep(0.4)
     vfd.require(len(cans) >= 10, f'dialog canvases missing: {len(cans)}')
     # dialog picker canvases are the last 5: [surf, hue, alpha, sw, pal]
     base = len(cans) - 5
     s.pen(base + 1, [(8, 6)])
     s.pen(base, [(96, 95)])
-    s.press_button('关闭')
+    s.press_button('取消')
     time.sleep(1.0)
-    label1 = re.search(r'当前标签色 (\S+?)"?', s.snapshot()).group(1)
+    label1 = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
     vfd.require(label1 == label0, f'cancel changed formal label: {label0} -> {label1}')
     s.press_button('打开标签色对话框')
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        cans = s.canvases()
+        if len(cans) >= 10:
+            break
+        time.sleep(0.4)
+    vfd.require(len(cans) >= 10, f'dialog canvases missing on reopen: {len(cans)}')
+    base = len(cans) - 5
     s.pen(base + 1, [(8, 6)])
     s.pen(base, [(96, 95)])
     s.press_button('确认')
     vfd.require(wait_log(s, lambda l: any('label 接受' in x for x in l)),
                 f'confirm commit missing: {log_lines(s)[-3:]}')
     time.sleep(1.0)
-    label2 = re.search(r'当前标签色 (\S+?)"?', s.snapshot()).group(1)
+    label2 = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
     vfd.require(label2 != label0, f'confirm did not change label: {label2}')
     report['cases'].append('V-02/03 dialog draft/confirm/cancel pass')
 
 
 # ── paint consumption (native) ──
+
+def case_narrow(args, out, report):
+    """V-05/06: native narrow window (640x560) + light/dark theme; the picker
+    stays reachable and the content color is theme-independent."""
+    import shutil
+    root = out / 'narrow-app'
+    if root.exists():
+        shutil.rmtree(root)
+    (root / 'src' / 'front').mkdir(parents=True)
+    for entry in (DEMO_APP / 'src').rglob('*'):
+        rel = entry.relative_to(DEMO_APP / 'src')
+        if entry.is_dir():
+            (root / 'src' / rel).mkdir(parents=True, exist_ok=True)
+        else:
+            (root / 'src' / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(entry, root / 'src' / rel)
+    pac = (DEMO_APP / 'pac.at').read_text(encoding='utf-8')
+    # native narrow: the demo stacks its two sections so 640x560 keeps the
+    # channel labels/inputs and the dialog footer reachable.
+    pac = re.sub(r'window:\s*"\d+x\d+"', 'window: "640x560"', pac)
+    dep = (REPO / 'packages' / 'color-picker').resolve().as_posix()
+    pac = re.sub(r'path:\s*"[^"]*packages/color-picker"', f'path: "{dep}"', pac)
+    (root / 'pac.at').write_text(pac, encoding='utf-8')
+    page = root / 'src' / 'front' / 'pages' / 'demo.at'
+    if page.exists():
+        txt = page.read_text(encoding='utf-8')
+        txt = re.sub(r'from "[^"]*packages/color-picker"', f'from "{dep}"', txt)
+        page.write_text(txt, encoding='utf-8')
+    s = Session(args, out, 7, root, '选色设置表单', name='narrow')
+    try:
+        snap = s.snapshot()
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            snap = s.snapshot()
+            if len(s.canvases()) >= 5:
+                break
+            time.sleep(0.4)
+        vfd.require('当前画笔 #3974E6CC' in snap, 'narrow: picker ink missing')
+        vfd.require(len(s.canvases()) >= 5, 'narrow: picker canvases missing')
+        vfd.require('RGB/HSV' in snap, 'narrow: channel toggle unreachable')
+        s.screenshot('demo-narrow-native.png')
+        report['visual'] += ['demo-narrow-native.png']
+        s.press_button('切换明暗')
+        time.sleep(0.8)
+        snap_dark = s.snapshot()
+        vfd.require('当前画笔 #3974E6CC' in snap_dark,
+                    f'narrow: theme changed content color: {snap_dark[:160]}')
+        s.screenshot('demo-native-dark.png')
+        report['visual'] += ['demo-native-dark.png']
+        s.press_button('切换明暗')
+        time.sleep(0.8)
+        vfd.require('当前画笔 #3974E6CC' in s.snapshot(),
+                    'narrow: theme round-trip changed content color')
+        report['cases'].append('V-05 narrow + light/dark pass')
+    finally:
+        s.stop()
+
 
 def case_paint(args, out, report):
     """V-04: legacy adaptation, picker commit -> pixel, save/load, undo."""
@@ -415,9 +508,14 @@ def run_vue(args, out, report):
             body2 = page.evaluate('document.body.innerText')
             vfd.require('ink 预览' in body2, f'vue drag no preview: {body2[:200]}')
             vfd.require('ink 接受' in body2, 'vue drag did not commit')
+            # reset to the controlled baseline before the channel-exact check
+            page.get_by_role('button', name=re.compile('重置画笔')).click()
+            time.sleep(1.2)
+            body_reset = page.evaluate('document.body.innerText')
+            vfd.require('#3974E6CC' in body_reset, 'vue reset ink missing')
             # r3 channel entry: R field (inputs[1]) -> 64 -> commit #4074E6CC
-            page.evaluate('document.querySelectorAll("input")[1].focus()')
-            page.keyboard.type('64')
+            page.locator('input').nth(1).fill('64')
+            time.sleep(0.4)
             page.keyboard.press('Enter')
             time.sleep(1.5)
             body3 = page.evaluate('document.body.innerText')
@@ -491,6 +589,11 @@ def main():
             case_paint(args, out, report)
         except AssertionError as e:
             failures.append(f'paint: {e}')
+        # narrow window + light/dark (V-05)
+        try:
+            case_narrow(args, out, report)
+        except (AssertionError, RuntimeError) as e:
+            failures.append(f'narrow: {e}')
     else:
         try:
             run_vue(args, out, report)

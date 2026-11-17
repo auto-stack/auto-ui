@@ -17,7 +17,7 @@ use color_model: cp_hex_norm, cp_hex_valid
 // widget 不新增 canvas。native input 无 onblur——Escape 经 builtin dialog
 // onclose 语义（dismiss）走取消路径。
 widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool = true, palette: List = [], disabled: bool = false, readOnly: bool = false, open: bool = false, title: str = "选择颜色") {
-    msg { Init, Tick, PickPreview(str), PickCommitted(str), PickCancelled, PickError(str), Confirm, Cancelled }
+    msg { Init, Tick, PickPreview(str), PickCommitted(str), PickCancelled, PickError(str), Confirm, Cancelled, "preview"(str), "committed"(str), "cancelled", "error"(str) }
     model {
         var interval int = 100
         var seen_rev int = 0
