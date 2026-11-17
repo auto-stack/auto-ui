@@ -210,18 +210,19 @@ def commits(lines):
 def case_known_colors(s, report):
     """V-01/06: fresh session; hue pen -> surface -> alpha -> hue edge."""
     vfd.require(s.ink_text() == '当前画笔 #3974E6CC', f'initial ink wrong: {s.ink_text()}')
+    # canvas order: [0]=surf [1]=hue [2]=alpha [3]=swatch [4]=palette
     # hue bar (8,6) -> h=15; surface (96,95) -> s=50 v=50; alpha baseline CC
-    s.pen(2, [(8, 6)])
-    s.pen(2, [(96, 95)])
+    s.pen(1, [(8, 6)])
+    s.pen(0, [(96, 95)])
     vfd.require(wait_log(s, lambda l: any('ink 接受 #805040CC' in x for x in l)),
                 f'hue+surface commit missing: {log_lines(s)[-3:]}')
     # alpha bar (96,6) -> a=127
-    s.pen(3, [(96, 6)])
+    s.pen(2, [(96, 6)])
     vfd.require(wait_log(s, lambda l: any('ink 接受 #8050407F' in x for x in l)),
                 f'alpha commit missing: {log_lines(s)[-3:]}')
     # hue right edge (192,6) -> 360 -> normalized 0; alpha stays 7F
-    s.pen(2, [(192, 6)])
-    s.pen(2, [(96, 95)])
+    s.pen(1, [(192, 6)])
+    s.pen(0, [(96, 95)])
     vfd.require(wait_log(s, lambda l: any('ink 接受 #8040407F' in x for x in l)),
                 f'hue-edge commit missing: {log_lines(s)[-3:]}')
     report['cases'].append('V-01/06 known-colors pass')
@@ -231,7 +232,7 @@ def case_gestures(s, report):
     """V-02: one gesture = one commit; preview carries surface source; external
     reset revokes drafts."""
     before = len(log_lines(s))
-    s.pen(2, [(30, 30), (96, 95)])
+    s.pen(0, [(30, 30), (96, 95)])
     vfd.require(wait_log(s, lambda l: len(commits(l)) >= before and len(
         [x for x in l if 'ink 接受' in x]) >= 1), 'gesture did not commit')
     lines = log_lines(s)
@@ -307,17 +308,17 @@ def case_dialog(s, report):
     s.press_button('打开标签色对话框')
     cans = s.canvases()
     vfd.require(len(cans) >= 10, f'dialog canvases missing: {len(cans)}')
-    # dialog picker: hue bar + surface (dialog canvases are the last 5)
+    # dialog picker canvases are the last 5: [surf, hue, alpha, sw, pal]
     base = len(cans) - 5
-    s.pen(base + 2, [(8, 6)])
-    s.pen(base + 2, [(96, 95)])
+    s.pen(base + 1, [(8, 6)])
+    s.pen(base, [(96, 95)])
     s.press_button('关闭')
     time.sleep(1.0)
     label1 = re.search(r'当前标签色 (\S+?)"?', s.snapshot()).group(1)
     vfd.require(label1 == label0, f'cancel changed formal label: {label0} -> {label1}')
     s.press_button('打开标签色对话框')
-    s.pen(base + 2, [(8, 6)])
-    s.pen(base + 2, [(96, 95)])
+    s.pen(base + 1, [(8, 6)])
+    s.pen(base, [(96, 95)])
     s.press_button('确认')
     vfd.require(wait_log(s, lambda l: any('label 接受' in x for x in l)),
                 f'confirm commit missing: {log_lines(s)[-3:]}')

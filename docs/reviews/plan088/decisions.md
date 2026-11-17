@@ -194,6 +194,25 @@ precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
 - 处置：本计划内不修 VM 实例语义（爆炸半径大）；按 needs_replan 做有界
   修订（通道输入内置化），缺口登记为 VM runtime 债（owner: VM runtime，
   关闭条件：depth-3 实例 Tick/状态解析正确后包内可嵌 NumericField）。
+
+### 7.1 depth-2 实例 handler 的字段读错位（r3 门实测补充，同族证据）
+
+- 修正记录：r3 门首輪「native 状态别名」结论部分源于门脚本 canvas 索引
+  错置（hue=1/alpha=2 写反）；索引修正后 **hue+surface 链精确通过**
+  （`ink 接受 #805040CC`，gate-native 报告 [4]）。
+- 仍存在的缺口（序列相关、可复现）：Tick 重基线（外部 value/revision
+  推进 → DECODE 重写 d_* 全字段）之后，下一个实例作用域 handler 对部分
+  字段的读返回**默认值或相邻字段值**：alpha handler 读 `.d_s`=0（模型
+  默认）⇒ 提交 `#8080807F`；channel handler 读 `.d_g` 得 `.d_b` 的值
+  （`#40E6E67F`）。同会话中 hue+surface（同 handler 族、同状态对象）精
+  确通过——错位随特定重播种/追加序列出现，与 ensure_child_instance 的
+  字段追加序（props 重播种 push 路径）和 handler 编译期字段索引之间的
+  一致性一致（VM runtime 定位面）。
+- 影响：依赖 Tick 重基线后继续编辑的入口（alpha/通道框）在 native 轨
+  不可靠；不依赖重基线时序的首笔编辑（hue+surface、palette、HEX 首提
+  交、R 单字段）已双轨实证通过。
+- 处置：并入 §7 同一 VM runtime 债（实例状态字段索引一致性），owner:
+  VM runtime；PLAN-088 通道入口的 native 证据在其修复前无法诚实出具。
 - 附带运行时修复（本计划内、已验证）：pen/mousemove/hit 处理器
   TypedInst 基座坐标/ID 追加 + MCP press/pen 按元素解析组件作用域派发
   （此前嵌套组件合成动作静默丢弃）；canvas 场景 8 位 hex alpha 按**串
