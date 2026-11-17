@@ -1,39 +1,41 @@
-// app.at — 031-paint 像素画板根组件（Plan 553）。
+// app.at — 031-paint 像素画板根组件（Plan 553；PLAN-088 T-04 迁移）。
 //
 // 形态：单组件内聚（025/028 形态——store 子组件 vue TS 生成损坏先例 013/038，
 // 全部状态进 App model）。
 //
-// 颜色表示（T3 实测修正，scratch/p553/）：颜色一律以 **完整 Tailwind 类串**
-// 形式存状态（如 " bg-[#ef4444] "，前后各一空格）——
-//   - 字面量随 model/handler 源进 vue 生成码 → Tailwind JIT 扫描命中
-//     （运行时拼接的任意值类不会进扫描面，T3 冒烟实证）；
-//   - 段间空格编进值本身：生成器把 style 的 ${} 段接为 `+` 拼接时会丢
-//     段边界空白（gen App.vue:192 实证），类值自带空格后拼接恒有效；
-//   - VM 侧同机制（028 launcher bg-[<color>21] chip 先例）。
+// 颜色表示（PLAN-088 迁移后）：文档颜色一律 canonical **"#RRGGBBAA"** 数值
+// 串（大写 8 位）——不再使用 Tailwind 类串承载文档内容色。像素画布经
+// canvas 场景（数据驱动，双轨同规约）渲染，任选颜色不需要生成器支持的
+// 动态类（PLAN-088 r2 禁令）。选色 UI = 官方 ColorPicker 包（PLAN-088）：
+// preview 只回显不写正式画笔色；committed 才改 cur；取消零业务修改、不增
+// 绘画历史（选色不是落笔）。
 //
-// 变更纪律（T6 VM 实测修正）：**运行时 str 列表禁止下标写**（`.px[i] = v`
-// 静默不生效——saved 翻转证分支执行、px 不变实证；038 下标写是 Obj 列表
-// +store 形态、028 从不下标写）。一律本地构建新列表 → 整体赋值 `.px = np`
-// （028 `.recent = nr` 同型）。单格改动走 `.SetPx`（256 拷贝），泛洪 BFS
-// 只算 seen 标记再单趟重建。
+// 旧文档兼容（PLAN-088 T-04）：storage 旧样本 " bg-[#rrggbb] " 类串在
+// Load/ApplySnap 读取路径逐格识别并迁移为 "#RRGGBBFF"（legacy_to_hex）；
+// 新格式（"#" 前缀）原样通过。保存键不变（paint.canvas.v1）。
 //
-// 其余状态表示（T1 探针）：cells/swatches handler 自建行对象（view 读自建
-// Obj 数组已证可用）；快照 join("|")/split；BFS 邻接判定 `h%16`/`h>=16`/
-// `h<240` 边界式绕开整数除法。拖画：v1 点击画（T1c——无按压门控指针流）。
+// 变更纪律（T6 VM 实测修正，沿用）：运行时 str 列表禁止下标写——本地构建
+// 新列表 → 整体赋值。快照 join("|")/split 沿用（hex 不含 "|"）。
+//
+// 其余状态表示（T1 探针）：快照 BFS 邻接判定 `h%16`/`h>=16`/`h<240` 边界式。
+// 拖画：v1 点击画（onhit 命中 → Paint(i)）。
 
+use auto.json
+use paint_color: legacy_to_hex, px_node
 use stylekit.styles: caption_text
 // PLAN-047 T-03：接入官方主题包。显式默认 dark 保留（pac theme: "dark" →
-// dark_mode=true）；族/模式选择经根 widget theme_name + design 数据绑定，
-// 测试经 autoui_fixture 驱动（B2 C-03）。调色板/画布 hex 类串为文档内容色
-// 字面豁免（颜色词汇表头注口径），换肤不改文档像素。
+// dark_mode=true）；调色板/画布 hex 为文档内容色（换肤不改文档像素）。
 use themes.themes: Auto, Solarized
+// PLAN-088 T-04：官方选色包（内嵌 NumericField 传递依赖按消费方声明纪律
+// 并列声明于 pac.at）。
 style tool_btn = "px-3 py-1.5 text-sm rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
 style wrap_row = "items-center gap-2 flex-wrap"
 
 widget App {
     msg {
         Init, SetTool(str), SetCur(str), Paint(int), Fill(int), SetPx(int, str),
-        PushUndo, Undo, Redo, ApplySnap(str), Clear, New, Save, Load
+        PushUndo, Undo, Redo, ApplySnap(str), Clear, New, Save, Load,
+        PickCommitted(str), PickPreview(str), PickCancelled, PickError(str), PaintHit(str)
     }
 
     // 主题/模式选择器（C-14：数据绑定，同帧校验发布）
@@ -43,32 +45,36 @@ widget App {
     }
 
     model {
-        // PLAN-047 T-03：主题族/模式选择态（主题选择，非业务/文档状态；
-        // dark-first 保留 pac theme:"dark" 显式默认）
+        // PLAN-047 T-03：主题族/模式选择态
         var theme_name str = "Auto"
         var dark_mode bool = true
 
-        // ---- 颜色词汇表（17 个字面类；白色 = 橡皮色）----
-        var white str = " bg-[#ffffff] "
+        // ---- 颜色词汇表（canonical hex；白色 = 橡皮色）----
+        var white str = "#FFFFFFFF"
         var palette = [
-            " bg-[#111827] ", " bg-[#ef4444] ", " bg-[#f97316] ", " bg-[#f59e0b] ",
-            " bg-[#84cc16] ", " bg-[#22c55e] ", " bg-[#14b8a6] ", " bg-[#3b82f6] ",
-            " bg-[#6366f1] ", " bg-[#a855f7] ", " bg-[#ec4899] ", " bg-[#92400e] ",
-            " bg-[#57534e] ", " bg-[#a8a29e] ", " bg-[#e7e5e4] ", " bg-[#ffffff] "
+            "#111827FF", "#EF4444FF", "#F97316FF", "#F59E0BFF",
+            "#84CC16FF", "#22C55EFF", "#14B8A6FF", "#3B82F6FF",
+            "#6366F1FF", "#A855F7FF", "#EC4899FF", "#92400EFF",
+            "#57534EFF", "#A8A29EFF", "#E7E5E4FF", "#FFFFFFFF"
         ]
 
-        // ---- 画布 ----
-        var canvas_cols int = 16   // 表式 cols → 生成内联 grid-template-columns
-                                   // （字面量 int 走 grid-cols-N 类，N>12 超
-                                   // Tailwind 刻度不生成——ui_gen/vue.rs 10289；
-                                   // 038 动态列同型）
-        var px = []                 // 256 × 类串（初始全 white）
-        var cells = []              // {i, chip} 行对象（handler 重建）
+        // ---- 画布（canvas 场景：256 像素节点，320×320 逻辑幅面）----
+        var px = []                 // 256 × "#RRGGBBFF"
+        var cells_pts List = []
+        var cells_meta List = []
+        var cells_nodes List = []
+        var cells_edges List = []
+        var cells_labels List = []
+        var curchip_pts List = []
+        var curchip_meta List = []
+        var curchip_nodes List = []
+        var curchip_edges List = []
+        var curchip_labels List = []
 
         // ---- 工具与当前色 ----
         var tool str = "pencil"     // pencil | eraser | fill | picker
-        var cur str = " bg-[#111827] "
-        var swatches = []           // {c, chip, sel} 行对象（handler 重建）
+        var cur str = "#111827FF"
+        var cur_rev int = 1         // ColorPicker 受控修订
         var pencil_class str = ""
         var eraser_class str = ""
         var fill_class str = ""
@@ -82,11 +88,12 @@ widget App {
         // ---- 状态条 ----
         var status str = ""
     }
+    // PLAN-088 T-04：官方选色包（widget 级 use；内嵌 NumericField 传递依赖
+    // 并列声明于 pac.at）。
+    use { package: color_picker from "../../../../../packages/color-picker" }
 
     view {
         col {
-            // mx-auto: Fill+max-w 子项不参与父级 items-center(iced 端),
-            // auto 边距负责在画廊视口内水平居中
             style: "w-full max-w-2xl bg-card border rounded-2xl shadow-2xl p-4 gap-3 mx-auto"
 
             // ---- 标题 + 工具行 ----
@@ -102,41 +109,21 @@ widget App {
                 button "💧 Picker" { onclick: .SetTool("picker"), style: .picker_class }
             }
 
-            // ---- 画布（16×16；容器 muted 底透 gap 成网格线）----
+            // ---- 画布（16×16 canvas 场景；onhit 命中 → Paint(i)）----
             col {
                 style: "p-1 bg-muted/50 border rounded-lg w-fit"
-                grid {
-                    cols: .canvas_cols
-                    gap: 1
-                    for c in .cells {
-                        col {
-                            onclick: .Paint(c.i)
-                            style: "w-5 h-5${c.chip}cursor-pointer"
-                        }
-                    }
-                }
+                canvas (scene: .cells, coords: "320x320", clear: "#ffffff", onhit: .PaintHit, style: "w-80 h-80 rounded") {}
             }
 
-            // ---- 调色板（当前色块 + 8×2 色板）----
+            // ---- 选色（官方 ColorPicker：预览不写正式色；确认才改 cur）----
             row {
-                style: "items-center gap-3"
+                style: "items-start gap-3"
                 col {
                     style: "flex flex-col items-center gap-1"
-                    col {
-                        style: "w-8 h-8 rounded-lg border${.cur}"
-                    }
+                    canvas (scene: .curchip, coords: "32x32", style: "w-8 h-8 rounded-lg border border-border") {}
                     text "Current" { style: caption_text }
                 }
-                grid {
-                    cols: 8
-                    gap: 1
-                    for s in .swatches {
-                        col {
-                            onclick: .SetCur(s.c)
-                            style: "w-6 h-6 rounded${s.chip}${s.sel}cursor-pointer"
-                        }
-                    }
-                }
+                ColorPicker (value: .cur, revision: .cur_rev, palette: .palette, onpreview: .PickPreview($event), oncommitted: .PickCommitted($event), oncancelled: .PickCancelled, onerror: .PickError($event)) {}
             }
 
             // ---- 操作行 + 状态条 ----
@@ -155,6 +142,16 @@ widget App {
 
     on {
         .Init -> {
+            .cells_pts = []
+            .cells_meta = []
+            .cells_nodes = []
+            .cells_edges = []
+            .cells_labels = []
+            .curchip_pts = []
+            .curchip_meta = []
+            .curchip_nodes = []
+            .curchip_edges = []
+            .curchip_labels = []
             var ip = []
             var k int = 0
             while k < 256 {
@@ -167,10 +164,10 @@ widget App {
             .saved = "1"
             .status = ""
             .tool = "pencil"
-            .cur = " bg-[#111827] "
+            .cur = "#111827FF"
             .ToolClasses()
-            .Swatches()
             .RebuildCells()
+            .RebuildChip()
         }
 
         // ---- 工具/当前色（选中态经 class 串状态，038 难度按钮同型）----
@@ -180,10 +177,28 @@ widget App {
             .status = ""
         }
 
-        .SetCur(c) -> {
+        .SetCur(c str) -> {
             .cur = c
-            .Swatches()
+            .cur_rev = .cur_rev + 1
+            .RebuildChip()
             .status = ""
+        }
+
+        // ---- PLAN-088：选色业务适配（确认才改正式画笔色）----
+        .PickPreview(ev str) -> {
+            // 预览不写 cur（正式画笔色不被预览覆盖）；无业务动作
+            .status = ""
+        }
+        .PickCommitted(ev str) -> {
+            var req = json.parse(ev)
+            .SetCur(req.value)
+        }
+        .PickCancelled -> {
+            // 取消：零业务修改、不增历史
+            .status = ""
+        }
+        .PickError(ev str) -> {
+            .status = f"picker error"
         }
 
         .ToolClasses -> {
@@ -213,26 +228,41 @@ widget App {
             }
         }
 
-        .Swatches -> {
-            .swatches = []
+        // ---- 画布节点重建（canvas 场景；256 节点 push 构建）----
+        .RebuildCells -> {
+            .cells_nodes = []
             var k int = 0
-            while k < .palette.len() {
-                var sel str = " border border-transparent "
-                if .palette[k] == .cur {
-                    sel = " border border-primary "
-                }
-                .swatches.push({ c: .palette[k], chip: .palette[k], sel: sel })
+            while k < 256 {
+                var it str = px_node(.px, k)
+                .cells_nodes.push(it)
                 k = k + 1
             }
         }
 
-        .RebuildCells -> {
-            .cells = []
-            var k int = 0
-            while k < 256 {
-                .cells.push({ i: k, chip: .px[k] })
-                k = k + 1
+        // ---- 当前色 chip（棋盘 + color8 覆盖——透明可见）----
+        .RebuildChip -> {
+            .curchip_nodes = []
+            var wr int = 0
+            while wr < 2 {
+                var wc int = 0
+                while wc < 2 {
+                    var tone str = "#ffffff"
+                    var m int = (wr + wc) % 2
+                    if m == 1 { tone = "#c8c8c8" }
+                    var it str = f"ck${wr}_${wc},${wc * 16 + 8},${wr * 16 + 8},rect,${tone},16,16"
+                    .curchip_nodes.push(it)
+                    wc = wc + 1
+                }
+                wr = wr + 1
             }
+            var ov str = f"ov,16,16,rect,${.cur},32,32"
+            .curchip_nodes.push(ov)
+        }
+
+        // ---- onhit 命中 → 落笔（id "px<i>"）----
+        .PaintHit(id) -> {
+            var idx int = id.substr(2, id.len()).to(int)
+            .Paint(idx)
         }
 
         // ---- 单格替换（本地构建 → 整体赋值；下标写静默失效，见文件头）----
@@ -271,7 +301,8 @@ widget App {
             }
             if .tool == "picker" {
                 .cur = .px[i]
-                .Swatches()
+                .cur_rev = .cur_rev + 1
+                .RebuildChip()
             }
         }
 
@@ -291,9 +322,7 @@ widget App {
             .saved = "0"
         }
 
-        // ---- 泛洪（迭代 BFS 只算 seen 标记——变更集即 seen；随后单趟
-        // 重建整体赋值。队列 int 列表 + qi 游标，禁递归；邻接用
-        // h%16 / h>=16 / h<240 边界式绕开整数除法）----
+        // ---- 泛洪（迭代 BFS；邻接 h%16 / h>=16 / h<240 边界式）----
         .Fill(i) -> {
             var target = .px[i]
             if target != .cur {
@@ -348,7 +377,6 @@ widget App {
                         }
                     }
                 }
-                // 单趟重建：seen 位 → cur，否则原色
                 var np = []
                 var k2 int = 0
                 while k2 < 256 {
@@ -404,17 +432,26 @@ widget App {
             }
         }
 
-        // ---- 快照应用（本地构建 → 整体赋值）。已知 VM 债 P553-D1：split
-        // 产物重建的**全同串列表**整体赋值后塌缩为单元素（uniform 快照恢复
-        // px len=1，实测；逐格 SetPx 恢复则触预算截断——两害取整体赋值，
-        // 混合内容快照不受影响；债见 KNOWN-DEBT P553-D1）。----
+        // ---- 快照应用（本地构建 → 整体赋值；旧格式类串在读取路径迁移）。
+        // 已知 VM 债 P553-D1：split 产物**全同串列表**整体赋值塌缩——混合
+        // 内容快照不受影响；迁移路径保持同律。----
         .ApplySnap(s) -> {
             var parts = s.split("|")
             if parts.len() == 256 {
                 var np = []
                 var k int = 0
                 while k < 256 {
-                    np.push(parts[k])
+                    var entry str = parts[k]
+                    if entry.starts_with("#") {
+                        np.push(entry)
+                    } else {
+                        var mig str = legacy_to_hex(entry)
+                        if mig == "" {
+                            np.push(.white)
+                        } else {
+                            np.push(mig)
+                        }
+                    }
                     k = k + 1
                 }
                 .px = np
@@ -461,8 +498,7 @@ widget App {
             .status = "new canvas"
         }
 
-        // ---- storage 存取（null 防御在 lowering 层：storage.get 产物
-        // ?? '' 对齐 VM "" 缺省——PLAN-553 ts_adapter 修复）----
+        // ---- storage 存取（null 防御在 lowering 层）----
         .Save -> {
             storage.set("paint.canvas.v1", .px.join("|"))
             .saved = "1"

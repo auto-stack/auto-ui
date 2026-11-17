@@ -2317,8 +2317,6 @@ fn tool_action(shared_handle: &SharedStateHandle, args: serde_json::Value) -> se
             }
         };
         if let Some((widget, event, root_widget)) = canvas_hit {
-            // PLAN-088 T-01 临时探针输出（提交前移除）。
-            eprintln!("[plan088-probe] hit-arm widget={widget:?} event={event:?} root={root_widget:?}");
             let id = match value.as_ref() {
                 Some(auto_val::Value::Str(s)) => s.as_str().to_string(),
                 Some(other) => other.to_string(),

@@ -165,12 +165,36 @@ precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
 
 ## 6. next
 
-- T-01 关闭：双轨探针 PASS（§3.6），放行 T-02。
-- T-02：颜色模型引擎 `packages/color-picker/color_model.at`——自含 fn
-  形态、形参 p 前缀、无 `.split()`、HSV 灰黑保留最近 H 的草稿规则由
-  widget 层承载。
-- T-03：ColorPicker/ColorDialog widget——每 canvas 前缀声明五表；
-  NumericField 通道输入（087 已归档）；跨包嵌套（package 内
-  `use { package: numeric_fields from "../numeric-fields" }`）须以真实
-  生成验证，失败即回退同型内嵌 input 并升级重审。
-- 未决机制：无阻塞；跨包 widget 嵌套为 T-03 首项探针。
+- T-01 关闭：双轨探针 PASS（§3.6），放行 T-02/T-03。
+- T-02/T-03 已实施并入库（分支提交 9c37d07a、06b92b0b）：包/引擎/widget/
+  示例/工具门全链在案；palette/pen/HEX/dialog 提交链在 native MCP 与 vue
+  Playwright 双轨实证。
+- **T-03 通道输入设计被平台缺口阻塞（needs_replan 依据，实证 §7）**：
+  depth-3 组件实例（App→ColorPicker→NumericField）的 Tick/实例状态解析
+  失效——Tick 以根态运行每 100ms×8 实例刷 `Field 'revision' not found`
+  （会话实录数千次），字段外部重投影不可用。修订方向（同目标/验收等价）：
+  通道输入改为内置 input + cp 引擎夹取校验（Enter 提交一次/同值零事件/
+  非法具名拒绝——087 语义基准），不嵌 NumericField 实例。
+- 未决机制：§7 depth-3 缺口（VM runtime 债，owner: VM runtime）。
+
+## 7. depth-3 组件实例缺口（T-03 实证，needs_replan 依据）
+
+- 形态：App → ColorPicker（包 widget，depth-2 正常）→ NumericField
+  （PLAN-087，depth-3）。
+- 实证（`plan-artifacts/plan-088/probe-out/demo*.log`）：每 100ms
+  `[VM-HANDLER] NumericField.Tick failed: Field 'revision' not found on
+  type instance App_State`（单会话 894～11234 次）；8 个存活实例身份在册
+  （`demo@//ColorPicker#0/NumericField#0..3` 等），但根 Tick 广播以
+  instance=None 入 `on_with_input_for` → ≥2 存活实例歧义 → 根态回退 →
+  读 props `.revision` 即错。depth-2 对照：087 demo（App→NumericField）
+  同构建零失败（`nf87.log`）。
+- 影响：depth-3 字段的外部重投影（Tick）不可用、错误风暴、会话不稳；
+  通道框在 native 轨不可交付。palette/pen/HEX/dialog 提交链（depth-2
+  picker 事件）不受影响，已双轨实证。
+- 处置：本计划内不修 VM 实例语义（爆炸半径大）；按 needs_replan 做有界
+  修订（通道输入内置化），缺口登记为 VM runtime 债（owner: VM runtime，
+  关闭条件：depth-3 实例 Tick/状态解析正确后包内可嵌 NumericField）。
+- 附带运行时修复（本计划内、已验证）：pen/mousemove/hit 处理器
+  TypedInst 基座坐标/ID 追加 + MCP press/pen 按元素解析组件作用域派发
+  （此前嵌套组件合成动作静默丢弃）；canvas 场景 8 位 hex alpha 按**串
+  长**判别（Hex(u32) 丢形态信息）。

@@ -1,0 +1,76 @@
+// paint_color.at — 031-paint 颜色辅助 fn（PLAN-088 T-04 迁移）。
+// 根 app.at 不承载顶层 fn（VM 链接实录：undefined symbol）——独立模块按名
+// 直引（prog_util 先例）；两 fn 均自含。
+
+// 旧格式（" bg-[#rrggbb] " 类串）→ "#RRGGBBFF"；已是 "#" 形态的原样规范化
+// 大写；其他 → ""（调用方回落白色）。自含。
+fn legacy_to_hex(ps str) str {
+    var lower str = "abcdef"
+    var upper str = "ABCDEF"
+    if ps.starts_with("#") {
+        var t str = ps.substr(1, ps.len())
+        var out0 str = "#"
+        var n0 int = t.len()
+        if n0 > 6 { n0 = 6 }
+        var i0 int = 0
+        while i0 < n0 {
+            var ch0 str = t.substr(i0, 1)
+            var up0 str = ch0
+            var k0 int = 0
+            while k0 < 6 {
+                if lower.substr(k0, 1) == ch0 { up0 = upper.substr(k0, 1) }
+                k0 = k0 + 1
+            }
+            out0 = out0 + up0
+            i0 = i0 + 1
+        }
+        return out0 + "FF"
+    }
+    if ps.starts_with(" bg-[#") {
+        // 形态 " bg-[#rrggbb] "：截取 "#" 到 "]" 之间
+        var hash int = 0 - 1
+        var endb int = 0 - 1
+        var i1 int = 0
+        var n1 int = ps.len()
+        while i1 < n1 {
+            if ps.substr(i1, 1) == "#" { hash = i1 }
+            if ps.substr(i1, 1) == "]" { endb = i1 }
+            i1 = i1 + 1
+        }
+        if hash >= 0 {
+            if endb > hash {
+                var raw str = ps.substr(hash + 1, endb - hash - 1)
+                if raw.len() == 6 {
+                    var out1 str = "#"
+                    var i2 int = 0
+                    while i2 < 6 {
+                        var ch1 str = raw.substr(i2, 1)
+                        var up1 str = ch1
+                        var k1 int = 0
+                        while k1 < 6 {
+                            if lower.substr(k1, 1) == ch1 { up1 = upper.substr(k1, 1) }
+                            k1 = k1 + 1
+                        }
+                        out1 = out1 + up1
+                        i2 = i2 + 1
+                    }
+                    return out1 + "FF"
+                }
+                if raw.len() == 8 { return legacy_to_hex("#" + raw) }
+            }
+        }
+    }
+    return ""
+}
+
+// 像素格 i → canvas 节点串（20px 格，320×320 逻辑幅面）。行/列以
+// h%16 与 (h-h%16)/16 边界式求取（绕开除法双轨差）。自含。
+fn px_node(pxs List, i int) str {
+    var col int = i % 16
+    var row int = (i - i % 16) / 16
+    var x int = col * 20 + 10
+    var y int = row * 20 + 10
+    var colr str = pxs[i]
+    return f"px${i},${x},${y},rect,${colr},20,20"
+}
+
