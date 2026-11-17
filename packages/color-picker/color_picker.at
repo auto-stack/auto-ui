@@ -1910,10 +1910,10 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 }
             }
         }
-        .RCommitted(v str) -> {
+        .RCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
-                var nv int = cp_text_int(v)
+                var nv int = cp_text_int(.ch_r)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
@@ -1989,10 +1989,10 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 }
             }
         }
-        .GCommitted(v str) -> {
+        .GCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
-                var nv int = cp_text_int(v)
+                var nv int = cp_text_int(.ch_g)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
@@ -2068,10 +2068,10 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 }
             }
         }
-        .BCommitted(v str) -> {
+        .BCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
-                var nv int = cp_text_int(v)
+                var nv int = cp_text_int(.ch_b)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
@@ -2147,10 +2147,10 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 }
             }
         }
-        .ACommitted(v str) -> {
+        .ACommitted() -> {
             if !.c_locked {
                 .ch_err = ""
-                var nv int = cp_text_int(v)
+                var nv int = cp_text_int(.ch_a)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
@@ -2226,10 +2226,10 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 }
             }
         }
-        .HCommitted(v str) -> {
+        .HCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
-                var nv int = cp_text_int(v)
+                var nv int = cp_text_int(.ch_h)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
@@ -2321,10 +2321,10 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 }
             }
         }
-        .SCommitted(v str) -> {
+        .SCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
-                var nv int = cp_text_int(v)
+                var nv int = cp_text_int(.ch_s)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {
@@ -2413,10 +2413,10 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 }
             }
         }
-        .VCommitted(v str) -> {
+        .VCommitted() -> {
             if !.c_locked {
                 .ch_err = ""
-                var nv int = cp_text_int(v)
+                var nv int = cp_text_int(.ch_v)
                 if nv < 0 {
                     .ch_err = "color-picker: invalid channel (invalid_channel)"
                 } else {

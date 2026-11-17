@@ -211,6 +211,15 @@ precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
 - 影响：依赖 Tick 重基线后继续编辑的入口（alpha/通道框）在 native 轨
   不可靠；不依赖重基线时序的首笔编辑（hue+surface、palette、HEX 首提
   交、R 单字段）已双轨实证通过。
+- **终诊（门三轮实证，索引修正后稳定复现）**：这不是 Tick 时序问题——
+  同一门序列内，**前一个实例作用域 handler 的整型字段写对后一个
+  handler 不可见**：surface handler 写 `.d_s=50`（提交 `#805040CC` ✓
+  自己的读正确），紧随的 alpha handler 读 `.d_s`=0（模型默认）⇒
+  `#8080807F`；channel case 同律（`#40E6E67F`，g/a 读陈旧）。字段写
+  可见性仅限 handler 自身 → 实例状态对象的写传播/读一致性缺口（VM
+  runtime）。d_hex（串字段）的写反而可见——整型 vs 串的绑定路径不同。
+  定位面：bridge 实例状态对象的 int 字段写回（nanbox/绑定腐化家族，
+  PLAN-043 T9 +0.001 绕道即同族先例）。
 - 处置：并入 §7 同一 VM runtime 债（实例状态字段索引一致性），owner:
   VM runtime；PLAN-088 通道入口的 native 证据在其修复前无法诚实出具。
 - 附带运行时修复（本计划内、已验证）：pen/mousemove/hit 处理器
