@@ -897,10 +897,17 @@ fn p980_web_full_dual_track_census() {
     // 只收平铺赋值——语法层拒，不能静默展平）；⑤空体 handler（无可发射
     // 语句）；⑥引号事件键/handler（`."save"` 形）；⑦store/HTML 片段伪源
     // （提取伪影，非 widget 源）。
+    // **2026-11-18 具名修订 #5（切片#6m：年龄面语法收敛——事件绑定调用
+    // 形（`.Msg($event)`，UI 侧 $event→nevent 同长归一化）/事件键修饰符
+    //（`onclick.self`）/元素括号属性行（`input (placeholder: …)`））**：
+    // (75,8,1,27)→**(75, 8, 4, 24)**——spliced+3（[4] modifier 键源、
+    // [18]/[59] $event 绑定源——含括号属性形）；absent-3。grammar-id 仅
+    // age-component/age-package 两值漂移（具名重基线，981 grammar_scope
+    // 测试内注明），其余 13 profile 逐字节不变。
     assert_eq!(corpus.len(), 83, "corpus size frozen");
     assert_eq!(
         (ok, err, spliced, absent),
-        (75, 8, 1, 27),
+        (75, 8, 4, 24),
         "dual-track aggregates frozen"
     );
 }
@@ -1473,3 +1480,74 @@ fn p980_web_textless_state_alias_multi_assign() {
         String::from_utf8_lossy(&out.stderr)
     );
 }
+
+/// WEB 切片#6m（年龄面语法收敛，V-B-WEB 处置续）：事件绑定调用形
+/// （`.QueryInput($event)`——UI 侧 `$event`→`nevent` 同长归一化+语言面
+/// age-event-binding 调用形）、事件键修饰符（`onclick.self`）、元素括号
+/// 属性行（`input (placeholder: …)`）——三形真语料主导形态经组件面编译
+/// 并 lane 拼接（spliced=1 各形）。
+#[test]
+fn p980_web_event_arg_forms() {
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+    let cases: Vec<(&str, String)> = vec![
+        (
+            "evt-binding",
+            "widget P {
+    msg Msg { QueryInput(str) }
+    state { var query str = \"\" }
+    view {
+        input { value: .query, oninput: .QueryInput($event) }
+    }
+    on {
+        .QueryInput(v) -> { .query = v }
+    }
+}
+"
+            .to_string(),
+        ),
+        (
+            "paren-props",
+            "widget P {
+    msg Msg { QueryInput(str) }
+    state { var query str = \"\" }
+    view {
+        input (placeholder: \"search\") { oninput: .QueryInput($event) }
+    }
+    on {
+        .QueryInput(v) -> { .query = v }
+    }
+}
+"
+            .to_string(),
+        ),
+        (
+            "key-modifier",
+            "widget W {
+    msg Msg { Cancel }
+    state { var x int = 0 }
+    view {
+        col { button \"x\" { onclick.self: .Cancel } }
+    }
+    on {
+        .Cancel -> { .x = 0 }
+    }
+}
+"
+            .to_string(),
+        ),
+    ];
+    for (name, src) in cases {
+        let (sfc, bodies, absent) =
+            generate_sfc_with_lane(&src, "p980-6m.at").expect("{name} derives");
+        assert!(absent.is_empty(), "{name}: lane-derived: {absent:?}");
+        assert_eq!(bodies.len(), 1, "{name}: one handler spliced");
+        let body = bodies.first().unwrap();
+        assert!(
+            body.lines.iter().any(|l| l.contains(".value = ")),
+            "{name}: assignment emitted"
+        );
+        let _ = &sfc;
+    }
+}
+
+

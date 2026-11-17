@@ -279,8 +279,16 @@ fn normalize_state_slots(src: &str) -> String {
 /// [`ComponentFragmentLane::compile`] 同一归一化+脱糖链）——区间配对方
 ///（`pair_lambda_regions`）与 lane 保持同一坐标系，防止原源/脱糖源位移。
 pub fn desugared_lane_source(src: &str) -> Result<String, String> {
-    let norm = normalize_state_slots(src);
+    let norm = normalize_dollar_event(&normalize_state_slots(src));
     ace_core::source::fstr::desugar_fstrings_widget(&norm).map_err(|e| format!("fstr desugar: {e}"))
+}
+
+/// 切片#6m：`$event` 宿主事件占位的**同长归一化**（`$event`→`nevent`，
+/// 6↔6 字节——span 零位移，沿 state→model 同法）。词法整词替换：方言事件
+/// 绑定实参位的占位（方言合同）；归一化后按普通 ident 进 age-event-arg
+///（pratt）；投影层丢弃实参（宿主通道，§13.14）。
+fn normalize_dollar_event(src: &str) -> String {
+    src.replace("$event", "nevent")
 }
 
 /// 一次组件面编译承载的 fragment lane（owned 编译结果；view 按调用借用）。
@@ -309,7 +317,7 @@ impl ComponentFragmentLane {
         // 前置归一化：行首 `state {`→`model {`（组件面槽位语法；state/model
         // 同为 5 字节——**span 零位移**；真语料主导形态，vue_capabilities
         // 双轨实测发现的 face 槽位别名缺口，UI 侧同长归一化承载）。
-        let src_norm = normalize_state_slots(src);
+        let src_norm = normalize_dollar_event(&normalize_state_slots(src));
         let ds_src = ace_core::source::fstr::desugar_fstrings_widget(&src_norm)
             .map_err(|e| format!("fstr desugar: {e}"))?;
         let src = ds_src.as_str();
