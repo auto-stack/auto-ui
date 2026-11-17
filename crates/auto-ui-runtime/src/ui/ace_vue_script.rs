@@ -276,6 +276,20 @@ pub fn lane_handler_bodies_spec(
                 map_emitted_with(expr, spec.params)
             ));
         }
+        // 复核 F-1（#6j/#6k 批级复核，authored 反例发现）：形参名与字段名
+        // 同拼写碰撞——宿主映射 `field.value` 的**基名**会被 SFC 函数形参遮
+        // 蔽（PARAMS-B「裸形参遮蔽字段」语义在 TS 宿主不可表达；node 实证
+        // `n.value = n` 在形参数字上写属性=TypeError）→ 具名缺席（fail-
+        // closed 旧道承载），不生成错误体。
+        let mapped_text = lines.join("\n");
+        if spec
+            .params
+            .iter()
+            .any(|p| mapped_text.contains(&format!("{p}.value")))
+        {
+            absent.push((*pat).to_string());
+            continue;
+        }
         bodies.push(LaneHandlerBody {
             pattern: (*pat).to_string(),
             field,

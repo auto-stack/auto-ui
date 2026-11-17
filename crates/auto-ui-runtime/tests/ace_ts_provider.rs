@@ -1305,8 +1305,12 @@ fn p980_web_lambda_browser_mount() {
     use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
 
     let b_src = "widget B {\n    model {\n        var n int = 5\n    }\n\n    view {\n        col { text \"B\" button \"+\" { onclick: () => { .n += 1 } } }\n    }\n}\n";
-    let (sfc, bodies, absent) = generate_sfc_with_lane(b_src, "p980-lambda-browser.at").expect("SFC");
-    assert!(absent.is_empty() && bodies.len() == 1, "lane-derived lambda");
+    let (sfc, bodies, absent) =
+        generate_sfc_with_lane(b_src, "p980-lambda-browser.at").expect("SFC");
+    assert!(
+        absent.is_empty() && bodies.len() == 1,
+        "lane-derived lambda"
+    );
     let body_js = bodies.first().unwrap().lines.join("\n");
     let rt_inline = "function a2x_add(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a + b)) throw new RangeError('a2x_add overflow');\n  return a + b;\n}\n";
     let html = format!(
@@ -1319,7 +1323,8 @@ fn p980_web_lambda_browser_mount() {
     std::fs::write(dir.join("index.html"), html).unwrap();
 
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let test_mjs = manifest.join("../../examples/ui/ace-web-lane/tests/test_lane_browser_lambda.mjs");
+    let test_mjs =
+        manifest.join("../../examples/ui/ace-web-lane/tests/test_lane_browser_lambda.mjs");
     let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
     let out = std::process::Command::new(&node)
         .arg(test_mjs.to_str().unwrap())
@@ -1333,4 +1338,28 @@ fn p980_web_lambda_browser_mount() {
         out.status.success() && stdout.contains("LANE_LAMBDA_BROWSER_OK"),
         "lambda browser: {stdout} / {stderr}"
     );
+}
+
+/// 复核 authored 反例（#6j/#6k 批级复核，永久）：PARAMS-B 裸形参遮蔽同拼
+/// 写 model 字段——`.Set(n) -> { .n = n }`：宿主映射 `field.value` 的基名
+/// 会被 SFC 函数形参遮蔽（node 实证 `n.value = n` 在形参数字上写属性=
+/// TypeError；ACE 语义「`.field` 恒指实例字段」在 TS 宿主**不可表达**）→
+/// **具名缺席**（F-1 修复=fail-closed 旧道承载），不生成错误体。
+#[test]
+fn p980_web_param_shadowing_is_param_not_field() {
+    use auto_ui_runtime::ui::ace_vue_script::{lane_handler_bodies_spec, LaneHandlerSpec};
+    let src = "widget S {\n    msg Msg { Set(int) }\n\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"S\" }\n    }\n\n    on {\n        .Set(n) -> { .n = n }\n    }\n}\n";
+    let p = vec!["n".to_string()];
+    let specs = [LaneHandlerSpec {
+        pattern: ".Set",
+        params: &p,
+        lambda_region: None,
+    }];
+    let (bodies, absent) =
+        lane_handler_bodies_spec(src, "p980-shadow.at", &specs).expect("shadow derives");
+    assert!(
+        bodies.is_empty(),
+        "param/field name collision must not fabricate a shadowed-broken body"
+    );
+    assert_eq!(absent, vec![".Set".to_string()], "named absence (F-1)");
 }
