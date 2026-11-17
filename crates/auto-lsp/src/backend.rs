@@ -161,12 +161,31 @@ impl Backend {
         content: &str,
     ) -> Option<workspace::WorkspaceState> {
         let resolver = self.resolver.read().await.clone()?;
-        let document_path = std::path::PathBuf::from(uri.strip_prefix("file://").unwrap_or(uri));
+        let document_path = document_uri_to_path(uri)?;
         Some(workspace::build_workspace_state(
             content,
             &document_path,
             &resolver,
         ))
+    }
+}
+
+/// `file://` URI → the real filesystem path (PLAN-971 B/T-08): a naive
+/// `strip_prefix("file://")` leaves a leading `/` in front of a Windows drive
+/// (`/D:/…`), so cross-file resolution never found the imported module on
+/// disk. The URL parser's `to_file_path` is the platform-correct conversion
+/// (and it keeps working for POSIX paths).
+fn document_uri_to_path(uri: &str) -> Option<std::path::PathBuf> {
+    if let Ok(url) = url::Url::parse(uri) {
+        if let Ok(path) = url.to_file_path() {
+            return Some(path);
+        }
+    }
+    let raw = uri.strip_prefix("file://").unwrap_or(uri);
+    if raw.is_empty() {
+        None
+    } else {
+        Some(std::path::PathBuf::from(raw))
     }
 }
 

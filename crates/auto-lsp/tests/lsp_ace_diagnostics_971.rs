@@ -597,3 +597,184 @@ async fn p971_lsp_ace_multifile_diagnostics_versioned_publish() {
         cli.seen.len()
     );
 }
+
+/// The flattened text of a hover payload (string / {"value"} / array forms).
+fn hover_text(contents: &Value) -> String {
+    match contents {
+        Value::String(text) => text.clone(),
+        Value::Object(map) => map
+            .get("value")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        Value::Array(items) => items
+            .iter()
+            .map(hover_text)
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
+}
+
+/// The source file the editor's existing analyzer resolves, plus its caller.
+/// The import form is the analyzer's package-root form (`use pac.util`) so
+/// cross-file resolution reads the module from disk — the same behaviour every
+/// existing Auto workspace relies on.
+const UTIL_LIB: &str = "fn hello() int { return 1 }\n";
+const MAIN_CALLER: &str = "use util\nfn main() int { let v = hello()\n return v }\n";
+
+/// PLAN-971 B/T-08：真实二进制下核验 LSP 既存的语义能力面（本包 T-08 的
+/// “核其现存能力”义务）：跨文件/跨包 goto 落到**原模块源文件**的正确行、
+/// hover 给出符号信息、workspace/symbol 找到该符号、semanticTokens 非空、
+/// completion 有响应。这些能力沿用既有分析实现（本包不重写），本用例把
+/// “能工作且指向正确源”变成可复跑的真实证据。
+#[tokio::test]
+async fn p971_lsp_existing_semantic_capabilities_verified() {
+    let started = Instant::now();
+    let workspace = TempWorkspace::new();
+    let util_path = workspace.write("util.at", UTIL_LIB);
+    let main_path = workspace.write("main.at", MAIN_CALLER);
+    let util_uri = file_uri(&util_path);
+    let main_uri = file_uri(&main_path);
+    let root_uri = file_uri(workspace.root());
+
+    let mut cli = LspCli::spawn(env!("CARGO_BIN_EXE_auto-lsp")).expect("spawn auto-lsp");
+    let init = cli
+        .request(
+            "initialize",
+            json!({ "processId": null, "rootUri": root_uri, "capabilities": {} }),
+        )
+        .await
+        .expect("initialize");
+    assert!(init["result"]["capabilities"].is_object(), "{init}");
+    cli.notify("initialized", json!({})).await.expect("initialized");
+
+    cli.notify("textDocument/didOpen", open_params(&util_uri, 1, UTIL_LIB))
+        .await
+        .expect("didOpen util");
+    cli.settle(SETTLE_OPEN).await.expect("settle util");
+    cli.notify("textDocument/didOpen", open_params(&main_uri, 1, MAIN_CALLER))
+        .await
+        .expect("didOpen main");
+    cli.settle(SETTLE_OPEN).await.expect("settle main");
+
+    // ---- 1. cross-file/package goto lands in the module's own source -----
+    // `hello` starts at line 1 column 24 in MAIN_CALLER; aim inside the word.
+    let def = cli
+        .request(
+            "textDocument/definition",
+            json!({
+                "textDocument": { "uri": main_uri },
+                "position": { "line": 1, "character": 26 },
+            }),
+        )
+        .await
+        .expect("definition response");
+    let result = &def["result"];
+    assert!(!result.is_null(), "goto must resolve the imported symbol: {def}");
+    let location = result
+        .as_array()
+        .and_then(|items| items.first())
+        .cloned()
+        .unwrap_or_else(|| result.clone());
+    assert_eq!(
+        location["uri"].as_str(),
+        Some(util_uri.as_str()),
+        "goto must land in the imported module's ORIGINAL source file: {location}"
+    );
+    assert_eq!(
+        location["range"]["start"]["line"].as_u64(),
+        Some(0),
+        "the definition is the `hello` declaration (line 0 of util): {location}"
+    );
+    assert_eq!(
+        location["range"]["start"]["character"].as_u64(),
+        Some(3),
+        "the definition position points at the `hello` name itself (col 3): {location}"
+    );
+
+    // ---- 2. hover describes the symbol -----------------------------------
+    let hover = cli
+        .request(
+            "textDocument/hover",
+            json!({
+                "textDocument": { "uri": main_uri },
+                "position": { "line": 1, "character": 26 },
+            }),
+        )
+        .await
+        .expect("hover response");
+    let text = hover_text(&hover["result"]["contents"]);
+    assert!(
+        text.contains("hello") || text.contains("int"),
+        "hover must describe the symbol, got {text:?} ({hover})"
+    );
+
+    // ---- 3. workspace/symbol finds it ------------------------------------
+    let symbols = cli
+        .request("workspace/symbol", json!({ "query": "hello" }))
+        .await
+        .expect("workspace symbol response");
+    let list = symbols["result"]
+        .as_array()
+        .unwrap_or_else(|| panic!("workspace/symbol result must be an array: {symbols}"));
+    assert!(
+        list.iter().any(|s| s["name"].as_str() == Some("hello")),
+        "workspace/symbol must list `hello`: {symbols}"
+    );
+
+    // ---- 4. semantic tokens are produced ---------------------------------
+    let tokens = cli
+        .request(
+            "textDocument/semanticTokens/full",
+            json!({ "textDocument": { "uri": main_uri } }),
+        )
+        .await
+        .expect("semantic tokens response");
+    let data = tokens["result"]["data"]
+        .as_array()
+        .unwrap_or_else(|| panic!("semantic tokens data must be an array: {tokens}"));
+    assert!(!data.is_empty(), "semantic tokens must not be empty: {tokens}");
+
+    // ---- 5. completion answers at the call site --------------------------
+    let completion = cli
+        .request(
+            "textDocument/completion",
+            json!({
+                "textDocument": { "uri": main_uri },
+                "position": { "line": 1, "character": 24 },
+            }),
+        )
+        .await
+        .expect("completion response");
+    assert!(
+        !completion["result"].is_null(),
+        "completion must answer at the call site: {completion}"
+    );
+
+    // ---- 6. clean shutdown ----------------------------------------------
+    cli.next_id += 1;
+    let shutdown_id = cli.next_id;
+    cli.send(&json!({"jsonrpc": "2.0", "id": shutdown_id, "method": "shutdown", "params": null}))
+        .await
+        .expect("send shutdown");
+    let _ = cli.wait_for_response(shutdown_id).await.expect("shutdown");
+    cli.notify("exit", json!({})).await.expect("exit");
+    let status = timeout(READ_TIMEOUT, cli.child.wait())
+        .await
+        .expect("the server exits promptly")
+        .expect("wait");
+    assert_eq!(status.code(), Some(0));
+
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "the semantic-capability fixture must stay under the 10s case gate, took {elapsed:?}"
+    );
+    eprintln!(
+        "p971_lsp_existing_semantic_capabilities_verified: {:.0}ms",
+        elapsed.as_secs_f64() * 1000.0
+    );
+}
+
+

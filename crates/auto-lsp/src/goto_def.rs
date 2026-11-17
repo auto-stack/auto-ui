@@ -1,3 +1,4 @@
+use auto_lang_core::database::FragKind;
 use tower_lsp_server::ls_types::*;
 
 /// Find the definition location for a symbol at a given position
@@ -146,9 +147,76 @@ fn find_definition_in_ast(
     None
 }
 
+/// A filesystem path (as stored by the workspace database) → a `file://` URI.
+/// PLAN-971 B/T-08: the naive `format!("file://{path}")` produced invalid URIs
+/// on Windows (`file://C:\…` — wrong separators, no drive slash), so every
+/// cross-file definition target failed to parse and goto silently returned
+/// nothing. The URL parser is the platform-correct conversion; an already-URI
+/// string is passed through.
+fn path_string_to_uri(file_path: &str) -> Option<Uri> {
+    if let Ok(url) = url::Url::parse(file_path) {
+        if url.scheme() == "file" {
+            return file_path.parse().ok();
+        }
+    }
+    let url = url::Url::from_file_path(std::path::Path::new(file_path)).ok()?;
+    url.as_str().parse().ok()
+}
+
+/// The declaration-site LSP position of `name` inside the target file's own
+/// text (the keyword form selects the declaration kind). The indexer's
+/// recorded fragment span is not an LSP position, so the definition target is
+/// derived from the source the workspace database already holds.
+fn declaration_position(source: &str, name: &str, kind: &FragKind) -> Option<Position> {
+    let keyword = match kind {
+        FragKind::Function => "fn",
+        FragKind::Struct => "type",
+        FragKind::Enum => "enum",
+        FragKind::Const => "const",
+        FragKind::Spec => "spec",
+        FragKind::Impl => return None,
+    };
+    let mut from = 0usize;
+    while let Some(index) = source[from..].find(name) {
+        let start = from + index;
+        let end = start + name.len();
+        let ident = |c: char| c.is_alphanumeric() || c == '_';
+        let before_ok = source[..start].chars().next_back().map_or(true, |c| !ident(c));
+        let after_ok = source[end..].chars().next().map_or(true, |c| !ident(c));
+        if before_ok && after_ok {
+            let prefix = source[..start].trim_end();
+            let previous: String = prefix
+                .chars()
+                .rev()
+                .take_while(|c| ident(*c))
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            if previous == keyword {
+                return Some(offset_to_lsp_position(source, start));
+            }
+        }
+        from = end.max(start + 1);
+        if from >= source.len() {
+            break;
+        }
+    }
+    None
+}
+
+/// Byte offset → LSP `Position` (0-based line, UTF-16 character).
+fn offset_to_lsp_position(source: &str, offset: usize) -> Position {
+    let offset = offset.min(source.len());
+    let before = &source[..offset];
+    let line = before.bytes().filter(|b| *b == b'\n').count() as u32;
+    let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let character = source[line_start..offset].chars().map(|c| c.len_utf16() as u32).sum();
+    Position { line, character }
+}
+
 /// Find definition using workspace state (cross-file aware)
-pub fn find_definition_workspace(
-    content: &str,
+pub fn find_definition_workspace(    content: &str,
     position: Position,
     uri: &str,
     ws_state: &crate::workspace::WorkspaceState,
@@ -197,23 +265,27 @@ pub fn find_definition_workspace(
                     .map(|p| p.to_string())
                     .unwrap_or_else(|| uri.to_string());
 
-                let target_uri = if file_path.starts_with("file://") {
-                    file_path.parse().ok()?
-                } else {
-                    format!("file://{}", file_path).parse().ok()?
-                };
+                let target_uri = path_string_to_uri(&file_path)?;
+
+                // PLAN-971 B/T-08 (F-971-B-01): the database fragment span is
+                // not a usable LSP position (the indexer records coarse/absent
+                // offsets), so derive the declaration position from the target
+                // file's OWN text (`fn <name>`, `type <name>`, …) and fall
+                // back to the recorded span when the declaration form is not
+                // recognised.
+                let position = db
+                    .get_source(meta.file_id)
+                    .and_then(|source| declaration_position(source.as_str(), &word, &meta.kind))
+                    .unwrap_or(Position {
+                        line: meta.span.line.saturating_sub(1) as u32,
+                        character: meta.span.column.saturating_sub(1) as u32,
+                    });
 
                 let location = Location {
                     uri: target_uri,
                     range: Range {
-                        start: Position {
-                            line: meta.span.line.saturating_sub(1) as u32,
-                            character: meta.span.column.saturating_sub(1) as u32,
-                        },
-                        end: Position {
-                            line: meta.span.line.saturating_sub(1) as u32,
-                            character: meta.span.column.saturating_sub(1) as u32,
-                        },
+                        start: position,
+                        end: position,
                     },
                 };
 
@@ -383,3 +455,4 @@ fn infer_variable_type_heuristic(content: &str, var_name: &str) -> Option<String
 
     None
 }
+
