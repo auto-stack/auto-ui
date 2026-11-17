@@ -92,8 +92,9 @@ struct AceStateSlot {
     /// mount 世代（每次 mount 取新值；重挂后旧 ticket 不再匹配）。
     generation: u64,
     initials: Vec<(String, InitialValue)>,
-    /// 本实例的定向消息历史（按序；场景重放语义）。
-    ops: Vec<String>,
+    /// 本实例的定向消息历史（按序；场景重放语义）。`None` = unit 消息
+    /// （`Send`）；`Some(values)` = 带载荷派发（`SendArgs`，PLAN-981 B-W1）。
+    ops: Vec<(String, Option<Vec<AceStateValue>>)>,
     /// 最近一次观察到的状态（字段声明序）。
     states: Vec<(String, AceStateValue)>,
 }
@@ -220,6 +221,29 @@ impl AceStateEngine {
     /// 已释放/未知身份 → 丢弃（不复活、不重定向、不诊断）。未声明消息在
     /// ACE 面具名拒（`source.age.component-event`），失败回滚已入队消息。
     pub fn dispatch(&mut self, identity: &str, msg: &str) -> Result<DispatchOutcome, String> {
+        self.dispatch_impl(identity, msg.to_string(), None)
+    }
+
+    /// PLAN-981 B-W1（IF-981-EVENT-PAYLOAD-B）：带载荷的定向事件——typed 值
+    /// 抬升进场景（唯一 verify、一次求值、按位绑定）。队列**拥有**载荷值
+    /// （`AceStateValue` 拷贝入槽，不把临时 borrow 跨 tick/close 存队列）；
+    /// 错 type/arity 在效果前拒并回滚（旧 dispatch 的原子性沿同一路径）；
+    /// 已释放/未知身份照旧丢弃（世代/所有权纪律不变）。
+    pub fn dispatch_with_args(
+        &mut self,
+        identity: &str,
+        msg: &str,
+        args: &[AceStateValue],
+    ) -> Result<DispatchOutcome, String> {
+        self.dispatch_impl(identity, msg.to_string(), Some(args.to_vec()))
+    }
+
+    fn dispatch_impl(
+        &mut self,
+        identity: &str,
+        msg: String,
+        args: Option<Vec<AceStateValue>>,
+    ) -> Result<DispatchOutcome, String> {
         {
             let Some(slot) = self.slot(identity) else {
                 return Ok(DispatchOutcome::Dropped(DropReason::UnknownIdentity));
@@ -228,7 +252,7 @@ impl AceStateEngine {
                 return Ok(DispatchOutcome::Dropped(DropReason::InstanceReleased));
             }
         }
-        self.slot_mut(identity).unwrap().ops.push(msg.to_string());
+        self.slot_mut(identity).unwrap().ops.push((msg, args));
         if let Err(e) = self.refresh() {
             self.slot_mut(identity).unwrap().ops.pop();
             return Err(e);
@@ -325,12 +349,27 @@ impl AceStateEngine {
         if live.is_empty() {
             return Ok(());
         }
+        // 宿主值没有作者 span——anchor 取整源区间（arity/unsupported 诊断本就
+        // 指向变体声明；type 诊断至少落在本源内，不用 0 冒充位置）。
+        let anchor = ace_core::atom_text::Span {
+            start: 0,
+            end: self.src.len(),
+        };
         let mut ops = Vec::new();
         for (new_idx, &slot_idx) in live.iter().enumerate() {
-            for msg in &self.slots[slot_idx].ops {
-                ops.push(ScenarioOp::Send {
-                    instance: new_idx,
-                    msg: msg.clone(),
+            for (msg, args) in &self.slots[slot_idx].ops {
+                ops.push(match args {
+                    // unit 消息保持旧 `Send`（等价空载荷）。
+                    None => ScenarioOp::Send {
+                        instance: new_idx,
+                        msg: msg.clone(),
+                    },
+                    Some(values) => ScenarioOp::send_args_from_values(
+                        new_idx,
+                        msg.clone(),
+                        &values.iter().map(initial_of).collect::<Vec<_>>(),
+                        anchor,
+                    ),
                 });
             }
         }
@@ -358,5 +397,14 @@ impl AceStateEngine {
                 .collect();
         }
         Ok(())
+    }
+}
+
+/// 桥值 → 场景初值域（同一 int/bool/str 值域的拷贝映射）。
+fn initial_of(v: &AceStateValue) -> InitialValue {
+    match v {
+        AceStateValue::Int(i) => InitialValue::Int(*i as i64),
+        AceStateValue::Bool(b) => InitialValue::Bool(*b),
+        AceStateValue::Str(s) => InitialValue::Str(s.clone()),
     }
 }

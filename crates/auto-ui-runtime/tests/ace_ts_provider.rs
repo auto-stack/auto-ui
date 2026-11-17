@@ -779,16 +779,20 @@ fn p980_web_unified_entry_census_v2() {
     ];
 
     // 冻结表（2026-11-16 实测；#6i 语法扩展后修订——具名 msg+带参 handler
-    // 现在可拼接：grammar opt msg_name + opt params + splice `): void {` 锚）：
-    // counter-3h=3；str-field=1；param-handler=**1**（语法扩展生效）；
-    // no-on/watch-only=0（passthrough）；inline-lambda-only=absent（铸造
-    // handler 无源锚——唯一剩余域缺口）。
+    // 现在可拼接：grammar opt msg_name + opt params + splice `): void {` 锚）。
+    // **2026-11-17 具名修订（PLAN-981 B-W1 / IF-981-EVENT-PAYLOAD-B）**：
+    // `Send` 恒等价空载荷——向载荷变体（`Add(str)`）空 Send 现在是 arity 域
+    // 错误（A 期组件面允许"丢参跑常量体"的拼接随之失效）；带参 handler 的
+    // lane 拼接改由 980 B-WEB 消费 typed 接口（`SendArgs`/参数环境）后恢复。
+    // param-handler 因此 1→0+absent；其余行不变。
+    // counter-3h=3；str-field=1；no-on/watch-only=0（passthrough）；
+    // inline-lambda-only=absent（铸造 handler 无源锚）。
     let expect: &[(&str, usize, bool)] = &[
         ("counter-3h", 3, false),
         ("str-field", 1, false),
         ("no-on", 0, false),
         ("watch-only", 0, false),
-        ("param-handler", 1, false),
+        ("param-handler", 0, true),
         ("inline-lambda-only", 0, true),
     ];
     for ((name, src), (exp_name, spliced, has_absent)) in corpus.iter().zip(expect) {

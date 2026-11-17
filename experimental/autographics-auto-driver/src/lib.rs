@@ -94,8 +94,7 @@ impl Session {
                     // R63-7 + R64-2：AGE 形状的源若旧 parser 也解析不了，就报共享
                     // verify 的具名诊断（`source.module-symbol` 等）；旧 parser 能
                     // 解析的源（例如模块级 `var` 的宿主脚本）保持旧路径。
-                    let legacy_ok =
-                        auto_lang_core::parser::Parser::from(source).parse().is_ok();
+                    let legacy_ok = auto_lang_core::parser::Parser::from(source).parse().is_ok();
                     if !legacy_ok {
                         return Err(ds.join("; "));
                     }
@@ -207,7 +206,7 @@ impl Session {
             .map(|a| (a.pid(), a.body_generation()))
             .ok_or_else(|| "this session is not an AGE session".into())
     }
- 
+
     /// 已应用的调度次数（tick/send）。
     pub fn age_dispatches(&self) -> Result<u64, String> {
         self.age
@@ -251,6 +250,20 @@ impl Session {
             .as_mut()
             .ok_or_else(|| "this session is not an AGE session".to_string())?
             .send(msg)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// PLAN-981 B-W1（IF-981-EVENT-PAYLOAD-B）：带载荷投递（typed 值经唯一
+    /// verify、一次求值、按位绑定；载荷变体不能再用空 `age_send` 派发）。
+    pub fn age_send_args(
+        &mut self,
+        msg: &str,
+        args: &[ace_core::source::age_component::InitialValue],
+    ) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .send_args(msg, args)
             .map_err(|ds| ds.join("; "))
     }
 
@@ -386,6 +399,20 @@ impl Session {
             .as_mut()
             .ok_or_else(|| "this session is not an AGE session".to_string())?
             .send_to(instance, msg)
+            .map_err(|ds| ds.join("; "))
+    }
+
+    /// PLAN-981 B-W1：定向实例的带载荷投递（同 [`Self::age_send_args`]）。
+    pub fn age_send_args_to(
+        &mut self,
+        instance: usize,
+        msg: &str,
+        args: &[ace_core::source::age_component::InitialValue],
+    ) -> Result<u64, String> {
+        self.age
+            .as_mut()
+            .ok_or_else(|| "this session is not an AGE session".to_string())?
+            .send_args_to(instance, msg, args)
             .map_err(|ds| ds.join("; "))
     }
     /// 主组件的呈现出口。

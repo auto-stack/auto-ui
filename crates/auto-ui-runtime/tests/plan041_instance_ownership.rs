@@ -519,4 +519,100 @@ mod p980_ace_state {
         );
         assert_eq!(e.read_state("/x#a", "count"), Some(AceStateValue::Int(0)));
     }
+
+    /// PLAN-981 B-W1（IF-981-EVENT-PAYLOAD-B / SESSION typed 队列）：
+    /// `dispatch_with_args` 的 int/str 载荷真实落到对应实例；错 type/空载荷在
+    /// 效果前拒且回滚（队列不被毒化）；unit `dispatch` 照旧；卸载丢弃、重挂
+    /// 新鲜（typed 历史随世代清零）。
+    #[test]
+    fn p981_state_typed_dispatch_args_bind_and_rollback() {
+        const SRC: &str = "node Panel {\n    msg Msg { Add(int), Rename(str) }\n    on {\n        .Add(delta) -> {\n            .count += delta\n        }\n        .Rename(next) -> {\n            .label = next\n        }\n    }\n    model {\n        count int = 0\n        label str = \"init\"\n    }\n    view {\n        text \"p\" {}\n    }\n}\n";
+        let mut e = AceStateEngine::new(SRC, "panel.at", AceAlias::Reject)
+            .expect("the payload node compiles");
+        e.mount("/Panel#a", vec![]).unwrap();
+
+        // int 载荷：count 0 → 7；unit 近邻（Add 的空派发）是 arity 域错误。
+        match e
+            .dispatch_with_args("/Panel#a", "Add", &[AceStateValue::Int(7)])
+            .unwrap()
+        {
+            DispatchOutcome::Delivered(states) => {
+                assert!(states.contains(&("count".to_string(), AceStateValue::Int(7))));
+            }
+            other => panic!("typed dispatch must deliver: {other:?}"),
+        }
+        let err = e.dispatch("/Panel#a", "Add").unwrap_err();
+        assert!(
+            err.contains("component-event") && err.contains("payload slot"),
+            "empty dispatch to a payload variant is the arity domain error: {err}"
+        );
+        assert_eq!(
+            e.read_state("/Panel#a", "count"),
+            Some(AceStateValue::Int(7))
+        );
+
+        // str 载荷：label 落新值（typed 值过唯一 verify + owned 转移）。
+        e.dispatch_with_args("/Panel#a", "Rename", &[AceStateValue::Str("中文".into())])
+            .unwrap();
+        assert_eq!(
+            e.read_state("/Panel#a", "label"),
+            Some(AceStateValue::Str("中文".into()))
+        );
+
+        // 错 type：效果前拒 + 回滚（状态不变，随后同入口派发仍可用）。
+        let err = e
+            .dispatch_with_args("/Panel#a", "Add", &[AceStateValue::Bool(true)])
+            .unwrap_err();
+        assert!(err.contains("type-mismatch"), "typed rejection: {err}");
+        assert_eq!(
+            e.read_state("/Panel#a", "count"),
+            Some(AceStateValue::Int(7))
+        );
+        e.dispatch_with_args("/Panel#a", "Add", &[AceStateValue::Int(1)])
+            .unwrap();
+        assert_eq!(
+            e.read_state("/Panel#a", "count"),
+            Some(AceStateValue::Int(8))
+        );
+
+        // 双实例隔离：b 的带值事件只动 b。
+        e.mount(
+            "/Panel#b",
+            vec![("count".into(), AceInitialValue::Int(100))],
+        )
+        .unwrap();
+        e.dispatch_with_args("/Panel#b", "Add", &[AceStateValue::Int(5)])
+            .unwrap();
+        assert_eq!(
+            e.read_state("/Panel#a", "count"),
+            Some(AceStateValue::Int(8))
+        );
+        assert_eq!(
+            e.read_state("/Panel#b", "count"),
+            Some(AceStateValue::Int(105))
+        );
+
+        // 卸载丢弃 typed 派发；重挂新鲜（载荷历史清零、初值回来）。
+        let gen_b = e.generation_of("/Panel#b").unwrap();
+        assert!(matches!(
+            e.unmount("/Panel#b"),
+            UnmountOutcome::Released(g) if g == gen_b
+        ));
+        match e
+            .dispatch_with_args("/Panel#b", "Add", &[AceStateValue::Int(1)])
+            .unwrap()
+        {
+            DispatchOutcome::Dropped(DropReason::InstanceReleased) => {}
+            other => panic!("late typed dispatch must drop: {other:?}"),
+        }
+        e.mount(
+            "/Panel#b",
+            vec![("count".into(), AceInitialValue::Int(100))],
+        )
+        .unwrap();
+        assert_eq!(
+            e.read_state("/Panel#b", "count"),
+            Some(AceStateValue::Int(100))
+        );
+    }
 }
