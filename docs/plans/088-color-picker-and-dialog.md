@@ -140,6 +140,8 @@ T-04新建`examples/color-picker/`，并迁移Paint普通选色流程；T-05新�
 
 r3 复审（2026-11-17，§9 末条）重开 T-02/T-03/T-04/T-05/T-06；current_step 按完成数重算为 1/8（仅 T-01 保持完成）。
 
+r5 复审（2026-11-17，§9 末条）重开 T-03/T-05/T-06；current_step 按完成数重算为 3/8（T-01/T-02/T-04 保持完成）。
+
 ## 9. 复审记录
 
 2026-11-14：stage: new；PLAN-088 r1；outcome: pass（规划可交接）；next: work，从T-01开始，T-03等087。新增T-01…08、AC-01…08、SD-01/02，0/8；本轮未实现或运行产品测试。
@@ -206,6 +208,48 @@ AC 结论：AC-01 pass（两生成器编译、工具门 2/2、双端示例/Paint
 
 2026-11-17（work，终审修复）：stage: work；PLAN-088 r3；outcome: pass；worktree `.wt/ui-088/auto-ui`；branch `codex/ui-088-color-picker`；commits `a49f88de`（F-01…F-11 修复）/`282dfb3d`（门硬化）/`6d5f147e`（decisions §9）；task_ids T-02✅/T-03✅/T-04✅/T-05✅/T-06✅（终审后重开并关闭）；evidence `gate-native-r5a/report-native.json`（pass，10 用例 + reopen + 3 截图）、`gate-vue-r5a/report-vue.json`（pass，4 截图）、工具门 2 passed 6.00s、`docs/reviews/plan088/decisions.md` §9；修复要点：Paint px42 像素读回/Undo/Save-Load（F-01）、门补 HEX 短形式/精确通道/同值零提交/非法错误与 showAlpha 保 alpha（F-02）、`cp_hex_norm` #RGBA 展开（F-03）、色面整数 floor 端点 100（F-04）、对话框取消 guard 单次（F-05）、27 handler 入口清错（F-06）、初始焦点=既有 modal 焦点事务（F-07，§5 不变）、vue dialog/dark 截图与 swatch 堆叠至最小宽 ~364（F-08）、报告 revision/commit/输入 hash 与 README 覆盖口径（F-09）、清理 tmp 截图/088-probe 且 ignore（F-10）、ch_rev/title/invalid_config 语义对齐（F-11）；输入 hash：picker 81b7ac97、model 62561f3e、dialog fa079179、gate fdab2346；残余：Linux not_run、native 模态截图平台限制、VM 整型字段债登记；next: review（final，独立上下文）。
 
+2026-11-17（review，final 复评，独立上下文）：stage: review | review_scope: final（repair re-review） | reviewer_identity: 独立子代理 reviewer-088（与实现者上下文分离；会话未暴露模型 ID） | plan_id: PLAN-088 | plan_revision: 3 | outcome: needs_fix | worktree_path: D:/autostack/.wt/ui-088/auto-ui | branch: codex/ui-088-color-picker | reviewed_commit: a49f88de（实现修复）+ 282dfb3d（门硬化）；HEAD 6d5f147e 为 docs-only 子提交；`git status --porcelain` 空 | base_commit: 2f42d661 | dependency_revisions: PLAN-087 归档 45a80058（沿 decisions §4，未复验）；auto-lang/auto-man 组构建（未复验） | spec_inputs: docs/specs/ui/*.md；docs/specs/ui/color-picker.md 主树/工作树仍不存在（SD-01/02 待 merge 落文）；r5a 报告 `input_hashes` 与当前 HEAD 文件逐一相同（picker 81b7ac97…、model 62561f3e…、dialog fa079179…、gate fdab2346…） | acceptance_results: AC-01 pass；AC-02 partial（F-13/F-16；F-02 oracle 受 F-12 影响）；AC-03 partial（F-05）；AC-04 partial（F-07 已闭；F-17）；AC-05 partial（F-01 已闭；取消/主题对照未断言）；AC-06 partial（Linux not_run；F-14）；AC-07 needs_fix；AC-08 pending | pending_closeout_gates: Linux native 轨；Spec 落文；strategy CL-08/Q-01；隔离环境下 native/vue 门复跑 | findings: F-05 未闭；F-11 部分闭；F-12/F-13/F-14/F-16/F-17 新增（下详） | next: work 修复 F-05/F-11/F-12/F-13/F-16/F-17（T-03/T-05/T-06），在无并发构建/窗口的隔离环境重跑 native+vue 门并留新报告，然后回 final review。
+
+复评执行与证据（可复核）：
+- baseline/输入：`git -C <tree> log --oneline 433f5cfe..HEAD` = a49f88de/282dfb3d/6d5f147e；`git status --porcelain` 空；r5a 两份报告 revision 3、commit 282dfb3d、input_hashes 与当前 HEAD 文件 sha256 前 16 位逐一相等（我本地重算一致），故 r5a 证据绑定被审实现，但见 F-12（复现性）。
+- 工具门复跑（未重复构建，预编译测试二进制在运行期读取被审 .at）：2 passed / exit 0，11.52s（作者记 6.00s；本轮宿主同时有 13 个 cargo/rustc/node 构建，量级差异为负载；无新增用例，单用例未超 10s）。输出仍含 `S001 INFO ... prop 'title' not declared on <button>`（F-11）。
+- 修复点代码复核：F-03 `color_model.at:115` n==3 才补 FF；F-04 `color_picker.at:439-452` 整数 floor `(x*100)/192`、`((192-y)*100)/192`；F-05 `color_dialog.at:26/72-77/100-109/126-135` cancel_guard；F-06 27 个 handler 入口清错；F-01 `examples/ui/031-paint/src/front/app.at` `px42=${.px[42]}` + `painted px…` 状态；F-07 平台侧 `crates/auto-ui-runtime/src/ui/iced/renderer/host.rs:4290-4319` modal 焦点事务聚焦内容区首个 `is_input`；F-08 swatch 移至条列下方（`color_picker.at:95-107`）；F-09 报告 revision/commit/input_hashes 与 README 覆盖口径；F-10 删除 5 张 paint tmp 截图与 `examples/ui/088-probe/`，`.gitignore` 增 `examples/**/src/front/tmp/`（`git ls-files` 复查为空）。
+- 引擎执行（生成物）：工具门重新生成 `last-gen/ColorPicker.gen.vue`（16:09）后 node 抽取执行（`plan-artifacts/plan-088/review-tools/hexcheck.js`）：`#F00→#FF0000FF`、`#F00A→#FF0000AA`、`#3974→#33997744`、`#3974E6CC` 原样，均 8 位——F-03 闭。
+- 端点实测（native MCP，`probe-corners`）：`(192,0)`→`#0051FFCC`（S=100,V=100）、`(0,0)`→`#FFFFFFCC`、`(0,192)`→`#000000CC`、`(192,192)`→`#000000CC`——F-04 的 100/0 端点闭（hue 侧见 F-16）。
+- F-06 实测：非法通道错误文本在色板（`#EAB308FF`）与色面成功提交后被移除（错误标签匹配排除日志行）→ 闭；但同源改动引入 F-13。
+- F-05 实测（`probe-dialog-events2`）：单次「取消」产生 **2** 条 `label 取消`，两轮累计 4 条；confirm 路径产生 0 条 cancelled（正常）。门脚本 `case_dialog` 只断言取消零正式提交，**没有**单次 cancelled 计数断言。
+- F-13 实测（`probe-hex-error`）：输入 `#GG0000` 后可见错误标签在；按 Enter 后标签为空、仅 `error(invalid_color)` 事件，ink 不变——可见错误丢失。
+- F-12 复现性：同一 input_hashes 的两次独立 native 复跑均失败——`gate-native-review2` 75.2s：`hex: channel readback ['#FF0000FF','255','0','0','255']`（`verify_color_picker.py:214-226` 的 input_values 走 `autoui_inspect`，读 `shared.styled_vtree` 缓存渲染值，`crates/auto-ui-runtime/src/ui/mcp_server.rs:1986-1992`）；`gate-native-review3` 86.0s：`screenshot: window size is zero` + `paint: round-trip load failed`。r5a 单次 pass 未被复现。
+- F-16 实测（`probe-corners`/`probe_hue_drift`）：#3974E6CC 的 H=220（HSV 模式实测 220/75/90），但 `(192,0)` 端点提交 `#0051FFCC`（H≈221）；`(190,0)`（S=98）多点拖拽仍保持 H=220。原因：SurfDown/Move/Up 入口与末尾都从量化后的 RGB 反解 H，S=V=100 时 `#0055FF` 反解为 221，后续 handler 沿用；±1 有界。
+- 视觉抽检：r5a `demo-native.png`（无残留错误、swatch 在位）、`demo-narrow-native.png`/`demo-native-dark.png`（640×560 浅深、57/116/230/204）；`gate-vue-r5a/vue-narrow.png`（420×560 HEX/RGB/HSV 完整可见，未裁切）、`vue-dialog.png`（HEX 获焦选中、footer 取消/确认）、`vue-dark.png`、`vue-light.png`。
+
+| 范围 | 入口 | 结果 | 时间 |
+|---|---|---|---|
+| 工具门（2 用例，无新增） | 预编译 `color_picker_component-6f39…exe` | 2 passed / exit 0 | 11.52s（负载中；作者记 6.00s；单用例 <10s） |
+| native 门复跑 #1（隔离 out-dir） | `verify_color_picker.py --backend native` | fail（hex readback） | 75.2s |
+| native 门复跑 #2 | 同上 | fail（截图 zero-size + paint round-trip） | 86.0s |
+| vue 门（r5a，复用） | `verify_color_picker.py --backend vue` | pass | 未在本轮观测 |
+| 定向探针（4 个） | dialog-events2 / hex-error / corners / hue-drift | 见上 | 各 15–25s |
+
+发现（severity｜AC｜task｜证据｜修法）：
+- F-05（medium｜AC-03｜T-03｜**未闭**）一次「取消」发两次 `cancelled`：`color_dialog.at:26,72-77,100-109,126-135` 的 `cancel_guard`（bool）未抑制第二次；探针单次取消 2 条、两轮 4 条。`cancel_guard` 是跨 handler 的 **bool** 字段，正落在登记的 VM 整型字段写可见性债同族（r3 已用串字段规避）；且 `.PickCancelled` 不检查 guard。修：改用串字段 guard（如 `"0"/"1"`，沿用 d_hex/ch_* 可靠路径）并让 `.PickCancelled`/`.Cancelled`/onclose 全走同一去重；demo 的取消日志加 `[seq]` 前缀，门显式断言恰好一次。
+- F-12（high｜AC-02/05/06 证据｜T-05｜新增）验收门不可复现：同一 input_hashes 两次复跑均失败（上表），r5a 单次 pass 未复现。hex readback 读的是 `autoui_inspect` 的 `styled_vtree` 缓存渲染值，无强制重绘；paint Save/New/Load 与截图均固定 sleep。修：改为状态驱动等待（等状态文本/日志出现，或强制无害重绘），paint 序列逐步等 `saved`/`new canvas`/`loaded`；在无并发构建/窗口的隔离环境重跑并留新报告；report 的 `commit` 记实现提交（当前记 HEAD，docs 提交会漂移）。
+- F-13（medium｜AC-02｜T-03｜新增）非法 HEX 的可见错误在 Enter 后消失：`color_picker.at:1649-1653` 入口清 `hex_err`，非法分支只发 `error(invalid_color)` 不回写文本（HexInput 在 `:1555-1556` 才设置）；实测输入 `#GG0000` 有可见错误、Enter 后标签为空。违反 §5「非法文本保留草稿并显示错误」。修：非法分支回写 `.hex_err`（或保留入口清、仅在合法分支清），门补可见错误断言。
+- F-11（low｜T-03/T-06｜部分闭）`ch_rev` 已删、demo `title` 已删、Tick `cfg_err` 已补；但包内 `button "RGB/HSV" ... title:`（`color_picker.at:115`）仍在，工具门复跑仍报 `S001 ... prop 'title' not declared`，与收据「工具门无 S001」不符。修：删 title 或按 schema 规则声明；更正收据。
+- F-16（low｜AC-02｜T-03｜新增）S=V=100 端点 hue ±1：`(192,0)` 提交 `#0051FFCC`（H≈221），引擎对 H=220/S=V=100 的期望是 `#0055FFCC`；S=98 的拖拽正常。原因：SurfDown/Move/Up 从量化 RGB 反解 H，量化边界上 ±1 有界。修：手势内沿用入口/`h_hold` 的 H，不二次反解；补端点 hue 断言（可接受 ±1 量化则在 V-01 明示容差）。
+- F-14（low｜AC-06｜T-05/T-06｜新增）窄窗对话框 footer 无证据：指南 088 行要求 420×560 外窗正文滚动且确认栏可达，但 `vue-dialog.png` 是 1100×800，native 模态期间截图平台限制；修：补 420×560 vue 打开态截图并断言 footer 可见/可达。
+- F-17（low｜AC-04｜T-05｜遗留）V-03 的「旧 action 拒绝」与「焦点恢复」仍无断言：平台 `host.rs` 有 modal_restore 且门只做结构检查；旧手势/旧 action 在外部重基线后的行为无对照。修：补旧手势/旧 action 负例与关闭后焦点恢复检查，或在计划中明示平台边界。
+
+关闭判定：F-01 闭（Paint px42 读数 + 门断言；paint 用例在复跑 #2 因时序失败属 F-12）；F-02 闭（case_hex/case_alpha 断言成立，但受 F-12 复现性影响）；F-03 闭（生成引擎执行验证）；F-04 闭（端点 100/0 实测）；F-06 闭（错误文本清除实测，但 F-13 为同源回归）；F-07 闭（既有 modal 焦点事务聚焦首个 input + vue-dialog.png 证据；native 焦点未直接观测，结构断言可接受）；F-08 闭（swatch 堆叠、420 vue 不裁切、dialog/dark 截图；F-14 为窄 footer 残余）；F-09 闭（报告字段/README 口径/引用修正）；F-10 闭（跟踪产物清零 + ignore）。
+
+AC 结论：AC-01 pass；AC-02 partial（F-13/F-16；F-02 oracle 受 F-12 影响）；AC-03 partial（F-05）；AC-04 partial（F-07 闭，F-17 遗留）；AC-05 partial（F-01 闭；Paint 取消/主题对照仍无断言，主题边界「pac 固定」已声明）；AC-06 partial（Win native/vue、窄窗浅深、重开成立；Linux not_run、F-14）；AC-07 needs_fix；AC-08 pending。
+
+未检查/假设边界：vue 门未重跑（复用 r5a 报告与截图，输入未变）；Linux 无 runner 未跑；未复验 087/auto-lang/auto-man 依赖修订；未跑全局回归；r5a 的 native 单次 pass 与我的两次失败都发生在高并发负载（13 个构建/窗口）下，环境因素与 F-12 的时序缺陷需在隔离环境区分；VM 整型字段债未做根因诊断，但 F-05 的 bool guard 与该债同族，有实证（2/2 次双发）。
+
+2026-11-17（goal）：stage: goal | plan_id: PLAN-088 | plan_revision: r3 | round: 3 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-088/auto-ui | commit: 693fd916 | next: review——第二次终审发现（F-05/11/12/13/14/16/17）修复完成，双轨门同 hash 三连 pass。
+
+2026-11-17（work，第二次终审修复）：stage: work；PLAN-088 r3；outcome: pass；worktree `.wt/ui-088/auto-ui`；branch `codex/ui-088-color-picker`；commits `693fd916`（F-05/11/12/13/14/16 修复）/`a6924d8c`（decisions §10）；task_ids T-03✅/T-05✅/T-06✅（重开并关闭）；evidence `gate-native-r6d/report-native.json`（pass，10 用例 + reopen + 3 截图，commit 693fd916）、`gate-vue-r6b/report-vue.json`（pass，5 截图）、工具门 2 passed 6.00s、decisions §10；修复要点：F-05 取消按打开会话去重（消费方 `dlg_state` 串字段 + 包内 cancel_guard 串兜底；门断言单条）、F-11 移除 RGB/HSV 按钮 title（S001 消失）、F-12 门确定性（hex 输入 inspect 校验后提交、状态驱动轮询、Paint 分步等待、截图 8×1s 重试、commit 固定实现提交/head 另记；同 hash native 三连 pass r6b/r6c/r6d）、F-13 HexEnter 非法重写 hex_err、F-14 vue 420×560 对话框 footer 截图 `vue-dialog-narrow.png`、F-16 surface 手势 `g_hue` 携带入口色相（角点 (192,0)→#FF00007F 断言）、F-17 旧 action/焦点恢复记平台边界（baseRevision 全程携带；modal_restore 既有）；输入 hash：picker 73542e36、model 62561f3e、dialog b96ac6da、gate 1cb7eb94；残余：Linux not_run、native 模态截图平台限制、Paint 主题 pac 固定、F-17 边界；next: review（final，独立上下文，第二次复审后的再复审）。
+
 ## 10. 待澄清事项
 
 r2已固定公共消息、通道范围/舍入、HSV灰黑边界和Dialog提交规则；T-01验证动态色面/计算复用、Paint历史适配与runner。尚无阻碍立项的用户决策；实际需要修改语言仓、扩大色彩管理范围或删除双端验收时须提出具体差异，不能自行回落系统弹窗。
@@ -219,3 +263,7 @@ r2已固定公共消息、通道范围/舍入、HSV灰黑边界和Dialog提交�
 待裁定（2026-11-17 review 提出，AC-04/F-07）：§5「Dialog 初始焦点为 HEX 输入」未实现——包内无 focus 调用（`rg focus packages/color-picker` 仅 README:104 边界说明）；README 记为「平台无 widget 级 autofocus」，但仓库既有 `ui.focus(".SetFileName")`（`packages/file-dialog/file_dialog.at:277`，PLAN-095 内建，native/vue 双轨），该约束需复证而非默认成立。二选一：①按既有 ui.focus/等价机制在打开时置焦 HEX 并补证据（§5 不变，T-03 收口）；②修订 §5 为「沿用 modal 焦点环与关闭恢复，不强制初始焦点」并在 README/AC-04 同步（语义合同变更，plan_revision+1）。裁定前 AC-04 只能记 partial。另：4 位 `#RGBA` 不在 §5 明列输入形式（F-03），work 可按 §5 直接拒绝该形式并同步 color_model 注释/README，无需等裁定。
 
 裁定（2026-11-17 work 修复）：取 ①——不改 §5。依据：既有 modal 焦点事务在对话框打开时聚焦内容区首个 input（`crates/auto-ui-runtime/src/ui/iced/renderer/host.rs:4290-4319`），ColorPicker 视图首输入即 HEX；vue 打开态截图 `vue-dialog.png` 显示 HEX 文本获焦选中，native 侧以结构断言（footer/取消/确认/10 canvas）与焦点恢复路径为证。F-03 取「补齐 #RGBA 展开」而非拒绝（与 color_model 既有注释一致，见 decisions §9）。
+
+复审确认（2026-11-17 review）：接受 ①（§5 不变，plan_revision 仍 3）。`host.rs:4290-4319` 的 modal 焦点事务确以 `find(|c| c.is_input)` 聚焦内容区首个输入，本包视图首输入为 HEX；`vue-dialog.png` 显示 HEX 获焦。F-03 的 #RGBA 展开为附加兼容（§5 明列三种形式仍成立），不构成语义变更。F-05 的双发与 F-13 的可见错误丢失属实现缺陷，走 §9 修复，不作为合同裁定。
+
+裁定（2026-11-17 第二次终审修复）：F-17（V-03 旧 action 拒绝 / 关闭后焦点恢复）记为平台边界——`baseRevision` 在每个 preview/committed 载荷中携带（消费方可校验），但演示 UI 无法在 preview→commit 之间异步推进外部 revision 构造 stale action；关闭后焦点恢复由既有 `modal_restore`（`crates/auto-ui-runtime/src/ui/iced/renderer/host.rs`）提供，native 无读取当前焦点的 MCP 探针，故不单列断言。
