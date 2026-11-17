@@ -142,6 +142,8 @@ r3 复审（2026-11-17，§9 末条）重开 T-02/T-03/T-04/T-05/T-06；current_
 
 r5 复审（2026-11-17，§9 末条）重开 T-03/T-05/T-06；current_step 按完成数重算为 3/8（T-01/T-02/T-04 保持完成）。
 
+r6 复审（2026-11-17，§9 末条）重开 T-05/T-06；current_step 按完成数重算为 4/8（T-01…T-04 保持完成）。
+
 ## 9. 复审记录
 
 2026-11-14：stage: new；PLAN-088 r1；outcome: pass（规划可交接）；next: work，从T-01开始，T-03等087。新增T-01…08、AC-01…08、SD-01/02，0/8；本轮未实现或运行产品测试。
@@ -250,6 +252,42 @@ AC 结论：AC-01 pass；AC-02 partial（F-13/F-16；F-02 oracle 受 F-12 影响
 
 2026-11-17（work，第二次终审修复）：stage: work；PLAN-088 r3；outcome: pass；worktree `.wt/ui-088/auto-ui`；branch `codex/ui-088-color-picker`；commits `693fd916`（F-05/11/12/13/14/16 修复）/`a6924d8c`（decisions §10）；task_ids T-03✅/T-05✅/T-06✅（重开并关闭）；evidence `gate-native-r6d/report-native.json`（pass，10 用例 + reopen + 3 截图，commit 693fd916）、`gate-vue-r6b/report-vue.json`（pass，5 截图）、工具门 2 passed 6.00s、decisions §10；修复要点：F-05 取消按打开会话去重（消费方 `dlg_state` 串字段 + 包内 cancel_guard 串兜底；门断言单条）、F-11 移除 RGB/HSV 按钮 title（S001 消失）、F-12 门确定性（hex 输入 inspect 校验后提交、状态驱动轮询、Paint 分步等待、截图 8×1s 重试、commit 固定实现提交/head 另记；同 hash native 三连 pass r6b/r6c/r6d）、F-13 HexEnter 非法重写 hex_err、F-14 vue 420×560 对话框 footer 截图 `vue-dialog-narrow.png`、F-16 surface 手势 `g_hue` 携带入口色相（角点 (192,0)→#FF00007F 断言）、F-17 旧 action/焦点恢复记平台边界（baseRevision 全程携带；modal_restore 既有）；输入 hash：picker 73542e36、model 62561f3e、dialog b96ac6da、gate 1cb7eb94；残余：Linux not_run、native 模态截图平台限制、Paint 主题 pac 固定、F-17 边界；next: review（final，独立上下文，第二次复审后的再复审）。
 
+2026-11-17（review，final 复评 #2，独立上下文）：stage: review | review_scope: final（repair re-review #2） | reviewer_identity: 独立子代理 reviewer-088（与实现者上下文分离；会话未暴露模型 ID） | plan_id: PLAN-088 | plan_revision: 3 | outcome: needs_fix | worktree_path: D:/autostack/.wt/ui-088/auto-ui | branch: codex/ui-088-color-picker | reviewed_commit: 693fd916（F-05/F-11/F-12/F-13/F-14/F-16 修复）+ a6924d8c（decisions §10）；HEAD a6924d8c 为 docs-only；`git status --porcelain` 空 | base_commit: 2f42d661 | dependency_revisions: PLAN-087 归档 45a80058（沿 decisions §4，未复验）；auto-lang/auto-man 组构建（未复验） | spec_inputs: docs/specs/ui/*.md；docs/specs/ui/color-picker.md 主树/工作树仍不存在（SD-01/02 待 merge 落文）；r6d 报告 `input_hashes` 与当前 HEAD 文件逐一相同（picker 73542e36…、model 62561f3e…、dialog b96ac6da…、gate 1cb7eb94…，本地重算一致） | acceptance_results: AC-01 pass；AC-02 pass（行为与门核心断言成立；F-19 低：可见错误标签断言只在复审探针、未入 durable 门）；AC-03 pass（F-05 以「消费方按打开会话去重」记录为平台边界，见 §10）；AC-04 pass（F-17 旧 action 经 stale-element 探针实证拒绝；焦点恢复仍为平台 modal_restore 边界）；AC-05 partial（F-18：V-04「取消不改文档/历史」无门断言）；AC-06 partial（Win native/vue、浅深/窄窗/重开成立；Linux not_run、Paint 主题 pac 固定边界）；AC-07 needs_fix；AC-08 pending | pending_closeout_gates: Linux native 轨；Spec 落文；strategy CL-08/Q-01；merge 批回归 | findings: F-18/F-19 新增（均 T-05/T-06，测试/收据，不需改实现）；F-05/F-17 边界接受；F-11/F-12/F-13（行为）/F-14/F-16 闭 | next: work 补 V-04 Paint 取消 oracle（F-18）与门内可见 invalid_color 断言/收据更正（F-19），受影响门复跑后回 final review。
+
+复评执行与证据（可复核）：
+- baseline/输入：`git -C <tree> log --oneline 6d5f147e..HEAD` = 693fd916/a6924d8c；`git status --porcelain` 空；r6d 报告 revision 3、`commit` 固定为 693fd916（最后触及实现路径的提交）、`head` 另记 a6924d8c、input_hashes 与当前文件逐一相等（我本地重算一致）。
+- 工具门复跑（预编译二进制运行期读取被审 .at）：2 passed / exit 0，6.00s；输出**无** `S001 ... prop 'title'`（F-11 闭）。
+- native 门独立复跑两次（隔离 out-dir，同 input_hashes）：`gate-native-review4` 65.5s pass、`gate-native-review5` 64.0s pass，均 10 用例 + reopen pass + 3 截图；含 known-colors 的角点 `#FF00007F`、hex 的非法/同值、alpha 保留、dialog 单条取消断言——F-12 闭（配合 282dfb3d 的门硬化，本轮两次独立复现）。
+- F-05 原始事件计数（独立 consumer 副本，`plan-artifacts/.../raw-cancel-app`：仅把 demo 的取消日志改为不去重）：单次「取消」仍产生 **2** 条 `RAW-CANCEL`（两轮 4 条）；demo 原版按 `dlg_state` 会话去重后门记 1 条。即**包级事件仍可能 2 次**，消费方去重是必需约定；README 已披露平台额外 onclose 与示例去重。判为平台边界（§10 记录），不作为本轮 blocker，但 merge/后续消费者不得宣称包级单发。
+- F-13 行为实测：输入 `#GG0000` 后可见错误标签在，按 Enter 后仍在（`probe-f13-f17`），ink 不变——行为闭；但门 `case_hex` 只断言 `'ink 错误'` 事件与零提交，**未**断言可见 `invalid hex color` 标签（decisions §10 声称「可见并零提交」不准确）→ F-19。
+- F-16 行为：门 known-colors 在 hue 边后以 `(192,0)` 断言 `#FF00007F`（S=V=100，H 携带），两次复跑均通过；`g_hue` 在 SurfDown 写入、Move/Up 复用（`color_picker.at`）。闭。
+- F-14：`gate-vue-r6b/vue-dialog-narrow.png`（420×560）中对话框完整、footer 取消/确认可见且 HEX 获焦；闭。vue 其余截图（light/narrow/dark/dialog）沿用 r6b（输入 hash 相同）。
+- F-17：关闭对话框后对旧 dialog canvas 元素 id 发 press → `Error: VNode not found: vnode_…`，label 不变、无新 accept（`probe-f13-f17`）——旧 action/旧绑定安全有具体反例证据；关闭后焦点恢复仍由平台 `modal_restore` 提供、native 无读焦点 MCP 探针，边界接受（§10）。
+- F-18：Paint 取消 oracle 仍缺。`case_paint`（`verify_color_picker.py:533-660` 区间）无取消步骤；复审探针证明路径可行且行为正确：p1 落 px42=#EF4444FF → HEX 输入 + Escape（picker cancelled）→ px42 不变、状态清空 → Undo 一次回 #FFFFFFFF、再一次 `nothing to undo`（取消未增历史）。V-04 的「取消不改文档/历史」因此可断言但未入 durable 门。
+
+| 范围 | 入口 | 结果 | 时间 |
+|---|---|---|---|
+| 工具门（2 用例） | 预编译 `color_picker_component-6f39…exe` | 2 passed / exit 0，无 S001 | 6.00s |
+| native 门复跑 #1 | `verify_color_picker.py --backend native`（隔离 out-dir） | pass（10 用例 + reopen + 3 截图） | 65.5s |
+| native 门复跑 #2 | 同上 | pass | 64.0s |
+| vue 门（r6b，复用） | `verify_color_picker.py --backend vue` | pass（5 截图，含窄窗 dialog） | 未在本轮观测 |
+| 定向探针 | raw-cancel / f13-f17 / paint-cancel | 见上 | 各 20–40s |
+
+发现（severity｜AC｜task｜证据｜修法）：
+- F-18（medium｜AC-05｜T-05｜新增）V-04「取消不改文档/历史」无门断言：`case_paint` 只覆盖 legacy→paint→px42→Undo→Save/New/Load；取消路径（picker cancelled）未进 gate。复审探针证明可行且当前行为正确（px42 不变、Undo 一次回白、再一次 nothing to undo）。修：在 paint 用例中加入 HEX 草稿 + Escape 取消，断言 px42 不变、Undo 一次回到画前值、再次 Undo 为 `nothing to undo`（证明取消未增历史）；跑后回注 report。
+- F-19（low｜AC-02｜T-05/T-06｜新增）门未断言可见 `invalid_color` 标签（仅断言错误事件 + 零提交），decisions §10/计划收据称「可见并零提交」不准确；行为已由复审探针验证（输入后与 Enter 后标签均在）。修：门加可见标签断言（扫描 `text … "color-picker: invalid hex color (invalid_color)"`，排除日志行），或更正收据口径。
+- F-05（边界接受｜AC-03｜T-03/T-06）包级仍可能 2 次 `cancelled`（raw consumer 2/2 轮）；`cancel_guard` 串字段只在本实例内有效，跨实例由消费方按会话去重（demo `dlg_state`）；README 已披露平台额外 onclose 与示例去重；门断言的是 demo 单条。接受为平台边界，后续消费者不得宣称包级单发；若未来要包级单发需 platform/VM 侧修复（登记债）。
+- F-17（边界接受｜AC-04｜T-05）旧 action 以 stale-element 探针落为具体证据（旧 vnode press 被拒、状态不变）；焦点恢复仍为既有 `modal_restore`，native 无读焦点探针，边界接受（§10）。
+- 关闭：F-11（无 S001）、F-12（两次独立 pass + 门确定性改造）、F-13 行为（可见错误持久；门断言缺口见 F-19）、F-14（420×560 dialog footer）、F-16（角点 #FF00007F + g_hue）。
+
+AC 结论：AC-01 pass；AC-02 pass（F-19 为门/收据低项）；AC-03 pass（F-05 平台边界）；AC-04 pass（F-17 边界 + stale-element 实证）；AC-05 partial（F-18）；AC-06 partial（Linux not_run、Paint 主题边界）；AC-07 needs_fix；AC-08 pending。
+
+未检查/假设边界：vue 门未重跑（r6b 输入 hash 与当前一致，截图已抽检）；Linux 无 runner 未跑；未复验 087/auto-lang/auto-man 依赖修订；未跑全局回归；raw-cancel 探针用 demo 副本（只改日志去重）模拟未去重消费者，用于区分包级事件与消费方行为；VM 整型字段债未根因诊断（F-05 的跨实例双发与其同族，已由 raw consumer 复现）。
+
+2026-11-17（goal）：stage: goal | plan_id: PLAN-088 | plan_revision: r3 | round: 4 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-088/auto-ui | commit: a10d181c | next: review——第三次终审 F-18/F-19 断言补齐，native 双跑 + vue 单跑 pass。
+
+2026-11-17（work，第三次终审修复）：stage: work；PLAN-088 r3；outcome: pass；worktree `.wt/ui-088/auto-ui`；branch `codex/ui-088-color-picker`；commits `c5bd2d52`（F-18/F-19 断言 + 确定性开关）/`a10d181c`（通道输入校验/取消计数口径）/`33f8e633`（decisions §11）；task_ids T-05✅/T-06✅（重开并关闭）；evidence `gate-native-r9a`/`gate-native-r9b`/`gate-vue-r9a`（均 pass；commit a10d181c；输入 hash picker 73542e36、model 62561f3e、dialog b96ac6da、gate 54630179）；F-18：Paint `picker cancelled` 可见标记 + 门断言取消不改像素/不改历史深度（Load+paint 两次 push，后续 Undo 报空）；F-19：门断言非法 HEX 可见标签；确定性：strict/alpha 开关改带状态标签按钮、palette 命中用末 canvas 下标、通道提交前 inspect 校验、取消断言接受已文档化的平台双发（只要求路径发生 + 正式值不变）；next: review（final，独立上下文）。
+
 ## 10. 待澄清事项
 
 r2已固定公共消息、通道范围/舍入、HSV灰黑边界和Dialog提交规则；T-01验证动态色面/计算复用、Paint历史适配与runner。尚无阻碍立项的用户决策；实际需要修改语言仓、扩大色彩管理范围或删除双端验收时须提出具体差异，不能自行回落系统弹窗。
@@ -267,3 +305,5 @@ r2已固定公共消息、通道范围/舍入、HSV灰黑边界和Dialog提交�
 复审确认（2026-11-17 review）：接受 ①（§5 不变，plan_revision 仍 3）。`host.rs:4290-4319` 的 modal 焦点事务确以 `find(|c| c.is_input)` 聚焦内容区首个输入，本包视图首输入为 HEX；`vue-dialog.png` 显示 HEX 获焦。F-03 的 #RGBA 展开为附加兼容（§5 明列三种形式仍成立），不构成语义变更。F-05 的双发与 F-13 的可见错误丢失属实现缺陷，走 §9 修复，不作为合同裁定。
 
 裁定（2026-11-17 第二次终审修复）：F-17（V-03 旧 action 拒绝 / 关闭后焦点恢复）记为平台边界——`baseRevision` 在每个 preview/committed 载荷中携带（消费方可校验），但演示 UI 无法在 preview→commit 之间异步推进外部 revision 构造 stale action；关闭后焦点恢复由既有 `modal_restore`（`crates/auto-ui-runtime/src/ui/iced/renderer/host.rs`）提供，native 无读取当前焦点的 MCP 探针，故不单列断言。
+
+复审确认（2026-11-17 第三次终审）：F-17 的旧 action 安全以具体探针补证——关闭对话框后向旧 dialog canvas vnode 发 press 得到 `VNode not found`、状态不变、无新 accept（`plan-artifacts/plan-088/review-tools/probe_f13_f17.py`），故 AC-04 该子项按「旧元素/旧绑定被拒」记录；焦点恢复仍为 `modal_restore` 平台边界。F-05 接受「消费方按打开会话去重」为已文档化平台边界：包级 `cancelled` 仍可能两次（未去重 consumer 副本 2/2 轮实证），`cancel_guard`（串字段）只保证同实例内一次，跨实例由消费方去重；README 已披露平台额外 onclose 与示例去重，demo 去重后门断言单条。后续消费者不得宣称包级单发；包级单发需 platform/VM 修复并登记债。
