@@ -40,13 +40,16 @@
 - **变换一致性**：按钮缩放/平移与手势共用同一投影公式（viewport 中心锚 + fit_scale×zoom），在包内以整数有理化实现按钮步进、以事件坐标实现手势，均产出同一 viewRequested tuple；不得出现两套算法。
 - **失败控制**：非法 fit/非有限 zoom → `invalid_view` error 事件，不派发 viewRequested；zoom 夹取 0.05…64 与 `image_surface_geometry` clamp 一致（夹取后同值零事件）。
 
-### 3.3 整链探针（待构建窗口）
+### 3.3 整链探针（已回填，2026-11-17）
 
-命令与结果（baseline image 回归 + 最小 consumer 双生成器）在构建窗口开放后回填：
+命令与结果（全部 dev/debug profile，本机 Windows，worktree `D:/autostack/.wt/ui-089/auto-ui`）：
 
-- [ ] `cargo test -p auto-ui-runtime --test image_surface_contract --test image_pipeline_parity`（改动前基线）
-- [ ] 最小 consumer（包 + App 绑定 viewRequested/loaded）经 `ui_build(rust)` + `ui_build(vue)` 生成成功
-- 结果：待回填
+- [x] `cargo test -p auto-ui-runtime --test image_surface_contract --test image_pipeline_parity` → **2/2 pass**（0.35s 执行；contract 测试已升级为断言输入三臂回调的负载语义：无参绑定零载荷、declared 形态追加 `(dx,dy,phase)` 字符串相位）
+- [x] 最小 consumer（vendored 包 + App 绑定 viewRequested/loaded/error/navigateRequested）经双生成器 → `cargo test -p auto-ui-tools --test image_viewer_component` **2/2 pass**（5.63s）：rust/vue 生成均含 ImageViewport/ImagePreviewDialog；vue 面断言 `JSON.stringify({ seq:`/`baseRevision:`/六个 source 标记/`direction: previous|next`/`deltaY`/三相 pointer 包装/`@dblclick`；严格模式缺依赖 = 具名失败
+- [x] 解析探针（bisect 证据，d1/d2 变体）：`.at` 对象字面量中 **`view` 是保留字**——r2 载荷键 `view` 必须以带引号 `"view": {...}` 输出（`json.stringify({"view": {...}})` 解析通过且输出 JSON 键名不变）；裸 `view:` 键报 `Expected key, got View`。已落地到包源码（16 处）
+- [x] `cargo test -p auto-ui-runtime --lib -- image_surface mouse_area onseek progress` → 17 pass（1.75s，改动面相邻回归）；`image_surface_vm_builder` 单测已升级含 declared-pan 载荷断言
+- 基线观察：改前同命令无法在新 worktree 运行（依赖兄弟树缺失）；改前语义基线以 `93e6b92..ba92217b` 主检出既有测试为准，本提交前 contract/parity 在改动后代码上全绿（无前置红灯）
+- 提交：`072b934e`（runtime 适配 + 包 + 示例 + tools 门 + 本页）
 
 ## 4. dependencies
 
