@@ -294,3 +294,19 @@ precision=0、min/max 通道界、step=1；HEX 用普通 input + 自校验。087
 
 未覆盖/边界：Linux not_run；native 模态期间截图不可用（平台）；Paint 例子主题由 pac 固定（内容色
 不变性由 demo 深浅用例覆盖）；VM 整型字段写可见性债仍登记（当前设计不再依赖）。
+
+## 10. 第二次终审（F-05/F-11/F-12/F-13/F-14/F-16/F-17）修复与复验（实现 `693fd916`）
+
+| 发现 | 处置 | 复验 |
+|---|---|---|
+| F-05 取消双发 | 根因：平台在按钮取消后还会触发一次 dialog onclose（对话框内容存在双实例化路径），实例内 guard 无法跨实例去重。改为**消费方按打开会话去重**（`demo.at` `dlg_state` 串字段：一次打开会话只记一条取消）；包内 `cancel_guard` 同步改为串字段兜底；门断言一次打开会话恰好 1 条 `label 取消` | native 门 dialog 用例 pass（单条） |
+| F-11 残留 title | 移除 RGB/HSV 按钮 `title:`（S001 schema 漂移告警消失） | 工具门输出无 S001 |
+| F-12 门可复现性 | hex 输入先 `autoui_inspect` 校验再提交（重试 3）；提交/读数改状态驱动轮询（ink 文本/输入值），Paint Save/New/Load 分步等待；截图重试 8×1s；报告 `commit` 固定为最后触及实现路径的提交（`head` 另记） | 同 hash 连续 3 次 native pass（r6b/r6c/r6d）；r6d/vue r6b 绑定 `693fd916` |
+| F-13 非法 HEX 可见错误 | `HexEnter` 非法分支重写 `hex_err`（不再被入口清理吞掉） | 门 hex 用例：非法提交后 `invalid_color` 可见并零提交 |
+| F-14 窄窗对话框 footer | vue 420×560 打开对话框截图 `vue-dialog-narrow.png` + 取消/确认断言 | vue 门 pass（5 截图） |
+| F-16 色相漂移 | surface 手势在 Down 时把入口 H 写入 `g_hue`（串字段），Move/Up 复用，不再从已量化 RGB 重解码 | 门新增 (192,0) 角点断言 `#FF00007F`（S=V=100，H 不漂移）pass |
+| F-17 旧 action/焦点恢复 | 声明为平台边界：V-03 的 `baseRevision` 在每个载荷中携带（消费方可校验），但演示 UI 无法在 preview→commit 之间异步推进外部 revision 构造 stale action；关闭后焦点恢复由既有 `modal_restore`（`host.rs`）提供，native 无「读当前焦点」的 MCP 探针 | 以结构/代码证据记录，AC-04 该子项记边界 |
+
+复验（`693fd916`，`git status --porcelain` 空）：native `gate-native-r6d` pass（10 用例 + reopen + 3 截图）；
+vue `gate-vue-r6b` pass（5 截图）；工具门 2 passed 6.00s。输入 hash：picker `73542e36`、model `62561f3e`、
+dialog `b96ac6da`、gate `1cb7eb94`。重跑三连（r6b/r6c/r6d，同 hash）native 均 pass。
