@@ -438,7 +438,10 @@ fn s2_proof_a_event_update_close_and_recovery() {
     let bad = UI.replace("text \"ui\" {}", "text \"ui\" {");
     match s.update_age_body(&bad) {
         Ok(_) => panic!("a malformed body edit must be rejected"),
-        Err(e) => assert!(!e.is_empty(), "named rejection"),
+        Err(e) => assert!(
+            e.contains("source."),
+            "the host surfaces a named diagnostic, not a generic message: {e}"
+        ),
     }
     let seen = s.age_observe().unwrap();
     assert_eq!(seen.components[0].instance_states, vec![vec![1]]);
@@ -454,6 +457,13 @@ fn s2_proof_a_event_update_close_and_recovery() {
     // 关闭/重启：停止后冻结观察，重启回初值。
     s.age_stop().expect("stop");
     assert!(s.age_is_stopped().unwrap());
+    // 停止后观察被冻结：仍返回停前状态（不是空/错误），且停止期间的调度被拒。
+    let frozen = s.age_observe().unwrap();
+    assert_eq!(frozen.components[0].instance_states, vec![vec![1]]);
+    match s.age_send("Inc") {
+        Ok(_) => panic!("a stopped session must reject dispatch"),
+        Err(_) => {}
+    }
     s.age_restart().expect("restart");
     let seen = s.age_observe().unwrap();
     assert_eq!(seen.components[0].instance_states, vec![vec![0]]);
