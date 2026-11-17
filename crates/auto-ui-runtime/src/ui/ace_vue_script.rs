@@ -36,13 +36,17 @@ pub struct LaneHandlerBody {
 
 /// lane 发射的 handler 输入（切片#6j）：pattern + **按位形参名**（来自
 /// widget `handler_params`——SFC 函数签名同名；空=unit handler 走状态函
-/// 数重放道）。
-#[derive(Clone, Copy, Debug)]
+/// 数重放道）。切片#6k：`lambda_region`（view 内联 lambda 铸造 handler
+/// `__evt_*` 专用）——源无 `->` 锚，区间由调用方从 `=> {` 定位，走
+/// `__age_vl_*` 值函数发射道（真实 body/origin）。
+#[derive(Clone, Debug)]
 pub struct LaneHandlerSpec<'a> {
-    /// handler pattern（如 `.Add`）。
+    /// handler pattern（如 `.Add`；`__evt_*` 铸造形亦可）。
     pub pattern: &'a str,
     /// 按位形参名（如 `["t"]`）；空=unit。
     pub params: &'a [String],
+    /// 切片#6k：预解析 lambda 体区间（脱糖源坐标）；Some=`__age_vl_` 道。
+    pub lambda_region: Option<std::ops::Range<usize>>,
 }
 
 /// 并发发射的宿主映射：发射局部名（`l<i>___age_s_<inst>_<field>` 或裸
@@ -167,6 +171,7 @@ pub fn lane_handler_bodies(
         .map(|p| LaneHandlerSpec {
             pattern: p,
             params: &[],
+            lambda_region: None,
         })
         .collect();
     lane_handler_bodies_spec(src, path, &specs)
@@ -175,18 +180,21 @@ pub fn lane_handler_bodies(
 /// 切片#6j：逐 handler 发射（param 感知）。unit handler=状态函数重放道
 /// （ops=`Send`）；**param handler=981 声明级检查函数道**（`__age_hv_*`——
 /// 不进 ops：`Send` 对载荷变体=arity 域错误；检查函数形参=真 handler 形
-/// 参，发射后按位映射到 SFC 形参名）。未命中（无检查函数=不可承载载荷
-/// 如 float；或无区间表达式）具名缺席——调用方按合同决定旧道或拒绝。
+/// 参，发射后按位映射到 SFC 形参名）。切片#6k：`lambda_region` 形走
+/// `__age_vl_*` 值函数道（view 内联 lambda——真实 body/origin）。未命中
+/// （无检查/值函数=不可承载载荷如 float；或无区间表达式）具名缺席——调
+/// 用方按合同决定旧道或拒绝。
 pub fn lane_handler_bodies_spec(
     src: &str,
     path: &str,
     specs: &[LaneHandlerSpec<'_>],
 ) -> Result<(Vec<LaneHandlerBody>, Vec<String>), String> {
     // ops 只含 unit handler（msg 无点前缀，ScenarioOp::Send 合同——载荷
-    // 变体的空 Send 是 981 arity 域错误，不进重放）。
+    // 变体的空 Send 是 981 arity 域错误，不进重放；lambda 形不是 on 块
+    // handler，同样不进 ops）。
     let msgs: Vec<&str> = specs
         .iter()
-        .filter(|s| s.params.is_empty())
+        .filter(|s| s.params.is_empty() && s.lambda_region.is_none())
         .map(|s| s.pattern.trim_start_matches('.'))
         .collect();
     let lane = ComponentFragmentLane::compile(src, path, &msgs)?;
@@ -197,15 +205,18 @@ pub fn lane_handler_bodies_spec(
     let mut absent = Vec::new();
     for spec in specs {
         let pat = spec.pattern;
-        let region = match handler_body_region(&ds, pat) {
-            Ok(r) => r,
-            Err(_) => {
-                absent.push((*pat).to_string());
-                continue;
-            }
+        let region = match spec.lambda_region.clone() {
+            Some(r) => r,
+            None => match handler_body_region(&ds, pat) {
+                Ok(r) => r,
+                Err(_) => {
+                    absent.push((*pat).to_string());
+                    continue;
+                }
+            },
         };
         // 写目标=体文本 LHS 首个 `.field`（赋值形 handler 家族——002 族；
-        // 两条发射道共用；具名边界：非单赋值形归 #6d 结构分析）。
+        // 三条发射道共用；具名边界：非单赋值形归 #6d 结构分析）。
         let region_text = &ds[region.clone()];
         let write_field = region_text
             .find('.')
@@ -217,8 +228,17 @@ pub fn lane_handler_bodies_spec(
                 (end > 0).then(|| rest[..end].to_string())
             })
             .ok_or_else(|| format!("no `.field` LHS in {pat:?} body: {region_text:?}"))?;
-        // 发射源：unit=状态函数；param=声明级检查函数（981 B-W1）。
-        let fn_name = if spec.params.is_empty() {
+        // 发射源：unit=状态函数；param=声明级检查函数（981 B-W1）；
+        // lambda=值函数（#6k V-EVT-B-ORIGIN）。
+        let fn_name = if spec.lambda_region.is_some() {
+            match lane.lambda_fn_covering(region.clone()) {
+                Some(f) => f,
+                None => {
+                    absent.push((*pat).to_string());
+                    continue;
+                }
+            }
+        } else if spec.params.is_empty() {
             let f = format!("__age_state_0_{write_field}");
             if !state_fns.contains(&f) {
                 absent.push((*pat).to_string());
@@ -371,8 +391,15 @@ pub fn generate_sfc_with_lane(
         .map(|(p, ps)| LaneHandlerSpec {
             pattern: p,
             params: ps,
+            lambda_region: None,
         })
         .collect();
+    // 切片#6k（V-EVT-B-ORIGIN）：`__evt_*`（view 内联 lambda 铸造 handler）
+    // 区间配对——脱糖源 `=> {` 体区间按序 ↔ 带体 `__evt_*` handler 按铸造
+    // 计数序（方言 DFS=源文本序；空体铸造（bare-input sync/空 lambda）无
+    // 区间、跳过=旧道）。计数失配（区间数 ≠ 带体 handler 数）=全体缺席
+    //（fail-closed，不猜测配对）。
+    let specs = pair_lambda_regions(src, &widget, specs);
     let (bodies, absent) = match lane_handler_bodies_spec(src, path, &specs) {
         Ok(v) => v,
         Err(_) => (Vec::new(), patterns.clone()),
@@ -383,4 +410,93 @@ pub fn generate_sfc_with_lane(
         splice_lane_handler_bodies(&sfc, &bodies)?
     };
     Ok((spliced, bodies, absent))
+}
+
+/// 切片#6k：脱糖源里的 view 内联 lambda 体区间清单（`=> {` …配对 `}`，
+/// 源文本序=方言铸造 DFS 序）。on 块 handler 用 `->`，不与此锚相撞。
+fn lambda_body_regions(ds: &str) -> Vec<std::ops::Range<usize>> {
+    let mut out = Vec::new();
+    let bytes = ds.as_bytes();
+    let mut from = 0usize;
+    while let Some(rel) = ds[from..].find("=>") {
+        let arrow = from + rel;
+        from = arrow + 2;
+        // 箭头后（跳空白）须紧跟 `{`——lambda 体开括号；括号配对到闭括号。
+        let mut open = None;
+        let mut i = arrow + 2;
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i < bytes.len() && bytes[i] == b'{' {
+            open = Some(i);
+        }
+        let Some(open) = open else { continue };
+        let mut depth = 0usize;
+        let mut j = open;
+        while j < bytes.len() {
+            match bytes[j] {
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        out.push(open..j + 1);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            j += 1;
+        }
+    }
+    out
+}
+
+/// `__evt_*` pattern → 铸造计数（尾段 `_n`）；非 `__evt_*` 形=None。
+fn evt_mint_counter(pattern: &str) -> Option<u32> {
+    let base = pattern.strip_prefix(".__evt_")?;
+    let (_, n) = base.rsplit_once('_')?;
+    n.parse().ok()
+}
+
+/// 配对：源 lambda 区间（序）↔ 带体 `__evt_*` handler（铸造计数序）。
+/// 返回带 `lambda_region` 的 specs；失配=全部 `__evt_*` 留 None（缺席）。
+fn pair_lambda_regions<'a>(
+    src: &str,
+    widget: &auto_ui_compiler::aura::AuraWidget,
+    mut specs: Vec<LaneHandlerSpec<'a>>,
+) -> Vec<LaneHandlerSpec<'a>> {
+    // 区间=**脱糖源坐标**（与 lane 同一基准——经公共出口重扫 `=>`；源含
+    // f-string 脱糖位移时配对方与 lane 不漂移）。计数失配=fail-closed。
+    let ds =
+        crate::ui::ace_ts_provider::desugared_lane_source(src).unwrap_or_else(|_| src.to_string());
+    let regions = lambda_body_regions(&ds);
+    // 带体 __evt_* handler：铸造计数序（空体=bare-input sync/空 lambda，
+    // 无区间不配对）。
+    let mut minted: Vec<(u32, usize)> = specs
+        .iter()
+        .enumerate()
+        .filter_map(|(i, s)| {
+            let counter = evt_mint_counter(s.pattern)?;
+            let key_with_params = widget
+                .handlers
+                .keys()
+                .find(|k| k.split('(').next() == Some(s.pattern))?;
+            let has_body = widget
+                .handlers
+                .get(key_with_params)
+                .map(|p| match p {
+                    auto_ui_compiler::aura::LogicPayload::AstStmts(stmts) => !stmts.is_empty(),
+                    _ => false,
+                })
+                .unwrap_or(false);
+            has_body.then_some((counter, i))
+        })
+        .collect();
+    minted.sort();
+    if minted.len() == regions.len() {
+        for ((_, spec_i), region) in minted.iter().zip(regions.iter()) {
+            specs[*spec_i].lambda_region = Some(region.clone());
+        }
+    }
+    specs
 }

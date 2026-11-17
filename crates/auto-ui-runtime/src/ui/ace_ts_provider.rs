@@ -275,6 +275,14 @@ fn normalize_state_slots(src: &str) -> String {
         + if src.ends_with('\n') { "\n" } else { "" }
 }
 
+/// 切片#6k：lane 脱糖源坐标基准的**公共出口**（与
+/// [`ComponentFragmentLane::compile`] 同一归一化+脱糖链）——区间配对方
+///（`pair_lambda_regions`）与 lane 保持同一坐标系，防止原源/脱糖源位移。
+pub fn desugared_lane_source(src: &str) -> Result<String, String> {
+    let norm = normalize_state_slots(src);
+    ace_core::source::fstr::desugar_fstrings_widget(&norm).map_err(|e| format!("fstr desugar: {e}"))
+}
+
 /// 一次组件面编译承载的 fragment lane（owned 编译结果；view 按调用借用）。
 /// **span 坐标基准 = f-string 脱糖后源**（组件面入口统一脱糖——DIALECT
 /// 批口径；无 f-string 源时与原源一致）。lane 持有脱糖源供定位。
@@ -416,10 +424,23 @@ impl ComponentFragmentLane {
     /// （**原源 span**，重命名保 span）+ return（首字段 span）——body 表达
     /// 式与 handler 体区间相交者唯一归属该 handler。
     pub fn check_fn_covering(&self, region: std::ops::Range<usize>) -> Option<String> {
+        self.hidden_fn_covering("__age_hv_", region)
+    }
+
+    /// 切片#6k（V-EVT-B-ORIGIN）：**view 内联 lambda 值函数**发现
+    /// （`__age_vl_<seq>`——语言侧铸造，赋值 RHS 原源 span；同检查函数的
+    /// 区间相交匹配合同）。inline-lambda 铸造 handler（`__evt_*`）的 lane
+    /// 发射源=该函数（真实 body/origin，无假 on 块/默认参数）。
+    pub fn lambda_fn_covering(&self, region: std::ops::Range<usize>) -> Option<String> {
+        self.hidden_fn_covering("__age_vl_", region)
+    }
+
+    /// 隐藏铸造函数族按区间相交发现（body 表达式与区间相交者唯一归属）。
+    fn hidden_fn_covering(&self, prefix: &str, region: std::ops::Range<usize>) -> Option<String> {
         let view = ace_a2x_core::SemanticView::from_checked(&self.checked).ok()?;
         view.functions()
             .iter()
-            .filter(|f| f.source_name.starts_with("__age_hv_"))
+            .filter(|f| f.source_name.starts_with(prefix))
             .find(|f| {
                 f.body
                     .exprs

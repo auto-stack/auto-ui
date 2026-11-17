@@ -787,7 +787,7 @@ fn p980_web_unified_entry_census_v2() {
             // 内联 lambda 铸造形（view onclick 无 on 块）：铸造 handler 无源
             // span/场景面不可重放（与参数化同族域缺口）→ 旧道。
             "inline-lambda-only",
-            "widget B {\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { button \"+\" { onclick: () => { .n += 1 } } }\n    }\n}\n",
+            "widget B {\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"B\" button \"+\" { onclick: () => { .n += 1 } } }\n    }\n}\n",
         ),
     ];
 
@@ -803,8 +803,11 @@ fn p980_web_unified_entry_census_v2() {
     // 函数发射恢复拼接）；新增 param-read=1（实读参行——与常量体行分列，
     // "spliced=1 不等价动态载荷支持"的判别由 p980_web_param_environment 承
     // 担）；新增 float-payload=0+absent（不可承载载荷具名缺席，不造假数值）。
-    // counter-3h=3；str-field=1；no-on/watch-only=0（passthrough）；
-    // inline-lambda-only=absent（铸造 handler 无源锚）。
+    // counter-3h=3；str-field=1；no-on/watch-only=0（passthrough）。
+    // **2026-11-17 具名修订 #3（切片#6k：V-EVT-B-ORIGIN）**：inline-lambda-
+    // only 0+absent→1——语言侧铸 `__age_vl_<seq>` 值函数（赋值 RHS 原源
+    // span），lane 以源 `=> {` 区间配对（铸造计数序）发射，SFC 合成
+    // `__evt_*` 体经 lane 拼接（真实 body/origin，不用旧 TS fallback）。
     let expect: &[(&str, usize, bool)] = &[
         ("counter-3h", 3, false),
         ("str-field", 1, false),
@@ -813,7 +816,7 @@ fn p980_web_unified_entry_census_v2() {
         ("param-handler", 1, false),
         ("param-read", 1, false),
         ("float-payload", 0, true),
-        ("inline-lambda-only", 0, true),
+        ("inline-lambda-only", 1, false),
     ];
     for ((name, src), (exp_name, spliced, has_absent)) in corpus.iter().zip(expect) {
         assert_eq!(name, exp_name);
@@ -982,6 +985,7 @@ fn p980_web_param_environment() {
         let specs = [LaneHandlerSpec {
             pattern: ".Query",
             params: &q,
+            lambda_region: None,
         }];
         lane_handler_bodies_spec(q_src, "p980-6j.at", &specs).expect("q bodies")
     };
@@ -1057,6 +1061,7 @@ fn p980_web_param_environment() {
         let specs = [LaneHandlerSpec {
             pattern: ".Resize",
             params: &f,
+            lambda_region: None,
         }];
         let (f_bodies, f_absent) =
             lane_handler_bodies_spec(f_src, "p980-6j.at", &specs).expect("f derives");
@@ -1074,6 +1079,7 @@ fn p980_web_param_environment() {
         let specs = [LaneHandlerSpec {
             pattern: ".Query",
             params: &[],
+            lambda_region: None,
         }];
         let err = lane_handler_bodies_spec(q_src, "p980-6j.at", &specs)
             .expect_err("unit spec on a payload variant must be a named arity rejection");
@@ -1108,6 +1114,7 @@ fn p980_web_param_browser_mount() {
         let specs = [LaneHandlerSpec {
             pattern: ".Query",
             params: &q,
+            lambda_region: None,
         }];
         lane_handler_bodies_spec(q_src, "p980-browser.at", &specs).expect("q")
     };
@@ -1116,6 +1123,7 @@ fn p980_web_param_browser_mount() {
         let specs = [LaneHandlerSpec {
             pattern: ".Move",
             params: &m,
+            lambda_region: None,
         }];
         lane_handler_bodies_spec(m_src, "p980-browser.at", &specs).expect("m")
     };
@@ -1124,6 +1132,7 @@ fn p980_web_param_browser_mount() {
         let specs = [LaneHandlerSpec {
             pattern: ".SetDark",
             params: &b,
+            lambda_region: None,
         }];
         lane_handler_bodies_spec(b_src, "p980-browser.at", &specs).expect("b")
     };
@@ -1158,5 +1167,170 @@ fn p980_web_param_browser_mount() {
     assert!(
         out.status.success() && stdout.contains("LANE_PARAM_BROWSER_OK"),
         "param browser: {stdout} / {stderr}"
+    );
+}
+
+/// WEB 切片#6k（V-EVT-B-ORIGIN，981 B-W1 联合）：view 内联 lambda 的
+/// 真实 body/origin——语言侧铸 `__age_vl_<seq>` 值函数（赋值 RHS 原源
+/// span）→ lane `=> {` 区间配对（铸造计数序）→ 发射 → SFC 合成
+/// `__evt_*` 体拼接。负控：拼接体**不得**是旧 TS fallback 形
+/// （`n.value += 1`——lane 形=a2x_add helper）。
+#[test]
+fn p980_web_lambda_origin() {
+    use auto_ui_runtime::ui::ace_ts_provider::ComponentFragmentLane;
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+
+    let b_src = "widget B {\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"B\" button \"+\" { onclick: () => { .n += 1 } } }\n    }\n}\n";
+
+    // ① typed：值函数在视图（span 相交发现——原 span→checked 函数可追）。
+    {
+        let lane = ComponentFragmentLane::compile(b_src, "p980-6k.at", &[]).expect("lane");
+        let ds = lane.desugared_source();
+        let arrow = ds.find("=> {").expect("lambda arrow");
+        let open = ds[arrow..].find('{').map(|o| arrow + o).expect("open");
+        let region = open..ds[open..].find('}').map(|c| open + c + 1).expect("close");
+        let vl = lane
+            .lambda_fn_covering(region)
+            .expect("__age_vl_ fn covers the lambda region");
+        assert!(vl.starts_with("__age_vl_"), "value fn name: {vl}");
+    }
+
+    // ② origin→SFC：拼接体=lane 发射形（a2x_add helper），非旧 TS fallback
+    // （`n.value += 1`——同语义不同车道；拼接必须来自 checked 函数）。
+    let (sfc, bodies, absent) = generate_sfc_with_lane(b_src, "p980-6k.at").expect("SFC");
+    assert!(absent.is_empty(), "lambda handler lane-derived: {absent:?}");
+    assert_eq!(bodies.len(), 1);
+    let body = bodies.first().unwrap();
+    assert_eq!(body.pattern, ".__evt_onclick_1");
+    let body_text = body.lines.join("\n");
+    assert!(
+        body_text.contains("a2x_add(n.value, 1)") && body_text.contains("n.value = "),
+        "lane-origin body: {body_text}"
+    );
+    let fn_start = sfc.find("function __evt_onclick_1").expect("synth fn");
+    let fn_end = sfc[fn_start..]
+        .find('}')
+        .map(|e| fn_start + e)
+        .unwrap_or(sfc.len());
+    let fn_text = &sfc[fn_start..fn_end];
+    assert!(
+        fn_text.contains("a2x_add") && !fn_text.contains("+= 1"),
+        "spliced synth fn carries the lane body (old TS fallback must not stand in): {fn_text}"
+    );
+
+    // ③ 002 真源端到端：on 块 6 handler + view 3 内联 lambda 全 lane 派生
+    // （`__evt_onclick_{1,2,3}` 语义=dec/reset/inc 对应）。
+    {
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let at = manifest.join("../../examples/ui/002-counter/src/front/app.at");
+        let src = std::fs::read_to_string(&at).unwrap_or_else(|e| panic!("002: {e}"));
+        let (sfc, bodies, absent) = generate_sfc_with_lane(&src, "p980-6k-002.at").expect("002");
+        assert!(absent.is_empty(), "002 all-lane: {absent:?}");
+        assert_eq!(bodies.len(), 9, "002: 6 on-block + 3 view lambdas");
+        let find = |pat: &str| {
+            bodies.iter().find(|b| b.pattern == pat).unwrap_or_else(|| {
+                panic!(
+                    "{pat} in {:?}",
+                    bodies.iter().map(|b| &b.pattern).collect::<Vec<_>>()
+                )
+            })
+        };
+        assert!(
+            find(".__evt_onclick_1")
+                .lines
+                .join("\n")
+                .contains("a2x_sub"),
+            "lambda 1 = dec semantics"
+        );
+        assert!(
+            find(".__evt_onclick_2")
+                .lines
+                .join("\n")
+                .contains("count.value = 0;"),
+            "lambda 2 = reset semantics"
+        );
+        assert!(
+            find(".__evt_onclick_3")
+                .lines
+                .join("\n")
+                .contains("a2x_add"),
+            "lambda 3 = inc semantics"
+        );
+        let _ = &sfc;
+    }
+
+    // ④ node：lambda 体宿主执行（n=5 → 6）。
+    {
+        let node_body = body.lines.join("\n");
+        let driver = format!(
+            "import {{ a2x_add }} from \"./a2x_rt.mjs\";\nconst n = {{ value: 5 }};\n{node_body}\nif (!(n.value === 6)) {{ throw new Error(\"FRAG_ASSERT_FAILED\"); }}\nconsole.log(\"FRAG_OK\");\n"
+        );
+        let dir = std::env::temp_dir().join(format!("p980-6k-node-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("a2x_rt.mjs"),
+            ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]),
+        )
+        .unwrap();
+        std::fs::write(dir.join("host.mjs"), driver).unwrap();
+        let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+        let out = std::process::Command::new(&node)
+            .arg("host.mjs")
+            .current_dir(&dir)
+            .output()
+            .expect("node spawn");
+        let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(
+            out.status.success() && stdout.contains("FRAG_OK"),
+            "node lambda body: {stdout} / {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
+/// WEB 切片#6k 浏览器档（V-EVT-B-ORIGIN browser 面，排窗
+/// `AUTO_UI_ACE_WEB_E2E=1`）：inline-lambda 铸造 handler 体在**真实浏览
+/// 器点击**中执行（lane 体=a2x_add 形，非旧 TS fallback）。
+#[test]
+fn p980_web_lambda_browser_mount() {
+    if std::env::var("AUTO_UI_ACE_WEB_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "p980_web_lambda_browser_mount: not scheduled (set AUTO_UI_ACE_WEB_E2E=1; \
+             browser tier, playwright required)"
+        );
+        return;
+    }
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+
+    let b_src = "widget B {\n    model {\n        var n int = 5\n    }\n\n    view {\n        col { text \"B\" button \"+\" { onclick: () => { .n += 1 } } }\n    }\n}\n";
+    let (sfc, bodies, absent) = generate_sfc_with_lane(b_src, "p980-lambda-browser.at").expect("SFC");
+    assert!(absent.is_empty() && bodies.len() == 1, "lane-derived lambda");
+    let body_js = bodies.first().unwrap().lines.join("\n");
+    let rt_inline = "function a2x_add(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a + b)) throw new RangeError('a2x_add overflow');\n  return a + b;\n}\n";
+    let html = format!(
+        "<!DOCTYPE html>\n<html><body>\n<div id=\"n\">5</div>\n<button id=\"inc\" onclick=\"__evt_onclick_1()\">+</button>\n<script>\n{rt_inline}\nconst n = {{ value: 5, notify() {{ document.getElementById('n').textContent = String(this.value); }} }};\nfunction __evt_onclick_1() {{\n{body_js}\nn.notify();\n}}\n</script>\n</body></html>\n"
+    );
+    let _ = &sfc;
+    let dir = std::env::temp_dir().join(format!("p980-lambda-browser-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.html"), html).unwrap();
+
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let test_mjs = manifest.join("../../examples/ui/ace-web-lane/tests/test_lane_browser_lambda.mjs");
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg(test_mjs.to_str().unwrap())
+        .arg(dir.to_str().unwrap())
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("LANE_LAMBDA_BROWSER_OK"),
+        "lambda browser: {stdout} / {stderr}"
     );
 }
