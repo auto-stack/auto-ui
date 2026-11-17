@@ -371,11 +371,24 @@ fn build_toast_card(t: &ToastReq) -> iced::Element<'static, IcedMessage> {
 }
 
 /// Plan 563: CSS 色串 → iced Color(场景契约的色值形态;坏值回退黑)。
+/// PLAN-088 T-01：8 位 hex(#RRGGBBAA)承载 alpha——from_hex 解析为
+/// Hex(0xRRGGBBAA)但 to_rgb8() 只读低 24 位，通道错乱且 alpha 丢失；vue
+/// 轨同一 CSS 串透传 fillStyle 本就半透明。此处按位取 RR/GG/BB/AA 保
+/// alpha，两轨同色。仅影响 canvas 场景色串（6 位路径逐字节不变；
+/// style class 解析不经过此处）。
 fn canvas_css_color(s: &str) -> iced::Color {
     crate::ui::style::Color::from_hex(s)
-        .map(|c| {
-            let (r, g, b) = c.to_rgb8();
-            iced::Color::from_rgb8(r, g, b)
+        .map(|c| match c {
+            crate::ui::style::Color::Hex(v) if v > 0xFF_FF_FF => iced::Color::from_rgba8(
+                ((v >> 24) & 0xFF) as u8,
+                ((v >> 16) & 0xFF) as u8,
+                ((v >> 8) & 0xFF) as u8,
+                (v & 0xFF) as f32 / 255.0,
+            ),
+            other => {
+                let (r, g, b) = other.to_rgb8();
+                iced::Color::from_rgb8(r, g, b)
+            }
         })
         .unwrap_or(iced::Color::BLACK)
 }

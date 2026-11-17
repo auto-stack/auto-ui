@@ -3467,18 +3467,29 @@ fn resolve_typed_color(c: &Color) -> Option<Rgba8> {
 // PLAN-034 T-05：CanvasScene → RGBA（canvas=位图快照过线的栅格化孪生）
 // ---------------------------------------------------------------------------
 
-/// CSS 色串 → tiny-skia Color（`#rrggbb` 六位；兜底黑——canvas_css_color
-/// 同规约的软栅格版）。
+/// CSS 色串 → tiny-skia Color（`#rrggbb`/`#rrggbbaa` 八位带 alpha；兜底
+/// 黑——canvas_css_color 同规约的软栅格版。PLAN-088 T-01：8 位 hex 对齐
+/// vue CSS 透传语义，6 位路径逐字节不变）。
 fn css_color_tiny(s: &str) -> tiny_skia::Color {
     let hex = s.strip_prefix('#').unwrap_or(s);
-    if hex.len() == 6 {
+    if hex.len() == 6 || hex.len() == 8 {
         if let Ok(v) = u32::from_str_radix(hex, 16) {
-            return tiny_skia::Color::from_rgba8(
-                ((v >> 16) & 0xff) as u8,
-                ((v >> 8) & 0xff) as u8,
-                (v & 0xff) as u8,
-                255,
-            );
+            let (r, g, b, a) = if hex.len() == 8 {
+                (
+                    ((v >> 24) & 0xff) as u8,
+                    ((v >> 16) & 0xff) as u8,
+                    ((v >> 8) & 0xff) as u8,
+                    (v & 0xff) as u8,
+                )
+            } else {
+                (
+                    ((v >> 16) & 0xff) as u8,
+                    ((v >> 8) & 0xff) as u8,
+                    (v & 0xff) as u8,
+                    255,
+                )
+            };
+            return tiny_skia::Color::from_rgba8(r, g, b, a);
         }
     }
     tiny_skia::Color::BLACK
