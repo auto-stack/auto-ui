@@ -76,3 +76,22 @@
 - 允许进入：T-02（`packages/image-viewer/` 抽取 + native 输入适配实现）。
 - 前置缺口：无阻塞性缺口；§3.3 探针回填是 T-02 关闭条件之一。
 - 未决机制：无混入 T-02 的自由设计——native 适配按 §3.2 决议执行；若实现中证明 `DynamicMessage::Typed` args 无法从渲染层派发，回本页增补决议（不 silent 改合同）。
+
+## 7. T-05 运行期发现（2026-11-17/18，产品门联调实录）
+
+| # | 发现 | 证据 | 决议/状态 |
+|---|---|---|---|
+| P1 | split 模式下 back 进程票据不入前进程注册表——前进程 image_surface 永远 `media ticket missing` | demo 早轮 `VM-MEDIA ... OnError` + 前进程空注册表；probe 单测 `open_session→uri` <250ms 证明运行时本身自洽 | demo 改走前端进程内建 `auto.image` 会话（单进程渲染）；back 保留为 031 同构消费面 |
+| P2 | 前端 VM 进程对相对夹具路径不解析——`tests/...`、`../tests/...`、`examples/...` 五种相对形态全部空索引；绝对路径可用 | probe 多候选探测（`|tests/...:empty|...`）；demo18 绝对路径 loaded=2 | gate 期原地重写三个夹具字面量为绝对路径，finally 字节恢复（restore 校验）；提交源保持相对形态 |
+| P3 | App 级 Tick 需显式 `timer { Tick (every_ms) }` + msg 变体；组件 `interval` 约定只覆盖子件 Tick | demo7 `timer: event 'Tick' has no matching msg variant`；probe ticks=79/14s | demo 落显式 timer；包组件沿用 interval 约定（子件 Tick 实证走通） |
+| P4 | `view` 是 `.at` 保留字：对象字面量裸 `view:` 键报 `Expected key, got View`；表达式成员位 `.view` 被 DotView 词元吞掉（静默取空） | 解析探针 d1/d2；`req.view.fit`→空 vs `req.source`→正常（probe3 A/B/C） | 包载荷以带引号 `"view"` 键输出（键名不变）；消费方 `req["view"]` 索引读取 |
+| P5 | `auto-ui-tool.exe` 是 split 会话的 VM UI 宿主（auto.exe 的 [tool] 分支 spawn）——runtime 修复必须重建 auto-ui-tool，否则旧行为继续 | 旧串 `skipping dispatch` 在新 auto.exe 会话仍出现；字节搜索两 exe：tool 缺 marker、auto.exe 有 | 重建双二进制；gate 显式 `--ui-tool-bin` 指向同源构建 |
+| P6 | 【未决·T-05 阻塞点】包组件 media notify 收集：当前会话中 sweep 未到达包组件的 image_surface（无 VM-MEDIA 行、loaded 不派发）；demo18 早期会话曾触达（loaded=2 全链走通），后续运行回归，根因未定位 | demo18 vs demo21-23/probe12 同二进制对比；`collect_media_surfaces` 遍历臂覆盖 Column/Row/Popover/Container/Scrollable/Grid/Overlay | 已落两项修复（实例名归一 + 零参回退派发）；下一轮以 probe12（最小包 + loaded 中继）为最小复现继续定位，方向：包组件子树在动态视图中的表示与 collect 遍历臂的覆盖 |
+| P7 | 机器占用：lang-980（ace_ts_provider）与 plan-982（p982_* 测试）编译期间按纪律等待并通知；未并行构建 | 进程 CommandLine 记录（23:23-23:24 起跑） | 构建窗口错峰执行 |
+
+### 3.3 补充：已回填探针结果（更新）
+
+- `cargo test -p auto-ui-runtime --test image_surface_contract --test image_pipeline_parity` → 2/2 pass（contract 升级为断言输入三臂回调负载语义）
+- `cargo test -p auto-ui-tools --test image_viewer_component` → 2/2 pass（5.63s）
+- `cargo test -p auto-ui-runtime --lib -- image_surface mouse_area onseek progress` → 17 pass（1.75s）
+- native 链路里程碑：demo18（split 会话）全链实证 loaded=2（双实例单次）+ viewRequested tuple 接受（rev 推进）——组件/运行时合同面成立；产品门剩余阻塞见 P6
