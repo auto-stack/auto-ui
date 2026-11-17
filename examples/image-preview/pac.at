@@ -8,9 +8,7 @@ description: "AutoUI image viewport & preview dialog demo (PLAN-089)"
 
 scene: "ui"
 render: "vue"
-api: "rust"
 front_port: 4391
-back_port: 8391
 icon: "image"
 title: "Image Preview Demo"
 title_zh: "图片预览演示"

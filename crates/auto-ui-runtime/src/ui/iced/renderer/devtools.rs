@@ -3141,6 +3141,19 @@ pub(super) fn media_notify_sweep(
     let converted = convert_view_messages(view);
     let mut surfaces: Vec<MediaSurfaceRef> = Vec::new();
     collect_media_surfaces(&converted, &mut surfaces);
+    // PLAN089SWEEP debug（临时）
+    if std::env::var("PLAN089_SWEEP_DEBUG").ok().as_deref() == Some("1") {
+        let dump = format!("{converted:?}");
+        eprintln!("[PLAN089SWEEP] tree_len={} image_surface_nodes={}", dump.len(), dump.matches("ImageSurface").count());
+        eprintln!("[PLAN089SWEEP] tree_head={}", dump.chars().take(500).collect::<String>());
+        let _ = std::fs::write("D:/autostack/plan-artifacts/plan-089/sweep-tree-dump.txt", &dump);
+        eprintln!("[PLAN089SWEEP] surfaces={}", surfaces.len());
+        for sf in &surfaces {
+            eprintln!("[PLAN089SWEEP] src={} loaded={:?} error={:?} status={:?}",
+                sf.src, sf.on_loaded.is_some(), sf.on_error.is_some(),
+                auto_media_core::image_pipeline::media_surface_status(&sf.src));
+        }
+    }
     let has_handled_surface = surfaces
         .iter()
         .any(|s| s.on_loaded.is_some() || s.on_error.is_some());

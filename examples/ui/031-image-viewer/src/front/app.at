@@ -264,11 +264,11 @@ widget App {
             let req = json.parse(ev)
             if req.baseRevision == .revision {
                 // PLAN-089：`view` 在成员位被 DotView 词元吞掉（auto-lang 解析缺口，成员访问静默取空）——消费方以索引取键，载荷键不变。
-                .fit_mode = req["view"].fit
-                .zoom = req["view"].zoom
-                .offset_x = req["view"].offsetX
-                .offset_y = req["view"].offsetY
-                .rotation = req["view"].rotation
+                .fit_mode = req.fit
+                .zoom = req.zoom
+                .offset_x = req.offsetX
+                .offset_y = req.offsetY
+                .rotation = req.rotation
                 .revision = .revision + 1
                 .status = "视图已接受"
             } else {

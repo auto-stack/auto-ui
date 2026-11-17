@@ -16,12 +16,14 @@ use auto.image
 // DoOpen/Retry/DoNavigate 各内联一份。`view` 载荷键以索引访问读取
 // （req["view"]——成员位 DotView 词元解析缺口，见 decisions.md §3.3）。
 widget App {
-    msg { Init, Tick, DoOpen(str, str, bool), Retry, ApplyView(str), MarkLoaded(str), ShowError(str), DoNavigate(str), OpenPreview, ClosePreview }
+    msg { Init, Tick, ToggleTheme, DoOpen(str, str, bool), Retry, ApplyView(str), MarkLoaded(str), ShowError(str), DoNavigate(str), OpenPreview, ClosePreview }
     // PLAN-089：App 级显式 timer（src 轮询）。
     timer {
         Tick (every_ms: 80)
     }
     model {
+        // 明暗切换（runtime 惯例 dark_mode 字段；V-05 双主题）。
+        var dark_mode bool = true
         // 会话与受控 view（应用所有；组件只持投影）。
         var session str = ""
         var src str = ""
@@ -66,6 +68,7 @@ widget App {
                 button "打开损坏图" { onclick: .DoOpen("tests/fixtures/damaged.png", "img-damaged", false), style: "h-8 px-2 text-xs rounded-md border border-border" }
                 button "重试" { onclick: .Retry, disabled: .last_path == "", style: "h-8 px-2 text-xs rounded-md border border-border disabled:opacity-40" }
                 button "打开预览" { onclick: .OpenPreview, disabled: .src == "", style: "h-8 px-2 text-xs rounded-md border border-primary text-primary disabled:opacity-40" }
+                button "切换明暗" { onclick: .ToggleTheme, style: "h-8 px-2 text-xs rounded-md border border-border" }
                 text .status { style: "text-xs text-muted-foreground" }
             }
             // 实例一：内嵌视口（工具栏全量动作；V-01/02/06 主夹具）。
@@ -110,6 +113,7 @@ widget App {
         .Init -> {
             .status = "打开一张图片开始"
         }
+        .ToggleTheme -> { .dark_mode = !.dark_mode }
         .Tick -> {
             .ticks = .ticks + 1
             // 入队后 rendition 由后台 lane 发布——current_uri 就绪前返回空。
@@ -132,8 +136,13 @@ widget App {
             .src = image.current_uri(session)
             .can_prev = is_b
             .can_next = !is_b
-            // 新图原子发布：revision++ 让视口把当前受控 view 当作该图初始
-            // 基线（缺省图则 contain/1/0/0/0）。
+            // 新图初始基线（r2：新图缺省 contain/1/0/0/0；显式恢复视图才由
+            // 调用方随图提供）——受控状态一并原子复位。
+            .fit = "contain"
+            .zoom = 1.0
+            .ox = 0.0
+            .oy = 0.0
+            .rot = 0
             .rev = .rev + 1
             .status = f"已打开 ${rid}"
         }
@@ -148,6 +157,11 @@ widget App {
                 let session = image.open_session(.last_path)
                 .session = session
                 .src = image.current_uri(session)
+                .fit = "contain"
+                .zoom = 1.0
+                .ox = 0.0
+                .oy = 0.0
+                .rot = 0
                 .can_prev = .last_is_b
                 .can_next = !.last_is_b
                 .rev = .rev + 1
@@ -161,11 +175,11 @@ widget App {
             let req = json.parse(ev)
             if req.baseRevision == .rev {
                 .request_count = .request_count + 1
-                .fit = req.view.fit
-                .zoom = req.view.zoom
-                .ox = req.view.offsetX
-                .oy = req.view.offsetY
-                .rot = req.view.rotation
+                .fit = req.fit
+                .zoom = req.zoom
+                .ox = req.offsetX
+                .oy = req.offsetY
+                .rot = req.rotation
                 .rev = .rev + 1
                 .status = "视图已接受"
             } else {
