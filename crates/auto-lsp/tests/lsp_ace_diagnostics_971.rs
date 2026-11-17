@@ -84,6 +84,17 @@ impl TempWorkspace {
         std::fs::write(&path, text).expect("write the workspace source");
         path
     }
+
+    /// Write one workspace source file at a nested relative path (a real
+    /// package subdirectory: `lib/util.at`).
+    fn write_nested(&self, relative: &str, text: &str) -> PathBuf {
+        let path = self.root.join(relative);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("create the package subdirectory");
+        }
+        std::fs::write(&path, text).expect("write the workspace source");
+        path
+    }
 }
 
 impl Drop for TempWorkspace {
@@ -565,6 +576,60 @@ async fn p971_lsp_ace_multifile_diagnostics_versioned_publish() {
         "the publish carries the version of the content actually checked (sequence: {sequence:?})"
     );
 
+    // ---- 5b. V-08: an out-of-order (older-version) change is dropped ------
+    let mark = cli.seen.len();
+    cli.notify(
+        "textDocument/didChange",
+        change_params(&main_uri, 2, MAIN_BAD),
+    )
+    .await
+    .expect("out-of-order didChange v2");
+    cli.settle(SETTLE_CHANGE)
+        .await
+        .expect("settle after the out-of-order change");
+    assert!(
+        cli.publishes_since(&main_uri, mark).is_empty(),
+        "an older-version change must never resurrect old text or publish: {:?}",
+        &cli.seen[mark..]
+    );
+
+    // ---- 5c. didClose of an imported document ----------------------------
+    // The module set is the OPEN documents, so closing the imported module
+    // makes the importer's next check report the unresolved import. This is
+    // the recorded boundary (module set = open documents), not a silent
+    // stale-green.
+    cli.notify(
+        "textDocument/didClose",
+        json!({ "textDocument": { "uri": util_uri } }),
+    )
+    .await
+    .expect("didClose util");
+    cli.settle(SETTLE_OPEN)
+        .await
+        .expect("settle after didClose");
+    let mark = cli.seen.len();
+    cli.notify(
+        "textDocument/didChange",
+        change_params(&main_uri, 5, MAIN_GOOD),
+    )
+    .await
+    .expect("didChange main after util closed");
+    cli.settle(SETTLE_CHANGE)
+        .await
+        .expect("settle after the importer change");
+    let publishes = cli.publishes_since(&main_uri, mark);
+    let last = publishes.last().unwrap_or_else(|| {
+        panic!(
+            "the importer must be re-checked after the imported document closes: {:?}",
+            &cli.seen[mark..]
+        )
+    });
+    let diagnostics = diagnostics_of(last);
+    assert!(
+        !diagnostics.is_empty(),
+        "with the imported document closed the import cannot resolve: {last}"
+    );
+
     // ---- 6. clean shutdown: exit code 0 ---------------------------------
     cli.next_id += 1;
     let shutdown_id = cli.next_id;
@@ -607,21 +672,18 @@ fn hover_text(contents: &Value) -> String {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string(),
-        Value::Array(items) => items
-            .iter()
-            .map(hover_text)
-            .collect::<Vec<_>>()
-            .join("\n"),
+        Value::Array(items) => items.iter().map(hover_text).collect::<Vec<_>>().join("\n"),
         _ => String::new(),
     }
 }
 
 /// The source file the editor's existing analyzer resolves, plus its caller.
-/// The import form is the analyzer's package-root form (`use pac.util`) so
-/// cross-file resolution reads the module from disk — the same behaviour every
+/// The import form is the analyzer's package-root form (`use pac.lib.util`)
+/// and the module lives in a real package subdirectory (`lib/util.at`), so the
+/// definition truly crosses a package path on disk — the same behaviour every
 /// existing Auto workspace relies on.
 const UTIL_LIB: &str = "fn hello() int { return 1 }\n";
-const MAIN_CALLER: &str = "use util\nfn main() int { let v = hello()\n return v }\n";
+const MAIN_CALLER: &str = "use pac.lib.util\nfn main() int { let v = hello()\n return v }\n";
 
 /// PLAN-971 B/T-08：真实二进制下核验 LSP 既存的语义能力面（本包 T-08 的
 /// “核其现存能力”义务）：跨文件/跨包 goto 落到**原模块源文件**的正确行、
@@ -632,7 +694,7 @@ const MAIN_CALLER: &str = "use util\nfn main() int { let v = hello()\n return v 
 async fn p971_lsp_existing_semantic_capabilities_verified() {
     let started = Instant::now();
     let workspace = TempWorkspace::new();
-    let util_path = workspace.write("util.at", UTIL_LIB);
+    let util_path = workspace.write_nested("lib/util.at", UTIL_LIB);
     let main_path = workspace.write("main.at", MAIN_CALLER);
     let util_uri = file_uri(&util_path);
     let main_uri = file_uri(&main_path);
@@ -647,15 +709,20 @@ async fn p971_lsp_existing_semantic_capabilities_verified() {
         .await
         .expect("initialize");
     assert!(init["result"]["capabilities"].is_object(), "{init}");
-    cli.notify("initialized", json!({})).await.expect("initialized");
+    cli.notify("initialized", json!({}))
+        .await
+        .expect("initialized");
 
     cli.notify("textDocument/didOpen", open_params(&util_uri, 1, UTIL_LIB))
         .await
         .expect("didOpen util");
     cli.settle(SETTLE_OPEN).await.expect("settle util");
-    cli.notify("textDocument/didOpen", open_params(&main_uri, 1, MAIN_CALLER))
-        .await
-        .expect("didOpen main");
+    cli.notify(
+        "textDocument/didOpen",
+        open_params(&main_uri, 1, MAIN_CALLER),
+    )
+    .await
+    .expect("didOpen main");
     cli.settle(SETTLE_OPEN).await.expect("settle main");
 
     // ---- 1. cross-file/package goto lands in the module's own source -----
@@ -671,7 +738,10 @@ async fn p971_lsp_existing_semantic_capabilities_verified() {
         .await
         .expect("definition response");
     let result = &def["result"];
-    assert!(!result.is_null(), "goto must resolve the imported symbol: {def}");
+    assert!(
+        !result.is_null(),
+        "goto must resolve the imported symbol: {def}"
+    );
     let location = result
         .as_array()
         .and_then(|items| items.first())
@@ -734,7 +804,10 @@ async fn p971_lsp_existing_semantic_capabilities_verified() {
     let data = tokens["result"]["data"]
         .as_array()
         .unwrap_or_else(|| panic!("semantic tokens data must be an array: {tokens}"));
-    assert!(!data.is_empty(), "semantic tokens must not be empty: {tokens}");
+    assert!(
+        !data.is_empty(),
+        "semantic tokens must not be empty: {tokens}"
+    );
 
     // ---- 5. completion answers at the call site --------------------------
     let completion = cli
@@ -776,5 +849,3 @@ async fn p971_lsp_existing_semantic_capabilities_verified() {
         elapsed.as_secs_f64() * 1000.0
     );
 }
-
-

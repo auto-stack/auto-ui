@@ -181,7 +181,10 @@ fn declaration_position(source: &str, name: &str, kind: &FragKind) -> Option<Pos
         let start = from + index;
         let end = start + name.len();
         let ident = |c: char| c.is_alphanumeric() || c == '_';
-        let before_ok = source[..start].chars().next_back().map_or(true, |c| !ident(c));
+        let before_ok = source[..start]
+            .chars()
+            .next_back()
+            .map_or(true, |c| !ident(c));
         let after_ok = source[end..].chars().next().map_or(true, |c| !ident(c));
         if before_ok && after_ok {
             let prefix = source[..start].trim_end();
@@ -211,12 +214,16 @@ fn offset_to_lsp_position(source: &str, offset: usize) -> Position {
     let before = &source[..offset];
     let line = before.bytes().filter(|b| *b == b'\n').count() as u32;
     let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let character = source[line_start..offset].chars().map(|c| c.len_utf16() as u32).sum();
+    let character = source[line_start..offset]
+        .chars()
+        .map(|c| c.len_utf16() as u32)
+        .sum();
     Position { line, character }
 }
 
 /// Find definition using workspace state (cross-file aware)
-pub fn find_definition_workspace(    content: &str,
+pub fn find_definition_workspace(
+    content: &str,
     position: Position,
     uri: &str,
     ws_state: &crate::workspace::WorkspaceState,
@@ -455,4 +462,3 @@ fn infer_variable_type_heuristic(content: &str, var_name: &str) -> Option<String
 
     None
 }
-

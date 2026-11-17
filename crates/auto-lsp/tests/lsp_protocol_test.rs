@@ -233,13 +233,17 @@ async fn signature_help_and_inlay_hints() {
     .await;
     assert!(resp.is_ok(), "signatureHelp ok");
     let result = ok_result(resp);
-    if let Some(sigs) = result["signatures"].as_array() {
-        let labels: Vec<&str> = sigs.iter().filter_map(|s| s["label"].as_str()).collect();
-        assert!(
-            labels.iter().any(|l| l.contains("greet")),
-            "greet signature offered: {labels:?}"
-        );
-    }
+    // PLAN-971 B (review F-11): require the actual signature CONTENT, not just
+    // an accepted request — an empty/null answer must fail this case.
+    let sigs = result["signatures"]
+        .as_array()
+        .unwrap_or_else(|| panic!("signatureHelp must offer signatures: {result}"));
+    assert!(!sigs.is_empty(), "signatureHelp returned no signatures");
+    let labels: Vec<&str> = sigs.iter().filter_map(|s| s["label"].as_str()).collect();
+    assert!(
+        labels.iter().any(|l| l.contains("greet")),
+        "greet signature offered: {labels:?}"
+    );
 
     // Inlay hints across the whole document.
     let resp = request(
