@@ -1,0 +1,62 @@
+// PLAN-085 F-05 fixture: removing the focused row must let focus fall back to
+// the nearest still-visible ancestor (or the first reachable row), and must not
+// touch the app's `selected`.
+widget focusrepair {
+    msg { Init, Down, Up, GoHome, GoEnd, Expand, Collapse, Activate, Shrink, Grow, CollapseP1, Pick(str) }
+    model {
+        var nodes List = []
+        var expanded List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            text f"sel=${.sel}" { style: "text-xs" }
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .sel,
+                      on_toggle: .Up, on_select: .Pick($event), on_retry: .Up, directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var kid List = []
+            kid.push({ id: "k1", label: "KID1", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            kid.push({ id: "k2", label: "KID2", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            var a List = []
+            a.push({ id: "p1", label: "PAR1", children: kid, kind: "dir", icon: "", is_leaf: false, badge: "" })
+            a.push({ id: "p2", label: "PAR2", children: [], kind: "dir", icon: "", is_leaf: false, badge: "" })
+            .nodes = a
+            .expanded = ["p1"]
+        }
+        // Collapse the focused subtree: the focused child disappears but its
+        // parent stays visible, so focus MUST land on that parent - not on a
+        // neighbour at the old index. This is the discriminator the earlier
+        // test lacked (it accepted a stale-index fallback as success).
+        .CollapseP1 -> { .expanded = [] }
+        // Shrink to a single root: the focused rows are gone entirely.
+        .Shrink -> {
+            var a List = []
+            a.push({ id: "p2", label: "PAR2", children: [], kind: "dir", icon: "", is_leaf: false, badge: "" })
+            .nodes = a
+            .expanded = []
+        }
+        // Restore the full tree.
+        .Grow -> {
+            var kid List = []
+            kid.push({ id: "k1", label: "KID1", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            kid.push({ id: "k2", label: "KID2", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            var a List = []
+            a.push({ id: "p1", label: "PAR1", children: kid, kind: "dir", icon: "", is_leaf: false, badge: "" })
+            a.push({ id: "p2", label: "PAR2", children: [], kind: "dir", icon: "", is_leaf: false, badge: "" })
+            .nodes = a
+            .expanded = ["p1"]
+        }
+        .Pick(v str) -> { .sel = v }
+        .Down -> { }
+        .Up -> { }
+        .GoHome -> { }
+        .GoEnd -> { }
+        .Expand -> { }
+        .Collapse -> { }
+        .Activate -> { }
+    }
+}

@@ -1,0 +1,15 @@
+name: "numeric-fields-demo"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "NumericFields demo"
+title_zh: "数值与单位输入演示"
+# PLAN-087：普通设置表单消费演示（字号/缩放/长度/时长/透明度只读）。
+# 产品门 verify_numeric_fields.py 以本示例为夹具（隔离目录运行）。
+window: "900x640"
+# vue 轨专用前端端口（避免默认 3000 与并行门冲突）。
+front_port: 4389
+# PLAN-087：官方包 dep 根（vue 轨物化扫描；native 轨由 widget 级 use 传递装载）。
+dep numeric_fields {
+    path: "../../packages/numeric-fields"
+}

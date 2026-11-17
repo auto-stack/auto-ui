@@ -1,0 +1,15 @@
+[package]
+name = "age-ace-session"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "PLAN-981 B-SESSION-I: AGE session typed-host bridge over ACE (AV execution), built against the live auto-lang tree in the plan worktree group."
+
+# 独立 workspace：本 crate 只依赖 ACE（live auto-lang 树）。driver 的冻结 SDK
+# （.sdk-source）与 live 树同名同版本但路径不同，Cargo 会报 package collision，
+# 所以桥接层先独立成型；driver 换 SDK（978）后再由它消费本 crate。
+[workspace]
+
+[dependencies]
+ace-core = { path = "../../../auto-lang/experimental/ace/crates/core" }
+ace-av = { path = "../../../auto-lang/experimental/ace/crates/av" }

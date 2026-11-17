@@ -134,10 +134,11 @@ widget W(a: str) {
             .parse_domain(&auto_ui_dialect::UiDialect)
             .map(auto_ui_dialect::UiCode)
             .expect("sidebar.at must parse cleanly");
-        let _ = auto_ui_compiler::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
-            &recipe_imports,
-            &ast,
-        );
+        let _ =
+            auto_ui_compiler::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
+                &recipe_imports,
+                &ast,
+            );
         let has_navtree = ast.domain_stmts().any(
             |s| matches!(s, auto_ui_dialect::UiStmt::WidgetDecl(d) if d.name.to_string() == "NavTree"),
         );

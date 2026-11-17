@@ -67,14 +67,10 @@ impl<C: Component> NativeThemeCarrier<C> {
     /// 嵌入官方包：启动期解析 themes.at 注册主题树（与 VM 轨
     /// `collect_named_themes` + `register_theme_trees` 同一收集/注册面）。
     /// 解析/校验失败 = 具名 Err（生成 exe 启动退出留痕，不静默降级）。
-    pub fn with_package(
-        inner: C,
-        pkg: &'static EmbeddedThemePackage,
-    ) -> Result<Self, String> {
+    pub fn with_package(inner: C, pkg: &'static EmbeddedThemePackage) -> Result<Self, String> {
         let ast = {
             let session = auto_lang_core::session::CompilerSession::ui();
-            let mut parser = auto_lang_core::Parser::from(pkg.themes_source)
-                .with_session(session);
+            let mut parser = auto_lang_core::Parser::from(pkg.themes_source).with_session(session);
             parser
                 .parse_domain(&auto_ui_dialect::UiDialect)
                 .map(auto_ui_dialect::UiCode)
@@ -181,10 +177,7 @@ impl<C: Component> Component for NativeThemeCarrier<C> {
         self.pkg.is_some()
     }
 
-    fn on_theme_policy(
-        &mut self,
-        snap: &PolicySnapshot,
-    ) -> Result<(), String> {
+    fn on_theme_policy(&mut self, snap: &PolicySnapshot) -> Result<(), String> {
         eprintln!(
             "[native-theme] push rev={} family={} version={} digest={}… mode={}",
             snap.revision,
@@ -199,7 +192,10 @@ impl<C: Component> Component for NativeThemeCarrier<C> {
         // 校验序（全部具名；任一失败 = 零全局变化保旧）：
         let declared = pkg.families.iter().find(|(n, _, _)| *n == snap.family);
         let Some((_, modes, _)) = declared else {
-            self.reject(format!("family {} 未在嵌入包 {} 中声明", snap.family, pkg.package));
+            self.reject(format!(
+                "family {} 未在嵌入包 {} 中声明",
+                snap.family, pkg.package
+            ));
             return Ok(());
         };
         if snap.version != pkg.version {
@@ -291,7 +287,9 @@ mod tests {
         impl Component for Named {
             type Msg = DummyMsg;
             fn on(&mut self, _: Self::Msg) {}
-            fn view(&self) -> View<Self::Msg> { View::Empty }
+            fn view(&self) -> View<Self::Msg> {
+                View::Empty
+            }
             fn dispatch_named(&mut self, name: &str, arg: Option<&str>) -> bool {
                 if (name == "NoArg" && arg.is_none()) || (name == "Text" && arg.is_some()) {
                     self.calls.push((name.to_string(), arg.map(str::to_string)));
@@ -312,11 +310,14 @@ mod tests {
             assert!(carrier.dispatch_named("Text", Some("")));
             assert!(!carrier.dispatch_named("Unknown", None));
             assert!(!carrier.dispatch_named("Text", None));
-            assert_eq!(carrier.inner.calls, vec![
-                ("NoArg".into(), None),
-                ("Text".into(), Some("中文😀54.25".into())),
-                ("Text".into(), Some(String::new())),
-            ]);
+            assert_eq!(
+                carrier.inner.calls,
+                vec![
+                    ("NoArg".into(), None),
+                    ("Text".into(), Some("中文😀54.25".into())),
+                    ("Text".into(), Some(String::new())),
+                ]
+            );
         }
     }
 
@@ -335,8 +336,8 @@ mod tests {
 
     #[test]
     fn carrier_push_preserves_inner_business_state() {
-        let mut c = NativeThemeCarrier::with_package(Stateful { elapsed: 1500 }, pkg())
-            .expect("package");
+        let mut c =
+            NativeThemeCarrier::with_package(Stateful { elapsed: 1500 }, pkg()).expect("package");
         // 推送 + 帧翻 applied——内部业务字段不得被换肤触碰/重置。
         c.on_theme_policy(&snap(2, "Auto", "0.2.0", "9fa07742dc68aa53", "dark"))
             .unwrap();
@@ -381,7 +382,10 @@ mod tests {
             .unwrap();
         assert_eq!(
             c.theme_policy_status(),
-            Some(("rejected".into(), "family Solarized 未在嵌入包 themes 中声明".into()))
+            Some((
+                "rejected".into(),
+                "family Solarized 未在嵌入包 themes 中声明".into()
+            ))
         );
         // 版本不符。
         c.on_theme_policy(&snap(2, "Auto", "0.3.0", "9fa07742dc68aa53", "dark"))

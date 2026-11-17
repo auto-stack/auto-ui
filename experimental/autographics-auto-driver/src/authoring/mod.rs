@@ -22,6 +22,7 @@ pub mod textured_models;
 
 pub mod interaction;
 
+pub mod light_adapter;
 pub mod measurement;
 pub mod spatial;
 pub mod view2d;

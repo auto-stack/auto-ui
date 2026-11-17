@@ -87,6 +87,45 @@ pub use dynamic_build::{build_dynamic_component, has_ui_keywords, run_file_dynam
 /// only（无 ui）构建恢复迁移前高层对话框路径**（不把 OS 实现藏在 ui
 /// renderer 门后）；dnd adapter 走 windows+native-dnd 双门控（模块本身
 /// 在 ui 门内=三分），缺席槽=false/VMError 同旧。
+/// PLAN-980 NATIVE：`AUTO_UI_ENGINE=ace` 的 run 通道入口（无条件编译——
+/// feature 关闭时具名拒绝；开启时走 `ui::ace_native` 真窗）。旧 vm 通道不因
+/// 本入口改变；出面外源由 ACE 面具名拒（不静默回退旧 VM）。
+pub fn run_ace_native_entry(code: &str, path: &str) -> Result<String, String> {
+    #[cfg(feature = "ace-bridge")]
+    {
+        crate::ui::ace_native::run_ace_native_ui(code, path)
+            .map(|_| "ace native window closed".to_string())
+    }
+    #[cfg(not(feature = "ace-bridge"))]
+    {
+        let _ = (code, path);
+        Err(
+            "AUTO_UI_ENGINE=ace requires the ace-bridge feature (build auto-ui-runtime with              --features ace-bridge)"
+                .to_string(),
+        )
+    }
+}
+
+/// PLAN-980 NATIVE r13：`AUTO_UI_ENGINE=ace` 的 MIN-A-UI 通用入口（无条件
+/// 编译——feature 关闭时具名拒绝；开启时走 `ui::ace_node_desktop`：Node/
+/// widget 兼容源 → AV→ui980 受检 FFI 实际 UI 更新 → Iced 真窗 + typed 事件
+/// 回 AV）。r11 `run_ace_native_entry`（宿主直读快照面）保留给自己的测试。
+pub fn run_ace_node_desktop_entry(code: &str, path: &str) -> Result<String, String> {
+    #[cfg(feature = "ace-bridge")]
+    {
+        crate::ui::ace_node_desktop::run_ace_node_desktop_ui(code, path, 1)
+            .map(|_| "ace node desktop window closed".to_string())
+    }
+    #[cfg(not(feature = "ace-bridge"))]
+    {
+        let _ = (code, path);
+        Err(
+            "AUTO_UI_ENGINE=ace requires the ace-bridge feature (build auto-ui-runtime with              --features ace-bridge)"
+                .to_string(),
+        )
+    }
+}
+
 pub fn install_ui_host_capabilities() {
     // PLAN-814: i18n lookup 钩子注册（原 shim_i18n_t 的 ui 直连边收口；
     // i18n_lookup 模块在 ui-interpreter 门——钩子注册随同门，R9-03 补齐）。

@@ -846,6 +846,12 @@ pub struct OnHandler {
     /// Pattern to match (e.g., ".Inc", "Msg::Dec")
     pub pattern: String,
 
+    /// PLAN-980 WEB 切片#6：源 span（byte_offset, byte_length）——on 块
+    /// 解析捕获（pattern 起至 body 止）；view 内联 lambda 铸造形为 None。
+    /// 消费面：提取线程化 + ComponentFragmentLane 逐 handler 定位。
+    #[serde(default)]
+    pub span: Option<(usize, usize)>,
+
     /// Parameter names for the handler (e.g., ["text"] for .AddItem(text))
     pub params: Vec<String>,
 

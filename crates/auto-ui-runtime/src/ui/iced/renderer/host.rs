@@ -1,12 +1,12 @@
 //! PLAN-014 T-06：宿主装配责任（startup 窗口配置、run_dynamic_*、run_session/update 闭包/view_desktop_fn/subscription 扇出/exit 机）（自 iced/renderer.rs 原样收编）。
 //! 消息序/active判据/last-owner exit/纹理与external pin寿命零改——纯移动。
-use super::*;
 use super::devtools::*;
 use super::media::*;
 use super::projection::*;
 use super::shell_state::*;
 use super::style_widgets::*;
 use super::subscriptions::*;
+use super::*;
 
 /// Plan 411: startup window size (logical px). Sources, in priority order:
 /// 1. pac.at `window: "WxH"` — injected by `auto run` as AUTO_VM_WINDOW
@@ -148,7 +148,6 @@ pub(super) fn effective_font_size(iced_style: &IcedStyle) -> Option<f32> {
 // ============================================================================
 // Plan 227: Send-safe IcedMessage wrapper for DynamicComponent
 // ============================================================================
-
 
 /// Run a `DynamicComponent` in an iced window.
 ///
@@ -515,7 +514,7 @@ fn run_session(
         .unwrap_or_default();
 
     // Start MCP UI server in background thread (Plan 278)
-    let (mcp_shared, mcp_action_rx) = crate::ui::mcp_server::start_mcp_server(
+    let (mcp_shared, mcp_action_gate) = crate::ui::mcp_server::start_mcp_server(
         widget_name.clone(),
         crate::ui::mcp_server::mcp_port(),
     );
@@ -523,12 +522,9 @@ fn run_session(
         .lock()
         .unwrap()
         .set_backend_kind(crate::ui::mcp_server::BackendKind::Vm);
-    // Store the action receiver in a global for the subscription to poll
-    {
-        let guard = MCP_ACTION_RX.get_or_init(|| std::sync::Mutex::new(None));
-        let mut lock = guard.lock().unwrap();
-        *lock = Some(mcp_action_rx);
-    }
+    // PLAN-098 T-02：gate 装全局（唯一 rx 终生锁内，永不搬走——订阅
+    // 身份漂移只换 poll 方，注入链不再随重订阅死亡）。
+    let _ = MCP_ACTION_GATE.set(mcp_action_gate);
 
     // PLAN-740 T-00（batch-drive 勘定通道——test-only）：AUTOUI_DRIVE_PROBE
     // =触发文件路径时 spawn 常驻探针线程；触发文件每追加一行
@@ -2379,16 +2375,27 @@ fn run_session(
         if msg.event == "__activate_focused_control" {
             let (view, _, _) = state.component.view_with_debug_gated(false);
             let converted = convert_view_messages(view);
-            if crate::ui::modal::active_content_path(&converted).is_none() { return iced::Task::none(); }
+            if crate::ui::modal::active_content_path(&converted).is_none() {
+                return iced::Task::none();
+            }
             let mut submits = std::collections::HashMap::new();
             modal_input_submits(&converted, &mut submits);
             let enter = msg.input_value.as_deref() == Some("Enter");
-            return iced::advanced::widget::operate(crate::ui::iced::focus_target::ActivateFocused::<IcedMessage>::default()).then(
-                move |(focused, activation)| {
-                    let message = activation.or_else(|| if enter { focused.and_then(|id| submits.get(&id).cloned()) } else { None });
-                    message.map(iced::Task::done).unwrap_or_else(iced::Task::none)
-                }
-            );
+            return iced::advanced::widget::operate(
+                crate::ui::iced::focus_target::ActivateFocused::<IcedMessage>::default(),
+            )
+            .then(move |(focused, activation)| {
+                let message = activation.or_else(|| {
+                    if enter {
+                        focused.and_then(|id| submits.get(&id).cloned())
+                    } else {
+                        None
+                    }
+                });
+                message
+                    .map(iced::Task::done)
+                    .unwrap_or_else(iced::Task::none)
+            });
         }
 
         // Plan 057 (ash-gui): global uncaptured Tab → focus the prompt editor
@@ -2615,11 +2622,7 @@ fn run_session(
                     .as_ref()
                     .map(|r| r.render(fmt));
                 let ok = match text {
-                    Some(t) => {
-                        {
-                            crate::ui::clipboard::clipboard_set(&t)
-                        }
-                    }
+                    Some(t) => crate::ui::clipboard::clipboard_set(&t),
                     None => false,
                 };
                 *state.app.devtools.select_copy_feedback.borrow_mut() = Some(ok);
@@ -3836,7 +3839,9 @@ fn run_session(
             *state.app.cached_rendered.borrow_mut() = None; // 强制重建(丢弃旧 widget)
             *state.app.cached_converted_view.borrow_mut() = None;
             *state.app.view_dirty.borrow_mut() = true;
-            if let Some(key) = &input_cache_key { state.app.input_values.remove(key); }
+            if let Some(key) = &input_cache_key {
+                state.app.input_values.remove(key);
+            }
             // Plan 047:view 重建后恢复 input 焦点(否则 on_submit 第二次不触发)。
             state.app.devtools.needs_prompt_refocus.set(true);
         }
@@ -4235,41 +4240,108 @@ fn run_session(
             let converted = convert_view_messages(view);
             let mut all = Vec::new();
             collect_focusable_controls(&converted, &mut all, true);
-            let requested = state.desktop.mcp_shared.as_ref().map(|shared|
-                shared.lock().unwrap().take_action_focus(&msg.widget, &msg.event)).unwrap_or(false);
+            let requested = state
+                .desktop
+                .mcp_shared
+                .as_ref()
+                .map(|shared| {
+                    shared
+                        .lock()
+                        .unwrap()
+                        .take_action_focus(&msg.widget, &msg.event)
+                })
+                .unwrap_or(false);
             if requested {
-                if let Some(control) = all.iter().find(|c| c.widget == msg.widget && c.event == msg.event) {
+                if let Some(control) = all
+                    .iter()
+                    .find(|c| c.widget == msg.widget && c.event == msg.event)
+                {
                     *state.app.mcp_activation_focus.borrow_mut() = Some(control.id.clone());
-                    tail_tasks.push(iced::advanced::widget::operate(crate::ui::iced::focus_target::guarded_focus(
-                        control.id.clone(), state.app.modal_focus_generation.clone(), state.app.modal_focus_generation.load(std::sync::atomic::Ordering::Acquire))));
+                    tail_tasks.push(iced::advanced::widget::operate(
+                        crate::ui::iced::focus_target::guarded_focus(
+                            control.id.clone(),
+                            state.app.modal_focus_generation.clone(),
+                            state
+                                .app
+                                .modal_focus_generation
+                                .load(std::sync::atomic::Ordering::Acquire),
+                        ),
+                    ));
                 }
             } else if !msg.event.starts_with("__") && msg.event != "Tick" {
                 state.app.mcp_activation_focus.borrow_mut().take();
             }
             let mut scoped = Vec::new();
             collect_focusable_inputs(&converted, &mut scoped);
-            let scope = crate::ui::modal::active_content_path(&converted).map(|path|
-                format!("{path:?}:{}", scoped.first().map(|c| c.widget.as_str()).unwrap_or("")));
+            let scope = crate::ui::modal::active_content_path(&converted).map(|path| {
+                format!(
+                    "{path:?}:{}",
+                    scoped.first().map(|c| c.widget.as_str()).unwrap_or("")
+                )
+            });
             let previous = state.app.modal_scope.borrow().clone();
             if scope != previous {
                 *state.app.modal_scope.borrow_mut() = scope.clone();
-                let generation = state.app.modal_focus_generation.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
+                let generation = state
+                    .app
+                    .modal_focus_generation
+                    .fetch_add(1, std::sync::atomic::Ordering::AcqRel)
+                    + 1;
                 if scope.is_some() {
-                    let first = scoped.iter().find(|c| c.is_input).or_else(|| scoped.first()).map(|c| c.id.clone());
+                    let first = scoped
+                        .iter()
+                        .find(|c| c.is_input)
+                        .or_else(|| scoped.first())
+                        .map(|c| c.id.clone());
                     let requested_restore = state.app.mcp_activation_focus.borrow_mut().take();
                     let restore = state.app.modal_restore.clone();
                     let guard = state.app.modal_focus_generation.clone();
-                    if requested_restore.is_some() { *restore.lock().unwrap() = requested_restore.clone(); }
-                    tail_tasks.push(iced::advanced::widget::operate(FindFocusedInput::new()).then(move |current| {
-                        if guard.load(std::sync::atomic::Ordering::Acquire) != generation { return iced::Task::none(); }
-                        if requested_restore.is_none() { *restore.lock().unwrap() = current; }
-                        first.clone().map(|target| iced::advanced::widget::operate(crate::ui::iced::focus_target::guarded_focus(target, guard.clone(), generation))).unwrap_or_else(iced::Task::none)
-                    }));
+                    if requested_restore.is_some() {
+                        *restore.lock().unwrap() = requested_restore.clone();
+                    }
+                    tail_tasks.push(
+                        iced::advanced::widget::operate(FindFocusedInput::new()).then(
+                            move |current| {
+                                if guard.load(std::sync::atomic::Ordering::Acquire) != generation {
+                                    return iced::Task::none();
+                                }
+                                if requested_restore.is_none() {
+                                    *restore.lock().unwrap() = current;
+                                }
+                                first
+                                    .clone()
+                                    .map(|target| {
+                                        iced::advanced::widget::operate(
+                                            crate::ui::iced::focus_target::guarded_focus(
+                                                target,
+                                                guard.clone(),
+                                                generation,
+                                            ),
+                                        )
+                                    })
+                                    .unwrap_or_else(iced::Task::none)
+                            },
+                        ),
+                    );
                 } else {
                     let saved = state.app.modal_restore.lock().unwrap().take();
-                    let target = saved.filter(|id| all.iter().any(|c| &c.id == id))
-                        .or_else(|| all.iter().find(|c| c.is_input).or_else(|| all.first()).map(|c| c.id.clone()));
-                    if let Some(target) = target { tail_tasks.push(iced::advanced::widget::operate(crate::ui::iced::focus_target::guarded_focus(target, state.app.modal_focus_generation.clone(), generation))); }
+                    let target = saved
+                        .filter(|id| all.iter().any(|c| &c.id == id))
+                        .or_else(|| {
+                            all.iter()
+                                .find(|c| c.is_input)
+                                .or_else(|| all.first())
+                                .map(|c| c.id.clone())
+                        });
+                    if let Some(target) = target {
+                        tail_tasks.push(iced::advanced::widget::operate(
+                            crate::ui::iced::focus_target::guarded_focus(
+                                target,
+                                state.app.modal_focus_generation.clone(),
+                                generation,
+                            ),
+                        ));
+                    }
                     state.app.mcp_activation_focus.borrow_mut().take();
                 }
             }
@@ -4998,12 +5070,13 @@ fn run_session(
                         // Plan 480 S3/S4：broker 孵化落地 + 多 client 帧泵
                         // （有在册/排队连接才有成本，零排队两调用皆空转）。
                         if state.pending_incubations() > 0 {
-                                                    // PLAN-075（DG-2）：attach 预算 env 档（缺席/非法 = 5000 原值）。
-                        let attach_budget = crate::ui::session::DesktopSession::broker_attach_budget_ms();
-                        if attach_budget != 5000 {
-                            eprintln!("[ui-desktop] broker attach budget {attach_budget}ms");
-                        }
-                        state.attach_pending_incubations(attach_budget);
+                            // PLAN-075（DG-2）：attach 预算 env 档（缺席/非法 = 5000 原值）。
+                            let attach_budget =
+                                crate::ui::session::DesktopSession::broker_attach_budget_ms();
+                            if attach_budget != 5000 {
+                                eprintln!("[ui-desktop] broker attach budget {attach_budget}ms");
+                            }
+                            state.attach_pending_incubations(attach_budget);
                         }
                         state.pump_broker_clients();
                         // PLAN-030 T-05/T-06：泵后三件——①壳看门兵（到期
@@ -5156,6 +5229,8 @@ fn run_session(
                     // dirty（行 fallback → 真缩略升级；dock/pager hover 面
                     // 同随 dirty 重建）。
                     DesktopEvent::SnapshotShot(ss) => {
+                        // PLAN-098 T-03：在途标记清零（screenshot Task 已回）。
+                        state.desktop.snapshot_inflight_since.set(None);
                         // PLAN-040 F3：裁剪判定前现算冻结态——入队到回调
                         // 之间窗可能刚最小化/被遮挡（400ms sync 未及），
                         // 用最新可见性裁决，杜绝污染帧入库。
@@ -6088,10 +6163,8 @@ fn run_session(
                                     // 会话无 PointerMoved 生产，outproc 子面
                                     // hover 态缺席）。
                                     {
-                                        let hit = state
-                                            .host
-                                            .as_ref()
-                                            .and_then(|h| h.wm.hit_test(x, y));
+                                        let hit =
+                                            state.host.as_ref().and_then(|h| h.wm.hit_test(x, y));
                                         if let Some(wid) = hit {
                                             if state
                                                 .broker_clients
@@ -6315,6 +6388,33 @@ fn run_session(
         window: iced::window::Id,
     ) -> iced::Element<'_, crate::ui::session::DesktopMessage> {
         use crate::ui::session::DesktopMessage as DM;
+        // PLAN-098 T-05: 帧心跳——每渲染帧打点（全局原子，零锁——view()
+        // 在 UI 线程，不得与 MCP 线程争 SharedState 锁）。楔死判定入口：
+        // frame_seq 停增 ≥30s = 渲染环停摆（GPU fence 楔死，DEBT-008
+        // 模式①——主循环卡 acquire_texture 时 view() 不再被调用）。
+        // AUTO_SCHED_DIAG 门控下每秒一行 `[SCHED-DIAG] frame_seq`（诊断
+        // 轨日志签名，watch3/5 探针同轴）。
+        {
+            let now_ms = crate::ui::dynamic::sched_diag_t0().elapsed().as_millis() as u64;
+            let seq = crate::ui::mcp_server::frame_heartbeat_tick(now_ms);
+            static LAST_EMIT_MS: std::sync::atomic::AtomicU64 =
+                std::sync::atomic::AtomicU64::new(0);
+            if crate::ui::sched_diag::enabled() {
+                let last = LAST_EMIT_MS.load(std::sync::atomic::Ordering::Relaxed);
+                if now_ms.saturating_sub(last) >= 1000
+                    && LAST_EMIT_MS
+                        .compare_exchange(
+                            last,
+                            now_ms,
+                            std::sync::atomic::Ordering::Relaxed,
+                            std::sync::atomic::Ordering::Relaxed,
+                        )
+                        .is_ok()
+                {
+                    eprintln!("[SCHED-DIAG] frame_seq t={now_ms}ms seq={seq}");
+                }
+            }
+        }
         // Plan 462：desktop 模式 —— 宿主窗渲染 WM z-stack（背景 + N 个
         // VirtualWindow 层），每层复用同一 per-App 视图管线（dynamic_view +
         // panic 边界 + DM::App 打标），仅外层组装按配置分叉（I3）。
@@ -7364,4 +7464,3 @@ fn run_session(
     auto_lang_core::vm::ffi::stdlib::exit_audit(0, "main_return");
     Ok("UI closed".to_string())
 }
-

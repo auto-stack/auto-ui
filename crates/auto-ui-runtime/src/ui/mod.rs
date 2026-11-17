@@ -11,8 +11,8 @@
 pub use auto_val;
 
 pub mod component;
-pub mod modal;
 pub mod file_dialog;
+pub mod modal;
 
 // PLAN-716 组B: 帧时间戳观测通道（供②——AUTO_FRAME_BENCH 门控零开销；
 // VM 内建 9918/9919 + a2r 臂同源，SD-B 契约）。
@@ -143,6 +143,28 @@ pub mod selection;
 // PLAN-814 R9-03：vm_bridge 类型面依赖 interpreter（dynamic/memo 字段族
 // 与 ui::dynamic 消费）——随 ui-interpreter 门（旧巨树 bare-ui 同为预存
 // 缺门，本批补齐声明面）。
+#[cfg(feature = "ace-bridge")]
+// PLAN-980 RUST（AXR0）：AGE→A2R 文件集发射桥（真编译归显式构建道）。
+pub mod ace_a2r_bridge;
+#[cfg(feature = "ace-bridge")]
+// PLAN-980 HELLO：首个 ACE AGE Node 文字窗口的最小接入桥。
+pub mod ace_hello;
+#[cfg(feature = "ace-bridge")]
+// PLAN-980 NATIVE：ACE 原生 run 通道（001 形源/状态写主题翻转）。
+pub mod ace_native;
+#[cfg(feature = "ace-bridge")]
+// PLAN-980 NATIVE r13：MIN-A-UI 通用 Node 桌面入口（UI-FFI 实效果 + typed
+// 事件回 AV）。r11 `ace_native`（宿主直读 AV 快照）保留自己的面。
+pub mod ace_node_desktop;
+#[cfg(feature = "ace-bridge")]
+// PLAN-980 B-STATE：ACE 状态执行桥（组件面消费端）。
+pub mod ace_state_bridge;
+#[cfg(feature = "ace-bridge")]
+// PLAN-980 WEB：976 TS/JS provider 的 fragment 消费切片。
+pub mod ace_ts_provider;
+#[cfg(feature = "ace-bridge")]
+// PLAN-980 WEB 切片#6c（路线 B 核心）：lane 派生 handler 函数体。
+pub mod ace_vue_script;
 pub mod vm_bridge;
 // PLAN-045：VM 渲染组件级 memo（菜单族四件 + sidebar nav 块；opt-in，
 // 缺省原始路径逐字节不变）。类型面依赖 interpreter 的 View/DynamicMessage，

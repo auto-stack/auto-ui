@@ -130,3 +130,87 @@
 - **关闭条件**：真实桌面 boot 后 Reader 后端子进程 env 含 `015_NOTES_DAEMON`+`NOTES_FP_CRED`
   （行为面：经 Reader 后端 fp 代理调用 Notes 成功；无声明 app 后端 env 零变化）。
   消费：auto-os PLAN-067 T-02 C-01/C-04 桌面编排（凭据腿以此交付为前置）。
+
+## DEBT-008 后端依赖不可达时 native UI 冻结（fp 流量 + notes kill，READER-013 T-08 复现）
+
+- **状态**：已确定性复现（3/3 轮同点位）、归因未定（2026-11-16）。来源：
+  READER-013 T-08 双端验收（证据包
+  auto-reader/plan-artifacts/plan-013/BACK-STALL-BLOCKER.md）。
+- **动机/症状**：`auto run -r vm --server vm` 原生窗口下，后端 HTTP 依赖
+  （notes 服务）被 kill 后，UI 在 fp 流量中（检查点 submit / 抽屉 list）
+  **整体失去响应**：后续所有 autoui 按压 30～120s 无投影、back 进程存活但
+  books GET 亦不响应（监视 DOWN）、整窗重启才恢复。同一流程 vue 轨全绿
+  （77/0/0 对照）——native 消息循环/同步 HTTP 语义与 vue 异步轨分歧。
+- **复现入口**：auto-reader 仓
+  `python tests/annotations/verify_featurepack_host.py --profile vm`
+  R03-U3a 腿（notes kill 后 UI submit），3/3 确定性；跑后 SQLite 直接可证
+  数据已提交、恢复意图恰好一条（产品合同满足，纯 UI 冻结）。
+- **提议形状**：定位 native 窗口 VM 消息循环中同步 HTTP 出站（fp POST/
+  GET）阻塞调度根因——候选：①出站无超时（后端依赖不可达时 handler 永久
+  pending）；②消息循环对 pending handler 的排队策略；③axum 工作线程与
+  VM owner 线程的交互。修复方向：出站超时 + 超时后 handler 可终止/降级
+  （错误投影已在 .at 层就绪：transport 分类 + 错误信封）。
+- **边界**：.at 层传输分类/错误投影/检查点恢复均已实现且 vue 轨验证
+  （READER-013 修复在案）；本债只覆盖 native 运行时的出站阻塞语义。
+- **关闭条件**：复现入口全绿（vm profile R-01～05 通过、无必需 skip），
+  且 notes kill 场景下 native UI 保持可交互（错误投影可见）。
+- **2026-11-16 engine 线诊断落点（归因修正，5 轮复现 + 停摆态线程栈；
+  全文见 auto-reader plan-artifacts/plan-013/BACK-STALL-BLOCKER.md 末节；
+  栈/dump/日志在 D:/autostack/plan-artifacts/fix-debt008-diag/，登记在
+  .retention/policy.json）**：
+  - **原候选①「出站无超时」排除**：引擎出站三重防御实锤（post_json 异步
+    live-op + 共享 client 30s + 执行器 total_timeout + 非阻塞准入），且 UI
+    失败期间 back 实测 0.02s 应答、front handler park/resume 毫秒级正常。
+    原候选②③的「VM owner 线程排队/axum 交互」亦无栈证据。
+  - **真根因 = 本仓窗口进程（auto-ui-tool vm-session 子进程）三失效模式**：
+    1. iced 主循环卡 `wgpu acquire_texture`/GPU fence 30~120s（停摆态栈
+       main 帧；**扰动即解冻**——1s 调试器挂起即可恢复，复发条件为连续
+       执行窗）；
+    2. `iced_wgpu.offscreen.source_texture` 无效 → wgpu Validation Error
+       → 主线程 panic = 「进程静默退出」（panic 日志在案；iced 0.14 +
+       wgpu 27.0.1）；
+    3. 事件注入丢失：handler park 线停 + 按压被吞，但渲染活/back 健康，
+       楔死态双进程栈显示**OS 层完全空闲**（无 VM 帧/锁/GPU 等待）——
+       事件在 MCP→iced→VM 派发链路丢失（会话管道/订阅 desync 类）。
+  - **触发器修正**：UI 侧重渲染搅动（抽屉 ToggleFp/错误横幅）即触发，
+    notes kill 非必要（run5 R-01 U2a 未杀 notes 即复现）；vue 轨绿 =
+    浏览器渲染无此三模式。
+  - **修复面（拟）**：渲染环 wgpu 错误处理改非 panic（device-lost/offscreen
+    texture 生命周期与重建）、acquire/帧等待加超时与恢复、事件注入链路
+    （mcp-action-push→iced subscription→VM 会话派发）的丢失检测与重置；
+    `AUTO_HTTP_STEP_BUDGET=1e9`/`AUTO_HTTP_REQUEST_TIMEOUT_MS=300000`
+    （验收环境放大项）建议回设计值后复测。
+
+  - **2026-11-16 PLAN-098 修复关闭（本仓义务面，master@1b3a02b6）**：
+    三失效模式根修全落地——①vm-session 子进程默认 `WGPU_BACKEND=dx12`
+    （Vulkan ash 楔死栈证据；用户显式设置不覆盖）+ 帧心跳判定入口
+    （FRAME_SEQ + `[SCHED-DIAG] frame_seq` 签名）；②`crates/patches/
+    iced_wgpu`（非 panic uncaptured handler `[WGPU-DEGRADE]` + screenshot
+    零尺寸早退 + poll 2s 有界）+ snapshot 泵 in-flight 守卫；③事件注入
+    gate 化（rx 终生锁内永不搬走，take-once 死亡类结构上不可达）+
+    交付计数/停滞检测 + `ActionResult.delivery`。验证：gate 单测 4/4
+    （断口期零丢失区分器）+ mcp_server 41/41 + vm profile ×3（设计值
+    env）零冻结/零 panic/零事件丢失，cohort 旧链对照 R-03 boundary
+    直接崩 vs 新链全推过。判定 artifact：
+    docs/plans/evidence/plan-098-backend-decision.md；规范：
+    docs/specs/runtime/window-runtime-resilience.md（WRR-01..04）。
+    验收口径 r2（用户裁决）：「R-01～05 全绿」依赖仓外域
+    （WebView2 CDP 起动摇摆→DEBT-009；reader 恢复语义→READER-013/
+    auto-reader；notes read-snapshot stall→notes 仓 owner①），残红
+    在 cohort 旧链同样红、非本计划回归。
+    **状态：本仓义务关闭；G4 全绿门随仓外域修复另行收口。**
+
+## DEBT-009 doc-surface WebView2 CDP 起动摇摆（PLAN-098 T-06 甄别移交，本仓 doc-surface 域）
+
+- **状态**：已甄别、未修（2026-11-16）。来源：PLAN-098 T-06 vm profile
+  ×3 轮（plan-artifacts/plan-098/ 取证，判定 artifact 在
+  docs/plans/evidence/plan-098-backend-decision.md）。
+- **症状**：doc-surface 的 WebView2 调试口（`--remote-debugging-port`）
+  间歇性 180s 不可达（run2 首窗、run1 boundary 重启窗；run3 全通）——
+  `browserType.connectOverCDP: ECONNREFUSED`。窗口进程本身健康
+  （books GET 3-10ms、242 HTTP 行活跃）。同域既有不稳定：cohort 旧链
+  对照轮直接 `boundary re-enter failed` 崩溃。
+- **域**：auto-ui-runtime doc-surface（wry/WebView2 子表面生命周期）。
+  非 DEBT-008 三模式（渲染环/注入链与它无关——窗口日志零冻结零丢失）。
+- **关闭条件**：vm profile 连续 ≥3 轮 boundary 重启后 CDP 均可达，
+  或 doc-surface 起动失败有显式重试/降级投影。

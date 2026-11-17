@@ -1,0 +1,37 @@
+// PLAN-085 F-09 fixture: 64 nested levels, all expanded (deep sample).
+widget scaledeep {
+    msg { Init, Toggle(str), Select(str), Retry(str) }
+    model {
+        var nodes List = []
+        var expanded List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-2") {
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .sel,
+                      on_toggle: .Toggle($event), on_select: .Select($event), on_retry: .Retry($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var node = { id: "L63", label: "Deep 63", children: [], kind: "file", icon: "", is_leaf: true, badge: "" }
+            var lvl int = 62
+            var exp List = []
+            while lvl >= 0 {
+                var kids List = []
+                kids.push(node)
+                node = { id: f"L${lvl}", label: f"Deep ${lvl}", children: kids, kind: "dir", icon: "", is_leaf: false, badge: "" }
+                exp.push(f"L${lvl}")
+                lvl = lvl - 1
+            }
+            var a List = []
+            a.push(node)
+            .nodes = a
+            .expanded = exp
+        }
+        .Toggle(v str) -> { }
+        .Select(v str) -> { .sel = v }
+        .Retry(v str) -> { }
+    }
+}

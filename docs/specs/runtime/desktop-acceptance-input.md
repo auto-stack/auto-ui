@@ -67,3 +67,15 @@ Verification anchors: runtime `p060_` tests (real native component input/render
 and negotiated named-pipe traffic), endpoint closing-ACK regression, and the
 real-child reopen/close lifecycle regression. Consumer task receipts bind the
 tested executable, generated receipt and Cargo artifact by SHA256.
+
+## Action delivery evidence (PLAN-098)
+
+Injected actions cross the MCP→iced boundary through the action gate
+(`window-runtime-resilience.md` WRR-03). A successful enqueue is not
+delivery: action tool responses carry a delivery snapshot
+(`sent`, `delivered` counters) — `sent > delivered` means the action was
+accepted but not yet consumed by the event loop, and an applied-ack timeout
+with an undelivered sequence raises a stale flag with a `[PLAN098]`
+diagnostic line. Acceptance assertions that depend on an action's effect must
+observe the effect (frame/state change or applied ack), never the send
+result alone.

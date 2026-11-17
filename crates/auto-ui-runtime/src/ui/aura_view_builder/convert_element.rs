@@ -295,14 +295,28 @@ impl<'a> AuraViewBuilder<'a> {
             // PLAN-530 步骤8（W13）：alert-dialog 全族 → 模态 Popover 原语
             // （untracked 镜像臂,D-GAP 规则）。见 convert_alert_dialog。
             // PLAN-533 T5: dialog 家族（可关闭模态）同走模态 Popover 臂。
-            "dialog" | "Dialog" => {
-                self.convert_alert_dialog(props, events, children, bindings, ModalDialogFamily::Dialog)
-            }
+            "dialog" | "Dialog" => self.convert_alert_dialog(
+                props,
+                events,
+                children,
+                bindings,
+                ModalDialogFamily::Dialog,
+            ),
             "dropdown-menu" | "dropdown_menu" | "dropdownmenu" | "DropdownMenu" => self
-                .convert_alert_dialog(props, events, children, bindings, ModalDialogFamily::DropdownMenu),
-            "alert-dialog" | "alert_dialog" | "alertdialog" => {
-                self.convert_alert_dialog(props, events, children, bindings, ModalDialogFamily::Alert)
-            }
+                .convert_alert_dialog(
+                    props,
+                    events,
+                    children,
+                    bindings,
+                    ModalDialogFamily::DropdownMenu,
+                ),
+            "alert-dialog" | "alert_dialog" | "alertdialog" => self.convert_alert_dialog(
+                props,
+                events,
+                children,
+                bindings,
+                ModalDialogFamily::Alert,
+            ),
             // PLAN-534: sheet/drawer → 贴边 Popover（untracked 镜像臂,
             // D-GAP 规则）。见 convert_side_panel。
             "sheet" | "Sheet" => {
@@ -1819,5 +1833,4 @@ impl<'a> AuraViewBuilder<'a> {
             on_right_click: None,
         }
     }
-
 }

@@ -1,12 +1,12 @@
 //! PLAN-014 T-06：view 投影责任（into_iced 巨分派、dynamic_view 族、fit_aware_root）（自 iced/renderer.rs 原样收编）。
 //! 消息序/active判据/last-owner exit/纹理与external pin寿命零改——纯移动。
-use super::*;
 use super::devtools::*;
 use super::host::*;
 use super::media::*;
 use super::shell_state::*;
 use super::style_widgets::*;
 use super::subscriptions::*;
+use super::*;
 use iced::widget::column;
 
 impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
@@ -16,7 +16,12 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
             // 的 iced Element factory 表。本计划未注册任何 factory（首个后端
             // 原生件落地时建表消费，提案 066 §3.2），零高 Space 防御臂与
             // Empty 同款（不占布局位）。
-            AbstractView::Custom { name, props, events, style } => {
+            AbstractView::Custom {
+                name,
+                props,
+                events,
+                style,
+            } => {
                 // PLAN-029 T-02：doc-surface 实验文档表面——组件 bounds 处挂
                 // wry WebView2 子表面（feature 同门，缺省保持零高 Space 防御
                 // 臂与 Empty 同款）。key/url 取已解析 props（派发期 Element
@@ -37,10 +42,8 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                             .map(|(_, v)| v.clone())
                             .unwrap_or_default()
                     };
-                    let painter = crate::ui::doc_surface::DocSurfacePainter::<M>::new(
-                        get("key"),
-                        get("url"),
-                    );
+                    let painter =
+                        crate::ui::doc_surface::DocSurfacePainter::<M>::new(get("key"), get("url"));
                     // 尺寸 props（px 数字；缺省 Fill——Fill 在 Shrink 父容器内
                     // 会塌缩为 0，探针页必须给显式 height）。
                     let size_hint = |k: &str| -> Option<iced::Length> {
@@ -53,29 +56,25 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     };
                     let width_hint = size_hint("width").unwrap_or(iced::Length::Fill);
                     let height_hint = size_hint("height").unwrap_or(iced::Length::Fill);
-                    let canvas_el: iced::Element<'static, M> =
-                        iced::widget::canvas(painter)
-                            .width(width_hint)
-                            .height(height_hint)
-                            .into();
+                    let canvas_el: iced::Element<'static, M> = iced::widget::canvas(painter)
+                        .width(width_hint)
+                        .height(height_hint)
+                        .into();
                     let is = style.as_ref().map(IcedStyle::from_style);
                     let mut surface = iced::widget::container(canvas_el);
                     if let Some(ref is) = is {
-                        let background =
-                            is.background_color.map(iced::Background::Color);
-                        let border_color =
-                            is.border_color.unwrap_or(iced::Color::TRANSPARENT);
+                        let background = is.background_color.map(iced::Background::Color);
+                        let border_color = is.border_color.unwrap_or(iced::Color::TRANSPARENT);
                         let border_width = is.border_width.unwrap_or(0.0);
                         let border_radius = is.border_radius.unwrap_or(0.0);
-                        surface = surface
-                            .style(move |_theme| iced::widget::container::Style {
-                                background,
-                                border: iced::Border::default()
-                                    .rounded(border_radius.min(9999.0))
-                                    .width(border_width)
-                                    .color(border_color),
-                                ..Default::default()
-                            });
+                        surface = surface.style(move |_theme| iced::widget::container::Style {
+                            background,
+                            border: iced::Border::default()
+                                .rounded(border_radius.min(9999.0))
+                                .width(border_width)
+                                .color(border_color),
+                            ..Default::default()
+                        });
                     }
                     return surface.into();
                 }
@@ -1345,8 +1344,14 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 style,
                 disabled,
             } => {
-                let mut input_widget =
-                    build_input_shape(&placeholder, &value, width, password, style.as_ref(), disabled);
+                let mut input_widget = build_input_shape(
+                    &placeholder,
+                    &value,
+                    width,
+                    password,
+                    style.as_ref(),
+                    disabled,
+                );
 
                 // PLAN-031 T-05（F-02）：禁用态不派发编辑/提交消息（输入被忽略），
                 // 表面由 style 的禁用呈现承担；与 Vue 侧原生 disabled 语义对齐。
@@ -1821,8 +1826,9 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 // A box-sized cell has room for the control only. Retain its
                 // semantic name in View/MCP/accessibility; consumers can draw
                 // the visible name in their table's adjacent column.
-                let control_only = iced_style.as_ref().is_some_and(|style|
-                    matches!(style.width, Some(IcedSize::Fixed(width)) if width <= cb_size));
+                let control_only = iced_style.as_ref().is_some_and(
+                    |style| matches!(style.width, Some(IcedSize::Fixed(width)) if width <= cb_size),
+                );
                 // Apply text style to label.
                 let mut label_widget = text(label.clone());
                 if let Some(ref is) = iced_style {
@@ -3560,7 +3566,6 @@ pub(crate) fn with_media_view_scope<R>(ns: u64, f: impl FnOnce() -> R) -> R {
     })
 }
 
-
 /// View function for one App's window, used by `view_desktop_fn` (iced::daemon
 /// per-window view). This is a standalone function (not a closure) so that Rust
 /// can correctly infer the higher-ranked lifetime bound `for<'a> ViewFn<'a, ...>`.
@@ -3594,7 +3599,9 @@ pub(super) fn dynamic_view_vwin(
 /// 根节点自带不透明底色时其方角会探出圆角窗框。根 style 已含任何
 /// radius 类（全角/方向性）= 应用作者显式声明，不干预；根无 style
 /// （透明）不探出，不处理。非容器根（text/scrollable 等）同样跳过。
-pub(super) fn round_bottom_root_default<M: Clone + std::fmt::Debug>(view: &mut crate::ui::view::View<M>) {
+pub(super) fn round_bottom_root_default<M: Clone + std::fmt::Debug>(
+    view: &mut crate::ui::view::View<M>,
+) {
     use crate::ui::style::{RoundedSize, StyleClass};
     let style = match view {
         crate::ui::view::View::Column { style, .. }
@@ -3664,9 +3671,11 @@ fn dynamic_view_impl_inner(
             Some(view) => {
                 let converted = convert_view_messages(view);
                 #[cfg(windows)]
-                return super::native_accessibility::with_scope(state.window, state.component, || {
-                    render_dynamic_view(converted, None, &mut path)
-                });
+                return super::native_accessibility::with_scope(
+                    state.window,
+                    state.component,
+                    || render_dynamic_view(converted, None, &mut path),
+                );
                 #[cfg(not(windows))]
                 render_dynamic_view(converted, None, &mut path)
             }
@@ -4235,7 +4244,11 @@ fn dynamic_view_impl_inner(
             }
             inject_todo_list(&mut view, &state.app.todos, state.component.widget_name());
             if !state.app.input_values.is_empty() {
-                patch_input_values_for_component(&mut view, &state.app.input_values, state.component);
+                patch_input_values_for_component(
+                    &mut view,
+                    &state.app.input_values,
+                    state.component,
+                );
             }
             let converted = convert_view_messages(view);
             *state.app.cached_converted_view.borrow_mut() = Some(converted.clone());
@@ -4587,4 +4600,3 @@ fn fit_aware_root(
             .into()
     }
 }
-

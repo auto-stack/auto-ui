@@ -8,22 +8,42 @@ use std::collections::{HashMap, VecDeque};
 #[derive(serde::Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase")]
 enum Command {
-    Open { config: DialogConfig },
-    Navigate { path: String },
-    Input { value: String },
+    Open {
+        config: DialogConfig,
+    },
+    Navigate {
+        path: String,
+    },
+    Input {
+        value: String,
+    },
     Up,
     Refresh,
-    Name { value: String },
-    Filter { id: String },
-    Hidden { value: bool },
-    Toggle { id: String },
-    Enter { id: String },
+    Name {
+        value: String,
+    },
+    Filter {
+        id: String,
+    },
+    Hidden {
+        value: bool,
+    },
+    Toggle {
+        id: String,
+    },
+    Enter {
+        id: String,
+    },
     Clear,
-    Page { index: usize },
+    Page {
+        index: usize,
+    },
     Confirm,
     Cancel,
     // PLAN-084: save/directory modes.
-    SaveName { value: String },
+    SaveName {
+        value: String,
+    },
     SelectCurrent,
     ConfirmOverwrite,
     OverwriteBack,
@@ -73,7 +93,10 @@ impl ComponentIo {
         // change it back to true before the next IO pump. Retain that boundary
         // rather than sampling only the final value of the parent-backed prop.
         for (identity, slot) in &mut self.instances {
-            if matches!(bridge.read_instance_state(identity, "open"), Ok(Value::Bool(false))) {
+            if matches!(
+                bridge.read_instance_state(identity, "open"),
+                Ok(Value::Bool(false))
+            ) {
                 slot.closed_prop_observed = true;
             }
         }
@@ -109,11 +132,19 @@ impl ComponentIo {
             // Parent props are refreshed by view construction, independently
             // of the 50ms component clock. Observe a closed prop at every host
             // boundary so an immediate reopen cannot miss the false edge.
-            let desired_open = matches!(bridge.read_instance_state(&identity, "open"), Ok(Value::Bool(true)));
+            let desired_open = matches!(
+                bridge.read_instance_state(&identity, "open"),
+                Ok(Value::Bool(true))
+            );
             if !desired_open || slot.closed_prop_observed {
                 slot.closed_prop_observed = false;
-                if matches!(bridge.read_instance_state(&identity, "seen_open"), Ok(Value::Bool(true))) {
-                    changed |= bridge.write_instance_state(&identity, "seen_open", Value::Bool(false)).is_ok();
+                if matches!(
+                    bridge.read_instance_state(&identity, "seen_open"),
+                    Ok(Value::Bool(true))
+                ) {
+                    changed |= bridge
+                        .write_instance_state(&identity, "seen_open", Value::Bool(false))
+                        .is_ok();
                 }
                 slot.model.cancel();
             }

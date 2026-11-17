@@ -147,14 +147,7 @@ fn produce_v2(view: View<()>) -> (Vec<Layer>, super::super::message::DisplayList
     let mut bms = Vec::new();
     let mut cache = ResourceCache::default();
     let list = lower_layers_v2(
-        &layers,
-        &mut obs,
-        &mut cache,
-        &mut bms,
-        false,
-        false,
-        2.0,
-        2.0,
+        &layers, &mut obs, &mut cache, &mut bms, false, false, 2.0, 2.0,
     );
     (layers, list, bms.len())
 }
@@ -170,7 +163,10 @@ fn displaylist_element_snapshot(
     let mut sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
         iced::Size::new(W, H),
-        crate::ui::iced::broker_surface::displaylist_element::<()>(&neutral, super::rq_probe::SIMULATOR_SCALE),
+        crate::ui::iced::broker_surface::displaylist_element::<()>(
+            &neutral,
+            super::rq_probe::SIMULATOR_SCALE,
+        ),
     );
     let snap = sim.snapshot(&theme()).map_err(|e| e.to_string())?;
     snap.matches_image(png).map_err(|e| e.to_string())?;
@@ -198,7 +194,8 @@ fn rq_matrix_t04_six_cell_driver() {
             CellStatus::Runnable | CellStatus::InprocApprox => {
                 let mut cases = Vec::new();
                 for (case, view) in case_views() {
-                    let direct_png = out.join(format!("{}-{}-direct.png", cell.id.replace('/', "_"), case));
+                    let direct_png =
+                        out.join(format!("{}-{}-direct.png", cell.id.replace('/', "_"), case));
                     let rq_png = out.join(format!("{}-{}-rq.png", cell.id.replace('/', "_"), case));
                     let (layers, list, bitmap_uploads) = produce_v2(view.clone());
                     let recorded = recorded_primitives(&layers);
@@ -317,7 +314,12 @@ fn rq_matrix_t04_negative_controls() {
     let v1 = DrawList {
         clear: None,
         ops: vec![DrawOp::Quad {
-            rect: WRect { x: 0.0, y: 0.0, w: 10.0, h: 10.0 },
+            rect: WRect {
+                x: 0.0,
+                y: 0.0,
+                w: 10.0,
+                h: 10.0,
+            },
             color: Rgba8::new(255, 0, 0, 255),
         }],
     };

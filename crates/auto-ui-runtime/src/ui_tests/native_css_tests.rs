@@ -210,7 +210,8 @@ mod native_css_tests {
                 _ => None,
             })
             .expect("expected widget");
-        let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl).expect("extract failed");
+        let widget =
+            auto_ui_compiler::aura::extract_widget_from_decl(decl).expect("extract failed");
         assert!(widget.style_css.is_some());
 
         let mut gen = VueGenerator::new();

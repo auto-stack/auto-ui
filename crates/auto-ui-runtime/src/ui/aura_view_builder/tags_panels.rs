@@ -1204,11 +1204,17 @@ impl<'a> AuraViewBuilder<'a> {
         // 形态不接管。
         let explicit_close = aura_events_get_base(events, "onclose")
             .map(|event| self.event_to_message_with(event, bindings));
-        let placement = if explicit_close.is_some() && matches!(props.get("closeOnOutside"),
-            Some(AuraPropValue::Expr(expression)) if matches!(self.resolve_expr_to_value(expression, bindings), Some(Value::Bool(false)))) {
+        let placement = if explicit_close.is_some()
+            && matches!(props.get("closeOnOutside"),
+            Some(AuraPropValue::Expr(expression)) if matches!(self.resolve_expr_to_value(expression, bindings), Some(Value::Bool(false))))
+        {
             PopoverPlacement::ModalExplicit
-        } else { placement };
-        let on_dismiss = if explicit_close.is_some() { explicit_close } else if matches!(
+        } else {
+            placement
+        };
+        let on_dismiss = if explicit_close.is_some() {
+            explicit_close
+        } else if matches!(
             family,
             ModalDialogFamily::Dialog | ModalDialogFamily::DropdownMenu
         ) {
@@ -1337,11 +1343,17 @@ impl<'a> AuraViewBuilder<'a> {
         // 形态不接管。
         let explicit_close = aura_events_get_base(events, "onclose")
             .map(|event| self.event_to_message_with(event, bindings));
-        let placement = if explicit_close.is_some() && matches!(props.get("closeOnOutside"),
-            Some(AuraPropValue::Expr(expression)) if matches!(self.resolve_expr_to_value(expression, bindings), Some(Value::Bool(false)))) {
+        let placement = if explicit_close.is_some()
+            && matches!(props.get("closeOnOutside"),
+            Some(AuraPropValue::Expr(expression)) if matches!(self.resolve_expr_to_value(expression, bindings), Some(Value::Bool(false))))
+        {
             PopoverPlacement::ModalExplicit
-        } else { placement };
-        let on_dismiss = if explicit_close.is_some() { explicit_close } else if matches!(
+        } else {
+            placement
+        };
+        let on_dismiss = if explicit_close.is_some() {
+            explicit_close
+        } else if matches!(
             family,
             ModalDialogFamily::Dialog | ModalDialogFamily::DropdownMenu
         ) {
@@ -1394,7 +1406,10 @@ impl<'a> AuraViewBuilder<'a> {
     /// PLAN-534 D2: sheet/drawer 面板 chrome（与 rust.rs 轨同串,保双轨
     /// 视觉一致）。横向（L/R）w-96 定宽 + h-full 拉满;纵向（T/B）w-full
     /// 拉满;drawer 竖向追加贴缘圆角（bottom rounded-t / top rounded-b）。
-    pub(super) fn side_panel_chrome(placement: crate::ui::view::PopoverPlacement, is_drawer: bool) -> String {
+    pub(super) fn side_panel_chrome(
+        placement: crate::ui::view::PopoverPlacement,
+        is_drawer: bool,
+    ) -> String {
         use crate::ui::view::PopoverPlacement;
         let base = match placement {
             PopoverPlacement::EdgeLeft | PopoverPlacement::EdgeRight => {
@@ -2385,9 +2400,7 @@ impl<'a> AuraViewBuilder<'a> {
         "text", "label", "h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "a", "link", "small",
         "strong", "em", "b", "i",
     ];
-
 }
-
 
 // ─────────────────────────────────────────────────────────────────────
 // PLAN-045 T-04/T-05: memo 门包装层。原始转换体全部原样保留在 `*_raw`

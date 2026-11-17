@@ -1,0 +1,476 @@
+use auto.json
+
+// 模块链接按名直引（T-02 探针实证：只注册直引 fn 裸名；引擎已按自含
+// 形态编写，无引擎内互调）。
+use numeric_decimal: nd_sign_of, nd_body, nd_valid, nd_ip, nd_f6, nd_cmp, nd_q6, nd_fmt, nd_add
+
+// PLAN-087 NumericField — 通用受控数值输入（十进制定点，无浮点）。
+//
+// 合同（Plan §5 r2 表）：value/revision 受控；Enter（或 MCP Enter）提交一次，
+// 与基准同值不重发；无效草稿保留并给出具名错误文本，不改基准值；步进按钮按
+// step 加减并夹取可表示边界，夹取后同值零事件；外部 value/revision/errorMessage
+// 变化经 Tick（interval 100ms）撤销旧草稿重投影。事件载荷 JSON
+// {seq, baseRevision, value, source}；业务拒绝由调用方保持 value/revision 不变
+// 并经 errorMessage 反馈（组件不把请求当成功）。
+//
+// 平台边界（T-01 决议 §4，r3 修订项）：
+// - native input 无 onblur —— v1 双轨统一以 Enter/步进按钮为提交路径；
+// - 字段级箭头键依赖全局 key_bindings（首见优先、不区分实例），双实例串扰 ——
+//   v1 不绑定箭头；Escape 绑定为"撤销绑定归属实例的未提交草稿"（草稿级、
+//   幂等，不发业务事件），多实例语义见 README；
+// - 错误以可见文本 + error 事件双通道呈现（Init 内 emit 不派发，086 实证）。
+widget NumericField (value: str = "0.00", revision: int = 0, label: str = "", precision: int = 2, min: str = "", max: str = "", step: str = "1", disabled: bool = false, readOnly: bool = false, errorMessage: str = "") {
+    msg { Init, Tick, Increment, Decrement, OnInput(str), OnEnter, OnEscape, "preview"(str), "committed"(str), "cancelled", "error"(str) }
+    model {
+        var interval int = 100
+        var draft str = ""
+        var editing bool = false
+        var draft_ok bool = false
+        var draft_err str = ""
+        var draft_code str = ""
+        var prev_err str = ""
+        var cfg_err str = ""
+        var seq int = 0
+        var seen_rev int = 0
+        var seen_val str = ""
+        var seen_err str = ""
+        var prec int = 2
+        var has_min bool = false
+        var has_max bool = false
+        var mn_s int = 1
+        var mn_ip int = 0
+        var mn_f6 int = 0
+        var mx_s int = 1
+        var mx_ip int = 0
+        var mx_f6 int = 0
+        var st_ip int = 0
+        var st_f6 int = 0
+        var v_s int = 1
+        var v_ip int = 0
+        var v_f6 int = 0
+        var can_inc bool = false
+        var can_dec bool = false
+        var ok_s int = 1
+        var ok_ip int = 0
+        var ok_f6 int = 0
+    }
+    computed {
+        c_locked => .disabled || .readOnly || .cfg_err != ""
+        c_has_err => .cfg_err != "" || .draft_err != "" || .errorMessage != ""
+    }
+    view {
+        col (style: "items-start gap-1 min-w-0") {
+            if .label != "" {
+                text .label { style: "text-xs font-medium text-muted-foreground" }
+            }
+            row (style: "items-center gap-1 w-full min-w-0") {
+                button (text: "−", title: "减少一个步长", onclick: .Decrement, disabled: .c_locked || !.can_dec, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md bg-background text-foreground hover:bg-muted") {}
+                input (value: .draft, oninput: .OnInput, onenter: .OnEnter, onkeydown.escape.prevent: .OnEscape, disabled: .c_locked, placeholder: "0.00", style: "flex-1 min-w-0 h-8 text-sm rounded-md bg-muted/40 text-right") {}
+                button (text: "+", title: "增加一个步长", onclick: .Increment, disabled: .c_locked || !.can_inc, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md bg-background text-foreground hover:bg-muted") {}
+            }
+            if .cfg_err != "" {
+                text .cfg_err { style: "text-xs text-destructive" }
+            }
+            if .draft_err != "" {
+                text .draft_err { style: "text-xs text-destructive" }
+            }
+            if .errorMessage != "" {
+                text .errorMessage { style: "text-xs text-destructive" }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .cfg_err = ""
+            .prec = .precision
+            if .prec < 0 { .cfg_err = "numeric-fields: precision must be 0..6 (unsupported_precision)" }
+            if .prec > 6 { .cfg_err = "numeric-fields: precision must be 0..6 (unsupported_precision)" }
+            if .prec < 0 { .prec = 2 }
+            if .prec > 6 { .prec = 6 }
+            .has_min = false
+            .mn_s = 1
+            .mn_ip = 0
+            .mn_f6 = 0
+            if .min != "" {
+                if nd_sign_of(.min) == 0 {
+                    .cfg_err = "numeric-fields: min is not a valid decimal (invalid_config)"
+                } else {
+                    var mbody str = nd_body(.min)
+                    var mcode int = nd_valid(mbody, 9, 6)
+                    if mcode != 0 {
+                        .cfg_err = "numeric-fields: min is not a valid decimal (invalid_config)"
+                    } else {
+                        var mf6 int = nd_f6(mbody)
+                        if nd_q6(mf6, .prec) != mf6 {
+                            .cfg_err = "numeric-fields: min not expressible at precision (invalid_config)"
+                        } else {
+                            .has_min = true
+                            .mn_s = nd_sign_of(.min)
+                            .mn_ip = nd_ip(mbody)
+                            .mn_f6 = mf6
+                        }
+                    }
+                }
+            }
+            .has_max = false
+            .mx_s = 1
+            .mx_ip = 0
+            .mx_f6 = 0
+            if .max != "" {
+                if nd_sign_of(.max) == 0 {
+                    .cfg_err = "numeric-fields: max is not a valid decimal (invalid_config)"
+                } else {
+                    var xbody str = nd_body(.max)
+                    var xcode int = nd_valid(xbody, 9, 6)
+                    if xcode != 0 {
+                        .cfg_err = "numeric-fields: max is not a valid decimal (invalid_config)"
+                    } else {
+                        var xf6 int = nd_f6(xbody)
+                        if nd_q6(xf6, .prec) != xf6 {
+                            .cfg_err = "numeric-fields: max not expressible at precision (invalid_config)"
+                        } else {
+                            .has_max = true
+                            .mx_s = nd_sign_of(.max)
+                            .mx_ip = nd_ip(xbody)
+                            .mx_f6 = xf6
+                        }
+                    }
+                }
+            }
+            if .has_min && .has_max {
+                if nd_cmp(.mn_s, .mn_ip, .mn_f6, .mx_s, .mx_ip, .mx_f6) > 0 {
+                    .cfg_err = "numeric-fields: min must be <= max (invalid_config)"
+                }
+            }
+            .st_ip = 0
+            .st_f6 = 0
+            if .step == "" {
+                .cfg_err = "numeric-fields: step is required (invalid_config)"
+            } else {
+                if nd_sign_of(.step) == 0 {
+                    .cfg_err = "numeric-fields: step is not a valid decimal (invalid_config)"
+                } else {
+                    var sbody str = nd_body(.step)
+                    var scode int = nd_valid(sbody, 9, 6)
+                    if scode != 0 {
+                        .cfg_err = "numeric-fields: step is not a valid decimal (invalid_config)"
+                    } else {
+                        var sf6 int = nd_f6(sbody)
+                        var sip int = nd_ip(sbody)
+                        if nd_q6(sf6, .prec) != sf6 {
+                            .cfg_err = "numeric-fields: step not expressible at precision (invalid_config)"
+                        } else {
+                            if sip == 0 && sf6 == 0 {
+                                .cfg_err = "numeric-fields: step must be > 0 (invalid_config)"
+                            } else {
+                                .st_ip = sip
+                                .st_f6 = sf6
+                            }
+                        }
+                    }
+                }
+            }
+            .seen_rev = .revision
+            .seen_val = .value
+            .seen_err = .errorMessage
+            .v_s = 1
+            .v_ip = 0
+            .v_f6 = 0
+            if .value != "" {
+                if nd_sign_of(.value) == 0 {
+                    .cfg_err = "numeric-fields: controlled value is not a valid decimal (invalid_config)"
+                } else {
+                    var vbody str = nd_body(.value)
+                    var vcode int = nd_valid(vbody, 9, 6)
+                    if vcode != 0 {
+                        .cfg_err = "numeric-fields: controlled value is not a valid decimal (invalid_config)"
+                    } else {
+                        .v_s = nd_sign_of(.value)
+                        .v_ip = nd_ip(vbody)
+                        .v_f6 = nd_f6(vbody)
+                        if .v_ip == 0 && .v_f6 == 0 { .v_s = 1 }
+                    }
+                }
+            }
+            .draft = nd_fmt(.v_s, .v_ip, .v_f6, .prec)
+            .editing = false
+            .draft_ok = false
+            .ok_s = 1
+            .ok_ip = 0
+            .ok_f6 = 0
+            .draft_err = ""
+            .draft_code = ""
+            .prev_err = ""
+            .seq = 0
+            .can_dec = true
+            .can_inc = true
+            if .has_min {
+                if nd_cmp(.v_s, .v_ip, .v_f6, .mn_s, .mn_ip, .mn_f6) <= 0 { .can_dec = false }
+            }
+            if .has_max {
+                if nd_cmp(.v_s, .v_ip, .v_f6, .mx_s, .mx_ip, .mx_f6) >= 0 { .can_inc = false }
+            }
+        }
+        .Tick -> {
+            if .revision != .seen_rev || .value != .seen_val || .errorMessage != .seen_err {
+                .seen_rev = .revision
+                .seen_val = .value
+                .seen_err = .errorMessage
+                .v_s = 1
+                .v_ip = 0
+                .v_f6 = 0
+                if .value != "" {
+                    if nd_sign_of(.value) != 0 {
+                        var tbody str = nd_body(.value)
+                        var tcode int = nd_valid(tbody, 9, 6)
+                        if tcode == 0 {
+                            .v_s = nd_sign_of(.value)
+                            .v_ip = nd_ip(tbody)
+                            .v_f6 = nd_f6(tbody)
+                            if .v_ip == 0 && .v_f6 == 0 { .v_s = 1 }
+                        }
+                    }
+                }
+                .draft = nd_fmt(.v_s, .v_ip, .v_f6, .prec)
+                .editing = false
+                .draft_ok = false
+                .ok_s = 1
+                .ok_ip = 0
+                .ok_f6 = 0
+                .draft_err = ""
+                .draft_code = ""
+                .can_dec = true
+                .can_inc = true
+                if .has_min {
+                    if nd_cmp(.v_s, .v_ip, .v_f6, .mn_s, .mn_ip, .mn_f6) <= 0 { .can_dec = false }
+                }
+                if .has_max {
+                    if nd_cmp(.v_s, .v_ip, .v_f6, .mx_s, .mx_ip, .mx_f6) >= 0 { .can_inc = false }
+                }
+            }
+        }
+        .OnInput(v str) -> {
+            if !.c_locked {
+                .draft = v
+                .editing = true
+                .draft_ok = false
+                .draft_err = ""
+                .draft_code = ""
+                var s int = nd_sign_of(v)
+                if s == 0 {
+                    // 空草稿：中性（不显示错误，也不可提交）
+                } else {
+                    var body str = nd_body(v)
+                    var code int = nd_valid(body, 9, 6)
+                    if code == 2 { .draft_err = "numeric-fields: invalid number syntax (invalid_number)" }
+                    if code == 3 { .draft_err = "numeric-fields: integer part exceeds 9 digits (invalid_number)" }
+                    if code == 4 { .draft_err = "numeric-fields: more than 6 decimal places (invalid_number)" }
+                    if code == 0 {
+                        var ip int = nd_ip(body)
+                        var f6 int = nd_f6(body)
+                        if ip == 0 && f6 == 0 { s = 1 }
+                        var rng int = 0
+                        if .has_min {
+                            if nd_cmp(s, ip, f6, .mn_s, .mn_ip, .mn_f6) < 0 { rng = 0 - 1 }
+                        }
+                        if rng == 0 {
+                            if .has_max {
+                                if nd_cmp(s, ip, f6, .mx_s, .mx_ip, .mx_f6) > 0 { rng = 1 }
+                            }
+                        }
+                        if rng < 0 {
+                            .draft_err = "numeric-fields: value below min (out_of_range)"
+                            .draft_code = "out_of_range"
+                        }
+                        if rng > 0 {
+                            .draft_err = "numeric-fields: value above max (out_of_range)"
+                            .draft_code = "out_of_range"
+                        }
+                        if rng == 0 {
+                            .draft_ok = true
+                            .ok_s = s
+                            .ok_ip = ip
+                            .ok_f6 = f6
+                            .seq = .seq + 1
+                            ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: nd_fmt(s, ip, f6, .prec), source: "input"}))
+                        }
+                    } else {
+                        .draft_code = "invalid_number"
+                    }
+                    if .draft_err != "" {
+                        if .draft_err != .prev_err {
+                            .seq = .seq + 1
+                            ."error"(json.stringify({seq: .seq, baseRevision: .revision, code: .draft_code, message: .draft_err}))
+                        }
+                    }
+                    .prev_err = .draft_err
+                }
+            }
+        }
+        .OnEnter -> {
+            if !.c_locked {
+                if .draft_ok {
+                    // 提交径用 OnInput 保存的精确分量（submit 同步会把绑定
+                    // state 重写为 float 值——T-02 探针实证），不得重读 .draft。
+                    var s int = .ok_s
+                    var ip int = .ok_ip
+                    var f6 int = .ok_f6
+                    if ip == 0 && f6 == 0 { s = 1 }
+                    var q int = nd_q6(f6, .prec)
+                    var qip int = ip
+                    if q >= 1000000 {
+                        qip = ip + 1
+                        q = 0
+                    }
+                    var bad str = ""
+                    if qip > 999999999 {
+                        bad = "numeric-fields: value exceeds representable range (overflow)"
+                        .draft_code = "overflow"
+                    } else {
+                        if .has_min {
+                            if nd_cmp(s, qip, q, .mn_s, .mn_ip, .mn_f6) < 0 { bad = "numeric-fields: value below min after rounding (out_of_range)" }
+                        }
+                        if bad == "" {
+                            if .has_max {
+                                if nd_cmp(s, qip, q, .mx_s, .mx_ip, .mx_f6) > 0 { bad = "numeric-fields: value above max after rounding (out_of_range)" }
+                            }
+                        }
+                    }
+                    if bad != "" {
+                        .draft_ok = false
+                        .draft_err = bad
+                        if .draft_code == "" { .draft_code = "out_of_range" }
+                        if bad != .prev_err {
+                            .seq = .seq + 1
+                            ."error"(json.stringify({seq: .seq, baseRevision: .revision, code: .draft_code, message: bad}))
+                        }
+                        .prev_err = bad
+                    } else {
+                        var canonical str = nd_fmt(s, qip, q, .prec)
+                        // 与基准同值：数值相等文本不同也不重发（Plan §5）
+                        if nd_cmp(s, qip, q, .v_s, .v_ip, .v_f6) != 0 {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: canonical, source: "input"}))
+                        }
+                    }
+                }
+            }
+        }
+        .OnEscape -> {
+            if !.c_locked {
+                if .editing {
+                    .draft = nd_fmt(.v_s, .v_ip, .v_f6, .prec)
+                    .editing = false
+                    .draft_ok = false
+                    .draft_err = ""
+                    .draft_code = ""
+                    ."cancelled"()
+                }
+            }
+        }
+        .Increment -> {
+            if !.c_locked {
+                var res str = nd_add(.v_s, .v_ip, .v_f6, 1, .st_ip, .st_f6)
+                var r_s int = 0
+                var r_ip int = 0
+                var r_f6 int = 0
+                if res == "" {
+                    if .has_max {
+                        r_s = .mx_s
+                        r_ip = .mx_ip
+                        r_f6 = .mx_f6
+                    } else {
+                        r_s = 1
+                        r_ip = 999999999
+                        r_f6 = 999999
+                    }
+                } else {
+                    r_s = nd_sign_of(res)
+                    r_ip = nd_ip(nd_body(res))
+                    r_f6 = nd_f6(nd_body(res))
+                    if r_ip == 0 && r_f6 == 0 { r_s = 1 }
+                }
+                if .has_max {
+                    if nd_cmp(r_s, r_ip, r_f6, .mx_s, .mx_ip, .mx_f6) > 0 {
+                        r_s = .mx_s
+                        r_ip = .mx_ip
+                        r_f6 = .mx_f6
+                    }
+                }
+                var q int = nd_q6(r_f6, .prec)
+                var qip int = r_ip
+                if q >= 1000000 {
+                    qip = r_ip + 1
+                    q = 0
+                }
+                if qip > 999999999 {
+                    qip = 999999999
+                    q = 999999
+                    if .has_max {
+                        qip = .mx_ip
+                        q = .mx_f6
+                    }
+                }
+                var canonical str = nd_fmt(r_s, qip, q, .prec)
+                // 夹取后与基准同值：零事件（边界步进）
+                if nd_cmp(r_s, qip, q, .v_s, .v_ip, .v_f6) != 0 {
+                    .seq = .seq + 1
+                    ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: canonical, source: "step"}))
+                }
+            }
+        }
+        .Decrement -> {
+            if !.c_locked {
+                var down int = 0 - 1
+                var res str = nd_add(.v_s, .v_ip, .v_f6, down, .st_ip, .st_f6)
+                var r_s int = 0
+                var r_ip int = 0
+                var r_f6 int = 0
+                if res == "" {
+                    if .has_min {
+                        r_s = .mn_s
+                        r_ip = .mn_ip
+                        r_f6 = .mn_f6
+                    } else {
+                        r_s = 0 - 1
+                        r_ip = 999999999
+                        r_f6 = 999999
+                    }
+                } else {
+                    r_s = nd_sign_of(res)
+                    r_ip = nd_ip(nd_body(res))
+                    r_f6 = nd_f6(nd_body(res))
+                    if r_ip == 0 && r_f6 == 0 { r_s = 1 }
+                }
+                if .has_min {
+                    if nd_cmp(r_s, r_ip, r_f6, .mn_s, .mn_ip, .mn_f6) < 0 {
+                        r_s = .mn_s
+                        r_ip = .mn_ip
+                        r_f6 = .mn_f6
+                    }
+                }
+                var q int = nd_q6(r_f6, .prec)
+                var qip int = r_ip
+                if q >= 1000000 {
+                    qip = r_ip + 1
+                    q = 0
+                }
+                if qip > 999999999 {
+                    if .has_min {
+                        qip = .mn_ip
+                        q = .mn_f6
+                    } else {
+                        r_s = 0 - 1
+                        qip = 999999999
+                        q = 999999
+                    }
+                }
+                var canonical str = nd_fmt(r_s, qip, q, .prec)
+                if nd_cmp(r_s, qip, q, .v_s, .v_ip, .v_f6) != 0 {
+                    .seq = .seq + 1
+                    ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: canonical, source: "step"}))
+                }
+            }
+        }
+    }
+}

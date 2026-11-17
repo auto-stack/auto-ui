@@ -172,6 +172,11 @@ pub struct ActionResult {
     pub handler: Option<String>,
     /// State changes: (field_name, before, after)
     pub state_changes: Vec<(String, String, String)>,
+    /// PLAN-098 T-02: 注入交付快照 `(sent, delivered)`——「socket 写成功」
+    /// 单独不构成投递证据；`sent > delivered` = 受理未交付（注入链停滞
+    /// 面，DEBT-008 楔死形态③的可检测化）。None = gate 不在场的路径
+    /// （直构测试/非服务）。
+    pub delivery: Option<(u64, u64)>,
 }
 
 // ============================================================================
@@ -287,6 +292,9 @@ impl ActionResult {
             for (field, before, after) in &self.state_changes {
                 lines.push(format!("    {}: {} -> {}", field, before, after));
             }
+        }
+        if let Some((sent, delivered)) = self.delivery {
+            lines.push(format!("  delivery: sent={sent} delivered={delivered}"));
         }
 
         lines.join("\n")

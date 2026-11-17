@@ -1,0 +1,4 @@
+name: "numeric-fields"
+version: "0.1.0"
+namespace: "auto"
+description: "AutoUI numeric and unit input fields (PLAN-087)"

@@ -1,0 +1,14 @@
+// PLAN-085 T-03: an externally-packaged child that declares a single
+// onkeydown key. Same-file children dispatch their keydown correctly; this
+// fixture is the external-package counterpart used to pin the remaining gap.
+widget pkghost {
+    msg { Init }
+    model { var nodes List = [] }
+    use { package: child from "../../pkg/child" }
+    view {
+        col (style: "p-4") {
+            ChildBox (nodes: []) {}
+        }
+    }
+    on { .Init -> { .nodes = [] } }
+}

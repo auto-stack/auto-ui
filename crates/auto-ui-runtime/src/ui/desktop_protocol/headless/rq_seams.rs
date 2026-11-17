@@ -84,7 +84,12 @@ fn record_element<M: Clone + std::fmt::Debug + 'static>(
     let style = iced::advanced::renderer::Style {
         text_color: iced::theme::Base::base(&theme).text_color,
     };
-    ui.draw(&mut renderer, &theme, &style, iced::mouse::Cursor::Unavailable);
+    ui.draw(
+        &mut renderer,
+        &theme,
+        &style,
+        iced::mouse::Cursor::Unavailable,
+    );
     match &mut renderer {
         iced::Renderer::Secondary(tiny) => tiny.layers().to_vec(),
         iced::Renderer::Primary(_) => unreachable!("probe 恒构造 Secondary 臂"),
@@ -123,7 +128,9 @@ fn json_text(t: &GfxText) -> serde_json::Value {
         let t = t;
         match t {
             GfxText::Paragraph {
-                paragraph, position, ..
+                paragraph,
+                position,
+                ..
             } => {
                 let mut runs = 0usize;
                 let mut glyphs = 0usize;
@@ -148,7 +155,9 @@ fn json_text(t: &GfxText) -> serde_json::Value {
                     "has_glyph_geometry": glyphs > 0,
                 })
             }
-            GfxText::Editor { editor, position, .. } => {
+            GfxText::Editor {
+                editor, position, ..
+            } => {
                 let mut glyphs = 0usize;
                 if let Some(e) = editor.upgrade() {
                     for run in e.buffer().layout_runs() {
@@ -160,7 +169,9 @@ fn json_text(t: &GfxText) -> serde_json::Value {
                     "glyphs": glyphs, "has_glyph_geometry": glyphs > 0,
                 })
             }
-            GfxText::Cached { content, bounds, .. } => serde_json::json!({
+            GfxText::Cached {
+                content, bounds, ..
+            } => serde_json::json!({
                 "kind": "cached", "content": content, "bounds": [bounds.x, bounds.y, bounds.width, bounds.height],
                 "has_glyph_geometry": false,
                 "note": "只有字符串+字体身份；无 glyph/位置 → Host 必须重排",
@@ -374,7 +385,10 @@ impl iced::widget::canvas::Program<()> for RotatedPathProbe {
         );
         frame.pop_transform();
         frame.stroke(
-            &Path::line(iced::Point::new(40.0, 200.0), iced::Point::new(140.0, 200.0)),
+            &Path::line(
+                iced::Point::new(40.0, 200.0),
+                iced::Point::new(140.0, 200.0),
+            ),
             Stroke::default()
                 .with_width(3.0)
                 .with_color(iced::Color::from_rgb(1.0, 0.0, 0.0)),
@@ -493,9 +507,7 @@ fn path_cmds(path: &tiny_skia::Path) -> Vec<Cmd> {
             tiny_skia::PathSegment::MoveTo(p) => Cmd::Move(p.x, p.y),
             tiny_skia::PathSegment::LineTo(p) => Cmd::Line(p.x, p.y),
             tiny_skia::PathSegment::QuadTo(a, b) => Cmd::Quad(a.x, a.y, b.x, b.y),
-            tiny_skia::PathSegment::CubicTo(a, b, c) => {
-                Cmd::Cubic(a.x, a.y, b.x, b.y, c.x, c.y)
-            }
+            tiny_skia::PathSegment::CubicTo(a, b, c) => Cmd::Cubic(a.x, a.y, b.x, b.y, c.x, c.y),
             tiny_skia::PathSegment::Close => Cmd::Close,
         })
         .collect()
@@ -524,10 +536,9 @@ impl iced::widget::canvas::Program<()> for WirePainter {
                     match *c {
                         Cmd::Move(x, y) => b.move_to(iced::Point::new(x, y)),
                         Cmd::Line(x, y) => b.line_to(iced::Point::new(x, y)),
-                        Cmd::Quad(x1, y1, x, y) => b.quadratic_curve_to(
-                            iced::Point::new(x1, y1),
-                            iced::Point::new(x, y),
-                        ),
+                        Cmd::Quad(x1, y1, x, y) => {
+                            b.quadratic_curve_to(iced::Point::new(x1, y1), iced::Point::new(x, y))
+                        }
                         Cmd::Cubic(x1, y1, x2, y2, x, y) => b.bezier_curve_to(
                             iced::Point::new(x1, y1),
                             iced::Point::new(x2, y2),
@@ -537,12 +548,16 @@ impl iced::widget::canvas::Program<()> for WirePainter {
                     }
                 }
             });
-            let color = iced::Color::from_rgba8(wp.color[0], wp.color[1], wp.color[2], wp.color[3] as f32 / 255.0);
+            let color = iced::Color::from_rgba8(
+                wp.color[0],
+                wp.color[1],
+                wp.color[2],
+                wp.color[3] as f32 / 255.0,
+            );
             match wp.stroke {
-                Some(width) => frame.stroke(
-                    &path,
-                    Stroke::default().with_width(width).with_color(color),
-                ),
+                Some(width) => {
+                    frame.stroke(&path, Stroke::default().with_width(width).with_color(color))
+                }
                 None => frame.fill(&path, color),
             }
         }
@@ -585,7 +600,9 @@ fn rq_seam_mesh_replays_from_probe_wire() {
     let mut sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
         iced::Size::new(W, H),
-        iced::widget::canvas(WirePainter { paths }).width(iced::Length::Fill).height(iced::Length::Fill),
+        iced::widget::canvas(WirePainter { paths })
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill),
     );
     let snap = sim.snapshot(&theme()).expect("replay mesh");
     snap.matches_image(&replay_png).expect("replay png");
@@ -599,7 +616,13 @@ fn rq_seam_mesh_replays_from_probe_wire() {
 fn rq_seam_text_glyph_vs_cached() {
     // 多帧观察：第 1 帧 live paragraph 可能尚未整形（buffer_lines=0），
     // 后续帧才带 glyph 几何——这本身就是首帧文本缺失/重排风险的证据。
-    let mut surface = HeadlessSurface::new(SeamComponent { view: View::text("中文路径客户数据库混排 ABC") }, W, H);
+    let mut surface = HeadlessSurface::new(
+        SeamComponent {
+            view: View::text("中文路径客户数据库混排 ABC"),
+        },
+        W,
+        H,
+    );
     let mut frames = Vec::new();
     for i in 0..4 {
         let layers = surface.drive_and_draw();
@@ -731,7 +754,10 @@ fn rq_seam_record_time_shaping_gives_glyph_runs() {
         "[RQSEAM] {}",
         serde_json::json!({ "tag": "glyph_run", "first": a, "second": b })
     );
-    assert!(a["glyphs"].as_u64().unwrap() > 0, "录制期整形必须产出 glyph");
+    assert!(
+        a["glyphs"].as_u64().unwrap() > 0,
+        "录制期整形必须产出 glyph"
+    );
     assert_eq!(
         a["glyphs"], b["glyphs"],
         "同输入两次整形 glyph 数必须一致（可复现）"
@@ -794,11 +820,8 @@ fn rq_seam_svg_raster_replay() {
     );
 
     // 生产端栅格化（resvg 与 iced 内部同源）→ RGBA 资源 → Host 位图重放
-    let tree = resvg::usvg::Tree::from_data(
-        PROBE_SVG.as_bytes(),
-        &resvg::usvg::Options::default(),
-    )
-    .expect("parse svg");
+    let tree = resvg::usvg::Tree::from_data(PROBE_SVG.as_bytes(), &resvg::usvg::Options::default())
+        .expect("parse svg");
     // 设备 scale=2：栅格化必须按物理像素生成（1x 再放大有 4.5% 差）。
     let scale = 2u32;
     let mut pixmap = tiny_skia::Pixmap::new(64 * scale, 64 * scale).expect("pixmap");
@@ -816,9 +839,13 @@ fn rq_seam_svg_raster_replay() {
         })
     );
 
-    let img = iced::widget::image(iced::widget::image::Handle::from_rgba(64 * scale, 64 * scale, rgba))
-        .width(iced::Length::Fixed(64.0))
-        .height(iced::Length::Fixed(64.0));
+    let img = iced::widget::image(iced::widget::image::Handle::from_rgba(
+        64 * scale,
+        64 * scale,
+        rgba,
+    ))
+    .width(iced::Length::Fixed(64.0))
+    .height(iced::Length::Fixed(64.0));
     let img: iced::Element<()> = img.into();
     let mut sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),

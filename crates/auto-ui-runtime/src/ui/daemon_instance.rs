@@ -22,9 +22,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::osconfig_daemon::{
-    DaemonIo, DaemonStatus, GenericDaemon, HealthSpec, HealthVerdict,
-};
+use super::osconfig_daemon::{DaemonIo, DaemonStatus, GenericDaemon, HealthSpec, HealthVerdict};
 
 /// 跨进程身份（身份键 + 数据根 + 端点 + 用户）。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,8 +92,7 @@ impl InstanceIdentity {
     /// 锁文件路径——**按端口**（端点互斥）：同端点不同数据根/实例键也必须
     /// 先争同一把锁，赢家写标记，输家读标记后具名拒绝（不能各起一份）。
     pub fn lock_path(&self) -> PathBuf {
-        self.scope_dir()
-            .join(format!("port-{}.lock", self.port))
+        self.scope_dir().join(format!("port-{}.lock", self.port))
     }
 
     /// 实例标记路径——**按端口**（同端点唯一 owner；身份差异由标记内容判定）。
@@ -154,7 +151,8 @@ impl InstanceMarker {
             std::fs::create_dir_all(parent)
                 .map_err(|err| format!("实例标记目录不可建（{}）：{err}", parent.display()))?;
         }
-        let body = serde_json::to_vec(&marker).map_err(|err| format!("实例标记序列化失败：{err}"))?;
+        let body =
+            serde_json::to_vec(&marker).map_err(|err| format!("实例标记序列化失败：{err}"))?;
         std::fs::write(&path, body)
             .map_err(|err| format!("实例标记写入失败（{}）：{err}", path.display()))?;
         Ok(marker)
@@ -168,10 +166,7 @@ impl InstanceMarker {
 
     /// 标记与期望身份是否一致（数据根按规范化文本比较）。
     pub fn matches(&self, identity: &InstanceIdentity) -> bool {
-        let expected_root = identity
-            .data_root
-            .as_deref()
-            .map(normalize_path_text);
+        let expected_root = identity.data_root.as_deref().map(normalize_path_text);
         self.instance_key == identity.instance_key
             && self.port == identity.port
             && self.data_root == expected_root
@@ -213,10 +208,7 @@ impl InstanceLock {
         let path = identity.lock_path();
         if let Some(parent) = path.parent() {
             if let Err(err) = std::fs::create_dir_all(parent) {
-                return LockOutcome::Io(format!(
-                    "锁目录不可建（{}）：{err}",
-                    parent.display()
-                ));
+                return LockOutcome::Io(format!("锁目录不可建（{}）：{err}", parent.display()));
             }
         }
         match open_exclusive(&path) {
@@ -238,10 +230,9 @@ impl InstanceLock {
                 })
             }
             Err(OpenError::Busy) => LockOutcome::Busy,
-            Err(OpenError::Io(err)) => LockOutcome::Io(format!(
-                "锁文件打开失败（{}）：{err}",
-                path.display()
-            )),
+            Err(OpenError::Io(err)) => {
+                LockOutcome::Io(format!("锁文件打开失败（{}）：{err}", path.display()))
+            }
         }
     }
 
@@ -370,7 +361,11 @@ impl Default for SharedEnsureOptions {
 
 /// 健康探测（与 ensure 同一合同；只探不孵）。经 [`DaemonIo::health`] 走
 /// 注入的执行环境——真实路径即 [`super::osconfig_daemon::probe_health`]。
-fn probe(io: &mut dyn DaemonIo, generic: &GenericDaemon, timeout: std::time::Duration) -> HealthVerdict {
+fn probe(
+    io: &mut dyn DaemonIo,
+    generic: &GenericDaemon,
+    timeout: std::time::Duration,
+) -> HealthVerdict {
     let spec = HealthSpec::declaring(&generic.url, generic.health_interface.as_deref(), timeout);
     io.health(&spec)
 }
@@ -421,14 +416,8 @@ pub fn ensure_shared_io(
     loop {
         match InstanceLock::try_acquire(identity) {
             LockOutcome::Acquired(lock) => {
-                let outcome = ensure_under_lock(
-                    generic,
-                    identity,
-                    io,
-                    &mut last,
-                    deadline,
-                    options.budget,
-                );
+                let outcome =
+                    ensure_under_lock(generic, identity, io, &mut last, deadline, options.budget);
                 // 锁在成功/失败后都释放：失败可让下一次冷启重试。
                 drop(lock);
                 return outcome;
@@ -518,7 +507,10 @@ fn ensure_under_lock(
             HealthVerdict::Ready => {
                 // 就绪即写身份标记（失败不推翻就绪，但记录）。
                 if let Err(err) = InstanceMarker::write_for(identity) {
-                    eprintln!("[plan083] 实例标记写入失败（daemon `{}`）：{err}", generic.name);
+                    eprintln!(
+                        "[plan083] 实例标记写入失败（daemon `{}`）：{err}",
+                        generic.name
+                    );
                 } else {
                     marker_written = true;
                 }
@@ -631,7 +623,11 @@ mod tests {
             Some("notes"),
             Some(root.join("data/").to_string_lossy().as_ref()),
         );
-        assert_eq!(a.normalized(), b.normalized(), "大小写/分隔符/尾斜杠不产生别名");
+        assert_eq!(
+            a.normalized(),
+            b.normalized(),
+            "大小写/分隔符/尾斜杠不产生别名"
+        );
         let c = InstanceIdentity::from_declaration("015-notes", 17819, Some("notes"), None);
         assert_ne!(a.normalized(), c.normalized(), "数据根参与身份");
         let d = InstanceIdentity::from_declaration("015-notes", 17820, Some("notes"), None);
@@ -678,7 +674,11 @@ mod tests {
             "015-notes",
             17819,
             Some("notes:other"),
-            identity.data_root.as_deref().map(|p| p.to_string_lossy().to_string()).as_deref(),
+            identity
+                .data_root
+                .as_deref()
+                .map(|p| p.to_string_lossy().to_string())
+                .as_deref(),
         );
         assert!(!marker.matches(&other_key));
     }
@@ -761,11 +761,7 @@ mod tests {
         // 写在同一 identity 的标记路径下（模拟端点冲突的真实布局）。
         let mut marker = marker;
         marker.data_root = Some("d:/other-root".to_string());
-        std::fs::write(
-            identity.marker_path(),
-            serde_json::to_vec(&marker).unwrap(),
-        )
-        .unwrap();
+        std::fs::write(identity.marker_path(), serde_json::to_vec(&marker).unwrap()).unwrap();
         let generic = generic_for(&identity, Some(PathBuf::from("D:/fixture.exe")));
         let mut io = ScriptedIo::new(vec![HealthVerdict::Ready]);
         let status = ensure_shared_io(
@@ -819,8 +815,12 @@ mod tests {
             HealthVerdict::NotReady { status: 503 }, // spawn 后首轮
             HealthVerdict::Ready,
         ]);
-        let status =
-            ensure_shared_io(&generic, &identity, &mut io, &SharedEnsureOptions::default());
+        let status = ensure_shared_io(
+            &generic,
+            &identity,
+            &mut io,
+            &SharedEnsureOptions::default(),
+        );
         assert_eq!(
             status,
             DaemonStatus::Running(generic.url.clone()),

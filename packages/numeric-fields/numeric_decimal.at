@@ -1,0 +1,347 @@
+// packages/numeric-fields/numeric_decimal.at — PLAN-087 十进制定点引擎。
+//
+// 纯函数库：值以 (sign:int, int_part:int, frac6:int) 三分量承载（无浮点）：
+//   value = sign × (int_part + frac6 / 10^6)，sign ∈ {-1, 1}，分量恒非负。
+// 全部中间量 < 2^31（VM int = i32，auto-val Value::Int 截断 I64——T-01 决议 §2 P9）；
+// 一切除法用精确整除形 (a - a % b) / b（widget 轨 vue `/` 为浮点，PLAN-086 实录 11.03），
+// 负号以 sign 分量外层表达，分量恒非负，规避双轨除法/取模符号差。
+// 数字桥 `.to(int)` 只对已验证的数字串调用（vue 侧 = Number()，T-01 决议 P2c）。
+// 单位换算 = 十进制小数点移位（字符串级，≤10 个数字），不引入任何大整数中间量。
+//
+// 包内模块链接形态约束（T-02 探针实证）：消费方 `use numeric_decimal: …` 只把
+// **直引 fn** 以裸名注册进消费方模块；引擎内部互调会被编译为
+// `numeric_decimal.xxx` 限定名而失链（App link failed: Undefined symbol）。
+// 因此本库**每个 fn 自含**（数字解码/比较/格式化在各 fn 内内联展开），
+// 不做引擎内互调；版本内一致性由本文件单源维护。
+
+/// 十进制语法主体检查 + 解析为 6 位定点分量（返回 int：0=合法且写入结果；
+/// 非 0 为具名类错误码：1=空，2=非法字符/缺整数位/多点，3=整数段超
+/// max_int_digits，4=小数段超 max_frac_digits）。
+/// out_ip/out_f6 经消费方 state 承接不便（fn 单返回值），本 fn 只做检查；
+/// 取分量用 nd_ip/nd_f6（同样自含）。三者对同一 body 的结论一致。
+fn nd_valid(body str, max_int_digits int, max_frac_digits int) int {
+    var n int = body.len()
+    if n == 0 { return 1 }
+    var dot int = 0 - 1
+    for i in 0..n {
+        if body.substr(i, 1) == "." {
+            if dot >= 0 { return 2 }
+            dot = i
+        }
+    }
+    var int_digits int = n
+    var frac_digits int = 0
+    if dot >= 0 {
+        int_digits = dot
+        frac_digits = n - dot - 1
+    }
+    if int_digits == 0 { return 2 }
+    if int_digits > max_int_digits { return 3 }
+    if frac_digits > max_frac_digits { return 4 }
+    for i in 0..n {
+        var ch str = body.substr(i, 1)
+        if ch != "." {
+            var d int = 0 - 1
+            if ch == "0" { d = 0 }
+            if ch == "1" { d = 1 }
+            if ch == "2" { d = 2 }
+            if ch == "3" { d = 3 }
+            if ch == "4" { d = 4 }
+            if ch == "5" { d = 5 }
+            if ch == "6" { d = 6 }
+            if ch == "7" { d = 7 }
+            if ch == "8" { d = 8 }
+            if ch == "9" { d = 9 }
+            if d < 0 { return 2 }
+        }
+    }
+    return 0
+}
+
+/// 主体整数段分量（先 nd_valid=0；≤9 位 → ≤999999999，i32 界内）。
+fn nd_ip(body str) int {
+    var n int = body.len()
+    var dot int = 0 - 1
+    for i in 0..n {
+        if body.substr(i, 1) == "." {
+            dot = i
+        }
+    }
+    var end int = n
+    if dot >= 0 { end = dot }
+    var v int = 0
+    for i in 0..end {
+        var ch str = body.substr(i, 1)
+        var d int = 0
+        if ch == "0" { d = 0 }
+        if ch == "1" { d = 1 }
+        if ch == "2" { d = 2 }
+        if ch == "3" { d = 3 }
+        if ch == "4" { d = 4 }
+        if ch == "5" { d = 5 }
+        if ch == "6" { d = 6 }
+        if ch == "7" { d = 7 }
+        if ch == "8" { d = 8 }
+        if ch == "9" { d = 9 }
+        v = v * 10 + d
+    }
+    return v
+}
+
+/// 主体小数段分量，按 6 位定点补齐（先 nd_valid=0；≤6 位 → ≤999999）。
+fn nd_f6(body str) int {
+    var n int = body.len()
+    var dot int = 0 - 1
+    for i in 0..n {
+        if body.substr(i, 1) == "." {
+            dot = i
+        }
+    }
+    if dot < 0 { return 0 }
+    var v int = 0
+    var count int = 0
+    for i in dot + 1..n {
+        var ch str = body.substr(i, 1)
+        var d int = 0
+        if ch == "0" { d = 0 }
+        if ch == "1" { d = 1 }
+        if ch == "2" { d = 2 }
+        if ch == "3" { d = 3 }
+        if ch == "4" { d = 4 }
+        if ch == "5" { d = 5 }
+        if ch == "6" { d = 6 }
+        if ch == "7" { d = 7 }
+        if ch == "8" { d = 8 }
+        if ch == "9" { d = 9 }
+        v = v * 10 + d
+        count = count + 1
+    }
+    for i in count..6 {
+        v = v * 10
+    }
+    return v
+}
+
+/// 符号分量：前导 "-" → -1；"+"/无符号 → 1；空串 → 0（调用方以 0 判空草稿）。
+fn nd_sign_of(s str) int {
+    if s == "" { return 0 }
+    if s.starts_with("-") { return -1 }
+    return 1
+}
+
+/// 去掉前导符号后的数字主体（前置 nd_sign_of != 0）。
+fn nd_body(s str) str {
+    if s.starts_with("-") { return s.substr(1, s.len()) }
+    if s.starts_with("+") { return s.substr(1, s.len()) }
+    return s
+}
+
+/// 三分量全序比较：a < b → -1；a == b → 0；a > b → 1（纯整数，双轨一致）。
+fn nd_cmp(sgn1 int, ip1 int, f61 int, sgn2 int, ip2 int, f62 int) int {
+    if sgn1 != sgn2 {
+        if sgn1 < sgn2 { return -1 }
+        return 1
+    }
+    var c int = 0
+    if ip1 < ip2 {
+        c = 0 - 1
+    } else {
+        if ip1 > ip2 { c = 1 }
+    }
+    if c == 0 {
+        if f61 < f62 {
+            c = 0 - 1
+        } else {
+            if f61 > f62 { c = 1 }
+        }
+    }
+    if c == 0 { return 0 }
+    if sgn1 < 0 { return 0 - c }
+    return c
+}
+
+/// frac6 按 precision=p 量化（最近值、半幅远离零），仍以 6 位定点标度返回；
+/// 返回 1000000 = p 位进位溢出（调用方 int_part+1、frac6=0）。
+fn nd_q6(f6 int, pfix int) int {
+    var pow int = 1
+    for i in pfix..6 {
+        pow = pow * 10
+    }
+    var q int = (f6 - f6 % pow) / pow
+    var r int = f6 % pow
+    if r * 2 >= pow {
+        q = q + 1
+    }
+    return q * pow
+}
+
+/// canonical 文本：固定 p 位小数（p=0 无小数点）；负号前置；调用方先量化。
+fn nd_fmt(sgn int, ip int, f6 int, pfix int) str {
+    var pow int = 1
+    for i in pfix..6 {
+        pow = pow * 10
+    }
+    var q int = (f6 - f6 % pow) / pow
+    var out str = f"${ip}"
+    if pfix > 0 {
+        var qs str = f"${q}"
+        var padded str = "000000" + qs
+        var start int = padded.len() - pfix
+        out = f"${ip}.${padded.substr(start, padded.len())}"
+    }
+    if sgn < 0 { out = "-" + out }
+    return out
+}
+
+/// 符号分量加法：(s1,ip1,f61) + (s2,ip2,f62)，返回 6 位定点 canonical 串
+/// （整数段 ≤ 9 位）；整数段超界 → ""（调用方按可表示边界夹取）。
+/// 自含：内联分量比较（nd_cmp 语义）与 6 位格式化（nd_fmt 语义）。
+fn nd_add(s1 int, ip1 int, f61 int, s2 int, ip2 int, f62 int) str {
+    var r_s int = s1
+    var r_ip int = 0
+    var r_f6 int = 0
+    if s1 == s2 {
+        var fs int = f61 + f62
+        var carry int = (fs - fs % 1000000) / 1000000
+        r_f6 = fs % 1000000
+        r_ip = ip1 + ip2 + carry
+    } else {
+        var c int = 0
+        if ip1 < ip2 {
+            c = 0 - 1
+        } else {
+            if ip1 > ip2 { c = 1 }
+        }
+        if c == 0 {
+            if f61 < f62 {
+                c = 0 - 1
+            } else {
+                if f61 > f62 { c = 1 }
+            }
+        }
+        if c == 0 {
+            r_s = 1
+            r_ip = 0
+            r_f6 = 0
+        } else {
+            if c > 0 {
+                r_s = s1
+                if f61 < f62 {
+                    r_f6 = f61 + 1000000 - f62
+                    r_ip = ip1 - ip2 - 1
+                } else {
+                    r_f6 = f61 - f62
+                    r_ip = ip1 - ip2
+                }
+            } else {
+                r_s = s2
+                if f62 < f61 {
+                    r_f6 = f62 + 1000000 - f61
+                    r_ip = ip2 - ip1 - 1
+                } else {
+                    r_f6 = f62 - f61
+                    r_ip = ip2 - ip1
+                }
+            }
+        }
+    }
+    if r_ip > 999999999 { return "" }
+    var out str = f"${r_ip}."
+    var qs str = f"${r_f6}"
+    var padded str = "000000" + qs
+    var start int = padded.len() - 6
+    out = f"${r_ip}.${padded.substr(start, padded.len())}"
+    if r_s < 0 { out = "-" + out }
+    return out
+}
+
+/// 去尾零但至少保留 keep 位（fr 长度 ≤ 10；固定 10 轮上限迭代）。
+fn nd_trim_frac(fr str, keep int) str {
+    var s str = fr
+    for i in 0..10 {
+        if s.len() > keep {
+            if s.substr(s.len() - 1, s.len()) == "0" {
+                s = s.substr(0, s.len() - 1)
+            }
+        }
+    }
+    return s
+}
+
+/// 基准分量 → 显示十进制文本（小数点左移 klog 位，精确、无舍入）：
+/// 去尾零但至少保留 pmin 位小数；负号前置。klog ∈ 0..3（mm/cm/m、ms/s 档位）。
+/// 自含：内联 6 位 frac 渲染（nd_fmt 语义）与尾零修剪（nd_trim_frac 语义）。
+fn nd_disp_str(sgn int, ip int, f6 int, u_shift int, pmin int) str {
+    var qs str = f"${f6}"
+    var padded str = "000000" + qs
+    var start int = padded.len() - 6
+    var digits str = f"${ip}" + padded.substr(start, padded.len())
+    var n int = digits.len()
+    var pfr int = 6 + u_shift
+    var out str = ""
+    if n > pfr {
+        var cut int = n - pfr
+        var ip2 str = digits.substr(0, cut)
+        var fr2 str = digits.substr(cut, n)
+        for i in 0..10 {
+            if fr2.len() > pmin {
+                if fr2.substr(fr2.len() - 1, fr2.len()) == "0" {
+                    fr2 = fr2.substr(0, fr2.len() - 1)
+                }
+            }
+        }
+        if fr2.len() > 0 {
+            out = f"${ip2}.${fr2}"
+        } else {
+            out = ip2
+        }
+    } else {
+        var zeros str = ""
+        for i in 0..pfr - n {
+            zeros = zeros + "0"
+        }
+        var all str = zeros + digits
+        for i in 0..10 {
+            if all.len() > pmin {
+                if all.substr(all.len() - 1, all.len()) == "0" {
+                    all = all.substr(0, all.len() - 1)
+                }
+            }
+        }
+        out = "0." + all
+    }
+    if sgn < 0 { out = "-" + out }
+    return out
+}
+
+/// 显示主体 → 基准主体（小数点右移 klog 位，字符串级精确）。
+/// 基准整数段超 9 位 → 返回 ""（调用方报 overflow，杜绝 i32 溢出中间量）。
+fn nd_shift_right(body str, u_shift int) str {
+    var n int = body.len()
+    var dot int = 0 - 1
+    for i in 0..n {
+        if body.substr(i, 1) == "." {
+            dot = i
+        }
+    }
+    var digits str = body
+    var int_len int = n
+    if dot >= 0 {
+        digits = body.substr(0, dot) + body.substr(dot + 1, n)
+        int_len = dot
+    }
+    var new_int_len int = int_len + u_shift
+    if new_int_len > 9 { return "" }
+    var out str = digits
+    var deficit int = new_int_len - digits.len()
+    if new_int_len >= digits.len() {
+        var pad str = ""
+        for i in 0..deficit {
+            pad = pad + "0"
+        }
+        out = digits + pad
+    } else {
+        out = digits.substr(0, new_int_len) + "." + digits.substr(new_int_len, digits.len())
+    }
+    return out
+}

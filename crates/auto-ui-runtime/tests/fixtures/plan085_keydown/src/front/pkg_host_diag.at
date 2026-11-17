@@ -1,0 +1,15 @@
+// PLAN-085 T-03: external-package child that declares onkeydown but no Init.
+// No Init matters for a view-based oracle: a child with an Init demand renders
+// a "Loading… (<Name>)" placeholder until the frame pump services it, which
+// otherwise reads exactly like a failed dispatch.
+widget pkghostdiag {
+    msg { Init }
+    model { var nodes List = [] }
+    use { package: child from "../../pkg/child" }
+    view {
+        col (style: "p-4") {
+            ChildBox (nodes: []) {}
+        }
+    }
+    on { .Init -> { .nodes = [] } }
+}

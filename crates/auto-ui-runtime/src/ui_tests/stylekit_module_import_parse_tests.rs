@@ -113,10 +113,7 @@ fn module_level_stylekit_named_import_survives_collect_module_imports() {
     crate::ui_module_parse_failures().lock().unwrap().clear();
 
     let built = crate::build_dynamic_component(HOST, Some(&path_str));
-    let failures: Vec<String> = crate::ui_module_parse_failures()
-        .lock()
-        .unwrap()
-        .clone();
+    let failures: Vec<String> = crate::ui_module_parse_failures().lock().unwrap().clone();
     assert!(
         failures.is_empty(),
         "子模块解析不得落 plan-446 C1 失败登记（stylekit 命名导入须在解析前入域）: {failures:?}"

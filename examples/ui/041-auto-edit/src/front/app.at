@@ -37,6 +37,8 @@ widget App {
     // PLAN-084: 官方 FileDialog 包(保存模式专用实例;分页闭包由包内
     // use 自动装载)。路径自 src/front 起五级到仓根。
     use { package: file_dialog from "../../../../../packages/file-dialog" }
+    // PLAN-085 T-04: TreeView 改用正式包（原 components/treeview.at 退役）。
+    use { package: tree_view from "../../../../../packages/tree-view" }
 
     // PLAN-047 T-03：主题族/模式选择态（主题选择，非业务状态；B2 038 同律）
     model {
@@ -146,7 +148,7 @@ widget App {
                 col (style: "w-56 shrink-0 border-r border-border bg-card hidden md:flex flex-col gap-2 p-2 overflow-y-auto") {
                     text "EXPLORER" { style: "text-[11px] text-muted-foreground px-1 pt-1 tracking-wider" }
                     text .store.ws_name { style: "text-[11px] text-muted-foreground px-1 pb-1" }
-                    TreeView (nodes: .store.tree_nodes, expanded: .store.tree_expanded, selected: .store.tree_sel, on_toggle: .TreeToggle, on_select: .TreeSelect, directory: true) {}
+                    TreeView (nodes: .store.tree_nodes, expanded: .store.tree_expanded, selected: .store.tree_sel, on_toggle: .TreeToggle($event), on_select: .TreeSelect($event), directory: true) {}
                 }
                 col (style: "flex-1 overflow-hidden") {
                     row (style: "h-8 items-center bg-muted/30 shrink-0 w-full gap-0") {

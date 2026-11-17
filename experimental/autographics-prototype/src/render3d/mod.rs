@@ -10,11 +10,13 @@ pub mod anim;
 pub mod camera;
 pub mod collision;
 pub mod editor_grid;
+pub mod light;
 pub mod pipeline;
 pub mod procedural;
 
 pub use anim::BobAnimation;
 pub use camera::{Camera3d, Projection};
 pub use collision::*;
+pub use light::{LightError, LightParams, shadow_vp_look_at, AMBIENT};
 pub use pipeline::{sample_light, LightDef, MeshInstance, MeshPipeline, MeshStore, Render3dStats};
 pub use procedural::{cylinder_mesh, ground_mesh, CYLINDER_POSITIONS};

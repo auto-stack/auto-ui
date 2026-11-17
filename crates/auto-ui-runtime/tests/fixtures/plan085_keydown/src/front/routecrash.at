@@ -1,0 +1,8 @@
+widget routecrash {
+    routes { "/" -> use demo_page }
+    view {
+        col (style: "w-full h-full") {
+            outlet
+        }
+    }
+}

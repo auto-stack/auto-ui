@@ -1,0 +1,8 @@
+widget AppImportOnly {
+    routes { "/" -> use import_only }
+    view {
+        col (style: "w-full h-full") {
+            outlet
+        }
+    }
+}

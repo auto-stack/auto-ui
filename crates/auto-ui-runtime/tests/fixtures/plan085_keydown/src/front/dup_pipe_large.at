@@ -1,0 +1,31 @@
+// PLAN-085 N-02b fixture: 1000 ids that ALL contain the `|` delimiter.
+//
+// The old implementation fell back to an O(n^2) VM loop for such ids (measured
+// 71.9s and 0 rows). Escaping them into the token stream keeps every id on the
+// native `contains` path, so this must stay fast.
+widget duppipelarge {
+    msg { Init, Select(str) }
+    model {
+        var nodes List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: [], selected: .sel,
+                      on_toggle: .Select($event), on_select: .Select($event), on_retry: .Select($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var a List = []
+            var i int = 0
+            while i < 1000 {
+                a.push({ id: f"p|${i}", label: f"Pipe ${i}", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+                i = i + 1
+            }
+            .nodes = a
+        }
+        .Select(v str) -> { .sel = v }
+    }
+}

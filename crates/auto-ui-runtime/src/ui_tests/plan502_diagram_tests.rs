@@ -203,8 +203,9 @@ fn plan502_m3_layout_geometry_e2e() {
     let comp_src = {
         // PLAN-590:画廊迁 auto-os 顶层——先解析序定位,旧仓内路径兜底。
         let p = locate_gallery_file("src/front/components/flow_diagram.at").unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../../auto-lang/examples/widgets-gallery/src/front/components/flow_diagram.at")
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+                "../../../auto-lang/examples/widgets-gallery/src/front/components/flow_diagram.at",
+            )
         });
         match std::fs::read_to_string(&p) {
             Ok(s) => s,
@@ -753,8 +754,9 @@ fn plan502_m5_hover_and_labels_e2e() {
     let comp_src = {
         // PLAN-590:画廊迁 auto-os 顶层——先解析序定位,旧仓内路径兜底。
         let p = locate_gallery_file("src/front/components/flow_diagram.at").unwrap_or_else(|| {
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../../auto-lang/examples/widgets-gallery/src/front/components/flow_diagram.at")
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+                "../../../auto-lang/examples/widgets-gallery/src/front/components/flow_diagram.at",
+            )
         });
         match std::fs::read_to_string(&p) {
             Ok(s) => s,
@@ -864,14 +866,16 @@ fn plan502_m5_vue_emission() {
             )
         });
     let opts = auto_ui_compiler::ui_gen::ComponentGenOptions::default();
-    let result =
-        match auto_ui_compiler::ui_gen::generate_component_from_file(std::path::Path::new(&path), opts) {
-            Ok(r) => r,
-            Err(_) => {
-                eprintln!("plan502 M5: SKIPPED — component gen not available");
-                return;
-            }
-        };
+    let result = match auto_ui_compiler::ui_gen::generate_component_from_file(
+        std::path::Path::new(&path),
+        opts,
+    ) {
+        Ok(r) => r,
+        Err(_) => {
+            eprintln!("plan502 M5: SKIPPED — component gen not available");
+            return;
+        }
+    };
     let sfc = result.vue_code;
     assert!(sfc.contains("<text"), "vue 轨节点标签 text 元素");
     assert!(sfc.contains("text-anchor"), "标签居中");

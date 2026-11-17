@@ -327,7 +327,12 @@ fn corpus() -> Vec<Case> {
         view: View::Overlay {
             base: Box::new(View::text("底层")),
             content: Box::new(View::text("浮层")),
-            position: crate::ui::view::OverlayPosition { top: None, right: None, bottom: None, left: None },
+            position: crate::ui::view::OverlayPosition {
+                top: None,
+                right: None,
+                bottom: None,
+                left: None,
+            },
         },
         note: "ready",
     });
@@ -734,7 +739,8 @@ pub(super) fn assert_named_aa_closure(name: &str, rep: &ResidualReport, bound: f
         rep.to_json()
     );
     assert_eq!(
-        rep.ink_hole_blocks, 0,
+        rep.ink_hole_blocks,
+        0,
         "{name} 存在块级墨洞（掉字信号）：{}",
         rep.to_json()
     );
@@ -754,11 +760,7 @@ pub(super) fn analyze_residual_pair(
 ) -> ResidualReport {
     let left = image::open(a).expect("left png").to_rgba8();
     let right = image::open(b).expect("right png").to_rgba8();
-    assert_eq!(
-        left.dimensions(),
-        right.dimensions(),
-        "对拍 PNG 尺寸不一致"
-    );
+    assert_eq!(left.dimensions(), right.dimensions(), "对拍 PNG 尺寸不一致");
     let (w, h) = left.dimensions();
     let n = (w as usize) * (h as usize);
     let l = left.into_raw();
@@ -889,11 +891,7 @@ pub(super) fn analyze_residual_pair(
     let flat_blob_max = max_blob_of(&flat_mask);
 
     // 墨量（相对共同底色）与列墨量轮廓对齐。
-    let bg = [
-        backdrop.r as i64,
-        backdrop.g as i64,
-        backdrop.b as i64,
-    ];
+    let bg = [backdrop.r as i64, backdrop.g as i64, backdrop.b as i64];
     let mut ink_l = vec![0i64; w as usize];
     let mut ink_r = vec![0i64; w as usize];
     let (mut total_l, mut total_r) = (0i64, 0i64);
@@ -927,7 +925,11 @@ pub(super) fn analyze_residual_pair(
             }
         }
     }
-    let zero = ink_l.iter().zip(ink_r.iter()).map(|(a, b)| (a - b).abs()).sum::<i64>();
+    let zero = ink_l
+        .iter()
+        .zip(ink_r.iter())
+        .map(|(a, b)| (a - b).abs())
+        .sum::<i64>();
     let mut best_shift = 0i64;
     let mut best_score = zero;
     for t in -2i64..=2 {
@@ -1015,7 +1017,8 @@ pub(super) fn direct_frames(view: View<()>, png: Option<&Path>) -> Result<(f64, 
         let frame = ms(t2.elapsed());
         if i == 0 {
             if let Some(p) = png {
-                snap.matches_image(p).map_err(|e| format!("direct png: {e}"))?;
+                snap.matches_image(p)
+                    .map_err(|e| format!("direct png: {e}"))?;
             }
         }
         if i >= WARMUP {
@@ -1045,7 +1048,8 @@ struct RqMeasure {
 }
 
 fn rq_measure(view: View<()>, png: Option<&Path>) -> Result<RqMeasure, String> {
-    let mut surface = HeadlessSurface::new(StaticComponent { view }, PROBE_W as f32, PROBE_H as f32);
+    let mut surface =
+        HeadlessSurface::new(StaticComponent { view }, PROBE_W as f32, PROBE_H as f32);
     let mut produce = Vec::new();
     let mut lower = Vec::new();
     let mut encode = Vec::new();
@@ -1053,8 +1057,9 @@ fn rq_measure(view: View<()>, png: Option<&Path>) -> Result<RqMeasure, String> {
     let mut copy = Vec::new();
     let mut replay_build: Option<f64> = None;
     let mut replay_frame = Vec::new();
-    let mut replay_sim: Option<iced_test::simulator::Simulator<'_, (), iced::Theme, iced::Renderer>> =
-        None;
+    let mut replay_sim: Option<
+        iced_test::simulator::Simulator<'_, (), iced::Theme, iced::Renderer>,
+    > = None;
     let mut ops = 0usize;
     let mut text_runs = 0usize;
     let mut quad_ops = 0usize;
@@ -1074,15 +1079,8 @@ fn rq_measure(view: View<()>, png: Option<&Path>) -> Result<RqMeasure, String> {
         let mut bms: Vec<super::super::endpoint::BitmapUpload> = Vec::new();
         let mut cache = ResourceCache::default();
         let list = lower_layers_v2(
-        &layers,
-        &mut obs,
-        &mut cache,
-        &mut bms,
-        false,
-        false,
-        2.0,
-        2.0,
-    );
+            &layers, &mut obs, &mut cache, &mut bms, false, false, 2.0, 2.0,
+        );
         let lower_d = t.elapsed();
 
         let t = Instant::now();
@@ -1115,7 +1113,10 @@ fn rq_measure(view: View<()>, png: Option<&Path>) -> Result<RqMeasure, String> {
             replay_sim = Some(iced_test::simulator::Simulator::with_size(
                 iced::Settings::default(),
                 iced::Size::new(PROBE_W as f32, PROBE_H as f32),
-                crate::ui::iced::broker_surface::displaylist_element::<()>(&replay_list, super::rq_probe::SIMULATOR_SCALE),
+                crate::ui::iced::broker_surface::displaylist_element::<()>(
+                    &replay_list,
+                    super::rq_probe::SIMULATOR_SCALE,
+                ),
             ));
             replay_build = Some(ms(t.elapsed()));
         }
@@ -1282,13 +1283,16 @@ fn rq_probe_t05_capability_rows() {
         let backdrop = crate::ui::desktop_protocol::client_runtime::bg();
 
         let mut surface = HeadlessSurface::new(
-            StaticComponent { view: case.view.clone() },
+            StaticComponent {
+                view: case.view.clone(),
+            },
             PROBE_W as f32,
             PROBE_H as f32,
         );
         let list = surface.render_frame_v2();
         for up in surface.drain_bitmap_uploads() {
-            crate::ui::iced::broker_surface::bitmap_cache_put(&format!("bitmap://{}", up.id),
+            crate::ui::iced::broker_surface::bitmap_cache_put(
+                &format!("bitmap://{}", up.id),
                 up.w,
                 up.h,
                 up.stride,
@@ -1320,13 +1324,19 @@ fn rq_probe_t05_capability_rows() {
         let mut rq_sim = iced_test::simulator::Simulator::with_size(
             settings(),
             size(),
-            crate::ui::iced::broker_surface::displaylist_element::<()>(&painted, super::rq_probe::SIMULATOR_SCALE),
+            crate::ui::iced::broker_surface::displaylist_element::<()>(
+                &painted,
+                super::rq_probe::SIMULATOR_SCALE,
+            ),
         );
         match rq_sim
             .snapshot(&theme())
             .map_err(|e| format!("rq snapshot: {e}"))
-            .and_then(|snap| snap.matches_image(&rq_req).map(|_| ()).map_err(|e| e.to_string()))
-        {
+            .and_then(|snap| {
+                snap.matches_image(&rq_req)
+                    .map(|_| ())
+                    .map_err(|e| e.to_string())
+            }) {
             Ok(()) => {}
             Err(err) => {
                 rows.push(serde_json::json!({
@@ -1377,7 +1387,11 @@ fn rq_probe_t05_capability_rows() {
         "能力 ID 无逐项读数（不删分母）: {missing:?}"
     );
     let ok = rows.iter().filter(|r| r["status"] == "ok").count();
-    assert_eq!(ok, ALL_VIEW_CAPABILITY_IDS.len(), "39 个 ID 必须全部有成功读数");
+    assert_eq!(
+        ok,
+        ALL_VIEW_CAPABILITY_IDS.len(),
+        "39 个 ID 必须全部有成功读数"
+    );
 
     // AC-01 的关闭条件（逐 ID）：**真实输出 + 结构对拍**，不是“渲染没崩”。
     // - 除空/未注册控件外，每个能力至少产出一个绘制 op（内容静默丢失可检出）；
@@ -1412,10 +1426,13 @@ fn rq_probe_t05_capability_rows() {
         serde_json::to_string_pretty(&report).unwrap_or_default(),
     )
     .expect("write capability rows");
-    println!("[RQCAPPROBE] {}", serde_json::json!({
-        "tag": "rows_written", "ids": ALL_VIEW_CAPABILITY_IDS.len(),
-        "path": out.join("t05-capability-rows.json").display().to_string(),
-    }));
+    println!(
+        "[RQCAPPROBE] {}",
+        serde_json::json!({
+            "tag": "rows_written", "ids": ALL_VIEW_CAPABILITY_IDS.len(),
+            "path": out.join("t05-capability-rows.json").display().to_string(),
+        })
+    );
 }
 
 #[test]
@@ -1603,7 +1620,9 @@ fn rq_probe_t01_interaction_baseline() {
             position: iced::Point::new(center.0, center.1),
         }),
         iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
-        iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)),
+        iced::Event::Mouse(iced::mouse::Event::ButtonReleased(
+            iced::mouse::Button::Left,
+        )),
     ];
     let _ = surface.update(&events);
     assert_eq!(surface.component.count, 1, "点击按钮后组件状态应为 1");
@@ -1621,16 +1640,19 @@ fn rq_probe_t01_interaction_baseline() {
     let out = out_dir();
     std::fs::create_dir_all(&out).expect("create probe out dir");
     let direct_ref = out.join("interaction_count1-direct.png");
-    let _ = direct_frames(
-        View::text("1"),
-        Some(direct_ref.as_path()),
-    )
-    .map_err(|e| eprintln!("[RQPROBE] interaction direct ref skipped: {e}"));
-    for (tag, list) in [("interaction_click0", &list0), ("interaction_click1", &list1)] {
+    let _ = direct_frames(View::text("1"), Some(direct_ref.as_path()))
+        .map_err(|e| eprintln!("[RQPROBE] interaction direct ref skipped: {e}"));
+    for (tag, list) in [
+        ("interaction_click0", &list0),
+        ("interaction_click1", &list1),
+    ] {
         let mut sim = iced_test::simulator::Simulator::with_size(
             iced::Settings::default(),
             iced::Size::new(240.0, 160.0),
-            crate::ui::iced::broker_surface::displaylist_element::<()>(list, super::rq_probe::SIMULATOR_SCALE),
+            crate::ui::iced::broker_surface::displaylist_element::<()>(
+                list,
+                super::rq_probe::SIMULATOR_SCALE,
+            ),
         );
         let snap = sim.snapshot(&theme()).expect("interaction replay frame");
         snap.matches_image(out.join(format!("{tag}-rq.png")))
@@ -1813,7 +1835,11 @@ fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
     };
 
     // ① 记录面：海报帧必须以 Image 原语过线，且上传字节与发布帧**完全相同**。
-    let mut surface = HeadlessSurface::new(StaticComponent { view: video() }, PROBE_W as f32, PROBE_H as f32);
+    let mut surface = HeadlessSurface::new(
+        StaticComponent { view: video() },
+        PROBE_W as f32,
+        PROBE_H as f32,
+    );
     let list = surface.render_frame_v2();
     let image_srcs: Vec<String> = list
         .ops
@@ -1832,7 +1858,10 @@ fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
     );
     let uploads = surface.drain_bitmap_uploads();
     assert_eq!(uploads.len(), 1, "海报帧必须作为位图资源上传一次");
-    assert_eq!((uploads[0].w, uploads[0].h, uploads[0].stride), (w, h, w * 4));
+    assert_eq!(
+        (uploads[0].w, uploads[0].h, uploads[0].stride),
+        (w, h, w * 4)
+    );
     assert_eq!(uploads[0].rgba, rgba, "过线字节必须等于发布的静态帧");
     assert_eq!(
         image_srcs[0],
@@ -1876,10 +1905,20 @@ fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
         .expect("direct png");
     let direct_png = out.join("poster-direct-wgpu.png");
 
-    let mut recorded = HeadlessSurface::new(StaticComponent { view: video() }, PROBE_W as f32, PROBE_H as f32);
+    let mut recorded = HeadlessSurface::new(
+        StaticComponent { view: video() },
+        PROBE_W as f32,
+        PROBE_H as f32,
+    );
     let recorded_list = recorded.render_frame_v2();
     for up in recorded.drain_bitmap_uploads() {
-        crate::ui::iced::broker_surface::bitmap_cache_put(&format!("bitmap://{}", up.id), up.w, up.h, up.stride, up.rgba.clone());
+        crate::ui::iced::broker_surface::bitmap_cache_put(
+            &format!("bitmap://{}", up.id),
+            up.w,
+            up.h,
+            up.stride,
+            up.rgba.clone(),
+        );
     }
     let mut painted = recorded_list.clone();
     painted.clear = Some(crate::ui::desktop_protocol::client_runtime::bg());
@@ -1889,7 +1928,10 @@ fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
     let mut replay_sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
         iced::Size::new(PROBE_W as f32, PROBE_H as f32),
-        crate::ui::iced::broker_surface::displaylist_element::<()>(&painted, super::rq_probe::SIMULATOR_SCALE),
+        crate::ui::iced::broker_surface::displaylist_element::<()>(
+            &painted,
+            super::rq_probe::SIMULATOR_SCALE,
+        ),
     );
     replay_sim
         .snapshot(&theme())
@@ -1897,11 +1939,17 @@ fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
         .matches_image(&replay_req)
         .expect("replay png");
     let diff = pixel_diff_ratio(&direct_png, &out.join("poster-rq-wgpu.png"), 2);
-    println!("[RQPROBE] {}", serde_json::json!({
-        "tag": "media_poster", "poster": [w, h], "uploads": 1,
-        "pixel_diff_vs_direct": diff,
-    }));
-    assert!(diff <= 0.01, "海报帧重放相对 direct 的像素差 {diff:.5} 超 1%（静态帧应精确）");
+    println!(
+        "[RQPROBE] {}",
+        serde_json::json!({
+            "tag": "media_poster", "poster": [w, h], "uploads": 1,
+            "pixel_diff_vs_direct": diff,
+        })
+    );
+    assert!(
+        diff <= 0.01,
+        "海报帧重放相对 direct 的像素差 {diff:.5} 超 1%（静态帧应精确）"
+    );
 
     media_poster::clear(src);
 }
@@ -1915,7 +1963,7 @@ fn rq_probe_t05_media_poster_frame_crosses_the_wire() {
 #[test]
 fn rq_perf_replay_shapes() {
     use crate::ui::desktop_protocol::message::{
-        DisplayOp, DisplayList, Fill, ImageFit, Rgba8, WRect,
+        DisplayList, DisplayOp, Fill, ImageFit, Rgba8, WRect,
     };
 
     type Sim = iced_test::simulator::Simulator<'static, (), iced::Theme, iced::Renderer>;
@@ -1951,16 +1999,36 @@ fn rq_perf_replay_shapes() {
 
     let mut shapes: Vec<(String, Option<DisplayList>)> = vec![
         ("plain_widget_tree".to_string(), None),
-        ("empty".to_string(), Some(DisplayList { clear: None, ops: Vec::new() })),
-        ("text_1".to_string(), Some(DisplayList { clear: None, ops: vec![text(8.0, 8.0, 0)] })),
+        (
+            "empty".to_string(),
+            Some(DisplayList {
+                clear: None,
+                ops: Vec::new(),
+            }),
+        ),
+        (
+            "text_1".to_string(),
+            Some(DisplayList {
+                clear: None,
+                ops: vec![text(8.0, 8.0, 0)],
+            }),
+        ),
         (
             "text_50".to_string(),
             Some(DisplayList {
                 clear: None,
-                ops: (0..50).map(|i| text(8.0, 8.0 + i as f32 * 2.0, i)).collect(),
+                ops: (0..50)
+                    .map(|i| text(8.0, 8.0 + i as f32 * 2.0, i))
+                    .collect(),
             }),
         ),
-        ("image_1".to_string(), Some(DisplayList { clear: None, ops: vec![image(8.0)] })),
+        (
+            "image_1".to_string(),
+            Some(DisplayList {
+                clear: None,
+                ops: vec![image(8.0)],
+            }),
+        ),
         (
             "image_20".to_string(),
             Some(DisplayList {
@@ -1986,7 +2054,10 @@ fn rq_perf_replay_shapes() {
             Some(list) => iced_test::simulator::Simulator::with_size(
                 iced::Settings::default(),
                 iced::Size::new(PROBE_W as f32, PROBE_H as f32),
-                crate::ui::iced::broker_surface::displaylist_element::<()>(&list, super::rq_probe::SIMULATOR_SCALE),
+                crate::ui::iced::broker_surface::displaylist_element::<()>(
+                    &list,
+                    super::rq_probe::SIMULATOR_SCALE,
+                ),
             ),
             None => {
                 let plain: iced::Element<'static, ()> =
@@ -2022,7 +2093,9 @@ fn rq_perf_replay_shapes() {
         for (idx, (_, _, sim)) in sims.iter_mut().enumerate() {
             let t = std::time::Instant::now();
             sim.snapshot(&theme()).expect("round-robin snapshot");
-            samples[idx].push(crate::ui::desktop_protocol::headless::rq_probe::ms(t.elapsed()));
+            samples[idx].push(crate::ui::desktop_protocol::headless::rq_probe::ms(
+                t.elapsed(),
+            ));
         }
     }
 

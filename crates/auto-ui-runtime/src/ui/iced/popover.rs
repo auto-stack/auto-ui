@@ -104,7 +104,8 @@ where
     }
 
     pub fn tab_handlers(mut self, next: Message, previous: Message) -> Self {
-        self.on_tab = Some((next, previous)); self
+        self.on_tab = Some((next, previous));
+        self
     }
 
     pub fn on_dismiss(mut self, msg: Message) -> Self {
@@ -133,9 +134,13 @@ impl<Message> Widget<Message, iced::Theme, iced::Renderer> for Popover<'_, Messa
 where
     Message: Clone + 'static,
 {
-    fn tag(&self) -> widget::tree::Tag { widget::tree::Tag::of::<ModalOpenState>() }
+    fn tag(&self) -> widget::tree::Tag {
+        widget::tree::Tag::of::<ModalOpenState>()
+    }
 
-    fn state(&self) -> widget::tree::State { widget::tree::State::new(ModalOpenState(self.open)) }
+    fn state(&self) -> widget::tree::State {
+        widget::tree::State::new(ModalOpenState(self.open))
+    }
 
     fn children(&self) -> Vec<Tree> {
         vec![Tree::new(&self.anchor), Tree::new(&self.content)]
@@ -145,7 +150,8 @@ where
         let previous = tree.state.downcast_mut::<ModalOpenState>();
         let reopened = self.open && !previous.0;
         previous.0 = self.open;
-        if reopened && self.placement == PopoverPlacement::ModalExplicit && tree.children.len() == 2 {
+        if reopened && self.placement == PopoverPlacement::ModalExplicit && tree.children.len() == 2
+        {
             // A new explicit modal session must expose its initial focused
             // input, rather than retain a previous session's scrolled viewport.
             tree.children[1] = Tree::new(&self.content);
@@ -614,7 +620,9 @@ where
                 if over_anchor {
                     // 锚上点击:dismiss 并捕获 —— 基础树收不到 toggle,菜单经
                     // on_dismiss 干净关闭(点触发器 = 关,menubar 语义)。
-                    if self.placement != PopoverPlacement::ModalExplicit { dismiss(shell, &self.on_dismiss); }
+                    if self.placement != PopoverPlacement::ModalExplicit {
+                        dismiss(shell, &self.on_dismiss);
+                    }
                 }
                 if !over_panel && !over_anchor {
                     // 宿主视口外（虚拟窗标题栏/缩放把手等 chrome）——整段
@@ -633,7 +641,9 @@ where
                     }
                     // 面板/锚之外的点击:dismiss 但放行给基础树 —— 别的
                     // menubar 触发器可以直接切换菜单。
-                    if self.placement != PopoverPlacement::ModalExplicit { dismiss(shell, &self.on_dismiss); }
+                    if self.placement != PopoverPlacement::ModalExplicit {
+                        dismiss(shell, &self.on_dismiss);
+                    }
                     // PLAN-530 步骤8（W13）：模态形态整吞外点——遮罩语义，
                     // 基础树收不到（alert-dialog：外点不关闭不透传）。
                     // 仅宿主视口内（真遮罩区）；chrome 区已上方放行。
@@ -660,10 +670,16 @@ where
                 }
             }
             Event::Keyboard(keyboard::Event::KeyPressed {
-                key: keyboard::Key::Named(keyboard::key::Named::Tab), modifiers, ..
+                key: keyboard::Key::Named(keyboard::key::Named::Tab),
+                modifiers,
+                ..
             }) if self.modal && self.on_tab.is_some() => {
                 let (next, previous) = self.on_tab.as_ref().unwrap();
-                shell.publish(if modifiers.shift() { previous.clone() } else { next.clone() });
+                shell.publish(if modifiers.shift() {
+                    previous.clone()
+                } else {
+                    next.clone()
+                });
                 shell.capture_event();
             }
             Event::Keyboard(keyboard::Event::KeyPressed {
@@ -674,7 +690,9 @@ where
                 shell.capture_event();
             }
             Event::Window(window::Event::Unfocused) => {
-                if self.placement != PopoverPlacement::ModalExplicit { dismiss(shell, &self.on_dismiss); }
+                if self.placement != PopoverPlacement::ModalExplicit {
+                    dismiss(shell, &self.on_dismiss);
+                }
             }
             _ => {
                 // 其余事件(移动/滚轮/键盘输入等)转发给 content,面板内
@@ -690,7 +708,9 @@ where
                     shell,
                     &Rectangle::with_size(Size::INFINITE),
                 );
-                if self.modal && matches!(event, Event::Keyboard(_)) { shell.capture_event(); }
+                if self.modal && matches!(event, Event::Keyboard(_)) {
+                    shell.capture_event();
+                }
             }
         }
     }

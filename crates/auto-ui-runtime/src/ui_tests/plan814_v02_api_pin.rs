@@ -92,7 +92,8 @@ fn plan814_v02_parser_bridge_surface_pins() {
     let _: auto_lang_core::token::Pos = b.cur_pos();
     let _ = b.is_kind(auto_lang_core::token::TokenKind::Ident);
     let _: auto_lang_core::token::Token = b.advance();
-    let _: auto_lang_core::error::AutoResult<()> = b.expect(auto_lang_core::token::TokenKind::Ident);
+    let _: auto_lang_core::error::AutoResult<()> =
+        b.expect(auto_lang_core::token::TokenKind::Ident);
     let _: auto_lang_core::error::AutoResult<()> = b.expect_keyword("pin");
     let _: Option<auto_lang_core::token::TokenKind> = b.probe_next_kind();
     let _: usize = b.skip_empty_lines();
@@ -114,8 +115,9 @@ fn plan814_v02_vm_public_surface_pins() {
     use auto_lang_core::vm::engine::AutoVM;
     use auto_lang_core::vm::native::NativeInterface;
 
-    let (vm, _stdout, _entry, _ty) = auto_lang_core::create_vm_from_source("fn main() int { return 1 }")
-        .expect("default composition compiles + runs");
+    let (vm, _stdout, _entry, _ty) =
+        auto_lang_core::create_vm_from_source("fn main() int { return 1 }")
+            .expect("default composition compiles + runs");
     let _ = &vm.flash;
     let _ = &vm.native_interface;
     let _ = &vm.strings;
@@ -125,9 +127,10 @@ fn plan814_v02_vm_public_surface_pins() {
 
     // NativeInterface 注册族 pin（真实调用形态——泛型 F 三族 + 具名三族）。
     let mut ni = NativeInterface::production();
-    ni.register_static(1u16, |_t: &mut auto_lang_core::vm::task::AutoTask, _v: &AutoVM| {
-        Ok(())
-    });
+    ni.register_static(
+        1u16,
+        |_t: &mut auto_lang_core::vm::task::AutoTask, _v: &AutoVM| Ok(()),
+    );
     let _dyn_id: u16 =
         ni.register_dynamic(|_t: &mut auto_lang_core::vm::task::AutoTask, _v: &AutoVM| Ok(()));
     ni.register_dynamic_with_id(
@@ -176,7 +179,8 @@ fn plan814_v02_root_reexports_and_type_identity_pins() {
 
     // UI 动态管线入口签名 pin（实装在 crate::dynamic_build，
     // 旧 crate 根路径经再导出保持）。
-    let _: fn(&str, Option<&str>) -> auto_lang_core::error::AutoResult<String> = crate::run_file_dynamic_ui;
+    let _: fn(&str, Option<&str>) -> auto_lang_core::error::AutoResult<String> =
+        crate::run_file_dynamic_ui;
     let _: fn(
         &str,
         Option<&str>,

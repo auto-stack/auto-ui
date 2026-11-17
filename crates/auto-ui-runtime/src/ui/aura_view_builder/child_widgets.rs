@@ -88,7 +88,9 @@ impl<'a> AuraViewBuilder<'a> {
                 // A same-named field on another widget is not a parent channel.
                 let parent_value = match self.override_state_obj_id {
                     Some(id) => self.bridge.read_child_state(id, field_name),
-                    None => self.bridge.read_root_parent_state(&child_widget.name, field_name),
+                    None => self
+                        .bridge
+                        .read_root_parent_state(&child_widget.name, field_name),
                 };
                 if let Ok(parent_val) = parent_value {
                     resolved_props.insert(field_name.clone(), parent_val);
@@ -172,11 +174,8 @@ impl<'a> AuraViewBuilder<'a> {
         // Per-frame re-seed set = declared props ∪ call-site-passed props
         // (parent-controlled channel). Model vars seed once at allocation
         // (PLAN-536 T8 extended to instances).
-        let mut prop_names: std::collections::HashSet<String> = child_widget
-            .props
-            .iter()
-            .map(|p| p.name.clone())
-            .collect();
+        let mut prop_names: std::collections::HashSet<String> =
+            child_widget.props.iter().map(|p| p.name.clone()).collect();
         for name in props.keys() {
             prop_names.insert(name.clone());
         }
@@ -380,7 +379,11 @@ impl<'a> AuraViewBuilder<'a> {
         let (child_state_id, instance_identity, init_props) =
             self.prepare_child_render_state_snap(child_widget, props, bindings);
         self.record_child_callback_routes_for(
-            child_state_id, self.widget_name.clone(), child_widget.name.clone(), props, events,
+            child_state_id,
+            self.widget_name.clone(),
+            child_widget.name.clone(),
+            props,
+            events,
         );
         // Plan 437 Phase 2: 子组件 Init 补发 —— 此前 VM 轨只有根 widget 的
         // Init 会触发(fire_init),视图中实例化的子组件 Init 从不运行,
@@ -507,7 +510,11 @@ impl<'a> AuraViewBuilder<'a> {
         let (child_state_id, instance_identity, init_props) =
             self.prepare_child_render_state_snap(child_widget, props, bindings);
         self.record_child_callback_routes_for(
-            child_state_id, self.widget_name.clone(), child_widget.name.clone(), props, events,
+            child_state_id,
+            self.widget_name.clone(),
+            child_widget.name.clone(),
+            props,
+            events,
         );
         if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1") {
             let loaded_v = self

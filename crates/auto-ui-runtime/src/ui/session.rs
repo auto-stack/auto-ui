@@ -330,8 +330,18 @@ fn broker_surface_local(
     Some((sx, sy))
 }
 
-fn broker_command_pointer_local(lx: f32, ly: f32, rw: f32, rh: f32, decorated: bool) -> Option<(f32, f32)> {
-    let top = if decorated { crate::ui::iced::virtual_window::TITLEBAR_H } else { 0.0 };
+fn broker_command_pointer_local(
+    lx: f32,
+    ly: f32,
+    rw: f32,
+    rh: f32,
+    decorated: bool,
+) -> Option<(f32, f32)> {
+    let top = if decorated {
+        crate::ui::iced::virtual_window::TITLEBAR_H
+    } else {
+        0.0
+    };
     let cy = ly - top;
     (lx >= 0.0 && lx < rw && cy >= 0.0 && cy < rh - top).then_some((lx, cy))
 }
@@ -472,6 +482,11 @@ pub struct DesktopState {
     /// 排空 request_capture 队列时记录；SnapshotShot 回调消费清空）。
     /// 一次整窗截图服务全部请求（裁剪按各窗 rect 分发）。
     pub snapshot_pending_wids: RefCell<Vec<Wid>>,
+    /// PLAN-098 T-03：整窗 screenshot 在途标记（发起时刻，sched_diag
+    /// 毫秒轴）。Task 未回（teardown/重配竞态下可能丢失）不重复发起
+    /// ——收敛重配窗口的 screenshot 竞态面；10s 过期自愈（防 Task
+    /// 永失把泵锁死）。SnapshotShot 回调清零。
+    pub snapshot_inflight_since: std::cell::Cell<Option<u64>>,
     /// Plan 501：最近一次 os-config daemon 检活结果（launch 声明
     /// `daemon: autoos` 的 App 时更新；boot 不预检）。settings 入口徽标
     ///（offline 置灰/提示，T5）消费。
@@ -600,6 +615,7 @@ impl DesktopState {
             date_text: RefCell::new(String::new()),
             notify_source: RefCell::new(None),
             snapshot_pending_wids: RefCell::new(Vec::new()),
+            snapshot_inflight_since: std::cell::Cell::new(None),
             shell_app: None,
             app_resolver: None,
             shell_fields: ShellFields::default(),
@@ -2628,8 +2644,7 @@ impl DesktopCommand {
                     // family 非空即收——目录符合性在执行臂策略核心具名校验）。
                     "set_theme_policy" => {
                         let mut it = arg.split([Self::FIELD_SEP, '\t']);
-                        let (Some(family), Some(mode), None) =
-                            (it.next(), it.next(), it.next())
+                        let (Some(family), Some(mode), None) = (it.next(), it.next(), it.next())
                         else {
                             return None;
                         };
@@ -3236,11 +3251,7 @@ pub fn live_inputs_from_keyboard(kb: &iced::keyboard::Event) -> Vec<LiveInput> {
                 .unwrap_or_default(),
             _ => Vec::new(),
         },
-        iced::keyboard::Event::KeyReleased {
-            key,
-            modifiers,
-            ..
-        } => match key {
+        iced::keyboard::Event::KeyReleased { key, modifiers, .. } => match key {
             iced::keyboard::Key::Named(name) => named_key_vk(name)
                 .map(|key| {
                     vec![LiveInput::KeyReleased {
@@ -3519,13 +3530,15 @@ pub(crate) fn desktop_message_scalar(value: &serde_json::Value) -> Result<auto_v
         serde_json::Value::Bool(flag) => Ok(Value::Bool(*flag)),
         serde_json::Value::Number(number) if number.is_i64() => {
             let integer = number.as_i64().unwrap();
-            i32::try_from(integer).map(Value::Int)
+            i32::try_from(integer)
+                .map(Value::Int)
                 .map_err(|_| "message integer exceeds the VM Int range".into())
         }
-        serde_json::Value::Number(number) if number.is_f64() => {
-            number.as_f64().filter(|value| (*value as f32).is_finite())
-                .map(Value::Float).ok_or_else(|| "message float exceeds the VM Float range".into())
-        }
+        serde_json::Value::Number(number) if number.is_f64() => number
+            .as_f64()
+            .filter(|value| (*value as f32).is_finite())
+            .map(Value::Float)
+            .ok_or_else(|| "message float exceeds the VM Float range".into()),
         _ => Err("message args require strings, booleans or VM scalar numbers".into()),
     }
 }
@@ -3704,9 +3717,16 @@ impl DesktopSession {
     pub fn open_window_for_session(&mut self, name: &str, app_id: AppId) -> Result<Wid, String> {
         // A cached mini must not override the app's current launch contract.
         // Native apps own their component/backend in the child process.
-        let spec = self.desktop.app_resolver.as_ref().and_then(|resolve| resolve(name));
-        let launch = crate::ui::app_registry::manifest_launch_lookup(std::path::Path::new("."), name);
-        if Self::decide_native_launch(launch.as_deref(), spec.as_ref()) != NativeLaunchDecision::Inproc {
+        let spec = self
+            .desktop
+            .app_resolver
+            .as_ref()
+            .and_then(|resolve| resolve(name));
+        let launch =
+            crate::ui::app_registry::manifest_launch_lookup(std::path::Path::new("."), name);
+        if Self::decide_native_launch(launch.as_deref(), spec.as_ref())
+            != NativeLaunchDecision::Inproc
+        {
             return self.launch_app(name);
         }
         let title = self
@@ -3749,46 +3769,90 @@ impl DesktopSession {
     /// None means an in-process surface; Some always belongs to the broker,
     /// including unsupported/failed sends, so callers must not invoke the
     /// placeholder component as a fallback.
-    pub fn broker_named_action(&mut self, app: AppId, name: &str, arg: Option<&str>, widget: Option<&str>) -> Option<Result<(), String>> {
-        let wid = self.host.as_ref()?.wm.wins.iter()
-            .find(|(_, window)| window.app == app).map(|(wid, _)| *wid)?;
-        let client = self.broker_clients.values_mut().find(|client| client.owns_wid(wid))?;
+    pub fn broker_named_action(
+        &mut self,
+        app: AppId,
+        name: &str,
+        arg: Option<&str>,
+        widget: Option<&str>,
+    ) -> Option<Result<(), String>> {
+        let wid = self
+            .host
+            .as_ref()?
+            .wm
+            .wins
+            .iter()
+            .find(|(_, window)| window.app == app)
+            .map(|(wid, _)| *wid)?;
+        let client = self
+            .broker_clients
+            .values_mut()
+            .find(|client| client.owns_wid(wid))?;
         if widget.is_some_and(|widget| widget != "App") {
-            return Some(Err("unsupported: named broker actions target the root App".into()));
+            return Some(Err(
+                "unsupported: named broker actions target the root App".into()
+            ));
         }
         Some(client.send_named_action(wid, name, arg))
     }
 
     /// Deliver typed acceptance arguments through the normal VM event loop.
     /// A broker-owned surface is never dispatched into its local placeholder.
-    pub(crate) fn dispatch_scalar_message(&mut self, app: AppId, name: String, args: &[serde_json::Value]) -> Result<(), String> {
+    pub(crate) fn dispatch_scalar_message(
+        &mut self,
+        app: AppId,
+        name: String,
+        args: &[serde_json::Value],
+    ) -> Result<(), String> {
         use crate::ui::Component;
         let broker_owned = self.host.as_ref().is_some_and(|host| {
-            host.wm.wins.iter().any(|(wid, window)| window.app == app
-                && self.broker_clients.values().any(|client| client.owns_wid(*wid)))
+            host.wm.wins.iter().any(|(wid, window)| {
+                window.app == app
+                    && self
+                        .broker_clients
+                        .values()
+                        .any(|client| client.owns_wid(*wid))
+            })
         });
         if broker_owned {
             return Err("typed message arrays are unsupported for broker-owned apps".into());
         }
-        let values = args.iter().map(desktop_message_scalar).collect::<Result<Vec<_>, _>>()?;
-        let session = self.apps.get_mut(&app).ok_or_else(|| "message target is not live".to_string())?;
-        session.component.on(crate::ui::interpreter::DynamicMessage::Typed {
-            widget_name: "App".into(), event_name: name, args: values,
-        });
+        let values = args
+            .iter()
+            .map(desktop_message_scalar)
+            .collect::<Result<Vec<_>, _>>()?;
+        let session = self
+            .apps
+            .get_mut(&app)
+            .ok_or_else(|| "message target is not live".to_string())?;
+        session
+            .component
+            .on(crate::ui::interpreter::DynamicMessage::Typed {
+                widget_name: "App".into(),
+                event_name: name,
+                args: values,
+            });
         *session.state.view_dirty.borrow_mut() = true;
         Ok(())
     }
 
     pub(crate) fn prune_mcp_app_surfaces(&self) {
         if let Some(shared) = &self.desktop.mcp_shared {
-            shared.lock().unwrap().retain_live_app_surfaces(|id| self.apps.contains_key(&AppId(id)));
+            shared
+                .lock()
+                .unwrap()
+                .retain_live_app_surfaces(|id| self.apps.contains_key(&AppId(id)));
         }
     }
 
     /// Request shutdown of this window's owning outproc app. Reclamation and
     /// buffer release remain on the normal ExitRequest/EOF pump path.
     pub fn broker_close_window(&mut self, wid: Wid) -> bool {
-        let Some(client) = self.broker_clients.values_mut().find(|c| c.wid == Some(wid)) else {
+        let Some(client) = self
+            .broker_clients
+            .values_mut()
+            .find(|c| c.wid == Some(wid))
+        else {
             return false;
         };
         match client.endpoint.close() {
@@ -4560,8 +4624,14 @@ impl DesktopSession {
                     "[session] launch_app(outproc-native) {name} <- {}",
                     exe.display()
                 );
-                Self::spawn_exe_child(exe, &child_name, &broker_pipe, spec.render_decl.as_deref(), host_env.as_ref())
-                    .map_err(|e| format!("spawn outproc child: {e}"))?
+                Self::spawn_exe_child(
+                    exe,
+                    &child_name,
+                    &broker_pipe,
+                    spec.render_decl.as_deref(),
+                    host_env.as_ref(),
+                )
+                .map_err(|e| format!("spawn outproc child: {e}"))?
             }
         };
         self.desktop.outproc_children.push(child);
@@ -4613,12 +4683,12 @@ impl DesktopSession {
             .spawn(move || {
                 while !stop.load(Ordering::Relaxed) {
                     match broker.serve_once() {
-                        Ok(Some(inc)) => {
-                            pending
-                                .lock()
-                                .unwrap()
-                                .push((inc.pipe_name, inc.end, inc.render, inc.adopt))
-                        }
+                        Ok(Some(inc)) => pending.lock().unwrap().push((
+                            inc.pipe_name,
+                            inc.end,
+                            inc.render,
+                            inc.adopt,
+                        )),
                         Ok(None) => {} // 探测 ping：吞掉重听
                         Err(_) => {
                             // 管道竞态/对端早断：退避后重听（防忙转）。
@@ -5091,8 +5161,7 @@ impl DesktopSession {
         if alive {
             let pending: Vec<crate::ui::desktop_protocol::message::ProtocolMsg> = {
                 let mut q = self.theme_push_queue.borrow_mut();
-                let (mine, rest): (Vec<_>, Vec<_>) =
-                    q.drain(..).partition(|(p, _)| p == pipe);
+                let (mine, rest): (Vec<_>, Vec<_>) = q.drain(..).partition(|(p, _)| p == pipe);
                 *q = rest;
                 mine.into_iter().map(|(_, m)| m).collect()
             };
@@ -5231,8 +5300,17 @@ impl DesktopSession {
             // PLAN-060 扩展：宿主窗 rect 与 child 表面尺寸不同（投影缩放）
             // 时按比例把 canvas 局部坐标换算回 child 表面坐标，否则
             // 指针永远落在错误控件上（calendar「>」delivered=true 但无反应）。
-            let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
-                !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
+            let Some((lx, ly)) = broker_surface_local(
+                client,
+                wid,
+                x - rect.x,
+                y - rect.y,
+                rect.width,
+                rect.height,
+                !self.desktop.shell_pseudo_wids.contains(&wid),
+            ) else {
+                return false;
+            };
             // PLAN-063 T-03（G-03）：真修饰位（desktop.current_modifiers
             // 事实源——此前恒 0，shift/ctrl 点击子面不可区分）。
             let input = ProtocolMsg::Input(InputMsg::PointerPressed {
@@ -5282,8 +5360,17 @@ impl DesktopSession {
             let Some(client) = self.broker_clients.values_mut().find(|c| c.owns_wid(wid)) else {
                 return false;
             };
-            let Some((lx, ly)) = broker_surface_local(client, wid, x - rect.x, y - rect.y, rect.width, rect.height,
-                !self.desktop.shell_pseudo_wids.contains(&wid)) else { return false };
+            let Some((lx, ly)) = broker_surface_local(
+                client,
+                wid,
+                x - rect.x,
+                y - rect.y,
+                rect.width,
+                rect.height,
+                !self.desktop.shell_pseudo_wids.contains(&wid),
+            ) else {
+                return false;
+            };
             // PLAN-063 T-03（G-03）：release 同 press 真修饰位。
             let input = ProtocolMsg::Input(InputMsg::PointerReleased {
                 wid: wid.0,
@@ -5555,9 +5642,7 @@ impl DesktopSession {
         match input {
             LiveInput::KeyPressed { key, modifiers } => self.broker_key_event(*key, *modifiers),
             // PLAN-063 T-03（G-02）：release 沿同焦点窗路由。
-            LiveInput::KeyReleased { key, modifiers } => {
-                self.broker_key_released(*key, *modifiers)
-            }
+            LiveInput::KeyReleased { key, modifiers } => self.broker_key_released(*key, *modifiers),
             LiveInput::Chars { text } => {
                 let mut routed = false;
                 for ch in text.chars() {
@@ -5586,10 +5671,7 @@ impl DesktopSession {
     /// `None` 静默弃臂，客户端停等 Welcome 不可归因）；Err 文本即具名错误
     /// 行（调用臂 eprintln，形态对齐既有 `[autodesk-broker] ... (budget)`
     /// 惯例；协议词汇与 attach 预算零变化）。
-    fn resolve_incubation_component(
-        &self,
-        app_name: &str,
-    ) -> Result<DynamicComponent, String> {
+    fn resolve_incubation_component(&self, app_name: &str) -> Result<DynamicComponent, String> {
         let Some(registry) = self.desktop.app_resolver.as_ref() else {
             return Err(format!(
                 "incubate attach 拒绝：app `{app_name}` 无宿主注册表（app_resolver 未接线——incubate = 宿主经注册表装载，外部自持组件客户端走 adopt 方言）"
@@ -5886,19 +5968,30 @@ impl DesktopSession {
                     client.app_name = Some(app_name.clone());
                     let app_id = self.allocate_app(component);
                     let title = if title.is_empty() { app_name } else { title };
-                    let rect = if client.endpoint.frame_mode == crate::ui::desktop_protocol::message::FrameMode::Commands {
+                    let rect = if client.endpoint.frame_mode
+                        == crate::ui::desktop_protocol::message::FrameMode::Commands
+                    {
                         use crate::ui::iced::virtual_window::{BORDER, TITLEBAR_H};
-                        let usable = crate::ui::layout::usable_rect(self.host_viewport(), self.desktop.dock_edges);
-                        let margin = 16.0_f32.min((usable.width / 4.0).max(0.0)).min((usable.height / 4.0).max(0.0));
+                        let usable = crate::ui::layout::usable_rect(
+                            self.host_viewport(),
+                            self.desktop.dock_edges,
+                        );
+                        let margin = 16.0_f32
+                            .min((usable.width / 4.0).max(0.0))
+                            .min((usable.height / 4.0).max(0.0));
                         iced::Rectangle::new(
                             iced::Point::new(usable.x + margin, usable.y + margin),
                             iced::Size::new(
                                 (width + 2.0 * BORDER).min((usable.width - 2.0 * margin).max(1.0)),
-                                (height + TITLEBAR_H + BORDER).min((usable.height - 2.0 * margin).max(1.0)),
+                                (height + TITLEBAR_H + BORDER)
+                                    .min((usable.height - 2.0 * margin).max(1.0)),
                             ),
                         )
                     } else {
-                        iced::Rectangle::new(iced::Point::new(16.0, 16.0), iced::Size::new(width, height))
+                        iced::Rectangle::new(
+                            iced::Point::new(16.0, 16.0),
+                            iced::Size::new(width, height),
+                        )
                     };
                     let wid = self.wm_add_win(app_id, title, rect);
                     let surface = client.surfaces.alloc(width, height);
@@ -5999,7 +6092,10 @@ impl DesktopSession {
                         .clone()
                         .unwrap_or_else(|| format!("pipe-{}", client.pipe));
                     let (status, reason) = if revision < client.theme_pushed_rev {
-                        ("stale".to_string(), format!("ack rev {revision} < 推送 rev {}", client.theme_pushed_rev))
+                        (
+                            "stale".to_string(),
+                            format!("ack rev {revision} < 推送 rev {}", client.theme_pushed_rev),
+                        )
                     } else {
                         (status, reason)
                     };
@@ -6132,8 +6228,8 @@ impl DesktopSession {
                     });
                     if let Some(payload) = ready {
                         if let Some(freed) = client.surfaces.compose(surface, slot, payload) {
-                        // PLAN-060：帧到达即请求 shell 重绘（否则窗口停留在旧帧）。
-                        crate::ui::theme_policy::mark_shell_dirty();
+                            // PLAN-060：帧到达即请求 shell 重绘（否则窗口停留在旧帧）。
+                            crate::ui::theme_policy::mark_shell_dirty();
                             to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
                                 wid,
                                 frame_id,
@@ -7112,9 +7208,11 @@ impl DesktopSession {
         // Include convention-discovered executables and strict native
         // declarations, not just an explicit desktop_exe. Otherwise a mini
         // silently promotes an interpreted copy instead of launching native.
-        let launch = crate::ui::app_registry::manifest_launch_lookup(std::path::Path::new("."), name);
+        let launch =
+            crate::ui::app_registry::manifest_launch_lookup(std::path::Path::new("."), name);
         if spec.exe.is_some()
-            || Self::decide_native_launch(launch.as_deref(), Some(&spec)) != NativeLaunchDecision::Inproc
+            || Self::decide_native_launch(launch.as_deref(), Some(&spec))
+                != NativeLaunchDecision::Inproc
         {
             return Ok(None);
         }
@@ -7800,7 +7898,8 @@ mod tests {
         let mut session = DesktopSession::__test_session();
         session.__test_open_desktop();
         let component =
-            crate::build_dynamic_component(r#"widget t { view { text "observer" } }"#, None).unwrap();
+            crate::build_dynamic_component(r#"widget t { view { text "observer" } }"#, None)
+                .unwrap();
         let mut app_endpoint = AppEndpoint::new(
             HeadlessFrameSource::new(component, 1280.0, 800.0),
             "resize",
@@ -8012,8 +8111,8 @@ mod tests {
         session.broker_clients.insert(pipe.clone(), client);
         session.pump_broker_clients();
         let _initial = receive(&mut child, "initial-resize"); // attach 期首拍 Resize（基线）
-        // 确保焦点在目标窗（attach 默认聚焦时 wm_focus 无沿、不产消息——
-        // prev == Some(wid) 守卫；漂焦时补沿）。边沿消息清仓后再断言。
+                                                              // 确保焦点在目标窗（attach 默认聚焦时 wm_focus 无沿、不产消息——
+                                                              // prev == Some(wid) 守卫；漂焦时补沿）。边沿消息清仓后再断言。
         session.wm_focus(wid);
         std::thread::sleep(std::time::Duration::from_millis(30));
         while child.try_recv().is_some() {}
@@ -8080,7 +8179,11 @@ mod tests {
             assert_eq!(map(80.0, 12.0, w, h, true), None, "host titlebar");
             assert_eq!(map(w + 1.0, 96.0, w, h, true), None);
             assert_eq!(map(80.0, h, w, h, true), None);
-            assert_eq!(map(80.0, 12.0, w, h, false), Some((80.0, 12.0)), "shell has no chrome");
+            assert_eq!(
+                map(80.0, 12.0, w, h, false),
+                Some((80.0, 12.0)),
+                "shell has no chrome"
+            );
         }
     }
 
@@ -8520,15 +8623,25 @@ mod tests {
                 ..Default::default()
             })
         }));
-        assert_eq!(ds.hatch_mini_app("p060-mini-probe").unwrap(), None,
-            "a convention-discovered native app must not acquire an interpreted mini");
+        assert_eq!(
+            ds.hatch_mini_app("p060-mini-probe").unwrap(),
+            None,
+            "a convention-discovered native app must not acquire an interpreted mini"
+        );
         let stale = ds.allocate_app(DynamicComponent::new(&make_mini_widget("OldMini")).unwrap());
-        assert!(ds.open_window_for_session("p060-mini-probe", stale).is_err(),
-            "native launch must surface the invalid executable instead of promoting an old mini");
+        assert!(
+            ds.open_window_for_session("p060-mini-probe", stale)
+                .is_err(),
+            "native launch must surface the invalid executable instead of promoting an old mini"
+        );
         assert!(ds.host.as_ref().unwrap().wm.wins.is_empty());
         std::fs::remove_file(&exe).unwrap();
-        let vm = ds.hatch_mini_app("p060-mini-probe").unwrap().expect("a VM-only mini remains supported");
-        ds.open_window_for_session("p060-mini-probe", vm).expect("normal mini promotion");
+        let vm = ds
+            .hatch_mini_app("p060-mini-probe")
+            .unwrap()
+            .expect("a VM-only mini remains supported");
+        ds.open_window_for_session("p060-mini-probe", vm)
+            .expect("normal mini promotion");
         assert_eq!(ds.host.as_ref().unwrap().wm.wins.len(), 1);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -8917,13 +9030,11 @@ mod tests {
     /// （rev < 本连接 theme_pushed_rev）可读分列 stale 行不覆盖新状态；
     /// 同 rev 结果原样落行（受控注入——真载体乱序腿的常驻回归）。
     #[test]
-    fn theme_policy_result_stale_anchor_rows()
-    {
+    fn theme_policy_result_stale_anchor_rows() {
         let pipe = format!("autodesk-probe-stale-{}", std::process::id());
-        let listener =
-            crate::ui::desktop_protocol::transport::listen(&pipe).expect("listen");
-        let mut app_end = crate::ui::desktop_protocol::transport::connect(&pipe, 2000)
-            .expect("connect");
+        let listener = crate::ui::desktop_protocol::transport::listen(&pipe).expect("listen");
+        let mut app_end =
+            crate::ui::desktop_protocol::transport::connect(&pipe, 2000).expect("connect");
         let _ = &mut app_end;
         let host_end = listener.wait_connect().expect("accept");
         let mut ds = desktop_session_with_host();
@@ -8931,8 +9042,7 @@ mod tests {
             crate::ui::desktop_protocol::stage3::BrokerClient::new(pipe.clone(), host_end);
         client.app_name = Some("012-clock".into());
         client.theme_pushed_rev = 5;
-        client.endpoint.state =
-            crate::ui::desktop_protocol::endpoint::HostState::Active;
+        client.endpoint.state = crate::ui::desktop_protocol::endpoint::HostState::Active;
         let actions = client
             .endpoint
             .on_message(crate::ui::desktop_protocol::message::ProtocolMsg::Control(
@@ -8946,7 +9056,10 @@ mod tests {
         ds.broker_apply_actions(&mut client, actions);
         {
             let rows = ds.theme_outproc_status.borrow();
-            let row = rows.iter().find(|(n, _, _)| n == "012-clock").expect("stale row");
+            let row = rows
+                .iter()
+                .find(|(n, _, _)| n == "012-clock")
+                .expect("stale row");
             assert_eq!(row.1, "stale");
             assert_eq!(row.2, "ack rev 3 < 推送 rev 5");
         }
@@ -10037,21 +10150,39 @@ mod tests {
         ds.host.as_mut().unwrap().wm.wins.remove(&wid);
         let reopened = ds.launch_app("probe").expect("reopen lands a live window");
         assert_ne!(reopened, wid);
-        assert_eq!(ds.host.as_ref().unwrap().wm.wins[&reopened].registry_id.as_deref(), Some("probe"));
+        assert_eq!(
+            ds.host.as_ref().unwrap().wm.wins[&reopened]
+                .registry_id
+                .as_deref(),
+            Some("probe")
+        );
 
         assert!(ds.broker_close_window(reopened));
         ds.wm_remove_win(reopened);
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         loop {
             ds.pump_broker_clients();
-            if let Some(status) = ds.desktop.outproc_children.last_mut().unwrap().try_wait().unwrap() {
+            if let Some(status) = ds
+                .desktop
+                .outproc_children
+                .last_mut()
+                .unwrap()
+                .try_wait()
+                .unwrap()
+            {
                 assert!(status.success(), "child closes through the protocol");
                 break;
             }
-            assert!(std::time::Instant::now() < deadline, "closed child did not exit");
+            assert!(
+                std::time::Instant::now() < deadline,
+                "closed child did not exit"
+            );
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        assert!(ds.desktop.outproc_children[0].try_wait().unwrap().is_none(), "unrelated client stays alive");
+        assert!(
+            ds.desktop.outproc_children[0].try_wait().unwrap().is_none(),
+            "unrelated client stays alive"
+        );
 
         // 收尾：kill 子进程 + 停 broker serve 线程（probe 连接唤醒退出）。
         for mut child in ds.desktop.outproc_children.drain(..) {
@@ -12183,11 +12314,26 @@ mod live_input_tests {
             .wm
             .last_cursor
             .set(iced::Point::new(700.0, 100.0));
-        assert!(session.broker_pointer_down(100.0, 100.0, crate::ui::desktop_protocol::message::MouseButton::Left));
-        assert!(matches!(wait_msg(&mut child_end), Some(ProtocolMsg::Input(InputMsg::PointerPressed { wid: w, .. })) if w == wid.0));
-        assert_eq!(session.host.as_ref().unwrap().wm.last_cursor.get(), iced::Point::new(100.0, 100.0));
-        assert!(session.broker_pointer_up(100.0, 100.0, crate::ui::desktop_protocol::message::MouseButton::Left));
-        assert!(matches!(wait_msg(&mut child_end), Some(ProtocolMsg::Input(InputMsg::PointerReleased { wid: w, .. })) if w == wid.0));
+        assert!(session.broker_pointer_down(
+            100.0,
+            100.0,
+            crate::ui::desktop_protocol::message::MouseButton::Left
+        ));
+        assert!(
+            matches!(wait_msg(&mut child_end), Some(ProtocolMsg::Input(InputMsg::PointerPressed { wid: w, .. })) if w == wid.0)
+        );
+        assert_eq!(
+            session.host.as_ref().unwrap().wm.last_cursor.get(),
+            iced::Point::new(100.0, 100.0)
+        );
+        assert!(session.broker_pointer_up(
+            100.0,
+            100.0,
+            crate::ui::desktop_protocol::message::MouseButton::Left
+        ));
+        assert!(
+            matches!(wait_msg(&mut child_end), Some(ProtocolMsg::Input(InputMsg::PointerReleased { wid: w, .. })) if w == wid.0)
+        );
         // 滚轮 → injected last_cursor 命中窗（hover 语义）。
         assert!(session.route_live_input(&LiveInput::Wheel { dx: 0.0, dy: -40.0 }));
         match wait_msg(&mut child_end) {

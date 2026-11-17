@@ -87,7 +87,8 @@ widget App {{
                 _ => None,
             })
             .expect("widget decl");
-        let mut widget = auto_ui_compiler::aura::extract::extract_widget_from_decl(decl).expect("extract");
+        let mut widget =
+            auto_ui_compiler::aura::extract::extract_widget_from_decl(decl).expect("extract");
         let mut gen = auto_ui_compiler::ui_gen::rust::RustGenerator::new();
         gen.generate_rust(&widget).expect("generate rust")
     }
@@ -446,7 +447,8 @@ widget App {{
     #[test]
     fn diff_files_window_faces_registered() {
         // catalog: 9921 canonical 归一（native_catalog.rs for_each_native 表）。
-        let src = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/native_catalog.rs");
+        let src =
+            include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/native_catalog.rs");
         assert!(
             src.contains("(9921, NATIVE_DIFF_FILES_WINDOW, shim_diff_files_window, \"auto.diff_files_window\")"),
             "catalog 9921 条目在册（供⑧ 改签位）"
@@ -457,7 +459,9 @@ widget App {{
         );
         // trans 裸名臂（a2r 轨）。PLAN-843：rust.rs 拆分后臂随 call_emit，
         // 扫描面=入口+族文件（随 owner 迁移，断言语义不变）。
-        let mut tr = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/trans/rust.rs").to_string();
+        let mut tr =
+            include_str!("../../../../../auto-lang/crates/auto-lang-core/src/trans/rust.rs")
+                .to_string();
         tr.push_str(
             "
 ",

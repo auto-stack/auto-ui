@@ -354,7 +354,9 @@ fn popover_panel_origin(
     let cx = r.x + r.w / 2.0 - pw / 2.0;
     let cy = r.y + r.h / 2.0 - ph / 2.0;
     let (px, py) = match placement {
-        PopoverPlacement::Modal | PopoverPlacement::ModalExplicit => ((vw - pw) / 2.0, (vh - ph) / 2.0),
+        PopoverPlacement::Modal | PopoverPlacement::ModalExplicit => {
+            ((vw - pw) / 2.0, (vh - ph) / 2.0)
+        }
         PopoverPlacement::EdgeLeft => (POP_MARGIN, (vh - ph) / 2.0),
         PopoverPlacement::EdgeRight => ((vw - pw - POP_MARGIN).max(POP_MARGIN), (vh - ph) / 2.0),
         PopoverPlacement::EdgeTop => ((vw - pw) / 2.0, POP_MARGIN),
@@ -938,8 +940,12 @@ impl<C: Component> FrameSource for RqProjector<C> {
     fn on_control(&mut self, control: &ControlMsg) {
         match control {
             ControlMsg::Resize { width, height, .. } => {
-                if width.is_finite() && height.is_finite() && *width > 0.0 && *height > 0.0
-                    && (self.width, self.height) != (*width, *height) {
+                if width.is_finite()
+                    && height.is_finite()
+                    && *width > 0.0
+                    && *height > 0.0
+                    && (self.width, self.height) != (*width, *height)
+                {
                     self.width = *width;
                     self.height = *height;
                     self.rev += 1;
@@ -3919,7 +3925,10 @@ mod tests {
         twin.render_frame();
         let regions = twin.hit_regions();
         for (i, (r, kind)) in regions.iter().enumerate() {
-            println!("REGION[{i}] kind={kind} rect=({},{},{},{})", r.x, r.y, r.w, r.h);
+            println!(
+                "REGION[{i}] kind={kind} rect=({},{},{},{})",
+                r.x, r.y, r.w, r.h
+            );
         }
         // 孪生侧 "+" 文本 op（与 t2 diag 的 child 侧 (363.8,433.35) 对拍）。
         let frame0 = twin.render_frame();
@@ -6998,5 +7007,3 @@ mod tests {
         );
     }
 }
-
-

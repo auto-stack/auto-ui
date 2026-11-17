@@ -14,7 +14,11 @@ impl<'a> AuraViewBuilder<'a> {
         let name = field_name.strip_prefix("store.").unwrap_or(field_name);
         // PLAN-041 T-02: outlet memo gate resolves read slots against the
         // page instance (scoped); the subtree's own override still wins.
-        if let Some(child_id) = self.slot_resolution_override.get().or(self.override_state_obj_id) {
+        if let Some(child_id) = self
+            .slot_resolution_override
+            .get()
+            .or(self.override_state_obj_id)
+        {
             // Try child state first, fall back to root state for store fields
             match self.bridge.read_child_state(child_id, name) {
                 Ok(v) => Ok(v),
@@ -28,9 +32,16 @@ impl<'a> AuraViewBuilder<'a> {
     /// Plan 320: read a state field as Vec<Value> (override-aware).
     /// Plan 370 D-GAP-4: also handles "store.field" paths by stripping the
     /// "store." prefix (store fields are merged into root state as bare names).
-    pub(super) fn read_state_as_vec(&self, field_name: &str) -> Result<Vec<auto_val::Value>, String> {
+    pub(super) fn read_state_as_vec(
+        &self,
+        field_name: &str,
+    ) -> Result<Vec<auto_val::Value>, String> {
         let name = field_name.strip_prefix("store.").unwrap_or(field_name);
-        if let Some(child_id) = self.slot_resolution_override.get().or(self.override_state_obj_id) {
+        if let Some(child_id) = self
+            .slot_resolution_override
+            .get()
+            .or(self.override_state_obj_id)
+        {
             // Try child state first, fall back to root state for store fields
             match self.bridge.read_child_state_as_vec(child_id, name) {
                 Ok(v) => Ok(v),
@@ -223,7 +234,11 @@ impl<'a> AuraViewBuilder<'a> {
     }
 
     /// Read a state field value as a display string, checking loop bindings first.
-    pub(super) fn read_state_as_string_with(&self, field_name: &str, bindings: &Bindings) -> String {
+    pub(super) fn read_state_as_string_with(
+        &self,
+        field_name: &str,
+        bindings: &Bindings,
+    ) -> String {
         // Check loop bindings first (e.g., "note" in `for note in .notes`)
         if let Some(val) = bindings.get(field_name) {
             return value_to_display_string(val);
@@ -698,7 +713,8 @@ impl<'a> AuraViewBuilder<'a> {
             Expr::None | Expr::Nil | Expr::Null => Some(Value::Nil),
             // Boolean control props use the same typed expression path as
             // conditions, including negation and ordered numeric comparisons.
-            Expr::Unary(Op::Not, operand) => self.resolve_expr_to_value(operand, bindings)
+            Expr::Unary(Op::Not, operand) => self
+                .resolve_expr_to_value(operand, bindings)
                 .map(|value| Value::Bool(!value.as_bool())),
             Expr::Bina(left, op @ (Op::Lt | Op::Le | Op::Gt | Op::Ge), right) => {
                 let number = |value: Value| match value {
@@ -710,8 +726,11 @@ impl<'a> AuraViewBuilder<'a> {
                 let left = number(self.resolve_expr_to_value(left, bindings)?)?;
                 let right = number(self.resolve_expr_to_value(right, bindings)?)?;
                 Some(Value::Bool(match op {
-                    Op::Lt => left < right, Op::Le => left <= right,
-                    Op::Gt => left > right, Op::Ge => left >= right, _ => unreachable!(),
+                    Op::Lt => left < right,
+                    Op::Le => left <= right,
+                    Op::Gt => left > right,
+                    Op::Ge => left >= right,
+                    _ => unreachable!(),
                 }))
             }
             // Plan 339: binary comparison for if-expressions (e.g., i == .active_index)
@@ -1478,7 +1497,11 @@ impl<'a> AuraViewBuilder<'a> {
     /// bridge.call_vm_fn 与 t()/style recipe 通道、Dot 臂含 store 特判）。
     /// 仅兜底不前置：既有绿臂语义零扰动；解析失败回 None（调用方落原
     /// false 语义）。
-    pub(super) fn resolve_condition_operand_fallback(&self, src: &str, bindings: &Bindings) -> Option<Value> {
+    pub(super) fn resolve_condition_operand_fallback(
+        &self,
+        src: &str,
+        bindings: &Bindings,
+    ) -> Option<Value> {
         let trimmed = src.trim();
         if trimmed.is_empty() {
             return None;
@@ -1505,7 +1528,11 @@ impl<'a> AuraViewBuilder<'a> {
     /// Plan 503: also resolves loop-member form `${member.field}` (e.g.
     /// launcher brand-color chip `style: "h-10 w-10 ${r.chip}"` inside
     /// `for r in .rows`) via resolve_expr_to_value over the loop bindings.
-    pub(super) fn resolve_literal_interpolation_with(&self, s: &str, bindings: &Bindings) -> String {
+    pub(super) fn resolve_literal_interpolation_with(
+        &self,
+        s: &str,
+        bindings: &Bindings,
+    ) -> String {
         if !s.contains("${") {
             return s.to_string();
         }
@@ -1602,5 +1629,4 @@ impl<'a> AuraViewBuilder<'a> {
     // ========================================================================
     // Event helpers
     // ========================================================================
-
 }

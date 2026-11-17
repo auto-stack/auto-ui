@@ -56,7 +56,9 @@ mod plan808_core_cut {
 
     #[test]
     fn terminal_glue_is_codec_only() {
-        let src = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/ffi/term_engine.rs");
+        let src = include_str!(
+            "../../../../../auto-lang/crates/auto-lang-core/src/vm/ffi/term_engine.rs"
+        );
         for shim in SHIMS {
             assert!(src.contains(shim), "missing shim {shim}");
         }
@@ -92,7 +94,8 @@ mod plan808_core_cut {
 
     #[test]
     fn catalog_and_shims_match_34() {
-        let catalog = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/native_catalog.rs");
+        let catalog =
+            include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/native_catalog.rs");
         for canonical in [
             "auto.term.engine_spawn",
             "auto.term.engine_write_line",
@@ -530,10 +533,14 @@ mod plan808_assembly {
         assert!(bare.terminal_provider().is_none(), "构造式缺席");
 
         let a = Arc::new(Recording::default());
-        auto_lang_core::vm::host_capabilities::set_process_default_terminal_host_provider(a.clone());
+        auto_lang_core::vm::host_capabilities::set_process_default_terminal_host_provider(
+            a.clone(),
+        );
         let vm1 = AutoVM::new(VirtualFlash::new(0), 256);
         let b = Arc::new(Recording::default());
-        auto_lang_core::vm::host_capabilities::set_process_default_terminal_host_provider(b.clone());
+        auto_lang_core::vm::host_capabilities::set_process_default_terminal_host_provider(
+            b.clone(),
+        );
         let vm2 = AutoVM::new(VirtualFlash::new(0), 256);
 
         // vm1 keeps its construction-time snapshot: calling a shim hits A.
@@ -559,7 +566,9 @@ mod plan808_assembly {
 
         // Later process-default changes do not affect existing instances.
         let d = Arc::new(Recording::default());
-        auto_lang_core::vm::host_capabilities::set_process_default_terminal_host_provider(d.clone());
+        auto_lang_core::vm::host_capabilities::set_process_default_terminal_host_provider(
+            d.clone(),
+        );
         let mut task = AutoTask::new(0, 256, 0);
         auto_lang_core::vm::ffi::term_engine::shim_term_window_width(&mut task, &vm2).unwrap();
         assert_eq!(b.take(), vec!["window_width()".to_string()]);
@@ -582,8 +591,13 @@ mod plan808_assembly {
         assert!(vm.terminal_provider().is_some(), "merge keeps provider");
 
         match saved {
-            Some(p) => auto_lang_core::vm::host_capabilities::set_process_default_terminal_host_provider(p),
-            None => auto_lang_core::vm::host_capabilities::clear_process_default_terminal_host_provider(),
+            Some(p) => {
+                auto_lang_core::vm::host_capabilities::set_process_default_terminal_host_provider(p)
+            }
+            None => {
+                auto_lang_core::vm::host_capabilities::clear_process_default_terminal_host_provider(
+                )
+            }
         }
     }
 
@@ -1084,10 +1098,18 @@ mod plan808_real_dll {
         let mut task = AutoTask::new(0, 1024, 0);
         task.ram.push_nv(auto_val::encode_i32(handle as i32));
         match which {
-            "cursor_row" => auto_lang_core::vm::ffi::term_engine::shim_term_cursor_row(&mut task, vm),
-            "cursor_col" => auto_lang_core::vm::ffi::term_engine::shim_term_cursor_col(&mut task, vm),
-            "viewport_cols" => auto_lang_core::vm::ffi::term_engine::shim_term_viewport_cols(&mut task, vm),
-            "viewport_rows" => auto_lang_core::vm::ffi::term_engine::shim_term_viewport_rows(&mut task, vm),
+            "cursor_row" => {
+                auto_lang_core::vm::ffi::term_engine::shim_term_cursor_row(&mut task, vm)
+            }
+            "cursor_col" => {
+                auto_lang_core::vm::ffi::term_engine::shim_term_cursor_col(&mut task, vm)
+            }
+            "viewport_cols" => {
+                auto_lang_core::vm::ffi::term_engine::shim_term_viewport_cols(&mut task, vm)
+            }
+            "viewport_rows" => {
+                auto_lang_core::vm::ffi::term_engine::shim_term_viewport_rows(&mut task, vm)
+            }
             _ => unreachable!(),
         }
         .unwrap();

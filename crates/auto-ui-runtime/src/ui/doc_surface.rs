@@ -33,9 +33,7 @@ use std::sync::{Mutex, OnceLock};
 
 use iced::widget::canvas::{self, Geometry, Path};
 use iced::{mouse, Rectangle, Size};
-use wry::raw_window_handle::{
-    HasWindowHandle, RawWindowHandle, Win32WindowHandle, WindowHandle,
-};
+use wry::raw_window_handle::{HasWindowHandle, RawWindowHandle, Win32WindowHandle, WindowHandle};
 
 // ---------------------------------------------------------------------------
 // Win32 面（窄声明，同 026 native_host 纪律：只取本缝所需原型）。
@@ -78,16 +76,24 @@ extern "system" {
     fn GetCurrentThreadId() -> u32;
     fn RegisterClassW(wc: *const WNDCLASSW) -> u16;
     fn CreateWindowExW(
-        ex: u32, class: *const u16, title: *const u16, style: u32,
-        x: i32, y: i32, w: i32, h: i32, parent: isize, menu: isize,
-        inst: isize, param: isize,
+        ex: u32,
+        class: *const u16,
+        title: *const u16,
+        style: u32,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+        parent: isize,
+        menu: isize,
+        inst: isize,
+        param: isize,
     ) -> isize;
     fn DefWindowProcW(hwnd: isize, msg: u32, w: usize, l: isize) -> isize;
     fn GetModuleHandleW(name: *const u16) -> isize;
     fn GetLastError() -> u32;
-    fn SetWindowPos(
-        hwnd: isize, after: isize, x: i32, y: i32, cx: i32, cy: i32, flags: u32,
-    ) -> i32;
+    fn SetWindowPos(hwnd: isize, after: isize, x: i32, y: i32, cx: i32, cy: i32, flags: u32)
+        -> i32;
     fn ShowWindow(hwnd: isize, cmd: i32) -> i32;
 }
 
@@ -103,9 +109,7 @@ const WHITE_BRUSH: isize = 0;
 /// SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE
 const SWP_Z_ONLY: u32 = 0x0001 | 0x0002 | 0x0010;
 
-unsafe extern "system" fn popup_proc(
-    hwnd: isize, msg: u32, w: usize, l: isize,
-) -> isize {
+unsafe extern "system" fn popup_proc(hwnd: isize, msg: u32, w: usize, l: isize) -> isize {
     // 最小 proc：弹出窗自身无消息语义，全部交 DefWindowProc。
     DefWindowProcW(hwnd, msg, w, l)
 }
@@ -171,8 +175,14 @@ fn ensure_popup_hwnd(owner: isize, x: i32, y: i32, w: i32, h: i32) -> Option<isi
                 cls,
                 title.as_ptr(),
                 WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS,
-                x, y, w.max(1), h.max(1),
-                owner, 0, hmod, 0,
+                x,
+                y,
+                w.max(1),
+                h.max(1),
+                owner,
+                0,
+                hmod,
+                0,
             );
             if hwnd == 0 {
                 eprintln!(
@@ -190,7 +200,11 @@ fn ensure_popup_hwnd(owner: isize, x: i32, y: i32, w: i32, h: i32) -> Option<isi
 
 fn dpi_scale(hwnd: isize) -> f32 {
     let dpi = unsafe { GetDpiForWindow(hwnd) };
-    if dpi == 0 { 1.0 } else { dpi as f32 / 96.0 }
+    if dpi == 0 {
+        1.0
+    } else {
+        dpi as f32 / 96.0
+    }
 }
 
 thread_local! {
@@ -202,7 +216,9 @@ thread_local! {
 
 extern "system" fn enum_host_callback(hwnd: isize, _lparam: isize) -> i32 {
     unsafe {
-        let Some((cx, cy)) = CENTER.with(|c| c.get()) else { return 1 };
+        let Some((cx, cy)) = CENTER.with(|c| c.get()) else {
+            return 1;
+        };
         if IsWindowVisible(hwnd) == 0 {
             return 1;
         }
@@ -211,7 +227,12 @@ extern "system" fn enum_host_callback(hwnd: isize, _lparam: isize) -> i32 {
                 return 1; // 跳过弹出窗自身
             }
         }
-        let mut client = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut client = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
         if GetClientRect(hwnd, &mut client) == 0 {
             return 1;
         }
@@ -245,7 +266,12 @@ fn locate_host(bounds: &Rectangle) -> Option<isize> {
 /// canvas 逻辑 bounds → 宿主客户区坐标系的物理 rect。
 fn canvas_physical_rect(hwnd: isize, bounds: &Rectangle) -> Option<(i32, i32, u32, u32)> {
     unsafe {
-        let mut client = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut client = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
         if GetClientRect(hwnd, &mut client) == 0 {
             return None;
         }
@@ -351,10 +377,14 @@ impl DocSurfaceState {
     }
 
     fn unbind(&self) {
-        let Some(key) = self.key.borrow_mut().take() else { return };
+        let Some(key) = self.key.borrow_mut().take() else {
+            return;
+        };
         let last = MOUNTED.with(|mounted| {
             let mut mounted = mounted.borrow_mut();
-            let Some(count) = mounted.get_mut(&key) else { return false };
+            let Some(count) = mounted.get_mut(&key) else {
+                return false;
+            };
             *count -= 1;
             if *count == 0 {
                 mounted.remove(&key);
@@ -379,9 +409,7 @@ impl Drop for DocSurfaceState {
 struct RawHwndHost(isize);
 
 impl HasWindowHandle for RawHwndHost {
-    fn window_handle(
-        &self,
-    ) -> Result<WindowHandle<'_>, wry::raw_window_handle::HandleError> {
+    fn window_handle(&self) -> Result<WindowHandle<'_>, wry::raw_window_handle::HandleError> {
         let Some(nz) = NonZeroIsize::new(self.0) else {
             return Err(wry::raw_window_handle::HandleError::Unavailable);
         };
@@ -460,8 +488,7 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
     };
     // 弹出窗跟随组件矩形移动/缩放（屏幕坐标）；SWP_Z_ONLY 的 z 跟随在
     // sync 尾部统一做。
-    static LAST_PHYS: OnceLock<Mutex<HashMap<String, (i32, i32, i32, i32)>>> =
-        OnceLock::new();
+    static LAST_PHYS: OnceLock<Mutex<HashMap<String, (i32, i32, i32, i32)>>> = OnceLock::new();
     let last = LAST_PHYS.get_or_init(|| Mutex::new(HashMap::new()));
     let moved = last
         .lock()
@@ -474,7 +501,9 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
             // SWP_NOZORDER(0x4)|SWP_NOACTIVATE(0x10)
             SetWindowPos(popup, 0, sx, sy, sw, sh, 0x0004 | 0x0010);
         }
-        last.lock().unwrap().insert(key.to_string(), (sx, sy, sw, sh));
+        last.lock()
+            .unwrap()
+            .insert(key.to_string(), (sx, sy, sw, sh));
     }
 
     if let std::collections::hash_map::Entry::Vacant(e) = map.entry(key.to_string()) {
@@ -492,7 +521,9 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
     let has_webview = WEBVIEWS.with(|w| w.borrow_mut().contains_key(key));
     if !has_webview || s.hwnd != popup {
         let popup_handle = RawHwndHost(popup);
-        let built = wry::WebViewBuilder::new().with_url(url).build_as_child(&popup_handle);
+        let built = wry::WebViewBuilder::new()
+            .with_url(url)
+            .build_as_child(&popup_handle);
         match built {
             Ok(wv) => {
                 // 弹出窗内部坐标：webview 填满弹出窗客户区 (0,0,sw,sh)——
@@ -535,7 +566,11 @@ pub fn sync_surface(key: &str, url: &str, bounds: &Rectangle) {
             if !s.popup_visible {
                 set_popup_visible(popup, true);
                 s.popup_visible = true;
-                action = if action == "sync" { "popup-show" } else { action };
+                action = if action == "sync" {
+                    "popup-show"
+                } else {
+                    action
+                };
             }
             if !s.visible {
                 let _ = wv.set_visible(true);
@@ -581,7 +616,11 @@ pub struct DocSurfacePainter<M> {
 
 impl<M> DocSurfacePainter<M> {
     pub fn new(key: String, url: String) -> Self {
-        Self { key, url, _message: std::marker::PhantomData }
+        Self {
+            key,
+            url,
+            _message: std::marker::PhantomData,
+        }
     }
 }
 
@@ -598,8 +637,7 @@ impl<M> canvas::Program<M> for DocSurfacePainter<M> {
     ) -> Vec<Geometry> {
         state.bind(&self.key);
         sync_surface(&self.key, &self.url, &bounds);
-        let mut frame =
-            canvas::Frame::new(renderer, Size::new(bounds.width, bounds.height));
+        let mut frame = canvas::Frame::new(renderer, Size::new(bounds.width, bounds.height));
         let rect = Path::rectangle(iced::Point::ORIGIN, frame.size());
         frame.fill(&rect, iced::Color::from_rgba8(0xF6, 0xF7, 0xF9, 1.0));
         vec![frame.into_geometry()]
@@ -611,11 +649,14 @@ mod plan068_mount_tests {
     use super::*;
 
     fn visible(key: &str) {
-        surfaces().lock().unwrap().insert(key.to_string(), SurfaceMeta {
-            visible: true,
-            popup_visible: true,
-            ..Default::default()
-        });
+        surfaces().lock().unwrap().insert(
+            key.to_string(),
+            SurfaceMeta {
+                visible: true,
+                popup_visible: true,
+                ..Default::default()
+            },
+        );
     }
 
     fn assert_visibility(key: &str, expected: bool) {
@@ -634,7 +675,10 @@ mod plan068_mount_tests {
         state.bind(key); // ordinary rebuilt painter must not add another lease
         drop(state);
         assert_visibility(key, false);
-        assert!(surfaces().lock().unwrap().contains_key(key), "hide retains the surface");
+        assert!(
+            surfaces().lock().unwrap().contains_key(key),
+            "hide retains the surface"
+        );
         let remount = DocSurfaceState::default();
         remount.bind(key);
         visible(key);

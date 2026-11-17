@@ -23,12 +23,15 @@ mod plan785_provider {
     /// host_capabilities 零 `ui::` 引用（能力接口与装配层分离）。
     #[test]
     fn core_clipboard_shims_have_no_ui_clipboard_reference() {
-        let native_rs = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/native.rs");
+        let native_rs =
+            include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/native.rs");
         assert!(
             !native_rs.contains("ui::clipboard::"),
             "vm/native.rs 不得直引 ui::clipboard（PLAN-785 剪断；供值经 host_capabilities provider）"
         );
-        let host_caps_rs = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/host_capabilities.rs");
+        let host_caps_rs = include_str!(
+            "../../../../../auto-lang/crates/auto-lang-core/src/vm/host_capabilities.rs"
+        );
         assert!(
             !host_caps_rs.contains("ui::"),
             "vm/host_capabilities.rs 是 core 能力接口，不得引用 ui"
@@ -145,7 +148,8 @@ mod plan785_provider {
         let _bridge = crate::ui::vm_bridge::VmBridge::new(&widget).expect("bridge");
 
         assert!(
-            auto_lang_core::vm::host_capabilities::process_default_clipboard_text_provider().is_some(),
+            auto_lang_core::vm::host_capabilities::process_default_clipboard_text_provider()
+                .is_some(),
             "VmBridge 构造须注册进程默认 clipboard text provider（PLAN-785 UI 装配）"
         );
     }
@@ -238,7 +242,9 @@ mod plan785_provider {
         auto_lang_core::vm::host_capabilities::test_default_slot_lock()
     }
 
-    struct DefaultGuard(Option<Arc<dyn auto_lang_core::vm::host_capabilities::ClipboardTextProvider>>);
+    struct DefaultGuard(
+        Option<Arc<dyn auto_lang_core::vm::host_capabilities::ClipboardTextProvider>>,
+    );
 
     impl DefaultGuard {
         fn new() -> Self {

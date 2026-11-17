@@ -1,0 +1,26 @@
+// PLAN-085 T-03 control for pkg_host_diag.at: identical shape, child declared
+// in this same file.
+widget SoloChildDiag (nodes: List = []) {
+    msg { Down }
+    model { var hits int = 0 }
+    view {
+        col (style: "w-full") {
+            onkeydown.down: .Down
+            text f"solo hits=${.hits}" { style: "text-xs" }
+        }
+    }
+    on {
+        .Down -> { .hits = .hits + 1 }
+    }
+}
+
+widget samefilediag {
+    msg { Init }
+    model { var nodes List = [] }
+    view {
+        col (style: "p-4") {
+            SoloChildDiag (nodes: []) {}
+        }
+    }
+    on { .Init -> { .nodes = [] } }
+}

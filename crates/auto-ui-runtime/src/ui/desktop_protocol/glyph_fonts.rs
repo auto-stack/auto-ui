@@ -47,7 +47,9 @@ pub fn hash_for_font_id(
     if let Some(cached) = id_to_hash().lock().unwrap().get(&id).copied() {
         return cached;
     }
-    let hash = system.get_font(id, weight).map(|font| font_hash(font.data()));
+    let hash = system
+        .get_font(id, weight)
+        .map(|font| font_hash(font.data()));
     id_to_hash().lock().unwrap().insert(id, hash);
     hash
 }
@@ -94,7 +96,8 @@ pub fn font_id_for_hash(hash: &FontHash) -> Option<cosmic_text::fontdb::ID> {
     let mut system = iced::advanced::graphics::text::font_system()
         .write()
         .expect("Write font system");
-    let candidates: Vec<cosmic_text::fontdb::ID> = system.raw().db_mut().faces().map(|f| f.id).collect();
+    let candidates: Vec<cosmic_text::fontdb::ID> =
+        system.raw().db_mut().faces().map(|f| f.id).collect();
     for id in candidates {
         if let Some(font) = system.raw().get_font(id, cosmic_text::Weight::NORMAL) {
             if font_hash(font.data()) == *hash {

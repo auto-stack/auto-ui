@@ -27,3 +27,9 @@ dep themes {
 dep pagination {
     path: "../../../packages/pagination"
 }
+
+# PLAN-085：官方 TreeView 包 dep 根（vue 轨 SFC 发出扫描；native 轨走 widget
+# 级 use 的 VM sweep 传递装载）。
+dep tree_view {
+    path: "../../../packages/tree-view"
+}

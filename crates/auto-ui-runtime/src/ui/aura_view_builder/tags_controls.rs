@@ -505,10 +505,16 @@ impl<'a> AuraViewBuilder<'a> {
             !self.eval_condition_with(&cond, bindings)
         } else {
             match props.get("disabled") {
-                Some(AuraPropValue::Expr(expr)) => self.resolve_expr_to_value(expr, bindings)
-                    .map(|v| { let text = value_to_display_string(&v); text == "true" || text == "1" })
-                    .unwrap_or_else(|| self.extract_string_with(props, "disabled", bindings)
-                        .is_some_and(|v| v == "true" || v == "1")),
+                Some(AuraPropValue::Expr(expr)) => self
+                    .resolve_expr_to_value(expr, bindings)
+                    .map(|v| {
+                        let text = value_to_display_string(&v);
+                        text == "true" || text == "1"
+                    })
+                    .unwrap_or_else(|| {
+                        self.extract_string_with(props, "disabled", bindings)
+                            .is_some_and(|v| v == "true" || v == "1")
+                    }),
                 _ => false,
             }
         };
@@ -1350,7 +1356,11 @@ impl<'a> AuraViewBuilder<'a> {
 
     /// PLAN-493: state-rooted 字段 → Vec<String>（bindings 命中 Array 直接
     /// 取；否则 read_state_as_vec 同步深拷贝）。Str/String 元素之外跳过。
-    pub(super) fn state_rooted_string_list(&self, field: &str, bindings: &Bindings) -> Option<Vec<String>> {
+    pub(super) fn state_rooted_string_list(
+        &self,
+        field: &str,
+        bindings: &Bindings,
+    ) -> Option<Vec<String>> {
         if field.is_empty() {
             return None;
         }
@@ -1465,5 +1475,4 @@ impl<'a> AuraViewBuilder<'a> {
     // ========================================================================
     // Text content conversion
     // ========================================================================
-
 }

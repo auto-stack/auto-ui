@@ -7,7 +7,6 @@ use super::style::Style;
 use super::view::View;
 use auto_val::{Node, Value};
 
-
 /// Errors that can occur during node conversion
 #[derive(Debug, Clone)]
 pub enum ConversionError {

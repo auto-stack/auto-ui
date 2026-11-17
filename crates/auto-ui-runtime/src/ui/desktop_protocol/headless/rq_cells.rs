@@ -15,8 +15,8 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use super::rq_probe::{
-    analyze_residual_pair, assert_named_aa_closure, direct_frames, ms, out_dir,
-    pixel_diff_ratio, stats, theme,
+    analyze_residual_pair, assert_named_aa_closure, direct_frames, ms, out_dir, pixel_diff_ratio,
+    stats, theme,
 };
 use super::*;
 use crate::ui::component::Component;
@@ -124,10 +124,7 @@ fn case_views() -> Vec<(&'static str, View<()>)> {
     vec![
         ("path_mesh", super::rq_seams::canvas_scene_view()),
         ("svg_icon", View::image("lucide:bell")),
-        (
-            "text_cjk",
-            View::text("中文路径客户数据库混排 ABC"),
-        ),
+        ("text_cjk", View::text("中文路径客户数据库混排 ABC")),
         (
             "gradient_border_shadow",
             View::container(View::text("渐变边框阴影"))
@@ -136,9 +133,14 @@ fn case_views() -> Vec<(&'static str, View<()>)> {
         ),
         (
             "scroll_clip",
-            View::scrollable(View::col().child(View::text("第一行")).child(View::text("第二行")).build())
-                .style("max-h-24")
-                .build(),
+            View::scrollable(
+                View::col()
+                    .child(View::text("第一行"))
+                    .child(View::text("第二行"))
+                    .build(),
+            )
+            .style("max-h-24")
+            .build(),
         ),
         (
             "shadow_only",
@@ -275,8 +277,9 @@ fn measure_case(
     let (mut produce, mut encode, mut decode, mut replay) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let mut inventory_json = serde_json::Value::Null;
-    let mut replay_sim: Option<iced_test::simulator::Simulator<'static, (), iced::Theme, iced::Renderer>> =
-        None;
+    let mut replay_sim: Option<
+        iced_test::simulator::Simulator<'static, (), iced::Theme, iced::Renderer>,
+    > = None;
 
     for i in 0..(WARMUP + SAMPLES) {
         let t = Instant::now();
@@ -295,7 +298,8 @@ fn measure_case(
 
         // 宿主把本帧资源登记进图像缓存（生产路径 = BitmapReady → cache）。
         for up in surface.drain_bitmap_uploads() {
-            crate::ui::iced::broker_surface::bitmap_cache_put(&format!("bitmap://{}", up.id),
+            crate::ui::iced::broker_surface::bitmap_cache_put(
+                &format!("bitmap://{}", up.id),
                 up.w,
                 up.h,
                 up.stride,
@@ -310,7 +314,10 @@ fn measure_case(
             replay_sim = Some(iced_test::simulator::Simulator::with_size(
                 iced::Settings::default(),
                 iced::Size::new(W, H),
-                crate::ui::iced::broker_surface::displaylist_element::<()>(&replay_list, super::rq_probe::SIMULATOR_SCALE),
+                crate::ui::iced::broker_surface::displaylist_element::<()>(
+                    &replay_list,
+                    super::rq_probe::SIMULATOR_SCALE,
+                ),
             ));
         }
         let t = Instant::now();
@@ -331,8 +338,7 @@ fn measure_case(
     let rq_png = written(out, &format!("{name}-rq"));
     let diff = pixel_diff_ratio(&direct_png, &rq_png, 2);
     // >0.1% 行生成像素级残差报告（0.1% 内 = exact 门已满足，无需具名化）。
-    let residual =
-        (diff > 0.001).then(|| analyze_residual_pair(&direct_png, &rq_png, backdrop));
+    let residual = (diff > 0.001).then(|| analyze_residual_pair(&direct_png, &rq_png, backdrop));
     let (uploads, uploaded_bytes, hits, _evictions, resident) = surface.resource_stats();
     let raster_hits = surface.raster_cache_hits();
     let mut inventory_json = inventory_json;
@@ -382,88 +388,88 @@ fn rq_cells_t05_six_cell_matrix() {
             CellStatus::Runnable | CellStatus::InprocApprox => {
                 let mut cases = Vec::new();
                 for (name, view) in case_views() {
-                  for (mode, glyph_runs) in [("default", false), ("v3_rich", true)] {
-                    match measure_case(view.clone(), &out, name, mode, glyph_runs) {
-                        Ok(reading) => {
-                            if mode == "default" {
-                                // 门只压默认 producer（生产路径）：文字/路径/SVG/滚动
-                                // 必须 ≤0.1%（阈值 2/255）。
-                                assert!(
+                    for (mode, glyph_runs) in [("default", false), ("v3_rich", true)] {
+                        match measure_case(view.clone(), &out, name, mode, glyph_runs) {
+                            Ok(reading) => {
+                                if mode == "default" {
+                                    // 门只压默认 producer（生产路径）：文字/路径/SVG/滚动
+                                    // 必须 ≤0.1%（阈值 2/255）。
+                                    assert!(
                                     reading.diff_ratio <= 0.001,
                                     "{name} 默认 producer 的像素差 {:.4} 超 0.1% 门（AC-02 r4）",
                                     reading.diff_ratio
                                 );
-                            } else {
-                                // v3 富模式是 r4 的具名边界（不得计为 exact），但边界
-                                // 本身必须被**断言**（复审 F-03）：文字类 ≤1.0%、
-                                // 含阴影贴片的例 ≤1.5%，其余原语维持 0.1%。
-                                let bound = match name {
-                                    "text_cjk" | "scroll_clip" => 0.010,
-                                    "gradient_border_shadow" | "shadow_only" => 0.015,
-                                    _ => 0.001,
-                                };
-                                assert!(
+                                } else {
+                                    // v3 富模式是 r4 的具名边界（不得计为 exact），但边界
+                                    // 本身必须被**断言**（复审 F-03）：文字类 ≤1.0%、
+                                    // 含阴影贴片的例 ≤1.5%，其余原语维持 0.1%。
+                                    let bound = match name {
+                                        "text_cjk" | "scroll_clip" => 0.010,
+                                        "gradient_border_shadow" | "shadow_only" => 0.015,
+                                        _ => 0.001,
+                                    };
+                                    assert!(
                                     reading.diff_ratio <= bound,
                                     "{name} v3 富模式像素差 {:.4} 超具名上界 {bound}（AC-02 r4）",
                                     reading.diff_ratio
                                 );
-                                // PLAN-073 T-03（A2/A3 收口）：>0.1% 的具名残差
-                                // 必须带像素级关闭依据（平坦区零差 + 边缘带 +
-                                // 墨量守恒 + 轮廓对齐）——非静默放宽。
-                                if let Some(rep) = &reading.residual {
-                                    assert_named_aa_closure(
-                                        &format!("{name} v3_rich"),
-                                        rep,
-                                        bound,
-                                    );
+                                    // PLAN-073 T-03（A2/A3 收口）：>0.1% 的具名残差
+                                    // 必须带像素级关闭依据（平坦区零差 + 边缘带 +
+                                    // 墨量守恒 + 轮廓对齐）——非静默放宽。
+                                    if let Some(rep) = &reading.residual {
+                                        assert_named_aa_closure(
+                                            &format!("{name} v3_rich"),
+                                            rep,
+                                            bound,
+                                        );
+                                    }
                                 }
-                            }
-                            // Plan §6：性能测量只在**隔离窗口**有效（不与其他会话
-                            // 争用 GPU）。共享窗口一律只记录：跑机负载会把 produce/
-                            // replay 的尾部放大到数倍（实测 SVG produce p50 32→76ms、
-                            // replay p50 5→18ms），据此判红是假红（复审 N-02）。
-                            let isolated_window = std::env::var("AUTO_RQ_TIMING_WINDOW")
-                                .as_deref()
-                                == Ok("isolated");
-                            if isolated_window {
-                                // produce p95 ≤10ms；SVG 例是**唯一具名例外**
-                                // （记录路径每帧新建 iced renderer），按 p50 设界
-                                // （p95 在负载下可到 90ms，属同一成本类别）。
-                                if name == "svg_icon" {
-                                    assert!(
-                                        reading.produce_p50 <= 60.0,
-                                        "SVG 例外仍须有界：produce p50 {:.2}ms > 60ms",
-                                        reading.produce_p50
-                                    );
-                                } else {
-                                    assert!(
+                                // Plan §6：性能测量只在**隔离窗口**有效（不与其他会话
+                                // 争用 GPU）。共享窗口一律只记录：跑机负载会把 produce/
+                                // replay 的尾部放大到数倍（实测 SVG produce p50 32→76ms、
+                                // replay p50 5→18ms），据此判红是假红（复审 N-02）。
+                                let isolated_window = std::env::var("AUTO_RQ_TIMING_WINDOW")
+                                    .as_deref()
+                                    == Ok("isolated");
+                                if isolated_window {
+                                    // produce p95 ≤10ms；SVG 例是**唯一具名例外**
+                                    // （记录路径每帧新建 iced renderer），按 p50 设界
+                                    // （p95 在负载下可到 90ms，属同一成本类别）。
+                                    if name == "svg_icon" {
+                                        assert!(
+                                            reading.produce_p50 <= 60.0,
+                                            "SVG 例外仍须有界：produce p50 {:.2}ms > 60ms",
+                                            reading.produce_p50
+                                        );
+                                    } else {
+                                        assert!(
                                         reading.produce_p95 <= 10.0,
                                         "{name} produce p95 {:.2}ms 超 061 冻结 W-C ≤10ms（且不属具名例外）",
                                         reading.produce_p95
                                     );
+                                    }
                                 }
-                            }
-                            println!(
-                                "[RQCELLS] {}",
-                                serde_json::json!({
-                                    "tag": "case", "cell": cell.id, "case": name, "producer_mode": mode,
-                                    "inventory": reading.inventory,
-                                    "produce_p50": reading.produce_p50,
-                                    "produce_p95": reading.produce_p95,
-                                    "encode_p50": reading.encode_p50,
-                                    "decode_p50": reading.decode_p50,
-                                    "replay_p50": reading.replay_p50,
-                                    "replay_p95": reading.replay_p95,
-                                    "uploads": reading.uploads,
-                                    "uploaded_bytes": reading.uploaded_bytes,
-                                    "hits": reading.hits,
-                                    "resident_bytes": reading.resident_bytes, "raster_hits": reading.raster_hits,
-                                    "pixel_diff_vs_direct": reading.diff_ratio,
-                                    "residual": reading.residual.as_ref().map(|r| r.to_json()),
-                                    "timing_gate": if std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated") { "asserted" } else { "skipped_shared_window" },
-                                })
-                            );
-                            cases.push(serde_json::json!({
+                                println!(
+                                    "[RQCELLS] {}",
+                                    serde_json::json!({
+                                        "tag": "case", "cell": cell.id, "case": name, "producer_mode": mode,
+                                        "inventory": reading.inventory,
+                                        "produce_p50": reading.produce_p50,
+                                        "produce_p95": reading.produce_p95,
+                                        "encode_p50": reading.encode_p50,
+                                        "decode_p50": reading.decode_p50,
+                                        "replay_p50": reading.replay_p50,
+                                        "replay_p95": reading.replay_p95,
+                                        "uploads": reading.uploads,
+                                        "uploaded_bytes": reading.uploaded_bytes,
+                                        "hits": reading.hits,
+                                        "resident_bytes": reading.resident_bytes, "raster_hits": reading.raster_hits,
+                                        "pixel_diff_vs_direct": reading.diff_ratio,
+                                        "residual": reading.residual.as_ref().map(|r| r.to_json()),
+                                        "timing_gate": if std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated") { "asserted" } else { "skipped_shared_window" },
+                                    })
+                                );
+                                cases.push(serde_json::json!({
                                 "case": name, "producer_mode": mode,
                                 "inventory": reading.inventory,
                                 "timing_ms": {
@@ -484,14 +490,14 @@ fn rq_cells_t05_six_cell_matrix() {
                                 "residual": reading.residual.as_ref().map(|r| r.to_json()),
                                 "timing_gate": if std::env::var("AUTO_RQ_TIMING_WINDOW").as_deref() == Ok("isolated") { "asserted" } else { "skipped_shared_window" },
                             }));
-                        }
-                        Err(err) => {
-                            cases.push(serde_json::json!({
+                            }
+                            Err(err) => {
+                                cases.push(serde_json::json!({
                                 "case": name, "producer_mode": mode, "error": err, "status": "failed",
                             }));
+                            }
                         }
                     }
-                  }
                 }
                 cell_rows.push(serde_json::json!({
                     "cell": cell.id, "producer": cell.producer, "host": cell.host,
@@ -524,7 +530,10 @@ fn rq_cells_t05_six_cell_matrix() {
         serde_json::to_string_pretty(&report).unwrap_or_default(),
     )
     .expect("write report");
-    println!("[RQCELLS] {}", serde_json::json!({ "tag": "cells_written", "path": out.join("t05-cells.json").display().to_string() }));
+    println!(
+        "[RQCELLS] {}",
+        serde_json::json!({ "tag": "cells_written", "path": out.join("t05-cells.json").display().to_string() })
+    );
 
     // 六格必须全部有证据（本模块矩阵 或 `rq_wire` 真实 wire），不得删分母。
     let runnable = report["cells"]
@@ -533,7 +542,10 @@ fn rq_cells_t05_six_cell_matrix() {
         .iter()
         .filter(|c| c["status"] == "runnable" || c["status"] == "inproc_approx")
         .count();
-    assert_eq!(runnable, 6, "六格必须全部可运行/有 wire 证据，实得 {runnable}");
+    assert_eq!(
+        runnable, 6,
+        "六格必须全部可运行/有 wire 证据，实得 {runnable}"
+    );
     let blocked = report["cells"]
         .as_array()
         .unwrap()
@@ -543,11 +555,17 @@ fn rq_cells_t05_six_cell_matrix() {
     assert_eq!(blocked, 0, "不得再有不可运行格（缺格不删分母）");
     for cell in report["cells"].as_array().unwrap() {
         assert!(
-            cell["owner"].as_str().map(|o| !o.is_empty()).unwrap_or(false),
+            cell["owner"]
+                .as_str()
+                .map(|o| !o.is_empty())
+                .unwrap_or(false),
             "每格必须有具名 owner/边界"
         );
         // 本模块驱动的格必须有逐例读数；wire 覆盖的格必须点名证据出处。
-        let driven_here = cell["cases"].as_array().map(|c| !c.is_empty()).unwrap_or(false);
+        let driven_here = cell["cases"]
+            .as_array()
+            .map(|c| !c.is_empty())
+            .unwrap_or(false);
         let wire_backed = cell["evidence"] == "rq_wire";
         assert!(
             driven_here || wire_backed,
@@ -647,11 +665,7 @@ fn rq_cells_t05_six_cell_matrix() {
         .iter()
         .find(|c| c["cell"] == "rust/standalone-rq")
         .and_then(|c| c["cases"].as_array().cloned())
-        .and_then(|cases| {
-            cases
-                .into_iter()
-                .find(|case| case["case"] == "path_mesh")
-        })
+        .and_then(|cases| cases.into_iter().find(|case| case["case"] == "path_mesh"))
         .expect("path_mesh 例存在");
     assert!(
         mesh["inventory"]["path"].as_u64().unwrap_or(0) > 0,

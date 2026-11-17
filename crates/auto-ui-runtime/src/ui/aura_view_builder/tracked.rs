@@ -5,7 +5,11 @@ use super::*;
 
 impl<'a> AuraViewBuilder<'a> {
     /// Dispatch an AuraNode to the appropriate converter with loop variable bindings.
-    pub(super) fn convert_node_with(&self, node: &AuraNode, bindings: &Bindings) -> View<DynamicMessage> {
+    pub(super) fn convert_node_with(
+        &self,
+        node: &AuraNode,
+        bindings: &Bindings,
+    ) -> View<DynamicMessage> {
         match node {
             AuraNode::Element {
                 tag,
@@ -231,9 +235,7 @@ impl<'a> AuraViewBuilder<'a> {
                 if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1")
                     && format!("{:?}", condition).contains("loaded")
                 {
-                    eprintln!(
-                        "[MEMO-DIAG] cond-loaded is_true={is_true}"
-                    );
+                    eprintln!("[MEMO-DIAG] cond-loaded is_true={is_true}");
                 }
                 let empty = Vec::new();
                 let body = if is_true {
@@ -708,9 +710,7 @@ impl<'a> AuraViewBuilder<'a> {
                 if std::env::var("AUTO_MEMO_DIAG").ok().as_deref() == Some("1")
                     && format!("{:?}", condition).contains("loaded")
                 {
-                    eprintln!(
-                        "[MEMO-DIAG] cond-loaded is_true={is_true}"
-                    );
+                    eprintln!("[MEMO-DIAG] cond-loaded is_true={is_true}");
                 }
                 let empty = Vec::new();
                 let body = if is_true {
@@ -1449,7 +1449,7 @@ impl<'a> AuraViewBuilder<'a> {
             "dropdown-menu" | "dropdown_menu" | "dropdownmenu" | "DropdownMenu" => self
                 .convert_alert_dialog_tracked_ctx(
                     props,
-                events,
+                    events,
                     children,
                     path,
                     id_map,
@@ -1460,7 +1460,7 @@ impl<'a> AuraViewBuilder<'a> {
             "alert-dialog" | "alert_dialog" | "alertdialog" => self
                 .convert_alert_dialog_tracked_ctx(
                     props,
-                events,
+                    events,
                     children,
                     path,
                     id_map,
@@ -3825,7 +3825,10 @@ impl<'a> AuraViewBuilder<'a> {
     /// PLAN-781 T-03: 后置注入 pane 归属——把本 pane 子树内**未限定**的
     /// ScrollAnchorMark 填上 controller key。遇嵌套 Scrollable 停（内层
     /// convert_scroll 已注入其自己的归属，外层不得覆盖）。
-    pub(super) fn inject_anchor_pane(view: View<DynamicMessage>, pane_key: &str) -> View<DynamicMessage> {
+    pub(super) fn inject_anchor_pane(
+        view: View<DynamicMessage>,
+        pane_key: &str,
+    ) -> View<DynamicMessage> {
         match view {
             View::ScrollAnchorMark { pane, key, child } => {
                 let pane = if pane.is_empty() {
@@ -3904,5 +3907,4 @@ impl<'a> AuraViewBuilder<'a> {
             }
         }
     }
-
 }

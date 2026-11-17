@@ -73,7 +73,10 @@ fn count_paths(list: &DisplayList) -> (usize, usize, usize) {
     let mut strokes = 0;
     let mut segs = 0;
     for op in &list.ops {
-        if let DisplayOp::Path { path, fill, stroke, .. } = op {
+        if let DisplayOp::Path {
+            path, fill, stroke, ..
+        } = op
+        {
             segs += path.segs.len();
             if fill.is_some() {
                 fills += 1;
@@ -121,10 +124,14 @@ fn render_rq_png(list: &DisplayList, out: &std::path::Path, name: &str) -> PathB
     let mut sim = iced_test::simulator::Simulator::with_size(
         iced::Settings::default(),
         iced::Size::new(W, H),
-        crate::ui::iced::broker_surface::displaylist_element::<()>(list, super::rq_probe::SIMULATOR_SCALE),
+        crate::ui::iced::broker_surface::displaylist_element::<()>(
+            list,
+            super::rq_probe::SIMULATOR_SCALE,
+        ),
     );
     let snap = sim.snapshot(&theme()).expect("rq snapshot");
-    snap.matches_image(&snapshot_path(out, name)).expect("rq png");
+    snap.matches_image(&snapshot_path(out, name))
+        .expect("rq png");
     written_path(out, name)
 }
 
@@ -156,11 +163,7 @@ fn rq_v3_mesh_paths_reach_wire_and_replay() {
     let direct_png = written_path(&out, "lossless_mesh-direct");
 
     // 生产录制（v2 降格 → v3 Path 增量）。
-    let mut surface = HeadlessSurface::new(
-        LosslessComponent { view },
-        W,
-        H,
-    );
+    let mut surface = HeadlessSurface::new(LosslessComponent { view }, W, H);
     let recorded = surface.render_frame_v2();
     let (fills, strokes, segs) = count_paths(&recorded);
     println!(
@@ -275,12 +278,20 @@ fn rq_v3_capability_admission_keeps_old_frame() {
     };
 
     // 能力齐全（全 optional）→ v3 帧按受。
-    assert!(store.compose_v2(sid, 0, quad_frame.clone()).unwrap().is_some());
-    assert!(store.compose_v2(sid, 1, path_frame.clone()).unwrap().is_some());
+    assert!(store
+        .compose_v2(sid, 0, quad_frame.clone())
+        .unwrap()
+        .is_some());
+    assert!(store
+        .compose_v2(sid, 1, path_frame.clone())
+        .unwrap()
+        .is_some());
     assert_eq!(store.front_v2(sid), Some(&path_frame));
 
     // 收窄到不含 pathfill 的能力集 → 具名拒绝，且**前端帧不变**（保旧帧）。
-    store.set_capabilities(CapabilitySet::parse(&["required:fidelity/glyphrun/1".to_string()]));
+    store.set_capabilities(CapabilitySet::parse(&[
+        "required:fidelity/glyphrun/1".to_string()
+    ]));
     let err = store
         .compose_v2(sid, 0, path_frame.clone())
         .expect_err("缺 pathfill 能力必须拒绝 v3 帧");
@@ -298,12 +309,18 @@ fn rq_v3_capability_admission_keeps_old_frame() {
             rect: WRect::new(0.0, 0.0, 10.0, 10.0),
         }],
     };
-    assert!(store.compose_v2(sid, 0, v2_frame.clone()).unwrap().is_some());
+    assert!(store
+        .compose_v2(sid, 0, v2_frame.clone())
+        .unwrap()
+        .is_some());
     assert_eq!(store.front_v2(sid), Some(&v2_frame));
 
     // 能力回补 → 恢复接受 v3。
     store.set_capabilities(CapabilitySet::all_optional());
-    assert!(store.compose_v2(sid, 0, path_frame.clone()).unwrap().is_some());
+    assert!(store
+        .compose_v2(sid, 0, path_frame.clone())
+        .unwrap()
+        .is_some());
     assert_eq!(store.front_v2(sid), Some(&path_frame));
 
     // 线词汇 round-trip：required/optional 语义不丢，裸串按 optional。
@@ -377,7 +394,13 @@ fn rq_v3_svg_and_image_replay_matches_direct() {
 
     // 生产重放：宿主把上传资源登记进图像缓存后按 src 解析。
     for up in &uploads {
-        broker_surface::bitmap_cache_put(&format!("bitmap://{}", up.id), up.w, up.h, up.stride, up.rgba.clone());
+        broker_surface::bitmap_cache_put(
+            &format!("bitmap://{}", up.id),
+            up.w,
+            up.h,
+            up.stride,
+            up.rgba.clone(),
+        );
     }
     let mut buf = Vec::new();
     list.encode(&mut buf);
@@ -461,7 +484,13 @@ fn rq_glyph_positions_match_physical_formula() {
         .expect("Write font system");
     let mut buffer = Buffer::new(fs.raw(), Metrics::new(16.0, 20.0));
     buffer.set_size(fs.raw(), Some(600.0), Some(200.0));
-    buffer.set_text(fs.raw(), "中文路径客户数据库混排 ABC", &Attrs::new(), Shaping::Advanced, None);
+    buffer.set_text(
+        fs.raw(),
+        "中文路径客户数据库混排 ABC",
+        &Attrs::new(),
+        Shaping::Advanced,
+        None,
+    );
     buffer.shape_until_scroll(fs.raw(), false);
     let scale = 2.0f32;
     let pos = (0.0f32, 0.0f32);
@@ -483,7 +512,10 @@ fn rq_glyph_positions_match_physical_formula() {
             }));
         }
     }
-    println!("[RQ062] {}", serde_json::json!({ "tag": "glyph_positions", "rows": rows }));
+    println!(
+        "[RQ062] {}",
+        serde_json::json!({ "tag": "glyph_positions", "rows": rows })
+    );
     for row in &rows {
         let lx = row["logical_x"].as_i64().unwrap() as f32;
         let mx = row["mine_x"].as_f64().unwrap() as f32;

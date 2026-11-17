@@ -1,0 +1,186 @@
+// Plan-085 TreeView demo — root-hosted controlled fixture.
+//
+// Shape note: the two real consumers (026 database, 041 auto-edit) host the
+// tree in the App root widget, so the fixture does the same. Routing is not
+// exercised here; keyboard/row semantics are pinned separately in
+// crates/auto-ui-runtime/tests/plan085_tree_keyboard.rs.
+//
+// The controlled loop is driven end to end:
+//   chevron  -> on_toggle -> app writes expanded  -> rows re-derive
+//   row      -> on_select -> app writes selected  -> selected style re-derives
+//   retry    -> on_retry  -> app clears errorIds  -> the error row recovers
+//
+// Two trees live on one page (A/B) with independent controlled state, so a
+// same-ID node in each must not cross-talk. The `aSummary`/`bSummary` strings
+// are consumer-side readouts for the product gate — the component ships no
+// status text of its own.
+//
+// `exp=` is maintained as real model state rather than computed inside an
+// f-string: interpolating a list parameter's `.len()` renders empty on the VM
+// track, so the summary is written by each handler after it mutates the list.
+use auto.json
+
+widget App {
+    msg {
+        Init,
+        AToggle(str), ASelect(str), ARetry(str),
+        BToggle(str), BSelect(str), BRetry(str),
+        LoadA, FailA, ClearA, LoadB,
+        ToggleTheme, Quit
+    }
+    model {
+        var dark_mode bool = false
+
+        // ── A tree: expanded / selected / disabled / loading / error ──
+        var aNodes List = []
+        var aExpanded List = []
+        var aSelected str = ""
+        var aDisabled List = []
+        var aLoading List = []
+        var aErrors List = []
+        var aLog str = ""
+        var aSummary str = "A 树 sel= exp=1"
+
+        // ── B tree: same node IDs, different content, separate state ──
+        var bNodes List = []
+        var bExpanded List = []
+        var bSelected str = ""
+        var bLog str = ""
+        var bSummary str = "B 树 sel= exp=0"
+    }
+    use { package: tree_view from "../../packages/tree-view" }
+    view {
+        col (style: "w-full h-full bg-background text-foreground gap-3 p-4") {
+            row (style: "items-center gap-2") {
+                text "TreeView 受控演示" { style: "text-sm font-medium" }
+                button "切换明暗" { onclick: .ToggleTheme, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+            }
+            row (style: "items-center gap-1.5 flex-wrap") {
+                button "A 加载中" { onclick: .LoadA, style: "px-2 py-1 text-xs rounded-md border border-border" }
+                button "A 加载失败" { onclick: .FailA, style: "px-2 py-1 text-xs rounded-md border border-border" }
+                button "A 清空" { onclick: .ClearA, style: "px-2 py-1 text-xs rounded-md border border-border" }
+                button "B 加载中" { onclick: .LoadB, style: "px-2 py-1 text-xs rounded-md border border-border" }
+                button "退出夹具" { onclick: .Quit, style: "px-2 py-1 text-xs rounded-md border border-border" }
+            }
+            row (style: "items-start gap-3 flex-1 min-h-0") {
+                col (style: "w-72 border border-border rounded-md p-2") {
+                    text .aSummary { style: "text-xs text-muted-foreground" }
+                    TreeView (nodes: .aNodes, expanded: .aExpanded, selected: .aSelected, disabledIds: .aDisabled, loadingIds: .aLoading, errorIds: .aErrors, on_toggle: .AToggle($event), on_select: .ASelect($event), on_retry: .ARetry($event), directory: true) {}
+                }
+                col (style: "w-72 border border-border rounded-md p-2") {
+                    text .bSummary { style: "text-xs text-muted-foreground" }
+                    TreeView (nodes: .bNodes, expanded: .bExpanded, selected: .bSelected, on_toggle: .BToggle($event), on_select: .BSelect($event), on_retry: .BRetry($event), directory: true) {}
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            // A: chapter-01 (expanded) > section-1.1 · images (loading+error) ·
+            //    chapter-02 (disabled) · notes
+            var sec List = []
+            sec.push({ id: "section-1.1", label: "Section 1.1", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            var a List = []
+            a.push({ id: "chapter-01", label: "Chapter 01", children: sec, kind: "dir", icon: "", is_leaf: false, badge: "" })
+            a.push({ id: "images", label: "Images", children: [], kind: "dir", icon: "", is_leaf: false, badge: "2" })
+            a.push({ id: "chapter-02", label: "Chapter 02", children: [], kind: "dir", icon: "", is_leaf: false, badge: "" })
+            a.push({ id: "notes", label: "Notes", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            .aNodes = a
+            .aExpanded = ["chapter-01"]
+            .aDisabled = ["chapter-02"]
+            .aLoading = ["images"]
+            .aErrors = ["images"]
+
+            // B: same ids as A, different labels — proves per-instance state.
+            var b List = []
+            b.push({ id: "chapter-01", label: "Chapter 01 (B)", children: [], kind: "dir", icon: "", is_leaf: true, badge: "B" })
+            b.push({ id: "notes", label: "Notes (B)", children: [], kind: "file", icon: "", is_leaf: true, badge: "B" })
+            .bNodes = b
+            .bExpanded = []
+
+            .aSummary = "A 树 sel= exp=1"
+            .bSummary = "B 树 sel= exp=0"
+        }
+        .AToggle(id str) -> {
+            .aLog = f"toggle:${id}"
+            .aExpanded = toggle_id_list(.aExpanded, id)
+            .aSummary = f"A 树 sel=${.aSelected} exp=${.aExpanded.len()} ${.aLog}"
+        }
+        .ASelect(id str) -> {
+            .aSelected = id
+            .aLog = f"select:${id}"
+            .aSummary = f"A 树 sel=${id} exp=${.aExpanded.len()} ${.aLog}"
+        }
+        .ARetry(id str) -> {
+            .aLog = f"retry:${id}"
+            .aErrors = remove_id_list(.aErrors, id)
+            .aSummary = f"A 树 sel=${.aSelected} exp=${.aExpanded.len()} ${.aLog}"
+        }
+        .BToggle(id str) -> {
+            .bLog = f"toggle:${id}"
+            .bExpanded = toggle_id_list(.bExpanded, id)
+            .bSummary = f"B 树 sel=${.bSelected} exp=${.bExpanded.len()} ${.bLog}"
+        }
+        .BSelect(id str) -> {
+            .bSelected = id
+            .bLog = f"select:${id}"
+            .bSummary = f"B 树 sel=${id} exp=${.bExpanded.len()} ${.bLog}"
+        }
+        .BRetry(id str) -> {
+            .bLog = f"retry:${id}"
+            .bSummary = f"B 树 sel=${.bSelected} exp=${.bExpanded.len()} ${.bLog}"
+        }
+        .LoadA -> {
+            .aLoading = ["images"]
+            .aLog = "loading:images"
+            .aSummary = f"A 树 sel=${.aSelected} exp=${.aExpanded.len()} ${.aLog}"
+        }
+        .FailA -> {
+            .aErrors = ["images"]
+            .aLog = "error:images"
+            .aSummary = f"A 树 sel=${.aSelected} exp=${.aExpanded.len()} ${.aLog}"
+        }
+        .ClearA -> {
+            .aNodes = []
+            .aSelected = ""
+            .aLog = "cleared"
+            .aSummary = "A 树 sel= exp=0 cleared"
+        }
+        .LoadB -> {
+            .bLog = "B loading"
+            .bSummary = f"B 树 sel=${.bSelected} exp=${.bExpanded.len()} ${.bLog}"
+        }
+        .ToggleTheme -> { .dark_mode = !.dark_mode }
+        .Quit -> { Process.exit(0) }
+    }
+}
+
+fn toggle_id_list(list List, id str) List {
+    var out List = []
+    var found bool = false
+    var i int = 0
+    while i < list.len() {
+        if list[i] == id {
+            found = true
+        } else {
+            out.push(list[i])
+        }
+        i = i + 1
+    }
+    if !found {
+        out.push(id)
+    }
+    return out
+}
+
+fn remove_id_list(list List, id str) List {
+    var out List = []
+    var i int = 0
+    while i < list.len() {
+        if list[i] != id {
+            out.push(list[i])
+        }
+        i = i + 1
+    }
+    return out
+}

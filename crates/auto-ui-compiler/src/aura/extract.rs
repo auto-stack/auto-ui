@@ -677,6 +677,20 @@ pub fn extract_module_fn(fn_decl: &auto_lang_core::ast::Fn) -> Option<AuraModule
 }
 
 /// Extract AuraWidget from parsed WidgetDecl
+/// PLAN-980 WEB 切片#6：on-block handler 源 span（pattern → (byte_offset,
+/// byte_length)，**原源坐标**）。消费面：ComponentFragmentLane 逐 handler
+/// 定位（lane 坐标基准=脱糖源——由调用方按 span 内容锚换算）；view 内联
+/// lambda 铸造形无 span（缺席）。
+pub fn extract_handler_spans(
+    decl: &WidgetDecl,
+) -> std::collections::BTreeMap<String, (usize, usize)> {
+    decl.on
+        .iter()
+        .flat_map(|on| on.handlers.iter())
+        .filter_map(|h| h.span.map(|s| (h.pattern.clone(), s)))
+        .collect()
+}
+
 pub fn extract_widget_from_decl(decl: &WidgetDecl) -> ExtractResult<AuraWidget> {
     // Extract state variables from model
     let mut state_vars = if let Some(model) = &decl.model {

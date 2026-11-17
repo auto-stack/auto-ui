@@ -369,6 +369,7 @@ pub(crate) fn mint_inline_event_handlers(decl: &mut WidgetDecl) -> AutoResult<()
             params: Vec::new(),
             body,
             stream: None,
+            span: None, // 铸造形（view 内联 lambda mint）——无源锚
         });
     }
     Ok(())
@@ -627,10 +628,9 @@ pub(crate) fn mint_modal_dialog_toggle_inner(
                                         inline: None,
                                     });
                                 }
-                                if !cev
-                                    .iter()
-                                    .any(|e| matches!(e.name.as_str(), "onmouseleave" | "onhoverout"))
-                                {
+                                if !cev.iter().any(|e| {
+                                    matches!(e.name.as_str(), "onmouseleave" | "onhoverout")
+                                }) {
                                     cev.push(ViewEvent {
                                         name: "onmouseleave".to_string(),
                                         handler: format!(".{leave}"),
@@ -642,7 +642,8 @@ pub(crate) fn mint_modal_dialog_toggle_inner(
                         }
                     }
                 }
-                if modal_dialog_tag_role(tag) == Some("root") && !props.iter().any(|p| p.name == "open")
+                if modal_dialog_tag_role(tag) == Some("root")
+                    && !props.iter().any(|p| p.name == "open")
                 {
                     *counter += 1;
                     let n = *counter;
@@ -693,7 +694,10 @@ pub(crate) fn mint_modal_dialog_toggle_inner(
                                     match &mut cch[0] {
                                         ViewNode::Element {
                                             events: inner_ev, ..
-                                        } if !inner_ev.iter().any(|e| is_click(e.name.as_str())) => {
+                                        } if !inner_ev
+                                            .iter()
+                                            .any(|e| is_click(e.name.as_str())) =>
+                                        {
                                             inner_ev
                                         }
                                         _ => cev,
@@ -1312,6 +1316,10 @@ pub(crate) fn parse_on_block(cx: &mut dyn DomainParseContext) -> AutoResult<OnBl
             break;
         }
 
+        // PLAN-980 WEB 切片#6：handler 源 span 起点（pattern 首 token）。
+        let handler_start = cx.cur_pos().pos;
+        let _ = handler_start;
+
         // Parse pattern (e.g., .Inc or Msg::Inc)
         // Plan 130: Support dot-prefixed patterns like .Inc
         // Plan 188 B4: Support parameterized patterns like .AddItem(text)
@@ -1404,11 +1412,14 @@ pub(crate) fn parse_on_block(cx: &mut dyn DomainParseContext) -> AutoResult<OnBl
         let body = body_res?;
         cx.exit_scope();
 
+        // PLAN-980 WEB 切片#6：span 终点=body 后当前位置（含 body 闭括号）。
+        let handler_end = cx.cur_pos().pos;
         handlers.push(OnHandler {
             pattern,
             params,
             body,
             stream: stream_sub,
+            span: Some((handler_start, handler_end.saturating_sub(handler_start))),
         });
         cx.skip_empty_lines();
     }
@@ -1486,9 +1497,7 @@ pub(crate) fn parse_bind_block(cx: &mut dyn DomainParseContext) -> AutoResult<Bi
 
 /// PLAN-007 T-05：design 块体——`name: expr` 条目序列（换行/逗号分隔，
 /// 值 = 普通表达式：模型绑定 / 字面量 / if 链）。重复键为解析错误。
-fn parse_design_block_inner(
-    cx: &mut dyn DomainParseContext,
-) -> AutoResult<ui_ast::DesignBlock> {
+fn parse_design_block_inner(cx: &mut dyn DomainParseContext) -> AutoResult<ui_ast::DesignBlock> {
     cx.expect_ident("design")?;
     cx.expect(TokenKind::LBrace)?;
     cx.skip_empty_lines();

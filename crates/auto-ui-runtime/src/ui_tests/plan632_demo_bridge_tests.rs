@@ -13,7 +13,6 @@
 //! 结构对齐 ui-gallery 实测布局：host(内嵌宿主) → demo(.at 适配器) →
 //! 自有模块/dep 组件。语料最小化但链路同构。
 
-
 use std::path::PathBuf;
 
 /// 内嵌三文件布局：host.at / demo.at /（按需）模块文件。返回 host 路径。

@@ -1,0 +1,38 @@
+// PLAN-085 review-repair fixture (F-01/F-02/F-03): a nested expanded tree with
+// a not-yet-loaded directory, a loading row and an error row.
+widget reviewfixes {
+    msg { Init, Toggle(str), Select(str), Retry(str) }
+    model {
+        var nodes List = []
+        var expanded List = []
+        var sel str = ""
+        var loading List = []
+        var errors List = []
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .sel,
+                      loadingIds: .loading, errorIds: .errors,
+                      on_toggle: .Toggle($event), on_select: .Select($event), on_retry: .Retry($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var kid List = []
+            kid.push({ id: "child", label: "CHILD", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+            var a List = []
+            a.push({ id: "parent", label: "PARENT", children: kid, kind: "dir", icon: "", is_leaf: false, badge: "" })
+            a.push({ id: "lazy", label: "LAZYDIR", children: [], kind: "dir", icon: "", is_leaf: false, badge: "" })
+            a.push({ id: "busy", label: "BUSY", children: [], kind: "dir", icon: "", is_leaf: false, badge: "" })
+            a.push({ id: "bad", label: "BAD", children: [], kind: "dir", icon: "", is_leaf: false, badge: "" })
+            .nodes = a
+            .expanded = ["parent"]
+            .loading = ["busy"]
+            .errors = ["bad"]
+        }
+        .Toggle(v str) -> { }
+        .Select(v str) -> { .sel = v }
+        .Retry(v str) -> { }
+    }
+}

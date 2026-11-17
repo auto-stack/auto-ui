@@ -105,7 +105,8 @@ widget App {
             _ => None,
         })
         .expect("widget decl");
-    let mut widget = auto_ui_compiler::aura::extract::extract_widget_from_decl(decl).expect("extract");
+    let mut widget =
+        auto_ui_compiler::aura::extract::extract_widget_from_decl(decl).expect("extract");
     // 清单 = 模块形态抽取产物（此处直接注入，等价）——只含 get_lines。
     widget.api_imports = vec!["get_lines".to_string()];
 
@@ -216,7 +217,8 @@ widget App {{
                 _ => None,
             })
             .expect("widget decl");
-        let mut widget = auto_ui_compiler::aura::extract::extract_widget_from_decl(decl).expect("extract");
+        let mut widget =
+            auto_ui_compiler::aura::extract::extract_widget_from_decl(decl).expect("extract");
         widget.api_imports = vec!["get_lines".to_string()];
         let mut gen = auto_ui_compiler::ui_gen::rust::RustGenerator::new();
         gen.generate_rust(&widget).expect("generate rust")

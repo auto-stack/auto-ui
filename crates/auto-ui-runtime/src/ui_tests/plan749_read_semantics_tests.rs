@@ -16,7 +16,6 @@
 //! 面；plan733 同款纪律）。
 
 #[cfg(test)]
-
 use auto_lang_core::vm::engine::SegmentOutcome;
 use auto_lang_core::vm::task::AutoTask;
 
@@ -28,7 +27,8 @@ fn p749_compile(
     auto_lang_core::vm::engine::AutoVM,
     std::sync::Arc<std::sync::RwLock<String>>,
 ) {
-    let (vm, stdout, _entry, _object_type) = auto_lang_core::create_vm_from_source(code).expect("compile");
+    let (vm, stdout, _entry, _object_type) =
+        auto_lang_core::create_vm_from_source(code).expect("compile");
     (vm, stdout)
 }
 

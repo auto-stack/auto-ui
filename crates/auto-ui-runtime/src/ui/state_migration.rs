@@ -55,12 +55,11 @@ pub type StateDefMap = HashMap<String, Type>;
 /// (root + children + stores). Each widget's model `state_vars` contributes
 /// name → type; collisions across widgets resolve to the first entry (the
 /// unified root state holds one slot per name, so the type must agree).
-pub fn flattened_state_defs<'a>(
-    widgets: impl Iterator<Item = &'a AuraStateDef>,
-) -> StateDefMap {
+pub fn flattened_state_defs<'a>(widgets: impl Iterator<Item = &'a AuraStateDef>) -> StateDefMap {
     let mut map = StateDefMap::new();
     for def in widgets {
-        map.entry(def.name.clone()).or_insert_with(|| def.type_info.clone());
+        map.entry(def.name.clone())
+            .or_insert_with(|| def.type_info.clone());
     }
     map
 }

@@ -65,10 +65,7 @@ impl SurfaceStore {
     }
 
     /// 设置宿主可接受的能力集合（握手声明来源）。
-    pub fn set_capabilities(
-        &mut self,
-        caps: crate::ui::desktop_protocol::message::CapabilitySet,
-    ) {
+    pub fn set_capabilities(&mut self, caps: crate::ui::desktop_protocol::message::CapabilitySet) {
         self.capabilities = caps;
     }
 
@@ -315,8 +312,7 @@ pub fn compose_v2_counted(
     surface: u64,
     slot: u8,
     payload: crate::ui::desktop_protocol::message::DisplayList,
-) -> Result<(Option<u8>, Vec<String>), crate::ui::desktop_protocol::message::AdmissionError>
-{
+) -> Result<(Option<u8>, Vec<String>), crate::ui::desktop_protocol::message::AdmissionError> {
     let result = surfaces.compose_v2(surface, slot, payload)?;
     let mut evicted = Vec::new();
     if result.is_some() {
@@ -386,7 +382,6 @@ impl<'a> ProtocolHost<'a> {
         }
     }
 
-
     /// 入帧准入拒绝：具名诊断 + 归还传输槽（ACK 只表示“宿主已读走载荷”，
     /// 不表示合成成功）；前端帧保持上一次完整帧。
     fn reject_frame(
@@ -400,8 +395,11 @@ impl<'a> ProtocolHost<'a> {
         eprintln!(
             "[rq-admission] 拒绝入帧 surface={surface} frame={frame_id}: {err}（保旧帧，槽 {slot} 归还）"
         );
-        self.to_app
-            .push(ProtocolMsg::Frame(FrameMsg::FrameAck { wid, frame_id, slot }));
+        self.to_app.push(ProtocolMsg::Frame(FrameMsg::FrameAck {
+            wid,
+            frame_id,
+            slot,
+        }));
     }
 
     /// 宿主侧处理一条来自 app 的消息；回发消息累积进 [`Self::to_app`]。
@@ -585,9 +583,7 @@ impl<'a> ProtocolHost<'a> {
                                     }));
                                 }
                                 Ok((None, _)) => {}
-                                Err(err) => {
-                                    self.reject_frame(surface, wid, frame_id, slot, &err)
-                                }
+                                Err(err) => self.reject_frame(surface, wid, frame_id, slot, &err),
                             }
                         }
                         continue;
@@ -1006,8 +1002,7 @@ mod tests {
             height: 320.0,
             fonts: vec![],
             surfaces: Vec::new(),
-                theme_caps: Vec::new(),
-
+            theme_caps: Vec::new(),
         });
         host.handle(&hello).unwrap();
         assert_eq!(
@@ -1060,14 +1055,11 @@ mod tests {
     }
 }
 
-
-
-
 #[cfg(test)]
 mod release_tests {
     use super::{compose_v2_counted, BitmapRefs, SurfaceStore};
     use crate::ui::desktop_protocol::message::{
-        CapabilitySet, DisplayList, DisplayOp, Fill, ImageFit, PathSeg, Rgba8, WirePath, WRect,
+        CapabilitySet, DisplayList, DisplayOp, Fill, ImageFit, PathSeg, Rgba8, WRect, WirePath,
     };
 
     fn frame_with(src: Option<&str>) -> DisplayList {
@@ -1163,7 +1155,7 @@ mod release_tests {
         let surface = store.alloc(64.0, 64.0);
         // 宿主只声明 glyphrun，无 pathfill —— v3 Path 帧必被拒。
         store.set_capabilities(CapabilitySet::parse(&[
-            "optional:fidelity/glyphrun/1".to_string(),
+            "optional:fidelity/glyphrun/1".to_string()
         ]));
         let mut refs = BitmapRefs::default();
         let mut keys = std::collections::BTreeMap::new();
@@ -1182,14 +1174,8 @@ mod release_tests {
             "前台仍显示 A —— 释放挂起"
         );
 
-        let rejected = compose_v2_counted(
-            &mut store,
-            &mut refs,
-            &mut keys,
-            surface,
-            1,
-            path_frame(),
-        );
+        let rejected =
+            compose_v2_counted(&mut store, &mut refs, &mut keys, surface, 1, path_frame());
         assert!(rejected.is_err(), "缺 pathfill 的 v3 帧必须被拒绝");
         assert_eq!(
             refs.pending_len(),
@@ -1254,7 +1240,11 @@ mod release_tests {
         assert_eq!(refs.tracking_len().0, 1);
 
         let evicted = refs.forget_surface(1);
-        assert_eq!(evicted, vec!["bitmap://B".to_string()], "回收后不再阻挡释放");
+        assert_eq!(
+            evicted,
+            vec!["bitmap://B".to_string()],
+            "回收后不再阻挡释放"
+        );
         assert_eq!(refs.tracking_len().0, 0, "表面记账必须随窗口回收清空");
         assert_eq!(refs.pending_len(), 0);
     }

@@ -214,7 +214,8 @@ fn widget_tick(
 /// `AUTOUI_PANIC_PROBE=1` 时，demo 的 `.panic_probe` 事件在 update 边界
 /// panic（落 catch_unwind），并记录肇事 App —— 其后的 view 出口仅对该
 /// App 持续 panic（落崩溃页元素），另一窗口不受影响。非 demo 运行零影响。
-pub(super) static PANIC_PROBE_CRASHED_APP: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub(super) static PANIC_PROBE_CRASHED_APP: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 pub(super) fn panic_probe_enabled() -> bool {
     std::env::var("AUTOUI_PANIC_PROBE")
@@ -283,10 +284,14 @@ pub(super) fn host_exit_window_end() {
     CURRENT_SESSION_SINCE.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
 }
 
-/// Global MCP action channel receiver (Plan 278).
-/// Set once at startup by `run_dynamic_iced`, polled by `mcp_action_subscription`.
-pub(super) static MCP_ACTION_RX: std::sync::OnceLock<
-    std::sync::Mutex<Option<std::sync::mpsc::Receiver<crate::ui::mcp_server::ActionMessage>>>,
+/// PLAN-098 T-02: MCP 动作注入门（唯一 rx 终生锁内，永不搬走——旧
+/// `MCP_ACTION_RX` take-once 漂移死亡类结构上不可达，机制见
+/// [`crate::ui::mcp_server::ActionGate`]）。由 `run_dynamic_iced`
+/// （VM/iced 主路径）与 `DevToolsState::default`（rust 模式）各自
+/// `set`，先到者赢（进程内只有一个 MCP server）。
+/// `mcp_action_subscription` 与 devtools 16ms tick 均经 gate 非阻塞消费。
+pub(super) static MCP_ACTION_GATE: std::sync::OnceLock<
+    std::sync::Arc<crate::ui::mcp_server::ActionGate>,
 > = std::sync::OnceLock::new();
 
 /// Plan 412 续(toast 堆叠视觉):kind → (边框色, 背景色, 标题)。success 绿 /
@@ -733,7 +738,8 @@ pub(super) fn build_toast_layer(toasts: &[ToastReq]) -> iced::Element<'static, I
 /// `__media_tick` only when it advanced (idle = zero messages, no update
 /// storm); the per-app awaiting gate tick continues from there.
 static MEDIA_WAKE_SEEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-pub(super) static MEDIA_SWEEP_SEEN_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub(super) static MEDIA_SWEEP_SEEN_GEN: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 fn poll_media_wake() -> Option<IcedMessage> {
     let gen = auto_media_core::image_pipeline::media_change_generation();
@@ -772,7 +778,10 @@ pub(super) fn mcp_noop_with_ack(ack: Option<u64>) -> IcedMessage {
 /// PLAN-737：合成动作 ack 回执（无 noop 臂的臂尾直执回执点；noop 臂由
 /// noop 消费臂回执——见 `__noop|ack=` 消费处）。复用 fixture 回执表
 ///（同 id 空间、同容量纪律；Applied 空载荷 = 纯栅栏语义）。
-pub(super) fn mcp_ack_apply(mcp_shared: &Option<crate::ui::mcp_server::SharedStateHandle>, ack: Option<u64>) {
+pub(super) fn mcp_ack_apply(
+    mcp_shared: &Option<crate::ui::mcp_server::SharedStateHandle>,
+    ack: Option<u64>,
+) {
     if let (Some(id), Some(mcp)) = (ack, mcp_shared) {
         mcp.lock().unwrap().finish_fixture(
             id,
@@ -813,13 +822,15 @@ fn map_mcp_action(action: crate::ui::mcp_server::ActionMessage) -> Option<IcedMe
 /// T-00/T-01 定责链：54Hz 驱动的原生动作间隔（18.5ms）被 16ms tick
 /// 消费网格重排出亚 16ms 消息对（got 间隔 8ms bin×49/127 直证），
 /// 配对落入 16.7ms 呈现槽被 iced_winit AboutToWait 批处理合并为单帧
-/// ——交付 0.79×驱动（<AC-02 ±10% 带）。本订阅经转发线程
-/// `recv()` 阻塞等待（**到达即投递**，间隔恢复原生 ±转发抖动 >
-/// 槽宽 → 无配对），唤醒后 `try_recv` 循环取空（**drain-to-empty
-/// 语义内含**——突发吸收；Disconnected 断流终止，Path 畸形臂原样）。
-/// 不 fork iced_winit（纯 app 侧订阅重排）；712 r2 泵域零触碰；
-/// 16ms 轮询的 tick 轴随之退役（mcp_poll 行由 mcp_recv 行接替——
-/// 转发线程逐动作打点，AUTO_SCHED_DIAG 门控零开销）。
+/// ——交付 0.79×驱动（<AC-02 ±10% 带）。本订阅**到达即投递**（间隔
+/// 恢复原生 ±抖动 > 槽宽 → 无配对），唤醒后循环取空（**drain-to-empty
+/// 语义内含**——突发吸收；Disconnected 断流终止，Path 畸形臂计数 +
+/// 日志）。
+/// PLAN-098 T-02 重构：转发线程（rx take-once + per-stream 通道）退役，
+/// 换共享 gate 非阻塞 poll——订阅身份漂移不再能杀死注入链（断口期
+/// 消息滞留 gate 队列，重挂即续），SCHED-DIAG `mcp_recv` 打点保留
+/// （AUTO_SCHED_DIAG 门控零开销）。不 fork iced_winit（纯 app 侧
+/// 订阅重排）；712 r2 泵域零触碰。
 #[derive(Debug, Clone, Hash)]
 struct McpPushRecipe {
     app: crate::ui::session::AppId,
@@ -841,44 +852,20 @@ impl iced_futures::subscription::Recipe for McpPushRecipe {
         use crate::ui::session::DesktopMessage as DM;
         use iced_futures::futures::StreamExt;
 
-        let guard = MCP_ACTION_RX.get_or_init(|| std::sync::Mutex::new(None));
-        let rx = guard.lock().unwrap().take();
-        let app = self.app;
-        let Some(rx) = rx else {
-            // 接收器不在位（rust 轨/重复装配）——空流兜底（订阅表
-            // 身份含本字符串，与 poll 轨互不去重冲突）。
-            eprintln!("[PLAN740] mcp push stream: receiver not present");
+        let Some(gate) = MCP_ACTION_GATE.get() else {
+            // gate 不在场（安装前的极早订阅窗口）——空流兜底。PLAN-098：
+            // rx 不再被搬走，身份漂移重订阅拿到的是**同一 gate**——本
+            // 分支只可能是「从未安装」，非「已被取走」。
+            eprintln!("[PLAN098] mcp push stream: gate not present");
             return iced_futures::futures::stream::empty().boxed();
         };
-        let (tx, rx_msg) = iced_futures::futures::channel::mpsc::unbounded::<IcedMessage>();
-        let _ = std::thread::Builder::new()
-            .name("mcp-action-push".to_string())
-            .spawn(move || {
-                loop {
-                    let Ok(action) = rx.recv() else { break };
-                    // drain-to-empty：唤醒后循环取空再逐条投递（突发
-                    // 吸收；顺序保持 recv 序）。
-                    let mut batch = vec![action];
-                    while let Ok(more) = rx.try_recv() {
-                        batch.push(more);
-                    }
-                    for a in batch {
-                        if crate::ui::sched_diag::enabled() {
-                            let t0 = crate::ui::dynamic::sched_diag_t0();
-                            eprintln!(
-                                "[SCHED-DIAG] mcp_recv t={}ms got=1",
-                                t0.elapsed().as_millis()
-                            );
-                        }
-                        if let Some(msg) = map_mcp_action(a) {
-                            if tx.unbounded_send(msg).is_err() {
-                                return; // 订阅端已断（进程退出路径）
-                            }
-                        }
-                    }
-                }
-            });
-        rx_msg.map(move |msg| DM::App(app, msg)).boxed()
+        let app = self.app;
+        McpActionStream {
+            app,
+            gate: gate.clone(),
+        }
+        .map(move |msg| DM::App(app, msg))
+        .boxed()
     }
 }
 
@@ -887,7 +874,10 @@ impl iced_futures::subscription::Recipe for McpPushRecipe {
 /// 过冲累积漂移，末 2ms 自旋兜精度）；动作经 `SharedState::send_action`
 /// 异步直推（与 MCP 工具同一 action 通道；**无 applied 栅栏**——栅栏会
 /// 把驱动闭成「应用率」回路，破坏吞吐勘定语义）。
-pub(super) fn spawn_drive_probe(mcp_shared: crate::ui::mcp_server::SharedStateHandle, trigger_file: String) {
+pub(super) fn spawn_drive_probe(
+    mcp_shared: crate::ui::mcp_server::SharedStateHandle,
+    trigger_file: String,
+) {
     std::thread::spawn(move || {
         let mut consumed_offset: u64 = 0;
         loop {
@@ -1170,10 +1160,68 @@ pub(super) fn apply_mcp_fixture(
 /// App（T8 单 App 语义）。
 /// PLAN-740 T-02：16ms 轮询 → push 通道（McpPushRecipe——到达即投递 +
 /// drain-to-empty；poll 轨退役理由与定责链见该类型文档）。
+/// PLAN-098 T-02：push 通道换共享 gate（rx 终生锁内不搬走；订阅身份
+/// 漂移只换 poll 方，断口期消息滞留队列重挂即续——DEBT-008 楔死形态③
+/// 根修）。
 pub(super) fn mcp_action_subscription(
     app: crate::ui::session::AppId,
 ) -> iced::Subscription<crate::ui::session::DesktopMessage> {
     iced_futures::subscription::from_recipe(McpPushRecipe { app })
+}
+
+/// PLAN-098 T-02：MCP action push 流——非阻塞 poll 共享 gate。「到达即
+/// 投递 + drain-to-empty」语义保持：send 侧持锁 notify / watcher 200ms
+/// 心跳唤醒 → iced 重 poll → 本流循环取到队列空再转 Pending。断口期
+/// （订阅身份漂移的弃旧建新窗口）消息滞留 gate 队列，不随旧 stream
+/// drop 丢失；交付计数在 gate 侧累加（[`ActionGate::delivered`]）。
+struct McpActionStream {
+    app: crate::ui::session::AppId,
+    gate: std::sync::Arc<crate::ui::mcp_server::ActionGate>,
+}
+
+impl iced_futures::futures::Stream for McpActionStream {
+    type Item = IcedMessage;
+
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        loop {
+            match this.gate.poll_recv(cx) {
+                Ok(Some(action)) => {
+                    if crate::ui::sched_diag::enabled() {
+                        let t0 = crate::ui::dynamic::sched_diag_t0();
+                        eprintln!(
+                            "[SCHED-DIAG] mcp_recv t={}ms got=1",
+                            t0.elapsed().as_millis()
+                        );
+                    }
+                    match map_mcp_action(action) {
+                        Some(msg) => return std::task::Poll::Ready(Some(msg)),
+                        None => {
+                            // Path/不支持 target——丢弃必须可见（计数 + 日志）。
+                            this.gate
+                                .mapped_none
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            eprintln!(
+                                "[PLAN098] mcp action dropped: path/unsupported target (mapped_none={})",
+                                this.gate
+                                    .mapped_none
+                                    .load(std::sync::atomic::Ordering::Relaxed)
+                            );
+                            continue;
+                        }
+                    }
+                }
+                Ok(None) => return std::task::Poll::Pending,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    return std::task::Poll::Ready(None)
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => return std::task::Poll::Pending,
+            }
+        }
+    }
 }
 
 /// Plan 314: MCP heartbeat. iced only calls `update()` in response to a
@@ -1189,7 +1237,8 @@ pub(super) fn mcp_action_subscription(
 /// stays fully idle.
 /// Plan 423 P1: update 闭包的热重载传播状态 —— 已见过的配置 generation
 /// (swap 比较)与上次 mtime 轮询时刻(500ms 节流)。
-pub(super) static CONFIG_GEN_SEEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub(super) static CONFIG_GEN_SEEN: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 pub(super) static CONFIG_MTIME_POLL: std::sync::Mutex<Option<std::time::Instant>> =
     std::sync::Mutex::new(None);
 
@@ -2208,7 +2257,8 @@ pub(super) fn keyboard_subscription_ext(
 /// execute_wallpaper_pick 置位、close/return 复位。picker 开时 ←/→/Esc 消费
 /// 为 picker 导航；负一屏无文本焦点窗，吞键无副作用。关态不拦截，App 文本
 /// 编辑不受影响）。
-pub(super) static PICKER_KEYS_OPEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub(super) static PICKER_KEYS_OPEN: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// Plan 463 T3/T6：桌面级热键订阅（单份，按宿主窗过滤；App 焦点无关，
 /// R12 桌面层路由的键盘半边）。
@@ -2250,7 +2300,9 @@ pub(super) fn desktop_hotkey_subscription(
 /// PLAN-019 v1.7：picker 键 → 消息的纯函数（订阅闭包可测化内核，
 /// desktop_hotkey_message 同型）。←/→ = 导航，Esc = 逐级退回链；其余
 /// 键 None（穿透热键表）。
-pub(super) fn picker_key_message(key: &iced::keyboard::Key) -> Option<crate::ui::session::DesktopMessage> {
+pub(super) fn picker_key_message(
+    key: &iced::keyboard::Key,
+) -> Option<crate::ui::session::DesktopMessage> {
     use crate::ui::session::DesktopEvent as DE;
     use crate::ui::session::DesktopMessage as DM;
     use iced::keyboard::{key::Named, Key};
@@ -2724,3 +2776,178 @@ pub(crate) enum InspectorSubTab {
     Source,
 }
 
+#[cfg(test)]
+mod plan098_gate_tests {
+    //! PLAN-098 T-01b/T-02b：动作注入门（gate）零丢失面。
+    //! Oracle：订阅身份漂移（弃旧 stream → 断口期发 → 新 stream 重挂）
+    //! 下动作按序补交、计数精确；wake 链（notify → watcher → waker）贯通。
+    //! 全部进程内、无构建、≤2s 有界等待。
+
+    use super::{map_mcp_action, McpActionStream};
+    use crate::ui::mcp_server::{ActionGate, ActionMessage, ActionTarget, SharedState};
+    use crate::ui::mcp_types::UiActionType;
+    use crate::ui::session::AppId;
+    use iced_futures::futures::Stream;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use std::task::{Context, Poll, Waker};
+
+    fn event_msg(widget: &str, event: &str) -> ActionMessage {
+        ActionMessage {
+            target: ActionTarget::Event {
+                widget: widget.to_string(),
+                event: event.to_string(),
+            },
+            action: UiActionType::Press,
+            value: None,
+        }
+    }
+
+    fn poll_stream(s: &mut McpActionStream) -> Poll<Option<super::IcedMessage>> {
+        let mut cx = Context::from_waker(Waker::noop());
+        std::pin::Pin::new(s).poll_next(&mut cx)
+    }
+
+    /// 断口期零丢失：stream A 交付一条 → 弃 A → 断口期连发 3 条 →
+    /// 新 stream B 重挂同一 gate → 按序补交。旧 take-once 实现在此
+    /// 序列下 B 拿 None 全灭（区分器）。
+    #[test]
+    fn plan098_gate_delivers_across_stream_churn_zero_loss() {
+        let (tx, rx) = std::sync::mpsc::channel::<ActionMessage>();
+        let gate = ActionGate::new(rx);
+
+        let mut s_a = McpActionStream {
+            app: AppId(0),
+            gate: gate.clone(),
+        };
+        tx.send(event_msg("w", "e1")).unwrap();
+        gate.notify_after_send();
+        match poll_stream(&mut s_a) {
+            Poll::Ready(Some(m)) => assert_eq!(m.event, "e1"),
+            other => panic!("expected Ready(Some(e1)), got {other:?}"),
+        }
+
+        // 身份漂移：弃旧 stream，断口期连发（不 poll）。
+        drop(s_a);
+        for e in ["e2", "e3", "e4"] {
+            tx.send(event_msg("w", e)).unwrap();
+            gate.notify_after_send();
+        }
+
+        // 新订阅重挂同一 gate——断口期消息按序补交。
+        let mut s_b = McpActionStream {
+            app: AppId(0),
+            gate: gate.clone(),
+        };
+        for e in ["e2", "e3", "e4"] {
+            match poll_stream(&mut s_b) {
+                Poll::Ready(Some(m)) => assert_eq!(m.event, e),
+                other => panic!("expected Ready(Some({e})), got {other:?}"),
+            }
+        }
+        assert!(matches!(poll_stream(&mut s_b), Poll::Pending));
+        assert_eq!(gate.delivered.load(Ordering::SeqCst), 4);
+    }
+
+    /// map 丢弃臂可见：Path target 被计数（mapped_none）且不阻塞后续。
+    #[test]
+    fn plan098_gate_mapped_none_counted_and_skipped() {
+        let (tx, rx) = std::sync::mpsc::channel::<ActionMessage>();
+        let gate = ActionGate::new(rx);
+
+        tx.send(ActionMessage {
+            target: ActionTarget::Path { path: vec![1, 2] },
+            action: UiActionType::Press,
+            value: None,
+        })
+        .unwrap();
+        tx.send(event_msg("w", "e_ok")).unwrap();
+        gate.notify_after_send();
+
+        let mut s = McpActionStream {
+            app: AppId(0),
+            gate: gate.clone(),
+        };
+        match poll_stream(&mut s) {
+            Poll::Ready(Some(m)) => assert_eq!(m.event, "e_ok"),
+            other => panic!("expected Ready(Some(e_ok)), got {other:?}"),
+        }
+        assert!(matches!(poll_stream(&mut s), Poll::Pending));
+        assert_eq!(gate.mapped_none.load(Ordering::SeqCst), 1);
+        // 两条都曾入队被消费（一条 map 丢弃）——delivered 计入两者。
+        assert_eq!(gate.delivered.load(Ordering::SeqCst), 2);
+        assert!(map_mcp_action(event_msg("w", "x")).is_some());
+    }
+
+    /// 交付快照：sent 随 send_action 增长，delivered 随消费增长；健康期
+    /// 停滞标志为假。
+    #[test]
+    fn plan098_delivery_snapshot_tracks_sent_and_delivered() {
+        let (tx, rx) = std::sync::mpsc::channel::<ActionMessage>();
+        let gate = ActionGate::new(rx);
+        let mut st = SharedState::new("T".into());
+        st.set_action_tx(tx.clone());
+        st.set_action_gate(gate.clone());
+
+        assert_eq!(st.delivery_snapshot(), (0, 0));
+        st.send_action(event_msg("w", "a")).unwrap();
+        st.send_action(event_msg("w", "b")).unwrap();
+        assert_eq!(st.delivery_snapshot(), (2, 0));
+        assert!(!st.injection_stale());
+
+        let mut s = McpActionStream {
+            app: AppId(0),
+            gate: gate.clone(),
+        };
+        poll_stream(&mut s);
+        poll_stream(&mut s);
+        assert_eq!(st.delivery_snapshot(), (2, 2));
+    }
+
+    /// wake 链贯通：Pending 登记 waker → send+notify → watcher 唤醒
+    /// waker（计数 ≥1）→ 消息可取。生产唤醒路径（condvar + watcher）
+    /// 全真。
+    #[test]
+    fn plan098_gate_wake_chain_notified_to_waker() {
+        struct WakeCount(Arc<AtomicU64>);
+        impl std::task::Wake for WakeCount {
+            fn wake(self: std::sync::Arc<Self>) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        let (tx, rx) = std::sync::mpsc::channel::<ActionMessage>();
+        let gate = ActionGate::new(rx);
+        gate.heartbeat_watch();
+
+        let woke = std::sync::Arc::new(AtomicU64::new(0));
+        let waker = Waker::from(std::sync::Arc::new(WakeCount(woke.clone())));
+
+        let mut s = McpActionStream {
+            app: AppId(0),
+            gate: gate.clone(),
+        };
+        {
+            let mut cx = Context::from_waker(&waker);
+            assert!(matches!(
+                std::pin::Pin::new(&mut s).poll_next(&mut cx),
+                Poll::Pending
+            ));
+        }
+
+        tx.send(event_msg("w", "wake1")).unwrap();
+        gate.notify_after_send();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while woke.load(Ordering::SeqCst) == 0 && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(
+            woke.load(Ordering::SeqCst) >= 1,
+            "waker must be woken via gate notify/watcher chain"
+        );
+        match poll_stream(&mut s) {
+            Poll::Ready(Some(m)) => assert_eq!(m.event, "wake1"),
+            other => panic!("expected Ready(Some(wake1)), got {other:?}"),
+        }
+    }
+}

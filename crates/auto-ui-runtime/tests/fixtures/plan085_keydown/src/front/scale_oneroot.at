@@ -1,0 +1,38 @@
+// PLAN-085 F-09/N-01 fixture: ONE root with 1000 children.
+//
+// This shape is the discriminator that a 1000-flat-roots fixture cannot be:
+// `nodes.len()` is 1 here, so a per-frame scan bounded on ROOT count would
+// re-scan 1001 nodes every frame and re-create the O(n^2) budget blowup that
+// renders zero rows. Bounding on total node count keeps it fast.
+widget scaleoneroot {
+    msg { Init, Toggle(str), Select(str), Retry(str) }
+    model {
+        var nodes List = []
+        var expanded List = []
+        var sel str = ""
+    }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (style: "p-4") {
+            TreeView (nodes: .nodes, expanded: .expanded, selected: .sel,
+                      on_toggle: .Toggle($event), on_select: .Select($event), on_retry: .Retry($event), directory: true) {}
+        }
+    }
+    on {
+        .Init -> {
+            var kids List = []
+            var i int = 0
+            while i < 1000 {
+                kids.push({ id: f"c${i}", label: f"Child ${i}", children: [], kind: "file", icon: "", is_leaf: true, badge: "" })
+                i = i + 1
+            }
+            var a List = []
+            a.push({ id: "root", label: "Root", children: kids, kind: "dir", icon: "", is_leaf: false, badge: "" })
+            .nodes = a
+            .expanded = ["root"]
+        }
+        .Toggle(v str) -> { }
+        .Select(v str) -> { .sel = v }
+        .Retry(v str) -> { }
+    }
+}

@@ -35,3 +35,6 @@ resolver = "2"
 # 重审。
 [patch.crates-io]
 iced_widget = { path = "crates/patches/iced_widget" }
+# PLAN-098 T-03（DEBT-008 形态②根修）：uncaptured wgpu 错误非 panic 化 +
+# screenshot 零尺寸早退 + 等待有界化——补丁语义=良性降级，见补丁 README。
+iced_wgpu = { path = "crates/patches/iced_wgpu" }

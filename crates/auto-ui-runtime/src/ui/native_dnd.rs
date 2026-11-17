@@ -692,10 +692,7 @@ pub mod win32 {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0);
-        let name = format!(
-            "auto-lang-drop-{}.png",
-            std::process::id() as u64 ^ nanos
-        );
+        let name = format!("auto-lang-drop-{}.png", std::process::id() as u64 ^ nanos);
         let p = dir.join(name);
         p.is_absolute().then_some(p)
     }

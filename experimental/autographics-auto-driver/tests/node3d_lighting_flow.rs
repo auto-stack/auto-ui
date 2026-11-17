@@ -1,0 +1,505 @@
+//! PLAN-080 T-03 permanent case: neutral light service through the frozen
+//! typed port, verified on a real GPU with independent CPU oracles.
+//!
+//! Covers the neutral slice of G3-C01..C06 (V-01 声明层、V-02 数值、V-03
+//! 阴影、V-05 准入、V-06 寿命) that does NOT require the 979/981 A slices;
+//! the author-chain consumption (Node 声明 → 979 → 981 AV/A2R) lands in
+//! T-04 when those A slices are published.
+//!
+//! Run: cargo test --manifest-path experimental/autographics-auto-driver/Cargo.toml
+//!      --test node3d_lighting_flow -- --test-threads=1
+use agp::{
+    assets::{MaterialDef, MeshData, ModelData},
+    render3d::{LightParams, MeshInstance, MeshPipeline, MeshStore},
+    renderer::{
+        capture::capture_png,
+        device::{DeviceToken, GpuDevice},
+        target::OffscreenTarget,
+    },
+};
+use glam::{Mat4, Vec3};
+use std::time::Instant;
+
+fn quad(id: &str, half: f32, z: f32) -> ModelData {
+    ModelData {
+        source_sha256: id.into(),
+        meshes: vec![MeshData {
+            name: "quad".into(),
+            positions: vec![
+                [-half, -half, z],
+                [half, -half, z],
+                [half, half, z],
+                [-half, half, z],
+            ],
+            normals: vec![[0., 0., 1.]; 4],
+            indices: vec![0, 1, 2, 0, 2, 3],
+            material: MaterialDef {
+                name: "self-authored".into(),
+                base_color: [0.4, 0.5, 0.6, 1.],
+                metallic: 0.,
+                roughness: 1.,
+            },
+            visual: None,
+        }],
+    }
+}
+
+fn srgb(x: f32) -> u8 {
+    let y = if x <= 0.003_130_8 {
+        12.92 * x
+    } else {
+        1.055 * x.powf(1. / 2.4) - 0.055
+    };
+    (y.clamp(0., 1.) * 255.).round() as u8
+}
+
+/// Independent CPU Lambert oracle on stable interior pixels (059 §9).
+fn expect_pixel(p: [u8; 4], lit: f32) {
+    for (i, c) in [0.4, 0.5, 0.6].iter().enumerate() {
+        let got = p[i] as i32;
+        let want = srgb(c * lit) as i32;
+        assert!(
+            (got - want).abs() <= 3,
+            "pixel {p:?} channel {i}: expected sRGB({c}*{lit})≈{want}, got {got}"
+        );
+    }
+}
+
+fn draw(
+    g: &GpuDevice,
+    p: &mut MeshPipeline,
+    s: &MeshStore,
+    ins: &[MeshInstance],
+    light: &agp::render3d::LightDef,
+    shadows: bool,
+    size: u32,
+) -> Vec<u8> {
+    let target = OffscreenTarget::new(g, size, size).unwrap();
+    let before = p.uploads.snapshot();
+    p.render(
+        g,
+        target.view(),
+        size,
+        size,
+        [0., 0., 0., 1.],
+        &Mat4::IDENTITY,
+        light,
+        s,
+        ins,
+        shadows,
+    );
+    g.wait_idle();
+    let delta = p.uploads.snapshot().delta_since(&before);
+    // 64 camera + 160 light + instance bytes (059 §9 constant per frame).
+    assert_eq!(delta.buffer_rewrites, 3);
+    assert_eq!(delta.bytes_rewritten, 224 + 64 * ins.len() as u64);
+    capture_png(g, &target).unwrap().1.into_raw()
+}
+
+fn px(img: &[u8], size: u32, x: u32, y: u32) -> [u8; 4] {
+    let at = ((y * size + x) * 4) as usize;
+    [img[at], img[at + 1], img[at + 2], img[at + 3]]
+}
+
+fn light(dir: Vec3, energy: f32, shadow: bool) -> agp::render3d::LightDef {
+    LightParams {
+        dir_to_light: dir,
+        color: [1., 1., 1.],
+        energy,
+        shadow_enabled: shadow,
+        center: Vec3::new(0.0, 0.0, 0.0),
+        radius: 1.0,
+        near: 0.0,
+        far: 1.0,
+        bias: 0.0005,
+    }
+    .admit()
+    .unwrap()
+}
+
+fn shadow_light(dir: Vec3, energy: f32) -> agp::render3d::LightDef {
+    LightParams {
+        dir_to_light: dir,
+        color: [1., 1., 1.],
+        energy,
+        shadow_enabled: true,
+        center: Vec3::new(0.0, 0.0, 0.0),
+        radius: 1.0,
+        near: 55.0,
+        far: 65.0,
+        bias: 0.0005,
+    }
+    .admit()
+    .unwrap()
+}
+
+#[test]
+fn v02_energy_direction_and_normals_match_the_cpu_oracle() {
+    let g = GpuDevice::new().unwrap();
+    let mut store = MeshStore::default();
+    let recv = quad("receiver", 0.95, 0.3);
+    store.get_or_upload(&g, &recv, 0).unwrap();
+    let mut p = MeshPipeline::new(&g, OffscreenTarget::FORMAT).unwrap();
+    let r = MeshInstance {
+        mesh: ("receiver".into(), "quad".into()),
+        model: Mat4::IDENTITY,
+    };
+
+    // energy=1 正面光：lit = 0.25(ambient) + 1.0 = 1.25。
+    let l = light(Vec3::Z, 1.0, false);
+    expect_pixel(px(&draw(&g, &mut p, &store, &[r.clone()], &l, false, 128), 128, 83, 64), 1.25);
+    // energy=0：只剩 ambient 0.25。
+    let l0 = light(Vec3::Z, 0.0, false);
+    expect_pixel(px(&draw(&g, &mut p, &store, &[r.clone()], &l0, false, 128), 128, 83, 64), 0.25);
+    // 方向反转（-Z 对 +Z 面法线无贡献）。
+    let rev = light(-Vec3::Z, 0.5, false);
+    expect_pixel(px(&draw(&g, &mut p, &store, &[r.clone()], &rev, false, 128), 128, 83, 64), 0.25);
+    // 斜向 45°：ndl = cos45。
+    let d45 = light(Vec3::new(-1., 0., 1.).normalize(), 0.5, false);
+    expect_pixel(
+        px(&draw(&g, &mut p, &store, &[r.clone()], &d45, false, 128), 128, 83, 64),
+        0.25 + 0.5 / 2f32.sqrt(),
+    );
+
+    // 非均匀缩放：独立逆对角法线 oracle（059 §9：法线 (1,0,1) 缩放 (2,1,.5)）。
+    let mut tilted = quad("tilted", 0.8, 0.4);
+    for n in &mut tilted.meshes[0].normals {
+        *n = [1., 0., 1.];
+    }
+    store.get_or_upload(&g, &tilted, 0).unwrap();
+    let ti = MeshInstance {
+        mesh: ("tilted".into(), "quad".into()),
+        model: Mat4::from_scale(Vec3::new(2., 1., 0.5)),
+    };
+    let lt = light(Vec3::Z, 0.5, false);
+    expect_pixel(
+        px(&draw(&g, &mut p, &store, &[ti], &lt, false, 128), 128, 83, 64),
+        0.25 + 0.5 * 2. / (4.25f32).sqrt(),
+    );
+}
+
+#[test]
+fn v03_shadow_on_off_move_and_negative_control_are_distinguishable() {
+    let g = GpuDevice::new().unwrap();
+    let mut store = MeshStore::default();
+    let recv = quad("receiver", 0.95, 0.3);
+    let cast = quad("caster", 0.18, 0.7);
+    for m in [&recv, &cast] {
+        store.get_or_upload(&g, m, 0).unwrap();
+    }
+    let mut p = MeshPipeline::new(&g, OffscreenTarget::FORMAT).unwrap();
+    let r = MeshInstance {
+        mesh: ("receiver".into(), "quad".into()),
+        model: Mat4::IDENTITY,
+    };
+    let c = MeshInstance {
+        mesh: ("caster".into(), "quad".into()),
+        model: Mat4::IDENTITY,
+    };
+    let sh = shadow_light(Vec3::new(-1., 0., 1.).normalize(), 0.5);
+    let lit = 0.25 + 0.5 / 2f32.sqrt();
+
+    // 遮挡：受影点 (83,64) 被 caster 遮住；旁点 (25,64) 亮。
+    let on = draw(&g, &mut p, &store, &[r.clone(), c.clone()], &sh, true, 128);
+    expect_pixel(px(&on, 128, 83, 64), 0.25);
+    expect_pixel(px(&on, 128, 25, 64), lit);
+    // shadow 关闭：全亮（正控）。
+    let off = draw(&g, &mut p, &store, &[r.clone(), c.clone()], &sh, false, 128);
+    expect_pixel(px(&off, 128, 83, 64), lit);
+    // 遮挡物移开：受影点恢复亮（正控）。
+    let moved = MeshInstance {
+        model: Mat4::from_translation(Vec3::new(0.7, 0., 0.)),
+        ..c
+    };
+    let im = draw(&g, &mut p, &store, &[r.clone(), moved], &sh, true, 128);
+    expect_pixel(px(&im, 128, 83, 64), lit);
+}
+
+#[test]
+fn v05_illegal_light_is_rejected_before_gpu_and_last_good_kept() {
+    // 第二灯 / 超域 / 坏数值都必须在 GPU 上传前被 typed 端口拒绝。
+    let g = GpuDevice::new().unwrap();
+    let mut store = MeshStore::default();
+    let recv = quad("receiver", 0.95, 0.3);
+    store.get_or_upload(&g, &recv, 0).unwrap();
+    let mut p = MeshPipeline::new(&g, OffscreenTarget::FORMAT).unwrap();
+    let r = MeshInstance {
+        mesh: ("receiver".into(), "quad".into()),
+        model: Mat4::IDENTITY,
+    };
+    let good = light(Vec3::Z, 0.5, false);
+    let im0 = draw(&g, &mut p, &store, &[r.clone()], &good, false, 128);
+    expect_pixel(px(&im0, 128, 83, 64), 0.75);
+
+    for (label, params) in [
+        ("bad_energy", LightParams {
+            dir_to_light: Vec3::Z,
+            color: [1., 1., 1.],
+            energy: 1.5,
+            shadow_enabled: false,
+            center: Vec3::ZERO,
+            radius: 1.0,
+            near: 0.0,
+            far: 1.0,
+            bias: 0.0005,
+        }),
+        ("bad_radius", LightParams {
+            dir_to_light: Vec3::Z,
+            color: [1., 1., 1.],
+            energy: 0.5,
+            shadow_enabled: false,
+            center: Vec3::ZERO,
+            radius: 0.0,
+            near: 0.0,
+            far: 1.0,
+            bias: 0.0005,
+        }),
+        ("bad_bias", LightParams {
+            dir_to_light: Vec3::Z,
+            color: [1., 1., 1.],
+            energy: 0.5,
+            shadow_enabled: false,
+            center: Vec3::ZERO,
+            radius: 1.0,
+            near: 0.0,
+            far: 1.0,
+            bias: 0.02,
+        }),
+        ("zero_direction", LightParams {
+            dir_to_light: Vec3::ZERO,
+            color: [1., 1., 1.],
+            energy: 0.5,
+            shadow_enabled: false,
+            center: Vec3::ZERO,
+            radius: 1.0,
+            near: 0.0,
+            far: 1.0,
+            bias: 0.0005,
+        }),
+    ] {
+        assert!(params.admit().is_err(), "{label} must be rejected");
+    }
+
+    // 同一受检灯重复渲染像素不变（last-good 语义）。
+    let re = light(Vec3::Z, 0.5, false);
+    let im1 = draw(&g, &mut p, &store, &[r.clone()], &re, false, 128);
+    let im2 = draw(&g, &mut p, &store, &[r.clone()], &re, false, 128);
+    assert_eq!(px(&im1, 128, 83, 64), px(&im2, 128, 83, 64));
+}
+
+#[test]
+fn v06_twenty_rounds_resize_zero_size_and_device_epoch() {
+    let g = GpuDevice::new().unwrap();
+    let epoch: DeviceToken = g.token();
+    let mut store = MeshStore::default();
+    let recv = quad("receiver", 0.95, 0.3);
+    store.get_or_upload(&g, &recv, 0).unwrap();
+    let r = MeshInstance {
+        mesh: ("receiver".into(), "quad".into()),
+        model: Mat4::IDENTITY,
+    };
+    let l = light(Vec3::Z, 0.5, false);
+    let start = Instant::now();
+    let warm = store.uploads.snapshot();
+    for i in 0..20 {
+        let mut p = MeshPipeline::new(&g, OffscreenTarget::FORMAT).unwrap();
+        // device epoch 必须与管道一致（旧 epoch 拒绝）。
+        assert_eq!(p.device_ordinal, Some(epoch.ordinal));
+        // 零尺寸拒绝且不破坏后续合法目标。
+        assert!(OffscreenTarget::new(&g, 0, 128).is_err());
+        for size in [64u32, 128u32] {
+            let im = draw(&g, &mut p, &store, &[r.clone()], &l, false, size);
+            expect_pixel(px(&im, size, size / 3, size / 2), 0.75);
+        }
+        drop(p);
+        g.wait_idle();
+        // warm mesh 上传字节无增长（identity 去重，059 §9）。
+        assert_eq!(
+            store.uploads.snapshot().bytes_rewritten,
+            warm.bytes_rewritten,
+            "round {i}: warm mesh must not re-upload"
+        );
+    }
+    assert!(start.elapsed().as_secs() < 120, "20 rounds too slow");
+}
+
+#[test]
+fn v05_run_stop_reject_repair_restore_keeps_last_good() {
+    // T-05 V-05 中立部分：真实 Run/Stop 语义（VM 会话 + 冻结端口发布 +
+    // GPU 呈现），坏输入拒绝→修复→下一 Run 恢复；全程保 last-good。
+    // 源采用 pilot 生成物格式（r_<field> 标量 + get_r_* 观察 getter），
+    // 不依赖 979/981 A 切片；作者整链的声明/span 部分留 T-04。
+    use autographics_auto_driver::{ResultKind, Scalar, Session};
+
+    // 生成物格式：普通 Auto 状态 + 观察 getter（059 §9 候选形态）。
+    let world = r#"
+var r_lx = 1.0
+var r_lz = 1.0
+var r_energy = 0.5
+var r_shadow = 0
+fn main_lifestart() {
+}
+fn main_lifetick(dt float) {
+ r_energy = (r_energy + 0.1)
+ r_shadow = 1
+}
+fn get_r_lx() float {return r_lx}
+fn get_r_lz() float {return r_lz}
+fn get_r_energy() float {return r_energy}
+fn get_r_shadow() int {return r_shadow}
+"#;
+    let assembled = format!("{world}\nfn main() {{}}");
+    let mut vm = Session::new(&assembled).expect("vm compile");
+    // main-first：先初始化生成 globals，再执行业务入口（059 §9 修复）。
+    vm.call("main", &[], ResultKind::Unit).unwrap();
+    vm.call("main_lifestart", &[], ResultKind::Unit).unwrap();
+
+    // 每次发布从 VM 标量 + 冻结端口 admit 产生 LightDef；坏值被端口拒绝。
+    let publish = |vm: &mut Session| -> Result<agp::render3d::LightDef, String> {
+        let e = vm.float("get_r_energy", &[])?;
+        let lx = vm.float("get_r_lx", &[])?;
+        let lz = vm.float("get_r_lz", &[])?;
+        let sh = vm.int("get_r_shadow", &[])?;
+        let p = LightParams {
+            dir_to_light: Vec3::new(lx, 0.0, lz),
+            color: [1., 1., 1.],
+            energy: e,
+            shadow_enabled: sh != 0,
+            center: Vec3::ZERO,
+            radius: 1.0,
+            near: 0.0,
+            far: 1.0,
+            bias: 0.0005,
+        };
+        p.admit().map_err(|e| format!("{e}"))
+    };
+
+    let g = GpuDevice::new().unwrap();
+    let mut store = MeshStore::default();
+    let recv = quad("receiver", 0.95, 0.3);
+    store.get_or_upload(&g, &recv, 0).unwrap();
+    let mut p = MeshPipeline::new(&g, OffscreenTarget::FORMAT).unwrap();
+    let r = MeshInstance {
+        mesh: ("receiver".into(), "quad".into()),
+        model: Mat4::IDENTITY,
+    };
+
+    // 首 Run：dir=(1,0,1) 归一化 45°，ndl=1/√2；energy=0.5 →
+    // lit = 0.25 + 0.5/√2 ≈ 0.6036。
+    let l0 = publish(&mut vm).expect("publish ok");
+    let im0 = draw(&g, &mut p, &store, &[r.clone()], &l0, false, 128);
+    expect_pixel(px(&im0, 128, 83, 64), 0.25 + 0.5 / 2f32.sqrt());
+    let good_pixel = px(&im0, 128, 83, 64);
+
+    // 坏输入（越域 energy）→ 端口拒绝，last-good 像素不变。
+    let bad = LightParams {
+        dir_to_light: Vec3::new(1., 0., 1.),
+        color: [1., 1., 1.],
+        energy: 9.9,
+        shadow_enabled: false,
+        center: Vec3::ZERO,
+        radius: 1.0,
+        near: 0.0,
+        far: 1.0,
+        bias: 0.0005,
+    };
+    assert!(bad.admit().is_err());
+    let im1 = draw(&g, &mut p, &store, &[r.clone()], &l0, false, 128);
+    assert_eq!(px(&im1, 128, 83, 64), good_pixel, "last-good kept");
+
+    // Tick 改值（energy→0.6）→ 重新发布 → 像素变化（真实 Run 语义）。
+    vm.call("main_lifetick", &[Scalar::Float(1. / 60.)], ResultKind::Unit).unwrap();
+    let l1 = publish(&mut vm).expect("republish ok");
+    let im2 = draw(&g, &mut p, &store, &[r.clone()], &l1, false, 128);
+    expect_pixel(px(&im2, 128, 83, 64), 0.25 + 0.6 / 2f32.sqrt());
+
+    // 坏源拒绝→修复→下一 Run 恢复：同入口新 Session 读修复后源并成功发布。
+    let repaired = world.replace("var r_energy = 0.5", "var r_energy = 0.4");
+    let assembled2 = format!("{repaired}\nfn main() {{}}");
+    let mut vm2 = Session::new(&assembled2).expect("repaired compile");
+    vm2.call("main", &[], ResultKind::Unit).unwrap();
+    vm2.call("main_lifestart", &[], ResultKind::Unit).unwrap();
+    let l2 = publish(&mut vm2).expect("restored publish ok");
+    let im3 = draw(&g, &mut p, &store, &[r.clone()], &l2, false, 128);
+    expect_pixel(px(&im3, 128, 83, 64), 0.25 + 0.4 / 2f32.sqrt());
+
+    // Stop：关闭会话，owner 释放。
+    let alive = vm.owner_probe();
+    assert!(alive());
+    vm.close();
+    assert!(!alive(), "session owner released on close");
+}
+
+
+
+
+
+#[test]
+fn v04_age_author_chain_drives_gpu_light() {
+    // T-04 V-01/V-04 作者整链：普通 Node 源经 AGE 前门（979/981 A 切片）
+    // 编译 → AV 观察 model 状态 → 冻结 LightParams 端口（int 缩放表达
+    // 0..10 → 0.0..1.0，因 av.owned/1 当前不持有 F32）→ 真实 GPU 像素。
+    // 同源修改（on 改 energy）→ 重新观察 → 像素变化。
+    use autographics_auto_driver::Session;
+
+    // 普通 Node：model 灯参数（energy/shadow 为 int 缩放）+ view 文本叶。
+    let src = "node Main {\n    model {\n        energy int = 5\n        shadow int = 0\n    }\n    on Life.Tick { energy = energy + 1 }\n    view {\n        text \"receiver\" {}\n    }\n}\n";
+    let mut s = Session::new(src).expect("AGE source opens");
+    assert!(s.is_age(), "author source must route to the AGE typed host");
+
+    // AV 观察：读取 model 状态（能量 5 → 0.5，shadow 0 → off）。
+    let o = s.age_observe().expect("AV observe");
+    let states = &o.components[0].instance_states[0];
+    assert_eq!(states, &[5, 0], "author model state flows out of AGE");
+
+    // 冻结端口准入（int 缩放）：energy=5/10 → 0.5，dir +Z。
+    let light = LightParams {
+        dir_to_light: Vec3::Z,
+        color: [1., 1., 1.],
+        energy: states[0] as f32 / 10.0,
+        shadow_enabled: states[1] != 0,
+        center: Vec3::ZERO,
+        radius: 1.0,
+        near: 0.0,
+        far: 1.0,
+        bias: 0.0005,
+    };
+    let l = light.admit().expect("admit author light");
+
+    // GPU 呈现：能量 0.5 → lit = 0.25 + 0.5 = 0.75。
+    let g = GpuDevice::new().unwrap();
+    let mut store = MeshStore::default();
+    let recv = quad("receiver", 0.95, 0.3);
+    store.get_or_upload(&g, &recv, 0).unwrap();
+    let mut p = MeshPipeline::new(&g, OffscreenTarget::FORMAT).unwrap();
+    let r = MeshInstance {
+        mesh: ("receiver".into(), "quad".into()),
+        model: Mat4::IDENTITY,
+    };
+    let im0 = draw(&g, &mut p, &store, &[r.clone()], &l, false, 128);
+    expect_pixel(px(&im0, 128, 83, 64), 0.75);
+
+    // 同源修改：Tick 使 energy 5→6（0.6）→ 重新观察 → 像素变化。
+    // （AV 宿主 dispatch 真实执行作者 Life.Tick 逻辑。）
+    s.age_tick(1).expect("tick");
+    let o1 = s.age_observe().expect("re-observe");
+    let states1 = &o1.components[0].instance_states[0];
+    assert_eq!(states1[0], 6, "author Tick mutated the light energy");
+    let l1 = LightParams {
+        dir_to_light: Vec3::Z,
+        color: [1., 1., 1.],
+        energy: states1[0] as f32 / 10.0,
+        shadow_enabled: states1[1] != 0,
+        center: Vec3::ZERO,
+        radius: 1.0,
+        near: 0.0,
+        far: 1.0,
+        bias: 0.0005,
+    }
+    .admit()
+    .expect("admit updated light");
+    let im1 = draw(&g, &mut p, &store, &[r.clone()], &l1, false, 128);
+    expect_pixel(px(&im1, 128, 83, 64), 0.25 + 0.6);
+    // 像素确实变化（同源修改改变了生成后执行结果）。
+    assert_ne!(px(&im0, 128, 83, 64), px(&im1, 128, 83, 64));
+}

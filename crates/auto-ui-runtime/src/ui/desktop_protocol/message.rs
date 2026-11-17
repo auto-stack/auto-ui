@@ -477,14 +477,7 @@ impl PathSeg {
             1 => PathSeg::MoveTo(r.f32()?, r.f32()?),
             2 => PathSeg::LineTo(r.f32()?, r.f32()?),
             3 => PathSeg::QuadTo(r.f32()?, r.f32()?, r.f32()?, r.f32()?),
-            4 => PathSeg::CubicTo(
-                r.f32()?,
-                r.f32()?,
-                r.f32()?,
-                r.f32()?,
-                r.f32()?,
-                r.f32()?,
-            ),
+            4 => PathSeg::CubicTo(r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?),
             5 => PathSeg::Close,
             tag => return Err(CodecError::UnknownTag(tag)),
         })
@@ -1901,7 +1894,8 @@ impl FrameMsg {
                 put_u32(out, *stride);
                 put_u32(out, *len);
                 put_u64(out, *generation);
-            }            Self::ResourceRelease { wid, srcs } => {
+            }
+            Self::ResourceRelease { wid, srcs } => {
                 put_u8(out, Self::RESOURCE_RELEASE);
                 put_u64(out, *wid);
                 put_u32(out, srcs.len() as u32);
@@ -2112,7 +2106,8 @@ impl FrameMsg {
                     len,
                     generation,
                 }
-            }            Self::RESOURCE_RELEASE => {
+            }
+            Self::RESOURCE_RELEASE => {
                 let wid = r.u64()?;
                 let count = r.u32()? as usize;
                 let mut srcs = Vec::with_capacity(count.min(1024));
@@ -2451,11 +2446,7 @@ impl InputMsg {
             11 => {
                 let wid = r.u64()?;
                 let name = r.string()?;
-                let arg = if r.bool()? {
-                    Some(r.string()?)
-                } else {
-                    None
-                };
+                let arg = if r.bool()? { Some(r.string()?) } else { None };
                 Self::Action { wid, name, arg }
             }
             tag => return Err(CodecError::UnknownTag(tag)),

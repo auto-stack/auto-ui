@@ -88,6 +88,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ace-a2x-rust"
+version = "0.1.0"
+dependencies = [
+ "ace-a2x-core",
+ "ace-core",
+ "ace-foreign-contract",
+]
+
+[[package]]
 name = "ace-a2x-store"
 version = "0.1.0"
 dependencies = [
@@ -99,6 +108,15 @@ dependencies = [
  "ace-source-query",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ace-a2x-ts"
+version = "0.1.0"
+dependencies = [
+ "ace-a2x-core",
+ "ace-core",
+ "ace-foreign-contract",
 ]
 
 [[package]]
@@ -1007,6 +1025,7 @@ dependencies = [
  "auto-terminal-core",
  "auto-test-case",
  "auto-text-core",
+ "auto-tool-execution",
  "auto-val",
  "auto-web-contract",
  "base64 0.22.1",
@@ -1170,6 +1189,7 @@ dependencies = [
 name = "auto-ui-compiler"
 version = "0.1.0"
 dependencies = [
+ "ace-core",
  "auto-atom",
  "auto-generation-core",
  "auto-lang-core",
@@ -1209,7 +1229,16 @@ dependencies = [
  "a2r-std",
  "accesskit",
  "accesskit_windows",
+ "ace-a2x-core",
+ "ace-a2x-rust",
+ "ace-a2x-ts",
+ "ace-abi",
+ "ace-av",
+ "ace-core",
+ "ace-foreign-contract",
+ "ace-source-query",
  "arboard",
+ "auto-lang-ace-host",
  "auto-lang-core",
  "auto-media-core",
  "auto-parser-api",
@@ -4231,8 +4260,6 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff144a999b0ca0f8a10257934500060240825c42e950ec0ebee9c8ae30561c13"
 dependencies = [
  "bitflags 2.13.2",
  "bytemuck",

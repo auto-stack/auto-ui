@@ -1,0 +1,364 @@
+// packages/tree-view/tree_view.at — TreeView 正式组件（PLAN-085）。
+//
+// 受控树：`nodes`/`expanded`/`selected`/`disabledIds`/`loadingIds`/`errorIds`
+// 全部由应用持有，组件只做纯派生渲染 + 上行请求回调。组件不复制业务选择或
+// expanded 集合，只保留两个实例局部字段：键盘焦点序号与结构校验报告。
+//
+// 命中区设计（沿用四示例既有语义，PLAN-614）：chevron 命中区与标签命中区是
+// **兄弟**节点——嵌套可点击会在 Vue 事件冒泡下双触发。chevron 只请求展开/
+// 折叠，标签只请求选择；行点击不折叠目录（Ant 语义）。
+//
+// 图标：chevron 用双字面量 view 分支，节点图标经 TreeIcon 有界调色板。
+// 行视觉状态用**字面量 class 分支**，不用 f-string 插值循环记录字段——
+// T-01 实证 class: 的 f-string 对 for-循环记录字段渲染为空（同记录 text
+// f-string 正常），故 selected/focused/disabled 各走独立分支。
+//
+// 加载/错误：`loadingIds` 行显示「加载中」，`errorIds` 行显示「加载失败」并
+// 给独立 `重试` 按钮请求 `on_retry(id)`；未加载但有 children 的目录仍可展开
+// 请求，不被当叶节点。
+//
+// # Usage
+// use { package: tree_view from "<resolved package dir>" }
+// TreeView (nodes: .tvNodes, expanded: .tvExpanded, selected: .tvSel,
+//           disabledIds: .tvDisabled, loadingIds: .tvLoading, errorIds: .tvError,
+//           on_toggle: .TvToggle($event), on_select: .TvSelect($event),
+//           on_retry: .TvRetry($event), directory: true) {}
+//
+// ⚠ 包内模块文件不自动导入：本文件显式 `use tree_view_util: …`，
+//   `use tree_icon: TreeIcon`。删除任一 use 都会让派生静默变空列表。
+use tree_view_util: tv_member, tv_duplicate_id, tv_count_rows, tv_derive_rows, tv_focus_id, tv_visible_parent, tv_first_reachable, tv_last_reachable, tv_step_reachable, tv_repair_focus
+use tree_icon: TreeIcon
+
+
+widget TreeView (nodes: List = [], expanded: List = [], selected: str = "", disabledIds: List = [], loadingIds: List = [], errorIds: List = [], on_toggle: msg, on_select: msg, on_retry: msg, directory: bool = false) {
+    msg {
+        Init,
+        Up,
+        Down,
+        GoHome,
+        GoEnd,
+        Expand,
+        Collapse,
+        Activate,
+        Validate,
+        WantToggle(str),
+        WantSelect(str),
+        WantRetry(str),
+        "toggle"(str),
+        "select"(str),
+        "retry"(str)
+    }
+
+    model {
+        var focus_index int = 0
+        var invalid str = ""
+        // Structural validity, computed once per Init/Validate rather than on
+        // every derivation: rescanning for duplicates each frame is O(n^2) and
+        // blows the instruction budget on large trees.
+        var dupFlag bool = false
+        var focus_id str = ""
+    }
+
+    computed {
+        rows => tv_derive_rows(.nodes, .expanded, .selected, .disabledIds, .loadingIds, .errorIds, .focus_index, .directory, .dupFlag)
+    }
+
+    view {
+        col (class: "w-full text-sm tv-tree") {
+            onkeydown.down: .Down
+            onkeydown.up: .Up
+            onkeydown.home: .GoHome
+            onkeydown.end: .GoEnd
+            onkeydown.right: .Expand
+            onkeydown.left: .Collapse
+            onkeydown.enter: .Activate
+
+            if .invalid != "" {
+                text .invalid { style: "text-xs text-destructive" }
+            }
+            col (style: "w-full") {
+                for r in .rows {
+                    // An empty tree contributes one sentinel row (see
+                    // tv_derive_rows): the emptiness is carried on the same
+                    // derivation that produces real rows, because a separate
+                    // computed over `.nodes` stays stale on the VM track.
+                    if r.empty {
+                        text r.label { style: "text-xs text-muted-foreground" }
+                    } else {
+                    row (style: "items-center") {
+                        // Indent unit per level: the row record carries `depth`,
+                        // so the hierarchy stays visible (a child sits one unit
+                        // right of its parent). Literal branches, because a
+                        // class/width f-string does not interpolate loop fields
+                        // on the VM track.
+                        if r.depth == 1 {
+                            div (class: "w-4 shrink-0 tv-lvl-1") {}
+                        }
+                        if r.depth == 2 {
+                            div (class: "w-8 shrink-0 tv-lvl-2") {}
+                        }
+                        if r.depth == 3 {
+                            div (class: "w-12 shrink-0 tv-lvl-3") {}
+                        }
+                        if r.depth == 4 {
+                            div (class: "w-16 shrink-0 tv-lvl-4") {}
+                        }
+                        if r.depth > 4 {
+                            div (class: "w-20 shrink-0 tv-lvl-deep") {}
+                        }
+                        if r.has_kids {
+                            mouse-area (onclick: .WantToggle(r.id), style: "w-5 h-5 shrink-0 items-center justify-center cursor-pointer rounded hover:bg-accent/60") {
+                                if r.open {
+                                    icon (name: "chevron-down", style: "w-3.5 h-3.5 text-muted-foreground") {}
+                                } else {
+                                    icon (name: "chevron-right", style: "w-3.5 h-3.5 text-muted-foreground") {}
+                                }
+                            }
+                        } else {
+                            div (style: "w-5 shrink-0") {}
+                        }
+
+                        // 标签命中区：四个字面量分支覆盖 disabled × (selected|focused)。
+                        if r.disabled {
+                            if r.selected {
+                                row (class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md opacity-50 bg-accent text-accent-foreground cursor-not-allowed tv-dis tv-sel") {
+                                    if r.icon != "" {
+                                        TreeIcon (name: r.icon) {}
+                                    }
+                                    text r.label { style: "text-sm line-through" }
+                                    if r.badge != "" {
+                                        text r.badge { style: "ml-auto text-xs text-muted-foreground" }
+                                    }
+                                }
+                            } else {
+                                row (class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md opacity-50 cursor-not-allowed tv-dis") {
+                                    if r.icon != "" {
+                                        TreeIcon (name: r.icon) {}
+                                    }
+                                    text r.label { style: "text-sm line-through" }
+                                    if r.badge != "" {
+                                        text r.badge { style: "ml-auto text-xs text-muted-foreground" }
+                                    }
+                                }
+                            }
+                        } else {
+                            if r.selected {
+                                if r.focused {
+                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md bg-accent text-accent-foreground ring-2 ring-primary cursor-pointer tv-sel") {
+                                        if r.icon != "" {
+                                            TreeIcon (name: r.icon) {}
+                                        }
+                                        text r.label { style: "text-sm" }
+                                        if r.badge != "" {
+                                            text r.badge { style: "ml-auto text-xs text-muted-foreground" }
+                                        }
+                                    }
+                                } else {
+                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md bg-accent text-accent-foreground cursor-pointer tv-sel") {
+                                        if r.icon != "" {
+                                            TreeIcon (name: r.icon) {}
+                                        }
+                                        text r.label { style: "text-sm" }
+                                        if r.badge != "" {
+                                            text r.badge { style: "ml-auto text-xs text-muted-foreground" }
+                                        }
+                                    }
+                                }
+                            } else {
+                                if r.focused {
+                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md ring-2 ring-primary cursor-pointer") {
+                                        if r.icon != "" {
+                                            TreeIcon (name: r.icon) {}
+                                        }
+                                        text r.label { style: "text-sm" }
+                                        if r.badge != "" {
+                                            text r.badge { style: "ml-auto text-xs text-muted-foreground" }
+                                        }
+                                    }
+                                } else {
+                                    row (onclick: .WantSelect(r.id), class: "flex flex-row flex-1 items-center gap-1.5 py-1 pr-2 rounded-md hover:bg-accent/50 cursor-pointer") {
+                                        if r.icon != "" {
+                                            TreeIcon (name: r.icon) {}
+                                        }
+                                        text r.label { style: "text-sm" }
+                                        if r.badge != "" {
+                                            text r.badge { style: "ml-auto text-xs text-muted-foreground" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if r.loading {
+                            text "加载中" { style: "ml-auto shrink-0 text-xs text-muted-foreground" }
+                        }
+                        if r.error {
+                            text "加载失败" { style: "ml-auto shrink-0 text-xs text-destructive" }
+                            button "重试" { onclick: .WantRetry(r.id), style: "shrink-0 px-1 py-0.5 text-xs rounded border border-border" }
+                        }
+                    }
+                    }
+                }
+            }
+        }
+    }
+
+    on {
+        .Init -> {
+            .focus_index = 0
+            .focus_id = ""
+            var dup str = tv_duplicate_id(.nodes)
+            if dup == "<empty-id>" {
+                .invalid = "树结构非法:存在空节点 ID"
+                .dupFlag = true
+            } else {
+                if dup != "" {
+                    .invalid = f"树结构非法:重复节点 ID ${dup}"
+                    .dupFlag = true
+                } else {
+                    .invalid = ""
+                    .dupFlag = false
+                }
+            }
+        }
+        // 结构校验可被消费者在 props 变化后主动触发（受控更新后复核）。
+        .Validate -> {
+            var dup str = tv_duplicate_id(.nodes)
+            if dup == "<empty-id>" {
+                .invalid = "树结构非法:存在空节点 ID"
+                .dupFlag = true
+            } else {
+                if dup != "" {
+                    .invalid = f"树结构非法:重复节点 ID ${dup}"
+                    .dupFlag = true
+                } else {
+                    .invalid = ""
+                    .dupFlag = false
+                }
+            }
+        }
+        .Down -> {
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
+            var nxt int = tv_step_reachable(.rows, .focus_index, true)
+            .focus_index = nxt
+            .focus_id = tv_focus_id(.rows, nxt)
+        }
+        .Up -> {
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
+            var prv int = tv_step_reachable(.rows, .focus_index, false)
+            .focus_index = prv
+            .focus_id = tv_focus_id(.rows, prv)
+        }
+        .GoHome -> {
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
+            var first int = tv_first_reachable(.rows)
+            if first >= 0 {
+                .focus_index = first
+                .focus_id = tv_focus_id(.rows, first)
+            }
+        }
+        .GoEnd -> {
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
+            var last int = tv_last_reachable(.rows)
+            if last >= 0 {
+                .focus_index = last
+                .focus_id = tv_focus_id(.rows, last)
+            }
+        }
+        // 右键：未展开则请求展开；已展开则进入首个可用子节点（焦点移动，
+        // 不请求选择）。
+        .Expand -> {
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
+            var hit str = tv_focus_id(.rows, .focus_index)
+            if hit != "" {
+                if !tv_member(.disabledIds, hit) {
+                    var is_open bool = false
+                    var has_kids bool = false
+                    var ri int = 0
+                    while ri < .rows.len() {
+                        var rw = .rows[ri]
+                        if rw.id == hit {
+                            is_open = rw.open
+                            has_kids = rw.has_kids
+                        }
+                        ri = ri + 1
+                    }
+                    if has_kids {
+                        if !is_open {
+                            ."toggle"(hit)
+                        } else {
+                            var nxt int = tv_step_reachable(.rows, .focus_index, true)
+                            .focus_index = nxt
+                            .focus_id = tv_focus_id(.rows, nxt)
+                        }
+                    }
+                }
+            }
+        }
+        // 左键：已展开则请求折叠；否则落到可见父节点（焦点移动）。
+        .Collapse -> {
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
+            var hit str = tv_focus_id(.rows, .focus_index)
+            if hit != "" {
+                if !tv_member(.disabledIds, hit) {
+                    var is_open bool = false
+                    var ri int = 0
+                    while ri < .rows.len() {
+                        var rw = .rows[ri]
+                        if rw.id == hit {
+                            is_open = rw.open
+                        }
+                        ri = ri + 1
+                    }
+                    if is_open {
+                        ."toggle"(hit)
+                    } else {
+                        var par str = tv_visible_parent(.nodes, .expanded, hit)
+                        if par != "" {
+                            var pi int = 0
+                            while pi < .rows.len() {
+                                if .rows[pi].id == par {
+                                    .focus_index = pi
+                                    .focus_id = par
+                                }
+                                pi = pi + 1
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Enter/Space：只请求选择当前可用行，不改展开。
+        .Activate -> {
+            .focus_index = tv_repair_focus(.rows, .nodes, .expanded, .focus_id, .focus_index)
+            .focus_id = tv_focus_id(.rows, .focus_index)
+            var hit str = tv_focus_id(.rows, .focus_index)
+            if hit != "" {
+                if !tv_member(.disabledIds, hit) {
+                    ."select"(hit)
+                }
+            }
+        }
+        .WantToggle(id str) -> {
+            if !tv_member(.disabledIds, id) {
+                ."toggle"(id)
+            }
+        }
+        .WantSelect(id str) -> {
+            if !tv_member(.disabledIds, id) {
+                ."select"(id)
+            }
+        }
+        .WantRetry(id str) -> {
+            if !tv_member(.disabledIds, id) {
+                ."retry"(id)
+            }
+        }
+    }
+}

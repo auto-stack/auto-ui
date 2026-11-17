@@ -12,6 +12,10 @@ name = "age-game-player"
 path = "src/bin/age-game-player.rs"
 
 [dependencies]
+# PLAN-981（SESSION S2）：AGE 会话适配所需的 ACE 依赖——取本仓 `.sdk-source`
+# 快照内的同一棵源码（不混用 live/pinned 两份 auto-atom，避免锁文件双源冲突）。
+ace-av = { path = ".sdk-source/experimental/ace/crates/av" }
+ace-core = { path = ".sdk-source/experimental/ace/crates/core" }
 auto-lang-core = { path = ".sdk-source/crates/auto-lang-core" }
 auto-val = { path = ".sdk-source/crates/auto-val" }
 

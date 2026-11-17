@@ -1,0 +1,297 @@
+// packages/tree-view/tree_view_util.at — TreeView UI 交互投影（PLAN-085 T-02）。
+//
+// 与语言 blueprint `bps.navigation.filetree.tree_util`（通用树工具 canonical
+// owner，L1 零副本）的分工：blueprint 持通用遍历/过滤形状；本模块只持 **UI
+// 交互投影**——禁用可达序、焦点 ordinal、行状态旗标。两者不重复实现同一算法，
+// 消费者要通用树工具仍从 blueprint 取。
+//
+// ⚠ VM 轨遍历纪律（PLAN-614 实证，本包沿用）：`for-in` 对函数参数列表迭代
+// 零次，因此所有列表遍历一律 `while` + 索引；嵌套 children 同式。递归可用，
+// 但本模块保持显式栈（64 层嵌套样本不依赖调用栈深度）。
+//
+// ⚠ 包内模块文件不自动导入（PLAN-085 T-01 实证）：使用本模块的 widget 文件
+// 必须显式 `use tree_view_util: <fn…>`；漏写时 `computed => fn(...)` 会静默
+// 产出空列表且无诊断。
+//
+// 节点 schema（与四示例既有 nested record 同形，字段全键书写——VM Obj 字面量
+// 为形状锁定类型，缺键字段访问是硬错）：
+// { id: str, label: str, children: List, kind: str, icon: str, is_leaf: bool,
+//   badge: str }
+
+/// 线性成员测试（while + 索引）。
+pub fn tv_member(list List, id str) bool {
+    var i int = 0
+    while i < list.len() {
+        if list[i] == id {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+/// 首个重复节点 ID（空串 = 无重复）。深度优先，遇到即返回，用于具名结构错误。
+pub fn tv_duplicate_id(nodes List) str {
+    var seen List = []
+    var stack List = []
+    var i int = nodes.len()
+    while i > 0 {
+        i = i - 1
+        stack.push(nodes[i])
+    }
+    while stack.len() > 0 {
+        var top int = stack.len() - 1
+        var nd = stack[top]
+        stack.pop()
+        if tv_member(seen, nd.id) {
+            return nd.id
+        }
+        seen.push(nd.id)
+        var kids List = nd.children
+        var k int = kids.len()
+        while k > 0 {
+            k = k - 1
+            stack.push(kids[k])
+        }
+    }
+    return ""
+}
+
+/// 键盘可达行数（展开可见且未被禁用）。空树 = 0。
+pub fn tv_count_rows(nodes List, expanded List, disabled List) int {
+    var n int = 0
+    var stack List = []
+    var i int = nodes.len()
+    while i > 0 {
+        i = i - 1
+        stack.push(nodes[i])
+    }
+    while stack.len() > 0 {
+        var top int = stack.len() - 1
+        var nd = stack[top]
+        stack.pop()
+        if !tv_member(disabled, nd.id) {
+            n = n + 1
+        }
+        if tv_member(expanded, nd.id) {
+            var kids List = nd.children
+            var j int = kids.len()
+            while j > 0 {
+                j = j - 1
+                stack.push(kids[j])
+            }
+        }
+    }
+    return n
+}
+
+/// 文件名 → 图标名（lucide 名）。纯展示映射：不探测文件系统、不判断真实
+/// 文件类型，只看显示文本后缀——与四示例既有 `ext_icon` 语义一致。
+pub fn tv_ext_icon(name str) str {
+    var ic str = "file"
+    if name.ends_with(".png") || name.ends_with(".jpg") || name.ends_with(".jpeg") || name.ends_with(".gif") || name.ends_with(".webp") || name.ends_with(".svg") {
+        ic = "image"
+    } else {
+        if name.ends_with(".at") || name.ends_with(".rs") || name.ends_with(".ts") || name.ends_with(".vue") || name.ends_with(".py") || name.ends_with(".js") {
+            ic = "file-code"
+        } else {
+            if name.ends_with(".md") || name.ends_with(".txt") || name.ends_with(".json") || name.ends_with(".toml") || name.ends_with(".css") || name.ends_with(".yaml") || name.ends_with(".yml") || name.ends_with(".log") {
+                ic = "file-text"
+            }
+        }
+    }
+    return ic
+}
+
+/// 行图标：`icon` 显式指定优先；`directory` 模式下按目录/文件派生
+/// （目录按展开态取 folder-open/folder，文件按后缀取 file 族）；
+/// 非 directory 模式且未显式指定 = 无图标。
+pub fn tv_row_icon(nd_icon str, label str, kind str, has_kids bool, open bool, directory bool) str {
+    if nd_icon != "" {
+        return nd_icon
+    }
+    if !directory {
+        return ""
+    }
+    var is_dir bool = kind == "dir" || has_kids
+    if is_dir {
+        if open {
+            return "folder-open"
+        }
+        return "folder"
+    }
+    return tv_ext_icon(label)
+}
+
+/// 可见行派生。只展开 `expanded` 中的节点；`disabled` 行仍显示（供读屏/MCP
+/// 观察其存在）但 `focused` 恒 false 且不占键盘序号。
+/// 行记录 = {id, label, has_kids, open, disabled, selected, focused,
+/// loading, error, leaf, icon, badge}。
+pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, loading List, error List, focus int, directory bool) List {
+    var out List = []
+    var stack List = []
+    var i int = nodes.len()
+    while i > 0 {
+        i = i - 1
+        stack.push(nodes[i])
+    }
+    var reachable int = 0
+    while stack.len() > 0 {
+        var top int = stack.len() - 1
+        var nd = stack[top]
+        stack.pop()
+        var kids List = nd.children
+        var leaf bool = nd.is_leaf == true
+        var has_kids bool = kids.len() > 0 && !leaf
+        var dis bool = tv_member(disabled, nd.id)
+        var op bool = false
+        if has_kids {
+            if tv_member(expanded, nd.id) {
+                op = true
+            }
+        }
+        var ord int = -1
+        if !dis {
+            ord = reachable
+            reachable = reachable + 1
+        }
+        var sel bool = false
+        if selected != "" {
+            if selected == nd.id {
+                sel = true
+            }
+        }
+        var ic str = tv_row_icon(nd.icon, nd.label, nd.kind, has_kids, op, directory)
+        out.push({ id: nd.id, label: nd.label, has_kids: has_kids, open: op, disabled: dis, selected: sel, focused: ord == focus, loading: tv_member(loading, nd.id), error: tv_member(error, nd.id), leaf: !has_kids, icon: ic, badge: nd.badge })
+        if op {
+            var j int = kids.len()
+            while j > 0 {
+                j = j - 1
+                stack.push(kids[j])
+            }
+        }
+    }
+    return out
+}
+
+/// 焦点序 → 节点 ID（越界/无行返回空串，调用方不得据此发空 ID 回调）。
+pub fn tv_focus_id(rows List, index int) str {
+    if index < 0 {
+        return ""
+    }
+    if index >= rows.len() {
+        return ""
+    }
+    return rows[index].id
+}
+
+/// 展开状态下当前焦点节点的可见父节点 ID（无父/父不可见返回空串）。
+/// 左键折叠或上移到父行由调用方按自己语义选择，这里只给可见祖先。
+pub fn tv_visible_parent(nodes List, expanded List, target str) str {
+    var parent str = ""
+    var found bool = false
+    var stack List = []
+    var parents List = []
+    var i int = nodes.len()
+    while i > 0 {
+        i = i - 1
+        stack.push(nodes[i])
+        parents.push("")
+    }
+    while stack.len() > 0 {
+        var top int = stack.len() - 1
+        var nd = stack[top]
+        var par str = parents[top]
+        stack.pop()
+        parents.pop()
+        if nd.id == target {
+            parent = par
+            found = true
+        }
+        if tv_member(expanded, nd.id) {
+            var kids List = nd.children
+            var j int = kids.len()
+            while j > 0 {
+                j = j - 1
+                stack.push(kids[j])
+                parents.push(nd.id)
+            }
+        }
+    }
+    if !found {
+        return ""
+    }
+    return parent
+}
+
+/// 焦点修复：当前焦点 ID 仍可见则保留其序号；否则回落到最近可用可见祖先，
+/// 再否则首个可用行；无可用行返回 0。绝不改业务 `selected`。
+pub fn tv_repair_focus(rows List, focus_id str, fallback int) int {
+    var i int = 0
+    while i < rows.len() {
+        var r = rows[i]
+        if !r.disabled {
+            if r.id == focus_id {
+                return i
+            }
+        }
+        i = i + 1
+    }
+    if fallback < 0 {
+        return 0
+    }
+    if fallback >= rows.len() {
+        return 0
+    }
+    return fallback
+}
+
+/// 首/末可用行的键盘序号（无可用行返回 -1）。
+pub fn tv_first_reachable(rows List) int {
+    var i int = 0
+    while i < rows.len() {
+        if !rows[i].disabled {
+            return i
+        }
+        i = i + 1
+    }
+    return -1
+}
+
+pub fn tv_last_reachable(rows List) int {
+    var i int = rows.len() - 1
+    while i >= 0 {
+        if !rows[i].disabled {
+            return i
+        }
+        i = i - 1
+    }
+    return -1
+}
+
+/// 下一个可用行序号（方向 +1/-1，到边界返回原序号 = 不动）。
+pub fn tv_step_reachable(rows List, from int, forward bool) int {
+    var n int = rows.len()
+    if n == 0 {
+        return 0
+    }
+    var i int = from
+    if forward {
+        i = i + 1
+        while i < n {
+            if !rows[i].disabled {
+                return i
+            }
+            i = i + 1
+        }
+        return from
+    }
+    i = i - 1
+    while i >= 0 {
+        if !rows[i].disabled {
+            return i
+        }
+        i = i - 1
+    }
+    return from
+}

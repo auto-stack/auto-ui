@@ -1,0 +1,11 @@
+widget roleprobe {
+    msg { Init }
+    model { var nodes List = [] }
+    use { package: tree_view from "../../pkg/tvfixture" }
+    view {
+        col (role: "tree", level: 1, style: "p-4") {
+            TreeView (nodes: .nodes, expanded: [], selected: "", on_toggle: .Init, on_select: .Init, on_retry: .Init, directory: true) {}
+        }
+    }
+    on { .Init -> { .nodes = [] } }
+}

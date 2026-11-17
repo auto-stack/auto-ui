@@ -200,11 +200,7 @@ impl HealthSpec {
     }
 
     /// 声明语义——完整合法响应且 interface 逐字相等才 Ready。
-    pub fn declaring(
-        url: &str,
-        interface: Option<&str>,
-        timeout: std::time::Duration,
-    ) -> Self {
+    pub fn declaring(url: &str, interface: Option<&str>, timeout: std::time::Duration) -> Self {
         Self {
             url: url.to_string(),
             interface: interface.map(str::to_string),
@@ -274,9 +270,7 @@ struct RawHealthResponse {
 
 /// `GET <url>/api/health`：裸 TCP + 有界读取；只支持 HTTP/1.x 的
 /// Content-Length / chunked / 连接关闭三种 body 形态，其余具名拒绝。
-fn read_health_response(
-    spec: &HealthSpec,
-) -> Result<RawHealthResponse, HealthVerdict> {
+fn read_health_response(spec: &HealthSpec) -> Result<RawHealthResponse, HealthVerdict> {
     use std::io::{Read, Write};
     let Some(addr) = socket_addr_of(&spec.url) else {
         return Err(HealthVerdict::OccupiedElsewhere(format!(
@@ -398,11 +392,7 @@ fn read_health_response(
     let content_length: Option<usize> = match header("content-length") {
         Some(v) => match v.parse::<usize>() {
             Ok(n) => Some(n),
-            Err(_) => {
-                return Err(HealthVerdict::BadBody(
-                    "Content-Length 非法".to_string(),
-                ))
-            }
+            Err(_) => return Err(HealthVerdict::BadBody("Content-Length 非法".to_string())),
         },
         None => None,
     };
@@ -461,11 +451,7 @@ fn read_health_response(
                 return Err(HealthVerdict::BadBody("chunked 响应超预算".to_string()));
             }
             match stream.read(&mut chunk) {
-                Ok(0) => {
-                    return Err(HealthVerdict::BadBody(
-                        "chunked 响应截断".to_string(),
-                    ))
-                }
+                Ok(0) => return Err(HealthVerdict::BadBody("chunked 响应截断".to_string())),
                 Ok(n) => body_raw.extend_from_slice(&chunk[..n]),
                 Err(err) => {
                     return Err(HealthVerdict::BadBody(format!(
@@ -579,7 +565,8 @@ pub fn decode_health_body(body: &[u8]) -> Result<serde_json::Value, String> {
     for _ in 0..2 {
         match value {
             serde_json::Value::String(inner) => {
-                value = serde_json::from_str(&inner).map_err(|err| format!("信封内 JSON 非法（{err}）"))?;
+                value = serde_json::from_str(&inner)
+                    .map_err(|err| format!("信封内 JSON 非法（{err}）"))?;
             }
             _ => break,
         }
@@ -783,7 +770,10 @@ pub fn expand_env_path(raw: &str) -> String {
                     }
                 }
             } else {
-                let rest: String = chars[i + 1..].iter().take_while(|ch| ch.is_ascii_alphanumeric() || **ch == '_').collect();
+                let rest: String = chars[i + 1..]
+                    .iter()
+                    .take_while(|ch| ch.is_ascii_alphanumeric() || **ch == '_')
+                    .collect();
                 if !rest.is_empty() {
                     if let Ok(value) = std::env::var(&rest) {
                         out.push_str(&value);
@@ -864,7 +854,8 @@ pub fn host_backend_env(
     def: &ManifestDaemon,
     base_dir: &Path,
 ) -> Result<HostBackendEnv, String> {
-    let mut entries: Vec<(String, String)> = vec![(daemon_env_key.to_string(), daemon_url.to_string())];
+    let mut entries: Vec<(String, String)> =
+        vec![(daemon_env_key.to_string(), daemon_url.to_string())];
     let mut remove: Vec<String> = vec![daemon_env_key.to_string()];
     let mut credential_env: Option<String> = None;
     if let Some(host) = &def.host {
@@ -987,11 +978,12 @@ pub fn resolve_manifest_host(
         };
     let generic = generic_daemon_from_manifest(name, &repo_dir, &def);
     match ensure_generic_io(&generic, &mut RealDaemonIo::new(), fallback_timeout) {
-        DaemonStatus::Running(url) => match host_backend_env(&generic.env_key, &url, &def, &repo_dir)
-        {
-            Ok(env) => ManifestHostResolution::Ready { url, env },
-            Err(err) => ManifestHostResolution::Offline(err),
-        },
+        DaemonStatus::Running(url) => {
+            match host_backend_env(&generic.env_key, &url, &def, &repo_dir) {
+                Ok(env) => ManifestHostResolution::Ready { url, env },
+                Err(err) => ManifestHostResolution::Offline(err),
+            }
+        }
         DaemonStatus::Offline(reason) => ManifestHostResolution::Offline(reason),
         DaemonStatus::Spawning => ManifestHostResolution::Offline("daemon 仍在拉起中".to_string()),
     }
@@ -1058,14 +1050,15 @@ pub fn probe_manifest_host(parent: &Path, name: &str) -> ManifestHostProbe {
         std::time::Duration::from_millis(800),
     );
     match probe_health(&spec) {
-        HealthVerdict::Ready => match host_backend_env(&generic.env_key, &generic.url, &def, &repo_dir)
-        {
-            Ok(env) => ManifestHostProbe::Ready {
-                url: generic.url,
-                env,
-            },
-            Err(err) => ManifestHostProbe::Invalid(err),
-        },
+        HealthVerdict::Ready => {
+            match host_backend_env(&generic.env_key, &generic.url, &def, &repo_dir) {
+                Ok(env) => ManifestHostProbe::Ready {
+                    url: generic.url,
+                    env,
+                },
+                Err(err) => ManifestHostProbe::Invalid(err),
+            }
+        }
         other => ManifestHostProbe::NotReady(other.reason()),
     }
 }
@@ -1107,11 +1100,12 @@ pub fn resolve_manifest_host_shared(
         &mut RealDaemonIo::new(),
         &options,
     ) {
-        DaemonStatus::Running(url) => match host_backend_env(&generic.env_key, &url, &def, &repo_dir)
-        {
-            Ok(env) => ManifestHostResolution::Ready { url, env },
-            Err(err) => ManifestHostResolution::Offline(err),
-        },
+        DaemonStatus::Running(url) => {
+            match host_backend_env(&generic.env_key, &url, &def, &repo_dir) {
+                Ok(env) => ManifestHostResolution::Ready { url, env },
+                Err(err) => ManifestHostResolution::Offline(err),
+            }
+        }
         DaemonStatus::Offline(reason) => ManifestHostResolution::Offline(reason),
         DaemonStatus::Spawning => ManifestHostResolution::Offline("daemon 仍在拉起中".to_string()),
     }
@@ -1393,7 +1387,8 @@ pub fn ensure_generic_strict(
 ) -> DaemonStatus {
     let budget = def.effective_ready_timeout(fallback_timeout);
     let interface = def.health_interface.as_deref();
-    let precheck = HealthSpec::declaring(&def.url, interface, std::time::Duration::from_millis(800));
+    let precheck =
+        HealthSpec::declaring(&def.url, interface, std::time::Duration::from_millis(800));
     match io.health(&precheck) {
         HealthVerdict::Ready => return DaemonStatus::Running(def.url.clone()),
         HealthVerdict::NoListener => {}
@@ -2025,11 +2020,8 @@ mod tests {
     }
 
     fn declaring_spec(url: &str, iface: &str) -> HealthSpec {
-        let mut spec = HealthSpec::declaring(
-            url,
-            Some(iface),
-            std::time::Duration::from_millis(800),
-        );
+        let mut spec =
+            HealthSpec::declaring(url, Some(iface), std::time::Duration::from_millis(800));
         spec.max_body_bytes = 512;
         spec
     }
@@ -2063,9 +2055,7 @@ mod tests {
         );
         let url = scripted_health_server(wrong.into_bytes());
         match probe_health(&declaring_spec(&url, "notes.fpack/1")) {
-            HealthVerdict::WrongInterface {
-                status, actual, ..
-            } => {
+            HealthVerdict::WrongInterface { status, actual, .. } => {
                 assert_eq!(status, 200);
                 assert_eq!(actual.as_deref(), Some("notes.fpack/2"), "实际接口进原因");
             }
@@ -2214,7 +2204,10 @@ mod tests {
         drop(tx);
         // 声明 interface 时同一响应必须被判坏（没有完整头/body）。
         let listener2 = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let url2 = format!("http://127.0.0.1:{}", listener2.local_addr().unwrap().port());
+        let url2 = format!(
+            "http://127.0.0.1:{}",
+            listener2.local_addr().unwrap().port()
+        );
         std::thread::spawn(move || {
             for stream in listener2.incoming().flatten() {
                 let mut s = stream;
@@ -2253,13 +2246,22 @@ mod tests {
             other => panic!("非法声明必须 Invalid（不可折成 NotDeclared），实际 {other:?}"),
         }
         assert!(matches!(
-            resolve_declared_backend(&root, "not-declared-at-all", std::time::Duration::from_millis(200)),
+            resolve_declared_backend(
+                &root,
+                "not-declared-at-all",
+                std::time::Duration::from_millis(200)
+            ),
             DeclaredBackendConfig::NotDeclared
         ));
         // 合法声明但可执行缺席：ensure 失败 → Offline（调用方按既有语义降级）。
         match resolve_declared_backend(&root, "other-app", std::time::Duration::from_millis(500)) {
             DeclaredBackendConfig::Offline(reason) => {
-                assert!(reason.contains("spawn") || reason.contains("不可复用") || reason.contains("无监听"), "{reason}")
+                assert!(
+                    reason.contains("spawn")
+                        || reason.contains("不可复用")
+                        || reason.contains("无监听"),
+                    "{reason}"
+                )
             }
             other => panic!("可执行缺席应 Offline，实际 {other:?}"),
         }
@@ -2323,7 +2325,10 @@ mod tests {
     #[test]
     fn ensure_strict_reuses_ready_without_spawn() {
         let mut io = FakeIo::new(vec![true]).with_health(vec![HealthVerdict::Ready]);
-        let def = generic_def_declaring(Some(PathBuf::from("D:/notes/notes-service.exe")), "notes.fpack/1");
+        let def = generic_def_declaring(
+            Some(PathBuf::from("D:/notes/notes-service.exe")),
+            "notes.fpack/1",
+        );
         let st = ensure_generic_io(&def, &mut io, std::time::Duration::from_secs(1));
         assert_eq!(
             st,
@@ -2339,7 +2344,10 @@ mod tests {
             expected: "notes.fpack/1".to_string(),
             actual: Some("notes.fpack/2".to_string()),
         }]);
-        let def = generic_def_declaring(Some(PathBuf::from("D:/notes/notes-service.exe")), "notes.fpack/1");
+        let def = generic_def_declaring(
+            Some(PathBuf::from("D:/notes/notes-service.exe")),
+            "notes.fpack/1",
+        );
         let st = ensure_generic_io(&def, &mut io, std::time::Duration::from_secs(1));
         match st {
             DaemonStatus::Offline(reason) => {
@@ -2360,7 +2368,10 @@ mod tests {
             HealthVerdict::NoListener,
             HealthVerdict::Ready,
         ]);
-        let def = generic_def_declaring(Some(PathBuf::from("D:/notes/notes-service.exe")), "notes.fpack/1");
+        let def = generic_def_declaring(
+            Some(PathBuf::from("D:/notes/notes-service.exe")),
+            "notes.fpack/1",
+        );
         let st = ensure_generic_io(&def, &mut io, std::time::Duration::from_secs(1));
         assert_eq!(
             st,
@@ -2399,7 +2410,10 @@ mod tests {
     #[test]
     fn ensure_strict_timeout_reports_last_verdict() {
         let mut io = FakeIo::new(vec![false]).with_health(vec![HealthVerdict::NoListener]);
-        let mut def = generic_def_declaring(Some(PathBuf::from("D:/notes/notes-service.exe")), "notes.fpack/1");
+        let mut def = generic_def_declaring(
+            Some(PathBuf::from("D:/notes/notes-service.exe")),
+            "notes.fpack/1",
+        );
         def.ready_timeout = Some(std::time::Duration::from_millis(200));
         let st = ensure_generic_io(&def, &mut io, std::time::Duration::from_secs(5));
         match st {
@@ -2419,7 +2433,10 @@ mod tests {
         let st = ensure_generic_io(&def, &mut io, std::time::Duration::from_millis(1));
         match st {
             DaemonStatus::Offline(reason) => {
-                assert!(reason.contains("未配置 bin") && reason.contains("015-notes"), "{reason}")
+                assert!(
+                    reason.contains("未配置 bin") && reason.contains("015-notes"),
+                    "{reason}"
+                )
             }
             other => panic!("应 Offline，实际 {other:?}"),
         }
@@ -2504,7 +2521,10 @@ mod tests {
             ..reference.clone()
         };
         let err = missing.resolve().expect_err("缺主体必须失败");
-        assert!(err.contains("no-such") && err.contains("fp-policy.json"), "{err}");
+        assert!(
+            err.contains("no-such") && err.contains("fp-policy.json"),
+            "{err}"
+        );
         assert!(!err.contains(cred.as_str()), "错误不回显凭据值: {err}");
         // 文件不可读。
         let absent = ManagedCredentialRef {
@@ -2555,20 +2575,10 @@ mod tests {
             }),
         });
 
-        let env_a = host_backend_env(
-            "NOTES_DAEMON",
-            "http://127.0.0.1:17819",
-            &def_a,
-            &root_a,
-        )
-        .expect("A 宿主配置");
-        let env_b = host_backend_env(
-            "NOTES_DAEMON",
-            "http://127.0.0.1:17820",
-            &def_b,
-            &root_b,
-        )
-        .expect("B 宿主配置");
+        let env_a = host_backend_env("NOTES_DAEMON", "http://127.0.0.1:17819", &def_a, &root_a)
+            .expect("A 宿主配置");
+        let env_b = host_backend_env("NOTES_DAEMON", "http://127.0.0.1:17820", &def_b, &root_b)
+            .expect("B 宿主配置");
 
         let get = |env: &HostBackendEnv, key: &str| {
             env.entries
@@ -2576,12 +2586,24 @@ mod tests {
                 .find(|(k, _)| k == key)
                 .map(|(_, v)| v.clone())
         };
-        assert_eq!(get(&env_a, "NOTES_DAEMON").as_deref(), Some("http://127.0.0.1:17819"));
-        assert_eq!(get(&env_b, "NOTES_DAEMON").as_deref(), Some("http://127.0.0.1:17820"));
+        assert_eq!(
+            get(&env_a, "NOTES_DAEMON").as_deref(),
+            Some("http://127.0.0.1:17819")
+        );
+        assert_eq!(
+            get(&env_b, "NOTES_DAEMON").as_deref(),
+            Some("http://127.0.0.1:17820")
+        );
         assert_eq!(get(&env_a, "NOTES_RETRY").as_deref(), Some("1"));
         assert_eq!(get(&env_b, "NOTES_RETRY").as_deref(), Some("2"));
-        assert_eq!(get(&env_a, "NOTES_FP_CRED").as_deref(), Some(cred_a.as_str()));
-        assert_eq!(get(&env_b, "NOTES_FP_CRED").as_deref(), Some(cred_b.as_str()));
+        assert_eq!(
+            get(&env_a, "NOTES_FP_CRED").as_deref(),
+            Some(cred_a.as_str())
+        );
+        assert_eq!(
+            get(&env_b, "NOTES_FP_CRED").as_deref(),
+            Some(cred_b.as_str())
+        );
         assert!(
             !env_a.entries.iter().any(|(_, v)| v == &cred_b),
             "A 不得看到 B 的凭据"
@@ -2601,7 +2623,10 @@ mod tests {
         assert!(non_secret.iter().any(|(k, _)| *k == "NOTES_DAEMON"));
         assert!(!non_secret.iter().any(|(k, _)| *k == "NOTES_FP_CRED"));
         assert!(env_a.has_credentials());
-        assert!(!format!("{env_a:?}").contains(cred_a.as_str()), "Debug 打码凭据");
+        assert!(
+            !format!("{env_a:?}").contains(cred_a.as_str()),
+            "Debug 打码凭据"
+        );
         assert!(format!("{env_a:?}").contains("<managed-credential>"));
         let _ = std::fs::remove_dir_all(&root_a);
         let _ = std::fs::remove_dir_all(&root_b);
@@ -2622,7 +2647,10 @@ mod tests {
         });
         let err = host_backend_env("NOTES_DAEMON", "http://127.0.0.1:17819", &def, &root)
             .expect_err("受管配置缺席必须具名失败");
-        assert!(err.contains("fp-reader") && err.contains("absent.json"), "{err}");
+        assert!(
+            err.contains("fp-reader") && err.contains("absent.json"),
+            "{err}"
+        );
         // 无 host 声明：只有地址键，且无凭据。
         let plain = manifest_def(17819);
         let env = host_backend_env("NOTES_DAEMON", "http://127.0.0.1:17819", &plain, &root)
@@ -2635,12 +2663,15 @@ mod tests {
     #[test]
     fn service_env_keeps_declared_config_and_port_authority() {
         let mut def = manifest_def(17819);
-        def.env.insert("AUTO_HTTP_PORT".to_string(), "9999".to_string());
-        def.env.insert("NOTES_DATA_DIR".to_string(), "D:/data".to_string());
+        def.env
+            .insert("AUTO_HTTP_PORT".to_string(), "9999".to_string());
+        def.env
+            .insert("NOTES_DATA_DIR".to_string(), "D:/data".to_string());
         let generic = generic_daemon_from_manifest("015-notes", Path::new("Z:/repo"), &def);
         let env = generic.spawn_env();
         assert!(
-            env.iter().any(|(k, v)| k == "NOTES_DATA_DIR" && v == "D:/data"),
+            env.iter()
+                .any(|(k, v)| k == "NOTES_DATA_DIR" && v == "D:/data"),
             "声明服务配置随 spawn 投递: {env:?}"
         );
         assert_eq!(

@@ -286,7 +286,6 @@ impl<'a> AuraViewBuilder<'a> {
             vec![v]
         }
     }
-
 }
 
 impl<'a> AuraViewBuilder<'a> {
@@ -534,7 +533,11 @@ impl<'a> AuraViewBuilder<'a> {
             &pinned_identity,
         );
         self.record_child_callback_routes_for(
-            child_state_id, self.widget_name.clone(), page_widget.name.clone(), empty_props, empty_events,
+            child_state_id,
+            self.widget_name.clone(),
+            page_widget.name.clone(),
+            empty_props,
+            empty_events,
         );
         let _slot_scope = ScopedSlotOverride {
             cell: &self.slot_resolution_override,
@@ -619,8 +622,7 @@ impl<'a> AuraViewBuilder<'a> {
         )) = cached
         {
             if seq_at_fill == seq && gfp_entry == gfp {
-                self.bridge
-                    .memo_hit_replay_instances(key.ctx_state_obj);
+                self.bridge.memo_hit_replay_instances(key.ctx_state_obj);
                 self.bridge.with_memo_cache(|c| {
                     c.note_hit();
                     c.note_seq_fast(Some(SITE_OUTLET_PAGE));
@@ -792,5 +794,4 @@ impl<'a> AuraViewBuilder<'a> {
     // two together). nav-item reuses View::Button (content subtree + hover
     // classes), so the iced renderer needs no new arm.
     // ─────────────────────────────────────────────────────────────────────
-
 }

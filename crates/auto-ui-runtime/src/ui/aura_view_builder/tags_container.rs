@@ -4,7 +4,6 @@
 use super::*;
 
 impl<'a> AuraViewBuilder<'a> {
-
     // ========================================================================
     // Layout converters
     // ========================================================================
@@ -1128,7 +1127,10 @@ impl<'a> AuraViewBuilder<'a> {
     /// 中高 Fill,双向 Fill 让 spacer 在任一方向的 flex 容器里都占据主轴剩余,
     /// 对齐 vue 侧 spacer→div 补 `flex-1` 的语义),交叉轴 Fill 复现 CSS 默认
     /// stretch。显式 style(spacer (style: "w-8"))不受影响。
-    pub(super) fn convert_spacer(&self, props: &HashMap<String, AuraPropValue>) -> View<DynamicMessage> {
+    pub(super) fn convert_spacer(
+        &self,
+        props: &HashMap<String, AuraPropValue>,
+    ) -> View<DynamicMessage> {
         let style = self.extract_style(props);
 
         let child = View::Empty;
@@ -1212,11 +1214,13 @@ impl<'a> AuraViewBuilder<'a> {
     }
 
     /// Convert a divider element: renders a horizontal line separator.
-    pub(super) fn convert_divider(&self, _props: &HashMap<String, AuraPropValue>) -> View<DynamicMessage> {
+    pub(super) fn convert_divider(
+        &self,
+        _props: &HashMap<String, AuraPropValue>,
+    ) -> View<DynamicMessage> {
         let child = View::Empty;
         let mut builder = View::container(child);
         builder = builder.with_style(Style::parse("w-full h-1 bg-gray-200").unwrap());
         builder.build()
     }
-
 }

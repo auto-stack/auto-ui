@@ -13,11 +13,11 @@ use std::time::{Duration, Instant};
 use super::rq_probe::theme;
 use super::rq_wire::{client_config, MediaStreamView};
 use super::*;
-use std::sync::Arc;
 use crate::ui::component::Component;
 use crate::ui::desktop_protocol::client_runtime::{ClientConfig, ClientPump};
 use crate::ui::desktop_protocol::message::{DisplayList, DisplayOp};
 use crate::ui::view::View;
+use std::sync::Arc;
 
 const MW: u32 = 640;
 const MH: u32 = 360;
@@ -104,8 +104,7 @@ fn assert_phases(host: &str, rep: PhaseReport) {
 
 /// 宿主侧读回断言：ids 的内容哈希必须落在产者对 n∈[0,400] 的独立哈希集合。
 fn assert_readback(host: &str, ids: &[String], max_n: u64) {
-    let producer: std::collections::HashSet<[u8; 32]> =
-        (0..=max_n).map(producer_hash).collect();
+    let producer: std::collections::HashSet<[u8; 32]> = (0..=max_n).map(producer_hash).collect();
     for src in ids {
         let host_hash = crate::ui::iced::broker_surface::bitmap_content_hash_of(src)
             .unwrap_or_else(|| panic!("{host}: {src} 无宿主内容哈希（读回账缺失）"));
@@ -119,19 +118,15 @@ fn assert_readback(host: &str, ids: &[String], max_n: u64) {
 /// standalone rqhost 宿主：RqDaemon 全链（T-04 驱动同律）。
 fn media_phases_standalone() {
     use crate::ui::desktop_protocol::rqhost::{
-        self, adopt_one, attach_window_for_test, composed_v2, daemon_for_test, rq_update,
-        RqMessage,
+        self, adopt_one, attach_window_for_test, composed_v2, daemon_for_test, rq_update, RqMessage,
     };
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
     let src_uri = format!("probe://t05-standalone-{}.mp4", std::process::id());
     let pause = Arc::new(AtomicBool::new(false));
     let seek_to = Arc::new(AtomicU64::new(0));
-    let (serve, _claim) = rqhost::RqServe::start(&format!(
-        "plan073-t05-rq-{}",
-        std::process::id()
-    ))
-    .expect("t05 rqserve");
+    let (serve, _claim) = rqhost::RqServe::start(&format!("plan073-t05-rq-{}", std::process::id()))
+        .expect("t05 rqserve");
     let state_srv = Arc::clone(&serve);
     let wellknown = format!("plan073-t05-rq-{}", std::process::id());
 
@@ -230,10 +225,11 @@ fn media_phases_standalone() {
         for (src, t_arrive) in &arrival {
             if let Some(h) = crate::ui::iced::broker_surface::bitmap_content_hash_of(src) {
                 if let Some(n) = hash_to_n.get(&h) {
-                    if let Some((_, t_pub)) =
-                        ledger.iter().find(|(ln, _)| ln == n)
-                    {
-                        lat.push((*n, t_arrive.saturating_duration_since(*t_pub).as_secs_f64() * 1000.0));
+                    if let Some((_, t_pub)) = ledger.iter().find(|(ln, _)| ln == n) {
+                        lat.push((
+                            *n,
+                            t_arrive.saturating_duration_since(*t_pub).as_secs_f64() * 1000.0,
+                        ));
                     }
                 }
             }
@@ -280,9 +276,7 @@ fn media_phases_standalone() {
         let _ = rq_update(&mut state, RqMessage::Tick);
         if let Some(list) = composed_v2(&state.clients[0]) {
             for src in image_refs(list) {
-                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH)
-                    .is_some()
-                {
+                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH).is_some() {
                     frozen_at.insert(src);
                 }
             }
@@ -296,9 +290,7 @@ fn media_phases_standalone() {
         let _ = rq_update(&mut state, RqMessage::Tick);
         if let Some(list) = composed_v2(&state.clients[0]) {
             for src in image_refs(list) {
-                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH)
-                    .is_some()
-                {
+                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH).is_some() {
                     assert!(
                         frozen_snapshot.contains(&src),
                         "standalone: 排空后暂停期出现新帧 {src}（未冻结）"
@@ -440,9 +432,7 @@ fn media_phases_desktop() {
         session.pump_broker_clients();
         if let Some(list) = composed_of(&session, &pipe) {
             for src in image_refs(&list) {
-                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH)
-                    .is_some()
-                {
+                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH).is_some() {
                     continuous.insert(src);
                 }
             }
@@ -465,9 +455,7 @@ fn media_phases_desktop() {
         session.pump_broker_clients();
         if let Some(list) = composed_of(&session, &pipe) {
             for src in image_refs(&list) {
-                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH)
-                    .is_some()
-                {
+                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH).is_some() {
                     frozen_at.insert(src);
                 }
             }
@@ -482,9 +470,7 @@ fn media_phases_desktop() {
         session.pump_broker_clients();
         if let Some(list) = composed_of(&session, &pipe) {
             for src in image_refs(&list) {
-                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH)
-                    .is_some()
-                {
+                if crate::ui::iced::broker_surface::resolve_drawlist_image(&src, MW, MH).is_some() {
                     assert!(
                         frozen_snapshot.contains(&src),
                         "desktop: 排空后暂停期出现新帧 {src}（未冻结）"

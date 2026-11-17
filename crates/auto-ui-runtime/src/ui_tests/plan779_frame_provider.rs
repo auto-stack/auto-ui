@@ -19,12 +19,15 @@ mod plan779_provider {
     /// 直引；host_capabilities 零 `ui::` 引用（能力接口与装配层分离）。
     #[test]
     fn core_frame_shims_have_no_ui_frame_bench_reference() {
-        let native_rs = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/native.rs");
+        let native_rs =
+            include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/native.rs");
         assert!(
             !native_rs.contains("ui::frame_bench"),
             "vm/native.rs 不得直引 ui::frame_bench（PLAN-779 剪断；供值经 host_capabilities provider）"
         );
-        let host_caps_rs = include_str!("../../../../../auto-lang/crates/auto-lang-core/src/vm/host_capabilities.rs");
+        let host_caps_rs = include_str!(
+            "../../../../../auto-lang/crates/auto-lang-core/src/vm/host_capabilities.rs"
+        );
         assert!(
             !host_caps_rs.contains("ui::"),
             "vm/host_capabilities.rs 是 core 能力接口，不得引用 ui"
@@ -138,8 +141,12 @@ mod plan779_provider {
     impl Drop for DefaultGuard {
         fn drop(&mut self) {
             match self.0.take() {
-                Some(p) => auto_lang_core::vm::host_capabilities::set_process_default_frame_provider(p),
-                None => auto_lang_core::vm::host_capabilities::clear_process_default_frame_provider(),
+                Some(p) => {
+                    auto_lang_core::vm::host_capabilities::set_process_default_frame_provider(p)
+                }
+                None => {
+                    auto_lang_core::vm::host_capabilities::clear_process_default_frame_provider()
+                }
             }
         }
     }

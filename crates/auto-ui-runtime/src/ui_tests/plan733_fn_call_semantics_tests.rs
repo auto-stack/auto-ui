@@ -9,7 +9,6 @@
 //! 逐格写状态字段，Rust 侧直读断言真值（不依赖 .at 侧断言原语——观测面
 //! 本身可能是缺陷面）。
 
-
 use std::path::PathBuf;
 
 // ── 语料（plan632 build_embedded 同款 tempfile 布局）──

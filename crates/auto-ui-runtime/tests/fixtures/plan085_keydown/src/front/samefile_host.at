@@ -1,0 +1,27 @@
+// PLAN-085 T-03 control: the same shape as pkg_host.at but the child lives in
+// this same file. Its keydown DOES dispatch — that contrast is the oracle.
+widget SoloChild (nodes: List = []) {
+    msg { Init, Down }
+    model { var hits int = 0 }
+    view {
+        col (style: "w-full") {
+            onkeydown.down: .Down
+            text f"solo hits=${.hits}" { style: "text-xs" }
+        }
+    }
+    on {
+        .Init -> { .hits = 0 }
+        .Down -> { .hits = .hits + 1 }
+    }
+}
+
+widget samefile {
+    msg { Init }
+    model { var nodes List = [] }
+    view {
+        col (style: "p-4") {
+            SoloChild (nodes: []) {}
+        }
+    }
+    on { .Init -> { .nodes = [] } }
+}

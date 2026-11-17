@@ -8,7 +8,8 @@
 
 mod plan446_batch5_u7 {
     fn build() -> crate::ui::dynamic::DynamicComponent {
-        let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan446_u7_loop_props/src/front/app.at";
+        let rel =
+            "../../../auto-lang/crates/auto-lang/test/ui/plan446_u7_loop_props/src/front/app.at";
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()
@@ -73,7 +74,8 @@ mod plan446_batch5_u7 {
 
 mod plan446_batch5_u1 {
     fn build() -> crate::ui::dynamic::DynamicComponent {
-        let rel = "../../../auto-lang/crates/auto-lang/test/ui/plan446_u1_event_freeze/src/front/app.at";
+        let rel =
+            "../../../auto-lang/crates/auto-lang/test/ui/plan446_u1_event_freeze/src/front/app.at";
         let candidates = [
             std::env::var("CARGO_MANIFEST_DIR")
                 .ok()

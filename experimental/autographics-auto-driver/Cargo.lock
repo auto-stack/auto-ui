@@ -33,6 +33,168 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "366ffbaa4442f4684d91e2cd7c5ea7c4ed8add41959a31447066e279e432b618"
 
 [[package]]
+name = "ace-artifacts"
+version = "0.1.0"
+dependencies = [
+ "ace-core",
+ "auto-cache",
+ "auto-tool-execution",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "ace-av"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-av-core",
+ "ace-core",
+ "ace-lowering",
+ "ace-semantics-contract",
+ "ace-source-cte",
+ "ace-source-query",
+ "ace-syntax-core",
+ "ace-syntax-grammar",
+ "ace-syntax-runtime",
+ "auto-tool-execution",
+ "base64 0.22.1",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "ace-av-core"
+version = "0.1.0"
+dependencies = [
+ "ace-foreign-contract",
+ "serde_json",
+]
+
+[[package]]
+name = "ace-core"
+version = "0.1.0"
+dependencies = [
+ "ace-foreign-contract",
+ "ace-syntax-grammar",
+ "ace-syntax-runtime",
+ "anyhow",
+ "serde",
+ "serde_json",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "ace-foreign-contract"
+version = "0.1.0"
+dependencies = [
+ "ace-semantics-contract",
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ace-lowering"
+version = "0.1.0"
+dependencies = [
+ "ace-av-core",
+ "ace-core",
+]
+
+[[package]]
+name = "ace-semantics"
+version = "0.1.0"
+dependencies = [
+ "ace-core",
+ "ace-semantics-contract",
+]
+
+[[package]]
+name = "ace-semantics-contract"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ace-source-cte"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-av-core",
+ "ace-core",
+ "ace-lowering",
+ "ace-semantics-contract",
+ "ace-source-query",
+ "blake3",
+]
+
+[[package]]
+name = "ace-source-query"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-core",
+ "ace-foreign-contract",
+ "ace-semantics",
+ "ace-semantics-contract",
+ "ace-syntax-artifacts",
+ "ace-syntax-runtime",
+ "blake3",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "ace-syntax-artifacts"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-syntax-grammar",
+ "ace-syntax-runtime",
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ace-syntax-core"
+version = "0.1.0"
+dependencies = [
+ "ace-artifacts",
+ "ace-core",
+ "ace-syntax-grammar",
+ "ace-syntax-runtime",
+]
+
+[[package]]
+name = "ace-syntax-grammar"
+version = "0.1.0"
+dependencies = [
+ "ace-syntax-runtime",
+ "auto-atom",
+ "auto-val",
+ "blake3",
+]
+
+[[package]]
+name = "ace-syntax-runtime"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -660,6 +822,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto-tool-execution"
+version = "0.1.0"
+
+[[package]]
 name = "auto-val"
 version = "0.1.0"
 dependencies = [
@@ -682,6 +848,8 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 name = "autographics-auto-driver"
 version = "0.1.0"
 dependencies = [
+ "ace-av",
+ "ace-core",
  "agp",
  "auto-lang-core",
  "auto-val",
