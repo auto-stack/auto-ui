@@ -406,6 +406,29 @@ impl ComponentFragmentLane {
             .unwrap_or_default()
     }
 
+    /// PLAN-981（IF-981-PARAMS-B，B-W1）**声明级检查函数**发现：组件面为
+    /// 每个 handler 铸 `__age_hv_<n>_<h>_<pos>` 形参=真 handler 形参的检
+    /// 查函数（载荷类型来自声明拼写；不可承载载荷如 float 不铸——fail-
+    /// closed）。param handler 的 lane 发射源=该函数（无场景重放、无代表
+    /// 值——参数是**真函数参数**，宿主按位映射到 SFC 形参名）。
+    ///
+    /// 匹配合同：检查函数体=字段 init（model 块 span）+ handler 赋值 RHS
+    /// （**原源 span**，重命名保 span）+ return（首字段 span）——body 表达
+    /// 式与 handler 体区间相交者唯一归属该 handler。
+    pub fn check_fn_covering(&self, region: std::ops::Range<usize>) -> Option<String> {
+        let view = ace_a2x_core::SemanticView::from_checked(&self.checked).ok()?;
+        view.functions()
+            .iter()
+            .filter(|f| f.source_name.starts_with("__age_hv_"))
+            .find(|f| {
+                f.body
+                    .exprs
+                    .iter()
+                    .any(|e| e.span.start < region.end && region.start < e.span.end)
+            })
+            .map(|f| f.source_name.to_string())
+    }
+
     /// 区间内**最宽**表达式发射（span ⊆ region；同宽取索引最大=组合形）。
     /// 区间无表达式 → None（调用方判缺席）。具名拒：状态函数不在视图。
     pub fn widest_expr_in(

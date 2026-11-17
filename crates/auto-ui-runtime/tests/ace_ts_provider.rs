@@ -771,6 +771,19 @@ fn p980_web_unified_entry_census_v2() {
             "widget L {\n    msg Msg { Add(str) }\n\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"L\" }\n    }\n\n    on {\n        .Add(t) -> { .n = 1 }\n    }\n}\n",
         ),
         (
+            // 切片#6j：param handler 实读参（QueryInput 形）——区别于常量体
+            // 行：spliced 的判别力在"形参进入体"（p980_web_param_environment
+            // 断言体文本/node/浏览器三层）。
+            "param-read",
+            "widget R {\n    msg Msg { Query(str) }\n\n    model {\n        var last str = \"\"\n    }\n\n    view {\n        col { text \"R\" }\n    }\n\n    on {\n        .Query(q) -> { .last = q }\n    }\n}\n",
+        ),
+        (
+            // 切片#6j 负控行：float 载荷不可承载（981 派发守卫同族
+            // fail-closed）→ 具名缺席（旧道承载），不造假数值。
+            "float-payload",
+            "widget F2 {\n    msg Msg { Resize(float) }\n\n    model {\n        var size int = 0\n    }\n\n    view {\n        col { text \"F\" }\n    }\n\n    on {\n        .Resize(w) -> { .size = 1 }\n    }\n}\n",
+        ),
+        (
             // 内联 lambda 铸造形（view onclick 无 on 块）：铸造 handler 无源
             // span/场景面不可重放（与参数化同族域缺口）→ 旧道。
             "inline-lambda-only",
@@ -785,6 +798,11 @@ fn p980_web_unified_entry_census_v2() {
     // 错误（A 期组件面允许"丢参跑常量体"的拼接随之失效）；带参 handler 的
     // lane 拼接改由 980 B-WEB 消费 typed 接口（`SendArgs`/参数环境）后恢复。
     // param-handler 因此 1→0+absent；其余行不变。
+    // **2026-11-17 具名修订 #2（切片#6j：980 B-WEB 消费 981 声明级检查函
+    // 数，参数环境落地）**：param-handler 0→1（常量体经 `__age_hv_*` 检查
+    // 函数发射恢复拼接）；新增 param-read=1（实读参行——与常量体行分列，
+    // "spliced=1 不等价动态载荷支持"的判别由 p980_web_param_environment 承
+    // 担）；新增 float-payload=0+absent（不可承载载荷具名缺席，不造假数值）。
     // counter-3h=3；str-field=1；no-on/watch-only=0（passthrough）；
     // inline-lambda-only=absent（铸造 handler 无源锚）。
     let expect: &[(&str, usize, bool)] = &[
@@ -792,7 +810,9 @@ fn p980_web_unified_entry_census_v2() {
         ("str-field", 1, false),
         ("no-on", 0, false),
         ("watch-only", 0, false),
-        ("param-handler", 0, true),
+        ("param-handler", 1, false),
+        ("param-read", 1, false),
+        ("float-payload", 0, true),
         ("inline-lambda-only", 0, true),
     ];
     for ((name, src), (exp_name, spliced, has_absent)) in corpus.iter().zip(expect) {
@@ -917,5 +937,226 @@ fn p980_web_lane_browser_mount() {
     assert!(
         out.status.success() && stdout.contains("LANE_BROWSER_OK"),
         "browser: {stdout} / {stderr}"
+    );
+}
+
+/// WEB 切片#6j（PLAN-981 B-W1 消费，V-EVT-WEB-CONSUME CPU 面）：**param
+/// handler 的 lane 参数环境**——声明级检查函数发射（`__age_hv_*` 真形参）
+/// + 按位宿主映射。分列：typed/fragment/splice/node + 负控（float 具名缺
+/// 席、无参数环境=拒绝拼接常量体）。
+#[test]
+fn p980_web_param_environment() {
+    use auto_ui_runtime::ui::ace_ts_provider::ComponentFragmentLane;
+    use auto_ui_runtime::ui::ace_vue_script::{
+        generate_sfc_with_lane, lane_handler_bodies_spec, LaneHandlerSpec,
+    };
+
+    // 同作者业务源族：QueryInput 实读参（str）、多载荷 (int,int)、bool。
+    let q_src = "widget Q {\n    msg Msg { Query(str) }\n\n    model {\n        var last str = \"\"\n    }\n\n    view {\n        col { text \"Q\" }\n    }\n\n    on {\n        .Query(q) -> { .last = q }\n    }\n}\n";
+    let m_src = "widget M {\n    msg Msg { Move(int, int) }\n\n    model {\n        var x int = 0\n    }\n\n    view {\n        col { text \"M\" }\n    }\n\n    on {\n        .Move(dx, dy) -> { .x = dx + dy }\n    }\n}\n";
+    let b_src = "widget B {\n    msg Msg { SetDark(bool) }\n\n    model {\n        var dark bool = false\n    }\n\n    view {\n        col { text \"B\" }\n    }\n\n    on {\n        .SetDark(on) -> { .dark = on }\n    }\n}\n";
+    let f_src = "widget F {\n    msg Msg { Resize(float) }\n\n    model {\n        var size int = 0\n    }\n\n    view {\n        col { text \"F\" }\n    }\n\n    on {\n        .Resize(w) -> { .size = 1 }\n    }\n}\n";
+    let q = vec!["q".to_string()];
+    let m = vec!["dx".to_string(), "dy".to_string()];
+    let b = vec!["on".to_string()];
+    let f = vec!["w".to_string()];
+
+    // ① typed：声明级检查函数在视图（981 B-W1 交付面）——span 匹配发现。
+    {
+        let lane = ComponentFragmentLane::compile(q_src, "p980-6j.at", &[]).expect("lane");
+        let ds = lane.desugared_source();
+        let arrow = ds.find("-> {").expect("arrow");
+        let region = arrow..ds[arrow..].find('}').map(|e| arrow + e + 1).expect("close");
+        let check_fn = lane
+            .check_fn_covering(region)
+            .expect("declared check fn covers the Query handler region");
+        assert!(
+            check_fn.starts_with("__age_hv_"),
+            "check fn name: {check_fn}"
+        );
+    }
+
+    // ② fragment：str 实读参（owned 转移=a2x_str_clone 单次求值拷贝——
+    // 981 PARAMS-B 语义），发射体引用**形参名**而非卫生局部/假值。
+    let (q_bodies, q_absent) = {
+        let specs = [LaneHandlerSpec {
+            pattern: ".Query",
+            params: &q,
+        }];
+        lane_handler_bodies_spec(q_src, "p980-6j.at", &specs).expect("q bodies")
+    };
+    assert!(q_absent.is_empty(), "Query lane-derived: {q_absent:?}");
+    let q_body = q_bodies.first().expect("q body");
+    assert_eq!(q_body.pattern, ".Query");
+    assert_eq!(q_body.field, "last");
+    assert_eq!(q_body.params, vec!["q".to_string()]);
+    let q_text = q_body.lines.join("\n");
+    assert!(
+        q_text.contains("a2x_str_clone(q)") && q_text.contains("last.value = "),
+        "str param read with owned-transfer clone: {q_text}"
+    );
+    assert!(
+        !q_text.contains("___age_hv_")
+            && !q_text.contains("___age_s_")
+            && !q_text.contains("___age_a_"),
+        "no hygienic-local leakage into the host body: {q_text}"
+    );
+
+    // ③ 多载荷/bool fragment + splice：SFC 函数签名携形参、体内实读参。
+    let (sfc, bodies, absent) = generate_sfc_with_lane(m_src, "p980-6j-m.at").expect("m SFC");
+    assert!(absent.is_empty(), "Move spliced: {absent:?}");
+    assert_eq!(bodies.len(), 1);
+    assert!(
+        sfc.contains("function Move(dx: any, dy: any): void {"),
+        "SFC signature carries positional params: {}",
+        &sfc[sfc.find("function Move").unwrap_or(0)
+            ..sfc.len().min(sfc.find("function Move").unwrap_or(0) + 120)]
+    );
+    assert!(
+        sfc.contains("a2x_add(dx, dy)") && sfc.contains("x.value = "),
+        "spliced body reads both params: search `Move` fn"
+    );
+    let (sfc_b, _, absent_b) = generate_sfc_with_lane(b_src, "p980-6j-b.at").expect("b SFC");
+    assert!(absent_b.is_empty());
+    assert!(
+        sfc_b.contains("function SetDark(on: any): void {") && sfc_b.contains("dark.value = on;"),
+        "bool param read directly"
+    );
+
+    // ④ node：宿主绑定实读参（多载荷 3+4=7；真 a2x_rt helper 就位）。
+    let m_body = bodies.first().expect("m body").lines.join("\n");
+    let driver = format!(
+        "import {{ a2x_add }} from \"./a2x_rt.mjs\";\nconst x = {{ value: 0 }};\nfunction Move(dx, dy) {{\n{m_body}\nreturn x.value;\n}}\nconst r = Move(3, 4);\nif (!(r === 7 && x.value === 7)) {{ throw new Error(\"FRAG_ASSERT_FAILED\"); }}\nconsole.log(\"FRAG_OK\");\n"
+    );
+    let dir = std::env::temp_dir().join(format!("p980-6j-node-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("a2x_rt.mjs"),
+        ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]),
+    )
+    .unwrap();
+    std::fs::write(dir.join("host.mjs"), driver).unwrap();
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg("host.mjs")
+        .current_dir(&dir)
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("FRAG_OK"),
+        "node param env: {stdout} / {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // ⑤ 负控——float 载荷：无检查函数（981 派发守卫同族 fail-closed），
+    // 具名缺席（旧道承载），不造假数值。
+    {
+        let specs = [LaneHandlerSpec {
+            pattern: ".Resize",
+            params: &f,
+        }];
+        let (f_bodies, f_absent) =
+            lane_handler_bodies_spec(f_src, "p980-6j.at", &specs).expect("f derives");
+        assert!(
+            f_bodies.is_empty(),
+            "float payload must not fabricate a body"
+        );
+        assert_eq!(f_absent, vec![".Resize".to_string()], "named absence");
+    }
+
+    // ⑥ 负控——无参数环境：param handler 以 unit spec（无形参）求导=**编
+    // 译期具名拒**（981 arity 域错误，零效果——不再像 981 前拼接常量体，
+    // "spliced=1 不等价动态载荷支持"）。
+    {
+        let specs = [LaneHandlerSpec {
+            pattern: ".Query",
+            params: &[],
+        }];
+        let err = lane_handler_bodies_spec(q_src, "p980-6j.at", &specs)
+            .expect_err("unit spec on a payload variant must be a named arity rejection");
+        assert!(
+            err.contains("component-event") && err.contains("payload slot"),
+            "named arity rejection: {err}"
+        );
+    }
+}
+
+/// WEB 切片#6j 浏览器档（V-EVT-WEB-CONSUME browser 面，排窗
+/// `AUTO_UI_ACE_WEB_E2E=1`）：param handler 体在**真实浏览器事件**中实读
+/// 参——str 输入事件（QueryInput）、多载荷点击、bool 点击。
+#[test]
+fn p980_web_param_browser_mount() {
+    if std::env::var("AUTO_UI_ACE_WEB_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "p980_web_param_browser_mount: not scheduled (set AUTO_UI_ACE_WEB_E2E=1; \
+             browser tier, playwright required)"
+        );
+        return;
+    }
+    use auto_ui_runtime::ui::ace_vue_script::{lane_handler_bodies_spec, LaneHandlerSpec};
+
+    let q_src = "widget Q {\n    msg Msg { Query(str) }\n\n    model {\n        var last str = \"\"\n    }\n\n    view {\n        col { text \"Q\" }\n    }\n\n    on {\n        .Query(q) -> { .last = q }\n    }\n}\n";
+    let m_src = "widget M {\n    msg Msg { Move(int, int) }\n\n    model {\n        var x int = 0\n    }\n\n    view {\n        col { text \"M\" }\n    }\n\n    on {\n        .Move(dx, dy) -> { .x = dx + dy }\n    }\n}\n";
+    let b_src = "widget B {\n    msg Msg { SetDark(bool) }\n\n    model {\n        var dark bool = false\n    }\n\n    view {\n        col { text \"B\" }\n    }\n\n    on {\n        .SetDark(on) -> { .dark = on }\n    }\n}\n";
+    let q = vec!["q".to_string()];
+    let m = vec!["dx".to_string(), "dy".to_string()];
+    let b = vec!["on".to_string()];
+    let (q_bodies, a) = {
+        let specs = [LaneHandlerSpec {
+            pattern: ".Query",
+            params: &q,
+        }];
+        lane_handler_bodies_spec(q_src, "p980-browser.at", &specs).expect("q")
+    };
+    assert!(a.is_empty());
+    let (m_bodies, a) = {
+        let specs = [LaneHandlerSpec {
+            pattern: ".Move",
+            params: &m,
+        }];
+        lane_handler_bodies_spec(m_src, "p980-browser.at", &specs).expect("m")
+    };
+    assert!(a.is_empty());
+    let (b_bodies, a) = {
+        let specs = [LaneHandlerSpec {
+            pattern: ".SetDark",
+            params: &b,
+        }];
+        lane_handler_bodies_spec(b_src, "p980-browser.at", &specs).expect("b")
+    };
+    assert!(a.is_empty());
+    let q_body = q_bodies.first().unwrap().lines.join("\n");
+    let m_body = m_bodies.first().unwrap().lines.join("\n");
+    let b_body = b_bodies.first().unwrap().lines.join("\n");
+
+    // a2x_rt helper 内联（rt_body.js 冻结语义手写——同 #6h a2x_add 先例；
+    // a2x_str_clone 在 JS-string 宿主=单次求值拷贝（immutable 值拷贝即本值）。
+    let rt_inline = "function a2x_add(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a + b)) throw new RangeError('a2x_add overflow');\n  return a + b;\n}\nfunction a2x_str_clone(x) {\n  return String(x);\n}\n";
+    let html = format!(
+        "<!DOCTYPE html>\n<html><body>\n<div id=\"last\">-</div><div id=\"x\">0</div><div id=\"dark\">false</div>\n<input id=\"q\" oninput=\"Query(this.value)\">\n<button id=\"move\" onclick=\"Move(3, 4)\">move</button>\n<button id=\"dark-btn\" onclick=\"SetDark(true)\">dark</button>\n<script>\n{rt_inline}\nconst last = {{ value: \"\", notify() {{ document.getElementById('last').textContent = this.value; }} }};\nconst x = {{ value: 0, notify() {{ document.getElementById('x').textContent = String(this.value); }} }};\nconst dark = {{ value: false, notify() {{ document.getElementById('dark').textContent = String(this.value); }} }};\nfunction Query(q) {{\n{q_body}\nlast.notify();\n}}\nfunction Move(dx, dy) {{\n{m_body}\nx.notify();\n}}\nfunction SetDark(on) {{\n{b_body}\ndark.notify();\n}}\n</script>\n</body></html>\n"
+    );
+    let dir = std::env::temp_dir().join(format!("p980-param-browser-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.html"), html).unwrap();
+
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let test_mjs =
+        manifest.join("../../examples/ui/ace-web-lane/tests/test_lane_browser_params.mjs");
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg(test_mjs.to_str().unwrap())
+        .arg(dir.to_str().unwrap())
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("LANE_PARAM_BROWSER_OK"),
+        "param browser: {stdout} / {stderr}"
     );
 }

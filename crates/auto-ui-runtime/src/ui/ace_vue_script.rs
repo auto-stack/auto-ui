@@ -9,6 +9,12 @@
 //! → 组装 `[helper 行..., field.value = expr;]`。写目标字段=命中区间的
 //! 状态函数（自动推导）。未命中区间的 handler=具名缺席（调用方决定旧道）。
 //!
+//! 切片#6j（PLAN-981 B-W1 消费）：**param handler 走声明级检查函数**
+//! （`__age_hv_*`，形参=真 handler 形参，载荷类型来自声明拼写）——不做
+//! 场景重放、不造代表值；ops 只含 unit handler（`Send` 对载荷变体=arity
+//! 域错误，981 IF-981-EVENT-PAYLOAD-B）。不可承载载荷（float 等）不铸检
+//! 查函数=具名缺席（fail-closed，旧道承载），不造假数值。
+//!
 //! 边界（具名）：本模块是路线 B 的**体级发射核心**，不含 SFC 拼接/默认
 //! 切换（#6d）；一行单赋值 handler 形态（002 族）为已验面——多语句体/
 //! 局部 var/控制流体的区间-最宽启发式不适用者具名拒绝（旧道承载）。
@@ -24,11 +30,32 @@ pub struct LaneHandlerBody {
     pub field: String,
     /// 函数体行（helper 行在前，赋值行在后；每行已带分号语义由调用方包装）。
     pub lines: Vec<String>,
+    /// PLAN-981 PARAMS-B：按位形参名（SFC 函数签名侧；空=unit handler）。
+    pub params: Vec<String>,
+}
+
+/// lane 发射的 handler 输入（切片#6j）：pattern + **按位形参名**（来自
+/// widget `handler_params`——SFC 函数签名同名；空=unit handler 走状态函
+/// 数重放道）。
+#[derive(Clone, Copy, Debug)]
+pub struct LaneHandlerSpec<'a> {
+    /// handler pattern（如 `.Add`）。
+    pub pattern: &'a str,
+    /// 按位形参名（如 `["t"]`）；空=unit。
+    pub params: &'a [String],
 }
 
 /// 并发发射的宿主映射：发射局部名（`l<i>___age_s_<inst>_<field>` 或裸
 /// 字段引用）→ `field.value`。词法整词替换（沿 ace_ts_provider 口径）。
 fn map_emitted(line: &str) -> String {
+    map_emitted_with(line, &[])
+}
+
+/// 切片#6j：param handler 版宿主映射。两族发射名：
+/// - `l<i>___age_s_<inst>_<field>` → `field.value`（状态字段，同上）；
+/// - `p<i>___age_hv_<n>_<h>_<pos>` → **按位 SFC 形参名**（`params[pos]`——
+///   声明级检查函数的真函数参数；无该位形参=保持原样（后续 splice 拒）。
+fn map_emitted_with(line: &str, params: &[String]) -> String {
     let mut out = String::with_capacity(line.len());
     let mut word = String::new();
     let flush = |out: &mut String, word: &mut String| {
@@ -43,7 +70,20 @@ fn map_emitted(line: &str) -> String {
                         None => word.clone(),
                     }
                 }
-                None => word.clone(),
+                // `p0___age_hv_0_2_0` → 形参名（pos=尾段）：981 检查函数
+                // 参数按位 ↔ SFC 函数签名形参。
+                None => match word.rfind("___age_hv_") {
+                    Some(at) => {
+                        let suffix = &word[at + "___age_hv_".len()..];
+                        let pos: Option<usize> =
+                            suffix.rsplit('_').next().and_then(|p| p.parse().ok());
+                        match pos.and_then(|p| params.get(p)) {
+                            Some(name) => name.clone(),
+                            None => word.clone(),
+                        }
+                    }
+                    None => word.clone(),
+                },
             };
             out.push_str(&mapped);
             word.clear();
@@ -115,23 +155,48 @@ fn handler_body_region(ds: &str, pattern: &str) -> Result<std::ops::Range<usize>
     Err(format!("unbalanced braces for {pattern:?} body"))
 }
 
-/// 逐 handler 发射 lane 派生函数体。`state_fn_prefix`=`__age_state_0_`（实例
-/// 0；多实例面归 #6d 后）。未命中任何状态函数区间的 handler 具名缺席
-/// （返回 `(bodies, absent)` 二元组——调用方按合同决定旧道或拒绝）。
+/// 逐 handler 发射 lane 派生函数体（unit 形——patterns 无参）。切片#6j
+/// 起为 [`lane_handler_bodies_spec`] 的薄包装。
 pub fn lane_handler_bodies(
     src: &str,
     path: &str,
     patterns: &[&str],
 ) -> Result<(Vec<LaneHandlerBody>, Vec<String>), String> {
-    // ops msg 无点前缀（ScenarioOp::Send 合同）；patterns 保留原拼写返回。
-    let msgs: Vec<&str> = patterns.iter().map(|p| p.trim_start_matches('.')).collect();
+    let specs: Vec<LaneHandlerSpec<'_>> = patterns
+        .iter()
+        .map(|p| LaneHandlerSpec {
+            pattern: p,
+            params: &[],
+        })
+        .collect();
+    lane_handler_bodies_spec(src, path, &specs)
+}
+
+/// 切片#6j：逐 handler 发射（param 感知）。unit handler=状态函数重放道
+/// （ops=`Send`）；**param handler=981 声明级检查函数道**（`__age_hv_*`——
+/// 不进 ops：`Send` 对载荷变体=arity 域错误；检查函数形参=真 handler 形
+/// 参，发射后按位映射到 SFC 形参名）。未命中（无检查函数=不可承载载荷
+/// 如 float；或无区间表达式）具名缺席——调用方按合同决定旧道或拒绝。
+pub fn lane_handler_bodies_spec(
+    src: &str,
+    path: &str,
+    specs: &[LaneHandlerSpec<'_>],
+) -> Result<(Vec<LaneHandlerBody>, Vec<String>), String> {
+    // ops 只含 unit handler（msg 无点前缀，ScenarioOp::Send 合同——载荷
+    // 变体的空 Send 是 981 arity 域错误，不进重放）。
+    let msgs: Vec<&str> = specs
+        .iter()
+        .filter(|s| s.params.is_empty())
+        .map(|s| s.pattern.trim_start_matches('.'))
+        .collect();
     let lane = ComponentFragmentLane::compile(src, path, &msgs)?;
     let ds = lane.desugared_source().to_string();
     let state_fns = lane.state_fns();
 
     let mut bodies = Vec::new();
     let mut absent = Vec::new();
-    for pat in patterns {
+    for spec in specs {
+        let pat = spec.pattern;
         let region = match handler_body_region(&ds, pat) {
             Ok(r) => r,
             Err(_) => {
@@ -140,8 +205,7 @@ pub fn lane_handler_bodies(
             }
         };
         // 写目标=体文本 LHS 首个 `.field`（赋值形 handler 家族——002 族；
-        // 所有状态函数都含全部 handler 的重放表达式，span 包含性不可区分
-        // 写路径——具名边界：非单赋值形归 #6d 结构分析）。
+        // 两条发射道共用；具名边界：非单赋值形归 #6d 结构分析）。
         let region_text = &ds[region.clone()];
         let write_field = region_text
             .find('.')
@@ -153,11 +217,25 @@ pub fn lane_handler_bodies(
                 (end > 0).then(|| rest[..end].to_string())
             })
             .ok_or_else(|| format!("no `.field` LHS in {pat:?} body: {region_text:?}"))?;
-        let fn_name = format!("__age_state_0_{write_field}");
-        if !state_fns.contains(&fn_name) {
-            absent.push((*pat).to_string());
-            continue;
-        }
+        // 发射源：unit=状态函数；param=声明级检查函数（981 B-W1）。
+        let fn_name = if spec.params.is_empty() {
+            let f = format!("__age_state_0_{write_field}");
+            if !state_fns.contains(&f) {
+                absent.push((*pat).to_string());
+                continue;
+            }
+            f
+        } else {
+            match lane.check_fn_covering(region.clone()) {
+                Some(f) => f,
+                // 无检查函数=载荷不可承载（float/ident 等，981 派发守卫同
+                // 族 fail-closed）——不造假数值，具名缺席（旧道承载）。
+                None => {
+                    absent.push((*pat).to_string());
+                    continue;
+                }
+            }
+        };
         let frag = match lane.widest_expr_in(&fn_name, region.clone())? {
             Some(f) => f,
             None => {
@@ -166,14 +244,23 @@ pub fn lane_handler_bodies(
             }
         };
         let field = write_field;
-        let mut lines: Vec<String> = frag.text.iter().map(|l| map_emitted(l)).collect();
+        let mut lines: Vec<String> = frag
+            .text
+            .iter()
+            .map(|l| map_emitted_with(l, spec.params))
+            .collect();
         if let Some(expr) = &frag.expr {
-            lines.push(format!("{}.value = {};", field, map_emitted(expr)));
+            lines.push(format!(
+                "{}.value = {};",
+                field,
+                map_emitted_with(expr, spec.params)
+            ));
         }
         bodies.push(LaneHandlerBody {
             pattern: (*pat).to_string(),
             field,
             lines,
+            params: spec.params.iter().map(|p| p.to_string()).collect(),
         });
     }
     Ok((bodies, absent))
@@ -257,15 +344,36 @@ pub fn generate_sfc_with_lane(
     let sfc = auto_ui_compiler::ui_gen::VueGenerator::new()
         .generate_sfc(&widget)
         .map_err(|e| format!("SFC: {e:?}"))?;
-    // lane 体（patterns=widget handler 键去参段——` .AddItem(text)` 形取
-    // `.AddItem`；缺席者保旧道）。
+    // lane 体（specs=widget handler 键去参段——`.AddItem(text)` 形取
+    // `.AddItem`+按位形参名（`handler_params` 同键族）；缺席者保旧道）。
     let patterns: Vec<String> = widget
         .handlers
         .keys()
         .map(|k| k.split('(').next().unwrap_or(k).to_string())
         .collect();
-    let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
-    let (bodies, absent) = match lane_handler_bodies(src, path, &pattern_refs) {
+    let param_names: Vec<Vec<String>> = patterns
+        .iter()
+        .map(|base| {
+            widget
+                .handler_params
+                .iter()
+                .find(|(k, _)| match k.find('(') {
+                    Some(i) if k.ends_with(')') => &k[..i] == base.as_str(),
+                    _ => k.as_str() == base.as_str(),
+                })
+                .map(|(_, v)| v.clone())
+                .unwrap_or_default()
+        })
+        .collect();
+    let specs: Vec<LaneHandlerSpec<'_>> = patterns
+        .iter()
+        .zip(param_names.iter())
+        .map(|(p, ps)| LaneHandlerSpec {
+            pattern: p,
+            params: ps,
+        })
+        .collect();
+    let (bodies, absent) = match lane_handler_bodies_spec(src, path, &specs) {
         Ok(v) => v,
         Err(_) => (Vec::new(), patterns.clone()),
     };
