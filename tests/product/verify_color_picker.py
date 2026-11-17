@@ -250,6 +250,27 @@ def case_gestures(s, report):
     report['cases'].append('V-02 gestures + external reset pass')
 
 
+def case_channel(s, report):
+    """V-01 (r3): builtin-input channel entry — precise value, invalid reject."""
+    snap = s.snapshot()
+    inputs = re.findall(r'input #vnode_(\d+)', snap)
+    vfd.require(len(inputs) >= 5, f'channel inputs missing: {len(inputs)}')
+    r_id = 'vnode_' + inputs[1]  # inputs[0] = HEX; inputs[1] = R
+    s.call('autoui_type', element_id=r_id, text='64')
+    time.sleep(0.4)
+    s.call('autoui_action', element_id=r_id, action='submit', latency=True)
+    vfd.require(wait_log(s, lambda l: any('ink 接受 #4074E6CC' in x for x in l)),
+                f'channel commit missing: {log_lines(s)[-3:]}')
+    s.call('autoui_type', element_id=r_id, text='abc')
+    time.sleep(0.4)
+    s.call('autoui_action', element_id=r_id, action='submit')
+    time.sleep(1.0)
+    snap2 = s.snapshot()
+    vfd.require('invalid_channel' in snap2, 'invalid channel error missing')
+    vfd.require(s.ink_text() == '当前画笔 #4074E6CC', f'invalid channel changed ink: {s.ink_text()}')
+    report['cases'].append('V-01 channel entry pass')
+
+
 def case_two_instances(s, report):
     """V-03: inline picker palette commits ink; dialog label independent."""
     s.hit(4, 'p0')
@@ -358,9 +379,10 @@ def run_vue(args, out, report):
                             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     url = None
     deadline = time.time() + 150
+    ansi = re.compile(r'\[[0-9;]*m')
     while time.time() < deadline:
-        text = open(log.name, 'r', encoding='utf-8', errors='ignore').read()
-        m = re.search(r'Local:\s+(http://127\.0\.0\.1:\d+/)', text)
+        text = ansi.sub('', open(log.name, 'r', encoding='utf-8', errors='ignore').read())
+        m = re.search(r'Local:\s*(http://127\.0\.0\.1:\d+/)', text)
         if m:
             url = m.group(1)
             break
@@ -392,6 +414,13 @@ def run_vue(args, out, report):
             body2 = page.evaluate('document.body.innerText')
             vfd.require('ink 预览' in body2, f'vue drag no preview: {body2[:200]}')
             vfd.require('ink 接受' in body2, 'vue drag did not commit')
+            # r3 channel entry: R field (inputs[1]) -> 64 -> commit #4074E6CC
+            page.evaluate('document.querySelectorAll("input")[1].focus()')
+            page.keyboard.type('64')
+            page.keyboard.press('Enter')
+            time.sleep(1.5)
+            body3 = page.evaluate('document.body.innerText')
+            vfd.require('#4074E6CC' in body3, f'vue channel commit missing: {body3[:240]}')
             page.screenshot(path=str(out / 'vue-light.png'), full_page=True)
             page2 = browser.new_page(viewport={'width': 420, 'height': 560})
             page2.goto(url, timeout=30000)
@@ -434,6 +463,7 @@ def main():
         try:
             for name, fn in [('known_colors', case_known_colors),
                              ('gestures', case_gestures),
+                             ('channel', case_channel),
                              ('two_instances', case_two_instances),
                              ('business_reject', case_business_reject),
                              ('dialog', case_dialog)]:

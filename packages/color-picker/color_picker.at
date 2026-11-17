@@ -2,7 +2,7 @@ use auto.json
 
 // 模块链接按名直引（PLAN-087 T-02 实证：只注册直引 fn 裸名；引擎已按
 // 自含形态编写，无引擎内互调）。
-use color_model: cp_alpha_item, cp_channel_of, cp_checker_item, cp_clamp, cp_cursor_edge_h, cp_cursor_edge_v, cp_floor_clamp, cp_hex_norm, cp_hex_valid, cp_hsv_hex, cp_hsv_of, cp_hue_item, cp_pal_item, cp_rgb_hex8, cp_row_item, cp_surf_col_item, cp_sw_item, cp_sv_of
+use color_model: cp_alpha_item, cp_channel_of, cp_text_int, cp_checker_item, cp_clamp, cp_cursor_edge_h, cp_cursor_edge_v, cp_floor_clamp, cp_hex_norm, cp_hex_valid, cp_hsv_hex, cp_hsv_of, cp_hue_item, cp_pal_item, cp_rgb_hex8, cp_row_item, cp_surf_col_item, cp_sw_item, cp_sv_of
 
 // PLAN-088 ColorPicker — 内嵌通用选色器（受控模式）。
 //
@@ -58,6 +58,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         var ch_s str = "0"
         var ch_v str = "0"
         var ch_rev int = 1
+        var ch_err str = ""
         // ── 场景表（每 canvas 前缀五表；vue canvas 脚本全表引用）──
         var surf_pts List = []
         var surf_meta List = []
@@ -122,17 +123,38 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                     }
                     button "RGB/HSV" { onclick: .ToggleHsv, disabled: .c_locked, title: "切换通道组", style: "px-2 py-0.5 text-xs rounded-md border border-border" }
                     if !.hsv_mode {
-                        NumericField (value: .ch_r, revision: .ch_rev, precision: 0, min: "0", max: "255", step: "1", label: "R", disabled: .c_dim, onpreview: .RPreview($event), oncommitted: .RCommitted($event)) {}
-                        NumericField (value: .ch_g, revision: .ch_rev, precision: 0, min: "0", max: "255", step: "1", label: "G", disabled: .c_dim, onpreview: .GPreview($event), oncommitted: .GCommitted($event)) {}
-                        NumericField (value: .ch_b, revision: .ch_rev, precision: 0, min: "0", max: "255", step: "1", label: "B", disabled: .c_dim, onpreview: .BPreview($event), oncommitted: .BCommitted($event)) {}
+                        row (style: "items-center gap-1 w-full") {
+                            text "R" { style: "text-xs text-muted-foreground w-3" }
+                            input (value: .ch_r, oninput: .RPreview, onenter: .RCommitted, disabled: .c_locked, style: "flex-1 min-w-0 h-7 text-sm rounded-md bg-muted/40") {}
+                        }
+                        row (style: "items-center gap-1 w-full") {
+                            text "G" { style: "text-xs text-muted-foreground w-3" }
+                            input (value: .ch_g, oninput: .GPreview, onenter: .GCommitted, disabled: .c_locked, style: "flex-1 min-w-0 h-7 text-sm rounded-md bg-muted/40") {}
+                        }
+                        row (style: "items-center gap-1 w-full") {
+                            text "B" { style: "text-xs text-muted-foreground w-3" }
+                            input (value: .ch_b, oninput: .BPreview, onenter: .BCommitted, disabled: .c_locked, style: "flex-1 min-w-0 h-7 text-sm rounded-md bg-muted/40") {}
+                        }
                         if .showAlpha {
-                            NumericField (value: .ch_a, revision: .ch_rev, precision: 0, min: "0", max: "255", step: "1", label: "A", disabled: .c_dim, onpreview: .APreview($event), oncommitted: .ACommitted($event)) {}
+                            row (style: "items-center gap-1 w-full") {
+                            text "A" { style: "text-xs text-muted-foreground w-3" }
+                            input (value: .ch_a, oninput: .APreview, onenter: .ACommitted, disabled: .c_locked, style: "flex-1 min-w-0 h-7 text-sm rounded-md bg-muted/40") {}
+                        }
                         }
                     }
                     if .hsv_mode {
-                        NumericField (value: .ch_h, revision: .ch_rev, precision: 0, min: "0", max: "360", step: "1", label: "H", disabled: .c_dim, onpreview: .HPreview($event), oncommitted: .HCommitted($event)) {}
-                        NumericField (value: .ch_s, revision: .ch_rev, precision: 0, min: "0", max: "100", step: "1", label: "S", disabled: .c_dim, onpreview: .SPreview($event), oncommitted: .SCommitted($event)) {}
-                        NumericField (value: .ch_v, revision: .ch_rev, precision: 0, min: "0", max: "100", step: "1", label: "V", disabled: .c_dim, onpreview: .VPreview($event), oncommitted: .VCommitted($event)) {}
+                        row (style: "items-center gap-1 w-full") {
+                            text "H" { style: "text-xs text-muted-foreground w-3" }
+                            input (value: .ch_h, oninput: .HPreview, onenter: .HCommitted, disabled: .c_locked, style: "flex-1 min-w-0 h-7 text-sm rounded-md bg-muted/40") {}
+                        }
+                        row (style: "items-center gap-1 w-full") {
+                            text "S" { style: "text-xs text-muted-foreground w-3" }
+                            input (value: .ch_s, oninput: .SPreview, onenter: .SCommitted, disabled: .c_locked, style: "flex-1 min-w-0 h-7 text-sm rounded-md bg-muted/40") {}
+                        }
+                        row (style: "items-center gap-1 w-full") {
+                            text "V" { style: "text-xs text-muted-foreground w-3" }
+                            input (value: .ch_v, oninput: .VPreview, onenter: .VCommitted, disabled: .c_locked, style: "flex-1 min-w-0 h-7 text-sm rounded-md bg-muted/40") {}
+                        }
                     }
                 }
             }
@@ -270,12 +292,12 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var ovt str = cp_sw_item(.d_hex)
             .sw_nodes.push(ovt)
             .pal_nodes = []
-            var pn int = .pal_norm.len()
-            var pi int = 0
-            while pi < pn {
-                var pit str = cp_pal_item(.pal_norm, pi)
+            var pn2 int = .pal_norm.len()
+            var pi2 int = 0
+            while pi2 < pn2 {
+                var pit str = cp_pal_item(.pal_norm, pi2)
                 .pal_nodes.push(pit)
-                pi = pi + 1
+                pi2 = pi2 + 1
             }
             .surf_edges = []
             var e1 str = cp_cursor_edge_h(.d_s, .d_v)
@@ -1293,14 +1315,17 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 }
             }
         }
-        .RPreview(ev str) -> {
+        .RPreview(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_r = nv
-                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_r = nv
+                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -1357,18 +1382,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    if "preview" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    }
+                }
             }
         }
-        .GPreview(ev str) -> {
+        .GPreview(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_g = nv
-                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_g = nv
+                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -1425,18 +1461,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    if "preview" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    }
+                }
             }
         }
-        .BPreview(ev str) -> {
+        .BPreview(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_b = nv
-                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_b = nv
+                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -1493,18 +1540,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    if "preview" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    }
+                }
             }
         }
-        .APreview(ev str) -> {
+        .APreview(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_a = nv
-                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_a = nv
+                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -1561,21 +1619,32 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    if "preview" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    }
+                }
             }
         }
-        .HPreview(ev str) -> {
+        .HPreview(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_h = nv
-                if .d_h >= 360 {
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_h = nv
+                    if .d_h >= 360 {
                 .d_h = 0
             }
             .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -1645,18 +1714,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    if "preview" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    }
+                }
             }
         }
-        .SPreview(ev str) -> {
+        .SPreview(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_s = nv
-                .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_s = nv
+                    .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -1726,18 +1806,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    if "preview" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    }
+                }
             }
         }
-        .VPreview(ev str) -> {
+        .VPreview(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_v = nv
-                .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_v = nv
+                    .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -1807,18 +1898,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    if "preview" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    }
+                }
             }
         }
-        .RCommitted(ev str) -> {
+        .RCommitted(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_r = nv
-                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_r = nv
+                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -1875,18 +1977,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    if "committed" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    }
+                }
             }
         }
-        .GCommitted(ev str) -> {
+        .GCommitted(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_g = nv
-                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_g = nv
+                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -1943,18 +2056,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    if "committed" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    }
+                }
             }
         }
-        .BCommitted(ev str) -> {
+        .BCommitted(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_b = nv
-                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_b = nv
+                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -2011,18 +2135,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    if "committed" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    }
+                }
             }
         }
-        .ACommitted(ev str) -> {
+        .ACommitted(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_a = nv
-                .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_a = nv
+                    .d_hex = cp_rgb_hex8(.d_r, .d_g, .d_b, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -2079,21 +2214,32 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    if "committed" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
+                    }
+                }
             }
         }
-        .HCommitted(ev str) -> {
+        .HCommitted(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_h = nv
-                if .d_h >= 360 {
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_h = nv
+                    if .d_h >= 360 {
                 .d_h = 0
             }
             .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -2163,18 +2309,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    if "committed" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    }
+                }
             }
         }
-        .SCommitted(ev str) -> {
+        .SCommitted(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_s = nv
-                .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_s = nv
+                    .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -2244,18 +2401,29 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    if "committed" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    }
+                }
             }
         }
-        .VCommitted(ev str) -> {
+        .VCommitted(v str) -> {
             if !.c_locked {
-                var req = json.parse(ev)
-                var nv int = req.value.to(int)
-                .d_v = nv
-                .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
-                .hex_text = .d_hex
-                .hex_err = ""
+                .ch_err = ""
+                var nv int = cp_text_int(v)
+                if nv < 0 {
+                    .ch_err = "color-picker: invalid channel (invalid_channel)"
+                } else {
+                    .d_v = nv
+                    .d_hex = cp_hsv_hex(.d_h, .d_s, .d_v, .d_a)
+                    .hex_text = .d_hex
+                    .hex_err = ""
             .d_r = cp_channel_of(.d_hex, 0)
             .d_g = cp_channel_of(.d_hex, 1)
             .d_b = cp_channel_of(.d_hex, 2)
@@ -2325,8 +2493,16 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(.d_s, .d_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                .seq = .seq + 1
-                ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    if "committed" == "committed" {
+                        if .d_hex != cp_hex_norm(.value) {
+                            .seq = .seq + 1
+                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                        }
+                    } else {
+                        .seq = .seq + 1
+                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
+                    }
+                }
             }
         }
         .ToggleHsv -> {

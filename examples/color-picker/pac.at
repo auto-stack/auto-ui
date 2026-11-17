@@ -9,10 +9,7 @@ title_zh: "选色器演示"
 window: "980x720"
 # vue 轨专用前端端口（避免默认 3000 与并行门冲突）。
 front_port: 4399
-# 官方包 dep 根（vue 轨物化扫描；跨包传递依赖按消费方声明纪律并列声明）。
+# 官方包 dep 根（vue 轨物化扫描）。
 dep color_picker {
     path: "../../packages/color-picker"
-}
-dep numeric_fields {
-    path: "../../packages/numeric-fields"
 }

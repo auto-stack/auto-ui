@@ -27,12 +27,15 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         var seq int = 0
         var dlg_hex str = "#000000FF"
         var dlg_rev int = 1
+        // open 属性的模型镜像（vue dialog 标签 v-model 不能绑 prop——
+        // r3 实录）；Tick 同步，父组件持正式 open。
+        var dlg_open bool = false
     }
     computed {
         c_locked => .disabled || .readOnly || .cfg_err != ""
     }
     view {
-        dialog (open: .open, onclose: .Cancelled, closeOnOutside: false) {
+        dialog (open: .dlg_open, onclose: .Cancelled, closeOnOutside: false) {
             dialog-content (style: "w-[480px] max-w-full p-4 gap-3 rounded-xl bg-background text-foreground max-h-[86vh]") {
                 text .title { style: "text-sm font-medium" }
                 if .cfg_err != "" {
@@ -64,6 +67,10 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             .dlg_rev = .dlg_rev + 1
         }
         .Tick -> {
+            // open 镜像先行（vue dialog v-model 绑模型镜像——r3 实录）
+            if .open != .dlg_open {
+                .dlg_open = .open
+            }
             if .revision != .seen_rev || .value != .seen_val || .open != .seen_open {
                 .seen_rev = .revision
                 .seen_val = .value

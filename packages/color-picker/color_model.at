@@ -526,6 +526,31 @@ fn cp_floor_clamp(pdec str, plo int, phi int) int {
     return v
 }
 
+/// 通道文本 → 整数（纯数字；空/含非数字 → -1，调用方具名 invalid_channel）。
+fn cp_text_int(pdec str) int {
+    var n int = pdec.len()
+    if n == 0 { return 0 - 1 }
+    var v int = 0
+    for i in 0..n {
+        var d int = 0 - 1
+        var ch str = pdec.substr(i, 1)
+        if ch == "0" { d = 0 }
+        if ch == "1" { d = 1 }
+        if ch == "2" { d = 2 }
+        if ch == "3" { d = 3 }
+        if ch == "4" { d = 4 }
+        if ch == "5" { d = 5 }
+        if ch == "6" { d = 6 }
+        if ch == "7" { d = 7 }
+        if ch == "8" { d = 8 }
+        if ch == "9" { d = 9 }
+        if d < 0 { return 0 - 1 }
+        v = v * 10 + d
+        if v > 999999 { return 0 - 1 }
+    }
+    return v
+}
+
 /// 整数夹取。
 fn cp_clamp(pxx int, plo int, phi int) int {
     if pxx < plo { return plo }

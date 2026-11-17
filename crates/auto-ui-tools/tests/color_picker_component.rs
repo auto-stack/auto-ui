@@ -3,7 +3,6 @@
 //! color engine's cross-track code shapes (self-contained fns, exact-division
 //! forms, no float paths), and the vendored dependency closure at a second
 //! absolute root (named failure when the closure is broken; the vendored
-//! consumer also proves the nested numeric-fields dep resolves from a
 //! relocated package root). The behavioral matrix (V-01..V-06) lives in the
 //! live product gate tests/product/verify_color_picker.py; this file is the
 //! tools track.
@@ -43,7 +42,7 @@ fn official_color_picker_compiles_through_both_generators() {
 }
 
 /// AC-01/06: the vendored closure generates from a second absolute root —
-/// package copied byte-equal TOGETHER WITH its numeric-fields dependency
+/// package copied byte-equal to a second root
 /// (nested package use resolves relative to the package dir, never a foreign
 /// checkout); consumer binds preview + committed + cancelled + error;
 /// deleting the color-picker dependency is a NAMED failure in strict
@@ -55,10 +54,8 @@ fn vendored_closure_generates_and_missing_dependency_fails_named() {
     let root = temporary.path();
     let front = root.join("src/front");
     let vendor = root.join("vendor/color-picker");
-    let vendor_fields = root.join("vendor/numeric-fields");
     std::fs::create_dir_all(&front).unwrap();
     std::fs::create_dir_all(&vendor).unwrap();
-    std::fs::create_dir_all(&vendor_fields).unwrap();
     for (src_dir, dst) in [(official_package(), &vendor)] {
         let _ = src_dir;
         let _ = dst;
@@ -70,23 +67,11 @@ fn vendored_closure_generates_and_missing_dependency_fails_named() {
         }
         std::fs::copy(&p, vendor.join(entry.file_name())).unwrap();
     }
-    // numeric-fields is vendored as a SIBLING of color-picker (the package's
-    // `use { package: numeric_fields from "../numeric-fields" }` must resolve
-    // inside the relocated root).
-    let numeric_package = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/numeric-fields");
-    for entry in std::fs::read_dir(numeric_package).unwrap().flatten() {
-        let p = entry.path();
-        if p.extension().map_or(true, |x| x != "at") {
-            continue;
-        }
-        std::fs::copy(&p, vendor_fields.join(entry.file_name())).unwrap();
-    }
     // vue-track materialization scans the CONSUMER descriptor dep roots, so
-    // the transitive numeric-fields dep is declared alongside color-picker
     // (package-internal use resolves against the sibling vendored layout).
     std::fs::write(
         root.join("pac.at"),
-        "name: \"color-vendor-control\"\nscene: \"ui\"\nrender: \"vue\"\ndep color_picker { path: \"vendor/color-picker\" }\ndep numeric_fields { path: \"vendor/numeric-fields\" }\n",
+        "name: \"color-vendor-control\"\nscene: \"ui\"\nrender: \"vue\"\ndep color_picker { path: \"vendor/color-picker\" }\n",
     )
     .unwrap();
     std::fs::write(
@@ -153,9 +138,6 @@ widget App {
     // engine's integer discipline is pinned by the exact-division shape
     // assertion above (087's Math.floor/parseFloat markers applied to the
     // numeric engine, not the canvas coordinate parser).
-    // The nested numeric-fields widget is generated as a sibling component.
-    let fields = project.output_dir.join("src/components/NumericField.vue");
-    assert!(fields.exists(), "nested numeric-fields dep must generate: {}", project.output_dir.display());
     let dialog = std::fs::read_to_string(project.output_dir.join("src/components/ColorDialog.vue")).unwrap();
     assert!(dialog.contains("source: 'confirm'"), "confirm source marker");
     assert_eq!(

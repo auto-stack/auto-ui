@@ -25,11 +25,7 @@ dep themes {
     path: "../../../packages/themes"
 }
 
-# PLAN-088 T-04：官方选色包（ColorPicker 消费；内嵌 NumericField 传递依赖
-# 按消费方声明纪律并列声明——vue 轨物化扫描按消费方 dep 根）。
+# PLAN-088 T-04：官方选色包（ColorPicker 消费）。
 dep color_picker {
     path: "../../../packages/color-picker"
-}
-dep numeric_fields {
-    path: "../../../packages/numeric-fields"
 }
