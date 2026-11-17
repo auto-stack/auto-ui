@@ -46,6 +46,18 @@ if problems:
     for p in problems[:20]:
         print(" ", p)
     sys.exit(1)
+# 清单里已不存在的旧文件必须清掉，否则 verify 会看到"多余文件"（半应用状态）。
+ROOTS = ("experimental/ace", "crates/auto-tool-execution", "stdlib/ace")
+for root in ROOTS:
+    base = sdk / root
+    if not base.is_dir():
+        continue
+    for path in base.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(sdk).as_posix()
+        if rel not in files:
+            path.unlink()
 for rel in files:
     dst = sdk / rel
     dst.parent.mkdir(parents=True, exist_ok=True)
