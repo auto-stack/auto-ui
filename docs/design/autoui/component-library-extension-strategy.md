@@ -33,7 +33,7 @@
 | CL-06 | 第二批 CommandPalette | 现有Command族、028 Launcher搜索/选中/键盘 | local/provided单一过滤owner、稳定命令ID、分组/禁用/键盘/提示；028保留原评分、recent、环绕和宿主启动 | [PLAN-096](../../plans/096-command-palette.md)，drafting r2，0/8；复用既有参考图 |
 | CL-07 | 第二批 TagInput | 015 Notes标签控件/store、Reader主检出book_detail（只读） | 标签增删、精确去重、静态建议、键盘/上限和修订确认；015真实存储消费，Reader后续独立迁移 | [PLAN-097](../../plans/097-tag-input.md)，drafting r2，0/8；复用既有参考图 |
 | CL-08 | 通用扩展批 ColorPicker / ColorDialog | 031 Paint 色板、Dialog、087数值输入 | 内嵌选色与对话框；sRGB/HEX/RGB/HSV、透明度、预览/提交/取消；实际Paint消费 | 已立 [PLAN-088](../../plans/088-color-picker-and-dialog.md)，drafting r2，0/8 |
-| CL-09 | 通用扩展批 ImageViewport / ImagePreviewDialog | 031局部ImageViewport、ImageSurface、029 Gallery | 缩放/平移/90°旋转/适应窗口、错误与modal；图片查看不扩成绘图或3D引擎 | 已立 [PLAN-089](../../plans/089-image-viewport-and-preview-dialog.md)，drafting r2，0/8 |
+| CL-09 | 通用扩展批 ImageViewport / ImagePreviewDialog | 031局部ImageViewport、ImageSurface、029 Gallery | 缩放/平移/90°旋转/适应窗口、错误与modal；图片查看不扩成绘图或3D引擎 | 已交 [PLAN-089](../../plans/089-image-viewport-and-preview-dialog.md)（r2，8/8：包 `packages/image-viewer/` + 规范 [docs/specs/ui/image-viewport.md](../specs/ui/image-viewport.md)） |
 | CL-10 | 能力补齐研究 DataTable | 已有注册、Vue 映射、026 表格及 CRUD blueprint | 先核查排序/选择/原生交互，再补正式合同；不作为“从零新增 DataTable”统计 | 待调查 |
 | CL-11 | 能力补齐研究 Date/Time Picker | Calendar 声明及原生日历转换 | 核查日期、时间、区间、格式、键盘和双端语义，再决定组合组件 | 待调查 |
 | CL-12 | 储备研究 FontPicker / FontDialog | Reader 字号预设、字体资源及主题接口 | 先调查字体枚举、可用字体与回退；现有字号选择不等于完整字体选择器 | 待调查 |
