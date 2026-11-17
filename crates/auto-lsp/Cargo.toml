@@ -11,13 +11,16 @@ lsp-types = "0.97"
 tokio = { version = "1", features = ["full"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde = { version = "1.0", features = ["derive"] }
-miette = { version = "7.2", features = ["fancy"] }
+# PLAN-971 T-08：诊断后端换 ACE 生产者后，旧 parser 诊断链的 miette/
+# auto-diagnostics 直连依赖不再被引用（其余 LSP 功能不依赖它们）。
 # PLAN-900：本 crate 自 auto-lang 迁 auto-ui 仓——语言基础走
 # auto-lang-core 直连（facade 零 UI 依赖后不再作为传递入口）。
 auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
+# PLAN-971 T-08：诊断改走 ACE 生产者（compile-only project check）。
+# 宿主桥接 crate 注册项目执行器；跨仓组内兄弟路径解析（与 auto-lang-core 同源）。
+auto-lang-ace-host = { path = "../../../auto-lang/crates/auto-lang-ace-host" }
 auto-ui-compiler = { path = "../auto-ui-compiler" }
 auto-ast = { path = "../../../auto-lang/crates/auto-ast" }
-auto-diagnostics = { path = "../../../auto-lang/crates/auto-diagnostics" }
 auto-val = { path = "../../../auto-lang/crates/auto-val" }
 env_logger = "0.11"
 url = "2.5"

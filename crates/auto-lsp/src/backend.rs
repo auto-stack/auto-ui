@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -8,7 +9,6 @@ use tower_lsp_server::ls_types::*;
 use tower_lsp_server::{Client, LanguageServer};
 
 use crate::completion;
-use crate::diagnostics;
 use crate::goto_def;
 use crate::hover_info;
 use crate::signature_help;
@@ -18,8 +18,23 @@ use crate::workspace;
 #[derive(Debug, Clone)]
 struct DocumentState {
     content: String,
-    #[allow(dead_code)]
     version: i32,
+    /// PLAN-971 V-08: monotonic content generation, bumped by every applied
+    /// content update. A diagnostics result may only be published while the
+    /// generations it was computed from are still current.
+    generation: u64,
+}
+
+/// Build the V-08 generation list (sorted by URI) of the current documents.
+fn generation_snapshot(
+    docs: &HashMap<String, DocumentState>,
+) -> crate::diagnostics::GenerationSnapshot {
+    let mut documents: Vec<(String, u64)> = docs
+        .iter()
+        .map(|(uri, state)| (uri.clone(), state.generation))
+        .collect();
+    documents.sort();
+    crate::diagnostics::GenerationSnapshot { documents }
 }
 
 /// Backend struct implementing the LanguageServer trait
@@ -33,6 +48,9 @@ pub struct Backend {
     workspace_root: Arc<RwLock<Option<PathBuf>>>,
     /// Filesystem resolver for cross-file module resolution
     resolver: Arc<RwLock<Option<auto_lang_core::resolver::FilesystemResolver>>>,
+    /// PLAN-971 V-08: monotonic counter backing the per-document content
+    /// generations.
+    generation_counter: Arc<AtomicU64>,
 }
 
 /// Clone implementation for debounced tasks
@@ -44,6 +62,7 @@ impl Clone for Backend {
             debounce_handles: self.debounce_handles.clone(),
             workspace_root: self.workspace_root.clone(),
             resolver: self.resolver.clone(),
+            generation_counter: self.generation_counter.clone(),
         }
     }
 }
@@ -57,6 +76,7 @@ impl Backend {
             debounce_handles: Arc::new(RwLock::new(HashMap::new())),
             workspace_root: Arc::new(RwLock::new(None)),
             resolver: Arc::new(RwLock::new(None)),
+            generation_counter: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -66,10 +86,59 @@ impl Backend {
         docs.get(uri).map(|doc| doc.content.clone())
     }
 
-    /// Update document content
-    async fn update_document(&self, uri: String, content: String, version: i32) {
+    /// Open (or force-refresh) a document from a `didOpen` notification. A
+    /// `didOpen` is authoritative regardless of the versions seen before, so
+    /// it always applies and bumps the content generation.
+    async fn open_document(&self, uri: String, content: String, version: i32) {
+        let generation = self.generation_counter.fetch_add(1, Ordering::SeqCst) + 1;
         let mut docs = self.documents.write().await;
-        docs.insert(uri, DocumentState { content, version });
+        docs.insert(
+            uri,
+            DocumentState {
+                content,
+                version,
+                generation,
+            },
+        );
+    }
+
+    /// Update document content from a `didChange` notification. Returns `true`
+    /// when the update was applied; an out-of-order (older-version) update is
+    /// dropped so a reordered notification can never resurrect old text.
+    async fn update_document(&self, uri: String, content: String, version: i32) -> bool {
+        let mut docs = self.documents.write().await;
+        if let Some(existing) = docs.get(&uri) {
+            if version < existing.version {
+                return false;
+            }
+        }
+        let generation = self.generation_counter.fetch_add(1, Ordering::SeqCst) + 1;
+        docs.insert(
+            uri,
+            DocumentState {
+                content,
+                version,
+                generation,
+            },
+        );
+        true
+    }
+
+    /// Snapshot every open document (content + LSP version + V-08 generation)
+    /// under one read lock, sorted by URI for deterministic project ordering.
+    async fn snapshot_documents(&self) -> Vec<crate::diagnostics::DocumentSnapshot> {
+        let docs = self.documents.read().await;
+        let mut snapshot: Vec<crate::diagnostics::DocumentSnapshot> = docs
+            .iter()
+            .map(|(uri, state)| crate::diagnostics::DocumentSnapshot {
+                uri: uri.clone(),
+                version: state.version,
+                generation: state.generation,
+                content: state.content.clone(),
+            })
+            .collect();
+        snapshot.sort_by(|a, b| a.uri.cmp(&b.uri));
+        snapshot
     }
 
     /// Remove document from cache
@@ -220,9 +289,10 @@ impl LanguageServer for Backend {
             .log_message(MessageType::INFO, format!("Opened document: {}", uri))
             .await;
 
-        self.update_document(uri.clone(), content, version).await;
+        self.open_document(uri.clone(), content, version).await;
 
-        // Parse and publish diagnostics
+        // PLAN-971 T-08: the first open is the binding root of a project
+        // check; publish the producer's per-document diagnostics.
         self.publish_diagnostics_for_uri(&uri).await;
     }
 
@@ -256,8 +326,23 @@ impl LanguageServer for Backend {
             current_content
         };
 
-        self.update_document(uri.clone(), new_content.clone(), version)
-            .await;
+        if !self
+            .update_document(uri.clone(), new_content.clone(), version)
+            .await
+        {
+            // PLAN-971 V-08: an out-of-order (older-version) change is
+            // dropped — it must not resurrect old text or old diagnostics.
+            self.client
+                .log_message(
+                    MessageType::LOG,
+                    format!(
+                        "Ignoring out-of-order didChange for {} (version {})",
+                        uri, version
+                    ),
+                )
+                .await;
+            return;
+        }
 
         // **Debouncing**: Cancel any existing parse task for this URI
         {
@@ -791,78 +876,120 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
-    /// Publish diagnostics for a document with timeout protection
+    /// Publish diagnostics for a document with timeout protection.
+    ///
+    /// PLAN-971 T-08: the diagnostics backend is the ACE producer's
+    /// compile-only project check over the documents this backend currently
+    /// tracks. The result is published per document (the producer's module
+    /// identity selects the URI and the owning document's text converts its
+    /// module-relative byte span), and ONLY while the document set/content it
+    /// was computed from is still current (V-08 — stale results are discarded,
+    /// never published).
     async fn publish_diagnostics_for_uri(&self, uri: &str) {
-        // Get document content
-        if let Some(content) = self.get_document(uri).await {
-            let uri_clone = uri.to_string(); // Clone to move into spawn_blocking
-            let content_clone = content.clone(); // Clone content to move into spawn_blocking
+        let snapshot = self.snapshot_documents().await;
+        if !snapshot.iter().any(|doc| doc.uri == uri) {
+            return;
+        }
 
-            self.client
-                .log_message(
-                    MessageType::LOG,
-                    format!("Parsing document for diagnostics: {}", uri),
-                )
-                .await;
+        let entry_uri = uri.to_string();
+        let root = self.workspace_root.read().await.clone();
+        let task_snapshot = snapshot.clone();
 
-            // Parse with timeout to prevent hanging
-            let diagnostics = tokio::time::timeout(
-                tokio::time::Duration::from_secs(5),
-                tokio::task::spawn_blocking(move || {
-                    diagnostics::parse_diagnostics(&uri_clone, &content_clone, 0)
-                }),
+        self.client
+            .log_message(
+                MessageType::LOG,
+                format!(
+                    "ACE project check for {} ({} open document(s))",
+                    uri,
+                    snapshot.len()
+                ),
             )
             .await;
 
-            match diagnostics {
-                Ok(Ok(diagnostics)) => {
-                    // Publish diagnostics to VSCode
-                    self.client
-                        .log_message(
-                            MessageType::LOG,
-                            format!("Publishing {} diagnostics for {}", diagnostics.len(), uri),
-                        )
-                        .await;
+        // Compile-only check on the blocking pool, bounded by the same 5s
+        // budget the legacy parse used (a hung producer is a named failure,
+        // never a silent clean bill).
+        let check = tokio::time::timeout(
+            tokio::time::Duration::from_secs(5),
+            tokio::task::spawn_blocking(move || {
+                crate::diagnostics::check_project(&task_snapshot, root.as_deref(), &entry_uri)
+            }),
+        )
+        .await;
 
-                    if let Ok(uri_parsed) = uri.parse::<Uri>() {
-                        self.client
-                            .publish_diagnostics(uri_parsed, diagnostics, None)
-                            .await;
-                    } else {
-                        self.client
-                            .log_message(
-                                MessageType::ERROR,
-                                format!("Failed to parse URI: {}", uri),
-                            )
-                            .await;
-                    }
-                }
-                Ok(Err(e)) => {
-                    // Task join error
-                    self.client
-                        .log_message(
-                            MessageType::ERROR,
-                            format!("Task join error while parsing: {:?}", e),
-                        )
-                        .await;
-                }
-                Err(_) => {
-                    // Timeout
-                    self.client
-                        .log_message(
-                            MessageType::ERROR,
-                            format!("Parsing timed out for: {}", uri),
-                        )
-                        .await;
-
-                    // Clear diagnostics on timeout to avoid showing stale errors
-                    if let Ok(uri_parsed) = uri.parse::<Uri>() {
-                        self.client
-                            .publish_diagnostics(uri_parsed, vec![], None)
-                            .await;
-                    }
-                }
+        let check = match check {
+            Ok(Ok(check)) => check,
+            Ok(Err(join_error)) => {
+                self.client
+                    .log_message(
+                        MessageType::ERROR,
+                        format!("ACE check task failed for {}: {:?}", uri, join_error),
+                    )
+                    .await;
+                return;
             }
+            Err(_) => {
+                self.client
+                    .log_message(
+                        MessageType::ERROR,
+                        format!("ACE project check timed out for {}", uri),
+                    )
+                    .await;
+                crate::diagnostics::host_failure_result(
+                    &snapshot,
+                    &crate::diagnostics::GenerationSnapshot::capture(&snapshot),
+                    uri,
+                    "ace.check/timeout",
+                    "the ACE project check did not complete within 5s",
+                )
+            }
+        };
+
+        // V-08: discard instead of publishing a stale result.
+        let current = generation_snapshot(&*self.documents.read().await);
+        if !check.snapshot.is_current(&current) {
+            self.client
+                .log_message(
+                    MessageType::LOG,
+                    format!(
+                        "Discarding stale ACE diagnostics for {} ({}; document set/content changed during the check)",
+                        uri, check.outcome
+                    ),
+                )
+                .await;
+            return;
+        }
+
+        self.client
+            .log_message(
+                MessageType::LOG,
+                format!(
+                    "Publishing ACE diagnostics for {} document(s) ({}), engine {}, {:.1}ms",
+                    check.publications.len(),
+                    check.outcome,
+                    check.engine,
+                    check.wall_ms
+                ),
+            )
+            .await;
+
+        for publication in check.publications {
+            let Ok(uri_parsed) = publication.uri.parse::<Uri>() else {
+                self.client
+                    .log_message(
+                        MessageType::ERROR,
+                        format!("Failed to parse URI: {}", publication.uri),
+                    )
+                    .await;
+                continue;
+            };
+            self.client
+                .publish_diagnostics(
+                    uri_parsed,
+                    publication.diagnostics,
+                    Some(publication.version),
+                )
+                .await;
         }
     }
 
