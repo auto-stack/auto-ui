@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-17
 plan_revision: 3
-current_step: 7
+current_step: 8
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/color-picker.md]
