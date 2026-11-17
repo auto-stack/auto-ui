@@ -86,8 +86,10 @@ vue 轨消费需在 `pac.at` 声明 `dep color_picker { path: "<本包目录>" }
 
 - 色面/色相条/alpha 条为 canvas 手势，begin/update/commit/cancel；一次
   pointer 手势或 Enter 最多一条 `committed`，同值不发。
-- 色面坐标：去边框局部 x→S 0..100，y 向下→V 100..0，越界夹取；色相条
-  左 0 右 360；alpha 条左 0 右 255。手势与数值框共用同一量化。
+- 色面坐标：去边框局部 x→S 0..100，y 向下→V 100..0（整数 floor；端点
+  x=192→S=100、y=0→V=100），越界夹取；色相条左 0 右 360；alpha 条左 0 右
+  255。手势与数值框共用同一量化；一次手势内的色相在按下时固定并沿用到收笔，
+  避免量化后重解码造成的 ±1 色相漂移。
 - `disabled`/`readOnly` 取消活动手势并禁止后续提交。
 - 主题只影响控件外观：同一色值在浅/深主题输出相同 RGBA。
 
@@ -95,7 +97,9 @@ vue 轨消费需在 `pac.at` 声明 `dep color_picker { path: "<本包目录>" }
 
 - 打开以当前 `value` 建草稿；内部 Picker 的 `committed` 只更新本地草稿，
   底栏「确认」才向父提交一次（source=confirm，与外部同值零提交）。
-- 「取消」/关闭/Escape 结束预览，不改正式值，不发 committed。
+- 「取消」/关闭/Escape 结束预览，不改正式值，不发 committed；一次打开会话
+  取消通知只记一次（平台在按钮取消时还会触发一次 dialog onclose，示例消费方
+  按会话串状态去重；包内另有 cancel_guard 兜底）。
 - 外部 value/revision 在编辑中变化时重基线草稿并失效旧手势。
 - 沿既有 modal 输入隔离与关闭恢复；确认栏固定可达，窄窗正文竖向滚动。
 

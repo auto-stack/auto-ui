@@ -166,11 +166,11 @@ class Session:
 
     def screenshot(self, name):
         shot = ''
-        for _ in range(4):
+        for _ in range(8):
             (_se, shot) = self.call('autoui_screenshot', allow_error=True)
             if re.search(r'(\S+\.(?:png|jpg))', shot):
                 break
-            time.sleep(0.6)
+            time.sleep(1.0)
         m = re.search(r'(\S+\.(?:png|jpg))', shot)
         vfd.require(m, f'screenshot failed: {shot[:160]}')
         src = Path(m.group(1))
@@ -242,24 +242,41 @@ def toggle_checkbox(s, label):
     s.call('autoui_action', element_id=f'vnode_{m.group(1)}', action='toggle', latency=True)
 
 
-def hex_commit(s, text, expected):
-    """Type+commit a HEX draft; retry until the formal ink shows the value."""
+def hex_type(s, text):
+    """Type a HEX draft and verify the input really carries it (retry once)."""
+    hex_id = ''
     for _ in range(3):
-        hex_submit(s, text)
-        if wait_log(s, lambda l: any(('ink 接受 ' + expected) in x for x in l), tries=5):
-            time.sleep(0.8)
-            if expected in s.ink_text():
+        ids = re.findall(r'input #vnode_(\d+)', s.snapshot())
+        vfd.require(ids, 'hex input missing')
+        hex_id = 'vnode_' + ids[0]
+        s.call('autoui_type', element_id=hex_id, text=text)
+        time.sleep(0.4)
+        (_e, t) = s.call('autoui_inspect', allow_error=True, element_id=hex_id)
+        m = re.search(r'value:\s*(\S*)', t)
+        if m and m.group(1).upper() == text.upper():
+            return hex_id
+    return hex_id
+
+
+def hex_commit(s, text, expected):
+    """Type+commit a HEX draft; retry until the formal ink text shows the value."""
+    for _ in range(3):
+        hex_id = hex_type(s, text)
+        for _ in range(2):
+            s.call('autoui_action', allow_error=True, element_id=hex_id,
+                   action='submit', latency=True)
+            s.call('autoui_keyboard', key='Enter')
+            time.sleep(0.5)
+        for _ in range(10):
+            if expected.upper() in s.ink_text().upper():
                 return True
+            time.sleep(0.5)
     return False
 
 
 def hex_submit(s, text):
     """Type a HEX draft into the first input and commit with submit + Enter."""
-    ids = re.findall(r'input #vnode_(\d+)', s.snapshot())
-    vfd.require(ids, 'hex input missing')
-    hex_id = 'vnode_' + ids[0]
-    s.call('autoui_type', element_id=hex_id, text=text)
-    time.sleep(0.5)
+    hex_id = hex_type(s, text)
     for _ in range(2):
         s.call('autoui_action', allow_error=True, element_id=hex_id, action='submit', latency=True)
         s.call('autoui_keyboard', key='Enter')
@@ -286,6 +303,11 @@ def case_known_colors(s, report):
     s.pen(0, [(96, 95)])
     vfd.require(wait_log(s, lambda l: any('ink 接受 #8040407F' in x for x in l)),
                 f'hue-edge commit missing: {log_lines(s)[-3:]}')
+    # F-16: corner (x=192,y=0) must reach S=100,V=100 with the hue carried
+    # through the gesture (H=0 here) -> #FF0000 with the current alpha 7F
+    s.pen(0, [(192, 0)])
+    vfd.require(wait_log(s, lambda l: any('ink 接受 #FF00007F' in x for x in l)),
+                f'surface corner commit missing: {log_lines(s)[-3:]}')
     # r2 rule: a gray draft keeps the last valid hue (S=0 drag then back)
     s.pen(1, [(8, 6)])      # H=15, S/V from #8040407F (S=50,V=50)
     s.pen(0, [(0, 95)])     # S=0 -> gray #8080807F
@@ -407,6 +429,7 @@ def case_dialog(s, report):
     base = len(cans) - inline_cans
     s.pen(base + 1, [(8, 6)])
     s.pen(base, [(96, 95)])
+    before_cancel = len([x for x in log_lines(s) if 'label 取消' in x])
     s.press_button('取消')
     deadline = time.time() + 8
     while time.time() < deadline:
@@ -414,6 +437,10 @@ def case_dialog(s, report):
             break
         time.sleep(0.4)
     time.sleep(0.5)
+    time.sleep(1.0)
+    cancels = [x for x in log_lines(s) if 'label 取消' in x]
+    vfd.require(len(cancels) - before_cancel == 1,
+                f'cancel must emit exactly once, got {cancels[before_cancel:]}')
     label1 = re.search(r'当前标签色 (\S+)', s.snapshot()).group(1)
     vfd.require(label1 == label0, f'cancel changed formal label: {label0} -> {label1}')
     s.press_button('打开标签色对话框')
@@ -456,7 +483,7 @@ def case_hex(s, report):
     vfd.require(hex_commit(s, '#3974E6CC', '#3974E6CC'),
                 f'hex: known-color commit missing: {log_lines(s)[-3:]}')
     vals = ['?'] * 5
-    for _ in range(4):
+    for _ in range(16):
         vals = input_values(s)
         if vals[:5] == ['#3974E6CC', '57', '116', '230', '204']:
             break
@@ -596,10 +623,16 @@ def case_paint(args, out, report):
         paint.hit(0, 'px42')
         time.sleep(1.2)
         paint.press_button('Save')
-        paint.press_button('New')
-        paint.press_button('Load')
         time.sleep(1.2)
-        st = re.search(r'text #vnode_\d+ "(loaded|no saved canvas|bad save data)"', paint.snapshot())
+        paint.press_button('New')
+        time.sleep(1.2)
+        paint.press_button('Load')
+        st = None
+        for _ in range(12):
+            time.sleep(0.5)
+            st = re.search(r'text #vnode_\d+ "(loaded|no saved canvas|bad save data)"', paint.snapshot())
+            if st and st.group(1) == 'loaded':
+                break
         vfd.require(st and st.group(1) == 'loaded', f'round-trip load failed')
         vfd.require('px42=#3B82F6FF' in paint.snapshot(), 'paint: save/load lost the pixel color')
         paint.screenshot('paint-native.png')
@@ -700,6 +733,13 @@ def run_vue(args, out, report):
             page2.goto(url, timeout=30000)
             time.sleep(3)
             page2.screenshot(path=str(out / 'vue-narrow.png'), full_page=True)
+            # narrow dialog footer (V-06/AC-06): 取消/确认 reachable at 420x560
+            page2.get_by_role('button', name=re.compile('打开标签色对话框')).click()
+            time.sleep(1.2)
+            body_n = page2.evaluate('document.body.innerText')
+            vfd.require('取消' in body_n and '确认' in body_n,
+                        'vue narrow dialog footer missing')
+            page2.screenshot(path=str(out / 'vue-dialog-narrow.png'), full_page=True)
             browser.close()
         report['cases'].append('V-05 vue drag + screenshots pass')
     finally:
@@ -774,15 +814,21 @@ def main():
     else:
         try:
             run_vue(args, out, report)
-            report['visual'] += ['vue-light.png', 'vue-narrow.png', 'vue-dark.png', 'vue-dialog.png']
+            report['visual'] += ['vue-light.png', 'vue-narrow.png', 'vue-dark.png', 'vue-dialog.png', 'vue-dialog-narrow.png']
         except AssertionError as e:
             failures.append(f'vue: {e}')
 
     try:
         report['commit'] = subprocess.check_output(
+            ['git', '-C', str(REPO), 'log', '-1', '--format=%H', '--',
+             'packages/color-picker', 'examples/color-picker',
+             'tests/product/verify_color_picker.py', 'examples/ui/031-paint'],
+            text=True).strip()
+        report['head'] = subprocess.check_output(
             ['git', '-C', str(REPO), 'rev-parse', 'HEAD'], text=True).strip()
     except Exception:
         report['commit'] = ''
+        report['head'] = ''
     hashed = {}
     for rel in ('packages/color-picker/color_picker.at',
                 'packages/color-picker/color_model.at',

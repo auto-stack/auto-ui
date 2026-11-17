@@ -38,6 +38,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         var seq int = 0
         // ── 草稿（编辑器局部；canonical 由 d_hex 承载）──
         var d_hex str = "#000000FF"
+        // 手势基准色相（SurfDown 写入；Move/Up 复用，避免量化后重解码漂移）
+        var g_hue str = "0"
         // 最近有效色相（草稿级；灰/黑时保留，串字段跨 handler 可靠）
         var h_hold str = "0"
         var hsv_mode bool = false
@@ -112,7 +114,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                     if .hex_err != "" {
                         text .hex_err { style: "text-xs text-destructive" }
                     }
-                    button "RGB/HSV" { onclick: .ToggleHsv, disabled: .c_locked, title: "切换通道组", style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                    button "RGB/HSV" { onclick: .ToggleHsv, disabled: .c_locked, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
                     if !.hsv_mode {
                         row (style: "items-center gap-1 w-full") {
                             text "R" { style: "text-xs text-muted-foreground w-3" }
@@ -437,6 +439,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                     ld_h = 0
                 }
             }
+            .g_hue = f"${ld_h}"
             var xf float = x
             var yf float = y
             var xs str = f"${xf}"
@@ -553,6 +556,13 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                     ld_h = 0
                 }
             }
+            ld_h = cp_text_int(.g_hue)
+            if ld_h >= 360 {
+                ld_h = 0
+            }
+            if ld_h < 0 {
+                ld_h = 0
+            }
             var xf float = x
             var yf float = y
             var xs str = f"${xf}"
@@ -668,6 +678,13 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 if ld_h < 0 {
                     ld_h = 0
                 }
+            }
+            ld_h = cp_text_int(.g_hue)
+            if ld_h >= 360 {
+                ld_h = 0
+            }
+            if ld_h < 0 {
+                ld_h = 0
             }
             var xf float = x
             var yf float = y
@@ -1649,6 +1666,7 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
                 .ch_err = ""
                 .hex_err = ""
                 if cp_hex_valid(.hex_text) != 0 {
+                    .hex_err = "color-picker: invalid hex color (invalid_color)"
                     ."error"(json.stringify({code: "invalid_color", message: "color-picker: invalid hex color (invalid_color)"}))
                 }
                 if cp_hex_valid(.hex_text) == 0 {

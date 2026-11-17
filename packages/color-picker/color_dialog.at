@@ -23,7 +23,7 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         var seen_rev int = 0
         var seen_val str = "#000000FF"
         var seen_open bool = false
-        var cancel_guard bool = false
+        var cancel_guard str = "0"
         var cfg_err str = ""
         var seq int = 0
         var dlg_hex str = "#000000FF"
@@ -72,7 +72,7 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             if .open != .dlg_open {
                 .dlg_open = .open
                 if .open {
-                    .cancel_guard = false
+                    .cancel_guard = "0"
                 }
             }
             if .revision != .seen_rev || .value != .seen_val || .open != .seen_open {
@@ -99,13 +99,16 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
         }
         .PickCancelled -> {
             // 取消：结束预览；草稿重基线到外部正式值（不改正式值）。
-            // cancel_guard 去重：随后的 open→false onclose 不再二次 emit。
-            if cp_hex_valid(.value) == 0 {
-                .dlg_hex = cp_hex_norm(.value)
-                .dlg_rev = .dlg_rev + 1
+            // cancel_guard（串字段，跨 handler 可靠）去重：随后的 open→false
+            // onclose 不再二次 emit。
+            if .cancel_guard == "0" {
+                .cancel_guard = "1"
+                if cp_hex_valid(.value) == 0 {
+                    .dlg_hex = cp_hex_norm(.value)
+                    .dlg_rev = .dlg_rev + 1
+                }
+                ."cancelled"()
             }
-            .cancel_guard = true
-            ."cancelled"()
         }
         .PickCommitted(ev str) -> {
             // 拦截子 Picker 提交：仅更新本地草稿，不向父提交
@@ -124,8 +127,8 @@ widget ColorDialog (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             }
         }
         .Cancelled -> {
-            if !.cancel_guard {
-                .cancel_guard = true
+            if .cancel_guard == "0" {
+                .cancel_guard = "1"
                 if cp_hex_valid(.value) == 0 {
                     .dlg_hex = cp_hex_norm(.value)
                     .dlg_rev = .dlg_rev + 1
