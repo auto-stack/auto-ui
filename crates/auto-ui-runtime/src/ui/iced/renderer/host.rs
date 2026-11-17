@@ -3220,6 +3220,8 @@ fn run_session(
         }
 
         let event_name = derive_event_name(&msg.event);
+        // PLAN-088 T-01 临时探针输出（提交前移除）。
+        eprintln!("[plan088-probe] host widget={:?} event={:?}", msg.widget, event_name);
         let input_cache_key = input_cache_key(state.component, &msg.widget, &event_name);
 
         // Save input text BEFORE on_with_input runs .at handler (which clears it for AddTodo)

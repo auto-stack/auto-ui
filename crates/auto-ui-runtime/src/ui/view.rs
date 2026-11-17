@@ -62,14 +62,21 @@ impl<M> SelectCallback<M> {
 /// 收 `(x, y)` **组件局部逻辑坐标**(coords 声明的 viewBox 系;缺省时为
 /// bounds 局部物理 px——raw 模式),返回消息。坐标换算在引擎层完成
 /// (iced PointerArea widget / vue 生成端内联表达式),组件代码不感知屏幕。
+use crate::ui::interpreter::DynamicMessage;
+
 pub struct PointerMoveHandler<M> {
     callback: Arc<dyn Fn(f32, f32) -> M + Send + Sync>,
+    /// PLAN-088 T-05：事件基座消息（Typed/TypedInst——实例身份与 handler
+    /// 名的提取源；MCP 合成动作按它解析组件作用域派发）。None = 旧构造。
+    /// 类型擦除存储（避免 M: Send+Sync 传染；提取点按 DynamicMessage 下转）。
+    base: Option<Arc<dyn std::any::Any + Send + Sync>>,
 }
 
-impl<M> Clone for PointerMoveHandler<M> {
+impl<M: Clone> Clone for PointerMoveHandler<M> {
     fn clone(&self) -> Self {
         Self {
             callback: Arc::clone(&self.callback),
+            base: self.base.clone(),
         }
     }
 }
@@ -87,11 +94,33 @@ impl<M> PointerMoveHandler<M> {
     {
         Self {
             callback: Arc::new(f),
+            base: None,
+        }
+    }
+
+    /// PLAN-088 T-05：带事件基座消息构造（实例感知派发的提取源）。
+    pub fn with_base<F>(f: F, base: M) -> Self
+    where
+        F: Fn(f32, f32) -> M + Send + Sync + 'static,
+        M: Send + Sync + 'static,
+    {
+        Self {
+            callback: Arc::new(f),
+            base: Some(Arc::new(base)),
         }
     }
 
     pub fn call(&self, x: f32, y: f32) -> M {
         (self.callback)(x, y)
+    }
+
+    /// PLAN-088 T-05：事件基座消息（None = 旧构造/匿名）。
+    /// 以 DynamicMessage 具体型下转（M 泛型点的克隆路径不走此访问器）。
+    pub fn base_message(&self) -> Option<&DynamicMessage>
+    where
+        M: 'static,
+    {
+        self.base.as_ref().and_then(|a| a.downcast_ref::<DynamicMessage>())
     }
 }
 
@@ -1342,6 +1371,9 @@ pub struct ElementHitHandler<M> {
     /// 事件名旁路（快照 actions 挂 press 的 handler 名来源，
     /// SliderChangeHandler 标签同款机制；None = 匿名）。
     label: Option<Arc<str>>,
+    /// PLAN-088 T-05：事件基座消息（Typed/TypedInst——实例身份提取源）。
+    /// 类型擦除存储（避免 M: Send+Sync 传染；提取点按 DynamicMessage 下转）。
+    base: Option<Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 impl<M> std::fmt::Debug for ElementHitHandler<M> {
@@ -1364,6 +1396,7 @@ impl<M> ElementHitHandler<M> {
         Self {
             callback: Arc::new(f),
             label: None,
+            base: None,
         }
     }
 
@@ -1375,6 +1408,20 @@ impl<M> ElementHitHandler<M> {
         Self {
             callback: Arc::new(f),
             label: Some(Arc::from(label)),
+            base: None,
+        }
+    }
+
+    /// PLAN-088 T-05：带事件名标签 + 基座消息构造（实例感知派发的提取源）。
+    pub fn new_labeled_with_base<F>(f: F, label: &str, base: M) -> Self
+    where
+        F: Fn(String) -> M + Send + Sync + 'static,
+        M: Send + Sync + 'static,
+    {
+        Self {
+            callback: Arc::new(f),
+            label: Some(Arc::from(label)),
+            base: Some(Arc::new(base)),
         }
     }
 
@@ -1385,6 +1432,15 @@ impl<M> ElementHitHandler<M> {
     /// 事件名标签（匿名 = None）。
     pub fn label(&self) -> Option<&str> {
         self.label.as_deref()
+    }
+
+    /// PLAN-088 T-05：事件基座消息（None = 旧构造/匿名）。
+    /// 以 DynamicMessage 具体型下转（M 泛型点的克隆路径不走此访问器）。
+    pub fn base_message(&self) -> Option<&DynamicMessage>
+    where
+        M: 'static,
+    {
+        self.base.as_ref().and_then(|a| a.downcast_ref::<DynamicMessage>())
     }
 }
 

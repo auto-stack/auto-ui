@@ -2317,6 +2317,8 @@ fn tool_action(shared_handle: &SharedStateHandle, args: serde_json::Value) -> se
             }
         };
         if let Some((widget, event, root_widget)) = canvas_hit {
+            // PLAN-088 T-01 临时探针输出（提交前移除）。
+            eprintln!("[plan088-probe] hit-arm widget={widget:?} event={event:?} root={root_widget:?}");
             let id = match value.as_ref() {
                 Some(auto_val::Value::Str(s)) => s.as_str().to_string(),
                 Some(other) => other.to_string(),
@@ -2429,6 +2431,106 @@ fn tool_action(shared_handle: &SharedStateHandle, args: serde_json::Value) -> se
         });
         if !pts_ok {
             return error_result("Action 'pen' points must be 'x,y' float pairs joined by ';'");
+        }
+        // PLAN-088 T-05：组件作用域 pen——element_id 指向 canvas vnode 时，
+        // 经 styled_vtree→live view 解析该画布 onpenstart/move/end 的基座
+        // 消息（Typed/TypedInst 携带组件作用域与实例身份），按段直接派发
+        // 事件（坐标 +1e-3 分数化同 drag）。解析失败回退根语义 __mcp_pen
+        // （parts[0] = 根组件 handler，Plan 563 既有形态）。
+        let mut scoped: Option<Vec<(String, String)>> = None;
+        {
+            let shared = shared_handle.lock().unwrap();
+            if let ElementId::Vnode(vnode_id) = element_id {
+                let node_ok = shared
+                    .styled_vtree
+                    .as_ref()
+                    .and_then(|st| st.vtree.get(vnode_id))
+                    .map(|n| format!("{}", n.kind) == "Canvas")
+                    .unwrap_or(false);
+                if node_ok {
+                    if let Some(view) = shared.view.as_ref() {
+                        if let Some(node) = shared
+                            .styled_vtree
+                            .as_ref()
+                            .and_then(|st| st.vtree.get(vnode_id))
+                        {
+                            if let Some(target_view) = find_view_by_path(view, &node.path) {
+                                if let crate::ui::view::View::Canvas {
+                                    on_pen_start,
+                                    on_pen_move,
+                                    on_pen_end,
+                                    ..
+                                } = target_view
+                                {
+                                    let smsg = on_pen_start
+                                        .as_ref()
+                                        .and_then(|h| h.base_message())
+                                        .and_then(extract_dyn_msg);
+                                    let mmsg = on_pen_move
+                                        .as_ref()
+                                        .and_then(|h| h.base_message())
+                                        .and_then(extract_dyn_msg);
+                                    let emsg = on_pen_end
+                                        .as_ref()
+                                        .and_then(|h| h.base_message())
+                                        .and_then(extract_dyn_msg);
+                                    if let (Some(sg), Some(mg), Some(eg)) = (smsg, mmsg, emsg) {
+                                        scoped = Some(vec![sg, mg, eg]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(phases) = scoped {
+            let mut pts: Vec<(f64, f64)> = Vec::new();
+            for pair in parts[4].split(';').filter(|s| !s.is_empty()) {
+                let mut it = pair.split(',');
+                let x = it.next().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+                let y = it.next().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+                pts.push((x, y));
+            }
+            if pts.is_empty() {
+                return error_result("Action 'pen' points must be 'x,y' float pairs joined by ';'");
+            }
+            let first = pts[0];
+            let last = pts[pts.len() - 1];
+            for (phase, (widget, ev_name)) in phases.iter().enumerate() {
+                let (x, y) = match phase {
+                    0 => first,
+                    1 => {
+                        if pts.len() < 2 {
+                            continue;
+                        }
+                        pts[1]
+                    }
+                    _ => last,
+                };
+                let event = crate::ui::mcp_types::encode_payload(
+                    ev_name,
+                    &[
+                        auto_val::Value::Float(x + 0.001),
+                        auto_val::Value::Float(y + 0.001),
+                    ],
+                );
+                let msg = ActionMessage {
+                    target: ActionTarget::Event {
+                        widget: widget.clone(),
+                        event,
+                    },
+                    action: UiActionType::Press,
+                    value: None,
+                };
+                if let Err(e) = SharedState::send_action_applied(&shared_handle, msg) {
+                    return error_result(e);
+                }
+            }
+            return text_result(format!(
+                "Pen stroke on {} via {} (start={} move={} end={}) (status: ok)",
+                parts[0], element_id_str, parts[1], parts[2], parts[3]
+            ));
         }
         let msg = ActionMessage {
             target: ActionTarget::Event {
@@ -4725,7 +4827,13 @@ pub(crate) fn extract_action_from_view(
         // 旁路；命中元素 id 由调用方经 "s" 载荷编码进事件串）。
         View::Canvas { on_hit, .. } if action_name == "press" => on_hit
             .as_ref()
-            .and_then(|h| h.label().map(|name| (String::new(), name.to_string()))),
+            .and_then(|h| {
+                // PLAN-088 T-05：优先基座消息（Typed/TypedInst——携带组件
+                // 作用域/实例身份，嵌套组件画布的合成 press 据此路由）；
+                // 无基座（旧构造）回退 label + 空 widget（根语义）。
+                h.base_message().and_then(extract_dyn_msg)
+                    .or_else(|| h.label().map(|name| (String::new(), name.to_string())))
+            }),
         // PLAN-043 T4: 布局件 onclick（row/col/div parity，renderer 侧
         // wrap_layout_onclick 消费面）——press 通道可达 layout onclick 件
         //（Details summary 行折叠回路）。

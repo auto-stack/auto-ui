@@ -83,24 +83,38 @@ fn cp_hex2_val(phex str, pstart int) int {
     return d1 * 16 + d2
 }
 
-/// HEX 文本 → canonical "#RRGGBBAA"（短形态位展开）；非法 → ""。（自含。）
+/// HEX 文本 → canonical "#RRGGBBAA"（短形态位展开；输出大写）；非法 → ""。
+/// （自含；小写位逐字映射大写。）
 fn cp_hex_norm(phex str) str {
     if cp_hex_valid(phex) != 0 { return "" }
+    var lower str = "abcdef"
+    var upper str = "ABCDEF"
     var t str = phex
     if t.starts_with("#") { t = t.substr(1, t.len()) }
     var n int = t.len()
-    if n == 6 { return "#" + t + "FF" }
-    if n == 8 { return "#" + t }
-    var r str = ""
+    var out str = "#"
     var count int = 0
+    if n == 6 { count = 6 }
+    if n == 8 { count = 8 }
     if n == 3 { count = 3 }
     if n == 4 { count = 4 }
     for i in 0..count {
         var ch str = t.substr(i, 1)
-        r = r + ch + ch
+        var up str = ch
+        for k in 0..6 {
+            if lower.substr(k, 1) == ch { up = upper.substr(k, 1) }
+        }
+        out = out + up
+        if n == 3 {
+            out = out + up
+        }
+        if n == 4 {
+            out = out + up
+        }
     }
-    if n == 3 { r = r + "FF" }
-    return "#" + r
+    if n <= 4 { out = out + "FF" }
+    if n == 6 { out = out + "FF" }
+    return out
 }
 
 /// canonical 8 位 HEX → 通道分量（pchn: 0=R 1=G 2=B 3=A）；非法 → -1。
@@ -158,7 +172,17 @@ fn cp_rgb_hex8(pr int, pg int, pb int, pa int) str {
     if b > 255 { b = 255 }
     if a < 0 { a = 0 }
     if a > 255 { a = 255 }
-    return "#" + (hexd.substr((r) - (r) % 16, 1) + hexd.substr((r) % 16, 1)) + (hexd.substr((g) - (g) % 16, 1) + hexd.substr((g) % 16, 1)) + (hexd.substr((b) - (b) % 16, 1) + hexd.substr((b) % 16, 1)) + (hexd.substr((a) - (a) % 16, 1) + hexd.substr((a) % 16, 1))
+    // 逐步拼接（VM 深串接链实录会产出截断串——088 T-04 实证）
+    var out str = "#"
+    out = out + hexd.substr((r - r % 16) / 16, 1)
+    out = out + hexd.substr(r % 16, 1)
+    out = out + hexd.substr((g - g % 16) / 16, 1)
+    out = out + hexd.substr(g % 16, 1)
+    out = out + hexd.substr((b - b % 16) / 16, 1)
+    out = out + hexd.substr(b % 16, 1)
+    out = out + hexd.substr((a - a % 16) / 16, 1)
+    out = out + hexd.substr(a % 16, 1)
+    return out
 }
 /// HSV → canonical "#RRGGBBAA"（pa=alpha 0..255；half-up；ph 360→0 由本
 /// fn 规范化；psc 0..100、pv 0..100 越界夹取）。自含：内联 half-up 与两位
@@ -177,12 +201,24 @@ fn cp_hsv_hex(ph int, psc int, pv int, pa int) str {
     var a int = pa
     if a < 0 { a = 0 }
     if a > 255 { a = 255 }
-    var vn int = ((2 * (vi * 255) + (100)) - (2 * (vi * 255) + (100)) % (2 * (100))) / (2 * (100))
+    // v255 = half-up(vi*255/100)——语句形（VM 大内联表达式实录会错评——088 T-04）
+    var hn int = 2 * (vi * 255) + 100
+    var hd int = 200
+    var vn int = (hn - hn % hd) / hd
     var sector int = (hh - hh % 60) / 60
     var f int = hh % 60
-    var tn int = ((2 * (vn * (6000 - sc * 60 + sc * f)) + (6000)) - (2 * (vn * (6000 - sc * 60 + sc * f)) + (6000)) % (2 * (6000))) / (2 * (6000))
-    var qn int = ((2 * (vn * (6000 - sc * f)) + (6000)) - (2 * (vn * (6000 - sc * f)) + (6000)) % (2 * (6000))) / (2 * (6000))
-    var pnn int = ((2 * (vn * (100 - sc)) + (100)) - (2 * (vn * (100 - sc)) + (100)) % (2 * (100))) / (2 * (100))
+    var tn int = 0
+    var qn int = 0
+    var pnn int = 0
+    var t1 int = vn * (6000 - sc * 60 + sc * f)
+    var t2 int = 2 * t1 + 6000
+    tn = (t2 - t2 % 12000) / 12000
+    var q1 int = vn * (6000 - sc * f)
+    var q2 int = 2 * q1 + 6000
+    qn = (q2 - q2 % 12000) / 12000
+    var p1 int = vn * (100 - sc)
+    var p2v int = 2 * p1 + 100
+    pnn = (p2v - p2v % 200) / 200
     var r int = vn
     var g int = vn
     var b int = vn
@@ -210,7 +246,16 @@ fn cp_hsv_hex(ph int, psc int, pv int, pa int) str {
         g = pnn
         b = qn
     }
-    return "#" + (hexd.substr((r) - (r) % 16, 1) + hexd.substr((r) % 16, 1)) + (hexd.substr((g) - (g) % 16, 1) + hexd.substr((g) % 16, 1)) + (hexd.substr((b) - (b) % 16, 1) + hexd.substr((b) % 16, 1)) + (hexd.substr((a) - (a) % 16, 1) + hexd.substr((a) % 16, 1))
+    var out str = "#"
+    out = out + hexd.substr((r - r % 16) / 16, 1)
+    out = out + hexd.substr(r % 16, 1)
+    out = out + hexd.substr((g - g % 16) / 16, 1)
+    out = out + hexd.substr(g % 16, 1)
+    out = out + hexd.substr((b - b % 16) / 16, 1)
+    out = out + hexd.substr(b % 16, 1)
+    out = out + hexd.substr((a - a % 16) / 16, 1)
+    out = out + hexd.substr(a % 16, 1)
+    return out
 }
 /// canonical 8 位 HEX → HSV 编码（ph*100000 + psc*1000 + pv；ph 0..359，
 /// psc/pv 0..100）。饱和度/明度 half-up；色相按最近整数（截断除法余数对
@@ -495,11 +540,11 @@ fn cp_surf_col_item(phue int, pi int) str {
     var hh int = phue
     if hh >= 360 { hh = hh - 360 }
     var x int = pi * 8 + 4
-    var si int = ((2 * (x * 100) + (192)) - (2 * (x * 100) + (192)) % (2 * (192))) / (2 * (192))
-    var aj int = ((2 * (si * 255) + (100)) - (2 * (si * 255) + (100)) % (2 * (100))) / (2 * (100))
+    var si int = (((2 * (x * 100)) + 192) - ((2 * (x * 100)) + 192) % 384) / 384
+    var aj int = (((2 * (si * 255)) + 100) - ((2 * (si * 255)) + 100) % 200) / 200
     var f int = hh % 60
-    var tn int = ((2 * (255 * f) + (60)) - (2 * (255 * f) + (60)) % (2 * (60))) / (2 * (60))
-    var qn int = ((2 * (255 * (60 - f)) + (60)) - (2 * (255 * (60 - f)) + (60)) % (2 * (60))) / (2 * (60))
+    var tn int = (((2 * (255 * f)) + 60) - ((2 * (255 * f)) + 60) % 120) / 120
+    var qn int = (((2 * (255 * (60 - f))) + 60) - ((2 * (255 * (60 - f))) + 60) % 120) / 120
     var sector int = (hh - hh % 60) / 60
     var r int = 255
     var g int = 255
@@ -528,11 +573,19 @@ fn cp_surf_col_item(phue int, pi int) str {
         g = 0
         b = qn
     }
-    var col str = "#" + (hexd.substr((r) - (r) % 16, 1) + hexd.substr((r) % 16, 1)) + (hexd.substr((g) - (g) % 16, 1) + hexd.substr((g) % 16, 1)) + (hexd.substr((b) - (b) % 16, 1) + hexd.substr((b) % 16, 1)) + (hexd.substr((aj) - (aj) % 16, 1) + hexd.substr((aj) % 16, 1))
-    return f"c${pi},${x},96,rect,${col},8,192"
+    var out str = "#"
+    out = out + hexd.substr((r - r % 16) / 16, 1)
+    out = out + hexd.substr(r % 16, 1)
+    out = out + hexd.substr((g - g % 16) / 16, 1)
+    out = out + hexd.substr(g % 16, 1)
+    out = out + hexd.substr((b - b % 16) / 16, 1)
+    out = out + hexd.substr(b % 16, 1)
+    out = out + hexd.substr((aj - aj % 16) / 16, 1)
+    out = out + hexd.substr(aj % 16, 1)
+    return f"c${pi},${x},96,rect,${out},8,192"
 }
 /// SV 面行 pj 节点（黑 alpha=1-v_j；8px 行，中心 y=pj*8+4）。
-fn cp_surf_row_item(pj int) str {
+fn cp_row_item(pj int) str {
     var hexd str = "0123456789ABCDEF"
     var y int = pj * 8 + 4
     var vj int = 100 - ((2 * (y * 100) + (192)) - (2 * (y * 100) + (192)) % (2 * (192))) / (2 * (192))
@@ -544,11 +597,11 @@ fn cp_surf_row_item(pj int) str {
 fn cp_hue_item(pi int) str {
     var hexd str = "0123456789ABCDEF"
     var x int = pi * 8 + 4
-    var hi int = ((2 * (x * 360) + (192)) - (2 * (x * 360) + (192)) % (2 * (192))) / (2 * (192))
+    var hi int = (((2 * (x * 360)) + 192) - ((2 * (x * 360)) + 192) % 384) / 384
     if hi >= 360 { hi = hi - 360 }
     var f int = hi % 60
-    var tn int = ((2 * (255 * f) + (60)) - (2 * (255 * f) + (60)) % (2 * (60))) / (2 * (60))
-    var qn int = ((2 * (255 * (60 - f)) + (60)) - (2 * (255 * (60 - f)) + (60)) % (2 * (60))) / (2 * (60))
+    var tn int = (((2 * (255 * f)) + 60) - ((2 * (255 * f)) + 60) % 120) / 120
+    var qn int = (((2 * (255 * (60 - f))) + 60) - ((2 * (255 * (60 - f))) + 60) % 120) / 120
     var sector int = (hi - hi % 60) / 60
     var r int = 255
     var g int = 255
@@ -577,8 +630,14 @@ fn cp_hue_item(pi int) str {
         g = 0
         b = qn
     }
-    var col str = "#" + (hexd.substr((r) - (r) % 16, 1) + hexd.substr((r) % 16, 1)) + (hexd.substr((g) - (g) % 16, 1) + hexd.substr((g) % 16, 1)) + (hexd.substr((b) - (b) % 16, 1) + hexd.substr((b) % 16, 1))
-    return f"h${pi},${x},6,rect,${col},8,12"
+    var out str = "#"
+    out = out + hexd.substr((r - r % 16) / 16, 1)
+    out = out + hexd.substr(r % 16, 1)
+    out = out + hexd.substr((g - g % 16) / 16, 1)
+    out = out + hexd.substr(g % 16, 1)
+    out = out + hexd.substr((b - b % 16) / 16, 1)
+    out = out + hexd.substr(b % 16, 1)
+    return f"h${pi},${x},6,rect,${out},8,12"
 }
 /// alpha 条段 pi 节点（当前 rgb6 + 段代表 alpha；a_i=half(x*255/192)）。
 fn cp_alpha_item(prgb6 str, pi int) str {

@@ -1,0 +1,133 @@
+use auto.json
+
+// PLAN-088 演示页 — 普通选色设置表单：受控回路（preview 实时预览不写正式
+// 值；committed → 应用接受 → value/revision 原子推进；业务拒绝模式开启时
+// 一律拒绝并保留正式值；取消零业务修改）。Inline ColorPicker 与
+// ColorDialog 同页消费，第二实例验证实例隔离。
+widget demo {
+    msg { Init, InlinePreview(str), InlineCommitted(str), InlineCancelled, InlineError(str), ToggleDlg, DlgPreview(str), DlgCommitted(str), DlgCancelled, DlgError(str), ToggleStrict, ResetInk, Quit }
+    model {
+        // 受控真源（应用所有；canonical #RRGGBBAA）
+        var ink str = "#3974E6CC"
+        var ink_rev int = 1
+        var label str = "#22C55EFF"
+        var label_rev int = 1
+        var dlg_open bool = false
+        // 业务拒绝演示开关
+        var strict bool = false
+        // 结果日志
+        var events List = []
+        var seq_log int = 0
+        var palette List = ["#ef4444", "#22c55e", "#3b82f6", "#eab308", "#a855f7", "#14b8a6", "#f97316", "#111827"]
+    }
+    use { package: color_picker from "../../../../../packages/color-picker" }
+    view {
+        col (style: "w-full h-full bg-background text-foreground gap-3 p-4 overflow-y-auto") {
+            row (style: "items-center gap-2") {
+                text "选色设置表单" { style: "text-sm font-medium" }
+                row (style: "flex-1") {}
+                checkbox { text: "业务拒绝模式", checked: .strict, onclick: .ToggleStrict }
+            }
+            row (style: "items-start gap-6 flex-wrap w-full") {
+                col (style: "gap-3 min-w-80 flex-1") {
+                    text "Inline 选色器（画笔颜色）" { style: "text-xs font-medium text-muted-foreground" }
+                    ColorPicker (value: .ink, revision: .ink_rev, palette: .palette, onpreview: .InlinePreview($event), oncommitted: .InlineCommitted($event), oncancelled: .InlineCancelled, onerror: .InlineError($event)) {}
+                    text f"当前画笔 ${.ink}" { style: "text-xs" }
+                }
+                col (style: "gap-3 min-w-80 flex-1") {
+                    text "ColorDialog（标签颜色）" { style: "text-xs font-medium text-muted-foreground" }
+                    text f"当前标签色 ${.label}" { style: "text-xs" }
+                    button "打开标签色对话框" { onclick: .ToggleDlg, style: "px-2 py-1 text-xs rounded-md border border-border" }
+                }
+            }
+            row (style: "items-center gap-2 border-t border-border pt-2") {
+                button "重置画笔" { onclick: .ResetInk, title: "外部置值（撤销未提交草稿）", style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                button "退出" { onclick: .Quit, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+            }
+            col (style: "gap-1") {
+                text "提交日志" { style: "text-xs font-medium text-muted-foreground" }
+                col (style: "gap-1 max-h-56 overflow-y-auto") {
+                    if .seq_log == 0 {
+                        text "（暂无提交）" { style: "text-xs text-muted-foreground" }
+                    }
+                    for line in .events {
+                        text line { style: "text-xs text-muted-foreground break-all" }
+                    }
+                }
+            }
+            ColorDialog (value: .label, revision: .label_rev, open: .dlg_open, title: "选择标签颜色", palette: .palette, onpreview: .DlgPreview($event), oncommitted: .DlgCommitted($event), oncancelled: .DlgCancelled, onerror: .DlgError($event)) {}
+        }
+    }
+    on {
+        .Init -> {
+            .events = []
+            .seq_log = 0
+        }
+        .InlinePreview(ev str) -> {
+            // 预览不写正式值——仅记录
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] ink 预览 ${ev}")
+        }
+        .InlineCommitted(ev str) -> {
+            var req = json.parse(ev)
+            if .strict {
+                .seq_log = .seq_log + 1
+                .events.push(f"[${.seq_log}] ink 拒绝 ${ev}")
+            } else {
+                .ink = req.value
+                .ink_rev = .ink_rev + 1
+                .seq_log = .seq_log + 1
+                .events.push(f"[${.seq_log}] ink 接受 ${req.value}")
+            }
+        }
+        .InlineCancelled -> {
+            .seq_log = .seq_log + 1
+            .events.push("ink 取消（零业务修改）")
+        }
+        .InlineError(ev str) -> {
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] ink 错误 ${ev}")
+        }
+        .ToggleDlg -> {
+            .dlg_open = !.dlg_open
+        }
+        .DlgPreview(ev str) -> {
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] label 预览 ${ev}")
+        }
+        .DlgCommitted(ev str) -> {
+            var req = json.parse(ev)
+            if .strict {
+                .seq_log = .seq_log + 1
+                .events.push(f"[${.seq_log}] label 拒绝 ${ev}")
+            } else {
+                .label = req.value
+                .label_rev = .label_rev + 1
+                .dlg_open = false
+                .seq_log = .seq_log + 1
+                .events.push(f"[${.seq_log}] label 接受 ${req.value}")
+            }
+        }
+        .DlgCancelled -> {
+            .dlg_open = false
+            .seq_log = .seq_log + 1
+            .events.push("label 取消（零业务修改）")
+        }
+        .DlgError(ev str) -> {
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] label 错误 ${ev}")
+        }
+        .ToggleStrict -> {
+            .strict = !.strict
+        }
+        .ResetInk -> {
+            .ink = "#3974E6CC"
+            .ink_rev = .ink_rev + 1
+            .seq_log = .seq_log + 1
+            .events.push(f"[${.seq_log}] 外部置值 ink=#3974E6CC")
+        }
+        .Quit -> {
+            ui.close()
+        }
+    }
+}

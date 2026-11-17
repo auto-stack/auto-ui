@@ -181,25 +181,48 @@ impl<'a> AuraViewBuilder<'a> {
     ) {
         let on_move = aura_events_get_base(events, "onmousemove").map(|event| {
             let base = self.event_to_message_with(event, bindings);
-            crate::ui::view::PointerMoveHandler::new(move |x: f32, y: f32| match &base {
-                DynamicMessage::Typed {
-                    widget_name,
-                    event_name,
-                    args,
-                } => {
-                    let mut new_args = args.clone();
-                    // PLAN-043 T9: +1e-3 分数化——auto_val nanbox 整值 float
-                    // 实参绑定腐坏绕道（DEBTS 043 引擎债；0.001px 不可见）。
-                    new_args.push(Value::Float(x as f64 + 0.001));
-                    new_args.push(Value::Float(y as f64 + 0.001));
+            // PLAN-088 T-05：实例子树内（TypedInst 基座）坐标实参同样追加
+            // 并保留实例身份——此前 TypedInst 落 other 臂整体克隆，坐标丢失
+            // （嵌套组件画布/图表的 mousemove 静默失效）。
+            let base_for_handler = base.clone();
+            crate::ui::view::PointerMoveHandler::with_base(
+                move |x: f32, y: f32| match &base_for_handler {
                     DynamicMessage::Typed {
-                        widget_name: widget_name.clone(),
-                        event_name: event_name.clone(),
-                        args: new_args,
+                        widget_name,
+                        event_name,
+                        args,
+                    } => {
+                        let mut new_args = args.clone();
+                        // PLAN-043 T9: +1e-3 分数化——auto_val nanbox 整值 float
+                        // 实参绑定腐坏绕道（DEBTS 043 引擎债；0.001px 不可见）。
+                        new_args.push(Value::Float(x as f64 + 0.001));
+                        new_args.push(Value::Float(y as f64 + 0.001));
+                        DynamicMessage::Typed {
+                            widget_name: widget_name.clone(),
+                            event_name: event_name.clone(),
+                            args: new_args,
+                        }
                     }
-                }
-                other => other.clone(),
-            })
+                    DynamicMessage::TypedInst {
+                        widget_name,
+                        event_name,
+                        args,
+                        instance,
+                    } => {
+                        let mut new_args = args.clone();
+                        new_args.push(Value::Float(x as f64 + 0.001));
+                        new_args.push(Value::Float(y as f64 + 0.001));
+                        DynamicMessage::TypedInst {
+                            widget_name: widget_name.clone(),
+                            event_name: event_name.clone(),
+                            args: new_args,
+                            instance: instance.clone(),
+                        }
+                    }
+                    other => other.clone(),
+                },
+                base,
+            )
         });
         let extent = self
             .extract_string_with(props, "coords", bindings)
@@ -216,23 +239,45 @@ impl<'a> AuraViewBuilder<'a> {
         bindings: &Bindings,
     ) -> crate::ui::view::PointerMoveHandler<DynamicMessage> {
         let base = self.event_to_message_with(event, bindings);
-        crate::ui::view::PointerMoveHandler::new(move |x: f32, y: f32| match &base {
-            DynamicMessage::Typed {
-                widget_name,
-                event_name,
-                args,
-            } => {
-                let mut new_args = args.clone();
-                new_args.push(Value::Float(x as f64 + 0.001));
-                new_args.push(Value::Float(y as f64 + 0.001));
+        // PLAN-088 T-05：TypedInst 基座（实例子树）同样追加坐标实参并保留
+        // 实例身份；此前 other 臂整体克隆丢坐标（嵌套组件画布 pen 静默失效）。
+        let base_for_handler = base.clone();
+        crate::ui::view::PointerMoveHandler::with_base(
+            move |x: f32, y: f32| match &base_for_handler {
                 DynamicMessage::Typed {
-                    widget_name: widget_name.clone(),
-                    event_name: event_name.clone(),
-                    args: new_args,
+                    widget_name,
+                    event_name,
+                    args,
+                } => {
+                    let mut new_args = args.clone();
+                    new_args.push(Value::Float(x as f64 + 0.001));
+                    new_args.push(Value::Float(y as f64 + 0.001));
+                    DynamicMessage::Typed {
+                        widget_name: widget_name.clone(),
+                        event_name: event_name.clone(),
+                        args: new_args,
+                    }
                 }
-            }
-            other => other.clone(),
-        })
+                DynamicMessage::TypedInst {
+                    widget_name,
+                    event_name,
+                    args,
+                    instance,
+                } => {
+                    let mut new_args = args.clone();
+                    new_args.push(Value::Float(x as f64 + 0.001));
+                    new_args.push(Value::Float(y as f64 + 0.001));
+                    DynamicMessage::TypedInst {
+                        widget_name: widget_name.clone(),
+                        event_name: event_name.clone(),
+                        args: new_args,
+                        instance: instance.clone(),
+                    }
+                }
+                other => other.clone(),
+            },
+            base,
+        )
     }
 
     /// Plan 563: canvas 元素 → View::Canvas(tracked/untracked 共用——
@@ -330,8 +375,11 @@ impl<'a> AuraViewBuilder<'a> {
     ) -> crate::ui::view::ElementHitHandler<DynamicMessage> {
         let base = self.event_to_message_with(event, bindings);
         let label = extract_handler_name(&event.handler).to_string();
-        crate::ui::view::ElementHitHandler::new_labeled(
-            move |id: String| match &base {
+        // PLAN-088 T-05：TypedInst 基座（实例子树）同样追加命中 id 并保留
+        // 实例身份；带基座构造供 MCP 合成动作做组件作用域派发解析。
+        let base_for_handler = base.clone();
+        crate::ui::view::ElementHitHandler::new_labeled_with_base(
+            move |id: String| match &base_for_handler {
                 DynamicMessage::Typed {
                     widget_name,
                     event_name,
@@ -345,9 +393,25 @@ impl<'a> AuraViewBuilder<'a> {
                         args: new_args,
                     }
                 }
+                DynamicMessage::TypedInst {
+                    widget_name,
+                    event_name,
+                    args,
+                    instance,
+                } => {
+                    let mut new_args = args.clone();
+                    new_args.push(Value::Str(id.into()));
+                    DynamicMessage::TypedInst {
+                        widget_name: widget_name.clone(),
+                        event_name: event_name.clone(),
+                        args: new_args,
+                        instance: instance.clone(),
+                    }
+                }
                 other => other.clone(),
             },
             &label,
+            base,
         )
     }
 

@@ -3327,6 +3327,8 @@ impl DynamicComponent {
                 // PLAN-069 F3: 类型精确匹配（身份含 outlet 路由装饰时旧后缀
                 // 拆解取到路由尾段 → 页实例恒 miss → 落根态）。
                 let live = self.bridge.child_instance_identities_of_type(widget_name);
+                // PLAN-088 T-01 临时探针输出（提交前移除）。
+                eprintln!("[plan088-probe] dispatch widget={widget_name} live={} ", live.len());
                 match live.as_slice() {
                     [only] => {
                         name_only_instance = only.clone();

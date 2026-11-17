@@ -1,0 +1,18 @@
+name: "color-picker-demo"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "ColorPicker demo"
+title_zh: "选色器演示"
+# PLAN-088：通用选色消费演示（画笔颜色/标签颜色的普通设置语义）。
+# 产品门 verify_color_picker.py 以本示例为夹具（隔离目录运行）。
+window: "980x720"
+# vue 轨专用前端端口（避免默认 3000 与并行门冲突）。
+front_port: 4399
+# 官方包 dep 根（vue 轨物化扫描；跨包传递依赖按消费方声明纪律并列声明）。
+dep color_picker {
+    path: "../../packages/color-picker"
+}
+dep numeric_fields {
+    path: "../../packages/numeric-fields"
+}
