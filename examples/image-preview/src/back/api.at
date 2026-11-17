@@ -1,6 +1,9 @@
 // image-preview control-plane API (PLAN-089 T-04).
 // Metadata-only control plane; pixels ride the shared media route
-// (/api/__auto/media/{id}/{revision}) exactly as 031.
+// (/api/__auto/media/{id}/{revision}) exactly as 031. The demo's own
+// viewing path uses front-side auto.image sessions (single-process native
+// rendering); this surface stays as the 031-isomorphic back consumption
+// face for V-04 cross-checks.
 use auto.image
 
 pub type ViewerControl = {

@@ -753,11 +753,12 @@ widget App {
         .ApplyView(ev str) -> {
             let req = json.parse(ev)
             if req.baseRevision == .view_rev {
-                .view_fit = req.view.fit
-                .view_zoom = req.view.zoom
-                .view_ox = req.view.offsetX
-                .view_oy = req.view.offsetY
-                .view_rot = req.view.rotation
+                // PLAN-089：`view` 在成员位被 DotView 词元吞掉（auto-lang 解析缺口，成员访问静默取空）——消费方以索引取键，载荷键不变。
+                .view_fit = req["view"].fit
+                .view_zoom = req["view"].zoom
+                .view_ox = req["view"].offsetX
+                .view_oy = req["view"].offsetY
+                .view_rot = req["view"].rotation
                 .view_rev = .view_rev + 1
             }
         }

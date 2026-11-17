@@ -3254,6 +3254,23 @@ pub(super) fn media_notify_sweep(
 
 /// loaded 通知派发：实参帧按声明数对齐（见 sweep 文档），payload 走
 /// PAYLOAD_SEP 类型化编码，与真实输入实参同一解码口径。
+/// PLAN-089：包组件实例的事件基座名携带实例装饰（如
+/// `ImageViewport/ImageViewport#0`、`Demo@1`、实例身份分隔符前缀）——
+/// handler 声明表按**类型名**记录，派发前须归约（on_with_input_for 的
+/// PLAN-654 同律）。
+fn media_widget_type_name(widget: &str) -> String {
+    let mut name = widget;
+    if let Some((base, _identity)) = name.split_once('\u{1}') {
+        if !base.is_empty() {
+            name = base;
+        }
+    }
+    let name = name.rsplit('/').next().unwrap_or(name);
+    let name = name.split_once('@').map_or(name, |(t, _)| t);
+    // 实例序号后缀（`Type#N`）同样归约到类型名。
+    name.split_once('#').map_or(name, |(t, _)| t).to_string()
+}
+
 fn media_dispatch_loaded(
     component: &mut crate::ui::dynamic::DynamicComponent,
     msg: &IcedMessage,
@@ -3262,7 +3279,8 @@ fn media_dispatch_loaded(
     revision: u64,
 ) {
     let (clean, _) = crate::ui::dynamic::decode_payload(&msg.event);
-    let args: Vec<auto_val::Value> = match component.handler_param_count(&msg.widget, &clean) {
+    let widget = media_widget_type_name(&msg.widget);
+    let args: Vec<auto_val::Value> = match component.handler_param_count(&widget, &clean) {
         Some(0) => Vec::new(),
         Some(1) => vec![auto_val::Value::Int(revision as i32)],
         Some(2) => vec![
@@ -3274,6 +3292,17 @@ fn media_dispatch_loaded(
             auto_val::Value::Int(height as i32),
             auto_val::Value::Int(revision as i32),
         ],
+        // PLAN-089：包子件 handler 的声明表在根 bridge 之外（单 VM 链接，
+        // handler_param_count 只收集根件）——查不到时按零参派发（组件
+        // onload/onerror 常规绑定形态），不再整事件丢弃；真实声明超出
+        // 0..=3 投影的极端配置仍会在 VM 派发期具名报错。
+        None => {
+            eprintln!(
+                "[VM-MEDIA] {}.{}(loaded) PLAN089D not-in-root zero-arg dispatch",
+                msg.widget, clean
+            );
+            Vec::new()
+        }
         other => {
             eprintln!(
                 "[VM-MEDIA] {}.{}(loaded) declares {other:?} params — media notify projects 0..=3; skipping dispatch",
@@ -3293,9 +3322,18 @@ fn media_dispatch_error(
     reason: &str,
 ) {
     let (clean, _) = crate::ui::dynamic::decode_payload(&msg.event);
-    let args: Vec<auto_val::Value> = match component.handler_param_count(&msg.widget, &clean) {
+    let widget = media_widget_type_name(&msg.widget);
+    let args: Vec<auto_val::Value> = match component.handler_param_count(&widget, &clean) {
         Some(0) => Vec::new(),
         Some(1) => vec![auto_val::Value::str(reason)],
+        // PLAN-089：同 loaded——包子件 handler 零参回退派发。
+        None => {
+            eprintln!(
+                "[VM-MEDIA] {}.{}(error) PLAN089D not-in-root zero-arg dispatch",
+                msg.widget, clean
+            );
+            Vec::new()
+        }
         other => {
             eprintln!(
                 "[VM-MEDIA] {}.{}(error) declares {other:?} params — media notify projects 0..=1; skipping dispatch",
