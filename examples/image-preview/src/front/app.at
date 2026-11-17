@@ -16,7 +16,7 @@ use auto.image
 // DoOpen/Retry/DoNavigate 各内联一份。`view` 载荷键以索引访问读取
 // （req["view"]——成员位 DotView 词元解析缺口，见 decisions.md §3.3）。
 widget App {
-    msg { Init, Tick, OpenALiteral, DoOpen(str, str, bool), Retry, ApplyView(str), MarkLoaded(str), ShowError(str), DoNavigate(str), OpenPreview, ClosePreview }
+    msg { Init, Tick, DoOpen(str, str, bool), Retry, ApplyView(str), MarkLoaded(str), ShowError(str), DoNavigate(str), OpenPreview, ClosePreview }
     // PLAN-089：App 级显式 timer（src 轮询）。
     timer {
         Tick (every_ms: 80)
@@ -61,7 +61,7 @@ widget App {
         col (style: "w-full h-full bg-background text-foreground gap-2 p-3 overflow-y-auto") {
             text "图片预览演示" { style: "text-sm font-medium" }
             row (style: "items-center gap-2") {
-                button "打开图片A" { onclick: .OpenALiteral, style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "打开图片A" { onclick: .DoOpen("tests/fixtures/corner-marked.png", "img-a", false), style: "h-8 px-2 text-xs rounded-md border border-border" }
                 button "打开图片B" { onclick: .DoOpen("tests/fixtures/scenic-320x240.png", "img-b", true), style: "h-8 px-2 text-xs rounded-md border border-border" }
                 button "打开损坏图" { onclick: .DoOpen("tests/fixtures/damaged.png", "img-damaged", false), style: "h-8 px-2 text-xs rounded-md border border-border" }
                 button "重试" { onclick: .Retry, disabled: .last_path == "", style: "h-8 px-2 text-xs rounded-md border border-border disabled:opacity-40" }
@@ -117,17 +117,6 @@ widget App {
                 .src = image.current_uri(.session)
             }
         }
-        .OpenALiteral -> {
-            .rid = "img-a"
-            .rrev = "img-a-lit"
-            let session = image.open_session("D:/autostack/.wt/ui-089/auto-ui/examples/image-preview/tests/fixtures/corner-marked.png")
-            .session = session
-            .src = image.current_uri(session)
-            .can_prev = false
-            .can_next = true
-            .rev = .rev + 1
-            .status = "已打开 img-a (literal)"
-        }
         .DoOpen(path str, rid str, is_b bool) -> {
             if .session != "" {
                 let _closed = image.close_session(.session)
@@ -141,8 +130,6 @@ widget App {
             let session = image.open_session(path)
             .session = session
             .src = image.current_uri(session)
-            // PLAN089DBG：一次性诊断（门跑完后移除）。
-            .last_loaded = f"DBG session=${session} uri=${.src} names=${image.names(session).len()}"
             .can_prev = is_b
             .can_next = !is_b
             // 新图原子发布：revision++ 让视口把当前受控 view 当作该图初始
@@ -174,11 +161,11 @@ widget App {
             let req = json.parse(ev)
             if req.baseRevision == .rev {
                 .request_count = .request_count + 1
-                .fit = req["view"].fit
-                .zoom = req["view"].zoom
-                .ox = req["view"].offsetX
-                .oy = req["view"].offsetY
-                .rot = req["view"].rotation
+                .fit = req.view.fit
+                .zoom = req.view.zoom
+                .ox = req.view.offsetX
+                .oy = req.view.offsetY
+                .rot = req.view.rotation
                 .rev = .rev + 1
                 .status = "视图已接受"
             } else {
