@@ -105,6 +105,37 @@ fn map_emitted_with(line: &str, params: &[String]) -> String {
     out
 }
 
+/// 切片#6l：k>0 片段的临时名整词改号（`t3` → `t2_3`）——多片段同域拼
+/// 接防 `const t0` 重复声明。片段文本里裸 `t<digits>` 只可能是发射器临时
+/// 名（其它名字族走 `l<i>_*`/`p<i>_*`/宿主映射名），整词边界安全。
+fn rename_temps(line: &str, k: usize) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut word = String::new();
+    let flush = |out: &mut String, word: &mut String| {
+        if !word.is_empty() {
+            let renamed = match word
+                .strip_prefix('t')
+                .and_then(|rest| rest.parse::<usize>().ok())
+            {
+                Some(i) => format!("t{k}_{i}"),
+                None => word.clone(),
+            };
+            out.push_str(&renamed);
+            word.clear();
+        }
+    };
+    for ch in line.chars() {
+        if ch.is_alphanumeric() || ch == '_' {
+            word.push(ch);
+        } else {
+            flush(&mut out, &mut word);
+            out.push(ch);
+        }
+    }
+    flush(&mut out, &mut word);
+    out
+}
+
 /// handler 体区间：pattern 锚 → 其后第一个 `->` 的 `{` 起做括号配对。
 fn handler_body_region(ds: &str, pattern: &str) -> Result<std::ops::Range<usize>, String> {
     // 锚定=pattern 后**紧邻**箭头的出现（view 内联引用 `.ToggleMode,` 无
@@ -256,25 +287,36 @@ pub fn lane_handler_bodies_spec(
                 }
             }
         };
-        let frag = match lane.widest_expr_in(&fn_name, region.clone())? {
-            Some(f) => f,
-            None => {
-                absent.push((*pat).to_string());
-                continue;
-            }
-        };
+        // 切片#6l：**逐赋值语句发射**（多赋值体——语句序=源序；单赋值族同
+        // 形：Assign 语句发射含 helper 行 + 赋值行，与旧手拼形态一致）。
+        // 区间无赋值（空体/纯调用族）=具名缺席。**临时名按片段改号**：每片
+        // 段的发射器临时名 `t<i>` 从 0 起，多片段同域拼接会撞声明——片段
+        // 文本里裸 `t<digits>` 只可能是临时名（局部/参数走 `l<i>_*`/`p<i>_*`
+        // 发射名或宿主映射名），k>0 片段整词改号为 `t{k}_{i}`（单片段形状
+        // 不变，既有断言/浏览器内联兼容）。
+        let stmts = lane.stmt_fragments_in(&fn_name, region.clone())?;
+        if stmts.is_empty() {
+            absent.push((*pat).to_string());
+            continue;
+        }
         let field = write_field;
-        let mut lines: Vec<String> = frag
-            .text
-            .iter()
-            .map(|l| map_emitted_with(l, spec.params))
-            .collect();
-        if let Some(expr) = &frag.expr {
-            lines.push(format!(
-                "{}.value = {};",
-                field,
-                map_emitted_with(expr, spec.params)
-            ));
+        let mut lines: Vec<String> = Vec::new();
+        for (k, frag) in stmts.iter().enumerate() {
+            for l in &frag.text {
+                let mapped = map_emitted_with(l, spec.params);
+                if k == 0 {
+                    lines.push(mapped);
+                } else {
+                    lines.push(rename_temps(&mapped, k));
+                }
+            }
+        }
+        // 976 片段接口缺口（#6l 实测）：owned 局部的赋值/返回语句片段引用
+        // 函数域 skip 簿记变量 `a2x_ret_owned_skip`——其 `let` 声明只在整函
+        // 数发射路径（lower 整体 1474 行）里，片段文本裸引用。宿主边界统
+        // 一补声明（引用才补；SFC 拼接/node/浏览器同治）。
+        if lines.iter().any(|l| l.contains("a2x_ret_owned_skip")) {
+            lines.insert(0, "let a2x_ret_owned_skip = null;".to_string());
         }
         // 复核 F-1（#6j/#6k 批级复核，authored 反例发现）：形参名与字段名
         // 同拼写碰撞——宿主映射 `field.value` 的**基名**会被 SFC 函数形参遮

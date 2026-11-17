@@ -16,9 +16,9 @@
 //!    gap 56), so full-file snapshots of SFC output would be brittle.
 //!    Single-fragment substring assertions are immune to both.
 
-use auto_ui_compiler::aura::extract_widget_from_decl;
 use auto_lang_core::parser::Parser;
 use auto_parser_api::session::CompilerSession;
+use auto_ui_compiler::aura::extract_widget_from_decl;
 use auto_ui_compiler::ui_gen::{BackendGenerator, VueGenerator};
 use auto_ui_dialect::UiStmt as Stmt;
 
@@ -674,8 +674,12 @@ widget W {
         "handler still emitted:\n{sfc}"
     );
     assert!(
-        sfc.contains("@input=\"QueryInput($event)\""),
-        "handler side effects still wired via @input alongside v-model:\n{sfc}"
+        // PLAN-980 WEB（V-B-WEB 处置·断言刷新）：单参 handler 的 @input 绑
+        // 定按 Plan 008/DEBTS #6 的后来设计取**输入文本**
+        // （`($event.target as HTMLInputElement).value`）——非陈旧的
+        // `$event` 直传形。v-model 仍并列（首断言），handler 副作用仍接线。
+        sfc.contains("@input=\"QueryInput(($event.target as HTMLInputElement).value)\""),
+        "handler side effects still wired via @input (typed-text form) alongside v-model:\n{sfc}"
     );
 }
 

@@ -450,6 +450,55 @@ impl ComponentFragmentLane {
             .map(|f| f.source_name.to_string())
     }
 
+    /// 切片#6l（真语料全量双轨）：区间内**逐赋值语句**发射（多赋值 handler
+    /// 体——[57] 七连赋值族）。过滤合同：HIR `Stmt` 无 span，按 **Assign 的
+    /// RHS 表达式 span ⊆ region** 选取（字段 init let 的 RHS span 在 model
+    /// 块=区间外；return 的 var 读 span=首字段声明=区间外），语句序=span
+    /// 起点序（源序）。语法层只收平铺 `.field (=|+=|-=) expr` 语句
+    /// （`age-view-stmt`）——控制流/let/调用在**语法层被拒**，不可能被静默
+    /// 展平，发射语义安全。空结果=区间内无赋值（空体/纯调用族——调用方判
+    /// 缺席）。
+    pub fn stmt_fragments_in(
+        &self,
+        fn_name: &str,
+        region: std::ops::Range<usize>,
+    ) -> Result<Vec<LocatedFragment>, String> {
+        use ace_a2x_ts::{emit_stmt_fragment, FragmentProgramContext, ScriptLang};
+        let view = ace_a2x_core::SemanticView::from_checked(&self.checked)
+            .map_err(|e| format!("semantic view: {e:?}"))?;
+        let facts = view
+            .functions()
+            .iter()
+            .find(|f| f.source_name == fn_name)
+            .ok_or_else(|| format!("fn `{fn_name}` not in the view"))?;
+        // (RHS span start, block, idx) —— 源序发射。
+        let mut hits: Vec<(usize, u32, usize)> = Vec::new();
+        for (bi, block) in facts.body.blocks.iter().enumerate() {
+            for (si, stmt) in block.stmts.iter().enumerate() {
+                if let ace_core::hir::Stmt::Assign { value, .. } = stmt {
+                    if let Some(e) = facts.body.exprs.get(value.0 as usize) {
+                        if region.start <= e.span.start && e.span.end <= region.end {
+                            hits.push((e.span.start, bi as u32, si));
+                        }
+                    }
+                }
+            }
+        }
+        hits.sort_by_key(|(start, _, _)| *start);
+        let ctx = FragmentProgramContext::from_view(&view);
+        let mut out = Vec::new();
+        for (_, block, idx) in hits {
+            let raw = emit_stmt_fragment(ScriptLang::TypeScript, &view, facts, block, idx, &ctx)
+                .map_err(|e| format!("stmt fragment: {e:?}"))?;
+            out.push(LocatedFragment {
+                text: raw.text,
+                expr: None,
+                helpers: raw.helpers,
+            });
+        }
+        Ok(out)
+    }
+
     /// 区间内**最宽**表达式发射（span ⊆ region；同宽取索引最大=组合形）。
     /// 区间无表达式 → None（调用方判缺席）。具名拒：状态函数不在视图。
     pub fn widest_expr_in(

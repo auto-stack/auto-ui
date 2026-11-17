@@ -68,6 +68,20 @@ pub fn parse_widget_decl(cx: &mut dyn DomainParseContext) -> AutoResult<UiStmt> 
             "model" => {
                 model = Some(crate::declarations::parse_model_block(cx)?);
             }
+            // PLAN-980 WEB（V-B-WEB 处置）：`state` 槽位别名=model（#6g 同
+            // 一别名在方言层落定；此前 `state {}` 落 fallback 被误解析为视
+            // 图元素，真 `view {}` 随之误报 duplicate view——vue_capabilities
+            // parse 族 10 预存红的根因）。model+state 并存=重复拒绝。
+            "state" => {
+                let block = crate::declarations::parse_state_block_alias(cx)?;
+                if model.replace(block).is_some() {
+                    return Err(SyntaxError::Generic {
+                        message: "duplicate `model`/`state` block in widget".into(),
+                        span: pos_to_span(cx.cur_pos()),
+                    }
+                    .into());
+                }
+            }
             "computed" => {
                 computed = Some(parse_computed_block_inner(cx)?);
             }

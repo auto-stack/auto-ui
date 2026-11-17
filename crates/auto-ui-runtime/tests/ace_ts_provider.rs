@@ -882,10 +882,25 @@ fn p980_web_full_dual_track_census() {
     // 在案归 triage），spliced=0/absent=23：**真语料主导形态=具名
     // `msg Msg {...}`/带参 handler/铸造 lambda——组件面语法域外**（语言侧
     // 前置×3：ScenarioOp 无 payload、具名 msg 语法、参数绑定面）。
+    //
+    // **2026-11-18 具名修订 #4（切片#6l：V-B-WEB 处置——text-leaf 门放
+    // 宽（states-only 不要求 text 叶）+ 方言 `state` 槽位别名 + 多赋值逐
+    // 语句发射）**：(72,11,0,23) → **(75, 8, 1, 27)**。ok+3=state 别名解
+    // 锁 parse 族 3 源（err-3：vue 门 cap_unused/null_init/event_arg 同根
+    // 因修复）；spliced+1=[15]（无 text 叶源经 states-only 编译拼接）；
+    // absent+4=新 parse 通源的 handler 族进入缺席分母。**缺席分母语料
+    // taxonomy（逐族具名，见规范 §13.13）**：①`$event` 视图实参/元素括号
+    // 属性行（`input (placeholder: …)`）等年龄面语法缺口族（语言面收敛
+    // 决策，非 UI 适配器可闭）；②float/f64 模型字段与 float 载荷（981 明
+    // 确不支撑域——fail-closed）；③双 widget 同文件源（组件面单 node 形
+    // 状——IF-981-MODULE 域）；④控制流/let/var/调用 handler 体（组件面
+    // 只收平铺赋值——语法层拒，不能静默展平）；⑤空体 handler（无可发射
+    // 语句）；⑥引号事件键/handler（`."save"` 形）；⑦store/HTML 片段伪源
+    // （提取伪影，非 widget 源）。
     assert_eq!(corpus.len(), 83, "corpus size frozen");
     assert_eq!(
         (ok, err, spliced, absent),
-        (72, 11, 0, 23),
+        (75, 8, 1, 27),
         "dual-track aggregates frozen"
     );
 }
@@ -1142,8 +1157,10 @@ fn p980_web_param_browser_mount() {
     let b_body = b_bodies.first().unwrap().lines.join("\n");
 
     // a2x_rt helper 内联（rt_body.js 冻结语义手写——同 #6h a2x_add 先例；
-    // a2x_str_clone 在 JS-string 宿主=单次求值拷贝（immutable 值拷贝即本值）。
-    let rt_inline = "function a2x_add(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a + b)) throw new RangeError('a2x_add overflow');\n  return a + b;\n}\nfunction a2x_str_clone(x) {\n  return String(x);\n}\n";
+    // a2x_str_clone 在 JS-string 宿主=单次求值拷贝（immutable 值拷贝即本值）；
+    // a2x_str_free 同宿主归约=no-op（字节账本无可观察语义；#6l 语句片段带
+    // ownership 簿记行）。
+    let rt_inline = "function a2x_add(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a + b)) throw new RangeError('a2x_add overflow');\n  return a + b;\n}\nfunction a2x_str_clone(x) {\n  return String(x);\n}\nfunction a2x_str_free(x) {\n}\n";
     let html = format!(
         "<!DOCTYPE html>\n<html><body>\n<div id=\"last\">-</div><div id=\"x\">0</div><div id=\"dark\">false</div>\n<input id=\"q\" oninput=\"Query(this.value)\">\n<button id=\"move\" onclick=\"Move(3, 4)\">move</button>\n<button id=\"dark-btn\" onclick=\"SetDark(true)\">dark</button>\n<script>\n{rt_inline}\nconst last = {{ value: \"\", notify() {{ document.getElementById('last').textContent = this.value; }} }};\nconst x = {{ value: 0, notify() {{ document.getElementById('x').textContent = String(this.value); }} }};\nconst dark = {{ value: false, notify() {{ document.getElementById('dark').textContent = String(this.value); }} }};\nfunction Query(q) {{\n{q_body}\nlast.notify();\n}}\nfunction Move(dx, dy) {{\n{m_body}\nx.notify();\n}}\nfunction SetDark(on) {{\n{b_body}\ndark.notify();\n}}\n</script>\n</body></html>\n"
     );
@@ -1362,4 +1379,97 @@ fn p980_web_param_shadowing_is_param_not_field() {
         "param/field name collision must not fabricate a shadowed-broken body"
     );
     assert_eq!(absent, vec![".Set".to_string()], "named absence (F-1)");
+}
+
+/// WEB 切片#6l（真语料全量双轨·V-B-WEB 处置）：①text-leaf 形状门只约束
+/// 文本观测车道——states-only 编译无 `text` 叶视图（button/input-only 真
+/// 实工程形态）可编译可拼接；②方言 `state` 槽位别名（=model，vue 门
+/// parse 族预存红根因修复）；③多赋值 handler 体**逐语句顺序发射**（语句
+/// 序=源序，[57] 七连赋值族；控制流/let/调用在语法层被拒=不可能静默展
+/// 平）。node 判别：完整七句执行后终值可区分（丢句即红）。
+#[test]
+fn p980_web_textless_state_alias_multi_assign() {
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+
+    // ①+②：无 text 叶 + `state {}` 拼写（方言别名）+ 单赋值 unit handler。
+    let t_src = "widget T {\n    msg Msg { Go }\n    state { var x int = 0 }\n    view { col { button \"go\" { onclick: .Go } } }\n    on { .Go -> { .x = 1 } }\n}\n";
+    let (sfc, bodies, absent) =
+        generate_sfc_with_lane(t_src, "p980-6l.at").expect("textless+state derives");
+    assert!(
+        absent.is_empty(),
+        "text-less view splices via states-only: {absent:?}"
+    );
+    assert_eq!(bodies.len(), 1);
+    assert!(sfc.contains("x.value = 1;"), "unit handler body spliced");
+
+    // ③：多赋值顺序体（int 域七连——除/模；[57] 族的 int 化形）。
+    let m_src = "widget M {
+    msg Msg { Go }
+    model {
+        var a int = 84
+        var b int = 2
+        var c int = 3
+        var d int = 0
+        var e int = 0
+        var f int = 0
+    }
+    view { col { text \"M\" button \"go\" { onclick: .Go } } }
+    on {
+        .Go -> {
+            .d = .a / .b
+            .e = .a % .c
+            .f = .d + .e
+        }
+    }
+}
+";
+    let (sfc, bodies, absent) =
+        generate_sfc_with_lane(m_src, "p980-6l-m.at").expect("multi derives");
+    assert!(absent.is_empty(), "multi-assign body splices: {absent:?}");
+    assert_eq!(bodies.len(), 1);
+    let body = bodies.first().unwrap();
+    let text = body.lines.join(
+        "
+",
+    );
+    assert!(
+        text.contains("a2x_div(a.value, b.value)") && text.contains("a2x_rem(a.value, c.value)"),
+        "division/modulo helpers emitted: {text}"
+    );
+    // 语句序=源序：d 在 e 前、f 最后（按行序断言）。
+    let d_pos = text.find("d.value = ").expect("d assign");
+    let e_pos = text.find("e.value = ").expect("e assign");
+    let f_pos = text.find("f.value = ").expect("f assign");
+    assert!(
+        d_pos < e_pos && e_pos < f_pos,
+        "source order preserved: {text}"
+    );
+    let _ = &sfc;
+
+    // node 判别：完整执行 a=84,b=2,c=3 → d=42, e=0, f=42（丢任一句即红）。
+    let driver = format!(
+        "import {{ a2x_div, a2x_rem, a2x_add }} from \"./a2x_rt.mjs\";\nconst a = {{ value: 84 }};\nconst b = {{ value: 2 }};\nconst c = {{ value: 3 }};\nconst d = {{ value: 0 }};\nconst e = {{ value: 0 }};\nconst f = {{ value: 0 }};\nfunction Go() {{\n{text}\n}}\nGo();\nif (!(d.value === 42 && e.value === 0 && f.value === 42)) {{ throw new Error(\"FRAG_ASSERT_FAILED\"); }}\nconsole.log(\"FRAG_OK\");\n"
+    );
+    let dir = std::env::temp_dir().join(format!("p980-6l-node-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("a2x_rt.mjs"),
+        ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]),
+    )
+    .unwrap();
+    std::fs::write(dir.join("host.mjs"), driver).unwrap();
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg("host.mjs")
+        .current_dir(&dir)
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("FRAG_OK"),
+        "multi-assign node leg: {stdout} / {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }

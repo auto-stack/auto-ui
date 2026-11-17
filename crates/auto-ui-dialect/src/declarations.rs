@@ -179,7 +179,28 @@ fn parse_model_block_impl(
     ctx: &mut dyn ParseContext,
     grammar: ModelGrammar,
 ) -> AutoResult<ModelSubset> {
-    expect_word(ctx, "model")?;
+    parse_model_block_impl_kw(ctx, grammar, "model")
+}
+
+/// PLAN-980 WEB（V-B-WEB 处置）：`state { … }` = `model` 块的**同义槽位
+/// 别名**（与 lane/ACE 侧 #6g 同长归一化同一别名——真语料 vue_capabilities
+/// 主导拼写）。解析为同一 ModelBlock；`model`+`state` 并存仍按重复拒绝
+///（调用方 replace 判定）。
+pub fn parse_state_block_alias(ctx: &mut dyn ParseContext) -> AutoResult<ModelBlock> {
+    match parse_model_block_impl_kw(ctx, ModelGrammar::Builtin, "state")? {
+        ModelSubset::Block(block) => Ok(block),
+        ModelSubset::NotClaimed => Err(ctx.syntax_error(
+            "internal error: builtin model grammar cannot yield NotClaimed".to_string(),
+        )),
+    }
+}
+
+fn parse_model_block_impl_kw(
+    ctx: &mut dyn ParseContext,
+    grammar: ModelGrammar,
+    kw: &str,
+) -> AutoResult<ModelSubset> {
+    expect_word(ctx, kw)?;
     ctx.expect(TokenKind::LBrace)?;
     ctx.skip_empty_lines();
 

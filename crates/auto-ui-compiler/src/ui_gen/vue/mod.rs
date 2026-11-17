@@ -1164,13 +1164,99 @@ impl VueGenerator {
             return emits;
         }
 
-        for payload in widget.handlers.values() {
-            if matches!(payload, crate::aura::LogicPayload::AstStmts(_)) {
-                for snake in &callback_props {
-                    let pascal = Self::snake_to_pascal(snake);
-                    if !emits.contains(&pascal) {
-                        emits.push(pascal);
+        // Plan 444 ①b 精化（PLAN-980 WEB V-B-WEB 处置）：prop 派生 Pascal
+        // emit 只有在 handler 体**实际调用**（`on_x(...)` 裸形 /
+        // `props.on_x(...)` 成员形——两者都经 musk-022/444①a 文本重写为
+        // `emit('<Pascal>', ...)`）时才真实可发射。此前只要有任一 handler
+        // 就把全部 `on_*: msg` prop 计入名册——声明而未调用的 prop 让父侧
+        // 名册谎报（`@Delete` 永不发射，真发射名=消息变体 `DeleteBlock`，
+        // cap_444_callback_channel_pass_through 的 pass-through 断言红）。
+        fn walk_expr_calls(expr: &auto_lang_core::ast::Expr, calls: &mut Vec<String>) {
+            use auto_lang_core::ast::Expr;
+            match expr {
+                Expr::Call(call) => {
+                    if let Some(n) = call.get_name_text_safe() {
+                        calls.push(n.as_str().to_string());
+                    } else if let Expr::Dot(obj, method) = call.name.as_ref() {
+                        calls.push(method.as_str().to_string());
+                        walk_expr_calls(obj, calls);
                     }
+                    for arg in &call.args.args {
+                        walk_expr_calls(&arg.get_expr(), calls);
+                    }
+                }
+                Expr::Bina(l, _, r) => {
+                    walk_expr_calls(l, calls);
+                    walk_expr_calls(r, calls);
+                }
+                Expr::Unary(_, e) => walk_expr_calls(e, calls),
+                Expr::Dot(obj, _) => walk_expr_calls(obj, calls),
+                Expr::Array(items) => {
+                    for item in items {
+                        walk_expr_calls(item, calls);
+                    }
+                }
+                Expr::Block(body) => {
+                    for stmt in &body.stmts {
+                        walk_stmt_calls(stmt, calls);
+                    }
+                }
+                Expr::Closure(c) => walk_expr_calls(&c.body, calls),
+                Expr::Lambda(l) => {
+                    for stmt in &l.body.stmts {
+                        walk_stmt_calls(stmt, calls);
+                    }
+                }
+                _ => {}
+            }
+        }
+        fn walk_stmt_calls(stmt: &auto_lang_core::ast::Stmt, calls: &mut Vec<String>) {
+            use auto_lang_core::ast::Stmt;
+            match stmt {
+                Stmt::Expr(e) => walk_expr_calls(e, calls),
+                Stmt::Store(st) => walk_expr_calls(&st.expr, calls),
+                Stmt::If(i) => {
+                    for b in &i.branches {
+                        walk_expr_calls(&b.cond, calls);
+                        for s in &b.body.stmts {
+                            walk_stmt_calls(s, calls);
+                        }
+                    }
+                    if let Some(eb) = &i.else_ {
+                        for s in &eb.stmts {
+                            walk_stmt_calls(s, calls);
+                        }
+                    }
+                }
+                Stmt::For(f) => {
+                    walk_expr_calls(&f.range, calls);
+                    for s in &f.body.stmts {
+                        walk_stmt_calls(s, calls);
+                    }
+                }
+                Stmt::Block(b) => {
+                    for s in &b.stmts {
+                        walk_stmt_calls(s, calls);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut invoked: Vec<String> = Vec::new();
+        for payload in widget.handlers.values() {
+            if let crate::aura::LogicPayload::AstStmts(stmts) = payload {
+                for stmt in stmts {
+                    walk_stmt_calls(stmt, &mut invoked);
+                }
+            }
+        }
+        for snake in &callback_props {
+            let bare = format!("on_{snake}");
+            // 裸形或 props. 成员形（成员臂已收 method 名=on_<x>）。
+            if invoked.iter().any(|n| n == &bare || n == snake) {
+                let pascal = Self::snake_to_pascal(snake);
+                if !emits.contains(&pascal) {
+                    emits.push(pascal);
                 }
             }
         }

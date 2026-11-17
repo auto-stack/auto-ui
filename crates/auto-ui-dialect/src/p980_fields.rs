@@ -976,6 +976,7 @@ mod tests {
             handlers: vec![OnHandler {
                 pattern: ".Inc".into(),
                 params: Vec::new(),
+                span: None,
                 body: auto_ast::ast::Body {
                     stmts: Vec::new(),
                     has_new_line: false,
