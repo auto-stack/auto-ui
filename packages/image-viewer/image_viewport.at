@@ -1,0 +1,448 @@
+use auto.json
+
+// PLAN-089 ImageViewport — 通用受控图片视口（抽取自 031 局部 widget 的正式包）。
+//
+// 合同（Plan §5 r2 表，冻结）：v1 仅受控视图——业务 view 由调用方持有；
+// 组件只持局部手势投影（拖拽累计），最终业务 view 只有调用方一份。任何
+// 变换动作（按钮/滚轮/拖拽）都发一次完整 tuple 的 viewRequested
+// （source ∈ zoom|pan|fit|rotate|reset|gesture），调用方按 baseRevision
+// 接受后一次性赋值并增 revision——组件不维护第二份默认 model。
+//
+// 资源与事件：
+// - 有效资源身份 = (resourceId 或 src, resourceRevision)；换图（三者任一
+//   变化）即重置手势/loaded/error 门，并捕获该图初始基线（调用方随新图
+//   提供的 fit/zoom/offsetX/offsetY/rotation；缺省 contain/1/0/0/0）。
+// - 同资源重绘/主题变化零请求（Tick 快照不变化即无操作）。
+// - loaded 最小体 {resourceId, resourceRevision}（不捏造未回传的图片元
+//   数据）；error {code, message, ...}；损坏/失效 URI 是 error，不伪装
+//   空图或无限 loading。
+// - navigateRequested 只发 {seq, baseRevision, resourceId, resourceRevision,
+//   direction: previous|next}；资源集合/顺序归应用；无相邻图时按钮禁用。
+//
+// 平台边界（decisions.md §3）：
+// - wheel 载荷 (delta_y)，pan 载荷 (dx, dy, phase:"start"|"move"|"end")，
+//   dblclick 无载荷——native 输入适配（Plan 547 Task 25 缺口）与 Vue 生成
+//   器同形；绑定位以 $0/$event.deltaY 占位声明。
+// - 缩放步进 ×1.25/÷1.25（二进制精确），界限 0.05…64 沿 image_surface_
+//   geometry clamp；越界夹取，非有限 zoom / 非法 fit → invalid_view 错误
+//   事件（同配置只报一次）。按钮与滚轮/拖拽共用同一变换算法（视口中心锚）。
+// - 校验/投影逻辑按 087 先例内联在 Init/Tick（widget 内不定义 fn）。
+widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resourceRevision: str = "", revision: int = 0, fit: str = "contain", zoom: float = 1.0, offsetX: float = 0.0, offsetY: float = 0.0, rotation: int = 0, showToolbar: bool = true, canPrevious: bool = false, canNext: bool = false) {
+    msg {
+        Init, Tick,
+        ZoomIn, ZoomOut, FitContain, FitWidth, OneToOne,
+        RotateLeft, RotateRight, ResetView,
+        PanLeft, PanRight, PanUp, PanDown, TogglePanPad,
+        OnWheel(float), OnPan(float, float, str), OnDoubleClick, OnLoaded, OnError,
+        RequestPrevious, RequestNext,
+        "viewRequested"(str), "loaded"(str), "error"(str), "navigateRequested"(str)
+    }
+    model {
+        var interval int = 80
+        // 受控快照（Tick 重投影基准；seen_* 与 props 逐字段对齐）。
+        var seen_rev int = 0
+        var seen_src str = ""
+        var seen_rid str = ""
+        var seen_rrev str = ""
+        var seen_fit str = "contain"
+        var seen_zoom float = 1.0
+        var seen_ox float = 0.0
+        var seen_oy float = 0.0
+        var seen_rot int = 0
+        var seen_can_prev bool = false
+        var seen_can_next bool = false
+        // 当前投影（image_surface 实际绑定 = seen + 局部手势）。
+        var cur_fit str = "contain"
+        var cur_zoom float = 1.0
+        var cur_ox float = 0.0
+        var cur_oy float = 0.0
+        var cur_rot int = 0
+        // 初始基线（换图捕获；Reset 恢复目标）。
+        var init_fit str = "contain"
+        var init_zoom float = 1.0
+        var init_ox float = 0.0
+        var init_oy float = 0.0
+        var init_rot int = 0
+        // 配置/加载错误观察（同配置只报一次）。
+        var cfg_err str = ""
+        var prev_err str = ""
+        var err_reported bool = false
+        var loaded_once bool = false
+        // 局部手势（拖拽累计；end 后清零并等待调用方接受）。
+        var dragging bool = false
+        var g_dx float = 0.0
+        var g_dy float = 0.0
+        // pan 方向键显隐（窄窗默认收起；普通命名控件可达）。
+        var pan_pad bool = false
+        var seq int = 0
+    }
+    computed {
+        c_ok => .cfg_err == ""
+    }
+    view {
+        col (style: "w-full h-full min-h-0 flex-col bg-background text-foreground") {
+            if .showToolbar {
+                row (style: "h-10 shrink-0 items-center gap-1 px-2 border-b border-border bg-card") {
+                    button (icon: "chevron-left", title: "上一张", onclick: .RequestPrevious, disabled: !.canPrevious, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                    button (icon: "chevron-right", title: "下一张", onclick: .RequestNext, disabled: !.canNext, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                    col (style: "w-2 shrink-0") {}
+                    button (icon: "zoom-out", title: "缩小", onclick: .ZoomOut, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                    button (icon: "zoom-in", title: "放大", onclick: .ZoomIn, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                    button (text: "适应", title: "适应窗口", onclick: .FitContain, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                    button (text: "宽度", title: "适应宽度", onclick: .FitWidth, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                    button (text: "1:1", title: "原始比例", onclick: .OneToOne, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                    col (style: "w-2 shrink-0") {}
+                    button (text: "↺", title: "向左旋转90°", onclick: .RotateLeft, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                    button (text: "↻", title: "向右旋转90°", onclick: .RotateRight, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                    button (icon: "maximize", title: "重置视图", onclick: .ResetView, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                    col (style: "w-2 shrink-0") {}
+                    button (text: "平移", title: "方向平移", onclick: .TogglePanPad, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                }
+                if .pan_pad {
+                    row (style: "h-10 shrink-0 items-center gap-1 px-2 border-b border-border bg-card") {
+                        button (text: "←", title: "左移", onclick: .PanLeft, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                        button (text: "→", title: "右移", onclick: .PanRight, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                        button (text: "↑", title: "上移", onclick: .PanUp, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                        button (text: "↓", title: "下移", onclick: .PanDown, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
+                    }
+                }
+            }
+            if .cfg_err != "" {
+                col (style: "flex-1 min-h-0 items-center justify-center gap-2 p-4") {
+                    text .cfg_err { style: "text-sm text-destructive text-center" }
+                }
+            } else {
+                col (style: "flex-1 min-h-0 w-full relative overflow-hidden") {
+                    if .src == "" {
+                        col (style: "w-full h-full items-center justify-center gap-2") {
+                            text "没有图片" { style: "text-sm text-muted-foreground" }
+                        }
+                    } else {
+                        image_surface (
+                            src: .src,
+                            alt: .alt,
+                            fit: .cur_fit,
+                            zoom: .cur_zoom,
+                            offset_x: .cur_ox,
+                            offset_y: .cur_oy,
+                            rotation: .cur_rot,
+                            onload: .OnLoaded,
+                            onerror: .OnError,
+                            onwheel: .OnWheel($event.deltaY),
+                            onpan: .OnPan($0, $1, $2),
+                            ondblclick: .OnDoubleClick,
+                            style: "w-full h-full"
+                        ) {}
+                    }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .seen_rev = .revision
+            .seen_src = .src
+            .seen_rid = .resourceId
+            .seen_rrev = .resourceRevision
+            .seen_fit = .fit
+            .seen_zoom = .zoom
+            .seen_ox = .offsetX
+            .seen_oy = .offsetY
+            .seen_rot = .rotation
+            .seen_can_prev = .canPrevious
+            .seen_can_next = .canNext
+            // 初始基线捕获（换图时同款逻辑；Init 即首图基线）。
+            var ifit str = "contain"
+            if .fit == "contain" { ifit = "contain" }
+            if .fit == "width" { ifit = "width" }
+            if .fit == "one-to-one" { ifit = "one-to-one" }
+            if .fit == "free" { ifit = "free" }
+            .init_fit = ifit
+            .init_zoom = .zoom
+            .init_ox = .offsetX
+            .init_oy = .offsetY
+            .init_rot = ((.rotation % 360) + 360) % 360
+            // 受控重投影。
+            .cur_fit = ifit
+            .cur_zoom = .zoom
+            if .cur_zoom < 0.05 { .cur_zoom = 0.05 }
+            if .cur_zoom > 64.0 { .cur_zoom = 64.0 }
+            .cur_ox = .offsetX
+            .cur_oy = .offsetY
+            .cur_rot = ((.rotation % 360) + 360) % 360
+            // 配置校验（invalid_view 同配置只报一次）。
+            var bad str = ""
+            if .zoom * 0.0 != 0.0 {
+                bad = "image-viewer: zoom must be a finite number (invalid_view)"
+            }
+            if bad == "" {
+                if .fit != "contain" && .fit != "width" && .fit != "one-to-one" && .fit != "free" {
+                    bad = "image-viewer: fit must be contain|width|one-to-one|free (invalid_view)"
+                }
+            }
+            if bad != "" && bad != .prev_err {
+                .seq = .seq + 1
+                ."error"(json.stringify({code: "invalid_view", message: bad, resourceId: .resourceId, resourceRevision: .resourceRevision}))
+            }
+            .prev_err = bad
+            .cfg_err = bad
+        }
+        .Tick -> {
+            if .revision != .seen_rev || .src != .seen_src || .resourceId != .seen_rid || .resourceRevision != .seen_rrev || .fit != .seen_fit || .zoom != .seen_zoom || .offsetX != .seen_ox || .offsetY != .seen_oy || .rotation != .seen_rot || .canPrevious != .seen_can_prev || .canNext != .seen_can_next {
+                // 资源换代：手势/门清零，新图初始基线 = 调用方随图提供的视图。
+                if .src != .seen_src || .resourceId != .seen_rid || .resourceRevision != .seen_rrev {
+                    .dragging = false
+                    .g_dx = 0.0
+                    .g_dy = 0.0
+                    .loaded_once = false
+                    .err_reported = false
+                    .prev_err = ""
+                    var rfit str = "contain"
+                    if .fit == "contain" { rfit = "contain" }
+                    if .fit == "width" { rfit = "width" }
+                    if .fit == "one-to-one" { rfit = "one-to-one" }
+                    if .fit == "free" { rfit = "free" }
+                    .init_fit = rfit
+                    .init_zoom = .zoom
+                    .init_ox = .offsetX
+                    .init_oy = .offsetY
+                    .init_rot = ((.rotation % 360) + 360) % 360
+                }
+                .seen_rev = .revision
+                .seen_src = .src
+                .seen_rid = .resourceId
+                .seen_rrev = .resourceRevision
+                .seen_fit = .fit
+                .seen_zoom = .zoom
+                .seen_ox = .offsetX
+                .seen_oy = .offsetY
+                .seen_rot = .rotation
+                .seen_can_prev = .canPrevious
+                .seen_can_next = .canNext
+                // 受控重投影（调用方接受/外部调整后组件面唯一写点）。
+                var pfit str = "contain"
+                if .fit == "contain" { pfit = "contain" }
+                if .fit == "width" { pfit = "width" }
+                if .fit == "one-to-one" { pfit = "one-to-one" }
+                if .fit == "free" { pfit = "free" }
+                .cur_fit = pfit
+                .cur_zoom = .zoom
+                if .cur_zoom < 0.05 { .cur_zoom = 0.05 }
+                if .cur_zoom > 64.0 { .cur_zoom = 64.0 }
+                .cur_ox = .offsetX
+                .cur_oy = .offsetY
+                .cur_rot = ((.rotation % 360) + 360) % 360
+                // 配置校验。
+                var bad str = ""
+                if .zoom * 0.0 != 0.0 {
+                    bad = "image-viewer: zoom must be a finite number (invalid_view)"
+                }
+                if bad == "" {
+                    if .fit != "contain" && .fit != "width" && .fit != "one-to-one" && .fit != "free" {
+                        bad = "image-viewer: fit must be contain|width|one-to-one|free (invalid_view)"
+                    }
+                }
+                if bad != "" && bad != .prev_err {
+                    .seq = .seq + 1
+                    ."error"(json.stringify({code: "invalid_view", message: bad, resourceId: .resourceId, resourceRevision: .resourceRevision}))
+                }
+                .prev_err = bad
+                .cfg_err = bad
+            }
+        }
+        .OnWheel(d float) -> {
+            if .c_ok && .src != "" {
+                var nz float = .seen_zoom
+                if d < 0.0 {
+                    nz = .seen_zoom * 1.25
+                } else {
+                    if d > 0.0 {
+                        nz = .seen_zoom / 1.25
+                    }
+                }
+                if nz < 0.05 { nz = 0.05 }
+                if nz > 64.0 { nz = 64.0 }
+                if nz != .seen_zoom {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: nz, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, source: "zoom"}))
+                }
+            }
+        }
+        .OnPan(dx float, dy float, phase str) -> {
+            if .c_ok && .src != "" {
+                if phase == "start" {
+                    .dragging = true
+                    .g_dx = 0.0
+                    .g_dy = 0.0
+                } else {
+                    if phase == "move" {
+                        if .dragging {
+                            // 局部手势投影：仅显示面跟随，业务 view 不变。
+                            .g_dx = .g_dx + dx
+                            .g_dy = .g_dy + dy
+                            .cur_ox = .seen_ox + .g_dx
+                            .cur_oy = .seen_oy + .g_dy
+                        }
+                    } else {
+                        if phase == "end" {
+                            if .dragging {
+                                .dragging = false
+                                var nx float = .seen_ox + .g_dx
+                                var ny float = .seen_oy + .g_dy
+                                .g_dx = 0.0
+                                .g_dy = 0.0
+                                // 回弹到受控基准：调用方接受（revision++）后
+                                // 才落位；拒绝则显示回原视图。
+                                .cur_ox = .seen_ox
+                                .cur_oy = .seen_oy
+                                if nx != .seen_ox || ny != .seen_oy {
+                                    .seq = .seq + 1
+                                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: nx, offsetY: ny, rotation: .seen_rot}, source: "gesture"}))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .OnDoubleClick -> {
+            // 031 同语义：双击在原始比例与适应窗口间切换。
+            if .c_ok && .src != "" {
+                if .seen_fit != "one-to-one" {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "one-to-one", zoom: 1.0, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, source: "fit"}))
+                } else {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "contain", zoom: 1.0, offsetX: 0.0, offsetY: 0.0, rotation: .seen_rot}, source: "fit"}))
+                }
+            }
+        }
+        .ZoomIn -> {
+            if .c_ok && .src != "" {
+                var nz float = .seen_zoom * 1.25
+                if nz > 64.0 { nz = 64.0 }
+                if nz != .seen_zoom {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: nz, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, source: "zoom"}))
+                }
+            }
+        }
+        .ZoomOut -> {
+            if .c_ok && .src != "" {
+                var nz float = .seen_zoom / 1.25
+                if nz < 0.05 { nz = 0.05 }
+                if nz != .seen_zoom {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: nz, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, source: "zoom"}))
+                }
+            }
+        }
+        .FitContain -> {
+            if .c_ok && .src != "" {
+                if .seen_fit != "contain" || .seen_zoom != 1.0 || .seen_ox != 0.0 || .seen_oy != 0.0 {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "contain", zoom: 1.0, offsetX: 0.0, offsetY: 0.0, rotation: .seen_rot}, source: "fit"}))
+                }
+            }
+        }
+        .FitWidth -> {
+            if .c_ok && .src != "" {
+                if .seen_fit != "width" || .seen_zoom != 1.0 {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "width", zoom: 1.0, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, source: "fit"}))
+                }
+            }
+        }
+        .OneToOne -> {
+            if .c_ok && .src != "" {
+                if .seen_fit != "one-to-one" || .seen_zoom != 1.0 {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "one-to-one", zoom: 1.0, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, source: "fit"}))
+                }
+            }
+        }
+        .RotateLeft -> {
+            if .c_ok && .src != "" {
+                var nr int = (.seen_rot + 270) % 360
+                if nr != .seen_rot {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy, rotation: nr}, source: "rotate"}))
+                }
+            }
+        }
+        .RotateRight -> {
+            if .c_ok && .src != "" {
+                var nr int = (.seen_rot + 90) % 360
+                if nr != .seen_rot {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy, rotation: nr}, source: "rotate"}))
+                }
+            }
+        }
+        .ResetView -> {
+            if .c_ok && .src != "" {
+                if .seen_fit != .init_fit || .seen_zoom != .init_zoom || .seen_ox != .init_ox || .seen_oy != .init_oy || .seen_rot != .init_rot {
+                    .seq = .seq + 1
+                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .init_fit, zoom: .init_zoom, offsetX: .init_ox, offsetY: .init_oy, rotation: .init_rot}, source: "reset"}))
+                }
+            }
+        }
+        .PanLeft -> {
+            if .c_ok && .src != "" {
+                .seq = .seq + 1
+                ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox - 40.0, offsetY: .seen_oy, rotation: .seen_rot}, source: "pan"}))
+            }
+        }
+        .PanRight -> {
+            if .c_ok && .src != "" {
+                .seq = .seq + 1
+                ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox + 40.0, offsetY: .seen_oy, rotation: .seen_rot}, source: "pan"}))
+            }
+        }
+        .PanUp -> {
+            if .c_ok && .src != "" {
+                .seq = .seq + 1
+                ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy - 40.0, rotation: .seen_rot}, source: "pan"}))
+            }
+        }
+        .PanDown -> {
+            if .c_ok && .src != "" {
+                .seq = .seq + 1
+                ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy + 40.0, rotation: .seen_rot}, source: "pan"}))
+            }
+        }
+        .TogglePanPad -> {
+            .pan_pad = !.pan_pad
+        }
+        .RequestPrevious -> {
+            if .canPrevious {
+                .seq = .seq + 1
+                ."navigateRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, direction: "previous"}))
+            }
+        }
+        .RequestNext -> {
+            if .canNext {
+                .seq = .seq + 1
+                ."navigateRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, direction: "next"}))
+            }
+        }
+        .OnLoaded -> {
+            // 媒体门（PLAN-095）保证单次派发；组件按当前资源身份转发最小体。
+            if !.loaded_once {
+                .loaded_once = true
+                .err_reported = false
+                ."loaded"(json.stringify({resourceId: .resourceId, resourceRevision: .resourceRevision}))
+            }
+        }
+        .OnError -> {
+            // 不伪装空图/无限 loading；不捏造未回传的图片元数据——code 为
+            // 组件级真实分类，message 固定短文（native 媒体门失败原因短文
+            // 属底层通道，v1 不透传占位）。
+            if !.err_reported {
+                .err_reported = true
+                .loaded_once = false
+                ."error"(json.stringify({code: "load_failed", message: "image failed to load", resourceId: .resourceId, resourceRevision: .resourceRevision}))
+            }
+        }
+    }
+}

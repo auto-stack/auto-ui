@@ -1969,9 +1969,14 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             filter,
             on_error: on_error.map(|m| IcedMessage::from_dynamic(&m)),
             on_loaded: on_loaded.map(|m| IcedMessage::from_dynamic(&m)),
-            on_wheel: on_wheel.map(|m| IcedMessage::from_dynamic(&m)),
-            on_pan: on_pan.map(|m| IcedMessage::from_dynamic(&m)),
-            on_double_click: on_double_click.map(|m| IcedMessage::from_dynamic(&m)),
+            // PLAN-089 T-02: 输入三臂随消息类型重映射（载荷回调保留；
+            // Video on_time_update 臂同款 Arc 包装）。
+            on_wheel: on_wheel
+                .map(|cb| cb.map_message(std::sync::Arc::new(|m: crate::ui::interpreter::DynamicMessage| IcedMessage::from_dynamic(&m)))),
+            on_pan: on_pan
+                .map(|cb| cb.map_message(std::sync::Arc::new(|m: crate::ui::interpreter::DynamicMessage| IcedMessage::from_dynamic(&m)))),
+            on_double_click: on_double_click
+                .map(|cb| cb.map_message(std::sync::Arc::new(|m: crate::ui::interpreter::DynamicMessage| IcedMessage::from_dynamic(&m)))),
             style,
         },
 

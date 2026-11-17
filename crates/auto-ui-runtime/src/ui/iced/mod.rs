@@ -31,6 +31,9 @@ mod pointer_placement_tests;
 pub mod frame_probe;
 // Plan 547: native display surface backed by the shared media registry.
 pub mod image_surface;
+// PLAN-089 T-01/T-02: ImageSurface native 输入适配（wheel/pan/dblclick 载荷
+// 回调 + PointerArea 同型包装 widget——Plan 547 Task 25 缺口的落地）。
+pub mod image_surface_input;
 // Plan 563: pen 事件层 widget(canvas onpenstart/onpenmove/onpenend 承载,
 // 按下门控 + ≤30Hz 限频 + 出界收笔,PointerArea 同型扩展)。
 pub mod pen_area;

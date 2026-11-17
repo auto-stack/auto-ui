@@ -1,0 +1,23 @@
+// pac.at — image-preview demo (PLAN-089 T-04).
+//
+// 官方 image-viewer 包的普通消费演示：真实 media ticket URI + 受控视图
+// 回路。产品门 verify_image_preview.py 以本示例为夹具（隔离目录运行）。
+name: "image-preview-demo"
+version: "0.1.0"
+description: "AutoUI image viewport & preview dialog demo (PLAN-089)"
+
+scene: "ui"
+render: "vue"
+api: "rust"
+front_port: 4391
+back_port: 8391
+icon: "image"
+title: "Image Preview Demo"
+title_zh: "图片预览演示"
+category: "media"
+theme: "dark"
+
+# PLAN-089：官方包 dep 根（vue 轨物化扫描；native 轨由 widget 级 use 传递装载）。
+dep image_viewer {
+    path: "../../packages/image-viewer"
+}

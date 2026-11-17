@@ -1,0 +1,79 @@
+use auto.json
+
+// PLAN-089 ImagePreviewDialog — 组合 ImageViewport 的模态图片预览
+// （PLAN-088 ColorDialog 同构：受控 open、事件纯转发、无第二份业务 view）。
+//
+// 合同（Plan §5 r2 表，冻结）：
+// - Dialog 只组合视口：viewport props 原样下传，viewRequested/loaded/
+//   error/navigateRequested 原样转发；cancelled 在关闭路径派发一次。
+// - 沿既有 modal 焦点/背景隔离、Escape 关闭、关闭恢复触发器；图片加载/
+//   错误不阻塞关闭（转发无门控）。
+// - 默认 960×720 并夹取（max-w/max-h），窄窗不丢失关闭按钮（guide §3.1）。
+// - 关闭不写原图片/数据库；共享资源引用归媒体管线（组件不持字节）。
+widget ImagePreviewDialog (src: str = "", alt: str = "", resourceId: str = "", resourceRevision: str = "", revision: int = 0, fit: str = "contain", zoom: float = 1.0, offsetX: float = 0.0, offsetY: float = 0.0, rotation: int = 0, open: bool = false, title: str = "图片预览", showToolbar: bool = true, canPrevious: bool = false, canNext: bool = false) {
+    msg {
+        Init,
+        Close,
+        OnViewRequest(str), OnChildLoaded(str), OnChildError(str), OnNavigate(str),
+        "viewRequested"(str), "loaded"(str), "error"(str), "navigateRequested"(str),
+        "cancelled"
+    }
+    model {
+        var interval int = 100
+        var seen_open bool = false
+        var cancel_armed bool = false
+    }
+    view {
+        dialog (open: .open, onclose: .Close, closeOnOutside: false) {
+            dialog-content (style: "w-[960px] max-w-[95vw] h-[720px] max-h-[92vh] p-0 gap-0 rounded-xl bg-background text-foreground") {
+                col (style: "w-full h-full flex-col") {
+                    row (style: "h-12 shrink-0 items-center justify-between px-4 border-b border-border bg-card") {
+                        text .title { style: "text-base font-semibold text-foreground truncate" }
+                        button (icon: "x", title: "关闭", onclick: .Close, style: "h-8 w-8 shrink-0 justify-center rounded-md text-muted-foreground hover:bg-muted") {}
+                    }
+                    ImageViewport (
+                        src: .src, alt: .alt,
+                        resourceId: .resourceId, resourceRevision: .resourceRevision,
+                        revision: .revision,
+                        fit: .fit, zoom: .zoom, offsetX: .offsetX, offsetY: .offsetY,
+                        rotation: .rotation,
+                        showToolbar: .showToolbar,
+                        canPrevious: .canPrevious, canNext: .canNext,
+                        onviewRequested: .OnViewRequest($event),
+                        onloaded: .OnChildLoaded($event),
+                        onerror: .OnChildError($event),
+                        onnavigateRequested: .OnNavigate($event)
+                    ) {}
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .seen_open = .open
+            if .open {
+                .cancel_armed = true
+            }
+        }
+        .Tick -> {
+            if .open != .seen_open {
+                .seen_open = .open
+                if .open {
+                    // 每次开启武装一次关闭→cancelled 派发（Escape/关闭按钮/
+                    // 程序性关闭同路径）。
+                    .cancel_armed = true
+                }
+            }
+        }
+        .Close -> {
+            if .cancel_armed {
+                .cancel_armed = false
+                ."cancelled"()
+            }
+        }
+        .OnViewRequest(ev str) -> { ."viewRequested"(ev) }
+        .OnChildLoaded(ev str) -> { ."loaded"(ev) }
+        .OnChildError(ev str) -> { ."error"(ev) }
+        .OnNavigate(ev str) -> { ."navigateRequested"(ev) }
+    }
+}

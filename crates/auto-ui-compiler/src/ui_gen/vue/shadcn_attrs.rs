@@ -5279,6 +5279,13 @@ impl VueGenerator {
                     i += b"$event.target.checked".len();
                     continue;
                 }
+                // PLAN-089 T-02: ImageSurface onwheel 的滚轮增量参数——与
+                // native ImageSurfaceInput 的 wheel 载荷 (delta_y) 同形。
+                if b[i..].starts_with(b"$event.deltaY") {
+                    out.extend_from_slice(b"($event as WheelEvent).deltaY");
+                    i += b"$event.deltaY".len();
+                    continue;
+                }
             }
             if c == b't'
                 && b[i..].starts_with(b"this.")

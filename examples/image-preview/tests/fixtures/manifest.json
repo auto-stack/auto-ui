@@ -1,0 +1,26 @@
+{
+  "fixtures": [
+    {
+      "file": "corner-marked.png",
+      "kind": "png",
+      "size": "64x48",
+      "alpha": true,
+      "oracle": "TL16x16=#FF0000 opaque; TR16x16=#0000FF opaque; BL16x16=#00FF00 opaque; BR16x16 fully transparent; center #F0F0F0 opaque",
+      "generation": "plan-artifacts/plan-089/gen_fixtures.py (stdlib zlib PNG writer, deterministic)"
+    },
+    {
+      "file": "scenic-320x240.png",
+      "kind": "png",
+      "size": "320x240",
+      "alpha": false,
+      "source": "byte-copy of examples/ui/031-image-viewer/tests/fixtures/scenic-320x240.png (sha256 2391b725d7c2373f2a528a062f4b8c6ebc1fb68f35845674c016a635f23b098f)"
+    },
+    {
+      "file": "damaged.png",
+      "kind": "png",
+      "corrupt": true,
+      "oracle": "valid signature + IHDR only; IDAT truncated away (decode must fail as error, never placeholder-success)",
+      "generation": "corner PNG truncated to first third (signature+IHDR, 25 bytes)"
+    }
+  ]
+}
