@@ -55,6 +55,7 @@ fn initials_of(states: &[(String, AceStateValue)]) -> ace_av::age_component::Com
                     AceStateValue::Int(i) => InitialValue::Int(*i as i64),
                     AceStateValue::Bool(b) => InitialValue::Bool(*b),
                     AceStateValue::Str(s) => InitialValue::Str(s.clone()),
+                    AceStateValue::F32(f) => InitialValue::Float(*f),
                 };
                 Some((n.clone(), iv))
             })
