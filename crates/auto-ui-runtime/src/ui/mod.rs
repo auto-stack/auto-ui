@@ -164,6 +164,8 @@ pub mod ace_package_bridge;
 #[cfg(feature = "ace-bridge")]
 pub mod ace_package_lane;
 #[cfg(feature = "ace-bridge")]
+pub mod ace_package_sfc;
+#[cfg(feature = "ace-bridge")]
 // PLAN-980 B-STATE：ACE 状态执行桥（组件面消费端）。
 pub mod ace_state_bridge;
 #[cfg(feature = "ace-bridge")]
