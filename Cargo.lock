@@ -88,6 +88,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ace-a2x-python"
+version = "0.1.0"
+dependencies = [
+ "ace-a2x-core",
+ "ace-core",
+ "ace-foreign-contract",
+]
+
+[[package]]
 name = "ace-a2x-rust"
 version = "0.1.0"
 dependencies = [
@@ -993,6 +1002,10 @@ dependencies = [
 name = "auto-lang-ace-host"
 version = "0.1.0"
 dependencies = [
+ "ace-a2x-core",
+ "ace-a2x-python",
+ "ace-a2x-rust",
+ "ace-a2x-ts",
  "ace-abi",
  "ace-av",
  "ace-av-core",
@@ -1004,6 +1017,7 @@ dependencies = [
  "base64 0.22.1",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -1362,9 +1376,6 @@ name = "auto-web"
 version = "0.1.0"
 dependencies = [
  "a2r-std",
- "ace-a2x-core",
- "ace-a2x-rust",
- "ace-core",
  "auto-generation-core",
  "auto-lang-core",
  "auto-media-core",
