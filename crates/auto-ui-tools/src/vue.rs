@@ -3642,6 +3642,9 @@ pub struct VueProject {
     pub has_routes: bool,
     /// Generated App.vue code
     pub app_vue_code: String,
+    /// PLAN-980 ④-A #7：ACE lane 产物的官方 a2x 运行时（Some=产品 lane 生成
+    /// 在场；写盘点随 App.vue 落 `src/a2x_rt.mjs`——SFC 内相对 import 位）。
+    pub ace_vue_rt: Option<String>,
     /// PLAN-024：根 widget 的 `view mini` 命名视图产物（view_name, SFC）——
     /// 桌面 vue 宿主 Mini.vue 落盘源；None = 该 app 无 mini 面。
     pub mini_face: Option<(String, String)>,
@@ -3852,6 +3855,18 @@ export default router
 
     /// Create a new Vue project context from a workspace directory
     /// （legacy 自扫路径——测试/旧调用；生产走 from_workspace_with_request。）
+    /// PLAN-980 ④-A #7：产品 lane 产物的官方 a2x 运行时落盘（App.vue 同目
+    /// 录——SFC 内 `./a2x_rt.mjs` 相对 import 的解析位；None=键未设，零写）。
+    pub fn write_ace_vue_rt(&self) -> AutoResult<()> {
+        if let Some(rt) = &self.ace_vue_rt {
+            let p = self.output_dir.join("src").join("a2x_rt.mjs");
+            fs::create_dir_all(p.parent().unwrap_or(&self.output_dir)).ok();
+            fs::write(&p, rt)
+                .map_err(|e| format!("Failed to write {}: {}", p.display(), e))?;
+        }
+        Ok(())
+    }
+
     pub fn from_workspace(root_dir: &Path) -> AutoResult<Self> {
         let pac_path = root_dir.join("pac.at");
         if !pac_path.exists() {
@@ -4115,6 +4130,9 @@ export default router
         // PLAN-024：根 widget mini 面收集（工程无 mini 恒 None）——
         // 声明提至外层作用域（ViewProject 构造消费）。
         let mut root_widget_name_minis: Option<(String, String)> = None;
+        // PLAN-980 ④-A #7：ACE 键在场时根 widget SFC 换产品 lane 产物；
+        // 官方 rt 随 Self 携带（generate/regenerate 写盘点落 src/a2x_rt.mjs）。
+        let mut ace_vue_rt: Option<String> = None;
         if app_at.exists() {
             match crate::shadcn_build::ui_build_shadcn_with_sub_widgets_and_stores_full(
                 app_at.to_str().unwrap(),
@@ -4155,11 +4173,20 @@ export default router
                             println!("{} {}", "Warning:".bright_yellow(), warning);
                         }
                         if i == 0 {
-                            // First widget is the App root
+                            // First widget is the App root（PLAN-980 ④-A #7：
+                            // ACE 键在场时换产品 lane 产物——缺席/失败具名拒）。
+                            let app_content = fs::read_to_string(&app_at).map_err(|e| {
+                                format!("Failed to read {}: {}", app_at.display(), e)
+                            })?;
+                            let (root_code, rt) = match ace_vue_app_sfc(&app_at, &app_content)? {
+                                Some((sfc, rt)) => (sfc, Some(rt)),
+                                None => (vue_code.clone(), None),
+                            };
+                            ace_vue_rt = rt;
                             all_components.push((
                                 "".to_string(),
                                 "app".to_string(),
-                                vue_code.clone(),
+                                root_code,
                                 widget.name.clone(),
                             ));
                         } else {
@@ -4862,6 +4889,7 @@ export default router
             shadcn_components,
             has_routes,
             app_vue_code,
+            ace_vue_rt,
             mini_face: root_widget_name_minis,
             components: all_components,
             routes: all_routes,
@@ -5437,6 +5465,7 @@ export default router
         let app_vue_path = src_dir.join("App.vue");
         fs::write(&app_vue_path, &self.app_vue_code)
             .map_err(|e| format!("Failed to write App.vue: {}", e))?;
+        self.write_ace_vue_rt()?;
 
         // Write main.ts
         let uses_autodown = self
@@ -5625,6 +5654,7 @@ export default router
         let app_vue_path = src_dir.join("App.vue");
         fs::write(&app_vue_path, &self.app_vue_code)
             .map_err(|e| format!("Failed to write App.vue: {}", e))?;
+        self.write_ace_vue_rt()?;
         println!("{}", "  ✓ Regenerated App.vue".bright_green());
 
         // Regenerate main.ts (re-copy pac.at `styles:` CSS files first so
@@ -7551,6 +7581,20 @@ pub fn incremental_compile_changed(
                 ) {
                     Ok((vue_code, widgets, stores)) => {
                         store_files.extend(stores);
+                        // PLAN-980 ④-A #7：ACE 键在场时 app SFC 换产品 lane
+                        // 产物（官方 rt 同目录落盘——SFC 内 `./a2x_rt.mjs`
+                        // 相对 import 的解析位）。
+                        let (vue_code, ace_rt) = match ace_vue_app_sfc(&app_at, &content)? {
+                            Some((sfc, rt)) => (sfc, Some(rt)),
+                            None => (vue_code, None),
+                        };
+                        if let Some(rt) = ace_rt {
+                            let rt_path = output_dir.join("src").join("a2x_rt.mjs");
+                            fs::create_dir_all(rt_path.parent().unwrap_or(&output_dir)).ok();
+                            fs::write(&rt_path, rt).map_err(|e| {
+                                format!("Failed to write {}: {}", rt_path.display(), e)
+                            })?;
+                        }
                         let content_hash = hash_string(&vue_code);
                         if let Some(widget_name) = widgets.first() {
                             changed_files.push((app_output_path, vue_code, widget_name.clone()));
@@ -7931,6 +7975,46 @@ fn handle_compile_error_with_dep_shape(
 /// bare VueGenerator. Mirrors the in-file collection in
 /// ui_gen::api::generate_component_from_file — parse failures yield an
 /// empty pool (the first pass already reported the real error).
+/// PLAN-980 ④-A #7（982 round-184 合同）：`AUTO_UI_ACE_VUE=1` 时 app.at 的
+/// SFC 走产品 lane 入口（`generate_sfc_with_lane_product`——lane 体 + 显式
+/// `./a2x_rt.mjs` import + 官方 rt 随产物）。
+/// 返回 `Ok(None)`=键未设（legacy 生成道逐字不变）；`Ok(Some((sfc, rt)))`
+/// =产品产物。lane 缺席/生成失败=**具名拒绝**（run 键下双轨收紧——不静默
+/// 落 legacy）；工具未按 `--features ace-vue` 构建同样具名拒绝。
+fn ace_vue_app_sfc(app_at: &Path, content: &str) -> AutoResult<Option<(String, String)>> {
+    if std::env::var("AUTO_UI_ACE_VUE").ok().as_deref() != Some("1") {
+        return Ok(None);
+    }
+    #[cfg(feature = "ace-vue")]
+    {
+        let product = auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane_product(
+            content,
+            &app_at.to_string_lossy(),
+        )
+        .map_err(|e| {
+            auto_val::AutoError::from(format!(
+                "ace.vue-lane-error: AUTO_UI_ACE_VUE=1 下 app.at 经产品 lane 入口生成失败：{e}"
+            ))
+        })?;
+        if !product.absent.is_empty() {
+            return Err(format!(
+                "ace.vue-lane-unsupported: AUTO_UI_ACE_VUE=1 要求 app.at 全部 handler 可由                  ACE lane 派生；缺席={}（本键下旧道 fallback 禁用，不静默回落）",
+                product.absent.join(", ")
+            )
+            .into());
+        }
+        Ok(Some((product.sfc, product.runtime_mjs)))
+    }
+    #[cfg(not(feature = "ace-vue"))]
+    {
+        let _ = (app_at, content);
+        Err(
+            "ace.vue-lane-unavailable: AUTO_UI_ACE_VUE=1 需要工具以 --features ace-vue 构建              （本构建无 ACE lane 生成道；不静默回落 legacy）"
+                .into(),
+        )
+    }
+}
+
 fn same_file_module_fns(code: &str) -> Vec<auto_ui_compiler::aura::AuraModuleFn> {
     let session = auto_lang_core::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(code).with_session(session);
@@ -12821,6 +12905,7 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
             shadcn_components: vec![],
             has_routes: false,
             app_vue_code: String::new(),
+            ace_vue_rt: None,
             mini_face: None,
             components: vec![],
             routes: vec![],
@@ -12857,6 +12942,7 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
             shadcn_components: vec![],
             has_routes: false,
             app_vue_code: String::new(),
+            ace_vue_rt: None,
             mini_face: None,
             components: vec![],
             routes: vec![],
@@ -12978,6 +13064,7 @@ widget App {
             shadcn_components: vec![],
             has_routes: false,
             app_vue_code: String::new(),
+            ace_vue_rt: None,
             mini_face: None,
             components: vec![],
             routes: vec![],
@@ -13015,6 +13102,7 @@ widget App {
             shadcn_components: vec![],
             has_routes: false,
             app_vue_code: String::new(),
+            ace_vue_rt: None,
             mini_face: None,
             components: vec![],
             routes: vec![],

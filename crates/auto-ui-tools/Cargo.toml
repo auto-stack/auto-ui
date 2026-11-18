@@ -5,6 +5,15 @@ edition = "2021"
 description = "UI engineering tool package (PLAN-815): M815-A hosts the real auto-ui-tool process (describe/validate_project) over the light I-TOOL protocol; generation/build/run closure lands with M815-B"
 license = "MIT"
 
+[features]
+# PLAN-980 ④-A #7（982 round-184 合同）：`auto run --render vue` 的 ACE
+# lane 生成道——AUTO_UI_ACE_VUE=1 时 app.at SFC 走产品 lane 入口
+# （generate_sfc_with_lane_product；lane 缺席具名拒、不静默落 legacy）。
+# 非默认：792 交付闭包不含 experimental/ace 树（auto-ui-runtime/ace-bridge
+# 的 optional path 同款投影剥除）；需要 lane 的工具按
+# `--features ace-vue` 构建。
+ace-vue = ["auto-ui-runtime/ace-bridge"]
+
 [dependencies]
 auto-web = { version = "=0.1.0", path = "../../../auto-web/crates/auto-web" }
 # 唯一协议来源(版本/能力/预算/错误/信封/framing),工具与客户端共享。
@@ -56,3 +65,8 @@ tempfile = "3.14"
 [[bin]]
 name = "auto-ui-tool"
 path = "src/bin/auto_ui_tool.rs"
+
+[[test]]
+name = "plan980_ace_vue_tool_wiring"
+path = "tests/plan980_ace_vue_tool_wiring.rs"
+required-features = ["ace-vue"]
