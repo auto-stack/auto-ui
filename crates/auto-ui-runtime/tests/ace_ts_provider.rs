@@ -910,10 +910,16 @@ fn p980_web_full_dual_track_census() {
     // 母（无可发射语句=缺席，语义正确）；两源第一 widget（载荷声明+参数
     // handler）**仍缺**：widget 头参数表（`widget N(props)`）+ ④ 调用体/`;
     // ` 分隔=下一层收敛（§13.15 边界）。
+    // **2026-11-18 具名修订 #7（切片#6o：widget 头参数表（age-node-params
+    // 对 age-component 开放，参数=宿主通道 prop）+`;` 单行分隔+调用语句语
+    // 法收全（body_foreign fail-closed：检查函数不铸/派发具名拒——
+    // a2ts.foreign-unsupported 域合同））**：(75,8,4,26)→**(75,8,7,23)**
+    // ——[66] 全源+头部参数源族 +3 spliced；调用表达式形（wide-ops pratt
+    // 无调用后缀）=[65] 等源的下一层（表达式面扩展）。
     assert_eq!(corpus.len(), 83, "corpus size frozen");
     assert_eq!(
         (ok, err, spliced, absent),
-        (75, 8, 4, 26),
+        (75, 8, 7, 23),
         "dual-track aggregates frozen"
     );
 }
@@ -1617,4 +1623,56 @@ widget B {
         Ok(_) => panic!("out-of-range node index must be a named rejection"),
     };
     assert!(err.contains("node index 2"), "named: {err}");
+}
+
+/// WEB 切片#6o（④语法收全·fail-closed 承载）：widget 头参数表（宿主通道
+/// prop）+`;` 分隔+多赋值经一体入口拼接；**调用体=具名缺席**（body_foreign
+/// ——检查函数不铸/派发具名拒，a2ts.foreign-unsupported 域合同；不做未验
+/// 证旁路）。负控：调用体 handler 不产 lane 体（旧道承载）。
+#[test]
+fn p980_web_head_props_semi_and_foreign_body_fail_closed() {
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+
+    // ① 头参数表 + `;` 分隔多赋值：全 lane 拼接。
+    let src = "widget App(on_delete: msg) {
+    msg Msg { Go }
+    model { var x int = 0 }
+    view { col { text \"t\" button \"go\" { onclick: .Go } } }
+    on { .Go -> { .x = 1; .x = 2 } }
+}
+";
+    let (sfc, bodies, absent) =
+        generate_sfc_with_lane(src, "p980-6o.at").expect("head-props derives");
+    assert!(absent.is_empty(), "head-props + semi spliced: {absent:?}");
+    assert_eq!(bodies.len(), 1);
+    let text = bodies.first().unwrap().lines.join(
+        "
+",
+    );
+    assert!(
+        text.contains("x.value = 1") && text.contains("x.value = 2"),
+        "both: {text}"
+    );
+    let _ = &sfc;
+
+    // ② 负控：调用体（on_select(1)）=具名缺席（fail-closed 旧道，不伪造）。
+    let f_src = "widget T {
+    msg Msg { Go }
+    model { var x int = 0 }
+    view { col { text \"t\" } }
+    on { .Go -> { .x = on_select(1) } }
+}
+";
+    match generate_sfc_with_lane(f_src, "p980-6o.at") {
+        Ok((_s, bodies, absent)) => {
+            // 调用在 RHS 表达式内——pratt 无调用后缀=语法层拒（编译失败→全
+            // 缺席）或 body_foreign 缺席；两形都不产 lane 体。
+            assert!(
+                bodies.iter().all(|b| b.pattern != ".Go" || !b.lines.iter().any(|l| l.contains("on_select"))),
+                "no fabricated foreign call emission"
+            );
+            let _ = absent;
+        }
+        Err(e) => assert!(!e.is_empty(), "named rejection"),
+    }
 }
