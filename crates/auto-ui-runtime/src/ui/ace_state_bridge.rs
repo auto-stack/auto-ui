@@ -24,12 +24,31 @@ use ace_av::age_component::{
 pub use ace_av::age_component::{InitialValue as AceInitialValue, LegacyWidgetAlias as AceAlias};
 
 /// UI 侧状态值（与组件面观察值同构）。
-#[derive(Clone, Debug, PartialEq, Eq)]
+///
+/// PLAN-981 F32 消费同窗（D-981-F32-CONSUMER-WINDOW）：F32 按**位相等**
+/// （与 981 ComponentFieldValue::F32 同一策略：NaN payload 可判别、
+/// -0.0 ≠ 0.0），故 PartialEq/Eq 手写而不是 derive（f32 无 Eq）。
+#[derive(Clone, Debug)]
 pub enum AceStateValue {
     Int(i32),
     Bool(bool),
     Str(String),
+    F32(f32),
 }
+
+impl PartialEq for AceStateValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Int(a), Self::Int(b)) => a == b,
+            (Self::Bool(a), Self::Bool(b)) => a == b,
+            (Self::Str(a), Self::Str(b)) => a == b,
+            (Self::F32(a), Self::F32(b)) => a.to_bits() == b.to_bits(),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for AceStateValue {}
 
 impl From<&ComponentFieldValue> for AceStateValue {
     fn from(v: &ComponentFieldValue) -> Self {
@@ -37,6 +56,7 @@ impl From<&ComponentFieldValue> for AceStateValue {
             ComponentFieldValue::Int(i) => AceStateValue::Int(*i),
             ComponentFieldValue::Bool(b) => AceStateValue::Bool(*b),
             ComponentFieldValue::Str(s) => AceStateValue::Str(s.clone()),
+            ComponentFieldValue::F32(f) => AceStateValue::F32(*f),
         }
     }
 }
@@ -406,5 +426,6 @@ fn initial_of(v: &AceStateValue) -> InitialValue {
         AceStateValue::Int(i) => InitialValue::Int(*i as i64),
         AceStateValue::Bool(b) => InitialValue::Bool(*b),
         AceStateValue::Str(s) => InitialValue::Str(s.clone()),
+        AceStateValue::F32(f) => InitialValue::Float(*f),
     }
 }

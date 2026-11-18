@@ -1270,6 +1270,11 @@ impl NodeDesktopBridge {
             AceStateValue::Str(v) => {
                 format!("ui_apply_str({}, {packed}, 0)", escape(v))
             }
+            // PLAN-981 F32 消费同窗：呈现=Rust 32 Display（可往返、与地区无关）；
+            // 宿主显示模型只有 str 车道，故 F32 以格式化串提交（值语义仍在引擎）。
+            AceStateValue::F32(v) => {
+                format!("ui_apply_str({}, {packed}, 0)", escape(&format!("{v}")))
+            }
         };
         let rc = av_call(&body)?;
         if rc != ui980_status::OK {
@@ -1551,6 +1556,7 @@ fn state_display(v: &AceStateValue) -> String {
         AceStateValue::Int(i) => i.to_string(),
         AceStateValue::Bool(b) => b.to_string(),
         AceStateValue::Str(s) => s.clone(),
+        AceStateValue::F32(f) => format!("{f}"),
     }
 }
 

@@ -249,6 +249,7 @@ fn _value_kind(v: &AceStateValue) -> &'static str {
         AceStateValue::Int(_) => "int",
         AceStateValue::Bool(_) => "bool",
         AceStateValue::Str(_) => "str",
+        AceStateValue::F32(_) => "f32",
     }
 }
 
