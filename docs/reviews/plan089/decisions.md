@@ -98,3 +98,45 @@
 
 | P8 | MCP 动作在 modal 打开时被 modal scope 收窄：dialog-content 内控件经 MCP 不可达（PLAN-084 行为，目标在活动 dialog 外或不可识别即具名拒绝） | V-03 对话框内 放大 press → `Modal dialog owns input; target is outside the active dialog` | v1 产品门记 not_run（接受回路与内嵌实例共用并已在 V-01 覆盖）；dialog 内驱动能力留给后续 plan（如 MCP modal-scope 语义扩展） |
 | P9 | 031/029 back 首次生成 + 编译耗时（约 2-4 分钟/个）——Session ready 截止已按会话序号放宽（V-04 腿 600s）；029 的 V-04 腿在其 back 编译缓存冷启动时仍可能超时 | V-04 029 legs 首轮 `app never rendered` | 已放宽至 600s；若仍超时记 not_run（单平台缺口，不并入总绿） |
+
+## 8. T-05/T-06 证据汇总（2026-11-18）
+
+### 8.1 native 产品门（demo, 前端 auto.image 会话拓扑）
+
+`python tests/product/verify_image_preview.py --auto-bin <auto-man/target/debug/auto.exe> --out-dir plan-artifacts/plan-089/gate-native --backend native`
+→ **RESULT: pass | 16 pass / 0 fail / 3 not_run | 709s**（report.json 含逐 case 计时）。
+
+- pass：V-01 open→loaded(5.5s)/放大 zoom=1.25(2.6s)/宽度/↻90°/**角点像素在帧内**(1.7s)/方向平移+40(2.2s)；V-06 tuple/换图原子重置/主题零重置；V-02 损坏具名 error/重试/恢复(共 3.1s)；V-03 modal 开关+cancelled(2.7s)；V-05 退出重开(8.9s)；夹具 sha256 不变(1.3s)。
+- not_run：V-03 对话框内 MCP 腿（modal scope 收窄，P8）；V-04 031/029 腿（见 8.3）。
+- 证据物：`plan-artifacts/plan-089/gate-native/report.json` + `v01-corners-native.png` 等 4 张截图。
+
+### 8.2 vue 轨
+
+首访页面渲染成功（图片预览演示 + 组件工具栏全量 + 平面键受控回路 UI 全部在 DOM）；
+媒体 open 后 loaded 未达——**根因 P10**：`auto.image.*` 是 `__vmOnly` VM 专属内建
+（vue.rs natives 层，浏览器运行期具名抛错），浏览器无法进行本地文件会话。
+031 的 vue 轨媒体走 back.api HTTP（back 进程建立会话、vite 代理 /api 拉流）——
+而该形态在 native split 下前进程注册表缺票（P1）。**单源双轨的媒体会话需要
+split 拓扑下的前端注册表喂给机制（media proxy/feed），超出本计划范围——具名
+后续依赖（P10）**。vue 轨产品门记 not_run（单平台缺口，`gate-vue/report.json`）。
+
+### 8.3 V-04 031/029 腿
+
+- 031：手动诊断两次到达 `view_state=ready`（rewrite 后 2s 内）；产品门驱动上下文
+  中 ready 断言 3 次未过（40s）——driver 与手动的时序差未定位；native 像素本身
+  受 P1 限制（split 下前进程注册表缺 back 票据；--server vm 亦三进程）。
+  031 的 vue 轨像素可经 back HTTP（P10 解除后一并验收）。
+- 029：back 首次生成+编译超产品门 deadline（P9，已放宽至 600s 仍不足的冷启动
+  场景记 not_run）。
+
+### 8.4 本会话测试模块/耗时表（test-discipline 要求）
+
+| 模块 | 结果 | 准备 | 发现 | 测试 | 清理 | 总计 |
+|---|---|---|---|---|---|---|
+| auto-ui-tools image_viewer_component（2 case） | 2/2 pass | 增量编译 | ~1s | 9.0s | - | ~10s |
+| auto-ui-runtime image_surface_contract + image_pipeline_parity | 2/2 pass | 增量 | ~0.2s | 0.35s | - | ~0.6s |
+| auto-ui-runtime lib（image_surface/mouse_area/onseek/progress 过滤 17 case） | 17 pass | - | - | 1.75s | - | ~2s |
+| 产品门 native（19 case：16 pass/3 not_run） | pass | back 生成+编译 ~40-90s | ~30s | ~350s | ~10s | ~710s |
+
+新增 case 计时：见 report.json 逐 case seconds（最大单 case 8.9s V-05 退出重开，
+全部 ≤10s 门内）。

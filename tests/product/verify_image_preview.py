@@ -168,8 +168,12 @@ class Session:
         # 运行同源（demo18 实证；pin 口会话的媒体 populate 不推进，见
         # decisions.md §7 P5/P6）。
         env = dict(os.environ)
+        env.setdefault('PLAN089_SWEEP_DEBUG', '1')
         env.pop('AUTOUI_TEST_FIXTURES', None)
         self.log = open(out / f'session-{index}.log', 'wb')
+        # PLAN-089：demo 会话默认拓扑（pac api:"rust" → vm+vm merged：back
+        # 与 front 同进程，注册表共享，票据可解析）。不再追加 --server vm
+        # （三进程 split 下 front 注册表缺 back 票据——§7 P1）。
         self.command = [str(args.auto_bin), 'run', '-r', 'vm']
         self.process = subprocess.Popen(self.command, cwd=cwd or (APP if cwd is None else cwd), env=env, stdout=self.log,
                                         stderr=subprocess.STDOUT,
@@ -323,9 +327,16 @@ class Browser:
         self.page = self._browser.new_page(viewport={'width': 1100, 'height': 800})
         self.page_errors = []
         self.page.on('pageerror', lambda e: self.page_errors.append(str(e)[:300]))
-        self.page.goto(url, wait_until='networkidle', timeout=30000)
-        self.page.wait_for_timeout(1500)
-        vfd.require(READY_TEXT in self.page.inner_text('body'), 'vue demo never rendered')
+        self.page.goto(url, wait_until='networkidle', timeout=60000)
+        # vite 首访按需预打包 + 物化 SFC 首编译可能数十秒——轮询就绪文本。
+        deadline = time.time() + 90
+        body = ''
+        while time.time() < deadline:
+            body = self.page.inner_text('body')
+            if READY_TEXT in body:
+                break
+            self.page.wait_for_timeout(1000)
+        vfd.require(READY_TEXT in body, f'vue demo never rendered; body: {body[:300]}')
 
     def snapshot(self):
         return self.page.inner_text('body')
@@ -734,26 +745,33 @@ def run_v04(args, out, cases):
                     time.sleep(1.0)
                     continue
                 break
-            last = s031.wait_state(lambda s: 'Ready' in s, timeout=40)
-            ready = 'Ready' in last
+            # view_state 走 autoui_state（渲染快照的 status 文本被 P1 误差
+            # 覆盖为 Waiting...——票据在前进程注册表缺失，见 §7 P1）。
+            def _ready(s):
+                try:
+                    return '"ready"' in s031.call('autoui_state', widget='App', allow_error=True)
+                except Exception:
+                    return False
+            last = s031.wait_state(_ready, timeout=40)
+            ready = '"ready"' in last
             cases.add('V-04 031 打开媒体→ready', 'press Open File',
                       'view_state=ready（组件 loaded→App）', [last[:160]], ready)
             s031.press('↻')
-            time.sleep(1.0)
-            line = s031.state_line('Zoom')
-            snap = s031.snapshot()
-            m = re.search(r'rotation[^\d-]*(-?\d+)', snap)
-            rot = m.group(1) if m else '?'
+            time.sleep(1.5)
+            st = s031.call('autoui_state', widget='App', allow_error=True)
+            m = re.search(r'rotation:\s*"?(-?\d+)', st)
+            rot = int(m.group(1)) if m else -1
             cases.add('V-04 031 组件工具栏旋转被接受', 'press ↻ (component)',
-                      'App rotation=90（viewRequested 接受）', [{'rotation': rot}], rot == '90')
+                      'App rotation=90（viewRequested 接受，autoui_state 读回）',
+                      [{'rotation': rot}], rot == 90)
             s031.press('平移')
             s031.press('→')
-            time.sleep(1.0)
-            snap = s031.snapshot()
-            m = re.search(r'offset_x[^\d-]*(-?[\d.]+)', snap)
+            time.sleep(1.5)
+            st = s031.call('autoui_state', widget='App', allow_error=True)
+            m = re.search(r'offset_x:\s*"?(-?[\d.]+)', st)
             ox = float(m.group(1)) if m else -1
             cases.add('V-04 031 组件工具栏平移被接受', 'press 平移 →',
-                      'offset_x=40（源=pan）', [{'offset_x': ox}], abs(ox - 40.0) < 1e-6)
+                      'offset_x=40（源=pan，autoui_state 读回）', [{'offset_x': ox}], abs(ox - 40.0) < 1e-6)
             s031.press('Open Directory')
             last = s031.wait_state(lambda s: 'ready' in s, timeout=25)
             cases.add('V-04 031 目录会话（多图 nav 可用）', 'press Open Directory',

@@ -22,9 +22,13 @@ widget ImagePreviewDialog (src: str = "", alt: str = "", resourceId: str = "", r
         var interval int = 100
         var seen_open bool = false
         var cancel_armed bool = false
+        // 内建 dialog 的 open 绑定用本地镜像（vue 生成器对 prop 发
+        // v-model:open → 编译错误「v-model cannot be used on a prop」；
+        // Tick 从受控 prop 同步——FileDialog fd_active 同款模式）。
+        var dlg_open bool = false
     }
     view {
-        dialog (open: .open, onclose: .Close, closeOnOutside: false) {
+        dialog (open: .dlg_open, onclose: .Close, closeOnOutside: false) {
             dialog-content (style: "w-[960px] max-w-[95vw] h-[720px] max-h-[92vh] p-0 gap-0 rounded-xl bg-background text-foreground") {
                 col (style: "w-full h-full flex-col") {
                     row (style: "h-12 shrink-0 items-center justify-between px-4 border-b border-border bg-card") {
@@ -64,6 +68,8 @@ widget ImagePreviewDialog (src: str = "", alt: str = "", resourceId: str = "", r
                     .cancel_armed = true
                 }
             }
+            // 本地镜像跟随受控 prop（v-model-on-prop 缺口的适配，见上）。
+            .dlg_open = .open
         }
         .Close -> {
             if .cancel_armed {
