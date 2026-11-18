@@ -916,11 +916,153 @@ fn p980_web_full_dual_track_census() {
     // a2ts.foreign-unsupported 域合同））**：(75,8,4,26)→**(75,8,7,23)**
     // ——[66] 全源+头部参数源族 +3 spliced；调用表达式形（wide-ops pratt
     // 无调用后缀）=[65] 等源的下一层（表达式面扩展）。
+    // **2026-11-18 具名修订 #8（切片#6p：调用表达式形·通道调用承载——
+    // "wide-ops 无调用后缀"经探针证伪：pratt 调用后缀在场（`.x = on_x(1)`
+    // 解析通过、Bind 拒）；真缺口=通道调用（callee=头参数）无承载+[65]
+    // `.Bump` 部分体拼接**静默丢调用语句**+body_foreign 检查函数照铸）**：
+    // 聚合 (75,8,7,23) **不变**——[65] 计数已在此前（部分拼接态）计入；
+    // 本切片修的是**内容正确性**：`.Bump` 体补全 `emit('Select', next);`
+    //（源序 merge）、域外调用 handler 缺席时**兄弟保全**（ops 豁免——
+    // 修正前连带全体缺席）、lambda 调用体不铸（不部分拼接）、值位置通道
+    // 具名拒。判别力由 `p980_web_channel_call_lane` 六臂断言承担（完整体
+    // 文本/兄弟保全/props 形/缺席负控）。
     assert_eq!(corpus.len(), 83, "corpus size frozen");
     assert_eq!(
         (ok, err, spliced, absent),
         (75, 8, 7, 23),
         "dual-track aggregates frozen"
+    );
+}
+
+/// WEB 切片 #6p（调用表达式形·通道调用承载）：widget 头参数（宿主通道
+/// prop）作 callee 的调用语句——lane 完整体拼接（赋值+通道行按源序），
+/// 兄弟保全（ops 豁免），emit/props 双形，域外/值位置 fail-closed。
+/// 修正前实况（探针实证）：[65] `.Bump` 部分体拼接、`on_select(next)`
+/// **静默丢弃**（检查函数只铸赋值）；域外调用 handler 进 ops=整 lane 编
+/// 译失败=兄弟全体缺席。
+#[test]
+fn p980_web_channel_call_lane() {
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+
+    // ① [65] 形：赋值+通道行完整体（源序保持；emit 形=on_select 的 Pascal
+    // 形 Select ∈ msg 变体——SFC defineEmits 已声明）。
+    let src = "widget Counter(on_select: msg) {
+    msg Msg { Select(int), Bump(int) }
+    model { var n int = 0 }
+    view { col { button \"increment\" { onclick: .Bump(.n + 1) } text .n { } } }
+    on { .Bump(next) -> { .n = next; on_select(next) } }
+}
+";
+    let (_sfc, bodies, absent) =
+        generate_sfc_with_lane(src, "p980-6p.at").expect("channel lane derives");
+    assert!(absent.is_empty(), "no absent: {absent:?}");
+    let bump = bodies.iter().find(|b| b.pattern == ".Bump").expect("Bump");
+    assert_eq!(
+        bump.lines,
+        vec!["n.value = next;", "emit('Select', next);"],
+        "complete body: assignment + channel emit in source order"
+    );
+
+    // ② 混合：unit 通道 handler（检查函数道）+ 兄弟 unit handler（状态函
+    // 数道）——ops 豁免保全兄弟。
+    let mixed = "widget M(on_go: msg) {
+    msg Msg { Go, Stop }
+    model { var x int = 0 }
+    view { col { button \"b\" { } } }
+    on { .Go -> { .x = 1; on_go(.x) }
+    .Stop -> { .x = 0 } }
+}
+";
+    let (_s, bodies, absent) =
+        generate_sfc_with_lane(mixed, "p980-6p.at").expect("mixed lane derives");
+    assert!(absent.is_empty(), "sibling preserved: {absent:?}");
+    let go = bodies.iter().find(|b| b.pattern == ".Go").expect("Go");
+    assert_eq!(go.lines, vec!["x.value = 1;", "emit('Go', x.value);"]);
+    let stop = bodies.iter().find(|b| b.pattern == ".Stop").expect("Stop");
+    assert_eq!(stop.lines, vec!["x.value = 0;"]);
+
+    // ③ 域外体（非头参数调用，④外部名面族）：缺席 + **兄弟保全**（修正
+    // 前：进 ops=编译失败=全体缺席）。
+    let foreign = "widget F {
+    msg Msg { Go, Stop }
+    model { var x int = 0 }
+    view { col { button \"b\" { } } }
+    on { .Go -> { .x = 1; fs_read(2) }
+    .Stop -> { .x = 0 } }
+}
+";
+    let (_s, bodies, absent) =
+        generate_sfc_with_lane(foreign, "p980-6p.at").expect("foreign body compiles");
+    assert_eq!(absent, vec![".Go"], "foreign handler absent (fail-closed)");
+    let stop = bodies.iter().find(|b| b.pattern == ".Stop").expect("Stop");
+    assert_eq!(stop.lines, vec!["x.value = 0;"], "sibling still spliced");
+    // 判别：缺席 handler 的体不落旧 fallback 形（无 fs_read 伪发射）。
+    assert!(
+        bodies
+            .iter()
+            .flat_map(|b| b.lines.iter())
+            .all(|l| !l.contains("fs_read")),
+        "no fabricated foreign emission"
+    );
+
+    // ④ props 形：on_delete 的 Pascal 形（Delete）∉ 变体（DeleteBlock）→
+    // 回调 prop 形（老道 PLAN-668 R-23/Plan 444 同约定）。
+    let props_form = "widget D(on_delete: msg) {
+    msg Msg { DeleteBlock(int) }
+    model { var x int = 0 }
+    view { col { button \"b\" { } } }
+    on { .DeleteBlock(id) -> { .x = id; on_delete(id) } }
+}
+";
+    let (_s, bodies, absent) =
+        generate_sfc_with_lane(props_form, "p980-6p.at").expect("props-form derives");
+    assert!(absent.is_empty(), "props form: {absent:?}");
+    let del = bodies
+        .iter()
+        .find(|b| b.pattern == ".DeleteBlock")
+        .expect("DeleteBlock");
+    assert_eq!(
+        del.lines,
+        vec!["x.value = id;", "props.on_delete(id);"],
+        "callback-prop form when no matching variant"
+    );
+
+    // ⑤ 值位置（RHS）通道调用：具名拒 → handler 缺席（不做效应作值）。
+    let rhs = "widget T(on_select: msg) {
+    msg Msg { Go }
+    model { var x int = 0 }
+    view { col { button \"b\" { } } }
+    on { .Go -> { .x = on_select(1) } }
+}
+";
+    match generate_sfc_with_lane(rhs, "p980-6p.at") {
+        Ok((_s, bodies, absent)) => {
+            assert_eq!(absent, vec![".Go"], "value-position channel absent");
+            assert!(bodies.is_empty());
+        }
+        Err(e) => assert!(!e.is_empty(), "named rejection: {e}"),
+    }
+
+    // ⑥ lambda 调用体（单语句形——lambda 体 list-nl，单行多语句=文法边
+    // 界）：foreign lambda 不铸 → 缺席（不部分拼接）。
+    let lambda_call = "widget L(on_go: msg) {
+    msg Msg { Go }
+    model { var x int = 0 }
+    view { col { button \"b\" { onclick: () => { on_go(.x) } } } }
+}
+";
+    let (_s, bodies, absent) =
+        generate_sfc_with_lane(lambda_call, "p980-6p.at").expect("lambda form compiles");
+    assert!(
+        bodies.is_empty() && absent.len() == 1,
+        "foreign lambda absent (not partially spliced): {absent:?}"
+    );
+    assert!(
+        bodies
+            .iter()
+            .flat_map(|b| b.lines.iter())
+            .all(|l| !l.contains("on_go")),
+        "no fabricated channel emission from an uncast lambda"
     );
 }
 

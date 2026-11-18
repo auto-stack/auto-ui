@@ -297,6 +297,30 @@ fn normalize_dollar_event(src: &str) -> String {
 pub struct ComponentFragmentLane {
     ds_src: String,
     checked: ace_core::verify::CheckedModule,
+    /// PLAN-980 WEB #6p：selected node 每 handler 的通道事实（语言侧投影
+    /// 的权威数据——callee=头参数判定在语言面完成）。
+    channel_facts: Vec<LaneHandlerFacts>,
+}
+
+/// PLAN-980 WEB #6p：一个 handler 的通道事实（按 msg 取用）。
+pub(crate) struct LaneHandlerFacts {
+    /// handler msg 名（pattern 去点）。
+    pub msg: String,
+    /// 通道调用行（span 坐标=脱糖源；实参 span 供 `emit_expr_at_span`
+    /// 经 a2x-ts 精确发射——实参已在语言侧死 let 验证）。
+    pub rows: Vec<ace_av::age_component::ComponentChannelCall>,
+    /// 域外体标记（let/if/非头参数调用——检查函数不铸，lane 缺席）。
+    pub body_foreign: bool,
+    /// 赋值语句数（语言侧投影——纯通道体=0：不需要发射函数）。
+    pub n_assigns: usize,
+}
+
+/// PLAN-980 WEB #6p：一个通道调用行（span 坐标=脱糖源；实参 span 供
+/// `emit_expr_at_span` 经 a2x-ts 精确发射——实参已在语言侧死 let 验证）。
+pub struct LaneChannelRow {
+    pub channel: String,
+    pub arg_spans: Vec<std::ops::Range<usize>>,
+    pub span: std::ops::Range<usize>,
 }
 
 /// 状态函数内按**源 span** 定位的发射结果（raw 面；宿主映射由调用方做）。
@@ -360,6 +384,30 @@ impl ComponentFragmentLane {
         })?;
         Ok(Self {
             ds_src,
+            // PLAN-980 WEB #6p：通道事实随描述出口透出（selected node；
+            // 单 node 形——`compile_at` 已选一编译）。n_assigns 取
+            // `handler_assigns`（语言侧投影的赋值语句计数）。
+            channel_facts: compiled
+                .description
+                .nodes
+                .iter()
+                .flat_map(|n| {
+                    n.handler_channel_calls
+                        .iter()
+                        .map(|(msg, rows, foreign)| LaneHandlerFacts {
+                            msg: msg.clone(),
+                            rows: rows.clone(),
+                            body_foreign: *foreign,
+                            n_assigns: n
+                                .handler_assigns
+                                .iter()
+                                .find(|(m, _)| m == msg)
+                                .map(|(_, a)| a.len())
+                                .unwrap_or(0),
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect(),
             checked: compiled.checked,
         })
     }
@@ -415,6 +463,42 @@ impl ComponentFragmentLane {
     /// 脱糖源（span 坐标基准；适配器定位/映射用）。
     pub fn desugared_source(&self) -> &str {
         &self.ds_src
+    }
+
+    /// PLAN-980 WEB #6p：按 msg 名取该 handler 的**通道调用行**（脱糖源
+    /// 坐标；`msg` = pattern 去点）。行来自语言侧投影（callee=widget 头
+    /// 参数的调用语句）；实参 span 供 `emit_expr_at_span` 精确发射——
+    /// 实参已在语言侧经检查函数**死 let** 验证（名字/类型/ownership），
+    /// 未验证拼写绝不进入拼接体。
+    pub fn channel_rows_for(&self, msg: &str) -> Vec<LaneChannelRow> {
+        self.facts(msg)
+            .map(|f| {
+                f.rows
+                    .iter()
+                    .map(|cc| LaneChannelRow {
+                        channel: cc.channel.clone(),
+                        arg_spans: cc.args.iter().map(|a| a.span.start..a.span.end).collect(),
+                        span: cc.span.start..cc.span.end,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// PLAN-980 WEB #6p：按 msg 名取该 handler 的**域外体标记**
+    ///（body_foreign——let/if/非头参数调用语句：检查函数不铸、lane 必须
+    /// 缺席，不得部分拼接）。
+    pub fn handler_body_foreign(&self, msg: &str) -> bool {
+        self.facts(msg).map(|f| f.body_foreign).unwrap_or(false)
+    }
+
+    /// #6p：按 msg 名取赋值语句数（语言侧投影；纯通道体=0）。
+    pub fn handler_assign_count(&self, msg: &str) -> usize {
+        self.facts(msg).map(|f| f.n_assigns).unwrap_or(0)
+    }
+
+    fn facts(&self, msg: &str) -> Option<&LaneHandlerFacts> {
+        self.channel_facts.iter().find(|f| f.msg == msg)
     }
 
     /// checked 模块（view 构建用；调用方自建 SemanticView）。
@@ -483,7 +567,7 @@ impl ComponentFragmentLane {
         &self,
         fn_name: &str,
         region: std::ops::Range<usize>,
-    ) -> Result<Vec<LocatedFragment>, String> {
+    ) -> Result<Vec<(std::ops::Range<usize>, LocatedFragment)>, String> {
         use ace_a2x_ts::{emit_stmt_fragment, FragmentProgramContext, ScriptLang};
         let view = ace_a2x_core::SemanticView::from_checked(&self.checked)
             .map_err(|e| format!("semantic view: {e:?}"))?;
@@ -492,30 +576,34 @@ impl ComponentFragmentLane {
             .iter()
             .find(|f| f.source_name == fn_name)
             .ok_or_else(|| format!("fn `{fn_name}` not in the view"))?;
-        // (RHS span start, block, idx) —— 源序发射。
-        let mut hits: Vec<(usize, u32, usize)> = Vec::new();
+        // (RHS span, block, idx) —— 源序发射；#6p：span 随片段返回（与通道
+        // 行按源序 merge，调用/赋值相对位置不重排）。
+        let mut hits: Vec<(std::ops::Range<usize>, u32, usize)> = Vec::new();
         for (bi, block) in facts.body.blocks.iter().enumerate() {
             for (si, stmt) in block.stmts.iter().enumerate() {
                 if let ace_core::hir::Stmt::Assign { value, .. } = stmt {
                     if let Some(e) = facts.body.exprs.get(value.0 as usize) {
                         if region.start <= e.span.start && e.span.end <= region.end {
-                            hits.push((e.span.start, bi as u32, si));
+                            hits.push((e.span.start..e.span.end, bi as u32, si));
                         }
                     }
                 }
             }
         }
-        hits.sort_by_key(|(start, _, _)| *start);
+        hits.sort_by_key(|(span, _, _)| span.start);
         let ctx = FragmentProgramContext::from_view(&view);
         let mut out = Vec::new();
-        for (_, block, idx) in hits {
+        for (span, block, idx) in hits {
             let raw = emit_stmt_fragment(ScriptLang::TypeScript, &view, facts, block, idx, &ctx)
                 .map_err(|e| format!("stmt fragment: {e:?}"))?;
-            out.push(LocatedFragment {
-                text: raw.text,
-                expr: None,
-                helpers: raw.helpers,
-            });
+            out.push((
+                span,
+                LocatedFragment {
+                    text: raw.text,
+                    expr: None,
+                    helpers: raw.helpers,
+                },
+            ));
         }
         Ok(out)
     }

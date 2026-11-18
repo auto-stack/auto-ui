@@ -49,6 +49,23 @@ pub struct LaneHandlerSpec<'a> {
     pub lambda_region: Option<std::ops::Range<usize>>,
 }
 
+/// PLAN-980 WEB #6p：通道调用发射上下文（方言侧预扫描）——
+/// - `op_exempt`：handler 体含**调用语句**（裸 `f(...)` 表达式语句）的 msg
+///   名（去点）。这些 unit handler **不进 ops**：通道 handler（callee=头
+///   参数）走检查函数道（语言侧场景重放对通道零效果具名拒——重放车道
+///   无宿主）；域外调用 handler（body_foreign）编译期不触发 ops 拒——
+///   两者的**兄弟 handler 不被连带缺席**（此前任一调用体进 ops = 整 lane
+///   编译失败 = 全体缺席）。
+/// - `variants`：本 widget 的 msg 变体名（emit 形判定：`on_x` 去 `on_` 前
+///   缀的 Pascal 形 ∈ variants → `emit('<Pascal>', args)`（契约事件，
+///   defineEmits 已声明）；否则 `props.on_x(args)`（回调 prop——老道
+///   PLAN-668 R-23/Plan 444 同约定，SFC 侧 defineProps 承载）。
+#[derive(Clone, Debug, Default)]
+pub struct LaneChannelCtx {
+    pub op_exempt: Vec<String>,
+    pub variants: Vec<String>,
+}
+
 /// 并发发射的宿主映射：发射局部名（`l<i>___age_s_<inst>_<field>` 或裸
 /// 字段引用）→ `field.value`。词法整词替换（沿 ace_ts_provider 口径）。
 fn map_emitted(line: &str) -> String {
@@ -220,23 +237,29 @@ pub fn lane_handler_bodies_spec(
     path: &str,
     specs: &[LaneHandlerSpec<'_>],
 ) -> Result<(Vec<LaneHandlerBody>, Vec<String>), String> {
-    lane_handler_bodies_spec_at(src, path, specs, 0)
+    lane_handler_bodies_spec_at(src, path, specs, 0, &LaneChannelCtx::default())
 }
 
 /// 切片#6n：node 选择器形态（多 widget 源——lane `compile_at`）。
+/// PLAN-980 WEB #6p：`channel_ctx`（方言侧通道预扫描）——通道 handler 从
+/// ops 排除（语言侧场景重放对通道零效果具名拒）并走检查函数道发射。
 pub fn lane_handler_bodies_spec_at(
     src: &str,
     path: &str,
     specs: &[LaneHandlerSpec<'_>],
     node_index: usize,
+    channel_ctx: &LaneChannelCtx,
 ) -> Result<(Vec<LaneHandlerBody>, Vec<String>), String> {
     // ops 只含 unit handler（msg 无点前缀，ScenarioOp::Send 合同——载荷
     // 变体的空 Send 是 981 arity 域错误，不进重放；lambda 形不是 on 块
-    // handler，同样不进 ops）。
+    // handler，同样不进 ops）。#6p：**含调用语句的 handler 也不进 ops**
+    //（通道=重放车道无宿主、效应不可丢；域外调用=编译期 ops 拒会连带
+    // 兄弟全体缺席——豁免后通道走检查函数道、域外走缺席，兄弟保全）。
     let msgs: Vec<&str> = specs
         .iter()
         .filter(|s| s.params.is_empty() && s.lambda_region.is_none())
         .map(|s| s.pattern.trim_start_matches('.'))
+        .filter(|m| !channel_ctx.op_exempt.iter().any(|c| c == m))
         .collect();
     let lane = ComponentFragmentLane::compile_at(src, path, &msgs, node_index)?;
     let ds = lane.desugared_source().to_string();
@@ -246,6 +269,15 @@ pub fn lane_handler_bodies_spec_at(
     let mut absent = Vec::new();
     for spec in specs {
         let pat = spec.pattern;
+        let msg = pat.trim_start_matches('.');
+        // PLAN-980 WEB #6p：域外体（let/if/非头参数调用——语言侧 body_foreign）
+        // → 具名缺席（检查函数不铸，不做部分体拼接；旧道承载）。
+        if lane.handler_body_foreign(msg) {
+            absent.push((*pat).to_string());
+            continue;
+        }
+        // #6p：通道调用行（语言侧投影权威；callee=头参数判定在语言面）。
+        let rows = lane.channel_rows_for(msg);
         let region = match spec.lambda_region.clone() {
             Some(r) => r,
             None => match handler_body_region(&ds, pat) {
@@ -257,38 +289,43 @@ pub fn lane_handler_bodies_spec_at(
             },
         };
         // 写目标=体文本 LHS 首个 `.field`（赋值形 handler 家族——002 族；
-        // 三条发射道共用；具名边界：非单赋值形归 #6d 结构分析）。
+        // 三条发射道共用；具名边界：非单赋值形归 #6d 结构分析）。#6p 起
+        // 可缺席——纯通道体（无赋值语句）无字段写。
         let region_text = &ds[region.clone()];
-        let write_field = region_text
-            .find('.')
-            .and_then(|d| {
-                let rest = &region_text[d + 1..];
-                let end = rest
-                    .find(|c: char| !(c.is_alphanumeric() || c == '_'))
-                    .unwrap_or(rest.len());
-                (end > 0).then(|| rest[..end].to_string())
-            })
-            .ok_or_else(|| format!("no `.field` LHS in {pat:?} body: {region_text:?}"))?;
-        // 发射源：unit=状态函数；param=声明级检查函数（981 B-W1）；
-        // lambda=值函数（#6k V-EVT-B-ORIGIN）。
-        let fn_name = if spec.lambda_region.is_some() {
+        let write_field = region_text.find('.').and_then(|d| {
+            let rest = &region_text[d + 1..];
+            let end = rest
+                .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+                .unwrap_or(rest.len());
+            (end > 0).then(|| rest[..end].to_string())
+        });
+        // 发射源：lambda=值函数（#6k）；**通道 handler=检查函数道**（#6p，
+        // unit 亦然——其效果是宿主通知，状态函数重放道无此体）；param=
+        // 声明级检查函数（981 B-W1）；unit=状态函数（ops 重放体）。
+        let fn_name: Option<String> = if spec.lambda_region.is_some() {
             match lane.lambda_fn_covering(region.clone()) {
-                Some(f) => f,
+                Some(f) => Some(f),
                 None => {
                     absent.push((*pat).to_string());
                     continue;
                 }
             }
+        } else if !rows.is_empty() {
+            lane.check_fn_covering(region.clone())
         } else if spec.params.is_empty() {
-            let f = format!("__age_state_0_{write_field}");
+            let Some(wf) = write_field.clone() else {
+                absent.push((*pat).to_string());
+                continue;
+            };
+            let f = format!("__age_state_0_{wf}");
             if !state_fns.contains(&f) {
                 absent.push((*pat).to_string());
                 continue;
             }
-            f
+            Some(f)
         } else {
             match lane.check_fn_covering(region.clone()) {
-                Some(f) => f,
+                Some(f) => Some(f),
                 // 无检查函数=载荷不可承载（float/ident 等，981 派发守卫同
                 // 族 fail-closed）——不造假数值，具名缺席（旧道承载）。
                 None => {
@@ -297,28 +334,101 @@ pub fn lane_handler_bodies_spec_at(
                 }
             }
         };
+        // #6p：通道 handler 需要函数承载赋值/实参发射（实参经检查函数死
+        // let 验证后按精确 span 发射）；零赋值+零实参的纯通知行可无函数
+        //（n_assigns=语言侧投影计数，非区间文本启发式）。
+        let n_assigns = lane.handler_assign_count(msg);
+        let needs_fn = n_assigns > 0 || rows.iter().any(|r| !r.arg_spans.is_empty());
+        let fn_name = match fn_name {
+            Some(f) => f,
+            None if !needs_fn => String::new(),
+            None => {
+                absent.push((*pat).to_string());
+                continue;
+            }
+        };
         // 切片#6l：**逐赋值语句发射**（多赋值体——语句序=源序；单赋值族同
         // 形：Assign 语句发射含 helper 行 + 赋值行，与旧手拼形态一致）。
-        // 区间无赋值（空体/纯调用族）=具名缺席。**临时名按片段改号**：每片
-        // 段的发射器临时名 `t<i>` 从 0 起，多片段同域拼接会撞声明——片段
-        // 文本里裸 `t<digits>` 只可能是临时名（局部/参数走 `l<i>_*`/`p<i>_*`
-        // 发射名或宿主映射名），k>0 片段整词改号为 `t{k}_{i}`（单片段形状
-        // 不变，既有断言/浏览器内联兼容）。
-        let stmts = lane.stmt_fragments_in(&fn_name, region.clone())?;
-        if stmts.is_empty() {
+        // 区间无赋值（空体）=具名缺席；**纯通道体例外**（#6p：无赋值语句、
+        // 只有通道行）。**临时名按片段改号**：每片段的发射器临时名 `t<i>`
+        // 从 0 起，多片段同域拼接会撞声明——片段文本里裸 `t<digits>` 只可
+        // 能是临时名（局部/参数走 `l<i>_*`/`p<i>_*` 发射名或宿主映射名），
+        // k>0 片段整词改号为 `t{k}_{i}`（单片段形状不变，既有断言/浏览器
+        // 内联兼容）。
+        let stmts = if fn_name.is_empty() {
+            Vec::new()
+        } else {
+            lane.stmt_fragments_in(&fn_name, region.clone())?
+        };
+        if stmts.is_empty() && rows.is_empty() {
             absent.push((*pat).to_string());
             continue;
         }
-        let field = write_field;
-        let mut lines: Vec<String> = Vec::new();
-        for (k, frag) in stmts.iter().enumerate() {
+        // #6p：赋值片段与通道行按**源 span 序 merge**（调用语句与赋值语句
+        // 的相对位置保持源序——`.n = next; on_select(next)` 与倒序形都不
+        // 重排）。通道行=emit 契约事件形或 props 回调形（老道 PLAN-668
+        // R-23/Plan 444 同约定：`on_x` 去 on_ 的 Pascal 形 ∈ msg 变体 →
+        // `emit('<Pascal>', args)`；否则 `props.on_x(args)`——SFC 侧
+        // defineEmits/defineProps 承载声明）。
+        enum Ev {
+            Assign(Vec<String>),
+            Channel(String),
+        }
+        let mut events: Vec<(usize, Ev)> = Vec::new();
+        for (k, (span, frag)) in stmts.iter().enumerate() {
+            let mut block = Vec::new();
             for l in &frag.text {
                 let mapped = map_emitted_with(l, spec.params);
                 if k == 0 {
-                    lines.push(mapped);
+                    block.push(mapped);
                 } else {
-                    lines.push(rename_temps(&mapped, k));
+                    block.push(rename_temps(&mapped, k));
                 }
+            }
+            events.push((span.start, Ev::Assign(block)));
+        }
+        for row in &rows {
+            let mut args: Vec<String> = Vec::new();
+            let mut ok = true;
+            for sp in &row.arg_spans {
+                match lane.emit_expr_at_span(&fn_name, sp.clone()) {
+                    Ok(frag) => match frag.expr {
+                        Some(e) => args.push(map_emitted_with(&e, spec.params)),
+                        None => {
+                            ok = false;
+                            break;
+                        }
+                    },
+                    Err(_) => {
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+            if !ok {
+                absent.push((*pat).to_string());
+                continue;
+            }
+            let pascal = channel_pascal(&row.channel);
+            let call = if channel_ctx.variants.iter().any(|v| *v == pascal) {
+                if args.is_empty() {
+                    format!("emit('{pascal}')")
+                } else {
+                    format!("emit('{}', {})", pascal, args.join(", "))
+                }
+            } else if args.is_empty() {
+                format!("props.{}()", row.channel)
+            } else {
+                format!("props.{}({})", row.channel, args.join(", "))
+            };
+            events.push((row.span.start, Ev::Channel(format!("{call};"))));
+        }
+        events.sort_by_key(|(start, _)| *start);
+        let mut lines: Vec<String> = Vec::new();
+        for (_, ev) in events {
+            match ev {
+                Ev::Assign(block) => lines.extend(block),
+                Ev::Channel(line) => lines.push(line),
             }
         }
         // 976 片段接口缺口（#6l 实测）：owned 局部的赋值/返回语句片段引用
@@ -344,12 +454,30 @@ pub fn lane_handler_bodies_spec_at(
         }
         bodies.push(LaneHandlerBody {
             pattern: (*pat).to_string(),
-            field,
+            field: write_field.unwrap_or_default(),
             lines,
             params: spec.params.iter().map(|p| p.to_string()).collect(),
         });
     }
     Ok((bodies, absent))
+}
+
+/// PLAN-980 WEB #6p：`on_<snake>` → Pascal 事件名（`on_select` → `Select`；
+/// 老道 `VueGenerator::snake_to_pascal` 同规则——emit 契约事件判定用）。
+fn channel_pascal(channel: &str) -> String {
+    channel
+        .strip_prefix("on_")
+        .unwrap_or(channel)
+        .split('_')
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let mut cs = s.chars();
+            match cs.next() {
+                Some(c) => c.to_uppercase().collect::<String>() + cs.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect()
 }
 
 /// 切片 #6d：**SFC 拼接**——lane 派生体替换编译器 SFC 内对应 handler 函数
@@ -502,12 +630,42 @@ fn generate_widget_with_lane(
     // 区间、跳过=旧道）。计数失配（区间数 ≠ 带体 handler 数）=全体缺席
     //（fail-closed，不猜测配对）。
     let specs = pair_lambda_regions(src, &widget, specs);
+    // PLAN-980 WEB #6p：通道上下文（方言侧预扫描）——
+    // - `op_exempt`：handler 体含**调用语句**（裸 `f(...)` 表达式语句）的
+    //   msg（去点）。通道 handler（callee ∈ 头参数）走检查函数道；域外
+    //   调用 handler（body_foreign）缺席；两者都不进 ops——兄弟保全。
+    // - `variants`：msg 变体名（emit 形判定：`on_x` 的 Pascal 形 ∈ 变体
+    //   → `emit('<Pascal>', args)` 契约事件；否则 `props.on_x(args)` 回调
+    //   prop——老道 PLAN-668 R-23/Plan 444 同约定，SFC 侧声明机制承载）。
+    let mut op_exempt: Vec<String> = Vec::new();
+    for (pattern, payload) in &widget.handlers {
+        if let auto_ui_compiler::aura::LogicPayload::AstStmts(stmts) = payload {
+            let has_call = stmts.iter().any(|s| {
+                use auto_lang_core::ast::{Expr, Stmt};
+                matches!(s, Stmt::Expr(Expr::Call(_)))
+            });
+            if has_call {
+                let base = pattern.split('(').next().unwrap_or(pattern);
+                op_exempt.push(base.trim_start_matches('.').to_string());
+            }
+        }
+    }
+    let variants: Vec<String> = widget
+        .messages
+        .iter()
+        .flat_map(|m| m.variants.iter().map(|v| v.name.clone()))
+        .collect();
+    let channel_ctx = LaneChannelCtx {
+        op_exempt,
+        variants,
+    };
     // 切片#6n：node 选择器——lane 编译选本 widget（多 widget 源非本节点
     // handler 的 ops/区间自然落空=缺席）。
-    let (bodies, absent) = match lane_handler_bodies_spec_at(src, path, &specs, node_index) {
-        Ok(v) => v,
-        Err(_) => (Vec::new(), patterns.clone()),
-    };
+    let (bodies, absent) =
+        match lane_handler_bodies_spec_at(src, path, &specs, node_index, &channel_ctx) {
+            Ok(v) => v,
+            Err(_) => (Vec::new(), patterns.clone()),
+        };
     let spliced = if bodies.is_empty() {
         sfc
     } else {
