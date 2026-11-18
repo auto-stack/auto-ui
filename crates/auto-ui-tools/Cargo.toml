@@ -70,3 +70,8 @@ path = "src/bin/auto_ui_tool.rs"
 name = "plan980_ace_vue_tool_wiring"
 path = "tests/plan980_ace_vue_tool_wiring.rs"
 required-features = ["ace-vue"]
+
+[[test]]
+name = "plan980_010_form_short"
+path = "tests/plan980_010_form_short.rs"
+required-features = ["ace-vue"]
