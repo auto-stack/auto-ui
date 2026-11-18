@@ -19,7 +19,7 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 
 ## 0. 变更摘要
 
-2026-11-18 r7当前：T-03完成（3/10）。**T-05 AV 阶段收尾已交（`350af5b8`）**：GPU **同宿主连续帧链**（单渲染宿主 6 连帧，AV 行位经 `Play::call_script`→`ag_biz_apply`/`ag_set_local` 逐帧应用，渲染路径零业务；逐帧质心=当帧 AV 行投影≤1px、逐帧位移匹配行差 6.00/6.50/6.50/3.00/0.00px）＋**use 实例目标**（fixture 升级 Target 定义 node+两实例行，ForNode 定向 2:1 Touch→实例状态 2/1 独立，探针+主 fixture 整合）。**AC/A2R 阶段门精确阻塞**（1068 drafting 0/10、981 AC/A2R 域图形端口未交、W2-AC/W3-A2R 未落地——见 D-07），按合同不以 AV/A2R 代 AC、A2R 不先于本包 AC。T-04/T-05 均未勾（原全量义务不减）。
+2026-11-18 r7当前：T-03完成（3/10）。**981 动态世代接口已消费（`12cb146b`，pin 刷 `0a167f611`）**：`AgeGfxCall`/`dispatch_with_ctx` 会话事实接进 `NeutralGfxHost`，判罚点落 UI058 车道——fault-13 判定（同 callback 二查询杀旧 token/纯 callback 边界/跨 Tick，载荷双面命名 tick/callback/epoch）与 fault-33 判定（死句柄写具名拒携会话事实，真实车道 `frame_after_despawn` 驱动）4/4 绿，连续链与双实例用例骑乘验证。**T-05 AV 阶段收尾已交（`350af5b8`）**：GPU **同宿主连续帧链**（单渲染宿主 6 连帧，AV 行位经 `Play::call_script`→`ag_biz_apply`/`ag_set_local` 逐帧应用，渲染路径零业务；逐帧质心=当帧 AV 行投影≤1px、逐帧位移匹配行差 6.00/6.50/6.50/3.00/0.00px）＋**use 实例目标**（fixture 升级 Target 定义 node+两实例行，ForNode 定向 2:1 Touch→实例状态 2/1 独立，探针+主 fixture 整合）。**AC/A2R 阶段门精确阻塞**（1068 drafting 0/10、981 AC/A2R 域图形端口未交、W2-AC/W3-A2R 未落地——见 D-07），按合同不以 AV/A2R 代 AC、A2R 不先于本包 AC。T-04/T-05 均未勾（原全量义务不减）。
 
 历史：2026-11-18 r7：T-04 G1/G2 正式作者形已接（`0e67b1cd`，AV phase 内）：981 G1+G2 pin `6e456794d` 落地后，fixture 改真实 `on Life.Tick`（hook-local `let q Sweep2D` + `if/else`）＋源侧 `layer: render-only`（typed `AgeSceneRow.layer` 替代宿主行名表），AV runner 改经 scenario 状态函数驱动；40 Tick 同宿主连续帧逐 Tick oracle 复跑同数（第35首触停位8.6/每 Tick 32 credits），GPU 同 Tick 预证复跑像素字节同前（3.00px/0.00px）。两条语言纪律实测入档：021 token 走查拒"后读"、每函数静态准入拒计费链复制。
 
@@ -136,6 +136,13 @@ T-03..06拟新增driver `tests/node_topdown2d_{flow,storage}.rs`与`tools/verify
 - **AC/A2R 阶段门核对（D-07 证据）**：PLAN-1068（AC 机器执行主责）`drafting` 0/10；981 的 `IF-AGE-GFX-AC`（LANGUAGE/FUSION AC 部分＋1068/T-04）与 B-RUST*/A2R 域图形端口均未交付（981 §8 各行未勾，"图形新增A2R实现/验证在UI-W2-AC正式后"）；UI-W2-AC/UI-W3-A2R 波次无落地收据。按 §5 阶段合同：AC 格不得以 AV/A2R 代，A2R 须本包 AC 正式来源在前——两项保持 pending，T-05 原全量义务不减。
 - **门禁（最终修订 `350af5b8` 全绿）**：`plan058_t04_av_chain` 5/5（5.13s；实例形 fixture 下 40 Tick 逐 Tick oracle/预算/分支/GPU 同 Tick 全保持）；`plan058_t05_gpu_continuous` 1/1（1.72s）；`plan058_t05_use_instances` 3/3（0.07s；逐例 4/6/52ms）；`plan058_t04_{arms,oracle,provider,pin}` 6/4/5/2；`node_topdown2d_flow` 5/5（4.47s）；`s2_age_routing` 21/21；`verify_plan058.py --controls` 6/6。新用例全部远低于 10s 门。
 
+**T-05 动态世代接口消费结果（2026-11-18实测，pin `0a167f611`）**：
+- **pin/事实面**：overlay 刷到 auto-lang master `0a167f611`（981 宿主动态 token/世代批 merge `2cb5df262`；681 base+**1435** overlay，+1 文件）；`AgeGfxCall { tick, callback, query_epoch, credits_used, symbol }` 经 `dispatch_with_ctx` 逐派发到达（默认转发不破既有 provider——`SharedHost` 包装显式转发）。
+- **判罚点落 UI058（981 只交事实）**：`NeutralGfxHost` 新增 `CallFact` 日志＋查询 token 簿记＋`last_ctx`；**fault-13 判定** `resolve_query_token`——世代边界（tick/callback）取**最近任意派发**的 ctx、epoch 取簿记（同 callback 第二次查询把簿记推进 E+1 即杀旧 token）；载荷双面命名（held {tick,callback,epoch,sweep} vs "moved to tick/callback N" / "epoch to N"）。**fault-33 判定**：dead 句柄写（frame/despawn）具名拒 `age-gfx.stale-render-handle` 携会话事实，never-issued 保持 `age-gfx.bad-token`（拆分）。
+- **验证（`plan058_t05_gfx_epochs` 4/4，逐例 32/36/59/26ms）**：①连续链骑乘——每 Tick 首 op epoch0、sweep→1（credits 21）、segment→2（30）、标量 op 原样带当前值、frame 收 32；`frame.tick`/callback/epoch 与会话访问器全同；②fault-13 载荷——同 callback 二查询杀旧 token（"epoch to 2"）、**纯 callback 边界**（sweep_only 16+peek 1=17 预算合法，"moved to callback 3"）、跨 Tick（"moved to tick 3"）；③双实例骑乘——Touch 回调零 gfx 派发（epoch 0）、Tick 回调 1→2、2:1 状态保持（last_node=4）；④fault-33 真实车道——`frame_after_despawn`（spawn→despawn→frame 死句柄）具名拒携事实、零发布。
+- **门禁（`12cb146b`）**：av_chain 5/arms 6/oracle 4/provider 5/pin 2/gpu_continuous 1/use_instances 3/topdown2d_flow 5/s2_age_routing 21/controls 6 全绿（fixture 增 `frame_after_despawn` 不触 40 Tick/预算路径）。
+- **边界**：判罚面为本宿主车道语义（PLAN-938 host authority）；981 侧 epoch=纯事实不动 op 语义；TS/WEB 车道不消费 ctx。
+
 ### 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
@@ -197,6 +204,18 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+### 2026-11-18 stage: work（**981 动态世代接口消费**：AgeGfxCall 接入＋fault-13/33 判罚载荷由 UI058 验证）| PLAN-058 r7 | outcome: pass（消费面完成；T-04/T-05 未勾）
+
+**绑定**：worktree `D:/autostack/.wt/ui-058/auto-ui` | branch `codex/plan-058-dev` | code commit `12cb146b`（6 文件 +665/−28，含 overlay.json）| 主检出只改Plan簿记。
+**pin**：overlay 刷到 auto-lang master `0a167f611`（981 宿主动态 token/世代+A2C 宿主面批 `82aecc9ad`/merge `2cb5df262`；`refresh_overlay`→`apply_overlay` 1435→`verify_overlay` PASS 681+1435→`prepare_sdk --verify-only` PASS）。
+**任务**：消费 981 `IF-981-GFX-HOST-PORT` 顺位第三批的会话事实面（981 §9「宿主动态 token/世代」收据；判罚点归 UI058/PLAN-938）。
+**交付**：①`NeutralGfxHost::dispatch_with_ctx`（CallFact 日志/查询簿记/last_ctx；op 语义零改动）；②fault-13 判定 `resolve_query_token`＋fault-33 判定 `stale-render-handle`（dead 句柄写拒，与 never-issued `bad-token` 拆分）；③fixture `frame_after_despawn`（真实车道 fault-33 驱动）；④`SharedHost` 包装显式转发（默认转发会绕过 ctx）；⑤`plan058_t05_gfx_epochs` 4/4。
+**验证数字**：连续链骑乘——每 Tick 首派发 epoch 0、sweep epoch1/credits21、segment epoch2/credits30、标量 op 原样带值、frame 收 32；`query_epoch()/callback_seq()` 与 ctx 全同。fault-13——同 callback "epoch to 2"、纯 callback 边界（sweep_only16+peek1=17，"moved to callback 3"）、跨 Tick（"moved to tick 3"）。双实例——Touch 回调零派发/epoch0、Tick 回调 1→2、`last_node=4`、2:1 保持。fault-33——`age-gfx.stale-render-handle` 携 "old generation...tick N callback M"、frames=0 零发布。
+**命令/结果**：`cargo test --test plan058_t05_gfx_epochs` 4/4（0.16s）；全门禁 av_chain5/arms6/oracle4/provider5/pin2/gpu_continuous1/use_instances3/topdown2d_flow5/s2_routing21/controls6 全绿（fixture 增 fn 不触既有路径）。
+**check→finding 映射**：①簿记只在查询时更新→世代边界改取最近任意派发 ctx（peek 后仍能判 callback 前移）；②peek 前 begin_tick 误加→跨 Tick 提前（预算也禁 32+1）→账重排：sweep_only16+peek1=17 演示纯 callback 边界；③会话世代顺延（前段耗 tick1/c1）→期望值顺延；④`run_def` 无参→fault-33 驱动并为单 unit fn。
+**边界**：判罚语义=本宿主车道（PLAN-938）；epoch=纯事实（981 不判）；A2C 宿主面（同批 981 交付）归 AC 车道 1068/T-04 消费，本包不涉。
+**next**：AV 侧对 981 事实面消费完成；AC/A2R 仍按 D-07 等波次门。
 
 ### 2026-11-18 stage: work（**T-05 AV 阶段收尾**：GPU 同宿主连续帧链 + use 实例目标；AC/A2R 阶段门精确阻塞）| PLAN-058 r7 | outcome: **pass（AV 阶段子面；T-04/T-05 未勾，AC/A2R blocked per D-07）**
 
