@@ -218,3 +218,57 @@ gate 脚本）**：
 r3 迭代期的超时 case（10.13/16.49/23.16/21.72/25.04/12.25/11.53 等）均在
 修复收敛前，原始值保留于对应轮次日志（plan-artifacts/plan-089/*run*.log）
 与 §8.4 更正版对照。
+
+### 8.6 r4 修复（2026-11-18，T-07 再复审 F-06/F-07/F-08 后——终版）
+
+**修复面**：
+- 组件 `packages/image-viewer/image_viewport.at`：工具栏行1 = 前后图/缩放/适应/宽度/1:1
+  + 具名“更多”；“更多”菜单 = 左转90°/右转90°/重置/平移（12 个普通命名控件，
+  420×560 不裁切）。
+- gate `tests/product/verify_image_preview.py`：`ensure_more`（按需展开，竞态重试）；
+  V-05 窄窗（native `SetWindowPos 420×560` + 动作生效 + Dialog 关闭；vue
+  `set_viewport_size` + 12 控件 rect 断言）；V-06 加载/禁用导航（`disabled:true`
+  同帧）与错误态截图；V-04R 031 原业务面改为目录索引断言（Images 面板 ≥2 个
+  `.png`）；029 变换改为 img rect/transform 效果断言（稳定后截图）；031 旋转/平移
+  与 V-01 统一走“更多”。
+- demo `examples/image-preview/src/front/app.at`：消息负载的 bool 字面量在 VM 侧
+  以 0/1 到达（`can_prev`/`last_is_b` 变 int，组件 bool 属性不认）——显式归一
+  bool。这是 V-06 反向禁用断言暴露的 app 缺陷，组件合同不变。
+- decisions §8.5 三处秒数按 r3 report 原值更正（1.66/2.79/3.36 → 2.11/3.17/3.43）。
+- F-09：auto-lang 未提交 probe 已移除（树净）。
+
+**终版门（同一冻结基线：d120b30a + 本轮修复提交；门期间邻组构建空闲）**：
+
+| 门 | 结果 | case 构成 | 总耗时 | 最大 case |
+|---|---|---|---|---|
+| 产品门 native（`gate-native-r4e/report.json`，sha256 前缀 d4101aed04db3e2d） | pass | 25 pass / 0 fail / 2 not_run（P1 split 具名） | 65.4s | 8.46s（V-05 重开冷启动） |
+| 产品门 vue（`gate-vue-r4c/report.json`，sha256 前缀 83d7581752891827） | pass | 17 pass / 0 fail / 18 not_run（P10 demo 媒体腿） | 126.7s | 4.18s |
+
+prep：031 17.4s / 029 13.2s / reopen 20.04s；cleanup exit 1 注记 + owned_reaped=true；
+fixtures_unchanged=true；reopen.ready=true。
+
+**r4 新增 case 计时（全部 ≤10s）**：
+
+| case | 行为 / oracle | 秒 |
+|---|---|---|
+| V-06 加载/禁用导航（A） | loaded 同帧 `上一张 disabled:true` / `下一张` enabled + 截图 | 0.79 |
+| V-06 错误态可见 | damaged `load_failed` 具名 + 实际截图 | 0.90 |
+| V-05 窄窗 resize | 窗口 420×560、client 407×524 | 1.95 |
+| V-05 窄窗 工具栏可达 | 行1 + 更多菜单 8+4 个命名控件 + 截图 | 0.31 |
+| V-05 窄窗 动作生效 | 重置/放大/右转90°/平移/→ → zoom=1.25 rot=90 x=40 | 4.03 |
+| V-05 窄窗 Dialog 关闭 | 打开/关闭 cancelled+1 | 2.23 |
+| V-05 窄窗（vue） | 12 控件 rect 全在 420 视口内 + 禁用态 + 组件区截图 | 0.95 |
+
+**V-04R 关键证据**：031 旋转 bounding box 64×48→48×64 + 象限重排；平移 x 228→268；
+导航媒体 URI 切换；目录索引 ≥2 `.png`（`rgb-1x1.png`/`scenic-320x240.png`）；029
+变换 img rect 64×48 `matrix(1)` → 80×60 `matrix(1.25)`（受控接受真实达渲染）。
+
+**本会话测试模块/耗时表**：
+
+| 模块 | 结果 | 准备 | 测试 | 备注 |
+|---|---|---|---|---|
+| tools `image_viewer_component` | 2/2 pass | 热 | 8.77s | 组件菜单变更后复跑 |
+| 产品门 native | 25/0/2 | 会话拉起×2（prep 未单列；总-和≈14s） | 65.4s | 最大 8.46s |
+| 产品门 vue | 17/0/18 | prewarm 031 17.4 / 029 13.2 / reopen 20.04 | 126.7s | 最大 4.18s |
+| 调试探针（narrow/dialog/disabled/can/run_narrow） | 5 个 | — | 会话外 | 用于 gate 竞态与 bool 归因，不作验收证据 |
+| compiler/tools 复用 | 编译器 1171/2 基线红/2 ignored；vue 343/343（本轮无 compiler 改动） | — | — | 复用 T-07 复审轮 |

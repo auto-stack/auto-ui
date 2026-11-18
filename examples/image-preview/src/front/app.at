@@ -121,14 +121,25 @@ widget App {
             }
             .last_path = path
             .last_rid = rid
-            .last_is_b = is_b
+            // 消息负载里的 bool 字面量在 VM 侧以 0/1 到达（r4 实测：
+            // can_prev 变 int 1，组件 bool 属性不认）——显式归一为 bool。
+            if is_b {
+                .last_is_b = true
+            } else {
+                .last_is_b = false
+            }
             .rid = rid
             .rrev = f"${rid}-r${.rrev_seq}"
             .rrev_seq = .rrev_seq + 1
             .session = image.open_session(path)
             .src = image.current_uri(.session)
-            .can_prev = is_b
-            .can_next = !is_b
+            if is_b {
+                .can_prev = true
+                .can_next = false
+            } else {
+                .can_prev = false
+                .can_next = true
+            }
             // 新图初始基线（r2：新图缺省 contain/1/0/0/0；显式恢复视图才由
             // 调用方随图提供）——受控状态一并原子复位。
             .fit = "contain"

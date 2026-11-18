@@ -195,18 +195,21 @@ def press_until(drv, label, predicate, timeout=20, tries=3):
 
 
 def ensure_more(drv):
-    """PLAN-089 r4：窄窗工具栏把旋转/重置/平移收入具名“更多”菜单——按需展开。"""
+    """PLAN-089 r4：窄窗工具栏把旋转/重置/平移收入具名“更多”菜单——按需展开。
+    vnode 登记竞态下首 press 可能静默 no-op：重试一次再具名失败。"""
     if hasattr(drv, 'page'):
-        if drv.page.get_by_role('button', name='左转90°').count() > 0:
-            return
-        drv.press('更多')
-        drv.page.wait_for_timeout(400)
+        for _ in range(2):
+            if drv.page.get_by_role('button', name='左转90°').count() > 0:
+                return
+            drv.press('更多')
+            drv.page.wait_for_timeout(500)
         vfd.require(drv.page.get_by_role('button', name='左转90°').count() > 0,
                     '更多菜单未展开（左转90° 不在 DOM）')
     else:
-        if '左转90°' in drv.snapshot():
-            return
-        drv.press('更多')
+        for _ in range(2):
+            if '左转90°' in drv.snapshot():
+                return
+            drv.press('更多')
         vfd.require('左转90°' in drv.snapshot(), '更多菜单未展开（左转90° 不在快照）')
 
 
@@ -332,21 +335,21 @@ def run_narrow(drv, cases, backend, out, report):
                       [{'row_ok': row_ok, 'menu_ok': menu_ok, 'shot': ashot}],
                       row_ok and menu_ok)
             # 窄窗内动作真实生效（不止“按钮存在”）：重置→放大→右转→平移→右移。
-            drv.press('重置')
-            drv.wait_state(lambda s: (lambda f: f and f.get('fit') == 'contain'
-                                      and f.get('zoom') == 1.0 and f.get('rot') == 0)(view_fields(s)),
-                           timeout=10)
-            drv.press('放大')
-            drv.wait_state(lambda s: (lambda f: f and f.get('zoom') == 1.25)(view_fields(s)),
-                           timeout=10)
-            drv.press('右转90°')
-            drv.wait_state(lambda s: (lambda f: f and f.get('rot') == 90)(view_fields(s)),
-                           timeout=10)
-            drv.press('平移')
-            drv.wait_state(lambda s: '左移' in s, timeout=8)
-            drv.press('→')
-            p = drv.wait_state(lambda s: (lambda f: f and f.get('x') == 40.0)(view_fields(s)),
-                               timeout=10)
+            # 组件子树 vnode 登记有竞态（r3 实证）——沿用 press_until 重试。
+            press_until(drv, '重置',
+                        lambda s: (lambda f: f and f.get('fit') == 'contain'
+                                   and f.get('zoom') == 1.0 and f.get('rot') == 0)(view_fields(s)),
+                        timeout=12)
+            press_until(drv, '放大',
+                        lambda s: (lambda f: f and f.get('zoom') == 1.25)(view_fields(s)),
+                        timeout=12)
+            press_until(drv, '右转90°',
+                        lambda s: (lambda f: f and f.get('rot') == 90)(view_fields(s)),
+                        timeout=12)
+            press_until(drv, '平移', lambda s: '左移' in s, timeout=12)
+            p = press_until(drv, '→',
+                            lambda s: (lambda f: f and f.get('x') == 40.0)(view_fields(s)),
+                            timeout=12)
             f = view_fields(p)
             cases.add('V-05 窄窗 420×560（动作生效，native）',
                       '更多 → 重置/放大/右转90°/平移/→',
@@ -356,11 +359,11 @@ def run_narrow(drv, cases, backend, out, report):
             # 窄窗 Dialog：退出（关闭）始终可达。
             c0 = re.search(r'cancelled=(\d+)', drv.snapshot())
             n0 = int(c0.group(1)) if c0 else 0
-            drv.press('打开预览')
-            d = drv.wait_state(lambda s: '图片预览' in s and '关闭' in s, timeout=10)
+            d = press_until(drv, '打开预览',
+                            lambda s: '图片预览' in s and '关闭' in s, timeout=12)
             dshot = drv.screenshot('v05-narrow-dialog-native')
-            drv.press('关闭')
-            c = drv.wait_state(lambda s: f'cancelled={n0 + 1}' in s, timeout=10)
+            c = press_until(drv, '关闭',
+                            lambda s: f'cancelled={n0 + 1}' in s, timeout=12)
             cases.add('V-05 窄窗 Dialog 关闭可达（native）', 'open modal at 420×560 → 关闭',
                       '对话框在窄窗打开、关闭控件可达、cancelled+1',
                       [{'shot': dshot, 'cancelled_before': n0}],
@@ -792,13 +795,17 @@ def run_matrix(drv, cases, backend, shots=True):
         body = drv.snapshot()
         # 图标按钮（icon: "zoom-in"）的可访问名来自 title 属性，不出现在
         # inner_text——文本按钮查 DOM 文本，图标按钮查 role+name 计数。
-        text_ok = all(k in body for k in ('适应', '宽度', '1:1', '平移', '当前视图', '请求数'))
+        # r4：旋转/重置/平移收入“更多”菜单——先查行1，再展开菜单查 4 项。
+        text_ok = all(k in body for k in ('适应', '宽度', '1:1', '更多', '当前视图', '请求数'))
         icon_ok = (drv.page.get_by_role('button', name='放大').count() >= 1
                    and drv.page.get_by_role('button', name='缩小').count() >= 1)
+        ensure_more(drv)
+        body_menu = drv.snapshot()
+        menu_ok = all(k in body_menu for k in ('左转90°', '右转90°', '重置', '平移'))
         cases.add('V-01 vue 组件工具栏与受控回路 UI 挂载（无媒体形态）', 'DOM inspection',
-                  '工具栏全量命名控件（文本+图标 title 可访问名）+ 受控视图读回在 DOM；'
+                  '工具栏行1（文本+图标 title）+ 更多菜单 4 项 + 受控视图读回在 DOM；'
                   '功能媒体腿由 V-04R back-HTTP 轨承担',
-                  [body[:200]], text_ok and icon_ok)
+                  [body[:200], {'menu_ok': menu_ok}], text_ok and icon_ok and menu_ok)
         for cid, entry in [('V-01 放大 → zoom 1.25 (×1.25 步进, 单一变换算法)', 'press 放大'),
                            ('V-01 宽度适配', 'press 宽度'),
                            ('V-01 ↻ → rotation 90 (±90 规范)', '更多 → 右转90°'),
@@ -1318,6 +1325,7 @@ def run_v04(args, out, cases, report):
                 b31.press('Open Directory')
                 last = b31.wait_state(lambda s: ('Images' in s and '视图已接受' in s) or 'Ready' in s,
                                       timeout=60)
+                dir_body = b31.snapshot()
                 # 导航 oracle：媒体 URI 切换（真资源目标变化，比文件名文本强）
                 # + App 状态 Next（导航被接受）。
                 def img_src():
@@ -1334,9 +1342,14 @@ def run_v04(args, out, cases, report):
                           [{'before': src0, 'after': src1, 'status': 'Next'}],
                           bool(src0) and bool(src1) and src0 != src1)
                 shot3 = b31.screenshot('v04r-031-directory')
-                cases.add('V-04R 031 原业务面保留（打开/目录/统计）', 'whole leg',
-                          'Open File/Directory 均可用（031 目录/索引业务不回退）',
-                          [{'screenshot': shot3}], True)
+                # r4（F-07）：原业务面不是“截一张即 pass”——目录索引须真的列出
+                # 两张夹具，且打开/目录控件仍在（031 索引业务不回退）。
+                dir_ok = ('Images' in dir_body and dir_body.count('.png') >= 2
+                          and 'Open File' in dir_body and 'Open Directory' in dir_body)
+                cases.add('V-04R 031 原业务面保留（打开/目录/索引）', 'Open File + Open Directory 后同帧',
+                          '目录索引列出 ≥2 张夹具（Images 面板）+ 打开/目录控件仍在（031 业务不回退）',
+                          [{'png_names': [l.strip()[:70] for l in dir_body.splitlines() if '.png' in l][:4],
+                            'shot': shot3}], dir_ok)
             finally:
                 b31.quit_and_wait()
     except Exception as e:
@@ -1391,12 +1404,29 @@ def run_v04(args, out, cases, report):
                               '组件工具栏控件出现（ImageViewport 替换原 image 直显）',
                               [body2[:200]], vp)
                     if vp:
+                        # r4（F-07）：变换不是“点一下就 pass”——断言受控接受后
+                        # 真实达渲染：img rect 64×48→80×60（transform scale 1.25）。
+                        def img_rect29():
+                            return b29.page.evaluate(
+                                "() => { const i = document.querySelector('img'); if (!i) return null;"
+                                " const r = i.getBoundingClientRect();"
+                                " return {x: Math.round(r.x), y: Math.round(r.y),"
+                                " w: Math.round(r.width), h: Math.round(r.height),"
+                                " transform: getComputedStyle(i).transform} }")
+                        rb = img_rect29()
                         b29.press('放大')
-                        time.sleep(1.0)
+                        ra = rb
+                        for _ in range(10):
+                            b29.page.wait_for_timeout(300)
+                            ra = img_rect29()
+                            if rb and ra and ra['w'] >= rb['w'] * 1.2:
+                                break
                         shot = b29.screenshot('v04r-029-viewer')
-                        cases.add('V-04R 029 组件变换被接受（vue）', 'press 放大 (component)',
-                                  'viewRequested → Gallery 受控接受（无原件写入）',
-                                  [{'screenshot': shot}], True)
+                        zoom_ok = bool(rb and ra and ra['w'] >= rb['w'] * 1.2 and ra['h'] > rb['h']
+                                       and '1.25' in (ra.get('transform') or ''))
+                        cases.add('V-04R 029 组件变换被接受（vue）', 'press 放大 (row1)',
+                                  '受控接受且达渲染：img rect 64×48→80×60（transform scale 1.25），无原件写入',
+                                  [{'before': rb, 'after': ra, 'shot': shot}], zoom_ok)
                     # 查看器关闭：悬浮胶囊自带'返回网格'控件（Escape 不关闭，
                     # r3 实测）——点击后断言查看器 chrome 消失且网格仍在。
                     try:
