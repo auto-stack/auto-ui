@@ -46,13 +46,35 @@ fn refreshed_pin_compiles_the_t04_source() {
     let t0 = Instant::now();
     match compile() {
         Ok(compiled) => {
-            assert_eq!(compiled.description.components.len(), 1);
-            assert_eq!(compiled.description.components[0].scene.len(), 6);
+            assert_eq!(
+                compiled.description.components.len(),
+                2,
+                "Target + Player components"
+            );
+            let target = compiled
+                .description
+                .components
+                .iter()
+                .find(|c| c.name == "Target")
+                .expect("Target component");
+            assert!(
+                target.handler_msgs.iter().any(|m| m == "Touch"),
+                "the same-definition target carries its Touch handler"
+            );
+            let player = compiled
+                .description
+                .components
+                .iter()
+                .find(|c| c.name == "Player")
+                .expect("Player component");
+            assert_eq!(player.scene.len(), 6);
+            assert_eq!(player.scene[4].kind, "Target", "target_a instance row");
+            assert_eq!(player.scene[5].kind, "Target", "target_b instance row");
             // G1: the checked row description carries the typed layer fact.
-            let scene = &compiled.description.components[0].scene;
+            let scene = &player.scene;
             assert_eq!(scene[0].layer, Some(AgeRowLayer::RenderOnly));
             // G2: the Tick is the authored hook-local let/if form.
-            let handler = &compiled.description.components[0].handler_stmts;
+            let handler = &player.handler_stmts;
             let tick_stmts = &handler
                 .iter()
                 .find(|(msg, _)| msg == "Life.Tick")
@@ -72,12 +94,7 @@ fn refreshed_pin_compiles_the_t04_source() {
                 compiled.symbol_of("tick_step").is_none(),
                 "the host-state tick_step form is retired"
             );
-            assert!(compiled
-                .description
-                .components[0]
-                .handler_msgs
-                .iter()
-                .any(|m| m == "Life.Tick"));
+            assert!(player.handler_msgs.iter().any(|m| m == "Life.Tick"));
             println!(
                 "PLAN058_TIMING test=refreshed_pin_compiles_the_t04_source ms={} rows=6 g1=layer g2=let_if",
                 t0.elapsed().as_millis()

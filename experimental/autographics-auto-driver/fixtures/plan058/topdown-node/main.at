@@ -43,6 +43,32 @@ pub fn sweep_only() i32 {
     return q.node
 }
 
+// The two same-definition interaction targets (V-S03): one `Target` node
+// carrying its own model and Touch handler, instantiated twice in the Player's
+// scene. Each instance keeps independent state (2:1 isolation is pinned by the
+// runner); the instance rows' per-instance `position`/`size` are the host rows'
+// geometry (declaration order = ordinal, 4 and 5, unchanged from the flat form).
+node Target {
+    model {
+        hits int = 0
+    }
+    msg {
+        Touch
+    }
+    on {
+        .Touch -> {
+            .hits += 1
+        }
+    }
+    view-2d {
+        shape2d body {
+            kind: quad
+            size: (1.0, 1.0)
+            visible: true
+        }
+    }
+}
+
 node Player {
     model {
         last_node i32 = -1
@@ -135,13 +161,11 @@ node Player {
             position: (4.0, -2.5)
             size: (2.0, 2.0)
         }
-        shape2d target_a {
-            kind: quad
+        Target target_a {
             position: (4.0, 2.0)
             size: (1.0, 1.0)
         }
-        shape2d target_b {
-            kind: quad
+        Target target_b {
             position: (4.0, 3.25)
             size: (1.0, 1.0)
         }

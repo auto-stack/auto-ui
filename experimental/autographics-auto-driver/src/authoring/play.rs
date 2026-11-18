@@ -1009,6 +1009,18 @@ impl Play {
         self.clear_clock();
         Ok(())
     }
+    /// PLAN-058 T-05 (AV-phase GPU chain): one bounded host-side call into the
+    /// world script by name (scalar args, int result — same rules as
+    /// [`Session::int`]). This is the presentation data channel: the host
+    /// applies externally computed facts (e.g. the AGE AV row position) to the
+    /// render world without re-running any business in the render path. Only
+    /// the scalar/VM face exists; AGE-backed sessions carry no script surface.
+    pub fn call_script(&mut self, name: &str, args: &[Scalar]) -> Result<i32, String> {
+        self.vm
+            .as_mut()
+            .ok_or_else(|| "no world script session".to_string())?
+            .int(name, args)
+    }
     pub fn single_step(&mut self) -> Result<(), String> {
         if self.state != State::Paused || self.pending() {
             return Err("step requires idle Paused".into());

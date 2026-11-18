@@ -59,17 +59,20 @@ fn compile(src: &str) -> AgePackageCompilation {
         source: src.into(),
         provider: None,
     };
-    // One instance, one Life.Tick: the scenario generates the per-field state
-    // functions (`__age_state_0_<field>` = field init + handler replay) the
-    // runner drives through the session.
+    // Two components (Target declared first, Player second); the scenario
+    // drives the Tick on the Player component only (per-module node indexing:
+    // Target = node 0, Player = node 1).
     compile_age_package_with_scenario(
         &[input],
         "plan058::main",
         LegacyWidgetAlias::Reject,
         &[PACKAGES_CAPABILITY.to_string()],
         &ComponentScenario {
-            instances: 1,
-            ops: vec![ScenarioOp::Tick { instance: 0 }],
+            instances: 2,
+            ops: vec![ScenarioOp::ForNode {
+                node: 1,
+                op: Box::new(ScenarioOp::Tick { instance: 0 }),
+            }],
         },
     )
     .unwrap_or_else(|ds| {
@@ -93,11 +96,21 @@ fn assets_root() -> PathBuf {
 /// `visible`. The render-only ground layer is the SOURCE's typed fact (G1):
 /// `AgeSceneRow.layer` on the same checked description every lane consumes.
 fn rows_from_scene(compiled: &AgePackageCompilation) -> Vec<HostRow> {
-    // The scene rows live on the (single) AGE node's `view-2d`; declaration
-    // order is the row ordinal the host uses.
-    assert_eq!(compiled.description.components.len(), 1, "one AGE node");
-    let scene = &compiled.description.components[0].scene;
+    // Two components: Target (its own body template rows) and Player (the run
+    // scene). The host rows come from the PLAYER's `view-2d`: declaration
+    // order is the row ordinal the host uses; the two `Target` instance rows
+    // are the same-definition targets (V-S03), ordinals 4 and 5.
+    assert_eq!(compiled.description.components.len(), 2, "Target + Player");
+    let player = compiled
+        .description
+        .components
+        .iter()
+        .find(|c| c.name == "Player")
+        .expect("Player component");
+    let scene = &player.scene;
     assert_eq!(scene.len(), 6, "six scene rows in the fixture");
+    assert_eq!(scene[4].kind, "Target", "target_a is a Target instance");
+    assert_eq!(scene[5].kind, "Target", "target_b is a Target instance");
     scene
         .iter()
         .enumerate()
@@ -161,11 +174,32 @@ fn tick_symbol(compiled: &AgePackageCompilation, name: &str) -> String {
 }
 
 /// The Tick is the REAL `on Life.Tick` handler now (G2): the scenario compiles
-/// it into per-field state functions (`__age_state_0_<field>` = field init +
-/// handler replay); the runner drives the `last_node` one — the handler's only
-/// outcome field — so the whole body executes exactly once per Tick.
+/// it into per-field state functions (field init + handler replay); the runner
+/// drives the `last_node` one — the handler's only outcome field — so the whole
+/// body executes exactly once per Tick. The state spelling is per-module node
+/// indexing (Player = node 1 of the main module → the `n1` form); resolve the
+/// frozen candidates by name, never by guessing a mangling rule.
 fn tick_def(compiled: &AgePackageCompilation) -> String {
-    tick_symbol(compiled, "__age_state_0_last_node")
+    for name in [
+        "__age_state_n1_0_last_node",
+        "__age_state_1_last_node",
+        "__age_state_0_last_node",
+    ] {
+        if let Some(symbol) = compiled.symbol_of(name) {
+            return format!("d_{symbol}");
+        }
+    }
+    panic!("no Player last_node state symbol")
+}
+
+/// The Player component (the second declared node; the first is Target).
+fn player_of(compiled: &AgePackageCompilation) -> &ace_core::source::age_package::AgePackageComponent {
+    compiled
+        .description
+        .components
+        .iter()
+        .find(|c| c.name == "Player")
+        .expect("Player component")
 }
 
 fn row_world(host: &Rc<RefCell<NeutralGfxHost>>, ordinal: usize) -> [f32; 2] {
@@ -520,7 +554,7 @@ fn g2_branch_and_g1_layer_facts_are_source_bound() {
     let compiled = compile(SOURCE);
 
     // G1 typed fact on the checked row description (+ the cpu Symbol twin).
-    let scene = &compiled.description.components[0].scene;
+    let scene = &player_of(&compiled).scene;
     assert_eq!(scene[0].name, "ground");
     assert_eq!(scene[0].layer, Some(AgeRowLayer::RenderOnly));
     assert!(
@@ -539,7 +573,7 @@ fn g2_branch_and_g1_layer_facts_are_source_bound() {
     }
     // G2 handler statement facts: hook-local lets (across the three axis
     // branches) and the closing branch on the same handler.
-    let handler = &compiled.description.components[0].handler_stmts;
+    let handler = &player_of(&compiled).handler_stmts;
     let tick_stmts = &handler
         .iter()
         .find(|(msg, _)| msg == "Life.Tick")
@@ -602,7 +636,7 @@ fn g2_branch_and_g1_layer_facts_are_source_bound() {
     // winning this same query by declaration ordinal (the 055 counterexample).
     let bare = compile(&SOURCE.replace("            layer: render-only\n", ""));
     assert_eq!(
-        bare.description.components[0].scene[0].layer,
+        player_of(&bare).scene[0].layer,
         None,
         "no declaration, no fact"
     );
