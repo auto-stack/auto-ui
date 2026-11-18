@@ -1,0 +1,117 @@
+// PLAN-058 T-04 prep — normal AGE Node source for the top-down 2D minimum
+// sample (1 Player + 2 obstacles + 2 same-definition interaction targets + 1
+// visible non-blocking ground). Frozen spellings only (IF-981-GFX-AV-SEAM):
+// query2d.segment/sweep, row.place/world, render2d.spawn/frame, image2d.png,
+// frame2d.at, input.*, tick.dt(). No legacy `_ag_*` calls.
+//
+// Syntax constraints recorded in t04-prep.md (981 side):
+//  * `on Life.Tick { … }` bodies are ASSIGNMENT-ONLY (`age-on-assign`), so the
+//    one-sweep/branch Tick lives in the `pub fn advance` helper and publishes
+//    through module scratch vars; hook-local `let` is a named AGE gap.
+//  * Scene rows are addressed by their declaration ordinal: there is no typed
+//    row handle/self-row accessor in the 17-op surface (named gap).
+//  * `shape2d` has no collision/layer attribute: the render-only ground fact
+//    must be supplied by the UI058 host lane until 981 adds a typed declaration
+//    (named gap, t04-prep §3).
+let atlas = image2d.png("assets/atlas.png")
+let frame0 = frame2d.at(atlas, 0, 0, 32, 32)
+
+// Per-Tick scratch written by `advance` (hook bodies cannot bind locals).
+var hit bool = false
+var t f32 = 1.0
+var node i32 = -1
+var dx f32 = 0.0
+var dy f32 = 0.0
+var sx f32 = 0.0
+var sy f32 = 0.0
+
+pub fn advance(px f32, py f32, speed f32, dt f32) i32 {
+    let ix f32 = 0.0
+    let iy f32 = 0.0
+    if input.space() == 2 {
+        ix = input.x()
+        iy = input.y()
+    }
+    // Diagonal normalisation keeps |v| == speed for (1,0) and (1,1): the frozen
+    // 055/021 constant, no sqrt dependency.
+    if ix != 0.0 {
+        if iy != 0.0 {
+            ix = ix * 0.70710677
+            iy = iy * 0.70710677
+        }
+    }
+    dx = ix * speed * dt
+    dy = iy * speed * dt
+    // Exactly one sweep per Tick; the player row is the mover (ordinal 1).
+    let q Sweep2D = query2d.sweep(1, true, dx, dy)
+    hit = q.hit
+    t = q.t
+    sx = px + dx * q.t
+    sy = py + dy * q.t
+    let placed i32 = row.place(1, sx, sy)
+    // Nearest interaction target from the moved position (upward 6 units).
+    let s Cast2D = query2d.segment(1, true, sx, sy, sx, sy + 6.0)
+    node = s.node
+    return placed
+}
+
+node Player {
+    model {
+        x f32 = 4.0
+        y f32 = 0.0
+        vx f32 = 0.0
+        vy f32 = 0.0
+        speed f32 = 8.0
+        last_node i32 = -1
+        token i32 = 0
+        ticked i32 = 0
+    }
+    on Life.Tick {
+        ticked = advance(x, y, speed, tick.dt())
+        x = sx
+        y = sy
+        vx = dx
+        vy = dy
+        last_node = node
+        token = render2d.spawn("player", x, y)
+        token = render2d.frame(token, "assets/atlas.png", 0, 0)
+    }
+    view-2d {
+        // Declaration order == row ordinal (0..5). The ground is VISIBLE but it
+        // must never be a query candidate: that fact is supplied by the host
+        // lane (t04-prep §3) because AGE has no render-only/layer declaration.
+        shape2d ground {
+            kind: quad
+            position: (8.0, 0.0)
+            size: (12.0, 8.0)
+            visible: true
+        }
+        shape2d player {
+            kind: quad
+            position: (4.0, 0.0)
+            size: (0.8, 1.0)
+            image: atlas
+            frame: frame0
+        }
+        shape2d wall_a {
+            kind: quad
+            position: (10.0, 0.0)
+            size: (2.0, 6.0)
+        }
+        shape2d wall_b {
+            kind: quad
+            position: (4.0, -2.5)
+            size: (2.0, 2.0)
+        }
+        shape2d target_a {
+            kind: quad
+            position: (4.0, 2.0)
+            size: (1.0, 1.0)
+        }
+        shape2d target_b {
+            kind: quad
+            position: (4.0, 3.25)
+            size: (1.0, 1.0)
+        }
+    }
+}
