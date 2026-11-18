@@ -1,0 +1,262 @@
+use auto.json
+use auto.image
+
+// PLAN-089 演示页 — 官方 image-viewer 包普通消费：受控回路
+// （viewRequested → baseRevision 校验 → 原子赋值 + revision++ → Tick 重投影）
+// 与真实 media ticket URI（前端进程内建 auto.image 会话；split 下 back 进程
+// 票据不入前进程注册表——decisions.md §7 P1）。
+//
+// App 级 Tick 需显式 timer 块（组件 interval 约定只覆盖子件）。
+// `view` 载荷键以索引/平面别名读取（DotView 词元缺口，§7 P4）。
+// 媒体 handler 不用 let（vue 轨 let 重名 TDZ——§7 P10）；换图体按
+// 087 先例在各 handler 内联。
+widget App {
+    msg { Init, Tick, ToggleTheme, DoOpen(str, str, bool), Retry, ApplyView(str), MarkLoaded(str), ShowError(str), DoNavigate(str), OpenPreview, ClosePreview }
+    // PLAN-089：App 级显式 timer（src 轮询）。
+    timer {
+        Tick (every_ms: 80)
+    }
+    model {
+        // 明暗切换（runtime 惯例 dark_mode 字段；V-05 双主题）。
+        var dark_mode bool = true
+        // 会话与受控 view（应用所有；组件只持投影）。
+        var session str = ""
+        var src str = ""
+        var rid str = ""
+        var rrev str = "0"
+        var rev int = 0
+        var fit str = "contain"
+        var zoom float = 1.0
+        var ox float = 0.0
+        var oy float = 0.0
+        var rot int = 0
+        var can_prev bool = false
+        var can_next bool = false
+        // Dialog 受控开合。
+        var open bool = false
+        // 事件读回槽位（产品门 oracle）。
+        var last_request str = ""
+        var last_loaded str = ""
+        var last_error str = ""
+        var last_nav str = ""
+        var request_count int = 0
+        var cancel_count int = 0
+        var load_count int = 0
+        var error_count int = 0
+        var status str = "打开一张图片开始"
+        // 重试面（最近一次打开的路径/身份）。
+        var last_path str = ""
+        var last_rid str = ""
+        var last_is_b bool = false
+        var rrev_seq int = 1
+        var ticks int = 0
+    }
+    // PLAN-089：查看区消费正式包（widget 内 use）。
+    use { package: image_viewer from "../../../packages/image-viewer" }
+    view {
+        col (style: "w-full h-full bg-background text-foreground gap-2 p-3 overflow-y-auto") {
+            text "图片预览演示" { style: "text-sm font-medium" }
+            row (style: "items-center gap-2") {
+                button "打开图片A" { onclick: .DoOpen("tests/fixtures/corner-marked.png", "img-a", false), style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "打开图片B" { onclick: .DoOpen("tests/fixtures/scenic-320x240.png", "img-b", true), style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "打开损坏图" { onclick: .DoOpen("tests/fixtures/damaged.png", "img-damaged", false), style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "重试" { onclick: .Retry, disabled: .last_path == "", style: "h-8 px-2 text-xs rounded-md border border-border disabled:opacity-40" }
+                button "打开预览" { onclick: .OpenPreview, disabled: .src == "", style: "h-8 px-2 text-xs rounded-md border border-primary text-primary disabled:opacity-40" }
+                button "切换明暗" { onclick: .ToggleTheme, style: "h-8 px-2 text-xs rounded-md border border-border" }
+                text .status { style: "text-xs text-muted-foreground" }
+            }
+            // 实例一：内嵌视口（工具栏全量动作；V-01/02/06 主夹具）。
+            col (style: "w-full h-80 border border-border rounded-lg overflow-hidden shrink-0") {
+                ImageViewport (
+                    src: .src, alt: "演示图片",
+                    resourceId: .rid, resourceRevision: .rrev,
+                    revision: .rev,
+                    fit: .fit, zoom: .zoom, offsetX: .ox, offsetY: .oy, rotation: .rot,
+                    canPrevious: .can_prev, canNext: .can_next,
+                    onviewRequested: .ApplyView($event),
+                    onloaded: .MarkLoaded($event),
+                    onerror: .ShowError($event),
+                    onnavigateRequested: .DoNavigate($event)
+                ) {}
+            }
+            // 受控视图读回（当前应用 view + 事件计数）。
+            col (style: "gap-1") {
+                text .last_request { style: "text-xs text-muted-foreground break-all" }
+                text f"当前视图 fit=${.fit} zoom=${.zoom} x=${.ox} y=${.oy} rot=${.rot} rev=${.rev} 请求数=${.request_count} ticks=${.ticks}" { style: "text-xs text-foreground" }
+                text f"loaded=${.load_count} error=${.error_count} 最后loaded=${.last_loaded}" { style: "text-xs text-muted-foreground" }
+                text f"最后error=${.last_error}" { style: "text-xs text-destructive break-all" }
+                text f"导航=${.last_nav} cancelled=${.cancel_count}" { style: "text-xs text-muted-foreground" }
+            }
+        }
+        // 实例二：模态预览（同一份应用受控 view；V-03/04 夹具）。
+        ImagePreviewDialog (
+            src: .src, alt: "预览图片",
+            resourceId: .rid, resourceRevision: .rrev,
+            revision: .rev,
+            fit: .fit, zoom: .zoom, offsetX: .ox, offsetY: .oy, rotation: .rot,
+            open: .open, title: "图片预览",
+            canPrevious: .can_prev, canNext: .can_next,
+            onviewRequested: .ApplyView($event),
+            onloaded: .MarkLoaded($event),
+            onerror: .ShowError($event),
+            onnavigateRequested: .DoNavigate($event),
+            oncancelled: .ClosePreview
+        ) {}
+    }
+    on {
+        .Init -> {
+            .status = "打开一张图片开始"
+        }
+        .Tick -> {
+            .ticks = .ticks + 1
+            // 入队后 rendition 由后台 lane 发布——current_uri 就绪前返回空。
+            if .session != "" && .src == "" {
+                .src = image.current_uri(.session)
+            }
+        }
+        .ToggleTheme -> { .dark_mode = !.dark_mode }
+        .DoOpen(path str, rid str, is_b bool) -> {
+            if .session != "" {
+                image.close_session(.session)
+            }
+            .last_path = path
+            .last_rid = rid
+            // 消息负载里的 bool 字面量在 VM 侧以 0/1 到达（r4 实测：
+            // can_prev 变 int 1，组件 bool 属性不认）——显式归一为 bool。
+            if is_b {
+                .last_is_b = true
+            } else {
+                .last_is_b = false
+            }
+            .rid = rid
+            .rrev = f"${rid}-r${.rrev_seq}"
+            .rrev_seq = .rrev_seq + 1
+            .session = image.open_session(path)
+            .src = image.current_uri(.session)
+            if is_b {
+                .can_prev = true
+                .can_next = false
+            } else {
+                .can_prev = false
+                .can_next = true
+            }
+            // 新图初始基线（r2：新图缺省 contain/1/0/0/0；显式恢复视图才由
+            // 调用方随图提供）——受控状态一并原子复位。
+            .fit = "contain"
+            .zoom = 1.0
+            .ox = 0.0
+            .oy = 0.0
+            .rot = 0
+            .rev = .rev + 1
+            .status = f"已打开 ${rid}"
+        }
+        .Retry -> {
+            if .last_path != "" {
+                if .session != "" {
+                    image.close_session(.session)
+                }
+                .rid = .last_rid
+                .rrev = f"${.last_rid}-r${.rrev_seq}"
+                .rrev_seq = .rrev_seq + 1
+                .session = image.open_session(.last_path)
+                .src = image.current_uri(.session)
+                .fit = "contain"
+                .zoom = 1.0
+                .ox = 0.0
+                .oy = 0.0
+                .rot = 0
+                .can_prev = .last_is_b
+                .can_next = !.last_is_b
+                .rev = .rev + 1
+                .status = f"已重试 ${.last_rid}"
+            }
+        }
+        .ApplyView(ev str) -> {
+            // 唯一业务 view 写点：baseRevision 校验后一次性赋值并增 revision
+            // （避免先 zoom 后 offset 的中间错误帧；拒绝 = 保持不变）。
+            // 平面别名键读取（P4 语言缺口适配，载荷内两处同值）。
+            .last_request = ev
+            let req = json.parse(ev)
+            if req.baseRevision == .rev {
+                .request_count = .request_count + 1
+                .fit = req.fit
+                .zoom = req.zoom
+                .ox = req.offsetX
+                .oy = req.offsetY
+                .rot = req.rotation
+                .rev = .rev + 1
+                .status = "视图已接受"
+            } else {
+                .status = "视图请求已过期（baseRevision 不匹配）"
+            }
+        }
+        .MarkLoaded(ev str) -> {
+            .last_loaded = ev
+            .load_count = .load_count + 1
+            .status = "图片已加载"
+        }
+        .ShowError(ev str) -> {
+            .last_error = ev
+            .error_count = .error_count + 1
+            .status = "图片加载失败"
+        }
+        .DoNavigate(ev str) -> {
+            // 资源集合/顺序归应用：next → 打开 B（真实换图），previous → 回 A。
+            .last_nav = ev
+            let req = json.parse(ev)
+            if req.direction == "next" {
+                if .session != "" {
+                    image.close_session(.session)
+                }
+                .rid = "img-b"
+                .rrev = f"img-b-r${.rrev_seq}"
+                .rrev_seq = .rrev_seq + 1
+                .last_path = "tests/fixtures/scenic-320x240.png"
+                .last_rid = "img-b"
+                .last_is_b = true
+                .session = image.open_session("tests/fixtures/scenic-320x240.png")
+                .src = image.current_uri(.session)
+                .fit = "contain"
+                .zoom = 1.0
+                .ox = 0.0
+                .oy = 0.0
+                .rot = 0
+                .can_prev = true
+                .can_next = false
+                .rev = .rev + 1
+                .status = "已打开 img-b"
+            } else {
+                if .session != "" {
+                    image.close_session(.session)
+                }
+                .rid = "img-a"
+                .rrev = f"img-a-r${.rrev_seq}"
+                .rrev_seq = .rrev_seq + 1
+                .last_path = "tests/fixtures/corner-marked.png"
+                .last_rid = "img-a"
+                .last_is_b = false
+                .session = image.open_session("tests/fixtures/corner-marked.png")
+                .src = image.current_uri(.session)
+                .fit = "contain"
+                .zoom = 1.0
+                .ox = 0.0
+                .oy = 0.0
+                .rot = 0
+                .can_prev = false
+                .can_next = true
+                .rev = .rev + 1
+                .status = "已打开 img-a"
+            }
+        }
+        .OpenPreview -> {
+            if .src != "" {
+                .open = true
+            }
+        }
+        .ClosePreview -> {
+            .open = false
+            .cancel_count = .cancel_count + 1
+            .status = "预览已关闭"
+        }
+    }
+}

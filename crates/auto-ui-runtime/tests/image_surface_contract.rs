@@ -70,9 +70,27 @@ fn image_surface_contract_is_preserved_across_generators() {
     };
     assert_eq!(event_name(on_error), "ImageFailed");
     assert_eq!(event_name(on_loaded), "ImageLoaded");
-    assert_eq!(event_name(on_wheel), "ZoomAt");
-    assert_eq!(event_name(on_pan), "PanBy");
-    assert_eq!(event_name(on_double_click), "ToggleFit");
+    // PLAN-089 T-02: 输入三臂改载荷回调。fixture 绑定为无参形态
+    // （`onwheel: .ZoomAt`），事件期零载荷派发——与 Vue「空声明 → 无参
+    // 调用」同语义；载荷路径（declared 参数形态）由 aura_view_builder
+    // 单测覆盖（image_surface_vm_builder）。
+    use auto_ui_runtime::ui::iced::image_surface_input::ImageSurfaceCarry;
+    assert_eq!(
+        event_name(on_wheel.call(ImageSurfaceCarry::Wheel { delta_y: -1.0, x: 1.0, y: 2.0 })),
+        "ZoomAt"
+    );
+    assert_eq!(
+        event_name(on_pan.call(ImageSurfaceCarry::Pan {
+            dx: 3.0,
+            dy: 4.0,
+            phase: auto_ui_runtime::ui::iced::image_surface::ImageSurfacePanPhase::Move,
+        })),
+        "PanBy"
+    );
+    assert_eq!(
+        event_name(on_double_click.call(ImageSurfaceCarry::DoubleClick { x: 5.0, y: 6.0 })),
+        "ToggleFit"
+    );
 
     // Rust generator: the same fixture emits the backend-neutral constructor,
     // live state bindings, transform props and all event hooks.

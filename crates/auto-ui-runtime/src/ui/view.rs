@@ -4,6 +4,7 @@
 // to support the unified styling system (Plan 004, 90% complete).
 
 use super::style::{Color, SizeValue, Style, StyleClass};
+use crate::ui::iced::image_surface_input::ImageSurfaceCallback;
 use crate::ui::scroll::{ScrollAxes, ScrollbarPolicy};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -1096,9 +1097,12 @@ pub enum View<M: Clone + Debug> {
         filter: String,
         on_error: Option<M>,
         on_loaded: Option<M>,
-        on_wheel: Option<M>,
-        on_pan: Option<M>,
-        on_double_click: Option<M>,
+        // PLAN-089 T-02: 输入事件臂改载荷回调（native 输入适配的视图合同
+        // 面；生成 Rust 侧经 `image_surface_events` 仍收 `Option<M>` 无感
+        // 包装；loaded/error 仍走 PLAN-095 媒体通知门，不改）。
+        on_wheel: Option<ImageSurfaceCallback<M>>,
+        on_pan: Option<ImageSurfaceCallback<M>>,
+        on_double_click: Option<ImageSurfaceCallback<M>>,
         style: Option<Style>,
     },
 
@@ -2108,32 +2112,7 @@ impl<M: Clone + Debug> View<M> {
     }
 
     /// Attach the five normalized ImageSurface event handlers.
-    pub fn image_surface_events(
-        mut self,
-        on_error: Option<M>,
-        on_loaded: Option<M>,
-        on_wheel: Option<M>,
-        on_pan: Option<M>,
-        on_double_click: Option<M>,
-    ) -> Self {
-        if let View::ImageSurface {
-            on_error: current_error,
-            on_loaded: current_loaded,
-            on_wheel: current_wheel,
-            on_pan: current_pan,
-            on_double_click: current_double_click,
-            ..
-        } = &mut self
-        {
-            *current_error = on_error;
-            *current_loaded = on_loaded;
-            *current_wheel = on_wheel;
-            *current_pan = on_pan;
-            *current_double_click = on_double_click;
-        }
-        self
-    }
-
+    ///
     /// Apply a Tailwind style string to an ImageSurface node.
     pub fn image_surface_style(mut self, style_str: &str) -> Self {
         if let View::ImageSurface { style, .. } = &mut self {
@@ -3033,9 +3012,9 @@ impl<M: Clone + Debug> View<M> {
                 filter,
                 on_error: on_error.map(|m| f(m)),
                 on_loaded: on_loaded.map(|m| f(m)),
-                on_wheel: on_wheel.map(|m| f(m)),
-                on_pan: on_pan.map(|m| f(m)),
-                on_double_click: on_double_click.map(|m| f(m)),
+                on_wheel: on_wheel.map(|cb| cb.map_message(std::sync::Arc::clone(f))),
+                on_pan: on_pan.map(|cb| cb.map_message(std::sync::Arc::clone(f))),
+                on_double_click: on_double_click.map(|cb| cb.map_message(std::sync::Arc::clone(f))),
                 style,
             },
             View::WindowThumbnail {
@@ -3963,6 +3942,48 @@ impl<M: Clone + Debug> View<M> {
     pub fn on_toggle(mut self, msg: M) -> Self {
         if let View::Checkbox { on_toggle, .. } = &mut self {
             *on_toggle = Some(msg);
+        }
+        self
+    }
+}
+
+// PLAN-089 T-02：ImageSurface 事件挂接（Send+Sync 消息面——生成 Rust 轨的
+// 类型化枚举恒满足；VM 轨经 aura_view_builder 直接构造回调，不走此方法）。
+impl<M: Clone + Debug + Send + Sync + 'static> View<M> {
+    /// Attach the five normalized ImageSurface event handlers.
+    ///
+    /// PLAN-089 T-02：输入三臂（wheel/pan/dblclick）在视图层包装成载荷
+    /// 回调。生成 Rust 侧传 `Option<M>` 纯消息——按「绑定位无参」语义零
+    /// 载荷派发（旧生成代码行为不变）；载荷路径由 VM builder 用 declared
+    /// 形态构造（image_surface_input::ImageSurfaceCallback::from_base）。
+    pub fn image_surface_events(
+        mut self,
+        on_error: Option<M>,
+        on_loaded: Option<M>,
+        on_wheel: Option<M>,
+        on_pan: Option<M>,
+        on_double_click: Option<M>,
+    ) -> Self {
+        // 生成 Rust 侧纯消息 → 恒发原消息的回调（零载荷，旧行为不变）。
+        let plain = |m: Option<M>| {
+            m.map(|message| {
+                ImageSurfaceCallback::from_closure(Arc::new(move |_carry| message.clone()))
+            })
+        };
+        if let View::ImageSurface {
+            on_error: current_error,
+            on_loaded: current_loaded,
+            on_wheel: current_wheel,
+            on_pan: current_pan,
+            on_double_click: current_double_click,
+            ..
+        } = &mut self
+        {
+            *current_error = on_error;
+            *current_loaded = on_loaded;
+            *current_wheel = plain(on_wheel);
+            *current_pan = plain(on_pan);
+            *current_double_click = plain(on_double_click);
         }
         self
     }

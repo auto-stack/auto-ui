@@ -670,9 +670,9 @@ impl VueGenerator {
         // 搜索行：icon + input（:value 绑定 + onsearch 处理器）。
         html.push_str(&format!("{}  <div class=\"{}\">\n", ind, nc::SEARCH_ROW));
         if self.is_shadcn() {
-            self.lucide_icons.insert("Search".to_string());
+            self.lucide_icons.insert("LucideSearch".to_string());
             html.push_str(&format!(
-                "{}    <Search class=\"{} text-muted-foreground shrink-0\" />\n",
+                "{}    <LucideSearch class=\"{} text-muted-foreground shrink-0\" />\n",
                 ind,
                 nc::ICON_MD
             ));
@@ -751,7 +751,7 @@ impl VueGenerator {
             .unwrap_or_default();
 
         let (item_classes, dot_class) = Self::category_color_classes(color);
-        self.lucide_icons.insert("ArrowRight".to_string());
+        self.lucide_icons.insert("LucideArrowRight".to_string());
 
         let mut html = String::new();
         html.push_str(&format!("{}<div>\n", ind));
@@ -821,7 +821,7 @@ impl VueGenerator {
 {}        <div class="font-medium text-sm truncate">{}</div>
 {}        <div class="text-xs text-muted-foreground truncate">{}</div>
 {}      </div>
-{}      <ArrowRight class="h-4 w-4 ml-auto shrink-0 text-muted-foreground opacity-0 -translate-x-2 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
+{}      <LucideArrowRight class="h-4 w-4 ml-auto shrink-0 text-muted-foreground opacity-0 -translate-x-2 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
 {}    </router-link>
 "#,
                         ind, to, vshow,

@@ -3476,14 +3476,44 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_double_click,
                 style,
             } => {
-                // Callback messages are retained in the View contract and
-                // consumed by the input adapter (Task 25); this paint pass
-                // must not synthesize duplicate notifications.
-                let _ = (on_error, on_loaded, on_wheel, on_pan, on_double_click);
-                render_image_surface(
-                    src, alt, width, height, quality, fit, zoom, offset_x, offset_y, rotation,
-                    filter, style,
-                )
+                // PLAN-089 T-02: native 输入适配接线（Plan 547 Task 25 缺口
+                // 落地）——wheel/pan/dblclick 载荷回调挂上输入包装 widget。
+                // loaded/error 通知仍由媒体门 sweep 派发，本 paint pass 不
+                // 合成重复通知；无输入绑定时零包装（旧渲染面字节同形）。
+                let _ = (on_error, on_loaded);
+                // URI 末段 = 入队时资产 revision（媒体门 sweep 同形解析）；
+                // 在 src 被渲染函数消费前取定。
+                let src_revision = src
+                    .rsplit('/')
+                    .next()
+                    .and_then(|r| r.parse::<u64>().ok())
+                    .unwrap_or(0);
+                let surface = render_image_surface(
+                    src,
+                    alt,
+                    width,
+                    height,
+                    quality,
+                    fit,
+                    zoom,
+                    offset_x,
+                    offset_y,
+                    rotation,
+                    filter,
+                    style,
+                );
+                if on_wheel.is_none() && on_pan.is_none() && on_double_click.is_none() {
+                    surface
+                } else {
+                    crate::ui::iced::image_surface_input::ImageSurfaceInput::new(
+                        surface,
+                        src_revision,
+                        on_wheel,
+                        on_pan,
+                        on_double_click,
+                    )
+                    .into()
+                }
             }
 
             // PLAN-617 T-19: `video` —— 原生播放面。

@@ -228,13 +228,22 @@ impl VueGenerator {
             script.push('\n');
         }
 
-        // Generate lucide-vue-next imports (if any icons were used)
+        // Generate lucide-vue-next imports (if any icons were used).
+        // PLAN-089 r3：集合内是带 `Lucide` 前缀的模板名（防 handler 同名冲突，
+        // 见 lucide_component_name）——import 以 `原名 as Lucide原名` 对应。
         if !self.lucide_icons.is_empty() {
             let mut icons: Vec<String> = self.lucide_icons.iter().cloned().collect();
             icons.sort();
+            let aliased: Vec<String> = icons
+                .iter()
+                .map(|n| {
+                    let raw = n.strip_prefix("Lucide").unwrap_or(n);
+                    format!("{raw} as {n}")
+                })
+                .collect();
             script.push_str(&format!(
                 "import {{ {} }} from 'lucide-vue-next'\n",
-                icons.join(", ")
+                aliased.join(", ")
             ));
             script.push('\n');
         }

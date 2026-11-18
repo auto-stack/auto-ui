@@ -122,18 +122,20 @@ def main():
         mcp.call("autoui_screenshot", name="vm-matrix-open",
                  baseline=True)
 
-        # 2. rotation: ArrowRight => +90
-        out = mcp.call("autoui_keyboard", key="ArrowRight")
-        assert "sent" in out.lower() or "ok" in out.lower(), out
+        # 2. rotation: PLAN-089 组件工具栏 "更多" → "右转90°"（viewRequested →
+        # ApplyView 接受 → App rotation 状态推进）；键盘快捷键已随工具栏迁入组件。
+        press_button(mcp, "更多")
+        press_button(mcp, "右转90°")
         time.sleep(0.5)
         rot1 = state_field(mcp, "rotation")
         checks.append((f"rotation {rot0}->{rot1}", rot1 in ("90", "90.0")))
         mcp.call("autoui_screenshot", name="vm-matrix-rotation",
                  baseline=True)
 
-        # 3. pan: 'd' => offset_x + 40
-        out = mcp.call("autoui_keyboard", key="d")
-        assert "sent" in out.lower() or "ok" in out.lower(), out
+        # 3. pan: 工具栏 "平移" 展开方向键 → "→" => offset_x + 40（fit 保持）
+        press_button(mcp, "平移")
+        time.sleep(0.3)
+        press_button(mcp, "→")
         time.sleep(0.5)
         off1 = state_field(mcp, "offset_x")
         delta_ok = None
@@ -142,7 +144,7 @@ def main():
         except (TypeError, ValueError):
             delta_ok = False
         checks.append((f"pan offset {off0}->{off1}", delta_ok))
-        checks.append(("pan free fit", state_field(mcp, "fit_mode") == "free"))
+        checks.append(("pan keeps fit", state_field(mcp, "fit_mode") == "contain"))
         mcp.call("autoui_screenshot", name="vm-matrix-pan",
                  baseline=True)
 

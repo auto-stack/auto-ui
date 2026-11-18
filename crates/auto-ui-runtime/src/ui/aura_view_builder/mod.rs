@@ -6435,9 +6435,74 @@ mod tests {
         };
         assert_eq!(event_name(error), "ImageFailed");
         assert_eq!(event_name(loaded), "ImageLoaded");
-        assert_eq!(event_name(wheel), "ZoomAt");
-        assert_eq!(event_name(pan), "PanBy");
-        assert_eq!(event_name(double_click), "ToggleOneToOne");
+        // PLAN-089 T-02: 输入三臂为载荷回调——空参绑定（此 fixture 的形态）
+        // 事件期零载荷派发（与 Vue「空声明 → 无参调用」同语义）。
+        assert_eq!(
+            event_name(wheel.call(crate::ui::iced::image_surface_input::ImageSurfaceCarry::Wheel { delta_y: -1.5, x: 3.0, y: 4.0 })),
+            "ZoomAt"
+        );
+        assert_eq!(
+            event_name(pan.call(crate::ui::iced::image_surface_input::ImageSurfaceCarry::Pan {
+                dx: 7.0,
+                dy: -2.0,
+                phase: crate::ui::iced::image_surface::ImageSurfacePanPhase::Move,
+            })),
+            "PanBy"
+        );
+        assert_eq!(
+            event_name(double_click.call(
+                crate::ui::iced::image_surface_input::ImageSurfaceCarry::DoubleClick { x: 5.0, y: 6.0 }
+            )),
+            "ToggleOneToOne"
+        );
+
+        // 声明参数绑定（`.PanBy($0, $1, $2)` 形态）：事件期追加 (dx, dy,
+        // phase 字符串) 固定载荷——与 Vue surface_pans 包装同形。
+        let mut declared_node = AuraNode::element("ImageSurface")
+            .with_prop("src", Expr::Str("probe://r".into()))
+            .with_event("onpan", ".PanBy");
+        if let AuraNode::Element { events, .. } = &mut declared_node {
+            events.insert(
+                "onpan".to_string(),
+                auto_ui_compiler::aura::AuraEvent {
+                    handler: ".PanBy".to_string(),
+                    params: vec!["$0".to_string(), "$1".to_string(), "$2".to_string()],
+                },
+            );
+        }
+        let (declared_view, _, _probe) = builder.build_with_debug(&declared_node);
+        let View::ImageSurface {
+            on_pan: Some(declared_pan),
+            ..
+        } = declared_view
+        else {
+            panic!("expected declared-params ImageSurface view")
+        };
+        let declared_message =
+            declared_pan.call(crate::ui::iced::image_surface_input::ImageSurfaceCarry::Pan {
+                dx: 7.0,
+                dy: -2.0,
+                phase: crate::ui::iced::image_surface::ImageSurfacePanPhase::End,
+            });
+        match declared_message {
+            DynamicMessage::Typed {
+                widget_name,
+                event_name,
+                args,
+            } => {
+                assert_eq!(widget_name, "Viewer");
+                assert_eq!(event_name, "PanBy");
+                assert_eq!(args.len(), 3, "declared pan carries (dx, dy, phase)");
+                assert!(matches!(args[0], auto_val::Value::Double(f) if (f - 7.0).abs() < 1e-6));
+                assert!(matches!(args[1], auto_val::Value::Double(f) if (f + 2.0).abs() < 1e-6));
+                assert!(
+                    matches!(&args[2], auto_val::Value::Str(s) if s.as_str() == "end"),
+                    "phase must be the start/move/end string, got {:?}",
+                    args[2]
+                );
+            }
+            other => panic!("expected typed declared pan message, got {other:?}"),
+        }
 
         // The tracked path for the root is empty and therefore always maps to
         // the same id across rebuilds; this is the identity used by VM events.

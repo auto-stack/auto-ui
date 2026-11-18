@@ -41,6 +41,11 @@ dep stylekit {
 # PLAN-046 T-03：官方主题单源包（C-13；不复制配色表进本 app）。family 经
 # theme_name + design 绑定；既有 dark 首帧默认（dark_mode=true）与
 # accent_color 契约保留（C-14）。
+# PLAN-089：查看区迁正式 image-viewer 包。
+dep image_viewer {
+    path: "../../../packages/image-viewer"
+}
+
 dep themes {
     path: "../../../packages/themes"
 }

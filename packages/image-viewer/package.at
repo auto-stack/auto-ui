@@ -1,0 +1,4 @@
+name: "image-viewer"
+version: "0.1.0"
+namespace: "auto"
+description: "AutoUI controlled image viewport & preview dialog (PLAN-089)"

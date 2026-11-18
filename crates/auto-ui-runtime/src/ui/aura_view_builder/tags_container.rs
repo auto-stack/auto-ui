@@ -1034,6 +1034,21 @@ impl<'a> AuraViewBuilder<'a> {
                 .find_map(|name| aura_events_get_base(events, name))
                 .map(|ev| self.event_to_message_with(ev, bindings))
         };
+        // PLAN-089 T-02: 输入三臂改载荷回调——绑定位声明了参数（`$0` 形态）
+        // 则事件期追加该 kind 固定载荷；空参绑定保持无参派发（Vue「空声明
+        // → 无参调用」同语义）。loaded/error 仍为纯消息（PLAN-095 门派发）。
+        let input_event = |names: &[&str]| {
+            names
+                .iter()
+                .find_map(|name| aura_events_get_base(events, name))
+                .map(|ev| {
+                    let declared = !ev.params.is_empty();
+                    crate::ui::iced::image_surface_input::ImageSurfaceCallback::from_base(
+                        self.event_to_message_with(ev, bindings),
+                        declared,
+                    )
+                })
+        };
         View::ImageSurface {
             src,
             alt,
@@ -1048,9 +1063,9 @@ impl<'a> AuraViewBuilder<'a> {
             filter,
             on_error: event(&["onerror", "on_error", "error"]),
             on_loaded: event(&["onload", "onloaded", "on_loaded", "loaded"]),
-            on_wheel: event(&["onwheel", "wheel"]),
-            on_pan: event(&["onpan", "pan"]),
-            on_double_click: event(&["ondblclick", "dblclick", "doubleclick"]),
+            on_wheel: input_event(&["onwheel", "wheel"]),
+            on_pan: input_event(&["onpan", "pan"]),
+            on_double_click: input_event(&["ondblclick", "dblclick", "doubleclick"]),
             style: self.extract_style_with(props, bindings),
         }
     }

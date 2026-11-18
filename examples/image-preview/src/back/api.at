@@ -1,0 +1,30 @@
+// image-preview control-plane API (PLAN-089 T-04).
+// 031 同构：元数据控制面；像素走共享 media 路由
+// (/api/__auto/media/{id}/{revision})。会话在 back 进程建立；native 轨以
+// --server vm（back in-process）运行使前进程注册表与 back 同进程
+// （decisions.md §7 P1 平台边界）。
+use auto.image
+
+pub type ViewerControl = {
+    status: str
+}
+
+#[api(method = "GET", path = "/api/viewer/health")]
+pub fn viewer_health() str {
+    return "Ready"
+}
+
+#[api(method = "POST", path = "/api/viewer/open-file")]
+pub fn open_file(path str) str {
+    return image.open_session(path)
+}
+
+#[api(method = "GET", path = "/api/viewer/current-uri")]
+pub fn current_uri(session str) str {
+    return image.current_uri(session)
+}
+
+#[api(method = "POST", path = "/api/viewer/close")]
+pub fn close_session(session str) bool {
+    return image.close_session(session)
+}

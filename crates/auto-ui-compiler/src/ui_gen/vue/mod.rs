@@ -1477,6 +1477,14 @@ impl VueGenerator {
     /// PLAN-706: 字面量 icon 名 → 合法 lucide 组件名。
     /// 未命中全量表（如 kitchen-sink 的占位 `"sample"`）回退 `Circle`，
     /// 与动态名降级同族，避免 `import { Sample }` 整页炸掉。
+    ///
+    /// PLAN-089 r3（模板内 `Lucide` 前缀别名）：组件名一律带 `Lucide` 前缀
+    /// （`ZoomIn` → `LucideZoomIn`，import 以 `ZoomIn as LucideZoomIn` 对应）。
+    /// 裸 Pascal 名会与 .at widget 的同名 msg handler（如 image-viewer 的
+    /// `ZoomIn`/`ZoomOut` 工具栏回调）在 SFC 作用域内冲突——图标元素解析到
+    /// handler 函数被当作函数式组件每次 render 调用，发出请求风暴（031 实测
+    /// 203 条 source=zoom 请求、视图缩到 0.05 下限）。import 端见
+    /// script.rs 的 lucide-vue-next 生成。
     fn lucide_component_name(kebab: &str) -> String {
         let pascal = Self::kebab_to_pascal(kebab);
         // PLAN-705 merge-fix：全量表在 ui-gated 的 lucide_generated 里——
@@ -1484,14 +1492,14 @@ impl VueGenerator {
         // 直出 Pascal 名，706 的回退语义仅在 ui 形态生效）。
         {
             if crate::lucide_generated::is_known(kebab) {
-                return pascal;
+                return format!("Lucide{pascal}");
             }
-            return "Circle".to_string();
+            return "LucideCircle".to_string();
         }
         #[cfg(not(feature = "ui"))]
         {
             let _ = kebab;
-            pascal
+            format!("Lucide{pascal}")
         }
     }
 
@@ -3932,21 +3940,21 @@ widget Icons {
         );
         // ① 都没有 → 默认 20px（w-5 h-5）
         assert!(
-            sfc.contains("<Play class=\"w-5 h-5\" />"),
+            sfc.contains("<LucidePlay class=\"w-5 h-5\" />"),
             "默认尺寸应为 w-5 h-5：\n{sfc}"
         );
         // ② 只有 size → px 内联样式，且**不得**再带默认类
         assert!(
-            sfc.contains("<Pause style=\"width:12px;height:12px\" />"),
+            sfc.contains("<LucidePause style=\"width:12px;height:12px\" />"),
             "size 应落成 px 内联尺寸：\n{sfc}"
         );
         assert!(
-            !sfc.contains("<Pause class=\"w-5 h-5\""),
+            !sfc.contains("<LucidePause class=\"w-5 h-5\""),
             "size 生效时不得再注入默认类：\n{sfc}"
         );
         // ③ 显式尺寸类 → 原样，不加默认、不加 style（否则又会静默盖掉用户意图）
         assert!(
-            sfc.contains("<Volume2 class=\"h-3 w-3 text-muted-foreground\" />"),
+            sfc.contains("<LucideVolume2 class=\"h-3 w-3 text-muted-foreground\" />"),
             "显式尺寸类应原样输出：\n{sfc}"
         );
     }
@@ -7086,7 +7094,7 @@ widget IconProbe {
             !sfc.contains("iconfile:system-monitor\n") || !sfc.contains("<Iconfile"),
             "iconfile 前缀不得泄入 Lucide 推导: {sfc}"
         );
-        assert!(sfc.contains("<Calculator"), "lucide 组件照旧: {sfc}");
+        assert!(sfc.contains("<LucideCalculator"), "lucide 组件照旧（PLAN-089 r3 起带 Lucide 前缀别名）: {sfc}");
     }
 
     /// PLAN-646 T-07: Select Anything DOM 标记——通用元素注入
@@ -7226,7 +7234,7 @@ widget NavDemo {
 {sfc}"
         );
         assert!(
-            sfc.contains(":icon-comp=\"MessageSquare\""),
+            sfc.contains(":icon-comp=\"LucideMessageSquare\""),
             "lucide 图标组件:
 {sfc}"
         );
@@ -7264,6 +7272,56 @@ widget NavDemo {
             sfc.contains("MessageSquare"),
             "lucide import 收集:
 {sfc}"
+        );
+    }
+
+    /// PLAN-089 r3: lucide 图标与 .at msg handler 同名冲突回归 ——
+    /// `icon: "zoom-in"` + handler `ZoomIn` 共存时，图标 import/元素必须带
+    /// `Lucide` 前缀别名，模板图标元素不得解析到 handler 函数（否则每次
+    /// render 把 handler 当函数式组件调用，发出 source=zoom 请求风暴——
+    /// 031 实测 203 条、视图缩到 0.05 下限）。
+    #[test]
+    fn plan089_lucide_icon_handler_name_collision_aliased() {
+        let sfc = gen_sfc_from_widget_src_shadcn(
+            r##"
+widget ViewerDemo {
+    msg { ZoomIn, ZoomOut, ApplyView(str) }
+    model {
+        var zoom float = 1.0
+    }
+    view {
+        row {
+            button (icon: "zoom-in", title: "放大", onclick: .ZoomIn) {}
+            button (icon: "zoom-out", title: "缩小", onclick: .ZoomOut) {}
+        }
+    }
+    on {
+        .ZoomIn -> { .zoom = .zoom * 1.25 }
+        .ZoomOut -> { .zoom = .zoom / 1.25 }
+        .ApplyView(ev) -> { }
+    }
+}
+"##,
+        );
+        assert!(
+            sfc.contains("ZoomIn as LucideZoomIn") && sfc.contains("ZoomOut as LucideZoomOut"),
+            "图标 import 带别名（与 handler 名解耦）:\n{sfc}"
+        );
+        assert!(
+            sfc.contains("<LucideZoomIn") && sfc.contains("<LucideZoomOut"),
+            "图标元素用别名标签:\n{sfc}"
+        );
+        assert!(
+            !sfc.contains("<ZoomIn ") && !sfc.contains("<ZoomOut "),
+            "裸 Pascal 图标元素禁止出现（会解析到 handler）:\n{sfc}"
+        );
+        assert!(
+            sfc.contains("function ZoomIn()") && sfc.contains("function ZoomOut()"),
+            "handler 函数保持原名（.at 契约不变）:\n{sfc}"
+        );
+        assert!(
+            sfc.contains("@click=\"ZoomIn\"") && sfc.contains("@click=\"ZoomOut\""),
+            "onclick 绑定 handler:\n{sfc}"
         );
     }
 
@@ -8539,7 +8597,7 @@ widget L {
             sfc
         );
         assert!(
-            sfc.contains("<Terminal class=\"mr-2 h-4 w-4\" />"),
+            sfc.contains("<LucideTerminal class=\"mr-2 h-4 w-4\" />"),
             "icon prop lowers to lucide child:
 {}",
             sfc
@@ -8575,7 +8633,7 @@ widget L {
             sfc
         );
         assert!(
-            sfc.contains("<Save class=\"mr-2 h-4 w-4\" />") && sfc.contains("<span>保存</span>"),
+            sfc.contains("<LucideSave class=\"mr-2 h-4 w-4\" />") && sfc.contains("<span>保存</span>"),
             "plain item composes icon + title:
 {}",
             sfc
@@ -8734,7 +8792,7 @@ widget L {
             sfc
         );
         assert!(
-            sfc.contains("<Check v-if=\"n > 0\""),
+            sfc.contains("<LucideCheck v-if=\"n > 0\""),
             "checked_if drives the check slot:\n{}",
             sfc
         );
@@ -8772,7 +8830,7 @@ widget L {
             sfc
         );
         assert!(
-            sfc.contains("<FilePlus class=\"h-4 w-4\" />"),
+            sfc.contains("<LucideFilePlus class=\"h-4 w-4\" />"),
             "lucide icon component:\n{}",
             sfc
         );
@@ -8819,7 +8877,7 @@ widget App {
             sfc
         );
         assert!(
-            sfc.contains("<Check v-if=\"n > 0\""),
+            sfc.contains("<LucideCheck v-if=\"n > 0\""),
             "bare checked_if compiles to the same condition:\n{}",
             sfc
         );
