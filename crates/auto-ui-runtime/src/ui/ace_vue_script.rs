@@ -762,3 +762,94 @@ fn pair_lambda_regions<'a>(
     }
     specs
 }
+
+/// PLAN-980 U0 产品出口（④-A #5）：单文件 lane SFC 的**产品形态**。
+///
+/// 生成器（而非测试夹具）承担 U0 预验收夹具里的两步：①SFC 显式发射
+/// `import { … } from "./a2x_rt.mjs"`（名字=脚本实际引用的 `a2x_*` 词法
+/// 整词 ∩ 官方 rt 导出面，按首次出现序稳定）；②官方运行时模块源随产物
+/// 返回（落盘约定=与 SFC 同目录的 `a2x_rt.mjs`）。`lang="ts"` 保持——
+/// TS 处理由既有 Vue 构建链（vite/esbuild 同族转换）承担，产物零额外
+/// 要求。absent handler 仍保编译器旧道体（双轨期合同不变）。
+#[derive(Clone, Debug)]
+pub struct LaneSfcProduct {
+    /// 完整 SFC（含显式 a2x_rt import；脚本零 `a2x_*` 引用时不含）。
+    pub sfc: String,
+    /// 官方 a2x 运行时模块源（`script_runtime_body` 原样；ESM）。
+    pub runtime_mjs: String,
+    /// lane 派生体（诊断/记账出口——980 验收断言复用）。
+    pub lane_bodies: Vec<LaneHandlerBody>,
+    /// 具名缺席（旧道承载；产品侧照常运行）。
+    pub absent: Vec<String>,
+}
+
+/// 词法整词收集 `a2x_*` 标识符（与 `map_emitted` 同族判定——不截断、
+/// 不跨边界匹配）。
+fn a2x_identifiers(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut word = String::new();
+    let mut flush = |word: &mut String, out: &mut Vec<String>| {
+        if word.starts_with("a2x_") && !out.contains(word) {
+            out.push(word.clone());
+        }
+        word.clear();
+    };
+    for ch in text.chars() {
+        if ch.is_alphanumeric() || ch == '_' {
+            word.push(ch);
+        } else {
+            flush(&mut word, &mut out);
+        }
+    }
+    flush(&mut word, &mut out);
+    out
+}
+
+/// 单文件 lane 路径的产品生成入口（982 的 `auto run`（Vue）后续经 CLI
+/// 调用；本函数只管生成与运行时依赖，不启动页面/服务）。
+pub fn generate_sfc_with_lane_product(src: &str, path: &str) -> Result<LaneSfcProduct, String> {
+    let (sfc, lane_bodies, absent) = generate_sfc_with_lane(src, path)?;
+    let runtime_mjs = ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]);
+    // 引用名 ∩ rt 实际导出面（导出面由 rt 源自扫——不复制维护目录）。
+    let exports: Vec<&str> = runtime_mjs
+        .lines()
+        .filter_map(|l| {
+            l.strip_prefix("export function ")
+                .and_then(|r| r.split('(').next())
+        })
+        .filter(|n| n.starts_with("a2x_"))
+        .collect();
+    let identifiers = a2x_identifiers(&sfc);
+    let needed: Vec<&str> = identifiers
+        .iter()
+        .map(|w| w.as_str())
+        .filter(|w| exports.contains(w))
+        .collect();
+    if needed.is_empty() || sfc.contains("./a2x_rt.mjs") {
+        return Ok(LaneSfcProduct {
+            sfc,
+            runtime_mjs,
+            lane_bodies,
+            absent,
+        });
+    }
+    // import 插入 `<script setup …>` 开标签之后（顶层 import 位置合法且
+    // 稳定；生成器从未发射过 a2x_rt import——contains 守卫兜底）。
+    let tag_at = sfc
+        .find("<script setup")
+        .ok_or("script setup block not found")?;
+    let insert_at = tag_at + sfc[tag_at..].find('>').ok_or("script tag unclosed")? + 1;
+    let mut out = String::with_capacity(sfc.len() + 96);
+    out.push_str(&sfc[..insert_at]);
+    out.push_str(&format!(
+        "\nimport {{ {} }} from \"./a2x_rt.mjs\";",
+        needed.join(", ")
+    ));
+    out.push_str(&sfc[insert_at..]);
+    Ok(LaneSfcProduct {
+        sfc: out,
+        runtime_mjs,
+        lane_bodies,
+        absent,
+    })
+}
