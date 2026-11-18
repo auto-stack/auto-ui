@@ -196,9 +196,9 @@ gate 脚本）**：
 
 **V-04R 关键证据（vue/back-HTTP 真实媒体，AC-05 收口）**：
 - 031 打开媒体→受控回路就绪：`Ready`/`视图已接受` + `Images 1 corner-marked.png`（0.95s）
-- 角点像素框内象限分布：`red:TL green:BL blue:TR`（1.66s）
-- 旋转达像素：DOM bounding box 64×48→48×64 纵横互换 + 框内角点重排（2.79s）
-- 平移达像素：img box x 228→268（+40px @zoom1，3.36s）
+- 角点像素框内象限分布：`red:TL green:BL blue:TR`（2.11s）
+- 旋转达像素：DOM bounding box 64×48→48×64 纵横互换 + 框内角点重排（3.17s）
+- 平移达像素：img box x 228→268（+40px @zoom1，3.43s）
 - 前后图导航：媒体 URI 切换 + 状态 Next（2-3s）
 - 029：网格两照片（back photo_service 扫描 AUTO_PHOTO_ROOT）→ 查看区组件挂载
   （工具栏+胶囊）→ 变换截图 → 关闭回网格（合计 ~5s）

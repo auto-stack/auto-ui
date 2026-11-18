@@ -122,9 +122,10 @@ def main():
         mcp.call("autoui_screenshot", name="vm-matrix-open",
                  baseline=True)
 
-        # 2. rotation: PLAN-089 组件工具栏 "↻"（viewRequested → ApplyView 接受
-        # → App rotation 状态推进）；键盘快捷键已随工具栏迁入组件。
-        press_button(mcp, "↻")
+        # 2. rotation: PLAN-089 组件工具栏 "更多" → "右转90°"（viewRequested →
+        # ApplyView 接受 → App rotation 状态推进）；键盘快捷键已随工具栏迁入组件。
+        press_button(mcp, "更多")
+        press_button(mcp, "右转90°")
         time.sleep(0.5)
         rot1 = state_field(mcp, "rotation")
         checks.append((f"rotation {rot0}->{rot1}", rot1 in ("90", "90.0")))

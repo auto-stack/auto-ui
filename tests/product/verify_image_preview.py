@@ -10,7 +10,7 @@ passes and cleanup/reopen succeeded. Missing platforms (Linux runner /
 missing chromium) are recorded as not_run per-case and never merged into a
 green total.
 """
-import argparse, hashlib, json, os, re, shutil, socket, struct, subprocess, sys, time, zlib
+import argparse, ctypes, hashlib, json, os, re, shutil, socket, struct, subprocess, sys, time, zlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -194,7 +194,212 @@ def press_until(drv, label, predicate, timeout=20, tries=3):
     raise AssertionError(f'{label}: predicate never met')
 
 
-# ── native VM session ──
+def ensure_more(drv):
+    """PLAN-089 r4：窄窗工具栏把旋转/重置/平移收入具名“更多”菜单——按需展开。"""
+    if hasattr(drv, 'page'):
+        if drv.page.get_by_role('button', name='左转90°').count() > 0:
+            return
+        drv.press('更多')
+        drv.page.wait_for_timeout(400)
+        vfd.require(drv.page.get_by_role('button', name='左转90°').count() > 0,
+                    '更多菜单未展开（左转90° 不在 DOM）')
+    else:
+        if '左转90°' in drv.snapshot():
+            return
+        drv.press('更多')
+        vfd.require('左转90°' in drv.snapshot(), '更多菜单未展开（左转90° 不在快照）')
+
+
+def disabled_in(snapshot, label):
+    """MCP 快照里按钮块的 `disabled: true` 属性（Plan 423 P3：禁用项进快照）。
+    快照 label 可能带图标名前缀（如 `chevron-left上一张`）——按子串定位。"""
+    m = re.search(r'button #vnode_\d+ "[^"]*' + re.escape(label) + r'"[^\n]*\{', snapshot)
+    if not m:
+        return None
+    seg = snapshot[m.end():m.end() + 1500]
+    end = re.search(r'\n\s*\}', seg)
+    block = seg[:end.start()] if end else seg
+    return 'disabled: true' in block
+
+
+def view_fields(s):
+    """当前视图读回（fit/zoom/x/y/rot/rev/请求数）——窄窗断言用。"""
+    m = re.search(r'当前视图 fit=(\S+) zoom=([\d.\-]+) x=([\d.\-]+) y=([\d.\-]+) '
+                  r'rot=(\d+) rev=(\d+) 请求数=(\d+)', s)
+    if not m:
+        return {}
+    return {'fit': m.group(1), 'zoom': float(m.group(2)), 'x': float(m.group(3)),
+            'y': float(m.group(4)), 'rot': int(m.group(5)), 'rev': int(m.group(6)),
+            'requests': int(m.group(7))}
+
+
+class _RECT(ctypes.Structure):
+    _fields_ = [('left', ctypes.c_long), ('top', ctypes.c_long),
+                ('right', ctypes.c_long), ('bottom', ctypes.c_long)]
+
+
+def _main_window(drv):
+    win = next((x for x in drv.windows if READY_TEXT in (x.get('title') or '')), None)
+    return win or drv.windows[0]
+
+
+def native_client_rect(drv):
+    user = ctypes.windll.user32
+    user.GetClientRect.argtypes = [ctypes.c_void_p, ctypes.POINTER(_RECT)]
+    user.GetClientRect.restype = ctypes.c_int
+    r = _RECT()
+    user.GetClientRect(ctypes.c_void_p(_main_window(drv)['handle']), ctypes.byref(r))
+    return {'w': r.right - r.left, 'h': r.bottom - r.top}
+
+
+def native_window_rect(drv):
+    user = ctypes.windll.user32
+    user.GetWindowRect.argtypes = [ctypes.c_void_p, ctypes.POINTER(_RECT)]
+    user.GetWindowRect.restype = ctypes.c_int
+    r = _RECT()
+    user.GetWindowRect(ctypes.c_void_p(_main_window(drv)['handle']), ctypes.byref(r))
+    return {'w': r.right - r.left, 'h': r.bottom - r.top}
+
+
+def native_resize(drv, w, h):
+    """窗口 resize 到逻辑 w×h（DPI 虚拟化坐标与 GetWindowRect 同空间）。"""
+    user = ctypes.windll.user32
+    user.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int,
+                                  ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+    user.SetWindowPos(ctypes.c_void_p(_main_window(drv)['handle']), None, 0, 0,
+                      int(w), int(h), 0x0002 | 0x0004)  # SWP_NOMOVE|SWP_NOZORDER
+    time.sleep(1.0)
+    return {'window': native_window_rect(drv), 'client': native_client_rect(drv)}
+
+
+NARROW_W, NARROW_H = 420, 560
+TOOLBAR_NAMES = ['上一张', '下一张', '缩小', '放大', '适应', '宽度', '1:1', '更多']
+MORE_NAMES = ['左转90°', '右转90°', '重置', '平移']
+
+
+def toolbar_rects(page, names):
+    """vue：逐按钮的视口内 rect（供 420 宽“不裁切”断言）。"""
+    return page.evaluate("""(names) => {
+      const out = {};
+      for (const n of names) {
+        const b = [...document.querySelectorAll('button')].find(
+          x => ((x.textContent || '').trim() === n) || (x.getAttribute('title') === n));
+        if (!b) { out[n] = null; continue; }
+        const r = b.getBoundingClientRect();
+        out[n] = {x: Math.round(r.x), right: Math.round(r.right), w: Math.round(r.width),
+                  vis: r.width > 0 && r.x >= 0 && r.right <= innerWidth + 0.5};
+      }
+      return {vw: innerWidth, rects: out};
+    }""", names)
+
+
+def viewport_clip(page):
+    """vue：组件根（工具栏按钮的上两层 col）的 clip 区域——窄窗截图只取组件。"""
+    return page.evaluate("""() => {
+      const b = [...document.querySelectorAll('button')].find(
+        x => (x.textContent || '').trim() === '更多');
+      if (!b) return null;
+      const root = b.parentElement && b.parentElement.parentElement;
+      if (!root) return null;
+      const r = root.getBoundingClientRect();
+      return {x: Math.max(0, r.x), y: Math.max(0, r.y), width: r.width,
+              height: Math.min(r.height, 420)};
+    }""")
+
+
+def run_narrow(drv, cases, backend, out, report):
+    """V-05/V-06（r4）：420×560 窄窗——工具栏不裁切、全部动作可达；
+    native 另验窄窗 Dialog 关闭可达（退出按钮始终可达）。"""
+    if backend == 'native':
+        old = native_window_rect(drv)
+        try:
+            client = native_resize(drv, NARROW_W, NARROW_H)
+            cases.add('V-05 窄窗 420×560（窗口 resize 生效）', 'SetWindowPos 420×560',
+                      '窗口 420×560（client 约 407×524，含标题栏/边框）；组件仍渲染',
+                      [{'window_before': old, 'window_after': client['window'],
+                        'client': client['client']}],
+                      abs(client['window']['w'] - NARROW_W) <= 4
+                      and abs(client['window']['h'] - NARROW_H) <= 4
+                      and client['client']['w'] > 300)
+            snap = drv.snapshot()
+            row_ok = all(k in snap for k in TOOLBAR_NAMES)
+            ensure_more(drv)
+            msnap = drv.snapshot()
+            menu_ok = all(k in msnap for k in MORE_NAMES)
+            ashot = drv.screenshot('v05-narrow-native')
+            cases.add('V-05 窄窗 420×560（工具栏可达，native）', '420×560 → 更多',
+                      '行1 8 控件 + 更多菜单 4 控件均以普通命名控件可达（截图）',
+                      [{'row_ok': row_ok, 'menu_ok': menu_ok, 'shot': ashot}],
+                      row_ok and menu_ok)
+            # 窄窗内动作真实生效（不止“按钮存在”）：重置→放大→右转→平移→右移。
+            drv.press('重置')
+            drv.wait_state(lambda s: (lambda f: f and f.get('fit') == 'contain'
+                                      and f.get('zoom') == 1.0 and f.get('rot') == 0)(view_fields(s)),
+                           timeout=10)
+            drv.press('放大')
+            drv.wait_state(lambda s: (lambda f: f and f.get('zoom') == 1.25)(view_fields(s)),
+                           timeout=10)
+            drv.press('右转90°')
+            drv.wait_state(lambda s: (lambda f: f and f.get('rot') == 90)(view_fields(s)),
+                           timeout=10)
+            drv.press('平移')
+            drv.wait_state(lambda s: '左移' in s, timeout=8)
+            drv.press('→')
+            p = drv.wait_state(lambda s: (lambda f: f and f.get('x') == 40.0)(view_fields(s)),
+                               timeout=10)
+            f = view_fields(p)
+            cases.add('V-05 窄窗 420×560（动作生效，native）',
+                      '更多 → 重置/放大/右转90°/平移/→',
+                      '窄窗内动作全部生效：zoom=1.25 rot=90 x=40',
+                      [{'fields': f}],
+                      f.get('zoom') == 1.25 and f.get('rot') == 90 and f.get('x') == 40.0)
+            # 窄窗 Dialog：退出（关闭）始终可达。
+            c0 = re.search(r'cancelled=(\d+)', drv.snapshot())
+            n0 = int(c0.group(1)) if c0 else 0
+            drv.press('打开预览')
+            d = drv.wait_state(lambda s: '图片预览' in s and '关闭' in s, timeout=10)
+            dshot = drv.screenshot('v05-narrow-dialog-native')
+            drv.press('关闭')
+            c = drv.wait_state(lambda s: f'cancelled={n0 + 1}' in s, timeout=10)
+            cases.add('V-05 窄窗 Dialog 关闭可达（native）', 'open modal at 420×560 → 关闭',
+                      '对话框在窄窗打开、关闭控件可达、cancelled+1',
+                      [{'shot': dshot, 'cancelled_before': n0}],
+                      '图片预览' in d and f'cancelled={n0 + 1}' in c)
+        finally:
+            native_resize(drv, old['w'], old['h'])
+        return
+
+    # vue：demo 无媒体（P10）——窄窗只判布局/裁切与禁用态；真实媒体窄窗由
+    # V-04R 031 腿承担。
+    old_vp = drv.page.viewport_size
+    try:
+        drv.page.set_viewport_size({'width': NARROW_W, 'height': NARROW_H})
+        drv.page.wait_for_timeout(900)
+        row = toolbar_rects(drv.page, TOOLBAR_NAMES)
+        ensure_more(drv)
+        more = toolbar_rects(drv.page, MORE_NAMES)
+        clip = viewport_clip(drv.page)
+        target = out / 'v05-narrow-vue.png'
+        if clip:
+            drv.page.screenshot(path=str(target), clip=clip)
+        else:
+            drv.page.screenshot(path=str(target))
+        shot = {'path': str(target), 'sha256': sha(target)}
+        rects = dict(row['rects'])
+        rects.update(more['rects'])
+        inside = all(v and v['vis'] for v in rects.values()) and len(rects) == len(TOOLBAR_NAMES) + len(MORE_NAMES)
+        dis = drv.page.get_by_role('button', name='上一张').is_disabled()
+        cases.add('V-05 窄窗 420×560（工具栏不裁切，vue）',
+                  'set_viewport_size 420×560 + 更多',
+                  '行1+更多菜单 12 个命名控件 rect 全在 420 视口内；无媒体时禁用态可见',
+                  [{'rects': rects, 'viewport': row['vw'], 'disabled_prev': dis, 'shot': shot}],
+                  inside and row['vw'] == NARROW_W and dis)
+    finally:
+        drv.page.set_viewport_size({'width': old_vp['width'], 'height': old_vp['height']})
+        drv.page.wait_for_timeout(400)
+
+
+
 
 class Session:
     """Native `auto run -r vm` window driven through MCP. This is NOT the
@@ -567,6 +772,15 @@ def run_matrix(drv, cases, backend, shots=True):
         cases.add('V-01 open A → loaded', 'press 打开图片A (media ticket URI)',
                   'loaded 事件 → 状态=图片已加载', [l for l in last.splitlines() if 'loaded=' in l][:1],
                   '图片已加载' in last)
+        # V-06（r4）：加载完成 + 禁用导航状态（A：canPrevious=false）同帧证据。
+        _snap = drv.snapshot()
+        _lshot = drv.screenshot('v06-loaded-disabled-nav-native')
+        cases.add('V-06 加载/禁用导航状态（A：上一张 disabled，下一张可用）',
+                  'open A 后同帧快照 + 截图',
+                  'loaded 可见；canPrevious=false → 上一张 disabled:true；下一张 enabled',
+                  [{'disabled_prev': disabled_in(_snap, '上一张'),
+                    'disabled_next': disabled_in(_snap, '下一张'), 'shot': _lshot}],
+                  disabled_in(_snap, '上一张') is True and disabled_in(_snap, '下一张') is False)
     else:
         cases.not_run('V-01 open A → loaded', 'press 打开图片A (media ticket URI)',
                       'P10：auto.image.* __vmOnly（vue 生成器具名抛错桩）——浏览器无本地媒体会话；'
@@ -587,7 +801,7 @@ def run_matrix(drv, cases, backend, shots=True):
                   [body[:200]], text_ok and icon_ok)
         for cid, entry in [('V-01 放大 → zoom 1.25 (×1.25 步进, 单一变换算法)', 'press 放大'),
                            ('V-01 宽度适配', 'press 宽度'),
-                           ('V-01 ↻ → rotation 90 (±90 规范)', 'press ↻'),
+                           ('V-01 ↻ → rotation 90 (±90 规范)', '更多 → 右转90°'),
                            ('V-01 角点像素在帧内（跨层像素 oracle）', 'screenshot after open A'),
                            ('V-01 方向平移 +40', 'press 平移 →'),
                            ('V-01 滚轮缩放（$event.deltaY 载荷）', 'wheel up -120'),
@@ -615,9 +829,10 @@ def run_matrix(drv, cases, backend, shots=True):
         cases.add('V-01 宽度适配', 'press 宽度', 'fit=width zoom=1',
                   [l for l in last.splitlines() if '当前视图' in l][:1],
                   'fit=width' in last and 'zoom=1' in last)
-        drv.press('↻')
+        ensure_more(drv)
+        drv.press('右转90°')
         last = drv.wait_state(lambda s: 'rot=90' in s, timeout=10)
-        cases.add('V-01 ↻ → rotation 90 (±90 规范)', 'press ↻', 'rot=90',
+        cases.add('V-01 ↻ → rotation 90 (±90 规范)', '更多 → 右转90°', 'rot=90',
                   [l for l in last.splitlines() if '当前视图' in l][:1],
                   'rot=90' in last)
         # pixel oracle: the corner fixture's pure red/blue/green must be on screen
@@ -630,10 +845,11 @@ def run_matrix(drv, cases, backend, shots=True):
             cases.add('V-01 角点像素在帧内（跨层像素 oracle）', 'screenshot after open A',
                       '红/蓝/绿角点色全部出现（corner-marked.png 真实解码）',
                       [{'screenshot': shot, 'quadrants': q}], seen)
+        ensure_more(drv)
         drv.press('平移')
         drv.press('→')
         last = drv.wait_state(lambda s: 'x=40' in s, timeout=10)
-        cases.add('V-01 方向平移 +40', 'press 平移 →', 'x=40（源=pan）',
+        cases.add('V-01 方向平移 +40', '更多 → 平移 → →', 'x=40（源=pan）',
                   [l for l in last.splitlines() if '当前视图' in l][:1],
                   'x=40' in last)
         if backend == 'vue':
@@ -667,11 +883,14 @@ def run_matrix(drv, cases, backend, shots=True):
                   'seq/baseRevision/resourceId/resourceRevision/view/source 同帧一条',
                   req_line, ok_tuple)
     if media:
-        last = press_until(drv, '打开图片B', lambda s: '"resourceId":"img-b"' in s or '"resourceId": "img-b"' in s, timeout=20)
+        last = press_until(drv, '打开图片B',
+                           lambda s: ('"resourceId":"img-b"' in s or '"resourceId": "img-b"' in s)
+                           and disabled_in(s, '下一张') is True, timeout=20)
         cur = [l for l in last.splitlines() if '当前视图' in l][:1]
         cases.add('V-06 换图原子重置（新图基线 contain/1/0/0/0）', 'open B after transforms',
-                  'fit=contain zoom=1 x=0 y=0 rot=0，B 重新加载',
-                  cur, 'fit=contain' in last and 'zoom=1' in last and 'x=0' in last)
+                  'fit=contain zoom=1 x=0 y=0 rot=0，B 重新加载；导航禁用反向（下一张 disabled）',
+                  cur, 'fit=contain' in last and 'zoom=1' in last and 'x=0' in last
+                  and disabled_in(last, '下一张') is True and disabled_in(last, '上一张') is False)
     else:
         cases.not_run('V-06 换图原子重置（新图基线 contain/1/0/0/0）', 'open B after transforms',
                       'P10：vue 轨 demo 无媒体会话（__vmOnly）——具名后继依赖同 V-01 open A')
@@ -683,6 +902,12 @@ def run_matrix(drv, cases, backend, shots=True):
         cases.add('V-02 损坏 URI 是具名 error（不伪装空图/无限 loading）', 'open damaged.png',
                   'error 事件 code=load_failed，状态=图片加载失败',
                   [err], 'load_failed' in last and '图片加载失败' in last)
+        # V-06（r4）：错误态实际截图（指南 §3.2 状态矩阵）。
+        eshot = drv.screenshot(f'v02-error-{backend}')
+        cases.add('V-06 错误态可见（damaged 截图）', 'open damaged.png → screenshot',
+                  '错误态具名可读（load_failed/图片加载失败）且已实际截图',
+                  [err, {'shot': eshot}],
+                  'load_failed' in last and '图片加载失败' in last)
         # 状态为单槽瞬态值——以 error_count/load_count 计数器为稳定判据。
         before_err = int(re.search(r'error=(\d+)', drv.snapshot()).group(1))
         for _ in range(3):
@@ -891,6 +1116,7 @@ def main():
     try:
         if args.scope == 'full':
             run_matrix(drv, cases, args.backend)
+            run_narrow(drv, cases, args.backend, out, report)
         if args.skip_v04:
             cases.not_run('V-04R 031/029 legs', 'skipped by flag', '--skip-v04')
         else:
@@ -1067,7 +1293,8 @@ def run_v04(args, out, cases, report):
                 cases.add('V-04R 031 角点像素在帧内（跨层像素 oracle）', 'screenshot after open',
                           '角点标记色出现在真实截图并呈象限分布（corner-marked.png 经 back HTTP 解码）',
                           [{'screenshot': shot0, 'quadrants': q0, 'img_rect': r0}], len(q0) >= 2)
-                b31.press('↻')
+                ensure_more(b31)
+                b31.press('右转90°')
                 time.sleep(1.5)
                 r1 = img_rect()
                 q1 = (corner_quadrants(b31.screenshot('v04r-031-rot90')['path'],
@@ -1076,15 +1303,16 @@ def run_v04(args, out, cases, report):
                 # 旋转 90°：DOM bounding box 纵横互换 + 框内角点象限重排。
                 rot_ok = bool(r0 and r1 and (r0['w'] - r0['h']) * (r1['w'] - r1['h']) < 0
                               and q1 and q1 != q0)
-                cases.add('V-04R 031 组件工具栏旋转达像素（vue）', 'press ↻ (component)',
+                cases.add('V-04R 031 组件工具栏旋转达像素（vue）', '更多 → 右转90° (component)',
                           '旋转后 DOM bounding box 纵横互换 + 框内角点象限重排（数值 rot=90 由 native V-01 承担）',
                           [{'before': q0, 'after': q1, 'rect0': r0, 'rect1': r1}], rot_ok)
+                ensure_more(b31)
                 b31.press('平移')
                 b31.press('→')
                 time.sleep(1.5)
                 r2 = img_rect()
                 pan_ok = bool(r1 and r2 and (r2['x'] - r1['x']) >= 30)
-                cases.add('V-04R 031 组件工具栏平移达像素（vue）', 'press 平移 →',
+                cases.add('V-04R 031 组件工具栏平移达像素（vue）', '更多 → 平移 → →',
                           '平移后 img bounding box x 位移 ≥30px（offset_x +40 @zoom1）',
                           [{'rot': r1, 'pan': r2}], pan_ok)
                 b31.press('Open Directory')

@@ -33,6 +33,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
         ZoomIn, ZoomOut, FitContain, FitWidth, OneToOne,
         RotateLeft, RotateRight, ResetView,
         PanLeft, PanRight, PanUp, PanDown, TogglePanPad,
+        ToggleMore,
         OnWheel(float), OnPan(float, float, str), OnDoubleClick, OnLoaded, OnError,
         RequestPrevious, RequestNext,
         "viewRequested"(str), "loaded"(str), "error"(str), "navigateRequested"(str)
@@ -74,6 +75,9 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
         var g_dy float = 0.0
         // pan 方向键显隐（窄窗默认收起；普通命名控件可达）。
         var pan_pad bool = false
+        // r4：窄窗（420×560）常用动作入一行、旋转/重置/平移收入具名
+        // “更多”菜单——工具栏不裁切，全部动作可达（指南 §3.1 089 行）。
+        var more_open bool = false
         var seq int = 0
     }
     computed {
@@ -92,11 +96,16 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                     button (text: "宽度", title: "适应宽度", onclick: .FitWidth, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
                     button (text: "1:1", title: "原始比例", onclick: .OneToOne, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
                     col (style: "w-2 shrink-0") {}
-                    button (text: "↺", title: "向左旋转90°", onclick: .RotateLeft, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
-                    button (text: "↻", title: "向右旋转90°", onclick: .RotateRight, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
-                    button (icon: "maximize", title: "重置视图", onclick: .ResetView, disabled: !.c_ok, style: "h-8 w-8 shrink-0 justify-center rounded-md hover:bg-muted disabled:opacity-40") {}
-                    col (style: "w-2 shrink-0") {}
-                    button (text: "平移", title: "方向平移", onclick: .TogglePanPad, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                    // r4：more 菜单开关（具名；420×560 下仍在本行内）。
+                    button (text: "更多", title: "更多变换", onclick: .ToggleMore, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                }
+                if .more_open {
+                    row (style: "h-10 shrink-0 items-center gap-1 px-2 border-b border-border bg-card") {
+                        button (text: "左转90°", title: "向左旋转90°", onclick: .RotateLeft, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                        button (text: "右转90°", title: "向右旋转90°", onclick: .RotateRight, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                        button (text: "重置", title: "重置视图", onclick: .ResetView, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                        button (text: "平移", title: "方向平移", onclick: .TogglePanPad, disabled: !.c_ok, style: "h-8 px-2 shrink-0 text-xs rounded-md hover:bg-muted disabled:opacity-40") {}
+                    }
                 }
                 if .pan_pad {
                     row (style: "h-10 shrink-0 items-center gap-1 px-2 border-b border-border bg-card") {
@@ -413,6 +422,9 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
         }
         .TogglePanPad -> {
             .pan_pad = !.pan_pad
+        }
+        .ToggleMore -> {
+            .more_open = !.more_open
         }
         .RequestPrevious -> {
             if .canPrevious {
