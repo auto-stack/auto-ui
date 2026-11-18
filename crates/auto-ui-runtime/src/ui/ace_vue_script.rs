@@ -562,7 +562,7 @@ pub fn generate_sfc_with_lane(
         (Vec::new(), Vec::new());
     let mut first_sfc: Option<String> = None;
     for (wi, decl) in decls.iter().enumerate() {
-        let (sfc_w, bodies_w, absent_w) = generate_widget_with_lane(decl, src, path, wi)?;
+        let (_name_w, sfc_w, bodies_w, absent_w) = generate_widget_with_lane(decl, src, path, wi)?;
         if first_sfc.is_none() {
             first_sfc = Some(sfc_w);
         }
@@ -587,7 +587,7 @@ fn generate_widget_with_lane(
     src: &str,
     path: &str,
     node_index: usize,
-) -> Result<(String, Vec<LaneHandlerBody>, Vec<String>), String> {
+) -> Result<(String, String, Vec<LaneHandlerBody>, Vec<String>), String> {
     use auto_ui_dialect::UiStmt;
     let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl)
         .map_err(|e| format!("extract: {e:?}"))?;
@@ -679,7 +679,8 @@ fn generate_widget_with_lane(
     } else {
         splice_lane_handler_bodies(&sfc, &bodies)?
     };
-    Ok((spliced, bodies, absent))
+    // ④-A #8：名字随件返回（多 widget 产品道按名对位产物）。
+    Ok((widget.name.clone(), spliced, bodies, absent))
 }
 
 /// 切片#6k：脱糖源里的 view 内联 lambda 体区间清单（`=> {` …配对 `}`，
@@ -813,12 +814,10 @@ fn a2x_identifiers(text: &str) -> Vec<String> {
     out
 }
 
-/// 单文件 lane 路径的产品生成入口（982 的 `auto run`（Vue）后续经 CLI
-/// 调用；本函数只管生成与运行时依赖，不启动页面/服务）。
-pub fn generate_sfc_with_lane_product(src: &str, path: &str) -> Result<LaneSfcProduct, String> {
-    let (sfc, lane_bodies, absent) = generate_sfc_with_lane(src, path)?;
-    let runtime_mjs = ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]);
-    // 引用名 ∩ rt 实际导出面（导出面由 rt 源自扫——不复制维护目录）。
+/// ④-A #8：rt import 插入参数化（href=产物相对 rt 的引用——App.vue 用
+/// `./a2x_rt.mjs`、src/components/ 下用 `../a2x_rt.mjs`）。零引用/已含时
+/// 原样返回。
+fn attach_rt_import(sfc: String, runtime_mjs: &str, href: &str) -> String {
     let exports: Vec<&str> = runtime_mjs
         .lines()
         .filter_map(|l| {
@@ -833,34 +832,123 @@ pub fn generate_sfc_with_lane_product(src: &str, path: &str) -> Result<LaneSfcPr
         .map(|w| w.as_str())
         .filter(|w| exports.contains(w))
         .collect();
-    if needed.is_empty() || sfc.contains("./a2x_rt.mjs") {
-        return Ok(LaneSfcProduct {
+    if needed.is_empty() || sfc.contains(href) {
+        return sfc;
+    }
+    let tag_at = match sfc.find("<script setup") {
+        Some(at) => at,
+        None => return sfc,
+    };
+    let insert_at = match sfc[tag_at..].find('>') {
+        Some(off) => tag_at + off + 1,
+        None => return sfc,
+    };
+    let mut out = String::with_capacity(sfc.len() + 96);
+    out.push_str(&sfc[..insert_at]);
+    out.push_str(&format!("
+import {{ {} }} from \"{href}\";", needed.join(", ")));
+    out.push_str(&sfc[insert_at..]);
+    out
+}
+
+/// PLAN-980 ④-A #8：**多 widget 产品件**——单文件源逐 widget 的 lane SFC
+/// （每个 widget 独立拼接自己的 lane 体；rt 官方模块共享一份，import 按各
+/// 产物位置参数化——根 widget 与组件 widget 的相对 href 不同）。
+#[derive(Clone, Debug)]
+pub struct WidgetLaneSfc {
+    /// widget 名（声明序）。
+    pub name: String,
+    /// 该 widget 的完整 SFC（lane 体已拼接 + 按位显式 a2x_rt import）。
+    pub sfc: String,
+    /// 该 widget 的 lane 派生体（诊断/记账出口）。
+    pub bodies: Vec<LaneHandlerBody>,
+    /// 该 widget 的具名缺席（工具键门聚合拒绝；产品侧不裁决）。
+    pub absent: Vec<String>,
+}
+
+/// 多 widget 产品集合（`generate_sfcs_with_lane_product` 返回）。
+#[derive(Clone, Debug)]
+pub struct LaneSfcProductMulti {
+    /// 声明序逐 widget（首件=根/App 位）。
+    pub widgets: Vec<WidgetLaneSfc>,
+    /// 官方 a2x 运行时模块源（全文件共享一份；落盘约定=src/a2x_rt.mjs）。
+    pub runtime_mjs: String,
+}
+
+/// 多 widget 产品生成入口（④-A #8：工具完整/增量双道的多 widget 接入）。
+/// `rt_href_root`=根产物（src/App.vue 位）的相对引用；`rt_href_component`
+/// =组件产物（src/components/{W}.vue 位）的相对引用。
+pub fn generate_sfcs_with_lane_product(
+    src: &str,
+    path: &str,
+    rt_href_root: &str,
+    rt_href_component: &str,
+) -> Result<LaneSfcProductMulti, String> {
+    use auto_ui_dialect::UiStmt;
+    let session = auto_parser_api::session::CompilerSession::ui();
+    let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+    let ast = parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+        .map_err(|e| format!("parse: {e:?}"))?;
+    let decls: Vec<&auto_ui_dialect::ast::WidgetDecl> = ast
+        .domain_stmts()
+        .filter_map(|s| match s {
+            UiStmt::WidgetDecl(d) => Some(d),
+            _ => None,
+        })
+        .collect();
+    if decls.is_empty() {
+        return Err("no widget decl".to_string());
+    }
+    let runtime_mjs = ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]);
+    let mut widgets = Vec::with_capacity(decls.len());
+    for (wi, decl) in decls.iter().enumerate() {
+        let (name, sfc, bodies, absent) = generate_widget_with_lane(decl, src, path, wi)?;
+        let href = if wi == 0 { rt_href_root } else { rt_href_component };
+        let sfc = attach_rt_import(sfc, &runtime_mjs, href);
+        widgets.push(WidgetLaneSfc {
+            name,
             sfc,
-            runtime_mjs,
-            lane_bodies,
+            bodies,
             absent,
         });
     }
-    // import 插入 `<script setup …>` 开标签之后（顶层 import 位置合法且
-    // 稳定；生成器从未发射过 a2x_rt import——contains 守卫兜底）。
-    let tag_at = sfc
-        .find("<script setup")
-        .ok_or("script setup block not found")?;
-    let insert_at = tag_at + sfc[tag_at..].find('>').ok_or("script tag unclosed")? + 1;
-    let mut out = String::with_capacity(sfc.len() + 96);
-    out.push_str(&sfc[..insert_at]);
-    out.push_str(&format!(
-        "\nimport {{ {} }} from \"./a2x_rt.mjs\";",
-        needed.join(", ")
-    ));
-    out.push_str(&sfc[insert_at..]);
-    Ok(LaneSfcProduct {
-        sfc: out,
+    Ok(LaneSfcProductMulti {
+        widgets,
         runtime_mjs,
+    })
+}
+
+/// 单文件 lane 路径的产品生成入口（982 的 `auto run`（Vue）后续经 CLI
+/// 调用；本函数只管生成与运行时依赖，不启动页面/服务）。④-A #8 起为多
+/// widget 出口的首件委托（单 widget 源行为不变；多 widget 源=首 widget
+/// SFC + 聚合 bodies/absent——完整逐件产物走 `generate_sfcs_with_lane_product`）。
+pub fn generate_sfc_with_lane_product(src: &str, path: &str) -> Result<LaneSfcProduct, String> {
+    let multi = generate_sfcs_with_lane_product(src, path, "./a2x_rt.mjs", "./a2x_rt.mjs")?;
+    let lane_bodies = multi
+        .widgets
+        .iter()
+        .flat_map(|w| w.bodies.clone())
+        .collect();
+    let absent = multi
+        .widgets
+        .iter()
+        .flat_map(|w| w.absent.clone())
+        .collect();
+    let first = multi
+        .widgets
+        .into_iter()
+        .next()
+        .ok_or_else(|| "no widget decl".to_string())?;
+    Ok(LaneSfcProduct {
+        sfc: first.sfc,
+        runtime_mjs: multi.runtime_mjs,
         lane_bodies,
         absent,
     })
 }
+
 
 /// 同文件模块 fn 收集（vue.rs 链 `same_file_module_fns` 同款——公开 API
 /// 复刻，供单文件 lane 生成道重挂；PLAN-075 的裸生成器丢顶层 fn 同病）。
