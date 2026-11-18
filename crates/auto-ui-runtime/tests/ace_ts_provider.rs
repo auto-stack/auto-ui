@@ -1824,3 +1824,48 @@ fn p980_web_head_props_semi_and_foreign_body_fail_closed() {
         Err(e) => assert!(!e.is_empty(), "named rejection"),
     }
 }
+
+/// PLAN-980 on-if 刀：param handler 的 if 体**结构化派生**（010 的
+/// `.SetTheme` 形）——检查函数语句整体发射（带 `if (…)` 分支结构，非扁平
+/// 无条件序列）、条件经 a2x_str_eq（Str==str 放行）、宿主映射（形参 `t`、
+/// `dark_mode.value`）。
+#[test]
+fn p980_on_if_param_handler_if_body_derives_structured() {
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+    let src = "widget W {
+    msg { SetTheme(str) }
+    model { var dark_mode bool = true }
+    view { col { text \"T\" } }
+    on {
+        .SetTheme(t) -> {
+            if t == \"light\" {
+                .dark_mode = false
+            }
+            if t == \"dark\" {
+                .dark_mode = true
+            }
+        }
+    }
+}
+";
+    let (sfc, bodies, absent) = generate_sfc_with_lane(src, "p980-onif.at").expect("SFC");
+    assert!(absent.is_empty(), "if-body param handler derives: {absent:?}");
+    assert_eq!(bodies.len(), 1);
+    let text = bodies[0].lines.join("
+");
+    assert!(
+        text.contains("a2x_str_eq(t, a2x_str_lit(\"light\"))"),
+        "str comparison condition emits via a2x_str_eq with the mapped param: {text}"
+    );
+    assert!(text.contains("if ("), "branch structure is emitted: {text}");
+    assert!(
+        text.contains("dark_mode.value"),
+        "field host mapping applies inside branches: {text}"
+    );
+    let at = sfc.find("function SetTheme").expect("spliced fn");
+    let tail = &sfc[at..(at + 700).min(sfc.len())];
+    assert!(
+        tail.contains("if (") && tail.contains("a2x_str_eq"),
+        "spliced handler carries the structured branch body"
+    );
+}

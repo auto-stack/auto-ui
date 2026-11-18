@@ -579,16 +579,34 @@ impl ComponentFragmentLane {
             .ok_or_else(|| format!("fn `{fn_name}` not in the view"))?;
         // (RHS span, block, idx) —— 源序发射；#6p：span 随片段返回（与通道
         // 行按源序 merge，调用/赋值相对位置不重排）。
+        // PLAN-980 on-if 刀：**根块结构化收集**——根块语句逐个判形：Assign
+        // 照旧按 RHS span 过滤；`If` 以 cond 表达式 span 过滤后**整语句发射**
+        //（a2x-ts lower 产出带分支的完整 if/else 文本——分支内赋值不再被
+        // 扁平块迭代裸喷成无条件序列，条件表达式不再丢失）。非根块不单独
+        // 收集（其赋值已随所属 If 语句整体发射）。
         let mut hits: Vec<(std::ops::Range<usize>, u32, usize)> = Vec::new();
-        for (bi, block) in facts.body.blocks.iter().enumerate() {
-            for (si, stmt) in block.stmts.iter().enumerate() {
-                if let ace_core::hir::Stmt::Assign { value, .. } = stmt {
+        let root = facts
+            .body
+            .blocks
+            .first()
+            .ok_or_else(|| format!("fn `{fn_name}` has no root block"))?;
+        for (si, stmt) in root.stmts.iter().enumerate() {
+            match stmt {
+                ace_core::hir::Stmt::Assign { value, .. } => {
                     if let Some(e) = facts.body.exprs.get(value.0 as usize) {
                         if region.start <= e.span.start && e.span.end <= region.end {
-                            hits.push((e.span.start..e.span.end, bi as u32, si));
+                            hits.push((e.span.start..e.span.end, 0u32, si));
                         }
                     }
                 }
+                ace_core::hir::Stmt::If { cond, .. } => {
+                    if let Some(e) = facts.body.exprs.get(cond.0 as usize) {
+                        if region.start <= e.span.start && e.span.end <= region.end {
+                            hits.push((e.span.start..e.span.end, 0u32, si));
+                        }
+                    }
+                }
+                _ => {}
             }
         }
         hits.sort_by_key(|(span, _, _)| span.start);
