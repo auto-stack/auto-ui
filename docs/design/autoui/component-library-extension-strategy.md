@@ -33,7 +33,7 @@
 | CL-06 | 第二批 CommandPalette | 现有Command族、028 Launcher搜索/选中/键盘 | local/provided单一过滤owner、稳定命令ID、分组/禁用/键盘/提示；028保留原评分、recent、环绕和宿主启动 | [PLAN-096](../../plans/096-command-palette.md)，drafting r2，0/8；复用既有参考图 |
 | CL-07 | 第二批 TagInput | 015 Notes标签控件/store、Reader主检出book_detail（只读） | 标签增删、精确去重、静态建议、键盘/上限和修订确认；015真实存储消费，Reader后续独立迁移 | [PLAN-097](../../plans/097-tag-input.md)，drafting r2，0/8；复用既有参考图 |
 | CL-08 | 通用扩展批 ColorPicker / ColorDialog | 031 Paint 色板、Dialog、087数值输入 | 内嵌选色与对话框；sRGB/HEX/RGB/HSV、透明度、预览/提交/取消；实际Paint消费 | 已立 [PLAN-088](../../plans/088-color-picker-and-dialog.md)，drafting r2，0/8 |
-| CL-09 | 通用扩展批 ImageViewport / ImagePreviewDialog | 031局部ImageViewport、ImageSurface、029 Gallery | 缩放/平移/90°旋转/适应窗口、错误与modal；图片查看不扩成绘图或3D引擎 | 已交 [PLAN-089](../../plans/089-image-viewport-and-preview-dialog.md)（r2，8/8：包 `packages/image-viewer/` + 规范 [docs/specs/ui/image-viewport.md](../specs/ui/image-viewport.md)） |
+| CL-09 | 通用扩展批 ImageViewport / ImagePreviewDialog | 031局部ImageViewport、ImageSurface、029 Gallery | 缩放/平移/90°旋转/适应窗口、错误与modal；图片查看不扩成绘图或3D引擎 | 已归档 [PLAN-089](../../plans/archived/089-image-viewport-and-preview-dialog.md)（delivered r3 @`5dbc3661`，9/9：包 `packages/image-viewer/` + 规范 [docs/specs/ui/image-viewport.md](../specs/ui/image-viewport.md)；031/029 迁移 + 窄窗“更多”菜单；091 消费 pin=`5dbc3661`） |
 | CL-10 | 能力补齐研究 DataTable | 已有注册、Vue 映射、026 表格及 CRUD blueprint | 先核查排序/选择/原生交互，再补正式合同；不作为“从零新增 DataTable”统计 | 待调查 |
 | CL-11 | 能力补齐研究 Date/Time Picker | Calendar 声明及原生日历转换 | 核查日期、时间、区间、格式、键盘和双端语义，再决定组合组件 | 待调查 |
 | CL-12 | 储备研究 FontPicker / FontDialog | Reader 字号预设、字体资源及主题接口 | 先调查字体枚举、可用字体与回退；现有字号选择不等于完整字体选择器 | 待调查 |
@@ -93,7 +93,7 @@ CL-18…26当前只保留目的、来源和重新讨论的触发条件，不冻�
 | 088选色器 | T-03等待087 | 负责Paint选色和内容颜色兼容，不改主题全局状态 |
 | 089图片查看 | 可独立；087为可选复用 | 先迁031视口与029查看区，随后091重基线网格 |
 | 090媒体播放 | 可独立 | 负责020/030控制条和实例媒体身份；业务列表/服务不搬迁 |
-| 091资源选择 | T-03等待085/086/089 | 消费029网格，复用图片预览；不另建文件系统服务 |
+| 091资源选择 | T-03等待085/086/089（089 pin=`5dbc3661`，消费 `packages/image-viewer/` + `docs/specs/ui/image-viewport.md`） | 消费029网格，复用图片预览；不另建文件系统服务 |
 | 092属性面板 | T-03等待087/088 | 先交普通设置消费，资源字段/反射/多对象编辑不纳本版 |
 | 093停靠布局 | 核心探针可独立，041迁移T-04等084/085 | 保留Editor文档/撤销/焦点和actions；与OS native_dock功能分开 |
 
