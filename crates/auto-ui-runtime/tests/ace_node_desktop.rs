@@ -309,7 +309,6 @@ fn p980_node_desktop_byte_len_lane_is_not_ui_dispatch() {
 
 /// 坏权限：provider 撤权后请求在分派前拒（零 UI 效果）；复权后同一公开门
 /// 恢复（exact-fix 先例）。
-#[test]
 /// 复核反例（B-NATIVE-R authored）：work 用例未覆盖的三个纪律面——
 /// ① 车道标签：错 op tag / 负打包值具名拒（BAD_OP/BAD_SLOT），零 UI 效果；
 /// ② 跨 session 队列隔离：显式句柄 poll 只见本 session 队列（不偷当前
@@ -359,6 +358,7 @@ fn p980_node_desktop_lane_tag_queue_isolation_and_double_close() {
     assert_eq!(raw_close(s1), ui980_status::SESSION_CLOSED);
 }
 
+#[test]
 fn p980_node_desktop_permission_revocation_refuses_before_dispatch() {
     ensure_ui980_provider().expect("provider ready");
     let (src, path) = counter_fixture();
@@ -747,4 +747,115 @@ fn p980_u01_input_on_static_face_refuses() {
         err.contains("event targets need a model/msg surface"),
         "named refusal: {err}"
     );
+}
+
+/// U01 真窗输入档（排窗，`AUTO_UI_ACE_NODE_E2E=1`）：真实窗口 + 脚本键入
+/// （`type` 动作）→ typed 队列 → AV 重放 → ui980 FFI apply → 受控回显；
+/// 含非法数值具名拒零效果与两实例隔离。**边界**：键入经桥注入（与真实
+/// 键盘同一注入边界），OS 级键盘事件不可自动化；窗口面验证=真窗渲染
+/// input 目标 + FFI 提交后的状态行（回显源）。
+#[test]
+fn p980_u01_window_input_e2e() {
+    if std::env::var("AUTO_UI_ACE_NODE_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "p980_u01_window_input_e2e: not scheduled (set AUTO_UI_ACE_NODE_E2E=1 after \
+             the prep stage; window single-instance discipline)"
+        );
+        return;
+    }
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let exe = manifest
+        .join("../../target/debug/examples/ace_node_desktop_window.exe")
+        .canonicalize()
+        .unwrap();
+    assert!(
+        exe.is_file(),
+        "preparation failure: {} missing — run the prep stage first",
+        exe.display()
+    );
+    let tmp = std::env::temp_dir().join(format!("p980-u01-e2e-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
+    let (src, _) = input_fixture();
+    let src_path = tmp.join("note_form.at");
+    std::fs::write(&src_path, &src).expect("write input fixture");
+    let ev_path = tmp.join("evidence.json");
+
+    // i0：note=你好 Auto、count=42、count=abc（具名拒）；i1：note=乙侧、count=-5。
+    let script = "3:type:0:0:你好 Auto,5:type:0:1:42,7:type:0:1:abc,9:type:1:0:乙侧,11:type:1:1:-5";
+    let out = std::process::Command::new(&exe)
+        .arg("--source")
+        .arg(&src_path)
+        .arg("--evidence")
+        .arg(&ev_path)
+        .arg("--instances")
+        .arg("2")
+        .arg("--script")
+        .arg(script)
+        .arg("--hold-ms")
+        .arg("6000")
+        .current_dir(&tmp)
+        .output()
+        .expect("spawn window exe");
+    assert!(
+        out.status.success(),
+        "window exe failed: {} / {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let ev: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&ev_path).unwrap())
+        .unwrap_or_else(|e| panic!("evidence json: {e}"));
+
+    assert_eq!(ev["node"].as_str().unwrap(), "NoteForm");
+    assert!(
+        ev["frames_rendered"].as_u64().unwrap_or(0) >= 4,
+        "real window rendered"
+    );
+
+    // 非法数值=具名拒（证据记名，不静默；其余无错误）。
+    let errors: Vec<&str> = ev["errors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e.as_str().unwrap_or(""))
+        .collect();
+    assert!(
+        errors.iter().any(|e| e.contains("invalid numeric input")),
+        "named invalid-input refusal: {errors:?}"
+    );
+
+    // dispatch 轨迹：4 次 typed 交付（非法那次不产生 dispatch），实例隔离。
+    let log = ev["dispatch_log"].as_array().unwrap();
+    let msgs: Vec<(u64, &str)> = log
+        .iter()
+        .map(|d| (d["instance"].as_u64().unwrap(), d["msg"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        msgs,
+        vec![
+            (0, "SetNote"),
+            (0, "SetCount"),
+            (1, "SetNote"),
+            (1, "SetCount")
+        ],
+        "typed dispatch order/instance isolation"
+    );
+
+    let state_of = |entry: &serde_json::Value, field: &str| -> String {
+        entry["states"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find_map(|kv| {
+                let pair = kv.as_array()?;
+                (pair[0].as_str() == Some(field)).then(|| pair[1].as_str().unwrap().to_string())
+            })
+            .unwrap_or_else(|| panic!("state {field} present: {entry}"))
+    };
+    let last_i0 = log.iter().filter(|d| d["instance"] == 0).last().unwrap();
+    let last_i1 = log.iter().filter(|d| d["instance"] == 1).last().unwrap();
+    assert_eq!(state_of(last_i0, "note"), "你好 Auto", "str input echo");
+    assert_eq!(state_of(last_i0, "count"), "42", "abc rejected, 42 stands");
+    assert_eq!(state_of(last_i1, "note"), "乙侧");
+    assert_eq!(state_of(last_i1, "count"), "-5");
 }
