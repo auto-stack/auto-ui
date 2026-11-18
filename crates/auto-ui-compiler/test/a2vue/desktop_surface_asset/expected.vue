@@ -3,7 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { Button } from '@/components/ui/button'
 
-import { ChevronLeft, ChevronRight, Circle, Image, X } from 'lucide-vue-next'
+import { ChevronLeft as LucideChevronLeft, ChevronRight as LucideChevronRight, Circle as LucideCircle, Image as LucideImage, X as LucideX } from 'lucide-vue-next'
 
 
 const __desktop_cmd = ref<string>('')
@@ -253,12 +253,12 @@ onMounted(() => {
 <div v-if="menu_id == e.id" class="fixed z-50 p-1 border rounded bg-card" :style="{ left: '8px', top: '8px' }">
                       <template v-if="e.full == '1'">
                         <div class="flex flex-col w-12 h-12">
-                          <Circle class="w-full h-full" />
+                          <LucideCircle class="w-full h-full" />
                         </div>
                       </template>
                       <template v-else>
                         <div :style="'h-10 w-10 items-center justify-center rounded-xl bg-[' + e.color + ']'" class="flex flex-col">
-                          <Circle class="w-5 h-5 text-white" />
+                          <LucideCircle class="w-5 h-5 text-white" />
                         </div>
                       </template>
                       <template v-if="menu_id == e.id">
@@ -281,7 +281,7 @@ onMounted(() => {
 <div v-if="drag_moved == '1'" class="fixed z-50 p-0 bg-transparent" :style="{ left: __desktop_cursor_x + 'px', top: __desktop_cursor_y + 'px' }">
             <template v-if="drag_moved == '1'">
               <div class="flex flex-col w-12 h-12 opacity-60">
-                <Circle class="w-full h-full" />
+                <LucideCircle class="w-full h-full" />
               </div>
             </template>
 </div>
@@ -307,16 +307,16 @@ onMounted(() => {
 <div v-if="__wp_picker == '1'" class="fixed z-50 p-4 border rounded-xl bg-card w-[720px] gap-3" :style="{ left: __wp_x + 'px', top: __wp_y + 'px' }">
         <template v-if="__wp_picker == '1'">
           <div class="flex flex-row w-full items-center gap-2">
-            <Image class="w-4 h-4 text-muted-foreground" />
+            <LucideImage class="w-4 h-4 text-muted-foreground" />
             <span class="text-xs text-muted-foreground flex-1 truncate">{{ __wp_dir }}</span>
             <Button variant="ghost" class="h-7 px-3 text-xs rounded-lg bg-muted text-muted-foreground hover:bg-primary/10" @click="PickerBrowse" :key="'Button-9'">浏览…</Button>
             <Button variant="ghost" class="h-7 w-7 px-0 rounded-lg text-muted-foreground hover:bg-primary/10" @click="PickerDismiss" :key="'Button-10'">
-              <X class="h-4 w-4" />            </Button>
+              <LucideX class="h-4 w-4" />            </Button>
           </div>
           <template v-if="__wp_preview == ''">
             <div class="flex flex-row w-full items-center gap-2">
               <Button variant="ghost" class="h-8 w-8 px-0 rounded-lg hover:bg-primary/10" @click="PickerNav('prev')" :key="'Button-11'">
-                <ChevronLeft class="h-4 w-4" />              </Button>
+                <LucideChevronLeft class="h-4 w-4" />              </Button>
               <div class="flex flex-col gap-1" v-for="e in __wp_visible" :key="(((e as any)?.id ?? e))">
                 <div @click="PickerApply(e.path)">
                   <div :class="(e.path == __wp_current ? 'w-[120px] h-[68px] rounded-lg border-2 border-primary' : 'w-[120px] h-[68px] rounded-lg border-2 border-transparent')" class="flex flex-col">
@@ -329,7 +329,7 @@ onMounted(() => {
                 </div>
               </div>
               <Button variant="ghost" class="h-8 w-8 px-0 rounded-lg hover:bg-primary/10" @click="PickerNav('next')" :key="'Button-13'">
-                <ChevronRight class="h-4 w-4" />              </Button>
+                <LucideChevronRight class="h-4 w-4" />              </Button>
             </div>
           </template>
           <template v-else>
@@ -337,10 +337,10 @@ onMounted(() => {
               <img :src="__wp_preview" alt="preview" class="w-full h-[440px] rounded-lg bg-black/40 object-contain" />
               <div class="flex flex-row items-center gap-2">
                 <Button variant="ghost" class="h-8 w-8 px-0 rounded-lg hover:bg-primary/10" @click="PickerNav('prev')" :key="'Button-14'">
-                  <ChevronLeft class="h-4 w-4" />                </Button>
+                  <LucideChevronLeft class="h-4 w-4" />                </Button>
                 <Button variant="ghost" class="h-7 px-3 text-xs rounded-lg bg-muted text-muted-foreground hover:bg-primary/10" @click="PickerBack" :key="'Button-15'">返回</Button>
                 <Button variant="ghost" class="h-8 w-8 px-0 rounded-lg hover:bg-primary/10" @click="PickerNav('next')" :key="'Button-16'">
-                  <ChevronRight class="h-4 w-4" />                </Button>
+                  <LucideChevronRight class="h-4 w-4" />                </Button>
               </div>
             </div>
           </template>

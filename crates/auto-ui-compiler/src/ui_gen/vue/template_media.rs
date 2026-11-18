@@ -1468,10 +1468,10 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                         // 勾选槽：与 vm 同构（16px 槽 + lucide check）。
                         let check = match a.checked_if.as_deref() {
                             Some(cond) => {
-                                self.lucide_icons.insert("Check".to_string());
+                                self.lucide_icons.insert("LucideCheck".to_string());
                                 format!(
                                     "{item_ind}  <span class=\"w-4 h-3 shrink-0 inline-flex items-center\">\
-                                     <Check v-if=\"{}\" class=\"h-3 w-3 text-zinc-200\" /></span>\n",
+                                     <LucideCheck v-if=\"{}\" class=\"h-3 w-3 text-zinc-200\" /></span>\n",
                                     self.convert_condition(cond)
                                 )
                             }
