@@ -240,6 +240,10 @@ pub struct HostSession {
     pub states: Vec<Vec<(String, String)>>,
     /// 事件目标（声明序）：(label, msg)。
     pub buttons: Vec<(String, String)>,
+    /// PLAN-980 B-AV U01（输入组件面）：文本输入目标（声明序，接 buttons
+    /// 之后编号）：(绑定字段名, 数值型？)。渲染值取该实例状态行——受控单
+    /// 向数据流（键入→typed 事件→AV 重放→apply→回显）。
+    pub inputs: Vec<(String, bool)>,
     queue: VecDeque<(usize, usize)>,
     closed: bool,
     /// 证据：实际 UI 提交计数/轨迹、poll 计数、late/stale 拒绝计数。
@@ -259,6 +263,7 @@ impl HostSession {
             texts: vec![Vec::new(); instances],
             states: vec![Vec::new(); instances],
             buttons: Vec::new(),
+            inputs: Vec::new(),
             queue: VecDeque::new(),
             closed: false,
             applies: 0,
@@ -709,6 +714,17 @@ pub struct ButtonSpec {
     pub msg: String,
 }
 
+/// PLAN-980 B-AV U01：**文本输入目标**规格——`input (value: .field)
+/// { oninput: .Msg }`（值绑定=受控回显源；oninput=typed 事件消息）。
+/// 载荷类型由绑定字段初值决定（int=数值输入：键入文本在桥面解析，
+/// 非数值=具名拒零效果；str=文本输入原样入队）。
+#[derive(Clone, Debug)]
+pub struct InputSpec {
+    pub field: String,
+    pub msg: String,
+    pub numeric: bool,
+}
+
 /// 一步的结果（测试/证据消费）。
 #[derive(Clone, Debug, PartialEq)]
 pub enum StepOutcome {
@@ -729,6 +745,13 @@ pub enum ScriptStep {
         instance: usize,
         target: usize,
     },
+    /// PLAN-980 B-AV U01：文本输入事件（键入全文；目标=输入目标编号，
+    /// 接 buttons 之后）。真实键入（窗口）与脚本注入同一边界。
+    TypeText {
+        instance: usize,
+        target: usize,
+        text: String,
+    },
     Close,
     Reopen,
     /// 向最近关闭的 session 定向晚到事件（世代纪律反例靶）。
@@ -744,6 +767,11 @@ pub struct NodeDesktopBridge {
     pub session: Option<i32>,
     instances: usize,
     buttons: Vec<ButtonSpec>,
+    /// PLAN-980 B-AV U01：输入目标（目标编号=buttons.len() 起）。
+    inputs: Vec<InputSpec>,
+    /// 输入事件的键入全文（FIFO，与 provider 事件队列 (instance, target)
+    /// 一一配对——poll 取码、桥面取文）。
+    pending_texts: VecDeque<(usize, usize, String)>,
     text_leaf_count: usize,
     load_texts: Vec<String>,
     last_states: Vec<Vec<(String, AceStateValue)>>,
@@ -755,10 +783,12 @@ pub struct NodeDesktopBridge {
     tick_no: usize,
 }
 
-/// view 树投影：文本叶计数 + 按钮目标（label=StrLit、onclick=.Msg）。
+/// view 树投影：文本叶计数 + 按钮目标（label=StrLit、onclick=.Msg）+
+/// 输入目标（value 绑定字段 + oninput 消息）。
 struct ViewShape {
     text_leaf_count: usize,
     buttons: Vec<ButtonSpec>,
+    inputs: Vec<InputSpec>,
 }
 
 fn project_view_shape(
@@ -774,6 +804,38 @@ fn project_view_shape(
             ComponentViewItem::Element(el) => {
                 if el.tag == "text" {
                     shape.text_leaf_count += 1;
+                } else if el.tag == "input" {
+                    // PLAN-980 B-AV U01：`input (value: .field)
+                    // { oninput: .Msg }`——值绑定（Entry key="value"，Expr
+                    // = .field 字段引用）+ 事件绑定（key 前缀 on）。numeric
+                    // 由字段初值定（load 阶段补）。
+                    let mut field = None;
+                    let mut msg = None;
+                    for sub in &el.items {
+                        if let ComponentViewItem::Entry(entry) = sub {
+                            if let ace_core::source::age_component::ComponentEntryValue::Expr(
+                                expr,
+                            ) = &entry.value
+                            {
+                                if let ExprKind::Field { base, name } = &expr.kind {
+                                    if matches!(&base.kind, ExprKind::Var(v) if v.name == "self") {
+                                        if entry.is_event {
+                                            msg = Some(name.name.clone());
+                                        } else if entry.key == "value" {
+                                            field = Some(name.name.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if let (Some(field), Some(msg)) = (field, msg) {
+                        shape.inputs.push(InputSpec {
+                            field,
+                            msg,
+                            numeric: false,
+                        });
+                    }
                 } else if el.tag == "button" {
                     let label = el
                         .label
@@ -851,6 +913,7 @@ impl NodeDesktopBridge {
         let mut shape = ViewShape {
             text_leaf_count: 0,
             buttons: Vec::new(),
+            inputs: Vec::new(),
         };
         project_view_shape(&node.view.tree, &mut shape);
 
@@ -908,7 +971,7 @@ impl NodeDesktopBridge {
         };
 
         // 事件引擎：有 model 的源挂 N 实例；Hello 类（无 model 字段可观察）
-        // 为静态面（engine=None——点击无从产生，事件面缺席具名可辨）。
+        // 为静态面（engine=None——点击/键入无从产生，事件面缺席具名可辨）。
         let mut engine = None;
         let mut identities = Vec::new();
         let mut last_states = Vec::new();
@@ -924,10 +987,28 @@ impl NodeDesktopBridge {
                     .first()
                     .map(|row| row.iter().map(|(n, _)| n.clone()).collect())
                     .unwrap_or_default();
+                // B-AV U01：输入载荷类型按绑定字段初值定（Int=数值输入，
+                // 键入文本桥面解析；Str=文本输入原样）。绑定字段不在状态行
+                // =投影/状态面失配，装载期具名拒。
+                for spec in &mut shape.inputs {
+                    let kind = last_states
+                        .first()
+                        .and_then(|row| row.iter().find(|(n, _)| *n == spec.field).map(|(_, v)| v));
+                    match kind {
+                        Some(AceStateValue::Int(_)) => spec.numeric = true,
+                        Some(AceStateValue::Str(_)) => {}
+                        _ => {
+                            return Err(format!(
+                                "input target binds field `{}` which is not a live str/int state",
+                                spec.field
+                            ))
+                        }
+                    }
+                }
                 engine = Some(e);
             }
             Err(e) if e.contains("requires at least one") => {
-                if !shape.buttons.is_empty() {
+                if !shape.buttons.is_empty() || !shape.inputs.is_empty() {
                     return Err(format!(
                         "event targets need a model/msg surface, but the state face refused: {e}"
                     ));
@@ -944,6 +1025,8 @@ impl NodeDesktopBridge {
             session: None,
             instances,
             buttons: shape.buttons,
+            inputs: shape.inputs,
+            pending_texts: VecDeque::new(),
             text_leaf_count: shape.text_leaf_count,
             load_texts: per_node_texts.first().cloned().unwrap_or_default(),
             last_states,
@@ -963,6 +1046,19 @@ impl NodeDesktopBridge {
     /// 事件目标清单（声明序；测试/证据消费）。
     pub fn buttons(&self) -> &[ButtonSpec] {
         &self.buttons
+    }
+
+    /// B-AV U01：输入目标清单（声明序；目标编号=buttons.len() 起）。
+    pub fn inputs(&self) -> &[InputSpec] {
+        &self.inputs
+    }
+
+    /// B-AV U01：文本输入事件注入（真实键入与脚本同一边界）——provider
+    /// 队列取 (instance, target) 码、桥面 FIFO 配对键入全文。
+    pub fn inject_text(&mut self, instance: usize, target: usize, text: &str) {
+        push_event(instance, target);
+        self.pending_texts
+            .push_back((instance, target, text.to_string()));
     }
 
     /// open：AV `ui_open` → session；就位显示模型并提交文本叶与状态初值
@@ -992,6 +1088,11 @@ impl NodeDesktopBridge {
                     .buttons
                     .iter()
                     .map(|b| (b.label.clone(), b.msg.clone()))
+                    .collect();
+                s.inputs = self
+                    .inputs
+                    .iter()
+                    .map(|i| (i.field.clone(), i.numeric))
                     .collect();
             }
         }
@@ -1067,10 +1168,64 @@ impl NodeDesktopBridge {
         }
         let instance = (code / 1000) as usize - 1;
         let target = (code % 1000) as usize - 1;
-        let Some(button) = self.buttons.get(target) else {
-            let msg = format!("event target {target} has no button binding");
-            self.errors.push(msg.clone());
-            return StepOutcome::LaneError(msg);
+        // B-AV U01：目标编号统一解析——buttons 段（0..buttons.len()）走
+        // unit 点击；inputs 段（buttons.len() 起）走 typed 键入（载荷=桥面
+        // FIFO 配对的键入全文；int 绑定桥面解析，非数值=非法输入具名拒零
+        // 效果）。先解析全部 owned 数据再借引擎，避免借用交叠。
+        enum Plan {
+            Unit {
+                msg: String,
+            },
+            Typed {
+                msg: String,
+                args: Vec<AceStateValue>,
+            },
+        }
+        let plan = if let Some(button) = self.buttons.get(target) {
+            Plan::Unit {
+                msg: button.msg.clone(),
+            }
+        } else {
+            let Some(spec) = target
+                .checked_sub(self.buttons.len())
+                .and_then(|i| self.inputs.get(i))
+                .cloned()
+            else {
+                let msg = format!("event target {target} has no button/input binding");
+                self.errors.push(msg.clone());
+                return StepOutcome::LaneError(msg);
+            };
+            // 配对取文：与 push 同序 FIFO（同 (instance, target) 多次键入
+            // 依序消费；无配对文本=协议断裂，具名拒）。
+            let pos = self
+                .pending_texts
+                .iter()
+                .position(|(i, t, _)| *i == instance && *t == target);
+            let Some(pos) = pos else {
+                let msg = format!("input event target {target} has no paired typed text");
+                self.errors.push(msg.clone());
+                return StepOutcome::LaneError(msg);
+            };
+            let (_, _, text) = self.pending_texts.remove(pos).unwrap();
+            let arg = if spec.numeric {
+                match text.trim().parse::<i32>() {
+                    Ok(v) => AceStateValue::Int(v),
+                    Err(_) => {
+                        let msg = format!("invalid numeric input for `{}`: {text:?}", spec.field);
+                        self.errors.push(msg.clone());
+                        return StepOutcome::DispatchRefused(msg);
+                    }
+                }
+            } else {
+                AceStateValue::Str(text)
+            };
+            Plan::Typed {
+                msg: spec.msg,
+                args: vec![arg],
+            }
+        };
+        let msg_name = match &plan {
+            Plan::Unit { msg } | Plan::Typed { msg, .. } => msg.clone(),
         };
         let Some(engine) = self.engine.as_mut() else {
             let msg = "static-face source has no event engine".to_string();
@@ -1082,17 +1237,21 @@ impl NodeDesktopBridge {
             .get(instance)
             .cloned()
             .unwrap_or_else(|| "i0".to_string());
-        match engine.dispatch(&identity, &button.msg) {
+        let dispatch_result = match plan {
+            Plan::Unit { msg } => engine.dispatch(&identity, &msg),
+            Plan::Typed { msg, args } => engine.dispatch_with_args(&identity, &msg, &args),
+        };
+        match dispatch_result {
             Ok(DispatchOutcome::Delivered(states)) => {
                 let snapshot: Vec<(String, String)> = states
                     .iter()
                     .map(|(n, v)| (n.clone(), state_display(v)))
                     .collect();
                 self.dispatch_log
-                    .push((instance, button.msg.clone(), snapshot));
+                    .push((instance, msg_name.clone(), snapshot));
                 StepOutcome::Dispatched {
                     instance,
-                    msg: button.msg.clone(),
+                    msg: msg_name,
                     states: self.diff_and_apply(instance, &states),
                 }
             }
@@ -1148,6 +1307,9 @@ impl NodeDesktopBridge {
             return Err(format!("ui_close refused: {rc}"));
         }
         self.session = None;
+        // B-AV U01：键入配对随 session 关闭一并丢弃（provider 队列已清，
+        // 残留文本会成为无码孤儿）。
+        self.pending_texts.clear();
         Ok(())
     }
 
@@ -1171,6 +1333,11 @@ impl NodeDesktopBridge {
         for step in due {
             match step {
                 ScriptStep::Click { instance, target } => push_event(instance, target),
+                ScriptStep::TypeText {
+                    instance,
+                    target,
+                    text,
+                } => self.inject_text(instance, target, &text),
                 ScriptStep::Close => {
                     if let Err(e) = self.close_session() {
                         self.errors.push(e);
@@ -1272,7 +1439,16 @@ pub fn with_bridge<R>(f: impl FnOnce(&mut NodeDesktopBridge) -> R) -> Option<R> 
 
 #[derive(Clone, Debug)]
 pub enum NodeDesktopMsg {
-    Click { instance: usize, target: usize },
+    Click {
+        instance: usize,
+        target: usize,
+    },
+    /// B-AV U01：文本输入事件（键入全文经 iced INPUT_TEXT 线程局部暂存，
+    /// on() 处理时读取——与 View::Input on_change 的既有机制同口）。
+    Type {
+        instance: usize,
+        target: usize,
+    },
     BridgeTick,
 }
 
@@ -1287,6 +1463,12 @@ impl Component for AceNodeDesktopWindow {
     fn on(&mut self, msg: Self::Msg) {
         match msg {
             NodeDesktopMsg::Click { instance, target } => push_event(instance, target),
+            NodeDesktopMsg::Type { instance, target } => {
+                // 真实键入全文（iced on_input 暂存）→ 桥注入（push_event
+                // + 配对文本，与脚本 TypeText 同一边界）。
+                let text = crate::ui::iced::renderer::last_input_text();
+                with_bridge(|b| b.inject_text(instance, target, &text));
+            }
             NodeDesktopMsg::BridgeTick => {
                 with_bridge(|b| b.step());
             }
@@ -1308,6 +1490,7 @@ impl Component for AceNodeDesktopWindow {
                 s.texts.clone(),
                 s.states.clone(),
                 s.buttons.clone(),
+                s.inputs.clone(),
                 s.generation,
             )
         }) else {
@@ -1316,7 +1499,7 @@ impl Component for AceNodeDesktopWindow {
                 .child(View::text("ace-node-desktop: no session"))
                 .build();
         };
-        let (texts, states, buttons, generation) = session;
+        let (texts, states, buttons, inputs, generation) = session;
         let mut root = View::col().spacing(10).padding(24);
         root = root.child(View::text_styled(
             &format!("session generation {generation}"),
@@ -1333,6 +1516,23 @@ impl Component for AceNodeDesktopWindow {
             }
             for (_slot, (name, value)) in states.get(i).into_iter().flatten().enumerate() {
                 col = col.child(View::text(format!("{name} = {value}")));
+            }
+            // B-AV U01：输入目标（受控单向数据流——显示值=该实例状态行，
+            // 键入→Type 消息→typed 队列→AV 重放→apply→回显）。
+            for (idx, (field, _numeric)) in inputs.iter().enumerate() {
+                let value = states
+                    .get(i)
+                    .and_then(|row| row.iter().find(|(n, _)| n == field).map(|(_, v)| v.clone()))
+                    .unwrap_or_default();
+                col = col.child(
+                    View::input(format!("{field}:"))
+                        .value(value)
+                        .on_change(NodeDesktopMsg::Type {
+                            instance: i,
+                            target: buttons.len() + idx,
+                        })
+                        .build(),
+                );
             }
             let mut row = View::row().spacing(8);
             for (target, (label, _msg)) in buttons.iter().enumerate() {

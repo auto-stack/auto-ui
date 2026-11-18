@@ -21,7 +21,7 @@
 use auto_ui_runtime::ui::ace_hello::stable_f0_root;
 use auto_ui_runtime::ui::ace_node_desktop::{
     ensure_ui980_provider, host_session_display, host_session_stats, push_event, push_late_event,
-    ui980_status, NodeDesktopBridge, StepOutcome, UI980_PROVIDER_NAME,
+    ui980_status, NodeDesktopBridge, ScriptStep, StepOutcome, UI980_PROVIDER_NAME,
 };
 
 fn hello_fixture(name: &str) -> (String, String) {
@@ -164,7 +164,8 @@ fn p980_node_desktop_bad_schema_and_abi_refuse_before_ui_effects() {
     let session = bridge.open().expect("open");
     push_event(0, 99);
     match bridge.step() {
-        StepOutcome::LaneError(e) => assert!(e.contains("no button binding"), "{e}"),
+        // B-AV U01：目标空间扩至 button/input 后文案随之（判别不弱化）。
+        StepOutcome::LaneError(e) => assert!(e.contains("no button/input binding"), "{e}"),
         other => panic!("unbound target must be a named lane error, got {other:?}"),
     }
     // 恢复：合法事件继续走通（失败后恢复，同入口）。
@@ -546,4 +547,204 @@ fn raw_ui980_call(body: &str) -> i32 {
         } => *n,
         other => panic!("raw ui980 call `{body}` failed: {other:?}"),
     }
+}
+
+// ---------------------------------------------------------------------------
+// PLAN-980 B-AV U01（首个实施切片）：文本输入组件的 AV 窗口面。
+// ---------------------------------------------------------------------------
+
+/// U01 输入夹具（converter-mini：str+int 双输入、无④依赖——主题/导入/
+/// f64 均不入本面；003/011 全量承载压在④域合同，见 §9 分母冻结）。
+fn input_fixture() -> (String, String) {
+    let src = "widget NoteForm {
+    msg Msg { SetNote(str), SetCount(int) }
+    model { var note str = \"\"
+        var count int = 7 }
+    view { col {
+        input (value: .note) { oninput: .SetNote }
+        input (value: .count) { oninput: .SetCount }
+        text .note { }
+    } }
+    on {
+        .SetNote(s) -> { .note = s }
+        .SetCount(v) -> { .count = v }
+    }
+}
+"
+    .to_string();
+    (src, "p980-u01-input.at".to_string())
+}
+
+/// 输入目标编号（fixture 冻结：无按钮，inputs 从 0 起）。
+const INPUT_NOTE: usize = 0;
+const INPUT_COUNT: usize = 1;
+
+fn str_state(bridge: &NodeDesktopBridge, instance: usize, field: &str) -> String {
+    use auto_ui_runtime::ui::ace_state_bridge::AceStateValue;
+    bridge
+        .states(instance)
+        .unwrap_or_else(|| panic!("instance {instance} live"))
+        .into_iter()
+        .find(|(n, _)| n == field)
+        .map(|(_, v)| match v {
+            AceStateValue::Str(s) => s,
+            other => panic!("{field} is not str: {other:?}"),
+        })
+        .unwrap_or_else(|| panic!("field {field} present"))
+}
+
+fn int_state(bridge: &NodeDesktopBridge, instance: usize, field: &str) -> i32 {
+    use auto_ui_runtime::ui::ace_state_bridge::AceStateValue;
+    bridge
+        .states(instance)
+        .unwrap_or_else(|| panic!("instance {instance} live"))
+        .into_iter()
+        .find(|(n, _)| n == field)
+        .map(|(_, v)| match v {
+            AceStateValue::Int(i) => i,
+            other => panic!("{field} is not int: {other:?}"),
+        })
+        .unwrap_or_else(|| panic!("field {field} present"))
+}
+
+/// U01 oracle 全件：原值/中文回显（str 载荷经 typed 队列→AV 重放→apply
+/// str）、数值输入（int 绑定桥面解析）、**非法输入**（非数值→具名拒零
+/// 效果——count 不动、无 apply）、两实例隔离。
+#[test]
+fn p980_u01_input_text_numeric_reject_and_two_instance_isolation() {
+    let (src, path) = input_fixture();
+    let mut bridge = NodeDesktopBridge::load(&src, &path, 2).expect("input fixture loads");
+    assert_eq!(bridge.buttons().len(), 0, "no buttons in fixture");
+    assert_eq!(bridge.inputs().len(), 2, "two input targets");
+    assert!(bridge.inputs()[INPUT_NOTE].field == "note" && !bridge.inputs()[INPUT_NOTE].numeric);
+    assert!(bridge.inputs()[INPUT_COUNT].field == "count" && bridge.inputs()[INPUT_COUNT].numeric);
+    bridge.open().expect("open");
+    bridge.install_script(vec![
+        (
+            1,
+            ScriptStep::TypeText {
+                instance: 0,
+                target: INPUT_NOTE,
+                text: "你好 Auto".to_string(),
+            },
+        ),
+        (
+            2,
+            ScriptStep::TypeText {
+                instance: 0,
+                target: INPUT_COUNT,
+                text: "42".to_string(),
+            },
+        ),
+        // 非法输入：非数值进 int 绑定——具名拒零效果。
+        (
+            3,
+            ScriptStep::TypeText {
+                instance: 0,
+                target: INPUT_COUNT,
+                text: "abc".to_string(),
+            },
+        ),
+        // 两实例隔离：实例 1 各自键入。
+        (
+            4,
+            ScriptStep::TypeText {
+                instance: 1,
+                target: INPUT_NOTE,
+                text: "乙侧".to_string(),
+            },
+        ),
+        (
+            5,
+            ScriptStep::TypeText {
+                instance: 1,
+                target: INPUT_COUNT,
+                text: "-5".to_string(),
+            },
+        ),
+    ]);
+
+    let mut refused = 0usize;
+    let mut dispatched: Vec<(usize, String)> = Vec::new();
+    for _ in 0..12 {
+        match bridge.step() {
+            StepOutcome::Dispatched { instance, msg, .. } => {
+                assert!(
+                    msg == "SetNote" || msg == "SetCount",
+                    "declared msg only: {msg}"
+                );
+                dispatched.push((instance, msg));
+            }
+            StepOutcome::DispatchRefused(e) => {
+                assert!(e.contains("invalid numeric input"), "named rejection: {e}");
+                refused += 1;
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(refused, 1, "exactly one invalid-input rejection");
+
+    // 原值/中文（str 经 typed 队列与 AV 场景重放）。
+    assert_eq!(str_state(&bridge, 0, "note"), "你好 Auto");
+    // 数值输入（int 绑定桥面解析→SendArgs int）。
+    assert_eq!(
+        int_state(&bridge, 0, "count"),
+        42,
+        "abc was rejected, 42 stands"
+    );
+    // 两实例隔离。
+    assert_eq!(str_state(&bridge, 1, "note"), "乙侧");
+    assert_eq!(int_state(&bridge, 1, "count"), -5);
+
+    // dispatch 轨迹：4 次 typed 交付（非法那次不产生 dispatch）——每实例
+    // 各一条 SetNote + SetCount。
+    assert_eq!(bridge.dispatch_log.len(), 4, "four typed dispatches");
+    assert_eq!(dispatched.len(), 4);
+    assert!(dispatched.contains(&(0, "SetNote".to_string())));
+    assert!(dispatched.contains(&(0, "SetCount".to_string())));
+    assert!(dispatched.contains(&(1, "SetNote".to_string())));
+    assert!(dispatched.contains(&(1, "SetCount".to_string())));
+    // apply 证据面：非法输入零 apply——SetCount 仅成功值各一次（i0=42、
+    // i1=-5；初值 7 在 open 已提交，不在此后重放）。
+    let evidence = bridge.evidence();
+    // 串行套件下 sessions 累积——取本 bridge 的 session（末位）。
+    let sessions = evidence["sessions"].as_array().unwrap();
+    let this = sessions.last().expect("own session recorded");
+    let applies_after: Vec<(usize, &str)> = this["applied"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| {
+            (
+                a["instance"].as_i64().unwrap() as usize,
+                a["kind"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    let str_applies = applies_after.iter().filter(|(_, k)| *k == "str").count();
+    // 每实例 2 次键入 str（note）+ 2 次初值（note=""）——非法输入不增。
+    assert_eq!(
+        str_applies, 4,
+        "two notes + two initial strs applied: {applies_after:?}"
+    );
+    let int_applies = applies_after.iter().filter(|(_, k)| *k == "int").count();
+    // open 初值 2 例 + 成功数值 2 例 = 4；非法输入不增。
+    assert_eq!(
+        int_applies, 4,
+        "initials + two valid numbers only: {applies_after:?}"
+    );
+}
+
+/// 负控：静态面源（无 model）带输入目标 → 装载期具名拒（事件面缺席）。
+#[test]
+fn p980_u01_input_on_static_face_refuses() {
+    let src = "widget HelloOnly {\n    view { col { input (value: .x) { oninput: .Go } } }\n}\n";
+    let err = match NodeDesktopBridge::load(src, "p980-u01-static.at", 1) {
+        Ok(_) => panic!("static face cannot host input targets"),
+        Err(e) => e,
+    };
+    assert!(
+        err.contains("event targets need a model/msg surface"),
+        "named refusal: {err}"
+    );
 }

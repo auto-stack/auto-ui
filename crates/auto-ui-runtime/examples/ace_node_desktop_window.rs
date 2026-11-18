@@ -103,7 +103,7 @@ fn count_clicks(spec: &Option<String>) -> usize {
     spec.as_ref()
         .map(|s| {
             s.split(',')
-                .filter(|p| p.split(':').nth(1) == Some("click"))
+                .filter(|p| matches!(p.split(':').nth(1), Some("click") | Some("type")))
                 .count()
         })
         .unwrap_or(0)
@@ -127,6 +127,18 @@ fn parse_script(spec: &str) -> Vec<(usize, ScriptStep)> {
                 let instance = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
                 let target = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
                 ScriptStep::Click { instance, target }
+            }
+            // B-AV U01：键入事件——tick:type:实例:目标:文本（文本=余段，
+            // 不含逗号；中文可用）。
+            "type" => {
+                let instance = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+                let target = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+                let text = fields.collect::<Vec<_>>().join(":");
+                ScriptStep::TypeText {
+                    instance,
+                    target,
+                    text,
+                }
             }
             "close" => ScriptStep::Close,
             "reopen" => ScriptStep::Reopen,
