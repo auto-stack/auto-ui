@@ -1,15 +1,12 @@
-//! PLAN-058 T-04 prep: the pinned SDK front-door probe for the normal AGE Node
-//! source (`fixtures/plan058/topdown-node/main.at`).
+//! PLAN-058 T-04: the refreshed `.sdk-source` (auto-lang master `64e8380f4`
+//! overlay: record ABI `5ee4d23c0`, f32 surface, gfx seam) now compiles the
+//! normal AGE Node fixture through the shared front door, and carries the
+//! service/port/budget surface the host lane consumes.
 //!
-//! The driver builds against the pinned `.sdk-source` snapshot (auto-lang
-//! `637faa210` overlay). That pin predates `IF-981-GFX-AV-SEAM` and the
-//! `D-981-AGE-F32-SURFACE` closure: it has no `AGE_GFX_SERVICE_OPS` and its
-//! `age-package` grammar has no f32 annotation arm. This test therefore asserts
-//! the *expected red* — the source must be rejected before execution — and acts
-//! as a canary: the moment the pin is refreshed to a commit with the seam and
-//! f32 surface, this test goes red and forces the T-04 gate to be re-based
-//! (refresh the expected state, then wire the AV chain). The pin itself is never
-//! modified here.
+//! This replaces the pre-refresh "expected red" canary: the pin is now *part of
+//! the contract*, so the test asserts the positive surface and fails loudly if
+//! the pin is rolled back or drifts (record fields, f32 annotation arms, the
+//! 17-op table, the 32-credit budget constant).
 use ace_core::source::age_h0::LegacyWidgetAlias;
 use ace_core::source::age_package::compile_age_package;
 use ace_core::source::packages::{PackageModuleInput, PACKAGES_CAPABILITY};
@@ -17,9 +14,7 @@ use std::time::Instant;
 
 const SOURCE: &str = include_str!("../fixtures/plan058/topdown-node/main.at");
 
-#[test]
-fn pinned_sdk_rejects_the_t04_source_expected_red_canary() {
-    let t0 = Instant::now();
+fn compile() -> Result<ace_core::source::age_package::AgePackageCompilation, String> {
     let input = PackageModuleInput {
         package: "plan058".into(),
         version: "1.0.0".into(),
@@ -27,75 +22,106 @@ fn pinned_sdk_rejects_the_t04_source_expected_red_canary() {
         source: SOURCE.into(),
         provider: None,
     };
-    let result = compile_age_package(
+    compile_age_package(
         &[input],
         "plan058::main",
         LegacyWidgetAlias::Reject,
         &[PACKAGES_CAPABILITY.to_string()],
-    );
-    match result {
-        Ok(_) => panic!(
-            "the pinned SDK now accepts the T-04 source: the SDK pin evidently contains \
-             IF-981-GFX-AV-SEAM + D-981-AGE-F32-SURFACE. Re-base this canary: record the new \
-             pin commit, then wire the T-04 AV chain (do not silently pass)."
-        ),
-        Err(diagnostics) => {
-            assert!(
-                !diagnostics.is_empty(),
-                "a rejected source must carry at least one named diagnostic"
-            );
-            let codes: Vec<&str> = diagnostics.iter().map(|d| d.code.as_str()).collect();
-            for d in diagnostics.iter().take(6) {
-                println!("PIN_RED code={} message={}", d.code, d.message);
-            }
-            // The pin is older than the seam: the source cannot even reach the
-            // service/typing lanes, so at least one diagnostic is reported.
-            assert!(
-                !codes.is_empty(),
-                "expected at least one named diagnostic on the old pin"
-            );
+    )
+    .map_err(|ds| {
+        ds.iter()
+            .map(|d| format!("{}: {}", d.code, d.message))
+            .collect::<Vec<_>>()
+            .join("; ")
+    })
+}
+
+/// The front door accepts the fixture: one AGE node, six scene rows, and the
+/// `tick_step` symbol the AV runner executes.
+#[test]
+fn refreshed_pin_compiles_the_t04_source() {
+    let t0 = Instant::now();
+    match compile() {
+        Ok(compiled) => {
+            assert_eq!(compiled.description.components.len(), 1);
+            assert_eq!(compiled.description.components[0].scene.len(), 6);
+            let symbol = compiled.symbol_of("tick_step").expect("tick_step symbol");
+            assert!(symbol.contains("tick_step"), "mangled symbol: {symbol}");
+            // The hook form stays authored (assignment-only body, G2 pending).
+            assert!(compiled
+                .description
+                .components[0]
+                .handler_msgs
+                .iter()
+                .any(|m| m == "Life.Tick"));
             println!(
-                "PLAN058_TIMING test=pinned_sdk_rejects_the_t04_source_expected_red_canary ms={} diagnostics={} codes={:?}",
-                t0.elapsed().as_millis(),
-                diagnostics.len(),
-                codes
+                "PLAN058_TIMING test=refreshed_pin_compiles_the_t04_source ms={} rows=6 symbol={symbol}",
+                t0.elapsed().as_millis()
             );
         }
+        Err(diagnostics) => panic!(
+            "the refreshed pin must compile the T-04 source (re-base this test if the pin \
+             rolled back): {diagnostics}"
+        ),
     }
 }
 
-/// The pin's service table must not pretend to have the seam: no `query2d.*`
-/// registration and no host-port table. This is the evidence behind the
-/// "SDK pin refresh" T-04 todo in t04-prep.md.
+/// The pin's surface: the 17-op table with the three record ports, f32 in the
+/// age-package annotation arms, and the co-frozen 32-credit budget.
 #[test]
-fn pinned_sdk_has_no_gfx_service_table() {
+fn refreshed_pin_carries_the_gfx_port_abi_surface() {
     let t0 = Instant::now();
-    let source = include_str!("../.sdk-source/experimental/ace/crates/core/src/source/age_resources.rs");
+    let resources = include_str!(
+        "../.sdk-source/experimental/ace/crates/core/src/source/age_resources.rs"
+    );
+    for symbol in [
+        "age.query2d.segment.v1",
+        "age.query2d.sweep.v1",
+        "age.image2d.png.v1",
+        "age.input.space.v1",
+        "age.row.place.v1",
+        "age.render2d.spawn.v1",
+        "age.frame2d.at.v1",
+    ] {
+        assert!(
+            resources.contains(symbol),
+            "the pin's service table is missing {symbol}"
+        );
+    }
     assert!(
-        !source.contains("AGE_GFX_SERVICE_OPS"),
-        "the pin unexpectedly carries the gfx service table"
+        resources.contains("GFX_CALLBACK_CREDIT_BUDGET: u32 = 32"),
+        "the frozen 32-credit budget must be in the pin"
     );
     assert!(
-        !source.contains("query2d.segment"),
-        "the pin unexpectedly registers query2d.segment"
-    );
-    let grammar = include_str!("../.sdk-source/experimental/ace/grammars/auto-source.at");
-    // The f32 annotation arms exist only outside the age-package trim in this
-    // pin; the T-04 source needs `f32` annotations inside age-package.
-    let annotation_arm =
-        "alt(profiles: [numeric, aggregates, scheduler, packages-aggregates-ct]) { f32-kw(field: \"word\") }";
-    assert!(
-        grammar.contains(annotation_arm),
-        "the pin's f32 annotation arm shape changed; re-read t04-prep.md"
+        resources.contains("\"query2d.segment\" => 8"),
+        "segment stays 8 credits"
     );
     assert!(
-        !grammar.contains(
-            "alt(profiles: [numeric, aggregates, scheduler, packages-aggregates-ct, age-package]) { f32-kw(field: \"word\") }"
-        ),
-        "the pin now opens f32 annotations in age-package: the canary above must be re-based"
+        resources.contains("\"query2d.sweep\" => 16"),
+        "sweep stays 16 credits"
+    );
+    // The port record fields in their AGE_PORT_FIELDS order.
+    for field in [
+        "\"point_x\"",
+        "\"point_y\"",
+        "\"normal_x\"",
+        "\"normal_y\"",
+        "\"origin_x\"",
+        "\"origin_y\"",
+        "\"start_overlap\"",
+        "\"sha256\"",
+        "\"byte_length\"",
+    ] {
+        assert!(resources.contains(field), "port field {field} missing");
+    }
+    let grammar =
+        include_str!("../.sdk-source/experimental/ace/grammars/auto-source.at");
+    assert!(
+        grammar.contains("alt(profiles: [age-package]) { f32-kw(field: \"word\") }"),
+        "the pin must open f32 annotations in the age-package face"
     );
     println!(
-        "PLAN058_TIMING test=pinned_sdk_has_no_gfx_service_table ms={} pin=637faa210 overlay",
+        "PLAN058_TIMING test=refreshed_pin_carries_the_gfx_port_abi_surface ms={} ops=17 budget=32",
         t0.elapsed().as_millis()
     );
 }

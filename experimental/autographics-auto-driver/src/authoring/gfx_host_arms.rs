@@ -30,6 +30,8 @@ use super::{
     document::Layer,
     gfx_host_port::{Cast2D, Image2D, Sweep2D},
 };
+use ace_av::age_gfx::{AgeGfxFault, AgeGfxHost, AgeGfxReturn};
+use ace_av_core::contract::{StrHandle, Value};
 use std::{
     path::{Component, Path, PathBuf},
     time::Instant,
@@ -103,10 +105,47 @@ impl HostRow {
     }
 }
 
-/// The neutral provider: rows + an asset root for `image2d.png`.
+/// One admitted render token (the fixture spawns the player leaf each Tick and
+/// reuses the slot, so a token stays live across Ticks).
+#[derive(Clone, Debug, PartialEq)]
+pub struct RenderToken {
+    pub token: i32,
+    pub leaf: String,
+    pub x: f32,
+    pub y: f32,
+    pub alive: bool,
+}
+
+/// One spawn publish of the Tick (leaf, world position).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Publish {
+    pub token: i32,
+    pub leaf: String,
+    pub x: f32,
+    pub y: f32,
+}
+
+/// One `render2d.frame` publish (token, resource name, ordinal, flip).
+#[derive(Clone, Debug, PartialEq)]
+pub struct FramePublish {
+    pub token: i32,
+    pub image: String,
+    pub ordinal: i32,
+    pub flip: i32,
+}
+
+/// The neutral provider: rows + host state (input/dt/render tokens) + an asset
+/// root for `image2d.png`. Charging is the 981 session's job, never this type's.
 pub struct NeutralGfxHost {
     rows: Vec<HostRow>,
     asset_root: PathBuf,
+    input: (i32, f32, f32, bool),
+    dt: f32,
+    tokens: Vec<RenderToken>,
+    publishes: Vec<Publish>,
+    frames: Vec<FramePublish>,
+    last_sweep: Option<Sweep2D>,
+    last_segment: Option<Cast2D>,
 }
 
 impl NeutralGfxHost {
@@ -114,10 +153,52 @@ impl NeutralGfxHost {
         Self {
             rows,
             asset_root: asset_root.into(),
+            input: (2, 0.0, 0.0, false),
+            dt: 1.0 / 60.0,
+            tokens: Vec::new(),
+            publishes: Vec::new(),
+            frames: Vec::new(),
+            last_sweep: None,
+            last_segment: None,
         }
     }
     pub fn rows(&self) -> &[HostRow] {
         &self.rows
+    }
+    /// Host input for the next Tick (`space`, axis x/y, any pressed bit).
+    pub fn set_input(&mut self, space: i32, x: f32, y: f32, pressed: bool) {
+        self.input = (space, x, y, pressed);
+    }
+    pub fn set_dt(&mut self, dt: f32) {
+        self.dt = dt;
+    }
+    pub fn dt(&self) -> f32 {
+        self.dt
+    }
+    pub fn row(&self, index: usize) -> Option<&HostRow> {
+        self.rows.get(index)
+    }
+    pub fn tokens(&self) -> &[RenderToken] {
+        &self.tokens
+    }
+    pub fn publishes(&self) -> &[Publish] {
+        &self.publishes
+    }
+    pub fn frames(&self) -> &[FramePublish] {
+        &self.frames
+    }
+    pub fn last_sweep(&self) -> Option<Sweep2D> {
+        self.last_sweep
+    }
+    pub fn last_segment(&self) -> Option<Cast2D> {
+        self.last_segment
+    }
+    /// Forget the per-Tick publishes/results (the runner may keep them per Tick).
+    pub fn clear_tick_observations(&mut self) {
+        self.publishes.clear();
+        self.frames.clear();
+        self.last_sweep = None;
+        self.last_segment = None;
     }
 
     fn mover(&self, mover: i32) -> Result<&HostRow, GfxFault> {
@@ -403,9 +484,9 @@ impl NeutralGfxHost {
         })
     }
 
-    /// The symbol dispatcher the thin AV adapter will call: three port ops with
-    /// their exact `AGE_PORT_FIELDS` record order, unknown symbols refused.
-    pub fn dispatch(&mut self, symbol: &str, args: &[GfxArg]) -> Result<GfxReturn, GfxFault> {
+    /// The UI-side symbol dispatcher for the three port ops (typed UI args).
+    /// The AV adapter (`impl AgeGfxHost`) maps `Value` onto this entry.
+    pub fn dispatch_args(&mut self, symbol: &str, args: &[GfxArg]) -> Result<GfxReturn, GfxFault> {
         match symbol {
             SEGMENT_SYMBOL => {
                 let [GfxArg::I32(mover), GfxArg::Bool(visible_only), GfxArg::F32(ax), GfxArg::F32(ay), GfxArg::F32(bx), GfxArg::F32(by)] =
@@ -420,6 +501,7 @@ impl NeutralGfxHost {
                     ));
                 };
                 let c = self.segment(*mover, *visible_only, *ax, *ay, *bx, *by)?;
+                self.last_segment = Some(c);
                 Ok(GfxReturn::Record(vec![
                     GfxValue::Bool(c.hit),
                     GfxValue::I32(c.node),
@@ -443,6 +525,7 @@ impl NeutralGfxHost {
                     ));
                 };
                 let s = self.sweep(*mover, *visible_only, *dx, *dy)?;
+                self.last_sweep = Some(s);
                 Ok(GfxReturn::Record(vec![
                     GfxValue::Bool(s.hit),
                     GfxValue::I32(s.node),
@@ -484,6 +567,235 @@ pub fn timed_dispatch(
     args: &[GfxArg],
 ) -> (Result<GfxReturn, GfxFault>, u128) {
     let start = Instant::now();
-    let out = host.dispatch(symbol, args);
+    let out = host.dispatch_args(symbol, args);
     (out, start.elapsed().as_micros())
+}
+
+// ---------------------------------------------------------------- AV adapter --
+//
+// `impl AgeGfxHost` is the thin bridge between the 981 typed dispatch and the
+// neutral arms above: `Value` -> `GfxArg` on the way in, the AGE_PORT_FIELDS
+// record back as `AgeGfxReturn::Record` on the way out. Charging is the 981
+// `AgeGfxSession`'s job (it wraps this provider), so nothing here meters.
+
+fn av_str(value: &Value) -> Option<String> {
+    match value {
+        Value::Str(handle) => Some(String::from_utf8_lossy(handle.bytes()).into_owned()),
+        // The AV lane passes literal resource/leaf names as borrowed views; the
+        // fixture's names are ASCII, so scalar indices equal byte offsets.
+        Value::StrView(view) => {
+            let bytes = match &view.src {
+                ace_av_core::contract::StrViewSrc::Share(handle) => handle.bytes().to_vec(),
+                ace_av_core::contract::StrViewSrc::Static { buf } => buf.to_vec(),
+            };
+            let (start, end) = (view.start as usize, view.end as usize);
+            bytes
+                .get(start..end)
+                .map(|slice| String::from_utf8_lossy(slice).into_owned())
+        }
+        _ => None,
+    }
+}
+
+fn av_arg(value: &Value) -> Result<GfxArg, AgeGfxFault> {
+    match value {
+        Value::I32(v) => Ok(GfxArg::I32(*v)),
+        Value::F32(v) => Ok(GfxArg::F32(*v)),
+        Value::Bool(v) => Ok(GfxArg::Bool(*v)),
+        Value::Str(_) | Value::StrView(_) => av_str(value)
+            .map(GfxArg::Str)
+            .ok_or_else(|| AgeGfxFault::new("bad-args", "malformed string argument")),
+        other => Err(AgeGfxFault::new(
+            "bad-args",
+            format!("unsupported argument value {other:?}"),
+        )),
+    }
+}
+
+fn av_value(value: GfxValue) -> Value {
+    match value {
+        GfxValue::Bool(v) => Value::Bool(v),
+        GfxValue::I32(v) => Value::I32(v),
+        GfxValue::F32(v) => Value::F32(v),
+        GfxValue::Str(v) => Value::Str(StrHandle::detached(v.into_bytes().into_boxed_slice())),
+    }
+}
+
+/// The AV lane formats a provider code as `age-gfx.<code>`, so the UI-side
+/// `age-gfx.` prefix is stripped here exactly once.
+fn av_fault(fault: GfxFault) -> AgeGfxFault {
+    AgeGfxFault::new(
+        fault.code.strip_prefix("age-gfx.").unwrap_or(fault.code),
+        fault.message,
+    )
+}
+
+fn scalar(value: GfxValue) -> Result<AgeGfxReturn, AgeGfxFault> {
+    Ok(AgeGfxReturn::Scalar(av_value(value)))
+}
+
+impl NeutralGfxHost {
+    fn row_index(&self, row: i32) -> Result<usize, GfxFault> {
+        usize::try_from(row)
+            .ok()
+            .filter(|i| *i < self.rows.len())
+            .ok_or_else(|| {
+                GfxFault::new(
+                    "age-gfx.bad-row",
+                    format!("row {row} is outside the {}-row scene", self.rows.len()),
+                )
+            })
+    }
+    fn token_mut(&mut self, token: i32) -> Result<&mut RenderToken, GfxFault> {
+        self.tokens
+            .iter_mut()
+            .find(|t| t.token == token && t.alive)
+            .ok_or_else(|| {
+                GfxFault::new(
+                    "age-gfx.bad-token",
+                    format!("render token {token} is unknown or dead"),
+                )
+            })
+    }
+}
+impl AgeGfxHost for NeutralGfxHost {
+    fn dispatch(&mut self, symbol: &str, args: &[Value]) -> Result<AgeGfxReturn, AgeGfxFault> {
+        // Every argument arrives as a typed `Value`; map once to the UI-side
+        // `GfxArg` so both the three record ops and the 13 scalar ops share one
+        // argument surface.
+        let mapped: Result<Vec<GfxArg>, AgeGfxFault> = args.iter().map(av_arg).collect();
+        let mapped = mapped?;
+        // The three port-result ops reuse the neutral algorithms and return the
+        // complete AGE_PORT_FIELDS-ordered record.
+        if matches!(symbol, SEGMENT_SYMBOL | SWEEP_SYMBOL | IMAGE_SYMBOL) {
+            return match self.dispatch_args(symbol, &mapped) {
+                Ok(GfxReturn::Record(fields)) => {
+                    Ok(AgeGfxReturn::Record(fields.into_iter().map(av_value).collect()))
+                }
+                Ok(GfxReturn::Scalar(value)) => Ok(AgeGfxReturn::Scalar(av_value(value))),
+                Err(fault) => Err(av_fault(fault)),
+            };
+        }
+        // The 13 scalar-result ops of IF-981-GFX-HOST-PORT.
+        match (symbol, mapped.as_slice()) {
+            ("age.input.space.v1", []) => scalar(GfxValue::I32(self.input.0)),
+            ("age.input.x.v1", []) => scalar(GfxValue::F32(self.input.1)),
+            ("age.input.y.v1", []) => scalar(GfxValue::F32(self.input.2)),
+            ("age.input.pressed.v1", [GfxArg::I32(action)]) => {
+                if !(0..=3).contains(action) {
+                    return Err(AgeGfxFault::new(
+                        "bad-args",
+                        format!("input.pressed action {action} is outside 0..=3"),
+                    ));
+                }
+                scalar(GfxValue::Bool(self.input.3))
+            }
+            ("age.tick.dt.v1", []) => scalar(GfxValue::F32(self.dt)),
+            ("age.row.place.v1", [GfxArg::I32(row), GfxArg::F32(x), GfxArg::F32(y)]) => {
+                let slot = self.row_index(*row).map_err(av_fault)?;
+                self.rows[slot].world = [*x, *y];
+                scalar(GfxValue::I32(1))
+            }
+            ("age.row.shift.v1", [GfxArg::I32(row), GfxArg::F32(dx), GfxArg::F32(dy)]) => {
+                let slot = self.row_index(*row).map_err(av_fault)?;
+                self.rows[slot].world[0] += *dx;
+                self.rows[slot].world[1] += *dy;
+                scalar(GfxValue::I32(1))
+            }
+            ("age.row.show.v1", [GfxArg::I32(row), GfxArg::Bool(visible)]) => {
+                let slot = self.row_index(*row).map_err(av_fault)?;
+                self.rows[slot].visible = *visible;
+                scalar(GfxValue::I32(1))
+            }
+            ("age.row.world.v1", [GfxArg::I32(row), GfxArg::I32(axis)]) => {
+                let slot = self.row_index(*row).map_err(av_fault)?;
+                let value = match axis {
+                    0 => self.rows[slot].world[0],
+                    1 => self.rows[slot].world[1],
+                    _ => {
+                        return Err(AgeGfxFault::new(
+                            "bad-args",
+                            format!("row.world axis {axis} is outside 0..=1"),
+                        ))
+                    }
+                };
+                scalar(GfxValue::F32(value))
+            }
+            ("age.row.local.v1", [GfxArg::I32(row), GfxArg::I32(axis)]) => {
+                let slot = self.row_index(*row).map_err(av_fault)?;
+                let value = match axis {
+                    0 => self.rows[slot].world[0],
+                    1 => self.rows[slot].world[1],
+                    _ => {
+                        return Err(AgeGfxFault::new(
+                            "bad-args",
+                            format!("row.local axis {axis} is outside 0..=1"),
+                        ))
+                    }
+                };
+                scalar(GfxValue::F32(value))
+            }
+            ("age.render2d.spawn.v1", [GfxArg::Str(leaf), GfxArg::F32(x), GfxArg::F32(y)]) => {
+                // Reuse the live token of the same leaf (022 respawn semantics).
+                if let Some(token) = self.tokens.iter_mut().find(|t| t.alive && t.leaf == *leaf)
+                {
+                    token.x = *x;
+                    token.y = *y;
+                    let id = token.token;
+                    self.publishes.push(Publish {
+                        token: id,
+                        leaf: leaf.clone(),
+                        x: *x,
+                        y: *y,
+                    });
+                    return scalar(GfxValue::I32(id));
+                }
+                let token = self.tokens.len() as i32 + 1;
+                self.tokens.push(RenderToken {
+                    token,
+                    leaf: leaf.clone(),
+                    x: *x,
+                    y: *y,
+                    alive: true,
+                });
+                self.publishes.push(Publish {
+                    token,
+                    leaf: leaf.clone(),
+                    x: *x,
+                    y: *y,
+                });
+                scalar(GfxValue::I32(token))
+            }
+            ("age.render2d.despawn.v1", [GfxArg::I32(token)]) => {
+                self.token_mut(*token).map_err(av_fault)?.alive = false;
+                scalar(GfxValue::I32(1))
+            }
+            (
+                "age.render2d.frame.v1",
+                [GfxArg::I32(token), GfxArg::Str(image), GfxArg::I32(ordinal), GfxArg::I32(flip)],
+            ) => {
+                if *ordinal < 0 || !(0..=1).contains(flip) {
+                    return Err(AgeGfxFault::new(
+                        "bad-args",
+                        format!("render2d.frame ordinal {ordinal}/flip {flip} is out of domain"),
+                    ));
+                }
+                let id = self.token_mut(*token).map_err(av_fault)?.token;
+                self.frames.push(FramePublish {
+                    token: id,
+                    image: image.clone(),
+                    ordinal: *ordinal,
+                    flip: *flip,
+                });
+                scalar(GfxValue::I32(id))
+            }
+            (symbol, _) => Err(AgeGfxFault::new(
+                "unknown-op",
+                format!(
+                    "`{symbol}` is not a graphics host op with {} argument(s)",
+                    mapped.len()
+                ),
+            )),
+        }
+    }
 }

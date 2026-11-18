@@ -16,6 +16,7 @@ path = "src/bin/age-game-player.rs"
 # 快照内的同一棵源码（不混用 live/pinned 两份 auto-atom，避免锁文件双源冲突）。
 ace-av = { path = ".sdk-source/experimental/ace/crates/av" }
 ace-core = { path = ".sdk-source/experimental/ace/crates/core" }
+ace-av-core = { path = ".sdk-source/experimental/ace/crates/av-core" }
 auto-lang-core = { path = ".sdk-source/crates/auto-lang-core" }
 auto-val = { path = ".sdk-source/crates/auto-val" }
 

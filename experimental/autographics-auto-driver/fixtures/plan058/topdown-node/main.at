@@ -16,43 +16,52 @@
 let atlas = image2d.png("assets/atlas.png")
 let frame0 = frame2d.at(atlas, 0, 0, 32, 32)
 
-// Per-Tick scratch written by `advance` (hook bodies cannot bind locals).
-var hit bool = false
-var t f32 = 1.0
-var node i32 = -1
-var dx f32 = 0.0
-var dy f32 = 0.0
-var sx f32 = 0.0
-var sy f32 = 0.0
-
-pub fn advance(px f32, py f32, speed f32, dt f32) i32 {
-    let ix f32 = 0.0
-    let iy f32 = 0.0
-    if input.space() == 2 {
-        ix = input.x()
-        iy = input.y()
-    }
-    // Diagonal normalisation keeps |v| == speed for (1,0) and (1,1): the frozen
-    // 055/021 constant, no sqrt dependency.
+// Host-state Tick (AV-driven form, T-04): the runner owns the row state, so the
+// function reads the row world, one sweep stops the row at the wall, one
+// segment picks the nearest target and the same Tick publishes the sprite. No
+// module/model state is replayed across the run; charging per Tick is exactly
+// input.x/y (2) + tick.dt (1) + row.world x2 (2) + sweep (16) + row.place (1) +
+// segment (8) + spawn (1) + frame (1) = 32.
+//
+// `on Life.Tick` keeps the authored hook shape (model + handler) but the
+// body is assignment-only (G2: hook-local `let`/memoized query results are not
+// delivered yet), so it delegates to the same host-state function.
+pub fn tick_step() i32 {
+    var ix f32 = input.x()
+    var iy f32 = input.y()
     if ix != 0.0 {
         if iy != 0.0 {
             ix = ix * 0.70710677
             iy = iy * 0.70710677
         }
     }
-    dx = ix * speed * dt
-    dy = iy * speed * dt
+    let dt f32 = tick.dt()
+    let dx f32 = ix * 8.0 * dt
+    let dy f32 = iy * 8.0 * dt
+    let px f32 = row.world(1, 0)
+    let py f32 = row.world(1, 1)
     // Exactly one sweep per Tick; the player row is the mover (ordinal 1).
     let q Sweep2D = query2d.sweep(1, true, dx, dy)
-    hit = q.hit
-    t = q.t
-    sx = px + dx * q.t
-    sy = py + dy * q.t
-    let placed i32 = row.place(1, sx, sy)
+    let nx f32 = px + dx * q.t
+    let ny f32 = py + dy * q.t
+    let placed i32 = row.place(1, nx, ny)
     // Nearest interaction target from the moved position (upward 6 units).
-    let s Cast2D = query2d.segment(1, true, sx, sy, sx, sy + 6.0)
-    node = s.node
-    return placed
+    let s Cast2D = query2d.segment(1, true, nx, ny, nx, ny + 6.0)
+    let token i32 = render2d.spawn("player", nx, ny)
+    let framed i32 = render2d.frame(token, "assets/atlas.png", 0, 0)
+    return s.node
+}
+
+// Budget control hooks (T-04 negative controls; not part of the Tick path):
+// `peek` costs 1 credit and `sweep_only` costs 16, so running one after a
+// 32-credit Tick is the named over-budget refusal the runner replays.
+pub fn peek() f32 {
+    return row.world(1, 0)
+}
+
+pub fn sweep_only() i32 {
+    let q Sweep2D = query2d.sweep(1, true, 0.0, 0.0)
+    return q.node
 }
 
 node Player {
@@ -67,14 +76,8 @@ node Player {
         ticked i32 = 0
     }
     on Life.Tick {
-        ticked = advance(x, y, speed, tick.dt())
-        x = sx
-        y = sy
-        vx = dx
-        vy = dy
-        last_node = node
-        token = render2d.spawn("player", x, y)
-        token = render2d.frame(token, "assets/atlas.png", 0, 0)
+        ticked = tick_step()
+        last_node = ticked
     }
     view-2d {
         // Declaration order == row ordinal (0..5). The ground is VISIBLE but it

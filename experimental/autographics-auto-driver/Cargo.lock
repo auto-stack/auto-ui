@@ -849,6 +849,7 @@ name = "autographics-auto-driver"
 version = "0.1.0"
 dependencies = [
  "ace-av",
+ "ace-av-core",
  "ace-core",
  "agp",
  "auto-lang-core",

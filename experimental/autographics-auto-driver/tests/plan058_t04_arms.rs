@@ -87,7 +87,7 @@ fn segment_matches_the_abi_record_and_the_fixture_geometry() {
     assert_eq!((c.normal_x, c.normal_y), (0.0, -1.0), "bottom face normal");
     // Record order: hit, node, t, point_x, point_y, normal_x, normal_y.
     let record = host
-        .dispatch(
+        .dispatch_args(
             SEGMENT_SYMBOL,
             &[
                 GfxArg::I32(1),
@@ -149,7 +149,7 @@ fn sweep_matches_the_abi_record_minkowski_and_start_overlap() {
     // Record order: hit, node, t, origin_x, origin_y, normal_x, normal_y,
     // start_overlap.
     let record = host
-        .dispatch(
+        .dispatch_args(
             SWEEP_SYMBOL,
             &[
                 GfxArg::I32(1),
@@ -259,7 +259,7 @@ fn image2d_record_is_content_identity_and_image_faults_are_named() {
     assert_eq!(image.height as u32, info.height);
     // Record order: sha256 Str, byte_length i32, width i32, height i32.
     let record = host
-        .dispatch(IMAGE_SYMBOL, &[GfxArg::Str(ASSET.into())])
+        .dispatch_args(IMAGE_SYMBOL, &[GfxArg::Str(ASSET.into())])
         .expect("dispatch");
     assert_eq!(
         record,
@@ -298,17 +298,17 @@ fn dispatch_refuses_unknown_symbols_and_bad_arguments() {
     let t0 = Instant::now();
     let mut host = fixture_host();
     assert_fault(
-        &host.dispatch("age.row.place.v1", &[GfxArg::I32(1)]).expect_err("scalar op"),
+        &host.dispatch_args("age.row.place.v1", &[GfxArg::I32(1)]).expect_err("scalar op"),
         "age-gfx.unknown-op",
     );
     assert_fault(
-        &host.dispatch("age.nope.v1", &[]).expect_err("unknown"),
+        &host.dispatch_args("age.nope.v1", &[]).expect_err("unknown"),
         "age-gfx.unknown-op",
     );
     // Wrong arity / wrong variant / non-finite endpoint.
     assert_fault(
         &host
-            .dispatch(
+            .dispatch_args(
                 SEGMENT_SYMBOL,
                 &[GfxArg::I32(1), GfxArg::Bool(true), GfxArg::F32(4.0), GfxArg::F32(0.0), GfxArg::F32(4.0)]
                     .to_vec(),
@@ -318,7 +318,7 @@ fn dispatch_refuses_unknown_symbols_and_bad_arguments() {
     );
     assert_fault(
         &host
-            .dispatch(
+            .dispatch_args(
                 SEGMENT_SYMBOL,
                 &[
                     GfxArg::I32(1),
@@ -334,13 +334,13 @@ fn dispatch_refuses_unknown_symbols_and_bad_arguments() {
     );
     assert_fault(
         &host
-            .dispatch(SWEEP_SYMBOL, &[GfxArg::I32(1), GfxArg::Bool(true), GfxArg::F32(f32::NAN), GfxArg::F32(0.0)])
+            .dispatch_args(SWEEP_SYMBOL, &[GfxArg::I32(1), GfxArg::Bool(true), GfxArg::F32(f32::NAN), GfxArg::F32(0.0)])
             .expect_err("NaN"),
         "age-gfx.bad-args",
     );
     assert_fault(
         &host
-            .dispatch(IMAGE_SYMBOL, &[GfxArg::I32(1)])
+            .dispatch_args(IMAGE_SYMBOL, &[GfxArg::I32(1)])
             .expect_err("image arg as i32"),
         "age-gfx.bad-args",
     );
