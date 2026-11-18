@@ -48,6 +48,33 @@ pub struct Object {
     /// and the display size stays the object scale, so a frame never changes
     /// the entity bounds.
     pub sprite: Option<SpriteBinding>,
+    /// PLAN-058 T-03: the row's collision role. Absent = collision (the
+    /// legacy meaning, so old documents serialize and hash byte-identically);
+    /// `render-only` keeps the row visible/presented while the render-only-aware
+    /// segment/sweep candidate set skips it, so a visible ground never blocks or
+    /// wins a query in the `topdown2d` profile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layer: Option<Layer>,
+}
+
+/// PLAN-058 T-03: public row-layer vocabulary. `Collision` is the implicit
+/// legacy value (an absent field), so the enum only names the explicit
+/// choices a new document may declare.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Layer {
+    /// The row participates in the frozen v3/v4 query candidate set (default).
+    Collision,
+    /// The row is presented (drawn) but skipped by the render-only-aware
+    /// segment/sweep candidate set: in the `topdown2d` profile it is never hit
+    /// or selected; every earlier profile rejects layered documents by name.
+    RenderOnly,
+}
+
+impl Layer {
+    pub fn is_collision(self) -> bool {
+        self == Self::Collision
+    }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -95,6 +122,7 @@ impl Object {
             parent: None,
             resource: None,
             sprite: None,
+            layer: None,
         }
     }
 }
@@ -198,6 +226,7 @@ impl Document {
             "autographics.scene/6",
             "autographics.scene/7",
             "autographics.scene/8",
+            "autographics.scene/9",
         ]
         .contains(&self.schema.as_str())
         {
@@ -241,6 +270,7 @@ impl Document {
                 "autographics.scene/6",
                 "autographics.scene/7",
                 "autographics.scene/8",
+                "autographics.scene/9",
             ]
             .contains(&self.schema.as_str())
                 && a.closure.is_some()
@@ -310,6 +340,12 @@ impl Document {
                 && (o.translation[2] != 0.0 || o.scale[2] != 1.0 || o.yaw != 0.0 || o.pitch != 0.0)
             {
                 return Err("2D unsupported property".into());
+            }
+            if o.layer.is_some() && self.schema != "autographics.scene/9" {
+                return Err("layer requires autographics.scene/9".into());
+            }
+            if o.layer == Some(Layer::RenderOnly) && !o.kind.is_2d() {
+                return Err("render-only layer requires a 2D shape".into());
             }
             if !o.kind.is_2d() && o.rgba != [0.9, 0.3, 0.2, 1.0] {
                 return Err("3D material is fixed".into());
@@ -397,6 +433,7 @@ impl Document {
             "autographics.scene/6",
             "autographics.scene/7",
             "autographics.scene/8",
+            "autographics.scene/9",
         ]
         .contains(&schema.as_str())
             && v.get("assets")
@@ -404,6 +441,13 @@ impl Document {
                 .is_some_and(|a| a.iter().any(|a| a.get("closure").is_some()))
         {
             return Err("legacy unknown model closure field".into());
+        }
+        if schema != "autographics.scene/9"
+            && v.get("objects")
+                .and_then(Value::as_array)
+                .is_some_and(|a| a.iter().any(|o| o.get("layer").is_some()))
+        {
+            return Err("layer requires autographics.scene/9".into());
         }
         if schema == "autographics.scene/1" || schema == "autographics.scene/2" {
             if v.get("assets").is_some() {
@@ -449,6 +493,13 @@ impl Document {
                     return Err("explicit parent required".into());
                 }
             }
+        }
+        if schema != "autographics.scene/9"
+            && v.get("objects")
+                .and_then(Value::as_array)
+                .is_some_and(|a| a.iter().any(|o| o.get("layer").is_some()))
+        {
+            return Err("layer requires autographics.scene/9".into());
         }
         if schema == "autographics.scene/1" || schema == "autographics.scene/2" {
             v["schema"] = Value::String("autographics.scene/3".into());
@@ -514,6 +565,7 @@ impl Document {
             "autographics.scene/6",
             "autographics.scene/7",
             "autographics.scene/8",
+            "autographics.scene/9",
         ]
         .contains(&schema.as_str())
         {

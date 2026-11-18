@@ -1,0 +1,35 @@
+// PLAN-058 T-03 autographics.renderonly/1: the per-row render-only table.
+// The host configures one flag per ordered row before _ag_start (0 credit,
+// array writes only); a row whose flag is 1 is presented but is never a query
+// candidate. Queries read it through _ag_ro_is; before the freeze every row
+// is collision (the legacy meaning), so an unconﬁgured Run behaves exactly like
+// the frozen profiles. A flag is 0/1 only: there is no third state.
+var _ag_ro=[]
+var _ag_ro_ready=0
+fn _ag_ro_reset(count int) {
+ if _ag_ro_ready==1 {_ag_fail(11,-1,count); return}
+ if count<0 {_ag_fail(11,-1,count); return}
+ if count>128 {_ag_fail(41,-1,count); return}
+ _ag_ro=[]
+ for i in 0..count {
+  _ag_ro.push(0)
+ }
+}
+fn _ag_ro_set(index int, flag int) {
+ if _ag_ro_ready==1 {_ag_fail(11,-1,index); return}
+ if flag!=0 {if flag!=1 {_ag_fail(42,index,flag); return}}
+ if index<0 {_ag_fail(11,-1,index); return}
+ if index>=_ag_ro.len() {_ag_fail(41,-1,index); return}
+ _ag_ro[index]=flag
+}
+fn _ag_ro_freeze() {
+ _ag_ro_ready=1
+}
+// 0 credit field read of one rows layer flag; an out-of-range row cannot be a
+// query candidate anyway, so it answers 0 (collision) without a fault.
+fn _ag_ro_is(index int) int {
+ if _ag_ro_ready==0 {return 0}
+ if index<0 {return 0}
+ if index>=_ag_ro.len() {return 0}
+ return _ag_ro[index]
+}

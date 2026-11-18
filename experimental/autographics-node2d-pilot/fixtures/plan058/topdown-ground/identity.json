@@ -1,0 +1,46 @@
+{
+ "generator": "plan058 T-03 hand-frozen fixture (NOT autographics-node2d-pilot generator output)",
+ "api": "autographics.topdown2d/1",
+ "document_id": "plan058-topdown-ground",
+ "user_source_sha256": "5ac49d9179e26343cb39756e13b385bb1a9c073b01cab7802bf0c9744523d361",
+ "user_source_bytes": 1304,
+ "scene_sha256": "56bdcc718fb675fa31741e334e0ffec4596a9ad85ebc8cdb1602fb34b2cb023f",
+ "scene_bytes": 2823,
+ "modules": {
+  "topdown-ground": "5ac49d9179e26343cb39756e13b385bb1a9c073b01cab7802bf0c9744523d361"
+ },
+ "closure": [
+  {
+   "name": "topdown-ground",
+   "sha256": "5ac49d9179e26343cb39756e13b385bb1a9c073b01cab7802bf0c9744523d361",
+   "bytes": 1304
+  }
+ ],
+ "roles": {
+  "character": 1,
+  "character_name": "spectator.body",
+  "solids": [],
+  "camera": 1,
+  "scene_objects": {
+   "spectator.body": 1,
+   "ground.body": 2,
+   "player.body": 3,
+   "obstacle_a.body": 4,
+   "obstacle_b.body": 5,
+   "target_a.body": 6,
+   "target_b.body": 7
+  },
+  "render_only": [
+   "ground.body"
+  ]
+ },
+ "provenance": {
+  "product": "plan058-topdown-ground",
+  "plan": "PLAN-058 T-03",
+  "consumer": "experimental/autographics-auto-driver/tests/node_topdown2d_flow.rs",
+  "consumption": "include_str! frozen scene.agscene + world.at; the host writes world.at to scripts/<scene.behavior.source.sha256>.at; the test also decodes the same scene into a Session using spatial::Descriptor rows",
+  "layer": "ground.body declares \"layer\": \"render-only\" on autographics.scene/9; the host writes one render-only flag per ordered row; the render-only segment/sweep units skip it and reject it as a mover/ignore row (named fault 60)",
+  "world_sha256": "5ac49d9179e26343cb39756e13b385bb1a9c073b01cab7802bf0c9744523d361"
+ },
+ "schema": "autographics.scene/9"
+}

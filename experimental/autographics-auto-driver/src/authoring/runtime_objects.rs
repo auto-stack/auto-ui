@@ -278,6 +278,8 @@ pub fn instance_object(template: &Object, slot: &Slot) -> Option<Object> {
         parent: None,
         resource: template.resource.clone(),
         sprite: template.sprite.clone(),
+        // Runtime instances are presented slots, never document query rows.
+        layer: None,
     })
 }
 

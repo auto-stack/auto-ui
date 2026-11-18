@@ -77,6 +77,17 @@ pub const COMPONENTS2_API: &str = include_str!("../../api/public_composition2d_v
 /// version; every earlier profile keeps its exact assembled bytes.
 pub const COMPONENTS3_VERSION: &str = "autographics.components3d/1";
 pub const COMPONENTS3_API: &str = include_str!("../../api/public_composition3d_v1.at");
+/// PLAN-058 T-03: the explicit 2D top-down composition profile. It composes the
+/// frozen 2D stack (objects + triggers + sprites + character + camera2d) with
+/// the per-row render-only table and the render-only-aware segment/sweep units,
+/// so a visible ground row can be presented without ever being a query
+/// candidate. It is an explicit new version (profile 30 / version 121, the next
+/// free ids); every earlier profile keeps its exact assembled bytes, prices and
+/// version numbers, and only this profile honors `Object.layer`.
+pub const TOPDOWN2_VERSION: &str = "autographics.topdown2d/1";
+pub const RENDERONLY_API: &str = include_str!("../../api/behavior_renderonly_v1.at");
+pub const SEGMENT_RO_API: &str = include_str!("../../api/behavior_segment_ro_v1.at");
+pub const SWEEP_RO_API: &str = include_str!("../../api/behavior_sweep_ro_v1.at");
 /// PLAN-048 基础 UI 档：无 AG 服务传输；受检入口只有 `fn main()`（全局
 /// 数组字面量在此初始化——T-02 冻结的 main-first 消费合同）。
 pub const NODE_UI_VERSION: &str = "autographics.node-ui/1";
@@ -112,6 +123,7 @@ pub enum Api {
     Presentation2V1,
     Components2V1,
     Components3V1,
+    Topdown2V1,
 }
 impl Api {
     pub fn parse(value: &str) -> Result<Self, String> {
@@ -141,6 +153,7 @@ impl Api {
             PRESENTATION2_VERSION => Ok(Self::Presentation2V1),
             COMPONENTS2_VERSION => Ok(Self::Components2V1),
             COMPONENTS3_VERSION => Ok(Self::Components3V1),
+            TOPDOWN2_VERSION => Ok(Self::Topdown2V1),
             _ => Err("unsupported behavior API".into()),
         }
     }
@@ -169,6 +182,7 @@ impl Api {
             Self::Presentation2V1 => PRESENTATION2_VERSION,
             Self::Components2V1 => COMPONENTS2_VERSION,
             Self::Components3V1 => COMPONENTS3_VERSION,
+            Self::Topdown2V1 => TOPDOWN2_VERSION,
             Self::NodeUi => NODE_UI_VERSION,
             Self::MixedUi2d3d => NODE_UI_MIXED_VERSION,
             Self::MixedRegions2 => NODE_UI_MIXED_REGIONS_VERSION,
@@ -201,6 +215,7 @@ impl Api {
             Self::NodeUi => 118,
             Self::MixedUi2d3d => 119,
             Self::MixedRegions2 => 120,
+            Self::Topdown2V1 => 121,
         }
     }
     pub fn profile(self) -> i32 {
@@ -230,6 +245,7 @@ impl Api {
             Self::Presentation2V1 => 26,
             Self::Components2V1 => 27,
             Self::Components3V1 => 28,
+            Self::Topdown2V1 => 30,
         }
     }
     /// The finite run-object profiles including the trigger profiles that
@@ -242,7 +258,8 @@ impl Api {
             | Self::Audio2V1
             | Self::Hud2V1
             | Self::Presentation2V1
-            | Self::Components2V1 => Some(super::runtime_objects::Dim::TwoD),
+            | Self::Components2V1
+            | Self::Topdown2V1 => Some(super::runtime_objects::Dim::TwoD),
             Self::Objects3V1
             | Self::Triggers3V1
             | Self::NodeAnimation3V1
@@ -261,7 +278,8 @@ impl Api {
             | Self::Audio2V1
             | Self::Hud2V1
             | Self::Presentation2V1
-            | Self::Components2V1 => Some(super::runtime_objects::Dim::TwoD),
+            | Self::Components2V1
+            | Self::Topdown2V1 => Some(super::runtime_objects::Dim::TwoD),
             Self::Triggers3V1
             | Self::NodeAnimation3V1
             | Self::Audio3V1
@@ -280,6 +298,7 @@ impl Api {
                 | Self::Hud2V1
                 | Self::Presentation2V1
                 | Self::Components2V1
+                | Self::Topdown2V1
         )
     }
     /// Every shipped profile, in the order the command line lists them.
@@ -311,7 +330,7 @@ impl Api {
             Self::NodeAnimation3V1 | Self::Audio3V1 | Self::Hud3V1 | Self::Components3V1
         )
     }
-    pub fn all() -> [Self; 22] {
+    pub fn all() -> [Self; 23] {
         [
             Self::V1,
             Self::SpatialV2,
@@ -335,6 +354,7 @@ impl Api {
             Self::Presentation2V1,
             Self::Components2V1,
             Self::Components3V1,
+            Self::Topdown2V1,
         ]
     }
     /// The command-line name of this profile. The public entry selects a Run by
@@ -363,6 +383,7 @@ impl Api {
             Self::Presentation2V1 => "presentation2d",
             Self::Components2V1 => "components2d",
             Self::Components3V1 => "components3d",
+            Self::Topdown2V1 => "topdown2d",
             Self::NodeUi => "node-ui",
             Self::MixedUi2d3d => "mixed-ui-2d-3d",
             Self::MixedRegions2 => "node-ui-mixed-regions",

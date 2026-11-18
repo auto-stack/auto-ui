@@ -298,6 +298,7 @@ impl Play {
             && snapshot.version != super::behavior::PRESENTATION2_VERSION
             && snapshot.version != super::behavior::COMPONENTS2_VERSION
             && snapshot.version != super::behavior::COMPONENTS3_VERSION
+            && snapshot.version != super::behavior::TOPDOWN2_VERSION
         {
             return Err("spatial constructor API mismatch".into());
         }
@@ -311,6 +312,11 @@ impl Play {
         descriptor: Option<super::spatial::Descriptor>,
     ) -> Result<Self, String> {
         let api = super::behavior::Api::parse(&snapshot.version)?;
+        if api != super::behavior::Api::Topdown2V1
+            && e.document.objects.iter().any(|o| o.layer.is_some())
+        {
+            return Err("layer requires the topdown2d profile (autographics.topdown2d/1)".into());
+        }
         let rebuilt = super::behavior::SourceSnapshot::from_bytes_for(
             &snapshot.path,
             snapshot.bytes.clone(),
@@ -364,7 +370,8 @@ impl Play {
                 | super::behavior::Api::Sprites2V1
                 | super::behavior::Api::Audio2V1
                 | super::behavior::Api::Hud2V1
-                | super::behavior::Api::Components2V1 => Some(CharProfile::TwoD),
+                | super::behavior::Api::Components2V1
+                | super::behavior::Api::Topdown2V1 => Some(CharProfile::TwoD),
                 super::behavior::Api::Character3V1
                 | super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
@@ -382,7 +389,8 @@ impl Play {
                 | super::behavior::Api::Sprites2V1
                 | super::behavior::Api::Audio2V1
                 | super::behavior::Api::Hud2V1
-                | super::behavior::Api::Components2V1 => Some(CameraDim::TwoD),
+                | super::behavior::Api::Components2V1
+                | super::behavior::Api::Topdown2V1 => Some(CameraDim::TwoD),
                 super::behavior::Api::Camera3V1
                 | super::behavior::Api::Objects3V1
                 | super::behavior::Api::Triggers3V1
@@ -441,6 +449,25 @@ impl Play {
                     configuration.push(Call::unit(
                         "_ag_trg_map",
                         vec![Scalar::Int(stable), Scalar::Int(index as i32)],
+                    ));
+                }
+            }
+            if api == super::behavior::Api::Topdown2V1 {
+                // PLAN-058 T-03: one render-only flag per ordered row, written
+                // before _ag_start. The document's `layer` is the single owner:
+                // RenderOnly rows are skipped by the render-only segment/sweep
+                // units and rejected as a mover/ignore row (named fault 60).
+                configuration.push(Call::unit(
+                    "_ag_ro_reset",
+                    vec![Scalar::Int(descriptor.rows().len() as i32)],
+                ));
+                for index in 0..descriptor.rows().len() {
+                    let flag = i32::from(
+                        descriptor.row_layer(index) == Some(super::document::Layer::RenderOnly),
+                    );
+                    configuration.push(Call::unit(
+                        "_ag_ro_set",
+                        vec![Scalar::Int(index as i32), Scalar::Int(flag)],
                     ));
                 }
             }

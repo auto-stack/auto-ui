@@ -1,5 +1,8 @@
 //! Read-only, Run-scoped geometry. No script output or vertex clone is used here.
-use super::{document::Document, hierarchy, interaction};
+use super::{
+    document::{Document, Layer},
+    hierarchy, interaction,
+};
 use agp::assets::ModelData;
 use glam::Vec3;
 use std::{
@@ -10,6 +13,7 @@ static VERTEX_SCANS: AtomicU64 = AtomicU64::new(0);
 pub fn vertex_scans() -> u64 {
     VERTEX_SCANS.load(Ordering::Relaxed)
 }
+
 fn local_bounds(m: &ModelData) -> Option<(Vec3, Vec3)> {
     VERTEX_SCANS.fetch_add(1, Ordering::Relaxed);
     interaction::bounds(m)
@@ -19,6 +23,12 @@ pub struct Descriptor {
     base_hash: String,
     resource_hashes: Vec<Option<String>>,
     boxes: Vec<[f32; 7]>,
+    /// PLAN-058 T-03: per ordered row layer. Not serialized: the identity is
+    /// already pinned by `base_hash` (the document, which includes the layer
+    /// field) and by the admitted box rows, so legacy descriptor bytes and
+    /// hashes stay identical.
+    #[serde(skip)]
+    layers: Vec<Layer>,
     pub local_scans: usize,
 }
 impl Descriptor {
@@ -32,9 +42,11 @@ impl Descriptor {
         let mut local_scans = 0;
         let mut boxes = Vec::new();
         let mut resource_hashes = Vec::new();
+        let mut layers = Vec::new();
         for n in order {
             let mut row = [0.; 7];
             let mut resource = None;
+            let mut layer = Layer::Collision;
             if let Some(o) = d.objects.iter().find(|o| o.id == n.id) {
                 let offsets = if o.kind.is_2d() {
                     Some((
@@ -75,19 +87,48 @@ impl Descriptor {
                 if let Some((lo, hi)) = offsets {
                     row = [1., lo.x, lo.y, lo.z, hi.x, hi.y, hi.z];
                 }
+                // PLAN-058 T-03: the declared layer rides the row table, but
+                // the geometry stays the document's real AABB. Only the
+                // render-only-aware query units consult the layer, so old
+                // units keep every row a candidate exactly as before.
+                layer = o.layer.unwrap_or(Layer::Collision);
             }
             boxes.push(row);
             resource_hashes.push(resource);
+            layers.push(layer);
         }
         Ok(Self {
             base_hash: d.hash()?,
             resource_hashes,
             boxes,
+            layers,
             local_scans,
         })
     }
     pub fn rows(&self) -> &[[f32; 7]] {
         &self.boxes
+    }
+    /// PLAN-058 T-03: the public query candidate table — ordered row indices
+    /// that take part in the pinned v3/v4 nearest-hit/selections. A
+    /// `render-only` row is presented but is **not** in this table.
+    pub fn query_candidates(&self) -> Vec<usize> {
+        self.layers
+            .iter()
+            .enumerate()
+            .filter(|(_, layer)| layer.is_collision())
+            .map(|(i, _)| i)
+            .collect()
+    }
+    /// PLAN-058 T-03: the declared layer of one ordered row (`Collision` for
+    /// legacy documents that carry no layer field).
+    pub fn row_layer(&self, index: usize) -> Option<Layer> {
+        self.layers.get(index).copied()
+    }
+    pub fn is_query_candidate(&self, index: usize) -> bool {
+        self.layers
+            .get(index)
+            .copied()
+            .is_some_and(Layer::is_collision)
     }
     pub fn hash(&self) -> String {
         agp::renderer::capture::sha256_hex(

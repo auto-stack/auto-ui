@@ -1,0 +1,217 @@
+{
+ "behavior": {
+  "api": "autographics.topdown2d/1",
+  "source": {
+   "format": "auto-source",
+   "sha256": "5ac49d9179e26343cb39756e13b385bb1a9c073b01cab7802bf0c9744523d361",
+   "byte_length": 1304
+  },
+  "actors": {
+   "two_d": 1,
+   "three_d": null
+  }
+ },
+ "schema": "autographics.scene/9",
+ "document_id": "plan058-topdown-ground",
+ "resources": [
+  "circle",
+  "quad",
+  "cylinder",
+  "player",
+  "mob"
+ ],
+ "objects": [
+  {
+   "id": 1,
+   "name": "spectator.body",
+   "kind": "quad",
+   "translation": [
+    -100.0,
+    -100.0,
+    0.0
+   ],
+   "scale": [
+    0.8,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.5,
+    0.5,
+    0.55,
+    1.0
+   ],
+   "visible": false,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 2,
+   "name": "ground.body",
+   "kind": "quad",
+   "translation": [
+    8.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    12.0,
+    8.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.18,
+    0.45,
+    0.22,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null,
+   "layer": "render-only"
+  },
+  {
+   "id": 3,
+   "name": "player.body",
+   "kind": "quad",
+   "translation": [
+    4.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.8,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.9,
+    0.3,
+    0.2,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 4,
+   "name": "obstacle_a.body",
+   "kind": "quad",
+   "translation": [
+    10.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    6.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.55,
+    0.55,
+    0.6,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 5,
+   "name": "obstacle_b.body",
+   "kind": "quad",
+   "translation": [
+    4.0,
+    -2.5,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.35,
+    0.35,
+    0.4,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 6,
+   "name": "target_a.body",
+   "kind": "quad",
+   "translation": [
+    4.0,
+    2.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    1.0,
+    0.55,
+    0.15,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  },
+  {
+   "id": 7,
+   "name": "target_b.body",
+   "kind": "quad",
+   "translation": [
+    4.0,
+    3.25,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "rgba": [
+    0.55,
+    0.15,
+    0.8,
+    1.0
+   ],
+   "visible": true,
+   "parent": null,
+   "resource": null,
+   "sprite": null
+  }
+ ],
+ "groups": [],
+ "assets": []
+}

@@ -1,0 +1,54 @@
+// PLAN-058 T-03 frozen fixture (hand-written, NOT generator output):
+// one logical owner row table with a render-only ground. Row ordinals:
+// 0 spectator(character row) 1 ground(render-only) 2 player 3/4 obstacles 5/6 targets.
+var ok=0.0
+var g_shit=0
+var g_snode=-1
+var g_st=0.0
+var g_snx=0.0
+var g_sov=0
+var g_uhit=0
+var g_unode=-1
+var g_ut=0.0
+var g_tav=0
+var g_tbv=0
+var g_px=0.0
+var g_py=0.0
+fn main_lifetick(dt float) {
+ let q = ag_sweep_aabb(2, 1, 100.0, 0.0, 0.0)
+ g_shit = ag_sweep_hit(q)
+ g_snode = ag_sweep_node(q)
+ g_st = ag_sweep_t(q)
+ g_snx = ag_sweep_normal(q, 0)
+ g_sov = ag_sweep_start_overlap(q)
+ let ax = ag_world(2, 0)
+ let ay = ag_world(2, 1)
+ let u = ag_cast_segment(2, 2, 1, ax, ay, 0.0, ax, (ay + 6.0), 0.0)
+ g_uhit = ag_cast_hit(u)
+ g_unode = ag_cast_node(u)
+ g_ut = ag_cast_t(u)
+ if (g_unode == 5) {
+  ag_set_visible(5, 1)
+  ag_set_visible(6, 0)
+ }
+ if (g_unode == 6) {
+  ag_set_visible(5, 0)
+  ag_set_visible(6, 1)
+ }
+ g_tav = ag_visible(5)
+ g_tbv = ag_visible(6)
+ if (g_shit == 1) {
+  if (g_sov == 0) {
+   ag_move_local(2, ((100.0 * g_st) - 0.02), 0.0, 0.0)
+  }
+ }
+ g_px = ag_world(2, 0)
+ g_py = ag_world(2, 1)
+}
+fn app_start() {
+ ok=ok+ag_char_bind(1)*1.0
+ ok=ok+ag_camera_follow_2d(1, 2.0, -4.0, 34.0, 12.0, 12.0, 8.0)*1.0
+}
+fn app_update(dt float) {
+ main_lifetick(dt)
+}

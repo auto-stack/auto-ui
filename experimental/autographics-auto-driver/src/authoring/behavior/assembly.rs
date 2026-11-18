@@ -1,8 +1,8 @@
 //! One driver-local trusted assembler. No user input, IO, admission or caching.
 use super::{
     Api, API, CAMERA2_API, CAMERA3_API, CHARACTER3_API, CHARACTER_API, COMPONENTS2_API,
-    COMPONENTS3_API, MOTION_API, MOTION_SCAN_API, OBJECTS_API, SEGMENT_API, SOURCE, SPATIAL_API,
-    SPRITES_API, SWEEP_API, TRIGGERS_API,
+    COMPONENTS3_API, MOTION_API, MOTION_SCAN_API, OBJECTS_API, RENDERONLY_API, SEGMENT_API,
+    SEGMENT_RO_API, SOURCE, SPATIAL_API, SPRITES_API, SWEEP_API, SWEEP_RO_API, TRIGGERS_API,
 };
 
 pub(super) struct Units {
@@ -17,7 +17,9 @@ struct Inputs<'a> {
     base: &'a str,
     spatial: &'a str,
     segment: &'a str,
+    segment_ro: &'a str,
     sweep: &'a str,
+    sweep_ro: &'a str,
     motion_scan: &'a str,
     motion: &'a str,
     character: &'a str,
@@ -27,6 +29,7 @@ struct Inputs<'a> {
     objects: &'a str,
     triggers: &'a str,
     sprite: &'a str,
+    renderonly: &'a str,
     entry: &'a str,
 }
 const INPUTS: Inputs<'static> = Inputs {
@@ -34,7 +37,9 @@ const INPUTS: Inputs<'static> = Inputs {
     base: API,
     spatial: SPATIAL_API,
     segment: SEGMENT_API,
+    segment_ro: SEGMENT_RO_API,
     sweep: SWEEP_API,
+    sweep_ro: SWEEP_RO_API,
     motion_scan: MOTION_SCAN_API,
     motion: MOTION_API,
     character: CHARACTER_API,
@@ -44,6 +49,7 @@ const INPUTS: Inputs<'static> = Inputs {
     objects: OBJECTS_API,
     triggers: TRIGGERS_API,
     sprite: SPRITES_API,
+    renderonly: RENDERONLY_API,
     entry: ENTRY,
 };
 pub(super) fn assemble(api: Api) -> Result<Units, String> {
@@ -431,6 +437,7 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             | Api::Triggers2V1
             | Api::Triggers3V1
             | Api::Sprites2V1
+            | Api::Topdown2V1
     ) {
         require(input.segment, "fn ag_cast_segment(", 1)?;
     }
@@ -447,6 +454,7 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             | Api::Triggers2V1
             | Api::Triggers3V1
             | Api::Sprites2V1
+            | Api::Topdown2V1
     ) {
         require(input.sweep, "fn ag_sweep_aabb(", 1)?;
     }
@@ -462,6 +470,7 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             | Api::Triggers2V1
             | Api::Triggers3V1
             | Api::Sprites2V1
+            | Api::Topdown2V1
     ) {
         require(input.motion_scan, "fn _ag_motion_two(", 1)?;
         require(input.motion_scan, "fn _ag_motion_three(", 1)?;
@@ -470,7 +479,12 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
     }
     if matches!(
         api,
-        Api::CharacterV1 | Api::Camera2V1 | Api::Objects2V1 | Api::Triggers2V1 | Api::Sprites2V1
+        Api::CharacterV1
+            | Api::Camera2V1
+            | Api::Objects2V1
+            | Api::Triggers2V1
+            | Api::Sprites2V1
+            | Api::Topdown2V1
     ) {
         require(input.character, "fn ag_char_move(", 1)?;
         require(input.character, "fn _ag_char_freeze(", 1)?;
@@ -488,7 +502,7 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
     }
     if matches!(
         api,
-        Api::Camera2V1 | Api::Objects2V1 | Api::Triggers2V1 | Api::Sprites2V1
+        Api::Camera2V1 | Api::Objects2V1 | Api::Triggers2V1 | Api::Sprites2V1 | Api::Topdown2V1
     ) {
         require(input.camera2, "fn ag_camera_follow_2d(", 1)?;
         require(input.camera2, "fn _ag_cam2_freeze(", 1)?;
@@ -502,14 +516,22 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
     }
     if matches!(
         api,
-        Api::Objects2V1 | Api::Objects3V1 | Api::Triggers2V1 | Api::Triggers3V1 | Api::Sprites2V1
+        Api::Objects2V1
+            | Api::Objects3V1
+            | Api::Triggers2V1
+            | Api::Triggers3V1
+            | Api::Sprites2V1
+            | Api::Topdown2V1
     ) {
         require(input.objects, "fn ag_object_spawn(", 1)?;
         require(input.objects, "fn _ag_obj_freeze(", 1)?;
         require(input.objects, "fn _ag_obj_tick_begin(", 1)?;
         require(input.objects, "var _ag_obj_dim=0", 1)?;
     }
-    if matches!(api, Api::Triggers2V1 | Api::Triggers3V1 | Api::Sprites2V1) {
+    if matches!(
+        api,
+        Api::Triggers2V1 | Api::Triggers3V1 | Api::Sprites2V1 | Api::Topdown2V1
+    ) {
         require(input.triggers, "fn ag_trigger_bind(", 1)?;
         require(input.triggers, "fn ag_round_request(", 1)?;
         require(input.triggers, "fn _ag_trg_freeze(", 1)?;
@@ -518,6 +540,15 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         require(input.triggers, "var _ag_trg_dim=0", 1)?;
     }
     // PLAN-004 sprite unit: only the explicit sprites2d profile composes it.
+    // PLAN-058 T-03 render-only table: only the explicit topdown2d profile.
+    if api == Api::Topdown2V1 {
+        require(input.renderonly, "fn _ag_ro_reset(", 1)?;
+        require(input.renderonly, "fn _ag_ro_set(", 1)?;
+        require(input.renderonly, "fn _ag_ro_freeze(", 1)?;
+        require(input.renderonly, "fn _ag_ro_is(", 1)?;
+        require(input.segment_ro, "_ag_ro_is(", 4)?;
+        require(input.sweep_ro, "_ag_ro_is(", 4)?;
+    }
     if api.sprites() {
         require(input.sprite, "fn _ag_spr_freeze(", 1)?;
         require(input.sprite, "fn _ag_spr_tick_begin(", 1)?;
@@ -548,7 +579,8 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
         | Api::Hud3V1
         | Api::Presentation2V1
         | Api::Components2V1
-        | Api::Components3V1 => segment_transport(input.transport)?,
+        | Api::Components3V1
+        | Api::Topdown2V1 => segment_transport(input.transport)?,
         Api::NodeUi | Api::MixedUi2d3d | Api::MixedRegions2 => {
             unreachable!("NodeUi/Mixed handled by assemble() early return")
         }
@@ -637,6 +669,7 @@ fn assemble_from(api: Api, input: Inputs<'_>) -> Result<Units, String> {
             ))?,
             "<runtime_sprites_v1.at>",
         ),
+        Api::Topdown2V1 => (topdown_api(input)?, "<runtime_topdown2d_v1.at>"),
         Api::Triggers3V1 => (
             segment_compact(&format!(
                 "{}\n{}\n{}\n{}\n{}",
@@ -694,18 +727,33 @@ fn triggers_unit(input: Inputs<'_>, dim: i32) -> Result<String, String> {
         .replace("var _ag_trg_dim=0", &format!("var _ag_trg_dim={dim}")))
 }
 fn motion_api(input: Inputs<'_>) -> Result<String, String> {
-    let base = query_api(input, true)?;
+    motion_api_units(input, input.segment, input.sweep)
+}
+fn motion_api_units(
+    input: Inputs<'_>,
+    segment_unit: &str,
+    sweep_unit: &str,
+) -> Result<String, String> {
+    let base = query_api_units(input, true, segment_unit, sweep_unit)?;
     let marker = segment_compact("fields[node*12+axis]=value; _ag_dirty=1")?;
     let replacement = segment_compact("if _ag_motion_set_leaf(node,axis,value)==1 {return};fields[node*12+axis]=value; _ag_dirty=1")?;
     let base = replace(&base, &marker, &replacement, 1)?;
     segment_compact(&format!("{base}\n{}\n{}", input.motion_scan, input.motion))
 }
 fn query_api(input: Inputs<'_>, sweep: bool) -> Result<String, String> {
+    query_api_units(input, sweep, input.segment, input.sweep)
+}
+fn query_api_units(
+    input: Inputs<'_>,
+    sweep: bool,
+    segment_unit: &str,
+    sweep_unit: &str,
+) -> Result<String, String> {
     let base = segment_base_api(input.base)?;
     if !sweep {
-        return segment_compact(&format!("{base}\n{}\n{}", input.spatial, input.segment));
+        return segment_compact(&format!("{base}\n{}\n{}", input.spatial, segment_unit));
     }
-    let segment = format!("var _ag_query_kind=0\n{}", input.segment);
+    let segment = format!("var _ag_query_kind=0\n{segment_unit}");
     let segment = replace(
         &segment,
         "_ag_cast_token=0",
@@ -719,9 +767,28 @@ fn query_api(input: Inputs<'_>, sweep: bool) -> Result<String, String> {
         1,
     )?;
     segment_compact(&format!(
-        "{base}\n{}\n{segment}\n{}",
-        input.spatial, input.sweep
+        "{base}\n{}\n{segment}\n{sweep_unit}",
+        input.spatial
     ))
+}
+/// PLAN-058 T-03: the topdown2d stack = the frozen sprites2d composition with
+/// the render-only segment/sweep units, preceded by the render-only table they
+/// read. No frozen unit text is edited; the render-only units are byte-copies
+/// plus the candidate skip, and the old v3/v4 bytes stay in their profiles.
+fn topdown_api(input: Inputs<'_>) -> Result<String, String> {
+    let stack = segment_compact(&format!(
+        "{}\n{}\n{}\n{}\n{}\n{}",
+        motion_api_units(input, input.segment_ro, input.sweep_ro)?,
+        locked_character(
+            input.character,
+            "fn ag_char_move(dx float, dy float, clearance float) int {\n if _ag_char_frozen==0 {_ag_fail(26,-1,0);return 0}\n"
+        )?,
+        input.camera2,
+        locked_objects(input, 2)?,
+        triggers_unit(input, 2)?,
+        input.sprite
+    ))?;
+    segment_compact(&format!("{}\n{}", input.renderonly, stack))
 }
 fn entry(api: Api, source: &str) -> Result<String, String> {
     // Check even v1 boundaries so a malformed trusted entry cannot slip through.
@@ -786,7 +853,8 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
         | Api::Hud3V1
         | Api::Presentation2V1
         | Api::Components2V1
-        | Api::Components3V1 => {
+        | Api::Components3V1
+        | Api::Topdown2V1 => {
             let source = replace(
                 &source,
                 "_ag_spatial_begin();",
@@ -949,6 +1017,36 @@ fn entry(api: Api, source: &str) -> Result<String, String> {
                         &source,
                         "if _ag_error==0 { app_start();",
                         "if _ag_error==0 { _ag_obj_freeze(); _ag_trg_freeze(); _ag_spr_freeze(); app_start();",
+                        1,
+                    )?;
+                    let source = replace(
+                        &source,
+                        "app_start(); _ag_cast_token=0",
+                        "app_start(); _ag_cast_token=0; _ag_char_freeze(); _ag_cam2_freeze()",
+                        1,
+                    )?;
+                    let source = replace(
+                        &source,
+                        "app_update(dt); _ag_cast_token=0",
+                        "_ag_char_tick_begin(); _ag_obj_tick_begin(); _ag_trg_tick_begin(); _ag_spr_tick_begin(); app_update(dt); _ag_cast_token=0",
+                        1,
+                    )?;
+                    replace(
+                        &source,
+                        "_ag_dirty=0; toggled=0}",
+                        "_ag_dirty=0; _ag_trg_evaluate(); toggled=0}",
+                        1,
+                    )
+                }
+                Api::Topdown2V1 => {
+                    // PLAN-058 T-03: the frozen sprites2d entry plus the
+                    // render-only table freeze (before app_start) and the same
+                    // per-tick begin/evaluate order. Every earlier profile
+                    // keeps its exact entry bytes.
+                    let source = replace(
+                        &source,
+                        "if _ag_error==0 { app_start();",
+                        "if _ag_error==0 { _ag_obj_freeze(); _ag_trg_freeze(); _ag_spr_freeze(); _ag_ro_freeze(); app_start();",
                         1,
                     )?;
                     let source = replace(

@@ -5,7 +5,13 @@ use std::path::Path;
 #[test]
 fn all_fifteen_delivered_profiles_keep_exact_assembled_bytes() {
     let mut profiles = serde_json::Map::new();
-    for api in Api::all().into_iter().filter(|a| !a.audio()) {
+    // PLAN-058 T-03 adds autographics.topdown2d/1; the frozen baseline is the
+    // historical PLAN-012 profile set, so the new profile is named out here
+    // instead of rewriting a pristine-assembler baseline.
+    for api in Api::all()
+        .into_iter()
+        .filter(|a| !a.audio() && *a != Api::Topdown2V1)
+    {
         let s = SourceSnapshot::from_bytes_for(
             Path::new("legacy.at"),
             b"fn app_start(){}\nfn app_update(dt float){}\n".to_vec(),
@@ -28,7 +34,10 @@ fn all_fifteen_delivered_profiles_keep_exact_assembled_bytes() {
 #[test]
 fn all_seventeen_pre_hud_profiles_keep_exact_assembled_bytes() {
     let mut profiles = serde_json::Map::new();
-    for api in Api::all().into_iter().filter(|a| !a.hud()) {
+    for api in Api::all()
+        .into_iter()
+        .filter(|a| !a.hud() && *a != Api::Topdown2V1)
+    {
         let snapshot = SourceSnapshot::from_bytes_for(
             Path::new("legacy.at"),
             b"fn app_start(){}\nfn app_update(dt float){}\n".to_vec(),
