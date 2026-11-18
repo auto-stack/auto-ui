@@ -591,7 +591,15 @@ fn generate_widget_with_lane(
     use auto_ui_dialect::UiStmt;
     let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl)
         .map_err(|e| format!("extract: {e:?}"))?;
-    let sfc = auto_ui_compiler::ui_gen::VueGenerator::new()
+    // 同文件模块 fn 重挂（产品道缺口，jade-garden 实测暴露）：裸
+    // VueGenerator 丢文件顶层 fn 定义（vue.rs 链 `same_file_module_fns`
+    // 同病同修——PLAN-075 臂）；此处与该链同款收集（UiDialect→lower→
+    // core Stmt::Fn→`extract_module_fn`），失败取 None=链上行为。
+    let mut gen = auto_ui_compiler::ui_gen::VueGenerator::new();
+    if let Some(module_fns) = same_file_module_fns(src) {
+        gen = gen.with_module_fns(module_fns);
+    }
+    let sfc = gen
         .generate_sfc(&widget)
         .map_err(|e| format!("SFC: {e:?}"))?;
     // lane 体（specs=widget handler 键去参段——`.AddItem(text)` 形取
@@ -852,4 +860,25 @@ pub fn generate_sfc_with_lane_product(src: &str, path: &str) -> Result<LaneSfcPr
         lane_bodies,
         absent,
     })
+}
+
+/// 同文件模块 fn 收集（vue.rs 链 `same_file_module_fns` 同款——公开 API
+/// 复刻，供单文件 lane 生成道重挂；PLAN-075 的裸生成器丢顶层 fn 同病）。
+/// 解析/降级失败返回 None（不猜、不阻断——生成继续走裸道，调用方诊断）。
+fn same_file_module_fns(src: &str) -> Option<Vec<auto_ui_compiler::aura::AuraModuleFn>> {
+    let session = auto_lang_core::session::CompilerSession::ui();
+    let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+    let ast = parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+        .and_then(|ui| auto_ui_compiler::ui_ast::lower_ui(&ui).map(|lowered| lowered.ui))
+        .ok()?;
+    Some(
+        ast.core_stmts()
+            .filter_map(|s| match s {
+                auto_lang_core::ast::Stmt::Fn(f) => auto_ui_compiler::aura::extract_module_fn(f),
+                _ => None,
+            })
+            .collect(),
+    )
 }

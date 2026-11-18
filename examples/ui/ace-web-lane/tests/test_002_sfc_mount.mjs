@@ -125,8 +125,8 @@ async function main() {
       return;
     }
     const name = url === '/' ? '/index.html' : url;
-    const file = path.join(dir, name);
-    if (!file.startsWith(dir) || !fs.existsSync(file)) {
+    const file = path.resolve(path.join(dir, name));
+    if (!file.startsWith(path.resolve(dir)) || !fs.existsSync(file)) {
       res.writeHead(404);
       res.end('not found');
       return;

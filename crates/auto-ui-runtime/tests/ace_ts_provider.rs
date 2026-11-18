@@ -926,10 +926,16 @@ fn p980_web_full_dual_track_census() {
     // 修正前连带全体缺席）、lambda 调用体不铸（不部分拼接）、值位置通道
     // 具名拒。判别力由 `p980_web_channel_call_lane` 六臂断言承担（完整体
     // 文本/兄弟保全/props 形/缺席负控）。
+    // **2026-11-18 具名修订 #9（④-A #6 jade-garden 刀：lang 基线前进——
+    // 981 G1/G2（on-body hook/view lambda/watch 适配）+980 P3 合并后组件面
+    // lane 派生面变化）**：(75,8,7,23)→**(75, 8, 8, 22)**——net spliced+1/
+    // absent-1（逐项 A/B 实证：本刀 ui 侧模块 fn 重挂对计数零影响——
+    // stash 对照逐项同值；翻转全部来自 lang 侧 lane 派生面（[60] 族进入
+    // 拼接、[18] 族移出））。本修订在 lang `010e26f08` 基线上实测。
     assert_eq!(corpus.len(), 83, "corpus size frozen");
     assert_eq!(
         (ok, err, spliced, absent),
-        (75, 8, 7, 23),
+        (75, 8, 8, 22),
         "dual-track aggregates frozen"
     );
 }
