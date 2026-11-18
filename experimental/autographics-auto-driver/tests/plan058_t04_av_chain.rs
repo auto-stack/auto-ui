@@ -3,18 +3,24 @@
 //! 981 `AgeGfxSession` (typed dispatch, shared 32-credit pool) with
 //! `NeutralGfxHost` as the registered provider.
 //!
-//! Rows are **source-bound**: they are derived from the compiled description's
-//! `scene` rows (declaration order = ordinal), not from a test-side table. The
-//! only host-supplied fact is the render-only ground layer (G1: AGE has no
-//! render-only declaration yet), which the host marks by row name.
+//! Since the auto-lang `6e456794d` pin (PLAN-981 G1+G2) the fixture is in the
+//! REAL author form: the Tick lives in `on Life.Tick` with hook-local `let` +
+//! `if/else` (G2), and the render-only ground is a SOURCE declaration
+//! (`layer: render-only`, G1) read from the checked row description's typed
+//! `AgeSceneRow.layer` fact — no host-side row-name table anymore.
 //!
+//! Rows are **source-bound**: they are derived from the compiled description's
+//! `scene` rows (declaration order = ordinal), not from a test-side table.
 //! Every Tick's position/query results are compared against the independent
 //! f32 oracle (`plan058_t04_oracle.rs` rules, re-implemented here as the same
 //! recurrence) and the session's per-Tick credit use is asserted.
 use ace_av::age_gfx::{AgeGfxFault, AgeGfxHost, AgeGfxReturn, AgeGfxSession};
 use ace_av_core::contract::Value;
+use ace_core::source::age_component::{ComponentScenario, ComponentStmt, ScenarioOp};
 use ace_core::source::age_h0::LegacyWidgetAlias;
-use ace_core::source::age_package::{compile_age_package, AgePackageCompilation};
+use ace_core::source::age_package::{
+    compile_age_package_with_scenario, AgePackageCompilation, AgeRowLayer,
+};
 use ace_core::source::packages::{PackageModuleInput, PACKAGES_CAPABILITY};
 use autographics_auto_driver::authoring::{
     document::Layer,
@@ -53,11 +59,18 @@ fn compile(src: &str) -> AgePackageCompilation {
         source: src.into(),
         provider: None,
     };
-    compile_age_package(
+    // One instance, one Life.Tick: the scenario generates the per-field state
+    // functions (`__age_state_0_<field>` = field init + handler replay) the
+    // runner drives through the session.
+    compile_age_package_with_scenario(
         &[input],
         "plan058::main",
         LegacyWidgetAlias::Reject,
         &[PACKAGES_CAPABILITY.to_string()],
+        &ComponentScenario {
+            instances: 1,
+            ops: vec![ScenarioOp::Tick { instance: 0 }],
+        },
     )
     .unwrap_or_else(|ds| {
         panic!(
@@ -77,7 +90,8 @@ fn assets_root() -> PathBuf {
 
 /// Rows from the compiled scene declaration: ordinal = declaration order, world
 /// and half extents from the author's `position`/`size`, visibility from
-/// `visible`. The render-only ground layer is the host fact (G1).
+/// `visible`. The render-only ground layer is the SOURCE's typed fact (G1):
+/// `AgeSceneRow.layer` on the same checked description every lane consumes.
 fn rows_from_scene(compiled: &AgePackageCompilation) -> Vec<HostRow> {
     // The scene rows live on the (single) AGE node's `view-2d`; declaration
     // order is the row ordinal the host uses.
@@ -111,10 +125,9 @@ fn rows_from_scene(compiled: &AgePackageCompilation) -> Vec<HostRow> {
                 ordinal,
                 world: [position[0], position[1]],
                 half: [size[0] * 0.5, size[1] * 0.5],
-                layer: if row.name == "ground" {
-                    Layer::RenderOnly
-                } else {
-                    Layer::Collision
+                layer: match row.layer {
+                    Some(AgeRowLayer::RenderOnly) => Layer::RenderOnly,
+                    None => Layer::Collision,
                 },
                 visible,
             }
@@ -147,6 +160,14 @@ fn tick_symbol(compiled: &AgePackageCompilation, name: &str) -> String {
     format!("d_{symbol}")
 }
 
+/// The Tick is the REAL `on Life.Tick` handler now (G2): the scenario compiles
+/// it into per-field state functions (`__age_state_0_<field>` = field init +
+/// handler replay); the runner drives the `last_node` one — the handler's only
+/// outcome field — so the whole body executes exactly once per Tick.
+fn tick_def(compiled: &AgePackageCompilation) -> String {
+    tick_symbol(compiled, "__age_state_0_last_node")
+}
+
 fn row_world(host: &Rc<RefCell<NeutralGfxHost>>, ordinal: usize) -> [f32; 2] {
     host.borrow().row(ordinal).expect("row").world
 }
@@ -155,7 +176,7 @@ fn row_world(host: &Rc<RefCell<NeutralGfxHost>>, ordinal: usize) -> [f32; 2] {
 fn av_tick_chain_matches_the_oracle_and_stops_at_the_wall() {
     let t0 = Instant::now();
     let compiled = compile(SOURCE);
-    let def = tick_symbol(&compiled, "tick_step");
+    let def = tick_def(&compiled);
     let (mut session, host) = spawn_session(&compiled);
 
     // Oracle state: one owner, the same initial row.
@@ -212,8 +233,11 @@ fn av_tick_chain_matches_the_oracle_and_stops_at_the_wall() {
             "tick {tick}: segment t {}",
             cast.t
         );
-        // The def's observable result is the segment node.
-        assert_eq!(value, Value::I32(cast_node), "tick {tick}: def result");
+        // The state function's observable result is the handler's outcome
+        // field: the start_overlap branch records -2, the else branch records
+        // the segment node (G2 branch facts, driven every Tick).
+        let want_last = if sweep.start_overlap { -2 } else { cast_node };
+        assert_eq!(value, Value::I32(want_last), "tick {tick}: def result");
         // Same-Tick presentation: one spawn (same leaf reuses its token) and one
         // frame publish at the moved position.
         let publishes = host.borrow().publishes().to_vec();
@@ -369,7 +393,7 @@ fn oracle_segment(px: f32, py: f32) -> (bool, i32, f32) {
 fn av_input_variants_and_changed_speed_follow_the_source() {
     let t0 = Instant::now();
     let compiled = compile(SOURCE);
-    let def = tick_symbol(&compiled, "tick_step");
+    let def = tick_def(&compiled);
     // (input axis, expected per-Tick displacement magnitude, expected sign)
     for (ix, iy, want) in [
         (1.0f32, 0.0f32, (0.13333334f32, 0.0f32)),
@@ -401,11 +425,11 @@ fn av_input_variants_and_changed_speed_follow_the_source() {
         );
         assert_eq!(session.credits_used(), 32);
     }
-    // Changed source: speed 4.0 halves the per-Tick displacement (no test-side
-    // fudge — the compiled source itself changes).
-    let slow = SOURCE.replace("ix * 8.0 * dt", "ix * 4.0 * dt");
+    // Changed source: the model's speed init 8.0 -> 4.0 halves the per-Tick
+    // displacement (no test-side fudge — the compiled source itself changes).
+    let slow = SOURCE.replace("speed f32 = 8.0", "speed f32 = 4.0");
     let compiled = compile(&slow);
-    let def = tick_symbol(&compiled, "tick_step");
+    let def = tick_def(&compiled);
     let (mut session, host) = spawn_session(&compiled);
     host.borrow_mut().set_input(2, 1.0, 0.0, false);
     host.borrow_mut().set_dt(DT);
@@ -426,7 +450,7 @@ fn av_input_variants_and_changed_speed_follow_the_source() {
 fn av_budget_is_exact_and_over_budget_is_named_zero_effect_sticky() {
     let t0 = Instant::now();
     let compiled = compile(SOURCE);
-    let tick = tick_symbol(&compiled, "tick_step");
+    let tick = tick_def(&compiled);
     let peek = tick_symbol(&compiled, "peek");
     let sweep_only = tick_symbol(&compiled, "sweep_only");
     let (mut session, host) = spawn_session(&compiled);
@@ -481,6 +505,122 @@ fn av_budget_is_exact_and_over_budget_is_named_zero_effect_sticky() {
     assert!(err.contains("age-gfx.session-stopped"), "{err}");
     println!(
         "PLAN058_TIMING test=av_budget_is_exact_and_over_budget_is_named_zero_effect_sticky ms={} tick=32 peek=refused(33) sweep_only=refused(48) reset=32 stop=named",
+        t0.elapsed().as_millis()
+    );
+}
+
+/// G1/G2 are source facts on the same checked description: the ground's typed
+/// `layer: render-only` reaches the AV lane's row table (and its removal
+/// re-admits the ground — the 055 counterexample), and the `on Life.Tick`
+/// hook-local `let` + `if q.start_overlap` branch decides what the Tick
+/// records (blocked -2 vs the nearest target).
+#[test]
+fn g2_branch_and_g1_layer_facts_are_source_bound() {
+    let t0 = Instant::now();
+    let compiled = compile(SOURCE);
+
+    // G1 typed fact on the checked row description (+ the cpu Symbol twin).
+    let scene = &compiled.description.components[0].scene;
+    assert_eq!(scene[0].name, "ground");
+    assert_eq!(scene[0].layer, Some(AgeRowLayer::RenderOnly));
+    assert!(
+        scene[0].cpu.iter().any(|(k, v)| k == "layer"
+            && matches!(
+                v,
+                ace_core::source::age_package::AgeSceneValue::Symbol(s) if s == "render-only"
+            )),
+        "the cpu face carries the render-only symbol twin"
+    );
+    for (ordinal, row) in scene.iter().enumerate().skip(1) {
+        assert_eq!(
+            row.layer, None,
+            "row {ordinal} carries no layer declaration"
+        );
+    }
+    // G2 handler statement facts: hook-local lets (across the three axis
+    // branches) and the closing branch on the same handler.
+    let handler = &compiled.description.components[0].handler_stmts;
+    let tick_stmts = &handler
+        .iter()
+        .find(|(msg, _)| msg == "Life.Tick")
+        .expect("Life.Tick handler")
+        .1;
+    fn count_lets(stmts: &[ComponentStmt]) -> usize {
+        stmts
+            .iter()
+            .map(|s| match s {
+                ComponentStmt::Let { .. } => 1,
+                ComponentStmt::If { then, els, .. } => {
+                    count_lets(then) + els.as_ref().map(|e| count_lets(e)).unwrap_or(0)
+                }
+                _ => 0,
+            })
+            .sum()
+    }
+    assert!(
+        count_lets(tick_stmts) >= 10,
+        "hook-local lets are projected: {tick_stmts:?}"
+    );
+    assert!(
+        matches!(tick_stmts.last(), Some(ComponentStmt::If { .. })),
+        "the Tick records through the axis branches"
+    );
+
+    // Overlap run: the player starts inside wall_b — the sweep reports
+    // start_overlap at t=0 and the then-branch records -2; the ground
+    // (render-only) is NOT the hit even though it also contains the mover.
+    let overlapped = compile(&SOURCE.replace("position: (4.0, 0.0)", "position: (4.0, -2.5)"));
+    let def = tick_def(&overlapped);
+    let (mut session, host) = spawn_session(&overlapped);
+    host.borrow_mut().set_input(2, 1.0, 0.0, false);
+    host.borrow_mut().set_dt(DT);
+    session.begin_tick();
+    let value = session
+        .run_def(&overlapped.checked, &def)
+        .unwrap_or_else(|e| panic!("overlap tick: {e}"));
+    assert_eq!(value, Value::I32(-2), "then branch: blocked, not a target");
+    assert_eq!(
+        session.credits_used(),
+        32,
+        "the branch only chooses what is recorded"
+    );
+    let sweep = host.borrow().last_sweep().expect("sweep ran");
+    assert_eq!(sweep.node, 3, "wall_b is the contact, not the ground");
+    assert_eq!(sweep.t, 0.0, "the overlap contact is at t=0");
+    assert!(sweep.start_overlap, "the mover starts inside wall_b");
+    assert_eq!(
+        row_world(&host, PLAYER_ORDINAL),
+        [4.0, -2.5],
+        "no movement out of the overlap"
+    );
+    let publishes = host.borrow().publishes().to_vec();
+    assert_eq!(publishes.len(), 1, "same-Tick publish still runs");
+    assert!((publishes[0].x - 4.0).abs() <= 1e-5);
+
+    // Negative control: remove the ground's `layer: render-only` declaration —
+    // the typed fact disappears and the ground re-enters the candidate set,
+    // winning this same query by declaration ordinal (the 055 counterexample).
+    let bare = compile(&SOURCE.replace("            layer: render-only\n", ""));
+    assert_eq!(
+        bare.description.components[0].scene[0].layer,
+        None,
+        "no declaration, no fact"
+    );
+    let def = tick_def(&bare);
+    let (mut session, host) = spawn_session(&bare);
+    host.borrow_mut().set_input(2, 1.0, 0.0, false);
+    host.borrow_mut().set_dt(DT);
+    session.begin_tick();
+    let value = session
+        .run_def(&bare.checked, &def)
+        .unwrap_or_else(|e| panic!("bare-ground tick: {e}"));
+    let sweep = host.borrow().last_sweep().expect("sweep ran");
+    assert_eq!(sweep.node, 0, "the unlayered ground is misselected first");
+    assert_eq!(sweep.t, 0.0);
+    assert!(sweep.start_overlap);
+    assert_eq!(value, Value::I32(-2), "still the blocked record");
+    println!(
+        "PLAN058_TIMING test=g2_branch_and_g1_layer_facts_are_source_bound ms={} overlap=node3,t=0 bare_ground=node0",
         t0.elapsed().as_millis()
     );
 }
@@ -807,7 +947,7 @@ fn sprite_centroid(image: &Image, colours: &[[u8; 3]]) -> (f64, f64, usize) {
 fn av_gpu_same_tick_pixels_at_the_wall_contact() {
     let t0 = Instant::now();
     let compiled = compile(SOURCE);
-    let def = tick_symbol(&compiled, "tick_step");
+    let def = tick_def(&compiled);
     let (mut session, host) = spawn_session(&compiled);
     let (colours, texel_cx, texel_cy, opaque) = atlas_mask();
 

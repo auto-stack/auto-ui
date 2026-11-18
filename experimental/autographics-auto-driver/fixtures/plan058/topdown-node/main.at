@@ -1,56 +1,35 @@
-// PLAN-058 T-04 prep — normal AGE Node source for the top-down 2D minimum
+// PLAN-058 T-04 — normal AGE Node source for the top-down 2D minimum
 // sample (1 Player + 2 obstacles + 2 same-definition interaction targets + 1
-// visible non-blocking ground). Frozen spellings only (IF-981-GFX-AV-SEAM):
-// query2d.segment/sweep, row.place/world, render2d.spawn/frame, image2d.png,
-// frame2d.at, input.*, tick.dt(). No legacy `_ag_*` calls.
+// visible non-blocking ground), in the REAL author form delivered by
+// auto-lang `6e456794d` (PLAN-981 G1+G2):
+//  * G2: the Tick lives in `on Life.Tick` with hook-local `let` (typed
+//    `let q Sweep2D = query2d.sweep(...)`, evaluated once per Tick) and
+//    `if/else` on the sweep's outcome.
+//  * G1: the ground row declares `layer: render-only` — the checked row
+//    description carries the typed fact to AV/AC/A2R and the host excludes it
+//    from query candidates (no host-side row-name table anymore).
 //
-// Syntax constraints recorded in t04-prep.md (981 side):
-//  * `on Life.Tick { … }` bodies are ASSIGNMENT-ONLY (`age-on-assign`), so the
-//    one-sweep/branch Tick lives in the `pub fn advance` helper and publishes
-//    through module scratch vars; hook-local `let` is a named AGE gap.
-//  * Scene rows are addressed by their declaration ordinal: there is no typed
-//    row handle/self-row accessor in the 17-op surface (named gap).
-//  * `shape2d` has no collision/layer attribute: the render-only ground fact
-//    must be supplied by the UI058 host lane until 981 adds a typed declaration
-//    (named gap, t04-prep §3).
+// Two frozen language disciplines shape the authoring (both pinned by 981
+// permanent cases):
+//  * hook-locals are immutable and branch-scoped, and the per-function static
+//    credit admission sums every gfx call site against the frozen 32-credit
+//    callback budget — so the Tick keeps exactly one copy of the charged
+//    chain and carries the axis normalization through the model fields
+//    `vx`/`vy` (assignment targets must be declared fields).
+//  * 021 query-token discipline: a second query2d.* invalidates every name
+//    bound before it, so each query's result is read immediately, and fields
+//    written before the queries are re-written after them (per-field state
+//    readers must stay current).
+//
+// Charging per Tick is exactly input.x/y (2) + tick.dt (1) + row.world x2 (2)
+// + sweep (16) + row.place (1) + segment (8) + spawn (1) + frame (1) = 32 —
+// exactly one of the three bodies runs per Tick.
+//
+// Frozen spellings only (IF-981-GFX-AV-SEAM): query2d.segment/sweep,
+// row.place/world, render2d.spawn/frame, image2d.png, frame2d.at, input.*,
+// tick.dt(). No legacy `_ag_*` calls.
 let atlas = image2d.png("assets/atlas.png")
 let frame0 = frame2d.at(atlas, 0, 0, 32, 32)
-
-// Host-state Tick (AV-driven form, T-04): the runner owns the row state, so the
-// function reads the row world, one sweep stops the row at the wall, one
-// segment picks the nearest target and the same Tick publishes the sprite. No
-// module/model state is replayed across the run; charging per Tick is exactly
-// input.x/y (2) + tick.dt (1) + row.world x2 (2) + sweep (16) + row.place (1) +
-// segment (8) + spawn (1) + frame (1) = 32.
-//
-// `on Life.Tick` keeps the authored hook shape (model + handler) but the
-// body is assignment-only (G2: hook-local `let`/memoized query results are not
-// delivered yet), so it delegates to the same host-state function.
-pub fn tick_step() i32 {
-    var ix f32 = input.x()
-    var iy f32 = input.y()
-    if ix != 0.0 {
-        if iy != 0.0 {
-            ix = ix * 0.70710677
-            iy = iy * 0.70710677
-        }
-    }
-    let dt f32 = tick.dt()
-    let dx f32 = ix * 8.0 * dt
-    let dy f32 = iy * 8.0 * dt
-    let px f32 = row.world(1, 0)
-    let py f32 = row.world(1, 1)
-    // Exactly one sweep per Tick; the player row is the mover (ordinal 1).
-    let q Sweep2D = query2d.sweep(1, true, dx, dy)
-    let nx f32 = px + dx * q.t
-    let ny f32 = py + dy * q.t
-    let placed i32 = row.place(1, nx, ny)
-    // Nearest interaction target from the moved position (upward 6 units).
-    let s Cast2D = query2d.segment(1, true, nx, ny, nx, ny + 6.0)
-    let token i32 = render2d.spawn("player", nx, ny)
-    let framed i32 = render2d.frame(token, "assets/atlas.png", 0, 0)
-    return s.node
-}
 
 // Budget control hooks (T-04 negative controls; not part of the Tick path):
 // `peek` costs 1 credit and `sweep_only` costs 16, so running one after a
@@ -66,28 +45,78 @@ pub fn sweep_only() i32 {
 
 node Player {
     model {
-        x f32 = 4.0
-        y f32 = 0.0
+        last_node i32 = -1
         vx f32 = 0.0
         vy f32 = 0.0
         speed f32 = 8.0
-        last_node i32 = -1
-        token i32 = 0
-        ticked i32 = 0
     }
+    // One Tick, one copy of the charged chain (the per-function static
+    // admission sums every call site against the frozen 32-credit callback
+    // budget, so the axis cases share one body): vx/vy carry the normalized
+    // unit axis into dx/dy, exactly one sweep stops the row at first contact,
+    // one segment picks the nearest target and the same Tick publishes the
+    // sprite. The 021 token discipline (a second query2d.* invalidates every
+    // name bound before it) shapes the tail: query results are read
+    // immediately, and the fields written before the queries are re-written
+    // after them with the achieved displacement, so every per-field state
+    // reader stays current. The closing branch records "requested move fully
+    // held by a contact" (-2) instead of the target node. Charging per Tick is
+    // exactly input.x/y (2) + tick.dt (1) + row.world x2 (2) + sweep (16) +
+    // row.place (1) + segment (8) + spawn (1) + frame (1) = 32 in both
+    // branches.
     on Life.Tick {
-        ticked = tick_step()
-        last_node = ticked
+        let ix f32 = input.x()
+        let iy f32 = input.y()
+        vx = ix
+        vy = iy
+        if ix != 0.0 {
+            if iy != 0.0 {
+                vx = ix * 0.70710677
+                vy = iy * 0.70710677
+            }
+        }
+        let dt f32 = tick.dt()
+        let dx f32 = vx * speed * dt
+        let dy f32 = vy * speed * dt
+        let px f32 = row.world(1, 0)
+        let py f32 = row.world(1, 1)
+        // Exactly one sweep per Tick; the player row is the mover (ordinal 1,
+        // declaration order). `q.t` is read immediately — the segment below
+        // invalidates this token.
+        let q Sweep2D = query2d.sweep(1, true, dx, dy)
+        let nx f32 = px + dx * q.t
+        let ny f32 = py + dy * q.t
+        let placed i32 = row.place(1, nx, ny)
+        // Nearest interaction target from the moved position (upward 6 units).
+        let s Cast2D = query2d.segment(1, true, nx, ny, nx, ny + 6.0)
+        let token i32 = render2d.spawn("player", nx, ny)
+        let framed i32 = render2d.frame(token, "assets/atlas.png", 0, 0)
+        // Post-segment field writes: the achieved displacement replaces the
+        // intent (also keeping the pre-query writes' state slots current).
+        vx = nx - px
+        vy = ny - py
+        if ix != 0.0 {
+            if nx == px {
+                last_node = -2
+            } else {
+                last_node = s.node
+            }
+        } else {
+            last_node = s.node
+        }
     }
     view-2d {
         // Declaration order == row ordinal (0..5). The ground is VISIBLE but it
-        // must never be a query candidate: that fact is supplied by the host
-        // lane (t04-prep §3) because AGE has no render-only/layer declaration.
+        // must never be a query candidate — a SOURCE fact now (G1): the
+        // checked row description carries `layer: render-only` to every
+        // consumer lane; removing the declaration re-admits it (the 055
+        // counterexample).
         shape2d ground {
             kind: quad
             position: (8.0, 0.0)
             size: (12.0, 8.0)
             visible: true
+            layer: render-only
         }
         shape2d player {
             kind: quad

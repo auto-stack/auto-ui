@@ -7,8 +7,9 @@
 //! the contract*, so the test asserts the positive surface and fails loudly if
 //! the pin is rolled back or drifts (record fields, f32 annotation arms, the
 //! 17-op table, the 32-credit budget constant).
+use ace_core::source::age_component::ComponentStmt;
 use ace_core::source::age_h0::LegacyWidgetAlias;
-use ace_core::source::age_package::compile_age_package;
+use ace_core::source::age_package::{compile_age_package, AgeRowLayer};
 use ace_core::source::packages::{PackageModuleInput, PACKAGES_CAPABILITY};
 use std::time::Instant;
 
@@ -36,8 +37,10 @@ fn compile() -> Result<ace_core::source::age_package::AgePackageCompilation, Str
     })
 }
 
-/// The front door accepts the fixture: one AGE node, six scene rows, and the
-/// `tick_step` symbol the AV runner executes.
+/// The front door accepts the fixture: one AGE node, six scene rows, the real
+/// `on Life.Tick` author form (G2: hook-local `let` + `if/else`), and the
+/// ground's typed render-only fact (G1) — the host-state `tick_step` form is
+/// retired.
 #[test]
 fn refreshed_pin_compiles_the_t04_source() {
     let t0 = Instant::now();
@@ -45,9 +48,30 @@ fn refreshed_pin_compiles_the_t04_source() {
         Ok(compiled) => {
             assert_eq!(compiled.description.components.len(), 1);
             assert_eq!(compiled.description.components[0].scene.len(), 6);
-            let symbol = compiled.symbol_of("tick_step").expect("tick_step symbol");
-            assert!(symbol.contains("tick_step"), "mangled symbol: {symbol}");
-            // The hook form stays authored (assignment-only body, G2 pending).
+            // G1: the checked row description carries the typed layer fact.
+            let scene = &compiled.description.components[0].scene;
+            assert_eq!(scene[0].layer, Some(AgeRowLayer::RenderOnly));
+            // G2: the Tick is the authored hook-local let/if form.
+            let handler = &compiled.description.components[0].handler_stmts;
+            let tick_stmts = &handler
+                .iter()
+                .find(|(msg, _)| msg == "Life.Tick")
+                .expect("Life.Tick handler")
+                .1;
+            assert!(
+                tick_stmts
+                    .iter()
+                    .any(|s| matches!(s, ComponentStmt::Let { .. })),
+                "hook-local lets are authored"
+            );
+            assert!(
+                matches!(tick_stmts.last(), Some(ComponentStmt::If { .. })),
+                "the start_overlap branch closes the Tick"
+            );
+            assert!(
+                compiled.symbol_of("tick_step").is_none(),
+                "the host-state tick_step form is retired"
+            );
             assert!(compiled
                 .description
                 .components[0]
@@ -55,7 +79,7 @@ fn refreshed_pin_compiles_the_t04_source() {
                 .iter()
                 .any(|m| m == "Life.Tick"));
             println!(
-                "PLAN058_TIMING test=refreshed_pin_compiles_the_t04_source ms={} rows=6 symbol={symbol}",
+                "PLAN058_TIMING test=refreshed_pin_compiles_the_t04_source ms={} rows=6 g1=layer g2=let_if",
                 t0.elapsed().as_millis()
             );
         }
