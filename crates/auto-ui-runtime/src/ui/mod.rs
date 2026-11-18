@@ -157,6 +157,7 @@ pub mod ace_native;
 // 事件回 AV）。r11 `ace_native`（宿主直读 AV 快照）保留自己的面。
 pub mod ace_node_desktop;
 pub mod ace_package_bridge;
+pub mod ace_package_lane;
 #[cfg(feature = "ace-bridge")]
 // PLAN-980 B-STATE：ACE 状态执行桥（组件面消费端）。
 pub mod ace_state_bridge;
