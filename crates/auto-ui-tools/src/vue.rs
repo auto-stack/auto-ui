@@ -4163,6 +4163,31 @@ export default router
                         all_shadcn_components.insert(comp.clone());
                     }
                     all_store_files.extend(stores);
+                    // PLAN-980 ④-A #7/#8：ACE 键在场时整文件**逐 widget**产品
+                    // lane 生成（一次；根/组件件按声明序对位——对位失败=具名
+                    // 拒，不静默回落 legacy）。
+                    let ace_products = {
+                        let app_content = fs::read_to_string(&app_at).map_err(|e| {
+                            format!("Failed to read {}: {}", app_at.display(), e)
+                        })?;
+                        ace_vue_app_sfcs(&app_at, &app_content)?
+                    };
+                    if let Some(p) = &ace_products {
+                        ace_vue_rt = Some(p.rt.clone());
+                    }
+                    let pick_ace = |i: usize, name: &str| -> AutoResult<Option<String>> {
+                        match &ace_products {
+                            None => Ok(None),
+                            Some(p) => match p.widgets.get(i) {
+                                Some((wname, sfc)) if wname == name => Ok(Some(sfc.clone())),
+                                other => Err(format!(
+                                    "ace.vue-lane-mismatch: app.at widget #{i} `{name}` 与产品件对位失败（got {:?}）——不静默回落 legacy",
+                                    other.map(|(w, _)| w.clone())
+                                )
+                                .into()),
+                            },
+                        }
+                    };
                     for (i, widget) in widgets.iter().enumerate() {
                         if let Some(ref routes) = widget.routes {
                             all_routes.extend(routes.routes.clone());
@@ -4173,16 +4198,10 @@ export default router
                             println!("{} {}", "Warning:".bright_yellow(), warning);
                         }
                         if i == 0 {
-                            // First widget is the App root（PLAN-980 ④-A #7：
-                            // ACE 键在场时换产品 lane 产物——缺席/失败具名拒）。
-                            let app_content = fs::read_to_string(&app_at).map_err(|e| {
-                                format!("Failed to read {}: {}", app_at.display(), e)
-                            })?;
-                            let (root_code, rt) = match ace_vue_app_sfc(&app_at, &app_content)? {
-                                Some((sfc, rt)) => (sfc, Some(rt)),
-                                None => (vue_code.clone(), None),
-                            };
-                            ace_vue_rt = rt;
+                            // First widget is the App root（④-A #8：产品件按
+                            // 声明序对位；键未设=legacy 原道）。
+                            let root_code = pick_ace(0, &widget.name)?
+                                .unwrap_or_else(|| vue_code.clone());
                             all_components.push((
                                 "".to_string(),
                                 "app".to_string(),
@@ -4191,6 +4210,22 @@ export default router
                             ));
                         } else {
                             // Additional widgets in app.at become components
+                            // PLAN-980 ④-A #8：ACE 键在场=产品件直用（声明序
+                            // 对位；shadcn 检测照跑）；键未设=下方 legacy 逐件
+                            // 生成道（原体不动）。
+                            if let Some(ace_code) = pick_ace(i, &widget.name)? {
+                                let comp_names = detect_shadcn_components(&ace_code);
+                                for comp in &comp_names {
+                                    all_shadcn_components.insert(comp.clone());
+                                }
+                                all_components.push((
+                                    "".to_string(),
+                                    widget.name.to_lowercase(),
+                                    ace_code,
+                                    widget.name.clone(),
+                                ));
+                                continue;
+                            }
                             // Extract store deps from app.at so these components get store imports
                             let app_store_deps =
                                 auto_ui_compiler::store_deps::extract_store_deps_from_file(
@@ -7581,19 +7616,41 @@ pub fn incremental_compile_changed(
                 ) {
                     Ok((vue_code, widgets, stores)) => {
                         store_files.extend(stores);
-                        // PLAN-980 ④-A #7：ACE 键在场时 app SFC 换产品 lane
-                        // 产物（官方 rt 同目录落盘——SFC 内 `./a2x_rt.mjs`
-                        // 相对 import 的解析位）。
-                        let (vue_code, ace_rt) = match ace_vue_app_sfc(&app_at, &content)? {
-                            Some((sfc, rt)) => (sfc, Some(rt)),
+                        // PLAN-980 ④-A #7/#8：ACE 键在场时 app SFC 换产品
+                        // lane 产物；多 widget 源逐件落盘（根=App.vue（随
+                        // changed_files）、其余=src/components/{W}.vue 与全量
+                        // 道同布局；官方 rt 落 src/）。
+                        let (vue_code, ace_rest) = match ace_vue_app_sfcs(&app_at, &content)? {
+                            Some(products) => {
+                                let mut widgets = products.widgets;
+                                let (_root_name, root_sfc) = widgets.remove(0);
+                                let rest: Vec<(String, String)> = widgets;
+                                if !rest.is_empty() {
+                                    println!(
+                                        "  {} (ace lane: {} + {} component widgets)",
+                                        "app.at".bright_yellow(),
+                                        "App",
+                                        rest.len()
+                                    );
+                                }
+                                (root_sfc, Some((rest, products.rt)))
+                            }
                             None => (vue_code, None),
                         };
-                        if let Some(rt) = ace_rt {
+                        if let Some((rest, rt)) = ace_rest {
                             let rt_path = output_dir.join("src").join("a2x_rt.mjs");
                             fs::create_dir_all(rt_path.parent().unwrap_or(&output_dir)).ok();
                             fs::write(&rt_path, rt).map_err(|e| {
                                 format!("Failed to write {}: {}", rt_path.display(), e)
                             })?;
+                            for (wname, wsfc) in rest {
+                                let comp_dir = output_dir.join("src").join("components");
+                                let comp_path = comp_dir.join(format!("{}.vue", wname));
+                                fs::create_dir_all(&comp_dir).ok();
+                                fs::write(&comp_path, wsfc).map_err(|e| {
+                                    format!("Failed to write {}: {}", comp_path.display(), e)
+                                })?;
+                            }
                         }
                         let content_hash = hash_string(&vue_code);
                         if let Some(widget_name) = widgets.first() {
@@ -7981,29 +8038,52 @@ fn handle_compile_error_with_dep_shape(
 /// 返回 `Ok(None)`=键未设（legacy 生成道逐字不变）；`Ok(Some((sfc, rt)))`
 /// =产品产物。lane 缺席/生成失败=**具名拒绝**（run 键下双轨收紧——不静默
 /// 落 legacy）；工具未按 `--features ace-vue` 构建同样具名拒绝。
-fn ace_vue_app_sfc(app_at: &Path, content: &str) -> AutoResult<Option<(String, String)>> {
+struct AceVueProducts {
+    /// 声明序逐 widget（name, sfc；首件=根/App 位）。
+    widgets: Vec<(String, String)>,
+    /// 官方 a2x 运行时（全文件共享；落 src/a2x_rt.mjs）。
+    rt: String,
+}
+
+/// ④-A #8：多 widget 版键门——`AUTO_UI_ACE_VUE=1` 时 app.at **逐 widget**
+/// 生成产品 lane SFC（根件 rt href=`./a2x_rt.mjs`、组件件=`../a2x_rt.mjs`
+/// ——src/App.vue 与 src/components/{W}.vue 的解析位）；任一 widget 缺席=
+/// 具名拒（附 widget 名）。键未设=Ok(None)（legacy 道逐字不变）；feature
+/// 未建=具名拒（不静默落 legacy）。
+fn ace_vue_app_sfcs(app_at: &Path, content: &str) -> AutoResult<Option<AceVueProducts>> {
     if std::env::var("AUTO_UI_ACE_VUE").ok().as_deref() != Some("1") {
         return Ok(None);
     }
     #[cfg(feature = "ace-vue")]
     {
-        let product = auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane_product(
+        let multi = auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product(
             content,
             &app_at.to_string_lossy(),
+            "./a2x_rt.mjs",
+            "../a2x_rt.mjs",
         )
         .map_err(|e| {
             auto_val::AutoError::from(format!(
                 "ace.vue-lane-error: AUTO_UI_ACE_VUE=1 下 app.at 经产品 lane 入口生成失败：{e}"
             ))
         })?;
-        if !product.absent.is_empty() {
+        let absent_detail: Vec<String> = multi
+            .widgets
+            .iter()
+            .filter(|w| !w.absent.is_empty())
+            .map(|w| format!("{}[{}]", w.name, w.absent.join("/")))
+            .collect();
+        if !absent_detail.is_empty() {
             return Err(format!(
-                "ace.vue-lane-unsupported: AUTO_UI_ACE_VUE=1 要求 app.at 全部 handler 可由                  ACE lane 派生；缺席={}（本键下旧道 fallback 禁用，不静默回落）",
-                product.absent.join(", ")
+                "ace.vue-lane-unsupported: AUTO_UI_ACE_VUE=1 要求 app.at 全部 widget 的                  handler 可由 ACE lane 派生；缺席={}（本键下旧道 fallback 禁用，不静默回落）",
+                absent_detail.join(", ")
             )
             .into());
         }
-        Ok(Some((product.sfc, product.runtime_mjs)))
+        Ok(Some(AceVueProducts {
+            widgets: multi.widgets.into_iter().map(|w| (w.name, w.sfc)).collect(),
+            rt: multi.runtime_mjs,
+        }))
     }
     #[cfg(not(feature = "ace-vue"))]
     {

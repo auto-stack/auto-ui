@@ -28,6 +28,83 @@ fn temp_workspace(tag: &str) -> std::path::PathBuf {
     dir
 }
 
+/// 多 widget 真实形源（002 族计数器 + 独立 Panel 开关——两件 handler 均
+/// lane 可派生；④-A #8 逐件产物判据）。
+const MULTI_SRC: &str = "widget App {
+    msg { Inc }
+
+    model {
+        var count int = 0
+    }
+
+    view {
+        col {
+            text `C: ${.count}`
+            button \"+\" { onclick: .Inc }
+        }
+    }
+
+    on {
+        .Inc -> { .count += 1 }
+    }
+}
+
+widget Panel {
+    msg { Toggle, Bump }
+
+    model {
+        var flag bool = false
+        var steps int = 0
+    }
+
+    view {
+        col {
+            button \"T\" { onclick: .Toggle }
+            button \"B\" { onclick: .Bump }
+        }
+    }
+
+    on {
+        .Toggle -> { .flag = !.flag }
+        .Bump -> { .steps += 1 }
+    }
+}
+";
+
+/// 多 widget 缺席负控：Panel 的 handler 为 F-1 形参遮蔽族（具名缺席）。
+const MULTI_ABSENT_SRC: &str = "widget App {
+    msg { Inc }
+
+    model {
+        var count int = 0
+    }
+
+    view {
+        col { text \"C\" }
+    }
+
+    on {
+        .Inc -> { .count += 1 }
+    }
+}
+
+widget Panel {
+    msg Msg { Set(int) }
+
+    model {
+        var n int = 0
+    }
+
+    view {
+        col { text \"P\" }
+    }
+
+    on {
+        .Set(n) -> { .n = n }
+    }
+}
+";
+
 /// lane 缺席负控源（F-1 形参遮蔽族——具名缺席，永久反例先例）。
 const ABSENT_SRC: &str = "widget S {\n    msg Msg { Set(int) }\n\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"S\" }\n    }\n\n    on {\n        .Set(n) -> { .n = n }\n    }\n}\n";
 
@@ -102,6 +179,76 @@ fn p980_ace_vue_tool_wiring_key_gate_and_named_rejects() {
         err2.to_string()
     );
     let _ = std::fs::remove_dir_all(&ws2);
+
+    // ── ⑥键在场·多 widget 增量道：根=App.vue（自己的 lane 体）、其余=
+    //    src/components/{W}.vue（各自的 lane 体+`../a2x_rt.mjs` href）。
+    let ws4 = temp_workspace("multi-incr");
+    std::fs::write(ws4.join("src/front/app.at"), MULTI_SRC).unwrap();
+    incremental_compile_changed(&ws4, None).expect("multi-widget incremental ok");
+    let app_multi = std::fs::read_to_string(ws4.join("gen/front/vue/src/App.vue")).unwrap();
+    assert!(
+        app_multi.contains("a2x_add(count.value, 1)") && app_multi.contains("./a2x_rt.mjs"),
+        "root artifact carries its own lane body + root-relative rt href"
+    );
+    assert!(
+        !app_multi.contains("(!flag.value)"),
+        "root artifact must NOT carry the second widget's handler"
+    );
+    let panel = std::fs::read_to_string(ws4.join("gen/front/vue/src/components/Panel.vue"))
+        .expect("second widget lands in its own component artifact");
+    assert!(
+        panel.contains("(!flag.value)") && panel.contains("a2x_add(steps.value, 1)"),
+        "component artifact carries its own lane bodies (NOT form + helper form)"
+    );
+    assert!(
+        panel.contains("../a2x_rt.mjs"),
+        "component artifact carries the component-relative rt href"
+    );
+    assert!(
+        !panel.contains("a2x_add(count.value, 1)"),
+        "component artifact must NOT carry the root's handler"
+    );
+
+    // ── ⑦键在场·多 widget 全量道：from_workspace 逐件对位（root + panel
+    //    组件项均为产品 lane 件）。
+    let project2 = VueProject::from_workspace(&ws4).expect("multi full path ok");
+    let root_entry = project2
+        .components
+        .iter()
+        .find(|(_, name, _, _)| name == "app")
+        .expect("root entry");
+    assert!(root_entry.2.contains("a2x_add(count.value, 1)"));
+    let panel_entry = project2
+        .components
+        .iter()
+        .find(|(_, _, _, w)| w == "Panel")
+        .expect("panel entry");
+    assert!(
+        panel_entry.2.contains("(!flag.value)")
+            && panel_entry.2.contains("a2x_add(steps.value, 1)"),
+        "full-path panel entry is the lane product"
+    );
+    assert!(
+        panel_entry.2.contains("../a2x_rt.mjs"),
+        "full-path panel entry carries the component-relative rt href"
+    );
+    assert!(project2.ace_vue_rt.is_some());
+    project2.write_ace_vue_rt().expect("rt write ok");
+    let _ = std::fs::remove_dir_all(&ws4);
+
+    // ── ⑧键在场·多 widget 缺席：具名拒携带 widget 名（Panel[.Set]）。
+    let ws5 = temp_workspace("multi-absent");
+    std::fs::write(ws5.join("src/front/app.at"), MULTI_ABSENT_SRC).unwrap();
+    let err3 = incremental_compile_changed(&ws5, None)
+        .expect_err("multi-widget absent must be named-rejected with the widget name");
+    assert!(
+        err3.to_string().contains("ace.vue-lane-unsupported")
+            && err3.to_string().contains("Panel")
+            && err3.to_string().contains(".Set"),
+        "named rejection names widget+handler: {}",
+        err3.to_string()
+    );
+    let _ = std::fs::remove_dir_all(&ws5);
 
     // ── ⑤键未设：同一缺席源恢复 legacy Ok（拒绝只在键下收紧）。
     std::env::remove_var("AUTO_UI_ACE_VUE");
