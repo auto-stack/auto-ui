@@ -107,6 +107,13 @@ T-03..06拟新增driver `tests/node_topdown2d_{flow,storage}.rs`与`tools/verify
 - **V-S08**：正例地面174116px可见、非候选（sweep→ord3 t=0.046000004/停位8.58；segment→ord5 t=0.25；credits=32）；变异去layer→t=0/start_overlap=1/位置4.0且segment被地面t=0抢选；**对抗反例**（地面置(65540,65540)、射线穿旧E1代理点/横跨真实box）→render-only hit=(0,0)，同文档去layer→均命中（t=0/t=0.2）。E1代理已删、非承载。
 - 旧021/022消费者：`node_queries_flow` 11/11、`node_sprites_flow` 4/4；`public_audio_compat` 3D六项为T-03前已漂移的预存红（同源stash复现；3D unit `9c13cca4` vs 基线`7bfbac0d`），非本任务回归。
 
+**T-04 AV 阶段结果（2026-11-18实测，AV phase pass；T-04 未勾，AC/A2R/GPU待后续波）**：
+- **正式来源/pin**：981 record ABI `5ee4d23c0`（receipt `381d7a364`，`D-981-GFX-PORT-ABI` closed）；`.sdk-source` overlay 刷新到 auto-lang master `64e8380f4`（681 base+1432 overlay；`prepare_sdk --verify-only` 与 `verify_overlay` 双 PASS），提交 `sdk/overlay/overlay.json`；driver 直依赖 `ace-av-core`（Value/StrView 映射）。预存红：`viewport3d_depth_probe`/`squash_feasibility` 缺 `Scene3dContent.hud_overlay`（PLAN-013 字段、测试未更新，与本 pin 无关，未修）。
+- **前门**：`main.at` 经 `compile_age_package` 真编译（1 node/6 scene 行/符号 `p7_plan058m4_main_tick_step`，37ms）；`on Life.Tick` 保留原形（assignment-only，G2待）；AV 驱动走无参 `pub fn tick_step()` **宿主状态形态**（`row.world` 读位、`input.*`/`tick.dt`、**恰一次** sweep 停墙、`row.place`、`segment` 最近、`render2d.spawn/frame` 同 Tick；每 Tick 恰 32 credits）。
+- **适配**：`impl AgeGfxHost for NeutralGfxHost`——`Value↔GfxArg`（含 `StrView`）、3 个 record op 复用三臂、13 个标量/行/精灵 op、fault 去 `age-gfx.` 前缀；收费/sticky 仍归 981 `AgeGfxSession`，provider 不计费。
+- **runner**（`tests/plan058_t04_av_chain.rs` 3/3，74/33/45ms）：40 Tick 逐 Tick 对独立 oracle 比位置/sweep(node,t,start_overlap)/segment(hit,node,t)；首次接触**第35 Tick**、停位 **8.6**、t=**0.5000353**，此后不穿透；同 Tick spawn 位置=行位、1 token 复用；输入 (1,0)/(1,1)/(0,0)/(−1,0) 与改源速度 8→4（单 Tick 0.0666667）随动；32 合法/第 33 credit sticky 拒/48 credit 拒且零效果/`begin_tick` 重置/`stop` 具名拒。
+- **边界**：G1（AGE 源侧 render-only 声明）与 G2（hook-local let/memoized）仍待 981；本阶段 render-only 地面由宿主按 scene 行名承载；GPU 像素/AC/A2R 与 `use` 实例归 T-05/后续波；`render2d.frame` 的 str 仅字面透传（G4 资源名语义待资源身份）。
+
 ### 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
@@ -159,7 +166,7 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-01 | work | 后续另行启动；T-01不等研究 | 只读差距/源版本/最低样本和oracle准备，核owner/唯一树scope | AC-01/AC-06 | [x] 2026-11-18：055 spec c185f8f2/归档10-10、AG022归档10-10、981 seam ddbda0228+ed8b16e01 32/8/16/1、f32 在途；样本6行/32credits（t01-entry.md） |
 | T-02 | work | T-01；055/AG022已交结论；981 T-02联冻已回签 | ≤2机制中立服务/GPU最低负载先证，冻结profile/typed端口/预算映射/数值/共同发布；先证接口=已有静态f32行值＋宿主行写（不依赖f32业务式），真实Auto移动积分等981 f32 AV切片；不冒Node整链go，失败replan | AC-01/AC-02/AC-03/AC-04/AC-10/AC-11 | [x] 2026-11-18：probe c5086f50 5/5（queries-2d/sprites-2d；宿主行写/f32行值）；机制=碰撞代理与外观分离四要件；GPU 210/400px同Tick；32合法/33 fault10/40>32零效果sticky/40→41/按Tick重置；单assembly与use实例留T-03 |
 | T-03 | work | T-02机制可行；981稳定合同供准备 | 中立图形服务/能力注册/可见非阻挡地面/Node领域声明与永久用例，不扩旧生成器；与981不相交写面并行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-01/AC-02/AC-03/AC-05/AC-10/AC-11 | [x] 2026-11-18：新profile `autographics.topdown2d/1`(30/121)+scene/9 layer+render-only行表/感知segment/sweep(fault 60)；旧22 profile/10 unit/价目零漂移；`node_topdown2d_flow` 5/5、controls 6/6、旧消费者11/11+4/4；E1代理被65536对抗反例否决并删；commit 7165dbad |
-| T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；**入口阻塞：待981 IF-981-GFX-HOST-PORT（2026-11-18裁定A）**；预备/三臂已交 `b071634c`/`f6418120`（源/oracle/segment+sweep+image2d ABI 臂），待 G1/G2+pin | 正常Node同源先AV整链、随后AC/A2R按§5阶段先证、四八向/查询/呈现同步、实例/owner/故障及输入门；缺接口回owner ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-10/AC-11 | [ ] |
+| T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；**入口阻塞：待981 IF-981-GFX-HOST-PORT（2026-11-18裁定A）**；预备/三臂/AV整链已交 `b071634c`/`f6418120`/`7a1503b7`（pin `64e8380f4`；40 Tick/每 Tick 32 credits/停位8.6/逐Tick oracle；`tick_step` 宿主形态）；AC/A2R/GPU 待 W2/T-05，G1/G2 待981 | 正常Node同源先AV整链、随后AC/A2R按§5阶段先证、四八向/查询/呈现同步、实例/owner/故障及输入门；缺接口回owner ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-10/AC-11 | [ ] |
 | T-05 | work | T-04整链go | V-S01..08、预算合法/超界、独立数值/GPU oracle与旧档触面回归，双后端实际运行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-10/AC-11 | [ ] |
 | T-06 | work | T-05 | 冷A→B/修复下一Run、SD与AG023双后端准确版本/命令/配方 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-05/AC-06/AC-10/AC-11 | [ ] |
 | T-07 | review | T-06 | 同树独立final，真实逐AC/SD/源和反例核验；finding同员有界复核 | AC-07 | [ ] |
@@ -168,6 +175,16 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+### 2026-11-18 stage: work（T-04 AV 整链：正常 Node 源经 981 host port 真跑）| PLAN-058 r7 | outcome: pass（AV phase；T-04 未勾，AC/A2R/GPU 待）
+
+**绑定**：worktree `D:/autostack/.wt/ui-058/auto-ui` | branch `codex/plan-058-dev` | code commit `7a1503b7`（8 文件，含 `sdk/overlay/overlay.json`）| 主检出只改Plan簿记。
+**pin**：overlay 刷新到 auto-lang master `64e8380f4`（含 record ABI `5ee4d23c0`、f32、seam）；`prepare_sdk.py --verify-only` PASS（681 base+1432 overlay/17 local packages）、`verify_overlay.py` PASS two-layer。预存红：`viewport3d_depth_probe.rs`/`squash_feasibility.rs` 缺 `Scene3dContent.hud_overlay`（PLAN-013 字段，测试未更新，与本 pin 无关，未修）。
+**任务**：T-04（AV 阶段）。
+**证据/命令**：`t04-chain.md`（`11c6e365…`）；`plan058_t04_av_chain` **3/3**（74/33/45ms）；`plan058_t04_{arms,oracle,provider,pin}` 6/4/5/2；`node_topdown2d_flow` 5/5；`s2_age_routing` 21/21；旧021 `node_queries_flow` 11/11；旧022 `node_sprites_flow` 4/4；`verify_plan058.py --controls` 6/6。
+**数字**：40 Tick 每 Tick **32 credits**、无 fault；逐 Tick 位置/sweep(node=2,t≈0.5,start_overlap)/segment(node=4,t=0.25) 与 oracle 一致；首次接触**第35 Tick 停位8.6/t=0.5000353**；输入四变体与改源速度8→4（0.0666667）随动；第33 credit sticky、48 credit 拒、零效果、`begin_tick` 重置、`stop` 具名拒。
+**边界**：G1（AGE `shape2d` 无 render-only 声明）与 G2（hook-local let/memoized）仍待981；AV 驱动用 `pub fn tick_step()` 宿主状态形态，`on Life.Tick` 原形保留；GPU 像素/AC/A2R/`use` 实例/OS 输入待 T-05/后续波；`render2d.frame` str 仅字面透传。
+**next**：W2-AC/981 AC 域与 G1/G2 后补 AC/A2R 与 GPU（T-05），T-04 全量义务不减。
 
 ### 2026-11-18 stage: work（T-04 三臂：segment/sweep/image2d 对齐 record ABI）| PLAN-058 r7 | outcome: pass（三臂完成；T-04 仍未勾，待 G1/G2+pin）
 
@@ -259,4 +276,4 @@ next: work（T-01只读准备→T-02先证）；本轮未开树。
 
 ## 10. 待澄清事项
 
-D-01：055/AG022研究已交，最低组合仍待本包先证，不能把研究当产品完成；需变更预算则replan。D-02：轴/姿态/单sweep及所有权由T-02冻结，不默加滑墙。D-03：AGE M1原生门已由AG026签章，981所需A正式接面仍未齐，前期并行不豁免终验，也不等待本AGE M2总签。D-04：T-02先证不以f32业务式为前提（已按静态行值完成）；真实Auto移动积分（位置/速度f32字段与f32业务式）的前置已满足——981 `D-981-AGE-F32-SURFACE`关闭（AV `be8480cae`+A2R `a4950f0b5`，auto-lang master；receipt `77dc0fc26`），UI058仍不以int近似；跨仓状态观察/呈现按981 `D-981-F32-CONSUMER-WINDOW`另行回签，T-04 AV先证可用`execute_component_def`取`Value::F32`。材料唯一`D:/autostack/plan-artifacts/plan-058/auto-ui/`，开工核跨仓同号owner并登记用途/路径/在途，外部B/SDK副本/target/原日志探针全收自有子scope；merge摘要折Plan、全输出对账/guard清树/删除自有scope构建物，仅具名owner/理由/关闭条件hold例外；不穿透链接、不碰外仓同号、不创建第二权威树。D-05（已解）：T-02冻结分离；T-03采用新profile+per-row render-only表（非代理），E1(65536代理)被对抗反例否决并删除；SD-01须在`node2d-topdown-composition.md`沉淀profile 30/121、scene/9 layer、fault 60与旧档零漂移。D-06（T-04入口，2026-11-18）：981 AV 车道具名拒15个HostAlgorithm+HostIdentity（`hir_adapter.rs:5082 lower.age-gfx-lane`），且无gfx宿主派发，故"正常Node源AV整链"缺执行口；用户裁定路线A=回981 owner补SESSION/typed宿主端口，`IF-981-GFX-HOST-PORT`请求已并入981 §9；UI058不建私有runner/旧生成器旁路，T-04待该正式来源。T-04预备（`b071634c`）另实测 AGE 侧缺口G1..G5（`shape2d`无render-only声明位/Tick体assignment-only/无typed行句柄/frame str拼写未证/pin旧），已并入981请求补充；pin刷新为T-04第1步。三臂（`f6418120`）已按 `D-981-GFX-PORT-ABI`（`5ee4d23c0`/`381d7a364`）实现 segment/sweep/image2d 的精确 record 与 dispatch；收费仍归981 session；G1 源侧声明与 G2 语法仍待981。
+D-01：055/AG022研究已交，最低组合仍待本包先证，不能把研究当产品完成；需变更预算则replan。D-02：轴/姿态/单sweep及所有权由T-02冻结，不默加滑墙。D-03：AGE M1原生门已由AG026签章，981所需A正式接面仍未齐，前期并行不豁免终验，也不等待本AGE M2总签。D-04：T-02先证不以f32业务式为前提（已按静态行值完成）；真实Auto移动积分（位置/速度f32字段与f32业务式）的前置已满足——981 `D-981-AGE-F32-SURFACE`关闭（AV `be8480cae`+A2R `a4950f0b5`，auto-lang master；receipt `77dc0fc26`），UI058仍不以int近似；跨仓状态观察/呈现按981 `D-981-F32-CONSUMER-WINDOW`另行回签，T-04 AV先证可用`execute_component_def`取`Value::F32`。材料唯一`D:/autostack/plan-artifacts/plan-058/auto-ui/`，开工核跨仓同号owner并登记用途/路径/在途，外部B/SDK副本/target/原日志探针全收自有子scope；merge摘要折Plan、全输出对账/guard清树/删除自有scope构建物，仅具名owner/理由/关闭条件hold例外；不穿透链接、不碰外仓同号、不创建第二权威树。D-05（已解）：T-02冻结分离；T-03采用新profile+per-row render-only表（非代理），E1(65536代理)被对抗反例否决并删除；SD-01须在`node2d-topdown-composition.md`沉淀profile 30/121、scene/9 layer、fault 60与旧档零漂移。D-06（T-04入口，2026-11-18）：981 AV 车道具名拒15个HostAlgorithm+HostIdentity（`hir_adapter.rs:5082 lower.age-gfx-lane`），且无gfx宿主派发，故"正常Node源AV整链"缺执行口；用户裁定路线A=回981 owner补SESSION/typed宿主端口，`IF-981-GFX-HOST-PORT`请求已并入981 §9；UI058不建私有runner/旧生成器旁路，T-04待该正式来源。T-04预备（`b071634c`）另实测 AGE 侧缺口G1..G5（`shape2d`无render-only声明位/Tick体assignment-only/无typed行句柄/frame str拼写未证/pin旧），已并入981请求补充；pin刷新为T-04第1步。三臂（`f6418120`）已按 `D-981-GFX-PORT-ABI`（`5ee4d23c0`/`381d7a364`）实现 segment/sweep/image2d 的精确 record 与 dispatch；收费仍归981 session；G1 源侧声明与 G2 语法仍待981。T-04 AV 阶段已真跑（`7a1503b7`）：overlay pin `64e8380f4`、`impl AgeGfxHost` 全 16 op、`tick_step` 宿主形态 40 Tick 每 Tick 32 credits、停位8.6/逐Tick oracle、预算 sticky/重置/stop；T-04 未勾，AC/A2R/GPU/`use` 实例待 W2/T-05。
