@@ -96,7 +96,7 @@
 - `cargo test -p auto-ui-runtime --lib -- image_surface mouse_area onseek progress` → 17 pass（1.75s）
 - native 链路里程碑：demo18（split 会话）全链实证 loaded=2（双实例单次）+ viewRequested tuple 接受（rev 推进）——组件/运行时合同面成立；产品门剩余阻塞见 P6
 
-| P8 | MCP 动作在 modal 打开时被 modal scope 收窄：dialog-content 内控件经 MCP 不可达（PLAN-084 行为，目标在活动 dialog 外或不可识别即具名拒绝） | V-03 对话框内 放大 press → `Modal dialog owns input; target is outside the active dialog` | v1 产品门记 not_run（接受回路与内嵌实例共用并已在 V-01 覆盖）；dialog 内驱动能力留给后续 plan（如 MCP modal-scope 语义扩展） |
+| P8 | 【r3 更正：非 PLAN-084 收窄行为】dialog 开启时 `press('放大')` 被 modal scope 拒绝——**根因＝同名双实例按钮的标签歧义**：快照首匹配落在树序前部的内嵌实例（活动 dialog 外），modal scope 正确拒绝该目标（背景隔离如期工作）；同 modal 内 `关闭`（dialog 头）press 成功证明 modal scope/包子树识别无缺口 | V-03 对话框内 放大 press → `Modal dialog owns input; target is outside the active dialog`；同腿 `关闭` press pass（cancelled=1） | r3 修复：gate `press(occurrence='last')` 消歧取 dialog 实例（正腿＝双实例变换独立 oracle）+ 首匹配显式负控（背景拒绝 oracle）；V-03 两腿转正 |
 | P9 | 031/029 back 首次生成 + 编译耗时（约 2-4 分钟/个）——Session ready 截止已按会话序号放宽（V-04 腿 600s）；029 的 V-04 腿在其 back 编译缓存冷启动时仍可能超时 | V-04 029 legs 首轮 `app never rendered` | 已放宽至 600s；若仍超时记 not_run（单平台缺口，不并入总绿） |
 
 ## 8. T-05/T-06 证据汇总（2026-11-18）
@@ -120,23 +120,101 @@
 split 拓扑下的前端注册表喂给机制（media proxy/feed），超出本计划范围——具名
 后续依赖（P10）**。vue 轨产品门记 not_run（单平台缺口，`gate-vue/report.json`）。
 
-### 8.3 V-04 031/029 腿
+### 8.3 V-04 031/029 腿（r3 更正：按原始证据归因）
 
-- 031：手动诊断两次到达 `view_state=ready`（rewrite 后 2s 内）；产品门驱动上下文
-  中 ready 断言 3 次未过（40s）——driver 与手动的时序差未定位；native 像素本身
-  受 P1 限制（split 下前进程注册表缺 back 票据；--server vm 亦三进程）。
-  031 的 vue 轨像素可经 back HTTP（P10 解除后一并验收）。
-- 029：back 首次生成+编译超产品门 deadline（P9，已放宽至 600s 仍不足的冷启动
-  场景记 not_run）。
+- 031：**根因＝P1，非"driver 时序差"**。session-3.log 实证组件已挂载、URI 正常
+  （`/api/__auto/media/2858e0…/1`），但常驻 `status=Failed("media ticket missing")`
+  ——back 进程票据不入前进程注册表（split/merged 拓扑下 back 持票）。早期手记
+  "手动诊断两次到达 ready" 无法复现且与本日志矛盾，以日志为准。修复依赖具名
+  后继机制（split 前端注册表 feed/媒体代理），r3 已裁定收口轨改为 031 的
+  back-HTTP vue 轨（V-04R）。
+- 029：back 首次生成+编译发生在**计时 case 内**（608.62s，超 600s deadline）——
+  除冷启动耗时外，本身即 test-discipline 违例（日测不自建前置）。r3 已改为
+  显式 pre-gate 准备段（prewarm），计时腿只消费已物化产物。
 
-### 8.4 本会话测试模块/耗时表（test-discipline 要求）
+### 8.4 首轮（2026-11-18 r2）测试模块/耗时表——**r3 更正版**
+
+> 更正说明：本表初版记"最大单 case 8.9s、全部 ≤10s 门内"，与其自引
+> report.json 原始值矛盾（T-07 复审 F-05 实证）。以下为按
+> `gate-native/report.json`（sha256 前缀 83c88d5241c51695）逐 case 原值
+> 的更正版；r3 重跑后的新表见 §8.5。
 
 | 模块 | 结果 | 准备 | 发现 | 测试 | 清理 | 总计 |
 |---|---|---|---|---|---|---|
 | auto-ui-tools image_viewer_component（2 case） | 2/2 pass | 增量编译 | ~1s | 9.0s | - | ~10s |
 | auto-ui-runtime image_surface_contract + image_pipeline_parity | 2/2 pass | 增量 | ~0.2s | 0.35s | - | ~0.6s |
 | auto-ui-runtime lib（image_surface/mouse_area/onseek/progress 过滤 17 case） | 17 pass | - | - | 1.75s | - | ~2s |
-| 产品门 native（19 case：16 pass/3 not_run） | pass | back 生成+编译 ~40-90s | ~30s | ~350s | ~10s | ~710s |
+| 产品门 native（19 case：16 pass/0 fail/3 not_run） | pass | back 生成+编译 ~40-90s | ~30s | ~350s | ~10s | 709.4s |
 
-新增 case 计时：见 report.json 逐 case seconds（最大单 case 8.9s V-05 退出重开，
-全部 ≤10s 门内）。
+首轮新增 case 计时**原值**（report.json）：最大 **16.49s（V-05 退出重开）**、
+**10.13s（V-01 open A，含会话拉起）**——两例超 10s 新 case 门＝F-01；not_run
+尝试耗时 54.99s（031）/608.62s（029，含在测 back 编译）。首轮计时缺陷的结构
+原因：`Case` 计时基线早于会话拉起（case 时长吸收 bring-up）+ V-05 终止/重开
+未拆分。r3 修复：`Case.pause_timer()`（拉起入准备段）+ V-05 拆分为
+"退出终止"与"重开就绪"两案 + prewarm 准备段。
+
+### 8.5 r3 重跑（2026-11-18，F-01/F-02/F-04/T-09 修复后——最终证据）
+
+**修复落地面**（r3 复审合同 F-01…F-05 + T-09）：
+
+- **F-01 计时合规**：`Case.pause_timer()`（会话拉起＝准备段，入 `report['prep']`）；
+  V-05 拆分为"退出终止"+"重开就绪"两案；vue 重开链改两段构造
+  （`defer_render`/`render_ready`——拉起 12.5-14.3s 入 prep，渲染就绪 case
+  0.37s）；029 照片集/AUTO_PHOTO_ROOT 与 031 夹具重写入 pre-gate 准备段
+  （`prewarm_vue`，冷物化 15-110s 不进计时 case）；031/029 pac 端口 gate 期
+  改绑（3031 落 Windows 保留段 → vite `listen EACCES`）；`taskkill /T` 整树回收。
+- **F-02 对话框内 oracle**：根因＝**同名双实例按钮的标签歧义**（快照首匹配
+  落在内嵌实例，modal scope 正确拒绝）——非 PLAN-084 行为、非包子树识别缺口
+  （同 modal 内 `关闭` press 一直可达）。gate 改 `press(occurrence='last')`
+  取对话框实例＋首匹配显式负控（背景拒绝 oracle）＋挂载稳定门（快照 ticks
+  掩码后连续两帧一致再压，vnode 登记竞态 flake 消除）。
+- **F-04 vue 轨**：渲染诊断面（pageerror/console/html 全落入失败消息）后，
+  vue demo 每轮正常渲染（首访空体未复现；09:46 失败归因孤证不立）。
+- **F-05 记录更正**：§8.3/§8.4 按原始证据重写（见上）。
+- **T-09 V-04R**：vue 收口轨全绿（见下表）；native split 腿记 P1 具名
+  not_run（不空耗 doomed 试跑，证据冻结于 session-3.log）。
+
+**新增发现 P11（vue codegen，已修复＋回归测试）**：lucide 图标 import 与
+.at msg handler 同名冲突（`ZoomIn`/`ZoomOut`）——模板图标元素解析到 handler
+函数被当作函数式组件每次 render 调用，发出 source=zoom 请求风暴（031 实测
+203 条、视图缩到 0.05 下限、画面成 4×3 像点）。修复：`lucide_component_name`
+统一 `Lucide` 前缀别名（import `ZoomIn as LucideZoomIn` 对应）；编译器 vue
+测试 342/342 绿＋新增回归 `plan089_lucide_icon_handler_name_collision_aliased`；
+金样 012_icon_state/desktop_surface_asset 同步。此为 vue 收口轨的阻断级发现，
+属本计划 runtime/codegen 修复面（P6 同族），已随 r3 落地。
+
+**最终门（同一冻结基线：compiler 修复后重建 auto.exe@auto-man cab347b + 最终
+gate 脚本）**：
+
+| 门 | 结果 | case 构成 | 总耗时 | 最大 pass case |
+|---|---|---|---|---|
+| 产品门 native（`gate-native-r3/report.json`，sha256 前缀 765de8e52cfda9d2） | **pass** | 19 pass / 0 fail / 2 not_run（V-04R native split＝P1 具名边界） | 46.8s | 7.34s（全部 ≤10s 门内） |
+| 产品门 vue（`gate-vue-r3/report.json`，sha256 前缀 d0cc5cd9b3f17b1b） | **pass** | 16 pass / 0 fail / 18 not_run（demo 媒体腿＝P10 具名边界；功能矩阵由 V-04R 承担） | 176.5s | 全部 ≤10s 门内 |
+| tools 门 image_viewer_component + tree_view_component | 4/4 pass | — | ~9s | 7.54s |
+| runtime image_surface_contract + image_pipeline_parity | 2/2 pass | — | ~0.4s | — |
+| compiler --lib（vue 模块 342/342；rust 模块 2 红为**基线既有**，stash 对拍实证与本改无关） | pass | — | ~1.5s | — |
+
+**V-04R 关键证据（vue/back-HTTP 真实媒体，AC-05 收口）**：
+- 031 打开媒体→受控回路就绪：`Ready`/`视图已接受` + `Images 1 corner-marked.png`（0.95s）
+- 角点像素框内象限分布：`red:TL green:BL blue:TR`（1.66s）
+- 旋转达像素：DOM bounding box 64×48→48×64 纵横互换 + 框内角点重排（2.79s）
+- 平移达像素：img box x 228→268（+40px @zoom1，3.36s）
+- 前后图导航：媒体 URI 切换 + 状态 Next（2-3s）
+- 029：网格两照片（back photo_service 扫描 AUTO_PHOTO_ROOT）→ 查看区组件挂载
+  （工具栏+胶囊）→ 变换截图 → 关闭回网格（合计 ~5s）
+
+**本会话测试模块/耗时表（r3 会话合计，test-discipline）**：
+
+| 模块 | 结果 | 准备 | 测试 | 清理 | 备注 |
+|---|---|---|---|---|---|
+| compiler --lib（vue 342 + 全量） | 342/342 绿；2 rust 红＝基线既有（stash 对拍） | 增量 | ~1.5s/轮 | - | 修复迭代期共 3 轮 |
+| tools 两门 | 4/4 pass | 增量 | ~9s | - | 1 轮（曾被泄漏进程锁 exe，/T 修复后通过） |
+| runtime contract+parity | 2/2 pass | 增量 | ~0.4s | - | 1 轮 |
+| 产品门 native | 19/0/2 | 会话拉起×2（prep） | 46.8s（终版） | taskkill /T | r3 共 8 轮（3-7 轮计时受邻组 cargo 构建窗口与 flake 修复迭代影响，原始值见各 report.json） |
+| 产品门 vue | 16/0/18 | prewarm×2+重开拉起（prep 15-110s/12-14s） | 176.5s（终版） | 同上 | r3 共 11 轮（含 F-04 诊断迭代） |
+| 031 vue 探针（probe_031_vue.py） | 诊断用 | - | ~1-2min/轮 | 自动还原 | 定位 P11 的关键工具，留档 plan-artifacts |
+
+新增 case 计时：终版两门全部 ≤10s（native 最大 7.34s；vue 最大 <10s）。
+r3 迭代期的超时 case（10.13/16.49/23.16/21.72/25.04/12.25/11.53 等）均在
+修复收敛前，原始值保留于对应轮次日志（plan-artifacts/plan-089/*run*.log）
+与 §8.4 更正版对照。
