@@ -308,6 +308,30 @@ fn p980_ace_vue_tool_wiring_key_gate_and_named_rejects() {
         "full-path components entry is the lane product"
     );
 
+    // ── ⑨c键在场·**原样 AutoNotes fp_editor.at**（view-if 刀后 lane 就绪）
+    //    经 components/ 通道编入正确组件（DraftEdit lane 体+组件位 href）。
+    {
+        let ws6b = temp_workspace("components-fp-orig");
+        let comp_dir6b = ws6b.join("src/front/components");
+        std::fs::create_dir_all(&comp_dir6b).unwrap();
+        let fp_src = std::fs::read_to_string(
+            "D:/autostack/auto-notes/src/front/components/fp_editor.at",
+        )
+        .expect("auto-notes fp_editor.at readable");
+        std::fs::write(comp_dir6b.join("fp_editor.at"), fp_src).unwrap();
+        incremental_compile_changed(&ws6b, None)
+            .expect("original fp_editor generates through the components channel");
+        let fp_orig = std::fs::read_to_string(
+            ws6b.join("gen/front/vue/src/components/FpNoteEditor.vue"),
+        )
+        .expect("original FpNoteEditor artifact written");
+        assert!(
+            fp_orig.contains("a2x_str_clone(v)") && fp_orig.contains("../a2x_rt.mjs"),
+            "original fp_editor artifact carries the DraftEdit lane body + component href"
+        );
+        let _ = std::fs::remove_dir_all(&ws6b);
+    }
+
     // ── ⑩键在场·components/ 缺席负控：具名拒附文件名+widget 名。
     let ws7 = temp_workspace("components-absent");
     let comp_dir2 = ws7.join("src/front/components");

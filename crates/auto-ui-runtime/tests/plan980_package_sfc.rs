@@ -109,3 +109,45 @@ fn p980_package_sfc_002_first_blocker_is_named() {
     );
     eprintln!("002 first blocker: {err}");
 }
+
+/// PLAN-980 view-if 刀：view 级条件项在包 SFC 模板腿渲染为
+/// `<template v-if/v-else>`（WEB 真语义；else-if 链=嵌套 template）。
+#[test]
+fn p980_package_sfc_renders_view_if_as_template_directives() {
+    let src = "widget W {
+    msg { R }
+
+    model {
+        var n int = 0
+    }
+
+    view {
+        col {
+            if .n == 1 {
+                text \"one\"
+            } else {
+                text \"many\"
+            }
+        }
+    }
+
+    on {
+        .R -> { .n = .n + 1 }
+    }
+}
+";
+    let sfc = generate_package_sfc(&[unit("app", "main", src)], "app::main")
+        .expect("view-if source generates a package SFC");
+    assert!(
+        sfc.contains("<template v-if="),
+        "then arm renders as template v-if: {sfc}"
+    );
+    assert!(
+        sfc.contains("one") && sfc.contains("many"),
+        "both arms' content renders"
+    );
+    assert!(
+        sfc.contains("<template v-else>"),
+        "else arm renders as template v-else"
+    );
+}

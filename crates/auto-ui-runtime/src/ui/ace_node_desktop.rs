@@ -849,6 +849,9 @@ fn project_view_shape(
         match item {
             ComponentViewItem::Text(_) => shape.text_leaf_count += 1,
             ComponentViewItem::Entry(_) => {}
+            // PLAN-980 view-if：装载点已具名拒（view_contains_cond）——
+            // 此臂不可达，防御性跳过。
+            ComponentViewItem::Cond(_) => {}
             ComponentViewItem::Element(el) => {
                 if el.tag == "text" {
                     shape.text_leaf_count += 1;
@@ -958,6 +961,13 @@ impl NodeDesktopBridge {
         let node = candidates
             .first()
             .ok_or_else(|| "no AGE node candidate in source".to_string())?;
+        // PLAN-980 view-if 刀：桌面渲染腿未定条件语义——装载点 fail-closed。
+        if let Some(sp) = ace_core::source::age_component::view_contains_cond(&node.view.tree) {
+            return Err(format!(
+                "ace.desktop.view-cond-unsupported: view 条件项 @{}..{} 本腿未承载（桌面渲染语义待后续刀；不静默展开）",
+                sp.start, sp.end
+            ));
+        }
         let mut shape = ViewShape {
             text_leaf_count: 0,
             buttons: Vec::new(),
@@ -1112,6 +1122,13 @@ impl NodeDesktopBridge {
         let node = candidates
             .first()
             .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
+        // PLAN-980 view-if 刀：包桥桌面装载点同律 fail-closed。
+        if let Some(sp) = ace_core::source::age_component::view_contains_cond(&node.view.tree) {
+            return Err(format!(
+                "ace.desktop.view-cond-unsupported: view 条件项 @{}..{} 本腿未承载（桌面渲染语义待后续刀；不静默展开）",
+                sp.start, sp.end
+            ));
+        }
         let mut shape = ViewShape {
             text_leaf_count: 0,
             buttons: Vec::new(),

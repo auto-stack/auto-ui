@@ -357,6 +357,21 @@ fn render_items(
                     ctx.push_str(&format!("{{{{ {js} }}}}"));
                 }
             }
+            // PLAN-980 view-if 刀：条件项 → `<template v-if/v-else>`（WEB
+            // 模板腿的真语义；else-if 链=嵌套 Cond→嵌套 template v-if）。
+            ComponentViewItem::Cond(c) => {
+                let cond_js = expr_to_template_js(&c.cond)?;
+                if !c.then_items.is_empty() {
+                    ctx.push_str(&format!("<template v-if=\"{cond_js}\">"));
+                    render_items(&c.then_items, ctx)?;
+                    ctx.push_str("</template>");
+                }
+                if !c.else_items.is_empty() {
+                    ctx.push_str("<template v-else>");
+                    render_items(&c.else_items, ctx)?;
+                    ctx.push_str("</template>");
+                }
+            }
             ComponentViewItem::Element(el) => {
                 let tag = match el.tag.as_str() {
                     "col" => "div",

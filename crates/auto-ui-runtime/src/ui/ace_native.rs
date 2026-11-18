@@ -105,6 +105,14 @@ fn observe(
     let node = candidates
         .first()
         .ok_or_else(|| "no AGE node candidate in source".to_string())?;
+    // PLAN-980 view-if 刀：native 渲染腿未定条件语义——装载点 fail-closed
+    //（不静默跳叶/双计双子树）。
+    if let Some(sp) = ace_core::source::age_component::view_contains_cond(&node.view.tree) {
+        return Err(format!(
+            "ace.native.view-cond-unsupported: view 条件项 @{}..{} 本腿未承载（native 渲染语义待后续刀；不静默展开）",
+            sp.start, sp.end
+        ));
+    }
     let mut leaf_props: Vec<(Option<String>, bool)> = Vec::new();
     walk_text_props(&node.view.tree, &mut leaf_props);
 
@@ -197,6 +205,9 @@ fn walk_text_props(
                 }
             }
             ComponentViewItem::Entry(_) => {}
+            // PLAN-980 view-if：装载点已具名拒（view_contains_cond）——
+            // 此臂不可达，防御性跳过。
+            ComponentViewItem::Cond(_) => {}
         }
     }
 }
