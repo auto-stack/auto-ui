@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-058
-status: drafting
+status: executing
 feature_name: AGE M2俯视二维公共组合与ACE作者接线
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-18
-plan_revision: 5
-current_step: 0
+plan_revision: 6
+current_step: 2
 total_steps: 10
 depends_on: [auto-ui/PLAN-055, ag-examples/PLAN-022, ag-examples/PLAN-021, ag-examples/PLAN-026, auto-lang/PLAN-981]
 supersedes_spec_components: []
@@ -19,7 +19,9 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 
 ## 0. 变更摘要
 
-2026-11-18 r5当前：981侧T-02接口联冻（IF-981-GFX-AV-SEAM）由本包回签；32 credits/世界回调（Tick）计量统一为「下一次扣费后累计超过 32 credits 即具名拒绝、零效果，且本 Tick 后续调用保持拒绝」；T-02先证接口冻结为已有静态f32行值＋宿主行写，真实Auto移动积分等981 f32 AV切片（不以int近似）；10任务、0完成，仍仅规划。
+2026-11-18 r6当前：T-01/T-02完成（2/10）。T-02机制冻结=**碰撞代理与外观分离**：统一静态场景行的数值语义成立，但旧queries-2d/sprites-2d互斥、冻结v3/v4无per-row碰撞位（可见地面入候选即fault 9），故按合同第二机制分离；四要件实测=一个逻辑owner/同Tick共同接受/无重复Tick或错位/无隐藏阻挡。预算实测：32 credits/回调合法、第33次与40>32具名fault 10零效果sticky、attempt计数无回退且fault终止Run、额度按Tick重置。GPU离屏证明查询世界位与精灵像素同Tick一致（4.0→210px、查询停位8.58→400px）。T-03接公共render-only行/层与生成器排除地面；原AC/V/预算不减。
+
+历史修订：2026-11-18 r5：981侧T-02接口联冻（IF-981-GFX-AV-SEAM）由本包回签；32 credits/世界回调（Tick）计量统一为「下一次扣费后累计超过 32 credits 即具名拒绝、零效果，且本 Tick 后续调用保持拒绝」；T-02先证接口冻结为已有静态f32行值＋宿主行写，真实Auto移动积分等981 f32 AV切片（不以int近似）；10任务、0完成，仍仅规划。
 
 历史修订：2026-11-11 r3：AG026已11/11签章，M1前置已闭；最终作者链消费981/SOURCE/SESSION/RUST及所用LANGUAGE的A切片正式来源，不等981整包归档。保原最低对象/预算，新增可见非阻挡地面组合AC-11/V-S08，为AG029国风首切片提供公共图形接面；不承担种植/存档/素材或重做055研究。10任务、0完成，仍仅规划。
 
@@ -37,13 +39,15 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 
 显式版本化能力/profile（T-02冻结）复用020局部组件语义、021 segment/sweep和022 PNG/帧表的中立实现，打通同一owner的查询/移动/精灵。旧SDK681仅作历史兼容基线；新Node经979/981共同前门受检，AV和新A2R通过同合同typed端口消费服务。Auto持业务，Rust只做通用算法；不新增旧world.at生成路径，不把互斥旧profile拼贴当组合支持。
 
-拟唯一树`D:/autostack/.wt/ui-058/auto-ui`，分支`codex/plan-058-dev`。同组依赖源按实际交付只读，无链接；共享AST/load/translate/API/host写面先核054与其它owner短窗，报告/target/scope独占。本轮不建树。
+唯一树`D:/autostack/.wt/ui-058/auto-ui`（2026-11-18已建），分支`codex/plan-058-dev`，base `b77998da`。同组依赖源按实际交付只读，无链接；共享AST/load/translate/API/host写面先核054与其它owner短窗，报告/target/scope独占。T-01/T-02在该树执行；主检出只留Plan簿记。
 
 ## 3. 技术栈
 
 旧链调查/兼容输入已核pilot `src/{load,translate,lower_components2d_runtime}.rs`，driver `src/authoring/runtime_sprites.rs`和既有查询/精灵服务；现有CLI `node2d-lower --profile queries-2d|sprites-2d|components-2d-runtime --entry … --out …`分别有不同支持域，不能当现成组合入口。中立服务沿现有driver/renderer owner复用，Node适配沿981接口，不将旧两个Cargo图强并、不复制解释器；新SDK/ABI/构建入口消费981/978正式交付。
 
 ## 4. 需求分析与背景调查
+
+2026-11-18执行授权：用户要求UI058启动T-01→T-02先证（统一场景行优先，旧slot实际阻断才试碰撞代理与外观分离），并让981开工f32 AV切片；T-02预算用例钉住两次sweep=32合法、sweep+segment=24后另一Node sweep超额零效果、随后1-credit继续拒、下一Tick重置。证据落`plan-artifacts/plan-058/auto-ui/`，代码只在唯一worktree提交，不改Plan外文件。
 
 2026-11-18当前授权：用户要求立即回签981的T-02接口联冻；预算口径统一为「下一次扣费后累计超过 32 credits 即具名拒绝、零效果，且本 Tick 后续调用保持拒绝」；T-02先证用已有静态f32行值＋宿主行写，真实Auto移动积分等981的f32 AV切片。本轮只修改规划/导航，不建树、不跑Cargo/GPU、不改Spec/价目/文法、不勾任务。
 
@@ -86,6 +90,12 @@ T-03..06拟新增driver `tests/node_topdown2d_{flow,storage}.rs`与`tools/verify
 **T-02 先证接口（本包冻结）**：用**已有静态 f32 行值**（场景行/`AgeSceneValueFn`观察真值，及fixture侧`scene_rows()`的f32 lo/hi/pos）与**宿主行写**（宿主侧写入行身份/可见性/字段/Descriptor；旧链先例`tests/node_queries_flow.rs:101-131`的`_ag_identity`/`_ag_visibility`/`_ag_append_field`/`_ag_spatial_config`）构成验证接口；独立f32轨迹/segment最近命中oracle在测试侧计算。T-02不以f32业务式为前提。真实Auto移动积分（`x = x + vx * dt`、位置/速度f32字段）等981 `D-981-AGE-F32-SURFACE`的f32 AV切片，UI058不以int近似或变通绕过。
 
 **预算口径（与981联冻，UI058回签）**：32 credits/**每世界回调（Tick）**，全Node共享一池，不按帧、不跨Tick累计、不给每模块复制额度。计量为累计扣费，统一写成：**「下一次扣费后累计超过 32 credits 即具名拒绝、零效果，且本 Tick 后续调用保持拒绝」**。即：恰好32合法；任何会使累计>32的**收费**调用在扣费前具名拒绝（语言侧静态准入=每函数调用点合计≤32，超界`lower.age-gfx-credits`具名拒零效果；宿主动态计费按同表具名拒），不扣费、不移动、不发布；本Tick内其后的收费调用（含更小价目）一律继续拒绝（sticky）；981记录的「第33」按累计credits解释，不按调用序号。例：两次sweep（16+16）已耗完32 credits，本Tick下一次收费调用即拒。0 credit的端口字段读不产生扣费、不改变计量；cast/sweep/getter价目不动（segment 8/sweep 16/其余服务1/端口字段读0）；物理写32与credits分开计，steps/credits/物理写/ms/GPU字节不互换。若最小链需提高限额或改计费策略，T-02列原账/候选账并needs_replan，不越权放宽。
+
+**T-02 冻结结果（2026-11-18实测，机制/预算/呈现）**：
+- **统一场景行数值语义成立**：同一f32行快照分别驱动查询（宿主行写`_ag_identity/_ag_visibility/_ag_append_field/_ag_spatial_config`）与呈现（文档行值→PNG精灵），查询`Tick`与渲染`frame.tick`同为1；sprite像素与查询世界位按相机投影逐点一致（行值4.0→px210,190；查询停位8.58→px400,190）；地面174716/164171px真实可见。
+- **分离原因不是slot容量**：queries-2d（`objects2d/1`）与sprites-2d（`sprites2d/1`）互斥，无单assembly组合；且冻结v3/v4候选集=全部2D行、**无per-row碰撞位**，`_ag_spatial_config` box flag=0得具名fault 9（整体失败，不跳过），"可见但不可碰"不能用同一行表表达。
+- **冻结机制=碰撞代理与外观分离**：地面=render-only行（可见、不进查询候选表），查询表仅solid行；一个逻辑owner（同一Row/f32快照）、同Tick共同接受、每Run恰1次Tick无重复/错位、无隐藏阻挡。055的t=0/start_overlap/no-move作为可判别变异反例（地面误入候选即复现）；021/022旧产物字节与价目不变。T-03据此建公共render-only行/层归属、生成器排除地面及永久用例/V-S08。
+- **预算实现口径（与统一句一致）**：`_ag_cast_charge`先累加后判界，被拒调用使attempt计数不回退（实测40→41）；fault 10具名且Run终止；额度按Tick重置（连续3 Tick各32合法），故障不因Tick清除；零效果=不移动、不发布、token 0。
 
 ### 规范增量
 
@@ -136,8 +146,8 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 
 | T | owner_stage | 依赖 | 写面/可验证结果 | AC | 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 后续另行启动；T-01不等研究 | 只读差距/源版本/最低样本和oracle准备，核owner/唯一树scope | AC-01/AC-06 | [ ] |
-| T-02 | work | T-01；055/AG022已交结论；981 T-02联冻已回签 | ≤2机制中立服务/GPU最低负载先证，冻结profile/typed端口/预算映射/数值/共同发布；先证接口=已有静态f32行值＋宿主行写（不依赖f32业务式），真实Auto移动积分等981 f32 AV切片；不冒Node整链go，失败replan | AC-01/AC-02/AC-03/AC-04/AC-10/AC-11 | [ ] 接口已回签（2026-11-18 r5）；先证未跑 |
+| T-01 | work | 后续另行启动；T-01不等研究 | 只读差距/源版本/最低样本和oracle准备，核owner/唯一树scope | AC-01/AC-06 | [x] 2026-11-18：055 spec c185f8f2/归档10-10、AG022归档10-10、981 seam ddbda0228+ed8b16e01 32/8/16/1、f32 在途；样本6行/32credits（t01-entry.md） |
+| T-02 | work | T-01；055/AG022已交结论；981 T-02联冻已回签 | ≤2机制中立服务/GPU最低负载先证，冻结profile/typed端口/预算映射/数值/共同发布；先证接口=已有静态f32行值＋宿主行写（不依赖f32业务式），真实Auto移动积分等981 f32 AV切片；不冒Node整链go，失败replan | AC-01/AC-02/AC-03/AC-04/AC-10/AC-11 | [x] 2026-11-18：probe c5086f50 5/5（queries-2d/sprites-2d；宿主行写/f32行值）；机制=碰撞代理与外观分离四要件；GPU 210/400px同Tick；32合法/33 fault10/40>32零效果sticky/40→41/按Tick重置；单assembly与use实例留T-03 |
 | T-03 | work | T-02机制可行；981稳定合同供准备 | 中立图形服务/能力注册/可见非阻挡地面/Node领域声明与永久用例，不扩旧生成器；与981不相交写面并行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-01/AC-02/AC-03/AC-05/AC-10/AC-11 | [ ] |
 | T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据 | 正常Node同源先AV整链、随后AC/A2R按§5阶段先证、四八向/查询/呈现同步、实例/owner/故障及输入门；缺接口回owner ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-10/AC-11 | [ ] |
 | T-05 | work | T-04整链go | V-S01..08、预算合法/超界、独立数值/GPU oracle与旧档触面回归，双后端实际运行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-10/AC-11 | [ ] |
@@ -148,6 +158,17 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+### 2026-11-18 stage: work（T-01→T-02 先证）| PLAN-058 r6 | outcome: pass（T-01/T-02 完成，2/10；T-03 可开）
+
+**绑定**：worktree `D:/autostack/.wt/ui-058/auto-ui` | branch `codex/plan-058-dev` | base `b77998da` | code commit `c5086f50144f355346fd2ae2736d529d76e0e8ff`（只加 `tests/plan058_t02_probe.rs`）| 主检出只改Plan簿记。
+**依赖版本**：055 spec `docs/specs/auto-graphics/topdown2d-feasibility.md`（sha256-16 `c185f8f2df252951`）＋归档10/10；AG022 archived 10/10（`966716d7b`）；981 IF-981-GFX-AV-SEAM `ddbda0228`+`ed8b16e01`，`GFX_CALLBACK_CREDIT_BUDGET=32`、segment8/sweep16/其余1/字段读0；`D-981-AGE-F32-SURFACE` 在途（f32注解/model字段未交，T-04前置）。
+**任务**：T-01、T-02。
+**证据**：`plan-artifacts/plan-058/auto-ui/t01-entry.md`（`80ae49ca…`）；`t02a-render-a.png` `33c5d019…`、`t02a-render-b.png` `ae41b5ad…`、`t02a-row-presentation.json`、`t02a-ground-separation.json`、`t02b-over-budget.json`；probe `tests/plan058_t02_probe.rs`。
+**命令与结果**：`python tools/prepare_sdk.py --verify-only` → exit 0（681 base+1414 overlay/17 local packages；`--from-snapshot`/`apply_overlay`因主检出前移拒绝，按`overlay.json`逐文件物化回退，记录在t01-entry）；`cargo test --locked --offline --test plan058_t02_probe -- --test-threads=1 --nocapture` → **5 passed/0 failed**；逐例 0.33/0.54/3.05（GPU空闲复跑；并发构建时曾11.56s，属机器负载非用例回归）/0.40/1.07s；rustfmt与dead-code清理后复跑同绿。
+**实测摘要**：sweep→obstacle_a t=0.046000004、停位8.58；segment→target_a t=0.25（target_b t=0.4583为真实第二候选）；地面正控不停走，变异（地面入候选）→t=0/start_overlap=1/位置4.0（055反例可判别）；GPU两Run行值4.0→px(210,190)、8.58→px(400,190)；两次sweep=32合法且连续3 Tick各32（按Tick重置）、第33次fault10、40>32零效果sticky（attempt 40→41）。
+**边界（未覆盖）**：单assembly query+sprite组合（T-03）；两个同定义`use`实例未占8实例包络（T-03/T-04）；真实Auto移动积分`x=x+vx*dt`等981 f32 AV切片（T-04）；OS输入/AC/A2R。未改Spec/旧价目；主检出他人WIP未触碰。
+**next**：work T-03（公共render-only行/层、能力注册、可见非阻挡地面、永久用例与V-S08），仍以§5当前端阶段合同为准。
 
 ### 2026-11-18 stage: handoff（T-02 接口联冻：UI058 侧回签）| PLAN-058 r5 | outcome: pass（接口回签；T-02 实施未跑、f32 业务式仍为981前置）
 
@@ -193,4 +214,4 @@ next: work（T-01只读准备→T-02先证）；本轮未开树。
 
 ## 10. 待澄清事项
 
-D-01：055/AG022研究已交，最低组合仍待本包先证，不能把研究当产品完成；需变更预算则replan。D-02：轴/姿态/单sweep及所有权由T-02冻结，不默加滑墙。D-03：AGE M1原生门已由AG026签章，981所需A正式接面仍未齐，前期并行不豁免终验，也不等待本AGE M2总签。D-04：T-02先证不以f32业务式为前提，用已有静态f32行值＋宿主行写；真实Auto移动积分（位置/速度f32字段与f32业务式）等981 `D-981-AGE-F32-SURFACE`的f32 AV切片（open），UI058不以int近似或变通绕过；若判定必须，回needs_replan并列为981前置。材料唯一`D:/autostack/plan-artifacts/plan-058/auto-ui/`，开工核跨仓同号owner并登记用途/路径/在途，外部B/SDK副本/target/原日志探针全收自有子scope；merge摘要折Plan、全输出对账/guard清树/删除自有scope构建物，仅具名owner/理由/关闭条件hold例外；不穿透链接、不碰外仓同号、不创建第二权威树。
+D-01：055/AG022研究已交，最低组合仍待本包先证，不能把研究当产品完成；需变更预算则replan。D-02：轴/姿态/单sweep及所有权由T-02冻结，不默加滑墙。D-03：AGE M1原生门已由AG026签章，981所需A正式接面仍未齐，前期并行不豁免终验，也不等待本AGE M2总签。D-04：T-02先证不以f32业务式为前提，用已有静态f32行值＋宿主行写；真实Auto移动积分（位置/速度f32字段与f32业务式）等981 `D-981-AGE-F32-SURFACE`的f32 AV切片（open），UI058不以int近似或变通绕过；若判定必须，回needs_replan并列为981前置。材料唯一`D:/autostack/plan-artifacts/plan-058/auto-ui/`，开工核跨仓同号owner并登记用途/路径/在途，外部B/SDK副本/target/原日志探针全收自有子scope；merge摘要折Plan、全输出对账/guard清树/删除自有scope构建物，仅具名owner/理由/关闭条件hold例外；不穿透链接、不碰外仓同号、不创建第二权威树。D-05：T-02已冻结碰撞代理与外观分离；若T-03为实现单assembly query+sprite组合需新增per-row碰撞位或新profile，须显式SD（`node2d-topdown-composition.md`）并保021/022旧产物字节/价目不漂移。
