@@ -143,6 +143,12 @@ T-03..06拟新增driver `tests/node_topdown2d_{flow,storage}.rs`与`tools/verify
 - **门禁（`12cb146b`）**：av_chain 5/arms 6/oracle 4/provider 5/pin 2/gpu_continuous 1/use_instances 3/topdown2d_flow 5/s2_age_routing 21/controls 6 全绿（fixture 增 `frame_after_despawn` 不触 40 Tick/预算路径）。
 - **边界**：判罚面为本宿主车道语义（PLAN-938 host authority）；981 侧 epoch=纯事实不动 op 语义；TS/WEB 车道不消费 ctx。
 
+**T-05 缺口⑤答复：跨模块实例身份已修 + typed 队列可直接复用（2026-11-18，981 `3047b3481`）**：
+- **跨模块撞号已关闭（981 侧三处统一为包级组件声明序）**：①场景 `Send/SendArgs` 的声明级核对从"逐模块用本模块 nodes"移到**绑定器包级聚合点**（越界消息报包内组件数）；②发射的 `__age_state_n<k>_…` 由 `node_base` 线程化为**包级序号**（此前是模块局部序号，与读回/AV 的包级期望错位——这正是"两 node 必须同模块"的根因）；③AV 观察改用 `symbol_of_in(module, name)`（原按源名表在多模块下同名互覆盖）。**永久反例**（`plan981_cross_module_nodes` 4 例）：两真实模块 `ForNode{0}×2+{1}×1` ⇒ 2:1；模块输入序调换 ⇒ 包级序随动；越界 `ForNode{2}` ⇒ 报"package declares 2 component(s)"；未包裹 `Send` 仍重放全部组件。**UI058 可把 `Target`/`Player` 拆回两个真模块**（不再需要塞同模块）。
+- **typed 队列复用：不需要新接口**。会话层已有 `send_to_component(node, instance, msg)` / `send_args_to_component(node, instance, msg, args)`——载荷经唯一 verify 按位绑定、`schedule` **原子重编**（被拒请求不污染既有 schedule）、stopped/越界/arity/type 具名拒；组件参数**现即包级序号**。"命中目标 → 向该实例派发"在**宿主侧**用这两个方法即可（判罚/路由=宿主 authority）。
+- **唯一确实缺失项（本批不新增，明确取舍）**：**作者代码内自派发**（17 个 gfx op 无 dispatch 端口）。做成作者可见端口会绕过 host authority（判罚与算法在宿主），且 W1 不需它——故保持具名缺口，**留待真实消费者提出**时按新服务面走版本化流程。
+- **消费提示**：本答复绑定 auto-lang `3047b3481`；下次刷 pin 时一并生效（本批无 ABI 变更，仅场景身份与符号解析，overlay 内容会随文件哈希变化）。
+
 ### 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
