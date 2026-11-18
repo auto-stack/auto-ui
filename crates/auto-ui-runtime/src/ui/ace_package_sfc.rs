@@ -291,20 +291,50 @@ fn expr_to_template_js(expr: &ace_core::source::ast::Expr) -> Result<String, Str
     }
 }
 
-/// lane 发射文本的局部名改写：`l0___age_s_0_<field>` → `<field>.value`。
+/// lane 发射文本的局部名改写：`l<i>___age_s_<inst>_<field>` → `<field>.value`。
+/// 边界修正（静态核对暴露的预存缺陷）：原实现硬编码 `l0___age_s_0_` 前缀
+/// ——**第二个及以后的状态字段（l1/l2/…）漏改**（#3 单字段计数器从未暴露；
+/// 双字段源实测 `a2x_add(l1___age_s_0_n, 1)` 裸名进产物=运行时
+/// ReferenceError）。泛化为任意局部索引与实例段（字段名=剥局部段与实例段
+/// 后的尾段——`___age_s_` 后是 `<inst>_<field>`）。
 fn rewrite_lane_locals(line: &str) -> String {
+    const MARK: &str = "___age_s_";
     let mut out = String::new();
-    let mut rest = line;
-    while let Some(pos) = rest.find("l0___age_s_0_") {
-        out.push_str(&rest[..pos]);
-        let tail = &rest[pos + "l0___age_s_0_".len()..];
-        let end = tail
-            .find(|c: char| !(c.is_alphanumeric() || c == '_'))
-            .unwrap_or(tail.len());
-        out.push_str(&format!("{}.value", &tail[..end]));
-        rest = &tail[end..];
+    let bytes = line.as_bytes();
+    let mut rest_start = 0usize;
+    let mut i = 0usize;
+    while i < bytes.len() {
+        // 局部名锚：`l<digits>` 后随 `___age_s_`。
+        if bytes[i] == b'l' {
+            let mut j = i + 1;
+            while j < bytes.len() && bytes[j].is_ascii_digit() {
+                j += 1;
+            }
+            if j > i + 1 && line[j..].starts_with(MARK) {
+                let field_start = j + MARK.len();
+                // 字段名=`___age_s_` 后剥掉实例数字段（`<inst>_`）。
+                let mut k = field_start;
+                while k < bytes.len() && bytes[k].is_ascii_digit() {
+                    k += 1;
+                }
+                if k > field_start && k < bytes.len() && bytes[k] == b'_' {
+                    let field = &line[k + 1..];
+                    let end = field
+                        .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+                        .unwrap_or(field.len());
+                    if end > 0 {
+                        out.push_str(&line[rest_start..i]);
+                        out.push_str(&format!("{}.value", &field[..end]));
+                        rest_start = k + 1 + end;
+                        i = rest_start;
+                        continue;
+                    }
+                }
+            }
+        }
+        i += 1;
     }
-    out.push_str(rest);
+    out.push_str(&line[rest_start..]);
     out
 }
 
@@ -360,8 +390,12 @@ fn render_items(
             // PLAN-980 view-if 刀：条件项 → `<template v-if/v-else>`（WEB
             // 模板腿的真语义；else-if 链=嵌套 Cond→嵌套 template v-if）。
             ComponentViewItem::Cond(c) => {
-                let cond_js = expr_to_template_js(&c.cond)?;
-                if !c.then_items.is_empty() {
+                // 边界（静态核对补）：①条件经 escape_attr（含双引号的比较
+                // 表达式不得裸插双引号属性）；②有 else 时保留前置 v-if 锚
+                // （空 then 发空 v-if 模板作锚，避免孤立 v-else）；双空臂
+                // （无 else 且 then 空）整体跳过。
+                let cond_js = escape_attr(&expr_to_template_js(&c.cond)?);
+                if !c.then_items.is_empty() || !c.else_items.is_empty() {
                     ctx.push_str(&format!("<template v-if=\"{cond_js}\">"));
                     render_items(&c.then_items, ctx)?;
                     ctx.push_str("</template>");
@@ -466,4 +500,140 @@ fn age_component_candidates(
             .collect::<Vec<_>>()
             .join("; ")
     })
+}
+
+#[cfg(test)]
+mod p980_cond_render_tests {
+    //! PLAN-980 view-if 边界（静态核对两缺陷）的单元级判据：转义（含双引号
+    //! 比较条件→&quot;）与空 then 的 v-if 锚（非孤立 v-else）。集成档（真
+    //! Vue 编译+分支切换）见 tests/plan980_package_sfc.rs——包面 checker 的
+    //! 条件值域（str 字面量比较/props 读）是另一具名边界，此处手造 Expr
+    //! 直测渲染机械。
+    use super::*;
+    use ace_core::atom_text::Span;
+    use ace_core::source::age_component::{
+        ComponentViewCond, ComponentViewElement, ComponentViewItem,
+    };
+    use ace_core::source::ast::{BinOp, Expr, ExprKind, Ident};
+
+    fn self_field(name: &str) -> Expr {
+        let sp = Span { start: 0, end: 0 };
+        Expr {
+            span: sp,
+            kind: ExprKind::Field {
+                base: Box::new(Expr {
+                    span: sp,
+                    kind: ExprKind::Var(Ident {
+                        name: "self".to_string(),
+                        span: sp,
+                    }),
+                }),
+                name: Ident {
+                    name: name.to_string(),
+                    span: sp,
+                },
+            },
+        }
+    }
+
+    fn str_lit(v: &str) -> Expr {
+        Expr {
+            span: self_field("x").span,
+            kind: ExprKind::StrLit(v.to_string()),
+        }
+    }
+
+    fn cond_item(
+        cond: Expr,
+        then_items: Vec<ComponentViewItem>,
+        else_items: Vec<ComponentViewItem>,
+    ) -> ComponentViewItem {
+        ComponentViewItem::Cond(ComponentViewCond {
+            cond,
+            then_items,
+            else_items,
+            span: self_field("x").span,
+        })
+    }
+
+    fn render(items: &[ComponentViewItem]) -> String {
+        let mut out = String::new();
+        let mut ctx = TmplCtx { out: &mut out };
+        render_items(items, &mut ctx).expect("render ok");
+        out
+    }
+
+    /// 含双引号的比较条件 → 属性转义（非裸插）。
+    #[test]
+    fn p980_cond_attr_escapes_double_quotes() {
+        let sp = self_field("x").span;
+        let cmp = Expr {
+            span: sp,
+            kind: ExprKind::Binary {
+                op: BinOp::Eq,
+                lhs: Box::new(self_field("mode")),
+                rhs: Box::new(str_lit("dark")),
+            },
+        };
+        let out = render(&[cond_item(
+            cmp,
+            vec![ComponentViewItem::Text(leaf("d"))],
+            vec![],
+        )]);
+        assert!(
+            out.contains("v-if=\"(mode === &quot;dark&quot;)\">"),
+            "quoted cond is attr-escaped: {out}"
+        );
+        assert!(
+            !out.contains("\"dark\""),
+            "no raw double quotes inside the attr: {out}"
+        );
+    }
+
+    /// 空 then + else → 空 v-if 锚紧邻 v-else（非孤立 v-else）。
+    #[test]
+    fn p980_cond_empty_then_keeps_vif_anchor() {
+        let out = render(&[cond_item(
+            self_field("flag"),
+            vec![],
+            vec![ComponentViewItem::Text(leaf("f"))],
+        )]);
+        assert_eq!(
+            out,
+            "<template v-if=\"flag\"></template><template v-else>f</template>"
+        );
+    }
+
+    /// 双空臂（无 else 且 then 空）整体跳过。
+    #[test]
+    fn p980_cond_both_empty_skips() {
+        let out = render(&[cond_item(self_field("flag"), vec![], vec![])]);
+        assert_eq!(out, "", "no output for a fully empty conditional");
+    }
+
+    /// 局部名改写泛化（静态核对暴露的预存缺陷）：`l1/l2…___age_s_<i>_` 与
+    /// `l0` 同改（原硬编码 l0——第二字段起漏改=运行时 ReferenceError）。
+    #[test]
+    fn p980_rewrite_lane_locals_maps_every_local_index() {
+        assert_eq!(
+            rewrite_lane_locals("const t0 = a2x_add(l1___age_s_0_n, 1);"),
+            "const t0 = a2x_add(n.value, 1);"
+        );
+        assert_eq!(
+            rewrite_lane_locals("l0___age_s_0_count = l2___age_s_1_other;"),
+            "count.value = other.value;"
+        );
+        assert_eq!(rewrite_lane_locals("plain_ident"), "plain_ident");
+    }
+
+    fn leaf(label: &str) -> ace_core::source::age_h0::AgeTextLeaf {
+        let sp = self_field("x").span;
+        ace_core::source::age_h0::AgeTextLeaf {
+            role: "view".to_string(),
+            spelling: "text".to_string(),
+            component_span: sp,
+            expr: str_lit(label),
+            span: sp,
+        }
+    }
 }
