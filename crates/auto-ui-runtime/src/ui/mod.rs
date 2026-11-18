@@ -156,7 +156,12 @@ pub mod ace_native;
 // PLAN-980 NATIVE r13：MIN-A-UI 通用 Node 桌面入口（UI-FFI 实效果 + typed
 // 事件回 AV）。r11 `ace_native`（宿主直读 AV 快照）保留自己的面。
 pub mod ace_node_desktop;
+// PLAN-980 ④-A：包感知桥与包片段 lane 同样只在 ce-bridge 面存在——
+// ce-av/ce-core/ce-a2x-ts 都是 optional 依赖，不加门会让默认构建
+// （auto-ui 自身、man 的 ace-candidate 链）拿到 E0433。
+#[cfg(feature = "ace-bridge")]
 pub mod ace_package_bridge;
+#[cfg(feature = "ace-bridge")]
 pub mod ace_package_lane;
 #[cfg(feature = "ace-bridge")]
 // PLAN-980 B-STATE：ACE 状态执行桥（组件面消费端）。
