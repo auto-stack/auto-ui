@@ -250,6 +250,100 @@ fn p980_ace_vue_tool_wiring_key_gate_and_named_rejects() {
     );
     let _ = std::fs::remove_dir_all(&ws5);
 
+    // ── ⑨键在场·components/ 通道（④-A #9）：原样 AutoNotes `fp_editor.at`
+    //    的 lane-ready 派生件（去 if-else view 形——981 域 view 面缺口具名）
+    //    编入正确的 Vue 组件（src/components/{W}.vue=产品件+组件位 href）。
+    let ws6 = temp_workspace("components-incr");
+    let comp_dir = ws6.join("src/front/components");
+    std::fs::create_dir_all(&comp_dir).unwrap();
+    std::fs::write(
+        comp_dir.join("fp_lite.at"),
+        "widget FpNoteEditorLite (mode: str) {
+    msg { DraftEdit(str) }
+
+    model {
+        var last_text str = \"\"
+    }
+
+    view {
+        col {
+            textarea { value: .last_text, oninput: .DraftEdit, placeholder: \"FP body\" }
+        }
+    }
+
+    on {
+        .DraftEdit(v) -> { .last_text = v }
+    }
+}
+",
+    )
+    .unwrap();
+    incremental_compile_changed(&ws6, None).expect("components channel incremental ok");
+    let fp_artifact = std::fs::read_to_string(
+        ws6.join("gen/front/vue/src/components/FpNoteEditorLite.vue"),
+    )
+    .expect("components channel writes the widget artifact");
+    assert!(
+        fp_artifact.contains("a2x_str_clone(v)") && fp_artifact.contains("last_text.value = t0;"),
+        "component artifact carries the DraftEdit lane body"
+    );
+    assert!(
+        fp_artifact.contains("../a2x_rt.mjs"),
+        "component artifact carries the component-relative rt href"
+    );
+    assert!(
+        ws6.join("gen/front/vue/src/a2x_rt.mjs").exists(),
+        "official rt lands in src/ (shared with the app channel)"
+    );
+
+    // ── ⑨b 全量道同律：from_workspace 的 components 条目=产品件。
+    let project3 = VueProject::from_workspace(&ws6).expect("components full path ok");
+    let fp_entry = project3
+        .components
+        .iter()
+        .find(|(_, _, _, w)| w == "FpNoteEditorLite")
+        .expect("components entry");
+    assert!(
+        fp_entry.2.contains("a2x_str_clone(v)") && fp_entry.2.contains("../a2x_rt.mjs"),
+        "full-path components entry is the lane product"
+    );
+
+    // ── ⑩键在场·components/ 缺席负控：具名拒附文件名+widget 名。
+    let ws7 = temp_workspace("components-absent");
+    let comp_dir2 = ws7.join("src/front/components");
+    std::fs::create_dir_all(&comp_dir2).unwrap();
+    std::fs::write(
+        comp_dir2.join("bad_comp.at"),
+        "widget BadComp {
+    msg Msg { Set(int) }
+
+    model {
+        var n int = 0
+    }
+
+    view {
+        col { text \"B\" }
+    }
+
+    on {
+        .Set(n) -> { .n = n }
+    }
+}
+",
+    )
+    .unwrap();
+    let err4 = incremental_compile_changed(&ws7, None)
+        .expect_err("components-file absent must be named-rejected with the file name");
+    let msg4 = err4.to_string();
+    assert!(
+        msg4.contains("ace.vue-lane-unsupported")
+            && msg4.contains("bad_comp.at")
+            && msg4.contains("BadComp"),
+        "named rejection names the components file and widget: {msg4}"
+    );
+    let _ = std::fs::remove_dir_all(&ws7);
+    let _ = std::fs::remove_dir_all(&ws6);
+
     // ── ⑤键未设：同一缺席源恢复 legacy Ok（拒绝只在键下收紧）。
     std::env::remove_var("AUTO_UI_ACE_VUE");
     let ws3 = temp_workspace("absent-key-off");

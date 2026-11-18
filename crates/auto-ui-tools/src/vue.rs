@@ -4489,7 +4489,36 @@ export default router
                                 // 文件顶层 fn 定义被丢弃,调用点有 emission 无定义
                                 // (vue-tsc TS2304)。与 src/front 兄弟臂同款重挂。
                                 let comp_module_fns = same_file_module_fns(&comp_code);
+                                // PLAN-980 ④-A #9：ACE 键在场时 components/
+                                // 通道走产品 lane 件（按名对位；缺席/对位失败
+                                // =具名拒，不静默回落 legacy 逐件生成）。
+                                let ace_products = ace_vue_component_sfcs(&path, &comp_code)?;
                                 for widget in &widgets {
+                                    if let Some(products) = &ace_products {
+                                        let wsfc = products
+                                            .widgets
+                                            .iter()
+                                            .find(|(wname, _)| wname == &widget.name)
+                                            .map(|(_, code)| code.clone())
+                                            .ok_or_else(|| {
+                                                format!(
+                                                    "ace.vue-lane-mismatch: {} 的 widget `{}` 与产品件对位失败——不静默回落 legacy",
+                                                    path.display(),
+                                                    widget.name
+                                                )
+                                            })?;
+                                        let stem = path
+                                            .file_stem()
+                                            .and_then(|s| s.to_str())
+                                            .unwrap_or("component");
+                                        all_components.push((
+                                            "components".to_string(),
+                                            stem.to_string(),
+                                            wsfc,
+                                            widget.name.clone(),
+                                        ));
+                                        continue;
+                                    }
                                     let gen = if shadcn {
                                         VueGenerator::new_shadcn()
                                     } else {
@@ -7462,6 +7491,11 @@ pub fn incremental_compile_changed(
                         ) {
                         Ok((vue_code, widgets, stores)) => {
                             store_files.extend(stores);
+                            // PLAN-980 ④-A #9：ACE 键在场时 components/ 通道
+                            // 逐 widget 产品 lane 件（各件自己的 lane 体+
+                            // `../a2x_rt.mjs` href；官方 rt 落 src/——与
+                            // app.at 通道共享一份）。缺席=具名拒（附文件名）。
+                            let ace_products = ace_vue_component_sfcs(&path, &content)?;
                             let artifacts: Vec<UIArtifact> = widgets
                                 .iter()
                                 .map(|w| UIArtifact {
@@ -7480,12 +7514,33 @@ pub fn incremental_compile_changed(
                                 if source_changed {
                                     println!("  {} (changed)", file_name.bright_yellow());
                                 }
-                                for artifact in &artifacts {
-                                    let out = output_dir.join(&artifact.output_path);
-                                    fs::create_dir_all(out.parent().unwrap_or(&output_dir)).ok();
-                                    fs::write(&out, &vue_code).map_err(|e| {
-                                        format!("Failed to write {}: {}", out.display(), e)
+                                if let Some(products) = &ace_products {
+                                    let rt_path = output_dir.join("src").join("a2x_rt.mjs");
+                                    fs::create_dir_all(rt_path.parent().unwrap_or(&output_dir))
+                                        .ok();
+                                    fs::write(&rt_path, &products.rt).map_err(|e| {
+                                        format!("Failed to write {}: {}", rt_path.display(), e)
                                     })?;
+                                    for (wname, wsfc) in &products.widgets {
+                                        let out = output_dir
+                                            .join("src")
+                                            .join("components")
+                                            .join(format!("{}.vue", wname));
+                                        fs::create_dir_all(out.parent().unwrap_or(&output_dir))
+                                            .ok();
+                                        fs::write(&out, wsfc).map_err(|e| {
+                                            format!("Failed to write {}: {}", out.display(), e)
+                                        })?;
+                                    }
+                                } else {
+                                    for artifact in &artifacts {
+                                        let out = output_dir.join(&artifact.output_path);
+                                        fs::create_dir_all(out.parent().unwrap_or(&output_dir))
+                                            .ok();
+                                        fs::write(&out, &vue_code).map_err(|e| {
+                                            format!("Failed to write {}: {}", out.display(), e)
+                                        })?;
+                                    }
                                 }
                             }
                             cache.update(path.clone(), hash, artifacts);
@@ -8051,6 +8106,22 @@ struct AceVueProducts {
 /// 具名拒（附 widget 名）。键未设=Ok(None)（legacy 道逐字不变）；feature
 /// 未建=具名拒（不静默落 legacy）。
 fn ace_vue_app_sfcs(app_at: &Path, content: &str) -> AutoResult<Option<AceVueProducts>> {
+    ace_vue_sfcs(app_at, content, "./a2x_rt.mjs", "../a2x_rt.mjs")
+}
+
+/// ④-A #9：components/ 通道键门（components/{f}.at 的全部 widget 产物都落
+/// src/components/{W}.vue——href 恒为 `../a2x_rt.mjs`；缺席具名拒附文件名
+/// +widget 名）。
+fn ace_vue_component_sfcs(at_path: &Path, content: &str) -> AutoResult<Option<AceVueProducts>> {
+    ace_vue_sfcs(at_path, content, "../a2x_rt.mjs", "../a2x_rt.mjs")
+}
+
+fn ace_vue_sfcs(
+    at_path: &Path,
+    content: &str,
+    rt_href_first: &str,
+    rt_href_rest: &str,
+) -> AutoResult<Option<AceVueProducts>> {
     if std::env::var("AUTO_UI_ACE_VUE").ok().as_deref() != Some("1") {
         return Ok(None);
     }
@@ -8058,9 +8129,9 @@ fn ace_vue_app_sfcs(app_at: &Path, content: &str) -> AutoResult<Option<AceVuePro
     {
         let multi = auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product(
             content,
-            &app_at.to_string_lossy(),
-            "./a2x_rt.mjs",
-            "../a2x_rt.mjs",
+            &at_path.to_string_lossy(),
+            rt_href_first,
+            rt_href_rest,
         )
         .map_err(|e| {
             auto_val::AutoError::from(format!(
@@ -8075,7 +8146,8 @@ fn ace_vue_app_sfcs(app_at: &Path, content: &str) -> AutoResult<Option<AceVuePro
             .collect();
         if !absent_detail.is_empty() {
             return Err(format!(
-                "ace.vue-lane-unsupported: AUTO_UI_ACE_VUE=1 要求 app.at 全部 widget 的                  handler 可由 ACE lane 派生；缺席={}（本键下旧道 fallback 禁用，不静默回落）",
+                "ace.vue-lane-unsupported: AUTO_UI_ACE_VUE=1 要求 {} 的全部 widget                  handler 可由 ACE lane 派生；缺席={}（本键下旧道 fallback 禁用，不静默回落）",
+                at_path.display(),
                 absent_detail.join(", ")
             )
             .into());
@@ -8087,7 +8159,7 @@ fn ace_vue_app_sfcs(app_at: &Path, content: &str) -> AutoResult<Option<AceVuePro
     }
     #[cfg(not(feature = "ace-vue"))]
     {
-        let _ = (app_at, content);
+        let _ = (at_path, content, rt_href_first, rt_href_rest);
         Err(
             "ace.vue-lane-unavailable: AUTO_UI_ACE_VUE=1 需要工具以 --features ace-vue 构建              （本构建无 ACE lane 生成道；不静默回落 legacy）"
                 .into(),
