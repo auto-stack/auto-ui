@@ -23,6 +23,9 @@ fn main() {
     let mut hold_ms: u64 = 8000;
     let mut min_frames: usize = 4;
     let mut script_spec: Option<String> = None;
+    // PLAN-980 ④-A #2b：AGE 包闭包输入（多单元 + 入口）——与 --source 二选一。
+    let mut package_spec: Option<String> = None;
+    let mut package_entry: Option<String> = None;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -32,6 +35,8 @@ fn main() {
             "--hold-ms" => hold_ms = args.next().and_then(|v| v.parse().ok()).unwrap_or(8000),
             "--min-frames" => min_frames = args.next().and_then(|v| v.parse().ok()).unwrap_or(4),
             "--script" => script_spec = args.next(),
+            "--package" => package_spec = args.next(),
+            "--entry" => package_entry = args.next(),
             "--prep-only" => {
                 // 预构建档：注册 provider（构建/命中缓存）后即退出——排窗前的
                 // 准备阶段，不真开窗。
@@ -45,20 +50,57 @@ fn main() {
             }
         }
     }
-    let source_path = source.expect("--source <app.at> is required");
     let evidence_path = evidence_path.expect("--evidence <out.json> is required");
-    let src = match std::fs::read_to_string(&source_path) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("ace_node_desktop_window: read source failed: {e}");
-            std::process::exit(3);
+    let mut bridge = if let Some(spec) = &package_spec {
+        // --package "app::main=<path>; util::steps=<path>" --entry app::main
+        let entry = package_entry.expect("--entry <pkg::module> is required with --package");
+        let mut units = Vec::new();
+        for item in spec.split(';') {
+            let Some((key, path)) = item.trim().split_once('=') else {
+                eprintln!("ace_node_desktop_window: bad --package item {item}");
+                std::process::exit(2);
+            };
+            let Some((pkg, id)) = key.trim().split_once("::") else {
+                eprintln!("ace_node_desktop_window: package unit key must be pkg::module: {key}");
+                std::process::exit(2);
+            };
+            let src = match std::fs::read_to_string(path.trim()) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("ace_node_desktop_window: read unit {key} failed: {e}");
+                    std::process::exit(3);
+                }
+            };
+            units.push(ace_core::source::packages::PackageModuleInput {
+                package: pkg.trim().to_string(),
+                version: "1.0.0".to_string(),
+                id: id.trim().to_string(),
+                source: src,
+                provider: None,
+            });
         }
-    };
-    let mut bridge = match NodeDesktopBridge::load(&src, &source_path, instances) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("ace_node_desktop_window: load failed: {e}");
-            std::process::exit(4);
+        match NodeDesktopBridge::load_package(units, &entry, instances) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("ace_node_desktop_window: package load failed: {e}");
+                std::process::exit(4);
+            }
+        }
+    } else {
+        let source_path = source.expect("--source <app.at> is required (or --package)");
+        let src = match std::fs::read_to_string(&source_path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("ace_node_desktop_window: read source failed: {e}");
+                std::process::exit(3);
+            }
+        };
+        match NodeDesktopBridge::load(&src, &source_path, instances) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("ace_node_desktop_window: load failed: {e}");
+                std::process::exit(4);
+            }
         }
     };
     if let Some(spec) = &script_spec {

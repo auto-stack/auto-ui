@@ -26,6 +26,7 @@
 //! 自己的测试/exe）；本模块 = r13 新范围（通用项目入口 + 实际 UI-FFI 效果与
 //! typed 事件）。001/002 完整主题/选择/全部组件与 Widgets 归 W1 B-AV。
 
+use crate::ui::ace_package_bridge::PackageStateEngine;
 use crate::ui::ace_state_bridge::{AceStateEngine, AceStateValue, DispatchOutcome};
 use crate::ui::{Component, View};
 use std::collections::VecDeque;
@@ -33,11 +34,58 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{OnceLock, RwLock};
 
+use ace_av::age_component::InitialValue as EngineInitialValue;
 use ace_av::age_component::{
     compile_component_scenario_with_initials, observe_component_states_and_texts,
     observe_component_texts, project_component_candidates, ComponentInitials, ComponentScenario,
     LegacyWidgetAlias,
 };
+use ace_core::source::packages::PackageModuleInput;
+
+/// PLAN-980 ④-A #2b：桥的后端面——组件面单源引擎 / AGE 包闭包引擎。
+enum BridgeEngine {
+    Component(AceStateEngine),
+    Package(PackageStateEngine),
+}
+
+impl BridgeEngine {
+    fn mount(
+        &mut self,
+        identity: &str,
+        initials: Vec<(String, EngineInitialValue)>,
+    ) -> Result<u64, String> {
+        match self {
+            Self::Component(e) => e.mount(identity, initials),
+            Self::Package(e) => e.mount(identity, initials),
+        }
+    }
+
+    fn read_all(&self, identity: &str) -> Option<Vec<(String, AceStateValue)>> {
+        match self {
+            Self::Component(e) => e.read_all(identity),
+            Self::Package(e) => e.read_all(identity),
+        }
+    }
+
+    fn dispatch(&mut self, identity: &str, msg: &str) -> Result<DispatchOutcome, String> {
+        match self {
+            Self::Component(e) => e.dispatch(identity, msg),
+            Self::Package(e) => e.dispatch(identity, msg),
+        }
+    }
+
+    fn dispatch_with_args(
+        &mut self,
+        identity: &str,
+        msg: &str,
+        args: &[AceStateValue],
+    ) -> Result<DispatchOutcome, String> {
+        match self {
+            Self::Component(e) => e.dispatch_with_args(identity, msg, args),
+            Self::Package(e) => e.dispatch_with_args(identity, msg, args),
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // ui980 provider：hooks trampoline（AV 侧受检车道；宿主侧状态由本 crate 持有）
@@ -762,7 +810,7 @@ pub struct NodeDesktopBridge {
     path: String,
     node_name: String,
     /// None = 静态面（无 model/msg 的 Hello 类源：文本经静态观察面，无事件）。
-    engine: Option<AceStateEngine>,
+    engine: Option<BridgeEngine>,
     identities: Vec<String>,
     pub session: Option<i32>,
     instances: usize,
@@ -1005,7 +1053,7 @@ impl NodeDesktopBridge {
                         }
                     }
                 }
-                engine = Some(e);
+                engine = Some(BridgeEngine::Component(e));
             }
             Err(e) if e.contains("requires at least one") => {
                 if !shape.buttons.is_empty() || !shape.inputs.is_empty() {
@@ -1041,6 +1089,92 @@ impl NodeDesktopBridge {
     /// 事件引擎面（静态面源 → false——Hello 类无事件）。
     pub fn engine_face(&self) -> bool {
         self.engine.is_some()
+    }
+
+    /// PLAN-980 ④-A #2b：**AGE 包闭包**装载（多单元 + 入口）。view 形状取入口
+    /// unit 的组件面投影；状态/事件走 [`PackageStateEngine`]（AV 包观察链）。
+    /// 边界（具名）：包面场景无 props/initials——实例种子为空；状态只含 int
+    /// 字段；带载荷 dispatch 本片未接线；非 int 输入绑定在装载期具名拒。
+    pub fn load_package(
+        units: Vec<PackageModuleInput>,
+        entry: &str,
+        instances: usize,
+    ) -> Result<Self, String> {
+        if instances == 0 {
+            return Err("a package bridge needs at least one instance".to_string());
+        }
+        let entry_src = units
+            .iter()
+            .find(|u| format!("{}::{}", u.package, u.id) == entry)
+            .map(|u| u.source.clone())
+            .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
+        let candidates = project_component_candidates(&entry_src).map_err(|ds| diags(&ds))?;
+        let node = candidates
+            .first()
+            .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
+        let mut shape = ViewShape {
+            text_leaf_count: 0,
+            buttons: Vec::new(),
+            inputs: Vec::new(),
+        };
+        project_view_shape(&node.view.tree, &mut shape);
+
+        let mut engine = PackageStateEngine::new(units, entry, LegacyWidgetAlias::Accept)?;
+        let identities: Vec<String> = (0..instances).map(|i| format!("i{i}")).collect();
+        let mut last_states = Vec::new();
+        let mut load_texts = Vec::new();
+        for (i, id) in identities.iter().enumerate() {
+            engine.mount(id, Vec::new())?;
+            last_states.push(engine.read_all(id).unwrap_or_default());
+            if i == 0 {
+                load_texts = engine.texts(id).unwrap_or_default();
+            }
+        }
+        if load_texts.len() != shape.text_leaf_count {
+            return Err(format!(
+                "text leaf mismatch: view tree has {}, AV observed {}",
+                shape.text_leaf_count,
+                load_texts.len()
+            ));
+        }
+        let field_names = last_states
+            .first()
+            .map(|row| row.iter().map(|(n, _)| n.clone()).collect())
+            .unwrap_or_default();
+        for spec in &mut shape.inputs {
+            let kind = last_states
+                .first()
+                .and_then(|row| row.iter().find(|(n, _)| *n == spec.field).map(|(_, v)| v));
+            match kind {
+                Some(AceStateValue::Int(_)) => spec.numeric = true,
+                _ => {
+                    return Err(format!(
+                        "input target binds field `{}` which is not a live int state on the \
+                         package face",
+                        spec.field
+                    ))
+                }
+            }
+        }
+        Ok(Self {
+            path: entry.to_string(),
+            node_name: node.name.name.clone(),
+            engine: Some(BridgeEngine::Package(engine)),
+            identities,
+            session: None,
+            instances,
+            buttons: shape.buttons,
+            inputs: shape.inputs,
+            pending_texts: VecDeque::new(),
+            text_leaf_count: shape.text_leaf_count,
+            load_texts,
+            last_states,
+            field_names,
+            dispatch_log: Vec::new(),
+            errors: Vec::new(),
+            script: Vec::new(),
+            tick_no: 0,
+        })
     }
 
     /// 事件目标清单（声明序；测试/证据消费）。
