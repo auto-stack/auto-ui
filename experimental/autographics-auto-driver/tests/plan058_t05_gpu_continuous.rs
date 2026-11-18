@@ -157,6 +157,14 @@ impl AgeGfxHost for SharedHost {
     fn dispatch(&mut self, symbol: &str, args: &[Value]) -> Result<AgeGfxReturn, AgeGfxFault> {
         self.0.borrow_mut().dispatch(symbol, args)
     }
+    fn dispatch_with_ctx(
+        &mut self,
+        symbol: &str,
+        args: &[Value],
+        ctx: &ace_av::age_gfx::AgeGfxCall<'_>,
+    ) -> Result<AgeGfxReturn, AgeGfxFault> {
+        self.0.borrow_mut().dispatch_with_ctx(symbol, args, ctx)
+    }
 }
 
 fn spawn_session(

@@ -43,6 +43,17 @@ pub fn sweep_only() i32 {
     return q.node
 }
 
+// Stale-render-handle drive (T-05 fault-33 judgment; not part of the Tick
+// path): spawn the player leaf, despawn it (the generation dies with the
+// handle), then frame the dead handle — the fault-33 write, refused by the
+// host with the session facts. The def errors; the frame never publishes.
+pub fn frame_after_despawn() i32 {
+    let token i32 = render2d.spawn("player", 4.0, 0.0)
+    let gone i32 = render2d.despawn(token)
+    let framed i32 = render2d.frame(token, "assets/atlas.png", 0, 0)
+    return framed
+}
+
 // The two same-definition interaction targets (V-S03): one `Target` node
 // carrying its own model and Touch handler, instantiated twice in the Player's
 // scene. Each instance keeps independent state (2:1 isolation is pinned by the

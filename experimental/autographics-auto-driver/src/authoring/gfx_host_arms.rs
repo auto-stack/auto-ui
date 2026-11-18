@@ -134,6 +134,29 @@ pub struct FramePublish {
     pub flip: i32,
 }
 
+/// One recorded session fact (an owned snapshot of the AV lane's `AgeGfxCall`:
+/// tick, callback generation, in-callback query epoch, post-accounting credits
+/// and the dispatched symbol).
+#[derive(Clone, Debug, PartialEq)]
+pub struct CallFact {
+    pub tick: u64,
+    pub callback: u64,
+    pub query_epoch: u32,
+    pub credits_used: u32,
+    pub symbol: String,
+}
+
+/// One query-token book entry: the latest `query2d.*` token the host issued in
+/// a callback (the provider side of the 021 token discipline — the second
+/// query in a callback invalidates every earlier one).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct QueryTokenBook {
+    pub tick: u64,
+    pub callback: u64,
+    pub epoch: u32,
+    pub sweep: bool,
+}
+
 /// The neutral provider: rows + host state (input/dt/render tokens) + an asset
 /// root for `image2d.png`. Charging is the 981 session's job, never this type's.
 pub struct NeutralGfxHost {
@@ -146,6 +169,13 @@ pub struct NeutralGfxHost {
     frames: Vec<FramePublish>,
     last_sweep: Option<Sweep2D>,
     last_segment: Option<Cast2D>,
+    /// Session facts recorded per dispatch (`dispatch_with_ctx`).
+    calls: Vec<CallFact>,
+    /// The provider's query-token book (latest issued token).
+    query_book: Option<QueryTokenBook>,
+    /// The most recent call facts (payload context for provider-level
+    /// judgments that the AV lane does not route).
+    last_ctx: Option<CallFact>,
 }
 
 impl NeutralGfxHost {
@@ -160,6 +190,9 @@ impl NeutralGfxHost {
             frames: Vec::new(),
             last_sweep: None,
             last_segment: None,
+            calls: Vec::new(),
+            query_book: None,
+            last_ctx: None,
         }
     }
     pub fn rows(&self) -> &[HostRow] {
@@ -199,6 +232,72 @@ impl NeutralGfxHost {
         self.frames.clear();
         self.last_sweep = None;
         self.last_segment = None;
+    }
+
+    /// The recorded session facts, in dispatch order.
+    pub fn calls(&self) -> &[CallFact] {
+        &self.calls
+    }
+    pub fn clear_calls(&mut self) {
+        self.calls.clear();
+    }
+    /// The provider's query-token book (the latest issued token).
+    pub fn query_book(&self) -> Option<QueryTokenBook> {
+        self.query_book
+    }
+
+    /// The host's fault-13 judgment (021 stale query token): resolve a held
+    /// token against the session facts. The generation boundaries come from the
+    /// LATEST dispatch ctx (any op advances the callback/Tick), and the epoch
+    /// from the query book (the same callback's later query invalidated every
+    /// earlier epoch). The payload names both sides' facts.
+    pub fn resolve_query_token(&self, held: QueryTokenBook) -> Result<(), GfxFault> {
+        let stale = |why: &str| {
+            GfxFault::new(
+                "age-gfx.stale-query-token",
+                format!(
+                    "query token (tick {}, callback {}, epoch {}, sweep {}) is stale ({why}): the session facts invalidated it",
+                    held.tick, held.callback, held.epoch, held.sweep
+                ),
+            )
+        };
+        let Some(ctx) = &self.last_ctx else {
+            return Err(stale("the session has not dispatched anything"));
+        };
+        if held.tick != ctx.tick {
+            return Err(stale(&format!("the session moved to tick {}", ctx.tick)));
+        }
+        if held.callback != ctx.callback {
+            return Err(stale(&format!(
+                "the session moved to callback {}",
+                ctx.callback
+            )));
+        }
+        let Some(book) = self.query_book else {
+            return Err(stale("no query token was issued in this session"));
+        };
+        if book.callback != held.callback || book.tick != held.tick {
+            return Err(stale(&format!(
+                "this callback's book holds tick {} callback {}",
+                book.tick, book.callback
+            )));
+        }
+        if held.epoch < book.epoch {
+            return Err(stale(&format!(
+                "a later query moved this callback's epoch to {}",
+                book.epoch
+            )));
+        }
+        if held.epoch > book.epoch {
+            return Err(GfxFault::new(
+                "age-gfx.bad-token",
+                format!(
+                    "query token epoch {} is ahead of the book (epoch {})",
+                    held.epoch, book.epoch
+                ),
+            ));
+        }
+        Ok(())
     }
 
     fn mover(&self, mover: i32) -> Result<&HostRow, GfxFault> {
@@ -646,19 +745,63 @@ impl NeutralGfxHost {
                 )
             })
     }
+    /// Resolve a render handle for a write (frame/despawn). Fault-33
+    /// discipline: a despawned handle is an OLD generation — the write is the
+    /// named `age-gfx.stale-render-handle` refusal carrying the session facts;
+    /// a never-issued id stays `age-gfx.bad-token`.
     fn token_mut(&mut self, token: i32) -> Result<&mut RenderToken, GfxFault> {
-        self.tokens
-            .iter_mut()
-            .find(|t| t.token == token && t.alive)
-            .ok_or_else(|| {
-                GfxFault::new(
-                    "age-gfx.bad-token",
-                    format!("render token {token} is unknown or dead"),
-                )
-            })
+        let ctx = self.last_ctx.clone();
+        let Some(t) = self.tokens.iter_mut().find(|t| t.token == token) else {
+            return Err(GfxFault::new(
+                "age-gfx.bad-token",
+                format!("render token {token} is unknown"),
+            ));
+        };
+        if !t.alive {
+            return Err(GfxFault::new(
+                "age-gfx.stale-render-handle",
+                format!(
+                    "render token {token} is an old generation (despawned); writing it is refused at tick {} callback {}",
+                    ctx.as_ref().map(|c| c.tick).unwrap_or(0),
+                    ctx.as_ref().map(|c| c.callback).unwrap_or(0)
+                ),
+            ));
+        }
+        Ok(t)
     }
 }
 impl AgeGfxHost for NeutralGfxHost {
+    /// The AV lane hands the session facts per dispatch; the provider keeps its
+    /// own books on them: the call-fact log, and the query-token book the
+    /// fault-13 judgment resolves against (a `query2d.*` at epoch E kills every
+    /// earlier token of this callback). Facts only — the op semantics below are
+    /// unchanged.
+    fn dispatch_with_ctx(
+        &mut self,
+        symbol: &str,
+        args: &[Value],
+        ctx: &ace_av::age_gfx::AgeGfxCall<'_>,
+    ) -> Result<AgeGfxReturn, AgeGfxFault> {
+        let fact = CallFact {
+            tick: ctx.tick,
+            callback: ctx.callback,
+            query_epoch: ctx.query_epoch,
+            credits_used: ctx.credits_used,
+            symbol: symbol.to_string(),
+        };
+        if matches!(symbol, SEGMENT_SYMBOL | SWEEP_SYMBOL) {
+            self.query_book = Some(QueryTokenBook {
+                tick: ctx.tick,
+                callback: ctx.callback,
+                epoch: ctx.query_epoch,
+                sweep: symbol == SWEEP_SYMBOL,
+            });
+        }
+        self.last_ctx = Some(fact.clone());
+        self.calls.push(fact);
+        self.dispatch(symbol, args)
+    }
+
     fn dispatch(&mut self, symbol: &str, args: &[Value]) -> Result<AgeGfxReturn, AgeGfxFault> {
         // Every argument arrives as a typed `Value`; map once to the UI-side
         // `GfxArg` so both the three record ops and the 13 scalar ops share one
