@@ -27,4 +27,5 @@ pub mod measurement;
 pub mod spatial;
 pub mod view2d;
 pub mod view3d;
+pub mod gfx_host_arms;
 pub mod gfx_host_port;

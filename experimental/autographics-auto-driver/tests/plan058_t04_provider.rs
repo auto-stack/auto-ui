@@ -207,7 +207,8 @@ fn image_and_frame_ports_carry_content_identity() {
     let mut p = fake();
     let a = p.image_png("assets/atlas.png").expect("image2d.png");
     let b = p.image_png("assets/other.png").expect("image2d.png");
-    assert_ne!(a.identity, b.identity, "identity is per content, not a name");
+    assert_ne!(a.sha256, b.sha256, "identity is per content, not a name");
+    assert_eq!((a.width, a.height), (32, 32), "ALE port carries IHDR extents");
     let fa = p.frame_at(a.clone(), 0, 0, 32, 32).expect("frame2d.at");
     let fb = p.frame_at(b.clone(), 1, 2, 16, 16).expect("frame2d.at");
     assert_eq!(fa.image, a, "the frame keeps its Image2D port");
@@ -215,10 +216,10 @@ fn image_and_frame_ports_carry_content_identity() {
     assert_eq!((fa.x, fa.y, fa.w, fa.h), (0, 0, 32, 32));
     assert_eq!(p.meter().credits(), 4 * CREDIT_BASE, "each port call is 1");
     println!(
-        "PLAN058_TIMING test=image_and_frame_ports_carry_content_identity ms={} credits=4 identities={}/{}",
+        "PLAN058_TIMING test=image_and_frame_ports_carry_content_identity ms={} credits=4 sha={}/{}",
         t0.elapsed().as_millis(),
-        &a.identity[..8.min(a.identity.len())],
-        &b.identity[..8.min(b.identity.len())]
+        &a.sha256[..8.min(a.sha256.len())],
+        &b.sha256[..8.min(b.sha256.len())]
     );
 }
 

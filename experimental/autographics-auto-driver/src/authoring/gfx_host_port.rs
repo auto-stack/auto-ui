@@ -49,10 +49,15 @@ pub struct Sweep2D {
     pub start_overlap: bool,
 }
 
-/// `image2d.png` identity port: content identity is host-supplied, never a name.
+/// `image2d.png` identity port: content identity is host-supplied, never a
+/// name. Field order/meaning match the landed record ABI
+/// (`AGE_PORT_FIELDS`: `sha256 Str, byte_length i32, width i32, height i32`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Image2D {
-    pub identity: String,
+    pub sha256: String,
+    pub byte_length: i32,
+    pub width: i32,
+    pub height: i32,
 }
 
 /// `frame2d.at` value-construction port: an integer pixel rect inside an image.
@@ -366,8 +371,15 @@ impl GfxHostProvider for RecordingProvider {
             return None;
         }
         self.image_seq += 1;
+        // The fake stands in for the host identity computation: a content-shaped
+        // digest per (path, sequence) so a name never doubles as an identity.
         Some(Image2D {
-            identity: format!("{path}#{}", self.image_seq),
+            sha256: agp::renderer::capture::sha256_hex(
+                format!("{path}#{}", self.image_seq).as_bytes(),
+            ),
+            byte_length: 0,
+            width: 32,
+            height: 32,
         })
     }
     fn frame_at(&mut self, image: Image2D, x: i32, y: i32, w: i32, h: i32) -> Option<Frame2D> {
