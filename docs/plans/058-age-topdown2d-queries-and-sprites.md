@@ -159,7 +159,7 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-01 | work | 后续另行启动；T-01不等研究 | 只读差距/源版本/最低样本和oracle准备，核owner/唯一树scope | AC-01/AC-06 | [x] 2026-11-18：055 spec c185f8f2/归档10-10、AG022归档10-10、981 seam ddbda0228+ed8b16e01 32/8/16/1、f32 在途；样本6行/32credits（t01-entry.md） |
 | T-02 | work | T-01；055/AG022已交结论；981 T-02联冻已回签 | ≤2机制中立服务/GPU最低负载先证，冻结profile/typed端口/预算映射/数值/共同发布；先证接口=已有静态f32行值＋宿主行写（不依赖f32业务式），真实Auto移动积分等981 f32 AV切片；不冒Node整链go，失败replan | AC-01/AC-02/AC-03/AC-04/AC-10/AC-11 | [x] 2026-11-18：probe c5086f50 5/5（queries-2d/sprites-2d；宿主行写/f32行值）；机制=碰撞代理与外观分离四要件；GPU 210/400px同Tick；32合法/33 fault10/40>32零效果sticky/40→41/按Tick重置；单assembly与use实例留T-03 |
 | T-03 | work | T-02机制可行；981稳定合同供准备 | 中立图形服务/能力注册/可见非阻挡地面/Node领域声明与永久用例，不扩旧生成器；与981不相交写面并行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-01/AC-02/AC-03/AC-05/AC-10/AC-11 | [x] 2026-11-18：新profile `autographics.topdown2d/1`(30/121)+scene/9 layer+render-only行表/感知segment/sweep(fault 60)；旧22 profile/10 unit/价目零漂移；`node_topdown2d_flow` 5/5、controls 6/6、旧消费者11/11+4/4；E1代理被65536对抗反例否决并删；commit 7165dbad |
-| T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；**入口阻塞：待981 IF-981-GFX-HOST-PORT（2026-11-18裁定A）**；预备已交 `b071634c`（源/oracle/candidate provider），待pin刷新 | 正常Node同源先AV整链、随后AC/A2R按§5阶段先证、四八向/查询/呈现同步、实例/owner/故障及输入门；缺接口回owner ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-10/AC-11 | [ ] |
+| T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；**入口阻塞：待981 IF-981-GFX-HOST-PORT（2026-11-18裁定A）**；预备/三臂已交 `b071634c`/`f6418120`（源/oracle/segment+sweep+image2d ABI 臂），待 G1/G2+pin | 正常Node同源先AV整链、随后AC/A2R按§5阶段先证、四八向/查询/呈现同步、实例/owner/故障及输入门；缺接口回owner ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-10/AC-11 | [ ] |
 | T-05 | work | T-04整链go | V-S01..08、预算合法/超界、独立数值/GPU oracle与旧档触面回归，双后端实际运行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-10/AC-11 | [ ] |
 | T-06 | work | T-05 | 冷A→B/修复下一Run、SD与AG023双后端准确版本/命令/配方 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-05/AC-06/AC-10/AC-11 | [ ] |
 | T-07 | review | T-06 | 同树独立final，真实逐AC/SD/源和反例核验；finding同员有界复核 | AC-07 | [ ] |
@@ -168,6 +168,16 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+### 2026-11-18 stage: work（T-04 三臂：segment/sweep/image2d 对齐 record ABI）| PLAN-058 r7 | outcome: pass（三臂完成；T-04 仍未勾，待 G1/G2+pin）
+
+**绑定**：worktree 同上 | code commit `f6418120b86b48e0149ed3d72e8bf31ee4252ad3`（5 文件+886/−7）| 主检出只改Plan簿记。
+**ABI 来源**：981 `D-981-GFX-PORT-ABI` closed（auto-lang `5ee4d23c0`，receipt `381d7a364`，master `f59592174`）；一次宿主调用返回完整 `AgeGfxReturn::Record`，AV 按调用槽 record 复核；收费由 981 `AgeGfxSession` 负责（segment 8/sweep 16/image 1、`age-gfx.credits` sticky）。
+**交付**：`src/authoring/gfx_host_arms.rs` 三臂＋`dispatch`（symbols `age.query2d.{segment,sweep}.v1`/`age.image2d.png.v1`）；`Image2D` 改为 ABI 四字段 `[sha256,len,width,height]`；测试 `tests/plan058_t04_arms.rs` 6 例。
+**记录顺序（逐元素断言）**：Cast2D `[hit,node,t,point_x,point_y,normal_x,normal_y]`；Sweep2D `[hit,node,t,origin_x,origin_y,normal_x,normal_y,start_overlap]`；Image2D `[sha256 Str,byte_length i32,width i32,height i32]`。
+**实测（root 复跑）**：arms 6/6（0.00s）、oracle 4/4、provider 5/5、controls 6/6。几何：segment mover1 (4,0)→(4,6)=`true,4,0.25,(4,1.5),(0,−1)`（裸 box）；sweep mover1@(8.533333,0) dx=0.13333334=`true,2,t≈0.5,origin(8.533333,0),(−1,0),false`（mover-half Minkowski，停位 8.6）；image2d 独立 sha2/png 复算一致（`95a08525…`，258B，96×32）。render-only 不入候选，改 Collision 即 055 node0/t0/overlap；render-only mover/越界/参数/路径/缺图/坏 PNG 均具名 fault。
+**边界**：三臂不计费（归 981 session）；AV/A2R 实际执行、PNG 进工程/GPU 像素、`use` 实例未覆盖；G1（AGE 源侧 render-only 声明）仍未交。
+**next**：pin 刷新后写 `impl AgeGfxHost` 薄适配（Value↔GfxValue、StrHandle、fault 去前缀），用 `AgeGfxSession` 跑 `on Life.Tick`，逐 Tick 对 oracle。
 
 ### 2026-11-18 stage: work（T-04 预备：正常 Node 源/独立 oracle/candidate provider）| PLAN-058 r7 | outcome: pass（备料完成；T-04 仍未勾，等 981 端口+pin）
 
@@ -249,4 +259,4 @@ next: work（T-01只读准备→T-02先证）；本轮未开树。
 
 ## 10. 待澄清事项
 
-D-01：055/AG022研究已交，最低组合仍待本包先证，不能把研究当产品完成；需变更预算则replan。D-02：轴/姿态/单sweep及所有权由T-02冻结，不默加滑墙。D-03：AGE M1原生门已由AG026签章，981所需A正式接面仍未齐，前期并行不豁免终验，也不等待本AGE M2总签。D-04：T-02先证不以f32业务式为前提（已按静态行值完成）；真实Auto移动积分（位置/速度f32字段与f32业务式）的前置已满足——981 `D-981-AGE-F32-SURFACE`关闭（AV `be8480cae`+A2R `a4950f0b5`，auto-lang master；receipt `77dc0fc26`），UI058仍不以int近似；跨仓状态观察/呈现按981 `D-981-F32-CONSUMER-WINDOW`另行回签，T-04 AV先证可用`execute_component_def`取`Value::F32`。材料唯一`D:/autostack/plan-artifacts/plan-058/auto-ui/`，开工核跨仓同号owner并登记用途/路径/在途，外部B/SDK副本/target/原日志探针全收自有子scope；merge摘要折Plan、全输出对账/guard清树/删除自有scope构建物，仅具名owner/理由/关闭条件hold例外；不穿透链接、不碰外仓同号、不创建第二权威树。D-05（已解）：T-02冻结分离；T-03采用新profile+per-row render-only表（非代理），E1(65536代理)被对抗反例否决并删除；SD-01须在`node2d-topdown-composition.md`沉淀profile 30/121、scene/9 layer、fault 60与旧档零漂移。D-06（T-04入口，2026-11-18）：981 AV 车道具名拒15个HostAlgorithm+HostIdentity（`hir_adapter.rs:5082 lower.age-gfx-lane`），且无gfx宿主派发，故"正常Node源AV整链"缺执行口；用户裁定路线A=回981 owner补SESSION/typed宿主端口，`IF-981-GFX-HOST-PORT`请求已并入981 §9；UI058不建私有runner/旧生成器旁路，T-04待该正式来源。T-04预备（`b071634c`）另实测 AGE 侧缺口G1..G5（`shape2d`无render-only声明位/Tick体assignment-only/无typed行句柄/frame str拼写未证/pin旧），已并入981请求补充；pin刷新为T-04第1步。
+D-01：055/AG022研究已交，最低组合仍待本包先证，不能把研究当产品完成；需变更预算则replan。D-02：轴/姿态/单sweep及所有权由T-02冻结，不默加滑墙。D-03：AGE M1原生门已由AG026签章，981所需A正式接面仍未齐，前期并行不豁免终验，也不等待本AGE M2总签。D-04：T-02先证不以f32业务式为前提（已按静态行值完成）；真实Auto移动积分（位置/速度f32字段与f32业务式）的前置已满足——981 `D-981-AGE-F32-SURFACE`关闭（AV `be8480cae`+A2R `a4950f0b5`，auto-lang master；receipt `77dc0fc26`），UI058仍不以int近似；跨仓状态观察/呈现按981 `D-981-F32-CONSUMER-WINDOW`另行回签，T-04 AV先证可用`execute_component_def`取`Value::F32`。材料唯一`D:/autostack/plan-artifacts/plan-058/auto-ui/`，开工核跨仓同号owner并登记用途/路径/在途，外部B/SDK副本/target/原日志探针全收自有子scope；merge摘要折Plan、全输出对账/guard清树/删除自有scope构建物，仅具名owner/理由/关闭条件hold例外；不穿透链接、不碰外仓同号、不创建第二权威树。D-05（已解）：T-02冻结分离；T-03采用新profile+per-row render-only表（非代理），E1(65536代理)被对抗反例否决并删除；SD-01须在`node2d-topdown-composition.md`沉淀profile 30/121、scene/9 layer、fault 60与旧档零漂移。D-06（T-04入口，2026-11-18）：981 AV 车道具名拒15个HostAlgorithm+HostIdentity（`hir_adapter.rs:5082 lower.age-gfx-lane`），且无gfx宿主派发，故"正常Node源AV整链"缺执行口；用户裁定路线A=回981 owner补SESSION/typed宿主端口，`IF-981-GFX-HOST-PORT`请求已并入981 §9；UI058不建私有runner/旧生成器旁路，T-04待该正式来源。T-04预备（`b071634c`）另实测 AGE 侧缺口G1..G5（`shape2d`无render-only声明位/Tick体assignment-only/无typed行句柄/frame str拼写未证/pin旧），已并入981请求补充；pin刷新为T-04第1步。三臂（`f6418120`）已按 `D-981-GFX-PORT-ABI`（`5ee4d23c0`/`381d7a364`）实现 segment/sweep/image2d 的精确 record 与 dispatch；收费仍归981 session；G1 源侧声明与 G2 语法仍待981。
