@@ -150,6 +150,20 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 45 | from: work | t
 **桥装载复测**：012 = `source.age.structure`（view 结构面，另查）；013 = 具名 `.store` 边界（store 块 `on` 体仍不可解析）；016 = `ace.desktop.view-for-unsupported: view data item shape`（日历网格遍历 computed 列表——harness 需按现域能力求值 computed 列表或展开循环）。
 
 **下一刀**：016 的 view-for（用 collections 执行 computed 列表并展开循环叶）、013 store 块 `on` 体解析、012 结构面。`next_responsible_role: work（T-02 W43）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 47 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: b338b450f | next: work
+
+2026-11-19 stage: work（T-02 W44：C 风格 for + 分支体调用）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `b338b450f`、auto-ui `7a8637cf` | task_ids: T-02（W44）| evidence: `plan105_list_handlers` 两例
+
+**交付**：①文法 `age-on-for-cond`（`for <cond> { … }`）进 handler/分支语句并集；分支体开放调用语句（`age-view-call-stmt` 增 age-package）；②`ComponentStmt::While` 全链（投影/重写/computed/subst/assigns/local names/walk/store 展开/flat/SFC 车道）；③执行面发射 `Stmt::While`，场景路径把**再赋值**的 hook 局部标可变（过 `verify.immutable-write`）；④分支/循环里的非列表方法调用仍标 `body_foreign`（980 on-if 负控保持）。
+
+**证据**：`plan105_list_handlers` 两例——List push/get 端到端 `n=7`；C-for（`for i < 3`）循环三次 `n=3`。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；auto-ui prep 6/6；census 4/4（component `9db961c7…`）。
+
+**桥装载新进展（两道新墙）**：013 = **store 已内联**，新墙 `.store.todos` 不是 store 字段——`prep` 把类型化列表字段（`var todos []Todo = []`）改写成**视图数据**（无类型），于是 store 字段映射里没有 `todos`。012 = `on Tick` 赋值 `w_rows`（**computed 只支持读，不支持写**）。
+
+**下一刀**：列表**状态字段**（`[]T` 模型字段进 collections 域 + store 字段映射含列表；`Todo` 记录类型由 types 单元内联）+ computed 可写面（或按原行为改写 computed 更新点）。`next_responsible_role: work（T-02 W45）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
