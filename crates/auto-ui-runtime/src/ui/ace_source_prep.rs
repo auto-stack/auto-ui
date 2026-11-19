@@ -102,11 +102,12 @@ fn module_file(dep_root: &Path, module: &str) -> Option<PathBuf> {
 fn style_literal(src: &str, name: &str) -> Option<String> {
     for line in src.lines() {
         let t = line.trim();
-        let rest = t
+        let Some(rest) = t
             .strip_prefix("pub style ")
             .or_else(|| t.strip_prefix("style "))
-            .or_else(|| t.strip_prefix("pub style\t"))
-            .or_else(|| t.strip_prefix("style\t"))?;
+        else {
+            continue;
+        };
         let Some((head, tail)) = rest.split_once('=') else {
             continue;
         };
@@ -120,7 +121,6 @@ fn style_literal(src: &str, name: &str) -> Option<String> {
     }
     None
 }
-
 /// PLAN-105 T-02（U03 真语料 012）：把**类型化列表数据字段**的初值改写为无类型
 /// 形——`var cities []str = ["…"]` → `var cities <blank> = ["…"]`（类型段等长
 /// 空白化，保 span）。AGE 组件/包面把无类型列表字面量当**只读视图数据**
@@ -235,8 +235,33 @@ pub fn prepare_component_source(
         out.push_str(nl);
         let _ = handled;
     }
-    for style in &inlined {
-        out.push_str(&format!("style {} = {}\n", style.name, style.literal));
+    // 内联样式必须落在**组件头之前**：模块样式表按源码顺序收集，组件之后声明的
+    // 样式在投影期解析不到（016 实测：追加到文件尾 → `style caption_text` 不解析；
+    // 前置到 widget 之前 → 整例通过）。
+    if !inlined.is_empty() {
+        let decls: Vec<String> = inlined
+            .iter()
+            .map(|s| format!("style {} = {}", s.name, s.literal))
+            .collect();
+        let mut lines: Vec<String> = out.split_inclusive('\n').map(|s| s.to_string()).collect();
+        let head = lines.iter().position(|l| {
+            let t = l.trim_start();
+            t.starts_with("widget ") || t.starts_with("node ") || t.starts_with("component ")
+        });
+        match head {
+            Some(idx) => {
+                let mut block = decls.join("\n");
+                block.push('\n');
+                lines.insert(idx, block);
+                out = lines.concat();
+            }
+            None => {
+                for d in &decls {
+                    out.push_str(d);
+                    out.push('\n');
+                }
+            }
+        }
     }
     Ok(PreparedComponentSource {
         source: out,
@@ -290,20 +315,20 @@ mod tests {
                 literal: "\"text-xs text-muted-foreground\"".into(),
             }]
         );
-        assert!(prepared.source.contains("style caption_text = \"text-xs text-muted-foreground\""));
-        // use 行等长空白化：`use` 文本消失，且原文件的行在前 N 行逐行等长（保 span）。
-        let src_lines: Vec<&str> = src.lines().collect();
-        let out_lines: Vec<&str> = prepared.source.lines().collect();
-        for (before, after) in src_lines.iter().zip(out_lines.iter()) {
-            if before.trim_start().starts_with("use ") {
-                assert_eq!(before.len(), after.len(), "use line keeps its byte length");
-                assert!(after.trim().is_empty(), "use line is blanked");
-            } else {
-                assert_eq!(*before, *after);
-            }
-        }
+        // 内联样式落在**组件头之前**（模块样式表按源码序收集；016 实测追加到
+        // 文件尾解析不到）。
+        let style_pos = prepared
+            .source
+            .find("style caption_text = \"text-xs text-muted-foreground\"")
+            .expect("inlined style present");
+        let widget_pos = prepared.source.find("widget App").expect("component head present");
+        assert!(style_pos < widget_pos, "inlined styles land before the component head");
+        // use 行等长空白化：`use` 文本消失，原行被等长空白替换（保 span）。
         assert!(!prepared.source.contains("use stylekit"));
         assert!(!prepared.source.contains("use themes"));
+        assert!(prepared
+            .source
+            .contains(&" ".repeat("use stylekit.styles: caption_text".len())));
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -335,4 +360,32 @@ mod tests {
         let nested = rewrite_typed_list_field("    var xs [][]int = []").unwrap();
         assert!(!nested.contains("[][]int"));
     }
+
+    #[test]
+    fn real_u03_apps_project_after_prep() {
+        // 真语料端到端：U03 六个应用经源准备后必须能被组件面投影（012 的列表
+        // 索引在组件面已开；包面语义另刀）。路径相对本 crate。
+        let ui_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
+        let mut failed = Vec::new();
+        // 012-clock 的 `on` 块仍有未接语义（列表索引求值等，见 plan-105 缺口表），
+        // 不在本测断言内；其余五例经源准备后组件面必须整体投影通过。
+        for app in [
+            "013-todo",
+            "015-notes",
+            "016-calendar",
+            "018-book-reader",
+            "022-kanban",
+        ] {
+            let app_root = ui_root.join(app);
+            let src = std::fs::read_to_string(app_root.join("src/front/app.at")).expect("app source");
+            // 工程根（pac.at 所在）才是依赖解析基准；源文件在 src/front 下。
+            let prepared = prepare_component_source(&app_root, &src).expect("prepare");
+            if let Err(ds) = ace_core::source::age_component::project_component_candidates(&prepared.source) {
+                let d = ds.first().map(|d| format!("{}: {}", d.code, d.message)).unwrap_or_default();
+                failed.push(format!("{app} ({d})"));
+            }
+        }
+        assert!(failed.is_empty(), "still failing: {failed:?}");
+    }
+
 }
