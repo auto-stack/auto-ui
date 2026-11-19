@@ -489,6 +489,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 37 | from: work | t
 **列表/数组语义勘察（下一刀的路标）**：在 `age-component` 面直接开放 `array-lit` 会让文法编译失败——4 条诊断：`condition-atom`/`atom-expr` 引用被裁剪规则、`array-elem-tail` 被裁剪、"repeat of nullable item is forbidden"（`array-elems` 在该面可空）。即：需要同时放开 `condition-atom`/`array-elem-tail` 的 profile，并把元素步改成**非可空**（如 pratt 而非 expr），否则文法自检拒绝。已回滚该实验（census 4/4 保持）。
 
 **下一刀**：按上述路标开放列表字面量（文法三处 + 非可空元素步），再验证 `let names [12]str = [...]` / `names[i]`（016 helper）与 handler 局部列表（012）。`next_responsible_role: work（T-02 W34）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 38 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: (本轮) | next: work
+
+2026-11-19 stage: work（T-02 W35：列表字面量开文法）| PLAN-105 r1 | outcome: pass（本刀部分完成——列表值语义仍待）| code_commit: 本轮提交 | task_ids: T-02（W35）| evidence: 全 affected + prep
+
+**交付**：`array-lit`/`array-elems`/`array-elem-tail`/`cfg-empty-array-lit` 与 `atom-expr`/`condition-atom` 的数组原子 profile 增加 `age-component, age-package`（含空列表 `[]`）；`rename_expr_with_params` 收 `ArrayLit`（元素递归重命名）；handler 局部列表字面量在执行面**具名拒**（不再内部适配错误）；下标读暂仍具名拒。census 重基线（component `bf45f4d9…`、package `591afe41…`）。
+
+**验证**：plan105 25/25、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24；auto-ui prep 6/6。
+
+**下一刀**：列表**值语义**——`let xs = [...]` 执行（List 构造 + 元素 get）、下标读/写、`push`（012/016 需要）；再 013 的 store 列表操作；之后 015 的宿主 API 面。`next_responsible_role: work（T-02 W36）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
