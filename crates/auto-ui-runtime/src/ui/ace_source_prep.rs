@@ -448,23 +448,11 @@ fn extract_store_block(src: &str, type_name: &str) -> Option<String> {
                 if depth == 0 {
                     // 与主源同律改写类型化列表数据字段（store 模型里
                     // `var notes []Note = []` → 无类型形，组件面才可解析）。
-                    // 列表字段暂仍按视图数据改写（核心的 `[]T` 模型字段/记录
-                    // 类型支持是下一刀）；记录类型依赖仍一并内联，切换时无需再改。
-                    let raw = &src[start..=i];
-                    let mut block = String::with_capacity(raw.len() + 1);
-                    for line in raw.split_inclusive('\n') {
-                        let (body, nl) = match line.strip_suffix('\n') {
-                            Some(b) => (b, "\n"),
-                            None => (line, ""),
-                        };
-                        match rewrite_typed_list_field(body) {
-                            Some(rewritten) => {
-                                block.push_str(&rewritten);
-                                block.push_str(nl);
-                            }
-                            None => block.push_str(line),
-                        }
-                    }
+                    // PLAN-105 T-02（U03 真语料 013/015）：store 的**列表状态字段**
+                    // 保持类型（`var todos []Todo = []`）——collections 域需要
+                    // `List<Todo>` 真类型；记录类型由 store 单元的 `use types:`
+                    // 依赖一并内联。
+                    let mut block = src[start..=i].to_string();
                     block.push('\n');
                     // PLAN-105 T-02（U03 真语料 013/015/016）：store handler 里的
                     // **自方法调用** `.Foo(args)`（源方言里指 store 自己的 handler）
