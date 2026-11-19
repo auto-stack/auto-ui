@@ -533,6 +533,39 @@ pub fn splice_lane_handler_bodies(sfc: &str, bodies: &[LaneHandlerBody]) -> Resu
 /// 切片 #6e：**一体化入口**——源文本 → lane SFC（编译器管线 SFC + lane
 /// handler 体拼接）。返回 `(sfc, lane_bodies, absent)`：absent 中的 handler
 /// 保持编译器旧道体（双轨期合同——缺席不拒绝，产品默认道仍为编译器）。
+/// PLAN-1072 刀A：本文件 style 配方的**显式注册**（prepare→parse→replay
+/// 三段中的首段；replay 段见 [`replay_file_style_recipes`]——与旧管线
+/// `generate_component_from_file` 同源同序）。此前 lane 入口只以裸
+/// `VueGenerator` 生成 SFC——文件级 `style N = "…"` 声明不注册，view 内
+/// `style: N` ident 引用落 `:style="N"`（setup 作用域无此名=运行时
+/// undefined，样式静默丢失）；产品道四调用点靠旧编译刚跑完的线程局部注
+/// 册表**隐式余温**生效，独立入口（`auto run` CLI/测试）为空注册表。注
+/// 册后 `extract_widget_from_decl` 的 `desugar_style_expr` 与旧管线同形
+/// 展开为字面量 class。导入模块解析失败按旧管线容忍（warning）。
+fn prepare_file_style_recipes(
+    src: &str,
+    path: &str,
+) -> Result<Vec<(auto_ui_dialect::ast::StyleRecipeDecl, String)>, String> {
+    let base_dir = std::path::Path::new(path)
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .to_path_buf();
+    auto_ui_compiler::design_tokens::recipe::prepare_style_recipe_imports(&base_dir, src)
+        .map_err(|e| format!("style recipes: {e}"))
+}
+
+/// replay 段（parse 后：导入源标签序复放 + 宿主本地声明 + 校验）。
+fn replay_file_style_recipes(
+    imports: &[(auto_ui_dialect::ast::StyleRecipeDecl, String)],
+    ast: &auto_ui_dialect::UiCode,
+) -> Result<(), String> {
+    auto_ui_compiler::design_tokens::recipe::load_and_validate_style_recipes_with_imports(
+        imports, ast,
+    )
+    .map_err(|e| format!("style recipes: {e}"))?;
+    Ok(())
+}
+
 pub fn generate_sfc_with_lane(
     src: &str,
     path: &str,
@@ -542,12 +575,15 @@ pub fn generate_sfc_with_lane(
     // 真实编译器管线。切片#6n：**多 widget 同文件源**——按声明序逐 widget
     // 生成并聚合（lane 经 node 选择器 `compile_at(i)`；单 widget 源行为不
     // 变）。返回值=首个 SFC + 全部 widget 的 bodies/absent 聚合。
+    // PLAN-1072 刀A：style 配方 prepare→parse→replay（见函数 doc）。
+    let recipe_imports = prepare_file_style_recipes(src, path)?;
     let session = auto_parser_api::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
     let ast = parser
         .parse_domain(&auto_ui_dialect::UiDialect)
         .map(auto_ui_dialect::UiCode)
         .map_err(|e| format!("parse: {e:?}"))?;
+    replay_file_style_recipes(&recipe_imports, &ast)?;
     let decls: Vec<&auto_ui_dialect::ast::WidgetDecl> = ast
         .domain_stmts()
         .filter_map(|s| match s {
@@ -845,8 +881,11 @@ fn attach_rt_import(sfc: String, runtime_mjs: &str, href: &str) -> String {
     };
     let mut out = String::with_capacity(sfc.len() + 96);
     out.push_str(&sfc[..insert_at]);
-    out.push_str(&format!("
-import {{ {} }} from \"{href}\";", needed.join(", ")));
+    out.push_str(&format!(
+        "
+import {{ {} }} from \"{href}\";",
+        needed.join(", ")
+    ));
     out.push_str(&sfc[insert_at..]);
     out
 }
@@ -885,12 +924,15 @@ pub fn generate_sfcs_with_lane_product(
     rt_href_component: &str,
 ) -> Result<LaneSfcProductMulti, String> {
     use auto_ui_dialect::UiStmt;
+    // PLAN-1072 刀A：style 配方 prepare→parse→replay（产品道与测试道同序）。
+    let recipe_imports = prepare_file_style_recipes(src, path)?;
     let session = auto_parser_api::session::CompilerSession::ui();
     let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
     let ast = parser
         .parse_domain(&auto_ui_dialect::UiDialect)
         .map(auto_ui_dialect::UiCode)
         .map_err(|e| format!("parse: {e:?}"))?;
+    replay_file_style_recipes(&recipe_imports, &ast)?;
     let decls: Vec<&auto_ui_dialect::ast::WidgetDecl> = ast
         .domain_stmts()
         .filter_map(|s| match s {
@@ -905,7 +947,11 @@ pub fn generate_sfcs_with_lane_product(
     let mut widgets = Vec::with_capacity(decls.len());
     for (wi, decl) in decls.iter().enumerate() {
         let (name, sfc, bodies, absent) = generate_widget_with_lane(decl, src, path, wi)?;
-        let href = if wi == 0 { rt_href_root } else { rt_href_component };
+        let href = if wi == 0 {
+            rt_href_root
+        } else {
+            rt_href_component
+        };
         let sfc = attach_rt_import(sfc, &runtime_mjs, href);
         widgets.push(WidgetLaneSfc {
             name,
@@ -948,7 +994,6 @@ pub fn generate_sfc_with_lane_product(src: &str, path: &str) -> Result<LaneSfcPr
         absent,
     })
 }
-
 
 /// 同文件模块 fn 收集（vue.rs 链 `same_file_module_fns` 同款——公开 API
 /// 复刻，供单文件 lane 生成道重挂；PLAN-075 的裸生成器丢顶层 fn 同病）。
