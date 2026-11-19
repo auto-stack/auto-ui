@@ -380,9 +380,23 @@ mod tests {
             let src = std::fs::read_to_string(app_root.join("src/front/app.at")).expect("app source");
             // 工程根（pac.at 所在）才是依赖解析基准；源文件在 src/front 下。
             let prepared = prepare_component_source(&app_root, &src).expect("prepare");
-            if let Err(ds) = ace_core::source::age_component::project_component_candidates(&prepared.source) {
-                let d = ds.first().map(|d| format!("{}: {}", d.code, d.message)).unwrap_or_default();
-                failed.push(format!("{app} ({d})"));
+            match ace_core::source::age_component::project_component_candidates(&prepared.source) {
+                Ok(_) => {}
+                Err(ds) if app == "013-todo" || app == "016-calendar" => {
+                    // 这两个应用的 `.store.*` 在**独立单元**（S1 跨单元装载未接线）
+                    // ——必须具名拒（不是结构/语法错，也不是静默通过）。
+                    let named = ds.iter().any(|d| {
+                        d.code == "source.age.component-unsupported" && d.message.contains(".store.")
+                    });
+                    if !named {
+                        let d = ds.first().map(|d| format!("{}: {}", d.code, d.message)).unwrap_or_default();
+                        failed.push(format!("{app} (expected named .store reject, got {d})"));
+                    }
+                }
+                Err(ds) => {
+                    let d = ds.first().map(|d| format!("{}: {}", d.code, d.message)).unwrap_or_default();
+                    failed.push(format!("{app} ({d})"));
+                }
             }
         }
         assert!(failed.is_empty(), "still failing: {failed:?}");
@@ -451,4 +465,5 @@ mod tests {
         assert!(sfc.contains("<template>"), "SFC template emitted");
         assert!(sfc.contains("text-xs text-muted-foreground"), "inlined style reaches the template");
         let _ = std::fs::remove_dir_all(&root);
-    }}
+    }
+}

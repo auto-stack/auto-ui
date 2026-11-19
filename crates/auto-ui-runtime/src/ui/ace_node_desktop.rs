@@ -1614,8 +1614,19 @@ impl NodeDesktopBridge {
         let raw = src.to_string();
         let candidates = match project_component_candidates(&raw) {
             Ok(c) => c,
-            Err(_) => project_component_candidates(&blank_style_surface(&raw))
-                .map_err(|ds| diags(&ds))?,
+            Err(ds) => {
+                // 只有样式解析类失败才退回空白化；其它具名拒（store/结构/语法）
+                // 必须原样透出——否则会被空白化路径的次生错误掩盖。
+                let style_only = ds
+                    .iter()
+                    .all(|d| d.code == "source.age.style-call");
+                if style_only {
+                    project_component_candidates(&blank_style_surface(&raw))
+                        .map_err(|ds| diags(&ds))?
+                } else {
+                    return Err(diags(&ds));
+                }
+            }
         };
         let node = candidates
             .first()
