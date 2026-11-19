@@ -393,3 +393,8 @@ required-features = ["ace-bridge"]
 [[example]]
 name = "ace_node_desktop_window"
 required-features = ["ace-bridge"]
+
+# PLAN-1022 ASE M0：同宿主 frame 文字浏览器原生验证入口（显式路径消费页面源）。
+[[example]]
+name = "ase_m0_text_window"
+required-features = ["ace-bridge"]
