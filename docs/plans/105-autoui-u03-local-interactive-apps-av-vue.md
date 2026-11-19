@@ -560,6 +560,12 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 43 | from: work | t
 实验已整体回滚（`adapter.rs` / `age_component.rs` / Cargo.toml 恢复），plan105 **25/25** 保持。
 
 **下一刀**：AGE 组件面 Atom 发射的 owned 文本模式（`StrLit`/`text_clone`/字段类型），随后再切 collections profile + 执行分派，012/013/016 的动态列表由此解锁。`next_responsible_role: work（T-02 W41）`
+
+2026-11-19 stage: work（T-02 W41：owned 文本发射尝试，已回滚）| PLAN-105 r1 | outcome: pass（负结果记录）| code_commit: 无（回滚，HEAD `3d7c5158d`）| evidence: plan105 25/25 + plan980 field manifest 7/7
+
+**尝试与负结果**：为满足 collections 域「不收 `str`」，尝试让**字符串字面量文本叶**不再套 `.clone()`（直接返回字面量，期望其被 owned 上下文 retag 成 `Str`）。结果：plan105 3 例 + plan980 field-manifest 2 例 + plan979 component 2 例翻红——字面量叶的 clone 在既有 leaf/描述面是**承重结构**（类型收敛与 `hidden_conclusion` 依赖它），不能单点去掉。已回滚，全绿恢复。
+
+**结论/下一刀**：collections owned 文本必须从**发射层的类型收敛**入手（例如：在 collections 模式把 `str_lit` 的 type 直接发射为 `t_Str`，同时保留 clone 节点语义），而不是删 clone。下一步先精读 `resolve_method` 的 `clone` 收敛与 `hidden_fn` 类型判定，再改发射层。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
