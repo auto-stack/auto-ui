@@ -469,6 +469,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 35 | from: work | t
 **效果**：016-calendar 越过 `month_label` 一墙（原 `leaf-expr: no local named self` 变为 `no function named month_name`——其 computed 表达式调用**模块级 helper fn**，组件面当前不含模块函数）。013-todo 的 store 块 `on` 体仍含列表操作（`todos.push(...)` 等）不可解析（列表语义未接线）。013/016 的下一步分别是**模块 helper fn 进组件校验面**与**列表操作语义**。
 
 **验证**：plan105 25/25；auto-ui prep 6/6。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 36 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: (本轮) | next: work
+
+2026-11-19 stage: work（T-02 W33：跨单元 helper 函数内联）| PLAN-105 r1 | outcome: pass（本刀完成；T-02 未整体完成）| code_commit: auto-ui 本轮提交 | task_ids: T-02（W33）| evidence: prep 6/6
+
+**交付**：`prepare_component_source` 解析 `use <unit>: <fn>` 的顶层 helper 函数并**内联**（`extract_unit_fn`：字符串内括号不计数、剥掉 `pub `；**只内联带返回类型注解的函数**——组件面要求注解，无注解的隐式返回函数留待列表刀）。016 的 `month_name` 已进入入口源。
+
+**效果**：016-calendar 的 `no function named month_name` 墙消失，新墙是 `month_name` 体内**定长数组字面量 + 下标**（`[12]str = [...]` / `names[month-1]`）——列表/数组语义未接线（`locals must be initialized at declaration`）。013 仍卡 store `on` 体列表操作。
+
+**下一刀**：列表/数组语义（字面量、下标读、`push`）——016/013 与 012 的共同大件；之后才是 015 类事件的宿主 API 面。`next_responsible_role: work（T-02 W34）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
