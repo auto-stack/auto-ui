@@ -417,6 +417,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 30 | from: work | t
 **桥装载复测**：015/018/022 = OK；013/016 = 具名 `.store` 边界（S1 跨单元 store 装载是下一步）。
 
 **下一刀**：跨单元 store 装载（auto-ui prep 读 `use <unit>: <StoreType>` 单元并合并进入口源，或包面多单元 store 接线）→ 013/016 解锁；随后 012 局部列表、点击脚本、A2Vue 真应用。`next_responsible_role: work（T-02 W28）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 31 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 7b9e23c4 | next: work
+
+2026-11-19 stage: work（T-02 W28：跨单元 store 内联）| PLAN-105 r1 | outcome: pass（本刀完成；T-02 未整体完成）| worktree: `D:/autostack/.wt/ui-105/auto-ui` + `auto-lang` @ `plan-105-dev` | code_commit: auto-ui `7b9e23c4`、auto-lang `a4ab5b73e` | task_ids: T-02（W28）| evidence: 6/6 + 全 affected
+
+**交付**：`prepare_component_source` 解析 `use <unit>: <StoreType>` → 从工程本地单元抽 `store … { … }` 整块（字符串内括号不计；块内类型化列表字段同律改写）→ **先做组件面可解析性探测**，可解析才前置内联进入口源（随后由 core 的同源 store 内联变共享状态）；解析不了就保留具名 `.store` 边界，不制造语法错。core 侧同名字段（016 dark_mode 镜像）改为复用组件字段而非加前缀。
+
+**验证**：auto-ui prep **6/6**（含 015/018/022 桥装载）；auto-lang plan105 24/24、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24、census 4/4。
+
+**边界**：013/016 的 store `on` 体含 if/for/局部 var（包面语句面），组件面 store 片断仍解析不了 → 保持具名 `.store` 边界。下一刀 = 让 store `on` 体在组件面接受包面语句面（或改走包面多单元 store 装载）。`next_responsible_role: work（T-02 W29）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
