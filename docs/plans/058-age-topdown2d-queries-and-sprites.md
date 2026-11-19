@@ -4,8 +4,8 @@ status: executing
 feature_name: AGE M2俯视二维公共组合与ACE作者接线
 author: [Codex]
 created_at: 2026-11-05
-updated_at: 2026-11-18
-plan_revision: 7
+updated_at: 2026-11-19
+plan_revision: 8
 current_step: 3
 total_steps: 10
 depends_on: [auto-ui/PLAN-055, ag-examples/PLAN-022, ag-examples/PLAN-021, ag-examples/PLAN-026, auto-lang/PLAN-981]
@@ -18,6 +18,8 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 # PLAN-058：俯视二维控制、查询与精灵公共组合
 
 ## 0. 变更摘要
+
+2026-11-19 **r8（用户裁定，范围有界修订）**：AC/A2R 格与双后端义务**原封转移**给新建后继 **PLAN-103**（`103-topdown2d-ac-a2r-wave-consumption.md`，drafting，等 1068/T-04＋981 AC/A2R 域端口＋UI-W2-AC/W3-A2R 波落地后开工）；本计划收口为 **AV 面**——T-04/T-05 重定义 AV 格（已交内容＋剩 OS 真实输入、V-S04 显式闭环、V-S05 冷 A→B AV 腿），T-06 保留 AV 配方/冷包、双后端配方转移，SD-01 措辞对齐实际支持域，AC-10 与 V-PHASE-GFX 多端条款转 PLAN-103 承接；原 V 行 ID/输入/expected/独立 oracle/包络**不减**；触碰路由缺口（17-op 无 dispatch）随 V-S03 完整形归 PLAN-103（scenario 侧 2:1 已证，作者面路由等 IF）。任务 ID/已完成证据全保留。
 
 2026-11-18 r7当前：T-03完成（3/10）。**981 动态世代接口已消费（`12cb146b`，pin 刷 `0a167f611`）**：`AgeGfxCall`/`dispatch_with_ctx` 会话事实接进 `NeutralGfxHost`，判罚点落 UI058 车道——fault-13 判定（同 callback 二查询杀旧 token/纯 callback 边界/跨 Tick，载荷双面命名 tick/callback/epoch）与 fault-33 判定（死句柄写具名拒携会话事实，真实车道 `frame_after_despawn` 驱动）4/4 绿，连续链与双实例用例骑乘验证。**T-05 AV 阶段收尾已交（`350af5b8`）**：GPU **同宿主连续帧链**（单渲染宿主 6 连帧，AV 行位经 `Play::call_script`→`ag_biz_apply`/`ag_set_local` 逐帧应用，渲染路径零业务；逐帧质心=当帧 AV 行投影≤1px、逐帧位移匹配行差 6.00/6.50/6.50/3.00/0.00px）＋**use 实例目标**（fixture 升级 Target 定义 node+两实例行，ForNode 定向 2:1 Touch→实例状态 2/1 独立，探针+主 fixture 整合）。**AC/A2R 阶段门精确阻塞**（1068 drafting 0/10、981 AC/A2R 域图形端口未交、W2-AC/W3-A2R 未落地——见 D-07），按合同不以 AV/A2R 代 AC、A2R 不先于本包 AC。T-04/T-05 均未勾（原全量义务不减）。
 
@@ -40,6 +42,8 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 普通Node/use/model/msg/on/Life.Tick承载业务；一Player、两静态障碍、两个同定义交互物构成最小完整链。非零输入轴归一，斜走不快于直走；一个Tick最多一次sweep并停于首次接触，不要求自动滑墙。查询/世界位置与当Tick精灵位置一致，两个交互物的状态/事件各自独立；最近目标、同距顺序、超距不触发由公共查询结果＋Auto逻辑表达。
 
 不包含tilemap批绘、任意大图、多角色/动态碰撞、完整背包种植存档、深度排序/2DHD光照、混合UI、寻路/自动滑墙、跨端/预算提升。通用ACE/AV/A2R归979/981，本包只接图形端口和领域声明，不重复实现语言后端。国风首切片由AG029新drafting合同承接，本包不冒完整游戏，不改M1平台游戏/Gallery分母。
+
+2026-11-19 r8：本计划交付域=**AV 面**（同一 Node 源经 981 AV 真跑的全部行为/预算/呈现/故障/恢复验收）；AC 机器执行格与 A2R 真编格由 **PLAN-103** 承接（转移清单见 §5 r8 块），原目标/最低样本/预算/独立 oracle 不减。
 
 ## 2. 架构方案
 
@@ -66,6 +70,20 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 2026-11-08的M2规划暂停保留为历史；2026-11-09用户提出合并原M2/M3并行ACE接入和2D/3D增强，本轮恢复规划修订，仍未授权实施/先证/素材/构建。055、AG022、AG021已交不重做研究，M1最终原生门由AG026及债务收据判定。补读979/981合同及auto-ui的ace-migration-feasibility Spec。下文原M2必需门均指当前AGE M1，不是等待合并M2最终签章。
 
 ## 5. 详细设计
+
+### 2026-11-19 r8 范围有界修订（用户裁定；优先于 2026-11-17 阶段合同的 AC/A2R 行）
+
+用户裁定（2026-11-19）：AC/A2R 内容整体转移给新建后继计划 **PLAN-103**，本计划收口 AV 面并允许在 AV 格闭合后完成 review/merge；PLAN-103 等 1068/W2/W3 落地后再开工。**转移清单（原封，不减）**：
+
+| 项 | 原位置 | 去向 |
+|---|---|---|
+| V-S01..S08 各行的 **AC 格/A2R 格**（输入/expected/独立 oracle/包络逐行原封） | §6 V 表 | PLAN-103 §5 继承表 |
+| **AC-10**（同一 Node 源经 981 在 AV 和 A2R 真实编译运行；AV 面已交） | §7 | PLAN-103 AC-10 |
+| V-PHASE-GFX 的 AC/A2R 格与多端"整包拒绝"条款 | §6 | PLAN-103（AC-PHASE-GFX 承接行） |
+| T-06 的**双后端** AG023 配方（两入口准确版本/命令/冷包） | §8 T-06 | PLAN-103 T-05 |
+| 触碰路由语言缺口（作者面业务→实例事件派发；17-op 无 dispatch 端口） | D-06 具名缺口 | PLAN-103 T-02（IF-TOPDOWN-TOUCH-ROUTE） |
+
+**本计划保留（不减）**：最低样本（1Player+2障碍+2同定义目标＋可见非阻挡地面）、32 credits/物理写 32、独立 f32 轨迹/segment/GPU oracle、旧档零漂移、V 各行 AV 格、T-04/T-05/T-06 的 AV 剩余格（OS 真实输入、V-S04 显式闭环、V-S05 冷 A→B AV 腿、AV 配方）。2026-11-17 阶段合同的"AV先交"行由本块收口；其 AC/A2R 行由 PLAN-103 对应合同接管——原表格文本保留在 git 历史（`b18196fd` 及此前）与本节下方，不再作为本计划现行合同。后继计划未开工不构成本计划的未决 hold（PLAN-103 已立项登记 owner）。
 
 ### 2026-11-17 当前阶段合同（优先于下文旧双端排期，原验收不减）
 
@@ -165,6 +183,8 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 
 以下均为未来work验证合同，本轮未执行。实施者先自检；同一权威树由独立上下文final复审，不能用同实现会话重跑充独立。只跑真实受影响case/必要消费门，GPU/窗口焦点/音频重门按机器单实例；不为merge重复全量AGE，不改根语言时不跑根全仓。新路径/入口由任务建立后才可执行。
 
+2026-11-19 r8：下列 V 行的 **AC 格/A2R 格**由 PLAN-103 逐行承接（行 ID/输入/expected/独立 oracle/包络不变，含 V-S07 的 A2R 腿与 V-S03 的作者面触碰路由完整形）；本计划关闭各行的 **AV 格**（V-S07 的 AV 运行腿已交 `350af5b8`/`12cb146b`，V-S03 的 scenario 侧 2:1 已交）。
+
 | case | AC | owner_stage | 输入/入口与可区分预期 | 覆盖边界 |
 |---|---|---|---|---|
 | V-S01 | AC-01/02 | work | T-04/05正常use模块全链：轴(1,0)/(1,1)同速、零/反向输入、改Auto速度真实变，比较f32轨迹/GPU；T-02格先用静态f32行值＋宿主行写（不依赖f32业务式） | 不能由平台重力或raw接口代作者支持；f32业务式待981 AV切片 |
@@ -178,7 +198,7 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 
 ## 7. 验收标准
 
-- [ ] **AC-PHASE-GFX / work**：原每一V行按AV→AC→A2R及§5适用性闭合，原独立oracle/包/资源与失败义务守恒。AV phase可以先正式交接，完整任务与整包最终仍须所有端；由V-PHASE-GFX、原T-03..06与T-07 final核验。
+- [ ] **AC-PHASE-GFX / work**：原每一V行的 **AV 格**按 §5 r8 适用性闭合，独立 oracle/包/资源与失败义务在 AV 面守恒；**AC/A2R 格与多端"整包拒绝"条款由 PLAN-103 原封承接**（§5 r8 转移清单）；由 V-PHASE-GFX 的 AV 格、T-03..06 与 T-07 final 核验。
 
 | AC | owner_stage | 可观察关闭条件 | 验证 |
 |---|---|---|---|
@@ -187,11 +207,11 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | AC-03 | work | query位置/精灵同Tick一致，最近目标和双实例事件隔离正确 | V-S02/03 |
 | AC-04 | work | 原预算峰值/owner/Run/超界和错误恢复真实成立；超界=下一次扣费后累计>32 credits即具名拒绝、零效果、本Tick后续收费调用保持拒绝 | V-S03/04 |
 | AC-05 | work | 冷消费/坏源修复下一Run及旧profile/锁兼容齐 | V-S04/05 |
-| AC-06 | work | SD/独立oracle与精确AG023消费入口齐，无完整种田能力虚称 | V-S05/06 |
+| AC-06 | work | SD/独立oracle与精确AG023 **AV 入口**齐（双后端配方归 PLAN-103），无完整种田能力虚称 | V-S05/06 |
 | AC-07 | review | 同树独立上下文final逐AC/SD/实际来源与代表性反例pass，finding返work同员有界复核 | T-07 |
 | AC-08 | merge | 冻结触面门/来源核后实际落主、canonical及同号归档/导航，结论和实际支持域一致 | T-08/09 |
 | AC-09 | merge | 全实际输出对账/必要源命令结果摘要折Plan/fresh guard清自有树与scope构建物，具名hold登记 | T-10 |
-| AC-10 | work | 增强服务与同一Node源码经981在AV和A2R真实编译运行，行为/绑定/资源及独立oracle正确；无新旧生成链/重复语言后端，AG023两入口可消费 | V-S07；T-04/05/06 |
+| AC-10 | **PLAN-103** | 同一Node源码经981在AV和A2R真实编译运行、行为/绑定/资源及独立oracle正确，AG023两入口可消费；AV 面已交（`350af5b8`/`12cb146b`），A2R 与触碰路由 IF 归后继 | V-S07；PLAN-103 继承表 |
 | AC-11 | work | 可见地面与阻挡/目标查询分离，原五对象/同Tick/费用和双端成立，供AG029公共消费 | V-S08、T-02..06 |
 
 ## 8. 执行步骤
@@ -201,15 +221,23 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-01 | work | 后续另行启动；T-01不等研究 | 只读差距/源版本/最低样本和oracle准备，核owner/唯一树scope | AC-01/AC-06 | [x] 2026-11-18：055 spec c185f8f2/归档10-10、AG022归档10-10、981 seam ddbda0228+ed8b16e01 32/8/16/1、f32 在途；样本6行/32credits（t01-entry.md） |
 | T-02 | work | T-01；055/AG022已交结论；981 T-02联冻已回签 | ≤2机制中立服务/GPU最低负载先证，冻结profile/typed端口/预算映射/数值/共同发布；先证接口=已有静态f32行值＋宿主行写（不依赖f32业务式），真实Auto移动积分等981 f32 AV切片；不冒Node整链go，失败replan | AC-01/AC-02/AC-03/AC-04/AC-10/AC-11 | [x] 2026-11-18：probe c5086f50 5/5（queries-2d/sprites-2d；宿主行写/f32行值）；机制=碰撞代理与外观分离四要件；GPU 210/400px同Tick；32合法/33 fault10/40>32零效果sticky/40→41/按Tick重置；单assembly与use实例留T-03 |
 | T-03 | work | T-02机制可行；981稳定合同供准备 | 中立图形服务/能力注册/可见非阻挡地面/Node领域声明与永久用例，不扩旧生成器；与981不相交写面并行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-01/AC-02/AC-03/AC-05/AC-10/AC-11 | [x] 2026-11-18：新profile `autographics.topdown2d/1`(30/121)+scene/9 layer+render-only行表/感知segment/sweep(fault 60)；旧22 profile/10 unit/价目零漂移；`node_topdown2d_flow` 5/5、controls 6/6、旧消费者11/11+4/4；E1代理被65536对抗反例否决并删；commit 7165dbad |
-| T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；预备/三臂/AV整链/AV-GPU预证已交 `b071634c`/`f6418120`/`7a1503b7`/`ba85f33f`（pin `64e8380f4`）；**G1/G2 正式作者形已接 `0e67b1cd`**（pin `6e456794d`；真实 on Life.Tick+源侧 layer；40 Tick 同宿主逐 Tick oracle/停位8.6/每 Tick 32 credits；GPU 同 Tick 复跑逐字节同）；AC/A2R/GPU 全量/`use` 实例 待 W2/T-05 | 正常Node同源先AV整链、随后AC/A2R按§5阶段先证、四八向/查询/呈现同步、实例/owner/故障及输入门；缺接口回owner ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-10/AC-11 | [ ] |
-| T-05 | work | T-04整链go；**AC/A2R 阶段门未开（D-07：1068 drafting 0/10、981 AC/A2R 域端口未交、W2/W3 未落地）**；AV 阶段收尾已交 `350af5b8`（GPU 同宿主连续帧链 + use 实例目标 + 2:1 隔离；门禁全绿） | V-S01..08、预算合法/超界、独立数值/GPU oracle与旧档触面回归，双后端实际运行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-10/AC-11 | [ ] |
-| T-06 | work | T-05 | 冷A→B/修复下一Run、SD与AG023双后端准确版本/命令/配方 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-05/AC-06/AC-10/AC-11 | [ ] |
+| T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；AV 整链/G1/G2 正式作者形/epoch 消费已交 `b071634c`/`f6418120`/`7a1503b7`/`ba85f33f`/`0e67b1cd`/`12cb146b`（pin `0a167f611`）；r8 后本任务=**AV 格**：剩 OS/真实窗口输入通道与 V-S04 显式闭环用例；AC/A2R 格归 PLAN-103 | 正常Node同源 AV 整链（四八向/查询/呈现同步/实例/owner/故障及输入门的 AV 可证面）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-11 | [ ] |
+| T-05 | work | T-04 AV 格；AV 收尾已交 `350af5b8`（GPU 同宿主连续帧链+use 实例+2:1 隔离）＋`12cb146b`（epoch 消费）；r8 后本任务=**AV 格**：剩 V-S05 冷 A→B AV 腿与 V-S01..08 的 AV 格成套收口；AC/A2R 格归 PLAN-103 | V-S01..08 的 AV 格（预算合法/超界、独立数值/GPU oracle、旧档触面回归）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-11 | [ ] |
+| T-06 | work | T-05 AV 格 | 冷A→B/修复下一Run、SD 与 AG023 **AV 入口**准确版本/命令/配方；**双后端配方归 PLAN-103**；执行以§5 r8 块为准，AV 原验收不减 | AC-05/AC-06/AC-11 | [ ] |
 | T-07 | review | T-06 | 同树独立final，真实逐AC/SD/源和反例核验；finding同员有界复核 | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结受影响门/准确身份后落主，不扩大无关全套门 | AC-08 | [ ] |
 | T-09 | merge | T-08 | canonical/同号归档/导航与真实支持/未证边界，非产品研究不冒功能交付 | AC-08 | [ ] |
 | T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+### 2026-11-19 stage: new（**PLAN-058 r8 范围有界修订**：AC/A2R 转移 PLAN-103，收口 AV 面）| PLAN-058 r8 | outcome: pass（修订合同可审阅；本计划保持 executing，T-04..06 按 r8 AV 格继续）
+
+**授权**：用户 2026-11-19 裁定——把 AC/A2R 内容挪到新计划、UI058 完成并合并；新计划等 1068 完成后再开始。
+**变更**：①§5 新增 r8 块（转移清单五项：V 行 AC/A2R 格、AC-10、V-PHASE-GFX 多端条款、T-06 双后端配方、触碰路由缺口；本计划保留义务清单）；②T-04/T-05/T-06 重定义 AV 格并保留任务 ID 与全部已完成证据；③§6 V 表加承接注（行内容不改写）；④§7 AC-PHASE-GFX/AC-06/AC-10 改写（AC-10 owner=PLAN-103，不标 NA）；⑤§1/§0/§10 对应行；⑥新建 **PLAN-103** `103-topdown2d-ac-a2r-wave-consumption.md`（drafting）承接全部转移项。
+**不减承诺**：原 V 行输入/expected/独立 oracle/包络逐行原封；最低样本/预算/旧档零漂移/SD-01 的 AV 面事实不变。
+**依赖变化**：本计划 frontmatter depends_on 不变（055/AG022/AG021/AG026/981 均已交付，为 AV 面基础）；1068/W2/W3 波次依赖移入 PLAN-103。
+**next**：work（T-04/T-05/T-06 的 AV 剩余格：OS 真实输入、V-S04 显式闭环、V-S05 冷 A→B AV 腿、AV 配方），随后 T-07 独立 final（r8 域）→ T-08..10 合并；PLAN-103 等 1068/W2/W3。
 
 ### 2026-11-18 stage: work（**981 动态世代接口消费**：AgeGfxCall 接入＋fault-13/33 判罚载荷由 UI058 验证）| PLAN-058 r7 | outcome: pass（消费面完成；T-04/T-05 未勾）
 
@@ -359,4 +387,4 @@ next: work（T-01只读准备→T-02先证）；本轮未开树。
 
 ## 10. 待澄清事项
 
-D-01：055/AG022研究已交，最低组合仍待本包先证，不能把研究当产品完成；需变更预算则replan。D-02：轴/姿态/单sweep及所有权由T-02冻结，不默加滑墙。D-03：AGE M1原生门已由AG026签章，981所需A正式接面仍未齐，前期并行不豁免终验，也不等待本AGE M2总签。D-04：T-02先证不以f32业务式为前提（已按静态行值完成）；真实Auto移动积分（位置/速度f32字段与f32业务式）的前置已满足——981 `D-981-AGE-F32-SURFACE`关闭（AV `be8480cae`+A2R `a4950f0b5`，auto-lang master；receipt `77dc0fc26`），UI058仍不以int近似；跨仓状态观察/呈现按981 `D-981-F32-CONSUMER-WINDOW`另行回签，T-04 AV先证可用`execute_component_def`取`Value::F32`。材料唯一`D:/autostack/plan-artifacts/plan-058/auto-ui/`，开工核跨仓同号owner并登记用途/路径/在途，外部B/SDK副本/target/原日志探针全收自有子scope；merge摘要折Plan、全输出对账/guard清树/删除自有scope构建物，仅具名owner/理由/关闭条件hold例外；不穿透链接、不碰外仓同号、不创建第二权威树。D-05（已解）：T-02冻结分离；T-03采用新profile+per-row render-only表（非代理），E1(65536代理)被对抗反例否决并删除；SD-01须在`node2d-topdown-composition.md`沉淀profile 30/121、scene/9 layer、fault 60与旧档零漂移。D-06（T-04入口，2026-11-18）：981 AV 车道具名拒15个HostAlgorithm+HostIdentity（`hir_adapter.rs:5082 lower.age-gfx-lane`），且无gfx宿主派发，故"正常Node源AV整链"缺执行口；用户裁定路线A=回981 owner补SESSION/typed宿主端口，`IF-981-GFX-HOST-PORT`请求已并入981 §9；UI058不建私有runner/旧生成器旁路，T-04待该正式来源。T-04预备（`b071634c`）另实测 AGE 侧缺口G1..G5（`shape2d`无render-only声明位/Tick体assignment-only/无typed行句柄/frame str拼写未证/pin旧），已并入981请求补充；pin刷新为T-04第1步。三臂（`f6418120`）已按 `D-981-GFX-PORT-ABI`（`5ee4d23c0`/`381d7a364`）实现 segment/sweep/image2d 的精确 record 与 dispatch；收费仍归981 session；G1 源侧声明与 G2 语法仍待981。T-04 AV 阶段已真跑（`7a1503b7`）：overlay pin `64e8380f4`、`impl AgeGfxHost` 全 16 op、`tick_step` 宿主形态 40 Tick 每 Tick 32 credits、停位8.6/逐Tick oracle、预算 sticky/重置/stop；AV/GPU 同 Tick 预证 `ba85f33f`（34/35/36 质心 vs 投影≤1px、34→35 3.00px 排除晚帧、35→36 0.00px 不穿墙）；T-04 未勾，AC/A2R/GPU 全量/`use` 实例待 W2/T-05。**G1/G2 解除并已接（`0e67b1cd`，2026-11-18）**：981 G1+G2 落主 `6e456794d`（G5 pin `65a6b2cf`/收据 `f9ade844`）；fixture 改真实 `on Life.Tick`+源侧 `layer: render-only`，AV 侧对 981 的缺口清零。作者面两条纪律实测入档（021 token 走查含状态槽传播/每字段状态函数尾读；每函数静态准入≤32 拒计费链复制）——详见 §5「T-04 G1/G2 正式作者形结果」与 §9 该轮 check→finding 映射；后续作者源按该形书写。D-07（AC/A2R 阶段门，2026-11-18）：T-05 的 AC/A2R 格 blocked——AC 随后需「UI-W2-AC＋1068/T-04＋981 LANGUAGE/FUSION 所用 AC 域端口」，A2R 最后需「UI-W3-A2R＋本包 AC 正式来源＋981 RUST/FUSION 所用 A2R 域端口」；实测 PLAN-1068 `drafting` 0/10、981 `IF-AGE-GFX-AC`/B-RUST* 图形端口未交（"图形新增A2R实现/验证在UI-W2-AC正式后"）、W2/W3 无落地收据。不以 AV/A2R 代 AC；解除动作=1068 T-04 与 981 AC 域端口交付→UI-W2-AC 收据→本包补 AC 格→A2R 波。AV 阶段不受阻部分（GPU 连续帧链、use 实例、2:1 隔离）已交 `350af5b8`；作者面"业务→实例事件派发"（触碰路由）无 gfx 端口=具名缺口，并入 981 IF 清单（同 G1..G5 模式）。
+D-01：055/AG022研究已交，最低组合仍待本包先证，不能把研究当产品完成；需变更预算则replan。D-02：轴/姿态/单sweep及所有权由T-02冻结，不默加滑墙。D-03：AGE M1原生门已由AG026签章，981所需A正式接面仍未齐，前期并行不豁免终验，也不等待本AGE M2总签。D-04：T-02先证不以f32业务式为前提（已按静态行值完成）；真实Auto移动积分（位置/速度f32字段与f32业务式）的前置已满足——981 `D-981-AGE-F32-SURFACE`关闭（AV `be8480cae`+A2R `a4950f0b5`，auto-lang master；receipt `77dc0fc26`），UI058仍不以int近似；跨仓状态观察/呈现按981 `D-981-F32-CONSUMER-WINDOW`另行回签，T-04 AV先证可用`execute_component_def`取`Value::F32`。材料唯一`D:/autostack/plan-artifacts/plan-058/auto-ui/`，开工核跨仓同号owner并登记用途/路径/在途，外部B/SDK副本/target/原日志探针全收自有子scope；merge摘要折Plan、全输出对账/guard清树/删除自有scope构建物，仅具名owner/理由/关闭条件hold例外；不穿透链接、不碰外仓同号、不创建第二权威树。D-05（已解）：T-02冻结分离；T-03采用新profile+per-row render-only表（非代理），E1(65536代理)被对抗反例否决并删除；SD-01须在`node2d-topdown-composition.md`沉淀profile 30/121、scene/9 layer、fault 60与旧档零漂移。D-06（T-04入口，2026-11-18）：981 AV 车道具名拒15个HostAlgorithm+HostIdentity（`hir_adapter.rs:5082 lower.age-gfx-lane`），且无gfx宿主派发，故"正常Node源AV整链"缺执行口；用户裁定路线A=回981 owner补SESSION/typed宿主端口，`IF-981-GFX-HOST-PORT`请求已并入981 §9；UI058不建私有runner/旧生成器旁路，T-04待该正式来源。T-04预备（`b071634c`）另实测 AGE 侧缺口G1..G5（`shape2d`无render-only声明位/Tick体assignment-only/无typed行句柄/frame str拼写未证/pin旧），已并入981请求补充；pin刷新为T-04第1步。三臂（`f6418120`）已按 `D-981-GFX-PORT-ABI`（`5ee4d23c0`/`381d7a364`）实现 segment/sweep/image2d 的精确 record 与 dispatch；收费仍归981 session；G1 源侧声明与 G2 语法仍待981。T-04 AV 阶段已真跑（`7a1503b7`）：overlay pin `64e8380f4`、`impl AgeGfxHost` 全 16 op、`tick_step` 宿主形态 40 Tick 每 Tick 32 credits、停位8.6/逐Tick oracle、预算 sticky/重置/stop；AV/GPU 同 Tick 预证 `ba85f33f`（34/35/36 质心 vs 投影≤1px、34→35 3.00px 排除晚帧、35→36 0.00px 不穿墙）；T-04 未勾，AC/A2R/GPU 全量/`use` 实例待 W2/T-05。**G1/G2 解除并已接（`0e67b1cd`，2026-11-18）**：981 G1+G2 落主 `6e456794d`（G5 pin `65a6b2cf`/收据 `f9ade844`）；fixture 改真实 `on Life.Tick`+源侧 `layer: render-only`，AV 侧对 981 的缺口清零。作者面两条纪律实测入档（021 token 走查含状态槽传播/每字段状态函数尾读；每函数静态准入≤32 拒计费链复制）——详见 §5「T-04 G1/G2 正式作者形结果」与 §9 该轮 check→finding 映射；后续作者源按该形书写。D-07（AC/A2R 阶段门，2026-11-18）：T-05 的 AC/A2R 格 blocked——AC 随后需「UI-W2-AC＋1068/T-04＋981 LANGUAGE/FUSION 所用 AC 域端口」，A2R 最后需「UI-W3-A2R＋本包 AC 正式来源＋981 RUST/FUSION 所用 A2R 域端口」；实测 PLAN-1068 `drafting` 0/10、981 `IF-AGE-GFX-AC`/B-RUST* 图形端口未交（"图形新增A2R实现/验证在UI-W2-AC正式后"）、W2/W3 无落地收据。不以 AV/A2R 代 AC；解除动作=1068 T-04 与 981 AC 域端口交付→UI-W2-AC 收据→本包补 AC 格→A2R 波。AV 阶段不受阻部分（GPU 连续帧链、use 实例、2:1 隔离）已交 `350af5b8`；作者面"业务→实例事件派发"（触碰路由）无 gfx 端口=具名缺口，并入 981 IF 清单（同 G1..G5 模式）。**r8（2026-11-19 用户裁定）**：AC/A2R 等待整体转移给 **PLAN-103**（`103-topdown2d-ac-a2r-wave-consumption.md`，drafting；转移清单见 §5 r8 块）——该外部等待不再阻塞 PLAN-058 的 AV 面收口与合并；触碰路由缺口随 V-S03 完整形归 PLAN-103 T-02（IF-TOPDOWN-TOUCH-ROUTE）。
