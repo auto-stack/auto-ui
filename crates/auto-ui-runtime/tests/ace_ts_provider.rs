@@ -789,6 +789,12 @@ fn p980_web_unified_entry_census_v2() {
             "inline-lambda-only",
             "widget B {\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"B\" button \"+\" { onclick: () => { .n += 1 } } }\n    }\n}\n",
         ),
+        (
+            // PLAN-980 lambda-if 刀（2026-11-19）：if 体 lambda（005 族——str
+            // `!=` 条件+分支赋值）——结构化铸造+If 整语句 lane 发射。
+            "lambda-if",
+            "widget P {\n    model {\n        var email str = \"\"\n        var email_error str = \"err\"\n    }\n\n    view {\n        col { input { oninput: () => { if .email != \"\" { .email_error = \"\" } } } }\n    }\n}\n",
+        ),
     ];
 
     // 冻结表（2026-11-16 实测；#6i 语法扩展后修订——具名 msg+带参 handler
@@ -808,6 +814,12 @@ fn p980_web_unified_entry_census_v2() {
     // only 0+absent→1——语言侧铸 `__age_vl_<seq>` 值函数（赋值 RHS 原源
     // span），lane 以源 `=> {` 区间配对（铸造计数序）发射，SFC 合成
     // `__evt_*` 体经 lane 拼接（真实 body/origin，不用旧 TS fallback）。
+    // **2026-11-19 具名修订 #10（PLAN-980 lambda-if 刀）**：新增 lambda-if=1
+    // 行——if 体 lambda（005 `oninput: () => { if .email != "" { … } }` 族）
+    // 从 foreign 不铸（缺席）翻转为结构化铸造+If 整语句 lane 发射；判别力
+    // 由 `p980_lambda_if_lane`（区间发现/If 整语句片段/a2x_add 判别器/调用
+    // 形负控）与浏览器档承担。005 整例仍缺席=use/style/design 既名墙连带
+    //（剥离墙片段 3/3 派生，plan-artifacts 探针摘要）。
     let expect: &[(&str, usize, bool)] = &[
         ("counter-3h", 3, false),
         ("str-field", 1, false),
@@ -817,6 +829,7 @@ fn p980_web_unified_entry_census_v2() {
         ("param-read", 1, false),
         ("float-payload", 0, true),
         ("inline-lambda-only", 1, false),
+        ("lambda-if", 1, false),
     ];
     for ((name, src), (exp_name, spliced, has_absent)) in corpus.iter().zip(expect) {
         assert_eq!(name, exp_name);
@@ -1521,6 +1534,138 @@ fn p980_web_lambda_browser_mount() {
     assert!(
         out.status.success() && stdout.contains("LANE_LAMBDA_BROWSER_OK"),
         "lambda browser: {stdout} / {stderr}"
+    );
+}
+
+/// PLAN-980 lambda-if 刀（UI lane 面，CPU 档）：view 内联 lambda 体 if 形
+/// 的端到端 lane 派生——语言侧铸 `__age_vl_`（含 If 整语句）→ `=> {` 区
+/// 间配对（括号深度容纳分支嵌套）→ `stmt_fragments_in` 根块 If 整语句发
+/// 射（分支赋值不裸喷成无条件序列、条件不丢）→ SFC 合成 `__evt_*` 拼接
+/// 体。判别器：then 臂复合赋值=lane 形 `a2x_add(n.value, 1)`，旧 TS
+/// fallback `n.value += 1` 不得在位（#6k 同族）。负控：分支内调用形
+/// lambda 具名缺席（#6p fail-closed 合同）。
+#[test]
+fn p980_lambda_if_lane() {
+    use auto_ui_runtime::ui::ace_ts_provider::ComponentFragmentLane;
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+
+    let src = "widget L {\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"L\" button \"t\" { onclick: () => { if .n == 0 { .n += 1 } else { .n = 0 } } } }\n    }\n}\n";
+
+    // ① typed：if 体值函数区间发现（If cond/RHS span 与 `=> {` 区间相交
+    // ——括号深度配对，分支嵌套不截断）+ If 整语句片段（单条，非裸赋值
+    // 序列）。
+    {
+        let lane = ComponentFragmentLane::compile(src, "p980-lif.at", &[]).expect("lane");
+        let ds = lane.desugared_source();
+        let arrow = ds.find("=> {").expect("lambda arrow");
+        let open = ds[arrow..].find('{').map(|o| arrow + o).expect("open");
+        let bytes = ds.as_bytes();
+        let mut depth = 0usize;
+        let mut close = None;
+        for (i, &b) in bytes.iter().enumerate().skip(open) {
+            if b == b'{' {
+                depth += 1;
+            } else if b == b'}' {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(i + 1);
+                    break;
+                }
+            }
+        }
+        let region = open..close.expect("depth-matched close");
+        let vl = lane
+            .lambda_fn_covering(region.clone())
+            .expect("__age_vl_ fn covers the if-lambda region");
+        assert!(vl.starts_with("__age_vl_"), "value fn name: {vl}");
+        let frags = lane
+            .stmt_fragments_in(&vl, region)
+            .expect("stmt fragments in the lambda region");
+        assert_eq!(frags.len(), 1, "one whole-statement If fragment");
+        let text = frags[0].1.text.join("\n");
+        assert!(
+            text.contains("if ("),
+            "branch structure stands in the emitted fragment: {text}"
+        );
+    }
+
+    // ② origin→SFC：缺席空 + 拼接体=lane 形（a2x_add 判别器 + else 臂平
+    // 铺赋值 + 宿主映射 n.value）。
+    let (_sfc, bodies, absent) = generate_sfc_with_lane(src, "p980-lif.at").expect("SFC");
+    assert!(absent.is_empty(), "if-lambda lane-derived: {absent:?}");
+    assert_eq!(bodies.len(), 1);
+    let body = bodies.first().unwrap();
+    assert_eq!(body.pattern, ".__evt_onclick_1");
+    let body_text = body.lines.join("\n");
+    assert!(
+        body_text.contains("a2x_add(n.value, 1)"),
+        "then arm = lane helper form (discriminator vs old fallback): {body_text}"
+    );
+    assert!(
+        body_text.contains("n.value = 0;"),
+        "else arm plain assign carries host mapping: {body_text}"
+    );
+    assert!(
+        !body_text.contains("+= 1"),
+        "old TS fallback must not stand in: {body_text}"
+    );
+
+    // ③ 负控：分支内调用形（值函数不铸——#6p 合同）→ 具名缺席。
+    let bad = "widget L {\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"L\" button \"t\" { onclick: () => { if .n == 0 {\n            .n += 1\n            side()\n        } } } }\n    }\n}\n";
+    let (_sfc, _bodies, absent) =
+        generate_sfc_with_lane(bad, "p980-lif-neg.at").expect("SFC (foreign lambda: old track)");
+    assert_eq!(
+        absent,
+        vec![".__evt_onclick_1".to_string()],
+        "call inside a branch: named absence, no partial body"
+    );
+}
+
+/// PLAN-980 lambda-if 刀浏览器档（排窗 `AUTO_UI_ACE_WEB_E2E=1`）：if 体
+/// lambda 的 lane 派生拼接在真实浏览器点击中执行——toggle 语义（then 臂
+/// a2x_add 增、else 臂清零），两分支都被真实走到。
+#[test]
+fn p980_lambda_if_browser_mount() {
+    if std::env::var("AUTO_UI_ACE_WEB_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "p980_lambda_if_browser_mount: not scheduled (set AUTO_UI_ACE_WEB_E2E=1; \
+             browser tier, playwright required)"
+        );
+        return;
+    }
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+
+    let src = "widget L {\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"L\" button \"t\" { onclick: () => { if .n == 0 { .n += 1 } else { .n = 0 } } } }\n    }\n}\n";
+    let (_sfc, bodies, absent) = generate_sfc_with_lane(src, "p980-lif-browser.at").expect("SFC");
+    assert!(
+        absent.is_empty() && bodies.len() == 1,
+        "lane-derived if-lambda"
+    );
+    let body_js = bodies.first().unwrap().lines.join("\n");
+    let rt_inline = "function a2x_add(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a + b)) throw new RangeError('a2x_add overflow');\n  return a + b;\n}\n";
+    let html = format!(
+        "<!DOCTYPE html>\n<html><body>\n<div id=\"n\">0</div>\n<button id=\"toggle\" onclick=\"__evt_onclick_1()\">t</button>\n<script>\n{rt_inline}\nconst n = {{ value: 0, notify() {{ document.getElementById('n').textContent = String(this.value); }} }};\nfunction __evt_onclick_1() {{\n{body_js}\nn.notify();\n}}\n</script>\n</body></html>\n"
+    );
+    let dir = std::env::temp_dir().join(format!("p980-lif-browser-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.html"), html).unwrap();
+
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let test_mjs =
+        manifest.join("../../examples/ui/ace-web-lane/tests/test_lane_browser_lambda_if.mjs");
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg(test_mjs.to_str().unwrap())
+        .arg(dir.to_str().unwrap())
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("LANE_LAMBDA_IF_BROWSER_OK"),
+        "lambda-if browser: {stdout} / {stderr}"
     );
 }
 
