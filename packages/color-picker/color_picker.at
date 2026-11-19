@@ -1875,15 +1875,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                    if "preview" == "committed" {
-                        if .d_hex != cp_hex_norm(.value) {
-                            .seq = .seq + 1
-                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
-                        }
-                    } else {
-                        .seq = .seq + 1
-                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
-                    }
+                    .seq = .seq + 1
+                    ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
                 }
             }
         }
@@ -1993,15 +1986,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                    if "preview" == "committed" {
-                        if .d_hex != cp_hex_norm(.value) {
-                            .seq = .seq + 1
-                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
-                        }
-                    } else {
-                        .seq = .seq + 1
-                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
-                    }
+                    .seq = .seq + 1
+                    ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
                 }
             }
         }
@@ -2111,15 +2097,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                    if "preview" == "committed" {
-                        if .d_hex != cp_hex_norm(.value) {
-                            .seq = .seq + 1
-                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
-                        }
-                    } else {
-                        .seq = .seq + 1
-                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
-                    }
+                    .seq = .seq + 1
+                    ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
                 }
             }
         }
@@ -2229,15 +2208,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                    if "preview" == "committed" {
-                        if .d_hex != cp_hex_norm(.value) {
-                            .seq = .seq + 1
-                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
-                        }
-                    } else {
-                        .seq = .seq + 1
-                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
-                    }
+                    .seq = .seq + 1
+                    ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "rgb"}))
                 }
             }
         }
@@ -2363,15 +2335,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                    if "preview" == "committed" {
-                        if .d_hex != cp_hex_norm(.value) {
-                            .seq = .seq + 1
-                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
-                        }
-                    } else {
-                        .seq = .seq + 1
-                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
-                    }
+                    .seq = .seq + 1
+                    ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
                 }
             }
         }
@@ -2494,15 +2459,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                    if "preview" == "committed" {
-                        if .d_hex != cp_hex_norm(.value) {
-                            .seq = .seq + 1
-                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
-                        }
-                    } else {
-                        .seq = .seq + 1
-                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
-                    }
+                    .seq = .seq + 1
+                    ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
                 }
             }
         }
@@ -2625,15 +2583,8 @@ widget ColorPicker (value: str = "#000000FF", revision: int = 0, showAlpha: bool
             var e2 str = cp_cursor_edge_v(ld_sat, ld_v)
             .surf_edges.push(e1)
             .surf_edges.push(e2)
-                    if "preview" == "committed" {
-                        if .d_hex != cp_hex_norm(.value) {
-                            .seq = .seq + 1
-                            ."committed"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
-                        }
-                    } else {
-                        .seq = .seq + 1
-                        ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
-                    }
+                    .seq = .seq + 1
+                    ."preview"(json.stringify({seq: .seq, baseRevision: .revision, value: .d_hex, source: "hsv"}))
                 }
             }
         }

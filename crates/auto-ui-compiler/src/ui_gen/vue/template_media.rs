@@ -3449,6 +3449,29 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                                 self.handler_to_function_call(&aura_event.handler)
                             );
                         }
+                        // PLAN-092 T-01 B-1: native `onenter` passes the typed
+                        // text as the first argument (dynamic.rs Plan 370 Audit
+                        // B12(b)); a bare-name binding on input/textarea whose
+                        // msg variant carries a payload must forward the input
+                        // value too — `Name()` both diverges from native and
+                        // fails TS2554 against the payload-typed signature
+                        // (088 channel inputs at `auto build`). Loop-mangled
+                        // or explicitly-arg'd calls are left untouched.
+                        if vue_event == "@keyup.enter"
+                            && matches!(html_tag.as_str(), "input" | "textarea")
+                            && aura_event.params.is_empty()
+                            && handler_fn == handler_name
+                            && self
+                                .msg_payload_arities
+                                .get(&handler_name)
+                                .map(|n| *n > 0)
+                                .unwrap_or(false)
+                        {
+                            handler_fn = format!(
+                                "{}(($event.target as HTMLInputElement).value)",
+                                handler_name
+                            );
+                        }
                         // Plan 448 C: an auto-sync mint on input/textarea is
                         // realized by the v-model fold below — emitting the
                         // @input attr for the empty handler would only add a

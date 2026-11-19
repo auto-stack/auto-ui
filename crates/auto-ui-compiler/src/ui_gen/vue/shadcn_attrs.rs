@@ -3679,6 +3679,28 @@ impl VueGenerator {
                         .insert(handler_name.clone(), loop_var.clone());
                 }
             }
+            // PLAN-092 T-01 B-1: native `onenter` passes the typed text as the
+            // first argument (dynamic.rs Plan 370 Audit B12(b)); a bare-name
+            // binding on input/textarea whose msg variant carries a payload
+            // must forward the input value too — `Name()` both diverges from
+            // native and fails TS2554 against the payload-typed signature.
+            // Loop-mangled or explicitly-arg'd calls are left untouched.
+            if vue_event == "@keyup.enter"
+                && matches!(tag, "input" | "textarea")
+                && aura_event.params.is_empty()
+                && !payload_forwarded
+                && handler_fn == handler_name
+                && self
+                    .msg_payload_arities
+                    .get(&handler_name)
+                    .map(|n| *n > 0)
+                    .unwrap_or(false)
+            {
+                handler_fn = format!(
+                    "{}(($event.target as HTMLInputElement).value)",
+                    handler_name
+                );
+            }
             self.used_handlers.insert(handler_name);
             let handler_fn = Self::ime_guard_enter_handler(&vue_event, handler_fn);
             attrs.push(format!("{}=\"{}\"", vue_event, handler_fn));

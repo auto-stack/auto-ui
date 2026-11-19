@@ -3709,10 +3709,55 @@ widget NoteEditor {
         assert!(sfc.contains("@save=\"Save\""), "onsave → @save:\n{}", sfc);
         assert!(
             sfc.contains("@cancel=\"Cancel\""),
-            "oncancel → @cancel:\n{}",
+            "onsave → @save:\n{}",
             sfc
         );
     }
+
+    /// PLAN-092 T-01 B-1: a bare-name `onenter` binding on input/textarea
+    /// whose msg variant carries a payload must forward the input's text —
+    /// native passes the typed text as the first argument (dynamic.rs Plan
+    /// 370 Audit B12(b)), and `Name()` both diverges from native and fails
+    /// vue-tsc TS2554 against the payload-typed signature. Payload-less
+    /// variants keep the arity-0 `Name()` invoke; explicit-arg calls are
+    /// untouched.
+    #[test]
+    fn plan092_onenter_payload_binding_forwards_input_value() {
+        let sfc = gen_sfc_from_widget_src(
+            r#"
+widget Probe {
+    msg { CommitChannel(str), EnterPlain }
+    model {
+        var ch str = ""
+    }
+    view {
+        input (value: .ch, oninput: .CommitChannel, onenter: .CommitChannel, placeholder: "chan") {}
+        input (value: .ch, onenter: .EnterPlain) {}
+    }
+    on {
+        .CommitChannel(v) -> { .ch = v }
+        .EnterPlain -> { }
+    }
+}
+"#,
+        );
+        // payload-carrying bare binding forwards the typed text…
+        assert!(
+            sfc.contains("CommitChannel(($event.target as HTMLInputElement).value)"),
+            "onenter payload binding must forward input value:\n{sfc}"
+        );
+        // …and the IME guard still wraps the forwarded invoke.
+        assert!(
+            sfc.contains("@keyup.enter=\"($event) => { if (!($event.isComposing || $event.keyCode === 229)) { CommitChannel(($event.target as HTMLInputElement).value) } }\""),
+            "IME guard wraps forwarded invoke:\n{sfc}"
+        );
+        // arity-0 bare binding stays a plain invoke.
+        assert!(
+            sfc.contains("{ EnterPlain() }"),
+            "payload-less onenter keeps arity-0 invoke:\n{sfc}"
+        );
+    }
+
 
     /// Plan 043 M5 B-1/B-2: `on_*: msg` callback props are typed from the msg
     /// variant payload (Pick(str) → (arg0: string) => void, Stop → () => void),

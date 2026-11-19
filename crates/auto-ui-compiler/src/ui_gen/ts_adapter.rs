@@ -2687,6 +2687,14 @@ fn try_transpile_builtin_call(
                 write!(out, ") as HTMLElement | null)?.focus()").ok();
                 true
             }
+            // PLAN-092 T-01 B-3: ui.close() closes the native window; the vue
+            // equivalent is window.close(). Without this arm the call falls
+            // through as a raw `ui.close()` reference — TS2304 at `auto build`
+            // and a runtime ReferenceError on the Quit path (087/088 demo页).
+            "close" => {
+                write!(out, "window.close()").ok();
+                true
+            }
             _ => false,
         },
         // event.dispatch(name) → window.dispatchEvent(new CustomEvent(name))
@@ -3125,6 +3133,27 @@ mod tests {
         assert!(
             code.contains("JSON.stringify({ title: body.value })"),
             "from_value 实参应恒等进入 Http 发射层的单层 stringify：{code}"
+        );
+    }
+
+    /// PLAN-092 T-01 B-3：`ui.close()` 必须桥接为 `window.close()`。
+    /// 此前无此臂，裸 `ui.close()` 原样发射 → 生成页 vue-tsc TS2304
+    /// （`auto build` 全红）且运行期点击 Quit 抛 ReferenceError
+    /// （087/088 演示页 Quit 按钮在 vue 轨均为该形态）。
+    #[test]
+    fn plan092_ui_close_bridges_to_window_close() {
+        let ctx = collision_context(&[]);
+        let code = collision_body(
+            "fn quit() { ui.close() }",
+            &ctx,
+        );
+        assert!(
+            !code.contains("ui.close"),
+            "不允许残留裸 ui.close 引用：{code}"
+        );
+        assert!(
+            code.contains("window.close()"),
+            "ui.close 必须发射 window.close()：{code}"
         );
     }
 
