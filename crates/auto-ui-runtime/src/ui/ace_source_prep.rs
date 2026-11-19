@@ -129,6 +129,76 @@ fn style_literal(src: &str, name: &str) -> Option<String> {
 /// 只改「类型含 `[]` 且初值以 `[` 开头」的字段；其余行原样返回。
 /// PLAN-105 T-02（U03 真语料 013/016）：从单元源里抽 `store <Type> { … }` 整块
 /// （含匹配的收尾 `}`；字符串内的括号不计数）。找不到返回 `None`。
+/// PLAN-105 T-02：把 store 体里的自方法调用 `.Foo(` 改写为 `store.Foo(`（只认
+/// 行首/空白/`{`/`;`/`}` 之后的点——`x.push(` 这类成员调用不动；按 **char**
+/// 处理，绝不切坏 UTF-8 注释）。
+fn rewrite_store_self_calls(src: &str) -> String {
+    let chars: Vec<char> = src.chars().collect();
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_';
+    let mut out = String::with_capacity(src.len());
+    let mut i = 0usize;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '.' {
+            let prev = if i == 0 { ' ' } else { chars[i - 1] };
+            let self_pos =
+                prev.is_whitespace() || prev == '{' || prev == ';' || prev == '}';
+            let mut j = i + 1;
+            while j < chars.len() && is_ident(chars[j]) {
+                j += 1;
+            }
+            let mut k = j;
+            while k < chars.len() && chars[k] == ' ' {
+                k += 1;
+            }
+            let mut is_handler_head = false;
+            if self_pos && j > i + 1 && k < chars.len() && chars[k] == '(' {
+                // `)` 之后的 `->` 表示这是 **handler 头**（`.Msg(params) -> {`），
+                // 不是调用语句——不动。
+                let mut depth = 0i32;
+                let mut m = k;
+                while m < chars.len() {
+                    if chars[m] == '(' {
+                        depth += 1;
+                    } else if chars[m] == ')' {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    m += 1;
+                }
+                let mut n = m + 1;
+                while n < chars.len() && chars[n].is_whitespace() {
+                    n += 1;
+                }
+                is_handler_head =
+                    n + 1 < chars.len() && chars[n] == '-' && chars[n + 1] == '>';
+            }
+            if self_pos && j > i + 1 && k < chars.len() && chars[k] == '(' && !is_handler_head {
+                // 回扫紧邻 dot 的标识符（跳过空白），已是 `store` 则不再加前缀。
+                let mut p = i;
+                while p > 0 && chars[p - 1].is_whitespace() {
+                    p -= 1;
+                }
+                let mut q = p;
+                while q > 0 && is_ident(chars[q - 1]) {
+                    q -= 1;
+                }
+                let ident: String = chars[q..p].iter().collect();
+                if ident != "store" {
+                    out.push_str("store");
+                }
+            }
+            out.push('.');
+            i += 1;
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
 fn extract_store_block(src: &str, type_name: &str) -> Option<String> {
     let needle = format!("store {type_name}");
     let start = src.find(&needle)?;
@@ -180,6 +250,11 @@ fn extract_store_block(src: &str, type_name: &str) -> Option<String> {
                         }
                     }
                     block.push('\n');
+                    // PLAN-105 T-02（U03 真语料 013/015/016）：store handler 里的
+                    // **自方法调用** `.Foo(args)`（源方言里指 store 自己的 handler）
+                    // 改写为 `store.Foo(args)`——core 的 store 内联把 `store.M()`
+                    // 展开成对应 handler 体（自调用从而变成可调度语句）。
+                    let block = rewrite_store_self_calls(&block);
                     return Some(block);
                 }
             }
@@ -573,3 +648,4 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 }
+
