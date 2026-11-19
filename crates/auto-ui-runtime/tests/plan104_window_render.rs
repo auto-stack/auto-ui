@@ -129,6 +129,95 @@ fn p104_004_real_window_renders_profile_card() {
     );
 }
 
+/// 005：条件视图 + 真窗交互三 oracle——空提交必填错误 / 明暗切换 / 主题族切换。
+/// 条件叶的可见性由桥按实例状态求值：开窗时错误叶隐藏（不渲染），提交后
+/// state 行给出错误值（文本叶刷新是后续切片，见计划 §11 r7 第③件）。
+#[test]
+fn p104_005_real_window_login_oracles() {
+    let exe = window_exe();
+    assert_eq!(
+        std::env::var("AUTO_UI_ACE_NODE_E2E").ok().as_deref(),
+        Some("1"),
+        "not scheduled: set AUTO_UI_ACE_NODE_E2E=1 after the prep stage"
+    );
+    assert!(
+        exe.is_file(),
+        "preparation failure: {} missing — build `--example ace_node_desktop_window` first",
+        exe.display()
+    );
+    let src = repo_root().join("examples/ui/005-login/src/front/app.at");
+    let ev = std::env::temp_dir().join(format!("plan104-005-{}.json", std::process::id()));
+    let _ = std::fs::remove_file(&ev);
+    let out = std::process::Command::new(&exe)
+        .arg("--source")
+        .arg(&src)
+        .arg("--evidence")
+        .arg(&ev)
+        .arg("--instances")
+        .arg("1")
+        .arg("--hold-ms")
+        .arg("8000")
+        .arg("--min-frames")
+        .arg("3")
+        .arg("--script")
+        .arg("3:click:0:3,7:click:0:2,11:click:0:1")
+        .output()
+        .expect("spawn window exe");
+    assert!(
+        out.status.success() && ev.is_file(),
+        "005 window failed: {} / {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&ev).unwrap()).unwrap();
+    let _ = std::fs::remove_file(&ev);
+    assert_eq!(json["node"].as_str(), Some("App"));
+    assert!(json["frames_rendered"].as_u64().unwrap_or(0) >= 3);
+    assert!(json["errors"].as_array().map(|a| a.is_empty()).unwrap_or(false), "no lane errors: {json}");
+
+    let session = &json["sessions"][0];
+    let shown = texts(session);
+    assert!(
+        shown.contains("Welcome back!"),
+        "login copy applied: {shown}"
+    );
+    assert!(
+        !shown.contains("Email is required"),
+        "hidden error-branch leaf must not be presented at open: {shown}"
+    );
+
+    let log = json["dispatch_log"].as_array().cloned().unwrap_or_default();
+    let state = |msg: &str, field: &str| -> Option<String> {
+        log.iter()
+            .find(|d| d["msg"].as_str() == Some(msg))
+            .and_then(|d| {
+                d["states"].as_array().and_then(|rows| {
+                    rows.iter().find_map(|kv| {
+                        let pair = kv.as_array()?;
+                        (pair[0].as_str() == Some(field))
+                            .then(|| pair[1].as_str().unwrap_or_default().to_string())
+                    })
+                })
+            })
+    };
+    assert_eq!(
+        state("Submit", "email_error").as_deref(),
+        Some("Email is required"),
+        "empty submit must raise the required-field error"
+    );
+    assert_eq!(
+        state("ToggleMode", "dark_mode").as_deref(),
+        Some("true"),
+        "theme-mode toggle must flip dark_mode"
+    );
+    assert_eq!(
+        state("UseSolarized", "theme_name").as_deref(),
+        Some("Solarized"),
+        "family switch must set theme_name"
+    );
+}
+
 /// 006：Hero 页——真窗渲染 + `dark_mode=true` 的 bool 提交（与 004 相反的极性）。
 #[test]
 fn p104_006_real_window_renders_hero() {

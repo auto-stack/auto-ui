@@ -36,7 +36,7 @@ use std::sync::{OnceLock, RwLock};
 
 use ace_av::age_component::InitialValue as EngineInitialValue;
 use ace_av::age_component::{
-    compile_component_scenario_with_initials, observe_component_states_and_texts,
+    compile_component_scenario_with_initials, observe_component_states_and_texts_flat,
     observe_component_texts, project_component_candidates, ComponentInitials, ComponentScenario,
     LegacyWidgetAlias,
 };
@@ -287,6 +287,8 @@ pub struct HostSession {
     pub texts: Vec<Vec<String>>,
     /// 每实例状态槽（字段声明序）。
     pub states: Vec<Vec<(String, String)>>,
+    /// PLAN-104：每实例、每文本叶的可见性（条件分支求值；叶序与 texts 一致）。
+    pub visibility: Vec<Vec<bool>>,
     /// 事件目标（声明序）：(label, msg)。
     pub buttons: Vec<(String, String)>,
     /// PLAN-980 B-AV U01（输入组件面）：文本输入目标（声明序，接 buttons
@@ -311,6 +313,7 @@ impl HostSession {
             instances,
             texts: vec![Vec::new(); instances],
             states: vec![Vec::new(); instances],
+            visibility: vec![Vec::new(); instances],
             buttons: Vec::new(),
             inputs: Vec::new(),
             queue: VecDeque::new(),
@@ -830,6 +833,8 @@ pub struct NodeDesktopBridge {
     pub errors: Vec<String>,
     script: Vec<(usize, ScriptStep)>,
     tick_no: usize,
+    /// PLAN-104：装载时的 view 树（条件可见性求值用；叶序与 texts 一致）。
+    view_items: Vec<ace_core::source::age_component::ComponentViewItem>,
 }
 
 /// view 树投影：文本叶计数 + 按钮目标（label=StrLit、onclick=.Msg）+
@@ -850,11 +855,15 @@ fn project_view_shape(
         match item {
             ComponentViewItem::Text(_) => shape.text_leaf_count += 1,
             ComponentViewItem::Entry(_) => {}
-            // PLAN-980 view-if：装载点已具名拒（view_contains_cond）——
-            // 此臂不可达，防御性跳过。
-            ComponentViewItem::Cond(_) => {}
-            // PLAN-1072 刀B：装载点已具名拒（view_contains_for）——同上。
-            ComponentViewItem::For(_) => {}
+            // PLAN-104：条件两支的叶都计入（与 AV flat 观察的平铺序一致）；
+            // 可见性在 `mark_leaf_visibility` 按实例状态求值。
+            ComponentViewItem::Cond(c) => {
+                project_view_shape(&c.then_items, shape);
+                project_view_shape(&c.else_items, shape);
+            }
+            ComponentViewItem::For(f) => {
+                project_view_shape(&f.items, shape);
+            }
             ComponentViewItem::Element(el) => {
                 if el.tag == "text" {
                     shape.text_leaf_count += 1;
@@ -928,6 +937,114 @@ fn project_view_shape(
     }
 }
 
+/// PLAN-104：条件表达式求值（`.field` / `.field ==/!= 字面量` / `!expr`）。
+/// 桌面 harness 的语料形；其他形状具名拒（渲染刀后续）。
+fn eval_view_cond(
+    expr: &ace_core::source::ast::Expr,
+    states: &[(String, AceStateValue)],
+) -> Result<bool, String> {
+    use ace_core::source::ast::{BinOp, ExprKind, UnaryOp};
+    match &expr.kind {
+        ExprKind::Field { base, name } => {
+            if matches!(&base.kind, ExprKind::Var(v) if v.name == "self") {
+                match states.iter().find(|(n, _)| n == &name.name).map(|(_, v)| v) {
+                    Some(AceStateValue::Bool(b)) => Ok(*b),
+                    Some(AceStateValue::Int(v)) => Ok(*v != 0),
+                    other => Err(format!(
+                        "ace.desktop.view-cond-unsupported-expr: condition field `{}` is not a live bool/int state ({other:?})",
+                        name.name
+                    )),
+                }
+            } else {
+                Err("ace.desktop.view-cond-unsupported-expr: nested field condition".into())
+            }
+        }
+        ExprKind::Unary {
+            op: UnaryOp::Not,
+            operand,
+        } => Ok(!eval_view_cond(operand, states)?),
+        ExprKind::Binary { op, lhs, rhs } => {
+            let l = cond_atom(lhs, states)?;
+            let r = cond_atom(rhs, states)?;
+            match (op, l, r) {
+                (BinOp::Eq, Some(l), Some(r)) => Ok(cond_atom_eq(&l, &r)),
+                (BinOp::Ne, Some(l), Some(r)) => Ok(!cond_atom_eq(&l, &r)),
+                _ => Err(
+                    "ace.desktop.view-cond-unsupported-expr: only `field ==/!= literal`".into(),
+                ),
+            }
+        }
+        _ => Err("ace.desktop.view-cond-unsupported-expr: expression shape".into()),
+    }
+}
+
+fn cond_atom(
+    expr: &ace_core::source::ast::Expr,
+    states: &[(String, AceStateValue)],
+) -> Result<Option<AceStateValue>, String> {
+    use ace_core::source::ast::ExprKind;
+    match &expr.kind {
+        ExprKind::Field { base, name } => {
+            if matches!(&base.kind, ExprKind::Var(v) if v.name == "self") {
+                Ok(states
+                    .iter()
+                    .find(|(n, _)| n == &name.name)
+                    .map(|(_, v)| v.clone()))
+            } else {
+                Ok(None)
+            }
+        }
+        ExprKind::StrLit(s) => Ok(Some(AceStateValue::Str(s.clone()))),
+        ExprKind::IntLit(i) => Ok(Some(AceStateValue::Int(*i as i32))),
+        ExprKind::BoolLit(b) => Ok(Some(AceStateValue::Bool(*b))),
+        _ => Ok(None),
+    }
+}
+
+fn cond_atom_eq(l: &AceStateValue, r: &AceStateValue) -> bool {
+    match (l, r) {
+        (AceStateValue::Str(a), AceStateValue::Str(b)) => a == b,
+        (AceStateValue::Int(a), AceStateValue::Int(b)) => a == b,
+        (AceStateValue::Bool(a), AceStateValue::Bool(b)) => a == b,
+        _ => false,
+    }
+}
+
+/// PLAN-104：按 view 树声明序遍历文本叶，标记可见性（叶序与
+/// `project_view_shape` 完全一致）。
+fn mark_leaf_visibility(
+    items: &[ace_core::source::age_component::ComponentViewItem],
+    states: &[(String, AceStateValue)],
+    active: bool,
+    out: &mut Vec<bool>,
+) -> Result<(), String> {
+    use ace_core::source::age_component::ComponentViewItem;
+    for item in items {
+        match item {
+            ComponentViewItem::Text(_) => out.push(active),
+            ComponentViewItem::Entry(_) => {}
+            ComponentViewItem::Cond(c) => {
+                let hit = eval_view_cond(&c.cond, states)?;
+                mark_leaf_visibility(&c.then_items, states, active && hit, out)?;
+                mark_leaf_visibility(&c.else_items, states, active && !hit, out)?;
+            }
+            ComponentViewItem::For(f) => {
+                mark_leaf_visibility(&f.items, states, active, out)?;
+            }
+            ComponentViewItem::Element(el) => {
+                if el.tag == "text" {
+                    out.push(active);
+                } else if el.tag == "input" || el.tag == "button" {
+                    // input/button 自身 label 不计文本叶（与 shape 一致）。
+                } else {
+                    mark_leaf_visibility(&el.items, states, active, out)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// AV 外调执行器：`use.rs ui980_native` 前门 + run_ace（同步、调用者线程）。
 fn av_call(body: &str) -> Result<i32, String> {
     let src = format!("use.rs ui980_native\nfn main() int {{ return {body} }}");
@@ -964,13 +1081,8 @@ impl NodeDesktopBridge {
         let node = candidates
             .first()
             .ok_or_else(|| "no AGE node candidate in source".to_string())?;
-        // PLAN-980 view-if 刀：桌面渲染腿未定条件语义——装载点 fail-closed。
-        if let Some(sp) = ace_core::source::age_component::view_contains_cond(&node.view.tree) {
-            return Err(format!(
-                "ace.desktop.view-cond-unsupported: view 条件项 @{}..{} 本腿未承载（桌面渲染语义待后续刀；不静默展开）",
-                sp.start, sp.end
-            ));
-        }
+        // PLAN-104：view 条件项由本 harness 消费——flat 观察 + 桥侧按实例状态
+        // 求值可见性（见 `mark_leaf_visibility`），不再在装载点整例拒绝。
         // PLAN-1072 刀B：循环项同 fail-closed（不静默单帧/丢项渲染）。
         if let Some(sp) = ace_core::source::age_component::view_contains_for(&node.view.tree) {
             return Err(format!(
@@ -1008,7 +1120,7 @@ impl NodeDesktopBridge {
         ) {
             Ok(compiled) => {
                 // 状态真值经事件引擎（mount 后 read_all）取；此处只消费文本叶。
-                let (_states0, texts0) = observe_component_states_and_texts(&compiled)?;
+                let (_states0, texts0) = observe_component_states_and_texts_flat(&compiled)?;
                 let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
                 if observed_leaves != shape.text_leaf_count {
                     return Err(format!(
@@ -1103,6 +1215,7 @@ impl NodeDesktopBridge {
             errors: Vec::new(),
             script: Vec::new(),
             tick_no: 0,
+            view_items: node.view.tree.clone(),
         })
     }
 
@@ -1201,6 +1314,7 @@ impl NodeDesktopBridge {
             errors: Vec::new(),
             script: Vec::new(),
             tick_no: 0,
+            view_items: node.view.tree.clone(),
         })
     }
 
@@ -1243,6 +1357,17 @@ impl NodeDesktopBridge {
                         row.iter()
                             .map(|(n, v)| (n.clone(), state_display(v)))
                             .collect()
+                    })
+                    .collect();
+                // PLAN-104：可见性按各实例状态在开窗时求值（叶序与 texts 一致）。
+                s.visibility = self
+                    .last_states
+                    .iter()
+                    .map(|row| {
+                        let mut vis = Vec::new();
+                        mark_leaf_visibility(&self.view_items, row, true, &mut vis)
+                            .unwrap_or_default();
+                        vis
                     })
                     .collect();
                 s.buttons = self
@@ -1461,6 +1586,22 @@ impl NodeDesktopBridge {
         if let Some(prev) = self.last_states.get_mut(instance) {
             *prev = row;
         }
+        // PLAN-104：状态变化后重算该实例的条件可见性（窗口下一帧即生效）。
+        if let Some(row) = self.last_states.get(instance).cloned() {
+            let mut vis = Vec::new();
+            if mark_leaf_visibility(&self.view_items, &row, true, &mut vis).is_ok() {
+                if let Ok(mut h) = host().write() {
+                    if let Some(id) = h.current {
+                        if let Some(s) = h.get(id) {
+                            if s.visibility.len() <= instance {
+                                s.visibility.resize(instance + 1, Vec::new());
+                            }
+                            s.visibility[instance] = vis;
+                        }
+                    }
+                }
+            }
+        }
         shown
     }
 
@@ -1660,6 +1801,7 @@ impl Component for AceNodeDesktopWindow {
                 s.buttons.clone(),
                 s.inputs.clone(),
                 s.generation,
+                s.visibility.clone(),
             )
         }) else {
             return View::col()
@@ -1667,7 +1809,7 @@ impl Component for AceNodeDesktopWindow {
                 .child(View::text("ace-node-desktop: no session"))
                 .build();
         };
-        let (texts, states, buttons, inputs, generation) = session;
+        let (texts, states, buttons, inputs, generation, visibility) = session;
         let mut root = View::col().spacing(10).padding(24);
         root = root.child(View::text_styled(
             &format!("session generation {generation}"),
@@ -1680,7 +1822,15 @@ impl Component for AceNodeDesktopWindow {
                 "text-lg font-semibold",
             ));
             for (leaf, text) in texts.get(i).into_iter().flatten().enumerate() {
-                col = col.child(View::text(format!("t{leaf}: {text}")));
+                // PLAN-104：条件分支的隐藏叶不渲染（可见性按实例状态求值）。
+                let shown = visibility
+                    .get(i)
+                    .and_then(|row| row.get(leaf))
+                    .copied()
+                    .unwrap_or(true);
+                if shown {
+                    col = col.child(View::text(format!("t{leaf}: {text}")));
+                }
             }
             for (_slot, (name, value)) in states.get(i).into_iter().flatten().enumerate() {
                 col = col.child(View::text(format!("{name} = {value}")));
