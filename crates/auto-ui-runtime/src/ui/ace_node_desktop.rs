@@ -1087,13 +1087,9 @@ impl NodeDesktopBridge {
             .ok_or_else(|| "no AGE node candidate in source".to_string())?;
         // PLAN-104：view 条件项由本 harness 消费——flat 观察 + 桥侧按实例状态
         // 求值可见性（见 `mark_leaf_visibility`），不再在装载点整例拒绝。
-        // PLAN-1072 刀B：循环项同 fail-closed（不静默单帧/丢项渲染）。
-        if let Some(sp) = ace_core::source::age_component::view_contains_for(&node.view.tree) {
-            return Err(format!(
-                "ace.desktop.view-for-unsupported: view 循环项 @{}..{} 本腿未承载（桌面循环渲染语义待后续刀；不静默展开）",
-                sp.start, sp.end
-            ));
-        }
+        // PLAN-104：循环项（010 `for i, f in .faqs { … }`）——循环体是**模板叶**，
+        // 不进 `view.texts`（投影只收集模块作用域叶）。全例只有循环体文本时，
+        // 本 harness 走 states-only 面（无文本叶可观察），列表渲染归后续刀。
         let mut shape = ViewShape {
             text_leaf_count: 0,
             buttons: Vec::new(),
@@ -1113,7 +1109,11 @@ impl NodeDesktopBridge {
         let trial_initials = ComponentInitials {
             per_instance: vec![Vec::new()],
         };
-        let per_node_texts = match compile_component_scenario_with_initials(
+        let per_node_texts = if node.view.texts.is_empty() {
+            // PLAN-104：无模块作用域文本叶（循环体模板叶）——states-only 面。
+            vec![vec![String::new(); 0]]
+        } else {
+            match compile_component_scenario_with_initials(
             src,
             path,
             LegacyWidgetAlias::Accept,
@@ -1152,6 +1152,7 @@ impl NodeDesktopBridge {
                 texts0
             }
             Err(ds) => return Err(diags(&ds)),
+            }
         };
 
         // 事件引擎：有 model 的源挂 N 实例；Hello 类（无 model 字段可观察）
@@ -1580,6 +1581,11 @@ impl NodeDesktopBridge {
     /// `ui_apply_text`（`text .field` 的文案随 dispatch 更新）。失败记录错误，
     /// 不吞掉（文本面不是状态面，不因它回滚消息）。
     fn refresh_texts(&mut self, instance: usize) -> Result<(), String> {
+        if self.text_leaf_count == 0 {
+            // PLAN-104：无模块作用域文本叶（循环体模板叶）——states-only 面，
+            // 没有可刷新的叶。
+            return Ok(());
+        }
         let scenario = ComponentScenario {
             instances: self.instances.max(1),
             ops: self.ops.iter().flatten().cloned().collect(),

@@ -219,6 +219,66 @@ fn p104_005_real_window_login_oracles() {
     );
 }
 
+/// 010：表单页——循环体是**模板叶**（不进模块作用域叶），本 harness 走
+/// states-only 面：真窗开窗 + Submit→`submitted=true`（列表渲染归后续刀，
+/// 见计划 §11 r10）。
+#[test]
+fn p104_010_real_window_submit_state() {
+    let exe = window_exe();
+    assert_eq!(
+        std::env::var("AUTO_UI_ACE_NODE_E2E").ok().as_deref(),
+        Some("1"),
+        "not scheduled: set AUTO_UI_ACE_NODE_E2E=1 after the prep stage"
+    );
+    assert!(
+        exe.is_file(),
+        "preparation failure: {} missing — build `--example ace_node_desktop_window` first",
+        exe.display()
+    );
+    let src = repo_root().join("examples/ui/010-contact-form/src/front/app.at");
+    let ev = std::env::temp_dir().join(format!("plan104-010-{}.json", std::process::id()));
+    let _ = std::fs::remove_file(&ev);
+    let out = std::process::Command::new(&exe)
+        .arg("--source")
+        .arg(&src)
+        .arg("--evidence")
+        .arg(&ev)
+        .arg("--instances")
+        .arg("1")
+        .arg("--hold-ms")
+        .arg("6000")
+        .arg("--min-frames")
+        .arg("3")
+        .arg("--script")
+        .arg("3:click:0:0")
+        .output()
+        .expect("spawn window exe");
+    assert!(
+        out.status.success() && ev.is_file(),
+        "010 window failed: {} / {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&ev).unwrap()).unwrap();
+    let _ = std::fs::remove_file(&ev);
+    assert_eq!(json["node"].as_str(), Some("App"));
+    assert!(json["frames_rendered"].as_u64().unwrap_or(0) >= 3);
+    assert!(
+        json["errors"].as_array().map(|a| a.is_empty()).unwrap_or(false),
+        "no lane errors: {json}"
+    );
+    let log = json["dispatch_log"].as_array().cloned().unwrap_or_default();
+    assert_eq!(log.len(), 1, "one Submit dispatch: {log:?}");
+    let states = log[0]["states"].as_array().cloned().unwrap_or_default();
+    let submitted = states.iter().find_map(|kv| {
+        let pair = kv.as_array()?;
+        (pair[0].as_str() == Some("submitted"))
+            .then(|| pair[1].as_str().unwrap_or_default().to_string())
+    });
+    assert_eq!(submitted.as_deref(), Some("true"), "Submit must set submitted");
+}
+
 /// 006：Hero 页——真窗渲染 + `dark_mode=true` 的 bool 提交（与 004 相反的极性）。
 #[test]
 fn p104_006_real_window_renders_hero() {
