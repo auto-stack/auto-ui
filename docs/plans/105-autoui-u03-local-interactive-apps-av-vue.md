@@ -186,6 +186,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 49 | from: work | t
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；prep 6/6；census 4/4（component `ad0d0273…`、package `0fe5c8c6…`）。
 
 **下一刀**：组件场景表达式面——`Todo { … }` 记录构造、`.todos[idx]`/`.todos[i].field` 下标+记录链、`[]T` 字面量初值在 collections 域的发射。`next_responsible_role: work（T-02 W47）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 50 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 48795c44e | next: work
+
+2026-11-19 stage: work（T-02 W47：表达式面 Index/ObjectLit + 013 缺口推进到 host API）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `48795c44e` | task_ids: T-02（W47）| evidence: 回归全绿 + prep 6/6
+
+**交付**：`rename_expr_with_params` 补 `Index { base, index }`（基/下标递归）与 `ObjectLit { fields }`（字段值递归、键原样）两臂——列表下标链（`.todos[idx].id`）与记录字面量（`Todo { id: 1, text: "a" }`）在场景面不再落「this expression shape is not wired」。
+
+**桥推进**：013 的表达式面已通过，装载推进到**新墙**——「handler body call statements are only wired for `store.<Msg>()`」：store handler 里的**宿主 API 调用**（`update_todo(…)` / `list_todos()` / `remove_completed(…)` / `add_todo(…)`）尚无接线面。012 仍是 computed 写入面（`on Tick` 赋值 `w_rows`）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 2/2；prep 6/6。
+
+**下一刀（S1 host API 面）**：给组件面一条**宿主 API/效果面**——调用语句按能力分派（`ac.runtime.host.api.v1`），AV 宿主提供内存实现（013/015 的 todo/notes 后端），失败/未接线一律具名拒。`next_responsible_role: work（T-02 W48）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
