@@ -63,6 +63,35 @@ mod tempdir {
     }
 }
 
+/// 真实交互 fixture（显式路径；具名准备失败不静默）：组内 auto-lang 兄弟树
+/// `experimental/ase-m0/fixtures/counter-{a,b}/main.at`（`ASE_M0_TEXT_ROOT`
+/// 可覆盖根，与 1022 文字页同约定）。
+fn fixture_apps() -> Vec<AseApp> {
+    let root = match std::env::var("ASE_M0_TEXT_ROOT") {
+        Ok(p) => std::path::PathBuf::from(p),
+        Err(_) => {
+            let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            manifest.join("../../../auto-lang/experimental/ase-m0/fixtures")
+        }
+    };
+    ["a", "b"]
+        .iter()
+        .map(|key| {
+            let path = root.join(format!("counter-{key}")).join("main.at");
+            assert!(
+                path.is_file(),
+                "preparation failure: fixture counter-{key} missing (ASE_M0_TEXT_ROOT or the \
+                 group sibling auto-lang tree): {}",
+                path.display()
+            );
+            AseApp {
+                key: format!("counter-{key}"),
+                path: path.to_string_lossy().to_string(),
+            }
+        })
+        .collect()
+}
+
 /// 引擎权威 count（业务真值；经 bridge.states=engine.read_all）。
 fn engine_count(host: &AseSessionHost, id: usize) -> i32 {
     let row = host
@@ -111,7 +140,9 @@ fn p1023_v07_min_two_live_sessions_real_retention() {
 
     // 开 A/B（同 app 双上下文：两次独立装载=双 engine，模型不合并）。
     let a = host.open_session("counter").expect("open session a");
-    let ui_a1 = host.ui_session_of(a).expect("a holds its lane while selected");
+    let ui_a1 = host
+        .ui_session_of(a)
+        .expect("a holds its lane while selected");
     let b = host.open_session("counter").expect("open session b");
     assert_ne!(
         host.ui_session_of(b).expect("b holds its lane"),
@@ -346,4 +377,63 @@ fn p1023_v10_min_unit_trajectory_and_payload_refusal() {
     }
     assert_eq!(engine_count(&host, s), 0, "zero business effect");
     eprintln!("p1023_v10_min elapsed: {:?}", started.elapsed());
+}
+
+/// T-02：真实交互 fixtures（counter-a/b，显式路径）经同一公共面装载——
+/// 共同 Schema/verify 通过（两源装载零错误）、不同合法根名各自独立装载、
+/// 双会话一次 Inc 各得 1 且互不影响；文字叶真值各归各源。
+#[test]
+fn p1023_t02_fixture_counter_sources_load_and_verify() {
+    let started = Instant::now();
+    let apps = fixture_apps();
+    let mut host = AseSessionHost::new(apps);
+
+    let a = host
+        .open_session("counter-a")
+        .expect("fixture counter-a loads");
+    let b = host
+        .open_session("counter-b")
+        .expect("fixture counter-b loads");
+    host.select(a).expect("select a");
+    host.click(TARGET_INC).expect("inc a");
+    match host.step_selected() {
+        StepOutcome::Dispatched { .. } => {}
+        other => panic!("inc a: {other:?}"),
+    }
+    host.select(b).expect("select b");
+    host.click(TARGET_INC).expect("inc b");
+    match host.step_selected() {
+        StepOutcome::Dispatched { .. } => {}
+        other => panic!("inc b: {other:?}"),
+    }
+    assert_eq!(engine_count(&host, a), 1, "counter-a count = 1");
+    assert_eq!(engine_count(&host, b), 1, "counter-b count = 1");
+    assert_eq!(host.metrics.loads, 2, "one compile per fixture session");
+    assert!(host.errors.is_empty(), "errors: {:?}", host.errors);
+
+    // 文字叶 AV 真值各归各源（不同根名/文字，同车道；隐藏会话以 980 HOST
+    // 保留的最后车道显示快照为证，业务真值经 engine_states 断言）。
+    let texts_a = host_session_display(host.last_lane_of(a).unwrap())
+        .unwrap()
+        .0
+        .into_iter()
+        .next()
+        .unwrap_or_default();
+    let texts_b = host_session_display(host.ui_session_of(b).unwrap())
+        .unwrap()
+        .0
+        .into_iter()
+        .next()
+        .unwrap_or_default();
+    assert_eq!(
+        texts_a,
+        vec!["ASE M0 Counter A".to_string()],
+        "counter-a text leaf truth"
+    );
+    assert_eq!(
+        texts_b,
+        vec!["counter B ascii".to_string()],
+        "counter-b text leaf truth"
+    );
+    eprintln!("p1023_t02 elapsed: {:?}", started.elapsed());
 }

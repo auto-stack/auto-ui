@@ -303,6 +303,14 @@ impl AseSessionHost {
         self.live_idx(id).and_then(|idx| self.live[idx].ui_session)
     }
 
+    /// 会话最近一次显示车道句柄（含隐藏会话——980 HOST 保留已关车道的
+    /// 显示模型快照，作显示面证据；业务真值仍以 [`Self::engine_states`]
+    /// 为准）。
+    pub fn last_lane_of(&self, id: usize) -> Option<i32> {
+        self.live_idx(id)
+            .and_then(|idx| self.live[idx].record.last_ui_session)
+    }
+
     /// 该 app 的下一代次号（同 app 历史会话数 + 1；关闭重开递增）。
     fn next_generation_of(&self, app_key: &str) -> u64 {
         let live_gens = self
