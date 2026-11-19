@@ -1,0 +1,4 @@
+name: "property-inspector"
+version: "0.1.0"
+namespace: "auto"
+description: "AutoUI data-driven property and settings inspector (PLAN-092)"

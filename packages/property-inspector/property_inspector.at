@@ -1,0 +1,435 @@
+use auto.json
+
+// 模块链接按名直引（numeric_field.at 同型：只注册直引 fn 裸名）。
+use inspector_model: pi_make_row, pi_schema_error
+
+// PLAN-092 PropertyInspector — 数据驱动的属性/设置面板（受控）。
+//
+// 合同（Plan §5 r2 表 + T-01 decisions）：
+// - fields/values/groups/fieldErrors 全部为调用方受控 List 记录；组件不拥有
+//   应用状态，不通过字符串路径写对象，不 eval 消息名。
+// - kind→真实子控件：string→input（单活动编辑、Enter 提交、Escape 撤销）、
+//   integer/number→087 NumericField（integer precision=0）、unit→087
+//   UnitField、bool→checkbox、enum→chip 按钮组（T-01 D-2）、color→088
+//   ColorPicker。无自有数值/选色实现。
+// - 请求载荷 {seq, baseRevision, schemaRevision, targetId, fieldId, kind,
+//   value[, unit], source}；source ∈ edit/reset；bool 的 value 为 JSON 布尔。
+// - schema 错误（重复 id / 未知 kind / 缺值 / 非法默认值）具名面板错误并
+//   禁用歧义编辑（整体不渲染编辑器）；error 事件每次配置变化最多一次。
+// - 目标/schemaRevision/错误数变化 → 撤销活动草稿与预览并重建投影行。
+// - 折叠为本地展示状态（view_epoch 触发 ≤100ms 投影刷新），不产生业务请求。
+//
+// T-01 机制结论（docs/reviews/plan092/decisions.md）落地：无 handler 互调、
+// 无 List 下标访问、无 nil；onenter 用裸名提交（D-1）；子控件事件带
+// $event 载荷 + 循环变量实参（D-1 实测可派发）。
+widget PropertyInspector (fields: List = [], values: List = [], groups: List = [], fieldErrors: List = [], targetId: str = "", revision: int = 0, schemaRevision: int = 0, disabled: bool = false, readOnly: bool = false, showSearch: bool = true) {
+    use { package: numeric_fields from "../numeric_fields" }
+    use { package: color_picker from "../color_picker" }
+    msg { Init, Tick, SetQuery(str), Sink(str), StrCommit, StrCancel, "changeRequested"(str), "previewRequested"(str), "previewCancelled"(str), "error"(str), BoolChange(str), EnumChange(str, str), NumChange(str, str), NumPreview(str, str), NumErr(str), NumCancel(str), UnitChange(str, str), UnitSwitch(str, str), ColorChange(str, str), ColorPreview(str, str), ColorErr(str), ColorCancel(str), ResetReq(str), EditStr(str), ToggleGroup(str) }
+    model {
+        var interval int = 100
+        var rows List = []
+        var grows List = []
+        var query str = ""
+        var sink str = ""
+        var panel_err str = ""
+        var panel_err_code str = ""
+        var edit_id str = ""
+        var edit_draft str = ""
+        var seq int = 0
+        var seen_target str = "|init"
+        var seen_rev int = -1
+        var seen_schema int = -1
+        var seen_errn int = -1
+        var seen_epoch int = -1
+        var view_epoch int = 0
+        var collapsed List = []
+        var has_err bool = false
+        var preview_id str = ""
+        var bool_vals List = []
+    }
+    computed {
+        c_locked => .disabled
+    }
+    view {
+        col (style: "w-full gap-3") {
+            if .has_err {
+                col (style: "w-full gap-1 rounded-md border border-destructive/40 bg-destructive/5 p-2") {
+                    text f"面板错误（${.panel_err_code}）" { style: "text-xs font-medium text-destructive" }
+                    text .panel_err { style: "text-xs text-destructive break-all" }
+                }
+            }
+            if !.has_err && .showSearch {
+                input (value: .query, oninput: .SetQuery, placeholder: "搜索字段（label/help）", style: "h-8 text-sm rounded-md bg-muted/40") {}
+            }
+            if !.has_err {
+                for g in .grows {
+                    if g.visible {
+                        col (style: "w-full gap-1") {
+                            row (style: "items-center gap-1 w-full") {
+                                button (icon: "chevron-down", title: if g.open { f"折叠 ${g.label}" } else { f"展开 ${g.label}" }, onclick: .ToggleGroup(g.id), style: "h-6 w-6 shrink-0 justify-center rounded-md hover:bg-muted text-muted-foreground") {}
+                                text g.label { style: "text-xs font-semibold text-muted-foreground" }
+                            }
+                            if g.open {
+                                col (style: "w-full gap-2") {
+                                    for f in g.rows {
+                                        if .query == "" || f.label.contains(.query) || f.help.contains(.query) {
+                                            col (style: "w-full gap-0.5") {
+                                                if f.kind == "string" {
+                                                    if .edit_id == f.id {
+                                                        row (style: "items-start gap-2 w-full") {
+                                                            text f.label { style: "text-xs w-28 shrink-0 pt-1.5" }
+                                                            input (value: .edit_draft, oninput: .Sink, onenter: .StrCommit, onkeydown.escape.prevent: .StrCancel, placeholder: "输入新值", style: "flex-1 min-w-0 h-8 text-sm rounded-md bg-muted/40") {}
+                                                            if f.hasDefault {
+                                                                button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
+                                                            }
+                                                        }
+                                                    } else {
+                                                        row (style: "items-start gap-2 w-full") {
+                                                            text f.label { style: "text-xs w-28 shrink-0 pt-1.5" }
+                                                            button f.vs { onclick: .EditStr(f.id), title: f"编辑 ${f.label}", disabled: f.locked, style: "flex-1 min-w-0 h-8 px-2 text-sm text-left rounded-md border border-border justify-start" }
+                                                            if f.hasDefault {
+                                                                button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                if f.kind == "integer" || f.kind == "number" {
+                                                    row (style: "items-start gap-2 w-full") {
+                                                        text f.label { style: "text-xs w-28 shrink-0 pt-1.5" }
+                                                        NumericField (value: f.vs, revision: f.edited, precision: f.prec, min: f.mn, max: f.mx, step: f.st, disabled: f.locked, errorMessage: f.err, oncommitted: .NumChange(f.id, $event), onpreview: .NumPreview(f.id, $event), onerror: .NumErr($event), oncancelled: .NumCancel(f.id)) {}
+                                                        if f.hasDefault {
+                                                            button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
+                                                        }
+                                                    }
+                                                }
+                                                if f.kind == "unit" {
+                                                    row (style: "items-start gap-2 w-full") {
+                                                        text f.label { style: "text-xs w-28 shrink-0 pt-1.5" }
+                                                        UnitField (value: f.vs, revision: f.edited, precision: f.prec, min: f.mn, max: f.mx, step: f.st, unitGroup: f.ug, unit: f.un, disabled: f.locked, errorMessage: f.err, oncommitted: .UnitChange(f.id, $event), onunitChanged: .UnitSwitch(f.id, $event), onerror: .NumErr($event), oncancelled: .NumCancel(f.id)) {}
+                                                        if f.hasDefault {
+                                                            button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
+                                                        }
+                                                    }
+                                                }
+                                                if f.kind == "bool" {
+                                                    row (style: "items-start gap-2 w-full") {
+                                                        checkbox { text: f.label, checked: f.vb, onclick: .BoolChange(f.id), disabled: f.locked }
+                                                        if f.hasDefault {
+                                                            button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
+                                                        }
+                                                    }
+                                                }
+                                                if f.kind == "enum" {
+                                                    row (style: "items-start gap-2 w-full") {
+                                                        text f.label { style: "text-xs w-28 shrink-0 pt-1.5" }
+                                                        row (style: "flex-1 min-w-0 gap-1") {
+                                                            for opt in f.opts {
+                                                                button opt.label { onclick: .EnumChange(f.id, opt.id), disabled: f.locked, title: f"选择 ${opt.label}", style: if f.vs == opt.id { "h-7 px-2 text-xs rounded-md bg-primary/10 text-primary border border-primary" } else { "h-7 px-2 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted" } }
+                                                            }
+                                                        }
+                                                        if f.hasDefault {
+                                                            button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
+                                                        }
+                                                    }
+                                                }
+                                                if f.kind == "color" {
+                                                    row (style: "items-start gap-2 w-full") {
+                                                        text f.label { style: "text-xs w-28 shrink-0 pt-1.5" }
+                                                        col (style: "flex-1 min-w-0 gap-1") {
+                                                            ColorPicker (value: f.vs, revision: f.edited, disabled: f.locked, oncommitted: .ColorChange(f.id, $event), onpreview: .ColorPreview(f.id, $event), onerror: .ColorErr($event), oncancelled: .ColorCancel(f.id)) {}
+                                                        }
+                                                        if f.hasDefault {
+                                                            button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
+                                                        }
+                                                    }
+                                                }
+                                                if f.err != "" {
+                                                    text f.err { style: "text-xs text-destructive break-all" }
+                                                }
+                                                if f.help != "" {
+                                                    text f.help { style: "text-xs text-muted-foreground" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if g.rows.len() == 0 {
+                                        text "（本组暂无匹配字段）" { style: "text-xs text-muted-foreground" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if .grows.len() == 0 {
+                    text "（无字段）" { style: "text-xs text-muted-foreground" }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            // 投影在首个 Tick 落地（087 同型；handler 内不做互调）
+        }
+        .Tick -> {
+            var errn int = .fieldErrors.len()
+            if .targetId != .seen_target || .revision != .seen_rev || .schemaRevision != .seen_schema || errn != .seen_errn || .view_epoch != .seen_epoch {
+                // 目标/修订/错误/本地展示状态变化：撤销活动草稿与预览
+                if .edit_id != "" {
+                    .edit_id = ""
+                    .edit_draft = ""
+                }
+                if .preview_id != "" {
+                    var pid str = .preview_id
+                    .preview_id = ""
+                    ."previewCancelled"(json.stringify({targetId: .targetId, fieldId: pid}))
+                }
+                .seen_target = .targetId
+                .seen_rev = .revision
+                .seen_schema = .schemaRevision
+                .seen_errn = errn
+                .seen_epoch = .view_epoch
+                .has_err = false
+                .panel_err = ""
+                .panel_err_code = ""
+                // ── schema 验证（模块 fn；具名面板错误，一次一条）──
+                var se = pi_schema_error(.fields, .values)
+                if se.code != "" {
+                    .has_err = true
+                    .panel_err = se.message
+                    .panel_err_code = se.code
+                } else {
+                    .has_err = false
+                    .panel_err = ""
+                    .panel_err_code = ""
+                }
+                // ── 投影：先建平铺行，再按组分区（无 handler 互调/下标访问）──
+                .rows = []
+                .grows = []
+                .bool_vals = []
+                if !.has_err {
+                    for f in .fields {
+                        .rows.push(pi_make_row(f, .values, .targetId, .revision, .schemaRevision, .disabled, .fieldErrors))
+                    }
+                    // 受控布尔镜像：vue 轨 checkbox 的 v-model 会写回投影行，
+                    // 请求值必须来自受控镜像而不是被本地改写的行
+                    for f in .fields {
+                        if f.kind == "bool" {
+                            var vb2 bool = false
+                            for v in .values {
+                                if v.id == f.id {
+                                    vb2 = v.value
+                                }
+                            }
+                            .bool_vals.push({ id: f.id, vb: vb2 })
+                        }
+                    }
+                    var rest List = []
+                    for g in .groups {
+                        var grows_rows List = []
+                        for r in .rows {
+                            if r.groupId == g.id {
+                                grows_rows.push(r)
+                            }
+                        }
+                        var open bool = true
+                        if .collapsed.contains(g.id) {
+                            open = false
+                        }
+                        .grows.push({ id: g.id, label: g.label, open: open, visible: true, rows: grows_rows })
+                    }
+                    for r in .rows {
+                        var known bool = false
+                        for g in .groups {
+                            if g.id == r.groupId {
+                                known = true
+                            }
+                        }
+                        if !known {
+                            rest.push(r)
+                        }
+                    }
+                    if rest.len() > 0 {
+                        var open2 bool = true
+                        if .collapsed.contains("|rest") {
+                            open2 = false
+                        }
+                        .grows.push({ id: "|rest", label: "其他", open: open2, visible: true, rows: rest })
+                    }
+                }
+                if .has_err {
+                    .seq = .seq + 1
+                    ."error"(json.stringify({code: .panel_err_code, message: .panel_err}))
+                }
+            }
+        }
+        .SetQuery(v str) -> {
+            .query = v
+        }
+        .ToggleGroup(id str) -> {
+            // 折叠只改变展示：本地状态 + view_epoch 触发 ≤100ms 投影刷新
+            if .collapsed.contains(id) {
+                var kept List = []
+                for gid in .collapsed {
+                    if gid != id {
+                        kept.push(gid)
+                    }
+                }
+                .collapsed = kept
+            } else {
+                .collapsed.push(id)
+            }
+            .view_epoch = .view_epoch + 1
+        }
+        .EditStr(id str) -> {
+            for g in .grows {
+                for f in g.rows {
+                    if f.id == id && !f.locked {
+                        .edit_id = id
+                        .edit_draft = f.vs
+                    }
+                }
+            }
+        }
+        .Sink(v str) -> {
+            // native 输入经 oninput 处理器写回（Plan 370）；单活动编辑器
+            .sink = v
+            .edit_draft = v
+        }
+        .StrCommit -> {
+            // 013-todo 验证形态：无参提交，字段身份从组件状态读（T-01 D-1）
+            var id str = .edit_id
+            var val str = .edit_draft
+            .edit_id = ""
+            .edit_draft = ""
+            if id != "" {
+                .seq = .seq + 1
+                ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "string", value: val, source: "edit"}))
+            }
+        }
+        .StrCancel -> {
+            // Escape 撤销未验证草稿：恢复显示正式值，不发业务事件
+            .edit_id = ""
+            .edit_draft = ""
+        }
+        .BoolChange(id str) -> {
+            var val bool = true
+            for b in .bool_vals {
+                if b.id == id {
+                    val = !b.vb
+                }
+            }
+            .seq = .seq + 1
+            ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "bool", value: val, source: "edit"}))
+        }
+        .EnumChange(id str, optId str) -> {
+            .seq = .seq + 1
+            ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "enum", value: optId, source: "edit"}))
+        }
+        .NumChange(id str, ev str) -> {
+            var req = json.parse(ev)
+            var kind str = "number"
+            for g in .grows {
+                for f in g.rows {
+                    if f.id == id {
+                        kind = f.kind
+                    }
+                }
+            }
+            .seq = .seq + 1
+            ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: kind, value: req.value, source: req.source}))
+        }
+        .NumPreview(id str, ev str) -> {
+            var req = json.parse(ev)
+            var kind str = "number"
+            for g in .grows {
+                for f in g.rows {
+                    if f.id == id {
+                        kind = f.kind
+                    }
+                }
+            }
+            .preview_id = id
+            ."previewRequested"(json.stringify({targetId: .targetId, fieldId: id, kind: kind, value: req.value}))
+        }
+        .NumCancel(id str) -> {
+            if .preview_id == id {
+                .preview_id = ""
+            }
+            ."previewCancelled"(json.stringify({targetId: .targetId, fieldId: id}))
+        }
+        .NumErr(ev str) -> {
+            ."error"(ev)
+        }
+        .UnitChange(id str, ev str) -> {
+            var req = json.parse(ev)
+            var vunit str = ""
+            for g in .grows {
+                for f in g.rows {
+                    if f.id == id {
+                        vunit = f.un
+                    }
+                }
+            }
+            .seq = .seq + 1
+            ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "unit", value: req.value, unit: vunit, source: req.source}))
+        }
+        .UnitSwitch(id str, ev str) -> {
+            var req = json.parse(ev)
+            var val str = ""
+            for g in .grows {
+                for f in g.rows {
+                    if f.id == id {
+                        val = f.vs
+                    }
+                }
+            }
+            .seq = .seq + 1
+            // T-01 决策 U-1：单位切换 value 不变，unit 随请求原子提交
+            ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "unit", value: val, unit: req.unit, source: "edit"}))
+        }
+        .ColorChange(id str, ev str) -> {
+            var req = json.parse(ev)
+            .seq = .seq + 1
+            ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "color", value: req.value, source: req.source}))
+        }
+        .ColorPreview(id str, ev str) -> {
+            var req = json.parse(ev)
+            .preview_id = id
+            ."previewRequested"(json.stringify({targetId: .targetId, fieldId: id, kind: "color", value: req.value}))
+        }
+        .ColorCancel(id str) -> {
+            if .preview_id == id {
+                .preview_id = ""
+            }
+            ."previewCancelled"(json.stringify({targetId: .targetId, fieldId: id}))
+        }
+        .ColorErr(ev str) -> {
+            ."error"(ev)
+        }
+        .ResetReq(id str) -> {
+            var val str = ""
+            var vb bool = false
+            var has bool = false
+            var kind str = ""
+            for g in .grows {
+                for f in g.rows {
+                    if f.id == id {
+                        kind = f.kind
+                        has = f.hasDefault
+                        val = f.defaultValue
+                        vb = f.defaultValue
+                    }
+                }
+            }
+            if has {
+                .seq = .seq + 1
+                if kind == "bool" {
+                    ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "bool", value: vb, source: "reset"}))
+                } else {
+                    ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: kind, value: val, source: "reset"}))
+                }
+            }
+        }
+    }
+}

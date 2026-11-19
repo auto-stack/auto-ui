@@ -1,0 +1,129 @@
+use auto.json
+
+// PLAN-092 inspector_model — 投影行构造的模块级纯 fn。
+// 形参用低碰撞名（087 教训：fn 形参与消费方 state 同名会在 vue 轨被误加
+// .value）；值按 kind 归位到类型化成员（bool→vb，其余→vs；unit 附 un）。
+// 无 IO、无全局状态；双轨内联（与 numeric_decimal 同载入方式）。
+
+// 值类型不合法的字段级错误（enum 不在候选 / 色值非 8 位 HEX）。
+fn pi_value_error(fld, vs) {
+    if fld.kind == "enum" && vs != "" {
+        var ok = false
+        for opt in fld.options {
+            if opt.id == vs {
+                ok = true
+            }
+        }
+        if !ok {
+            return f"invalid_value: 值 ${vs} 不在候选内"
+        }
+    }
+    if fld.kind == "color" && vs != "" {
+        if !vs.starts_with("#") || vs.len() != 9 {
+            return "invalid_value: 色值须为 #RRGGBBAA"
+        }
+    }
+    return ""
+}
+
+// 面板级默认值校验：非法默认值禁用歧义编辑（enum 候选内 / 色值形状 /
+// 数值型非空）。数值语法本身由 087 引擎在渲染/编辑时强校验。
+fn pi_default_error(fld) {
+    if !fld.hasDefault {
+        return ""
+    }
+    if fld.kind == "enum" {
+        var ok = false
+        for opt in fld.options {
+            if opt.id == fld.defaultValue {
+                ok = true
+            }
+        }
+        if !ok {
+            return f"字段 ${fld.id} 的默认值不在候选内（invalid_default）"
+        }
+    }
+    if fld.kind == "color" {
+        if !fld.defaultValue.starts_with("#") || fld.defaultValue.len() != 9 {
+            return f"字段 ${fld.id} 的默认色值须为 #RRGGBBAA（invalid_default）"
+        }
+    }
+    if fld.kind == "integer" || fld.kind == "number" || fld.kind == "unit" {
+        if fld.defaultValue == "" {
+            return f"字段 ${fld.id} 缺少默认值（invalid_default）"
+        }
+    }
+    return ""
+}
+
+// 单字段投影行：值解析 + 锁定态 + 业务错误 + kind 附加位。
+fn pi_make_row(fld, vals, tid, rv, srev, dis, ferrs) {
+    var vs = ""
+    var vb = false
+    var vunit = fld.unit
+    for v in vals {
+        if v.id == fld.id {
+            if fld.kind == "bool" {
+                vb = v.value
+            } else {
+                vs = v.value
+            }
+            if fld.kind == "unit" {
+                vunit = v.unit
+            }
+        }
+    }
+    var ferr = pi_value_error(fld, vs)
+    if ferr == "" {
+        for fe in ferrs {
+            if fe.targetId == tid && fe.fieldId == fld.id {
+                ferr = f"${fe.code}: ${fe.message}"
+            }
+        }
+    }
+    var locked = dis || fld.disabled || fld.readOnly
+    if ferr != "" {
+        locked = true
+    }
+    var opts List = []
+    if fld.kind == "enum" {
+        opts = fld.options
+    }
+    var prec = fld.precision
+    if fld.kind == "integer" {
+        prec = 0
+    }
+    return { id: fld.id, label: fld.label, kind: fld.kind, groupId: fld.groupId, help: fld.help, vs: vs, vb: vb, un: vunit, opts: opts, prec: prec, mn: fld.min, mx: fld.max, st: fld.step, ug: fld.unitGroup, locked: locked, err: ferr, edited: rv + srev, hasDefault: fld.hasDefault, defaultValue: fld.defaultValue }
+}
+
+// 面板级 schema 扫描：返回 {code, message}（无错误时 code 为空串）。
+fn pi_schema_error(fields, vals) {
+    var seen List = []
+    for f in fields {
+        if f.kind != "string" && f.kind != "integer" && f.kind != "number" && f.kind != "unit" && f.kind != "bool" && f.kind != "enum" && f.kind != "color" {
+            return { code: "unknown_kind", message: f"字段 ${f.id} 的 kind 未知（${f.kind}）" }
+        }
+        if seen.contains(f.id) {
+            return { code: "duplicate_field_id", message: f"字段 id 重复（${f.id}）" }
+        }
+        seen.push(f.id)
+    }
+    for f in fields {
+        var found = false
+        for v in vals {
+            if v.id == f.id {
+                found = true
+            }
+        }
+        if !found {
+            return { code: "invalid_values", message: f"字段 ${f.id} 缺少值（invalid_values）" }
+        }
+    }
+    for f in fields {
+        var derr = pi_default_error(f)
+        if derr != "" {
+            return { code: "invalid_default", message: derr }
+        }
+    }
+    return { code: "", message: "" }
+}

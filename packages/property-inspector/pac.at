@@ -1,0 +1,9 @@
+name: "property_inspector"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "PropertyInspector"
+title_zh: "属性与设置面板"
+# PLAN-092：数据驱动属性/设置面板官方包。包 pac.at 保持无 dep 块（T-01 D-3：
+# VM 模块解析器不认 dep DSL）；嵌套包依赖由消费方 pac.at 声明，包内 widget
+# 以蛇形物化名同级引用（../numeric_fields、../color_picker）。
