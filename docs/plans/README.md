@@ -6,7 +6,7 @@
 
 | 本仓号 | 计划 | 状态与范围 |
 |---|---|---|
-| 104 | [U02 页面与表单](104-autoui-u02-pages-and-forms-av-vue.md) | drafting r1，0/8，7 个原应用及关联 Widgets |
+| 104 | [U02 页面与表单（归档）](archived/104-autoui-u02-pages-and-forms-av-vue.md) | 已交付：AV 真窗 7/7（005 三 oracle、010 Submit+FAQ、004/006/007 文本/label/状态）+ A2Vue 7/7（005/010 引 1072 正式收据、余例真浏览器档）；复审 pass；合入 ui `5a862d46` / lang `2fb094483`；T-01..T-08 全勾，8/8 |
 | 105 | [U03 本地应用与编辑](105-autoui-u03-local-interactive-apps-av-vue.md) | executing r1，1/8（T-02 暂停：用户裁定先停，待 104 合入 master 后从 master 重开工作树、不共享分支；U03 缺口矩阵 S1–S9 已留档），6 个原应用及关联 Widgets |
 | 106 | [U04 服务与数据应用](106-autoui-u04-service-and-data-apps-av-vue.md) | drafting r1，0/8，6 个原应用及关联 Widgets |
 | 107 | [U05 媒体、图表与绘制](107-autoui-u05-media-chart-and-paint-apps-av-vue.md) | drafting r1，0/8，7 个原应用及关联 Widgets |

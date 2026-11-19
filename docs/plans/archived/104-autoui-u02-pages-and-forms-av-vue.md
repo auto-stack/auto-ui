@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-104
-status: reviewed
+status: archived
 feature_name: AutoUI U02 页面与表单 AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-19
 plan_revision: 3
-current_step: 6
+current_step: 8
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -39,7 +39,7 @@ touched_goals: []
 - [x] **T-05｜work** （r3：F-04 样式 token 断言、F-05 单浏览器会话 7.98s、F-06 版本/哈希已记）005、010 按 §11 接收和核对 1072 的 A2Vue 收据，缺失的必验入口或行为仍记待交。其余示例和适用 Widgets 从真实入口验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。收据 §11 r16/r17：005/010 引用 1072 正式收据（本基面复跑 `plan1072_vue_web` 8/8）；004/006/007/008/009 由本计划新增真浏览器档 `plan104_vue_browser` 5/5（23.14s，真 Chromium 挂载 + 期望子串 + 零 page error）。
 - [x] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，在矩阵内登记复用收据与本计划新跑结果，补齐规范增量。收据见 §9 T-06/T-07：冻结 **ui `d0e1621d`**/lang `d186a81d3`（r3 复审后的修复提交仅动 tests+rig，产品码零变化）；受影响回归全绿；规范增量=无（§14 补记由 merge 落 canonical）。
 - [x] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
-- [ ] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
+- [x] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。收据见 §12：ui `5a862d46`（先 lang `2fb094483`）、§14 已落 canonical、归档本文件并更新 README、四树+分支+组目录+`plan-artifacts` 清理、批回归移交。
 ## 9. 复审记录
 2026-11-19 stage: new，drafting 0/8。U02 的原样示例、Widgets、AutoLang 支持和组件补齐均处于待实施状态。
 2026-11-19 stage: work（T-01 冻结矩阵与首阻断）| PLAN-104 r1 | outcome: pass | worktree: `D:/autostack/.wt/ui-104/auto-ui` @ `plan-104-dev`（基 `d2e7d7a4`）/ `D:/autostack/.wt/ui-104/auto-lang` @ `plan-104-dev`（基 `2b829c5d1`）/ 路径依赖 auto-web detached `3d328a3`、auto-down detached `72b0970` | task_ids: T-01 | evidence: `D:/autostack/plan-artifacts/plan-104/t01-matrix.md` + `t01-ace-probe.log`**原源冻结（7 例）**：004/105 行/0 style/无 msg；005/134/3 style/无名载荷 msg；006/69/0/payload msg；007/488/12 style + stylekit.styles；008/375/8/payload msg；009/277/4/payload msg；010/177/1/payload msg（含 `faqs` 只读列表与 `view for`）。全部 `dep themes`（007 另 `dep stylekit`）。Widgets 闭包按 1071 §9 T-01 行消费，只读不写。**两端入口实测（真实运行）**：`cargo test -p auto-ui-runtime --features ace-bridge --test plan104_u02_probe -- --nocapture --test-threads=1`（临时探针用后删净，980 先例）——ACE 包面 AV（`compile_age_package_with_scenario`，`PackageStateEngine` 同入口）**7/7 同点失败**：`source.syntax: expected fn, found widget` @ 各例 `widget App {` 行；ACE A2Vue（`generate_package_sfc`）005–010 `expected fn, found style`、006 `source.age.slot: expected text`、004 `expected fn, found widget`。对照：legacy 方言道 `build_dynamic_component` **7/7 可建**（text_leaves 4/6/2/63/48/23/15）；`example_theme_migration` **2/2 PASS**（0.11s）。**判读**：①`widget` 拼写并非缺失——`grammars/auto-source.at` 已给 `age-widget-head` 启用 age-package（@L284/@L315），故 7/7 的 `expected fn, found widget` 是 980 §9 L1837 已具名的 item 级回滚位泛错，真因在例内（payload msg / design 值 / view 槽 / `view for`），T-02 逐例二分；②A2Vue 的 `ace_package_sfc` 先走组件面单文件投影（`use`/`style` 按 981 单文件合同拒），故包闭包源在 SFC lane 首阻断恒早于 AV，SFC 真结论须在 AV 面解锁后再取；③`packages/themes/themes.at` 的 `pub theme` 在 ACE 两侧语法无 item 规则，`use themes.themes` 需最小主题数据接面（T-02），主题包身份/族表生成期嵌入归 auto-ui 工具链。**写面归属**：ACE 包面例内投影补齐（payload msg/design/view for/槽位）与主题数据接面=本计划 auto-lang 树；A2Vue 生产链=`1072`（executing，按版本消费，缺口登记不重写）；Widgets=auto-os；证据根=`plan-artifacts/plan-104/`。**主检出观察（非本计划改动，落地前须由 owner 收口）**：auto-ui 主检出存在未提交删除 `packages/themes/{pac.at,themes.at,theme-package.json}` 与 `examples/ui/stylekit/{pac.at,src/front/styles.at}`（HEAD 中存在）；ui-104 树从 master 建，文件在位，本计划不受影响，但 merge 的 master-zero-WIP 门需先处理该 WIP。
@@ -210,3 +210,13 @@ status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-104/auto-
 ext_responsible_role、- **/- [ 列表项均恢复行首；**表格行与段落间空行仍为内联**（内容可读，格式退化），下轮可继续整理。教训：追加/写回只用单个字符串或 -Raw，禁止数组 + -NoNewline。
 
 2026-11-19 stage: merge（等待轮 #3 → 记 blocked）| PLAN-104 r3 | outcome: blocked（publication-only）| 连续三轮（33/34/35）复核：主检出 WIP 未变（auto-ui 86 项、auto-lang 196 项）；实施树 clean（ui e433c047 / lang 6c8d05090）。按用户裁定 A 不做落地/归档/写操作。**解除条件**：两主检出的未提交改动由 owner 提交或还原（或用户改裁 B：授权我只提交 docs/plans 的 104–108 批次与 README/.next-id，其余 WIP 原样保留并继续 ff-only 落地）。解除后一次执行：lang ff-only → ui ff-only（§14 已在 6c8d05090）→ 归档 docs/plans/archived/104-* + 提交 docs → 四树移除/分支删除/组目录移除 → 删除 plan-artifacts/plan-104/ + registry 刷新 → 批回归到期移交 → 目标完成。
+
+## 12. 归档记录（T-08 merge，2026-11-19）
+
+- **交付提交**：auto-ui 5a862d46（master 快进，9 提交：apply_bool i32、条件视图可见性、文本叶刷新、states-only 回退、view-for 展开叶、样式面空白化+label、A2Vue 余例浏览器档、T-07 两批修复）；auto-lang 2fb094483（3 提交：裸自闭合标签、av flat 观察入口、m2-autoui §14 补记）。
+- **落地前核对**：两分支已 rebase 到落地时 master（ui 基 90d58979、lang 基 master 当前 tip）；旧→新映射 ui d0e1621d→5a862d46、lang d186a81d3→2fb094483；本计划触及文件 blob 逐一相同（rebase 纯重写，无冲突/无语义漂移）。
+- **落地后验证（主检出）**：auto-lang conformance plan104 **3/3**、plan98 **301/301**；auto-ui plan104_window_render **5/5**、plan104_vue_browser **5/5**（均为本计划永久例，见 §9 各轮收据）。
+- **canonical**：uto-lang/docs/specs/ace-migration/m2-autoui.md §14 已含 PLAN-104 补记（2fb094483）。
+- **验收**：AC-01/AC-02/AC-03 pass（r3 口径，用户裁定 B）；AC-04 于本轮合入后成立；T-07 独立复审 pass（§9 二级终审收据）。
+- **清理**：四棵工作树（ui/lang/web/down）经 wt-guard clean 后移除、plan-104-dev 分支删除、组目录 D:/autostack/.wt/ui-104 移除、plan-artifacts/plan-104/ 按 2026-10-31 裁定删除（证据已折叠进本文件）。
+- **批回归**：.last-batch-regression.json last_covered=1064（2026-11-16），已到期 → 移交 uto-plan-regress 在主检出单实例执行。
