@@ -72,6 +72,11 @@ pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result
                 ace_core::source::age_component::ComponentStmt::If { .. } => {
                     return Some("if");
                 }
+                // PLAN-105 T-02：handler 级 `for`（列表迭代）——本车道只复放
+                // 平铺赋值，整句具名拒（不部分复放）。
+                ace_core::source::age_component::ComponentStmt::For { .. } => {
+                    return Some("for");
+                }
             }
         }
         None
