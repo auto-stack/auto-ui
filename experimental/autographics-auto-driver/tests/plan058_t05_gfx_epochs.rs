@@ -20,9 +20,12 @@ use ace_core::source::age_h0::LegacyWidgetAlias;
 use ace_core::source::age_package::compile_age_package_with_scenario;
 use ace_core::source::packages::{PackageModuleInput, PACKAGES_CAPABILITY};
 use autographics_auto_driver::authoring::gfx_host_arms::{NeutralGfxHost, QueryTokenBook};
-use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
+use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, time::Instant};
 
 const SOURCE: &str = include_str!("../fixtures/plan058/topdown-node/main.at");
+const ATLAS_PNG: &[u8] = include_bytes!(
+    "../../autographics-node2d-pilot/fixtures/sprites2d/assets/95a08525ebe48c2423f04ecb8105965109c5a1c6b55fb6d15c154f3338a5bbb1.png"
+);
 const DT: f32 = 1.0 / 60.0;
 const PLAYER_ORDINAL: usize = 1;
 
@@ -79,8 +82,16 @@ impl AgeGfxHost for SharedHost {
 }
 
 fn assets_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../autographics-node2d-pilot/fixtures/sprites2d/assets")
+    // The fixture's asset paths are project-relative ("assets/atlas.png"), so
+    // the host's asset root is a staged PROJECT root, not the assets dir.
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/plan058-t05-assets");
+    let assets = dir.join("assets");
+    fs::create_dir_all(&assets).expect("assets dir");
+    let atlas = assets.join("atlas.png");
+    if !atlas.exists() {
+        fs::write(&atlas, ATLAS_PNG).expect("atlas");
+    }
+    dir
 }
 
 /// Resolve a state function by its frozen spelling candidates (the state

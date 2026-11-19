@@ -87,8 +87,16 @@ fn compile(src: &str) -> AgePackageCompilation {
 }
 
 fn assets_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../autographics-node2d-pilot/fixtures/sprites2d/assets")
+    // The fixture's asset paths are project-relative ("assets/atlas.png"), so
+    // the host's asset root is a staged PROJECT root, not the assets dir.
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/plan058-t05-assets");
+    let assets = dir.join("assets");
+    fs::create_dir_all(&assets).expect("assets dir");
+    let atlas = assets.join("atlas.png");
+    if !atlas.exists() {
+        fs::write(&atlas, ATLAS_PNG).expect("atlas");
+    }
+    dir
 }
 
 /// Rows from the compiled scene declaration: ordinal = declaration order, world

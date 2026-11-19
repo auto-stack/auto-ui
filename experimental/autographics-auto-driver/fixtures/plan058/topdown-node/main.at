@@ -54,6 +54,20 @@ pub fn frame_after_despawn() i32 {
     return framed
 }
 
+// Asset identity drives (T-05 V-S04; not part of the Tick path): the real
+// atlas resolves to its content identity byte length; a missing asset is the
+// named image fault. Note: top-level resource `let`s do not dispatch in this
+// AV slice — asset ops run where the author calls them.
+pub fn load_atlas() i32 {
+    let img Image2D = image2d.png("assets/atlas.png")
+    return img.byte_length
+}
+
+pub fn load_missing() i32 {
+    let img Image2D = image2d.png("assets/missing-atlas.png")
+    return img.byte_length
+}
+
 // The two same-definition interaction targets (V-S03): one `Target` node
 // carrying its own model and Touch handler, instantiated twice in the Player's
 // scene. Each instance keeps independent state (2:1 isolation is pinned by the
