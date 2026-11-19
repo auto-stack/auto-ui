@@ -50,3 +50,9 @@ examples/**/.am/
 __pycache__/
 
 examples/**/src/front/tmp/
+
+# PLAN-983 r27: terminal_pixel 金样=首跑自建机器本地留档（有意不入库——
+# wgpu MSAA/系统字体环境敏感面，docs/plans/evidence/634/）；忽略后
+# ls-files --others 不再列出，四仓门 require_clean 可过（原未忽略时
+# 首个全绿门跑也会被终段清洁检查拒）。
+crates/auto-ui-runtime/test/ui/terminal_pixel/
