@@ -527,6 +527,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 40 | from: work | t
 `TEXT_DISPLAY` lowering 门收窄为「**声明 `ac.runtime.text.v1` 的 data/owned 模块**」（先前放开 data/owned 全域会让 host-console/generic-records 等既有负测翻红——收窄后 generic_records 4 例恢复通过）。`plan980_state_face` 的 f-string 文本叶负测按新行为**翻转为渲染断言**（`c: 1` 可观察），8/8 通过。
 
 **ace-av 全量基线（1289 passed / 17 failed）说明**：17 个失败中，`plan980_state_face::…refuses` 是本刀**行为翻转**（已更新）；其余 16 个（a2x 端 char_to_str/slice、module_packages 四端、stdlib_core math/text slice、host_console 两例、generic_records 3 例在收窄后已恢复、performance 内存门）与本次 lowering 门无因果关系（跨 a2x/host-console 面，疑似分支既有红），需在 T-06 全量基线时以干净检出复核并分派。**本刀不声称 av 全量绿**。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 41 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: (本轮) | next: work
+
+2026-11-19 stage: work（T-02 W38：泛型接收位开口）| PLAN-105 r1 | outcome: pass（本刀完成"可解析"层；列表值语义仍未接线）| code_commit: 本轮提交 | task_ids: T-02（W38）| evidence: 25/25 + 全 affected
+
+**交付**：AGE 组件面开放**泛型接收位**——`generic-atom`/`generic-call`/`const-args`/`const-arg*`/`type-args`/`type-arg*`/`generic-ty` 的 profile 增加 `age-component`（此前只有 instances/aggregates 面），`rename_expr_with_params` 增加 `GenericType` 透传臂（类型不是值，实参由共享 resolver 校验）。census 重基线（component `ed4058a9…`）。
+
+**效果**：`let xs = List<int>.new()` 现在**可解析/可投影**（此前文法直接拒），随后被 resolver 具名拒（"parameterized type receivers are not part of this source profile"）——精确边界：组件面 HIR 域是 text-record，列表需要 collections 域。`let xs = List<int>.new()\n xs.push(1)` 在 scene 编译**通过**（push 语句路径已可用）。下一步是把组件面的 HIR 域迁到 collections（或为列表源单独走 collections 车道），这是 012/013/016 的动态列表共同前置。
+
+**验证**：plan105 25/25、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24；census 4/4。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
