@@ -85,7 +85,7 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 - [x] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。收据见 §9（2026-11-19 T-01）：六例原源事实、组件面/包面首阻断、缺口台账 G1–G11、共享实现线与唯一写面已冻结；矩阵与原始日志在 `D:/autostack/plan-artifacts/plan-105/t01-matrix.md` + `t01-probe.log`。
 - [ ] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
 - [ ] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
-- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。（**部分**：015/018/022 已真开 Iced 窗并产证据 JSON——frames 2/2/3、errors 0、sessions 1，收据见 §9 W25；013/016 待 S1 store、012 待局部列表；脚本化点击受 handler 体限制仍拒。）
+- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。（**部分**：015/018/022 已真开 Iced 窗——frames 2/2/3、errors 0；**018 已真点击交互**：`ToggleTheme` 两次点击 `dark_mode` false→true、dispatch 2、errors 0（收据见 §9 W25/W29）；015 事件体含 store/API 调用仍具名拒；013/016 待 S1；012 待局部列表。）
 - [ ] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
 - [ ] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
 - [ ] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
@@ -427,6 +427,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 31 | from: work | t
 **验证**：auto-ui prep **6/6**（含 015/018/022 桥装载）；auto-lang plan105 24/24、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24、census 4/4。
 
 **边界**：013/016 的 store `on` 体含 if/for/局部 var（包面语句面），组件面 store 片断仍解析不了 → 保持具名 `.store` 边界。下一刀 = 让 store `on` 体在组件面接受包面语句面（或改走包面多单元 store 装载）。`next_responsible_role: work（T-02 W29）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 32 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 7b9e23c4 | next: work
+
+2026-11-19 stage: work（T-04 交互验收：018 真点击）| PLAN-105 r1 | outcome: pass（证据轮；T-02/T-04 未整体完成）| code_commit: 无（同 W28）| task_ids: T-04（交互部分）| evidence: `plan-artifacts/plan-105/av-018-click2.json`
+
+**证据（真实 Iced 窗 + 脚本化点击 + 状态观测）**：`ace_node_desktop_window --source examples/ui/018-book-reader/src/front/app.at --script "3:click:0:0,7:click:0:0"` → `frames_rendered=6`、`errors=0`、`dispatch_log` 两条 `ToggleTheme`：第一次点击后 `dark_mode=false`、第二次 `dark_mode=true`——**事件派发 + 状态推进 + 重渲染链路在真语料上成立**（收据 sha256 前 16：见 `av-018-click2.json`）。静态装载证据（W25）保持：015/018/022 frames 2/2/3、errors 0。
+
+**边界（诚实）**：015 的事件体含 store/API 调用（`store.NewNote()` 等）→ 既有 body_foreign 具名拒（"a directed event must not run a partial body"）；022 带脚本运行未渲染帧（frames=0，待查）；013/016 待 S1 跨单元 store + store `on` 体语句面（`var`/`for`/`if` + 方法调用/列表操作）。
+
+**下一刀**：store 方法调度与列表操作（015/013/016 解锁），或先修 022 脚本运行（frames=0）。`next_responsible_role: work（T-02 W30）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
