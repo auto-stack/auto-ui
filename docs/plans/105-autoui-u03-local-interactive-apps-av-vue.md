@@ -499,6 +499,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 38 | from: work | t
 **验证**：plan105 25/25、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24；auto-ui prep 6/6。
 
 **下一刀**：列表**值语义**——`let xs = [...]` 执行（List 构造 + 元素 get）、下标读/写、`push`（012/016 需要）；再 013 的 store 列表操作；之后 015 的宿主 API 面。`next_responsible_role: work（T-02 W36）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 39 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: (本轮) | next: work
+
+2026-11-19 stage: work（T-02 W36：常量查表函数降级）| PLAN-105 r1 | outcome: pass（本刀完成；T-02 未整体完成）| code_commit: auto-ui 本轮提交 | task_ids: T-02（W36）| evidence: prep 6/6
+
+**交付**：`lower_const_table_fn`——把「常量表 + 单条 `return tbl[expr]`」形态的 helper 函数（016 `month_name`）**等价降级**为 if 链（`if expr == i { return e_i }`，越界回落末元素），只在函数体恰为该形态时生效（否则原样保留）。这是纯常量语义的等价改写，不改变可观察行为；生成结果可投影 + 可场景编译。
+
+**效果**：016-calendar 越过 `month_name` 一墙，新墙是 `verify.ownership-required: assignment to l1 implicitly transfers l1`（generated 局部所有权面）。013 仍具名 `.store` 边界。
+
+**下一刀**：016 的所有权/局部赋值墙（`assignment to l1 implicitly transfers l1` 定位与修正），然后 013 的 store 列表操作。`next_responsible_role: work（T-02 W37）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
