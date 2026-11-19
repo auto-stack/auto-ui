@@ -1,4 +1,5 @@
 use auto.json
+use auto.image
 
 // PLAN-091 asset-picker demo — 应用自有授权资源 provider + AssetPicker 消费。
 //
@@ -11,10 +12,10 @@ use auto.json
 // 目录合成：5 条图片夹具（back 媒体会话真实 URI，Init 轮询回填）+ 998 条
 // 合成附件 = 1003 条（V-01 代表规模；尾页可选由产品门断言）。
 widget App {
-    use { package: asset_browser from "D:/autostack/.wt/ui-091/auto-ui/packages/asset-browser" }
+    use { package: asset_browser from "../../../packages/asset-browser" }
     msg {
         Init, Tick,
-        OpenPicker, ReloadLog,
+        OpenPicker, ReloadLog, InvalidateSelected,
         OnQuery(str), OnSel(str), OnPrev(str), OnConfirm(str), OnCancel,
         ApplyQuery, SlowFire
     }
@@ -52,9 +53,15 @@ widget App {
         var slow_records = []
         var slow_total int = 0
         var slow_ticks int = 0
-        // ---- 媒体 URI 轮询 ----
+        // ---- 媒体 URI（front 进程内建 auto.image 会话；探针实证零 emit
+        // 丢失拓扑——PLAN-089 P1 同款。back media-uris 端点保留给 vue 轨）----
         var uris_ready bool = false
         var uri_polls int = 0
+        var sess_lake str = ""
+        var sess_corner str = ""
+        var sess_rgb str = ""
+        var sess_alpha str = ""
+        var sess_orient str = ""
         // ---- 业务写读回 ----
         var attach_count int = 0
         var last_attach str = ""
@@ -80,6 +87,7 @@ widget App {
             row (style: "items-center gap-2") {
                 button "打开选择器" { onclick: .OpenPicker, style: "h-8 px-3 text-xs rounded-md border border-primary text-primary" }
                 button "刷新附件日志" { onclick: .ReloadLog, style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "使选中失效" { onclick: .InvalidateSelected, style: "h-8 px-2 text-xs rounded-md border border-border" }
             }
             col (style: "gap-1") {
                 text f"status=${.status}" { style: "text-xs text-foreground" }
@@ -175,36 +183,45 @@ widget App {
                 }
             }
         }
-        // ---- 图片夹具 URI 回填（真实授权媒体 URI；opaque，组件不拼路径）----
+        // ---- 图片夹具 URI 回填（front 进程会话；rendition 发布后即就绪停轮询）----
         .FetchUris -> {
-            try {
-                let data = Http.get_json("/api/assets/media-uris")
-                var list = data ?? []
-                var ready bool = true
-                var ci int = 0
-                while ci < list.len() {
-                    var uri str = list[ci].uri ?? ""
-                    if uri == "" {
-                        ready = false
-                    }
-                    var ki int = 0
-                    while ki < .catalog.len() {
-                        if .catalog[ki].id == list[ci].id {
-                            if uri != "" {
-                                .catalog[ki].thumbnailUri = uri
-                            }
+            if .sess_lake == "" {
+                .sess_lake = image.open_session("tests/fixtures/scenic-320x240.png")
+            }
+            if .sess_corner == "" {
+                .sess_corner = image.open_session("tests/fixtures/corner-marked.png")
+            }
+            if .sess_rgb == "" {
+                .sess_rgb = image.open_session("tests/fixtures/rgb-1x1.png")
+            }
+            if .sess_alpha == "" {
+                .sess_alpha = image.open_session("tests/fixtures/alpha-2x1.png")
+            }
+            if .sess_orient == "" {
+                .sess_orient = image.open_session("tests/fixtures/orientation-6.jpg")
+            }
+            var ready bool = true
+            var pairs = [{id: "lake", uri: image.current_uri(.sess_lake)}, {id: "corner", uri: image.current_uri(.sess_corner)}, {id: "rgb", uri: image.current_uri(.sess_rgb)}, {id: "alpha", uri: image.current_uri(.sess_alpha)}, {id: "orient", uri: image.current_uri(.sess_orient)}]
+            var ci int = 0
+            while ci < pairs.len() {
+                var uri str = pairs[ci].uri ?? ""
+                if uri == "" {
+                    ready = false
+                }
+                var ki int = 0
+                while ki < .catalog.len() {
+                    if .catalog[ki].id == pairs[ci].id {
+                        if uri != "" {
+                            .catalog[ki].thumbnailUri = uri
                         }
-                        ki = ki + 1
                     }
-                    ci = ci + 1
+                    ki = ki + 1
                 }
-                if ready {
-                    if list.len() > 0 {
-                        .uris_ready = true
-                        .ApplyQuery()
-                    }
-                }
-            } catch {
+                ci = ci + 1
+            }
+            if ready {
+                .uris_ready = true
+                .ApplyQuery()
             }
         }
         // ---- 业务写读回（接受 handler 落账后刷新；应用 Storage 承载）----
@@ -513,6 +530,29 @@ widget App {
             .n_cancelled = .n_cancelled + 1
             .open = false
             .status = "picker cancelled"
+        }
+        // provider 故障演练钩子：同 ID 换 revision（V-03 身份失效拒绝腿）。
+        .InvalidateSelected -> {
+            if .selection != "" {
+                try {
+                    let sl = json.parse(.selection)
+                    var i int = 0
+                    while i < .catalog.len() {
+                        if .catalog[i].id == sl.id {
+                            var cur str = .catalog[i].revision
+                            .catalog[i].revision = cur + "-x"
+                        }
+                        i = i + 1
+                    }
+                    .ApplyQuery()
+                    var nid str = sl.id
+                    .status = f"selected identity invalidated: ${nid}"
+                } catch {
+                    .status = "invalidate parse failed"
+                }
+            } else {
+                .status = "invalidate: no selection"
+            }
         }
         .OpenPicker -> {
             .open = true
