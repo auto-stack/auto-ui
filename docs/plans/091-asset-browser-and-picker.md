@@ -155,6 +155,12 @@ T-04新`examples/asset-picker/`及授权资源provider夹具，T-05新`crates/au
 新定位（P-4 深化）：**delivery sent=N delivered=0 现象**——MCP ActionResult 报 handler 命中但 VM 派发队列投递 0，连根 App handler 的状态写都不落（InvalidateSelected 空转实测）；按时间窗双模出现，重试可恢复但窗口可持续数十秒。另：handler 体内 f-string 参数插值（${param}）使 handler 静默中止（改串拼接修复）。
 未达成（next）：stale 段（身份失效/旧 vnode/V-06 重开清反馈）、visual 段浅色/窄窗/退出重开、029 迁移腿——全部被 delivery=0 窗口阻断（stale 段钩子按压 sent=1 delivered=0 实录）；vue 轨未跑。运行时投递可靠性修复具名超出本计划范围（运行时仓 owner）。下轮可选：降低会话内按压密度重试完整门；或按 execution_done 部分（picker 矩阵）+ 具名边界（P-4 深化）提交复审裁量。当前 5/8（T-05 part）。
 
+2026-11-20（续2）：stage: goal（work 进行中，第3轮）；from: work | to: work | outcome: blocked（运行时投递丢失，组件侧不可修复）；next: work（待运行时 owner）。
+投递普查（guardtest.log）：主页面「使选中失效」连续按压 10 次，仅 2 次 delivered≥1——dlg_open 80ms 写守卫重放后依旧；handler 线恒在（MCP 报命中）而 VM 派发队列为 delivered=0，状态写不落。与组件、对话框、包层数无关（主页面裸按压亦丢）。
+结论：**运行时 VM 事件派发层存在时间窗投递丢失**（本轮全部剩余腿——stale 段钩子、visual 段明暗/窄窗、029 腿——的直接阻断）。组件合同面（P-1 try 包裹 remedy 后）在投递成功窗口内 12-14 腿全绿复现（r47/r51/r52）。
+精确 unblock：运行时 owner 修复 VM 派发队列投递丢失（MCP press 的 delivery 计数器已可观测）；修复后 T-05 剩余腿（stale/visual/029/vue 轨）在本门（--runs 3）内完成，预计无组件侧改动。
+已保全：组件/示例/门全部提交于 codex/ui-091-asset-browser（14dd89d2 + 门韧性 + dlg_open 守卫）；计划/decisions 同步。当前 5/8（T-05 part，blocked on runtime）。
+
 ## 10. 待澄清事项
 
 r2已固定provider查询和确认反馈协议；T-01验证真实事件/状态接线、Gallery读回、依赖解析与runner。没有阻碍立项的用户决策。多选、模型/音视频深度预览和导入服务保留后续需求，不通过本计划偷偷扩大范围；越界服务依赖需明确owner。
