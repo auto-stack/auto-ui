@@ -499,6 +499,15 @@ fn rewrite_typed_list_field(line: &str) -> Option<String> {
     if !ty.contains("[]") {
         return None;
     }
+    // PLAN-105 T-02（U03 真语料 012）：**内建元素**的列表字段（`[]str` / `[]int`
+    // / `[]bool` / `[]f32`）保持类型——collections 域按 `List<T>` 真承载，handler
+    // 可写（012 的 `.w_rows = rows`）。记录元素的列表仍按视图数据改写（记录类型
+    // 依赖尚需显式内联）。
+    let elem = ty.trim_start_matches('[').trim_start_matches(']');
+    let elem_builtin = matches!(elem, "str" | "Str" | "int" | "i32" | "bool" | "f32" | "float");
+    if elem_builtin {
+        return None;
+    }
     while i < bytes.len() && bytes[i] == b' ' {
         i += 1;
     }
@@ -799,19 +808,22 @@ mod tests {
 
     #[test]
     fn rewrites_typed_list_data_fields() {
-        // 012 形：类型化列表数据字段 → 无类型视图数据（类型段等长空白化）。
-        let rewritten = rewrite_typed_list_field("        var cities []str = [\"Beijing\"]")
-            .expect("list data field rewritten");
-        assert_eq!(rewritten.len(), "        var cities []str = [\"Beijing\"]".len());
-        assert!(!rewritten.contains("[]str"));
-        assert!(rewritten.trim_end().ends_with("= [\"Beijing\"]"));
+        // 记录元素的类型化列表字段 → 无类型视图数据（类型段等长空白化）。
+        let rewritten = rewrite_typed_list_field("        var faqs []Faq = []")
+            .expect("record list data field rewritten");
+        assert_eq!(rewritten.len(), "        var faqs []Faq = []".len());
+        assert!(!rewritten.contains("[]Faq"));
+        assert!(rewritten.trim_end().ends_with("= []"));
+        // 内建元素的列表字段**保持类型**（collections 域真承载；012 的 `[]str`）。
+        assert!(rewrite_typed_list_field("        var cities []str = [\"Beijing\"]").is_none());
+        assert!(rewrite_typed_list_field("    var xs []int = []").is_none());
         // 非列表类型、非列表初值、普通语句一律不动。
         assert!(rewrite_typed_list_field("    var n int = 0").is_none());
         assert!(rewrite_typed_list_field("    var xs []str = \"a\"").is_none());
         assert!(rewrite_typed_list_field("    text \"x\" {}").is_none());
-        // 嵌套列表类型与空列表初值。
-        let nested = rewrite_typed_list_field("    var xs [][]int = []").unwrap();
-        assert!(!nested.contains("[][]int"));
+        // 嵌套列表（记录元素）仍改写。
+        let nested = rewrite_typed_list_field("    var xs [][]Faq = []").unwrap();
+        assert!(!nested.contains("[][]Faq"));
     }
 
     #[test]
@@ -925,7 +937,6 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 }
-
 
 
 
