@@ -175,3 +175,40 @@ workaround，T-05 实拍归档时按 AC-06 记录。
 - V-04 读回口径：同进程显式「读回」按钮（set→get→回投）；应用级退出重开
   验证二次渲染（V05）。native storage 跨进程生命周期属 VM 存储层行为，
   不作本包合同断言。
+
+
+## 9. 复审修复轮（F-1/F-2 收口，2026-11-20）
+
+**F-1（gate 计时分相）— 已修复**：`verify_property_inspector.py` 增
+`Case.reset_stamp()`（准备段锚重置）+ 快速清理轮询；会话启动/页面水合计入
+准备段不归属功能用例。复跑：native 23 pass + 1 not_run、vue 18/18，全部用例
+≤10s（native 最长 6.57s=V05-cleanup（清理相）、vue 最长 4.46s）。
+
+**F-2（交互折叠）— 带证据改道（B-6 深化）**：复审指出原 B-6 诊断与
+fn-record 缺陷混淆。修复轮在**内联行+编译器 B-7 修复后的干净基线**上系统
+复测六种实现形态：
+
+| # | 形态 | 结果 |
+|---|---|---|
+| 1 | 视图 `List.contains(循环成员)` 条件 | **UI 校验器拒绝**（受控 bisect A/B：同文件去/留对照） |
+| 2 | 投影期过滤 + 组记录成员条件（`g.collapsed`） | Tick 重建执行但组级结构不重渲染（snap_fold2） |
+| 3 | 列表变异 unfold（整体替换） | 不传播 |
+| 4 | 列表变异 unfold（pop+回填） | 不传播 |
+| 5 | toggle_seq 奇偶 + 行 hidden 成员（行级条件） | fold（隐藏）传播、unfold（恢复）不传播 |
+| 6 | 标量 `.folded_group` + 组级兄弟互换（edit_id 同型） | 不传播 |
+
+结论（D-10）：native 视图差分对「组级结构变化/被移除子树的再插入」不传播；
+仅「现存子树内的标量驱动互换」（edit_id 型）与「push 驱动的 contains 首折」
+可见。交互折叠在本机 native 不可靠交付，**v1 维持静态分组标题**（9d112489
+语义）；折叠能力依赖 VM 视图差分修复（与 B-5 同族的 runtime 债），归档时
+入 debts 登记由 runtime owner 排期。vue 轨视图响应正常，折叠可在 VM 修复后
+双轨补齐（合同文本不变）。
+
+**B-7（新基线适配）**：视图条件串后处理补 `.contains(x)` → `.includes(x)`
+（空格/紧凑双形态；此前 is_empty/length/find 有映射而 contains 缺失——
+PropertyInspector 折叠条件 vue 轨 TS2339）。永久回归
+`plan092_view_condition_contains_maps_to_includes`；编译套件 1171/1171。
+
+F-2 收口口径：AC-03 的「折叠」子项以 B-6/D-10 边界 + 六形态证据改道为
+runtime 债（非本包可修）；恢复默认/搜索/草稿/只读/无隐式写入等其余子项
+双轨门全绿。是否接受该改道由复审裁定；不接受则 needs_replan 修订 AC-03。

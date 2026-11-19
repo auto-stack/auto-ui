@@ -3714,6 +3714,51 @@ widget NoteEditor {
         );
     }
 
+    /// PLAN-092 T-07 B-7: view-condition `.contains(x)` (List or string,
+    /// incl. the spaced `parse_condition_expr` form) maps to JS `.includes(x)`
+    /// in the emitted v-if. The condition-string post-processor previously
+    /// mapped is_empty/length/find but not contains, leaving the raw Auto
+    /// method name in the template (TS2339 on the vue track).
+    #[test]
+    fn plan092_view_condition_contains_maps_to_includes() {
+        let sfc = gen_sfc_from_widget_src(
+            r#"
+widget Probe {
+    msg { Init }
+    model {
+        var collapsed List = []
+        var q str = ""
+    }
+    view {
+        col {
+            if !.collapsed.contains("appearance") {
+                text "open" { style: "text-xs" }
+            }
+            if q.contains("x") {
+                text "has x" { style: "text-xs" }
+            }
+        }
+    }
+}
+"#,
+        );
+        assert!(
+            sfc.contains("collapsed.includes("),
+            "List.contains in view-if must emit includes:
+{sfc}"
+        );
+        assert!(
+            sfc.contains("q.includes("),
+            "str.contains in view-if must emit includes:
+{sfc}"
+        );
+        assert!(
+            !sfc.contains(".contains("),
+            "no raw .contains may remain in the template:
+{sfc}"
+        );
+    }
+
     /// PLAN-092 T-01 B-1: a bare-name `onenter` binding on input/textarea
     /// whose msg variant carries a payload must forward the input's text —
     /// native passes the typed text as the first argument (dynamic.rs Plan

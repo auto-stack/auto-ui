@@ -253,6 +253,13 @@ impl VueGenerator {
         }
         result = result.replace(".is_empty ( )", ".length === 0");
         result = result.replace(".is_empty()", ".length === 0");
+        // PLAN-092 T-07 修复（B-7）：视图条件串的 `.contains ( x )` /
+        // `.contains(x)` → `.includes(x)`（JS 数组/串方法名；expr.rs:553 的
+        // 方法映射只覆盖脚本臂，parse_condition_expr 的条件串后处理缺此映射
+        // ——PropertyInspector 折叠 `!.collapsed.contains(g.id)` 在 vue 轨
+        // TS2339）。空格形态与紧凑形态都改写。
+        result = result.replace(".contains ( ", ".includes(");
+        result = result.replace(".contains(", ".includes(");
         // Plan 043 M5: Auto's None/nil literal → JS null in view conditions.
         // parse_condition_expr emits tokens space-separated, so `None`/`nil`
         // appear as standalone words. Replace them with `null`.

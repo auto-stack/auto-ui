@@ -35,6 +35,11 @@ class Case:
         self.rows = []
         self._last = time.monotonic()
 
+    def reset_stamp(self):
+        """分相记账（test-discipline）：app 启动/会话准备/页面水合不属任何
+        功能用例——准备段结束后重置计时锚，功能用例只计自身执行时长。"""
+        self._last = time.monotonic()
+
     def _stamp(self):
         now = time.monotonic()
         dur = round(now - self._last, 2)
@@ -205,9 +210,10 @@ class Session:
             self.call('autoui_action', element_id=self.node('退出'), action='press')
         except Exception:
             pass
-        try:
-            self.process.wait(timeout=10)
-        except Exception:
+        deadline = time.time() + 6
+        while time.time() < deadline and self.process.poll() is None:
+            time.sleep(0.2)
+        if self.process.poll() is None:
             self.process.kill()
             self.process.wait(timeout=10)
 
@@ -254,6 +260,8 @@ class Browser:
         self.page.wait_for_timeout(2000)
         vfd.require('阅读与外观' in self.page.inner_text('body'), 'vue fixture never rendered')
         vfd.require('字号' in self.page.inner_text('body'), 'vue inspector fields never rendered')
+        # 首屏加载/水合属准备段：用例计时自此之后起算
+        self.page.wait_for_timeout(2500)
 
     def snapshot(self):
         return self.page.inner_text('body')
@@ -384,6 +392,7 @@ def run_native(args, case, report):
         # 确定起点：清 Storage 恢复默认
         s.press('重置全部')
         s.wait(lambda t: '已恢复默认设置' in t, timeout=10, what='reset to defaults')
+        case.reset_stamp()
         snap = s.snapshot()
         # V-01: kinds render from record data (A 页：string/integer/number/bool/enum/color)
         for label in ['字号', '行距', '显示辅助提示', '对齐', '文本色', '预览文本']:
@@ -488,6 +497,7 @@ def run_native(args, case, report):
         try:
             snap = s2.wait(lambda t: '字号' in t and '预览' in t, timeout=20,
                            what='relaunch rendered')
+            case.reset_stamp()
             case.add('V04-reopen', '退出重开二次渲染成功',
                      '字号' in snap and '预览' in snap, snap[-160:])
             report['reopen'] = {'session': 2, 'rendered': '字号' in snap}
@@ -503,6 +513,7 @@ def run_native(args, case, report):
             # 子件异步水合：等 UnitField 的单位按钮出现再断言
             snap = s3.wait(lambda t: '页宽' in t and 'mm' in t and 'cm' in t,
                            timeout=20, what='unit field hydration')
+            case.reset_stamp()
             case.add('V03-two-targets', '第二实例独立目标 editor（同 label 不同面板）',
                      '目标 editor' in snap and '同label不同目标' in snap, snap[-160:])
             b_ok = '数量' in snap and '（系统只读）' in snap and '锁定备注' in snap
@@ -570,6 +581,7 @@ def run_native(args, case, report):
 def run_vue(args, case, report):
     b = Browser(args, args.out_dir, 0)
     try:
+        case.reset_stamp()
         text = b.snapshot()
         # V-01 kinds + sub-controls on vue (home route)
         for label in ['字号', '行距', '显示辅助提示', '对齐', '文本色', '预览文本']:
