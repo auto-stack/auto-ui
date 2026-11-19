@@ -566,6 +566,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 43 | from: work | t
 **尝试与负结果**：为满足 collections 域「不收 `str`」，尝试让**字符串字面量文本叶**不再套 `.clone()`（直接返回字面量，期望其被 owned 上下文 retag 成 `Str`）。结果：plan105 3 例 + plan980 field-manifest 2 例 + plan979 component 2 例翻红——字面量叶的 clone 在既有 leaf/描述面是**承重结构**（类型收敛与 `hidden_conclusion` 依赖它），不能单点去掉。已回滚，全绿恢复。
 
 **结论/下一刀**：collections owned 文本必须从**发射层的类型收敛**入手（例如：在 collections 模式把 `str_lit` 的 type 直接发射为 `t_Str`，同时保留 clone 节点语义），而不是删 clone。下一步先精读 `resolve_method` 的 `clone` 收敛与 `hidden_fn` 类型判定，再改发射层。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 46 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 6b7d6cbed | next: work
+
+2026-11-19 stage: work（T-02 W43：013 store 块定位）| PLAN-105 r1 | outcome: pass（小修 + 缺口定位）| code_commit: auto-lang `6b7d6cbed` | task_ids: T-02（W43）| evidence: 25/25 + 全 affected + prep 6/6
+
+**交付**：`rewrite_store_expr` 不再把 `store.<Msg>()` 判为未接线——这类调用由 store 内联的**展开阶段**（`expand_store_calls`）处理；此前在重写阶段误拒，导致任何含 store 自调用的 store 声明都无法内联。
+
+**013 缺口定位（逐 handler 二分）**：13 个 store handler 中，#4 `.ToggleTodo`、#6 `.ToggleAll`、#8 `.Recompute`、#9 `.StartEdit`、#11 `.CommitEdit` 使用 **C 风格 `for <cond> { … }`** 循环（`for idx < .todos.len() { … }`），AGE `on` 体文法只收 `for <x> in <expr>`；另有 `.todos[idx].id` 列表下标 + 记录字段链。AST 已有 `Stmt::While`，故下一刀 = 文法收 C-for（映射 `Stmt::While`）+ 组件 lowering 的 while 发射 + 列表下标/记录访问。
+
+**012 线索**：其 `for r in .w_rows` 是受支持形，结构错误来自 view 面（`text r` 里的裸名 + `for` 内 `style:` 行），需单独看 view-for 内的 `style` 归属。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248；auto-ui prep 6/6。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
