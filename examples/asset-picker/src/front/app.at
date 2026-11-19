@@ -562,7 +562,7 @@ widget App {
                     }
                     .ApplyQuery()
                     var nid str = sl.id
-                    .status = f"selected identity invalidated: ${nid}"
+                    .status = "selected identity invalidated: " + nid
                 } catch {
                     .status = "invalidate parse failed"
                 }

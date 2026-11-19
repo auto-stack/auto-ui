@@ -741,6 +741,29 @@ def run_picker_matrix(args, out, cases, report):
                   'session=2；confirm 计数只 +1（锁定防重）',
                   'accepted' in conf and (c1 - c0) == 1)
 
+    except Exception as e:
+        report['prep'].append({'stage': 'picker matrix crashed', 'error': repr(e)[:200]})
+    finally:
+        cases.pause_timer()
+        s.stop()
+        cases.resume_timer()
+        patch.restore()
+
+
+def run_picker_stale(args, out, cases, report):
+    """V-03 late segment (fresh session): identity invalidation → rejected →
+    retry; stale vnode rejection; V-06 reopen clears stale feedback."""
+    app_dir = ROOT / 'examples' / 'asset-picker'
+    patch = AppPatch(app_dir)
+    s = None
+    try:
+        cases.pause_timer()
+        s = Session(args, out, 5, app_dir)
+        cases.resume_timer()
+        cases.pause_timer()
+        ok = s.open_picker()
+        vfd.require(ok, 'picker did not open (stale segment)')
+        cases.resume_timer()
         # identity invalidation → rejected not_found → retry allowed → cancel keeps ledger
         s.open_picker()
         time.sleep(1.2)
@@ -748,28 +771,31 @@ def run_picker_matrix(args, out, cases, report):
         attach_before = int(re.findall(r'\d+', s.readback().get('attach', '0 条'))[0]) if re.findall(r'\d+', s.readback().get('attach', '')) else 0
         rb_inv = s.ensure_effect('使选中失效', lambda f: 'invalidated' in f.get('status', ''))
         vfd.require('invalidated' in rb_inv.get('status', ''),
-                    f'invalidate hook did not apply; status={rb_inv.get("status")!r:.120}')
+                f'invalidate hook did not apply; status={rb_inv.get("status")!r:.120}')
         time.sleep(0.8)
+        ok_re = s.open_picker()
+        vfd.require(ok_re, 'picker did not reopen after invalidate')
+        time.sleep(0.6)
         s.press_ok('确认')
         rb = s.wait_rb(lambda f: 'rejected' in f.get('confirmation', ''), timeout=6)
         conf = rb.get('confirmation', '')
         snap = s.snapshot()
         cases.add('V-03 身份失效→具名拒绝', '使选中失效 → 确认',
-                  'confirmation rejected not_found（资源已失效）；picker 未关闭；错误可见',
-                  [conf[:140], '资源已失效' in snap],
-                  'rejected' in conf and 'not_found' in conf and '资源已失效' in snap)
+              'confirmation rejected not_found（资源已失效）；picker 未关闭；错误可见',
+              [conf[:140], '资源已失效' in snap],
+              'rejected' in conf and 'not_found' in conf and '资源已失效' in snap)
         c_before = int(rb.get('counts', ['0'] * 8)[3])
         s.press_ok('确认')
         rb2 = s.wait_rb(lambda f: int(f.get('counts', ['0'] * 8)[3]) > c_before, timeout=6)
         cases.add('V-03 拒绝反馈解锁→可重试', '确认 again',
-                  'confirm 计数继续增长（解锁后可重试）',
-                  [rb2.get('counts')], int(rb2.get('counts', ['0'] * 8)[3]) > c_before)
+              'confirm 计数继续增长（解锁后可重试）',
+              [rb2.get('counts')], int(rb2.get('counts', ['0'] * 8)[3]) > c_before)
         s.press_ok('取消')
         rb3 = s.wait_rb(lambda f: int(f.get('counts', ['0'] * 8)[7]) >= 1, timeout=6)
         attach_after = int(re.findall(r'\d+', rb3.get('attach', '0 条'))[0]) if re.findall(r'\d+', rb3.get('attach', '')) else 0
         cases.add('V-03 取消不落账', '取消',
-                  'cancelled≥1；附件引用数不变（拒绝/取消路径零写入）',
-                  [attach_before, attach_after], attach_after == attach_before)
+              'cancelled≥1；附件引用数不变（拒绝/取消路径零写入）',
+              [attach_before, attach_after], attach_after == attach_before)
 
         # stale vnode rejection: old card vnode after query change
         s.open_picker()
@@ -788,8 +814,8 @@ def run_picker_matrix(args, out, cases, report):
         time.sleep(1.0)
         sel_after = s.readback().get('selection', '')
         cases.add('V-03 旧节点 action 拒绝', 'old vnode press after query change',
-                  '旧 vnode 不产生新选择（被拒或 no-op），新正例可用',
-                  [sel_after[:60]], sel_after == sel_before and 'att-6' not in sel_after)
+              '旧 vnode 不产生新选择（被拒或 no-op），新正例可用',
+              [sel_after[:60]], sel_after == sel_before and 'att-6' not in sel_after)
         s.press_ok('全部')
 
         # V-06: reopen clears stale confirmation feedback
@@ -797,13 +823,16 @@ def run_picker_matrix(args, out, cases, report):
         time.sleep(1.0)
         rb = s.readback()
         cases.add('V-06 重开清空旧确认反馈', 'reopen',
-                  'confirmation=""（旧 accepted/rejected 不入新会话）',
-                  [rb.get('confirmation', '')], rb.get('confirmation', '') == '')
+              'confirmation=""（旧 accepted/rejected 不入新会话）',
+              [rb.get('confirmation', '')], rb.get('confirmation', '') == '')
         s.ensure_closed()
+    except Exception as e:
+        report['prep'].append({'stage': 'stale segment crashed', 'error': repr(e)[:200]})
     finally:
-        cases.pause_timer()
-        s.stop()
-        cases.resume_timer()
+        if s is not None:
+            cases.pause_timer()
+            s.stop()
+            cases.resume_timer()
         patch.restore()
     report['picker_prep'] = report.get('picker_prep', [])
 
@@ -834,8 +863,8 @@ def run_visual_and_reopen(args, out, cases, report):
         cases.add('V-06 pending 反馈后终态回灌', '确认 → wait',
                   'accepted/rejected 回灌（pending 有文字且合同锁定）',
                   [rb.get('confirmation', '')[:100]], rb.get('confirmation', '') != '')
+        # light theme（主页面按钮——对话框必须已关）
         s.ensure_closed()
-        # light theme
         s.press_ok('切换明暗')
         time.sleep(0.8)
         s.open_picker()
@@ -1084,6 +1113,7 @@ def main():
                 completed = True
                 try:
                     run_picker_matrix(args, out, cases, report)
+                    run_picker_stale(args, out, cases, report)
                     run_visual_and_reopen(args, out, cases, report)
                     if not args.skip_029:
                         run_029_legs(args, out, cases, report)
