@@ -38,7 +38,9 @@
 | P-5 | 多包整链真实挂载（asset-browser+tree-view+pagination+image-viewer 同一 Dialog）在 native VM 成功：TreeView 分类行、PaginationControl 页码、卡片网格、ImageViewport 预览面同屏 | 快照 snapshot-picker.txt（`全部/风景/城市/文档` 行、`第 1 / 5 页`、`Lake.jpg` 卡、预览面按钮） | AC-01 native 侧成立；vue 侧由 tools 门生成 + 产品门实跑 |
 | P-6 | 查询/确认/取消/代次闭环真实事件实测通过：queryRequested(seq/baseRevision+完整query) → 应用发布 q2/page=2 → resultQueryId 回灌；确认 `{"session":1|2,"seq":…}` → accepted 后父 open=false；取消一次 cancelled；双按只发一次；provider 故障时确认禁用 | 矩阵 P1/L1/L2/L2b/L3/L3b/L4/L6/L6b pass（probe-results.json） | r2 §5 查询流/确认流合同在 VM 轨成立 |
 | P-7 | 慢A快B代次门：text="slow" 延迟 15 拍发布，期间 kind 翻转立即应用 B；A 到期被应用侧代次门丢弃（staleDrop=1），组件结果保持 B | 矩阵 L5 pass（一轮实证）；驱动轮询有抖动时以 provider 读回为准 | r2 "应用通过请求代次阻止乱序响应"成立 |
-| P-8 | front 进程 `auto.image` 会话（P1 of 089 同拓扑）为记录提供真实媒体 URI：Init 打开会话 → current_uri `/api/__auto/media/{id}/1` 回填 thumbnailUri，卡片 image 元素走真实授权媒体路径 | 读回 `lake_uri=/api/__auto/media/ed6f…/1`；卡片 [Image] 渲染 | 缩略图/预览 src = 既有授权媒体 URI（opaque），组件零字节持有 |
+| P-8 | front 进程 `auto.image` 会话（P1 of 089 同拓扑）为记录提供真实媒体 URI：Init 打开会话 → current_uri `/api/__auto/media/{id}/1` 回填 thumbnailUri，卡片 image 元素走真实授权媒体路径；asset-picker 例改用 **back 进程会话**（`api: rust` 合并模式下票据注册表共享，back api `media_uris` 无状态端点）同出真实 URI | 读回 `lake_uri=/api/__auto/media/…`；示例卡片真图渲染 | 缩略图/预览 src = 既有授权媒体 URI（opaque），组件零字节持有 |
+| P-9 | **示例相对包路径在 dev 运行也静默缺席**：asset-picker 例 `../../`、`../../../` 两种相对形态 + image-preview 例既有 `../../../packages/image-viewer` 提交形态，dev `auto run` 下组件全部不挂载（快照无组件节点）；绝对路径挂载成功。029 既有 5-up 相对形态同族 | smoke5-7 对照 + image-preview dev 快照（放大/宽度工具栏缺席） | 提交源沿仓库先例保留相对形态（image-preview/029 同款），**产品门必须原地重写为绝对路径**（089 P6b 规程）；跨例的路径解析基准问题具名为仓库级观察，不在本计划内改运行时 |
+| P-10 | a2r 生成后端的自定义模块 lift（`use attachdb`）产物引用 `once_cell` 但 axum 族 manifest 不含该依赖 → back 编译失败（E0433） | smoke2.log error[E0433]；生成物 attachdb.rs:4 `use once_cell::sync::Lazy` | 示例改用 031 同构无状态 back + 应用 Storage 承载附件日志（029 favs 同款应用自有持久化）；生成器缺口具名，不在本计划内修 |
 
 ### 3.2 tools 生成门（已落地，永久门 T-05 复用）
 

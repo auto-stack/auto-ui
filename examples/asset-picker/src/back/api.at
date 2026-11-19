@@ -1,0 +1,32 @@
+// api.at — asset-picker demo backend (PLAN-091 T-04).
+//
+// 授权资源 provider 的业务面：图片夹具的真实媒体 URI（back 进程媒体会话；
+// 合并模式下 back 在前进程内、票据注册表共享——PLAN-089 P1 拓扑）。
+// 附件引用日志由前端应用 Storage 承载（029 favs 同款应用自有持久化）；
+// 本后端保持无状态（031 控制面同构）。
+use auto.image
+
+pub type AssetUri = {
+    id: str
+    uri: str
+}
+
+/// GET /api/assets/health
+#[api(method = "GET", path = "/api/assets/health")]
+pub fn health() str {
+    return "Ready"
+}
+
+/// GET /api/assets/media-uris — 图片夹具的真实授权媒体 URI。
+/// rendition 由后台 lane 发布：current_uri 就绪前为空串，前端轮询回填。
+/// 会话按调用打开（demo 夹具；前端就绪即停轮询，调用次数有限）。
+#[api(method = "GET", path = "/api/assets/media-uris")]
+pub fn media_uris() []AssetUri {
+    var out []AssetUri = []
+    out.push({ id: "lake", uri: image.current_uri(image.open_session("tests/fixtures/scenic-320x240.png")) })
+    out.push({ id: "corner", uri: image.current_uri(image.open_session("tests/fixtures/corner-marked.png")) })
+    out.push({ id: "rgb", uri: image.current_uri(image.open_session("tests/fixtures/rgb-1x1.png")) })
+    out.push({ id: "alpha", uri: image.current_uri(image.open_session("tests/fixtures/alpha-2x1.png")) })
+    out.push({ id: "orient", uri: image.current_uri(image.open_session("tests/fixtures/orientation-6.jpg")) })
+    return out
+}

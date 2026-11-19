@@ -1,20 +1,22 @@
 // app.at — 029-photo-gallery 现代相册（Plan 628 → PLAN-043 Part 1 后端化）
 //
 // 数据源：后端 photo_service 实时扫描（pac `photo_root:` 声明根目录）——
-// Init 拉 /api/photos/scan?dir=<当前目录> 建网格；缩略图走
+// Init 拉 /api/photos/scan?dir=<当前目录> 建库面；缩略图走
 // /api/photos/thumb/:id（按需渲染 + 磁盘缓存），查看器原图走
 // /api/photos/full/:id。目录增删后重启 app 即跟随（Plan 628 离线烘焙链
 // 已删，见 pac.at 头注）。
 //
-// 浏览模型（2026-09-24 用户裁定）：**非递归**——网格只列当前目录直属
-// 图片；子目录以导航 chip 呈现（计数 = 该目录直属图片数），点击进入、
-// 顶栏返回上一级。收藏跨目录全局（fav 记录带完整 URL，收藏页聚合
-// 所有目录的收藏项）。
+// PLAN-091 T-04 网格/搜索/目录迁移：库面（网格/搜索/相册/目录导航）消费
+// 官方 AssetBrowser 包（受控 query/selection 合同）——应用仍是唯一
+// provider：scan 业务、收藏（photo-gallery.favs）、相册、资源 URL 契约
+// 全部保留；查看区（PLAN-089 ImageViewport）不变。卡片点击=选择；
+// 「查看大图」按选择身份进入查看器；收藏走工具栏「收藏选中」；分页由
+// PaginationControl 驱动（替代原 render_cap 批量闸）。
 //
-// UI：平板/手机端沉浸式设计——分段相册导航（动态分组：全部/各子目录/
-// 收藏）+ 搜索/排序/网格密度工具栏 + 无边框照片网格 + 悬浮胶囊查看器
-// （上一张/下一张/收藏）。收藏 id 落 app Storage（photo-gallery.favs），
-// 重开保留。
+// 浏览模型（2026-09-24 用户裁定，迁移后保留）：**非递归**——库面只列当前
+// 目录直属图片；子目录以分类树节点呈现（folder id = "dir:<rel>"，选择即
+// 进入）。收藏跨目录全局（fav 记录带完整 URL，收藏夹聚合所有目录的收藏
+// 项）。收藏 id 落 app Storage（photo-gallery.favs），重开保留。
 
 use auto.json
 use stylekit.styles: caption_text
@@ -24,32 +26,24 @@ use stylekit.styles: caption_text
 // ToggleDark/SetAccent 原 handler 全保留；scan/thumb/full 与收藏业务零改动）。
 use themes.themes: Auto, Solarized
 
+// PLAN-091 T-04：库面消费官方包（查看区消费 image_viewer 保持不变）。
+use { package: asset_browser from "../../../../../packages/asset-browser" }
+
 style label_xs_medium = "text-xs font-medium"
-style emoji_count = "text-[11px] ml-1.5 opacity-60"
-style img_fill = "w-full h-full"
-style photo_btn = "w-full h-auto p-0 border-0 rounded-none bg-transparent block cursor-pointer"
-style meta_trunc = "text-xs font-semibold truncate"
-style row_meta = "items-center gap-2.5"
 style glass_btn_a = "h-9 px-4 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center gap-1.5 border border-white/10"
 style glass_btn_b = "h-9 px-3.5 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center gap-1.5 backdrop-blur-md border border-white/10"
 style icon_btn = "h-8 w-8 rounded-lg bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center"
-style group_card = "group rounded-2xl overflow-hidden bg-card border border-border/50 hover:border-primary/60 transition-all shadow-sm flex flex-col"
-style meta_col = "flex-1 min-w-0 pr-2"
 
 widget App {
     // PLAN-089：查看区（原图展示）消费正式包（widget 内 use；收藏/目录/
-    // 扫描业务仍归 Gallery，029 网格保留给 PLAN-091 后续重基线）。
+    // 扫描业务仍归 Gallery）。
     use { package: image_viewer from "../../../../../packages/image-viewer" }
     msg {
         Init,
-        SelectAlbum(str), SetSearch(str), ApplyFilter,
-        NavigateDir(str), GoUp, ReloadDir,
-        ToggleSort, SetDensity(int),
-        OpenPhoto(str), PrevPhoto, NextPhoto, BackToGrid,
-        ApplyView(str),
-        ToggleFav(str),
-        LoadMore,
-        ToggleDark, SetAccent(str)
+        GoUp, ReloadDir,
+        ToggleSort, ToggleDark, SetAccent(str),
+        OpenSelected, ToggleFavSelected,
+        GalQuery(str), GalSel(str), GalPrev(str), GalApply
     }
 
     model {
@@ -61,37 +55,42 @@ widget App {
         var mode str = "grid"               // "grid" | "view"
 
         // ---- 数据源（Init/导航自后端 scan 填充；非递归浏览模型）----
-        var photos = []                     // 当前目录直属图片 {id,title,date,meta,fav,thumb,full,sort_key}
-        var dirs = []                       // 当前目录的子目录导航 [{name,rel_path,image_count}]
+        var photos = []                     // 当前目录直属图片（scan 原始条目）
+        var dirs = []                       // 当前目录的子目录 [{name,rel_path}]
         var dir str = ""                    // 当前目录（根相对路径，"" = 根）
-        var dir_badge str = ""              // 页签行目录徽标（"📁 <dir>"，根为空）
-        var scan_source_label str = ""      // 信息条扫描源文案
         var fav_records = []                // 收藏全记录（跨目录聚合视图 + Storage 持久化）
         var load_error str = ""             // scan 失败文案（空 = 成功）
         var root_missing bool = false       // 后端根目录缺席诚实态
 
-        // ---- 过滤 / 排序 / 密度 ----
-        var album str = "all"               // all | favorites | <album key>
+        // ---- 过滤 / 排序（provider 镜像）----
+        var album str = "all"               // all | favorites
         var search_q str = ""
         var sort_dir str = "desc"           // "desc"=最新在前 | "asc"
         var sort_label str = "最新 ↓"
-        var density int = 3                 // 网格列数：2 | 3 | 4
-        var album_tabs = []                 // {key,label,count} 动态分组
+        var status_label str = "加载中…"
+        var scan_source_label str = ""
 
-        // ---- 主列表与视图列表 ----
-        var view_list = []
+        // ---- PLAN-091 provider 受控面（AssetBrowser 的应用侧）----
+        var gal_records = []                // 当前页（r2 记录形状）
+        var gal_folders = []                // 分类树（全部/收藏/各子目录）
+        var gal_error str = ""              // 组件 errorMessage（provider 具名错误）
+        var query str = ""
+        var querySeq int = 0
+        var resultQueryId str = ""
+        var total int = 0
+        var selection str = ""
+        var revision int = 100
+        var loading bool = false
+        var qf_id str = "q1"
+        var qf_folder str = "all"
+        var qf_text str = ""
+        var qf_kind str = ""
+        var qf_page int = 1
+        var qf_pageSize int = 50
+        var qid_counter int = 1
+        var last_accepted_seq int = 0
+        var view_list = []                  // 过滤+排序后的全量（当前语义域）
         var view_ids = []
-        var has_view bool = false
-        // 分批渲染闸（PLAN-043 性能边界）：VM native 渲染器的 image 加载
-        // 是渲染线程同步阻塞 HTTP——一次全量渲染 400+ 缩略图会把 UI 冻死
-        //（实机：412 张时 screenshot 超时 / 进程失联）。网格只画前
-        // render_cap 张，底部「加载更多」分批解锁；查看器单张不受影响。
-        var render_cap int = 60
-        var render_more_label str = ""
-        var render_list = []
-
-        // ---- 计数与文案 ----
-        var view_label str = "加载中…"
 
         // ---- 查看器 ----
         var cur_id str = ""
@@ -105,13 +104,11 @@ widget App {
         var view_ox float = 0.0
         var view_oy float = 0.0
         var view_rot int = 0
-        var view_events int = 0
         var prev_id str = ""
         var next_id str = ""
         var fav_label str = "♡ 收藏"
         var is_cur_fav bool = false
-        // PLAN-046 T-03：主题族选择态（与既有 dark_mode/accent_color 契约
-        // 变量同列；family 经 design 绑定接官方包两族，默认 Auto）。
+        // PLAN-046 T-03：主题族选择态。
         var theme_name str = "Auto"
     }
 
@@ -127,81 +124,35 @@ widget App {
             style: "w-full h-screen flex flex-col bg-background text-foreground overflow-hidden font-sans"
 
             // ════════════════════════════════════════════════════════
-            // 模式 1：网格相册模式 (移动/平板全幅沉浸)
+            // 模式 1：库面（PLAN-091：AssetBrowser 消费网格/搜索/目录）
             // ════════════════════════════════════════════════════════
             if .mode == "grid" {
                 col {
                     style: "w-full h-full flex flex-col overflow-hidden"
 
-                    // ---- 顶部沉浸式导航栏（Segmented Control + 工具栏） ----
+                    // ---- 顶栏：标题 + 选择动作 + 排序/主题 ----
                     row {
-                        style: "h-16 shrink-0 items-center justify-between px-6 border-b border-border bg-card/60 backdrop-blur-md gap-4"
+                        style: "h-14 shrink-0 items-center justify-between px-5 border-b border-border bg-card/60 gap-3"
 
-                        // App 标题徽标
                         row {
-                            style: row_meta
+                            style: "items-center gap-2.5"
                             text "相册" { style: "text-lg font-bold tracking-tight" }
                             text "Photos" { style: "text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium" }
-                        }
-
-                        // 分段胶囊控制条（全部/收藏 + 子目录导航 chips）
-                        row {
-                            style: "items-center p-1 bg-muted/60 rounded-xl border border-border/50 gap-1"
                             if .dir != "" {
-                                button {
+                                button (text: "← 上一级", variant: "ghost") {
                                     onclick: .GoUp
-                                    style: "h-8 px-3 rounded-lg bg-background text-foreground text-xs font-semibold shadow-sm"
-                                    text "← 返回" { style: "text-xs" }
-                                }
-                                text .dir_badge { style: "text-[11px] text-muted-foreground px-1 max-w-40 truncate" }
-                            }
-                            for t in .album_tabs {
-                                button {
-                                    onclick: .SelectAlbum(t.key)
-                                    style: if .album == t.key { "h-8 px-4 rounded-lg bg-background text-foreground text-xs font-semibold shadow-sm" } else { "h-8 px-4 rounded-lg bg-transparent text-muted-foreground hover:text-foreground text-xs font-medium" }
-                                    text t.label { style: "text-xs" }
-                                    text t.count { style: emoji_count }
-                                }
-                            }
-                            for d in .dirs {
-                                button {
-                                    onclick: .NavigateDir(d.rel_path)
-                                    style: "h-8 px-3 rounded-lg bg-transparent text-muted-foreground hover:text-foreground text-xs font-medium border border-border/40"
-                                    text d.label { style: "text-xs" }
-                                    text d.count { style: emoji_count }
+                                    style: "h-8 px-3 rounded-lg bg-background text-foreground text-xs font-semibold shadow-sm border border-border"
                                 }
                             }
                         }
 
-                        // 右侧工具区：搜索、排序、网格密度调节、主题色
                         row {
-                            style: row_meta
-                            input {
-                                value: .search_q
-                                oninput: .SetSearch
-                                onchange: .SetSearch
-                                placeholder: "🔍 搜索照片…"
-                                style: "w-44 h-8 text-xs px-3 bg-background border border-border/80 rounded-lg outline-none placeholder:text-muted-foreground focus:border-primary"
-                            }
+                            style: "items-center gap-2"
+                            button (text: "查看大图", title: "查看选中的照片", onclick: .OpenSelected, disabled: .selection == "", style: "h-8 px-3 text-xs rounded-lg border border-primary text-primary disabled:opacity-40") {}
+                            button (text: "收藏选中", title: "收藏/取消收藏选中的照片", onclick: .ToggleFavSelected, disabled: .selection == "", style: "h-8 px-3 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40") {}
                             button (text: .sort_label, variant: "ghost") {
                                 onclick: .ToggleSort
                                 style: "h-8 px-2.5 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground"
-                            }
-                            // 缩放密度按钮 (2 / 3 / 4 列)
-                            row {
-                                style: "items-center bg-muted/60 border border-border/60 rounded-lg p-0.5 gap-0.5"
-                                button (text: "2", variant: "ghost") {
-                                    onclick: .SetDensity(2)
-                                    style: if .density == 2 { "h-7 w-7 text-xs rounded-md bg-background text-foreground font-bold shadow-sm" } else { "h-7 w-7 text-xs rounded-md text-muted-foreground hover:text-foreground" }
-                                }
-                                button (text: "3", variant: "ghost") {
-                                    onclick: .SetDensity(3)
-                                    style: if .density == 3 { "h-7 w-7 text-xs rounded-md bg-background text-foreground font-bold shadow-sm" } else { "h-7 w-7 text-xs rounded-md text-muted-foreground hover:text-foreground" }
-                                }
-                                button (text: "4", variant: "ghost") {
-                                    onclick: .SetDensity(4)
-                                    style: if .density == 4 { "h-7 w-7 text-xs rounded-md bg-background text-foreground font-bold shadow-sm" } else { "h-7 w-7 text-xs rounded-md text-muted-foreground hover:text-foreground" }
-                                }
                             }
                             if .dark_mode {
                                 button {
@@ -219,10 +170,10 @@ widget App {
                         }
                     }
 
-                    // 信息提示条（计数 + 后端扫描态）
+                    // ---- 信息条（计数 + 后端扫描态/错误）----
                     row {
-                        style: "h-8 shrink-0 items-center justify-between px-6 bg-muted/20 border-b border-border/40"
-                        text .view_label { style: caption_text }
+                        style: "h-8 shrink-0 items-center justify-between px-5 bg-muted/20 border-b border-border/40"
+                        text .status_label { style: caption_text }
                         if .root_missing {
                             text "⚠️ 照片源目录不存在（检查 photo_root）" { style: "text-[11px] text-destructive/80" }
                         } else {
@@ -230,163 +181,20 @@ widget App {
                         }
                     }
 
-                    // 照片网格区 (无缝现代网格设计，纯净呈现图片主体)
-                    col {
-                        style: "flex-1 min-h-0 overflow-y-auto p-5"
-                        if .has_view {
-                            if .density == 2 {
-                                grid {
-                                    cols: 2
-                                    gap: 16
-                                    for item in .render_list {
-                                        col {
-                                            style: group_card
-                                            // 图片区域（点击直开原图）
-                                            button {
-                                                onclick: .OpenPhoto(item.id)
-                                                style: photo_btn
-                                                col {
-                                                    style: "h-56 w-full overflow-hidden bg-muted"
-                                                    image (src: item.thumb, alt: item.title, fit: "cover") {
-                                                        style: img_fill
-                                                    }
-                                                }
-                                            }
-                                            // 悬浮信息条（标题 + 拍摄日期 + 收藏）
-                                            row {
-                                                style: "items-center justify-between px-3.5 py-2.5 bg-card"
-                                                col {
-                                                    style: meta_col
-                                                    text item.title { style: meta_trunc }
-                                                    text item.date { style: "text-[11px] text-muted-foreground mt-0.5" }
-                                                }
-                                                if item.fav {
-                                                    button (text: "❤", variant: "ghost") {
-                                                        onclick: .ToggleFav(item.id)
-                                                        style: "shrink-0 h-7 w-7 p-0 text-sm text-destructive hover:bg-destructive/10 rounded-full"
-                                                    }
-                                                } else {
-                                                    button (text: "♡", variant: "ghost") {
-                                                        onclick: .ToggleFav(item.id)
-                                                        style: "shrink-0 h-7 w-7 p-0 text-sm text-muted-foreground hover:text-foreground rounded-full"
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else if .density == 3 {
-                                grid {
-                                    cols: 3
-                                    gap: 14
-                                    for item in .render_list {
-                                        col {
-                                            style: group_card
-                                            button {
-                                                onclick: .OpenPhoto(item.id)
-                                                style: photo_btn
-                                                col {
-                                                    style: "h-48 w-full overflow-hidden bg-muted"
-                                                    image (src: item.thumb, alt: item.title, fit: "cover") {
-                                                        style: img_fill
-                                                    }
-                                                }
-                                            }
-                                            row {
-                                                style: "items-center justify-between px-3 py-2 bg-card"
-                                                col {
-                                                    style: meta_col
-                                                    text item.title { style: meta_trunc }
-                                                    text item.date { style: "text-[10px] text-muted-foreground mt-0.5" }
-                                                }
-                                                if item.fav {
-                                                    button (text: "❤", variant: "ghost") {
-                                                        onclick: .ToggleFav(item.id)
-                                                        style: "shrink-0 h-6 w-6 p-0 text-xs text-destructive hover:bg-destructive/10 rounded-full"
-                                                    }
-                                                } else {
-                                                    button (text: "♡", variant: "ghost") {
-                                                        onclick: .ToggleFav(item.id)
-                                                        style: "shrink-0 h-6 w-6 p-0 text-xs text-muted-foreground hover:text-foreground rounded-full"
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else if .density == 4 {
-                                grid {
-                                    cols: 4
-                                    gap: 10
-                                    for item in .render_list {
-                                        col {
-                                            style: "group rounded-xl overflow-hidden bg-card border border-border/50 hover:border-primary/60 transition-all shadow-sm flex flex-col"
-                                            button {
-                                                onclick: .OpenPhoto(item.id)
-                                                style: photo_btn
-                                                col {
-                                                    style: "h-36 w-full overflow-hidden bg-muted"
-                                                    image (src: item.thumb, alt: item.title, fit: "cover") {
-                                                        style: img_fill
-                                                    }
-                                                }
-                                            }
-                                            row {
-                                                style: "items-center justify-between px-2.5 py-1.5 bg-card"
-                                                col {
-                                                    style: "flex-1 min-w-0 pr-1"
-                                                    text item.title { style: "text-[11px] font-medium truncate" }
-                                                    text item.date { style: "text-[10px] text-muted-foreground" }
-                                                }
-                                                if item.fav {
-                                                    button (text: "❤", variant: "ghost") {
-                                                        onclick: .ToggleFav(item.id)
-                                                        style: "shrink-0 h-5 w-5 p-0 text-xs text-destructive rounded-full"
-                                                    }
-                                                } else {
-                                                    button (text: "♡", variant: "ghost") {
-                                                        onclick: .ToggleFav(item.id)
-                                                        style: "shrink-0 h-5 w-5 p-0 text-xs text-muted-foreground rounded-full"
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if .render_more_label != "" {
-                            row {
-                                style: "w-full items-center justify-center py-6"
-                                button (text: .render_more_label, variant: "ghost") {
-                                    onclick: .LoadMore
-                                    style: "h-9 px-5 text-xs rounded-full border border-border text-muted-foreground hover:text-foreground"
-                                }
-                            }
-                        }
-                        if !.has_view {
-                            col {
-                                style: "w-full flex flex-col items-center justify-center py-24 gap-3"
-                                if .load_error != "" {
-                                    text "⚠️" { style: "text-5xl opacity-80" }
-                                    text .load_error { style: "text-sm font-semibold" }
-                                    text "后端启动后重新打开本应用（scan 端点 /api/photos/scan）" { style: caption_text }
-                                } else if .root_missing {
-                                    text "🖼️" { style: "text-5xl opacity-80" }
-                                    text "照片源目录不存在" { style: "text-sm font-semibold" }
-                                    text "检查后端 photo_root 配置指向的目录" { style: caption_text }
-                                } else {
-                                    text "🖼️" { style: "text-5xl opacity-80" }
-                                    text "当前相册未找到照片" { style: "text-sm font-semibold" }
-                                    text "试着清空搜索关键字，或在上方切换到其他相簿" { style: caption_text }
-                                }
-                            }
-                        }
-                    }
+                    // ---- 库面：官方 AssetBrowser（PLAN-091）----
+                    AssetBrowser (
+                        records: .gal_records, folders: .gal_folders, query: .query,
+                        querySeq: .querySeq, resultQueryId: .resultQueryId,
+                        total: .total, selection: .selection, revision: .revision,
+                        loading: .loading, errorMessage: .gal_error,
+                        onqueryRequested: .GalQuery($event),
+                        onselectionRequested: .GalSel($event),
+                        onpreviewRequested: .GalPrev($event)
+                    ) {}
                 }
             } else {
                 // ════════════════════════════════════════════════════════
-                // 模式 2：沉浸式原画全屏查看态 (移动/平板 Lightbox)
+                // 模式 2：沉浸式原画全屏查看态 (PLAN-089 查看区，不变)
                 // ════════════════════════════════════════════════════════
                 col {
                     style: "w-full h-full flex flex-col bg-black text-white relative select-none"
@@ -461,7 +269,7 @@ widget App {
     }
 
     on {
-        // ---- Init：收藏恢复（JSON 全记录）→ scan 当前目录 → 建网格 ----
+        // ---- Init：收藏恢复（JSON 全记录）→ scan 当前目录 → 建库面 ----
         .Init -> {
             // 收藏恢复：JSON 往返（Storage 字符串 → 解析 list）。勿用逐
             // 字符 CSV 解析——str[i] 索引返回字符码 int，拼接会把字节转
@@ -495,9 +303,7 @@ widget App {
                     let d = dd[di]
                     dlist.push({
                         name: d.name,
-                        rel_path: d.rel_path,
-                        label: "📂 " + d.name,
-                        count: d.image_count.str()
+                        rel_path: d.rel_path
                     })
                     di = di + 1
                 }
@@ -532,12 +338,9 @@ widget App {
                     i = i + 1
                 }
                 .photos = plist
-                // 目录徽标与扫描源文案（text 只接标识符，表达式须预计算）
                 if .dir == "" {
-                    .dir_badge = ""
                     .scan_source_label = "后端实时扫描 · 根目录"
                 } else {
-                    .dir_badge = "📁 " + .dir
                     .scan_source_label = "后端实时扫描 · " + .dir
                 }
             } catch {
@@ -545,18 +348,12 @@ widget App {
                 .dirs = []
                 .root_missing = false
                 .load_error = "照片后端未就绪（scan 请求失败）"
+                .gal_error = "gallery: " + .load_error
             }
-            .ApplyFilter()
+            .GalApply()
         }
 
-        // ---- 导航：进入子目录 / 返回上一级 ----
-        .NavigateDir(rel) -> {
-            .dir = rel
-            .album = "all"
-            .render_cap = 60
-            .ReloadDir()
-        }
-
+        // ---- 导航：返回上一级（进入子目录走分类树选择）----
         .GoUp -> {
             // 去掉末段：a/b/c → a/b；单段 → 根。split + 重组（不用逐字符
             // 索引——str[i] 返回字符码 int，与 str 比较恒假）。
@@ -574,37 +371,137 @@ widget App {
                 .dir = up
             }
             .album = "all"
-            .render_cap = 60
+            .qf_folder = "all"
             .ReloadDir()
         }
 
-        .SelectAlbum(a) -> {
-            .album = a
-            .render_cap = 60
-            .ApplyFilter()
+        .ToggleSort -> {
+            if .sort_dir == "desc" {
+                .sort_dir = "asc"
+                .sort_label = "最早 ↑"
+            } else {
+                .sort_dir = "desc"
+                .sort_label = "最新 ↓"
+            }
+            .GalApply()
         }
 
-        .SetSearch(q) -> {
-            .search_q = q
-            .render_cap = 60
-            .ApplyFilter()
+        // ============================================================
+        // PLAN-091 provider：AssetBrowser 的应用侧（唯一查询/选择写点）
+        // ============================================================
+        // 查询请求：folder 语义映射（all=当前目录 / favorites=收藏夹 /
+        // dir:<rel>=进入子目录），text=搜索，page/pageSize=真实分页。
+        .GalQuery(ev str) -> {
+            try {
+                let req = json.parse(ev)
+                let q = req.query
+                if req.baseRevision != .revision {
+                    .querySeq = req.seq
+                    .loading = false
+                    .gal_error = "gallery: 查询代次已过期（invalid_query）"
+                    .status_label = "查询被拒绝：代次过期"
+                } else {
+                    if req.seq <= .last_accepted_seq {
+                        .status_label = "查询已丢弃：代次过期"
+                    } else {
+                        .last_accepted_seq = req.seq
+                        .querySeq = req.seq
+                        var clear_sel bool = false
+                        if q.folderId != .qf_folder {
+                            clear_sel = true
+                        }
+                        if q.text != .qf_text {
+                            clear_sel = true
+                        }
+                        if q.kind != .qf_kind {
+                            clear_sel = true
+                        }
+                        if clear_sel {
+                            .selection = ""
+                        }
+                        var navigate str = ""
+                        if q.folderId != .qf_folder {
+                            if q.folderId == "all" {
+                                .album = "all"
+                                if .dir != "" {
+                                    navigate = "root"
+                                }
+                            } else {
+                                if q.folderId == "favorites" {
+                                    .album = "favorites"
+                                    if .dir != "" {
+                                        navigate = "root"
+                                    }
+                                } else {
+                                    var rel str = q.folderId
+                                    if rel.contains("dir:") {
+                                        rel = rel.replace("dir:", "")
+                                        .album = "all"
+                                        navigate = rel
+                                    }
+                                }
+                            }
+                        }
+                        .qf_folder = q.folderId
+                        .qf_text = q.text
+                        .qf_kind = q.kind
+                        .qf_page = q.page
+                        .qf_pageSize = q.pageSize
+                        .qid_counter = .qid_counter + 1
+                        .qf_id = "q" + .qid_counter.str()
+                        .query = json.stringify({id: .qf_id, folderId: .qf_folder, text: .qf_text, kind: .qf_kind, page: .qf_page, pageSize: .qf_pageSize})
+                        .revision = .revision + 1
+                        .gal_error = ""
+                        .loading = true
+                        if navigate == "root" {
+                            .dir = ""
+                            .ReloadDir()
+                        } else {
+                            if navigate != "" {
+                                .dir = navigate
+                                .ReloadDir()
+                            } else {
+                                .GalApply()
+                            }
+                        }
+                    }
+                }
+            } catch {
+                .status_label = "查询请求解析失败"
+            }
         }
 
-        // ---- 过滤 + 排序 + 页签计数（all=当前目录 / favorites=全局收藏）----
-        .ApplyFilter -> {
-            let ql str = .search_q.lower()
+        // 应用查询：分类树 + 过滤 + 排序 + 真实分页 + 发布（结果可信三件套）。
+        .GalApply -> {
+            // 分类树（当前目录视角：全部/收藏/各子目录）
+            var tabs = [{id: "all", label: "全部", children: []}, {id: "favorites", label: "❤ 收藏", children: []}]
+            var ti int = 0
+            while ti < .dirs.len() {
+                tabs.push({id: "dir:" + .dirs[ti].rel_path, label: "📂 " + .dirs[ti].name, children: []})
+                ti = ti + 1
+            }
+            .gal_folders = tabs
 
-            // 数据源：收藏视图聚合 fav_records，其余为当前目录 photos
+            let ql str = .qf_text.lower()
+
+            // 数据源：收藏夹聚合 fav_records，其余为当前目录 photos
             var source = .photos
             if .album == "favorites" { source = .fav_records }
 
-            // 过滤：搜索子串（fav 已在两源各自内建）
+            // 搜索子串（fav 已在两源各自内建）
             var hits = []
             var i int = 0
             var n_all int = source.len()
             while i < n_all {
                 let p = source[i]
-                let tmatch = (ql == "") || p.title.lower().contains(ql)
+                var tmatch bool = false
+                if ql == "" {
+                    tmatch = true
+                } else {
+                    if p.title.lower().contains(ql) {
+                        tmatch = true
+                    }
+                }
                 if tmatch {
                     hits.push(i)
                 }
@@ -650,58 +547,109 @@ widget App {
 
             .view_list = vlist
             .view_ids = vids
-            .has_view = (vids.len() > 0)
+            .total = vlist.len()
 
-            // 分批渲染闸：只画前 render_cap 张（VM native image 同步阻塞
-            // 加载的实机性能边界——见 model 注记）。剩余张数进按钮文案。
-            var cap int = .render_cap
-            if vlist.len() < cap { cap = vlist.len() }
-            var rlist = []
-            var ri int = 0
-            while ri < cap {
-                rlist.push(vlist[ri])
-                ri = ri + 1
+            // 真实分页（PLAN-091：page/pageSize 由 query 携带；替代原
+            // render_cap 批量闸——分页由 PaginationControl 驱动）。
+            var start int = (.qf_page - 1) * .qf_pageSize
+            var page = []
+            var ri int = start
+            while ri < vlist.len() {
+                if ri >= start + .qf_pageSize {
+                    ri = vlist.len()
+                } else {
+                    let p = vlist[ri]
+                    page.push({
+                        id: p.id,
+                        revision: p.sort_key.str(),
+                        label: p.title,
+                        kind: "image",
+                        thumbnailUri: p.thumb,
+                        resourceRef: "photo:" + p.id
+                    })
+                    ri = ri + 1
+                }
             }
-            .render_list = rlist
-            if vlist.len() > cap {
-                .render_more_label = "还有 " + (vlist.len() - cap).str() + " 张 · 点击加载更多"
-            } else {
-                .render_more_label = ""
-            }
-
-            // 页签：全部（当前目录）+ 收藏（全局）；子目录走独立导航条。
-            var c_fav int = .fav_records.len()
-            var tabs2 = [{ key: "all", label: "全部照片", count: .photos.len().str() }]
-            tabs2.push({ key: "favorites", label: "❤ 收藏", count: c_fav.str() })
-            .album_tabs = tabs2
+            .gal_records = page
+            .resultQueryId = .qf_id
+            .loading = false
+            .search_q = .qf_text
 
             // 文案
             var cur_label str = "全部"
-            if .album == "favorites" { cur_label = "收藏" }
-            if .search_q == "" {
-                .view_label = vids.len().str() + " 项内容 · " + cur_label
+            if .album == "favorites" { cur_label = "收藏夹" }
+            if .qf_text == "" {
+                .status_label = .total.str() + " 项内容 · " + cur_label + " · 第 " + .qf_page.str() + " 页"
             } else {
-                .view_label = vids.len().str() + " 项内容 · 搜索 “" + .search_q + "” · " + cur_label
+                .status_label = .total.str() + " 项内容 · 搜索 “" + .qf_text + "” · " + cur_label + " · 第 " + .qf_page.str() + " 页"
             }
         }
 
-        .ToggleSort -> {
-            if .sort_dir == "desc" {
-                .sort_dir = "asc"
-                .sort_label = "最早 ↑"
-            } else {
-                .sort_dir = "desc"
-                .sort_label = "最新 ↓"
+        // 选择请求：在当前语义域定位真实身份（收藏夹里可能不在当前目录）。
+        .GalSel(ev str) -> {
+            try {
+                let req = json.parse(ev)
+                var found int = -1
+                var src = .photos
+                if .album == "favorites" {
+                    src = .fav_records
+                }
+                var si int = 0
+                while si < src.len() {
+                    if src[si].id == req.id { found = si }
+                    si = si + 1
+                }
+                if found < 0 {
+                    // 不在当前域（跨目录收藏等）：回退在 photos 里定位
+                    var pi int = 0
+                    while pi < .photos.len() {
+                        if .photos[pi].id == req.id { found = pi }
+                        pi = pi + 1
+                    }
+                    if found >= 0 {
+                        src = .photos
+                    }
+                }
+                if found >= 0 {
+                    let c = src[found]
+                    .selection = json.stringify({id: c.id, revision: c.sort_key.str(), label: c.title})
+                    .status_label = "已选 " + c.title
+                } else {
+                    .status_label = "选择被拒绝：当前库中无此资源"
+                }
+            } catch {
+                .status_label = "选择请求解析失败"
             }
-            .render_cap = 60
-            .ApplyFilter()
         }
 
-        .SetDensity(d) -> {
-            .density = d
+        // 组件内预览（缩略图视口）仅观察；大图走「查看大图」→查看器。
+        .GalPrev(ev str) -> {
+            .status_label = "缩略图预览请求已收到"
         }
 
-        // ---- 查看器：按 id 定位（view_ids 为当前过滤排序序）----
+        // ---- 查看器：按选择身份定位（view_ids 为当前过滤排序序）----
+        .OpenSelected -> {
+            if .selection != "" {
+                try {
+                    let s = json.parse(.selection)
+                    .OpenPhoto(s.id)
+                } catch {
+                    .status_label = "选择身份解析失败"
+                }
+            }
+        }
+
+        // ---- 收藏选中（业务保留：photos 翻标 + fav_records 增删 + 持久化）----
+        .ToggleFavSelected -> {
+            if .selection != "" {
+                try {
+                    let s = json.parse(.selection)
+                    .ToggleFav(s.id)
+                } catch {
+                }
+            }
+        }
+
         .OpenPhoto(pid) -> {
             var pos int = -1
             var n int = .view_ids.len()
@@ -762,11 +710,13 @@ widget App {
                 .view_rev = .view_rev + 1
             }
         }
-        // 组件 loaded/error/navigate 事件在 029 仅计数观察（导航走胶囊按钮）。
+        // 组件 loaded/error/navigate 事件在 029 仅观察（导航走胶囊按钮）。
         .ViewEvent(ev str) -> {
-            .view_events = .view_events + 1
         }
-        .BackToGrid -> { .mode = "grid" }
+        .BackToGrid -> {
+            .mode = "grid"
+            .ReloadDir()
+        }
 
         // ---- 收藏：photos 翻标 + fav_records 增删（跨目录全局）+ 持久化 ----
         .ToggleFav(pid) -> {
@@ -818,7 +768,7 @@ widget App {
             }
             storage.set("photo-gallery.favs", json.encode(.fav_records))
 
-            .ApplyFilter()
+            .GalApply()
             if .mode == "view" && .cur_id == pid {
                 var si int = -1
                 var j2 int = 0
@@ -845,11 +795,6 @@ widget App {
                     }
                 }
             }
-        }
-
-        .LoadMore -> {
-            .render_cap = .render_cap + 60
-            .ApplyFilter()
         }
 
         .ToggleDark -> { .dark_mode = !.dark_mode }

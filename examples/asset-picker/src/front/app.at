@@ -1,0 +1,523 @@
+use auto.json
+
+// PLAN-091 asset-picker demo — 应用自有授权资源 provider + AssetPicker 消费。
+//
+// provider 合同（r2 §5）：queryRequested(seq/baseRevision+完整 query) →
+// 应用发布新 query（调用方分配 id）/querySeq/loading → 完成时
+// resultQueryId=query.id + records/total、loading=false；确认在唯一接受
+// handler 重验资源当前身份后写 confirmation 并 POST 附件引用日志（真实业务
+// 写入跨进程读回）；取消/拒绝不落账。
+//
+// 目录合成：5 条图片夹具（back 媒体会话真实 URI，Init 轮询回填）+ 998 条
+// 合成附件 = 1003 条（V-01 代表规模；尾页可选由产品门断言）。
+widget App {
+    use { package: asset_browser from "D:/autostack/.wt/ui-091/auto-ui/packages/asset-browser" }
+    msg {
+        Init, Tick,
+        OpenPicker, ReloadLog,
+        OnQuery(str), OnSel(str), OnPrev(str), OnConfirm(str), OnCancel,
+        ApplyQuery, SlowFire
+    }
+    timer {
+        Tick (every_ms: 80)
+    }
+    model {
+        var dark_mode bool = true
+        // ---- 受控 props ----
+        var catalog = []
+        var folders = []
+        var query str = ""
+        var querySeq int = 0
+        var resultQueryId str = ""
+        var total int = 0
+        var selection str = ""
+        var revision int = 100
+        var loading bool = false
+        var errorMessage str = ""
+        var open bool = false
+        var pending bool = false
+        var confirmation str = ""
+        // ---- provider 查询镜像 ----
+        var qf_id str = ""
+        var qf_folder str = ""
+        var qf_text str = ""
+        var qf_kind str = ""
+        var qf_page int = 1
+        var qf_pageSize int = 50
+        var qid_counter int = 1
+        var last_accepted_seq int = 0
+        var records_out = []
+        // ---- 慢查询延迟释放（slow 前缀触发；A 慢 B 快代次门演示）----
+        var slow_id str = ""
+        var slow_records = []
+        var slow_total int = 0
+        var slow_ticks int = 0
+        // ---- 媒体 URI 轮询 ----
+        var uris_ready bool = false
+        var uri_polls int = 0
+        // ---- 业务写读回 ----
+        var attach_count int = 0
+        var last_attach str = ""
+        // ---- 读回 ----
+        var last_query_req str = ""
+        var last_sel_req str = ""
+        var last_prev_req str = ""
+        var last_confirm_req str = ""
+        var last_feedback str = ""
+        var n_query int = 0
+        var n_sel int = 0
+        var n_prev int = 0
+        var n_confirm int = 0
+        var n_stale_drop int = 0
+        var n_accepted int = 0
+        var n_rejected int = 0
+        var n_cancelled int = 0
+        var status str = "初始化…"
+    }
+    view {
+        col (style: "w-full h-full bg-background text-foreground gap-2 p-3 overflow-y-auto") {
+            text "资源选择演示（PLAN-091）" { style: "text-sm font-medium" }
+            row (style: "items-center gap-2") {
+                button "打开选择器" { onclick: .OpenPicker, style: "h-8 px-3 text-xs rounded-md border border-primary text-primary" }
+                button "刷新附件日志" { onclick: .ReloadLog, style: "h-8 px-2 text-xs rounded-md border border-border" }
+            }
+            col (style: "gap-1") {
+                text f"status=${.status}" { style: "text-xs text-foreground" }
+                text f"counts: query=${.n_query} sel=${.n_sel} prev=${.n_prev} confirm=${.n_confirm} staleDrop=${.n_stale_drop} accepted=${.n_accepted} rejected=${.n_rejected} cancelled=${.n_cancelled}" { style: "text-xs text-muted-foreground break-all" }
+                text f"provider: qid=${.qf_id} qseq=${.querySeq} rqid=${.resultQueryId} rev=${.revision} total=${.total} loading=${.loading} folder=${.qf_folder} text=${.qf_text} kind=${.qf_kind} page=${.qf_page} size=${.qf_pageSize}" { style: "text-xs text-muted-foreground break-all" }
+                text f"selection=${.selection}" { style: "text-xs text-muted-foreground break-all" }
+                text f"confirmation=${.confirmation}" { style: "text-xs text-muted-foreground break-all" }
+                text f"附件日志: ${.attach_count} 条 · 最近=${.last_attach}" { style: "text-xs text-foreground" }
+                text f"last_confirm_req=${.last_confirm_req}" { style: "text-xs text-muted-foreground break-all" }
+            }
+        }
+        AssetPicker (
+            records: .records_out, folders: .folders, query: .query,
+            querySeq: .querySeq, resultQueryId: .resultQueryId,
+            total: .total, selection: .selection, revision: .revision,
+            loading: .loading, errorMessage: .errorMessage,
+            open: .open, title: "选择资源", pending: .pending,
+            confirmation: .confirmation,
+            onqueryRequested: .OnQuery($event),
+            onselectionRequested: .OnSel($event),
+            onpreviewRequested: .OnPrev($event),
+            onconfirmRequested: .OnConfirm($event),
+            oncancelled: .OnCancel
+        ) {}
+    }
+    on {
+        .Init -> {
+            // ---- 分类夹具（r2 形状 {id,label,children}）----
+            var cat_all = [{id: "all", label: "全部", children: [{id: "images", label: "图片", children: []}, {id: "docs", label: "文档", children: []}]}, {id: "archive", label: "归档", children: []}]
+            .folders = cat_all
+            // ---- 图片夹具（真实媒体 URI；先占位后轮询回填）----
+            var cat = []
+            cat.push({id: "lake", revision: "r3", label: "Lake.jpg", kind: "image", folder: "images", resourceRef: "asset:lake", thumbnailUri: ""})
+            cat.push({id: "corner", revision: "r1", label: "Corner.png", kind: "image", folder: "images", resourceRef: "asset:corner", thumbnailUri: ""})
+            cat.push({id: "rgb", revision: "r2", label: "Rgb.png", kind: "image", folder: "images", resourceRef: "asset:rgb", thumbnailUri: ""})
+            cat.push({id: "alpha", revision: "r1", label: "Alpha.png", kind: "image", folder: "images", resourceRef: "asset:alpha", thumbnailUri: ""})
+            cat.push({id: "orient", revision: "r2", label: "Orient.jpg", kind: "image", folder: "images", resourceRef: "asset:orient", thumbnailUri: ""})
+            // ---- 合成附件 998 条（确定性身份：att-N / r{N%3} 循环）----
+            var i int = 1
+            while i <= 998 {
+                var rev str = "r1"
+                if i % 3 == 0 {
+                    rev = "r3"
+                } else {
+                    if i % 3 == 1 {
+                        rev = "r1"
+                    } else {
+                        rev = "r2"
+                    }
+                }
+                var num str = i.str()
+                cat.push({id: "att-" + num, revision: rev, label: "附件-" + num + ".bin", kind: "file", folder: "docs", resourceRef: "asset:att-" + num, thumbnailUri: ""})
+                i = i + 1
+            }
+            .catalog = cat
+            .total = .catalog.len()
+            .FetchUris()
+            .ReloadLog()
+            // ---- 初始查询（无请求发布：querySeq=0，resultQueryId=q1）----
+            .qf_id = "q1"
+            .qf_folder = "all"
+            .qf_text = ""
+            .qf_kind = ""
+            .qf_page = 1
+            .qf_pageSize = 50
+            .query = json.stringify({id: .qf_id, folderId: .qf_folder, text: .qf_text, kind: .qf_kind, page: .qf_page, pageSize: .qf_pageSize})
+            .ApplyQuery()
+            .status = "ready"
+        }
+        .Tick -> {
+            // 媒体 URI 就绪轮询（rendition 后台 lane 发布）。
+            if !.uris_ready {
+                .uri_polls = .uri_polls + 1
+                if .uri_polls % 12 == 0 {
+                    .FetchUris()
+                }
+            }
+            // 慢查询延迟释放 + 代次门。
+            if .slow_ticks > 0 {
+                .slow_ticks = .slow_ticks - 1
+                if .slow_ticks == 0 {
+                    if .slow_id == .qf_id {
+                        .records_out = .slow_records
+                        .total = .slow_total
+                        .resultQueryId = .qf_id
+                        .loading = false
+                        .status = "slow applied"
+                    } else {
+                        .n_stale_drop = .n_stale_drop + 1
+                        .status = "stale release dropped"
+                    }
+                    .slow_id = ""
+                }
+            }
+        }
+        // ---- 图片夹具 URI 回填（真实授权媒体 URI；opaque，组件不拼路径）----
+        .FetchUris -> {
+            try {
+                let data = Http.get_json("/api/assets/media-uris")
+                var list = data ?? []
+                var ready bool = true
+                var ci int = 0
+                while ci < list.len() {
+                    var uri str = list[ci].uri ?? ""
+                    if uri == "" {
+                        ready = false
+                    }
+                    var ki int = 0
+                    while ki < .catalog.len() {
+                        if .catalog[ki].id == list[ci].id {
+                            if uri != "" {
+                                .catalog[ki].thumbnailUri = uri
+                            }
+                        }
+                        ki = ki + 1
+                    }
+                    ci = ci + 1
+                }
+                if ready {
+                    if list.len() > 0 {
+                        .uris_ready = true
+                        .ApplyQuery()
+                    }
+                }
+            } catch {
+            }
+        }
+        // ---- 业务写读回（接受 handler 落账后刷新；应用 Storage 承载）----
+        .ReloadLog -> {
+            .attach_count = 0
+            .last_attach = ""
+            try {
+                let saved = json.parse(storage.get("asset-picker.attachments"))
+                if saved != null {
+                    .attach_count = saved.len()
+                    if saved.len() > 0 {
+                        let last = saved[saved.len() - 1]
+                        .last_attach = last.id + "@" + last.revision
+                    }
+                }
+            } catch {
+            }
+        }
+        // ---- 查询请求（r2 provider 流）----
+        .OnQuery(ev str) -> {
+            .last_query_req = ev
+            .n_query = .n_query + 1
+            try {
+                let req = json.parse(ev)
+                let q = req.query
+                if req.baseRevision != .revision {
+                    .querySeq = req.seq
+                    .loading = false
+                    .errorMessage = "asset-provider: baseRevision 过期（invalid_query）"
+                    .status = "query rejected: stale baseRevision"
+                } else {
+                    if req.seq <= .last_accepted_seq {
+                        .n_stale_drop = .n_stale_drop + 1
+                        .status = "query dropped: stale seq"
+                    } else {
+                        .last_accepted_seq = req.seq
+                        .querySeq = req.seq
+                        var clear_sel bool = false
+                        if q.folderId != .qf_folder {
+                            clear_sel = true
+                        }
+                        if q.text != .qf_text {
+                            clear_sel = true
+                        }
+                        if q.kind != .qf_kind {
+                            clear_sel = true
+                        }
+                        if clear_sel {
+                            .selection = ""
+                        }
+                        .qf_folder = q.folderId
+                        .qf_text = q.text
+                        .qf_kind = q.kind
+                        .qf_page = q.page
+                        .qf_pageSize = q.pageSize
+                        .qid_counter = .qid_counter + 1
+                        .qf_id = "q" + .qid_counter.str()
+                        .query = json.stringify({id: .qf_id, folderId: .qf_folder, text: .qf_text, kind: .qf_kind, page: .qf_page, pageSize: .qf_pageSize})
+                        .revision = .revision + 1
+                        .errorMessage = ""
+                        .loading = true
+                        if .qf_text == "slow" {
+                            .SlowFire()
+                        } else {
+                            .ApplyQuery()
+                        }
+                    }
+                }
+            } catch {
+                .status = "query req parse failed"
+            }
+        }
+        // 立即应用：过滤+分页+发布（结果可信三件套）。
+        .ApplyQuery -> {
+            var ql str = .qf_text.lower()
+            var hits = []
+            var i int = 0
+            while i < .catalog.len() {
+                var take bool = false
+                var c = .catalog[i]
+                var fok bool = false
+                if .qf_folder == "all" {
+                    fok = true
+                } else {
+                    if c.folder == .qf_folder {
+                        fok = true
+                    }
+                }
+                var tok bool = false
+                if ql == "" {
+                    tok = true
+                } else {
+                    if c.label.lower().contains(ql) {
+                        tok = true
+                    }
+                }
+                var kok bool = false
+                if .qf_kind == "" {
+                    kok = true
+                } else {
+                    if c.kind == .qf_kind {
+                        kok = true
+                    }
+                }
+                if fok {
+                    if tok {
+                        if kok {
+                            take = true
+                        }
+                    }
+                }
+                if take {
+                    hits.push(c)
+                }
+                i = i + 1
+            }
+            .total = hits.len()
+            var start int = (.qf_page - 1) * .qf_pageSize
+            var page = []
+            var j int = start
+            while j < hits.len() {
+                if j >= start + .qf_pageSize {
+                    j = hits.len()
+                } else {
+                    let c = hits[j]
+                    page.push({id: c.id, revision: c.revision, label: c.label, kind: c.kind, thumbnailUri: c.thumbnailUri, resourceRef: c.resourceRef})
+                    j = j + 1
+                }
+            }
+            .records_out = page
+            .resultQueryId = .qf_id
+            .loading = false
+        }
+        // 慢查询：结果预计算，延迟 slow_ticks 拍由 Tick 释放。
+        .SlowFire -> {
+            var ql str = .qf_text.lower()
+            var hits = []
+            var i int = 0
+            while i < .catalog.len() {
+                var take bool = false
+                var c = .catalog[i]
+                var fok bool = false
+                if .qf_folder == "all" {
+                    fok = true
+                } else {
+                    if c.folder == .qf_folder {
+                        fok = true
+                    }
+                }
+                var tok bool = false
+                if ql == "" {
+                    tok = true
+                } else {
+                    if c.label.lower().contains(ql) {
+                        tok = true
+                    }
+                }
+                var kok bool = false
+                if .qf_kind == "" {
+                    kok = true
+                } else {
+                    if c.kind == .qf_kind {
+                        kok = true
+                    }
+                }
+                if fok {
+                    if tok {
+                        if kok {
+                            take = true
+                        }
+                    }
+                }
+                if take {
+                    hits.push(c)
+                }
+                i = i + 1
+            }
+            .slow_total = hits.len()
+            var start int = (.qf_page - 1) * .qf_pageSize
+            var page = []
+            var j int = start
+            while j < hits.len() {
+                if j >= start + .qf_pageSize {
+                    j = hits.len()
+                } else {
+                    let c = hits[j]
+                    page.push({id: c.id, revision: c.revision, label: c.label, kind: c.kind, thumbnailUri: c.thumbnailUri, resourceRef: c.resourceRef})
+                    j = j + 1
+                }
+            }
+            .slow_records = page
+            .slow_id = .qf_id
+            .slow_ticks = 15
+            .status = "slow deferred"
+        }
+        // ---- 选择请求（provider 校验资源存在后发布受控 selection）----
+        .OnSel(ev str) -> {
+            .last_sel_req = ev
+            .n_sel = .n_sel + 1
+            try {
+                let req = json.parse(ev)
+                var found int = -1
+                var i int = 0
+                while i < .catalog.len() {
+                    if .catalog[i].id == req.id {
+                        found = i
+                    }
+                    i = i + 1
+                }
+                if found >= 0 {
+                    let c = .catalog[found]
+                    .selection = json.stringify({id: c.id, revision: c.revision, label: c.label})
+                    .status = f"selected ${c.id}@${c.revision}"
+                } else {
+                    .status = "selection rejected: unknown id"
+                }
+            } catch {
+                .status = "sel parse failed"
+            }
+        }
+        .OnPrev(ev str) -> {
+            .last_prev_req = ev
+            .n_prev = .n_prev + 1
+        }
+        // ---- 确认（唯一接受 handler：身份/权限重验 + 真实业务写入）----
+        .OnConfirm(ev str) -> {
+            .last_confirm_req = ev
+            .n_confirm = .n_confirm + 1
+            .pending = true
+            try {
+                let req = json.parse(ev)
+                var ok bool = true
+                var code str = ""
+                var msg str = ""
+                if req.baseRevision != .revision {
+                    ok = false
+                    code = "stale_selection"
+                    msg = "确认代次已过期"
+                }
+                if ok {
+                    if req.queryId != .qf_id {
+                        ok = false
+                        code = "stale_selection"
+                        msg = "查询代次已过期"
+                    }
+                }
+                if ok {
+                    var found int = -1
+                    var i int = 0
+                    while i < .catalog.len() {
+                        if .catalog[i].id == req.id {
+                            if .catalog[i].revision == req.revision {
+                                found = i
+                            }
+                        }
+                        i = i + 1
+                    }
+                    if found < 0 {
+                        ok = false
+                        code = "not_found"
+                        msg = "资源已失效"
+                    }
+                }
+                var st str = "rejected"
+                if ok {
+                    st = "accepted"
+                }
+                .confirmation = json.stringify({session: req.session, seq: req.seq, status: st, code: code, message: msg})
+                .last_feedback = .confirmation
+                .pending = false
+                if ok {
+                    .n_accepted = .n_accepted + 1
+                    // 业务写入：附件引用落账（应用 Storage；取消/拒绝路径不经过这里）。
+                    var refs = []
+                    try {
+                        let saved = json.parse(storage.get("asset-picker.attachments"))
+                        if saved != null {
+                            refs = saved
+                        }
+                    } catch {
+                        refs = []
+                    }
+                    var c = .catalog[0]
+                    var ki int = 0
+                    while ki < .catalog.len() {
+                        if .catalog[ki].id == req.id {
+                            c = .catalog[ki]
+                        }
+                        ki = ki + 1
+                    }
+                    refs.push({id: req.id, revision: req.revision, label: c.label})
+                    storage.set("asset-picker.attachments", json.encode(refs))
+                    .ReloadLog()
+                    .open = false
+                    .status = "confirm accepted"
+                } else {
+                    .n_rejected = .n_rejected + 1
+                    .status = f"confirm rejected: ${code}"
+                }
+            } catch {
+                .pending = false
+                .status = "confirm parse failed"
+            }
+        }
+        .OnCancel -> {
+            .n_cancelled = .n_cancelled + 1
+            .open = false
+            .status = "picker cancelled"
+        }
+        .OpenPicker -> {
+            .open = true
+            .confirmation = ""
+            .status = "picker opened"
+        }
+    }
+}

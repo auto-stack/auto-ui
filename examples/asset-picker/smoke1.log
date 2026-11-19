@@ -1,0 +1,549 @@
+---------------------------
+AutoNexus / Auto CLI
+---------------------------
+Loading AmConfig from Some("C:\\Users\\zhaop\\.auto\\auto-man\\am.at")...
+AmConfig: AmConfig {
+  name: default
+  index: {
+    default: git@gitee.com:auto-stack/auto-index.git
+    boe: git@codeup.aliyun.com:soutek/boe/index.git
+    soutek: git@codeup.aliyun.com:soutek/auto-stack/auto-index.git
+  }
+}
+
+
+Loaded port: 
+auto.config/engine: no ACE configuration executor is installed in this build; the legacy configuration engine serves pac documents (named boundary, AUTO_CONFIG_ENGINE=av refuses instead of falling back)
+port NAME: windows_ninja
+all index: {"default": "git@gitee.com:auto-stack/auto-index.git", "boe": "git@codeup.aliyun.com:soutek/boe/index.git", "soutek": "git@codeup.aliyun.com:soutek/auto-stack/auto-index.git"}
+used index: ["default"]
+17:37:19 [0m[34m[INFO] [0mloading index store from C:/Users/zhaop/.auto/auto-man/index/default
+setting port builder: windows_ninja ninja, at build
+17:37:19 [0m[34m[INFO] [0mAutoCache initialized for project: asset-picker-demo
+  → split mode: frontend vm ↔ backend rust over HTTP
+  Backend API server port: 8394 (from pac.at)
+  Frontend dev server port: 4394 (from pac.at)
+  VM window size: 1080x800 (from pac.at)
+  VM window title: 资源选择演示 (from pac.at)
+  UI theme: dark (from pac.at)
+17:37:19 [0m[34m[INFO] [0mRunning project ...
+
+------------ output ------------
+accepted request id=1 op=run_ui
+  ✓ Generated Rust server: asset-picker-07055e88-back/
+[PLAN-007-DBG] back contract = Some("D:\\autostack\\.wt\\ui-091\\auto-ui\\examples\\asset-picker\\src\\back\\api.at")
+  ✓ Generated Rust server: asset-picker-07055e88-back/
+
+▶ Starting API backend server (Rust axum)...
+  Building native API backend...
+    Blocking waiting for file lock on package cache
+    Updating `aliyun` index
+    Blocking waiting for file lock on package cache
+     Locking 523 packages to latest compatible versions
+      Adding axum v0.7.9 (available: v0.8.9)
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding matchit v0.8.4 (available: v0.8.6)
+      Adding tower-http v0.5.2 (available: v0.7.1)
+   Compiling unicode-ident v1.0.27
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling cfg-if v1.0.5
+   Compiling memchr v2.8.3
+   Compiling windows-link v0.2.1
+   Compiling getrandom v0.4.3
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.15
+   Compiling smallvec v1.16.6
+   Compiling serde_core v1.0.229
+   Compiling itoa v1.0.19
+   Compiling equivalent v1.0.3
+   Compiling hashbrown v0.17.1
+   Compiling serde v1.0.229
+   Compiling version_check v0.9.5
+   Compiling log v0.4.35
+   Compiling stable_deref_trait v1.2.1
+   Compiling thiserror v2.0.21
+   Compiling once_cell v1.21.4
+   Compiling pkg-config v0.3.34
+   Compiling windows_x86_64_msvc v0.52.6
+   Compiling windows-sys v0.61.2
+   Compiling zmij v1.0.23
+   Compiling arrayvec v0.7.8
+   Compiling serde_json v1.0.154
+   Compiling typenum v1.20.1
+   Compiling bytes v1.12.2
+   Compiling cpufeatures v0.3.1
+   Compiling autocfg v1.5.1
+   Compiling zerocopy v0.8.63
+   Compiling foldhash v0.2.0
+   Compiling writeable v0.6.4
+   Compiling pin-project-lite v0.2.17
+   Compiling aho-corasick v1.1.5
+   Compiling litemap v0.8.3
+   Compiling indexmap v2.14.2
+   Compiling regex-syntax v0.8.12
+   Compiling futures-core v0.3.34
+   Compiling utf_types v1.0.0
+   Compiling constant_time_eq v0.4.2
+   Compiling jobserver v0.1.35
+   Compiling generic-array v0.14.7
+   Compiling num-traits v0.2.19
+   Compiling glob-match v0.2.1
+   Compiling scopeguard v1.2.0
+   Compiling parking_lot_core v0.9.12
+   Compiling windows-targets v0.52.6
+   Compiling normalize-path v0.2.2
+   Compiling anyhow v1.0.104
+   Compiling libc v0.2.191
+   Compiling http v1.5.0
+   Compiling utf8_iter v1.1.0
+   Compiling cc v1.11.2
+   Compiling simd-adler32 v0.3.10
+   Compiling lock_api v0.4.14
+   Compiling futures-sink v0.3.34
+   Compiling bitflags v2.13.2
+   Compiling crossbeam-utils v0.8.23
+   Compiling rustversion v1.0.23
+   Compiling slab v0.4.12
+   Compiling futures-channel v0.3.34
+   Compiling ahash v0.8.12
+   Compiling adler2 v2.0.1
+   Compiling crossbeam-epoch v0.9.21
+   Compiling crc32fast v1.5.5
+   Compiling syn v3.0.10
+   Compiling syn v2.0.119
+   Compiling windows-sys v0.59.0
+   Compiling tracing-core v0.1.36
+   Compiling percent-encoding v2.3.2
+   Compiling parking_lot v0.12.5
+   Compiling futures-io v0.3.34
+   Compiling futures-task v0.3.34
+   Compiling crossbeam-deque v0.8.8
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling blake3 v1.8.7
+   Compiling http-body v1.1.0
+   Compiling subtle v2.6.1
+   Compiling regex-automata v0.4.19
+   Compiling icu_properties_data v2.4.0
+   Compiling either v1.19.0
+   Compiling allocator-api2 v0.2.21
+   Compiling vcpkg v0.2.15
+   Compiling icu_normalizer_data v2.4.0
+   Compiling rayon-core v1.13.0
+   Compiling httparse v1.10.1
+   Compiling digest v0.10.7
+   Compiling tracing v0.1.44
+   Compiling miniz_oxide v0.9.1
+   Compiling tower-service v0.3.3
+   Compiling zlib-rs v0.6.8
+   Compiling num-integer v0.1.47
+   Compiling libsqlite3-sys v0.27.0
+   Compiling icu_locale_fallback_data v2.4.0
+   Compiling http-body-util v0.1.5
+   Compiling form_urlencoded v1.2.2
+   Compiling cpufeatures v0.2.17
+   Compiling icu_segmenter_data v2.4.0
+   Compiling option-ext v0.2.0
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling num-bigint v0.4.8
+   Compiling tower-layer v0.3.3
+   Compiling fallible-iterator v0.3.0
+   Compiling sync_wrapper v1.0.2
+   Compiling libloading v0.8.9
+   Compiling heck v0.5.0
+   Compiling fnv v1.0.7
+   Compiling alloc-no-stdlib v3.0.0
+   Compiling atomic-waker v1.1.2
+   Compiling try-lock v0.2.5
+   Compiling chrono v0.4.45
+   Compiling zstd-sys v2.1.3+zstd.1.5.7
+   Compiling want v0.3.2
+   Compiling windows-result v0.4.1
+   Compiling alloc-stdlib v0.3.0
+   Compiling windows-strings v0.5.1
+   Compiling rustc-demangle v0.1.28
+   Compiling native-tls v0.2.18
+   Compiling object v0.39.1
+   Compiling rayon v1.12.0
+   Compiling ace-syntax-runtime v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\syntax-runtime)
+   Compiling target-features v0.1.6
+   Compiling time-core v0.1.9
+   Compiling httpdate v1.0.3
+   Compiling num-conv v0.2.2
+   Compiling auto-tool-execution v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-tool-execution)
+   Compiling ryu v1.0.23
+   Compiling mime v0.3.18
+   Compiling regex v1.13.2
+   Compiling backtrace v0.3.77
+   Compiling windows-registry v0.6.1
+   Compiling time-macros v0.2.32
+   Compiling brotli-decompressor v6.3.2
+   Compiling num-rational v0.4.2
+   Compiling hybrid-array v0.4.15
+   Compiling as-slice v0.2.1
+   Compiling paste v1.0.15
+   Compiling built v0.8.1
+   Compiling is_ci v1.2.0
+   Compiling powerfmt v0.2.1
+   Compiling winapi v0.3.9
+   Compiling flate2 v1.1.11
+   Compiling ipnet v2.12.2
+   Compiling av-scenechange v0.14.1
+   Compiling unicode-width v0.1.14
+   Compiling deranged v0.5.9
+   Compiling base64 v0.23.1
+   Compiling unicode-width v0.2.3
+   Compiling rav1e v0.8.1
+   Compiling supports-color v3.0.2
+   Compiling aligned v0.4.3
+   Compiling backtrace-ext v0.2.1
+   Compiling lzma-sys v0.1.20
+   Compiling bzip2-sys v0.1.13+1.0.8
+   Compiling windows-sys v0.52.0
+   Compiling nom v8.0.0
+   Compiling no_std_io2 v0.9.4
+   Compiling cookie v0.18.2
+   Compiling getrandom v0.2.17
+   Compiling brotli v9.1.3
+   Compiling y4m v0.8.0
+   Compiling zstd-safe v7.4.1
+   Compiling pastey v0.1.1
+   Compiling compression-core v0.4.34
+   Compiling owo-colors v4.4.0
+   Compiling zerocopy-derive v0.8.63
+   Compiling equator-macro v0.4.2
+   Compiling arg_enum_proc_macro v0.3.4
+   Compiling profiling-procmacros v1.0.18
+   Compiling miette-derive v7.6.0
+   Compiling zeroize_derive v1.5.0
+   Compiling supports-hyperlinks v3.2.0
+   Compiling byteorder v1.5.0
+   Compiling supports-unicode v3.0.0
+   Compiling time v0.3.55
+   Compiling quick-error v2.0.1
+   Compiling unicase v2.10.0
+   Compiling utf8parse v0.2.2
+   Compiling anstyle v1.0.14
+   Compiling once_cell_polyfill v1.70.2
+   Compiling equator v0.4.2
+   Compiling rand_core v0.10.1
+   Compiling zeroize v1.9.2
+   Compiling profiling v1.0.18
+   Compiling anstyle-parse v1.0.0
+   Compiling serde_derive v1.0.229
+   Compiling synstructure v0.14.0
+   Compiling thiserror-impl v2.0.21
+   Compiling zerovec-derive v0.11.7
+   Compiling displaydoc v0.2.7
+   Compiling tokio-macros v2.7.2
+   Compiling futures-macro v0.3.34
+   Compiling aligned-vec v0.6.4
+   Compiling mime_guess v2.0.5
+   Compiling multiversion-macros v0.8.1
+   Compiling v_frame v0.3.9
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling windows-implement v0.57.0
+   Compiling strum_macros v0.26.4
+   Compiling num-derive v0.4.2
+   Compiling futures-util v0.3.34
+   Compiling windows-interface v0.57.0
+   Compiling bitstream-io v4.10.0
+   Compiling zerofrom v0.1.8
+   Compiling maybe-rayon v0.1.1
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling yoke v0.8.4
+   Compiling sha2 v0.10.9
+   Compiling itertools v0.14.0
+   Compiling encoding_rs v0.8.44
+   Compiling inout v0.1.4
+   Compiling miniz_oxide v0.8.9
+   Compiling simd_helpers v0.1.0
+   Compiling windows-result v0.1.2
+   Compiling imgref v1.12.3
+   Compiling zerovec v0.11.9
+   Compiling zerotrie v0.2.5
+   Compiling zune-core v0.5.3
+   Compiling psl-types v2.0.11
+   Compiling weezl v0.1.12
+   Compiling litrs v1.0.1
+   Compiling filetime v0.2.30
+   Compiling av1-grain v0.2.5
+   Compiling crc-catalog v2.5.0
+   Compiling ecow v0.2.6
+   Compiling ace-semantics-contract v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\semantics-contract)
+   Compiling bincode v1.3.3
+   Compiling shim-metadata v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\shim-metadata)
+   Compiling serde_urlencoded v0.7.1
+   Compiling ntapi v0.4.3
+   Compiling const-oid v0.10.3
+   Compiling colorchoice v1.0.5
+   Compiling getrandom v0.3.4
+   Compiling auto-val v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-val)
+   Compiling compression-codecs v0.4.47
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling syn v1.0.109
+   Compiling noop_proc_macro v0.3.0
+   Compiling new_debug_unreachable v1.0.6
+   Compiling document-features v0.2.12
+   Compiling digest v0.11.3
+   Compiling tinystr v0.8.5
+   Compiling potential_utf v0.1.6
+   Compiling ace-foreign-contract v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\foreign-contract)
+   Compiling zune-jpeg v0.5.15
+   Compiling crc v3.4.0
+   Compiling loop9 v0.1.5
+   Compiling icu_collections v2.4.0
+   Compiling windows-core v0.57.0
+   Compiling cipher v0.4.4
+   Compiling icu_locale_core v2.4.0
+   Compiling auto-atom v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-atom)
+   Compiling multiversion v0.8.1
+   Compiling ar_archive_writer v0.5.5
+   Compiling chacha20 v0.10.2
+   Compiling rand_core v0.6.4
+   Compiling sha1 v0.10.7
+   Compiling hmac v0.12.1
+   Compiling ace-syntax-grammar v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\syntax-grammar)
+   Compiling fdeflate v0.3.7
+   Compiling zune-inflate v0.2.54
+   Compiling avif-serialize v0.8.9
+   Compiling clap_lex v1.1.2
+   Compiling bit_field v0.10.4
+   Compiling bumpalo v3.20.4
+   Compiling unicode-segmentation v1.13.3
+   Compiling strsim v0.11.1
+   Compiling pxfm v0.1.30
+   Compiling bytemuck v1.25.2
+   Compiling simdutf8 v0.1.5
+   Compiling psm v0.1.32
+   Compiling fax v0.2.7
+   Compiling auto-web-contract v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-web-contract)
+   Compiling multiversion_no_op v1.0.0
+   Compiling lebe v0.5.3
+   Compiling foldhash v0.1.5
+   Compiling base64 v0.22.1
+   Compiling color_quant v1.1.0
+   Compiling core_detect v1.0.0
+   Compiling data-encoding v2.11.1
+   Compiling rgb v0.8.53
+   Compiling thiserror v1.0.69
+   Compiling byteorder-lite v0.1.0
+   Compiling hashbrown v0.15.5
+   Compiling qoi v0.4.1
+   Compiling zopfli v0.8.4
+   Compiling ace-core v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\core)
+   Compiling gif v0.14.2
+   Compiling windows v0.57.0
+   Compiling icu_provider v2.4.0
+   Compiling png v0.18.1
+   Compiling image-webp v0.2.4
+   Compiling rand v0.10.4
+   Compiling pbkdf2 v0.12.2
+   Compiling aes v0.8.4
+   Compiling zstd v0.13.5
+   Compiling lzma-rs v0.3.0
+   Compiling bzip2 v0.5.2
+   Compiling futures-executor v0.3.34
+   Compiling icu_normalizer v2.4.0
+   Compiling icu_properties v2.4.0
+   Compiling icu_locale_fallback v2.4.0
+warning: unused import: `ConfigPairValue`
+    --> D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\core\src\source\cst\project.rs:4461:58
+     |
+4461 |         use crate::source::config_document::{ConfigPair, ConfigPairValue};
+     |                                                          ^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused doc comment
+   --> D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\core\src\source\platform_io.rs:579:5
+    |
+579 | /     /// PLAN-982 (Q-982-2 (a) step 1): the host-provided per-run argv line
+580 | |     /// (narrow argv-read grant — never carries the spawn family).
+    | |__________________________________________________________________^
+581 | /     PlatformSourceOp {
+582 | |         callee: "proc_run_argv_w16",
+583 | |         symbol: "auto.platform.process.run_argv_w16.v1",
+584 | |         params: P_2I32,
+585 | |         result: VT::I32,
+586 | |         capability: "platform.process.argv",
+587 | |     },
+    | |_____- rustdoc does not generate documentation for expressions
+    |
+    = help: use `//` for a plain comment
+    = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling sha1 v0.11.0
+   Compiling mio v1.2.5
+   Compiling socket2 v0.6.5
+   Compiling dirs-sys v0.5.0
+   Compiling schannel v0.1.30
+   Compiling terminal_size v0.4.4
+   Compiling icu_segmenter v2.4.0
+   Compiling dirs v6.0.0
+   Compiling half v2.7.1
+   Compiling anstyle-query v1.1.5
+   Compiling anstyle-wincon v3.0.11
+   Compiling ppv-lite86 v0.2.21
+   Compiling winapi-util v0.1.11
+   Compiling serde_spanned v0.6.9
+   Compiling toml_datetime v0.6.11
+   Compiling hashbrown v0.14.5
+   Compiling socket2 v0.5.10
+   Compiling tokio v1.54.1
+   Compiling anstream v1.0.0
+   Compiling rustls-pki-types v1.16.0
+   Compiling clap_derive v4.6.8
+   Compiling rand_chacha v0.3.1
+   Compiling same-file v1.0.6
+   Compiling tiff v0.11.3
+   Compiling exr v1.74.3
+   Compiling moxcms v0.8.1
+   Compiling thiserror-impl v1.0.69
+   Compiling itertools v0.13.0
+   Compiling idna_adapter v1.2.2
+   Compiling clap_builder v4.6.7
+   Compiling arc-swap v1.9.5
+   Compiling textwrap v0.16.4
+   Compiling stacker v0.1.25
+   Compiling combine v4.6.9
+   Compiling hashlink v0.8.4
+   Compiling idna v1.1.0
+   Compiling nibble_vec v0.1.0
+   Compiling instant v0.1.13
+   Compiling constant_time_eq v0.3.1
+   Compiling miette v7.6.0
+   Compiling mutate_once v0.1.2
+   Compiling rusqlite v0.30.0
+   Compiling deflate64 v0.1.12
+   Compiling toml_write v0.1.2
+   Compiling winnow v0.7.15
+   Compiling url v2.5.8
+   Compiling publicsuffix v2.3.0
+   Compiling error-code v3.4.0
+   Compiling endian-type v0.1.2
+   Compiling sha1_smol v1.0.1
+   Compiling trans-derive v0.4.0
+   Compiling kamadak-exif v0.6.2
+   Compiling clipboard-win v5.4.3
+   Compiling radix_trie v0.2.1
+   Compiling notify-types v1.0.1
+   Compiling cookie_store v0.22.1
+   Compiling rand v0.8.8
+   Compiling auto-lex v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-lex)
+   Compiling walkdir v2.5.0
+   Compiling tungstenite v0.30.0
+   Compiling auto-cache v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-cache)
+   Compiling futures v0.3.34
+   Compiling ravif v0.13.0
+   Compiling home v0.5.12
+   Compiling auto-diagnostics v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-diagnostics)
+   Compiling auto-ast v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-ast)
+   Compiling imara-diff v0.2.0
+   Compiling heck v0.3.3
+   Compiling ace-av-core v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\av-core)
+   Compiling clap v4.6.8
+   Compiling fd-lock v4.0.4
+   Compiling csv-core v0.1.13
+   Compiling auto-lang-core v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-lang-core)
+   Compiling xmlparser v0.13.6
+   Compiling utf-8 v0.7.6
+   Compiling fastrand v2.5.0
+   Compiling toml_edit v0.22.27
+   Compiling autodown-test-parser v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\vendor\autodown-test-parser)
+   Compiling inventory v0.3.25
+   Compiling rustyline v14.0.0
+   Compiling csv v1.4.0
+   Compiling tungstenite v0.24.0
+   Compiling auto-text-core v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-text-core)
+   Compiling auto-macros v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-macros)
+   Compiling roxmltree v0.18.1
+   Compiling auto-test-case v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-test-case)
+   Compiling trans v0.4.0
+   Compiling auto-bindgen v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-bindgen)
+warning: linker stdout: 正在创建库 D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\auto_macros-3cb1dbf80b9788db.dll.lib 和对象 D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\auto_macros-3cb1dbf80b9788db.dll.exp
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `auto-macros` (lib) generated 1 warning
+   Compiling notify v7.0.0
+   Compiling dashmap v6.2.1
+   Compiling colored v3.1.1
+   Compiling tar v0.4.46
+   Compiling ansi_term v0.12.1
+   Compiling auto-terminal-core v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-terminal-core)
+   Compiling md-5 v0.10.6
+   Compiling serde_path_to_error v0.1.20
+   Compiling hex v0.4.3
+   Compiling semver v1.0.28
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\av-core\src\av.rs:314:19
+    |
+314 |     let (outcome, mut trace) = execute_module_impl(module, limits, cancel, &args, arena, true);
+    |                   ----^^^^^
+    |                   |
+    |                   help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling urlencoding v2.1.3
+warning: variable does not need to be mutable
+   --> D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\av-core\src\av.rs:550:19
+    |
+550 |     let (outcome, mut trace) = execute_module_impl_with_host(
+    |                   ----^^^^^
+    |                   |
+    |                   help: remove this `mut`
+
+   Compiling lazy_static v1.5.1
+   Compiling strum v0.26.3
+   Compiling auto-project-model v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-project-model)
+   Compiling async-trait v0.1.92
+   Compiling axum-core v0.5.6
+   Compiling matchit v0.8.4
+   Compiling matchit v0.7.3
+   Compiling tower-http v0.5.2
+   Compiling toml v0.8.23
+   Compiling axum-core v0.4.5
+   Compiling xz2 v0.1.7
+   Compiling zip v3.0.0
+   Compiling redis v0.27.6
+   Compiling image v0.25.10
+   Compiling tokio-util v0.7.20
+   Compiling tower v0.5.3
+   Compiling async-compression v0.4.52
+   Compiling tokio-native-tls v0.3.1
+   Compiling tokio-tungstenite v0.30.0
+   Compiling auto-parser-api v0.1.0 (D:\autostack\.wt\ui-091\auto-lang\crates\auto-parser-api)
+   Compiling h2 v0.4.20
+   Compiling tower-http v0.6.11
+error: could not compile `h2` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\zhaop\.cargo\bin\sccache.exe 'C:\Users\zhaop\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe' --crate-name h2 --edition=2021 'C:\Users\zhaop\.cargo\registry\src\mirrors.aliyun.com-0671735e7cc7f5e7\h2-0.4.20\src\lib.rs' --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no --warn=unexpected_cfgs --check-cfg 'cfg(fuzzing)' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("stream", "unstable"))' -C metadata=af399d12a0a99137 -C extra-filename=-b5133d42133bd71d --out-dir 'D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' -C strip=debuginfo -L 'dependency=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' --extern 'atomic_waker=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libatomic_waker-57215645fbf8dfc2.rmeta' --extern 'bytes=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libbytes-bb4a431a2a81e373.rmeta' --extern 'fnv=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libfnv-fd54fbefd5ea0924.rmeta' --extern 'futures_core=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libfutures_core-edcd467687788cae.rmeta' --extern 'futures_sink=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libfutures_sink-3ca7903c34cfda8d.rmeta' --extern 'http=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libhttp-f0ebfbde298b293c.rmeta' --extern 'indexmap=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libindexmap-e0099686a577f1c2.rmeta' --extern 'slab=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libslab-c0db48402fec4f9d.rmeta' --extern 'tokio=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libtokio-3d91c2dcf9ab82ef.rmeta' --extern 'tokio_util=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libtokio_util-8bb05620f16a4ec1.rmeta' --extern 'tracing=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libtracing-7e7d518fcb0bfa6d.rmeta' --cap-lints allow -C 'link-arg=/STACK:268435456'` (exit code: 143)
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `image` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\zhaop\.cargo\bin\sccache.exe 'C:\Users\zhaop\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe' --crate-name image --edition=2021 'C:\Users\zhaop\.cargo\registry\src\mirrors.aliyun.com-0671735e7cc7f5e7\image-0.25.10\src\lib.rs' --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no --cfg 'feature="avif"' --cfg 'feature="bmp"' --cfg 'feature="dds"' --cfg 'feature="default"' --cfg 'feature="default-formats"' --cfg 'feature="exr"' --cfg 'feature="ff"' --cfg 'feature="gif"' --cfg 'feature="hdr"' --cfg 'feature="ico"' --cfg 'feature="jpeg"' --cfg 'feature="png"' --cfg 'feature="pnm"' --cfg 'feature="qoi"' --cfg 'feature="rayon"' --cfg 'feature="tga"' --cfg 'feature="tiff"' --cfg 'feature="webp"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("avif", "avif-native", "benchmarks", "bmp", "color_quant", "dds", "default", "default-formats", "exr", "ff", "gif", "hdr", "ico", "jpeg", "nasm", "png", "pnm", "qoi", "rayon", "serde", "tga", "tiff", "webp"))' -C metadata=276bce8cfcfcab39 -C extra-filename=-364d0d3b5f7ad1b2 --out-dir 'D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' -C strip=debuginfo -L 'dependency=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' --extern 'bytemuck=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libbytemuck-f08123313d42479e.rmeta' --extern 'byteorder_lite=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libbyteorder_lite-2f7f4cc8db37b5ab.rmeta' --extern 'color_quant=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libcolor_quant-4f4d4c02c676ca2e.rmeta' --extern 'exr=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libexr-00a43dc52b7fab87.rmeta' --extern 'gif=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libgif-67dccd8d5b378309.rmeta' --extern 'image_webp=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libimage_webp-3e15b67d5eccbabc.rmeta' --extern 'moxcms=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libmoxcms-905756a1d9d0f52d.rmeta' --extern 'num_traits=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libnum_traits-47700220d73f8831.rmeta' --extern 'png=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libpng-e9449c93ebe1b7b1.rmeta' --extern 'qoi=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libqoi-ab7d534f630bada8.rmeta' --extern 'ravif=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libravif-ceca9bb709fe5042.rmeta' --extern 'rayon=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\librayon-f2117176e3a434d3.rmeta' --extern 'rgb=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\librgb-95378ddfff1a6cce.rmeta' --extern 'tiff=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libtiff-04d49adc977f17a9.rmeta' --extern 'zune_core=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libzune_core-ad2445de1c01dda8.rmeta' --extern 'zune_jpeg=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libzune_jpeg-5b06c42fef58b4ff.rmeta' --cap-lints allow -C 'link-arg=/STACK:268435456'` (exit code: 143)
+error: could not compile `redis` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\zhaop\.cargo\bin\sccache.exe 'C:\Users\zhaop\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe' --crate-name redis --edition=2021 'C:\Users\zhaop\.cargo\registry\src\mirrors.aliyun.com-0671735e7cc7f5e7\redis-0.27.6\src\lib.rs' --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no --cfg 'feature="acl"' --cfg 'feature="default"' --cfg 'feature="geospatial"' --cfg 'feature="keep-alive"' --cfg 'feature="script"' --cfg 'feature="sha1_smol"' --cfg 'feature="socket2"' --cfg 'feature="streams"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("acl", "ahash", "aio", "async-native-tls", "async-std", "async-std-comp", "async-std-native-tls-comp", "async-std-rustls-comp", "async-std-tls-comp", "async-trait", "backon", "bigdecimal", "bytes", "cluster", "cluster-async", "connection-manager", "crc16", "default", "disable-client-setinfo", "futures", "futures-rustls", "futures-util", "geospatial", "hashbrown", "json", "keep-alive", "log", "native-tls", "num-bigint", "pin-project-lite", "r2d2", "rand", "rust_decimal", "rustls", "rustls-native-certs", "rustls-pemfile", "rustls-pki-types", "script", "sentinel", "serde", "serde_json", "sha1_smol", "socket2", "streams", "tcp_nodelay", "tls", "tls-native-tls", "tls-rustls", "tls-rustls-insecure", "tls-rustls-webpki-roots", "tokio", "tokio-comp", "tokio-native-tls", "tokio-native-tls-comp", "tokio-rustls", "tokio-rustls-comp", "tokio-util", "uuid", "webpki-roots"))' -C metadata=57593314536683ac -C extra-filename=-82907f7af44ece7a --out-dir 'D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' -C strip=debuginfo -L 'dependency=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' --extern 'arc_swap=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libarc_swap-a818a613788d278e.rmeta' --extern 'combine=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libcombine-1689460e0967d5e4.rmeta' --extern 'itertools=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libitertools-0775cd028b78a08e.rmeta' --extern 'itoa=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libitoa-26c0a3500b6f68b1.rmeta' --extern 'num_bigint=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libnum_bigint-61f2f5528393221e.rmeta' --extern 'percent_encoding=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libpercent_encoding-7603577e6d3905f4.rmeta' --extern 'ryu=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libryu-1bf1c7a3fdfe0a23.rmeta' --extern 'sha1_smol=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libsha1_smol-1dbb5534bc84fe10.rmeta' --extern 'socket2=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libsocket2-52cff4c7e327fd65.rmeta' --extern 'url=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\liburl-0c8d715c6e7b929b.rmeta' --cap-lints allow -C 'link-arg=/STACK:268435456' -L 'native=C:\Users\zhaop\.cargo\registry\src\mirrors.aliyun.com-0671735e7cc7f5e7\windows_x86_64_msvc-0.52.6\lib'` (exit code: 143)
+warning: `ace-av-core` (lib) generated 2 warnings (run `cargo fix --lib -p ace-av-core` to apply 2 suggestions)
+error: could not compile `ace-av-core` (lib); 2 warnings emitted
+
+Caused by:
+  process didn't exit successfully: `C:\Users\zhaop\.cargo\bin\sccache.exe 'C:\Users\zhaop\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe' --crate-name ace_av_core --edition=2021 'D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\av-core\src\lib.rs' --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=777fe25c93d912c3 -C extra-filename=-9758bb2bb7744c23 --out-dir 'D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' -C 'incremental=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\incremental' -C strip=debuginfo -L 'dependency=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' --extern 'ace_foreign_contract=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libace_foreign_contract-1d820d69dff9a210.rmeta' --extern 'serde_json=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libserde_json-d46520acb6431d10.rmeta' -C 'link-arg=/STACK:268435456' -L 'native=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\build\blake3-f158ba2d46e67de4\out' -L 'native=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\build\blake3-f158ba2d46e67de4\out'` (exit code: 143)
+warning: `ace-core` (lib) generated 2 warnings (run `cargo fix --lib -p ace-core` to apply 1 suggestion)
+error: could not compile `ace-core` (lib); 2 warnings emitted
+
+Caused by:
+  process didn't exit successfully: `C:\Users\zhaop\.cargo\bin\sccache.exe 'C:\Users\zhaop\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe' --crate-name ace_core --edition=2021 'D:\autostack\.wt\ui-091\auto-lang\experimental\ace\crates\core\src\lib.rs' --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("legacy-syntax-oracle"))' -C metadata=3244d77790c26fd8 -C extra-filename=-7fe2bfe9f82579dd --out-dir 'D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' -C 'incremental=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\incremental' -C strip=debuginfo -L 'dependency=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' --extern 'ace_foreign_contract=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libace_foreign_contract-1d820d69dff9a210.rmeta' --extern 'ace_syntax_grammar=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libace_syntax_grammar-89deade39dc0d58c.rmeta' --extern 'ace_syntax_runtime=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libace_syntax_runtime-d7262cba64ae34c8.rmeta' --extern 'anyhow=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libanyhow-0fd4e1b7036789d3.rmeta' --extern 'serde=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libserde-a55870265920ab9f.rmeta' --extern 'serde_json=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libserde_json-d46520acb6431d10.rmeta' --extern 'windows_sys=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libwindows_sys-c9df327cd7e05333.rmeta' -C 'link-arg=/STACK:268435456' -L 'native=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\build\blake3-f158ba2d46e67de4\out' -L 'native=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\build\blake3-f158ba2d46e67de4\out' -L 'native=C:\Users\zhaop\.cargo\registry\src\mirrors.aliyun.com-0671735e7cc7f5e7\windows_x86_64_msvc-0.52.6\lib'` (exit code: 143)
+error: could not compile `windows` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\zhaop\.cargo\bin\sccache.exe 'C:\Users\zhaop\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe' --crate-name windows --edition=2021 'C:\Users\zhaop\.cargo\registry\src\mirrors.aliyun.com-0671735e7cc7f5e7\windows-0.57.0\src\lib.rs' --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no --warn=rust_2018_idioms --warn=unexpected_cfgs --warn=missing_docs --check-cfg 'cfg(windows_raw_dylib, windows_debugger_visualizer)' --cfg 'feature="Wdk"' --cfg 'feature="Wdk_System"' --cfg 'feature="Wdk_System_SystemInformation"' --cfg 'feature="Wdk_System_SystemServices"' --cfg 'feature="Wdk_System_Threading"' --cfg 'feature="Win32"' --cfg 'feature="Win32_Foundation"' --cfg 'feature="Win32_NetworkManagement"' --cfg 'feature="Win32_NetworkManagement_IpHelper"' --cfg 'feature="Win32_NetworkManagement_Ndis"' --cfg 'feature="Win32_NetworkManagement_NetManagement"' --cfg 'feature="Win32_Networking"' --cfg 'feature="Win32_Networking_WinSock"' --cfg 'feature="Win32_Security"' --cfg 'feature="Win32_Security_Authentication"' --cfg 'feature="Win32_Security_Authentication_Identity"' --cfg 'feature="Win32_Security_Authorization"' --cfg 'feature="Win32_Storage"' --cfg 'feature="Win32_Storage_FileSystem"' --cfg 'feature="Win32_System"' --cfg 'feature="Win32_System_Com"' --cfg 'feature="Win32_System_Diagnostics"' --cfg 'feature="Win32_System_Diagnostics_Debug"' --cfg 'feature="Win32_System_IO"' --cfg 'feature="Win32_System_Ioctl"' --cfg 'feature="Win32_System_Kernel"' --cfg 'feature="Win32_System_Memory"' --cfg 'feature="Win32_System_Performance"' --cfg 'feature="Win32_System_Power"' --cfg 'feature="Win32_System_ProcessStatus"' --cfg 'feature="Win32_System_Registry"' --cfg 'feature="Win32_System_RemoteDesktop"' --cfg 'feature="Win32_System_Rpc"' --cfg 'feature="Win32_System_SystemInformation"' --cfg 'feature="Win32_System_SystemServices"' --cfg 'feature="Win32_System_Threading"' --cfg 'feature="Win32_System_Variant"' --cfg 'feature="Win32_System_WindowsProgramming"' --cfg 'feature="Win32_System_Wmi"' --cfg 'feature="Win32_UI"' --cfg 'feature="Win32_UI_Shell"' --cfg 'feature="default"' --cfg 'feature="std"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("AI", "AI_MachineLearning", "ApplicationModel", "ApplicationModel_Activation", "ApplicationModel_AppExtensions", "ApplicationModel_AppService", "ApplicationModel_Appointments", "ApplicationModel_Appointments_AppointmentsProvider", "ApplicationModel_Appointments_DataProvider", "ApplicationModel_Background", "ApplicationModel_Calls", "ApplicationModel_Calls_Background", "ApplicationModel_Calls_Provider", "ApplicationModel_Chat", "ApplicationModel_CommunicationBlocking", "ApplicationModel_Contacts", "ApplicationModel_Contacts_DataProvider", "ApplicationModel_Contacts_Provider", "ApplicationModel_ConversationalAgent", "ApplicationModel_Core", "ApplicationModel_DataTransfer", "ApplicationModel_DataTransfer_DragDrop", "ApplicationModel_DataTransfer_DragDrop_Core", "ApplicationModel_DataTransfer_ShareTarget", "ApplicationModel_Email", "ApplicationModel_Email_DataProvider", "ApplicationModel_ExtendedExecution", "ApplicationModel_ExtendedExecution_Foreground", "ApplicationModel_Holographic", "ApplicationModel_LockScreen", "ApplicationModel_Payments", "ApplicationModel_Payments_Provider", "ApplicationModel_Preview", "ApplicationModel_Preview_Holographic", "ApplicationModel_Preview_InkWorkspace", "ApplicationModel_Preview_Notes", "ApplicationModel_Resources", "ApplicationModel_Resources_Core", "ApplicationModel_Resources_Management", "ApplicationModel_Search", "ApplicationModel_Search_Core", "ApplicationModel_UserActivities", "ApplicationModel_UserActivities_Core", "ApplicationModel_UserDataAccounts", "ApplicationModel_UserDataAccounts_Provider", "ApplicationModel_UserDataAccounts_SystemAccess", "ApplicationModel_UserDataTasks", "ApplicationModel_UserDataTasks_DataProvider", "ApplicationModel_VoiceCommands", "ApplicationModel_Wallet", "ApplicationModel_Wallet_System", "Data", "Data_Html", "Data_Json", "Data_Pdf", "Data_Text", "Data_Xml", "Data_Xml_Dom", "Data_Xml_Xsl", "Devices", "Devices_Adc", "Devices_Adc_Provider", "Devices_Background", "Devices_Bluetooth", "Devices_Bluetooth_Advertisement", "Devices_Bluetooth_Background", "Devices_Bluetooth_GenericAttributeProfile", "Devices_Bluetooth_Rfcomm", "Devices_Custom", "Devices_Display", "Devices_Display_Core", "Devices_Enumeration", "Devices_Enumeration_Pnp", "Devices_Geolocation", "Devices_Geolocation_Geofencing", "Devices_Geolocation_Provider", "Devices_Gpio", "Devices_Gpio_Provider", "Devices_Haptics", "Devices_HumanInterfaceDevice", "Devices_I2c", "Devices_I2c_Provider", "Devices_Input", "Devices_Input_Preview", "Devices_Lights", "Devices_Lights_Effects", "Devices_Midi", "Devices_PointOfService", "Devices_PointOfService_Provider", "Devices_Portable", "Devices_Power", "Devices_Printers", "Devices_Printers_Extensions", "Devices_Pwm", "Devices_Pwm_Provider", "Devices_Radios", "Devices_Scanners", "Devices_Sensors", "Devices_Sensors_Custom", "Devices_SerialCommunication", "Devices_SmartCards", "Devices_Sms", "Devices_Spi", "Devices_Spi_Provider", "Devices_Usb", "Devices_WiFi", "Devices_WiFiDirect", "Devices_WiFiDirect_Services", "Embedded", "Embedded_DeviceLockdown", "Foundation", "Foundation_Collections", "Foundation_Diagnostics", "Foundation_Metadata", "Foundation_Numerics", "Gaming", "Gaming_Input", "Gaming_Input_Custom", "Gaming_Input_ForceFeedback", "Gaming_Input_Preview", "Gaming_Preview", "Gaming_Preview_GamesEnumeration", "Gaming_UI", "Gaming_XboxLive", "Gaming_XboxLive_Storage", "Globalization", "Globalization_Collation", "Globalization_DateTimeFormatting", "Globalization_Fonts", "Globalization_NumberFormatting", "Globalization_PhoneNumberFormatting", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Graphics_Display", "Graphics_Display_Core", "Graphics_Effects", "Graphics_Holographic", "Graphics_Imaging", "Graphics_Printing", "Graphics_Printing3D", "Graphics_Printing_OptionDetails", "Graphics_Printing_PrintSupport", "Graphics_Printing_PrintTicket", "Graphics_Printing_Workflow", "Management", "Management_Core", "Management_Deployment", "Management_Deployment_Preview", "Management_Policies", "Management_Update", "Management_Workplace", "Media", "Media_AppBroadcasting", "Media_AppRecording", "Media_Audio", "Media_Capture", "Media_Capture_Core", "Media_Capture_Frames", "Media_Casting", "Media_ClosedCaptioning", "Media_ContentRestrictions", "Media_Control", "Media_Core", "Media_Core_Preview", "Media_Devices", "Media_Devices_Core", "Media_DialProtocol", "Media_Editing", "Media_Effects", "Media_FaceAnalysis", "Media_Import", "Media_MediaProperties", "Media_Miracast", "Media_Ocr", "Media_PlayTo", "Media_Playback", "Media_Playlists", "Media_Protection", "Media_Protection_PlayReady", "Media_Render", "Media_SpeechRecognition", "Media_SpeechSynthesis", "Media_Streaming", "Media_Streaming_Adaptive", "Media_Transcoding", "Networking", "Networking_BackgroundTransfer", "Networking_Connectivity", "Networking_NetworkOperators", "Networking_Proximity", "Networking_PushNotifications", "Networking_ServiceDiscovery", "Networking_ServiceDiscovery_Dnssd", "Networking_Sockets", "Networking_Vpn", "Networking_XboxLive", "Perception", "Perception_Automation", "Perception_Automation_Core", "Perception_People", "Perception_Spatial", "Perception_Spatial_Preview", "Perception_Spatial_Surfaces", "Phone", "Phone_ApplicationModel", "Phone_Devices", "Phone_Devices_Notification", "Phone_Devices_Power", "Phone_Management", "Phone_Management_Deployment", "Phone_Media", "Phone_Media_Devices", "Phone_Notification", "Phone_Notification_Management", "Phone_PersonalInformation", "Phone_PersonalInformation_Provisioning", "Phone_Speech", "Phone_Speech_Recognition", "Phone_StartScreen", "Phone_System", "Phone_System_Power", "Phone_System_Profile", "Phone_System_UserProfile", "Phone_System_UserProfile_GameServices", "Phone_System_UserProfile_GameServices_Core", "Phone_UI", "Phone_UI_Input", "Security", "Security_Authentication", "Security_Authentication_Identity", "Security_Authentication_Identity_Core", "Security_Authentication_OnlineId", "Security_Authentication_Web", "Security_Authentication_Web_Core", "Security_Authentication_Web_Provider", "Security_Authorization", "Security_Authorization_AppCapabilityAccess", "Security_Credentials", "Security_Credentials_UI", "Security_Cryptography", "Security_Cryptography_Certificates", "Security_Cryptography_Core", "Security_Cryptography_DataProtection", "Security_DataProtection", "Security_EnterpriseData", "Security_ExchangeActiveSyncProvisioning", "Security_Isolation", "Services", "Services_Maps", "Services_Maps_Guidance", "Services_Maps_LocalSearch", "Services_Maps_OfflineMaps", "Services_Store", "Services_TargetedContent", "Storage", "Storage_AccessCache", "Storage_BulkAccess", "Storage_Compression", "Storage_FileProperties", "Storage_Pickers", "Storage_Pickers_Provider", "Storage_Provider", "Storage_Search", "Storage_Streams", "System", "System_Diagnostics", "System_Diagnostics_DevicePortal", "System_Diagnostics_Telemetry", "System_Diagnostics_TraceReporting", "System_Display", "System_Implementation", "System_Implementation_FileExplorer", "System_Inventory", "System_Power", "System_Profile", "System_Profile_SystemManufacturers", "System_RemoteDesktop", "System_RemoteDesktop_Input", "System_RemoteDesktop_Provider", "System_RemoteSystems", "System_Threading", "System_Threading_Core", "System_Update", "System_UserProfile", "UI", "UI_Accessibility", "UI_ApplicationSettings", "UI_Composition", "UI_Composition_Core", "UI_Composition_Desktop", "UI_Composition_Diagnostics", "UI_Composition_Effects", "UI_Composition_Interactions", "UI_Composition_Scenes", "UI_Core", "UI_Core_AnimationMetrics", "UI_Core_Preview", "UI_Input", "UI_Input_Core", "UI_Input_Inking", "UI_Input_Inking_Analysis", "UI_Input_Inking_Core", "UI_Input_Inking_Preview", "UI_Input_Preview", "UI_Input_Preview_Injection", "UI_Input_Spatial", "UI_Notifications", "UI_Notifications_Management", "UI_Notifications_Preview", "UI_Popups", "UI_Shell", "UI_StartScreen", "UI_Text", "UI_Text_Core", "UI_UIAutomation", "UI_UIAutomation_Core", "UI_ViewManagement", "UI_ViewManagement_Core", "UI_WebUI", "UI_WebUI_Core", "UI_WindowManagement", "UI_WindowManagement_Preview", "Wdk", "Wdk_Devices", "Wdk_Devices_HumanInterfaceDevice", "Wdk_Foundation", "Wdk_Graphics", "Wdk_Graphics_Direct3D", "Wdk_NetworkManagement", "Wdk_NetworkManagement_Ndis", "Wdk_NetworkManagement_WindowsFilteringPlatform", "Wdk_Storage", "Wdk_Storage_FileSystem", "Wdk_Storage_FileSystem_Minifilters", "Wdk_System", "Wdk_System_IO", "Wdk_System_OfflineRegistry", "Wdk_System_Registry", "Wdk_System_SystemInformation", "Wdk_System_SystemServices", "Wdk_System_Threading", "Web", "Web_AtomPub", "Web_Http", "Web_Http_Diagnostics", "Web_Http_Filters", "Web_Http_Headers", "Web_Syndication", "Web_UI", "Web_UI_Interop", "Win32", "Win32_AI", "Win32_AI_MachineLearning", "Win32_AI_MachineLearning_DirectML", "Win32_AI_MachineLearning_WinML", "Win32_Data", "Win32_Data_HtmlHelp", "Win32_Data_RightsManagement", "Win32_Data_Xml", "Win32_Data_Xml_MsXml", "Win32_Data_Xml_XmlLite", "Win32_Devices", "Win32_Devices_AllJoyn", "Win32_Devices_BiometricFramework", "Win32_Devices_Bluetooth", "Win32_Devices_Communication", "Win32_Devices_DeviceAccess", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Devices_DeviceQuery", "Win32_Devices_Display", "Win32_Devices_Enumeration", "Win32_Devices_Enumeration_Pnp", "Win32_Devices_Fax", "Win32_Devices_FunctionDiscovery", "Win32_Devices_Geolocation", "Win32_Devices_HumanInterfaceDevice", "Win32_Devices_ImageAcquisition", "Win32_Devices_PortableDevices", "Win32_Devices_Properties", "Win32_Devices_Pwm", "Win32_Devices_Sensors", "Win32_Devices_SerialCommunication", "Win32_Devices_Tapi", "Win32_Devices_Usb", "Win32_Devices_WebServicesOnDevices", "Win32_Foundation", "Win32_Gaming", "Win32_Globalization", "Win32_Graphics", "Win32_Graphics_CompositionSwapchain", "Win32_Graphics_DXCore", "Win32_Graphics_Direct2D", "Win32_Graphics_Direct2D_Common", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D10", "Win32_Graphics_Direct3D11", "Win32_Graphics_Direct3D11on12", "Win32_Graphics_Direct3D12", "Win32_Graphics_Direct3D9", "Win32_Graphics_Direct3D9on12", "Win32_Graphics_Direct3D_Dxc", "Win32_Graphics_Direct3D_Fxc", "Win32_Graphics_DirectComposition", "Win32_Graphics_DirectDraw", "Win32_Graphics_DirectManipulation", "Win32_Graphics_DirectWrite", "Win32_Graphics_Dwm", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Graphics_GdiPlus", "Win32_Graphics_Hlsl", "Win32_Graphics_Imaging", "Win32_Graphics_Imaging_D2D", "Win32_Graphics_OpenGL", "Win32_Graphics_Printing", "Win32_Graphics_Printing_PrintTicket", "Win32_Management", "Win32_Management_MobileDeviceManagementRegistration", "Win32_Media", "Win32_Media_Audio", "Win32_Media_Audio_Apo", "Win32_Media_Audio_DirectMusic", "Win32_Media_Audio_DirectSound", "Win32_Media_Audio_Endpoints", "Win32_Media_Audio_XAudio2", "Win32_Media_DeviceManager", "Win32_Media_DirectShow", "Win32_Media_DirectShow_Tv", "Win32_Media_DirectShow_Xml", "Win32_Media_DxMediaObjects", "Win32_Media_KernelStreaming", "Win32_Media_LibrarySharingServices", "Win32_Media_MediaFoundation", "Win32_Media_MediaPlayer", "Win32_Media_Multimedia", "Win32_Media_PictureAcquisition", "Win32_Media_Speech", "Win32_Media_Streaming", "Win32_Media_WindowsMediaFormat", "Win32_NetworkManagement", "Win32_NetworkManagement_Dhcp", "Win32_NetworkManagement_Dns", "Win32_NetworkManagement_InternetConnectionWizard", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_MobileBroadband", "Win32_NetworkManagement_Multicast", "Win32_NetworkManagement_Ndis", "Win32_NetworkManagement_NetBios", "Win32_NetworkManagement_NetManagement", "Win32_NetworkManagement_NetShell", "Win32_NetworkManagement_NetworkDiagnosticsFramework", "Win32_NetworkManagement_NetworkPolicyServer", "Win32_NetworkManagement_P2P", "Win32_NetworkManagement_QoS", "Win32_NetworkManagement_Rras", "Win32_NetworkManagement_Snmp", "Win32_NetworkManagement_WNet", "Win32_NetworkManagement_WebDav", "Win32_NetworkManagement_WiFi", "Win32_NetworkManagement_WindowsConnectNow", "Win32_NetworkManagement_WindowsConnectionManager", "Win32_NetworkManagement_WindowsFilteringPlatform", "Win32_NetworkManagement_WindowsFirewall", "Win32_NetworkManagement_WindowsNetworkVirtualization", "Win32_Networking", "Win32_Networking_ActiveDirectory", "Win32_Networking_BackgroundIntelligentTransferService", "Win32_Networking_Clustering", "Win32_Networking_HttpServer", "Win32_Networking_Ldap", "Win32_Networking_NetworkListManager", "Win32_Networking_RemoteDifferentialCompression", "Win32_Networking_WebSocket", "Win32_Networking_WinHttp", "Win32_Networking_WinInet", "Win32_Networking_WinSock", "Win32_Networking_WindowsWebServices", "Win32_Security", "Win32_Security_AppLocker", "Win32_Security_Authentication", "Win32_Security_Authentication_Identity", "Win32_Security_Authentication_Identity_Provider", "Win32_Security_Authorization", "Win32_Security_Authorization_UI", "Win32_Security_ConfigurationSnapin", "Win32_Security_Credentials", "Win32_Security_Cryptography", "Win32_Security_Cryptography_Catalog", "Win32_Security_Cryptography_Certificates", "Win32_Security_Cryptography_Sip", "Win32_Security_Cryptography_UI", "Win32_Security_DiagnosticDataQuery", "Win32_Security_DirectoryServices", "Win32_Security_EnterpriseData", "Win32_Security_ExtensibleAuthenticationProtocol", "Win32_Security_Isolation", "Win32_Security_LicenseProtection", "Win32_Security_NetworkAccessProtection", "Win32_Security_Tpm", "Win32_Security_WinTrust", "Win32_Security_WinWlx", "Win32_Storage", "Win32_Storage_Cabinets", "Win32_Storage_CloudFilters", "Win32_Storage_Compression", "Win32_Storage_DataDeduplication", "Win32_Storage_DistributedFileSystem", "Win32_Storage_EnhancedStorage", "Win32_Storage_FileHistory", "Win32_Storage_FileServerResourceManager", "Win32_Storage_FileSystem", "Win32_Storage_Imapi", "Win32_Storage_IndexServer", "Win32_Storage_InstallableFileSystems", "Win32_Storage_IscsiDisc", "Win32_Storage_Jet", "Win32_Storage_Nvme", "Win32_Storage_OfflineFiles", "Win32_Storage_OperationRecorder", "Win32_Storage_Packaging", "Win32_Storage_Packaging_Appx", "Win32_Storage_Packaging_Opc", "Win32_Storage_ProjectedFileSystem", "Win32_Storage_StructuredStorage", "Win32_Storage_Vhd", "Win32_Storage_VirtualDiskService", "Win32_Storage_Vss", "Win32_Storage_Xps", "Win32_Storage_Xps_Printing", "Win32_System", "Win32_System_AddressBook", "Win32_System_Antimalware", "Win32_System_ApplicationInstallationAndServicing", "Win32_System_ApplicationVerifier", "Win32_System_AssessmentTool", "Win32_System_ClrHosting", "Win32_System_Com", "Win32_System_Com_CallObj", "Win32_System_Com_ChannelCredentials", "Win32_System_Com_Events", "Win32_System_Com_Marshal", "Win32_System_Com_StructuredStorage", "Win32_System_Com_UI", "Win32_System_Com_Urlmon", "Win32_System_ComponentServices", "Win32_System_Console", "Win32_System_Contacts", "Win32_System_CorrelationVector", "Win32_System_DataExchange", "Win32_System_DeploymentServices", "Win32_System_DesktopSharing", "Win32_System_DeveloperLicensing", "Win32_System_Diagnostics", "Win32_System_Diagnostics_Ceip", "Win32_System_Diagnostics_ClrProfiling", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_Debug_ActiveScript", "Win32_System_Diagnostics_Debug_Extensions", "Win32_System_Diagnostics_Etw", "Win32_System_Diagnostics_ProcessSnapshotting", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Diagnostics_TraceLogging", "Win32_System_DistributedTransactionCoordinator", "Win32_System_Environment", "Win32_System_ErrorReporting", "Win32_System_EventCollector", "Win32_System_EventLog", "Win32_System_EventNotificationService", "Win32_System_GroupPolicy", "Win32_System_HostCompute", "Win32_System_HostComputeNetwork", "Win32_System_HostComputeSystem", "Win32_System_Hypervisor", "Win32_System_IO", "Win32_System_Iis", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_Js", "Win32_System_Kernel", "Win32_System_LibraryLoader", "Win32_System_Mailslots", "Win32_System_Mapi", "Win32_System_Memory", "Win32_System_Memory_NonVolatile", "Win32_System_MessageQueuing", "Win32_System_MixedReality", "Win32_System_Mmc", "Win32_System_Ole", "Win32_System_ParentalControls", "Win32_System_PasswordManagement", "Win32_System_Performance", "Win32_System_Performance_HardwareCounterProfiling", "Win32_System_Pipes", "Win32_System_Power", "Win32_System_ProcessStatus", "Win32_System_RealTimeCommunications", "Win32_System_Recovery", "Win32_System_Registry", "Win32_System_RemoteAssistance", "Win32_System_RemoteDesktop", "Win32_System_RemoteManagement", "Win32_System_RestartManager", "Win32_System_Restore", "Win32_System_Rpc", "Win32_System_Search", "Win32_System_Search_Common", "Win32_System_SecurityCenter", "Win32_System_ServerBackup", "Win32_System_Services", "Win32_System_SettingsManagementInfrastructure", "Win32_System_SetupAndMigration", "Win32_System_Shutdown", "Win32_System_SideShow", "Win32_System_StationsAndDesktops", "Win32_System_SubsystemForLinux", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_TaskScheduler", "Win32_System_Threading", "Win32_System_Time", "Win32_System_TpmBaseServices", "Win32_System_TransactionServer", "Win32_System_UpdateAgent", "Win32_System_UpdateAssessment", "Win32_System_UserAccessLogging", "Win32_System_Variant", "Win32_System_VirtualDosMachines", "Win32_System_WinRT", "Win32_System_WinRT_AllJoyn", "Win32_System_WinRT_Composition", "Win32_System_WinRT_CoreInputView", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Display", "Win32_System_WinRT_Graphics", "Win32_System_WinRT_Graphics_Capture", "Win32_System_WinRT_Graphics_Direct2D", "Win32_System_WinRT_Graphics_Imaging", "Win32_System_WinRT_Holographic", "Win32_System_WinRT_Isolation", "Win32_System_WinRT_ML", "Win32_System_WinRT_Media", "Win32_System_WinRT_Metadata", "Win32_System_WinRT_Pdf", "Win32_System_WinRT_Printing", "Win32_System_WinRT_Shell", "Win32_System_WinRT_Storage", "Win32_System_WindowsProgramming", "Win32_System_WindowsSync", "Win32_System_Wmi", "Win32_UI", "Win32_UI_Accessibility", "Win32_UI_Animation", "Win32_UI_ColorSystem", "Win32_UI_Controls", "Win32_UI_Controls_Dialogs", "Win32_UI_Controls_RichEdit", "Win32_UI_HiDpi", "Win32_UI_Input", "Win32_UI_Input_Ime", "Win32_UI_Input_Ink", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Input_Pointer", "Win32_UI_Input_Radial", "Win32_UI_Input_Touch", "Win32_UI_Input_XboxController", "Win32_UI_InteractionContext", "Win32_UI_LegacyWindowsEnvironmentFeatures", "Win32_UI_Magnification", "Win32_UI_Notifications", "Win32_UI_Ribbon", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_Shell_PropertiesSystem", "Win32_UI_TabletPC", "Win32_UI_TextServices", "Win32_UI_WindowsAndMessaging", "Win32_UI_Wpf", "Win32_Web", "Win32_Web_InternetExplorer", "default", "deprecated", "docs", "implement", "std"))' -C metadata=4051ceae0b2c155e -C extra-filename=-97c305bdcff59fae --out-dir 'D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' -C strip=debuginfo -L 'dependency=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps' --extern 'windows_core=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libwindows_core-85a8d900ede46db4.rmeta' --extern 'windows_targets=D:\autostack\.wt\ui-091\auto-lang\target\generated-consumers\ecfaa65a\debug\deps\libwindows_targets-3c454bbaac816440.rmeta' --cap-lints allow -C 'link-arg=/STACK:268435456' -L 'native=C:\Users\zhaop\.cargo\registry\src\mirrors.aliyun.com-0671735e7cc7f5e7\windows_x86_64_msvc-0.52.6\lib'` (exit code: 143)
