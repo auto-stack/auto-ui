@@ -521,6 +521,12 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 40 | from: work | t
 **验证**：plan105 25/25、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24；auto-ui prep 6/6；ace-av conformance 全量在后台跑（结果下轮并入）。
 
 **下一刀**：016 的 `view for` 网格（列表/循环语义或其源级降级），然后 013 store 列表。`next_responsible_role: work（T-02 W38）`
+
+2026-11-19 stage: work（T-02 W37b：TEXT_DISPLAY 门收窄 + 980 测试翻转）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `a325fa0ae` | evidence: plan980 8/8 + av 子集
+
+`TEXT_DISPLAY` lowering 门收窄为「**声明 `ac.runtime.text.v1` 的 data/owned 模块**」（先前放开 data/owned 全域会让 host-console/generic-records 等既有负测翻红——收窄后 generic_records 4 例恢复通过）。`plan980_state_face` 的 f-string 文本叶负测按新行为**翻转为渲染断言**（`c: 1` 可观察），8/8 通过。
+
+**ace-av 全量基线（1289 passed / 17 failed）说明**：17 个失败中，`plan980_state_face::…refuses` 是本刀**行为翻转**（已更新）；其余 16 个（a2x 端 char_to_str/slice、module_packages 四端、stdlib_core math/text slice、host_console 两例、generic_records 3 例在收窄后已恢复、performance 内存门）与本次 lowering 门无因果关系（跨 a2x/host-console 面，疑似分支既有红），需在 T-06 全量基线时以干净检出复核并分派。**本刀不声称 av 全量绿**。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
