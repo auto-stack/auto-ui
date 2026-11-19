@@ -57,6 +57,9 @@ pub struct AseMetrics {
     pub ui_lane_opens: u64,
     /// 注入 980 事件队列的真实点击数（与 handler 执行数对账）。
     pub clicks_offered: u64,
+    /// 跨宿主生命周期的累计真实 handler 执行数（step 边界计数；关闭会话
+    /// 的 per-session 记录随 owner 释放，此计数保留全程走势对账）。
+    pub dispatches: u64,
 }
 
 /// 一条会话生命周期记录（证据面；关闭后保留记录、释放 owner）。
@@ -274,7 +277,8 @@ impl AseSessionHost {
     }
 
     /// 受控步进选中会话（AV poll → 真实 handler 执行 → 差量 apply 到当前
-    /// 车道）。无选中 → Idle。
+    /// 车道）。无选中 → Idle。`Dispatched` 在 step 边界计入累计
+    /// `metrics.dispatches`（真实 handler 执行走势）。
     pub fn step_selected(&mut self) -> StepOutcome {
         let Some(id) = self.selected else {
             return StepOutcome::Idle;
@@ -282,7 +286,11 @@ impl AseSessionHost {
         let Some(idx) = self.live_idx(id) else {
             return StepOutcome::Idle;
         };
-        self.live[idx].bridge.step()
+        let outcome = self.live[idx].bridge.step();
+        if matches!(outcome, StepOutcome::Dispatched { .. }) {
+            self.metrics.dispatches += 1;
+        }
+        outcome
     }
 
     /// 引擎权威状态读回（业务真值；显示模型只是只读镜像）。已关闭会话 →
@@ -368,7 +376,8 @@ impl AseSessionHost {
                 "loads": self.metrics.loads,
                 "ui_lane_opens": self.metrics.ui_lane_opens,
                 "clicks_offered": self.metrics.clicks_offered,
-                "dispatches": self.dispatches(),
+                "dispatches_total": self.metrics.dispatches,
+                "dispatches_live": self.dispatches(),
             },
             "log": self.log,
             "errors": self.errors,

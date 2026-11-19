@@ -630,3 +630,86 @@ fn p1023_t04_increment_target_limit_and_late_events() {
     assert!(host.errors.iter().any(|e| e.contains("session.limit")));
     eprintln!("p1023_t04 elapsed: {:?}", started.elapsed());
 }
+
+/// V-05 核心（T-05 CPU 面）：20 轮 开→点→切→关 资源计量——受管 Session/
+/// 引擎/车道计数与 owner 走势：常驻会话 a2 全程引擎不重建（loads 不因
+/// 切换增长、dispatches 恒 7、值恒 7），每轮 a1 新开/关闭各一次记账，
+/// 结束 live 清空、closed 记录在案；观察口全额对账（loads/dispatches/
+/// clicks/ui_lane_opens 精确值）。共享 provider 缓存单列（非会话资源）。
+#[test]
+fn p1023_t05_twenty_rounds_resource_accounting() {
+    let started = Instant::now();
+    let apps = fixture_apps();
+    let counter_a = apps
+        .iter()
+        .find(|a| a.key == "counter-a")
+        .cloned()
+        .expect("counter-a fixture");
+    let mut host = AseSessionHost::new(vec![counter_a]);
+
+    // 常驻会话 a2：一次装载，7 次真实点击 → 7。
+    let a2 = host.open_session("counter-a").expect("open resident a2");
+    for _ in 0..7 {
+        host.click(TARGET_INC).expect("inc a2");
+        match host.step_selected() {
+            StepOutcome::Dispatched { .. } => {}
+            other => panic!("inc a2: {other:?}"),
+        }
+    }
+    assert_eq!(engine_count(&host, a2), 7);
+
+    // 20 轮：开 a1（新代次种子0）→ 点 1 次 → 切回 a2（保留 7）→ 关 a1。
+    for round in 0..20 {
+        let a1 = host
+            .open_session("counter-a")
+            .unwrap_or_else(|e| panic!("round {round}: {e}"));
+        assert_eq!(engine_count(&host, a1), 0, "round {round} fresh seed");
+        host.click(TARGET_INC).expect("inc a1");
+        match host.step_selected() {
+            StepOutcome::Dispatched { .. } => {}
+            other => panic!("round {round} inc: {other:?}"),
+        }
+        assert_eq!(engine_count(&host, a1), 1);
+        host.select(a2)
+            .unwrap_or_else(|e| panic!("round {round} select: {e}"));
+        assert_eq!(engine_count(&host, a2), 7, "round {round} a2 retains 7");
+        assert_eq!(
+            displayed_count(host.ui_session_of(a2).unwrap()),
+            "7",
+            "round {round} lane resubmits engine truth"
+        );
+        host.close_session(a1)
+            .unwrap_or_else(|e| panic!("round {round} close: {e}"));
+        assert_eq!(host.live_ids(), vec![a2], "round {round} only a2 live");
+    }
+
+    // 计量对账：1（a2）+20（每轮 a1）次装载；7+20 次点击/执行；每轮
+    // a1 车道开 + a2 车道重开（+初始 a2）共 41 次车道 open。
+    let m = host.metrics.clone();
+    assert_eq!(m.loads, 21, "one compile per open, zero per switch");
+    assert_eq!(m.clicks_offered, 27);
+    assert_eq!(
+        m.dispatches, 27,
+        "cumulative handler executions (survives closes)"
+    );
+    assert_eq!(
+        host.dispatches_of(a2),
+        Some(7),
+        "resident session never re-executes"
+    );
+    assert_eq!(
+        m.ui_lane_opens, 41,
+        "lane churn accounted (2 per round + initial)"
+    );
+
+    // 收尾：关闭常驻会话 → live 清空，21 条 closed 记录在案（owner 全释放）。
+    host.close_session(a2).expect("close resident");
+    assert!(host.live_ids().is_empty(), "no live session leaked");
+    assert_eq!(
+        host.evidence()["closed"].as_array().unwrap().len(),
+        21,
+        "21 closed session records (engines released)"
+    );
+    assert!(host.errors.is_empty(), "errors: {:?}", host.errors);
+    eprintln!("p1023_t05 elapsed: {:?}", started.elapsed());
+}
