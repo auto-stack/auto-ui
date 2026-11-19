@@ -252,11 +252,6 @@ fn p980_package_sfc_cond_branches_switch_in_real_vue() {
 /// 负例——包面 widget 形 on 体控制流（if，`age-view-if-stmt` 包面文法可
 /// 达）在本车道**具名拒**（`source.age.sfc-handler-stmt`），不双支裸喷/
 /// 部分复放（lang 侧 `handler_stmts` 契约：部分复放=错状态值，禁止）。
-/// **let 边界归档（r21 附带「UI 侧 Let 永久例」）**：widget 形 on 块的
-/// `let` 在文法层即拒（G2 修订合同——`age-on-let` 是包面**钩子形**
-/// `on Life.Tick` 体专属，钩子形不经本 SFC 车道；既有负控
-/// `p981_hook_let_and_if_stay_syntax_refused_on_the_component_face`）——
-/// 门的 Let 臂为合同防御（`handler_stmts` 契约要求见 Let/If 即拒）。
 #[test]
 fn p980_package_sfc_if_handler_named_reject() {
     let src = "node T {\n    msg { Go }\n\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"T\" }\n    }\n\n    on {\n        .Go -> { if .n == 1 { .n = 2 } else { .n = 3 } }\n    }\n}\n";
@@ -269,5 +264,26 @@ fn p980_package_sfc_if_handler_named_reject() {
     assert!(
         err.contains('`') && err.contains("Go") && err.contains("if"),
         "names the handler and the statement kind: {err}"
+    );
+}
+
+/// F-R21-2 门 Let 臂永久例（r21 附带「UI 侧 Let 永久例」收口）：981 r21
+/// fold 落主（lang `33895d91c`——`age-on-widget-stmt` 并集规则两面同开
+/// let/if）后，widget 形 on 块 `let` 在主线**可解析并到达消费门**——本车
+/// 道具名拒 `…contains a \`let\` statement…`（fold 前同源在文法层被拒=
+/// `source.age.structure`，门 Let 臂主线不可达的历史归档由此收口；并集
+/// 树验收探针已先行证实命中，本例为其永久化）。
+#[test]
+fn p980_package_sfc_let_handler_named_reject() {
+    let src = "node T {\n    msg { Go }\n\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"T\" }\n    }\n\n    on {\n        .Go -> {\n            let q = .n + 1\n            .n = q\n        }\n    }\n}\n";
+    let err = generate_package_sfc(&[unit("app", "main", src)], "app::main")
+        .expect_err("let-body handler must named-reject on this lane");
+    assert!(
+        err.contains("source.age.sfc-handler-stmt") && err.contains("let"),
+        "named rejection with the let kind: {err}"
+    );
+    assert!(
+        !err.contains("source.age.structure"),
+        "post-fold mainline parses the let body (grammar no longer rejects first): {err}"
     );
 }
