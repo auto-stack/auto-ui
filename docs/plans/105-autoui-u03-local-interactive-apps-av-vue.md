@@ -174,6 +174,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 48 | from: work | t
 **验证**：auto-ui prep 6/6（015/018/022 桥装载保持）；013/015 桥复测：015 OK、013 仍具名 `.store` 边界（列表字段未进 store 映射）。
 
 **下一刀**：核心侧 **列表模型字段**（`[]T`/`[N]T` → `List<T>` 字段、`field_type` 扩展、记录类型进 collections 类型表），然后切回 prep 保留 store 列表类型 → 013 解锁。`next_responsible_role: work（T-02 W46）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 49 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: 25550e67d | next: work
+
+2026-11-19 stage: work（T-02 W46：列表模型字段打通到记录构造面）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `bfde9b8e4`+`25550e67d`、auto-ui `f93f349e` | task_ids: T-02（W46）| evidence: prep 6/6 + 回归全绿
+
+**交付**：①`field_ann`——`[]T`/`[N]T` → `List<T>`（元素内建或记录名），状态槽 Let 注解改用之（三处）；②`needs_collections_face` 在模型字段带列表类型时也切 collections 域；③文法 `age-list-ty`（`[`opt int`]` 元素类型）并入 `age-model-ty`（两面同开，census 重基线）；④观测门接受 `field_ann` 可解析的列表字段（观测通道仍只打包 int）；⑤prep 的 store 列表状态字段恢复保留类型（`var todos []Todo = []`）。
+
+**桥装载推进**：013 的 store 声明（含 `var todos []Todo = []`）现可**解析并内联**，装载推进到新的具名拒「this expression shape is not wired in the component scenario slice yet」（record 构造/下标写等表达式面）。015/018/022 不变（OK）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；prep 6/6；census 4/4（component `ad0d0273…`、package `0fe5c8c6…`）。
+
+**下一刀**：组件场景表达式面——`Todo { … }` 记录构造、`.todos[idx]`/`.todos[i].field` 下标+记录链、`[]T` 字面量初值在 collections 域的发射。`next_responsible_role: work（T-02 W47）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
