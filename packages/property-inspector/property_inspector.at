@@ -1,7 +1,7 @@
 use auto.json
 
 // 模块链接按名直引（numeric_field.at 同型：只注册直引 fn 裸名）。
-use inspector_model: pi_make_row, pi_schema_error
+use inspector_model: pi_value_error, pi_schema_error
 
 // PLAN-092 PropertyInspector — 数据驱动的属性/设置面板（受控）。
 //
@@ -17,7 +17,7 @@ use inspector_model: pi_make_row, pi_schema_error
 // - schema 错误（重复 id / 未知 kind / 缺值 / 非法默认值）具名面板错误并
 //   禁用歧义编辑（整体不渲染编辑器）；error 事件每次配置变化最多一次。
 // - 目标/schemaRevision/错误数变化 → 撤销活动草稿与预览并重建投影行。
-// - 折叠为本地展示状态（view_epoch 触发 ≤100ms 投影刷新），不产生业务请求。
+// - v1 分组标题为静态展示；交互式折叠deferred（B-6 边界，见 decisions）。
 //
 // T-01 机制结论（docs/reviews/plan092/decisions.md）落地：无 handler 互调、
 // 无 List 下标访问、无 nil；onenter 用裸名提交（D-1）；子控件事件带
@@ -25,7 +25,7 @@ use inspector_model: pi_make_row, pi_schema_error
 widget PropertyInspector (fields: List = [], values: List = [], groups: List = [], fieldErrors: List = [], targetId: str = "", revision: int = 0, schemaRevision: int = 0, disabled: bool = false, readOnly: bool = false, showSearch: bool = true) {
     use { package: numeric_fields from "../numeric_fields" }
     use { package: color_picker from "../color_picker" }
-    msg { Init, Tick, SetQuery(str), Sink(str), StrCommit, StrCancel, "changeRequested"(str), "previewRequested"(str), "previewCancelled"(str), "error"(str), BoolChange(str), EnumChange(str, str), NumChange(str, str), NumPreview(str, str), NumErr(str), NumCancel(str), UnitChange(str, str), UnitSwitch(str, str), ColorChange(str, str), ColorPreview(str, str), ColorErr(str), ColorCancel(str), ResetReq(str), EditStr(str), ToggleGroup(str) }
+    msg { Init, Tick, SetQuery(str), Sink(str), StrCommit, StrCancel, "changeRequested"(str), "previewRequested"(str), "previewCancelled"(str), "error"(str), BoolChange(str), EnumChange(str, str), NumCommit(str), NumPreview(str), NumErr(str), SubCancel, UnitCommit(str), UnitSwitch(str), ColorCommit(str), ColorPreview(str), ColorErr(str), ResetReq(str), EditStr(str) }
     model {
         var interval int = 100
         var rows List = []
@@ -41,12 +41,10 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
         var seen_rev int = -1
         var seen_schema int = -1
         var seen_errn int = -1
-        var seen_epoch int = -1
-        var view_epoch int = 0
-        var collapsed List = []
         var has_err bool = false
         var preview_id str = ""
         var bool_vals List = []
+        var slot_ids List = []
     }
     computed {
         c_locked => .disabled
@@ -67,11 +65,9 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
                     if g.visible {
                         col (style: "w-full gap-1") {
                             row (style: "items-center gap-1 w-full") {
-                                button (icon: "chevron-down", title: if g.open { f"折叠 ${g.label}" } else { f"展开 ${g.label}" }, onclick: .ToggleGroup(g.id), style: "h-6 w-6 shrink-0 justify-center rounded-md hover:bg-muted text-muted-foreground") {}
                                 text g.label { style: "text-xs font-semibold text-muted-foreground" }
                             }
-                            if g.open {
-                                col (style: "w-full gap-2") {
+                            col (style: "w-full gap-2") {
                                     for f in g.rows {
                                         if .query == "" || f.label.contains(.query) || f.help.contains(.query) {
                                             col (style: "w-full gap-0.5") {
@@ -97,7 +93,7 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
                                                 if f.kind == "integer" || f.kind == "number" {
                                                     row (style: "items-start gap-2 w-full") {
                                                         text f.label { style: "text-xs w-28 shrink-0 pt-1.5" }
-                                                        NumericField (value: f.vs, revision: f.edited, precision: f.prec, min: f.mn, max: f.mx, step: f.st, disabled: f.locked, errorMessage: f.err, oncommitted: .NumChange(f.id, $event), onpreview: .NumPreview(f.id, $event), onerror: .NumErr($event), oncancelled: .NumCancel(f.id)) {}
+                                                        NumericField (value: f.vs, revision: f.edited, precision: f.prec, min: f.mn, max: f.mx, step: f.st, disabled: f.locked, errorMessage: f.err, oncommitted: .NumCommit($event), onpreview: .NumPreview($event), onerror: .NumErr($event), oncancelled: .SubCancel) {}
                                                         if f.hasDefault {
                                                             button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
                                                         }
@@ -106,7 +102,7 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
                                                 if f.kind == "unit" {
                                                     row (style: "items-start gap-2 w-full") {
                                                         text f.label { style: "text-xs w-28 shrink-0 pt-1.5" }
-                                                        UnitField (value: f.vs, revision: f.edited, precision: f.prec, min: f.mn, max: f.mx, step: f.st, unitGroup: f.ug, unit: f.un, disabled: f.locked, errorMessage: f.err, oncommitted: .UnitChange(f.id, $event), onunitChanged: .UnitSwitch(f.id, $event), onerror: .NumErr($event), oncancelled: .NumCancel(f.id)) {}
+                                                        UnitField (value: f.vs, revision: f.edited, precision: f.prec, min: f.mn, max: f.mx, step: f.st, unitGroup: f.ug, unit: f.un, disabled: f.locked, errorMessage: f.err, oncommitted: .UnitCommit($event), onunitChanged: .UnitSwitch($event), onerror: .NumErr($event), oncancelled: .SubCancel) {}
                                                         if f.hasDefault {
                                                             button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
                                                         }
@@ -137,7 +133,7 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
                                                     row (style: "items-start gap-2 w-full") {
                                                         text f.label { style: "text-xs w-28 shrink-0 pt-1.5" }
                                                         col (style: "flex-1 min-w-0 gap-1") {
-                                                            ColorPicker (value: f.vs, revision: f.edited, disabled: f.locked, oncommitted: .ColorChange(f.id, $event), onpreview: .ColorPreview(f.id, $event), onerror: .ColorErr($event), oncancelled: .ColorCancel(f.id)) {}
+                                                            ColorPicker (value: f.vs, revision: f.edited, disabled: f.locked, oncommitted: .ColorCommit($event), onpreview: .ColorPreview($event), onerror: .ColorErr($event), oncancelled: .SubCancel) {}
                                                         }
                                                         if f.hasDefault {
                                                             button (icon: "rotate-ccw", title: f"恢复 ${f.label} 默认值", onclick: .ResetReq(f.id), disabled: f.locked, style: "h-7 w-7 shrink-0 justify-center border border-border rounded-md text-muted-foreground hover:bg-muted") {}
@@ -157,7 +153,6 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
                                         text "（本组暂无匹配字段）" { style: "text-xs text-muted-foreground" }
                                     }
                                 }
-                            }
                         }
                     }
                 }
@@ -173,7 +168,7 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
         }
         .Tick -> {
             var errn int = .fieldErrors.len()
-            if .targetId != .seen_target || .revision != .seen_rev || .schemaRevision != .seen_schema || errn != .seen_errn || .view_epoch != .seen_epoch {
+            if .targetId != .seen_target || .revision != .seen_rev || .schemaRevision != .seen_schema || errn != .seen_errn {
                 // 目标/修订/错误/本地展示状态变化：撤销活动草稿与预览
                 if .edit_id != "" {
                     .edit_id = ""
@@ -188,7 +183,6 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
                 .seen_rev = .revision
                 .seen_schema = .schemaRevision
                 .seen_errn = errn
-                .seen_epoch = .view_epoch
                 .has_err = false
                 .panel_err = ""
                 .panel_err_code = ""
@@ -208,8 +202,57 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
                 .grows = []
                 .bool_vals = []
                 if !.has_err {
+                    var slotn int = 0
                     for f in .fields {
-                        .rows.push(pi_make_row(f, .values, .targetId, .revision, .schemaRevision, .disabled, .fieldErrors))
+                        // 行构造内联（probe 同型）：模块 fn 返回的记录在
+                        // native 视图绑定中不重投影（B-6 实证），仅 handler
+                        // 侧纯计算走 inspector_model
+                        var vs2 str = ""
+                        var vb2 bool = false
+                        var vunit2 str = f.unit
+                        for v in .values {
+                            if v.id == f.id {
+                                if f.kind == "bool" {
+                                    vb2 = v.value
+                                } else {
+                                    vs2 = v.value
+                                }
+                                if f.kind == "unit" {
+                                    vunit2 = v.unit
+                                }
+                            }
+                        }
+                        var ferr2 str = pi_value_error(f, vs2)
+                        if ferr2 == "" {
+                            for fe in .fieldErrors {
+                                if fe.targetId == .targetId && fe.fieldId == f.id {
+                                    ferr2 = f"${fe.code}: ${fe.message}"
+                                }
+                            }
+                        }
+                        var locked2 bool = .disabled || f.disabled || f.readOnly
+                        if ferr2 != "" {
+                            locked2 = true
+                        }
+                        var opts2 List = []
+                        if f.kind == "enum" {
+                            opts2 = f.options
+                        }
+                        var prec2 int = f.precision
+                        if f.kind == "integer" {
+                            prec2 = 0
+                        }
+                        .rows.push({ id: f.id, label: f.label, kind: f.kind, groupId: f.groupId, help: f.help, vs: vs2, vb: vb2, un: vunit2, opts: opts2, prec: prec2, mn: f.min, mx: f.max, st: f.step, ug: f.unitGroup, locked: locked2, err: ferr2, edited: (.revision + 1) * 1000 + slotn, hasDefault: f.hasDefault, defaultValue: f.defaultValue })
+                        slotn = slotn + 1
+                    }
+                    // 行槽位表：子控件事件只有 $event 载荷（T-01 D-1 扩展：
+                    // view 实参 + $event 的子件绑定在 native 静默不派发），
+                    // 行身份经 revision 槽位编码：edited = (rev+1)*1000 + slot
+                    .slot_ids = []
+                    var slotv int = 0
+                    for r in .rows {
+                        .slot_ids.push({ slot: slotv, id: r.id })
+                        slotv = slotv + 1
                     }
                     // 受控布尔镜像：vue 轨 checkbox 的 v-model 会写回投影行，
                     // 请求值必须来自受控镜像而不是被本地改写的行
@@ -232,11 +275,7 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
                                 grows_rows.push(r)
                             }
                         }
-                        var open bool = true
-                        if .collapsed.contains(g.id) {
-                            open = false
-                        }
-                        .grows.push({ id: g.id, label: g.label, open: open, visible: true, rows: grows_rows })
+                        .grows.push({ id: g.id, label: g.label, visible: true, rows: grows_rows })
                     }
                     for r in .rows {
                         var known bool = false
@@ -250,11 +289,7 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
                         }
                     }
                     if rest.len() > 0 {
-                        var open2 bool = true
-                        if .collapsed.contains("|rest") {
-                            open2 = false
-                        }
-                        .grows.push({ id: "|rest", label: "其他", open: open2, visible: true, rows: rest })
+                        .grows.push({ id: "|rest", label: "其他", visible: true, rows: rest })
                     }
                 }
                 if .has_err {
@@ -265,21 +300,6 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
         }
         .SetQuery(v str) -> {
             .query = v
-        }
-        .ToggleGroup(id str) -> {
-            // 折叠只改变展示：本地状态 + view_epoch 触发 ≤100ms 投影刷新
-            if .collapsed.contains(id) {
-                var kept List = []
-                for gid in .collapsed {
-                    if gid != id {
-                        kept.push(gid)
-                    }
-                }
-                .collapsed = kept
-            } else {
-                .collapsed.push(id)
-            }
-            .view_epoch = .view_epoch + 1
         }
         .EditStr(id str) -> {
             for g in .grows {
@@ -326,9 +346,16 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
             .seq = .seq + 1
             ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "enum", value: optId, source: "edit"}))
         }
-        .NumChange(id str, ev str) -> {
+        .NumCommit(ev str) -> {
             var req = json.parse(ev)
+            var slotv int = req.baseRevision - (req.baseRevision / 1000) * 1000
+            var id str = ""
             var kind str = "number"
+            for m in .slot_ids {
+                if m.slot == slotv {
+                    id = m.id
+                }
+            }
             for g in .grows {
                 for f in g.rows {
                     if f.id == id {
@@ -339,9 +366,16 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
             .seq = .seq + 1
             ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: kind, value: req.value, source: req.source}))
         }
-        .NumPreview(id str, ev str) -> {
+        .NumPreview(ev str) -> {
             var req = json.parse(ev)
+            var slotv int = req.baseRevision - (req.baseRevision / 1000) * 1000
+            var id str = ""
             var kind str = "number"
+            for m in .slot_ids {
+                if m.slot == slotv {
+                    id = m.id
+                }
+            }
             for g in .grows {
                 for f in g.rows {
                     if f.id == id {
@@ -352,18 +386,27 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
             .preview_id = id
             ."previewRequested"(json.stringify({targetId: .targetId, fieldId: id, kind: kind, value: req.value}))
         }
-        .NumCancel(id str) -> {
-            if .preview_id == id {
+        .SubCancel -> {
+            // 子件 cancelled 无载荷；撤销最近预览行（preview_id 单活动）
+            if .preview_id != "" {
+                var pid str = .preview_id
                 .preview_id = ""
+                ."previewCancelled"(json.stringify({targetId: .targetId, fieldId: pid}))
             }
-            ."previewCancelled"(json.stringify({targetId: .targetId, fieldId: id}))
         }
         .NumErr(ev str) -> {
             ."error"(ev)
         }
-        .UnitChange(id str, ev str) -> {
+        .UnitCommit(ev str) -> {
             var req = json.parse(ev)
+            var slotv int = req.baseRevision - (req.baseRevision / 1000) * 1000
+            var id str = ""
             var vunit str = ""
+            for m in .slot_ids {
+                if m.slot == slotv {
+                    id = m.id
+                }
+            }
             for g in .grows {
                 for f in g.rows {
                     if f.id == id {
@@ -374,9 +417,16 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
             .seq = .seq + 1
             ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "unit", value: req.value, unit: vunit, source: req.source}))
         }
-        .UnitSwitch(id str, ev str) -> {
+        .UnitSwitch(ev str) -> {
             var req = json.parse(ev)
+            var slotv int = req.baseRevision - (req.baseRevision / 1000) * 1000
+            var id str = ""
             var val str = ""
+            for m in .slot_ids {
+                if m.slot == slotv {
+                    id = m.id
+                }
+            }
             for g in .grows {
                 for f in g.rows {
                     if f.id == id {
@@ -388,21 +438,29 @@ widget PropertyInspector (fields: List = [], values: List = [], groups: List = [
             // T-01 决策 U-1：单位切换 value 不变，unit 随请求原子提交
             ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "unit", value: val, unit: req.unit, source: "edit"}))
         }
-        .ColorChange(id str, ev str) -> {
+        .ColorCommit(ev str) -> {
             var req = json.parse(ev)
+            var slotv int = req.baseRevision - (req.baseRevision / 1000) * 1000
+            var id str = ""
+            for m in .slot_ids {
+                if m.slot == slotv {
+                    id = m.id
+                }
+            }
             .seq = .seq + 1
             ."changeRequested"(json.stringify({seq: .seq, baseRevision: .revision, schemaRevision: .schemaRevision, targetId: .targetId, fieldId: id, kind: "color", value: req.value, source: req.source}))
         }
-        .ColorPreview(id str, ev str) -> {
+        .ColorPreview(ev str) -> {
             var req = json.parse(ev)
+            var slotv int = req.baseRevision - (req.baseRevision / 1000) * 1000
+            var id str = ""
+            for m in .slot_ids {
+                if m.slot == slotv {
+                    id = m.id
+                }
+            }
             .preview_id = id
             ."previewRequested"(json.stringify({targetId: .targetId, fieldId: id, kind: "color", value: req.value}))
-        }
-        .ColorCancel(id str) -> {
-            if .preview_id == id {
-                .preview_id = ""
-            }
-            ."previewCancelled"(json.stringify({targetId: .targetId, fieldId: id}))
         }
         .ColorErr(ev str) -> {
             ."error"(ev)

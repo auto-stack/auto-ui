@@ -57,7 +57,10 @@ fn pi_default_error(fld) {
 }
 
 // 单字段投影行：值解析 + 锁定态 + 业务错误 + kind 附加位。
-fn pi_make_row(fld, vals, tid, rv, srev, dis, ferrs) {
+// slotn = 行序号（编码进子控件 revision：edited = (rv+1)*1000 + slotn）——
+// 子控件事件载荷仅 $event（native 子件绑定不派发 view 实参），行身份由
+// baseRevision 槽位反解。
+fn pi_make_row(fld, vals, tid, rv, srev, dis, ferrs, slotn) {
     var vs = ""
     var vb = false
     var vunit = fld.unit
@@ -93,7 +96,7 @@ fn pi_make_row(fld, vals, tid, rv, srev, dis, ferrs) {
     if fld.kind == "integer" {
         prec = 0
     }
-    return { id: fld.id, label: fld.label, kind: fld.kind, groupId: fld.groupId, help: fld.help, vs: vs, vb: vb, un: vunit, opts: opts, prec: prec, mn: fld.min, mx: fld.max, st: fld.step, ug: fld.unitGroup, locked: locked, err: ferr, edited: rv + srev, hasDefault: fld.hasDefault, defaultValue: fld.defaultValue }
+    return { id: fld.id, label: fld.label, kind: fld.kind, groupId: fld.groupId, help: fld.help, vs: vs, vb: vb, un: vunit, opts: opts, prec: prec, mn: fld.min, mx: fld.max, st: fld.step, ug: fld.unitGroup, locked: locked, err: ferr, edited: (rv + 1) * 1000 + slotn, hasDefault: fld.hasDefault, defaultValue: fld.defaultValue }
 }
 
 // 面板级 schema 扫描：返回 {code, message}（无错误时 code 为空串）。

@@ -1,0 +1,110 @@
+use auto.json
+
+// PLAN-092 高级/边界页 — 第二 PropertyInspector 实例（targetId=editor）。
+// 与基础页同 label 不同目标（V-03 双面板语义；B-6 证据下按路由分离挂载）。
+// 边界夹具（V-01/V-06）：integer 默认 0、bool 默认 false、hasDefault=false、
+// 只读字段；「坏schema」注入重复 id + 未知 kind 验证具名拒绝且不波及基础页。
+widget advanced {
+    use { package: property_inspector from "../../../../../packages/property-inspector" }
+    use { package: numeric_fields from "../../../../../packages/numeric-fields" }
+    use { package: color_picker from "../../../../../packages/color-picker" }
+    msg { Init, ChangeRequested2(str), PreviewRequested(str), PreviewCancelled(str), Err(str), ToggleBadSchema, Quit }
+    model {
+        var rev2 int = 1
+        var schema_rev int = 1
+        var fields2 List = []
+        var values2 List = []
+        var groups List = []
+        var ferrs2 List = []
+        var bad_schema bool = false
+        var seq_log int = 0
+        var log List = []
+    }
+    view {
+        col (style: "w-full h-full bg-background text-foreground gap-3 p-4 overflow-y-auto") {
+            row (style: "items-center gap-2") {
+                text "高级/边界（第二实例 · 目标 editor）" { style: "text-sm font-medium" }
+                row (style: "flex-1") {}
+                button "坏schema样例" { onclick: .ToggleBadSchema, title: "注入/移除重复id与未知kind", style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                button "退出" { onclick: .Quit, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+            }
+            PropertyInspector (fields: .fields2, values: .values2, groups: .groups, fieldErrors: .ferrs2, targetId: "editor", revision: .rev2, schemaRevision: .schema_rev, onchangeRequested: .ChangeRequested2($event), onpreviewRequested: .PreviewRequested($event), onpreviewCancelled: .PreviewCancelled, onerror: .Err($event)) {}
+            text "事件日志" { style: "text-xs font-medium text-muted-foreground mt-2" }
+            col (style: "gap-1 max-h-56 overflow-y-auto") {
+                if .seq_log == 0 {
+                    text "（暂无事件）" { style: "text-xs text-muted-foreground" }
+                }
+                for line in .log {
+                    text line { style: "text-xs text-muted-foreground break-all" }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .groups.push({ id: "appearance", label: "阅读与外观" })
+            // 边界夹具（V-03 双面板/V-06）：同 label 不同目标；integer 默认 0、
+            // bool 默认 false、hasDefault=false 与只读字段
+            .fields2.push({ id: "fontSize", label: "字号", kind: "integer", groupId: "appearance", help: "同label不同目标", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: "12", precision: 0, min: "8", max: "72", step: "1", unitGroup: "", unit: "", options: [] })
+            .fields2.push({ id: "count", label: "数量", kind: "integer", groupId: "appearance", help: "默认 0（区分空值）", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: "0", precision: 0, min: "", max: "", step: "1", unitGroup: "", unit: "", options: [] })
+            .fields2.push({ id: "showHints", label: "显示辅助提示", kind: "bool", groupId: "appearance", help: "默认 false", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: false, precision: 0, min: "", max: "", step: "", unitGroup: "", unit: "", options: [] })
+            .fields2.push({ id: "width", label: "页宽", kind: "unit", groupId: "appearance", help: "长度单位（087 UnitField）", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: "210.00", precision: 2, min: "10.00", max: "1000.00", step: "1", unitGroup: "length", unit: "mm", options: [] })
+            .fields2.push({ id: "align", label: "对齐", kind: "enum", groupId: "appearance", help: "同label不同目标", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: "center", precision: 0, min: "", max: "", step: "", unitGroup: "", unit: "", options: [{ id: "left", label: "左" }, { id: "center", label: "中" }, { id: "right", label: "右" }] })
+            .fields2.push({ id: "note", label: "备注", kind: "string", groupId: "appearance", help: "无默认值（hasDefault=false）", required: false, readOnly: false, disabled: false, hasDefault: false, defaultValue: "", precision: 0, min: "", max: "", step: "", unitGroup: "", unit: "", options: [] })
+            .fields2.push({ id: "locknote", label: "锁定备注", kind: "string", groupId: "appearance", help: "只读字段仍可读", required: false, readOnly: true, disabled: false, hasDefault: false, defaultValue: "", precision: 0, min: "", max: "", step: "", unitGroup: "", unit: "", options: [] })
+            .values2.push({ id: "fontSize", value: "12" })
+            .values2.push({ id: "count", value: "0" })
+            .values2.push({ id: "showHints", value: false })
+            .values2.push({ id: "width", value: "210.00", unit: "mm" })
+            .values2.push({ id: "align", value: "center" })
+            .values2.push({ id: "note", value: "" })
+            .values2.push({ id: "locknote", value: "（系统只读）" })
+        }
+        .ChangeRequested2(ev str) -> {
+            // 独立接受回路：目标绑定校验（旧目标/异目标的迟到请求不落本页）
+            var req = json.parse(ev)
+            if req.targetId == "editor" {
+                var out List = []
+                for v in .values2 {
+                    if v.id == req.fieldId {
+                        out.push({ id: v.id, value: req.value })
+                    } else {
+                        out.push(v)
+                    }
+                }
+                .values2 = out
+                .ferrs2 = []
+                .rev2 = .rev2 + 1
+                .seq_log = .seq_log + 1
+                .log.push(f"[${.seq_log}] B接受 ${req.fieldId} = ${req.value} ${req.source}")
+            } else {
+                .seq_log = .seq_log + 1
+                .log.push(f"[${.seq_log}] 拒绝异目标请求 ${req.targetId}")
+            }
+        }
+        .PreviewRequested(ev str) -> {
+        }
+        .PreviewCancelled -> {
+        }
+        .Err(ev str) -> {
+            .seq_log = .seq_log + 1
+            .log.push(f"[${.seq_log}] 错误 ${ev}")
+        }
+        .ToggleBadSchema -> {
+            // V-01/V-03 反例：重复 id + 未知 kind 一次注入；具名面板错误禁用
+            // 歧义编辑；基础页不受影响（独立实例/路由）
+            .bad_schema = !.bad_schema
+            .schema_rev = .schema_rev + 1
+            if .bad_schema {
+                .fields2.push({ id: "fontSize", label: "字号2", kind: "gauge", groupId: "appearance", help: "", required: false, readOnly: false, disabled: false, hasDefault: false, defaultValue: "", precision: 0, min: "", max: "", step: "", unitGroup: "", unit: "", options: [] })
+            } else {
+                .fields2.pop()
+            }
+            .seq_log = .seq_log + 1
+            .log.push(f"[${.seq_log}] 坏schema=${.bad_schema}（第二实例）")
+        }
+        .Quit -> {
+            ui.close()
+        }
+    }
+}

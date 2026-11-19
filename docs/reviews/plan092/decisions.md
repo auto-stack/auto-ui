@@ -150,3 +150,28 @@ workaround，T-05 实拍归档时按 AC-06 记录。
   `auto run` vue 封装观察项、Linux 双轨、错误/预览窄窗实拍（指南 §3.2）。
 - 合同层留痕（供复审确认，非阻塞）：U-1（unit 值记录带 unit 成员 + 单位
   切换走 source=edit）为 §5 r2 的解释性落地，如需改 r2 文本则增 revision。
+
+
+## 7. T-02…T-05 增补决议（2026-11-20）
+
+| ID | 决议 | 实证 |
+|---|---|---|
+| D-7 | 示例双实例按路由分离（`/` 基础 + `/advanced` 高级/边界）：native 同页同类型双实例的面板行重投影不稳定（B-6），路由分离保持单实例挂载，双面板语义经导航呈现 | 单实例 probe 20/20 vs 双实例复现陈旧按钮；路由化后 gate 全绿 |
+| D-8 | 行构造 handler 内联（B-6）：模块 fn 返回的记录在 native 视图绑定不重投影；纯计算（schema 扫描/值错误）保留模块 fn（pi_schema_error/pi_value_error），结果经模型变量/内联字段落视图 | 内联后单实例重投影恢复、双实例路由化门全绿 |
+| D-9 | 子控件事件一律 `$event` 单参绑定，行身份经 revision 槽位编码（`(rev+1)*1000+行序`，slot_ids 反解）：native 子件事件带 view 实参时静默不派发（D-1 扩展） | 087 错误事件（$event-only）路由成功 vs `.NumChange(f.id,$event)` 静默；槽位化后 gate 通过 |
+| B-4 | shadcn checkbox 资产：文本槽移出 CheckboxIndicator（原顶替勾选图标、标签不可见）；外层 div 而非 label（label 转发点击造成双派发，一次点击两条请求） | vue 实测 label 渲染 + 单发；编译套件 1170/1170 |
+| B-5 | VM runtime 债（不修，留痕）：native 包父层子件注入不派发——±按钮 delivered=0、嵌套 input Enter 无 committed；错误事件路由正常。088 decisions §7 depth-3 债扩展 | route 形态对照 smoke10/11；gate 单列 not_run，vue 轨承担该行为矩阵 |
+| B-6 | native 同类型多实例视图重投影不稳定 + 动态记录成员视图条件不重渲染：交互折叠 deferred（v1 静态分组标题）、双实例路由分离、行构造内联 | dbg 标记：状态/重建正确而视图成员滞后；单实例无此象 |
+| U-1 落地 | unit 值记录带 `unit` 成员；单位切换发 `changeRequested{kind:unit, value 不变, unit, source:edit}` | gate（native 高级页 + vue）通过 |
+
+## 8. 最终门禁（T-05 收口）
+
+- tools：`property_inspector_component` 2/2；compiler lib 1170/1170（含
+  B-1/B-3 永久回归）。
+- native 产品门：23 pass + 1 not_run（B5-native-nested-write，Q-04 单列）。
+- vue 产品门：18/18（含 numeric 步进、unit、坏 schema、420 窄窗、无页面错误）。
+- 报告/截图：plan-artifacts/plan-092/gate/{natf6,vuef}/；计时与矩阵见
+  evidence.md §2/§3。
+- V-04 读回口径：同进程显式「读回」按钮（set→get→回投）；应用级退出重开
+  验证二次渲染（V05）。native storage 跨进程生命周期属 VM 存储层行为，
+  不作本包合同断言。
