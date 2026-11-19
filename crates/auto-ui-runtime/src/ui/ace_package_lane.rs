@@ -43,6 +43,8 @@ impl PackageFragmentLane {
         entry: &str,
         handler_msgs: &[&str],
     ) -> Result<Self, String> {
+        // PLAN-105 T-02：单元统一 f-string 脱糖（组件面/包桥同一入口）。
+        let units = &crate::ui::ace_package_units::desugar_units(units.to_vec())?[..];
         let entry_src = units
             .iter()
             .find(|u| format!("{}::{}", u.package, u.id) == entry)

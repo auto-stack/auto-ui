@@ -38,6 +38,8 @@ impl PackageStateEngine {
         entry: &str,
         alias: LegacyWidgetAlias,
     ) -> Result<Self, String> {
+        // PLAN-105 T-02：包闭包单元统一 f-string 脱糖（组件面同一边界）。
+        let units = crate::ui::ace_package_units::desugar_units(units)?;
         let engine = Self {
             units,
             entry: entry.to_string(),
