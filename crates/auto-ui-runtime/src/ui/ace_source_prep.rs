@@ -407,4 +407,48 @@ mod tests {
             )
             .unwrap_or_else(|e| panic!("{app} must load through the AV bridge: {e}"));
         }
+    }
+
+    /// PLAN-105 T-02：带工程根的 SFC 生成——entry 的 `use`/依赖样式先过源准备，
+    /// 组件投影才拿得到可吃进的单源（真语料形态的最小复现）。
+    #[test]
+    fn sfc_generation_prepares_entry_source() {
+        let root = std::env::temp_dir().join(format!(
+            "p105-sfc-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(root.join("src/front")).unwrap();
+        std::fs::create_dir_all(root.join("deps/stylekit/src/front")).unwrap();
+        std::fs::write(
+            root.join("pac.at"),
+            "name: \"app\"\nversion: \"1.0.0\"\ndep stylekit {\n    path: \"deps/stylekit\"\n}\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("deps/stylekit/src/front/styles.at"),
+            "pub style caption_text = \"text-xs text-muted-foreground\"\n",
+        )
+        .unwrap();
+        let app_src = "use stylekit.styles: caption_text\nwidget App {\n    model { var n int = 0 }\n    view { text \"x\" { style: caption_text } }\n}\n";
+        std::fs::write(root.join("src/front/app.at"), app_src).unwrap();
+        let units = vec![ace_core::source::packages::PackageModuleInput {
+            package: "app".into(),
+            version: "1.0.0".into(),
+            id: "app".into(),
+            source: app_src.into(),
+            provider: None,
+        }];
+        let sfc = crate::ui::ace_package_sfc::generate_package_sfc_with_root(
+            &units,
+            "app::app",
+            Some(&root),
+        )
+        .expect("prepared entry generates an SFC");
+        assert!(sfc.contains("<template>"), "SFC template emitted");
+        assert!(sfc.contains("text-xs text-muted-foreground"), "inlined style reaches the template");
+        let _ = std::fs::remove_dir_all(&root);
     }}

@@ -19,6 +19,17 @@ mod widgets;
 
 /// 生成一份可直接挂载的 Vue SFC（template + script setup）。
 pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result<String, String> {
+    generate_package_sfc_with_root(units, entry, None)
+}
+
+/// PLAN-105 T-02（U03 真语料）：带工程根的 SFC 生成——entry 源先过组件面源准备
+/// （`use` 行空白化 + 依赖样式内联 + 类型化列表数据字段改写），再走组件投影；
+/// 其余单元已由 `desugar_units` 统一 f-string 脱糖。
+pub fn generate_package_sfc_with_root(
+    units: &[PackageModuleInput],
+    entry: &str,
+    project_root: Option<&std::path::Path>,
+) -> Result<String, String> {
     // PLAN-105 T-02：单元统一 f-string 脱糖（与组件面/包桥同一入口）。
     let units = &crate::ui::ace_package_units::desugar_units(units.to_vec())?[..];
     let entry_src = units
@@ -26,10 +37,32 @@ pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result
         .find(|u| format!("{}::{}", u.package, u.id) == entry)
         .map(|u| u.source.clone())
         .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
-    let node = package_candidates(&entry_src)?
+    let prepared_entry = match project_root {
+        Some(root) => crate::ui::ace_source_prep::prepare_component_source(root, &entry_src)
+            .map(|p| p.source)
+            .unwrap_or_else(|_| entry_src.clone()),
+        None => entry_src.clone(),
+    };
+    let node = age_component_candidates(&prepared_entry)?
         .into_iter()
         .next()
         .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
+    // entry 单元用**源准备后的源**参与包编译（`use` 已空白化、依赖样式已内联），
+    // 否则包面仍会解析原始 `use`（导入样式 = 具名待接面）。
+    let prepared_units: Vec<PackageModuleInput> = units
+        .iter()
+        .map(|u| {
+            if format!("{}::{}", u.package, u.id) == entry {
+                PackageModuleInput {
+                    source: prepared_entry.clone(),
+                    ..u.clone()
+                }
+            } else {
+                u.clone()
+            }
+        })
+        .collect();
+    let units = &prepared_units[..];
     // 受检描述：字段/初值/处理器赋值（同名一次编译）。
     let caps = [ace_core::source::packages::PACKAGES_CAPABILITY.to_string()];
     let compiled = ace_core::source::age_package::compile_age_package_with_scenario(
