@@ -839,9 +839,9 @@ pub struct NodeDesktopBridge {
     tick_no: usize,
     /// PLAN-104：装载时的 view 树（条件可见性求值用；叶序与 texts 一致）。
     view_items: Vec<ace_core::source::age_component::ComponentViewItem>,
-    /// PLAN-104：源与逐实例场景 op 历史（文本叶随状态刷新用）。
+    /// PLAN-104：源（负控/诊断面）。PLAN-1106 T-05：场景 op 历史随增量会话
+    /// 接线退役——文本叶改由会话纯读（`AceStateEngine::read_texts`）。
     src: String,
-    ops: Vec<Vec<ace_core::source::age_component::ScenarioOp>>,
     /// PLAN-104：文本叶来自循环体模板展开（视图数据，非状态派生）——不参与
     /// 状态驱动的叶刷新。
     expanded_static: bool,
@@ -1587,7 +1587,6 @@ impl NodeDesktopBridge {
             tick_no: 0,
             view_items: node.view.tree.clone(),
             src: src.to_string(),
-            ops: vec![Vec::new(); instances],
             expanded_static,
         })
     }
@@ -1689,7 +1688,6 @@ impl NodeDesktopBridge {
             tick_no: 0,
             view_items: node.view.tree.clone(),
             src: entry_src.clone(),
-            ops: vec![Vec::new(); instances],
             expanded_static: false,
         })
     }
@@ -1921,11 +1919,8 @@ impl NodeDesktopBridge {
         };
         match dispatch_result {
             Ok(DispatchOutcome::Delivered(states)) => {
-                // PLAN-104：记录场景 op（文本叶刷新需按同一历史重放），并在
-                // 状态提交后把**动态文本叶**重新求值/提交（`text .field` 文案）。
-                self.ops
-                    .get_mut(instance)
-                    .map(|v| v.push(ScenarioOp::Send { instance, msg: msg_name.clone() }));
+                // PLAN-1106 T-05：文本叶刷新改走增量会话纯读（不再按 op 历史
+                // 重放整场景）；状态差量提交保持原序。
                 if let Err(e) = self.refresh_texts(instance) {
                     self.errors.push(format!("text refresh: {e}"));
                 }
@@ -1954,48 +1949,28 @@ impl NodeDesktopBridge {
         }
     }
 
-    /// PLAN-104：按实例 op 历史重放求值 flat 文本叶，只对**变化**的叶发
-    /// `ui_apply_text`（`text .field` 的文案随 dispatch 更新）。失败记录错误，
-    /// 不吞掉（文本面不是状态面，不因它回滚消息）。
+    /// PLAN-1106 T-05：文本叶刷新改走**增量会话纯读**（每叶一次派发、不执行
+    /// 业务 handler、零重编——替代按 op 历史重放整场景的旧道），只对**变化**
+    /// 的叶发 `ui_apply_text`。失败记录错误，不吞掉（文本面不是状态面，不因
+    /// 它回滚消息）。states-only 边界（f-string 叶）的源在此具名报错——与
+    /// 旧道在装载/刷新两处的既有边界一致。
     fn refresh_texts(&mut self, instance: usize) -> Result<(), String> {
         if self.text_leaf_count == 0 || self.expanded_static {
             // PLAN-104：无模块作用域文本叶（循环体模板叶）——states-only 面，
             // 没有可刷新的叶。
             return Ok(());
         }
-        let scenario = ComponentScenario {
-            instances: self.instances.max(1),
-            ops: self.ops.iter().flatten().cloned().collect(),
+        let row: Vec<String> = match self.engine.as_mut() {
+            Some(BridgeEngine::Component(engine)) => {
+                let identity = self
+                    .identities
+                    .get(instance)
+                    .cloned()
+                    .unwrap_or_else(|| "i0".to_string());
+                engine.read_texts(&identity)?
+            }
+            _ => return Ok(()),
         };
-        let initials = ComponentInitials {
-            per_instance: vec![Vec::new(); self.instances.max(1)],
-        };
-        let caps = ["ac.runtime.text.v1".to_string()];
-        let compiled = compile_component_scenario_with_initials(
-            &self.src,
-            &self.path,
-            LegacyWidgetAlias::Accept,
-            &caps,
-            &scenario,
-            None,
-            &initials,
-        )
-        .map_err(|ds| {
-            ds.iter()
-                .map(|d| format!("{}: {}", d.code, d.message))
-                .collect::<Vec<_>>()
-                .join("; ")
-        })?;
-        let (_states, texts) = observe_component_states_and_texts_flat(&compiled)?;
-        let Some(row) = texts.get(instance) else {
-            return Ok(());
-        };
-        let prev = self
-            .load_texts
-            .get(..)
-            .map(|_| ())
-            .map(|_| ());
-        let _ = prev;
         // 逐叶 diff：以宿主 session 当前值为基准（open 已提交 load_texts）。
         let current: Vec<String> = host()
             .read()
