@@ -149,6 +149,10 @@ pub struct EngineExecutionAudit {
     pub retired_handler_entries: u64,
     /// 会话链接数（每 mount +1；事件/读取/切换不得增长）。
     pub links: u64,
+    /// Real init entries on all mounted sessions.
+    pub init_runs: u64,
+    /// State roots released through the production unmount path.
+    pub released_roots: u64,
     /// 程序编译次数（new 时 1；事件不得增长）。
     pub compile_count: u64,
     /// 负控车道对旧场景 producer 的真实调用次数（生产路径恒 0）。
@@ -235,6 +239,13 @@ impl AceStateEngine {
         })
     }
 
+    pub(crate) fn accepts_clock_tick(&self) -> bool {
+        self.program.handlers().iter().any(|handler| {
+            handler.msg == "Tick"
+                && matches!(handler.payload.as_slice(), [spelling] if matches!(spelling.as_str(), "int" | "i32"))
+        })
+    }
+
     fn live_count(&self) -> usize {
         self.slots.iter().filter(|s| s.live).count()
     }
@@ -286,6 +297,7 @@ impl AceStateEngine {
         // 开会话（link + init + 可选 seed）：失败即不挂载（干净回滚）。
         let session = self.program.open_session(&seeds)?;
         let generation = session.generation();
+        self.audit.init_runs += session.audit().init_runs;
         let states = session
             .last_committed_states()
             .iter()
@@ -322,11 +334,13 @@ impl AceStateEngine {
     /// 卸载实例：关闭会话（释放状态根）；晚到事件/旧世代完成不再可见。
     pub fn unmount(&mut self, identity: &str) -> UnmountOutcome {
         let mut retired = 0u64;
+        let mut released = false;
         let outcome = match self.slot_mut(identity) {
             Some(slot) if slot.live => {
                 if let Some(mut session) = slot.session.take() {
                     retired += session.0.audit().handler_entries;
                     session.0.close();
+                    released = session.0.audit().released;
                 }
                 slot.live = false;
                 slot.states.clear();
@@ -336,6 +350,7 @@ impl AceStateEngine {
         };
         // 卸载把该会话的真实入口数折入累计账（增量不变量在关开全程可对账）。
         self.audit.retired_handler_entries += retired;
+        self.audit.released_roots += u64::from(released);
         outcome
     }
 

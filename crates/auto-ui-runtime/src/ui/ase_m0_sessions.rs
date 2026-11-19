@@ -27,12 +27,49 @@
 //! 与引擎重建可区分）、`metrics.clicks_offered`（注入 980 队列的真实点击）、
 //! `dispatches*`（真实 handler 执行计数，`dispatch_log` 同源）。
 
-use crate::ui::ace_node_desktop::{current_session, push_event, NodeDesktopBridge, StepOutcome};
-use crate::ui::ace_state_bridge::AceStateValue;
+use crate::ui::ace_node_desktop::{
+    current_session, host_session_text_applies, push_event, NodeDesktopBridge, StepOutcome,
+};
+use crate::ui::ace_state_bridge::{AceStateValue, EngineExecutionAudit};
 use crate::ui::{Component, View};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{OnceLock, RwLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+const CLOCK_PERIOD: Duration = Duration::from_secs(1);
+const UTC_DAY_SECONDS: i32 = 86_400;
+
+/// One deadline tied to the session, its generation, and one visibility interval.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClockWake {
+    session: usize,
+    generation: u64,
+    visibility: u64,
+    deadline: Instant,
+}
+
+struct VisibleClock {
+    wake: ClockWake,
+    pending: bool,
+    ready: bool,
+}
+
+#[derive(Default)]
+struct ClockMetrics {
+    samples: u64,
+    delivered: u64,
+    stale_wakes: u64,
+    rejected_samples: u64,
+}
+
+/// Real wall-clock time in UTC seconds since midnight.
+fn sample_wall_clock() -> Result<i32, String> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|time| (time.as_secs() % UTC_DAY_SECONDS as u64) as i32)
+        .map_err(|e| format!("system time before Unix epoch: {e}"))
+}
 
 /// 本 profile 的活会话上限（第三个请求具名 `session.limit` 拒）。
 pub const ASE_M0_SESSION_LIMIT: usize = 2;
@@ -82,12 +119,14 @@ pub struct SessionRecord {
     pub closed: bool,
     /// 最近一次打开的显示车道句柄（关闭后仅作证据；车道已撤）。
     pub last_ui_session: Option<i32>,
+    retired_audit: Option<EngineExecutionAudit>,
 }
 
 struct LiveSession {
     record: SessionRecord,
     bridge: NodeDesktopBridge,
     ui_session: Option<i32>,
+    clock: bool,
 }
 
 /// ASE 交互会话宿主：app 注册表 + 会话表（活≤2）+ 选中态 + 观察口。
@@ -97,6 +136,11 @@ pub struct AseSessionHost {
     closed: Vec<SessionRecord>,
     selected: Option<usize>,
     next_id: usize,
+    clock_app: Option<String>,
+    visibility: u64,
+    clock: Option<VisibleClock>,
+    clock_metrics: ClockMetrics,
+    clock_lanes: Vec<i32>,
     /// 切换计数（证据面：隐藏/切回次数）。
     pub switches: u64,
     pub metrics: AseMetrics,
@@ -114,6 +158,11 @@ impl AseSessionHost {
             closed: Vec::new(),
             selected: None,
             next_id: 1,
+            clock_app: None,
+            visibility: 0,
+            clock: None,
+            clock_metrics: ClockMetrics::default(),
+            clock_lanes: Vec::new(),
             switches: 0,
             metrics: AseMetrics::default(),
             log: Vec::new(),
@@ -121,6 +170,13 @@ impl AseSessionHost {
             script: Vec::new(),
             tick_no: 0,
         }
+    }
+
+    /// Register the app that receives the host's one-second Tick(int) samples.
+    pub fn with_clock_app(mut self, app_key: String) -> Result<Self, String> {
+        self.app_path(&app_key)?;
+        self.clock_app = Some(app_key);
+        Ok(self)
     }
 
     /// 已注册应用 key（声明序）。
@@ -177,12 +233,21 @@ impl AseSessionHost {
         self.metrics.loads += 1;
         let mut bridge = NodeDesktopBridge::load(&src, &path.to_string_lossy(), 1)
             .map_err(|e| format!("load refused for {app_key}: {e}"))?;
+        let clock = self.clock_app.as_deref() == Some(app_key);
+        if clock && !bridge.accepts_clock_tick() {
+            return Err(format!(
+                "clock app {app_key:?} must declare a Tick(int) handler"
+            ));
+        }
         // 新会话成为选中：出向车道先撤（引擎常驻，只撤显示副本）。
         self.close_outgoing_lane("open-session")?;
         self.metrics.ui_lane_opens += 1;
-        let ui_session = bridge
-            .open()
-            .map_err(|e| format!("open refused for {app_key}: {e}"))?;
+        let ui_session = if clock {
+            bridge.open_awaiting_event()
+        } else {
+            bridge.open()
+        }
+        .map_err(|e| format!("open refused for {app_key}: {e}"))?;
         let generation = self.next_generation_of(app_key);
         let id = self.next_id;
         self.next_id += 1;
@@ -198,11 +263,13 @@ impl AseSessionHost {
                 generation,
                 closed: false,
                 last_ui_session: Some(ui_session),
+                retired_audit: None,
             },
             bridge,
             ui_session: Some(ui_session),
+            clock,
         });
-        self.selected = Some(id);
+        self.activate(id, generation, clock);
         Ok(id)
     }
 
@@ -218,14 +285,19 @@ impl AseSessionHost {
             .ok_or_else(|| format!("select refused: session {id} is not a live session"))?;
         self.close_outgoing_lane("select")?;
         self.metrics.ui_lane_opens += 1;
-        let ui_session = self.live[idx]
-            .bridge
-            .open()
-            .map_err(|e| format!("select refused: reopening lane for {id}: {e}"))?;
-        self.live[idx].ui_session = Some(ui_session);
-        self.live[idx].record.last_ui_session = Some(ui_session);
+        let session = &mut self.live[idx];
+        let ui_session = if session.clock {
+            session.bridge.open_awaiting_event()
+        } else {
+            session.bridge.open()
+        }
+        .map_err(|e| format!("select refused: reopening lane for {id}: {e}"))?;
+        session.ui_session = Some(ui_session);
+        session.record.last_ui_session = Some(ui_session);
+        let generation = session.record.generation;
+        let clock = session.clock;
         self.switches += 1;
-        self.selected = Some(id);
+        self.activate(id, generation, clock);
         self.log.push(format!(
             "select session {id} ui {ui_session} (switch #{}, loads={}, lane_opens={})",
             self.switches, self.metrics.loads, self.metrics.ui_lane_opens
@@ -239,39 +311,161 @@ impl AseSessionHost {
         let idx = self
             .live_idx(id)
             .ok_or_else(|| format!("close refused: session {id} is not a live session"))?;
-        let mut session = self.live.remove(idx);
-        if let Err(e) = session.bridge.close_session() {
-            let msg = format!("close session {id} lane: {e}");
-            self.errors.push(msg.clone());
-            return Err(msg);
+        if self.selected == Some(id) {
+            self.close_outgoing_lane("close-session")?;
+        } else {
+            self.live[idx].bridge.close_session()?;
         }
+        let mut session = self.live.remove(idx);
+        session.record.retired_audit = session.bridge.close_engine();
         session.record.closed = true;
         self.log.push(format!(
             "close session {} app {} gen {} (engine owner released)",
             session.record.id, session.record.app_key, session.record.generation
         ));
-        if self.selected == Some(id) {
-            self.selected = None;
-        }
         self.closed.push(session.record);
         Ok(())
     }
 
     /// 关闭当前选中者的显示车道（引擎保留；空选中 no-op）。
     fn close_outgoing_lane(&mut self, reason: &'static str) -> Result<(), String> {
-        if let Some(id) = self.selected {
-            if let Some(idx) = self.live_idx(id) {
-                self.live[idx]
-                    .bridge
-                    .close_session()
-                    .map_err(|e| format!("{reason}: closing lane of session {id}: {e}"))?;
-                self.live[idx].ui_session = None;
-                self.log.push(format!(
-                    "{reason}: lane of session {id} closed (engine retained)"
-                ));
+        self.clock = None;
+        let Some(id) = self.selected.take() else {
+            return Ok(());
+        };
+        if let Some(idx) = self.live_idx(id) {
+            let session = &mut self.live[idx];
+            if let Err(error) = session.bridge.close_session() {
+                if session.ui_session.is_some() && current_session(|s| s.id) == session.ui_session {
+                    let generation = session.record.generation;
+                    let clock = session.clock;
+                    self.activate(id, generation, clock);
+                }
+                return Err(format!("{reason}: closing lane of session {id}: {error}"));
             }
+            session.ui_session = None;
+            self.log.push(format!(
+                "{reason}: lane of session {id} closed (engine retained)"
+            ));
         }
         Ok(())
+    }
+
+    fn activate(&mut self, id: usize, generation: u64, clock: bool) {
+        self.selected = Some(id);
+        if clock {
+            self.visibility += 1;
+            if let Some(lane) = self.ui_session_of(id) {
+                if self.clock_lanes.last() != Some(&lane) {
+                    self.clock_lanes.push(lane);
+                }
+            }
+            self.clock = Some(VisibleClock {
+                wake: ClockWake {
+                    session: id,
+                    generation,
+                    visibility: self.visibility,
+                    deadline: Instant::now(),
+                },
+                pending: false,
+                ready: false,
+            });
+        }
+    }
+
+    /// Close all sessions after the native window loop returns.
+    pub fn close_all(&mut self) -> Result<(), String> {
+        for id in self.live_ids() {
+            self.close_session(id)?;
+        }
+        Ok(())
+    }
+
+    pub fn clock_wake(&self) -> Option<ClockWake> {
+        self.clock.as_ref().map(|clock| clock.wake)
+    }
+
+    /// Offer a due host wake to the one-slot queue. Duplicate offers coalesce.
+    pub fn queue_clock_wake(&mut self, wake: ClockWake, now: Instant) -> bool {
+        let Some(clock) = self.clock.as_mut().filter(|clock| clock.wake == wake) else {
+            self.clock_metrics.stale_wakes += 1;
+            return false;
+        };
+        if clock.pending || now < wake.deadline {
+            return false;
+        }
+        clock.pending = true;
+        true
+    }
+
+    /// Validate the selected owner again immediately before sampling and dispatch.
+    pub fn dispatch_clock_wake(
+        &mut self,
+        now: Instant,
+        sample: impl FnOnce() -> Result<i32, String>,
+    ) -> StepOutcome {
+        let Some(wake) = self
+            .clock
+            .as_ref()
+            .filter(|clock| clock.pending)
+            .map(|clock| clock.wake)
+        else {
+            return StepOutcome::Idle;
+        };
+        let Some(idx) = self.live_idx(wake.session).filter(|&idx| {
+            let owner = &self.live[idx];
+            self.selected == Some(wake.session)
+                && owner.record.generation == wake.generation
+                && owner.ui_session.is_some()
+                && current_session(|s| s.id) == owner.ui_session
+        }) else {
+            self.clock = None;
+            self.clock_metrics.stale_wakes += 1;
+            return StepOutcome::Idle;
+        };
+
+        let clock = self
+            .clock
+            .as_mut()
+            .expect("wake belongs to the active clock");
+        clock.pending = false;
+        // Schedule from the current host turn. Missed intervals are never replayed.
+        clock.wake.deadline = now + CLOCK_PERIOD;
+        self.clock_metrics.samples += 1;
+        let sample = match sample() {
+            Ok(seconds) if (0..UTC_DAY_SECONDS).contains(&seconds) => seconds,
+            other => {
+                self.clock_metrics.rejected_samples += 1;
+                return StepOutcome::DispatchRefused(format!("clock sample refused: {other:?}"));
+            }
+        };
+
+        let bridge = &mut self.live[idx].bridge;
+        let prior_errors = bridge.errors.len();
+        let outcome = bridge.dispatch_typed(0, "Tick", &[AceStateValue::Int(sample)]);
+        self.errors
+            .extend_from_slice(&bridge.errors[prior_errors..]);
+        if matches!(outcome, StepOutcome::Dispatched { .. }) {
+            clock.ready = true;
+            self.clock_metrics.delivered += 1;
+            self.metrics.dispatches += 1;
+        }
+        outcome
+    }
+
+    pub fn clock_queue_depth(&self) -> usize {
+        usize::from(self.clock.as_ref().is_some_and(|clock| clock.pending))
+    }
+
+    pub fn execution_audit_of(&self, id: usize) -> Option<EngineExecutionAudit> {
+        if let Some(idx) = self.live_idx(id) {
+            return self.live[idx].bridge.execution_audit();
+        }
+        self.closed
+            .iter()
+            .find(|r| r.id == id)?
+            .retired_audit
+            .clone()
     }
 
     /// 点击选中会话的第 `button_idx` 个按钮（声明序；真实 980 队列注入，
@@ -297,6 +491,14 @@ impl AseSessionHost {
     pub fn step_selected(&mut self) -> StepOutcome {
         self.tick_no += 1;
         self.run_due_script();
+        let now = Instant::now();
+        if let Some(wake) = self.clock_wake() {
+            self.queue_clock_wake(wake, now);
+            let outcome = self.dispatch_clock_wake(now, sample_wall_clock);
+            if !matches!(outcome, StepOutcome::Idle) {
+                return outcome;
+            }
+        }
         let Some(id) = self.selected else {
             return StepOutcome::Idle;
         };
@@ -408,6 +610,14 @@ impl AseSessionHost {
                 serde_json::json!({
                     "id": r.id, "app": r.app_key, "generation": r.generation,
                     "closed": r.closed, "last_ui_session": r.last_ui_session,
+                    "engine_audit": r.retired_audit.as_ref().map(|audit| serde_json::json!({
+                        "compile_count": audit.compile_count,
+                        "links": audit.links,
+                        "init_runs": audit.init_runs,
+                        "handler_entries": audit.handler_entries,
+                        "retired_handler_entries": audit.retired_handler_entries,
+                        "released_roots": audit.released_roots,
+                    })),
                 })
             })
             .collect();
@@ -419,6 +629,18 @@ impl AseSessionHost {
             "closed": closed,
             "selected": self.selected,
             "switches": self.switches,
+            "clock": {
+                "registrations": usize::from(self.clock.is_some()),
+                "pending": self.clock_queue_depth(),
+                "samples": self.clock_metrics.samples,
+                "delivered": self.clock_metrics.delivered,
+                "stale_wakes": self.clock_metrics.stale_wakes,
+                "rejected_samples": self.clock_metrics.rejected_samples,
+                "lanes": self.clock_lanes.iter().map(|&lane| serde_json::json!({
+                    "id": lane,
+                    "text_applies": host_session_text_applies(lane),
+                })).collect::<Vec<_>>(),
+            },
             "metrics": {
                 "loads": self.metrics.loads,
                 "ui_lane_opens": self.metrics.ui_lane_opens,
@@ -512,7 +734,7 @@ impl Component for AseM0SessionsWindow {
 
     fn view(&self) -> View<Self::Msg> {
         ASE_M0_SESSIONS_FRAMES.fetch_add(1, Ordering::Relaxed);
-        let (app_keys, live, selected, error) = with_ase_sessions_host(|h| {
+        let (app_keys, live, selected, error, clock_ready) = with_ase_sessions_host(|h| {
             (
                 h.app_keys()
                     .iter()
@@ -521,9 +743,10 @@ impl Component for AseM0SessionsWindow {
                 h.live_ids(),
                 h.selected_id(),
                 h.errors.last().cloned(),
+                h.clock.as_ref().map(|clock| clock.ready),
             )
         })
-        .unwrap_or((Vec::new(), Vec::new(), None, None));
+        .unwrap_or((Vec::new(), Vec::new(), None, None, None));
 
         let mut root = View::col().spacing(10).padding(16);
         // app 打开行。
@@ -564,6 +787,12 @@ impl Component for AseM0SessionsWindow {
 
         // frame 区：选中会话显示模型（AV 真值经 ui980 FFI 提交）+ 业务按钮
         // （点击=真实 typed 队列注入）。无活动 → 空 frame。
+        if clock_ready == Some(false) {
+            return root.child(View::text("Loading time…")).build();
+        }
+        if selected.is_none() {
+            return root.build();
+        }
         if let Some((texts, states, buttons, generation)) = current_session(|s| {
             (
                 s.texts.clone(),
@@ -573,16 +802,24 @@ impl Component for AseM0SessionsWindow {
             )
         }) {
             let mut frame = View::col().spacing(6).padding(12);
-            frame = frame.child(View::text_styled(
-                &format!("frame session generation {generation}"),
-                "text-sm",
-            ));
+            if clock_ready.is_none() {
+                frame = frame.child(View::text_styled(
+                    &format!("frame session generation {generation}"),
+                    "text-sm",
+                ));
+            }
             for i in 0..texts.len().max(states.len()) {
                 for (leaf, text) in texts.get(i).into_iter().flatten().enumerate() {
-                    frame = frame.child(View::text(format!("t{leaf}: {text}")));
+                    frame = if clock_ready == Some(true) {
+                        frame.child(View::text_styled(text, "text-4xl font-mono"))
+                    } else {
+                        frame.child(View::text(format!("t{leaf}: {text}")))
+                    };
                 }
-                for (_slot, (name, value)) in states.get(i).into_iter().flatten().enumerate() {
-                    frame = frame.child(View::text(format!("{name} = {value}")));
+                if clock_ready.is_none() {
+                    for (name, value) in states.get(i).into_iter().flatten() {
+                        frame = frame.child(View::text(format!("{name} = {value}")));
+                    }
                 }
             }
             let mut row = View::row().spacing(8);

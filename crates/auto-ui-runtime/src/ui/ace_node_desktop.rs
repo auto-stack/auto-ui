@@ -27,7 +27,9 @@
 //! typed 事件）。001/002 完整主题/选择/全部组件与 Widgets 归 W1 B-AV。
 
 use crate::ui::ace_package_bridge::PackageStateEngine;
-use crate::ui::ace_state_bridge::{AceStateEngine, AceStateValue, DispatchOutcome};
+use crate::ui::ace_state_bridge::{
+    AceStateEngine, AceStateValue, DispatchOutcome, EngineExecutionAudit,
+};
 use crate::ui::{Component, View};
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -456,6 +458,20 @@ pub fn host_session_display(id: i32) -> Option<(Vec<Vec<String>>, Vec<Vec<(Strin
         .map(|s| (s.texts.clone(), s.states.clone()))
 }
 
+pub(crate) fn host_session_text_applies(id: i32) -> Vec<String> {
+    let Ok(host) = host().read() else {
+        return Vec::new();
+    };
+    host.sessions
+        .iter()
+        .find(|s| s.id == id)
+        .into_iter()
+        .flat_map(|s| &s.applied)
+        .filter(|apply| apply.kind == "text")
+        .map(|apply| apply.value.clone())
+        .collect()
+}
+
 // --- hooks 实现（provider DLL 经函数指针回调；签名与 Ui980Hooks 逐一同型）---
 
 fn tag_matches(op: *const u8, op_len: i32, expected: &[u8]) -> bool {
@@ -732,7 +748,19 @@ pub fn install_ui980_lane() -> Result<(), String> {
     if HOOKS_INSTALLED.load(Ordering::SeqCst) == 1 {
         return Ok(());
     }
-    let cdylib = ensure_ui980_provider()?;
+    let cdylib = match std::env::var("ACE_NODE_DESKTOP_PREPARED_RUSTC") {
+        Ok(rustc) => {
+            auto_lang_ace_host::install().map_err(|e| format!("ace host install: {e}"))?;
+            auto_lang_ace_host::register_prepared_source_provider(
+                UI980_PROVIDER_NAME,
+                &stable_ui980_root(),
+                UI980_PROVIDER_SOURCE,
+                &rustc,
+            )?
+        }
+        Err(std::env::VarError::NotPresent) => ensure_ui980_provider()?,
+        Err(error) => return Err(error.to_string()),
+    };
     let lib = ace_abi::rust_provider::RawLibrary::load(&cdylib)
         .map_err(|e| format!("ui980 dll load: {e}"))?;
     let install_sym = lib
@@ -827,6 +855,7 @@ pub struct NodeDesktopBridge {
     /// 输入事件的键入全文（FIFO，与 provider 事件队列 (instance, target)
     /// 一一配对——poll 取码、桥面取文）。
     pending_texts: VecDeque<(usize, usize, String)>,
+    deferred_snapshot: bool,
     text_leaf_count: usize,
     load_texts: Vec<String>,
     last_states: Vec<Vec<(String, AceStateValue)>>,
@@ -1466,59 +1495,6 @@ impl NodeDesktopBridge {
         let trial_initials = ComponentInitials {
             per_instance: vec![Vec::new()],
         };
-        let per_node_texts = if node.view.texts.is_empty() {
-            // PLAN-104：无模块作用域文本叶（循环体模板叶）——按视图数据把
-            // 循环体展开为具体叶值（010 的 FAQ 列表）；states-only 面照常。
-            let expanded = expand_view_for_leaves(node)?;
-            if expanded.is_empty() {
-                vec![vec![String::new(); 0]]
-            } else {
-                shape.text_leaf_count = expanded.len();
-                vec![expanded]
-            }
-        } else {
-            match compile_component_scenario_with_initials(
-                src,
-                path,
-                LegacyWidgetAlias::Accept,
-                &caps,
-                &trial,
-                None,
-                &trial_initials,
-            ) {
-                Ok(compiled) => {
-                    // 状态真值经事件引擎（mount 后 read_all）取；此处只消费文本叶。
-                    let (_states0, texts0) = observe_component_states_and_texts_flat(&compiled)?;
-                    let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
-                    if observed_leaves != shape.text_leaf_count {
-                        return Err(format!(
-                            "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
-                            shape.text_leaf_count
-                        ));
-                    }
-                    texts0
-                }
-                Err(ds)
-                    if ds
-                        .iter()
-                        .any(|d| d.message.contains("requires at least one")) =>
-                {
-                    // Hello 类（无 model 字段）：静态观察面（带 on 的源在此被
-                    // 具名拒——`on` handler 属场景面，不属静态面）。
-                    let texts0 = observe_component_texts(src, path, LegacyWidgetAlias::Accept)?;
-                    let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
-                    if observed_leaves != shape.text_leaf_count {
-                        return Err(format!(
-                            "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
-                            shape.text_leaf_count
-                        ));
-                    }
-                    texts0
-                }
-                Err(ds) => return Err(diags(&ds)),
-            }
-        };
-
         // 事件引擎：有 model 的源挂 N 实例；Hello 类（无 model 字段可观察）
         // 为静态面（engine=None——点击/键入无从产生，事件面缺席具名可辨）。
         let mut engine = None;
@@ -1566,6 +1542,79 @@ impl NodeDesktopBridge {
             Err(e) => return Err(e),
         }
 
+        let session_texts = match engine.as_mut() {
+            Some(BridgeEngine::Component(engine)) if !node.view.texts.is_empty() => identities
+                .first()
+                .and_then(|id| engine.read_texts(id).ok().map(|texts| vec![texts])),
+            _ => None,
+        };
+        // Reuse the live checked program and its initial state for text leaves.
+        // Preserve the observation fallback for static and legacy sources.
+        let per_node_texts = if let Some(texts) = session_texts {
+            let observed_leaves = texts[0].len();
+            if observed_leaves != shape.text_leaf_count {
+                return Err(format!(
+                    "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
+                    shape.text_leaf_count
+                ));
+            }
+            texts
+        } else {
+            if node.view.texts.is_empty() {
+                // PLAN-104：无模块作用域文本叶（循环体模板叶）——按视图数据把
+                // 循环体展开为具体叶值（010 的 FAQ 列表）；states-only 面照常。
+                let expanded = expand_view_for_leaves(node)?;
+                if expanded.is_empty() {
+                    vec![vec![String::new(); 0]]
+                } else {
+                    shape.text_leaf_count = expanded.len();
+                    vec![expanded]
+                }
+            } else {
+                match compile_component_scenario_with_initials(
+                    src,
+                    path,
+                    LegacyWidgetAlias::Accept,
+                    &caps,
+                    &trial,
+                    None,
+                    &trial_initials,
+                ) {
+                    Ok(compiled) => {
+                        // 状态真值经事件引擎（mount 后 read_all）取；此处只消费文本叶。
+                        let (_states0, texts0) =
+                            observe_component_states_and_texts_flat(&compiled)?;
+                        let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
+                        if observed_leaves != shape.text_leaf_count {
+                            return Err(format!(
+                                "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
+                                shape.text_leaf_count
+                            ));
+                        }
+                        texts0
+                    }
+                    Err(ds)
+                        if ds
+                            .iter()
+                            .any(|d| d.message.contains("requires at least one")) =>
+                    {
+                        // Hello 类（无 model 字段）：静态观察面（带 on 的源在此被
+                        // 具名拒——`on` handler 属场景面，不属静态面）。
+                        let texts0 = observe_component_texts(src, path, LegacyWidgetAlias::Accept)?;
+                        let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
+                        if observed_leaves != shape.text_leaf_count {
+                            return Err(format!(
+                                "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
+                                shape.text_leaf_count
+                            ));
+                        }
+                        texts0
+                    }
+                    Err(ds) => return Err(diags(&ds)),
+                }
+            }
+        };
+
         let expanded_static = node.view.texts.is_empty()
             && !per_node_texts.first().map(|r| r.is_empty()).unwrap_or(true);
         Ok(Self {
@@ -1578,6 +1627,7 @@ impl NodeDesktopBridge {
             buttons: shape.buttons,
             inputs: shape.inputs,
             pending_texts: VecDeque::new(),
+            deferred_snapshot: false,
             text_leaf_count: shape.text_leaf_count,
             load_texts: per_node_texts.first().cloned().unwrap_or_default(),
             last_states,
@@ -1678,6 +1728,7 @@ impl NodeDesktopBridge {
             buttons: shape.buttons,
             inputs: shape.inputs,
             pending_texts: VecDeque::new(),
+            deferred_snapshot: false,
             text_leaf_count: shape.text_leaf_count,
             load_texts,
             last_states,
@@ -1712,12 +1763,22 @@ impl NodeDesktopBridge {
     /// open：AV `ui_open` → session；就位显示模型并提交文本叶与状态初值
     /// （FFI 实效果——UI 创建/提交效果经 provider 车道承载）。
     pub fn open(&mut self) -> Result<i32, String> {
+        self.open_lane(false)
+    }
+
+    /// Open the frame layout and defer its values until a fresh event arrives.
+    pub(crate) fn open_awaiting_event(&mut self) -> Result<i32, String> {
+        self.open_lane(true)
+    }
+
+    fn open_lane(&mut self, deferred_snapshot: bool) -> Result<i32, String> {
         install_ui980_lane()?;
         let session = av_call(&format!("ui_open(\"open\", {}, 0)", self.instances))?;
         if session < 1 {
             return Err(format!("ui_open refused: {session}"));
         }
         self.session = Some(session);
+        self.deferred_snapshot = deferred_snapshot;
         {
             let mut h = host().write().unwrap();
             if let Some(s) = h.get(session) {
@@ -1728,7 +1789,14 @@ impl NodeDesktopBridge {
                     .iter()
                     .map(|row| {
                         row.iter()
-                            .map(|(n, v)| (n.clone(), state_display(v)))
+                            .map(|(n, v)| {
+                                let value = if deferred_snapshot {
+                                    String::new()
+                                } else {
+                                    state_display(v)
+                                };
+                                (n.clone(), value)
+                            })
                             .collect()
                     })
                     .collect();
@@ -1765,6 +1833,17 @@ impl NodeDesktopBridge {
                     .collect();
             }
         }
+        if deferred_snapshot {
+            return Ok(session);
+        }
+        if let Err(error) = self.apply_initial_snapshot() {
+            let _ = self.close_session();
+            return Err(error);
+        }
+        Ok(session)
+    }
+
+    fn apply_initial_snapshot(&self) -> Result<(), String> {
         // 文本叶（AV 真值）逐实例逐叶提交（view 即载荷，显式句柄）。
         for i in 0..self.instances {
             for leaf in 0..self.text_leaf_count {
@@ -1785,7 +1864,7 @@ impl NodeDesktopBridge {
                 self.apply_value(i, slot, v)?;
             }
         }
-        Ok(session)
+        Ok(())
     }
 
     fn apply_value(
@@ -1899,22 +1978,42 @@ impl NodeDesktopBridge {
                 args: vec![arg],
             }
         };
-        let msg_name = match &plan {
-            Plan::Unit { msg } | Plan::Typed { msg, .. } => msg.clone(),
-        };
+        match plan {
+            Plan::Unit { msg } => self.dispatch_event(instance, &msg, None),
+            Plan::Typed { msg, args } => self.dispatch_event(instance, &msg, Some(&args)),
+        }
+    }
+
+    /// Dispatch a typed host event to its current lane using the normal AV and frame path.
+    pub fn dispatch_typed(
+        &mut self,
+        instance: usize,
+        msg: &str,
+        args: &[AceStateValue],
+    ) -> StepOutcome {
+        if self.session.is_none() || current_session(|s| s.id) != self.session {
+            return StepOutcome::LaneError("typed event refused: no current display lane".into());
+        }
+        self.dispatch_event(instance, msg, Some(args))
+    }
+
+    fn dispatch_event(
+        &mut self,
+        instance: usize,
+        msg_name: &str,
+        args: Option<&[AceStateValue]>,
+    ) -> StepOutcome {
         let Some(engine) = self.engine.as_mut() else {
             let msg = "static-face source has no event engine".to_string();
             self.errors.push(msg.clone());
             return StepOutcome::LaneError(msg);
         };
-        let identity = self
-            .identities
-            .get(instance)
-            .cloned()
-            .unwrap_or_else(|| "i0".to_string());
-        let dispatch_result = match plan {
-            Plan::Unit { msg } => engine.dispatch(&identity, &msg),
-            Plan::Typed { msg, args } => engine.dispatch_with_args(&identity, &msg, &args),
+        let Some(identity) = self.identities.get(instance) else {
+            return StepOutcome::DispatchRefused(format!("unknown instance {instance}"));
+        };
+        let dispatch_result = match args {
+            Some(args) => engine.dispatch_with_args(identity, msg_name, args),
+            None => engine.dispatch(identity, msg_name),
         };
         match dispatch_result {
             Ok(DispatchOutcome::Delivered(states)) => {
@@ -1928,11 +2027,13 @@ impl NodeDesktopBridge {
                     .map(|(n, v)| (n.clone(), state_display(v)))
                     .collect();
                 self.dispatch_log
-                    .push((instance, msg_name.clone(), snapshot));
+                    .push((instance, msg_name.to_owned(), snapshot));
+                let states = self.diff_and_apply(instance, &states);
+                self.deferred_snapshot = false;
                 StepOutcome::Dispatched {
                     instance,
-                    msg: msg_name,
-                    states: self.diff_and_apply(instance, &states),
+                    msg: msg_name.to_owned(),
+                    states,
                 }
             }
             Ok(DispatchOutcome::Dropped(reason)) => {
@@ -2022,7 +2123,7 @@ impl NodeDesktopBridge {
                 .and_then(|prev| prev.get(slot))
                 .map(|(pn, pv)| pn == name && pv != value)
                 .unwrap_or(true);
-            if changed {
+            if changed || self.deferred_snapshot {
                 if let Err(e) = self.apply_value(instance, slot, value) {
                     self.errors.push(e);
                 }
@@ -2114,6 +2215,27 @@ impl NodeDesktopBridge {
                     }
                 }
             }
+        }
+    }
+
+    pub(crate) fn accepts_clock_tick(&self) -> bool {
+        matches!(&self.engine, Some(BridgeEngine::Component(engine)) if engine.accepts_clock_tick())
+    }
+
+    pub(crate) fn close_engine(&mut self) -> Option<EngineExecutionAudit> {
+        let Some(BridgeEngine::Component(engine)) = self.engine.as_mut() else {
+            return None;
+        };
+        for identity in &self.identities {
+            engine.unmount(identity);
+        }
+        Some(engine.execution_audit())
+    }
+
+    pub fn execution_audit(&self) -> Option<EngineExecutionAudit> {
+        match &self.engine {
+            Some(BridgeEngine::Component(engine)) => Some(engine.execution_audit()),
+            _ => None,
         }
     }
 

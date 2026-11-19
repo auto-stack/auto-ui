@@ -28,6 +28,8 @@ fn main() {
     let mut hold_ms: u64 = 8000;
     let mut min_frames: usize = 8;
     let mut script_spec: Option<String> = None;
+    let mut clock_app = None;
+    let mut await_window_close = false;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -52,6 +54,13 @@ fn main() {
                     path: path.to_string(),
                 });
             }
+            "--clock-app" => {
+                clock_app = Some(
+                    args.next()
+                        .expect("--clock-app requires a registered app key"),
+                );
+            }
+            "--await-window-close" => await_window_close = true,
             "--evidence" => evidence_path = args.next(),
             "--hold-ms" => hold_ms = args.next().and_then(|v| v.parse().ok()).unwrap_or(8000),
             "--min-frames" => min_frames = args.next().and_then(|v| v.parse().ok()).unwrap_or(8),
@@ -72,36 +81,65 @@ fn main() {
         std::process::exit(2);
     }
     let evidence_path = evidence_path.expect("--evidence <out.json> is required");
+    await_window_close |= clock_app.is_some() && script_spec.is_none();
     let mut host = AseSessionHost::new(apps);
+    if let Some(key) = clock_app {
+        host = match host.with_clock_app(key) {
+            Ok(host) => host,
+            Err(error) => {
+                eprintln!("ase_m0_sessions_window: {error}");
+                std::process::exit(2);
+            }
+        };
+    }
     if let Some(spec) = &script_spec {
         host.install_script(parse_script(spec));
     }
     install_ase_sessions_host(host);
 
-    // 收口线程（只观察不驱动——会话/桥步进只在窗口 tick 主线程）：脚本
-    // 注完 + 帧数达标或 hold 超时 → 证据退出。
-    std::thread::spawn(move || {
-        let deadline = Instant::now() + Duration::from_millis(hold_ms.max(1000));
-        loop {
-            let settled = with_ase_sessions_host(|h| h.script_done()).unwrap_or(false);
-            let frames = ASE_M0_SESSIONS_FRAMES.load(Ordering::Relaxed);
-            if (settled && frames >= min_frames) || Instant::now() > deadline {
-                break;
+    if !await_window_close {
+        let observer_path = evidence_path.clone();
+        // 收口线程（只观察不驱动——会话/桥步进只在窗口 tick 主线程）：脚本
+        // 注完 + 帧数达标或 hold 超时 → 证据退出。
+        std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_millis(hold_ms.max(1000));
+            loop {
+                let settled = with_ase_sessions_host(|h| h.script_done()).unwrap_or(false);
+                let frames = ASE_M0_SESSIONS_FRAMES.load(Ordering::Relaxed);
+                if (settled && frames >= min_frames) || Instant::now() > deadline {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(40));
             }
-            std::thread::sleep(Duration::from_millis(40));
-        }
-        let mut json = with_ase_sessions_host(|h| h.evidence())
-            .unwrap_or_else(|| serde_json::json!({"error": "ase sessions host gone"}));
-        json["frames_rendered"] = serde_json::json!(ASE_M0_SESSIONS_FRAMES.load(Ordering::Relaxed));
-        let _ = std::fs::write(&evidence_path, serde_json::to_string_pretty(&json).unwrap());
-        std::process::exit(0);
-    });
+            let mut json = with_ase_sessions_host(|h| h.evidence())
+                .unwrap_or_else(|| serde_json::json!({"error": "ase sessions host gone"}));
+            json["frames_rendered"] =
+                serde_json::json!(ASE_M0_SESSIONS_FRAMES.load(Ordering::Relaxed));
+            let _ = std::fs::write(&observer_path, serde_json::to_string_pretty(&json).unwrap());
+            std::process::exit(0);
+        });
+    }
 
     if let Err(e) = auto_ui_runtime::ui::iced::run_app_with_title::<AseM0SessionsWindow>(Some(
         "ASE M0 交互会话",
     )) {
         eprintln!("ase_m0_sessions_window: window run failed: {e:?}");
         std::process::exit(7);
+    }
+
+    let outcome = with_ase_sessions_host(|h| {
+        let before = h.evidence();
+        let cleanup = h.close_all();
+        (before, h.evidence(), cleanup)
+    });
+    let (before, mut json, cleanup) = outcome.expect("ASE host available at window shutdown");
+    json["before_window_close"] = before;
+    json["frames_rendered"] = serde_json::json!(ASE_M0_SESSIONS_FRAMES.load(Ordering::Relaxed));
+    json["cleanup_error"] = serde_json::json!(cleanup.as_ref().err());
+    std::fs::write(&evidence_path, serde_json::to_string_pretty(&json).unwrap())
+        .expect("write ASE window evidence");
+    if cleanup.is_err() {
+        std::process::exit(8);
     }
 }
 
