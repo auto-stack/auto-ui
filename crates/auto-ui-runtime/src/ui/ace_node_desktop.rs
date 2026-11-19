@@ -1267,7 +1267,8 @@ fn parse_view_data_literal(src: &str) -> Result<Vec<Vec<(String, String)>>, Stri
 ///
 /// 行宽保持包含行尾 `\r`（CRLF 源：`\r` 也替换成空格，字节数不变）；花括号
 /// 计数忽略字符串字面量内的括号（Tailwind 任意值可能含 `{}`）。
-fn blank_style_surface(src: &str) -> String {
+pub(crate) fn blank_style_surface(src: &str) -> String {
+    /// 行内花括号净差（跳过字符串）。
     fn depth_delta(s: &str) -> i32 {
         let mut d = 0i32;
         let mut in_str = false;
@@ -1292,33 +1293,127 @@ fn blank_style_surface(src: &str) -> String {
         d
     }
 
+    /// 在一行里找 `style:` 条目（字符串外）并给出**值区间**的起止与净开括号数。
+    /// 值在 `,`/`}`（同层）/行尾结束；多行条件样式返回净开括号数供续行空白化。
+    fn style_entry_span(body: &str) -> Option<(usize, usize, i32)> {
+        let mut in_str = false;
+        let mut esc = false;
+        for (i, ch) in body.char_indices() {
+            if in_str {
+                if esc {
+                    esc = false;
+                } else if ch == '\\' {
+                    esc = true;
+                } else if ch == '"' {
+                    in_str = false;
+                }
+                continue;
+            }
+            if ch == '"' {
+                in_str = true;
+                continue;
+            }
+            if body[i..].starts_with("style:") {
+                // 值区间：从 `style:` 后到同层 `,`/`}` 或行尾。
+                let start = i;
+                // 同层 `,` 先截断（同一条目行上的后续 entry 不受影响）；
+                // 否则取本行**最后一个** `}` 之前（元素自身的收尾大括号保留；
+                // 值内的条件分支大括号随之消失——整段样式语法块消失）。
+                let mut j = i + "style:".len();
+                let mut d = 0i32;
+                let mut in_s = false;
+                let mut es = false;
+                let mut comma_at: Option<usize> = None;
+                let mut last_close: Option<usize> = None;
+                while j < body.len() {
+                    let c = body.as_bytes()[j] as char;
+                    if in_s {
+                        if es {
+                            es = false;
+                        } else if c == '\\' {
+                            es = true;
+                        } else if c == '"' {
+                            in_s = false;
+                        }
+                    } else if c == '"' {
+                        in_s = true;
+                    } else if c == '{' {
+                        d += 1;
+                    } else if c == '}' {
+                        if d == 0 {
+                            last_close = Some(j);
+                        } else {
+                            d -= 1;
+                        }
+                    } else if c == ',' && d == 0 {
+                        comma_at = Some(j);
+                        break;
+                    }
+                    j += 1;
+                }
+                let (end, opens) = if let Some(c) = comma_at {
+                    (c, 0)
+                } else if d > 0 && last_close.is_none() {
+                    // 值在本行未收口（多行条件样式）——本行尾整段空白化，
+                    // 续行按深度整行空白化。
+                    (body.len(), d)
+                } else {
+                    (last_close.unwrap_or(body.len()), 0)
+                };
+                return Some((start, end, opens));
+            }
+            // (char_indices 自增——无手工 i += 1)
+        }
+        None
+    }
+
     let mut out = String::with_capacity(src.len());
-    // None = 未在空白化；Some(depth>0) = 跨行 style 值未收口。
+    // Some(depth>0) = 跨行样式值未收口（继续整行空白化）。
     let mut depth: Option<i32> = None;
     for seg in src.split_inclusive('\n') {
         let (body, nl) = match seg.strip_suffix('\n') {
             Some(b) => (b, "\n"),
             None => (seg, ""),
         };
-        let trim = body.trim_start();
-        let starts_style = trim.starts_with("style ") || trim.starts_with("style:");
-        let blank_this = match depth {
-            Some(_) => true,
-            None => starts_style,
-        };
-        if !blank_this {
-            out.push_str(seg);
+        if let Some(d) = depth {
+            let nd = d + depth_delta(body);
+            // 多行样式值的续行整行空白化（含花括号——整个语法块消失，
+            // 不留匿名块）。
+            out.push_str(&" ".repeat(body.len()));
+            out.push_str(nl);
+            depth = if nd > 0 { Some(nd) } else { None };
             continue;
         }
-        let base = depth.unwrap_or(0);
-        let d = base + depth_delta(body);
-        out.push_str(&" ".repeat(body.len()));
-        out.push_str(nl);
-        depth = if d > 0 { Some(d) } else { None };
+        // 独立 style 声明（`style name = …`）整行空白化。
+        let trim = body.trim_start();
+        if trim.starts_with("style ") {
+            out.push_str(&" ".repeat(body.len()));
+            out.push_str(nl);
+            continue;
+        }
+        // 行内 entry 形（`text "x" { style: ref }`）——只空白化值区间。
+        if let Some((start, end, opens)) = style_entry_span(body) {
+            let mut s = String::with_capacity(body.len());
+            if opens > 0 {
+                // 多行条件样式：本行尾部整段空白化（含 `{`），续行整行空白化。
+                s.push_str(&body[..start]);
+                s.push_str(&" ".repeat(body.len() - start));
+                out.push_str(&s);
+                out.push_str(nl);
+                depth = Some(opens);
+                continue;
+            }
+            s.push_str(&body[..start]);
+            s.push_str(&" ".repeat(end - start));
+            s.push_str(&body[end..]);
+            out.push_str(&s);
+            out.push_str(nl);
+            continue;
+        }
+        out.push_str(seg);
     }
     out
 }
-
 /// PLAN-104：**元素 label 展示**（`h2 .dashboard_title` / `span "✓"` 族）——
 /// 这些不是 `text` 叶（不进 AV 叶表），但 harness 显示面需要；按实例状态求值
 /// 成展示行（仅显示，不参与 FFI 叶编号）。
@@ -2896,3 +2991,25 @@ mod style_blank_tests {
         }
     }
 }
+    #[test]
+    fn blank_inline_entry_keeps_braces() {
+        let src = "widget App {\n    view { col {\n        text \"x\" { style: settings_label }\n    } }\n}\n";
+        let out = blank_style_surface(src);
+        assert_eq!(out.len(), src.len(), "width preserved");
+        assert!(!out.contains("settings_label"), "inline style ref blanked");
+        assert_eq!(out.matches('{').count(), src.matches('{').count());
+        assert_eq!(out.matches('}').count(), src.matches('}').count());
+    }
+
+    #[test]
+    fn blank_multiline_conditional_style() {
+        let src = "widget App {\n    button \"b\" {\n        style: if .a {\n            active_style\n        } else {\n            idle_style\n        }\n    }\n}\n";
+        let out = blank_style_surface(src);
+        assert_eq!(out.len(), src.len(), "width preserved");
+        assert!(!out.contains("active_style"), "then arm blanked");
+        assert!(!out.contains("idle_style"), "else arm blanked");
+        assert!(!out.contains("if .a"), "the conditional block disappears whole");
+        // 条件块的两个 `{`/`}` 一并消失；元素自身的大括号保留。
+        assert_eq!(out.matches('{').count(), src.matches('{').count() - 2);
+        assert_eq!(out.matches('}').count(), src.matches('}').count() - 2);
+    }
