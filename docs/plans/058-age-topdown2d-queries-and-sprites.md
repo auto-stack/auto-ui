@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-058
-status: executing
+status: reviewed
 feature_name: AGE M2俯视二维公共组合与ACE作者接线
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-19
 plan_revision: 8
-current_step: 6
+current_step: 7
 total_steps: 10
 depends_on: [auto-ui/PLAN-055, ag-examples/PLAN-022, ag-examples/PLAN-021, ag-examples/PLAN-026, auto-lang/PLAN-981]
 supersedes_spec_components: []
@@ -18,6 +18,8 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 # PLAN-058：俯视二维控制、查询与精灵公共组合
 
 ## 0. 变更摘要
+
+2026-11-19 r8当前：**T-07 final pass（7/10）——同树独立上下文复审 r8 AV 域：12 套件＋controls 本会话实跑全绿（计数与收据一致），旧 021/022 消费者补跑 11/11＋4/4，SD-01 全文事实对码核对通过，无 blocking finding；status=reviewed，交 T-08..10 merge**。
 
 2026-11-19 r8当前：**T-06 完成（`21bdf39b`，6/10）——SD-01 草稿（AV 支持域全文＋AG023 AV 配方五步）落 worktree，merge 时发布 canonical；work 任务 T-01..06 全闭合，execution_done，交 T-07 独立 final（r8 域）**。
 
@@ -228,12 +230,26 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；AV 整链/G1/G2 正式作者形/epoch 消费/OS 真实输入/V-S04 闭环已交 `b071634c`/`f6418120`/`7a1503b7`/`ba85f33f`/`0e67b1cd`/`12cb146b`/`eb724dd0`（pin `0a167f611`）；r8 **AV 格全闭合**；AC/A2R 格归 PLAN-103 | 正常Node同源 AV 整链（四八向/查询/呈现同步/实例/owner/故障及输入门的 AV 可证面）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-11 | [x] 2026-11-19：r8 AV 格全闭合（`eb724dd0`）：OS 输入链/20 轮 Run/旧句柄/坏模块/缺资产→修复真跑；12 套件＋controls 全绿 |
 | T-05 | work | T-04 AV 格；AV 收尾已交 `350af5b8`＋`12cb146b`＋`eb724dd0`（连续帧/use 实例/epoch/冷 A→B AV 腿）；r8 **AV 格全闭合**；AC/A2R 格归 PLAN-103 | V-S01..08 的 AV 格（预算合法/超界、独立数值/GPU oracle、旧档触面回归）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-11 | [x] 2026-11-19：V-S01..08 AV 格收口（V-S04/V-S05 AV 腿 `eb724dd0`；V-S03 scenario 2:1＋触碰路由作者面归 PLAN-103）；12 套件＋controls 全绿 |
 | T-06 | work | T-05 AV 格 | 冷A→B/修复下一Run（`eb724dd0`）、SD-01 草稿（worktree `docs/specs/auto-graphics/node2d-topdown-composition.md`，merge 落 canonical）与 AG023 **AV 入口**配方成文（spec §AG023 配方五步）；**双后端配方归 PLAN-103**；执行以§5 r8 块为准 | AC-05/AC-06/AC-11 | [x] 2026-11-19：SD-01 草稿＋AV 配方成文（`21bdf39b`）；冷A→B/修复先交（`eb724dd0`） |
-| T-07 | review | T-06 | 同树独立final，真实逐AC/SD/源和反例核验；finding同员有界复核 | AC-07 | [ ] |
+| T-07 | review | T-06 | 同树独立final，真实逐AC/SD/源和反例核验；finding同员有界复核 | AC-07 | [x] 2026-11-19：final pass（r8 AV 域；12 套件＋controls＋旧消费者实跑全绿；SD-01 对码核对；见 §9 复审记录） |
 | T-08 | merge | T-07 pass | 冻结受影响门/准确身份后落主，不扩大无关全套门 | AC-08 | [ ] |
 | T-09 | merge | T-08 | canonical/同号归档/导航与真实支持/未证边界，非产品研究不冒功能交付 | AC-08 | [ ] |
 | T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+### 2026-11-19 stage: review（**T-07 final**：r8 AV 域独立逐 AC/SD/源/反例核验）| PLAN-058 r8 | outcome: **final pass（T-07 勾选，7/10；status=reviewed；next=T-08..10 merge）**
+
+**reviewer_identity/limitations**：ZCode 独立会话（GLM 模型），与 T-01..06 实现会话无共享上下文；本会话只做复核＋实跑，未写任何实现/Spec。独立上下文满足 T-07"同树独立 final"合同；跨模型独立性未要求、未虚称。
+**绑定**：worktree `D:/autostack/.wt/ui-058/auto-ui` | branch `codex/plan-058-dev` | reviewed commit `21bdf39b`（树净，门禁运行前后 `git status` 均空，verdict 绑定该树该 HEAD）| base `b77998da`（分支含 master resync merge `cbe350b4`）| 依赖：981 pin auto-lang `0a167f611`（overlay 681+1435，pin 套件本会话绿）、055 spec `c185f8f2`/AG022/AG021/AG026 按 §9 历史收据已交、PLAN-103 drafting（承接 AC/A2R，非本包门）。主检出仅本 Plan 簿记。
+**门禁实跑（本会话，`cargo test --locked --offline --test … -- --test-threads=1`）**：12 套件＋controls 全绿且计数与收据逐一套合——pin 2/provider 5/oracle 4/arms 6/av_chain 5（suite 6.07s）/gfx_epochs 4（0.18s）/use_instances 3（0.08s）/gpu_continuous 1（1.74s）/av_os_input 1（1.37s）/av_lifecycle 3（2.77s）/node_topdown2d_flow 5（4.35s）/s2_age_routing 21（0.32s）＋`verify_plan058.py --controls` 6/6。
+**旧档零漂移补跑（final 加固）**：`node_queries_flow` 11/11（43.28s）、`node_sprites_flow` 4/4（78.05s）——共享面（assembly/document/play/spatial）自 T-03 后有 T-04/05 增改，故本轮不再沿用旧证据而实跑。
+**新用例计时表（≤10s 门，全部通过）**：av_os_input 1.37s；av_lifecycle 3 例合计 2.77s（单例上限 <2.77s）；gpu_continuous 1.74s（本子面前交，复跑同绿）。负载注：auto-lang 仓 plan-983 integration gen＋nextest full-lib 在另一仓并发（无 target 目录冲突）；`node_sprites_flow` 78s 慢于前收据 49.6s 属机器负载，断言全绿非回归（旧例不设 10s 门）。
+**AC 证据图（r8 域）**：AC-01 pass（T-01 收据＋pin 套件守 981 接口身份）；AC-02 pass（av_chain 40 Tick 逐 Tick oracle/停位 8.6/t=0.5000353＋os_input 归一化/对角 |v|·dt/反向抵消/暂停清除）；AC-03 pass（av_chain segment/sweep 逐 Tick＋gpu_continuous 质心 vs 投影≤1px＋use_instances 2:1 隔离）；AC-04 pass（provider 40>32 fault10 sticky/attempt 40→41/按 Tick 重置＋av_chain 预算例＋gfx_epochs credits 21/30/32 记账＋lifecycle 旧句柄 bad-token/坏模块具名诊断/缺资产 image-missing→修复同入口真跑）；AC-05 pass（lifecycle 冷 A→B 按 sha 换源/`input_hash` A≠B 旧 Ready 不适用＋controls C2/C3/C5 字节级守恒＋旧消费者本轮实跑）；AC-06 pass（SD-01 全文＋AG023 AV 配方五步＋独立 oracle 各套件）；AC-11 pass（topdown2d_flow V-S08 正例/去 layer 变异 t=0/start_overlap 可判别＋对抗反例＋controls C4）；AC-07 本记录 pass；AC-08/09 merge 收口 pending（不充 pass）；AC-10 归 PLAN-103（AV 腿已交，不标 NA）。
+**SD-01 对码核对（规范增量核验）**：16 op=13 标量＋3 record 且 `frame2d.at` 纯值不派发（`gfx_host_arms.rs:823-932`）；fault 码 `age-gfx.stale-query-token`/`age-gfx.bad-token`/`age-gfx.stale-render-handle`（`gfx_host_arms.rs:257/756/762`）；fault 60 render-only 作 mover/ignore（`behavior_{segment,sweep}_ro_v1.at:40/112/60/133`）；profile 30/version 121/CLI `topdown2d`（`behavior.rs:84-87/386`、`assembly.rs:774-785`）；layer 非该 profile 具名拒（`play.rs:318`）；record 字段序 Cast2D 7/Sweep2D 8/Image2D 4（arms 套件逐元素断言绿）；AG023 配方五步与验收入口清单与 `tests/` 实文件一一对应。文本描述当前已证行为（AV 支持域），未冒 AC/A2R/双端，与 021/022 canonical 无冲突（add-only）。`supersedes_spec_components=[]`、`new_spec_components` 路径准确、`touched_goals=[GOAL-008]` 为 autographics 车道既用 ID（001..103 计划同值）。
+**findings**：无 blocking。非阻塞注记 **N-01**（P3，交 merge 收口）：SD-01 身份行署"分支 `codex/plan-058-dev` @ `eb724dd0` 预备"，实际落文件提交为 `21bdf39b`（两提交间唯一 delta 即本文件）；T-08/09 落 canonical 时对齐署名即可，不改语义、不阻 merge。
+**pending_closeout_gates**：T-08 冻结触面门/准确身份落主；T-09 canonical 发布/同号归档/导航；T-10 全路径对账/摘要折 Plan/fresh guard 清自有树与 scope/hold 登记。PLAN-103 的 AC/A2R 格与触碰路由 IF 为后继计划义务，非本包收口门。
+**evidence**：本记录即 durable 摘要（命令/计数/计时全在文内）；worktree 树净复核运行前后均空；无新增附件。
+**next**：merge（T-08..10，按 auto-plan-merge 收口）；PLAN-103 等 1068/T-04＋981 AC/A2R 域端口＋UI-W2-AC/W3-A2R 波后开工。
 
 ### 2026-11-19 stage: work（**T-06 文档收口**：SD-01 草稿＋AG023 AV 配方）| PLAN-058 r8 | outcome: pass（**work 全闭合，execution_done；next=T-07 独立 final**）
 
