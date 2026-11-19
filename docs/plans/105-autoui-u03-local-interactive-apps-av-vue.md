@@ -407,6 +407,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 29 | from: work | t
 **交付**：`store <Name> { … }` 从「只能解析」推进到**结构化候选**——`ComponentStore{name,fields,messages,handlers,span}`、`ComponentNode.stores`、`project_component_stores`（独立于 node，store 单元可无 node）、`FrontOk.component_stores` 进前门产物。两消费面同律具名拒（组件面 "parsed with N field(s)/M message(s) … (S1)"；包面对含 store 的单元，`use` 行按 prep 同律空白化后再投影）。回归 `p105_store_decl_projects_structure`（累计 **23 例**）；affected 全绿：104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24、census 4/4。
 
 **下一刀**：store 语义接线（共享实例、`.store.*` 绑定、store 方法调度）——组件面先做单文件 store+node 形，包面再做多单元；013/016 由此解锁，015/018 点击脚本随同。`next_responsible_role: work（T-02 W27）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 30 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 23ea2e368 | next: work
+
+2026-11-19 stage: work（T-02 W27：store 内联）| PLAN-105 r1 | outcome: pass（本刀完成；T-02 未整体完成）| worktree: `D:/autostack/.wt/ui-105/auto-lang` + `auto-ui` @ `plan-105-dev` | code_commit: auto-lang `23ea2e368`、auto-ui `a3ac03c7` | task_ids: T-02（W27，S1 第三刀）| evidence: 回归单测 + 桥装载复测
+
+**交付**：`inline_store_decl`——同源 `store` 声明在**组件投影出口**内联为共享状态：字段→`st_<f>`、消息→`St_<m>`、store handler 同前缀并入并重写体内 `.field`（`self.field` 与 `self.store.field` 两形都命中），组件侧 `.store.field` 读/写改写为前缀字段；同名冲突/多 store/未知字段/赋值表达式里的 `store.<Msg>()` 均**具名拒**。残留 `.store.*`（store 在独立单元、跨单元装载未接线）在文本叶上具名拒（不再落到 `no local named self`；f-string 实参里的 store 引用也覆盖）。auto-ui 侧桥装载只在**样式类**错误时退回空白化，具名拒不再被次生错误掩盖。
+
+**桥装载复测**：015/018/022 = OK；013/016 = 具名 `.store` 边界（S1 跨单元 store 装载是下一步）。
+
+**下一刀**：跨单元 store 装载（auto-ui prep 读 `use <unit>: <StoreType>` 单元并合并进入口源，或包面多单元 store 接线）→ 013/016 解锁；随后 012 局部列表、点击脚本、A2Vue 真应用。`next_responsible_role: work（T-02 W28）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
