@@ -389,6 +389,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 27 | from: work | t
 **边界（诚实）**：脚本化点击（`--script "3:click:0:0"`）在 015 上被具名拒——`ToggleDarkMode`/`NewNote` 的 handler 体含调用/let/控制流（"a directed event must not run a partial body"），需 S1 store（`.store.*`）与 handler 语义接线；静态装载与渲染已通。
 
 **下一刀**：S1 store 语义（013/016 + 015/018 的可点击事件）、012 局部列表/push、再跑三应用点击脚本与 013/016 装载。`next_responsible_role: work（T-02 W25）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 28 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 50a8e527 | next: work
+
+2026-11-19 stage: work（T-02 W25：SFC 接源准备）| PLAN-105 r1 | outcome: pass（本刀完成；T-02/T-05 未整体完成）| worktree: `D:/autostack/.wt/ui-105/auto-ui` @ `plan-105-dev` | code_commit: auto-ui `50a8e527` | task_ids: T-02/T-05 前置 | evidence: 单测 6/6
+
+**交付**：A2Vue 车道 `generate_package_sfc` 此前把入口 unit 原文直接交给组件投影（`use`/导入样式全被拒）。新增 `generate_package_sfc_with_root(units, entry, project_root)`——入口源先过 `prepare_component_source`（use 空白化 + 依赖样式内联 + 类型化列表改写），**并用准备后的源参与包编译**；旧入口委托到它（root=None）。回归 `sfc_generation_prepares_entry_source`（临时工程 + stylekit 依赖 → SFC 生成成功、内联样式进模板）。
+
+**T-05 现状**：SFC 生成路径对「带 use/依赖样式的真工程源」已可工作；真应用（015/018/022）仍被**包闭包**挡住——store/api 单元缺失 + store 语义未接线（S1）。
+
+**下一刀**：S1 store 语义（包面多单元装载 + `.store.*` 绑定 + 方法调用），然后 013/016 装载与 015/018 的点击脚本、A2Vue 真应用生成。`next_responsible_role: work（T-02 W26）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
