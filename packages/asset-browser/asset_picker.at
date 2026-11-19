@@ -160,7 +160,10 @@ widget AssetPicker (records: List = [], folders: List = [], query: str = "", que
         .RequestClose -> {
             if .cancel_armed {
                 .cancel_armed = false
-                ."cancelled"()
+                try {
+                    ."cancelled"()
+                } catch {
+                }
             }
         }
         .Close -> {
@@ -176,20 +179,32 @@ widget AssetPicker (records: List = [], folders: List = [], query: str = "", que
                         .pending_session = .session
                         .confirm_lock = true
                         .confirm_error = ""
-                        ."confirmRequested"(json.stringify({seq: .pending_seq, session: .session, baseRevision: .revision, id: .sel_id, revision: .sel_rev, queryId: .q_id}))
+                        try {
+                            ."confirmRequested"(json.stringify({seq: .pending_seq, session: .session, baseRevision: .revision, id: .sel_id, revision: .sel_rev, queryId: .q_id}))
+                        } catch {
+                        }
                     }
                 }
             }
         }
         // 子件事件纯转发（preview 额外驱动同 Dialog 预览）。
         .OnChildQuery(ev str) -> {
-            ."queryRequested"(ev)
+            try {
+                ."queryRequested"(ev)
+            } catch {
+            }
         }
         .OnChildSelection(ev str) -> {
-            ."selectionRequested"(ev)
+            try {
+                ."selectionRequested"(ev)
+            } catch {
+            }
         }
         .OnChildPreview(ev str) -> {
-            ."previewRequested"(ev)
+            try {
+                ."previewRequested"(ev)
+            } catch {
+            }
         }
         // query/selection 镜像同步（Init/Tick 共用臂）。
         .AbSync -> {

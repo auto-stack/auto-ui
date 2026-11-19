@@ -12,7 +12,7 @@ use auto.image
 // 目录合成：5 条图片夹具（back 媒体会话真实 URI，Init 轮询回填）+ 998 条
 // 合成附件 = 1003 条（V-01 代表规模；尾页可选由产品门断言）。
 widget App {
-    use { package: asset_browser from "../../../packages/asset-browser" }
+    use { package: asset_browser from "D:/autostack/.wt/ui-091/auto-ui/packages/asset-browser" }
     msg {
         Init, Tick,
         OpenPicker, ReloadLog, InvalidateSelected,
@@ -139,7 +139,9 @@ widget App {
                     }
                 }
                 var num str = i.str()
-                cat.push({id: "att-" + num, revision: rev, label: "附件-" + num + ".bin", kind: "file", folder: "docs", resourceRef: "asset:att-" + num, thumbnailUri: ""})
+                var pad str = ""
+                if i < 10 { pad = "00" } else { if i < 100 { pad = "0" } }
+                cat.push({id: "att-" + num, revision: rev, label: "Asset-" + pad + num + ".bin", kind: "file", folder: "docs", resourceRef: "asset:att-" + num, thumbnailUri: ""})
                 i = i + 1
             }
             .catalog = cat
@@ -152,7 +154,7 @@ widget App {
             .qf_text = ""
             .qf_kind = ""
             .qf_page = 1
-            .qf_pageSize = 50
+            .qf_pageSize = 25
             .query = json.stringify({id: .qf_id, folderId: .qf_folder, text: .qf_text, kind: .qf_kind, page: .qf_page, pageSize: .qf_pageSize})
             .ApplyQuery()
             .status = "ready"
@@ -185,6 +187,12 @@ widget App {
         }
         // ---- 图片夹具 URI 回填（front 进程会话；rendition 发布后即就绪停轮询）----
         .FetchUris -> {
+        try {
+            // 轮询封顶 + 异常隔离：rendition 未就绪时不无限开会话拖垮 Tick
+            //（会话累积曾令慢释放块饿死——staleDrop 恒 0 的根因）。
+            if .uri_polls > 60 {
+                .uris_ready = true
+            }
             if .sess_lake == "" {
                 .sess_lake = image.open_session("tests/fixtures/scenic-320x240.png")
             }
@@ -223,6 +231,8 @@ widget App {
                 .uris_ready = true
                 .ApplyQuery()
             }
+        } catch {
+        }
         }
         // ---- 业务写读回（接受 handler 落账后刷新；应用 Storage 承载）----
         .ReloadLog -> {
@@ -283,10 +293,16 @@ widget App {
                         .revision = .revision + 1
                         .errorMessage = ""
                         .loading = true
-                        if .qf_text == "slow" {
-                            .SlowFire()
+                        if .qf_text == "fail" {
+                            .loading = false
+                            .errorMessage = "asset-provider: 模拟故障（provider_error）"
+                            .status = "provider error published"
                         } else {
-                            .ApplyQuery()
+                            if .qf_text == "slow" {
+                                .SlowFire()
+                            } else {
+                                .ApplyQuery()
+                            }
                         }
                     }
                 }

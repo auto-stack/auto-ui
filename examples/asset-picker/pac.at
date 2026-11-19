@@ -24,14 +24,14 @@ window: "1080x800"
 # 装载）。依赖闭包整组交付：asset-browser + tree-view + pagination +
 # image-viewer（缺依赖 = vue 轨具名构建失败）。
 dep asset_browser {
-    path: "../../packages/asset-browser"
+    path: "D:/autostack/.wt/ui-091/auto-ui/packages/asset-browser"
 }
 dep tree_view {
-    path: "../../packages/tree-view"
+    path: "D:/autostack/.wt/ui-091/auto-ui/packages/tree-view"
 }
 dep pagination {
-    path: "../../packages/pagination"
+    path: "D:/autostack/.wt/ui-091/auto-ui/packages/pagination"
 }
 dep image_viewer {
-    path: "../../packages/image-viewer"
+    path: "D:/autostack/.wt/ui-091/auto-ui/packages/image-viewer"
 }
