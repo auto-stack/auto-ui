@@ -97,9 +97,9 @@ fn main() {
         std::process::exit(0);
     });
 
-    if let Err(e) =
-        auto_ui_runtime::ui::iced::run_app_with_title::<AseM0SessionsWindow>(Some("ASE M0 交互会话"))
-    {
+    if let Err(e) = auto_ui_runtime::ui::iced::run_app_with_title::<AseM0SessionsWindow>(Some(
+        "ASE M0 交互会话",
+    )) {
         eprintln!("ase_m0_sessions_window: window run failed: {e:?}");
         std::process::exit(7);
     }
