@@ -263,6 +263,93 @@ fn extract_unit_fn(src: &str, name: &str) -> Option<String> {
     None
 }
 
+/// PLAN-105 T-02（U03 真语料 016）：**常量查表函数**降级——组件面/列表语义
+/// 未接线时，把
+/// ```text
+/// fn name(params) R {
+///     let tbl [N]R = [e0, e1, …]
+///     return tbl[<expr>]
+/// }
+/// ```
+/// 改写成等价的 if 链（`if <expr> == 0 { return e0 } else if …`）。只在函数体
+/// 恰好是「常量表 + 单条 return 下标」时生效（其余返回 None，原样保留）——
+/// 这是纯常量语义的等价改写，不改变可观察行为。
+fn lower_const_table_fn(block: &str) -> Option<String> {
+    let lines: Vec<&str> = block.lines().collect();
+    // 头行 + `let ... = [` 行 + 元素行(可能多行) + `]` + `return tbl[expr]` + `}`
+    let table_line = lines.iter().position(|l| {
+        let t = l.trim_start();
+        t.starts_with("let ") && t.contains('[') && t.contains("= [")
+    })?;
+    let ret_idx = lines
+        .iter()
+        .position(|l| l.trim_start().starts_with("return "))
+        .filter(|&i| i > table_line)?;
+    // 解析表名
+    let t = lines[table_line].trim_start();
+    let rest = t.strip_prefix("let ")?;
+    let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+    if name.is_empty() {
+        return None;
+    }
+    // 收集元素文本：从 `= [` 之后到匹配 `]`
+    let after_eq = lines[table_line].find("= [")? + 3;
+    let mut elems_text = lines[table_line][after_eq..].to_string();
+    let mut end_line = table_line;
+    if !elems_text.contains(']') {
+        for (k, l) in lines.iter().enumerate().skip(table_line + 1) {
+            elems_text.push_str(l);
+            end_line = k;
+            if l.contains(']') {
+                break;
+            }
+        }
+    }
+    let close = elems_text.find(']')?;
+    let elems_text = &elems_text[..close];
+    let elems: Vec<String> = elems_text
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+    if elems.len() < 2 {
+        return None;
+    }
+    // return 行必须是 `return <name>[<expr>]`
+    let ret = lines[ret_idx].trim_start();
+    let ret_rest = ret.strip_prefix("return ")?;
+    let mut chars = ret_rest.chars();
+    let ret_name: String = chars.by_ref().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+    if ret_name != name {
+        return None;
+    }
+    let mut rest_iter = ret_rest[ret_name.len()..].chars();
+    if rest_iter.next() != Some('[') {
+        return None;
+    }
+    let inner: String = rest_iter.collect();
+    let close_idx = inner.find(']')?;
+    let idx_expr = inner[..close_idx].trim();
+    // 组装 if 链
+    let head = lines[..table_line].join("\n");
+    let mut out = String::with_capacity(block.len() + 64);
+    out.push_str(&head);
+    out.push('\n');
+    for (i, e) in elems.iter().enumerate() {
+        out.push_str(&format!(
+            "    if {idx_expr} == {i} {{\n        return {e}\n    }}\n"
+        ));
+    }
+    // 下标越界/负值：回落到最后一个元素（与原表读取的边界行为一致）。
+    out.push_str(&format!(
+        "    return {}\n}}\n",
+        elems.last().cloned().unwrap_or_default()
+    ));
+    let _ = end_line;
+    Some(out)
+}
+
 fn extract_store_block(src: &str, type_name: &str) -> Option<String> {
     let needle = format!("store {type_name}");
     let start = src.find(&needle)?;
@@ -455,6 +542,7 @@ pub fn prepare_component_source(
                         // 单模块，函数体问题应在真正 verify 时暴露，而不是在
                         // 源准备阶段被静默丢弃）。
                         if let Some(block) = extract_unit_fn(&unit_src, item) {
+                            let block = lower_const_table_fn(&block).unwrap_or(block);
                             // 组件面要求返回类型注解：无注解的 helper（如 016 的
                             // build_month_grid，隐式返回列表）暂不内联——留给
                             // 后续刀（列表/循环语义），此处不制造半截函数。
@@ -742,6 +830,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 }
+
 
 
 
