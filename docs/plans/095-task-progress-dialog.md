@@ -1,0 +1,212 @@
+---
+plan_id: PLAN-095
+status: drafting
+feature_name: TaskProgressDialog 任务进度对话框
+author: [Codex]
+created_at: 2026-11-14
+updated_at: 2026-11-14
+plan_revision: 2
+current_step: 0
+total_steps: 8
+supersedes_spec_components: []
+new_spec_components: [docs/specs/ui/task-progress-dialog.md]
+touched_goals: []
+---
+
+# PLAN-095 TaskProgressDialog 任务进度对话框
+
+## 0. 变更摘要
+
+补齐组件库路线 CL-05 的实施合同；组合确定/不确定进度、当前步骤、成功/失败/跳过计数、结果明细、取消请求与终态关闭。任务启动、执行、传输中断、回滚和重试由应用负责。见[持续跟踪 strategy](../design/autoui/component-library-extension-strategy.md)。当前为执行准备度复核后的drafting r2，0/8，组件和下列新增测试尚未实施。
+
+## 1. 目标
+
+Windows/Linux native VM 与 Vue 使用相同公共接口、状态语义和普通控件。用户键盘/鼠标与 MCP 驱动同一条事件链，自动测试不要求系统文件窗口或操作系统前台焦点。提供正式可移根组件包、普通消费示例、现有消费者迁移及无人值守证据。
+
+非目标：任务调度器、持久作业服务、自动重试策略、导入/下载引擎、取消即回滚、跨仓修改 Reader。不在当前承诺中加入 macOS；将来支持须补真实 macOS 构建、窗口、字体、MCP 和生命周期验收，不能以交叉编译或 Windows 成功代替。
+
+## 2. 架构方案
+
+应用任务 owner 持 taskId/runId、递增 snapshotRevision、状态和结果 → 受控对话框显示 → cancelRequested → 应用停止后续工作/终止可中断步骤 → 新快照确认 cancelling/cancelled。发出取消请求不能直接制造 cancelled。
+
+新增正式 `packages/task-progress/`，公共名为 `TaskProgressDialog`。复用标准 Dialog/Input/Button/List/Progress 和既有主题/包机制，仅按本组件需要取用。编译器注册优先级 Builtin > Local > Package；禁止靠同名包覆盖已登记控件。模型/协议尽量单源 `.at`；必要共享运行时接缝须最小化并验证 native/Vue 等价，不造两份独立算法或 compiler→runtime 依赖。
+
+应用持有业务数据、权限、I/O、持久化及执行效果；组件持有焦点、草稿、选中和防重复请求状态。普通重绘不换实例身份；context/会话真正变化才使旧动作失效。公共可见操作必须能按语义名称发现，不能只靠坐标或数组下标。
+
+## 3. 技术栈
+
+沿用 `.at` 正式包与普通消息、Rust compiler/runtime/tools、native VM、Vue及现有主题。测试复用 `crates/auto-ui-tools/tests/` 包导入/移根模式和 `tests/product/` 的进程、端口、MCP证据做法；Vue 使用真实浏览器操作。仅因应用需要服务时启动隔离的已有服务，不建设新的测试平台。
+
+## 4. 需求分析与背景调查
+
+授权来自2026-11-14用户请求：为四组件分别补齐实施计划，复用既有实现、引用已生成参考图、写明跨平台/MCP/无人值守验收并更新 strategy。本轮动作限本仓计划、设计导航及引用；不实施组件、不启动实施树、不提交其他WIP、不修改兄弟仓。用户未指定模型、预算、并行代理或自动实施；这里不推定授权。
+
+2026-11-14本次复核HEAD `3cab09943079a1d1fca993fa5a4c4dd2a9fa8315`；084交付 `7ea71f0c`，086交付 `765251b9`。本次用户授权再次审查/补齐计划并推荐下一项，仍无实施、建树、跨仓写入授权。补读当前FileDialog/Pagination Spec及Windows系统语义合同；下列原始源文件摘要复核未变。
+
+初稿观察基线 auto-ui HEAD `a6f776c24a4ba98611849955edceb5a04edac969`；未提交来源采用下表摘要/路径，不当作已交付版本。已读 [Spec总览](../specs/README.md)、`ui/{examples-ownership,theme-scope-and-publication,structure-closure}.md`、[原生验证合同](../specs/runtime/native-vm-app-validation.md)、`build/ui-test-selection.md`。当前无本组件专门Spec，拟在交付时新增；当前Spec不能因草案而改成已支持。
+
+| 已核来源 | 复用边界与现存差额 |
+|---|---|
+| `D:/autostack/auto-reader/src/front/pages/bookshelf.at（只读）` | Reader HEAD 36f438480326599472d3e83f43f14c32481e9d88；SHA256 CFF0194FB689FE1FAF49EBEDD67ADF6DB31C2717722CFC376A8D7135BD07926A。CancelImport 调用 cancelActiveTransfer；CancelRemaining 由应用循环在项目间检查 batch_cancel，表明取消协议和任务生命周期属于应用。 |
+| `crates/auto-ui-compiler/schema/aura.at、现有 Dialog/Progress/List` | 复用基础控件与普通模态状态；没有把 Reader 局部任务循环直接搬入组件包。 |
+| `tests/product/verify_file_dialog.py` | 可参考进程、端口及 MCP 证据协议；其 Session 有专用 FileDialog 就绪/环境约定，不复制成通用 runner。 |
+| `packages/file-dialog/`、`crates/auto-ui-tools/tests/file_dialog_component.rs` | 正式包导入、依赖闭包、移根和实际控件测试可复用；不复制文件业务/专用就绪协议。 |
+
+实施 T-01 必须重新读取上述来源并记录实际 commit/hash、工具版本和脏文件边界。Reader 路径是当前主检出的只读参考，不依赖已消失的 `.wt/reader-009/`；Reader产品迁移、vendor同步和发布另属其自身计划。四项094–097相互无硬依赖，也不等待087；不为复用抽象平白新建第五个前置项目。
+
+## 5. 详细设计
+
+### 公共接口与所有权
+
+| 接口 | r2合同 |
+|---|---|
+| props | open:bool=false；taskId/runId:str；snapshotRevision:int；title/currentStep:str；state:str=running；mode:str=determinate；completed/total/succeeded/failed/skipped:int=0；results:List=[]；canCancel:bool=true；cancelPending:bool=false；response:str="" |
+| 结果记录 | {id,label,state,message}；id 在同 run 中稳定且唯一，state=pending/running/succeeded/failed/skipped。results 是当前任务已提供的明细窗口，可小于 completed；单独显示“最近 N 项”，不由可见行数推导完成数，应用提供的明细可滚动到末项。 |
+| 任务状态 | running/cancelling/succeeded/failed/cancelled；完成计数=成功+失败+跳过，不含尚未完成/未开始。succeeded 要求 failed=0，已知总量时 completed=total；终态 failed 可有成功项和未处理项；cancelled 时尚未处理项不擅自计作完成。新一轮任务必须更换 runId。 |
+| 进度 | determinate 要求 0<=completed<=total 且计数相等；total=0 时 running 显示0/0、0%，succeeded 的空任务显示100%。indeterminate 以明确活动指示显示，不伪造百分比；若总量未知 total=-1，仅此模式允许。非法配置显示具名错误并阻止动作，不静默夹取。 |
+| 消息/反馈 | cancelRequested(str)、closeRequested(str)、error(str)。请求={seq,taskId,runId,baseRevision:snapshotRevision}；response={seq,taskId,runId,status:rejected,message} 用于拒绝取消并解除锁。应用用 state=cancelling/cancelled 等快照确认接受，不另造成功回调。 |
+| 身份 | 同 run 的 snapshotRevision 只能前进；旧快照忽略，进度更新不重置取消锁。取消绑定 taskId/runId，baseRevision 仅供诊断，不因下一步正常进展误拒；旧 run 反馈不能影响当前任务。 |
+
+事件载荷示例（JSON字符串，字段名固定；不是新MCP接口）：
+
+```json
+{"instanceToken":"app-1/mount-17","seq":2,"taskId":"validation","runId":"run-8","baseRevision":6}
+```
+
+`.at` 公共消息沿既有包的可导出命名方式声明（例如 `"changed"(str)`），由普通 `onchanged`/对应消息绑定消费。上表类型是接口语义，T-01只核对当前语法/封装方法，不把接口再交给执行者自由重设计。普通 props 数据通过组件正常输入提供，不从测试环境变量注入成功结果。
+
+### r2 身份、反馈与复用接缝
+
+每个实际挂载实例分配不复用的 `instanceToken:str`，普通重绘保留，卸载重建/另一个实例必须不同；其来源绑定App及真实组件owner/generation，不使用label、列表索引或每次渲染时间戳。所有请求、取消/关闭消息和异步response均增加此字段，调用方原样回传。T-01证明native/Vue中的可用分配机制；优先复用现有实例生命周期，只在确有缺口时补最小共享接缝。重建后seq/session即使重新从1开始，旧token也不能命中新实例。
+
+同revision出现影响动作含义的数据变化也必须失效旧绑定，不能依赖调用方永不漏增revision。迟到消息先核对instanceToken、当前目标及活动请求，再处理业务状态；排队的用户动作还须在消费时检查可见、启用、当前modal与数据身份。两个同名实例、隐藏重开、卸载重建均配当前有效操作正例，禁止把所有动作都拒绝作为“隔离通过”。
+
+复用 `crates/auto-ui-runtime/src/ui/modal.rs` 与 `ui/iced/renderer/host.rs` 的modal收窄、`ui.focus`/焦点路径，不另写全局键盘服务。配置错误首次挂载和相关配置变化必须可见；相同错误不每帧刷回调。保留 `error(str)` 约定，T-01验证首次配置错误恰好一次通知的正常调度路径：已交付分页Spec说明native子组件Init内emit不派发，不能只在Init中发事件。若需最小接缝修复，归本Plan T-01/03并验证兄弟组件，不默默删除事件合同。
+
+### 状态、交互与消费适配
+
+- 应用收到cancelRequested后同步按taskId/runId记cancelPending=true，再做异步许可/停止处理；该状态由任务owner持有，隐藏/卸载重建不丢失。UI本地锁与cancelPending共同抑制重复取消，普通进度更新不解除锁；可取消性变更只改变能力，不自动确认取消。
+- 合法状态为running→cancelling或任一终态，cancelling→任一终态，终态在同run中不可回退为running。任务自然完成可能与取消竞态，最终state=succeeded/failed优先，不捏造cancelled；state离开running后迟到“取消拒绝”不得重新启用Cancel。新task/run使旧本地请求失效，cancelPending按新owner数据重置。
+- modal打开时焦点落当前可用Cancel，若不可取消则落可聚焦对话框容器；终态后落Close。Tab不得进入底层，父层隐藏后恢复有效触发器/安全焦点。此组件无文本输入，IME门不适用；不能为满足通用模板添加输入框。
+
+- 运行时取消按钮先锁再发一次请求，显示“已请求取消，等待任务响应”；state=cancelling 后显示“正在取消”，保持锁。拒绝取消显示原因并恢复可用（若仍 canCancel）；state=cancelled 才显示已取消。canCancel=false 时按钮禁用并说明不可中断，不能只隐藏失败。
+- running/cancelling 默认不允许用户关闭，Escape、遮罩点击不得隐藏任务；终态 Close/Escape 发 closeRequested。父层可主动隐藏但任务 owner 继续存在，重新打开仍显示当前 run，而不是重新执行。卸载 UI 不负责杀应用任务。
+- 应用按同一 run 保证 completed 单调且计数真实；新 run 可归零。组件不从消息文字或进度条像素推断状态，不生成工作结果、错误或取消成功。跳过项只有应用明确认定才计 skipped。
+- 新建 examples/task-progress/ 作为首个跨平台真实消费者：应用逐项校验输入记录并构建 acceptedRecords/results，一项无效用于失败明细；通过应用事件循环推进，可在项目之间处理取消。每一计数来自实际校验结果，禁止只计时增加进度。无总量模式由实际逐项发现记录驱动。
+- 同示例提供开始、展示/隐藏、不同任务等普通操作；取消后记录未执行项，结果顺序/校验值可读回。Reader 只形成字段/事件适配文档，标明 batch/import 两种不同取消能力，后续 Reader 计划才能修改其代码、vendor 或真实导入验收。
+- 结果列表具备命名行、状态和错误详情，长消息可展开/滚动，错误不只靠颜色；v1 不引入任务数据库或任意规模虚拟列表。至少验证1000条已提供结果可滚动读取首末项；总任务量和可见结果窗口不强制相等。
+
+具名配置错误采用 `error(str)`，至少含 code/message；组件应显示错误并阻止相关修改，不用空列表或静默截断掩盖非法数据。业务拒绝与配置错误分开呈现。公开规模不承诺无限性能；不得未经记录默加“只支持前N项”的截断。新增资源上限或不兼容约束需先修订合同，不能只改测试。
+
+### 视觉引用
+
+固定任务夹具：输入R01…R10，value为1…10但R06为空；应用校验非空正整数并将合法值×2加入acceptedRecords。处理前六项后应completed=6/succeeded=5/failed=1，输出值2/4/6/8/10，R06有错误；全部完成时failed终态、9成功1失败。应用事件循环串行推进，测试可用较长调度间隔便于正常取消；间隔本身不增加进度。取消在途项允许按应用规则完成，断言请求后不再启动新项，输出只含实际完成项；记录启动/完成/取消的应用trace，不能硬断言每次都恰停在第6项。未知总量用同样记录的逐项发现模式。夹具和trace在T-04/05新增，当前未运行。
+
+直接复用[已生成的四组件参考图](../design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1.png)及[文件导航/轻量交互视觉指南](../design/autoui/file-navigation-and-interaction-visual-guide.md)，只实现**右上：当前步骤、6/10 完成（5 成功、1 失败）、最近结果与取消请求**。[生成提示](../design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1-prompt.md)和最终PNG均为仓库设计资产，不依赖attachments或个人缓存。PNG SHA256 `EF667ABE23CFDC6377DDCF9E38005D118DD55D9CDCAFFD92D449CF02A440DD13`，1586×992 RGB。
+
+样式沿[公共执行/视觉指南](../design/autoui/common-components-execution-and-visual-guide.md)：32px控件、8px间距、16px面板padding、16px outline图标、约6px圆角，语义主题色和focus ring。图不是界面纹理或尺寸像素金标准；中文/长标签/错误、浅深色及420×560小窗以真实GUI可读可操作为准。图中文字不覆盖上表状态/异步合同。
+
+### 规范增量
+
+| delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
+|---|---|---|---|---|---|
+| SD-01 | add | docs/specs/ui/task-progress-dialog.md | 无正式专门合同→上述受控参数、消息、校验和身份/异步状态规则 | 收拢应用重复交互，保留业务owner | AC-01,AC-02,AC-03 |
+| SD-02 | add | docs/specs/ui/task-progress-dialog.md | 无本组件发布/验收约定→包导入/移根、普通消费者、跨端MCP/视觉/无人值守门及平台边界 | 可复用、可操作、可验证 | AC-04,AC-05,AC-06 |
+
+拟实施树 `D:/autostack/.wt/ui-095/auto-ui`，分支 `codex/ui-095-task-progress-dialog`，本轮未创建。实现、自检、独立最终复审依次使用这一棵树；Plan进度留主检出，不在另一棵树同步实现。
+
+执行入口是 T-01：来源已核、接口和AC已定，当前无外部组件交付阻塞。先走完整最小链路：**正式导入→开始一组实际记录校验→6/10快照→正常取消事件→owner确认停止→关闭重开；验证应用事件循环能接收取消，不用阻塞循环演示假取消。**。产物 `docs/reviews/plan095/decisions.md`（新增）记录可行路径、实际语法/命令、版本、待修接缝和探针证据；不得只看schema或源码文本。探针失败先在原目标内修接缝；若必须改平台/API/业务owner或AC阈值，则修订Plan并保留原要求，不擅自降级为截图/静态通过。
+
+## 6. 测试设计
+
+### 区分正确与错误实现的必需用例
+
+下表每行 owner_stage=work、执行任务=T-05；入口是新增 `tests/product/verify_task_progress_dialog.py` 的具名case，以及新增 `crates/auto-ui-tools/tests/task_progress_dialog_component.rs` 中的模型/包边界反例。应用效果必须由正常页面/应用持久读回确认，不能通过直接调组件回调来制造成功。
+
+| case_id | acceptance IDs | 代表输入/状态 | 可观察oracle / 失败对照 |
+|---|---|---|---|
+| J-01 | AC-01,AC-02 | 6/10=5成功+1失败；total=0 空任务；indeterminate | 计数一致，60%；空任务规则明确；未知总量没有伪造百分比，失败明细可见。 |
+| J-02 | AC-02,AC-03 | 取消请求到响应前、取消拒绝、任务尚有在途项目 | 一次请求，等待/取消中均不同于已取消；拒绝可重试；应用读回没有继续启动未处理项，不承诺撤销已完成项。 |
+| J-03 | AC-03,AC-04 | 旧 run 快照/取消反馈；当前 run 正常更新；隐藏重开 | 旧状态不覆盖新任务，进度更新不解除取消锁；重开不另起任务、完成结果不丢失。 |
+| J-04 | AC-04,AC-05 | 真实输入含坏记录，取消前后 acceptedRecords | 逐项校验结果与输出集合一致；任务终态由 owner 确认，不以取消按钮文字作为停止证据。 |
+| J-05 | AC-02,AC-04 | completed>total、计数不等、重复结果ID；1000条明细 | 配置错误可见且无操作；大量明细首末项可滚动/发现；最近结果数量不冒充完成总量。 |
+| J-06 | AC-02,AC-03,AC-05 | 取消待确认时卸载重建；取消与自然完成竞态；迟到拒绝 | 相同run的cancelPending仍锁定，只一次取消请求；自然完成显示真实终态且Close可用，迟到拒绝不复活Cancel；run内终态回退具名拒绝，正常进展正例有效。 |
+| X-01 | AC-01,AC-06 | 正式包从另一目录导入；缺依赖、同名内置并存 | 无绝对开发机路径，实际导入生成并运行；缺依赖具名失败，内置旧示例仍能解析运行，不以搜索字符串通过。 |
+| X-02 | AC-04,AC-06 | Windows/Linux native VM 与Vue，当前树动作及关闭重开 | 真实窗口/非空树、实际控件动作与应用读回相符；错误对照返回明确失败，退出后本轮进程/端口回收，再次启动可用。 |
+| X-03 | AC-06 | 浅/深主题、中文长标签、420×560、错误/禁用/pending | 同版本真实截图可读、正文可滚动、主要操作可达，无glyph缺失、重叠或误点击；空/加载态按组件适用状态覆盖。 |
+| X-04 | AC-02,AC-03 | 卸载重建后seq重复、同revision数据变更；首次非法配置及修正 | 新instanceToken拒旧反馈，旧动作零误写且当前正例可用；配置错误可见且每次配置变化恰好一次error，修正后正常恢复。 |
+| X-05 | AC-02,AC-04 | 多输入/双实例/嵌套modal；组合输入适用时 | MCP发现并操作当前目标，不把首个input代理误当真实焦点；底层按钮/快捷键被阻挡，Tab/关闭恢复正确；输入法按下文分层证据验证。 |
+| X-06 | AC-04,AC-06 | 浏览器GUI通过但MCP不可用、启动/动作中途失败 | GUI不能替代MCP记录；缺必需能力整体not_run/非零退出；失败也执行finally清理、保存最后树与日志，原有进程不受影响。 |
+| X-07 | AC-04,AC-06 | Windows原生真实系统树的输入/按钮 | 按native-vm-app-validation及native-system-accessibility核对受影响标准控件的role/label/value/focus/bounds/action；不以MCP树冒充系统provider或物理输入证据。 |
+
+共同不变量：一次合法手势至多一条当前身份业务请求；非法/禁用/旧动作零目标变更；业务拒绝不伪造成功；接受后的真实消费状态与事件一致。组件树状态断言与消费者读回必须相互独立。测试通过“输入正确但状态owner写错/重复执行/旧对象覆盖”的反例来区分 plausible 错误实现，不能只计绿测试数量。
+
+### 运行入口与证据合同
+
+以下脚本和测试目标均是 **T-05待新增、当前未执行**；T-01在decision中落实真实工具参数/示例启动配置，脚本负责正常启动对应普通消费者，不能要求测试人员手工抢焦点。
+
+```text
+cargo test -p auto-ui-tools --test task_progress_dialog_component
+python tests/product/verify_task_progress_dialog.py --auto-bin <绝对CLI路径> --ui-tool-bin <绝对MCP工具路径> --out-dir <本轮独立证据目录> --backend native
+python tests/product/verify_task_progress_dialog.py --auto-bin <绝对CLI路径> --ui-tool-bin <绝对MCP工具路径> --out-dir <另一独立证据目录> --backend vue --browser-mcp-config <绝对浏览器MCP配置路径>
+```
+
+native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--server vm`当原生前端）。Vue及MCP入口按下文分层合同验证。只跑本组件、被修改公共接缝和迁移消费者的必要回归，保留既有oracle，不叠加无关整仓测试。
+
+无人值守runner必须：每轮隔离数据/目录/端口；native校验自身拥有的OS窗口和非空live MCP树，Vue核验本轮页面/浏览器会话和实际MCP提供方；由当前snapshot发现真实节点再find/action/type/键盘/scroll/screenshot；动作后正常事件→应用读回；包含一项明确失败负对照；正常退出、核验本轮拥有的子进程和端口已释放并重开。原生动作不能依赖OS前台焦点，不能使用系统dialog、`AUTO_OPEN_PATH`、直接改组件状态、调用accepted处理器或回放旧node ID。超时须有限且保存最后树/日志，不能无限重试掩盖失败。
+
+每个平台/后端分别记录 pass/fail/not_run：**Windows native、Linux native、Windows Vue、Linux Vue**均为本Plan必需门；缺Linux runner（按下文VMware路由，须真实窗口）记not_run，不得汇总成跨平台通过。macOS未承诺。浏览器无宿主/磁盘权限时保留不可用结果，不放宽安全边界。
+
+收据 `docs/reviews/plan095/` 持有实际版本/依赖闭包摘要、命令/退出码、case→AC矩阵、截图/树、业务事件及读回结果、负控、生命周期与必要回归。产物大日志放独立证据目录，文档引用可复现位置和摘要；不要把个人缓存当唯一凭据。Q-01文字glyph缺失不能因MCP文本完整而结案；若公共渲染器超范围，建立具名修复依赖，受影响AC-06保持未关闭。
+
+本轮只做草案静态自检，无产品验收结果。用户未分配实现/内部检查/最终评审模型；未来执行者先自检，最终评审须独立上下文并绑定实现revision，同一实施树顺序复用；不据此自行启动其他agent/chat。
+
+### r2 可执行门与证据分层
+
+- 每个平台均拆为普通GUI交互、MCP工具调用、应用读回、适用视觉/输入桥、退出重开；不要求把全部边界case在GUI和MCP重复笛卡尔积。§6每个case记录实际测试层；模型测试可直接喂模型，产品路径必须通过普通控件，不能用模型测试冒充真实消费。
+- native复用 `crates/auto-ui-runtime/src/ui/mcp_server.rs` 的 `autoui_snapshot/action/type/keyboard/screenshot` 正常工具；保留RPC请求/结果和当前节点发现。Vue复用已存在的浏览器MCP提供方（或已交付生产桥），从真实DOM/可访问树进行输入/点击/键盘，记录提供方、工具版本、调用/结果和应用读回；Playwright只操作同一真实页面，不能单独作为“MCP通过”。本Plan不新建Vue MCP服务器；T-01定位当前配置，缺提供方则Vue MCP门not_run，不由四组件分别造桥。
+- product脚本保留原拟议CLI，Vue增 `--browser-mcp-config <绝对配置路径>`（T-05待实现，配置描述实际提供方/会话接入；凭据不进报告）；两种driver共用case断言。native的OS窗口归属以owned PID/handle证明；Vue验证本轮生成页面URL、浏览器会话和服务PID，不套用native HWND证明。两条腿均有真实MCP操作与独立业务读回。
+- Prompt/Command/Tag的IME门：普通 `autoui_type` 是整串替换，不证明composition、物理按键或OS输入法。Vue输入桥用compositionstart/update/end与isComposing事件序列；native使用当前标准输入适配层的preedit/commit/取消→Enter事件集成测试，观测生产事件抑制与一次业务提交，并补普通GUI/MCP中文最终值读回。已有 `autoui_desktop` 的acceptance专用handler/key通道不代替普通组件MCP产品门。若适配层无法表达，T-01定位最小输入接缝后补测试；TaskProgress无文本编辑，IME标明不适用，仍测正常键盘/modal。
+- 复用当前Spec及已有包而非只复用FileDialog：正式包必须提供 `package.at/pac.at/组件.at/README.md`，native源相对import和Vue既有components/vendor路径解析分别运行；从第二绝对根验证完整依赖闭包和无开发机路径。四Plan不得分别重写同一公共runner/输入桥；第一个发现公共缺口者在decision登记owner/提交，后续重基线复用。
+- Linux GUI验证沿084归档§10的用户决定：自制Linux发行版就绪后在VMware内单独验，不以WSL/WSLg结果替代，也不继续追WSLg修复。Windows门可先执行；Linux缺环境如实not_run且相应AC未关闭，不删除Linux要求、不预勾选最终评审。组件行为仍面向Win/Linux一致，macOS维持未承诺。
+- 每个实际运行门输出 `report.json`：plan/revision/platform/backend、source/tools/dependency摘要、runner和MCP提供方、case/layer/期望/实测/status、截图/树/读回路径及摘要、cleanup/reopen、result。退出码0仅当本次门全部必需case通过且清理重开成功；失败为1，缺必需环境/能力not_run为2。聚合四门缺任何一门不能总pass。有效控制与关闭端口的同一MCP方法配对，关闭目标要求有界connection-refused，不能仅HTTP探测代替。
+- 默认启动上限300秒、单动作15秒、退出清理30秒；runner可显式配置并记入收据，不能无限等待/重试。失败走finally清理本轮owned进程/端口/隔离数据并保存最后证据；只对确认身份的自有残留强制终止且写明原因。关闭/重开Dialog与退出/重启整个App分别验证；不把关闭UI误认为业务任务取消。
+
+## 7. 验收标准
+
+| ID | owner_stage | 可观察结果及验证方法 | 任务 / 状态 |
+|---|---|---|---|
+| AC-01 | work | 正式包公共接口按§5导入/生成/运行；X-01正反例、最小普通消费者及包依赖闭包可复现，无内置同名覆盖 | T-01,T-02,T-05；[ ] |
+| AC-02 | work | §5正常/错误/禁用/键盘及输入适用性规则、本组件case及X-04/05全部有期望断言；IME明确不适用，无重复取消或虚假成功 | T-02,T-03,T-05；[ ] |
+| AC-03 | work | 当前身份、重复请求锁、外部改动/迟到反馈/关闭重开/双实例隔离反例通过，旧对象零误写（含卸载重建与同revision内容变化） | T-02,T-03,T-05；[ ] |
+| AC-04 | work | 普通GUI和MCP通过当前可见控件完成关键用例；四个平台/后端门分别有结果，原生不依赖前台焦点；X-02/05/06/07分层门、生命周期与负控通过，缺必需MCP/平台门不算通过 | T-03,T-05；[ ] |
+| AC-05 | work | 普通消费者的输入校验、acceptedRecords、失败记录和停止启动后续项可直接读回；Reader 适配映射仅是文档，不标成 Reader 导入已验收。 | T-04,T-05；[ ] |
+| AC-06 | work | X-01/03/06/07、移根、必要公共/消费者回归及真实截图通过；中文/暗色/窄窗可用，Q-01若影响本组件则闭环；README/待沉淀Spec与证据齐 | T-05,T-06；[ ] |
+| AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定Plan r2和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[ ] |
+| AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，不把未运行平台标为支持 | T-08；[ ] |
+
+## 8. 执行步骤
+
+| ID | owner_stage | 依赖 | 影响文件/符号与独立产出 | 验证/预期 | AC / 进度 |
+|---|---|---|---|---|---|
+| T-01 | work | 无；现有来源重核 | §4来源、正式包导入/事件路径；新增`docs/reviews/plan095/decisions.md`，落实§5最小全链探针、instanceToken/首次error/模态焦点/输入桥可行性、真实包命令、平台及MCP提供方/依赖pin | 两端普通控件事件到应用读回；不是仅schema登记；差额有具名owner | AC-01；[ ] |
+| T-02 | work | T-01 | 新增`packages/task-progress/`的数据/交互模型、校验、消息与身份协议；沿既有包元数据/相对导入 | §6有效/非法/迟到/双实例模型反例；无业务I/O进入包 | AC-01,02,03；[ ] |
+| T-03 | work | T-02 | 同包UI/主题/键盘与MCP可见语义；必要现有runtime接缝最小修复 | 本组件case普通GUI/MCP路径可操作，IME/焦点和pending正确；对照参考图布局 | AC-02,03,04；[ ] |
+| T-04 | work | T-03 | examples/task-progress/（新增）；docs/design/autoui/task-progress-reader-adapter.md（新增，只读来源映射）；复用§4实际业务入口 | §5消费路径输出真实变化；保持原业务权限/数据/模式，不同步兄弟仓 | AC-05；[ ] |
+| T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/task_progress_dialog_component.rs`、`tests/product/verify_task_progress_dialog.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；四门、必需case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[ ] |
+| T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan095/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[ ] |
+| T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[ ] |
+| T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/task-progress-dialog.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[ ] |
+
+任务只保留本表一份当前进度；每项完成写实际证据，不预先勾选评审/合并。必要平台缺口留在对应AC，不能把产品正确性转给merge阶段兜底。
+
+## 9. 复审记录
+
+- 2026-11-14：stage: new；PLAN-095 r1；outcome: pass；next: work/T-01。新建T-01…08、AC-01…08及SD-01/02；已核来源、复用边界、参考图和平台矩阵，准备进入实施。
+- 2026-11-14：stage: new；PLAN-095 r2；outcome: pass（修订后计划可进入T-01）；next: work/T-01。再次复核复用边界/图/平台矩阵，补instanceToken、精确异步确认、现有Init/MCP限制及分层输入证据、VMware路由、具名反例与失败清理；T-01…08、AC-01…08、SD-01/02保持，扩充§5/6并强化AC-02…06。详见[本轮审核报告](../reviews/component-plans-094-097-2026-11-14/README.md)。原r1记录保留为历史。
+- 此pass仅指计划合同可执行；不是组件测试通过、独立实现评审或交付完成。本轮未创建实施树，未执行上列拟新增测试；current_step=0/8。
+
+## 10. 待澄清事项
+
+无必须向用户补问的产品决策；按§5边界执行。包语法/实例token/首次error/模态焦点/IME/反馈时序及现有Vue MCP提供方由T-01具名探针落实；T-02前关闭机制选择，不能把协议自由设计留给实现中途，失败须记录而非假定已支持。运行工具与Linux runner是否可用由T-01实查；缺失使相关验收not_run，不能自动扩大平台承诺或删除必需门。业务能力不在宿主上提供时明确不可用，按上述普通消费者和真实原生消费者各自验收。
+

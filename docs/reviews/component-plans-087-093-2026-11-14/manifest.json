@@ -1,0 +1,163 @@
+{
+  "date": "2026-11-14",
+  "stage": "new",
+  "scope": "plan-contract-readiness-and-visual-reference",
+  "source_head": "93e6b924749a45c5c6c390725a4bb2d8a10bfc07",
+  "independent_product_review": false,
+  "product_tests_run": false,
+  "document_checks": {
+    "structure": "pass",
+    "links": "pass",
+    "metadata": "pass",
+    "task_ac_sd_case_mapping": "pass",
+    "dependency_graph": "pass",
+    "json_and_numeric_examples": "pass",
+    "whitespace_and_conflicts": "pass",
+    "image_identity": "pass",
+    "unit_display_precision_example": "pass"
+  },
+  "plans": [
+    {
+      "id": "087",
+      "revision": 2,
+      "tasks": 8,
+      "ac": 8,
+      "spec_deltas": 2,
+      "cases": 6,
+      "current_step": 0,
+      "result": "pass"
+    },
+    {
+      "id": "088",
+      "revision": 2,
+      "tasks": 8,
+      "ac": 8,
+      "spec_deltas": 2,
+      "cases": 6,
+      "current_step": 0,
+      "result": "pass"
+    },
+    {
+      "id": "089",
+      "revision": 2,
+      "tasks": 8,
+      "ac": 8,
+      "spec_deltas": 2,
+      "cases": 6,
+      "current_step": 0,
+      "result": "pass"
+    },
+    {
+      "id": "090",
+      "revision": 2,
+      "tasks": 8,
+      "ac": 8,
+      "spec_deltas": 2,
+      "cases": 6,
+      "current_step": 0,
+      "result": "pass"
+    },
+    {
+      "id": "091",
+      "revision": 2,
+      "tasks": 8,
+      "ac": 8,
+      "spec_deltas": 2,
+      "cases": 6,
+      "current_step": 0,
+      "result": "pass"
+    },
+    {
+      "id": "092",
+      "revision": 2,
+      "tasks": 8,
+      "ac": 8,
+      "spec_deltas": 2,
+      "cases": 6,
+      "current_step": 0,
+      "result": "pass"
+    },
+    {
+      "id": "093",
+      "revision": 2,
+      "tasks": 8,
+      "ac": 8,
+      "spec_deltas": 3,
+      "cases": 6,
+      "current_step": 0,
+      "result": "pass"
+    }
+  ],
+  "image": {
+    "path": "docs/design/autoui/assets/common-components-087-093-reference-v1.png",
+    "size": [
+      1585,
+      992
+    ],
+    "mode": "RGB",
+    "sha256": "f4da10c65fdc266f7ed574e9351a65653b66fda631926d71aeaaf391fcca41c1",
+    "generated_reference_only": true
+  },
+  "files": [
+    {
+      "path": "docs/plans/087-numeric-and-unit-fields.md",
+      "sha256": "2015ed75241d931780634088e22e48a0bebc5355b3f6c8e4ba7e5e5f6892e618"
+    },
+    {
+      "path": "docs/plans/088-color-picker-and-dialog.md",
+      "sha256": "ac7edb6e5e19b34658e98a8a07250eaa4c408d7d258785fcfec68339438e0dcf"
+    },
+    {
+      "path": "docs/plans/089-image-viewport-and-preview-dialog.md",
+      "sha256": "82e81d368ca7c4ead87da5809f6fc7b68bf9652ac57212f5b7b9ee6db8e2582b"
+    },
+    {
+      "path": "docs/plans/090-media-player-and-transport-controls.md",
+      "sha256": "2bb60c73b7f80cf346a6f7a1d832349a2b3e4822d1bbda86c5b5e3a396d968d2"
+    },
+    {
+      "path": "docs/plans/091-asset-browser-and-picker.md",
+      "sha256": "07778936b84d60e6d187f68a990a5341ab749973cf3a5fcfb37d280fa9764874"
+    },
+    {
+      "path": "docs/plans/092-property-inspector.md",
+      "sha256": "30efaf34332515910e6671e4ac04a5ffd054b9487ad3d6df725af9cf063b1889"
+    },
+    {
+      "path": "docs/plans/093-dock-layout-and-panels.md",
+      "sha256": "d98c771dee9989e76555186a336d46fe805ac0e6d00aed3dc39a0e75a892b4fd"
+    },
+    {
+      "path": "docs/design/autoui/common-components-execution-and-visual-guide.md",
+      "sha256": "3f8299b40e721cfec4d0a9c1d55ded12a645ae5a114922761f745dffb0d98874"
+    },
+    {
+      "path": "docs/design/autoui/component-library-extension-strategy.md",
+      "sha256": "447134d32621f63266b64fe8e521315e8d7958690073f81ffb4da3ec11de0313"
+    },
+    {
+      "path": "docs/design/autoui/assets/common-components-087-093-reference-v1-prompt.md",
+      "sha256": "d9b39dc0d278f4fdbab83a4005feb3cc769a6641f0cf7aaaa73e782c93211ac0"
+    },
+    {
+      "path": "docs/reviews/component-plans-087-093-2026-11-14/README.md",
+      "sha256": "ddc4dee8538e4fd8090aeb7fb8c0d47aaab63d5dd87dc3d605d2ce90f142a78a"
+    },
+    {
+      "path": "docs/design/autoui/assets/common-components-087-093-reference-v1.png",
+      "sha256": "f4da10c65fdc266f7ed574e9351a65653b66fda631926d71aeaaf391fcca41c1"
+    },
+    {
+      "path": "docs/design/README.md",
+      "sha256": "63828172911cad61b827a3dedd46ff142e824f728cca1b19ece52dde94d3f806"
+    },
+    {
+      "path": "docs/plans/README.md",
+      "sha256": "f61e48930e24a612cb389dfbfb5ca80fd41d863385ce6d8b03171c6f8ecaedfa"
+    },
+    {
+      "path": "docs/design/autoui/design-system-abstractions.md",
+      "sha256": "a8724fe10bacd62329a1d2ee4b3eb635c0b133d288afd332e96c68cc3755c58c"
+    }
+  ]
+}
