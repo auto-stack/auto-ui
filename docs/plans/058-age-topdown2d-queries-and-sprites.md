@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-19
 plan_revision: 8
-current_step: 5
+current_step: 6
 total_steps: 10
 depends_on: [auto-ui/PLAN-055, ag-examples/PLAN-022, ag-examples/PLAN-021, ag-examples/PLAN-026, auto-lang/PLAN-981]
 supersedes_spec_components: []
@@ -18,6 +18,8 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 # PLAN-058：俯视二维控制、查询与精灵公共组合
 
 ## 0. 变更摘要
+
+2026-11-19 r8当前：**T-06 完成（`21bdf39b`，6/10）——SD-01 草稿（AV 支持域全文＋AG023 AV 配方五步）落 worktree，merge 时发布 canonical；work 任务 T-01..06 全闭合，execution_done，交 T-07 独立 final（r8 域）**。
 
 2026-11-19 r8当前：**T-04/T-05 的 AV 格全部完成并勾选（`eb724dd0`，5/10）**——OS 真实输入通道（`play.input.key` 焦点门控/OS 抑制重复→`sample()`→宿主权威喂点→`input.x/y` ops；四向/八向对角归一化/同时反向/零输入/反向/暂停清除，每 Tick 恰 32 credits 对独立 oracle）、V-S04 显式闭环（20 轮 Run 确定性无残留/跨 Run 旧句柄拒/坏模块具名诊断/缺资产 image-missing→精确修复同入口真跑至 35 Tick 停墙 8.6）、V-S05 冷 A→B AV 腿（冷载无 producer 根/网络、scene 按 sha 换源、`identity().input_hash` A≠B 旧 Ready 不适用）。语言事实入档：模块级资源 `let` 在 AV 切片不派发（资产 op 在作者调用处）、资产路径工程相对、frame op 只记录不触 fs。T-06 剩 SD-01 草稿与 AG023 AV 配方成文。12 套件＋controls 全绿。
 
@@ -225,13 +227,20 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-03 | work | T-02机制可行；981稳定合同供准备 | 中立图形服务/能力注册/可见非阻挡地面/Node领域声明与永久用例，不扩旧生成器；与981不相交写面并行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-01/AC-02/AC-03/AC-05/AC-10/AC-11 | [x] 2026-11-18：新profile `autographics.topdown2d/1`(30/121)+scene/9 layer+render-only行表/感知segment/sweep(fault 60)；旧22 profile/10 unit/价目零漂移；`node_topdown2d_flow` 5/5、controls 6/6、旧消费者11/11+4/4；E1代理被65536对抗反例否决并删；commit 7165dbad |
 | T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；AV 整链/G1/G2 正式作者形/epoch 消费/OS 真实输入/V-S04 闭环已交 `b071634c`/`f6418120`/`7a1503b7`/`ba85f33f`/`0e67b1cd`/`12cb146b`/`eb724dd0`（pin `0a167f611`）；r8 **AV 格全闭合**；AC/A2R 格归 PLAN-103 | 正常Node同源 AV 整链（四八向/查询/呈现同步/实例/owner/故障及输入门的 AV 可证面）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-11 | [x] 2026-11-19：r8 AV 格全闭合（`eb724dd0`）：OS 输入链/20 轮 Run/旧句柄/坏模块/缺资产→修复真跑；12 套件＋controls 全绿 |
 | T-05 | work | T-04 AV 格；AV 收尾已交 `350af5b8`＋`12cb146b`＋`eb724dd0`（连续帧/use 实例/epoch/冷 A→B AV 腿）；r8 **AV 格全闭合**；AC/A2R 格归 PLAN-103 | V-S01..08 的 AV 格（预算合法/超界、独立数值/GPU oracle、旧档触面回归）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-11 | [x] 2026-11-19：V-S01..08 AV 格收口（V-S04/V-S05 AV 腿 `eb724dd0`；V-S03 scenario 2:1＋触碰路由作者面归 PLAN-103）；12 套件＋controls 全绿 |
-| T-06 | work | T-05 AV 格 | 冷A→B/修复下一Run（**已交**：`eb724dd0` 生命周期用例）、SD-01 草稿与 AG023 **AV 入口**配方成文（merge 时落 canonical）；**双后端配方归 PLAN-103**；执行以§5 r8 块为准 | AC-05/AC-06/AC-11 | [ ] 冷A→B/修复已交；剩 SD-01 草稿＋AV 配方成文 |
+| T-06 | work | T-05 AV 格 | 冷A→B/修复下一Run（`eb724dd0`）、SD-01 草稿（worktree `docs/specs/auto-graphics/node2d-topdown-composition.md`，merge 落 canonical）与 AG023 **AV 入口**配方成文（spec §AG023 配方五步）；**双后端配方归 PLAN-103**；执行以§5 r8 块为准 | AC-05/AC-06/AC-11 | [x] 2026-11-19：SD-01 草稿＋AV 配方成文（`21bdf39b`）；冷A→B/修复先交（`eb724dd0`） |
 | T-07 | review | T-06 | 同树独立final，真实逐AC/SD/源和反例核验；finding同员有界复核 | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结受影响门/准确身份后落主，不扩大无关全套门 | AC-08 | [ ] |
 | T-09 | merge | T-08 | canonical/同号归档/导航与真实支持/未证边界，非产品研究不冒功能交付 | AC-08 | [ ] |
 | T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+### 2026-11-19 stage: work（**T-06 文档收口**：SD-01 草稿＋AG023 AV 配方）| PLAN-058 r8 | outcome: pass（**work 全闭合，execution_done；next=T-07 独立 final**）
+
+**绑定**：worktree `D:/autostack/.wt/ui-058/auto-ui` | branch `codex/plan-058-dev` | code commit `21bdf39b`（docs/specs/auto-graphics/node2d-topdown-composition.md 新建）| 主检出只改Plan簿记。
+**交付**：SD-01 全文（AV 支持域结论文本、组合档/scene-9 layer/render-only/fault 60、兼容守恒 C1..C6、AGE 作者面 G1/G2/021 token 纪律/每函数静态准入/端口价目 32 池/会话事实与 fault-13/33 宿主判罚/模块级资源 let 不派发、行为保证、AG023 AV 消费配方五步、未证边界=PLAN-103 承接面）；merge 时落 canonical 并由 T-08/09 发布。
+**事实核对**：16 派发 op=13 标量＋3 record（frame2d.at 纯值不派发——SDK `is_host_symbol` 注释同源）；身份=pin `0a167f611`＋worktree `eb724dd0..21bdf39b`。
+**next**：**T-07 同树独立上下文 final**（r8 域逐 AC/SD/来源/反例；本实现会话不复审）；PLAN-103 等 1068/W2/W3。
 
 ### 2026-11-19 stage: work（**T-04/T-05 r8 AV 剩余格**：OS 真实输入＋V-S04 闭环＋V-S05 冷 A→B AV 腿）| PLAN-058 r8 | outcome: pass（T-04/T-05 勾选，5/10；T-06 剩 SD-01 草稿＋AV 配方成文）
 
