@@ -113,6 +113,13 @@ fn observe(
             sp.start, sp.end
         ));
     }
+    // PLAN-1072 刀B：循环项同 fail-closed（不静默单帧/丢项渲染）。
+    if let Some(sp) = ace_core::source::age_component::view_contains_for(&node.view.tree) {
+        return Err(format!(
+            "ace.native.view-for-unsupported: view 循环项 @{}..{} 本腿未承载（native 循环渲染语义待后续刀；不静默展开）",
+            sp.start, sp.end
+        ));
+    }
     let mut leaf_props: Vec<(Option<String>, bool)> = Vec::new();
     walk_text_props(&node.view.tree, &mut leaf_props);
 
@@ -208,6 +215,8 @@ fn walk_text_props(
             // PLAN-980 view-if：装载点已具名拒（view_contains_cond）——
             // 此臂不可达，防御性跳过。
             ComponentViewItem::Cond(_) => {}
+            // PLAN-1072 刀B：装载点已具名拒（view_contains_for）——同上。
+            ComponentViewItem::For(_) => {}
         }
     }
 }

@@ -418,6 +418,15 @@ fn render_items(
                     ctx.push_str(&format!("{{{{ {js} }}}}"));
                 }
             }
+            // PLAN-1072 刀B：循环项（`for <i>, <v> in <view-data>`）——
+            // **组件面形**（视图数据字段经旧管线方言 AST 承载 v-for；包面
+            // 脚本无视图数据发射面）——包面模板腿具名拒，不静默丢项。
+            ComponentViewItem::For(f) => {
+                return Err(format!(
+                    "source.age.sfc-view-for: view 循环项 @{}..{} 本面未承载（循环+视图数据是组件面形；包面保持标量模板边界）",
+                    f.span.start, f.span.end
+                ));
+            }
             // PLAN-980 view-if 刀：条件项 → `<template v-if/v-else>`（WEB
             // 模板腿的真语义；else-if 链=嵌套 Cond→嵌套 template v-if）。
             ComponentViewItem::Cond(c) => {

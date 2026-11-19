@@ -76,22 +76,50 @@ fn p1072_005_style_expansion_is_literal_not_binding() {
     }
 }
 
-/// 刀B 红相钉面：010 真源当前 lane 状态——三墙（文件级 style field_col、
-/// `var faqs = [...]` 无类型列表字段、view `for i, f in .faqs`）。刀B
-/// 落地后本例翻转为 0 缺席+6 派生（Submit if 体/SetTheme if 体/SetAccent/
-/// λ×3——on-if 刀已交形状）。
+/// 刀B 交付态：010 真源整例——3 handler 全派生（Submit 赋值/SetTheme 双
+/// bare-if 结构化/SetAccent 实读参）、零缺席；view `for i, f in .faqs` 与
+/// 无类型列表字段经 lang 侧 view-data 承载（1071 边界）；SFC 侧 v-for
+/// 发射+field_col 配方展开；`__bind_*` 方言合成件不进 lane 规格集（值绑
+/// 定由模板 :value 承载——红相实证：进 ops=整 lane 编译失败连带全体缺席）。
 #[test]
-fn p1072_010_lane_state() {
+fn p1072_010_lane_whole_source_derives() {
     use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let at = manifest.join("../../examples/ui/010-contact-form/src/front/app.at");
     let src = std::fs::read_to_string(&at).unwrap_or_else(|e| panic!("010: {e}"));
     let (sfc, bodies, absent) =
-        generate_sfc_with_lane(&src, "p1072-010.at").expect("010 derives an SFC shell");
-    eprintln!("010: bodies={} absent={absent:?}", bodies.len());
-    assert!(sfc.contains("<script"), "SFC produced");
+        generate_sfc_with_lane(&src, "p1072-010.at").expect("010 whole-source derives");
+    assert!(absent.is_empty(), "010 zero absent handlers: {absent:?}");
+    assert_eq!(bodies.len(), 3, "3 on-handlers lane-derived");
+    // SetTheme：双 bare-if 结构化（str 相等条件+布尔赋值）。
+    let st = bodies
+        .iter()
+        .find(|b| b.pattern.trim_start_matches('.') == "SetTheme")
+        .unwrap();
+    let joined = st.lines.join(
+        "
+",
+    );
     assert!(
-        !absent.is_empty(),
-        "010 stays wall-blocked until knife B lands (faqs/style/for)"
+        joined.contains("a2x_str_eq") && joined.contains("light") && joined.contains("dark"),
+        "SetTheme carries both if arms: {joined}"
+    );
+    // SetAccent：实读参（param handler 检查函数道）。
+    let sa = bodies
+        .iter()
+        .find(|b| b.pattern.trim_start_matches('.') == "SetAccent")
+        .unwrap();
+    assert!(
+        sa.lines.iter().any(|l| l.contains("accent_color")),
+        "SetAccent writes the accent field"
+    );
+    // 模板面：v-for（faqs 只读数据源——旧管线方言 AST 承载）+ field_col 展开。
+    assert!(
+        sfc.contains("v-for=") && sfc.contains("faqs"),
+        "the FAQ loop renders via v-for over faqs"
+    );
+    assert!(
+        sfc.contains("gap-1.5 w-full") && !sfc.contains(":style=\"field_col\""),
+        "field_col recipe expands to the literal class"
     );
 }

@@ -640,10 +640,15 @@ fn generate_widget_with_lane(
         .map_err(|e| format!("SFC: {e:?}"))?;
     // lane 体（specs=widget handler 键去参段——`.AddItem(text)` 形取
     // `.AddItem`+按位形参名（`handler_params` 同键族）；缺席者保旧道）。
+    // PLAN-1072 刀B（010 真语料）：方言侧为 input 值绑定合成的
+    // `__bind_*` handler **不进 lane 规格集**——值绑定由模板腿的
+    // `:value`/v-model 承载（AGE 面无此声明，进 ops=整 lane 编译失败
+    // 连带真 handler 全体缺席；旧 bytecode 轨的合成件归旧轨）。
     let patterns: Vec<String> = widget
         .handlers
         .keys()
         .map(|k| k.split('(').next().unwrap_or(k).to_string())
+        .filter(|k| !k.contains("__bind_"))
         .collect();
     let param_names: Vec<Vec<String>> = patterns
         .iter()

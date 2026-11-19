@@ -852,6 +852,8 @@ fn project_view_shape(
             // PLAN-980 view-if：装载点已具名拒（view_contains_cond）——
             // 此臂不可达，防御性跳过。
             ComponentViewItem::Cond(_) => {}
+            // PLAN-1072 刀B：装载点已具名拒（view_contains_for）——同上。
+            ComponentViewItem::For(_) => {}
             ComponentViewItem::Element(el) => {
                 if el.tag == "text" {
                     shape.text_leaf_count += 1;
@@ -965,6 +967,13 @@ impl NodeDesktopBridge {
         if let Some(sp) = ace_core::source::age_component::view_contains_cond(&node.view.tree) {
             return Err(format!(
                 "ace.desktop.view-cond-unsupported: view 条件项 @{}..{} 本腿未承载（桌面渲染语义待后续刀；不静默展开）",
+                sp.start, sp.end
+            ));
+        }
+        // PLAN-1072 刀B：循环项同 fail-closed（不静默单帧/丢项渲染）。
+        if let Some(sp) = ace_core::source::age_component::view_contains_for(&node.view.tree) {
+            return Err(format!(
+                "ace.desktop.view-for-unsupported: view 循环项 @{}..{} 本腿未承载（桌面循环渲染语义待后续刀；不静默展开）",
                 sp.start, sp.end
             ));
         }

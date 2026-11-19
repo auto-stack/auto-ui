@@ -1,11 +1,10 @@
-//! PLAN-980 ④-A #9：原样 `010-contact-form` 短回归。**诚实口径**：010 当前
-//! lane **0/6**（`var faqs = [...]` 无类型列表字段=文件级 lane 编译拒 +
-//! `.SetTheme` if-else 体=控制流边界——两族 981 域语言面墙，最小复现随
-//! style 复测/#9 收据在案）。故：①浏览器行为基线=legacy 产物（输入绑定/
-//! 提交回执/零错误）；②"ACE 断言"以**键下具名拒实证**承载（fail-closed
-//! 合同的可观察行为——缺席清单含 .Submit/.SetTheme/.SetAccent 全量）；
-//! ③键关 legacy 产物含三 handler（主题切换的产物面证据——宿主通道腿
-//! 无页面内触发件）。
+//! PLAN-980 ④-A #9：原样 `010-contact-form` 短回归。
+//! **PLAN-1072 刀B 修订（2026-11-19）**：010 整例 lane 翻转（view-for
+//! 结构承载+faqs 无类型列表字段=仅视图数据（1071 边界）+`style: if` 条件
+//! 样式值+`__bind_*` 方言合成件出 lane 规格集）——①键下**生成成功**且
+//! 产物含 lane 体标记（a2x 检查函数道：SetTheme 的 a2x_str_eq）；②键关
+//! legacy 产物含三 handler；③浏览器短回归（排窗）不变（legacy 基线）。
+//! 历史口径（0/6 具名拒=faqs+控制流两族 981 域墙）随刀收档。
 use auto_ui_tools::vue::incremental_compile_changed;
 
 fn copy_dir(src: &std::path::Path, dst: &std::path::Path) {
@@ -35,19 +34,20 @@ fn p980_010_short_regression_named_reject_legacy_and_mount() {
     if std::env::var("AUTO_UI_ACE_WEB_E2E").ok().as_deref() != Some("1") {
         eprintln!("browser tier not scheduled (set AUTO_UI_ACE_WEB_E2E=1) — CPU 段照跑");
     }
-    // ①键在场=具名拒（0/6 全量缺席——fail-closed 实证；两族 981 域墙见文件头）。
+    // ①键在场=lane 生成成功（PLAN-1072 刀B 翻转：absent=[]，产物含受检体
+    // 标记——SetTheme 检查函数道的 a2x_str_eq；faqs 经 view-data 承载）。
     let ws = temp_010("keyon");
     std::env::set_var("AUTO_UI_ACE_VUE", "1");
-    let err = incremental_compile_changed(&ws, None)
-        .expect_err("010 under the key must fail closed with the full absent list");
+    incremental_compile_changed(&ws, None).expect("010 derives under the key (knife B flip)");
     std::env::remove_var("AUTO_UI_ACE_VUE");
-    let msg = err.to_string();
-    for handler in [".Submit", ".SetTheme", ".SetAccent"] {
-        assert!(msg.contains(handler), "absent list names {handler}: {msg}");
-    }
+    let app = std::fs::read_to_string(ws.join("gen/front/vue/src/App.vue")).unwrap();
     assert!(
-        msg.contains("ace.vue-lane-unsupported"),
-        "named code: {msg}"
+        app.contains("a2x_str_eq") && app.contains("a2x_rt"),
+        "lane body markers present in the keyed artifact"
+    );
+    assert!(
+        app.contains("v-for=") && app.contains("faqs"),
+        "the FAQ loop renders via v-for over the view-data field"
     );
     let _ = std::fs::remove_dir_all(&ws);
 
