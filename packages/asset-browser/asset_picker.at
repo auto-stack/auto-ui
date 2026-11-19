@@ -112,10 +112,15 @@ widget AssetPicker (records: List = [], folders: List = [], query: str = "", que
                 .cancel_armed = true
                 .session = .session + 1
             }
-            .dlg_open = .open
+            if .dlg_open != .open {
+                .dlg_open = .open
+            }
             .AbSync()
         }
         .Tick -> {
+            if .dlg_open != .open {
+                .dlg_open = .open
+            }
             if .open != .seen_open {
                 .seen_open = .open
                 if .open {
@@ -128,7 +133,6 @@ widget AssetPicker (records: List = [], folders: List = [], query: str = "", que
                     .cancel_armed = true
                 }
             }
-            .dlg_open = .open
             .AbSync()
             // 确认反馈（错 session/seq 忽略；处理后清位防重放）。
             if .confirm_lock {
