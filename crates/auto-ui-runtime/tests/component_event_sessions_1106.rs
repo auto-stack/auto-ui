@@ -90,10 +90,16 @@ fn v07_forced_rebuild_lane_caught_by_execution_audit() {
     e.dispatch("a", "Inc").unwrap();
     assert_eq!(count_of(&e, "a"), 3, "outer numbers stay consistent");
     let audit = e.execution_audit();
-    // ……但真实编译/链接增长、不变量破裂（重建道不产生 handler 入口）。
+    // ……但 prepare/init 证据红：每事件一次真实重编 + 状态根身份更换
+    //（链接增长）。注意：本模拟道为拿正确终值真实派发了一次 handler，
+    // 故增量不变量**不是** V-07 的 oracle——其错误机制在编译/链接/种子
+    // 成本与身份，恰由 rebuild_compiles/links 抓红。
     assert!(audit.rebuild_compiles >= 1, "recompile really happened");
     assert!(audit.links >= 2, "state root identity replaced per event");
-    assert!(!audit.incremental_invariant_holds());
+    assert!(
+        audit.compile_count >= 1 && audit.links >= 2,
+        "prepare/init identity evidence is the V-07 red"
+    );
 
     // 显式 close/reopen 正控不被误杀：重开 = 新代次、init 一次、归 0。
     e.debug_force_rebuild_lane(false);
@@ -126,8 +132,7 @@ fn v08_forced_getter_dispatch_caught_by_execution_audit() {
     let _ = e.read_texts("a").unwrap();
     let audit = e.execution_audit();
     assert_eq!(
-        audit.handler_entries,
-        2,
+        audit.handler_entries, 2,
         "getter-triggered business dispatch is visible in handler entries"
     );
     assert!(
@@ -149,8 +154,14 @@ fn v08_forced_getter_dispatch_caught_by_execution_audit() {
 #[test]
 fn v02_bridge_level_incremental_evidence() {
     let mut e = engine();
-    e.mount("a", vec![("count".into(), auto_ui_runtime::ui::ace_state_bridge::AceInitialValue::Int(10))])
-        .unwrap();
+    e.mount(
+        "a",
+        vec![(
+            "count".into(),
+            auto_ui_runtime::ui::ace_state_bridge::AceInitialValue::Int(10),
+        )],
+    )
+    .unwrap();
     e.mount("b", Vec::new()).unwrap();
     for _ in 0..3 {
         assert!(matches!(
@@ -175,11 +186,29 @@ fn v02_bridge_level_incremental_evidence() {
         let _ = e.read_state("b", "count");
     }
     assert_eq!(e.execution_audit().handler_entries, 10);
-    // 卸载释放；重挂新鲜（seed 重新生效）。
+    // 卸载释放；重挂新鲜（seed 重新生效）。复审 F-2 折入账：卸载把 a 的
+    // 真实入口数折入 retired——增量不变量在**关开全程**保持可对账
+    // （delivered 10 == 存活 b 的 7 + 折入 a 的 3）。
     e.unmount("a");
     assert_eq!(e.read_state("a", "count"), None);
+    {
+        let audit = e.execution_audit();
+        assert_eq!(audit.retired_handler_entries, 3, "unmounted a folded");
+        assert_eq!(audit.handler_entries, 10, "live 7 + retired 3");
+        assert!(
+            audit.incremental_invariant_holds(),
+            "healthy lane keeps the invariant across unmount (delivered={}, handlers={})",
+            audit.events_delivered,
+            audit.handler_entries
+        );
+    }
     e.mount("a", Vec::new()).unwrap();
     assert_eq!(count_of(&e, "a"), 0);
     assert_eq!(e.execution_audit().links, 3);
     assert_eq!(e.execution_audit().compile_count, 1);
+    let audit = e.execution_audit();
+    assert!(
+        audit.incremental_invariant_holds(),
+        "invariant holds after reopen"
+    );
 }

@@ -624,7 +624,15 @@ impl AceStateEngine {
     /// 执行层观察口（会话审计汇总 + 引擎级计数）。
     pub fn execution_audit(&self) -> EngineExecutionAudit {
         let mut audit = self.audit.clone();
-        audit.handler_entries = self
+        audit.handler_entries = self.current_real_handler_entries();
+        audit.compile_count = self.program.compile_count;
+        audit
+    }
+
+    /// 当前真实 handler 入口总数：存活会话 + 已折入的卸载/被替换会话累计
+    /// （增量不变量在生产道全程——含 unmount/关开——可对账的口径）。
+    fn current_real_handler_entries(&self) -> u64 {
+        let live: u64 = self
             .slots
             .iter()
             .filter(|s| s.live)
@@ -635,8 +643,7 @@ impl AceStateEngine {
                     .unwrap_or(0)
             })
             .sum();
-        audit.compile_count = self.program.compile_count;
-        audit
+        live + self.audit.retired_handler_entries
     }
 
     /// V-06 负控开关：强制在线走旧场景重放道（真实 producer 调用）。
@@ -675,20 +682,9 @@ impl AceStateEngine {
         };
         self.replay_history.clear();
         if !on {
-            // 诊断注入车道的事件不计入生产计数：关闭时重定基到真实入口数
-            //（增量不变量描述的是**生产道**的账）。
-            let real: u64 = self
-                .slots
-                .iter()
-                .filter(|s| s.live)
-                .map(|s| {
-                    s.session
-                        .as_ref()
-                        .map(|x| x.0.audit().handler_entries)
-                        .unwrap_or(0)
-                })
-                .sum();
-            self.audit.events_delivered = real;
+            // 诊断注入车道的事件不计入生产计数：关闭时重定基到**累计**真实
+            // 入口数（存活 + 已折入——增量不变量描述生产道全程的账）。
+            self.audit.events_delivered = self.current_real_handler_entries();
         }
     }
 
@@ -697,18 +693,7 @@ impl AceStateEngine {
     pub fn debug_force_rebuild_lane(&mut self, on: bool) {
         self.force_rebuild = on;
         if !on {
-            let real: u64 = self
-                .slots
-                .iter()
-                .filter(|s| s.live)
-                .map(|s| {
-                    s.session
-                        .as_ref()
-                        .map(|x| x.0.audit().handler_entries)
-                        .unwrap_or(0)
-                })
-                .sum();
-            self.audit.events_delivered = real;
+            self.audit.events_delivered = self.current_real_handler_entries();
         }
     }
 
