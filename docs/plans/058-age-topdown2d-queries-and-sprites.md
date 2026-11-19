@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-19
 plan_revision: 8
-current_step: 3
+current_step: 5
 total_steps: 10
 depends_on: [auto-ui/PLAN-055, ag-examples/PLAN-022, ag-examples/PLAN-021, ag-examples/PLAN-026, auto-lang/PLAN-981]
 supersedes_spec_components: []
@@ -18,6 +18,8 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 # PLAN-058：俯视二维控制、查询与精灵公共组合
 
 ## 0. 变更摘要
+
+2026-11-19 r8当前：**T-04/T-05 的 AV 格全部完成并勾选（`eb724dd0`，5/10）**——OS 真实输入通道（`play.input.key` 焦点门控/OS 抑制重复→`sample()`→宿主权威喂点→`input.x/y` ops；四向/八向对角归一化/同时反向/零输入/反向/暂停清除，每 Tick 恰 32 credits 对独立 oracle）、V-S04 显式闭环（20 轮 Run 确定性无残留/跨 Run 旧句柄拒/坏模块具名诊断/缺资产 image-missing→精确修复同入口真跑至 35 Tick 停墙 8.6）、V-S05 冷 A→B AV 腿（冷载无 producer 根/网络、scene 按 sha 换源、`identity().input_hash` A≠B 旧 Ready 不适用）。语言事实入档：模块级资源 `let` 在 AV 切片不派发（资产 op 在作者调用处）、资产路径工程相对、frame op 只记录不触 fs。T-06 剩 SD-01 草稿与 AG023 AV 配方成文。12 套件＋controls 全绿。
 
 2026-11-19 **r8（用户裁定，范围有界修订）**：AC/A2R 格与双后端义务**原封转移**给新建后继 **PLAN-103**（`103-topdown2d-ac-a2r-wave-consumption.md`，drafting，等 1068/T-04＋981 AC/A2R 域端口＋UI-W2-AC/W3-A2R 波落地后开工）；本计划收口为 **AV 面**——T-04/T-05 重定义 AV 格（已交内容＋剩 OS 真实输入、V-S04 显式闭环、V-S05 冷 A→B AV 腿），T-06 保留 AV 配方/冷包、双后端配方转移，SD-01 措辞对齐实际支持域，AC-10 与 V-PHASE-GFX 多端条款转 PLAN-103 承接；原 V 行 ID/输入/expected/独立 oracle/包络**不减**；触碰路由缺口（17-op 无 dispatch）随 V-S03 完整形归 PLAN-103（scenario 侧 2:1 已证，作者面路由等 IF）。任务 ID/已完成证据全保留。
 
@@ -221,15 +223,25 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-01 | work | 后续另行启动；T-01不等研究 | 只读差距/源版本/最低样本和oracle准备，核owner/唯一树scope | AC-01/AC-06 | [x] 2026-11-18：055 spec c185f8f2/归档10-10、AG022归档10-10、981 seam ddbda0228+ed8b16e01 32/8/16/1、f32 在途；样本6行/32credits（t01-entry.md） |
 | T-02 | work | T-01；055/AG022已交结论；981 T-02联冻已回签 | ≤2机制中立服务/GPU最低负载先证，冻结profile/typed端口/预算映射/数值/共同发布；先证接口=已有静态f32行值＋宿主行写（不依赖f32业务式），真实Auto移动积分等981 f32 AV切片；不冒Node整链go，失败replan | AC-01/AC-02/AC-03/AC-04/AC-10/AC-11 | [x] 2026-11-18：probe c5086f50 5/5（queries-2d/sprites-2d；宿主行写/f32行值）；机制=碰撞代理与外观分离四要件；GPU 210/400px同Tick；32合法/33 fault10/40>32零效果sticky/40→41/按Tick重置；单assembly与use实例留T-03 |
 | T-03 | work | T-02机制可行；981稳定合同供准备 | 中立图形服务/能力注册/可见非阻挡地面/Node领域声明与永久用例，不扩旧生成器；与981不相交写面并行 ；执行以§5当前端阶段合同为准，原全量义务不减 | AC-01/AC-02/AC-03/AC-05/AC-10/AC-11 | [x] 2026-11-18：新profile `autographics.topdown2d/1`(30/121)+scene/9 layer+render-only行表/感知segment/sweep(fault 60)；旧22 profile/10 unit/价目零漂移；`node_topdown2d_flow` 5/5、controls 6/6、旧消费者11/11+4/4；E1代理被65536对抗反例否决并删；commit 7165dbad |
-| T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；AV 整链/G1/G2 正式作者形/epoch 消费已交 `b071634c`/`f6418120`/`7a1503b7`/`ba85f33f`/`0e67b1cd`/`12cb146b`（pin `0a167f611`）；r8 后本任务=**AV 格**：剩 OS/真实窗口输入通道与 V-S04 显式闭环用例；AC/A2R 格归 PLAN-103 | 正常Node同源 AV 整链（四八向/查询/呈现同步/实例/owner/故障及输入门的 AV 可证面）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-11 | [ ] |
-| T-05 | work | T-04 AV 格；AV 收尾已交 `350af5b8`（GPU 同宿主连续帧链+use 实例+2:1 隔离）＋`12cb146b`（epoch 消费）；r8 后本任务=**AV 格**：剩 V-S05 冷 A→B AV 腿与 V-S01..08 的 AV 格成套收口；AC/A2R 格归 PLAN-103 | V-S01..08 的 AV 格（预算合法/超界、独立数值/GPU oracle、旧档触面回归）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-11 | [ ] |
-| T-06 | work | T-05 AV 格 | 冷A→B/修复下一Run、SD 与 AG023 **AV 入口**准确版本/命令/配方；**双后端配方归 PLAN-103**；执行以§5 r8 块为准，AV 原验收不减 | AC-05/AC-06/AC-11 | [ ] |
+| T-04 | work | T-03；981所需A切片正式来源及AG026已闭M1收据；AV 整链/G1/G2 正式作者形/epoch 消费/OS 真实输入/V-S04 闭环已交 `b071634c`/`f6418120`/`7a1503b7`/`ba85f33f`/`0e67b1cd`/`12cb146b`/`eb724dd0`（pin `0a167f611`）；r8 **AV 格全闭合**；AC/A2R 格归 PLAN-103 | 正常Node同源 AV 整链（四八向/查询/呈现同步/实例/owner/故障及输入门的 AV 可证面）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-11 | [x] 2026-11-19：r8 AV 格全闭合（`eb724dd0`）：OS 输入链/20 轮 Run/旧句柄/坏模块/缺资产→修复真跑；12 套件＋controls 全绿 |
+| T-05 | work | T-04 AV 格；AV 收尾已交 `350af5b8`＋`12cb146b`＋`eb724dd0`（连续帧/use 实例/epoch/冷 A→B AV 腿）；r8 **AV 格全闭合**；AC/A2R 格归 PLAN-103 | V-S01..08 的 AV 格（预算合法/超界、独立数值/GPU oracle、旧档触面回归）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-11 | [x] 2026-11-19：V-S01..08 AV 格收口（V-S04/V-S05 AV 腿 `eb724dd0`；V-S03 scenario 2:1＋触碰路由作者面归 PLAN-103）；12 套件＋controls 全绿 |
+| T-06 | work | T-05 AV 格 | 冷A→B/修复下一Run（**已交**：`eb724dd0` 生命周期用例）、SD-01 草稿与 AG023 **AV 入口**配方成文（merge 时落 canonical）；**双后端配方归 PLAN-103**；执行以§5 r8 块为准 | AC-05/AC-06/AC-11 | [ ] 冷A→B/修复已交；剩 SD-01 草稿＋AV 配方成文 |
 | T-07 | review | T-06 | 同树独立final，真实逐AC/SD/源和反例核验；finding同员有界复核 | AC-07 | [ ] |
 | T-08 | merge | T-07 pass | 冻结受影响门/准确身份后落主，不扩大无关全套门 | AC-08 | [ ] |
 | T-09 | merge | T-08 | canonical/同号归档/导航与真实支持/未证边界，非产品研究不冒功能交付 | AC-08 | [ ] |
 | T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [ ] |
 
 ## 9. 复审记录
+
+### 2026-11-19 stage: work（**T-04/T-05 r8 AV 剩余格**：OS 真实输入＋V-S04 闭环＋V-S05 冷 A→B AV 腿）| PLAN-058 r8 | outcome: pass（T-04/T-05 勾选，5/10；T-06 剩 SD-01 草稿＋AV 配方成文）
+
+**绑定**：worktree `D:/autostack/.wt/ui-058/auto-ui` | branch `codex/plan-058-dev` | code commit `eb724dd0`（4 改＋2 新测试文件）| 主检出只改Plan簿记。
+**交付**：①`plan058_t05_av_os_input`（OS 真实输入通道：`play.input.key`（焦点门控/OS 抑制重复）→`sample()`→宿主权威喂点→`input.x/y` ops；四向/八向对角 |v|·dt/同时反向抵消/零输入/反向/暂停清除，每 Tick 32 credits 对独立 oracle）；②`plan058_t05_av_lifecycle`（V-S04：20 轮 Run 确定性无残留/跨 Run 旧句柄 `bad-token`/坏模块具名诊断/缺资产 `image-missing`→精确修复同入口真跑 35 Tick 停墙 8.6；V-S05 AV 腿：暂存工程冷载、scene 按 sha 换源、`identity().input_hash` A≠B、旧会话确定性保持）；③fixture 增 `load_atlas`/`load_missing` 资产驱动 fn。
+**命令/结果**：12 套件全绿（av_chain 5/arms 6/oracle 4/provider 5/pin 2/gpu_continuous 1/use_instances 3/gfx_epochs 4/av_os_input 1/av_lifecycle 3/topdown2d_flow 5/s2_age_routing 21）＋controls 6/6。新用例计时：os_input 1304ms/lifecycle 3 例 241/184/2223ms——全部 ≤10s 门。
+**语言事实入档（§5 r8 块）**：模块级资源 `let` 在 AV 切片不派发（资产 op 在作者调用处运行——tick 32 credits 无 image op 实证）；资产路径工程相对（`asset_root`=暂存工程根而非 assets 目录）；`render2d.frame` 只记录不触 fs。
+**check→finding 映射**：①直连 provider 的 GfxFault code 为裸后缀（AV 车道加 `age-gfx.` 前缀）→断言改 `bad-token`；②B 步骤漏改 scene 清单（scene 按 sha 文件名引用脚本）→补 scene-b；③play 未 pump 停在 Starting→补 settle；④单对象场景 sprites2d 装配拒（error 27）→复用已验证 7 对象场景；⑤对角位移基准错（原点 vs tick 前位置）→改 Δ；⑥fixture 行尾 CRLF 化致层变异 replace 失配→归一 LF＋EOL 无关替换。
+**边界**：OS 消息泵→winit→Play 边界归运行时窗口域（098 已验）；V-S03 作者面触碰路由归 PLAN-103；AC/A2R 格归 PLAN-103。
+**next**：T-06 剩 SD-01 草稿＋AG023 AV 配方成文（merge 预备）→ T-07 独立 final（r8 域）。
 
 ### 2026-11-19 stage: new（**PLAN-058 r8 范围有界修订**：AC/A2R 转移 PLAN-103，收口 AV 面）| PLAN-058 r8 | outcome: pass（修订合同可审阅；本计划保持 executing，T-04..06 按 r8 AV 格继续）
 
