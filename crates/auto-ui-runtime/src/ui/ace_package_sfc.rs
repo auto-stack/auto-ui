@@ -49,6 +49,37 @@ pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result
         .first()
         .ok_or_else(|| "package declares no component".to_string())?;
 
+    // F-R21-2（PLAN-981 r21 复审指派，owner 980/UI）：`handler_stmts` 契约
+    // 的消费门——本车道只复放平铺赋值（`handler_assigns`）；体含 if/let
+    //（age-package 作者面文法可达）时**具名拒**，不双支裸喷/部分复放
+    //（lang 侧 `age_component.rs` `handler_stmts` 契约：部分复放=错状态
+    // 值，禁止）。
+    fn control_flow_kind(
+        stmts: &[ace_core::source::age_component::ComponentStmt],
+    ) -> Option<&'static str> {
+        for st in stmts {
+            match st {
+                ace_core::source::age_component::ComponentStmt::Assign(_) => {}
+                ace_core::source::age_component::ComponentStmt::Let { .. } => {
+                    return Some("let");
+                }
+                // If 本身即控制流（then/els 内嵌套同拒）。
+                ace_core::source::age_component::ComponentStmt::If { .. } => {
+                    return Some("if");
+                }
+            }
+        }
+        None
+    }
+    for (msg, stmts) in &component.handler_stmts {
+        if let Some(kind) = control_flow_kind(stmts) {
+            return Err(format!(
+                "source.age.sfc-handler-stmt: handler `{msg}` contains a `{kind}` statement — \
+                 this lane replays flat assigns only; partial replay is forbidden"
+            ));
+        }
+    }
+
     // handler 消息（on-block 声明序）——lane 用它重放状态函数。
     let msgs: Vec<String> = component
         .handler_assigns
