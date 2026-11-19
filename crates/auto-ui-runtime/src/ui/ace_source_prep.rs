@@ -121,7 +121,63 @@ fn style_literal(src: &str, name: &str) -> Option<String> {
     None
 }
 
-/// 准备组件面源：内联依赖样式 + 空白化 `use` 行。
+/// PLAN-105 T-02（U03 真语料 012）：把**类型化列表数据字段**的初值改写为无类型
+/// 形——`var cities []str = ["…"]` → `var cities <blank> = ["…"]`（类型段等长
+/// 空白化，保 span）。AGE 组件/包面把无类型列表字面量当**只读视图数据**
+/// （1071 边界）；类型化列表 state 尚不在切片内，写面由投影后的具名拒绝兜底。
+///
+/// 只改「类型含 `[]` 且初值以 `[` 开头」的字段；其余行原样返回。
+fn rewrite_typed_list_field(line: &str) -> Option<String> {
+    let bytes = line.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() && bytes[i] == b' ' {
+        i += 1;
+    }
+    if !line[i..].starts_with("var ") {
+        return None;
+    }
+    i += 4;
+    // 名字段
+    let name_start = i;
+    while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+        i += 1;
+    }
+    if i == name_start {
+        return None;
+    }
+    while i < bytes.len() && bytes[i] == b' ' {
+        i += 1;
+    }
+    // 类型段（到空白）
+    let ty_start = i;
+    while i < bytes.len() && !bytes[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    let ty = &line[ty_start..i];
+    if !ty.contains("[]") {
+        return None;
+    }
+    while i < bytes.len() && bytes[i] == b' ' {
+        i += 1;
+    }
+    if i >= bytes.len() || bytes[i] != b'=' {
+        return None;
+    }
+    i += 1;
+    while i < bytes.len() && bytes[i] == b' ' {
+        i += 1;
+    }
+    if i >= bytes.len() || bytes[i] != b'[' {
+        return None;
+    }
+    let mut out = String::with_capacity(line.len());
+    out.push_str(&line[..ty_start]);
+    out.push_str(&" ".repeat(ty.len()));
+    out.push_str(&line[ty_start + ty.len()..]);
+    Some(out)
+}
+
+/// 准备组件面源：内联依赖样式 + 空白化 `use` 行 + 类型化列表数据字段改写。
 pub fn prepare_component_source(
     project_root: &Path,
     src: &str,
@@ -136,8 +192,13 @@ pub fn prepare_component_source(
         };
         let t = body.trim_start();
         let Some(rest) = t.strip_prefix("use ") else {
-            out.push_str(line);
-            let _ = nl;
+            // 非 use 行：按需改写类型化列表数据字段（`var x []T = [...]`）。
+            if let Some(rewritten) = rewrite_typed_list_field(body) {
+                out.push_str(&rewritten);
+                out.push_str(nl);
+            } else {
+                out.push_str(line);
+            }
             continue;
         };
         // `use <module>: a, b` —— 取 module 与成员表。
@@ -247,8 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn unknown_dep_style_is_not_inlined() {
-        let root = temp_project();
+    fn unknown_dep_style_is_not_inlined() {        let root = temp_project();
         let prepared = prepare_component_source(
             &root,
             "use stylekit.styles: nope\nwidget App { view { text \"x\" {} } }\n",
@@ -257,5 +317,22 @@ mod tests {
         assert!(prepared.inlined.is_empty());
         assert!(!prepared.source.contains("style nope"));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn rewrites_typed_list_data_fields() {
+        // 012 形：类型化列表数据字段 → 无类型视图数据（类型段等长空白化）。
+        let rewritten = rewrite_typed_list_field("        var cities []str = [\"Beijing\"]")
+            .expect("list data field rewritten");
+        assert_eq!(rewritten.len(), "        var cities []str = [\"Beijing\"]".len());
+        assert!(!rewritten.contains("[]str"));
+        assert!(rewritten.trim_end().ends_with("= [\"Beijing\"]"));
+        // 非列表类型、非列表初值、普通语句一律不动。
+        assert!(rewrite_typed_list_field("    var n int = 0").is_none());
+        assert!(rewrite_typed_list_field("    var xs []str = \"a\"").is_none());
+        assert!(rewrite_typed_list_field("    text \"x\" {}").is_none());
+        // 嵌套列表类型与空列表初值。
+        let nested = rewrite_typed_list_field("    var xs [][]int = []").unwrap();
+        assert!(!nested.contains("[][]int"));
     }
 }
