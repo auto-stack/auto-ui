@@ -33,9 +33,7 @@ use ace_av::age_component::{
     self, ComponentFieldValue, ComponentInitials, ComponentScenario, InitialValue,
     LegacyWidgetAlias, ScenarioOp,
 };
-use ace_av::component_event_sessions::{
-    ComponentEventSession, ComponentEventSessionProgram,
-};
+use ace_av::component_event_sessions::{ComponentEventSession, ComponentEventSessionProgram};
 
 // 消费者（含集成测试）经本模块取面配置类型，不必直接依赖 ace-av。
 pub use ace_av::age_component::{InitialValue as AceInitialValue, LegacyWidgetAlias as AceAlias};
@@ -211,8 +209,7 @@ impl AceStateEngine {
     /// 一次真实编译（共享前门 + 唯一 verify + lower/admit/link 前探）校验
     /// 源形状，错误带具名诊断码。
     pub fn new(src: &str, module_path: &str, alias: LegacyWidgetAlias) -> Result<Self, String> {
-        let program =
-            ComponentEventSessionProgram::compile(src, module_path, alias)?;
+        let program = ComponentEventSessionProgram::compile(src, module_path, alias)?;
         let compile_count = program.compile_count;
         Ok(Self {
             src: src.to_string(),
@@ -384,17 +381,14 @@ impl AceStateEngine {
         let result = {
             let slot = self.slot_mut(identity).expect("live checked above");
             let session = slot.session.as_mut().expect("live slot holds a session");
-            session
-                .0
-                .dispatch(&msg, &payload)
-                .map(|_| {
-                    session
-                        .0
-                        .last_committed_states()
-                        .iter()
-                        .map(|(n, v)| (n.clone(), AceStateValue::from(v)))
-                        .collect::<Vec<(String, AceStateValue)>>()
-                })
+            session.0.dispatch(&msg, &payload).map(|_| {
+                session
+                    .0
+                    .last_committed_states()
+                    .iter()
+                    .map(|(n, v)| (n.clone(), AceStateValue::from(v)))
+                    .collect::<Vec<(String, AceStateValue)>>()
+            })
         };
         match result {
             Ok(states) => {
@@ -438,11 +432,7 @@ impl AceStateEngine {
         };
         let mut ops = Vec::new();
         for (new_idx, id) in live.iter().enumerate() {
-            let Some((_, history)) = self
-                .replay_history
-                .iter()
-                .find(|(hid, _)| hid == id)
-            else {
+            let Some((_, history)) = self.replay_history.iter().find(|(hid, _)| hid == id) else {
                 continue;
             };
             for (m, a) in history {
@@ -522,23 +512,17 @@ impl AceStateEngine {
             };
             let slot = self.slot_mut(identity).expect("live checked above");
             let session = slot.session.as_mut().expect("live slot holds a session");
-            session
-                .0
-                .dispatch(&msg, &payload)
-                .map(|_| {
-                    session
-                        .0
-                        .last_committed_states()
-                        .iter()
-                        .map(|(n, v)| (n.clone(), v.clone()))
-                        .collect::<Vec<(String, ComponentFieldValue)>>()
-                })?
+            session.0.dispatch(&msg, &payload).map(|_| {
+                session
+                    .0
+                    .last_committed_states()
+                    .iter()
+                    .map(|(n, v)| (n.clone(), v.clone()))
+                    .collect::<Vec<(String, ComponentFieldValue)>>()
+            })?
         };
-        let program = ComponentEventSessionProgram::compile(
-            &self.src,
-            &self.module_path,
-            self.alias,
-        )?;
+        let program =
+            ComponentEventSessionProgram::compile(&self.src, &self.module_path, self.alias)?;
         self.audit.rebuild_compiles += 1;
         let rebuilt = program.open_session(&target)?;
         self.audit.links += 1;
@@ -633,7 +617,12 @@ impl AceStateEngine {
             .slots
             .iter()
             .filter(|s| s.live)
-            .map(|s| s.session.as_ref().map(|x| x.0.audit().handler_entries).unwrap_or(0))
+            .map(|s| {
+                s.session
+                    .as_ref()
+                    .map(|x| x.0.audit().handler_entries)
+                    .unwrap_or(0)
+            })
             .sum();
         audit.compile_count = self.program.compile_count;
         audit
@@ -681,7 +670,12 @@ impl AceStateEngine {
                 .slots
                 .iter()
                 .filter(|s| s.live)
-                .map(|s| s.session.as_ref().map(|x| x.0.audit().handler_entries).unwrap_or(0))
+                .map(|s| {
+                    s.session
+                        .as_ref()
+                        .map(|x| x.0.audit().handler_entries)
+                        .unwrap_or(0)
+                })
                 .sum();
             self.audit.events_delivered = real;
         }
@@ -696,7 +690,12 @@ impl AceStateEngine {
                 .slots
                 .iter()
                 .filter(|s| s.live)
-                .map(|s| s.session.as_ref().map(|x| x.0.audit().handler_entries).unwrap_or(0))
+                .map(|s| {
+                    s.session
+                        .as_ref()
+                        .map(|x| x.0.audit().handler_entries)
+                        .unwrap_or(0)
+                })
                 .sum();
             self.audit.events_delivered = real;
         }

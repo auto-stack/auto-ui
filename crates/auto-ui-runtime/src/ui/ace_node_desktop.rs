@@ -1002,7 +1002,9 @@ fn expand_view_for_leaves(
         for it in items {
             match it {
                 ComponentViewItem::Text(leaf) => {
-                    out.push(eval_item_expr(&leaf.expr, index_name, value_name, idx, item)?);
+                    out.push(eval_item_expr(
+                        &leaf.expr, index_name, value_name, idx, item,
+                    )?);
                 }
                 ComponentViewItem::Element(el) => {
                     if let Some(label) = &el.label {
@@ -1017,7 +1019,8 @@ fn expand_view_for_leaves(
                 }
                 ComponentViewItem::For(_) => {
                     return Err(
-                        "ace.desktop.view-for-unsupported: nested `for` is outside this slice".into(),
+                        "ace.desktop.view-for-unsupported: nested `for` is outside this slice"
+                            .into(),
                     )
                 }
                 ComponentViewItem::Entry(_) => {}
@@ -1092,7 +1095,8 @@ fn expand_view_for_leaves(
         }
         _ => {
             return Err(
-                "ace.desktop.view-for-unsupported: iteration source must be `.viewDataField`".into(),
+                "ace.desktop.view-for-unsupported: iteration source must be `.viewDataField`"
+                    .into(),
             )
         }
     };
@@ -1269,9 +1273,7 @@ fn collect_element_labels(
                     let shown = match &label.kind {
                         ExprKind::StrLit(s) => Some(s.clone()),
                         ExprKind::IntLit(i) => Some(i.to_string()),
-                        ExprKind::Field { base, name }
-                            if matches!(&base.kind, ExprKind::Var(v) if v.name == "self") =>
-                        {
+                        ExprKind::Field { base, name } if matches!(&base.kind, ExprKind::Var(v) if v.name == "self") => {
                             states
                                 .iter()
                                 .find(|(n, _)| n == &name.name)
@@ -1290,7 +1292,9 @@ fn collect_element_labels(
                 collect_element_labels(&c.else_items, states, out);
             }
             // 循环体已在模板叶展开（含 label）。
-            ComponentViewItem::For(_) | ComponentViewItem::Text(_) | ComponentViewItem::Entry(_) => {}
+            ComponentViewItem::For(_)
+            | ComponentViewItem::Text(_)
+            | ComponentViewItem::Entry(_) => {}
         }
     }
 }
@@ -1327,9 +1331,9 @@ fn eval_view_cond(
             match (op, l, r) {
                 (BinOp::Eq, Some(l), Some(r)) => Ok(cond_atom_eq(&l, &r)),
                 (BinOp::Ne, Some(l), Some(r)) => Ok(!cond_atom_eq(&l, &r)),
-                _ => Err(
-                    "ace.desktop.view-cond-unsupported-expr: only `field ==/!= literal`".into(),
-                ),
+                _ => {
+                    Err("ace.desktop.view-cond-unsupported-expr: only `field ==/!= literal`".into())
+                }
             }
         }
         _ => Err("ace.desktop.view-cond-unsupported-expr: expression shape".into()),
@@ -1477,44 +1481,44 @@ impl NodeDesktopBridge {
             }
         } else {
             match compile_component_scenario_with_initials(
-            src,
-            path,
-            LegacyWidgetAlias::Accept,
-            &caps,
-            &trial,
-            None,
-            &trial_initials,
-        ) {
-            Ok(compiled) => {
-                // 状态真值经事件引擎（mount 后 read_all）取；此处只消费文本叶。
-                let (_states0, texts0) = observe_component_states_and_texts_flat(&compiled)?;
-                let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
-                if observed_leaves != shape.text_leaf_count {
-                    return Err(format!(
-                        "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
-                        shape.text_leaf_count
-                    ));
+                src,
+                path,
+                LegacyWidgetAlias::Accept,
+                &caps,
+                &trial,
+                None,
+                &trial_initials,
+            ) {
+                Ok(compiled) => {
+                    // 状态真值经事件引擎（mount 后 read_all）取；此处只消费文本叶。
+                    let (_states0, texts0) = observe_component_states_and_texts_flat(&compiled)?;
+                    let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
+                    if observed_leaves != shape.text_leaf_count {
+                        return Err(format!(
+                            "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
+                            shape.text_leaf_count
+                        ));
+                    }
+                    texts0
                 }
-                texts0
-            }
-            Err(ds)
-                if ds
-                    .iter()
-                    .any(|d| d.message.contains("requires at least one")) =>
-            {
-                // Hello 类（无 model 字段）：静态观察面（带 on 的源在此被
-                // 具名拒——`on` handler 属场景面，不属静态面）。
-                let texts0 = observe_component_texts(src, path, LegacyWidgetAlias::Accept)?;
-                let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
-                if observed_leaves != shape.text_leaf_count {
-                    return Err(format!(
-                        "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
-                        shape.text_leaf_count
-                    ));
+                Err(ds)
+                    if ds
+                        .iter()
+                        .any(|d| d.message.contains("requires at least one")) =>
+                {
+                    // Hello 类（无 model 字段）：静态观察面（带 on 的源在此被
+                    // 具名拒——`on` handler 属场景面，不属静态面）。
+                    let texts0 = observe_component_texts(src, path, LegacyWidgetAlias::Accept)?;
+                    let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
+                    if observed_leaves != shape.text_leaf_count {
+                        return Err(format!(
+                            "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
+                            shape.text_leaf_count
+                        ));
+                    }
+                    texts0
                 }
-                texts0
-            }
-            Err(ds) => return Err(diags(&ds)),
+                Err(ds) => return Err(diags(&ds)),
             }
         };
 
@@ -1565,8 +1569,8 @@ impl NodeDesktopBridge {
             Err(e) => return Err(e),
         }
 
-        let expanded_static =
-            node.view.texts.is_empty() && !per_node_texts.first().map(|r| r.is_empty()).unwrap_or(true);
+        let expanded_static = node.view.texts.is_empty()
+            && !per_node_texts.first().map(|r| r.is_empty()).unwrap_or(true);
         Ok(Self {
             path: path.to_string(),
             node_name: node.name.name.clone(),
@@ -2387,7 +2391,14 @@ mod style_blank_tests {
             let blanked = blank_style_surface(&src);
             assert_eq!(blanked.len(), src.len(), "{app}: width preserved");
             let r = ace_core::source::age_component::project_component_candidates(&blanked);
-            assert!(r.is_ok(), "{app} must project after blanking: {:?}", r.err().map(|ds| ds.iter().map(|d| format!("{}: {}", d.code, d.message)).collect::<Vec<_>>()));
+            assert!(
+                r.is_ok(),
+                "{app} must project after blanking: {:?}",
+                r.err().map(|ds| ds
+                    .iter()
+                    .map(|d| format!("{}: {}", d.code, d.message))
+                    .collect::<Vec<_>>())
+            );
             // 编译面同源（窗口 load 的第二阶段）：确认空白化后场景编译也通过。
             let caps = ["ac.runtime.text.v1".to_string()];
             let scenario = ace_av::age_component::ComponentScenario {
