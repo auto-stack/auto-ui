@@ -547,6 +547,19 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 42 | from: work | t
 **回归证据（新构建）**：重新构建 `ace_node_desktop_window` 后跑 015-notes → `frames=1`、`errors=0`、`buttons=3`（store 内联 + computed/ownership/TextDisplay 改动后的真窗回归正常）；016-calendar 仍未产证据（`view-for-unsupported`，与其桥装载墙一致）。
 
 **下一刀**：AGE Atom 文本生成的 collections 域支持（列表类型 + List ctor/push/get 的 HIR 形状），这是 012/013/016 动态列表的共同前置。`next_responsible_role: work（T-02 W40）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 43 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 3d7c5158d | next: work
+
+2026-11-19 stage: work（T-02 W40：collections 域的 Atom 生成勘察·第二步）| PLAN-105 r1 | outcome: pass（勘察轮，未提交代码）| code_commit: 无（实验回滚，HEAD 仍 `3d7c5158d`）| task_ids: T-02 勘察 | evidence: `plan-artifacts/plan-105/atom-dump.txt`（生成的 collections atom 快照）
+
+**勘察结论（精确到 descriptor 规则）**：把组件面 HIR 切到 collections 域后，Atom 生成有**两处**不兼容：
+1. 类型表缺 `t_str`——`atom:41:45 bind.dangling-type-ref: dangling type reference t_str`（文本叶的 `str_lit` 用借用 `str`）。
+2. 补上 `t_str` 后，**collections 描述符不接受 `str`**——`atom:8:24 bind.unknown-case: no accepted case type.str in descriptor`。即 collections 域要求文本值是 `Str`（owned）。
+→ 结论：AGE 组件面的 Atom 发射必须**全域按 owned 文本**（`StrLit` → `t_Str`、`text_clone` 形参、字段/返回类型同步），而不是补一行类型表就能通过。这是下一刀的具体工作（adapter 发射层，多文件）。生成的 atom 快照已存档供对照。
+
+实验已整体回滚（`adapter.rs` / `age_component.rs` / Cargo.toml 恢复），plan105 **25/25** 保持。
+
+**下一刀**：AGE 组件面 Atom 发射的 owned 文本模式（`StrLit`/`text_clone`/字段类型），随后再切 collections profile + 执行分派，012/013/016 的动态列表由此解锁。`next_responsible_role: work（T-02 W41）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
