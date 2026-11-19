@@ -134,12 +134,19 @@ pub enum AsyncSpawnError {
 }
 
 /// 执行层观察口（真实调用边界计量；V-02/V-06..08 的 oracle）。
+///
+/// **有效域（复审 F-2 冻结）**：`incremental_invariant_holds` 在**生产道
+/// 全程**（含 unmount/关开）可对账——`handler_entries` 为存活会话入口数 +
+/// 已卸载会话折入的 `retired_handler_entries` 累计；负控诊断注入道开启
+/// 期间的 delivered 计数在旋钮关闭时重定基到真实入口数。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct EngineExecutionAudit {
     /// 引擎已交付的事件数（含负控车道）。
     pub events_delivered: u64,
-    /// 会话侧真实 handler 入口数（只在执行器派发成功后增长）。
+    /// 会话侧真实 handler 入口数（存活会话 + 已折入的卸载会话累计）。
     pub handler_entries: u64,
+    /// 已卸载/被替换会话折入的真实入口数（不再出现在存活会话审计里）。
+    pub retired_handler_entries: u64,
     /// 会话链接数（每 mount +1；事件/读取/切换不得增长）。
     pub links: u64,
     /// 程序编译次数（new 时 1；事件不得增长）。
@@ -171,7 +178,6 @@ struct AceStateSlot {
     live: bool,
     /// mount 世代（每次 mount 取新值；重挂后旧 ticket 不再匹配）。
     generation: u64,
-    initials: Vec<(String, InitialValue)>,
     /// 本实例的增量会话（独立状态根；live 期间常驻）。
     session: Option<SyncSession>,
     /// 最近一次观察到的状态（字段声明序；读取零派发）。
@@ -278,7 +284,7 @@ impl AceStateEngine {
             seeds.push((name.clone(), fv));
         }
         // 开会话（link + init + 可选 seed）：失败即不挂载（干净回滚）。
-        let mut session = self.program.open_session(&seeds)?;
+        let session = self.program.open_session(&seeds)?;
         let generation = session.generation();
         let states = session
             .last_committed_states()
@@ -290,7 +296,6 @@ impl AceStateEngine {
             Some(slot) => {
                 slot.live = true;
                 slot.generation = generation;
-                slot.initials = initials;
                 slot.session = Some(session);
                 slot.states = states;
             }
@@ -298,7 +303,6 @@ impl AceStateEngine {
                 identity: identity.to_string(),
                 live: true,
                 generation,
-                initials,
                 session: Some(session),
                 states,
             }),
@@ -317,18 +321,22 @@ impl AceStateEngine {
 
     /// 卸载实例：关闭会话（释放状态根）；晚到事件/旧世代完成不再可见。
     pub fn unmount(&mut self, identity: &str) -> UnmountOutcome {
-        match self.slot_mut(identity) {
+        let mut retired = 0u64;
+        let outcome = match self.slot_mut(identity) {
             Some(slot) if slot.live => {
                 if let Some(mut session) = slot.session.take() {
+                    retired += session.0.audit().handler_entries;
                     session.0.close();
                 }
                 slot.live = false;
-                slot.initials.clear();
                 slot.states.clear();
                 UnmountOutcome::Released(slot.generation)
             }
             _ => UnmountOutcome::NotMounted,
-        }
+        };
+        // 卸载把该会话的真实入口数折入累计账（增量不变量在关开全程可对账）。
+        self.audit.retired_handler_entries += retired;
+        outcome
     }
 
     /// 定向事件：一次被接纳事件 = 恰一次目标 handler 真实派发（全部求值在
@@ -527,9 +535,11 @@ impl AceStateEngine {
         let rebuilt = program.open_session(&target)?;
         self.audit.links += 1;
         // 状态根替换（旧会话关闭——重建道的可观察事实就是身份更换）。
+        let mut retired = 0u64;
         let delivered_states: Vec<(String, AceStateValue)> = {
             let slot = self.slot_mut(identity).unwrap();
             if let Some(mut old) = slot.session.take() {
+                retired += old.0.audit().handler_entries;
                 old.0.close();
             }
             slot.session = Some(SyncSession(rebuilt));
@@ -540,6 +550,7 @@ impl AceStateEngine {
             slot.states.clone()
         };
         self.audit.events_delivered += 1;
+        self.audit.retired_handler_entries += retired;
         Ok(DispatchOutcome::Delivered(delivered_states))
     }
 

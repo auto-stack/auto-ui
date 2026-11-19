@@ -40,7 +40,6 @@ use ace_av::age_component::{
     observe_component_texts, project_component_candidates, ComponentInitials, ComponentScenario,
     LegacyWidgetAlias,
 };
-use ace_core::source::age_component::ScenarioOp;
 use ace_core::source::packages::PackageModuleInput;
 
 /// PLAN-980 ④-A #2b：桥的后端面——组件面单源引擎 / AGE 包闭包引擎。
@@ -839,11 +838,9 @@ pub struct NodeDesktopBridge {
     tick_no: usize,
     /// PLAN-104：装载时的 view 树（条件可见性求值用；叶序与 texts 一致）。
     view_items: Vec<ace_core::source::age_component::ComponentViewItem>,
-    /// PLAN-104：源（负控/诊断面）。PLAN-1106 T-05：场景 op 历史随增量会话
-    /// 接线退役——文本叶改由会话纯读（`AceStateEngine::read_texts`）。
-    src: String,
     /// PLAN-104：文本叶来自循环体模板展开（视图数据，非状态派生）——不参与
-    /// 状态驱动的叶刷新。
+    /// 状态驱动的叶刷新。（PLAN-1106 T-05：源串与场景 op 历史随增量会话
+    /// 接线退役——文本叶改由会话纯读 `AceStateEngine::read_texts`。）
     expanded_static: bool,
 }
 
@@ -1590,7 +1587,6 @@ impl NodeDesktopBridge {
             script: Vec::new(),
             tick_no: 0,
             view_items: node.view.tree.clone(),
-            src: src.to_string(),
             expanded_static,
         })
     }
@@ -1691,7 +1687,6 @@ impl NodeDesktopBridge {
             script: Vec::new(),
             tick_no: 0,
             view_items: node.view.tree.clone(),
-            src: entry_src.clone(),
             expanded_static: false,
         })
     }
