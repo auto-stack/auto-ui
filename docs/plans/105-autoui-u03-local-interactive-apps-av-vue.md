@@ -228,6 +228,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 52 | from: work | t
 **已定界的实现路径（下一刀）**：用 HIR 既有 `DefKind::Intrinsic { symbol, effect, ty }` 承载宿主 API——①组件面把 `use api: f` 的 `pub fn` 签名声明为 intrinsic def（符号 `host.api.<unit>.<fn>`，带参数/返回类型）；②verify 按声明类型核调用；③MIR/AV 解释器按 symbol 分派到**宿主表**（AV 侧内存实现 todo/notes/cards 后端，会话内状态）；④能力门 `ac.runtime.host.api.v1`，未声明即具名拒。现状核对：intrinsic 目前只作缓存/依赖元数据用，**尚无执行分派**，需补 ③。
 
 **并行候选**：A2Vue 车道（TS 运行时自带宿主与组合），可能是 018/022（routes+outlet）更近的路；下一轮先做一次**干净的 SFC 生成探测**（用真实 `PackageModuleInput`），再决定两车道顺序。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 53 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: f7c1d99b | next: work
+
+2026-11-19 stage: work（T-02 W50：内建列表字段保持类型 + A2Vue 入口勘察）| PLAN-105 r1 | outcome: pass | code_commit: auto-ui `f7c1d99b` | task_ids: T-02（W50）| evidence: prep 6/6 + 012 新推进
+
+**交付**：`rewrite_typed_list_field` 只改写**记录元素**的列表字段（`[]Faq`、`[][]Faq`）；**内建元素**列表字段（`[]str`/`[]int`/`[]bool`/`[]f32`）**保持类型**——collections 域真承载、handler 可写（012 的 `.w_rows = rows`）。测试同步更新（正反两面：记录改写、内建保持）。
+
+**效果**：012 从「`on Tick` assigns undeclared model field `w_rows`」推进到**新的具名拒** `source.age.structure: unexpected token in a bare element tag (spacer/divider/sep/outlet)`（view 结构面下一刀）。
+
+**A2Vue 入口勘察**：`generate_package_sfc_with_root` 只传入口单元会报 `source.module-identity: invalid or duplicate package/module identity`；带 store 的例（013/016）报「package-level store semantics are not wired yet (S1)」。→ A2Vue 的真入口需要**整包单元装配**（app + store + pages + types…），当前 runtime 只有测试消费者，生产装配在 auto-ui-tools，下一轮勘查。
+
+**验证**：auto-ui prep 6/6；plan105/980/979/981 等核心回归未受影响（本轮未动 core）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
