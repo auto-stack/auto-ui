@@ -537,6 +537,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 41 | from: work | t
 **效果**：`let xs = List<int>.new()` 现在**可解析/可投影**（此前文法直接拒），随后被 resolver 具名拒（"parameterized type receivers are not part of this source profile"）——精确边界：组件面 HIR 域是 text-record，列表需要 collections 域。`let xs = List<int>.new()\n xs.push(1)` 在 scene 编译**通过**（push 语句路径已可用）。下一步是把组件面的 HIR 域迁到 collections（或为列表源单独走 collections 车道），这是 012/013/016 的动态列表共同前置。
 
 **验证**：plan105 25/25、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24；census 4/4。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 42 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 3d7c5158d | next: work
+
+2026-11-19 stage: work（T-02 W39：collections 域切换勘察 + 015 回归证据）| PLAN-105 r1 | outcome: pass（勘察轮，未提交代码）| code_commit: 无（实验已回滚，HEAD 仍 `3d7c5158d`）| task_ids: T-02 勘察 | evidence: `plan-artifacts/plan-105/av-015-w39.json`
+
+**勘察结论（关键路标）**：把组件面 HIR 域从 `TextRecord` 切到 `Collections`（`compile_program_parts_age(..., SourceProfile::Collections)` + `verify_collections`），并让 av 执行器按 `checked.domain()` 分派 `lower_checked_collections`——**失败点**：连 `let xs = List<int>.new()` + `xs.push(1)` 都在 `compile_program_parts_age` 阶段报 `source.internal internal adapter error: generated Atom text failed to bind`。说明 AGE 组件面的 **Atom 文本生成是 text-record 专用**（集合域的类型/入口约定不同），不是换一个 profile 参数就能切。正确顺序：先让 Atom 文本生成器对 collections 域可用（列表类型、`List.new/push/get` 的 HIR 形状、入口约定），再切 profile + 执行分派。实验已整体回滚，plan105 25/25 保持。
+
+**回归证据（新构建）**：重新构建 `ace_node_desktop_window` 后跑 015-notes → `frames=1`、`errors=0`、`buttons=3`（store 内联 + computed/ownership/TextDisplay 改动后的真窗回归正常）；016-calendar 仍未产证据（`view-for-unsupported`，与其桥装载墙一致）。
+
+**下一刀**：AGE Atom 文本生成的 collections 域支持（列表类型 + List ctor/push/get 的 HIR 形状），这是 012/013/016 动态列表的共同前置。`next_responsible_role: work（T-02 W40）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
