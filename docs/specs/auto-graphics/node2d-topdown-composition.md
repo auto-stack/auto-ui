@@ -1,7 +1,7 @@
 # 俯视二维组合（topdown2d）与 AGE 图形端口
 
 PLAN-058 的交付知识（SD-01；r8 范围修订后本文描述 **AV 支持域**）。
-适用身份：本文件由 auto-ui 分支 `codex/plan-058-dev` @ `eb724dd0` 预备、merge 时落主；
+适用身份：本文件由 auto-ui 分支 `codex/plan-058-dev` @ `21bdf39b`（T-07 final 复审基线）预备、merge 时落主；
 SDK 基座=`.sdk-source` 两层快照（base 681 + overlay 1435，auto-lang `0a167f611`，
 含 PLAN-981 G1/G2/宿主动态世代批）。旧 055 研究结论见
 `topdown2d-feasibility.md`，其 no-go 结论由本组合的显式新档解除，研究数据不重述。
