@@ -509,6 +509,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 39 | from: work | t
 **效果**：016-calendar 越过 `month_name` 一墙，新墙是 `verify.ownership-required: assignment to l1 implicitly transfers l1`（generated 局部所有权面）。013 仍具名 `.store` 边界。
 
 **下一刀**：016 的所有权/局部赋值墙（`assignment to l1 implicitly transfers l1` 定位与修正），然后 013 的 store 列表操作。`next_responsible_role: work（T-02 W37）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 40 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 014e4c876 | next: work
+
+2026-11-19 stage: work（T-02 W37：016 过所有权与 TEXT_DISPLAY 两墙）| PLAN-105 r1 | outcome: pass（本刀两提交；T-02 未整体完成）| code_commit: auto-lang `8fe9706fd`（lowering）、`014e4c876`（core）| task_ids: T-02（W37）| evidence: 25/25 + 全 affected
+
+**交付**：①`wrap_owned_transfer` 泛化为 `clone_if_place`——owned `str` 赋值右手若是**位置表达式**（变量/字段/下标），补 `.clone()`（否则 `verify.ownership-required: assignment … implicitly transfers`）；hook-local 裸名写路径同样补。②`TEXT_DISPLAY` 在 `data`/`owned` 车道放开 lowering（ABC 准入 `family.allows_data_tags()` 本就允许，只有 adapter 的 collections/closures 门挡住）——组件面 `text .intField` 在 AV 车道可编译。
+
+**效果**：**016-calendar 通过场景编译与 AV 桥装载的编译阶段**（此前 `leaf-expr: self` → 所有权 → TextDisplay 三道墙已逐一关闭），桥装载新墙是 `ace.desktop.view-for-unsupported: view data item shape`（016 的日历网格用 `for` 遍历 computed 列表——循环叶展开只支持视图数据字面量列表）。
+
+**验证**：plan105 25/25、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24；auto-ui prep 6/6；ace-av conformance 全量在后台跑（结果下轮并入）。
+
+**下一刀**：016 的 `view for` 网格（列表/循环语义或其源级降级），然后 013 store 列表。`next_responsible_role: work（T-02 W38）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
