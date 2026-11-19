@@ -290,6 +290,8 @@ pub struct HostSession {
     pub states: Vec<Vec<(String, String)>>,
     /// PLAN-104：每实例、每文本叶的可见性（条件分支求值；叶序与 texts 一致）。
     pub visibility: Vec<Vec<bool>>,
+    /// PLAN-104：元素 label 展示行（`h2 .title` / `span "✓"` 族；仅显示）。
+    pub labels: Vec<Vec<String>>,
     /// 事件目标（声明序）：(label, msg)。
     pub buttons: Vec<(String, String)>,
     /// PLAN-980 B-AV U01（输入组件面）：文本输入目标（声明序，接 buttons
@@ -315,6 +317,7 @@ impl HostSession {
             texts: vec![Vec::new(); instances],
             states: vec![Vec::new(); instances],
             visibility: vec![Vec::new(); instances],
+            labels: vec![Vec::new(); instances],
             buttons: Vec::new(),
             inputs: Vec::new(),
             queue: VecDeque::new(),
@@ -1191,6 +1194,107 @@ fn parse_view_data_literal(src: &str) -> Result<Vec<Vec<(String, String)>>, Stri
     Ok(out)
 }
 
+/// PLAN-104：**harness 不消费 style 面**——`style …` 声明行与 `style:` 条目行
+/// （含跨行 `if … { … } else { … }` 继续行）按原**字节**长度空白化，span 不漂移；
+/// 样式由 A2Vue（1072 生产链）覆盖。
+///
+/// 行宽保持包含行尾 `\r`（CRLF 源：`\r` 也替换成空格，字节数不变）；花括号
+/// 计数忽略字符串字面量内的括号（Tailwind 任意值可能含 `{}`）。
+fn blank_style_surface(src: &str) -> String {
+    fn depth_delta(s: &str) -> i32 {
+        let mut d = 0i32;
+        let mut in_str = false;
+        let mut esc = false;
+        for ch in s.chars() {
+            if in_str {
+                if esc {
+                    esc = false;
+                } else if ch == '\\' {
+                    esc = true;
+                } else if ch == '"' {
+                    in_str = false;
+                }
+            } else if ch == '"' {
+                in_str = true;
+            } else if ch == '{' {
+                d += 1;
+            } else if ch == '}' {
+                d -= 1;
+            }
+        }
+        d
+    }
+
+    let mut out = String::with_capacity(src.len());
+    // None = 未在空白化；Some(depth>0) = 跨行 style 值未收口。
+    let mut depth: Option<i32> = None;
+    for seg in src.split_inclusive('\n') {
+        let (body, nl) = match seg.strip_suffix('\n') {
+            Some(b) => (b, "\n"),
+            None => (seg, ""),
+        };
+        let trim = body.trim_start();
+        let starts_style = trim.starts_with("style ") || trim.starts_with("style:");
+        let blank_this = match depth {
+            Some(_) => true,
+            None => starts_style,
+        };
+        if !blank_this {
+            out.push_str(seg);
+            continue;
+        }
+        let base = depth.unwrap_or(0);
+        let d = base + depth_delta(body);
+        out.push_str(&" ".repeat(body.len()));
+        out.push_str(nl);
+        depth = if d > 0 { Some(d) } else { None };
+    }
+    out
+}
+
+/// PLAN-104：**元素 label 展示**（`h2 .dashboard_title` / `span "✓"` 族）——
+/// 这些不是 `text` 叶（不进 AV 叶表），但 harness 显示面需要；按实例状态求值
+/// 成展示行（仅显示，不参与 FFI 叶编号）。
+fn collect_element_labels(
+    items: &[ace_core::source::age_component::ComponentViewItem],
+    states: &[(String, AceStateValue)],
+    out: &mut Vec<String>,
+) {
+    use ace_core::source::age_component::ComponentViewItem;
+    use ace_core::source::ast::ExprKind;
+    for item in items {
+        match item {
+            ComponentViewItem::Element(el) => {
+                if let Some(label) = &el.label {
+                    let shown = match &label.kind {
+                        ExprKind::StrLit(s) => Some(s.clone()),
+                        ExprKind::IntLit(i) => Some(i.to_string()),
+                        ExprKind::Field { base, name }
+                            if matches!(&base.kind, ExprKind::Var(v) if v.name == "self") =>
+                        {
+                            states
+                                .iter()
+                                .find(|(n, _)| n == &name.name)
+                                .map(|(_, v)| state_display(v))
+                        }
+                        _ => None,
+                    };
+                    if let Some(s) = shown {
+                        out.push(format!("{}: {s}", el.tag));
+                    }
+                }
+                collect_element_labels(&el.items, states, out);
+            }
+            ComponentViewItem::Cond(c) => {
+                collect_element_labels(&c.then_items, states, out);
+                collect_element_labels(&c.else_items, states, out);
+            }
+            // 循环体已在模板叶展开（含 label）。
+            ComponentViewItem::For(_) | ComponentViewItem::Text(_) | ComponentViewItem::Entry(_) => {}
+        }
+    }
+}
+
 /// PLAN-104：条件表达式求值（`.field` / `.field ==/!= 字面量` / `!expr`）。
 /// 桌面 harness 的语料形；其他形状具名拒（渲染刀后续）。
 fn eval_view_cond(
@@ -1331,6 +1435,8 @@ impl NodeDesktopBridge {
     /// + states-only 引擎挂载（keyed 实例、世代纪律；无 model/msg 的 Hello 类
     /// 源为静态面——事件面缺席具名可辨）。
     pub fn load(src: &str, path: &str, instances: usize) -> Result<Self, String> {
+        // PLAN-104：harness 不消费 style 面（A2Vue 覆盖样式）；空白化保字节长。
+        let src = &blank_style_surface(src);
         let candidates = project_component_candidates(src).map_err(|ds| diags(&ds))?;
         let node = candidates
             .first()
@@ -1645,6 +1751,16 @@ impl NodeDesktopBridge {
                     .iter()
                     .map(|b| (b.label.clone(), b.msg.clone()))
                     .collect();
+                // PLAN-104：元素 label 展示行（元素标签不是 text 叶）。
+                s.labels = self
+                    .last_states
+                    .iter()
+                    .map(|row| {
+                        let mut labels = Vec::new();
+                        collect_element_labels(&self.view_items, row, &mut labels);
+                        labels
+                    })
+                    .collect();
                 s.inputs = self
                     .inputs
                     .iter()
@@ -1943,18 +2059,23 @@ impl NodeDesktopBridge {
         if let Some(prev) = self.last_states.get_mut(instance) {
             *prev = row;
         }
-        // PLAN-104：状态变化后重算该实例的条件可见性（窗口下一帧即生效）。
+        // PLAN-104：状态变化后重算该实例的条件可见性与元素 label 展示行。
         if let Some(row) = self.last_states.get(instance).cloned() {
             let mut vis = Vec::new();
-            if mark_leaf_visibility(&self.view_items, &row, true, &mut vis).is_ok() {
-                if let Ok(mut h) = host().write() {
-                    if let Some(id) = h.current {
-                        if let Some(s) = h.get(id) {
-                            if s.visibility.len() <= instance {
-                                s.visibility.resize(instance + 1, Vec::new());
-                            }
-                            s.visibility[instance] = vis;
+            let _ = mark_leaf_visibility(&self.view_items, &row, true, &mut vis);
+            let mut labels = Vec::new();
+            collect_element_labels(&self.view_items, &row, &mut labels);
+            if let Ok(mut h) = host().write() {
+                if let Some(id) = h.current {
+                    if let Some(s) = h.get(id) {
+                        if s.visibility.len() <= instance {
+                            s.visibility.resize(instance + 1, Vec::new());
                         }
+                        s.visibility[instance] = vis;
+                        if s.labels.len() <= instance {
+                            s.labels.resize(instance + 1, Vec::new());
+                        }
+                        s.labels[instance] = labels;
                     }
                 }
             }
@@ -2049,6 +2170,7 @@ impl NodeDesktopBridge {
                             "late_dropped": s.late_dropped,
                             "stale_rejected": s.stale_rejected,
                             "texts": s.texts,
+                            "labels": s.labels,
                             "states": s.states,
                             "applied": s.applied.iter().map(|a| serde_json::json!({
                                 "instance": a.instance, "kind": a.kind,
@@ -2159,6 +2281,7 @@ impl Component for AceNodeDesktopWindow {
                 s.inputs.clone(),
                 s.generation,
                 s.visibility.clone(),
+                s.labels.clone(),
             )
         }) else {
             return View::col()
@@ -2166,7 +2289,7 @@ impl Component for AceNodeDesktopWindow {
                 .child(View::text("ace-node-desktop: no session"))
                 .build();
         };
-        let (texts, states, buttons, inputs, generation, visibility) = session;
+        let (texts, states, buttons, inputs, generation, visibility, labels) = session;
         let mut root = View::col().spacing(10).padding(24);
         root = root.child(View::text_styled(
             &format!("session generation {generation}"),
@@ -2191,6 +2314,10 @@ impl Component for AceNodeDesktopWindow {
             }
             for (_slot, (name, value)) in states.get(i).into_iter().flatten().enumerate() {
                 col = col.child(View::text(format!("{name} = {value}")));
+            }
+            // PLAN-104：元素 label（`h2 .title` / `span "✓"` 族）展示行——仅显示。
+            for label in labels.get(i).into_iter().flatten() {
+                col = col.child(View::text(format!("· {label}")));
             }
             // B-AV U01：输入目标（受控单向数据流——显示值=该实例状态行，
             // 键入→Type 消息→typed 队列→AV 重放→apply→回显）。
@@ -2235,4 +2362,86 @@ pub fn run_ace_node_desktop_ui(src: &str, path: &str, instances: usize) -> Resul
     install_bridge(bridge);
     crate::ui::iced::run_app::<AceNodeDesktopWindow>()
         .map_err(|e| format!("node desktop window: {e:?}"))
+}
+
+#[cfg(test)]
+mod style_blank_tests {
+    use super::blank_style_surface;
+
+    #[test]
+    fn blank_single_line_style_keeps_width() {
+        let src = "widget App {\n    view { col {\n        style: \"a b\"\n    } }\n}\n";
+        let out = blank_style_surface(src);
+        assert_eq!(out.len(), src.len());
+        assert!(!out.contains("style"));
+        assert!(out.contains("view { col {"));
+    }
+
+    #[test]
+    fn blank_multiline_style_until_brace_closes() {
+        let src = "view { col {\n    style: if .dark {\n        \"a\"\n    } else {\n        \"b\"\n    }\n    text \"x\"\n} }\n";
+        let out = blank_style_surface(src);
+        assert_eq!(out.len(), src.len());
+        assert!(!out.contains("style"));
+        assert!(!out.contains("else"));
+        assert!(out.contains("text \"x\""));
+    }
+
+    #[test]
+    fn blank_handles_crlf_lines() {
+        let src = "widget App {\r\n    view { col {\r\n        style: \"a\"\r\n    } }\r\n}\r\n";
+        let out = blank_style_surface(src);
+        assert_eq!(out.len(), src.len(), "byte width must be preserved");
+        assert!(!out.contains("style"));
+    }
+
+    #[test]
+    fn blank_handles_missing_trailing_newline() {
+        let src = "widget App {\n    view { col {\n        style: \"a\"\n    } }";
+        let out = blank_style_surface(src);
+        assert_eq!(out.len(), src.len());
+        assert!(!out.contains("style"));
+    }
+
+    #[test]
+    fn blanked_real_006_source_projects() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        for app in ["006-hero-section", "010-contact-form", "007-stats-board"] {
+            let p = root.join("examples/ui").join(app).join("src/front/app.at");
+            let src = std::fs::read_to_string(&p).unwrap();
+            let blanked = blank_style_surface(&src);
+            assert_eq!(blanked.len(), src.len(), "{app}: width preserved");
+            let r = ace_core::source::age_component::project_component_candidates(&blanked);
+            assert!(r.is_ok(), "{app} must project after blanking: {:?}", r.err().map(|ds| ds.iter().map(|d| format!("{}: {}", d.code, d.message)).collect::<Vec<_>>()));
+            // 编译面同源（窗口 load 的第二阶段）：确认空白化后场景编译也通过。
+            let caps = ["ac.runtime.text.v1".to_string()];
+            let scenario = ace_av::age_component::ComponentScenario {
+                instances: 1,
+                ops: Vec::new(),
+            };
+            let initials = ace_av::age_component::ComponentInitials {
+                per_instance: vec![Vec::new()],
+            };
+            if let Err(ds) = ace_av::age_component::compile_component_scenario_with_initials(
+                &blanked,
+                "fixture.at",
+                ace_av::age_component::LegacyWidgetAlias::Accept,
+                &caps,
+                &scenario,
+                None,
+                &initials,
+            ) {
+                let msgs: Vec<String> = ds
+                    .iter()
+                    .map(|d| format!("{}: {}", d.code, d.message))
+                    .collect();
+                // 006/010 的视图叶全在元素 label 上（无 `text` 叶）时，文本车道
+                // 会以 "requires at least one text leaf" 具名拒——这是载入分支
+                // 已处理的既有边界，不算空白化失败。
+                if !msgs.iter().any(|m| m.contains("requires at least one")) {
+                    panic!("{app}: compile after blanking failed: {msgs:?}");
+                }
+            }
+        }
+    }
 }

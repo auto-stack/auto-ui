@@ -313,3 +313,22 @@ fn p104_006_real_window_renders_hero() {
         "bool state (dark_mode) must be applied on the ABI i32 lane: {ap:?}"
     );
 }
+
+/// 007：数据看板——**style 面不参与 AV harness**（空白化保字节长，样式归 A2Vue），
+/// 真窗呈现元素 label（`h2`/`span` 族，按状态求值）与状态行。
+#[test]
+fn p104_007_real_window_labels_from_state() {
+    let ev = run_window("007-stats-board", "007", "4000");
+    assert_eq!(ev["node"].as_str(), Some("App"));
+    assert!(
+        ev["errors"].as_array().map(|a| a.is_empty()).unwrap_or(false),
+        "no lane errors: {ev}"
+    );
+    let labels: Vec<String> = ev["sessions"][0]["labels"][0]
+        .as_array()
+        .map(|rows| rows.iter().filter_map(|l| l.as_str().map(|s| s.to_string())).collect())
+        .unwrap_or_default();
+    assert!(labels.iter().any(|l| l.contains("Dashboard")), "dashboard label: {labels:?}");
+    assert!(labels.iter().any(|l| l.contains("123k")), "stat value from state: {labels:?}");
+    assert!(labels.len() >= 30, "board labels all rendered (got {})", labels.len());
+}
