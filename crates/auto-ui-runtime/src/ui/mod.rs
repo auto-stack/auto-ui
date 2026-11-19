@@ -160,6 +160,10 @@ pub mod ace_node_desktop;
 // PLAN-1022 ASE M0：同宿主 frame 轮换薄适配（页面注册/导航代次/陈旧拒绝；
 // 纯 980 公共面消费，不复制 FFI/解析/窗口）。
 pub mod ase_m0_frame;
+#[cfg(feature = "ace-bridge")]
+// PLAN-1023 ASE M0：交互会话宿主（两活会话/引擎常驻/选中车道/关闭代次；
+// 纯 980/981 公共面消费，观察口在真实调用边界计量）。
+pub mod ase_m0_sessions;
 // PLAN-980 ④-A：包感知桥与包片段 lane 同样只在 ce-bridge 面存在——
 // ce-av/ce-core/ce-a2x-ts 都是 optional 依赖，不加门会让默认构建
 // （auto-ui 自身、man 的 ace-candidate 链）拿到 E0433。
