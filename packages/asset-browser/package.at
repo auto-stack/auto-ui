@@ -1,0 +1,4 @@
+name: "asset-browser"
+version: "0.1.0"
+namespace: "auto"
+description: "AutoUI controlled asset browser & picker (PLAN-091)"

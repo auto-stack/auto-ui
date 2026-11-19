@@ -1,0 +1,620 @@
+// packages/asset-browser/asset_browser.at — AssetBrowser 正式组件（PLAN-091）。
+//
+// 应用内授权资源库的浏览面：分类（TreeView/085 薄适配）、搜索、类型过滤、
+// 分页（PaginationControl/086）、grid/list 视图、单选、预览请求。组件不持
+// 第二份数据、不切片、不发业务请求：records/total/query 全部由应用受控发布，
+// 组件只投影并发上行请求（r2 冻结合同）。
+//
+// 事件契约（r2，带引号 msg 变体；消费方 onqueryRequested: .X($event) 接法）：
+// - "queryRequested"(str)：`{"seq":N,"baseRevision":R,"query":{folderId,text,
+//   kind,page,pageSize}}`。seq 为本实例递增；应用接受请求后发布新 query
+//   （含调用方分配的 id）并回灌 querySeq=seq；完成时发布 resultQueryId=
+//   query.id 与 records/total、loading=false。
+// - "selectionRequested"(str)：`{"queryId":…,"id":…,"revision":…,"label":…}`
+//   或明确清空 `{"queryId":…,"clear":true}`。组件不持业务选择。
+// - "previewRequested"(str)：`{"id":…,"revision":…,"label":…,"kind":…,
+//   "src":…}`（src 为既有授权媒体 URI；组件不持字节、不做文件 IO）。
+//
+// 数据可信（可确认）条件：resultQueryId == query.id 且最后请求已反馈
+// （querySeq == last_emitted_seq）且无 errorMessage 且记录结构合法。请求失败
+// 保留上一有效结果但显式标过期，不伪装空库（r2）。locked（AssetPicker 确认
+// pending）时禁用查询/选择变更——功能性拦截在 handler 内 + 容器弱化/状态行
+// 文字；普通按钮走 disabled。
+//
+// 视图纪律（PLAN-085 同族实证，逐字面量分支）：卡片/行视觉状态用字面量
+// class 分支——class 的 f-string 不插值 for 循环记录字段；图标只用字面量名
+// （KindIcon 调色板）。单击选择与预览是兄弟命中区，避免 Vue 冒泡双触发。
+//
+// # Usage
+// use { package: asset_browser from "<resolved package dir>" }
+// AssetBrowser (records: .recs, folders: .fds, query: .query, querySeq: .qseq,
+//               resultQueryId: .rqid, total: .total, selection: .sel,
+//               revision: .rev, loading: .loading, errorMessage: .err,
+//               onqueryRequested: .OnQuery($event),
+//               onselectionRequested: .OnSel($event),
+//               onpreviewRequested: .OnPrev($event)) {}
+//
+// 依赖闭包（整组 vendor，字节一致）：asset-browser + tree-view + pagination +
+// asset_kind_icon/asset_browser_util（包内模块）；缺依赖 = vue 轨具名构建
+// 失败 / native 轨静默缺席（build 轨负例门兜底）。
+use asset_browser_util: ab_check_records, ab_adapt_folders, ab_top_ids, ab_find_index, ab_derive_cards, ab_step, ab_step_back
+use asset_kind_icon: KindIcon
+
+widget AssetBrowser (records: List = [], folders: List = [], query: str = "", querySeq: int = 0, resultQueryId: str = "", total: int = 0, selection: str = "", revision: int = 0, loading: bool = false, errorMessage: str = "", viewMode: str = "grid", locked: bool = false) {
+    use { package: tree_view from "../tree-view" }
+    use { package: pagination from "../pagination" }
+    use { package: image_viewer from "../image-viewer" }
+    msg {
+        Init, Tick,
+        SearchInput(str), DoSearch, SetKind(str), ToggleView,
+        FoldToggle(str), FoldSelect(str), PageChanged(str),
+        CardSelect(str), CardPreview(str),
+        KUp, KDown, KLeft, KRight, KHome, KEnd, KEnter,
+        "queryRequested"(str), "selectionRequested"(str), "previewRequested"(str)
+    }
+    model {
+        var interval int = 80
+        // ---- query 镜像（Tick 按原串快照增量重解析）----
+        var q_raw str = ""
+        var q_id str = ""
+        var q_folder str = ""
+        var q_text str = ""
+        var q_kind str = ""
+        var q_page int = 1
+        var q_pageSize int = 50
+        var q_error str = ""
+        // ---- 搜索草稿（Enter/按钮提交，无隐藏 debounce）----
+        var search_draft str = ""
+        // ---- 分类树局部展开（呈现态；分类选择仍走应用受控 query）----
+        var fold_expanded = []
+        // ---- 视图形态镜像（受控 prop + 本地切换投影）----
+        var vm str = "grid"
+        // ---- 键盘焦点（当前页内下标；-1 = 无）----
+        var k_index int = -1
+        // ---- 请求代次（本实例递增；baseRevision 取受控 revision）----
+        var last_emitted_seq int = 0
+        // ---- selection 镜像 ----
+        var sel_id str = ""
+        var sel_label str = ""
+        var sel_rev str = ""
+        var pv_open bool = false
+        var pv_src str = ""
+        var pv_id str = ""
+        var pv_rev str = ""
+        var pv_label str = ""
+        var pv_events int = 0
+        var dbg str = ""
+    }
+    computed {
+        // 平铺无互引（PLAN-536 T3 / PLAN-086 实证纪律）。
+        record_error => ab_check_records(.records)
+        folder_nodes => ab_adapt_folders(.folders)
+        cards => ab_derive_cards(.records, .sel_id, .k_index)
+        provider_error => if .errorMessage != "" { true } else { false }
+        // 数据可信：结果 id 匹配当前 query 且最后请求已反馈且无错误。
+        data_current => if .q_error != "" { false } else if .q_id == "" { false } else if .resultQueryId != .q_id { false } else if .querySeq != .last_emitted_seq { false } else if .errorMessage != "" { false } else { true }
+        // 结果过期：已有结果属于旧 query（区别于首次加载的空白）。
+        result_stale => if .q_error != "" { false } else if .q_id == "" { false } else if .resultQueryId == "" { false } else if .resultQueryId != .q_id { true } else { false }
+        // 请求待反馈：已发出但应用尚未回灌 querySeq。
+        request_pending => if .last_emitted_seq == 0 { false } else if .querySeq != .last_emitted_seq { true } else { false }
+        has_filter => if .q_text != "" { true } else if .q_kind != "" { true } else if .q_folder != "" { true } else { false }
+        page_label => if .total <= 0 { "0 项" } else { f"共 ${.total} 项" }
+    }
+    view {
+        col (class: "w-full h-full flex flex-col bg-background text-foreground", onkeydown.up: .KUp, onkeydown.down: .KDown, onkeydown.left: .KLeft, onkeydown.right: .KRight, onkeydown.home: .KHome, onkeydown.end: .KEnd, onkeydown.enter: .KEnter, onkeydown.escape: .KEscape) {
+            // ---- 工具行：搜索 / 类型过滤 / 视图切换 ----
+            row (style: "h-12 shrink-0 items-center gap-2 px-3 border-b border-border") {
+                input {
+                    value: .search_draft
+                    oninput: .SearchInput
+                    onchange: .SearchInput
+                    onenter: .DoSearch
+                    placeholder: "搜索资源…"
+                    disabled: .locked
+                    style: "w-44 h-8 text-xs px-2 bg-background border border-border rounded-md outline-none placeholder:text-muted-foreground focus:border-primary"
+                }
+                button (text: "搜索", title: "执行搜索", onclick: .DoSearch, disabled: .locked, style: "h-8 px-2 text-xs rounded-md border border-border hover:bg-muted disabled:opacity-40") {}
+                row (style: "items-center gap-1 ml-2") {
+                    if .q_kind == "" {
+                        button (text: "全部", title: "全部类型", onclick: .SetKind(""), disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
+                    } else {
+                        button (text: "全部", title: "全部类型", onclick: .SetKind(""), disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
+                    }
+                    if .q_kind == "image" {
+                        button (text: "图片", title: "图片类型", onclick: .SetKind("image"), disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
+                    } else {
+                        button (text: "图片", title: "图片类型", onclick: .SetKind("image"), disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
+                    }
+                    if .q_kind == "file" {
+                        button (text: "文件", title: "文件类型", onclick: .SetKind("file"), disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
+                    } else {
+                        button (text: "文件", title: "文件类型", onclick: .SetKind("file"), disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
+                    }
+                }
+                row (style: "items-center gap-1 ml-auto") {
+                    if .vm == "grid" {
+                        button (text: "网格", title: "网格视图", onclick: .ToggleView, disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
+                    } else {
+                        button (text: "网格", title: "网格视图", onclick: .ToggleView, disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
+                    }
+                    if .vm == "list" {
+                        button (text: "列表", title: "列表视图", onclick: .ToggleView, disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
+                    } else {
+                        button (text: "列表", title: "列表视图", onclick: .ToggleView, disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
+                    }
+                }
+            }
+            // ---- 主体：预览面板或（分类侧栏 + 结果区）----
+            if .pv_open {
+                col (style: "flex-1 min-h-0 w-full flex flex-col") {
+                    row (style: "h-10 shrink-0 items-center justify-between px-3 border-b border-border") {
+                        text .pv_label { style: "text-xs font-medium truncate" }
+                        button (text: "关闭预览", title: "关闭预览", onclick: .ClosePreview, style: "h-7 px-2 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground") {}
+                    }
+                    col (style: "flex-1 min-h-0 p-2") {
+                        ImageViewport (
+                            src: .pv_src,
+                            alt: .pv_label,
+                            resourceId: .pv_id,
+                            resourceRevision: .pv_rev,
+                            onloaded: .PvEvent($event),
+                            onerror: .PvEvent($event)
+                        ) {}
+                    }
+                }
+            } else {
+            row (style: "flex-1 min-h-0 w-full") {
+                col (style: "w-40 shrink-0 h-full border-r border-border overflow-y-auto p-2") {
+                    TreeView (nodes: .folder_nodes, expanded: .fold_expanded, selected: .q_folder, on_toggle: .FoldToggle($event), on_select: .FoldSelect($event)) {}
+                }
+                col (style: "flex-1 min-w-0 h-full flex flex-col") {
+                    // ---- 状态行：计数 / loading / 待反馈 / 过期 / 错误 / 选择摘要 ----
+                    row (style: "h-8 shrink-0 items-center gap-3 px-3 border-b border-border/60 text-xs") {
+                        text .page_label { style: "text-muted-foreground whitespace-nowrap" }
+                        if .loading {
+                            text "加载中…" { style: "text-muted-foreground whitespace-nowrap" }
+                        }
+                        if .request_pending {
+                            if !.loading {
+                                text "请求处理中…" { style: "text-muted-foreground whitespace-nowrap" }
+                            }
+                        }
+                        if .result_stale {
+                            text "结果已过期" { style: "text-amber-600 whitespace-nowrap" }
+                        }
+                        if .provider_error {
+                            text .errorMessage { style: "text-destructive break-all" }
+                        }
+                        if .locked {
+                            text "选择已锁定（确认处理中）" { style: "text-muted-foreground whitespace-nowrap" }
+                        }
+                        text .dbg { style: "text-[10px] text-muted-foreground/60 break-all max-w-80" }
+                        if .sel_id != "" {
+                            text f"已选: ${.sel_label} (${.sel_id} @ ${.sel_rev})" { style: "ml-auto text-foreground truncate max-w-60" }
+                        } else {
+                            text "未选择" { style: "ml-auto text-muted-foreground" }
+                        }
+                    }
+                    // ---- 结果区 ----
+                    col (style: if .locked { "flex-1 min-h-0 overflow-y-auto p-3 opacity-60" } else { "flex-1 min-h-0 overflow-y-auto p-3" }) {
+                        if .record_error == "<empty-id>" {
+                            text "asset-browser: 记录结构非法（存在空 id）" { style: "text-xs text-destructive" }
+                        } else {
+                            if .record_error == "<no-revision>" {
+                                text "asset-browser: 记录结构非法（存在空 revision）" { style: "text-xs text-destructive" }
+                            } else {
+                                if .record_error != "" {
+                                    text f"asset-browser: 重复记录 ID ${.record_error}" { style: "text-xs text-destructive" }
+                                } else {
+                                    if .q_error != "" {
+                                        text .q_error { style: "text-xs text-destructive" }
+                                    } else {
+                                        if .cards.len() == 0 {
+                                            col (style: "w-full flex flex-col items-center justify-center py-16 gap-2") {
+                                                if .loading {
+                                                    text "加载中…" { style: "text-sm text-muted-foreground" }
+                                                } else {
+                                                    if .has_filter {
+                                                        text "无匹配资源" { style: "text-sm font-semibold" }
+                                                        text "试着调整搜索关键字或过滤条件" { style: "text-xs text-muted-foreground" }
+                                                    } else {
+                                                        text "资源库为空" { style: "text-sm font-semibold" }
+                                                        text "该分类下暂无可用资源" { style: "text-xs text-muted-foreground" }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            if .vm == "grid" {
+                                                grid {
+                                                    cols: 4
+                                                    gap: 12
+                                                    for c in .cards {
+                                                        col {
+                                                            if c.sel {
+                                                                if c.focused {
+                                                                    col (class: "rounded-lg overflow-hidden border-2 border-primary bg-accent text-accent-foreground flex flex-col ab-card ab-sel ab-focus") {
+                                                                        button (onclick: .CardSelect(c.id), class: "w-full h-auto p-0 border-0 rounded-none bg-transparent flex flex-col items-stretch cursor-pointer text-left") {
+                                                                            if c.has_thumb {
+                                                                                col (style: "h-24 w-full overflow-hidden bg-muted") {
+                                                                                    image (src: c.thumbnailUri, alt: c.label, fit: "cover") {
+                                                                                        style: "w-full h-full"
+                                                                                    }
+                                                                                }
+                                                                            } else {
+                                                                                col (style: "h-24 w-full items-center justify-center bg-muted") {
+                                                                                    KindIcon (name: c.icon) {}
+                                                                                }
+                                                                            }
+                                                                            text c.label { style: "text-xs font-medium truncate px-2 pt-1" }
+                                                                        }
+                                                                        row (style: "items-center justify-between px-2 py-1") {
+                                                                            text c.kind { style: "text-[11px] text-muted-foreground" }
+                                                                            if c.can_preview {
+                                                                                button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground") {}
+                                                                            } else {
+                                                                                col (style: "h-6 w-12") {}
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    col (class: "rounded-lg overflow-hidden border-2 border-primary bg-accent text-accent-foreground flex flex-col ab-card ab-sel") {
+                                                                        button (onclick: .CardSelect(c.id), class: "w-full h-auto p-0 border-0 rounded-none bg-transparent flex flex-col items-stretch cursor-pointer text-left") {
+                                                                            if c.has_thumb {
+                                                                                col (style: "h-24 w-full overflow-hidden bg-muted") {
+                                                                                    image (src: c.thumbnailUri, alt: c.label, fit: "cover") {
+                                                                                        style: "w-full h-full"
+                                                                                    }
+                                                                                }
+                                                                            } else {
+                                                                                col (style: "h-24 w-full items-center justify-center bg-muted") {
+                                                                                    KindIcon (name: c.icon) {}
+                                                                                }
+                                                                            }
+                                                                            text c.label { style: "text-xs font-medium truncate px-2 pt-1" }
+                                                                        }
+                                                                        row (style: "items-center justify-between px-2 py-1") {
+                                                                            text c.kind { style: "text-[11px] text-muted-foreground" }
+                                                                            if c.can_preview {
+                                                                                button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground") {}
+                                                                            } else {
+                                                                                col (style: "h-6 w-12") {}
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                if c.focused {
+                                                                    col (class: "rounded-lg overflow-hidden border-2 border-primary bg-card flex flex-col ab-card ab-focus") {
+                                                                        button (onclick: .CardSelect(c.id), class: "w-full h-auto p-0 border-0 rounded-none bg-transparent flex flex-col items-stretch cursor-pointer text-left") {
+                                                                            if c.has_thumb {
+                                                                                col (style: "h-24 w-full overflow-hidden bg-muted") {
+                                                                                    image (src: c.thumbnailUri, alt: c.label, fit: "cover") {
+                                                                                        style: "w-full h-full"
+                                                                                    }
+                                                                                }
+                                                                            } else {
+                                                                                col (style: "h-24 w-full items-center justify-center bg-muted") {
+                                                                                    KindIcon (name: c.icon) {}
+                                                                                }
+                                                                            }
+                                                                            text c.label { style: "text-xs font-medium truncate px-2 pt-1" }
+                                                                        }
+                                                                        row (style: "items-center justify-between px-2 py-1") {
+                                                                            text c.kind { style: "text-[11px] text-muted-foreground" }
+                                                                            if c.can_preview {
+                                                                                button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground") {}
+                                                                            } else {
+                                                                                col (style: "h-6 w-12") {}
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    col (class: "rounded-lg overflow-hidden border border-border bg-card hover:border-primary/60 flex flex-col ab-card") {
+                                                                        button (onclick: .CardSelect(c.id), class: "w-full h-auto p-0 border-0 rounded-none bg-transparent flex flex-col items-stretch cursor-pointer text-left") {
+                                                                            if c.has_thumb {
+                                                                                col (style: "h-24 w-full overflow-hidden bg-muted") {
+                                                                                    image (src: c.thumbnailUri, alt: c.label, fit: "cover") {
+                                                                                        style: "w-full h-full"
+                                                                                    }
+                                                                                }
+                                                                            } else {
+                                                                                col (style: "h-24 w-full items-center justify-center bg-muted") {
+                                                                                    KindIcon (name: c.icon) {}
+                                                                                }
+                                                                            }
+                                                                            text c.label { style: "text-xs font-medium truncate px-2 pt-1" }
+                                                                        }
+                                                                        row (style: "items-center justify-between px-2 py-1") {
+                                                                            text c.kind { style: "text-[11px] text-muted-foreground" }
+                                                                            if c.can_preview {
+                                                                                button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground") {}
+                                                                            } else {
+                                                                                col (style: "h-6 w-12") {}
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                col (class: "w-full flex flex-col gap-1") {
+                                                    for c in .cards {
+                                                        if c.sel {
+                                                            if c.focused {
+                                                                row (onclick: .CardSelect(c.id), class: "flex flex-row items-center gap-2 px-2 py-1.5 rounded-md bg-accent text-accent-foreground border-2 border-primary cursor-pointer ab-row ab-sel ab-focus") {
+                                                                    KindIcon (name: c.icon) {}
+                                                                    text c.label { style: "text-xs font-medium truncate flex-1" }
+                                                                    text c.kind { style: "text-[11px] text-muted-foreground" }
+                                                                    if c.can_preview {
+                                                                        button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground shrink-0") {}
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                row (onclick: .CardSelect(c.id), class: "flex flex-row items-center gap-2 px-2 py-1.5 rounded-md bg-accent text-accent-foreground border border-primary cursor-pointer ab-row ab-sel") {
+                                                                    KindIcon (name: c.icon) {}
+                                                                    text c.label { style: "text-xs font-medium truncate flex-1" }
+                                                                    text c.kind { style: "text-[11px] text-muted-foreground" }
+                                                                    if c.can_preview {
+                                                                        button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground shrink-0") {}
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            if c.focused {
+                                                                row (onclick: .CardSelect(c.id), class: "flex flex-row items-center gap-2 px-2 py-1.5 rounded-md border-2 border-primary cursor-pointer ab-row ab-focus") {
+                                                                    KindIcon (name: c.icon) {}
+                                                                    text c.label { style: "text-xs font-medium truncate flex-1" }
+                                                                    text c.kind { style: "text-[11px] text-muted-foreground" }
+                                                                    if c.can_preview {
+                                                                        button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground shrink-0") {}
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                row (onclick: .CardSelect(c.id), class: "flex flex-row items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 border border-transparent cursor-pointer ab-row") {
+                                                                    KindIcon (name: c.icon) {}
+                                                                    text c.label { style: "text-xs font-medium truncate flex-1" }
+                                                                    text c.kind { style: "text-[11px] text-muted-foreground" }
+                                                                    if c.can_preview {
+                                                                        button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground shrink-0") {}
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // ---- 分页 ----
+                    row (style: "h-10 shrink-0 items-center justify-center border-t border-border/60") {
+                        PaginationControl (page: .q_page, pageSize: .q_pageSize, total: .total, showPageSize: true, hideWhenSingle: false, disabled: .locked, onchanged: .PageChanged($event)) {}
+                    }
+                }
+            }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .fold_expanded = ab_top_ids(.folders)
+            .q_raw = .query
+            try {
+                let q = json.parse(.query)
+                .q_id = q.id ?? ""
+                .q_folder = q.folderId ?? ""
+                .q_text = q.text ?? ""
+                .q_kind = q.kind ?? ""
+                .q_page = q.page ?? 1
+                .q_pageSize = q.pageSize ?? 50
+                .q_error = ""
+                .search_draft = q.text ?? ""
+            } catch {
+                .q_error = "asset-browser: query 解析失败（invalid_query）"
+            }
+            .vm = .viewMode
+        }
+        .Tick -> {
+            if .q_raw != .query {
+                .q_raw = .query
+                try {
+                    let q = json.parse(.query)
+                    .q_id = q.id ?? ""
+                    .q_folder = q.folderId ?? ""
+                    .q_text = q.text ?? ""
+                    .q_kind = q.kind ?? ""
+                    .q_page = q.page ?? 1
+                    .q_pageSize = q.pageSize ?? 50
+                    .q_error = ""
+                    .search_draft = q.text ?? ""
+                    .k_index = -1
+                } catch {
+                    .q_error = "asset-browser: query 解析失败（invalid_query）"
+                }
+            }
+            if .vm != .viewMode {
+                .vm = .viewMode
+            }
+            if .selection == "" {
+                .sel_id = ""
+                .sel_label = ""
+                .sel_rev = ""
+            } else {
+                try {
+                    let s = json.parse(.selection)
+                    .sel_id = s.id ?? ""
+                    .sel_label = s.label ?? ""
+                    .sel_rev = s.revision ?? ""
+                } catch {
+                    .sel_id = ""
+                    .sel_label = ""
+                    .sel_rev = ""
+                }
+            }
+        }
+        // ---- 搜索：Enter/按钮提交；类型/分类/分页立即发（无隐藏 debounce）----
+        .SearchInput(v str) -> {
+            .search_draft = v
+        }
+        .DoSearch -> {
+            if !.locked {
+                .last_emitted_seq = .last_emitted_seq + 1
+                try {
+                    ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: .q_folder, text: .search_draft, kind: .q_kind, page: 1, pageSize: .q_pageSize}}))
+                } catch {
+                }
+            }
+        }
+        .SetKind(k str) -> {
+            if !.locked {
+                if k != .q_kind {
+                    .last_emitted_seq = .last_emitted_seq + 1
+                    try {
+                        ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: .q_folder, text: .q_text, kind: k, page: 1, pageSize: .q_pageSize}}))
+                    } catch {
+                    }
+                }
+            }
+        }
+        .FoldSelect(id str) -> {
+            if !.locked {
+                if id != .q_folder {
+                    .last_emitted_seq = .last_emitted_seq + 1
+                    try {
+                        ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: id, text: .q_text, kind: .q_kind, page: 1, pageSize: .q_pageSize}}))
+                    } catch {
+                    }
+                }
+            }
+        }
+        .PageChanged(ev str) -> {
+            if !.locked {
+                try {
+                    let p = json.parse(ev)
+                    .last_emitted_seq = .last_emitted_seq + 1
+                    ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: .q_folder, text: .q_text, kind: .q_kind, page: p.page, pageSize: p.pageSize}}))
+                } catch {
+                }
+            }
+        }
+        .FoldToggle(id str) -> {
+            // 局部展开/折叠（呈现态）：重建列表（.at 无按下标写）。
+            var next List = []
+            var had bool = false
+            var i int = 0
+            while i < .fold_expanded.len() {
+                if .fold_expanded[i] == id {
+                    had = true
+                } else {
+                    next.push(.fold_expanded[i])
+                }
+                i = i + 1
+            }
+            if !had {
+                next.push(id)
+            }
+            .fold_expanded = next
+        }
+        // ---- 选择 / 预览（单选；再点已选项 = 请求清空）----
+        .CardSelect(id str) -> {
+            var idx int = ab_find_index(.records, id)
+            .dbg = f"selreq ${id} idx=${idx} locked=${.locked} recs=${.records.len()} selid=${.sel_id} qid=${.q_id}"
+            if !.locked {
+                if idx >= 0 {
+                    if id != .sel_id {
+                        try {
+                            let r = .records[idx]
+                            ."selectionRequested"(json.stringify({queryId: .q_id, id: r.id, revision: r.revision, label: r.label}))
+                        } catch {
+                        }
+                    }
+                }
+            }
+        }
+        .CardPreview(id str) -> {
+            if !.locked {
+                var idx int = ab_find_index(.records, id)
+                if idx >= 0 {
+                    let r = .records[idx]
+                    if r.kind == "image" {
+                        if r.thumbnailUri != "" {
+                            .pv_src = r.thumbnailUri
+                            .pv_id = r.id
+                            .pv_rev = r.revision
+                            .pv_label = r.label
+                            .pv_open = true
+                            try {
+                                ."previewRequested"(json.stringify({id: r.id, revision: r.revision, label: r.label, kind: r.kind, src: r.thumbnailUri}))
+                            } catch {
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .ClosePreview -> {
+            .pv_open = false
+        }
+        .PvEvent(ev str) -> {
+            .pv_events = .pv_events + 1
+        }
+        .KEscape -> {
+            if .pv_open {
+                .pv_open = false
+            }
+        }
+        // ---- 视图切换（呈现态镜像；资源身份不变）----
+        .ToggleView -> {
+            if !.locked {
+                if .vm == "grid" {
+                    .vm = "list"
+                } else {
+                    .vm = "grid"
+                }
+            }
+        }
+        // ---- 键盘：移动焦点；Enter 发选择请求（不直接确认）----
+        .KDown -> {
+            var cols int = 1
+            if .vm == "grid" {
+                cols = 4
+            }
+            .k_index = ab_step(.cards, .k_index, cols)
+        }
+        .KUp -> {
+            var cols int = 1
+            if .vm == "grid" {
+                cols = 4
+            }
+            .k_index = ab_step_back(.cards, .k_index, cols)
+        }
+        .KRight -> {
+            .k_index = ab_step(.cards, .k_index, 1)
+        }
+        .KLeft -> {
+            .k_index = ab_step_back(.cards, .k_index, 1)
+        }
+        .KHome -> {
+            if .cards.len() > 0 {
+                .k_index = 0
+            }
+        }
+        .KEnd -> {
+            if .cards.len() > 0 {
+                .k_index = .cards.len() - 1
+            }
+        }
+        .KEnter -> {
+            if .k_index >= 0 {
+                if .k_index < .cards.len() {
+                    .CardSelect(.cards[.k_index].id)
+                }
+            }
+        }
+    }
+}
