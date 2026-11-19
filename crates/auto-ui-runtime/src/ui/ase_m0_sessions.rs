@@ -316,6 +316,11 @@ impl AseSessionHost {
         } else {
             self.live[idx].bridge.close_session()?;
         }
+        self.retire_session(idx);
+        Ok(())
+    }
+
+    fn retire_session(&mut self, idx: usize) {
         let mut session = self.live.remove(idx);
         session.record.retired_audit = session.bridge.close_engine();
         session.record.closed = true;
@@ -324,25 +329,23 @@ impl AseSessionHost {
             session.record.id, session.record.app_key, session.record.generation
         ));
         self.closed.push(session.record);
-        Ok(())
     }
 
-    /// 关闭当前选中者的显示车道（引擎保留；空选中 no-op）。
+    /// Cancel the selection before closing its display lane. A failed close keeps
+    /// the lane handle for a later retry, without granting it event ownership.
     fn close_outgoing_lane(&mut self, reason: &'static str) -> Result<(), String> {
         self.clock = None;
-        let Some(id) = self.selected.take() else {
-            return Ok(());
-        };
-        if let Some(idx) = self.live_idx(id) {
-            let session = &mut self.live[idx];
-            if let Err(error) = session.bridge.close_session() {
-                if session.ui_session.is_some() && current_session(|s| s.id) == session.ui_session {
-                    let generation = session.record.generation;
-                    let clock = session.clock;
-                    self.activate(id, generation, clock);
-                }
-                return Err(format!("{reason}: closing lane of session {id}: {error}"));
-            }
+        self.selected = None;
+        if let Some(session) = self
+            .live
+            .iter_mut()
+            .find(|session| session.ui_session.is_some())
+        {
+            let id = session.record.id;
+            session
+                .bridge
+                .close_session()
+                .map_err(|error| format!("{reason}: closing lane of session {id}: {error}"))?;
             session.ui_session = None;
             self.log.push(format!(
                 "{reason}: lane of session {id} closed (engine retained)"
@@ -375,10 +378,18 @@ impl AseSessionHost {
 
     /// Close all sessions after the native window loop returns.
     pub fn close_all(&mut self) -> Result<(), String> {
-        for id in self.live_ids() {
-            self.close_session(id)?;
+        self.clock = None;
+        self.selected = None;
+        let mut failure = None;
+        while let Some(session) = self.live.first_mut() {
+            if let Err(error) = session.bridge.close_for_shutdown() {
+                let error = format!("close session {} lane: {error}", session.record.id);
+                self.errors.push(error.clone());
+                failure.get_or_insert(error);
+            }
+            self.retire_session(0);
         }
-        Ok(())
+        failure.map_or(Ok(()), Err)
     }
 
     pub fn clock_wake(&self) -> Option<ClockWake> {
@@ -416,10 +427,12 @@ impl AseSessionHost {
             let owner = &self.live[idx];
             self.selected == Some(wake.session)
                 && owner.record.generation == wake.generation
-                && owner.ui_session.is_some()
-                && current_session(|s| s.id) == owner.ui_session
+                && owner.bridge.can_dispatch_to_current_lane()
         }) else {
             self.clock = None;
+            if self.selected == Some(wake.session) {
+                self.selected = None;
+            }
             self.clock_metrics.stale_wakes += 1;
             return StepOutcome::Idle;
         };
@@ -443,12 +456,18 @@ impl AseSessionHost {
         let bridge = &mut self.live[idx].bridge;
         let prior_errors = bridge.errors.len();
         let outcome = bridge.dispatch_typed(0, "Tick", &[AceStateValue::Int(sample)]);
-        self.errors
-            .extend_from_slice(&bridge.errors[prior_errors..]);
+        let present_errors = &bridge.errors[prior_errors..];
+        self.errors.extend_from_slice(present_errors);
         if matches!(outcome, StepOutcome::Dispatched { .. }) {
+            self.metrics.dispatches += 1;
+            if let Some(error) = present_errors.first() {
+                let error = format!("clock frame publication failed: {error}");
+                self.clock = None;
+                self.selected = None;
+                return StepOutcome::LaneError(error);
+            }
             clock.ready = true;
             self.clock_metrics.delivered += 1;
-            self.metrics.dispatches += 1;
         }
         outcome
     }
@@ -562,6 +581,9 @@ impl AseSessionHost {
 
     /// 会话当前显示车道句柄（仅选中会话非 None）。
     pub fn ui_session_of(&self, id: usize) -> Option<i32> {
+        if self.selected != Some(id) {
+            return None;
+        }
         self.live_idx(id).and_then(|idx| self.live[idx].ui_session)
     }
 

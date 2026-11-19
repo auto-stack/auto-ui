@@ -328,3 +328,93 @@ fn failed_samples_recover_and_twenty_rounds_release_the_state_root() {
         started.elapsed()
     );
 }
+
+#[test]
+fn revoked_lane_cancels_clock_and_shutdown_releases_all_sessions() {
+    use auto_ui_runtime::ui::ace_node_desktop::{current_session, UI980_PROVIDER_NAME};
+
+    struct RevokedProvider;
+
+    impl RevokedProvider {
+        fn revoke() -> Self {
+            assert!(auto_lang_ace_host::revoke_provider(UI980_PROVIDER_NAME));
+            Self
+        }
+    }
+
+    impl Drop for RevokedProvider {
+        fn drop(&mut self) {
+            auto_lang_ace_host::readmit_provider(UI980_PROVIDER_NAME);
+        }
+    }
+
+    let started = Instant::now();
+    let mut host = host();
+    let counter = host.open_session("counter-a").unwrap();
+    let clock = host.open_session("clock").unwrap();
+    let old_lane = host.ui_session_of(clock).unwrap();
+    let now = Instant::now();
+    offer(&mut host, now, Ok(1));
+    let old_apply_count = host_session_stats(old_lane).unwrap().applies;
+    let old_audit = host.execution_audit_of(clock).unwrap();
+    let old_wake = host.clock_wake().unwrap();
+    let later = now + Duration::from_secs(2);
+    assert!(host.queue_clock_wake(old_wake, later));
+
+    {
+        let _revoked = RevokedProvider::revoke();
+        let error = host.select(counter).unwrap_err();
+        assert!(error.contains("revoked"), "{error}");
+        assert_eq!(host.selected_id(), None);
+        assert!(host.clock_wake().is_none());
+        assert_eq!(host.clock_queue_depth(), 0);
+        assert!(!host.queue_clock_wake(old_wake, later));
+        assert_eq!(
+            host.dispatch_clock_wake(later, || panic!("failed switch sampled")),
+            StepOutcome::Idle,
+        );
+        assert_eq!(host.execution_audit_of(clock).unwrap(), old_audit);
+        assert_eq!(
+            host_session_stats(old_lane).unwrap().applies,
+            old_apply_count
+        );
+        assert_eq!(host_session_display(old_lane).unwrap().0, [["00:00:01"]]);
+    }
+
+    host.select(clock).unwrap();
+    let new_lane = host.ui_session_of(clock).unwrap();
+    assert_ne!(new_lane, old_lane);
+    assert!(host_session_stats(old_lane).unwrap().closed);
+    assert!(!host.queue_clock_wake(old_wake, later));
+    offer(&mut host, later, Ok(2));
+    expect_time(&host, clock, "00:00:02");
+    assert_eq!(host.execution_audit_of(clock).unwrap().handler_entries, 2);
+
+    let pending = host.clock_wake().unwrap();
+    let final_turn = later + Duration::from_secs(2);
+    assert!(host.queue_clock_wake(pending, final_turn));
+    let _revoked = RevokedProvider::revoke();
+    assert_eq!(
+        host.dispatch_clock_wake(final_turn, || panic!("revoked lane sampled")),
+        StepOutcome::Idle,
+    );
+    assert_eq!(host.execution_audit_of(clock).unwrap().handler_entries, 2);
+    assert_eq!(host.selected_id(), None);
+    assert!(host.ui_session_of(clock).is_none());
+    assert_eq!(host_session_display(new_lane).unwrap().0, [["00:00:02"]]);
+    let error = host.close_all().unwrap_err();
+    assert!(error.contains("revoked"), "{error}");
+    assert!(host.live_ids().is_empty());
+    assert!(host.clock_wake().is_none());
+    assert_eq!(host.clock_queue_depth(), 0);
+    assert!(current_session(|s| s.id).is_none());
+    assert!(host_session_stats(new_lane).unwrap().closed);
+    for id in [clock, counter] {
+        assert!(host.engine_states(id).is_none());
+        assert_eq!(host.execution_audit_of(id).unwrap().released_roots, 1);
+    }
+    eprintln!(
+        "revoked_lane_cancels_clock_and_shutdown_releases_all_sessions: {:?}",
+        started.elapsed()
+    );
+}

@@ -705,6 +705,10 @@ unsafe extern "C" fn hook_close(op: *const u8, op_len: i32, session: i32, _reser
     if !tag_matches(op, op_len, b"close") {
         return ui980_status::BAD_OP;
     }
+    close_host_session(session)
+}
+
+fn close_host_session(session: i32) -> i32 {
     let mut h = host().write().unwrap();
     let Some(s) = h.get(session) else {
         return ui980_status::UNKNOWN_HANDLE;
@@ -1991,10 +1995,16 @@ impl NodeDesktopBridge {
         msg: &str,
         args: &[AceStateValue],
     ) -> StepOutcome {
-        if self.session.is_none() || current_session(|s| s.id) != self.session {
+        if !self.can_dispatch_to_current_lane() {
             return StepOutcome::LaneError("typed event refused: no current display lane".into());
         }
         self.dispatch_event(instance, msg, Some(args))
+    }
+
+    pub(crate) fn can_dispatch_to_current_lane(&self) -> bool {
+        self.session.is_some()
+            && current_session(|s| s.id) == self.session
+            && auto_lang_ace_host::provider_is_admitted(UI980_PROVIDER_NAME)
     }
 
     fn dispatch_event(
@@ -2172,6 +2182,18 @@ impl NodeDesktopBridge {
         // 残留文本会成为无码孤儿）。
         self.pending_texts.clear();
         Ok(())
+    }
+
+    /// Release the host-owned copy at shutdown even when its provider refuses closure.
+    pub(crate) fn close_for_shutdown(&mut self) -> Result<(), String> {
+        let result = self.close_session();
+        if result.is_err() {
+            if let Some(session) = self.session.take() {
+                close_host_session(session);
+            }
+            self.pending_texts.clear();
+        }
+        result
     }
 
     /// 重开：新 session（新世代），按当前业务状态重新提交显示模型。

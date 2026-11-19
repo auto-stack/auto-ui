@@ -83,4 +83,4 @@ auto-lang `docs/specs/ace-migration/component-event-sessions.md`。
 
 `ase_m0_sessions_window` 接收 `--app clock=<Clock 源路径> --app counter-a=<Counter 源路径> --clock-app clock`。在需要验证原生关窗清理时使用 `--await-window-close`，证据包括关窗前的会话和自然退出后的释放状态。现有 `--prep-only` 准备 UI980 provider。运行验证时将 `ACE_NODE_DESKTOP_ROOT` 指向准备目录，并将 `ACE_NODE_DESKTOP_PREPARED_RUSTC` 设为准备阶段的 `rustc --version` 输出。缺失或过期的 provider 会具名拒绝。
 
-Clock 使用现有 20 毫秒宿主循环消费单个已到期唤醒。宿主负责选中、单调截止点与 UTC 日内秒采样，`NodeDesktopBridge::dispatch_typed` 复用受检 AV 派发和文本差量提交。Clock 显示车道在重新选中时等待首个新样本。会话卸载用实际 AV close 记录已释放状态根。CPU 生命周期入口为 `cargo test -p auto-ui-runtime --features ace-bridge --test ase_clock_lifecycle -- --test-threads=1`。适用范围和验收来源见 auto-lang `docs/specs/ase/visible-tab-timers.md` 与 PLAN-1109 归档。
+Clock 使用现有 20 毫秒宿主循环消费单个已到期唤醒。宿主负责选中、单调截止点与 UTC 日内秒采样，`NodeDesktopBridge::dispatch_typed` 复用受检 AV 派发和文本差量提交。Clock 显示车道在重新选中时等待首个新样本。会话卸载用实际 AV close 记录已释放状态根。 Provider 拒绝关闭时，旧车道进入待关闭状态并失去定时资格。窗体退出继续回收宿主显示车道和所有会话根，证据保留关闭错误。CPU 生命周期入口为 `cargo test -p auto-ui-runtime --features ace-bridge --test ase_clock_lifecycle -- --test-threads=1`。适用范围和验收来源见 auto-lang `docs/specs/ase/visible-tab-timers.md` 与 PLAN-1109 归档。
