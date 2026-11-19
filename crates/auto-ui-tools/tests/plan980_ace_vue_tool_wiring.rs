@@ -279,10 +279,9 @@ fn p980_ace_vue_tool_wiring_key_gate_and_named_rejects() {
     )
     .unwrap();
     incremental_compile_changed(&ws6, None).expect("components channel incremental ok");
-    let fp_artifact = std::fs::read_to_string(
-        ws6.join("gen/front/vue/src/components/FpNoteEditorLite.vue"),
-    )
-    .expect("components channel writes the widget artifact");
+    let fp_artifact =
+        std::fs::read_to_string(ws6.join("gen/front/vue/src/components/FpNoteEditorLite.vue"))
+            .expect("components channel writes the widget artifact");
     // PLAN-1072 刀C 具名修订（str 边界统一）：形参读=a2x_str_lit 包裹、
     // 写=解码+释放 owned 副本（宿主裸串 ↔ rt 文本边界）。
     assert!(
@@ -308,7 +307,8 @@ fn p980_ace_vue_tool_wiring_key_gate_and_named_rejects() {
         .expect("components entry");
     // PLAN-1072 刀C 具名修订：同 ⑨a 的 marshal 包裹形。
     assert!(
-        fp_entry.2.contains("a2x_str_clone(a2x_str_lit(v))") && fp_entry.2.contains("../a2x_rt.mjs"),
+        fp_entry.2.contains("a2x_str_clone(a2x_str_lit(v))")
+            && fp_entry.2.contains("../a2x_rt.mjs"),
         "full-path components entry is the lane product"
     );
 
@@ -318,17 +318,15 @@ fn p980_ace_vue_tool_wiring_key_gate_and_named_rejects() {
         let ws6b = temp_workspace("components-fp-orig");
         let comp_dir6b = ws6b.join("src/front/components");
         std::fs::create_dir_all(&comp_dir6b).unwrap();
-        let fp_src = std::fs::read_to_string(
-            "D:/autostack/auto-notes/src/front/components/fp_editor.at",
-        )
-        .expect("auto-notes fp_editor.at readable");
+        let fp_src =
+            std::fs::read_to_string("D:/autostack/auto-notes/src/front/components/fp_editor.at")
+                .expect("auto-notes fp_editor.at readable");
         std::fs::write(comp_dir6b.join("fp_editor.at"), fp_src).unwrap();
         incremental_compile_changed(&ws6b, None)
             .expect("original fp_editor generates through the components channel");
-        let fp_orig = std::fs::read_to_string(
-            ws6b.join("gen/front/vue/src/components/FpNoteEditor.vue"),
-        )
-        .expect("original FpNoteEditor artifact written");
+        let fp_orig =
+            std::fs::read_to_string(ws6b.join("gen/front/vue/src/components/FpNoteEditor.vue"))
+                .expect("original FpNoteEditor artifact written");
         // PLAN-1072 刀C 具名修订：同 ⑨a（marshal 包裹形）。
         assert!(
             fp_orig.contains("a2x_str_clone(a2x_str_lit(v))") && fp_orig.contains("../a2x_rt.mjs"),

@@ -236,8 +236,8 @@ fn p1072_marshal_str_boundary_preserves_string_literals() {
     }
 }
 "#;
-    let (_sfc, bodies, absent) = generate_sfc_with_lane(src, "p1072-marshal-lit.at")
-        .expect("theme probe lane compiles");
+    let (_sfc, bodies, absent) =
+        generate_sfc_with_lane(src, "p1072-marshal-lit.at").expect("theme probe lane compiles");
     assert!(absent.is_empty(), "zero absent handlers: {absent:?}");
     let body = bodies
         .iter()
@@ -328,16 +328,26 @@ fn p1072_watch_expose_style_lane_and_setup_boundary() {
     )
     .expect("Widget A derives");
     let w_a = &prod_a.widgets[0];
-    assert!(w_a.absent.is_empty(), "Widget A zero absent: {:?}", w_a.absent);
+    assert!(
+        w_a.absent.is_empty(),
+        "Widget A zero absent: {:?}",
+        w_a.absent
+    );
     assert_eq!(w_a.bodies.len(), 1, "Inc derived through ACE lane");
     assert!(
         w_a.sfc.contains("a2x_add(count.value, 1)") && !w_a.sfc.contains("count.value += 1"),
         "Inc uses ACE lane a2x_add (no legacy fallback): {}",
         w_a.sfc
     );
-    assert!(w_a.sfc.contains("from \"./a2x_rt.mjs\""), "rt import present");
+    assert!(
+        w_a.sfc.contains("from \"./a2x_rt.mjs\""),
+        "rt import present"
+    );
     assert!(w_a.sfc.contains("watch(count,"), "watch(count) emitted");
-    assert!(w_a.sfc.contains("defineExpose({ Inc, count, watch_hits })"), "defineExpose emitted");
+    assert!(
+        w_a.sfc.contains("defineExpose({ Inc, count, watch_hits })"),
+        "defineExpose emitted"
+    );
     assert!(
         w_a.sfc.contains("px-2 py-1 text-xs") && !w_a.sfc.contains(":style=\"badge\""),
         "style recipe expands to literal class"
@@ -399,7 +409,8 @@ fn p1072_watch_expose_setup_unmount_browser_mount() {
     std::fs::write(dir.join("compB.sfc"), &prod_b.sfc).unwrap();
 
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let rig = manifest.join("../../examples/ui/ace-web-lane/tests/test_p1072_lifecycle_watch_expose.mjs");
+    let rig =
+        manifest.join("../../examples/ui/ace-web-lane/tests/test_p1072_lifecycle_watch_expose.mjs");
     let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
     let out = std::process::Command::new(&node)
         .arg(rig.to_str().unwrap())
