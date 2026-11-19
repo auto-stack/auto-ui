@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-14
 plan_revision: 2
-current_step: 6
+current_step: 8
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/property-inspector.md]
@@ -138,8 +138,8 @@ T-04新`examples/settings-inspector/`真实设置/预览/应用Storage消费，T
 | T-04 ✅ | work / T-03 | 新`examples/settings-inspector/`普通设置预览和应用Storage | V-04实际参数、可见效果、保存/重开读回，不改用户系统设置 | 05 |
 | T-05 ✅ | work / T-04 | 新上述tools/product门，落实所有V及必要基础组件回归 | §6入口Win/Linux+Vue有真消费、反例和退出重开；含r2 V-06和指南§3真实视觉/窄窗 | 01…06 |
 | T-06 ✅ | work / T-05 | README、`docs/reviews/plan092/`证据、最终SD/strategy摘要；README含r2 props/events、可运行消费例和视觉指南 | 基础包/工具/存储身份可复核，Q-01受影响项闭环 | 06 |
-| T-07 | review / T-06 | 同树独立review，停止实现写入 | reviewed commit逐AC/SD结论；失败返work | 07 |
-| T-08 | merge / T-07 pass | Spec、合并/归档/strategy链接及实际清理 | 最终提交/文档/树状态核验，不以合入补产品验收 | 08 |
+| T-07 ✅ | review / T-06 | 同树独立review，停止实现写入 | reviewed commit逐AC/SD结论；失败返work | 07 |
+| T-08 ✅ | merge / T-07 pass | Spec、合并/归档/strategy链接及实际清理 | 最终提交/文档/树状态核验，不以合入补产品验收 | 08 |
 
 ## 9. 复审记录
 
