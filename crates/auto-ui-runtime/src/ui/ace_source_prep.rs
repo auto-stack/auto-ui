@@ -127,6 +127,69 @@ fn style_literal(src: &str, name: &str) -> Option<String> {
 /// （1071 边界）；类型化列表 state 尚不在切片内，写面由投影后的具名拒绝兜底。
 ///
 /// 只改「类型含 `[]` 且初值以 `[` 开头」的字段；其余行原样返回。
+/// PLAN-105 T-02（U03 真语料 013/016）：从单元源里抽 `store <Type> { … }` 整块
+/// （含匹配的收尾 `}`；字符串内的括号不计数）。找不到返回 `None`。
+fn extract_store_block(src: &str, type_name: &str) -> Option<String> {
+    let needle = format!("store {type_name}");
+    let start = src.find(&needle)?;
+    // 名字后面必须紧跟 `{`（允许空白）。
+    let after = &src[start + needle.len()..];
+    let brace_rel = after.find('{')?;
+    if !after[..brace_rel].trim().is_empty() {
+        return None;
+    }
+    let open = start + needle.len() + brace_rel;
+    let bytes = src.as_bytes();
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut i = open;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_str {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' => in_str = true,
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    // 与主源同律改写类型化列表数据字段（store 模型里
+                    // `var notes []Note = []` → 无类型形，组件面才可解析）。
+                    let raw = &src[start..=i];
+                    let mut block = String::with_capacity(raw.len() + 1);
+                    for line in raw.split_inclusive('\n') {
+                        let (body, nl) = match line.strip_suffix('\n') {
+                            Some(b) => (b, "\n"),
+                            None => (line, ""),
+                        };
+                        match rewrite_typed_list_field(body) {
+                            Some(rewritten) => {
+                                block.push_str(&rewritten);
+                                block.push_str(nl);
+                            }
+                            None => block.push_str(line),
+                        }
+                    }
+                    block.push('\n');
+                    return Some(block);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
 fn rewrite_typed_list_field(line: &str) -> Option<String> {
     let bytes = line.as_bytes();
     let mut i = 0usize;
@@ -184,6 +247,10 @@ pub fn prepare_component_source(
 ) -> Result<PreparedComponentSource, String> {
     let deps = pac_dep_roots(project_root);
     let mut inlined: Vec<InlinedStyle> = Vec::new();
+    // PLAN-105 T-02（U03 真语料 013/016）：跨单元 store 声明——组件面只能看见
+    // 本源；`use <unit>: <StoreType>` 指向的单元里若有同名 `store` 声明，就把
+    // 整块**前置内联**进入口源（core 侧再按同源 store 内联成共享状态）。
+    let mut store_blocks: Vec<String> = Vec::new();
     let mut out = String::with_capacity(src.len());
     for line in src.split_inclusive('\n') {
         let (body, nl) = match line.strip_suffix('\n') {
@@ -230,6 +297,44 @@ pub fn prepare_component_source(
                 }
             }
         }
+        // 工程本地单元（`src/front/<unit>.at`）里的 store 声明：按导入的成员名
+        // 找 `store <Member> { … }` 并整块前置内联。
+        if !handled {
+            let last_seg = module.rsplit('.').next().unwrap_or(module);
+            for rel in [
+                format!("src/front/{last_seg}.at"),
+                format!("src/{last_seg}.at"),
+                format!("{last_seg}.at"),
+            ] {
+                let file = project_root.join(&rel);
+                if let Ok(unit_src) = std::fs::read_to_string(&file) {
+                    for item in items.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+                        if let Some(block) = extract_store_block(&unit_src, item) {
+                            // 只有该 store 片断在组件面**可解析**时才内联；含
+                            // 组件面尚不支持的 `on` 语句（if/for/局部 var 等）时
+                            // 放弃内联，保留具名 `.store` 边界（不制造语法错）。
+                            let probe = format!(
+                                "{block}\nwidget __StoreProbe {{\n    model {{ var __n int = 0 }}\n    view {{ text \"x\" {{}} }}\n}}\n"
+                            );
+                            if ace_core::source::age_component::project_component_stores(&probe)
+                                .map(|s| !s.is_empty())
+                                .unwrap_or(false)
+                                && ace_core::source::age_component::project_component_candidates(
+                                    &probe,
+                                )
+                                .is_ok()
+                            {
+                                store_blocks.push(block);
+                                handled = true;
+                            }
+                        }
+                    }
+                    if handled {
+                        break;
+                    }
+                }
+            }
+        }
         // `use` 行等长空白化（保 span）。
         out.push_str(&" ".repeat(body.len()));
         out.push_str(nl);
@@ -238,11 +343,12 @@ pub fn prepare_component_source(
     // 内联样式必须落在**组件头之前**：模块样式表按源码顺序收集，组件之后声明的
     // 样式在投影期解析不到（016 实测：追加到文件尾 → `style caption_text` 不解析；
     // 前置到 widget 之前 → 整例通过）。
-    if !inlined.is_empty() {
-        let decls: Vec<String> = inlined
+    if !inlined.is_empty() || !store_blocks.is_empty() {
+        let mut decls: Vec<String> = inlined
             .iter()
             .map(|s| format!("style {} = {}", s.name, s.literal))
             .collect();
+        decls.extend(store_blocks.iter().cloned());
         let mut lines: Vec<String> = out.split_inclusive('\n').map(|s| s.to_string()).collect();
         let head = lines.iter().position(|l| {
             let t = l.trim_start();
