@@ -196,10 +196,11 @@ pub fn ui_apply_int(op: &str, instance_slot: i32, value: i32) -> i32 {
 /// Apply one bool state-SLOT update to the CURRENT session (value rides
 /// as 0/1). `instance_slot` = instance*1000 + slot.
 // auto-ffi fn ui_apply_bool symbol=ui980.apply_bool.v1 form=pure ret=i32
-pub fn ui_apply_bool(op: &str, instance_slot: i32, value: bool) -> i32 {
-    with_hooks(|h| unsafe {
-        (h.apply_bool)(op.as_ptr(), op.len() as i32, instance_slot, value as i32)
-    })
+// PLAN-104：value 走 **i32 标量**（0/1）而不是 bool——ABI 的 bool 参与调用时
+// packed 槽位实参错位（真窗实证：调用串 slot=6，hook 实收 instance_slot=48），
+// 与桥内 hook 表的 i32 签名也对齐；hook 侧按 `value != 0` 解释。
+pub fn ui_apply_bool(op: &str, instance_slot: i32, value: i32) -> i32 {
+    with_hooks(|h| unsafe { (h.apply_bool)(op.as_ptr(), op.len() as i32, instance_slot, value) })
 }
 
 /// Apply one str state-SLOT update to the CURRENT session (field table;
@@ -1291,6 +1292,7 @@ impl NodeDesktopBridge {
                 format!("ui_apply_int(\"apply-int\", {packed}, {v})")
             }
             AceStateValue::Bool(v) => {
+                // 0/1 标量（provider 面也是 i32；见上方 provider 声明注释）。
                 format!("ui_apply_bool(\"apply-bool\", {packed}, {})", *v as i32)
             }
             AceStateValue::Str(v) => {
