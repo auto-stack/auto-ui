@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-058
-status: reviewed
+status: archived
 feature_name: AGE M2俯视二维公共组合与ACE作者接线
 author: [Codex]
 created_at: 2026-11-05
 updated_at: 2026-11-19
 plan_revision: 8
-current_step: 7
+current_step: 10
 total_steps: 10
 depends_on: [auto-ui/PLAN-055, ag-examples/PLAN-022, ag-examples/PLAN-021, ag-examples/PLAN-026, auto-lang/PLAN-981]
 supersedes_spec_components: []
@@ -18,6 +18,8 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 # PLAN-058：俯视二维控制、查询与精灵公共组合
 
 ## 0. 变更摘要
+
+2026-11-19 r8当前：**merge 完成（T-08..10，10/10）——落主 ff-only `c50c5ff3`（无 merge commit；rebase 12/12，plan 面对码＝仅 N-01 一行）、canonical `node2d-topdown-composition.md`（sha256-16 `de0ef3c9eb8dff27`）落主、本 Plan 归档 archived/、树/分支/plan-artifacts（530M）清讫、registry 刷新；completion_kind=delivered，无具名 hold。PLAN-103 维持 drafting 等 1068/W2/W3**。
 
 2026-11-19 r8当前：**T-07 final pass（7/10）——同树独立上下文复审 r8 AV 域：12 套件＋controls 本会话实跑全绿（计数与收据一致），旧 021/022 消费者补跑 11/11＋4/4，SD-01 全文事实对码核对通过，无 blocking finding；status=reviewed，交 T-08..10 merge**。
 
@@ -39,9 +41,9 @@ affects: [node2d-authoring, query-sprite-composition, autographics-auto-driver]
 
 历史修订：2026-11-11 r3：AG026已11/11签章，M1前置已闭；最终作者链消费981/SOURCE/SESSION/RUST及所用LANGUAGE的A切片正式来源，不等981整包归档。保原最低对象/预算，新增可见非阻挡地面组合AC-11/V-S08，为AG029国风首切片提供公共图形接面；不承担种植/存档/素材或重做055研究。10任务、0完成，仍仅规划。
 
-历史修订：2026-11-09 r2：归入[合并AGE M2](../design/autographics/age-three-milestones-and-ace-m2.md)二维线。中立图形服务与ACE接入并行，最终Node作者链走981的同源AV/A2R，不扩旧SDK源码生成器。原最低样本/图形预算/兼容义务及10任务保留，新增AC-10/V-S07；drafting、0/10，仅规划。
+历史修订：2026-11-09 r2：归入[合并AGE M2](../../design/autographics/age-three-milestones-and-ace-m2.md)二维线。中立图形服务与ACE接入并行，最终Node作者链走981的同源AV/A2R，不扩旧SDK源码生成器。原最低样本/图形预算/兼容义务及10任务保留，新增AC-10/V-S07；drafting、0/10，仅规划。
 
-承接055真实研究与AG022需求输入，交付有限、显式版本的正常Auto俯视二维组合作者链：无重力四/八向控制、单次sweep停墙、最近交互查询、具名精灵帧与普通use组件局部事件。不是完整种田游戏。本轮只规划；055已交研究结论不等于本组合go，正常作者终验仍须原M1必需门关闭。见[本批路线](../design/autographics/m3-next-wave-execution-order.md)。
+承接055真实研究与AG022需求输入，交付有限、显式版本的正常Auto俯视二维组合作者链：无重力四/八向控制、单次sweep停墙、最近交互查询、具名精灵帧与普通use组件局部事件。不是完整种田游戏。本轮只规划；055已交研究结论不等于本组合go，正常作者终验仍须原M1必需门关闭。见[本批路线](../../design/autographics/m3-next-wave-execution-order.md)。
 
 ## 1. 目标
 
@@ -204,7 +206,7 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 
 ## 7. 验收标准
 
-- [ ] **AC-PHASE-GFX / work**：原每一V行的 **AV 格**按 §5 r8 适用性闭合，独立 oracle/包/资源与失败义务在 AV 面守恒；**AC/A2R 格与多端"整包拒绝"条款由 PLAN-103 原封承接**（§5 r8 转移清单）；由 V-PHASE-GFX 的 AV 格、T-03..06 与 T-07 final 核验。
+- [x] **AC-PHASE-GFX / work**（2026-11-19 T-07 final 核验闭合）：原每一V行的 **AV 格**按 §5 r8 适用性闭合，独立 oracle/包/资源与失败义务在 AV 面守恒；**AC/A2R 格与多端"整包拒绝"条款由 PLAN-103 原封承接**（§5 r8 转移清单）；由 V-PHASE-GFX 的 AV 格、T-03..06 与 T-07 final 核验。
 
 | AC | owner_stage | 可观察关闭条件 | 验证 |
 |---|---|---|---|
@@ -231,11 +233,22 @@ T-03..T-06及同号阶段复核消费原输入/expected：①原AV必需格齐�
 | T-05 | work | T-04 AV 格；AV 收尾已交 `350af5b8`＋`12cb146b`＋`eb724dd0`（连续帧/use 实例/epoch/冷 A→B AV 腿）；r8 **AV 格全闭合**；AC/A2R 格归 PLAN-103 | V-S01..08 的 AV 格（预算合法/超界、独立数值/GPU oracle、旧档触面回归）；执行以§5 r8 块为准，AV 原验收不减 | AC-02/AC-03/AC-04/AC-05/AC-06/AC-11 | [x] 2026-11-19：V-S01..08 AV 格收口（V-S04/V-S05 AV 腿 `eb724dd0`；V-S03 scenario 2:1＋触碰路由作者面归 PLAN-103）；12 套件＋controls 全绿 |
 | T-06 | work | T-05 AV 格 | 冷A→B/修复下一Run（`eb724dd0`）、SD-01 草稿（worktree `docs/specs/auto-graphics/node2d-topdown-composition.md`，merge 落 canonical）与 AG023 **AV 入口**配方成文（spec §AG023 配方五步）；**双后端配方归 PLAN-103**；执行以§5 r8 块为准 | AC-05/AC-06/AC-11 | [x] 2026-11-19：SD-01 草稿＋AV 配方成文（`21bdf39b`）；冷A→B/修复先交（`eb724dd0`） |
 | T-07 | review | T-06 | 同树独立final，真实逐AC/SD/源和反例核验；finding同员有界复核 | AC-07 | [x] 2026-11-19：final pass（r8 AV 域；12 套件＋controls＋旧消费者实跑全绿；SD-01 对码核对；见 §9 复审记录） |
-| T-08 | merge | T-07 pass | 冻结受影响门/准确身份后落主，不扩大无关全套门 | AC-08 | [ ] |
-| T-09 | merge | T-08 | canonical/同号归档/导航与真实支持/未证边界，非产品研究不冒功能交付 | AC-08 | [ ] |
-| T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [ ] |
+| T-08 | merge | T-07 pass | 冻结受影响门/准确身份后落主，不扩大无关全套门 | AC-08 | [x] 2026-11-19：rebase 12/12 onto master（plan 面 tree-identity＝仅 N-01 一行 `a339f2b1`；overlay.json 重放双冲突以原 blob 复原、终态 `0a167f611`；pin 2/2＋controls 6/6 复绿）→ ff-only 落主 `c50c5ff3`，无 merge commit |
+| T-09 | merge | T-08 | canonical/同号归档/导航与真实支持/未证边界，非产品研究不冒功能交付 | AC-08 | [x] 2026-11-19：canonical `docs/specs/auto-graphics/node2d-topdown-composition.md`（sha256-16 `de0ef3c9eb8dff27`）@ `c50c5ff3` 落主＋本 Plan `git mv` archived/＋status=archived；支持域/未证边界以 SD-01 文本为准（AV 面），不冒双端 |
+| T-10 | merge | T-09 | 全路径对账/摘要折Plan/fresh guard清自有树与scope、hold登记 | AC-09 | [x] 2026-11-19：门禁计数/计时全折 §9；fresh wt-guard 后清 `ui-058` 树＋`codex/plan-058-dev` 分支＋`plan-artifacts/plan-058`（530M）＋registry 刷新；无具名 hold（N-01 已闭合） |
 
 ## 9. 复审记录
+
+### 2026-11-19 stage: merge（**T-08..10 收口**：落主＋canonical＋归档＋清理）| PLAN-058:r8 | outcome: **pass（completion_kind=delivered；archived；cleaned；无具名 hold）**
+
+**prepared**：reviewed 基线 `21bdf39b`＋N-01 对齐尾提交 `a339f2b1`（documentation-only，1 行署名 eb724dd0→21bdf39b，T-07 §9 预授权）；canonical 目标 `docs/specs/auto-graphics/node2d-topdown-composition.md`（worktree 内已备）。
+**rebase/landed**：`codex/plan-058-dev` rebase onto master（28 提交前移，无文件重叠）；重放 12/12 提交，old→new 映射 c5086f50→32e2e1d6、7165dbad→52b9038e、b071634c→a93da292、f6418120→fca523dc、7a1503b7→67cb3007、ba85f33f→a2ed82be、0e67b1cd→997e94e9、350af5b8→a4b05fae、12cb146b→6554110d、eb724dd0→b31c9575、21bdf39b→d914e1a6、a339f2b1→c50c5ff3（内部 merge `cbe350b4` 按 rebase 语义扁平化；`65a6b2cf`/`f9ade844` 已在 master 不重放）。**tree-identity 证明＝`git diff 21bdf39b c50c5ff3 -- experimental/ docs/specs/auto-graphics/` 恰为 N-01 一行**（等价性强于 range-diff）。重放双冲突均在 `sdk/overlay/overlay.json`（master 经 pin 线已携 `65a6b2cf`@`6e456794d`，dev 线 `7a1503b7` 引入 @`64e8380f4`）：均以原提交 blob 复原，终态＝`12cb146b` 的 `0a167f611`。冲突触面复验（rebased tip）：`plan058_t04_pin` 2/2（overlay 身份）＋`verify_plan058.py --controls` 6/6。落主＝主检出 `git merge --ff-only codex/plan-058-dev` → **master tip `c50c5ff3`，无 merge commit**。
+**canonical_verified**：`docs/specs/auto-graphics/node2d-topdown-composition.md` @ `c50c5ff3`，blob `cc7a1f84`，sha256-16 `de0ef3c9eb8dff27`，内容＝T-07 核验文本＋N-01 一行；无 index/ledger 写。
+**archived**：本 Plan `git mv` → `docs/plans/archived/058-age-topdown2d-queries-and-sprites.md`，status=archived，AC-PHASE-GFX/T-08..10 勾选，任务 10/10，簿记提交到默认分支。
+**cleaned**：fresh `wt-guard` clean → 删 `D:/autostack/.wt/ui-058/auto-ui` 树＋`codex/plan-058-dev` 分支（全并）；`plan-artifacts/plan-058`（530M）全删（证据已折本 §9/§5）；registry `.retention/policy.json` 刷新登记。无未解决 hold——N-01 已随落主闭合；D-06 触碰路由/D-07 AC·A2R 阶段门均由 PLAN-103 登记承接，非本包 hold。
+**批次回归 due 核对**：auto-ui 仓无 `docs/plans/.last-batch-regression.json` 惯例（该门为 auto-lang PLAN-898 车道）；PLAN-058 非 mod-5。记录为 N/A，不启动他仓门。
+**部署观察**：本包触面＝experimental 驱动 crate＋docs，无 production-facing 产物（无 release 二进制/web bundle），无需刷新观察项。
+**门禁汇总（本 merge 会话实跑）**：rebase 前复核门（review 会话）＝12 套件＋controls＋旧消费者 11/11+4/4（见 T-07 记录）；rebase 后受冲突影响复验＝pin 2/2（0.07s）＋controls 6/6（17s，C6 子进程流含 flow 5/5）。无新增用例、无新计时义务。
 
 ### 2026-11-19 stage: review（**T-07 final**：r8 AV 域独立逐 AC/SD/源/反例核验）| PLAN-058 r8 | outcome: **final pass（T-07 勾选，7/10；status=reviewed；next=T-08..10 merge）**
 
