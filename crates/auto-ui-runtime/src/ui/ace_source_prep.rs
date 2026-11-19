@@ -202,6 +202,69 @@ fn rewrite_store_self_calls(src: &str) -> String {
 /// PLAN-105 T-02（U03 真语料 016）：从单元源里抽 `[pub] fn <name> … { … }` 整块
 /// （含匹配收尾 `}`；字符串内括号不计数）；顶层 `pub ` 前缀剥掉（组件面
 /// 只校验单模块，函数体原样内联）。找不到返回 `None`。
+/// PLAN-105 T-02（U03 真语料 013）：从单元源里抽 `[pub] type <Name> { … }` 整块
+/// （record 声明；`pub ` 前缀剥离）。找不到返回 None。
+fn extract_unit_type(src: &str, name: &str) -> Option<String> {
+    let mut start = None;
+    let mut offset = 0usize;
+    for line in src.split_inclusive('\n') {
+        let t = line.trim_start();
+        let indent = line.len() - t.len();
+        if indent == 0 {
+            let rest = t.strip_prefix("pub ").unwrap_or(t);
+            if let Some(after) = rest.strip_prefix("type ") {
+                let tname: String = after
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if tname == name {
+                    start = Some(offset + (line.len() - rest.len()));
+                    break;
+                }
+            }
+        }
+        offset += line.len();
+    }
+    let start = start?;
+    let bytes = src.as_bytes();
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut i = start;
+    let mut seen_open = false;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_str {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' => in_str = true,
+            b'{' => {
+                depth += 1;
+                seen_open = true;
+            }
+            b'}' => {
+                depth -= 1;
+                if seen_open && depth == 0 {
+                    let mut block = src[start..=i].to_string();
+                    block.push('\n');
+                    return Some(block);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
 fn extract_unit_fn(src: &str, name: &str) -> Option<String> {
     let mut start = None;
     let mut offset = 0usize;
@@ -385,6 +448,8 @@ fn extract_store_block(src: &str, type_name: &str) -> Option<String> {
                 if depth == 0 {
                     // 与主源同律改写类型化列表数据字段（store 模型里
                     // `var notes []Note = []` → 无类型形，组件面才可解析）。
+                    // 列表字段暂仍按视图数据改写（核心的 `[]T` 模型字段/记录
+                    // 类型支持是下一刀）；记录类型依赖仍一并内联，切换时无需再改。
                     let raw = &src[start..=i];
                     let mut block = String::with_capacity(raw.len() + 1);
                     for line in raw.split_inclusive('\n') {
@@ -480,6 +545,8 @@ pub fn prepare_component_source(
     // PLAN-105 T-02（U03 真语料 016）：`use <unit>: <fn>` 的顶层 helper 函数
     // 内联（组件面只校验单模块；`month_name` 等由 calendar_util 提供）。
     let mut fn_blocks: Vec<String> = Vec::new();
+    // PLAN-105 T-02（U03 真语料 013）：`use <unit>: <Record>` 的 record 声明。
+    let mut type_blocks: Vec<String> = Vec::new();
     let mut out = String::with_capacity(src.len());
     for line in src.split_inclusive('\n') {
         let (body, nl) = match line.strip_suffix('\n') {
@@ -538,6 +605,13 @@ pub fn prepare_component_source(
                 let file = project_root.join(&rel);
                 if let Ok(unit_src) = std::fs::read_to_string(&file) {
                     for item in items.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+                        // 记录类型声明（`use types: Todo` → `type Todo { … }`）
+                        // 内联：组件面单模块需要记录类型才可声明列表字段。
+                        if let Some(block) = extract_unit_type(&unit_src, item) {
+                            type_blocks.push(block);
+                            handled = true;
+                            continue;
+                        }
                         // 顶层 helper 函数直接内联（不做语义预检：组件面只校验
                         // 单模块，函数体问题应在真正 verify 时暴露，而不是在
                         // 源准备阶段被静默丢弃）。
@@ -560,7 +634,39 @@ pub fn prepare_component_source(
                                 handled = true;
                                 continue;
                             }
-                        }                        if let Some(block) = extract_store_block(&unit_src, item) {
+                        }                        // store 单元自己的 `use <mod>: <Record>` 依赖（013：
+                        // `use types: Todo`）——记录类型要一起内联，列表字段才可声明。
+                        for dep_line in unit_src.lines() {
+                            let t = dep_line.trim_start();
+                            if let Some(rest) = t.strip_prefix("use ") {
+                                if let Some((dep_mod, dep_items)) = rest.split_once(':') {
+                                    let dep_mod = dep_mod.trim();
+                                    let last = dep_mod.rsplit('.').next().unwrap_or(dep_mod);
+                                    for rel in [
+                                        format!("src/front/{last}.at"),
+                                        format!("src/{last}.at"),
+                                        format!("{last}.at"),
+                                    ] {
+                                        if let Ok(dep_src) =
+                                            std::fs::read_to_string(project_root.join(&rel))
+                                        {
+                                            for dep_item in dep_items
+                                                .split(',')
+                                                .map(str::trim)
+                                                .filter(|s| !s.is_empty())
+                                            {
+                                                if let Some(tb) =
+                                                    extract_unit_type(&dep_src, dep_item)
+                                                {
+                                                    type_blocks.push(tb);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(block) = extract_store_block(&unit_src, item) {
                             // 只有该 store 片断在组件面**可解析**时才内联；含
                             // 组件面尚不支持的 `on` 语句（if/for/局部 var 等）时
                             // 放弃内联，保留具名 `.store` 边界（不制造语法错）。
@@ -594,11 +700,12 @@ pub fn prepare_component_source(
     // 内联样式必须落在**组件头之前**：模块样式表按源码顺序收集，组件之后声明的
     // 样式在投影期解析不到（016 实测：追加到文件尾 → `style caption_text` 不解析；
     // 前置到 widget 之前 → 整例通过）。
-    if !inlined.is_empty() || !store_blocks.is_empty() || !fn_blocks.is_empty() {
+    if !inlined.is_empty() || !store_blocks.is_empty() || !fn_blocks.is_empty() || !type_blocks.is_empty() {
         let mut decls: Vec<String> = inlined
             .iter()
             .map(|s| format!("style {} = {}", s.name, s.literal))
             .collect();
+        decls.extend(type_blocks.iter().cloned());
         decls.extend(fn_blocks.iter().cloned());
         decls.extend(store_blocks.iter().cloned());
         let mut lines: Vec<String> = out.split_inclusive('\n').map(|s| s.to_string()).collect();
