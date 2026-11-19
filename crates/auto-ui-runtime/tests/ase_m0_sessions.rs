@@ -713,3 +713,236 @@ fn p1023_t05_twenty_rounds_resource_accounting() {
     assert!(host.errors.is_empty(), "errors: {:?}", host.errors);
     eprintln!("p1023_t05 elapsed: {:?}", started.elapsed());
 }
+
+/// V-02 完整（CPU）：两会话 A×3/B×7 → 切回各保留；换宿主顺序（先 B 后
+/// A）同样成立（适配不锚定打开顺序/应用名）；显示与引擎权威一致。
+#[test]
+fn p1023_v02_two_counters_retained_both_orders() {
+    let started = Instant::now();
+    // 顺序 1：先开 a 后开 b。
+    {
+        let mut host = AseSessionHost::new(fixture_apps());
+        let a = host.open_session("counter-a").expect("open a");
+        let b = host.open_session("counter-b").expect("open b");
+        host.select(a).expect("select a");
+        for _ in 0..3 {
+            host.click(TARGET_INC).expect("inc a");
+            assert!(matches!(
+                host.step_selected(),
+                StepOutcome::Dispatched { .. }
+            ));
+        }
+        host.select(b).expect("select b");
+        for _ in 0..7 {
+            host.click(TARGET_INC).expect("inc b");
+            assert!(matches!(
+                host.step_selected(),
+                StepOutcome::Dispatched { .. }
+            ));
+        }
+        host.select(a).expect("back to a");
+        assert_eq!(engine_count(&host, a), 3);
+        assert_eq!(displayed_count(host.ui_session_of(a).unwrap()), "3");
+        host.select(b).expect("back to b");
+        assert_eq!(engine_count(&host, b), 7);
+        assert_eq!(displayed_count(host.ui_session_of(b).unwrap()), "7");
+        assert!(host.errors.is_empty(), "errors: {:?}", host.errors);
+    }
+    // 顺序 2：先开 b 后开 a（换序仍成立）。
+    {
+        let mut host = AseSessionHost::new(fixture_apps());
+        let b = host.open_session("counter-b").expect("open b first");
+        let a = host.open_session("counter-a").expect("open a second");
+        host.select(b).expect("select b");
+        for _ in 0..7 {
+            host.click(TARGET_INC).expect("inc b");
+            assert!(matches!(
+                host.step_selected(),
+                StepOutcome::Dispatched { .. }
+            ));
+        }
+        host.select(a).expect("select a");
+        for _ in 0..3 {
+            host.click(TARGET_INC).expect("inc a");
+            assert!(matches!(
+                host.step_selected(),
+                StepOutcome::Dispatched { .. }
+            ));
+        }
+        host.select(b).expect("back to b");
+        assert_eq!(engine_count(&host, b), 7);
+        assert_eq!(displayed_count(host.ui_session_of(b).unwrap()), "7");
+        host.select(a).expect("back to a");
+        assert_eq!(engine_count(&host, a), 3);
+        assert_eq!(displayed_count(host.ui_session_of(a).unwrap()), "3");
+        assert!(host.errors.is_empty(), "errors: {:?}", host.errors);
+    }
+    eprintln!("p1023_v02 elapsed: {:?}", started.elapsed());
+}
+
+/// 窗口档（排窗 `AUTO_UI_ASE_M0_E2E=1` 单实例；V-02/V-05）：同一真窗两会话
+/// 生命周期（开 A→点3→开 B→点7→切回 A→关 A→重开新代次→切 B）+ OS 级
+/// resize/最小化-恢复注入（命中当前 frame、无错误串扰）；证据 JSON 断言
+/// 保留值/代次/计量。真鼠标/键盘注入归手工档（与自动注入分账）。
+#[test]
+fn p1023_window_e2e_sessions_with_os_resize_focus() {
+    if std::env::var("AUTO_UI_ASE_M0_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "p1023_window_e2e_sessions_with_os_resize_focus: not scheduled (set \
+             AUTO_UI_ASE_M0_E2E=1 after the prep stage; window single-instance discipline)"
+        );
+        return;
+    }
+    let started = Instant::now();
+    let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let exe = manifest
+        .join("../../target/debug/examples/ase_m0_sessions_window.exe")
+        .canonicalize()
+        .unwrap();
+    assert!(
+        exe.is_file(),
+        "preparation failure: {} missing — run the prep stage first",
+        exe.display()
+    );
+    let apps = fixture_apps();
+    let tmp = std::env::temp_dir().join(format!("p1023-e2e-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
+    let ev_path = tmp.join("evidence.json");
+
+    let mut cmd = std::process::Command::new(&exe);
+    for app in &apps {
+        cmd.arg("--app").arg(format!("{}={}", app.key, app.path));
+    }
+    cmd.arg("--evidence")
+        .arg(&ev_path)
+        .arg("--script")
+        .arg("3:open:counter-a,6:click:2,8:click:2,10:click:2,14:open:counter-b,17:click:2,19:click:2,21:click:2,23:click:2,25:click:2,27:click:2,29:click:2,60:select:1,90:close:1,120:open:counter-a,150:select:2")
+        .arg("--hold-ms")
+        .arg("6000")
+        .arg("--min-frames")
+        .arg("15")
+        .current_dir(&tmp);
+    let mut child = cmd.spawn().expect("spawn window exe");
+
+    // OS 级注入（真实 WM_SIZE / 最小化-恢复焦点转移）：命中当前 frame。
+    std::thread::sleep(std::time::Duration::from_millis(1500));
+    let hwnd = os_inject::find_window("ASE M0 交互会话");
+    if let Some(h) = hwnd {
+        os_inject::resize(h, 1080, 760);
+    }
+    std::thread::sleep(std::time::Duration::from_millis(600));
+    if let Some(h) = hwnd {
+        os_inject::minimize_restore(h);
+    }
+
+    let out = child.wait().expect("wait window exe");
+    assert!(out.success(), "window exe failed");
+    let ev: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&ev_path).unwrap()).unwrap();
+
+    // 单窗持续重渲染（resize/焦点后仍渲染）。
+    assert!(
+        ev["frames_rendered"].as_u64().unwrap_or(0) >= 15,
+        "one real window re-rendered across lifecycle+injections: {}",
+        ev["frames_rendered"]
+    );
+    assert!(
+        ev["errors"].as_array().unwrap().is_empty(),
+        "errors: {}",
+        ev["errors"]
+    );
+    // 保留与代次：b 恒 7（7 次执行）；重开 a 新代次种子 0；a1 关闭在案。
+    let live = ev["live"].as_array().unwrap();
+    assert_eq!(live.len(), 2, "sessions 2 (b) and 3 (reopened a) stay live");
+    let find_live = |id: u64| live.iter().find(|s| s["id"].as_u64() == Some(id)).unwrap();
+    let b = find_live(2);
+    assert_eq!(b["dispatches"].as_u64(), Some(7));
+    let state_is = |entry: &serde_json::Value, field: &str, shown: &str| {
+        entry["engine_states"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|pair| {
+                pair.as_array().is_some_and(|p| {
+                    p.first().and_then(|n| n.as_str()) == Some(field)
+                        && p.get(1).and_then(|v| v.as_str()) == Some(shown)
+                })
+            })
+    };
+    assert!(state_is(b, "count", "Int(7)"), "b retains 7: {b}");
+    let a3 = find_live(3);
+    assert_eq!(a3["generation"].as_u64(), Some(2), "reopened a is gen 2");
+    assert!(state_is(a3, "count", "Int(0)"), "reopened a seeds 0: {a3}");
+    let closed = ev["closed"].as_array().unwrap();
+    assert_eq!(closed.len(), 1);
+    assert_eq!(closed[0]["id"].as_u64(), Some(1));
+    assert_eq!(ev["metrics"]["loads"].as_u64(), Some(3));
+    assert_eq!(ev["metrics"]["dispatches_total"].as_u64(), Some(10));
+    assert_eq!(ev["metrics"]["clicks_offered"].as_u64(), Some(10));
+    let _ = std::fs::remove_dir_all(&tmp);
+    eprintln!("p1023_window_e2e elapsed: {:?}", started.elapsed());
+}
+
+/// 最小 user32 注入面（raw extern——不引 windows crate 依赖；plan804 同款
+/// 纪律）。只用于排窗档的 resize/焦点注入。
+mod os_inject {
+    #[repr(C)]
+    #[derive(Default, Clone, Copy)]
+    struct Rect {
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+    }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn FindWindowW(class: *const u16, title: *const u16) -> isize;
+        fn SetWindowPos(
+            hwnd: isize,
+            after: isize,
+            x: i32,
+            y: i32,
+            cx: i32,
+            cy: i32,
+            flags: u32,
+        ) -> i32;
+        fn ShowWindow(hwnd: isize, cmd: i32) -> i32;
+        fn GetWindowRect(hwnd: isize, rect: *mut Rect) -> i32;
+        fn IsWindow(hwnd: isize) -> i32;
+    }
+
+    fn wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    pub fn find_window(title: &str) -> Option<isize> {
+        let t = wide(title);
+        let h = unsafe { FindWindowW(std::ptr::null(), t.as_ptr()) };
+        (h != 0).then_some(h)
+    }
+
+    /// 真实 OS resize（WM_SIZE 路径；保持左上角不动）。
+    pub fn resize(hwnd: isize, cx: i32, cy: i32) -> bool {
+        let mut r = Rect::default();
+        unsafe { GetWindowRect(hwnd, &mut r) };
+        let ok = unsafe {
+            SetWindowPos(hwnd, 0, r.left, r.top, cx, cy, 0x0004 /*SWP_NOZORDER*/) != 0
+        };
+        let alive = unsafe { IsWindow(hwnd) } != 0;
+        ok && alive
+    }
+
+    /// 真实焦点转移（最小化→恢复；焦点离开再回到目标窗）。
+    pub fn minimize_restore(hwnd: isize) -> bool {
+        unsafe {
+            ShowWindow(hwnd, 6 /*SW_MINIMIZE*/)
+        };
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        unsafe {
+            ShowWindow(hwnd, 9 /*SW_RESTORE*/)
+        };
+        unsafe { IsWindow(hwnd) != 0 }
+    }
+}

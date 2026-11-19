@@ -62,6 +62,16 @@ pub struct AseMetrics {
     pub dispatches: u64,
 }
 
+/// 会话脚本动作（e2e exe 与 CPU 测试同一边界；窗口按钮走同一 on 消息面）。
+#[derive(Clone, Debug)]
+pub enum AseSessionAction {
+    Open(String),
+    Select(usize),
+    Close(usize),
+    /// frame 按钮（声明序 target；与窗口点击同一 typed 队列）。
+    Click(usize),
+}
+
 /// 一条会话生命周期记录（证据面；关闭后保留记录、释放 owner）。
 #[derive(Clone, Debug)]
 pub struct SessionRecord {
@@ -92,6 +102,8 @@ pub struct AseSessionHost {
     pub metrics: AseMetrics,
     pub log: Vec<String>,
     pub errors: Vec<String>,
+    script: Vec<(usize, AseSessionAction)>,
+    tick_no: usize,
 }
 
 impl AseSessionHost {
@@ -106,6 +118,8 @@ impl AseSessionHost {
             metrics: AseMetrics::default(),
             log: Vec::new(),
             errors: Vec::new(),
+            script: Vec::new(),
+            tick_no: 0,
         }
     }
 
@@ -278,8 +292,11 @@ impl AseSessionHost {
 
     /// 受控步进选中会话（AV poll → 真实 handler 执行 → 差量 apply 到当前
     /// 车道）。无选中 → Idle。`Dispatched` 在 step 边界计入累计
-    /// `metrics.dispatches`（真实 handler 执行走势）。
+    /// `metrics.dispatches`（真实 handler 执行走势）。到期脚本先注入（tick
+    /// 从 1 起；与 980/1022 脚本纪律同构——窗口按钮与脚本同一 on 消息面）。
     pub fn step_selected(&mut self) -> StepOutcome {
+        self.tick_no += 1;
+        self.run_due_script();
         let Some(id) = self.selected else {
             return StepOutcome::Idle;
         };
@@ -291,6 +308,36 @@ impl AseSessionHost {
             self.metrics.dispatches += 1;
         }
         outcome
+    }
+
+    /// 安装会话脚本（tick 从 1 起；e2e exe 与 CPU 测试同一边界）。
+    pub fn install_script(&mut self, script: Vec<(usize, AseSessionAction)>) {
+        self.script = script;
+    }
+
+    /// 脚本是否已全部注入（e2e 收口观察面）。
+    pub fn script_done(&self) -> bool {
+        self.script.iter().all(|(t, _)| *t <= self.tick_no)
+    }
+
+    fn run_due_script(&mut self) {
+        let due: Vec<AseSessionAction> = self
+            .script
+            .iter()
+            .filter(|(t, _)| *t == self.tick_no)
+            .map(|(_, a)| a.clone())
+            .collect();
+        for action in due {
+            let result = match &action {
+                AseSessionAction::Open(key) => self.open_session(key).map(|_| ()),
+                AseSessionAction::Select(id) => self.select(*id),
+                AseSessionAction::Close(id) => self.close_session(*id),
+                AseSessionAction::Click(target) => self.click(*target),
+            };
+            if let Err(e) = result {
+                self.errors.push(format!("script {action:?}: {e}"));
+            }
+        }
     }
 
     /// 引擎权威状态读回（业务真值；显示模型只是只读镜像）。已关闭会话 →
