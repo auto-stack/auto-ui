@@ -107,16 +107,17 @@ fn component_and_store_paths_delegate() {
 
 /// 生产 import 新建 Parser 的默认装配同源：以 import 管线同一构造
 ///（`Parser::from(..).with_session(ui)`，lib.rs 模块重读路径）解析一个
-/// **真实被导入文件**（examples/ui/018-book-reader treeview 组件，含
-/// msg/model），产物同为同一 AST 类型。
+/// **真实被导入文件**（examples/ui/018-book-reader 文件树组件，含
+/// msg/model），产物同为同一 AST 类型。plan085 F-10（a79fe604）删除了
+/// 从未实例化的 treeview.at 副本——现名 filetree.at（ef2e869b 迁仓同源）。
 #[test]
 fn import_created_parser_uses_default_declarations() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../examples/ui/018-book-reader/src/front/components/treeview.at"
+        "/../../examples/ui/018-book-reader/src/front/components/filetree.at"
     );
     let code = std::fs::read_to_string(path)
-        .expect("real imported UI file exists (examples/ui/018-book-reader treeview)");
+        .expect("real imported UI file exists (examples/ui/018-book-reader filetree)");
     assert!(
         code.contains("msg {") || code.contains("model {"),
         "fixture file carries declarations"

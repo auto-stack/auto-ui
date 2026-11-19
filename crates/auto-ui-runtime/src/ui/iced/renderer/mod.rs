@@ -4338,6 +4338,10 @@ mod tests {
     fn desktop_bus_inbox_drains_through_real_arms() {
         use crate::ui::layout::LayoutMode;
         use crate::ui::session::{DesktopCommand, DesktopSession};
+        // Plan 540 T2 同款桌面 config 隔离：__test_session 会读真实机器
+        // `~/.config/autoos/apps/desktop/config.at`——本机 `notes_enabled:
+        // false` 使 Notify 臂短路（机器相关红）；隔离到缺席临时文件=内置默认。
+        let _cfg = t2_isolate_storage("bus-inbox");
         let mut ds = DesktopSession::__test_session();
         // PLAN-759 T-05：壁纸机器态隔离——空临时目录存活至测试结束，挡掉
         // env/stella 探测两级（712 T-13/T-14 后 #hex 不再短路目录回退，
@@ -5459,6 +5463,10 @@ mod tests {
     #[test]
     fn workspace_v11_host_arms_add_close_send() {
         use crate::ui::session::DesktopCommand as DC;
+        // Plan 540 T2 同款桌面 config 隔离：两个 WorkspaceClose toast 臂都走
+        // push_notification 的 notes_enabled 门——未隔离时读真实机器 config
+        // （本机 false ⇒ toast 不落，机器相关红）。
+        let _cfg = t2_isolate_storage("ws-v11");
         let mut ds = t3_session_with_shell();
         let a = t3_add_win(&mut ds, "Alpha"); // ws0，焦点窗
                                               // `+`：增分区并即入新分区（验收②）。
@@ -10373,10 +10381,10 @@ fn ade_fg_light() -> crate::ui::code_editor::theme::Rgba {
 // 层无罪；真机缺陷在 v-html 降级链（VM length=字符数/sub=字节切片语义
 // 不一致 × musk render_mentions 逐字符扫描），修于 musk 22960ca。
 // 本模块保留两笔资产：①pct-hug 路径 CJK/latin 测宽对等回归钉；②bisect
-// 文档化测试——MaxWidthPct 子树内的 text 节点对 iced_selector/Find 操作
-// 恒不可见（container 候选可见、text 候选缺失，operate traverse 修复无
-// 效）——MCP 快照对被包节点的文本上报缺口（§10-11 capped 盒伪影家族）
-// 待后续专项（候选通道：MaxWidthPct tag/state 委托引发的 Tree 错位）。
+// 文档化测试——历史上 MaxWidthPct 子树内的 text 节点对 iced_selector/Find
+// 操作不可见（operate 递归一层过深）；76b0340c（2026-11-02）修复
+// `MaxWidthPct::operate` 转发自身布局节点后 text 候选已可见（MCP 快照
+// 被包节点文本上报缺口闭合，§10-11 capped 盒伪影家族历史态）。
 #[cfg(test)]
 mod plan080_uat_cjk_bubble_tests {
     use super::*;
@@ -10707,11 +10715,14 @@ This is a **bold** and *italic* paragraph with `code` and [link](https://x).
         assert!(dx1 > x_of("crates/"), "说明列必须在名称列右侧");
     }
 
-    /// 文档化（无断言）：MaxWidthPct 子树 text 节点对 Find 操作不可见、
-    /// container 可见——见模块头②。
+    /// 文档化：MaxWidthPct 子树 text 节点对 Find 操作的可见性——76b0340c
+    ///（2026-11-02）修复 `MaxWidthPct::operate` 转发自身布局节点（此前递归
+    /// 一层过深，内容件拿的是首个子叶节点——2026-09-21 bisect 记录的
+    /// 「operate traverse 修复无效」态）后，pct 包裹的 text 候选**已可见**：
+    /// MCP 快照对被包节点的文本上报缺口随之闭合（模块头②的历史态已翻）。
     #[test]
     fn plan080_uat_max_width_pct_operation_visibility_bisect() {
-        for (outer, expect_text) in [("flex flex-col", true), ("max-w-[70%]", false)] {
+        for (outer, expect_text) in [("flex flex-col", true), ("max-w-[70%]", true)] {
             let el = render_dynamic_view(
                 AbstractView::Column {
                     children: vec![AbstractView::Text {

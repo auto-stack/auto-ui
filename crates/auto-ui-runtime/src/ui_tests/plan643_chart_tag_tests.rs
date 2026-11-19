@@ -163,6 +163,10 @@ fn collect_view_texts(
                 collect_view_texts(c, out);
             }
         }
+        // Plan 031 T-05（1c66c24d）起 panel/card 落 Container 臂（保留
+        // 自身 style；无 grid/flex 类 ⇒ View::Container 包裹子树）——文本
+        // 面采集需递归进容器，否则 with_charts 的 header/card 文本全丢。
+        View::Container { child, .. } => collect_view_texts(child, out),
         View::AnchorSlot { child, .. } => collect_view_texts(child, out),
         _ => {}
     }

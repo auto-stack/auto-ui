@@ -18318,14 +18318,17 @@ widget Counter {
             "icon user 类透传:\n{}",
             code
         );
-        // badge：样式 Row + variant 预设 + label 子级（text prop 必达）。
+        // badge：PLAN-052（8d90626d）起经 a2r kit 元素发射——基类补 `inline-flex`
+        // 对齐 shadcn 真实 badge，样式经 `.to_string().as_str()` 包装；此处
+        // 断言类串本身 + label 子级（text prop 必达）。
         assert!(
-            code.contains("View::row().style(\"items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground\")"),
+            code.contains("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground"),
             "badge shadcn 基类+variant:\n{}",
             code
         );
+        assert!(code.contains("View::row()"), "badge 承载 Row:\n{}", code);
         assert!(
-            code.contains("View::text(\"Active\")"),
+            code.contains("View::text(\"Active\".to_string())"),
             "badge label 必达:\n{}",
             code
         );
@@ -18693,9 +18696,11 @@ widget Probe {
             "Point anchor bound to cursor state:\n{}",
             code
         );
+        // PLAN-052（c4b09ae2）起 typed-string 比较规范化为 `.as_str()` 方法形
+        //（E0605 ×98 株修复）——open 仍绑定状态表达式，拼写随规范化更新。
         assert!(
-            code.contains("open: self.blank_menu !="),
-            "open bound to state expression:\n{}",
+            code.contains("open: (self.blank_menu.as_str()) != (\"\".to_string().as_str())"),
+            "open bound to state expression (normalized str compare):\n{}",
             code
         );
         assert!(

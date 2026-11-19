@@ -25,6 +25,32 @@ fn repo_examples_ui() -> std::path::PathBuf {
         .join("ui")
 }
 
+/// AUTO_OS_ROOT 机器泄漏隔离（见测试内注释）：设置即权威地指向空临时
+/// 目录（apps.manifest 缺席 ⇒ launch 声明缺席），进程内串行、drop 恢复
+/// 原值——与 compiler 侧 `app_registry::tests` 的 env_lock 同款纪律。
+struct AutoOsRootIsolation(
+    Option<std::ffi::OsString>,
+    std::sync::MutexGuard<'static, ()>,
+);
+impl Drop for AutoOsRootIsolation {
+    fn drop(&mut self) {
+        match self.0.take() {
+            Some(v) => std::env::set_var("AUTO_OS_ROOT", v),
+            None => std::env::remove_var("AUTO_OS_ROOT"),
+        }
+    }
+}
+fn isolate_auto_os_root() -> AutoOsRootIsolation {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let guard = LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let saved = std::env::var_os("AUTO_OS_ROOT");
+    let scratch = std::env::temp_dir().join(format!("plan814-empty-os-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&scratch);
+    std::fs::create_dir_all(&scratch).expect("scratch dir");
+    std::env::set_var("AUTO_OS_ROOT", &scratch);
+    AutoOsRootIsolation(saved, guard)
+}
+
 // ---- Plan 463 T8：注册表 × LaunchApp 会话级端到端（真实仓库 examples/ui；
 // 验收 §5.1「≥3 个不同 App 启动」的无头等价——UI 半边（launcher/任务栏
 // 点击）随 464。boot 同款 resolver 构造见 renderer boot 注册表段）----
@@ -73,6 +99,14 @@ fn launch_three_real_apps_via_registry_resolver() {
 
     // 验收 §5.1 的 vm 已验证集取三个不同 App（声明 render 混合 vue/vm；
     // PLAN-552：459-dual-app 迁 capability-tests 后第三 App 换 041）。
+    // 机器泄漏隔离（os-054 3cd4585 后必要）：`resolve_os_manifest_root` 的
+    // 硬编码兜底会读开发机 `D:/autostack/auto-os/apps.manifest`——本机把
+    // 013-todo 声明为 native launch，而任何干净检出都没有其 rust 构建产物
+    // ⇒ StrictMissing 拒绝（机器相关红；CI 无该目录=声明缺席走 Inproc 绿）。
+    // 与 compiler 侧 app_registry 测试同款纪律：AUTO_OS_ROOT 指向空临时
+    // 目录（manifest 缺席 ⇒ launch 未声明 ⇒ 与 CI 同形 Inproc），测试结
+    // 束恢复原值。
+    let _os_root = isolate_auto_os_root();
     for id in ["011-calculator", "013-todo", "041-auto-edit"] {
         ds.launch_app(id)
             .unwrap_or_else(|e| panic!("launch {id} failed: {e}"));

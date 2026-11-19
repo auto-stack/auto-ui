@@ -86,6 +86,13 @@ widget DesktopSurface {
         var drag_moved str = ""
         var __desktop_label_dark str = ""
         var blank_menu str = ""
+        // PLAN-053 T-02：主题策略状态面（宿主注入——family/mode/rev 摘要 +
+        // 每应用 applied/rejected/unsupported 状态行；具名拒绝/落盘失败进
+        // __theme_error。空 = family 链未激活，视图零占位）。
+        var __theme_family str = ""
+        var __theme_mode str = ""
+        var __theme_status str = ""
+        var __theme_error str = ""
         // PLAN-012：光标坐标（宿主 __mouse_moved 臂持续写入，只写不置
         // view_dirty；空白菜单坐标锚数据源——open 翻转重建时读取最新值）。
         var __desktop_cursor_x float = 0.0
@@ -340,6 +347,52 @@ widget DesktopSurface {
                     onclick: .ThemeLightBlank
                     style: "w-full h-8 px-2 text-sm text-left rounded-md bg-transparent text-foreground hover:bg-primary/10"
                 }
+                // PLAN-053 T-02：主题策略区（family 链）——组头 + 六直选
+                // （Auto/Solarized × 浅/深/跟随系统）+ 当前策略与每应用
+                // 状态行（宿主 __theme_status/__theme_error 注入；拒绝具名）。
+                text "主题包（跟随/覆盖）" {
+                    style: "text-xs text-muted-foreground px-2 pt-1"
+                }
+                row {
+                    style: "gap-1 px-1"
+                    button (text: "Auto 浅", variant: "ghost") {
+                        onclick: .ThemeAutoLight
+                        style: "h-7 px-2 text-xs rounded-md bg-transparent text-foreground hover:bg-primary/10"
+                    }
+                    button (text: "Auto 深", variant: "ghost") {
+                        onclick: .ThemeAutoDark
+                        style: "h-7 px-2 text-xs rounded-md bg-transparent text-foreground hover:bg-primary/10"
+                    }
+                    button (text: "Auto 系统", variant: "ghost") {
+                        onclick: .ThemeAutoSystem
+                        style: "h-7 px-2 text-xs rounded-md bg-transparent text-foreground hover:bg-primary/10"
+                    }
+                }
+                row {
+                    style: "gap-1 px-1"
+                    button (text: "Solarized 浅", variant: "ghost") {
+                        onclick: .ThemeSolarizedLight
+                        style: "h-7 px-2 text-xs rounded-md bg-transparent text-foreground hover:bg-primary/10"
+                    }
+                    button (text: "Solarized 深", variant: "ghost") {
+                        onclick: .ThemeSolarizedDark
+                        style: "h-7 px-2 text-xs rounded-md bg-transparent text-foreground hover:bg-primary/10"
+                    }
+                    button (text: "Solarized 系统", variant: "ghost") {
+                        onclick: .ThemeSolarizedSystem
+                        style: "h-7 px-2 text-xs rounded-md bg-transparent text-foreground hover:bg-primary/10"
+                    }
+                }
+                if .__theme_status != "" {
+                    text .__theme_status {
+                        style: "text-xs text-muted-foreground px-2 pt-1"
+                    }
+                }
+                if .__theme_error != "" {
+                    text .__theme_error {
+                        style: "text-xs text-destructive px-2 pb-1"
+                    }
+                }
                 // PLAN-014 W-05'：恢复默认图标（清 shell.desktop.hidden
                 // 单源——boot 合并臂不再排除任何条目，重启全量回；
                 // refresh_desktop_icons 触发宿主即时重注入，storage 已清
@@ -523,6 +576,35 @@ widget DesktopSurface {
         .ThemeLightBlank -> {
             .blank_menu = ""
             .SendCmd("set_theme\tlight")
+        }
+        // PLAN-053 T-02：宿主主题策略选择（family 链六直选——Auto/Solarized
+        // × 浅色/深色/跟随系统）。动词字面 = session.rs parse 臂
+        // "set_theme_policy\t<family>\t<mode>" → SetThemePolicy → 宿主策略
+        // 核心 stage→落盘→publish 单点（校验拒绝具名回写 __theme_error，
+        // 保旧 policy；成功 __theme_rev 推进 + 全场快照撤 + 会话广播）。
+        .ThemeAutoLight -> {
+            .blank_menu = ""
+            .SendCmd("set_theme_policy\tAuto\tlight")
+        }
+        .ThemeAutoDark -> {
+            .blank_menu = ""
+            .SendCmd("set_theme_policy\tAuto\tdark")
+        }
+        .ThemeAutoSystem -> {
+            .blank_menu = ""
+            .SendCmd("set_theme_policy\tAuto\tsystem")
+        }
+        .ThemeSolarizedLight -> {
+            .blank_menu = ""
+            .SendCmd("set_theme_policy\tSolarized\tlight")
+        }
+        .ThemeSolarizedDark -> {
+            .blank_menu = ""
+            .SendCmd("set_theme_policy\tSolarized\tdark")
+        }
+        .ThemeSolarizedSystem -> {
+            .blank_menu = ""
+            .SendCmd("set_theme_policy\tSolarized\tsystem")
         }
 
         // 菜单：打开 = activate 两臂（同双击）。

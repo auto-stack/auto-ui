@@ -6911,7 +6911,7 @@ mod plan654_path_timesource {
     const HOST_FOR: &str = r#"
 widget ForHost654 {
     model {
-        var items str = "a,b,c"
+        var items []str = ["a", "b", "c"]
         var show bool = true
     }
     view {
@@ -7246,33 +7246,34 @@ widget Plain654 {
     /// for 多实例装配：view 一次登记多条 path。
     #[test]
     fn plan654_for_view_registers_multiple_paths() {
-        // items 需为数组——HOST_FOR 的 items str 可能不被 for 读成 3 项。
-        // 用显式 model 数组语义：写 state 为逗号串时 builder 读 state 名。
-        // 若 for 源解析失败则 path 为空——本测改用手工 sink 与 view 双路径：
-        // 优先 view；若未登记则 fallback 手工（与 T-A02 一致）。
-        let src = format!("{HOST_IF}\n{DEMO_CLOCK}");
+        // PLAN-980（34bb4326）起 subscribable_instance_timesources 以 bridge
+        // 实例身份为准（mounted_paths 仅在 bridge 无该类型实例时兜底展开）
+        // ——手工 sink 登记不再参与计数，本测回到其名义语义：真 for 视图
+        // 装配一次登记 3 条实例 path，3 条均可订阅。
+        let src = format!("{HOST_FOR}\n{DEMO_CLOCK}");
         let mut comp = build(&src);
         let _ = comp.view_with_debug_gated(false);
-        // 至少一条 path 已由装配登记
-        assert!(
-            comp.mounted_paths().iter().any(|p| p.is_instance()),
-            "view assembly must register at least one instance path; got {:?}",
-            comp.mounted_paths()
+        // view 装配登记了实例 path（for 展开 a,b,c 三项）
+        let paths: Vec<String> = comp
+            .mounted_paths()
+            .iter()
+            .filter(|p| p.widget_type() == "DemoClock654" && p.is_instance())
+            .map(|p| p.as_str().to_string())
+            .collect();
+        assert_eq!(
+            paths.len(),
+            3,
+            "for view assembly must register three instance paths; got {:?}",
+            paths
         );
-        // 手工扩到 3 条后 expand
-        comp.begin_mount_frame();
-        {
-            let sink = comp.mount_path_sink();
-            sink.register("DemoClock654");
-            sink.register("DemoClock654");
-            sink.register("DemoClock654");
-            comp.mounted_sink()
-                .borrow_mut()
-                .insert("DemoClock654".into());
-        }
+        // 实例时间源随 bridge 实例身份展开为 3 条
         let inst = comp.subscribable_instance_timesources();
         let n = inst.iter().filter(|s| s.widget == "DemoClock654").count();
-        assert_eq!(n, 3);
+        assert_eq!(
+            n, 3,
+            "three real instances -> three subscribable instance timesources; got {:?}",
+            inst
+        );
     }
 
     /// AC-A4：path 可区分；handler 仍类型级（单 VM 根态）。

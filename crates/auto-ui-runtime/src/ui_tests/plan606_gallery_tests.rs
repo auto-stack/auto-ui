@@ -12,6 +12,37 @@ mod plan606_gallery_tests {
     use crate::ui::style::StyleClass;
     use crate::ui::view::View;
 
+    /// PLAN-089 T-04（69044a8b）起 029 查看区迁官方 image-viewer 包——
+    /// 查看态媒体面是 `image_surface` ⇒ `View::ImageSurface`（Plan 547 异步
+    /// 媒体面），不再落 `View::Image`。查看态断言用本采集器（src, fit）。
+    fn collect_image_surfaces(view: &View<DynamicMessage>, out: &mut Vec<(String, String)>) {
+        match view {
+            View::ImageSurface { src, fit, .. } => out.push((src.clone(), fit.clone())),
+            View::Column { children, .. } | View::Row { children, .. } => {
+                for c in children {
+                    collect_image_surfaces(c, out);
+                }
+            }
+            View::Grid { cells, .. } => {
+                for c in cells {
+                    collect_image_surfaces(c, out);
+                }
+            }
+            View::Container { child, .. } => {
+                collect_image_surfaces(child, out);
+            }
+            View::Button { content, .. } => {
+                if let Some(c) = content {
+                    collect_image_surfaces(c, out);
+                }
+            }
+            View::Scrollable { child, .. } => {
+                collect_image_surfaces(child, out);
+            }
+            _ => {}
+        }
+    }
+
     fn collect_images(
         view: &View<DynamicMessage>,
         out: &mut Vec<(String, Option<crate::ui::Style>)>,
@@ -262,24 +293,17 @@ mod plan606_gallery_tests {
             event_name: "OpenPhoto".to_string(),
             args: vec![auto_val::Value::str("p07")],
         });
-        crate::plan370_test_support::drive_parked_segments(
-            &mut dc,
-            |dc| {
-                let mut imgs = Vec::new();
-                collect_images(&dc.view(), &mut imgs);
-                imgs.iter()
-                    .filter(|(src, _)| !src.starts_with("lucide:"))
-                    .count()
-                    == 1
-            },
-            "029 viewer",
-        );
+        // PLAN-089（69044a8b）后查看区迁官方 image-viewer 包——ImageViewport
+        // 是**子件**（child widget），其 Init demand 需 PLAN-840 的驱动面
+        //（渲染暴露子件 Init → 调度/IO 泵至终态）翻转「Loading…」占位；
+        // plan370 的 parked 泵单独不足以驱动子件装配。
+        dc.drive_test_to_completion("029 viewer mount", std::time::Duration::from_secs(10));
 
         let view_mode = dc.view();
-        let mut all_viewer_images = Vec::new();
-        collect_images(&view_mode, &mut all_viewer_images);
+        let mut all_viewer_surfaces = Vec::new();
+        collect_image_surfaces(&view_mode, &mut all_viewer_surfaces);
 
-        let viewer_photos: Vec<_> = all_viewer_images
+        let viewer_photos: Vec<_> = all_viewer_surfaces
             .into_iter()
             .filter(|(src, _)| !src.starts_with("lucide:"))
             .collect();
@@ -287,26 +311,21 @@ mod plan606_gallery_tests {
         assert_eq!(
             viewer_photos.len(),
             1,
-            "Viewer mode should have exactly 1 full image, got {}",
+            "Viewer mode should have exactly 1 full-image surface, got {}",
             viewer_photos.len()
         );
-        let (full_src, full_style) = &viewer_photos[0];
+        let (full_src, full_fit) = &viewer_photos[0];
         // 全图 URL 与所选同一 id 精确一致（origin/app/id 映射）。
         assert_eq!(
             full_src,
             &stub.full_url("p07"),
-            "Full image src must be the exact stub full URL for the selected id"
+            "Full image surface src must be the exact stub full URL for the selected id"
         );
-        let s = full_style.as_ref().expect("Full image should have style");
-        let has_contain = s.classes.iter().any(|c| {
-            matches!(
-                c,
-                StyleClass::ObjectFit(crate::ui::style::ObjectFit::Contain)
-            )
-        });
-        assert!(
-            has_contain,
-            "Full image should have StyleClass::ObjectFit(Contain) from fit: 'contain'"
+        // PLAN-089 后 fit 由 ImageSurface.fit 字符串承载（surface 渲染器的
+        // Object-fit 策略）。
+        assert_eq!(
+            full_fit, "contain",
+            "Full image surface fit must be 'contain'"
         );
 
         // env 恢复由 _env Drop 完成（正常/panic/early-return 全覆盖，

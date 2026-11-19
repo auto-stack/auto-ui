@@ -124,6 +124,11 @@ pub fn list_notes() []Note {
 pub fn create_note(title str) Note {
     return db.add(title)
 }
+
+#[api(method = "POST", path = "/api/notes/validate")]
+pub fn validate_note(id int, title str) Note {
+    return db.add(title)
+}
 "#,
     )
     .expect("write api.at");
@@ -404,12 +409,19 @@ fn http_e2e_back_proxy_not_found_faces() {
     assert_eq!(status, 404, "missing /apps prefix");
 }
 
-/// 缺参按名绑定的 400 面。
+/// 缺参按名绑定的 400 面。aea33365 起单 str 形参端点走「完整 body 绑定」
+/// legacy 合同（POST `{}` 会被单参吸收为 title）——缺参面改由多参端点
+/// 按名绑定验证：body 只带 `id`，`title` 缺席 ⇒ 具名 400。
 #[test]
 fn http_e2e_back_proxy_missing_param_is_400() {
     let (config, _dir) = fixture_config("400", ephemeral_port());
     let proxy = start(config).expect("start back proxy");
-    let (status, body) = http_request(proxy.port, "POST", "/apps/fixture/api/notes", Some("{}"));
+    let (status, body) = http_request(
+        proxy.port,
+        "POST",
+        "/apps/fixture/api/notes/validate",
+        Some(r#"{"id": 1}"#),
+    );
     assert_eq!(status, 400, "missing param, body: {body}");
     assert!(body.contains("missing param `title`"), "body: {body}");
 }

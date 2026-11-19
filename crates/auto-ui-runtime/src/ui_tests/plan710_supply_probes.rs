@@ -653,9 +653,12 @@ fn plan714_back_try_arm_return_propagation() {
         rs.contains("Ok(Some(__v)) => return __v"),
         "Some 传播臂: {rs}"
     );
+    // PLAN-956（764f454d1）起 None 尾臂发射为空块 `{}`（Option 传播形
+    // 分流 enclosing_option；体必 return 形下不可达——安全），旧
+    // `return Default::default()` 拼写随之退役。
     assert!(
-        rs.contains("Ok(None) => return Default::default()"),
-        "None 尾臂（体必 return 形不可达）: {rs}"
+        rs.contains("Ok(None) => {},"),
+        "None 尾臂（体必 return 形不可达，956 起空块形）: {rs}"
     );
     assert!(rs.contains("return Some(true)"), "体 return 包 Some: {rs}");
 }

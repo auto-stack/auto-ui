@@ -403,6 +403,11 @@ impl Coverage {
             "overflow-",
             "min-w-",
             "min-h-",
+            // plan084（5cfc5a6b）把官方 FileDialog 包接进 041-auto-edit 后，
+            // 其 roots 列 `max-h-64`（3219e7bc）进入运行视图——max-h- 同
+            // min-h- 的降级放行边界：native 队列投影的高度钳制渲染 not-yet
+            // （iced 真渲染臂已映射 MaxHeight），非静默扩权。
+            "max-h-",
             "leading-",
             "flex",
             "block",

@@ -1754,8 +1754,12 @@ fn popover_edge_bottom_snaps_and_spans_full_width() {
 fn desktop_surface_z_slot_window_covers_icons() {
     // 真 desktop.at 装载 + 三条目注入（投影形状 = renderer
     // inject_desktop_surface 的 {id,icon,label,src}）。
+    // PLAN-012 T11 W5（auto-lang c5498ab61）起 desktop.at 图标面改迭代
+    // `.__desktop_cells`（spacer/c/r 表，形状 = DesktopCellEntry::to_value）
+    // ——只写 __desktop_icons 不再渲染格面，两路同注入。
     let mut comp = crate::ui::shell::build_desktop_surface_component().expect("desktop.at 装载");
-    let entries: Vec<auto_val::Value> = ["011-calculator", "013-todo", "015-notes"]
+    let ids = ["011-calculator", "013-todo", "015-notes"];
+    let entries: Vec<auto_val::Value> = ids
         .iter()
         .map(|id| {
             auto_val::Value::Obj(Box::new(auto_val::Obj::from_pairs([
@@ -1767,6 +1771,23 @@ fn desktop_surface_z_slot_window_covers_icons() {
         })
         .collect();
     let _ = comp.write_state_vec("__desktop_icons", entries);
+    let cells: Vec<auto_val::Value> = ids
+        .iter()
+        .enumerate()
+        .map(|(c, id)| {
+            auto_val::Value::Obj(Box::new(auto_val::Obj::from_pairs([
+                ("id", auto_val::Value::Str((*id).into())),
+                ("icon", auto_val::Value::Str("app-window".into())),
+                ("full", auto_val::Value::Str("".into())),
+                ("label", auto_val::Value::Str((*id).into())),
+                ("src", auto_val::Value::Str("pinned".into())),
+                ("color", auto_val::Value::Str("".into())),
+                ("c", auto_val::Value::Str(c.to_string().into())),
+                ("r", auto_val::Value::Str("0".into())),
+            ])))
+        })
+        .collect();
+    let _ = comp.write_state_vec("__desktop_cells", cells);
     let (view, _, _) = comp.view_with_debug_gated(false);
     let surface_el: iced::Element<'static, ()> = view.map_msg(|_| ()).into_iced();
 
@@ -2818,16 +2839,17 @@ on_scroll: None,
         "h-full 形态 pill 必须可见（实测 {w}x{h}）"
     );
 
-    // 缺陷形态（无高度类）钉住渲染器缺口：provider h-full 塌缩 → 0×0
-    // （Row 交叉轴无 CSS stretch 语义;若未来渲染器补 stretch 语义,本断言
-    // 应同步翻转为正尺寸——KNOWN-DEBT P625-T04）。
+    // 缺陷形态（无高度类）钉住渲染器缺口：aside 无高度来源时，style_widgets
+    // 的 min-height 回退把 `min-h-0` 映射为 `Length::Fixed(0.0)`，iced 0.14
+    // flex 对 Fixed(0) 子件**不产出布局节点**——整棵 aside 子树从布局树消失
+    // （find/operate 均不可见；Fixed(0.001) 起节点才在）。原「0×0 但可 find」
+    // 哨兵与「Row 交叉轴无 stretch」前提均已不成立（去 min-h-0 时 pills 有
+    // 正尺寸）；渲染器若补 CSS 语义（min-height 0 不折 Fixed(0)），本断言
+    // 应翻转为正尺寸可见——KNOWN-DEBT P625-T04。
     let mut ui = simulator(root_with(aside_with("")).into_iced());
-    let (x2, _y2, w2, h2) = bounds_of(&mut ui, "全部");
-    eprintln!("[p625][no-height] pill 全部 bounds=({x2},,{w2}x{h2})");
-    assert_eq!(
-        (w2, h2),
-        (0.0, 0.0),
-        "无高度类形态应保持 0×0（渲染器缺口哨兵）"
+    assert!(
+        ui.find("全部").is_err(),
+        "无高度类形态：min-h-0→Fixed(0) 子树被布局树丢弃（渲染器缺口哨兵）"
     );
 }
 
