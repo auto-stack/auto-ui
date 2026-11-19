@@ -1324,6 +1324,7 @@ pub(crate) fn blank_style_surface(src: &str) -> String {
                 let mut in_s = false;
                 let mut es = false;
                 let mut comma_at: Option<usize> = None;
+                let mut first_close: Option<usize> = None;
                 let mut last_close: Option<usize> = None;
                 while j < body.len() {
                     let c = body.as_bytes()[j] as char;
@@ -1341,6 +1342,9 @@ pub(crate) fn blank_style_surface(src: &str) -> String {
                         d += 1;
                     } else if c == '}' {
                         if d == 0 {
+                            if first_close.is_none() {
+                                first_close = Some(j);
+                            }
                             last_close = Some(j);
                         } else {
                             d -= 1;
@@ -1357,8 +1361,14 @@ pub(crate) fn blank_style_surface(src: &str) -> String {
                     // 值在本行未收口（多行条件样式）——本行尾整段空白化，
                     // 续行按深度整行空白化。
                     (body.len(), d)
-                } else {
+                } else if body[start..].contains(" else ") {
+                    // 单行条件样式 `if … { … } else { … }`：值到本行最后一个 `}`
+                    // 之前（保留外层元素的收尾括号）。
                     (last_close.unwrap_or(body.len()), 0)
+                } else {
+                    // 普通条目：到第一个同层 `}` 之前（嵌套单行元素只带走自己的
+                    // 收尾括号，不越界吃外层）。
+                    (first_close.unwrap_or(body.len()), 0)
                 };
                 return Some((start, end, opens));
             }
@@ -1598,8 +1608,15 @@ impl NodeDesktopBridge {
     /// 源为静态面——事件面缺席具名可辨）。
     pub fn load(src: &str, path: &str, instances: usize) -> Result<Self, String> {
         // PLAN-104：harness 不消费 style 面（A2Vue 覆盖样式）；空白化保字节长。
-        let src = &blank_style_surface(src);
-        let candidates = project_component_candidates(src).map_err(|ds| diags(&ds))?;
+        // PLAN-105 T-02：**先用原源**投影（本地/内联样式可解析），仅当原源投影
+        // 失败才退回空白化（104 既有语料语义不变；真实工程源不再因样式引用被
+        // 误伤）。
+        let raw = src.to_string();
+        let candidates = match project_component_candidates(&raw) {
+            Ok(c) => c,
+            Err(_) => project_component_candidates(&blank_style_surface(&raw))
+                .map_err(|ds| diags(&ds))?,
+        };
         let node = candidates
             .first()
             .ok_or_else(|| "no AGE node candidate in source".to_string())?;
