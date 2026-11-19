@@ -85,7 +85,7 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 - [x] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。收据见 §9（2026-11-19 T-01）：六例原源事实、组件面/包面首阻断、缺口台账 G1–G11、共享实现线与唯一写面已冻结；矩阵与原始日志在 `D:/autostack/plan-artifacts/plan-105/t01-matrix.md` + `t01-probe.log`。
 - [ ] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
 - [ ] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
-- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。（**部分**：015/018/022 已真开 Iced 窗——frames 2/2/3、errors 0；**018 已真点击交互**：`ToggleTheme` 两次点击 `dark_mode` false→true、dispatch 2、errors 0（收据见 §9 W25/W29）；015 事件体含 store/API 调用仍具名拒；013/016 待 S1；012 待局部列表。）
+- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。（**部分**：015/018/022 已真开 Iced 窗——frames 2/2/3、errors 0；**018/022 已真点击交互**：`ToggleTheme`/`ToggleDarkMode` 两次点击状态翻转、dispatch 2、errors 0（收据 §9 W25/W29/W34）；015 事件体含 store/API 调用仍具名拒；013/016 待列表语义；012 待局部列表。）
 - [ ] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
 - [ ] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
 - [ ] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
@@ -479,6 +479,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 36 | from: work | t
 **效果**：016-calendar 的 `no function named month_name` 墙消失，新墙是 `month_name` 体内**定长数组字面量 + 下标**（`[12]str = [...]` / `names[month-1]`）——列表/数组语义未接线（`locals must be initialized at declaration`）。013 仍卡 store `on` 体列表操作。
 
 **下一刀**：列表/数组语义（字面量、下标读、`push`）——016/013 与 012 的共同大件；之后才是 015 类事件的宿主 API 面。`next_responsible_role: work（T-02 W34）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 37 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: b9ef4d3a | next: work
+
+2026-11-19 stage: work（T-04 交互验收 022 + 列表语法勘察）| PLAN-105 r1 | outcome: pass（证据轮）| code_commit: 无 | task_ids: T-04 / T-02 勘察 | evidence: `plan-artifacts/plan-105/av-022-click3.json`
+
+**证据（真实 Iced 窗 + 脚本化点击）**：022-kanban `--script "4:click:0:0,8:click:0:0"` → `frames=1`、`errors=0`、dispatch 2 条 `ToggleDarkMode`：`dark_mode` false→true（**022 交互成立**）。015-notes 同法仍被 body_foreign 具名拒（store handler 内含 API 调用）。至此 **018/022 两个应用有真点击交互证据**。
+
+**列表/数组语义勘察（下一刀的路标）**：在 `age-component` 面直接开放 `array-lit` 会让文法编译失败——4 条诊断：`condition-atom`/`atom-expr` 引用被裁剪规则、`array-elem-tail` 被裁剪、"repeat of nullable item is forbidden"（`array-elems` 在该面可空）。即：需要同时放开 `condition-atom`/`array-elem-tail` 的 profile，并把元素步改成**非可空**（如 pratt 而非 expr），否则文法自检拒绝。已回滚该实验（census 4/4 保持）。
+
+**下一刀**：按上述路标开放列表字面量（文法三处 + 非可空元素步），再验证 `let names [12]str = [...]` / `names[i]`（016 helper）与 handler 局部列表（012）。`next_responsible_role: work（T-02 W34）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
