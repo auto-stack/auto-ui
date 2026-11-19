@@ -399,6 +399,14 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 28 | from: work | t
 **T-05 现状**：SFC 生成路径对「带 use/依赖样式的真工程源」已可工作；真应用（015/018/022）仍被**包闭包**挡住——store/api 单元缺失 + store 语义未接线（S1）。
 
 **下一刀**：S1 store 语义（包面多单元装载 + `.store.*` 绑定 + 方法调用），然后 013/016 装载与 015/018 的点击脚本、A2Vue 真应用生成。`next_responsible_role: work（T-02 W26）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 29 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: bd7f9f29a | next: work
+
+2026-11-19 stage: work（T-02 W26：store 结构投影）| PLAN-105 r1 | outcome: pass（本刀完成；T-02 未整体完成）| worktree: `D:/autostack/.wt/ui-105/auto-lang` @ `plan-105-dev` | code_commit: auto-lang `bd7f9f29a` | task_ids: T-02（W26，S1 第二刀）| evidence: 回归单测 + 全 affected
+
+**交付**：`store <Name> { … }` 从「只能解析」推进到**结构化候选**——`ComponentStore{name,fields,messages,handlers,span}`、`ComponentNode.stores`、`project_component_stores`（独立于 node，store 单元可无 node）、`FrontOk.component_stores` 进前门产物。两消费面同律具名拒（组件面 "parsed with N field(s)/M message(s) … (S1)"；包面对含 store 的单元，`use` 行按 prep 同律空白化后再投影）。回归 `p105_store_decl_projects_structure`（累计 **23 例**）；affected 全绿：104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24、census 4/4。
+
+**下一刀**：store 语义接线（共享实例、`.store.*` 绑定、store 方法调度）——组件面先做单文件 store+node 形，包面再做多单元；013/016 由此解锁，015/018 点击脚本随同。`next_responsible_role: work（T-02 W27）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
