@@ -214,3 +214,30 @@
   非 DEBT-008 三模式（渲染环/注入链与它无关——窗口日志零冻结零丢失）。
 - **关闭条件**：vm profile 连续 ≥3 轮 boundary 重启后 CDP 均可达，
   或 doc-surface 起动失败有显式重试/降级投影。
+
+## DEBT-010 native 视图差分/子件注入缺口：组级结构重渲染与包父层子件事件（PLAN-092 甄别移交，本仓 auto-ui-runtime 域）
+
+- **状态**：已甄别、未修（2026-11-20）。来源：PLAN-092 T-07 复审修复轮
+  六形态系统复测（docs/plans/archived/092-property-inspector.md §9、
+  docs/reviews/plan092/decisions.md §9）。
+- **症状（两个互补面）**：
+  ①**组级结构重渲染缺口（B-6）**：包 widget 内 `for g in .grows` 的组级
+  结构变化（grows 重建、组记录成员条件、被移除子树的再插入）在 native
+  视图不重渲染；仅现存子树内的标量驱动互换（edit_id 型）与 push 驱动的
+  `List.contains` 首折可见。同类型多实例还伴随面板行重投影不稳定。
+  ②**包父层子件注入缺口（B-5）**：父件为包 widget 时，子控件按钮的注入
+  消息 `delivery: sent=1 delivered=0`、嵌套 input Enter 不派发 committed；
+  错误事件路由正常。route 形态对照：local 父
+  `.NumericFielddemo@//…`（通）vs 包父
+  `.NumericField/PropertyInspector#0/…`（不派发）。
+- **影响**：PropertyInspector 交互折叠 deferred（v1 静态分组标题）；native
+  子控件（087/088）编辑事件矩阵由 vue 轨承担（产品门 B5 用例 not_run
+  单列）。受影响消费面：任何包 widget 内嵌子控件按钮/输入的 MCP 无人值守
+  驱动与组级动态 UI。
+- **域**：auto-ui-runtime 视图差分（dynamic.rs 重渲染/diff）与子件事件
+  注入链（dynamic.rs Plan 370/PLAN-098 注入族）。非 DEBT-008/009 面。
+- **关闭条件**：①组级结构变化（列表重建/成员条件翻转）在包 widget 内
+  可靠重渲染（受控对照用例：折叠→字段消失→展开→字段恢复，双实例共存）；
+  ②包父层子件按钮 press 的 delivered=received 且嵌套 input Enter 派发
+  committed（PLAN-092 复现脚本可复用）。修复后 PropertyInspector 交互
+  折叠双轨补齐（合同文本不变）。
