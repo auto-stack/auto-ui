@@ -17,7 +17,8 @@
 #![cfg(all(windows, feature = "ace-bridge"))]
 
 use auto_ui_runtime::ui::ace_node_desktop::{
-    host_session_display, host_session_stats, push_event, NodeDesktopBridge, StepOutcome,
+    current_session, host_session_display, host_session_stats, push_event, push_late_event,
+    NodeDesktopBridge, StepOutcome,
 };
 use auto_ui_runtime::ui::ace_state_bridge::{
     AceAlias, AceInitialValue, AceStateEngine, AceStateValue, DispatchOutcome,
@@ -534,4 +535,98 @@ fn p1023_t03_same_app_isolation_close_reopen_zero() {
         "window view rendered one frame"
     );
     eprintln!("p1023_t03 elapsed: {:?}", started.elapsed());
+}
+
+/// V-04/V-09 核心（T-04）：状态增量只落选中车道（单事件=恰好一个 int 槽
+/// apply，目标/值对应显示）；第三会话具名 `session.limit` 拒且现有两会话
+/// 不动；关闭后迟到事件定向旧车道 late_dropped、新代次模型零业务/UI 效果；
+/// 释放名额后可再开。
+#[test]
+fn p1023_t04_increment_target_limit_and_late_events() {
+    let started = Instant::now();
+    let apps = fixture_apps();
+    let counter_a = apps
+        .iter()
+        .find(|a| a.key == "counter-a")
+        .cloned()
+        .expect("counter-a fixture");
+    let mut host = AseSessionHost::new(vec![counter_a]);
+    let a1 = host.open_session("counter-a").expect("open a1");
+    let a2 = host.open_session("counter-a").expect("open a2");
+    host.select(a1).expect("select a1");
+
+    // 增量目标：一次 Inc → 恰好一个 int apply（count 槽 0→1），值/目标与
+    // 显示一一对应；另一会话（无事件）不被污染。
+    let lane1 = host.ui_session_of(a1).unwrap();
+    let applies_before = host_session_stats(lane1).unwrap().applies;
+    let count_slot = host_session_display(lane1)
+        .unwrap()
+        .1
+        .first()
+        .unwrap()
+        .iter()
+        .position(|(n, _)| n == "count")
+        .expect("count slot");
+    // a2（隐藏，无事件）基线：a1 的事件不得污染其车道。
+    let lane2 = host.last_lane_of(a2).unwrap();
+    let lane2_applies_before = host_session_stats(lane2).unwrap().applies;
+    host.click(TARGET_INC).expect("inc a1");
+    match host.step_selected() {
+        StepOutcome::Dispatched { .. } => {}
+        other => panic!("inc a1: {other:?}"),
+    }
+    let stats1 = host_session_stats(lane1).unwrap();
+    assert_eq!(
+        stats1.applies,
+        applies_before + 1,
+        "one event = exactly one diff apply (count only)"
+    );
+    let last_apply = current_session(|s| s.applied.last().cloned()).flatten();
+    let last_apply = last_apply.expect("one applied row");
+    assert_eq!(last_apply.kind, "int", "count is the int lane");
+    assert_eq!(last_apply.slot, count_slot, "apply hits the count slot");
+    assert_eq!(last_apply.value, "1", "applied value = new engine truth");
+    assert_eq!(displayed_count(lane1), "1");
+    assert_eq!(
+        host_session_stats(lane2).unwrap().applies,
+        lane2_applies_before,
+        "a2 untouched (no cross-session pollution)"
+    );
+
+    // 两会话上限：第三个 open 具名 session.limit 拒；现有会话/装载不动。
+    let loads_before = host.metrics.loads;
+    let err = host
+        .open_session("counter-a")
+        .expect_err("third live session must refuse");
+    assert!(err.contains("session.limit"), "named refusal: {err}");
+    assert_eq!(host.live_ids(), vec![a1, a2], "existing sessions unchanged");
+    assert_eq!(host.metrics.loads, loads_before, "zero loads on refusal");
+    assert_eq!(engine_count(&host, a1), 1, "a1 keeps 1");
+    assert_eq!(engine_count(&host, a2), 0, "a2 keeps 0");
+
+    // 关闭 a1 → 迟到事件定向旧车道（late_dropped 计数），新代次模型零
+    // 业务/UI 效果；释放名额后同 app 可再开（新会话种子 0）。
+    host.close_session(a1).expect("close a1");
+    let late_before = host_session_stats(lane1).unwrap().late_dropped;
+    push_late_event(lane1);
+    push_late_event(lane1);
+    assert_eq!(
+        host_session_stats(lane1).unwrap().late_dropped,
+        late_before + 2,
+        "late events dropped on the stale lane, counted"
+    );
+    let a3 = host.open_session("counter-a").expect("freed slot reopens");
+    let lane3 = host.ui_session_of(a3).unwrap();
+    assert_eq!(engine_count(&host, a3), 0, "fresh model seeds 0");
+    let applies3 = host_session_stats(lane3).unwrap().applies;
+    push_late_event(lane1);
+    assert_eq!(
+        host_session_stats(lane3).unwrap().applies,
+        applies3,
+        "late event has zero UI effect on the new generation"
+    );
+    assert_eq!(displayed_count(lane3), "0", "new model display stays 0");
+    assert_eq!(engine_count(&host, a2), 0, "a2 still untouched");
+    assert!(host.errors.iter().any(|e| e.contains("session.limit")));
+    eprintln!("p1023_t04 elapsed: {:?}", started.elapsed());
 }
