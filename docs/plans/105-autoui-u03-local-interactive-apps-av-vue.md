@@ -216,6 +216,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 51 | from: work | t
 **结构事实**：018/022 用 `routes { "/" -> use page }` + `outlet`（页面在 `src/front/pages/*.at`，故「真窗只渲染壳件」是**结构性**的，不是遗漏）；013/015/016 用 `store`（已可内联）；六例中 5 个需要**宿主 API/后端**或**页面组合**之一。
 
 **下一步排序（按解锁面）**：①**页面组合**（routes/outlet → 渲染 `pages/*.at` 的 widget，共享 store）——一次解锁 018/022 两个例；②**宿主 API 面**（S1）——解锁 013/015；③**view-for over state 列表**——解锁 016/022 内容；④computed 写入——解锁 012。①与②可并行推进；先做①（面更大且不改语言语义）。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 52 | from: work | to: work | status: executing | outcome: pass（S1 方案定界）| worktree: D:/autostack/.wt/ui-105 | commit: 无代码提交 | next: work
+
+2026-11-19 stage: work（T-02 W49：S1 宿主 API 面定界 + 后端来源勘察）| PLAN-105 r1 | outcome: pass | task_ids: T-02（W49）| evidence: 013 `src/back/{api,db}.at` 实读
+
+**勘察事实**：013 的后端是**纯 Auto 源码 + 内存态**（`db.at`：模块级 `var todos List<Todo>` + `pub fn all_todos/create_todo/update_todo/...`；`api.at` 只是薄封装 `return db.all_todos()`）——不是外部服务，故 S1 不必先造网络/文件宿主，可实现为**语言内后端**。
+
+**关键约束**：组件面（widget）没有模块级状态与返回值的自由函数面（model 字段只能被 handler 读写），所以「把后端函数内联成组件函数」这条路走不通；需要一条**宿主调用面**。
+
+**已定界的实现路径（下一刀）**：用 HIR 既有 `DefKind::Intrinsic { symbol, effect, ty }` 承载宿主 API——①组件面把 `use api: f` 的 `pub fn` 签名声明为 intrinsic def（符号 `host.api.<unit>.<fn>`，带参数/返回类型）；②verify 按声明类型核调用；③MIR/AV 解释器按 symbol 分派到**宿主表**（AV 侧内存实现 todo/notes/cards 后端，会话内状态）；④能力门 `ac.runtime.host.api.v1`，未声明即具名拒。现状核对：intrinsic 目前只作缓存/依赖元数据用，**尚无执行分派**，需补 ③。
+
+**并行候选**：A2Vue 车道（TS 运行时自带宿主与组合），可能是 018/022（routes+outlet）更近的路；下一轮先做一次**干净的 SFC 生成探测**（用真实 `PackageModuleInput`），再决定两车道顺序。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
