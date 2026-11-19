@@ -447,6 +447,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 33 | from: work | t
 **验证**：plan105 **25/25**、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24、census 4/4；auto-ui prep 6/6（015/018/022 桥装载保持）。
 
 **下一刀**：013/016 的 store `on` 体面（`var` 局部 + `for` + 列表操作）与 API 调用；012 局部列表。`next_responsible_role: work（T-02 W31）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 34 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: c968f158 | next: work
+
+2026-11-19 stage: work（T-02 W31：store 自方法改写 + view 树 store 重写）| PLAN-105 r1 | outcome: pass（本刀完成；T-02 未整体完成）| code_commit: auto-ui `c968f158`、auto-lang `197a87923` | task_ids: T-02（W31）| evidence: 6/6 + 25/25 + affected
+
+**交付**：①auto-ui prep 把 store 体内**自方法调用** `.Foo(args)` 改写为 `store.Foo(args)`（char 迭代不切碎 UTF-8、handler 头 `) -> {` 豁免、已有 `store.` 不重复加）；②core `rewrite_store_view_items` 递归重写 view **树**（`tree`/`named_trees`：文本叶/元素条目/内联 lambda/条件/循环体）里的 `.store.*`——循环体文本叶不进 `texts`，必须单独走。
+
+**效果**：**015-notes 经真实源准备投影通过并进入 AV 桥**（此前的结构错误消失）；016-calendar 的 store 块已解析并内联（`st_year/st_month/...` 前缀字段出现），剩余一墙是 `leaf-expr: no local named self`（仍有未重写的 store 链待定位）；013 仍具名 `.store` 边界（store 块不可解析）。
+
+**验证**：auto-ui prep 6/6；auto-lang plan105 25/25、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24。
+
+**下一刀**：016 的 leaf-expr `self` 定位（view 树重写是否覆盖其文本叶形态）、013 store 块解析（其 `on` 体语句形态）、012 局部列表。`next_responsible_role: work（T-02 W32）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
