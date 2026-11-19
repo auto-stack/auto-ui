@@ -113,14 +113,16 @@ async function main() {
   const port = server.address().port;
 
   const chromium = await resolvePlaywright();
+  // PLAN-104：优先 bundled chromium（最快），channel 仅作回退；F-05 逐例耗时
+  // 受 channel 探测影响（msedge 首启可达数十秒）。
   let browser;
   try {
-    browser = await chromium.launch({ headless: true, channel: 'msedge' });
+    browser = await chromium.launch({ headless: true });
   } catch (_) {
     try {
-      browser = await chromium.launch({ headless: true, channel: 'chrome' });
+      browser = await chromium.launch({ headless: true, channel: 'msedge' });
     } catch (_) {
-      browser = await chromium.launch({ headless: true });
+      browser = await chromium.launch({ headless: true, channel: 'chrome' });
     }
   }
   const page = await (await browser.newContext()).newPage();

@@ -33,7 +33,7 @@ fn scheduled() -> bool {
 }
 
 /// 生成 lane 产物并真浏览器挂载；返回 evidence 文本（判据命中行）。
-fn mount_app(app: &str, expected: &[&str]) -> String {
+fn mount_app(app: &str, expected: &[&str], style_tokens: &[&str]) -> String {
     use auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product;
     let at = repo_root()
         .join("examples/ui")
@@ -43,6 +43,13 @@ fn mount_app(app: &str, expected: &[&str]) -> String {
     // 真实源路径：style 配方（如 007 的 stylekit 依赖）按路径相对解析。
     let product = generate_sfcs_with_lane_product(&src, at.to_str().unwrap(), "./a2x_rt.mjs", "./a2x_rt.mjs")
         .unwrap_or_else(|e| panic!("{app}: lane derive failed: {e}"));
+    // F-04：样式落产物断言（生成级，非像素布局）——SFC 文本必须含这些 token。
+    for tok in style_tokens {
+        assert!(
+            product.widgets[0].sfc.contains(tok),
+            "[{app}] generated SFC missing style token `{tok}`"
+        );
+    }
     let dir = std::env::temp_dir().join(format!("p104-vue-{app}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -72,6 +79,7 @@ fn p104_004_vue_browser_mount() {
     let out = mount_app(
         "004-profile-card",
         &["Jane Cooper", "Full Stack Developer", "Active"],
+        &["bg-gradient-to-r", "rounded-t-lg", "rounded-full"],
     );
     eprintln!("{out}");
 }
@@ -85,6 +93,7 @@ fn p104_006_vue_browser_mount() {
     let out = mount_app(
         "006-hero-section",
         &["Build Beautiful Apps", "Get Started"],
+        &["bg-background", "text-foreground"],
     );
     eprintln!("{out}");
 }
@@ -97,6 +106,7 @@ fn p104_007_vue_browser_mount() {
     let out = mount_app(
         "007-stats-board",
         &["Dashboard", "Campaign Insights", "123k"],
+        &["text-2xl", "font-bold", "text-foreground"],
     );
     eprintln!("{out}");
 }
@@ -109,6 +119,7 @@ fn p104_008_vue_browser_mount() {
     let out = mount_app(
         "008-pricing-table",
         &["Single Developer", "$39", "Contact Us"],
+        &["bg-card", "border-border"],
     );
     eprintln!("{out}");
 }
@@ -121,6 +132,7 @@ fn p104_009_vue_browser_mount() {
     let out = mount_app(
         "009-article-feed",
         &["Blog Posts", "Sarah Chen", "Tutorial"],
+        &["text-muted-foreground", "rounded-xl"],
     );
     eprintln!("{out}");
 }
