@@ -176,6 +176,9 @@ pub mod ace_package_sfc;
 // PLAN-105 T-02：包闭包单元的 widget f-string 统一脱糖（单一入口）。
 #[cfg(feature = "ace-bridge")]
 pub mod ace_package_units;
+// PLAN-105 T-02：组件面源准备（use 行空白化 + 依赖样式内联）。
+#[cfg(feature = "ace-bridge")]
+pub mod ace_source_prep;
 #[cfg(feature = "ace-bridge")]
 mod ace_widget_props;
 #[cfg(feature = "ace-bridge")]
