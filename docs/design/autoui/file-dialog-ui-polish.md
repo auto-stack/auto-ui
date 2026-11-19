@@ -59,3 +59,17 @@ Windows完整产品门`D:/autostack/tmp/file-dialog-ui-polish/refine-cells-verif
 最终runtime两组8+10通过，生成兼容3/3通过，合计21项。产品回执SHA256：`refine-cells-verified/report.json`=`D586FEE3FA4C0F31278131ABFC4D77EEA616C875C4677D1CA78E4CABBFA223B8`；`refine-cells-narrow/report.json`=`E059470427C53E5E6AE89E2860C9CA3E72918794A0B8E17D13C23BB1282EAAD2`。
 
 这些修订沿同一官方组件源完成；Linux实机与Reader副本更新仍不在本轮验证声明内。
+
+## 后续消费实测与组件扩展（2026-11-13）
+
+上述“副本尚未更新”保留为UI改进时的历史边界。随后用户另行授权提交与同步：AutoUI改进提交 `3219e7bcc6fe10029cfb4a14d92db21f5d9de869`；Reader009工作树 `D:/autostack/.wt/reader-009/auto-reader` 的消费同步为 `ef00316b4624749675b223f83a041e9b7d652a30`。这不代表Reader主检出已集成009。
+
+[Reader009实测报告](../../../../.wt/reader-009/auto-reader/docs/reviews/file-dialog-ui-sync-2026-11-13/README.md)记录Windows实际选择器八项消费测试通过（书籍混合/小批/重复坏文件/取消、PNG/JPG/WebP/封面取消），以及精确文件字节和目录状态断言。报告同时保留**可见标签/文件名部分文字缺失**的问题，等待及焦点重绘未完全恢复，MCP文本仍完整；原因尚未确定，不能把功能通过解释为视觉已通过。
+
+后续由[组件库扩展 strategy](component-library-extension-strategy.md)统一跟踪。本页保留UI参考和历史实拍，不扩写为第二份实施进度：
+
+- [PLAN-084](../../plans/084-file-dialog-folder-and-save-modes.md)：在同一FileDialog内增目录/保存模式、文件名与覆盖确认；选择器不代写文件。
+- [PLAN-086](../../plans/086-shared-pagination-control.md)：先抽取并接入共享PaginationControl；保持checkbox独立列、图标导航、过滤同行、隐藏/分页同行、单页整组隐藏。
+- 两计划均在T-01调查上述文字缺失，受影响视觉验收必须闭环；扩展继续沿现有主题和实际控件，不使用参考图片替代UI。
+
+两个后继计划当前仅drafting r1、0/8。Windows/Linux真实运行、包依赖闭包和消费者门须按对应合同分别验证，不沿用本文旧回执当作新模式的验收。

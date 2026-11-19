@@ -1,0 +1,133 @@
+{
+  "date": "2026-11-14",
+  "type": "generated-ui-design-reference-assets",
+  "generation_mode": "built-in GPT image generation",
+  "product_tests_run_by_this_visual_task": false,
+  "images": [
+    {
+      "path": "docs/design/autoui/assets/file-navigation-084-086-reference-v1.png",
+      "sha256": "56028af0bc95e954c1bcfe38a7ca646d07308db477c81e0e427db6562dbdb159",
+      "size": [
+        1585,
+        992
+      ],
+      "mode": "RGB",
+      "role": "generated-design-reference",
+      "reused": false
+    },
+    {
+      "path": "docs/design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1.png",
+      "sha256": "ef667abe23cfdc6377ddcf9e38005d118dd55d9cdcaffd92d449cf02a440dd13",
+      "size": [
+        1586,
+        992
+      ],
+      "mode": "RGB",
+      "role": "generated-design-reference",
+      "reused": false
+    },
+    {
+      "path": "docs/design/autoui/assets/common-components-087-093-reference-v1.png",
+      "sha256": "f4da10c65fdc266f7ed574e9351a65653b66fda631926d71aeaaf391fcca41c1",
+      "size": [
+        1585,
+        992
+      ],
+      "mode": "RGB",
+      "role": "generated-design-reference",
+      "reused": true
+    }
+  ],
+  "prompt_files": [
+    {
+      "path": "docs/design/autoui/assets/file-navigation-084-086-reference-v1-prompt.md",
+      "sha256": "ebd026efdd350fdfc674d5ed3b7946c83a20b97e94ef6b4cb9ccc9195ced7bfb"
+    },
+    {
+      "path": "docs/design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1-prompt.md",
+      "sha256": "753a0154bfdc861e8846c34c58571ade06106c737cae6fa724930bda441a003c"
+    }
+  ],
+  "plans": [
+    {
+      "plan": "084",
+      "revision": 2,
+      "status_at_snapshot": "drafting",
+      "current_step_at_snapshot": 0,
+      "cases": 8,
+      "document_result": "pass"
+    },
+    {
+      "plan": "085",
+      "revision": 2,
+      "status_at_snapshot": "drafting",
+      "current_step_at_snapshot": 0,
+      "cases": 7,
+      "document_result": "pass"
+    },
+    {
+      "plan": "086",
+      "revision": 2,
+      "status_at_snapshot": "drafting",
+      "current_step_at_snapshot": 1,
+      "cases": 8,
+      "document_result": "pass"
+    }
+  ],
+  "visual_only_candidates": [
+    "CL-04",
+    "CL-05",
+    "CL-06",
+    "CL-07"
+  ],
+  "prior_execution_review_files_unchanged": [
+    "docs/plans/087-numeric-and-unit-fields.md",
+    "docs/plans/088-color-picker-and-dialog.md",
+    "docs/plans/089-image-viewport-and-preview-dialog.md",
+    "docs/plans/090-media-player-and-transport-controls.md",
+    "docs/plans/091-asset-browser-and-picker.md",
+    "docs/plans/092-property-inspector.md",
+    "docs/plans/093-dock-layout-and-panels.md",
+    "docs/design/autoui/common-components-execution-and-visual-guide.md",
+    "docs/design/autoui/assets/common-components-087-093-reference-v1.png"
+  ],
+  "checks": {
+    "plan_structure_and_cases": "pass",
+    "links_and_paths": "pass",
+    "image_identity": "pass",
+    "candidate_status": "pass",
+    "active_086_progress_retained": "pass",
+    "prior_seven_plans_and_common_visual_unchanged": "pass",
+    "whitespace_and_conflicts": "pass"
+  },
+  "documents": [
+    {
+      "path": "docs/plans/084-file-dialog-folder-and-save-modes.md",
+      "sha256": "12d73c86669e2bb0559ff0fb72551689ff7b009da3b70c9703b63c2a5e635e02"
+    },
+    {
+      "path": "docs/plans/085-official-tree-view-component.md",
+      "sha256": "bb843060b8762db475ed19742ce48451fbb23dd18bf1559cd3fbf2509dcf9665"
+    },
+    {
+      "path": "docs/plans/086-shared-pagination-control.md",
+      "sha256": "c49c78dd3466bd30f4c7038adccc3318339fc17489c052e99d72c9f5cccc30e2"
+    },
+    {
+      "path": "docs/design/autoui/file-navigation-and-interaction-visual-guide.md",
+      "sha256": "ee10fba45e61249503ccb236dc4bd9ca20840aec9971bebdab916c828a0ad8d9"
+    },
+    {
+      "path": "docs/design/autoui/component-library-extension-strategy.md",
+      "sha256": "39e665a4f878581f6bdd919f978dc3b7d09ef1b525a8bb16b8676855860d864d"
+    },
+    {
+      "path": "docs/design/autoui/assets/file-navigation-084-086-reference-v1-prompt.md",
+      "sha256": "ebd026efdd350fdfc674d5ed3b7946c83a20b97e94ef6b4cb9ccc9195ced7bfb"
+    },
+    {
+      "path": "docs/design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1-prompt.md",
+      "sha256": "753a0154bfdc861e8846c34c58571ade06106c737cae6fa724930bda441a003c"
+    }
+  ]
+}

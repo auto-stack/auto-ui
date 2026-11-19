@@ -1,11 +1,28 @@
 # auto-ui设计索引
 
+## AGE M2三路线当前入口（2026-11-17，仅规划）
+
+| 设计 | 范围 |
+|---|---|
+| [统一strategy](../../../auto-lang/docs/design/strategy/age-m2-three-route-strategy.md) | R1生产UI替代、R2首批后2D/3D增强、R3新版AutoForge；A/B和三波有向交接 |
+| [共同架构](../../../auto-lang/docs/design/autographics/age-m2-three-route-architecture.md) | 单一Schema/Node、typed资源/事件/FFI、阶段来源与真实验收边界 |
+| [引擎详细合同](autographics/age-m2-engine-extension-contract.md) | UI099–102四有界AV合同；AC/A2R由981/1068既有owner承接，AG031增量required |
+| [AutoForge产品架构](../../../auto-forge/docs/design/architecture.md) | 工程/源码往返/隔离预览/恢复/Agent不可信提案；新仓独立产品 |
+| [AutoForge首批执行路线](../../../auto-forge/docs/strategy/roadmap.md) | 001→002→003先AV整包，004先AC阶段再A2R，不反卡985/A或AG031 |
+
+UI080已归档10/10，保有限单方向光/硬阴影的实际已交范围；旧M3/M4文件名和下方日期状态为历史映射，当前调度以上述入口及Plan实际正式来源为准。
+
 AGE（Auto Graphics Engine；旧称AG/AutoGraphics）实验代码与实现计划已归本仓；旧canonical Specs与历史设计继续按明确跨仓链接引用，以下只登记新增本仓设计。
 
 | 专题 | 范围/状态 |
 |---|---|
+| [AutoUI组件库扩展路线 strategy](autoui/component-library-extension-strategy.md) | r6/2026-11-14：084/086代码交付归档，保留待补门；下一项建议085 TreeView。094–097经[再次审核](../reviews/component-plans-094-097-2026-11-14/README.md)为drafting r2、0/8，复用既有[四组件图](autoui/file-navigation-and-interaction-visual-guide.md)；087–093合同保持 |
+| [AGE两阶段当前路线与ACE M2接洽](autographics/age-three-milestones-and-ace-m2.md) | 2026-11-09：原M2增强与M3融合合并M2，执行/二维/三维/生产融合四线并行规划；979 r5、980 r4、981 r7、UI058/AG023 r2；传统UI全支持与完整AGE语法为独立必需门，仍未实施。下方旧M3/M4文件名/日期快照为历史映射，当前口径以本路线为准 |
+| [两游戏Windows独立运行与二进制发行](autographics/games-windows-player-and-release.md) | UI072已交5fd25be8、10/10；AG028已归档11/11，原两游戏exe＋资源便携包已交。ACE/A2R新发行归981，不重做原游戏 |
+| [RQ完整功能与直接渲染一致性](autoui/renderqueue-complete-fidelity.md) / [子路线](autoui/renderqueue-refactoring-roadmap.md) | UI061–063及OS063草案r3；VM/Rust六格、三类Host、ACE/AGE；异步批量/复用/调度/隔离与direct性能对照，仅规划 |
 | [下一批M3组合/研究与执行顺序](autographics/m3-next-wave-execution-order.md) | UI058俯视组合/059方向光研究/AG023二维小例；先行准备与真实交付门分明，仅规划 |
 | [全AGE计划状态快照](autographics/plan-status-and-execution-order-2026-11-05.md) | 迁仓后逐项合同/实际交付与当前8项未完、并行和顺序；不重复计历史映射 |
+| [原子Reload与浏览器实例第二批](autoui/atomic-reload-and-live-isolation-stage-two.md) | 语言940坏源恢复→UI056原子多文件Reload；UI057真实Vue隔离独立并行，全部仅规划 |
 | [M2最后缺口与M3首轮预研](autographics/m2-closure-and-m3-first-wave.md) | UI054补公共混合接线；UI055俯视二维研究/AG022种田切片与three.js盘点可并行准备；仅规划 |
 | [M3二维/2DHD与复杂三维增强](autographics/m3-2d-3d-capability-roadmap.md) | 国风种田切片＋three.js固定目录；首轮UI055/AG022研究合同已规划，未实施产品能力 |
 | [M4与现有AutoUI融合](autographics/m4-autoui-integration-roadmap.md) | 原M3融合顺延；等ACE Schema成熟及旧编译器替换实际启动，再从001逐步跑通UI Demo；无新Plan或实施 |

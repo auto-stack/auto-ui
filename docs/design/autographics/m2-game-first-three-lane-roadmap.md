@@ -1,5 +1,10 @@
 # AGE M2游戏优先路线：内容闭环、编辑迁移与统一版本联验
 
+> **2026-11-11当前口径**：AGE只有M1/M2。M1已由AG026完成11/11并签三仓v0.6-AGE-M1，双债已闭；M2仍仅规划。981 r10十批34任务；UI058/AG023 r3；国风AG029、正式光影UI080/AG030、联合AG031已建drafting合同且全部0/10，复用研究、未实施。当前职责/状态/最小接口见[两阶段路线](age-three-milestones-and-ace-m2.md)，下方所有旧日期的状态/编号/“当前”字样均为历史快照，不作为今日调度或重开M1依据。
+
+
+> **2026-11-06 当前路线**：本页收口目标改称AGE M1，原M2-01..10验收ID/两游戏/Gallery分母保持。AG021已交付9afe257并清理，原生输入/编辑OS等必需缺证仍待关闭；以[三阶段路线及补充工作](age-three-milestones-and-ace-m2.md)为准，下方旧日期状态仅作历史。强化2D/3D为AGE M2，完整AutoUI/ACE融合为AGE M3。
+
 > **2026-11-05 再核现场**：054已有唯一实现树和1f3be333代码提交，头部状态/进度尚未同步执行记录，按实施中/未交付报告；AG021原owner2/10等054。055/AG022仍草案。下一批[058/059/AG023](m3-next-wave-execution-order.md)仅规划M3组合/研究/小例，不新增M2前置；[全路线状态与顺序](plan-status-and-execution-order-2026-11-05.md)逐项登记。
 
 2026-11-05，设计v10。AGE作者模型仍是AutoUI式Node/use、局部model/msg/on、view-2d/view-3d及具名资源/事件；桌面M2原两游戏/编辑/必要音画/资源离线/Gallery/统一最终引擎版本分母保持。ACE/AOT/ECS/CPC/跨端不新增前置。
@@ -36,7 +41,7 @@ AG016/017/018/019均已合并，不接管/重开。019交付原合同候选不�
 
 UI043模型模板/UI044源码诊断已交付（044 delivery 9bf9874a），实际支持/来源/预算依各归档和canonical；旧AG016/019不自动升级锁。这两份不再计未完成，041/042与在途052/053属于其它UI路线，不接管或复用其号。
 
-新[UI055](../../plans/archived/055-age-m3-topdown2d-feasibility-and-capacity.md)固定已交付源研究俯视移动/交互/场景链与容量；[AG022](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md)整理国风首切片/素材及固定three.js全目录差距。研究准备可与054/AG021并行，022 T-06等055实际结果；go/bounded-go/no-go均须真实证据，不把研究归档当产品能力。共享源只读，材料/target独占，GPU/原生焦点错峰。
+新[UI055](../../plans/archived/055-age-m3-topdown2d-feasibility-and-capacity.md)固定已交付源研究俯视移动/交互/场景链与容量；[AG022](../../../../ag-examples/docs/plans/archived/022-age-m3-farming-slice-and-threejs-inventory.md)整理国风首切片/素材及固定three.js全目录差距。研究准备可与054/AG021并行，022 T-06等055实际结果；go/bounded-go/no-go均须真实证据，不把研究归档当产品能力。共享源只读，材料/target独占，GPU/原生焦点错峰。
 
 ## 4. G04不是简单的单维重写
 
@@ -62,7 +67,7 @@ AG019是一次明确的里程碑档，原全AG/性能资源样本按原条件在
 
 ## 7. 基础UI混用补齐与当前可执行边界
 
-048基础UI与049root有限混合已交付；049 canonical明确非root区域/条件区域挂卸不支持，Host还有固定名称/实例0路径。AG021原G-M07/AC-04仍需寿命和另一owner存活，不能删条件操作或改成根展开来绕过。[054](../../plans/054-age-mixed-regions-components-and-lifecycle.md)补metadata驱动区域/组件实例/挂卸代次/原生输入，在独立上下文核验新候选和048/049必需复用面；不倒签旧归档。
+048基础UI与049root有限混合已交付；049 canonical明确非root区域/条件区域挂卸不支持，Host还有固定名称/实例0路径。AG021原G-M07/AC-04仍需寿命和另一owner存活，不能删条件操作或改成根展开来绕过。[054](../../plans/archived/054-age-mixed-regions-components-and-lifecycle.md)补metadata驱动区域/组件实例/挂卸代次/原生输入，在独立上下文核验新候选和048/049必需复用面；不倒签旧归档。
 
 AG021原owner已记T-01/02准备完成、executing/r2/2-10，T-03完整接线等054实际交付/独立final/canonical与工具来源。不追tip，showcases/ui-2d-3d独立工程/包不增Gallery分母；最终旧九项、新M2-10、两游戏与22入口47变体逐项对账，真实受影响门重验、可证等价具名复用；任何必需原生/来源/批门未证都不称M2完成。
 

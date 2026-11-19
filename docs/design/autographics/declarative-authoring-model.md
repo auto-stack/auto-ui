@@ -1,5 +1,7 @@
 # AGE声明、组件、绑定与事件作者模型
 
+> **2026-11-09 当前M2完整作者语言目标**：按[两阶段路线](age-three-milestones-and-ace-m2.md)，传统AutoUI与完整AGE语法均须ACE支持：979供共同接面，980保传统widget/store原源与全UI能力，981/LANGUAGE/FUSION验完整Node普通UI、2D/3D、五类view/选择、if/#if、Start/Tick/Frame及新旧组件互操作。同源AV开发与A2R编译运行分别实证。旧016/有限profile排除Frame/多呈现等只属历史范围，不能缩当前M2；§1–2确认目标与五view设计进入完整分母，§3未定具体策略由981有界决定门关闭，不据草图声称已实现。本轮仍只规划。
+
 > **2026-11-04 当前M2补齐路线**：M2现明确包含新语法基础UI＋2D＋3D同应用组合，新增M2-10；[能力核查/补齐设计](m2-mixed-ui-2d-3d-composition.md)拆为UI048基础UI→049混合引擎→AG021综合示例，均仅规划。AG019已交付3daf2eb并归档，原候选fc82061c/旧合同/holds不改，不据此声称扩展M2完成；043在途、044可选不作本链前置。AGE命名沿[决议](age-naming-and-content-repository.md)，内容目录仍ag-examples；020 r2默认019＋021及扩展M2必需门收口后维护窗口更名，历史号/交付身份保持。
 
 2026-10-30；目标与要求回归 v3。本文承接用户本日对 AG-001 的走读和设计纠偏，恢复最初的作者模型；不是新增实施 Plan，也不声明语法、模块装配或 ACE 集成已实现。新设计归 auto-ui，Gallery 内容归 ag-examples；历史设计与现状 Specs 仍在 auto-lang。
@@ -7,6 +9,9 @@
 2026-10-30命名与局部性续议：共同组件定义采用`node`，`widget`经明确兼容迁移后退役；`view`/`view-2d`/`view-3d`直接声明UI/2D/3D呈现，纯二维/三维Node无需额外套一层view；系统事件写`on { Life.Start -> ...; Life.Tick(dt) -> ... }`，不新增辅助lifecycle节点或要求msg重复声明。`msg { Collect(Key) }`声明当前Node事件，`.Collect`及`.remaining`均指当前实例成员。默认model、呈现与on内聚，普通use复用真正组件/资源/函数；独立view导入及作用域后议，不为同组件局部引用添加重复参数映射。更新后的[示例v4与实现分析](g11-2d-target-source-sketch.md)区分已确认命名和未定运行语义；尚未实施。
 
 2026-10-30时钟事件定名：`Life.Tick(dt)`为固定步长逻辑更新，`Life.Frame(dt)`为呈现帧节奏更新；不再使用含混的Update命名。一呈现帧可对应零次或多次Tick，多视图不重复推进同一实例。Frame仅记录为后继事件，不纳入auto-ui/016的实现、样例或验收；具体呈现调度后议，不能将Frame等同GPU直接绘制回调。本轮仍只修文档、暂不实施。
+
+2026-11-13当前补充：ACE首Hello直接采用AGE `node`，由Schema参与parser与结构校验，复用AutoUI组件/声明body。`widget/model/view/on`等是AGE环境中的位置敏感node名称：只有当前Schema声明的NodeName槽与允许父规则才赋予领域含义，普通变量/形参/函数/字段/字符串及无AGE环境不全局保留。旧widget原源通过同一Schema显式兼容别名与规范Node共享投影/行为/组件；只改声明头的迁移副本与原源兼容分开验收。既有命名退役须经兼容门，不在Hello阶段删旧义务。具体约束/反控见[979当前合同](../../../../auto-lang/docs/plans/979-ace-m2-schema.md)与[本路线§12](age-three-milestones-and-ace-m2.md#12-age-node首hello与位置敏感名称2026-11-13当前)，不是已实现声明；不另造传统widget接入线。
+
 
 ## 1. 已确认目标与适用边界
 
@@ -94,13 +99,13 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 
 截至2026-10-31，[auto-ui/016最小真实执行验证](../../plans/archived/016-autographics-node2d-minimal-validation.md)已实际交付932bd5f：一个Player、两个同定义独立Hazard和一个可销毁Coin，证明有限node/view-2d/Life、use、实例状态与事件绑定链；实际限制以[本仓pilot Spec](../../specs/auto-graphics/node2d-pilot.md)为准，不代表完整目标源码或ACE融合已实现。
 
-截至2026-10-31，[完整G11/2d能力设计](g11-2d-node-authoring-completion.md)对应的[auto-ui/017引擎能力](../../plans/archived/017-autographics-g11-2d-node-authoring.md)与[ag-examples/007内容迁移](../../../../ag-examples/docs/plans/archived/007-autographics-gallery-g11-2d-node-migration.md)已实际交付，保原二维玩法/51项验收与预算，三维仍旧源码/锁。其余目标草图提案不自动因此成为已实现能力。
+截至2026-10-31，[完整G11/2d能力设计](g11-2d-node-authoring-completion.md)对应的[auto-ui/017引擎能力](../../plans/archived/017-autographics-g11-2d-node-authoring.md)与[ag-examples/007内容迁移](../../../../age-examples/docs/plans/archived/007-autographics-gallery-g11-2d-node-migration.md)已实际交付，保原二维玩法/51项验收与预算，三维仍旧源码/锁。其余目标草图提案不自动因此成为已实现能力。
 
-用户随后要求其余Gallery示例都迁入相同作者形式；[全量迁移设计](gallery-node-authoring-migration.md)列出21入口及W1..W6能力波次。截至2026-11-01，[auto-ui/019二维基础能力](../../plans/archived/019-autographics-node2d-scenes-character-camera.md)与固定消费它的[ag-examples/008五入口迁移](../../../../ag-examples/docs/plans/archived/008-autographics-gallery-node2d-first-wave.md)均已实际交付，008已合并8a01a34并完成归档清理。连同AG007，当前迁移进度6/21、涉及5个逻辑项，剩余15入口；纯场景允许无角色，编辑器教程保持编辑器验收，计划与源码/内容仍按仓管理。
+用户随后要求其余Gallery示例都迁入相同作者形式；[全量迁移设计](gallery-node-authoring-migration.md)列出21入口及W1..W6能力波次。截至2026-11-01，[auto-ui/019二维基础能力](../../plans/archived/019-autographics-node2d-scenes-character-camera.md)与固定消费它的[ag-examples/008五入口迁移](../../../../age-examples/docs/plans/archived/008-autographics-gallery-node2d-first-wave.md)均已实际交付，008已合并8a01a34并完成归档清理。连同AG007，当前迁移进度6/21、涉及5个逻辑项，剩余15入口；纯场景允许无角色，编辑器教程保持编辑器验收，计划与源码/内容仍按仓管理。
 
 2026-11-01：019已实际交付（[归档合同](../../plans/archived/019-autographics-node2d-scenes-character-camera.md)），AG008已交付并固定消费019，不把019根逻辑/子纯view限制当最终模型。用户要求明确补齐局部性与下一波服务，[020/021/022设计](node-components-queries-and-sprites.md)规定Player等组件内model/msg/on、独立receiver、typed父事件及其上的查询/精灵；状态以各自合同为准，后两项等020实际交付，不重开已归档008或追加入其前置。
 
-2026-11-01新阶段规划：020局部组件、021二维查询、023有限game音画已经实际交付，但023的固定count/state及Collect/Goal/Fail生成模板不是最终作者模型。经用户授权，[024 3D基础](../../plans/024-autographics-node3d-foundation.md)从首版支持view-3d与局部model/msg/on/use；[025声音/HUD通用Node接线](../../plans/025-autographics-node-presentation-services.md)要求玩法/计分/胜败回归作者on，原预算下无角色/连续输入/提前终点/四请求真链先证。二者均仅规划，不改既有profile事实、在途内容合同或当前6/21计数；共享边界见[共同设计](node3d-foundation-and-generic-presentation.md)。
+2026-11-01新阶段规划：020局部组件、021二维查询、023有限game音画已经实际交付，但023的固定count/state及Collect/Goal/Fail生成模板不是最终作者模型。经用户授权，[024 3D基础](../../plans/archived/024-autographics-node3d-foundation.md)从首版支持view-3d与局部model/msg/on/use；[025声音/HUD通用Node接线](../../plans/archived/025-autographics-node-presentation-services.md)要求玩法/计分/胜败回归作者on，原预算下无角色/连续输入/提前终点/四请求真链先证。二者均仅规划，不改既有profile事实、在途内容合同或当前6/21计数；共享边界见[共同设计](node3d-foundation-and-generic-presentation.md)。
 
 [840 §3/4.2/5.2](../../../../auto-lang/docs/plans/archive/840-autographics-public-behavior-api-and-user-scripts.md)将单文件定义为首版切片：SDK 有模块服务，消费者尚未验证其装配/诊断链，因此不读取未快照依赖；没有证明多模块不可验证。[854](../../../../auto-lang/docs/plans/archive/854-autographics-behavior-source-assembly.md)的“可审计”指内部受信装配的来源/顺序/错误可追查，不是新的产品定位，也不能倒推840的禁 use是长期要求。此前外部讨论纪要的“可审计 agent 代码运行时”解释不作为产品需求依据。
 
@@ -113,3 +118,6 @@ JSON 是当前原型便于保存/验证的选择，没有“可审计所以只�
 2026-11-04阶段安排更新：共同Node/use/model/msg/on与view/view-2d/view-3d作者方向贯穿后续阶段。用户将[M3主目标改为2D/2DHD游戏与复杂3D增强](m3-2d-3d-capability-roadmap.md)，包括俯视角国风种田承载切片、three.js逐项能力覆盖；[AutoUI/ACE正式融合顺延M4](m4-autoui-integration-roadmap.md)，保留Schema能力成熟及旧编译器替换实际启动的前置，届时001起验证全部UI Demo原语义兼容。
 
 M2现有有限验证和048/049/AG021合同保持，M3公共能力扩展不等生产UI正式融合；普通模块复用/局部状态/正常Auto业务与声明运行组织分离不变。M3若增容量/执行支持，另按真实场景冻结profile/预算，不把当前实验限额写成永久语言限制或静默抬额；M4不提前以扩完整手写UI parser推进。本轮只改路线，不取号/实现。
+
+
+2026-11-13 本轮仅规划的静态核验：4份计划原95任务ID/勾选/数量/状态/进度与依赖元数据保持；新增3项AC、7项拟验证及3项拟Spec增量，全部未执行。9份文档本地引用、0–10章节、表格/围栏与新AC/V任务映射核对通过；F0→E0→B0与H0汇合HELLO、随后981按接口扩展的切片顺序不新增反向整包等待。963及其实施树未由本轮修改；未生成fixture/binding/SDK、未运行编译/产品/GPU/性能、未建树/提交/合入/tag。此为规划预检，不是实现独立review PASS。

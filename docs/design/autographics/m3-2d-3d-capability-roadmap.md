@@ -1,5 +1,16 @@
 # AGE M3：2D／2DHD游戏能力与复杂3D图形扩展
 
+> **2026-11-17 当前路线已统一**：[三路线strategy](../../../../auto-lang/docs/design/strategy/age-m2-three-route-strategy.md)、[共同架构](../../../../auto-lang/docs/design/autographics/age-m2-three-route-architecture.md)、[首批后引擎扩展合同](age-m2-engine-extension-contract.md)、[新版AutoForge产品架构](../../../../auto-forge/docs/design/architecture.md)为当前target-state入口。本页下方原M2/M3/M4排期、旧Forge定位及计划状态为对应日期历史快照；已交范围/标签/预算/研究保留，旧快照不作为当前阻塞或完成依据。
+
+R1复用980/981/1068/OS064/985–987：ACE M2-A真实基础→完整UI/Widgets AV→AC→A2R→真实AutoOS全量迁移/安装退役。R2复用UI058→AG023→AG029与**已交UI080**→AG030；新增UI099地图、100场景资源、101 PBR/多灯、102通用TRS动画，AV包可完整归档，981/1068后续接AC/A2R，AG031保原门并接四扩展三端。R3新版AutoForge按工程/人工编辑→Agent提案/真实预览→App/Game AV创作→AC/A2R输出，独立产品验收；不把纯静态场景编辑或旧Agent冒新产品。
+
+新cap/Forge不增加985/A前置；原UI各波不等新cap/Forge全交，AGE与Forge最终签章不互等。UI055/059/AG022研究不重做；621项是研究目录，不是承诺本轮全部实现。此次仅规划，原执行状态/已完成任务保持，不启动/恢复实施。
+
+> **2026-11-11当前口径**：AGE只有M1/M2。M1已由AG026完成11/11并签三仓v0.6-AGE-M1，双债已闭；M2仍仅规划。981 r10十批34任务；UI058/AG023 r3；国风AG029、正式光影UI080/AG030、联合AG031已建drafting合同且全部0/10，复用研究、未实施。当前职责/状态/最小接口见[两阶段路线](age-three-milestones-and-ace-m2.md)，下方所有旧日期的状态/编号/“当前”字样均为历史快照，不作为今日调度或重开M1依据。
+
+
+> **2026-11-09 当前两阶段口径**：本页图形增强与原M4生产融合合入同一个AGE M2，详[当前路线§6/§13](age-three-milestones-and-ace-m2.md)。执行接入、二维、三维、生产融合并行；UI058/AG023已修订r2，先中立图形服务、最终正常Node同源AV/A2R消费981，不扩旧SDK生成链。055/059/AG022研究不重做；国风首可玩切片、正式3D光影和首批目录分母仍须冻结，研究不冒产品交付。下文原M2/M3/M4编号与旧日期状态保留为历史，不再单设AGE M3；本轮只规划。
+
 > **2026-11-05 下一批规划**：[UI058/059与AG023](m3-next-wave-execution-order.md)已立草案：俯视二维控制/查询/精灵公共组合、方向光/阴影作者链研究、二维组合小示例。055与AG022尚未交付，058正式先证/接线等其实际结论及M2收口；059研究可先行，AG023只提前准备、正式消费等058。原M2/预算/分母不改，当前[全状态/顺序](plan-status-and-execution-order-2026-11-05.md)，以下首轮段落保既有边界。
 
 2026-11-05，路线v2。用户调整：考虑ACE集成所需时间，AGE与现有AutoUI正式融合顺延M4；M3优先增强2D/3D，支持更复杂的游戏/图形应用，以俯视角2D/2DHD国风种田游戏和three.js示例覆盖为两条主要验证线。首轮研究已规划为UI055/AG022；不建树、不实施或改当前M2验收。
@@ -32,7 +43,7 @@ M3不等待ACE正式融合才能推进；涉及ACE专属能力的切片仍须真
 
 ## 3. 三维主线：以three.js示例建立可追踪覆盖
 
-目标是持续覆盖three.js各类示例所体现的图形能力，逐项可查；以官方示例目录为对照，不用少量相似截图声称全覆盖。2026-11-04查阅[官方示例页](https://threejs.org/examples/)及[官方目录files.json](https://github.com/mrdoob/three.js/blob/dev/examples/files.json)，包含WebGL/WebGPU、材质/模型动画/光照、后处理、性能/平台相关等不同类别。这里是方向调查，当时未冻结M3参考tag/commit或全量条目数；2026-11-05 [AG022](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md)现固定首轮盘点来源为r187、commit `7e89746a687bb88271253698fa108b1dd59825d0`，目录内容hash/条目分母由T-01获取并验证，本轮未声称已计数；dev分支只作本次观察来源，正式覆盖表必须固定不可变版本/目录摘要，并记录后续上游差异。
+目标是持续覆盖three.js各类示例所体现的图形能力，逐项可查；以官方示例目录为对照，不用少量相似截图声称全覆盖。2026-11-04查阅[官方示例页](https://threejs.org/examples/)及[官方目录files.json](https://github.com/mrdoob/three.js/blob/dev/examples/files.json)，包含WebGL/WebGPU、材质/模型动画/光照、后处理、性能/平台相关等不同类别。这里是方向调查，当时未冻结M3参考tag/commit或全量条目数；2026-11-05 [AG022](../../../../ag-examples/docs/plans/archived/022-age-m3-farming-slice-and-threejs-inventory.md)现固定首轮盘点来源为r187、commit `7e89746a687bb88271253698fa108b1dd59825d0`，目录内容hash/条目分母由T-01获取并验证，本轮未声称已计数；dev分支只作本次观察来源，正式覆盖表必须固定不可变版本/目录摘要，并记录后续上游差异。
 
 拟按公共机制逐批扩展：
 
@@ -52,7 +63,7 @@ AGE底层仍wgpu；复现图形/交互能力不自动承诺three.js JavaScript/W
 
 现有M2实验profile与原预算/SDK锁不改。更大地图/对象与复杂3D必然需要先验证容量：每个M3切片应先固定代表性规模/合法最坏轨迹、CPU Tick/加载/生成/绘制分别计量、实际对象/资产owner与内存/帧时、边界反例及恢复；新资源域/费用或上限变化另有显式profile/兼容合同，不把8状态Node/128行/32credits永远当生产语言规则，也不静默抬额、停掉模块或用Rust业务凑绿。旧VM/编译成本是否满足目标必须先证；依赖不足时具名调度/重规划，不假定ACE已替换来掩盖瓶颈。
 
-首轮已立[UI055俯视二维与容量研究](../../plans/archived/055-age-m3-topdown2d-feasibility-and-capacity.md)和[AG022国风切片/three.js全目录盘点](../../../../ag-examples/docs/plans/022-age-m3-farming-slice-and-threejs-inventory.md)，详见[本批设计](m2-closure-and-m3-first-wave.md)。055最多两机制/三规模，给真实Auto链go/bounded-go/no-go；022 T-01..05可并行固定目录/素材/目标源码合同，T-06容量与后继建议消费055实际结论。它们是研究/规划输入，不等于游戏、效果、完整能力或全目录覆盖交付；后续能力包按证据另取号。M2公共接线缺口归054→AG021，不用M3研究代验收。
+首轮已立[UI055俯视二维与容量研究](../../plans/archived/055-age-m3-topdown2d-feasibility-and-capacity.md)和[AG022国风切片/three.js全目录盘点](../../../../ag-examples/docs/plans/archived/022-age-m3-farming-slice-and-threejs-inventory.md)，详见[本批设计](m2-closure-and-m3-first-wave.md)。055最多两机制/三规模，给真实Auto链go/bounded-go/no-go；022 T-01..05可并行固定目录/素材/目标源码合同，T-06容量与后继建议消费055实际结论。它们是研究/规划输入，不等于游戏、效果、完整能力或全目录覆盖交付；后续能力包按证据另取号。M2公共接线缺口归054→AG021，不用M3研究代验收。
 
 ## 5. 阶段完成与当前范围
 

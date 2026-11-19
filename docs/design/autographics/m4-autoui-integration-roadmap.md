@@ -1,5 +1,18 @@
 # AGE M4：与现有AutoUI正式融合
 
+> **2026-11-17 当前路线已统一**：[三路线strategy](../../../../auto-lang/docs/design/strategy/age-m2-three-route-strategy.md)、[共同架构](../../../../auto-lang/docs/design/autographics/age-m2-three-route-architecture.md)、[首批后引擎扩展合同](age-m2-engine-extension-contract.md)、[新版AutoForge产品架构](../../../../auto-forge/docs/design/architecture.md)为当前target-state入口。本页下方原M2/M3/M4排期、旧Forge定位及计划状态为对应日期历史快照；已交范围/标签/预算/研究保留，旧快照不作为当前阻塞或完成依据。
+
+R1复用980/981/1068/OS064/985–987：ACE M2-A真实基础→完整UI/Widgets AV→AC→A2R→真实AutoOS全量迁移/安装退役。R2复用UI058→AG023→AG029与**已交UI080**→AG030；新增UI099地图、100场景资源、101 PBR/多灯、102通用TRS动画，AV包可完整归档，981/1068后续接AC/A2R，AG031保原门并接四扩展三端。R3新版AutoForge按工程/人工编辑→Agent提案/真实预览→App/Game AV创作→AC/A2R输出，独立产品验收；不把纯静态场景编辑或旧Agent冒新产品。
+
+新cap/Forge不增加985/A前置；原UI各波不等新cap/Forge全交，AGE与Forge最终签章不互等。UI055/059/AG022研究不重做；621项是研究目录，不是承诺本轮全部实现。此次仅规划，原执行状态/已完成任务保持，不启动/恢复实施。
+
+> **2026-11-11当前口径**：AGE只有M1/M2。M1已由AG026完成11/11并签三仓v0.6-AGE-M1，双债已闭；M2仍仅规划。981 r10十批34任务；UI058/AG023 r3；国风AG029、正式光影UI080/AG030、联合AG031已建drafting合同且全部0/10，复用研究、未实施。当前职责/状态/最小接口见[两阶段路线](age-three-milestones-and-ace-m2.md)，下方所有旧日期的状态/编号/“当前”字样均为历史快照，不作为今日调度或重开M1依据。
+
+
+> **2026-11-09 完整性补充**：当前AGE M2必须同时通过传统AutoUI全语法/组件/模式迁移（980）和完整AGE Node语法/新旧组件互操作（981/LANGUAGE/FUSION），不是只接2D/3D或四类基础控件。纯传统UI源无需改Node，普通Node view可使用完整UI能力；五view、选择/条件与Start/Tick/Frame纳完整分母。两项硬门及未决策略见[当前路线§6](age-three-milestones-and-ace-m2.md)，本页历史编号/有限profile范围不覆盖新目标。
+
+> **2026-11-09 当前两阶段口径**：本页完整融合现与2D/3D增强合入AGE M2，详[当前路线§6/§13](age-three-milestones-and-ace-m2.md)。979/980/981承共同前门、AV开发/A2R发行与生产融合，复用M1基础，不反向等新增二维/光影切片终验；增强服务并行、最终作者链消费ACE接面。不再单设AGE M3，Schema、组件/主题/Store/输入、direct/RQ及真实宿主兼容义务全部保留。下文M3/M4为历史编号，旧日期授权由当前路线覆盖；本轮只规划，不代表ACE已具备完整AGE能力或已获实施授权。
+
 2026-11-04，路线决议v3。用户调整里程碑：M3先增强2D/3D与更复杂游戏/图形能力，AGE与现有AutoUI正式融合顺延M4。原M3融合目标与ACE前置保留，现归M4。用户进一步确认：Schema方言与ACE替换旧编译器应统一考虑，M4正式接入等待相应前置。本页确定下一阶段方向与边界，不是执行合同；本轮不取Plan号、不建树、不实现或切换默认入口。
 
 ## 1. 阶段定位
@@ -65,3 +78,8 @@ Demo通过指在AGE公共路径**正常运行**，覆盖原有显示、绑定、
 - [Reload实际就绪边界](../../specs/runtime/reload-readiness-and-lifecycle.md)：研究有界结论不等完整HMR已交付。
 
 本轮只登记M4目标并更新路线/索引，不改变M2验收或现有Plan依赖，不迁目录/升级SDK/构建运行/创建agent。
+
+
+## 6. RQHost接缝（2026-11-05新增设计关联）
+
+用户要求未来ACE替代VM/a2r、AGE替代当前AutoUI时仍支持App不自绘的RQ形态，详[完整RQ设计§8](../autoui/renderqueue-complete-fidelity.md)与[子路线](../autoui/renderqueue-refactoring-roadmap.md)。执行器和图形后端分别适配，surface/session/输入/资源寿命控制面稳定、绘图payload能力协商演进；当前DisplayList v2不冒完整3D/AGE合同。当前UI061–063/OS063完善iced/wgpu路线，不等待M4，不提前实施AGE生产融合；本页既有Schema/旧编译器替换进入门不变。未来M4合同须包含direct/RQ语料对照、两类现行Host及Linux compositor实际支持面、版本并存/回退，不能只把AGE嵌入独立窗口就关闭RQ义务。
