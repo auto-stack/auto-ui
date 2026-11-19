@@ -38,18 +38,27 @@ FFI/解析/窗口，不改 980 模块，**不安装 980 全局 BRIDGE 槽**（�
 档，真人走查档 pending。HOST 已关闭 session 记录随轮次累积属 980 既有 late 靶
 设计，裁剪义务归 980 owner。
 
-## 交互会话消费（PLAN-1023 已验）
+## 交互会话消费（PLAN-1023 行为 + PLAN-1106 增量修复已交付）
 
 `crates/auto-ui-runtime/src/ui/ase_m0_sessions.rs` 是交互会话宿主的薄消费
 适配：纯 980/981 公共面（`NodeDesktopBridge::load/open/close_session/step`
 + `AceStateEngine::read_all`/`dispatch_log` + 全局 HOST 队列/显示），不复制
 FFI/解析/窗口，不修改 980/981 模块。已验范围与判别重放边界见 auto-lang
-`docs/specs/ase/m0-interactive-sessions.md`（单源权威）。
+`docs/specs/ase/m0-interactive-sessions.md`（单源权威）；增量会话能力合同见
+auto-lang `docs/specs/ace-migration/component-event-sessions.md`。
+
+> **2026-11-19 更正（历史保留）**：1023 的双应用切换/显示/关闭行为证据
+> 保留；"外层计数已证明内部handler无重放"的解释撤回（旧 `dispatch_impl→
+> refresh` 重编/重执行累计场景）。
+> **2026-11-20 修复交付（PLAN-1106）**：`AceStateEngine` 重接 AV 增量事件
+> 会话——一次编译、每实例独立 cell 状态根、每事件恰一次 handler 真实
+> 派发、读取/切换零派发、卸载释放；外层数字与执行层证据现在一致。
 
 - 接线（冻结）：`ui_apply_*` 钩子定向进程全局 current——双开显示车道被拒；
   **选中车道+引擎常驻**（每会话一 engine 为业务权威，切换=关出向+开目标
-  车道，显示从引擎真值重提交）。两活会话上限 `session.limit` 具名拒；ASE
-  级关闭释放引擎 owner，重开新代次种子 0。
+  车道，显示从引擎真值重提交；1106 起切换/读取零业务派发）。两活会话上限
+  `session.limit` 具名拒；ASE 级关闭释放引擎 owner 与状态根，重开新代次
+  种子 0（每代次 init 恰一次）。
 - 窗口：`AseM0SessionsWindow`（app 打开行/会话 tab 行/frame 区渲染选中会话
   显示模型；frame 业务按钮→`push_event` 真实 typed 队列，与脚本注入同一
   边界；tick 20ms 受控步进）。原生入口 `examples/ase_m0_sessions_window`
@@ -62,4 +71,10 @@ FFI/解析/窗口，不修改 980/981 模块。已验范围与判别重放边界
   选中车道、第三会话拒绝、迟到事件 late_dropped 零效果、20 轮资源对账、
   重放/重建负控同观察口判红、无参轨迹+载荷近邻具名拒。新增 case 全部
   ≤10s（预备档=构建示例+`--prep-only`，日常档零 rustc）。
+- **增量执行与执行层 oracle（1106）**：`tests/component_event_sessions_1106.rs`
+  ——每事件恰一次入口（`EngineExecutionAudit` 不变量 events==handlers，
+  含跨 unmount 折入）、读取/文本刷新零业务派发、同 owner 隐蔽重放/每事件
+  重建/getter 派发负控经真实 producer 注入道判红（旋钮生产恒关）；执行层
+  观察口与 `loads/dispatch_log` 分账。差量 UI 提交与业务增量执行是两个
+  独立门，收据以 1106 验收为准。
 
