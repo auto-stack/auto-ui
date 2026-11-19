@@ -437,6 +437,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 32 | from: work | t
 **边界（诚实）**：015 的事件体含 store/API 调用（`store.NewNote()` 等）→ 既有 body_foreign 具名拒（"a directed event must not run a partial body"）；022 带脚本运行未渲染帧（frames=0，待查）；013/016 待 S1 跨单元 store + store `on` 体语句面（`var`/`for`/`if` + 方法调用/列表操作）。
 
 **下一刀**：store 方法调度与列表操作（015/013/016 解锁），或先修 022 脚本运行（frames=0）。`next_responsible_role: work（T-02 W30）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 33 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: 52fb1eebe | next: work
+
+2026-11-19 stage: work（T-02 W30：调用语句入候选 + store 方法展开）| PLAN-105 r1 | outcome: pass（本刀完成；T-02 未整体完成）| code_commit: auto-lang `52fb1eebe`、auto-ui `cd698e74` | task_ids: T-02（W30，S1 第四刀）| evidence: 25 例 + 全 affected
+
+**交付**：`ComponentStmt::Call{call,span}`——`age-view-call-stmt` 投影为调用语句（不再只标 foreign 丢弃）；`inline_store_decl` 把 `store.<Msg>(args)` **展开**成 store handler 体（形参替换实参、递归展开带深度上限），展开后无残余调用则清 `body_foreign` 并重算 `assigns`；未知方法/实参数不符/超深均具名拒。同时修正调用表达式变体是 `ExprKind::MethodCall`（此前按 `Method` 匹配，store 方法检测从未触发）；所有语句面 match（flat assigns / local names / assign targets / walk / hook 降级 / view lambda / store 引用遍历 / SFC 车道）补齐。回归 `p105_store_method_call_expands_into_handler_stmts`。
+
+**验证**：plan105 **25/25**、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24、census 4/4；auto-ui prep 6/6（015/018/022 桥装载保持）。
+
+**下一刀**：013/016 的 store `on` 体面（`var` 局部 + `for` + 列表操作）与 API 调用；012 局部列表。`next_responsible_role: work（T-02 W31）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
