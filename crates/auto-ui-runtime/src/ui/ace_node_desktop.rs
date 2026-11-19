@@ -839,6 +839,9 @@ pub struct NodeDesktopBridge {
     /// PLAN-104：源与逐实例场景 op 历史（文本叶随状态刷新用）。
     src: String,
     ops: Vec<Vec<ace_core::source::age_component::ScenarioOp>>,
+    /// PLAN-104：文本叶来自循环体模板展开（视图数据，非状态派生）——不参与
+    /// 状态驱动的叶刷新。
+    expanded_static: bool,
 }
 
 /// view 树投影：文本叶计数 + 按钮目标（label=StrLit、onclick=.Msg）+
@@ -939,6 +942,253 @@ fn project_view_shape(
             }
         }
     }
+}
+
+/// PLAN-104：循环体**模板叶**展开（010 `for i, f in .faqs { span f.q … }`）。
+///
+/// 视图数据源=`ComponentViewDataField.literal`（仅视图数据、惰性原始文本，1071
+/// 边界）；本 harness 按最小字面量语法（`[ { k: "v", … }, … ]`）解析并在展开
+/// 时把 `f.<field>` / `i` 代入叶表达式。不支持的形状具名拒——不静默丢项。
+fn expand_view_for_leaves(
+    node: &ace_core::source::age_component::ComponentNode,
+) -> Result<Vec<String>, String> {
+    use ace_core::source::age_component::{ComponentViewFor, ComponentViewItem};
+    use ace_core::source::ast::ExprKind;
+
+    fn eval_item_expr(
+        expr: &ace_core::source::ast::Expr,
+        index_name: &str,
+        value_name: &str,
+        idx: usize,
+        item: &[(String, String)],
+    ) -> Result<String, String> {
+        match &expr.kind {
+            ExprKind::StrLit(s) => Ok(s.clone()),
+            ExprKind::IntLit(i) => Ok(i.to_string()),
+            ExprKind::Var(id) if id.name == index_name => Ok(idx.to_string()),
+            ExprKind::Field { base, name } => match &base.kind {
+                ExprKind::Var(v) if v.name == value_name => item
+                    .iter()
+                    .find(|(k, _)| k == &name.name)
+                    .map(|(_, v)| v.clone())
+                    .ok_or_else(|| {
+                        format!(
+                            "ace.desktop.view-for-unsupported: item has no field `{}`",
+                            name.name
+                        )
+                    }),
+                _ => Err(
+                    "ace.desktop.view-for-unsupported: only `<value>.<field>` item reads".into(),
+                ),
+            },
+            _ => Err(format!(
+                "ace.desktop.view-for-unsupported: expression shape {:?}",
+                expr.kind
+            )),
+        }
+    }
+
+    fn collect_leaves(
+        items: &[ComponentViewItem],
+        index_name: &str,
+        value_name: &str,
+        idx: usize,
+        item: &[(String, String)],
+        out: &mut Vec<String>,
+    ) -> Result<(), String> {
+        for it in items {
+            match it {
+                ComponentViewItem::Text(leaf) => {
+                    out.push(eval_item_expr(&leaf.expr, index_name, value_name, idx, item)?);
+                }
+                ComponentViewItem::Element(el) => {
+                    if let Some(label) = &el.label {
+                        out.push(eval_item_expr(label, index_name, value_name, idx, item)?);
+                    }
+                    collect_leaves(&el.items, index_name, value_name, idx, item, out)?;
+                }
+                ComponentViewItem::Cond(c) => {
+                    let hit = expr_truthy(&c.cond, index_name, value_name, idx, item)?;
+                    let branch = if hit { &c.then_items } else { &c.else_items };
+                    collect_leaves(branch, index_name, value_name, idx, item, out)?;
+                }
+                ComponentViewItem::For(_) => {
+                    return Err(
+                        "ace.desktop.view-for-unsupported: nested `for` is outside this slice".into(),
+                    )
+                }
+                ComponentViewItem::Entry(_) => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn expr_truthy(
+        expr: &ace_core::source::ast::Expr,
+        index_name: &str,
+        value_name: &str,
+        idx: usize,
+        item: &[(String, String)],
+    ) -> Result<bool, String> {
+        use ace_core::source::ast::{BinOp, ExprKind};
+        match &expr.kind {
+            ExprKind::Binary { op, lhs, rhs } => {
+                let l = eval_item_expr(lhs, index_name, value_name, idx, item)?;
+                let r = eval_item_expr(rhs, index_name, value_name, idx, item)?;
+                let (li, ri) = (l.parse::<i64>().ok(), r.parse::<i64>().ok());
+                match (op, li, ri) {
+                    (BinOp::Lt, Some(a), Some(b)) => Ok(a < b),
+                    (BinOp::Le, Some(a), Some(b)) => Ok(a <= b),
+                    (BinOp::Gt, Some(a), Some(b)) => Ok(a > b),
+                    (BinOp::Ge, Some(a), Some(b)) => Ok(a >= b),
+                    (BinOp::Eq, _, _) => Ok(l == r),
+                    (BinOp::Ne, _, _) => Ok(l != r),
+                    _ => Err("ace.desktop.view-for-unsupported: condition shape".into()),
+                }
+            }
+            ExprKind::Field { base, name } => match &base.kind {
+                ExprKind::Var(v) if v.name == value_name => Ok(item
+                    .iter()
+                    .find(|(k, _)| k == &name.name)
+                    .map(|(_, v)| !v.is_empty())
+                    .unwrap_or(false)),
+                _ => Err("ace.desktop.view-for-unsupported: condition field".into()),
+            },
+            ExprKind::BoolLit(b) => Ok(*b),
+            _ => Err("ace.desktop.view-for-unsupported: condition expression".into()),
+        }
+    }
+
+    fn find_for<'a>(items: &'a [ComponentViewItem]) -> Option<&'a ComponentViewFor> {
+        for it in items {
+            match it {
+                ComponentViewItem::For(f) => return Some(f),
+                ComponentViewItem::Element(el) => {
+                    if let Some(f) = find_for(&el.items) {
+                        return Some(f);
+                    }
+                }
+                ComponentViewItem::Cond(c) => {
+                    if let Some(f) = find_for(&c.then_items).or_else(|| find_for(&c.else_items)) {
+                        return Some(f);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    let Some(f) = find_for(&node.view.tree) else {
+        return Ok(Vec::new());
+    };
+    // 数据源：`<iter>` 必须是 `.field`（仅视图数据字段）。
+    let data_name = match &f.iter.kind {
+        ExprKind::Field { base, name } if matches!(&base.kind, ExprKind::Var(v) if v.name == "self") => {
+            name.name.clone()
+        }
+        _ => {
+            return Err(
+                "ace.desktop.view-for-unsupported: iteration source must be `.viewDataField`".into(),
+            )
+        }
+    };
+    let Some(field) = node.view_data.iter().find(|d| d.name == data_name) else {
+        return Err(format!(
+            "ace.desktop.view-for-unsupported: no view-data field `{data_name}`"
+        ));
+    };
+    let items = parse_view_data_literal(&field.literal)?;
+    let mut out = Vec::new();
+    for (idx, item) in items.iter().enumerate() {
+        collect_leaves(&f.items, &f.index, &f.value, idx, item, &mut out)?;
+    }
+    Ok(out)
+}
+
+/// PLAN-104：视图数据字面量的最小解析（`[ { k: "v", … }, … ]`）。
+fn parse_view_data_literal(src: &str) -> Result<Vec<Vec<(String, String)>>, String> {
+    let mut chars = src.chars().peekable();
+    let mut out: Vec<Vec<(String, String)>> = Vec::new();
+    let skip_ws = |c: &mut std::iter::Peekable<std::str::Chars<'_>>| {
+        while c.peek().is_some_and(|ch| ch.is_whitespace()) {
+            c.next();
+        }
+    };
+    skip_ws(&mut chars);
+    if chars.next() != Some('[') {
+        return Err("ace.desktop.view-for-unsupported: view data is not a list literal".into());
+    }
+    loop {
+        skip_ws(&mut chars);
+        match chars.peek() {
+            Some(']') => {
+                chars.next();
+                break;
+            }
+            Some(',') => {
+                chars.next();
+                continue;
+            }
+            Some('{') => {
+                chars.next();
+            }
+            _ => return Err("ace.desktop.view-for-unsupported: view data item shape".into()),
+        }
+        let mut item: Vec<(String, String)> = Vec::new();
+        loop {
+            skip_ws(&mut chars);
+            match chars.peek() {
+                Some('}') => {
+                    chars.next();
+                    break;
+                }
+                Some(',') => {
+                    chars.next();
+                    continue;
+                }
+                _ => {}
+            }
+            // key
+            let mut key = String::new();
+            while let Some(&ch) = chars.peek() {
+                if ch.is_alphanumeric() || ch == '_' {
+                    key.push(ch);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            if key.is_empty() {
+                return Err("ace.desktop.view-for-unsupported: item key".into());
+            }
+            skip_ws(&mut chars);
+            if chars.next() != Some(':') {
+                return Err("ace.desktop.view-for-unsupported: item key separator".into());
+            }
+            skip_ws(&mut chars);
+            if chars.next() != Some('"') {
+                return Err("ace.desktop.view-for-unsupported: item value must be a string".into());
+            }
+            let mut value = String::new();
+            let mut escaped = false;
+            for ch in chars.by_ref() {
+                if escaped {
+                    value.push(ch);
+                    escaped = false;
+                } else if ch == '\\' {
+                    escaped = true;
+                } else if ch == '"' {
+                    break;
+                } else {
+                    value.push(ch);
+                }
+            }
+            item.push((key, value));
+        }
+        out.push(item);
+    }
+    Ok(out)
 }
 
 /// PLAN-104：条件表达式求值（`.field` / `.field ==/!= 字面量` / `!expr`）。
@@ -1110,8 +1360,15 @@ impl NodeDesktopBridge {
             per_instance: vec![Vec::new()],
         };
         let per_node_texts = if node.view.texts.is_empty() {
-            // PLAN-104：无模块作用域文本叶（循环体模板叶）——states-only 面。
-            vec![vec![String::new(); 0]]
+            // PLAN-104：无模块作用域文本叶（循环体模板叶）——按视图数据把
+            // 循环体展开为具体叶值（010 的 FAQ 列表）；states-only 面照常。
+            let expanded = expand_view_for_leaves(node)?;
+            if expanded.is_empty() {
+                vec![vec![String::new(); 0]]
+            } else {
+                shape.text_leaf_count = expanded.len();
+                vec![expanded]
+            }
         } else {
             match compile_component_scenario_with_initials(
             src,
@@ -1202,6 +1459,8 @@ impl NodeDesktopBridge {
             Err(e) => return Err(e),
         }
 
+        let expanded_static =
+            node.view.texts.is_empty() && !per_node_texts.first().map(|r| r.is_empty()).unwrap_or(true);
         Ok(Self {
             path: path.to_string(),
             node_name: node.name.name.clone(),
@@ -1223,6 +1482,7 @@ impl NodeDesktopBridge {
             view_items: node.view.tree.clone(),
             src: src.to_string(),
             ops: vec![Vec::new(); instances],
+            expanded_static,
         })
     }
 
@@ -1324,6 +1584,7 @@ impl NodeDesktopBridge {
             view_items: node.view.tree.clone(),
             src: entry_src.clone(),
             ops: vec![Vec::new(); instances],
+            expanded_static: false,
         })
     }
 
@@ -1581,7 +1842,7 @@ impl NodeDesktopBridge {
     /// `ui_apply_text`（`text .field` 的文案随 dispatch 更新）。失败记录错误，
     /// 不吞掉（文本面不是状态面，不因它回滚消息）。
     fn refresh_texts(&mut self, instance: usize) -> Result<(), String> {
-        if self.text_leaf_count == 0 {
+        if self.text_leaf_count == 0 || self.expanded_static {
             // PLAN-104：无模块作用域文本叶（循环体模板叶）——states-only 面，
             // 没有可刷新的叶。
             return Ok(());

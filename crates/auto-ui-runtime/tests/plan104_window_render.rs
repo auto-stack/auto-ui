@@ -270,6 +270,18 @@ fn p104_010_real_window_submit_state() {
     );
     let log = json["dispatch_log"].as_array().cloned().unwrap_or_default();
     assert_eq!(log.len(), 1, "one Submit dispatch: {log:?}");
+    // PLAN-104：循环体模板叶按视图数据展开（4 项 × q/a = 8 叶），真窗可读。
+    let session = &json["sessions"][0];
+    let shown = texts(session);
+    assert_eq!(
+        session["texts"][0].as_array().map(|a| a.len()).unwrap_or(0),
+        8,
+        "expanded FAQ leaves: {shown}"
+    );
+    assert!(
+        shown.contains("What are your business hours?") && shown.contains("Do you offer phone support?"),
+        "FAQ items rendered from view data: {shown}"
+    );
     let states = log[0]["states"].as_array().cloned().unwrap_or_default();
     let submitted = states.iter().find_map(|kv| {
         let pair = kv.as_array()?;
