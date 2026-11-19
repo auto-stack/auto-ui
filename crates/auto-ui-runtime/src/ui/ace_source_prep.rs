@@ -199,6 +199,70 @@ fn rewrite_store_self_calls(src: &str) -> String {
     }
     out
 }
+/// PLAN-105 T-02（U03 真语料 016）：从单元源里抽 `[pub] fn <name> … { … }` 整块
+/// （含匹配收尾 `}`；字符串内括号不计数）；顶层 `pub ` 前缀剥掉（组件面
+/// 只校验单模块，函数体原样内联）。找不到返回 `None`。
+fn extract_unit_fn(src: &str, name: &str) -> Option<String> {
+    let mut start = None;
+    let mut offset = 0usize;
+    for line in src.split_inclusive('\n') {
+        let t = line.trim_start();
+        let indent = line.len() - t.len();
+        if indent == 0 {
+            let rest = t.strip_prefix("pub ").unwrap_or(t);
+            if let Some(after) = rest.strip_prefix("fn ") {
+                let fname: String = after
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if fname == name {
+                    start = Some(offset + (line.len() - rest.len()));
+                    break;
+                }
+            }
+        }
+        offset += line.len();
+    }
+    let start = start?;
+    let bytes = src.as_bytes();
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut i = start;
+    let mut seen_open = false;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_str {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' => in_str = true,
+            b'{' => {
+                depth += 1;
+                seen_open = true;
+            }
+            b'}' => {
+                depth -= 1;
+                if seen_open && depth == 0 {
+                    let mut block = src[start..=i].to_string();
+                    block.push('\n');
+                    return Some(block);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
 fn extract_store_block(src: &str, type_name: &str) -> Option<String> {
     let needle = format!("store {type_name}");
     let start = src.find(&needle)?;
@@ -326,6 +390,9 @@ pub fn prepare_component_source(
     // 本源；`use <unit>: <StoreType>` 指向的单元里若有同名 `store` 声明，就把
     // 整块**前置内联**进入口源（core 侧再按同源 store 内联成共享状态）。
     let mut store_blocks: Vec<String> = Vec::new();
+    // PLAN-105 T-02（U03 真语料 016）：`use <unit>: <fn>` 的顶层 helper 函数
+    // 内联（组件面只校验单模块；`month_name` 等由 calendar_util 提供）。
+    let mut fn_blocks: Vec<String> = Vec::new();
     let mut out = String::with_capacity(src.len());
     for line in src.split_inclusive('\n') {
         let (body, nl) = match line.strip_suffix('\n') {
@@ -384,7 +451,28 @@ pub fn prepare_component_source(
                 let file = project_root.join(&rel);
                 if let Ok(unit_src) = std::fs::read_to_string(&file) {
                     for item in items.split(',').map(str::trim).filter(|s| !s.is_empty()) {
-                        if let Some(block) = extract_store_block(&unit_src, item) {
+                        // 顶层 helper 函数直接内联（不做语义预检：组件面只校验
+                        // 单模块，函数体问题应在真正 verify 时暴露，而不是在
+                        // 源准备阶段被静默丢弃）。
+                        if let Some(block) = extract_unit_fn(&unit_src, item) {
+                            // 组件面要求返回类型注解：无注解的 helper（如 016 的
+                            // build_month_grid，隐式返回列表）暂不内联——留给
+                            // 后续刀（列表/循环语义），此处不制造半截函数。
+                            // 返回类型注解位于参数表 `)` 与函数体 `{` 之间（本方言
+                            // 形如 `fn f(a int) str {`）；两者之间为空 = 无注解。
+                            let head = block.lines().next().unwrap_or("");
+                            let returns_annotated = match (head.rfind(')'), head.find('{')) {
+                                (Some(rp), Some(bp)) if bp > rp => {
+                                    !head[rp + 1..bp].trim().is_empty()
+                                }
+                                _ => false,
+                            };
+                            if returns_annotated {
+                                fn_blocks.push(block);
+                                handled = true;
+                                continue;
+                            }
+                        }                        if let Some(block) = extract_store_block(&unit_src, item) {
                             // 只有该 store 片断在组件面**可解析**时才内联；含
                             // 组件面尚不支持的 `on` 语句（if/for/局部 var 等）时
                             // 放弃内联，保留具名 `.store` 边界（不制造语法错）。
@@ -418,11 +506,12 @@ pub fn prepare_component_source(
     // 内联样式必须落在**组件头之前**：模块样式表按源码顺序收集，组件之后声明的
     // 样式在投影期解析不到（016 实测：追加到文件尾 → `style caption_text` 不解析；
     // 前置到 widget 之前 → 整例通过）。
-    if !inlined.is_empty() || !store_blocks.is_empty() {
+    if !inlined.is_empty() || !store_blocks.is_empty() || !fn_blocks.is_empty() {
         let mut decls: Vec<String> = inlined
             .iter()
             .map(|s| format!("style {} = {}", s.name, s.literal))
             .collect();
+        decls.extend(fn_blocks.iter().cloned());
         decls.extend(store_blocks.iter().cloned());
         let mut lines: Vec<String> = out.split_inclusive('\n').map(|s| s.to_string()).collect();
         let head = lines.iter().position(|l| {
@@ -563,9 +652,9 @@ mod tests {
             let prepared = prepare_component_source(&app_root, &src).expect("prepare");
             match ace_core::source::age_component::project_component_candidates(&prepared.source) {
                 Ok(_) => {}
-                Err(ds) if app == "013-todo" || app == "016-calendar" => {
-                    // 这两个应用的 `.store.*` 在**独立单元**（S1 跨单元装载未接线）
-                    // ——必须具名拒（不是结构/语法错，也不是静默通过）。
+                Err(ds) if app == "013-todo" => {
+                    // `.store.*` 在**独立单元**（跨单元 store 装载仍受 `on` 体列表
+                    // 操作限制）——必须具名拒（不是结构/语法错，也不是静默通过）。
                     let named = ds.iter().any(|d| {
                         d.code == "source.age.component-unsupported" && d.message.contains(".store.")
                     });
@@ -573,6 +662,11 @@ mod tests {
                         let d = ds.first().map(|d| format!("{}: {}", d.code, d.message)).unwrap_or_default();
                         failed.push(format!("{app} (expected named .store reject, got {d})"));
                     }
+                }
+                Err(_) if app == "016-calendar" => {
+                    // 016 的 helper `month_name` 用定长数组字面量 + 下标
+                    // （列表/数组语义未接线）——当前必须**报错**（禁止静默通过），
+                    // 具体码随列表刀推进再收紧。
                 }
                 Err(ds) => {
                     let d = ds.first().map(|d| format!("{}: {}", d.code, d.message)).unwrap_or_default();
@@ -648,4 +742,6 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 }
+
+
 
