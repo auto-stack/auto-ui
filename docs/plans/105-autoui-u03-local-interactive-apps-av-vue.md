@@ -164,6 +164,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 47 | from: work | t
 **桥装载新进展（两道新墙）**：013 = **store 已内联**，新墙 `.store.todos` 不是 store 字段——`prep` 把类型化列表字段（`var todos []Todo = []`）改写成**视图数据**（无类型），于是 store 字段映射里没有 `todos`。012 = `on Tick` 赋值 `w_rows`（**computed 只支持读，不支持写**）。
 
 **下一刀**：列表**状态字段**（`[]T` 模型字段进 collections 域 + store 字段映射含列表；`Todo` 记录类型由 types 单元内联）+ computed 可写面（或按原行为改写 computed 更新点）。`next_responsible_role: work（T-02 W45）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 48 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 2891783c | next: work
+
+2026-11-19 stage: work（T-02 W45：record 类型内联）| PLAN-105 r1 | outcome: pass | code_commit: auto-ui `2891783c` | task_ids: T-02（W45）| evidence: prep 6/6
+
+**交付**：`extract_unit_type`（抽 `[pub] type <Name> { … }`）→ `use <unit>: <Record>` 命中时前置内联记录声明；**store 单元自身的 `use types: …` 依赖也一并内联**（013 的 `Todo`）。列表状态字段（`[]T` 模型字段）暂仍按视图数据改写——核心侧的 list 字段/记录类型支持是下一刀（记录类型前置已就位，届时 prep 无需再改）。
+
+**验证**：auto-ui prep 6/6（015/018/022 桥装载保持）；013/015 桥复测：015 OK、013 仍具名 `.store` 边界（列表字段未进 store 映射）。
+
+**下一刀**：核心侧 **列表模型字段**（`[]T`/`[N]T` → `List<T>` 字段、`field_type` 扩展、记录类型进 collections 类型表），然后切回 prep 保留 store 列表类型 → 013 解锁。`next_responsible_role: work（T-02 W46）`
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
