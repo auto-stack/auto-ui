@@ -223,7 +223,9 @@ fn marshal_str_boundary(lines: &[String], str_fields: &[String], params: &[Strin
 }
 
 /// 行内整词包裹：`host` 的每次出现（非已包裹——`a2x_str_lit(` 紧前缀除
-/// 外，幂等）→ `a2x_str_lit(host)`。按字符边界扫描（UTF-8 安全）。
+/// 外，幂等）→ `a2x_str_lit(host)`。按字符边界扫描（UTF-8 安全）；跳过引号
+/// 字面量（`"..."` / `'...'`，含转义 `\"` / `\'` / `\\`），避免误包字符串
+/// 字面量内容（如 `if light == "light"`）。
 fn wrap_host_reads(line: &str, host: &str) -> String {
     let is_word = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '.';
     let mut out = String::with_capacity(line.len() + 16);
@@ -232,7 +234,25 @@ fn wrap_host_reads(line: &str, host: &str) -> String {
     let n = chars.len();
     let h = needle.len();
     let mut i = 0usize;
+    let mut in_quote: Option<char> = None;
     while i < n {
+        if let Some(q) = in_quote {
+            out.push(chars[i]);
+            if chars[i] == '\\' && i + 1 < n {
+                i += 1;
+                out.push(chars[i]);
+            } else if chars[i] == q {
+                in_quote = None;
+            }
+            i += 1;
+            continue;
+        }
+        if chars[i] == '"' || chars[i] == '\'' {
+            in_quote = Some(chars[i]);
+            out.push(chars[i]);
+            i += 1;
+            continue;
+        }
         if i + h <= n && chars[i..i + h] == needle[..] {
             let before_ok = i == 0 || !is_word(chars[i - 1]);
             let after_ok = i + h >= n || !is_word(chars[i + h]);
@@ -467,6 +487,11 @@ pub fn lane_handler_bodies_spec_at(
         // #6p：通道 handler 需要函数承载赋值/实参发射（实参经检查函数死
         // let 验证后按精确 span 发射）；零赋值+零实参的纯通知行可无函数
         //（n_assigns=语言侧投影计数，非区间文本启发式）。
+        // PLAN-1072 残余记账（原 981 r21 漂移项）：`n_assigns` 来自语言侧
+        // `handler_assigns`（自 981 r21 起由 `flat_handler_assigns(&stmts)`
+        // 跨 If 分支深平铺得出）；其唯一消费方是此处的 `needs_fn` 判定——对
+        // 含分支赋值的 handler `n_assigns > 0` 保守且语义正确（分支体必须
+        // 发射函数承载），无 census 计数或执行语义漂移。
         let n_assigns = lane.handler_assign_count(msg);
         let needs_fn = n_assigns > 0 || rows.iter().any(|r| !r.arg_spans.is_empty());
         let fn_name = match fn_name {

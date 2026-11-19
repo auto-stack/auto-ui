@@ -1339,11 +1339,14 @@ fn p980_web_param_browser_mount() {
     let m_body = m_bodies.first().unwrap().lines.join("\n");
     let b_body = b_bodies.first().unwrap().lines.join("\n");
 
-    // a2x_rt helper 内联（rt_body.js 冻结语义手写——同 #6h a2x_add 先例；
-    // a2x_str_clone 在 JS-string 宿主=单次求值拷贝（immutable 值拷贝即本值）；
-    // a2x_str_free 同宿主归约=no-op（字节账本无可观察语义；#6l 语句片段带
-    // ownership 簿记行）。
-    let rt_inline = "function a2x_add(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a + b)) throw new RangeError('a2x_add overflow');\n  return a + b;\n}\nfunction a2x_str_clone(x) {\n  return String(x);\n}\nfunction a2x_str_free(x) {\n}\n";
+    // PLAN-1072 刀C（str-boundary）：浏览器 inline 档直接使用官方
+    // `script_runtime_body`（仅剥除顶层 `export ` 以适配非 module `<script>`），
+    // 真跑 `a2x_str_lit` / `a2x_str_clone` / `a2x_str_utf8` / `a2x_str_free` 跨边界流程。
+    let rt_inline = ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[])
+        .lines()
+        .map(|l| l.strip_prefix("export ").unwrap_or(l))
+        .collect::<Vec<_>>()
+        .join("\n");
     let html = format!(
         "<!DOCTYPE html>\n<html><body>\n<div id=\"last\">-</div><div id=\"x\">0</div><div id=\"dark\">false</div>\n<input id=\"q\" oninput=\"Query(this.value)\">\n<button id=\"move\" onclick=\"Move(3, 4)\">move</button>\n<button id=\"dark-btn\" onclick=\"SetDark(true)\">dark</button>\n<script>\n{rt_inline}\nconst last = {{ value: \"\", notify() {{ document.getElementById('last').textContent = this.value; }} }};\nconst x = {{ value: 0, notify() {{ document.getElementById('x').textContent = String(this.value); }} }};\nconst dark = {{ value: false, notify() {{ document.getElementById('dark').textContent = String(this.value); }} }};\nfunction Query(q) {{\n{q_body}\nlast.notify();\n}}\nfunction Move(dx, dy) {{\n{m_body}\nx.notify();\n}}\nfunction SetDark(on) {{\n{b_body}\ndark.notify();\n}}\n</script>\n</body></html>\n"
     );

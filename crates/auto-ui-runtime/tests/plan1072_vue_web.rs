@@ -212,3 +212,205 @@ fn p1072_010_product_browser_mount() {
         "010 lane-product browser mount (same oracle as legacy): {stdout} / {stderr}"
     );
 }
+
+/// T-03 回归防线：`marshal_str_boundary` 的 `wrap_host_reads` 跳过引号字面
+/// 量——形参名 `light` 与字符串字面量 `"light"` 碰撞时，只包裹标识符形
+/// 参 `a2x_str_lit(light)`，绝不篡改 `"light"` 或 `"say \"light\""`。
+#[test]
+fn p1072_marshal_str_boundary_preserves_string_literals() {
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+    let src = r#"widget ThemeProbe {
+    msg { SetTheme(str) }
+    model {
+        var theme str = ""
+    }
+    view {
+        col { text .theme }
+    }
+    on {
+        .SetTheme(light) -> {
+            if light == "light" {
+                .theme = "say \"light\""
+            }
+        }
+    }
+}
+"#;
+    let (_sfc, bodies, absent) = generate_sfc_with_lane(src, "p1072-marshal-lit.at")
+        .expect("theme probe lane compiles");
+    assert!(absent.is_empty(), "zero absent handlers: {absent:?}");
+    let body = bodies
+        .iter()
+        .find(|b| b.pattern.trim_start_matches('.') == "SetTheme")
+        .expect("SetTheme body");
+    let joined = body.lines.join("\n");
+    assert!(
+        joined.contains("a2x_str_eq(a2x_str_lit(light), a2x_str_lit(\"light\"))"),
+        "ident param wrapped while string literal \"light\" untouched: {joined}"
+    );
+    assert!(
+        !joined.contains("\"a2x_str_lit(light)\""),
+        "must never wrap inside string literal quotes: {joined}"
+    );
+    assert!(
+        joined.contains("say \\\"light\\\""),
+        "escaped inner quotes preserved intact: {joined}"
+    );
+}
+
+const WATCH_EXPOSE_WIDGET_A: &str = r#"style badge = "px-2 py-1 text-xs"
+
+widget WatchExposeApp {
+    msg { Inc }
+    model {
+        var count int = 0
+        var watch_hits int = 0
+    }
+    expose { .Inc, .count, .watch_hits }
+    watch {
+        .count -> { .watch_hits += 1 }
+    }
+    view {
+        col {
+            text `C:${.count} W:${.watch_hits}` { style: badge }
+            button "+" { onclick: .Inc }
+        }
+    }
+    on {
+        .Inc -> { .count += 1 }
+    }
+}
+"#;
+
+const SETUP_EXT_WIDGET_B: &str = r#"widget SetupBoundaryApp {
+    use { fn: record_setup from "src/front/utils/boot.ts" }
+    setup {
+        let boot = record_setup()
+    }
+    msg { Bump }
+    model {
+        var n int = 0
+        var seen int = 0
+    }
+    expose { .Bump, .n, .seen }
+    watch {
+        .n -> { .seen += 1 }
+    }
+    view {
+        col {
+            text .boot
+            text `N:${.n} S:${.seen}`
+            button "Bump" { onclick: .Bump }
+        }
+    }
+    on {
+        .Bump -> { .n += 1 }
+    }
+}
+"#;
+
+/// T-03（CPU 生成面）：①Widget A（style 配方 + watch + `.name` expose + on）
+/// 走 ACE lane 全派生（`absent=[]`），SFC 含 `a2x_add`、`./a2x_rt.mjs`、
+/// `watch(count,`、`defineExpose({ Inc, count, watch_hits })` 与字面量 style；
+/// ②Widget B（`setup` + `use { fn }` + `watch`）诚实落双轨边界——emits
+/// `import { record_setup }` from `@/ext/...`、`const boot = record_setup()`、
+/// `watch(n,` 与 `absent=[".Bump"]`（component face 拒 setup/use{}）。
+#[test]
+fn p1072_watch_expose_style_lane_and_setup_boundary() {
+    use auto_ui_runtime::ui::ace_vue_script::{
+        generate_sfc_with_lane_product, generate_sfcs_with_lane_product,
+    };
+    let prod_a = generate_sfcs_with_lane_product(
+        WATCH_EXPOSE_WIDGET_A,
+        "p1072-watch-expose.at",
+        "./a2x_rt.mjs",
+        "./a2x_rt.mjs",
+    )
+    .expect("Widget A derives");
+    let w_a = &prod_a.widgets[0];
+    assert!(w_a.absent.is_empty(), "Widget A zero absent: {:?}", w_a.absent);
+    assert_eq!(w_a.bodies.len(), 1, "Inc derived through ACE lane");
+    assert!(
+        w_a.sfc.contains("a2x_add(count.value, 1)") && !w_a.sfc.contains("count.value += 1"),
+        "Inc uses ACE lane a2x_add (no legacy fallback): {}",
+        w_a.sfc
+    );
+    assert!(w_a.sfc.contains("from \"./a2x_rt.mjs\""), "rt import present");
+    assert!(w_a.sfc.contains("watch(count,"), "watch(count) emitted");
+    assert!(w_a.sfc.contains("defineExpose({ Inc, count, watch_hits })"), "defineExpose emitted");
+    assert!(
+        w_a.sfc.contains("px-2 py-1 text-xs") && !w_a.sfc.contains(":style=\"badge\""),
+        "style recipe expands to literal class"
+    );
+
+    let prod_b = generate_sfc_with_lane_product(SETUP_EXT_WIDGET_B, "p1072-setup-boundary.at")
+        .expect("Widget B dual-track product generates");
+    assert_eq!(
+        prod_b.absent,
+        vec![".Bump".to_string()],
+        "setup/use{{}} keeps component-face fail-closed boundary (dual-track)"
+    );
+    assert!(
+        prod_b
+            .sfc
+            .contains("import { record_setup } from '@/ext/src/front/utils/boot'"),
+        "ext_imports emitted: {}",
+        prod_b.sfc
+    );
+    assert!(
+        prod_b.sfc.contains("const boot = record_setup()"),
+        "setup statement emitted at top level: {}",
+        prod_b.sfc
+    );
+    assert!(prod_b.sfc.contains("watch(n,"), "watch(n) emitted");
+}
+
+/// T-03（真浏览器排窗 `AUTO_UI_ACE_WEB_E2E=1`）：Widget A（lane watch +
+/// expose + unmount 停 watch）与 Widget B（setup 仅一次 + ext_imports +
+/// watch + unmount 停 watch）在无头 Chromium 上全链验证。
+#[test]
+fn p1072_watch_expose_setup_unmount_browser_mount() {
+    if std::env::var("AUTO_UI_ACE_WEB_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "p1072_watch_expose_setup_unmount_browser_mount: not scheduled \
+             (set AUTO_UI_ACE_WEB_E2E=1; browser tier, playwright required)"
+        );
+        return;
+    }
+    use auto_ui_runtime::ui::ace_vue_script::{
+        generate_sfc_with_lane_product, generate_sfcs_with_lane_product,
+    };
+    let prod_a = generate_sfcs_with_lane_product(
+        WATCH_EXPOSE_WIDGET_A,
+        "p1072-watch-expose.at",
+        "./a2x_rt.mjs",
+        "./a2x_rt.mjs",
+    )
+    .expect("Widget A derives");
+    assert!(prod_a.widgets[0].absent.is_empty());
+    let prod_b = generate_sfc_with_lane_product(SETUP_EXT_WIDGET_B, "p1072-setup-boundary.at")
+        .expect("Widget B derives");
+
+    let dir = std::env::temp_dir().join(format!("p1072-lifecycle-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("compA.sfc"), &prod_a.widgets[0].sfc).unwrap();
+    std::fs::write(dir.join("a2x_rt.mjs"), &prod_a.runtime_mjs).unwrap();
+    std::fs::write(dir.join("compB.sfc"), &prod_b.sfc).unwrap();
+
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let rig = manifest.join("../../examples/ui/ace-web-lane/tests/test_p1072_lifecycle_watch_expose.mjs");
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg(rig.to_str().unwrap())
+        .arg(dir.to_str().unwrap())
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("P1072_LIFECYCLE_WATCH_EXPOSE_OK"),
+        "lifecycle/watch/expose/setup browser mount: {stdout} / {stderr}"
+    );
+}

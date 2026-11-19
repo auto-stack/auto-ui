@@ -51,6 +51,7 @@ fn p980_u0_product_sfc_carries_explicit_rt_import_and_lane_bodies() {
         .filter(|n| !n.is_empty())
         .collect();
     names.sort_unstable();
+    // PLAN-1072 刀C（str-boundary）：state str 读取经 `a2x_str_utf8` 解码，新增为官方 rt 引用项。
     assert_eq!(
         names,
         vec![
@@ -58,6 +59,7 @@ fn p980_u0_product_sfc_carries_explicit_rt_import_and_lane_bodies() {
             "a2x_str_free",
             "a2x_str_lit",
             "a2x_str_to_owned",
+            "a2x_str_utf8",
             "a2x_sub"
         ],
         "import carries exactly the referenced official rt names: {import_line}"
@@ -68,6 +70,7 @@ fn p980_u0_product_sfc_carries_explicit_rt_import_and_lane_bodies() {
         "a2x_sub",
         "a2x_str_lit",
         "a2x_str_to_owned",
+        "a2x_str_utf8",
         "a2x_str_free",
     ] {
         assert!(

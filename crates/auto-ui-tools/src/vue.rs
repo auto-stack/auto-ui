@@ -4493,6 +4493,11 @@ export default router
                                 // 通道走产品 lane 件（按名对位；缺席/对位失败
                                 // =具名拒，不静默回落 legacy 逐件生成）。
                                 let ace_products = ace_vue_component_sfcs(&path, &comp_code)?;
+                                if let Some(products) = &ace_products {
+                                    if ace_vue_rt.is_none() {
+                                        ace_vue_rt = Some(products.rt.clone());
+                                    }
+                                }
                                 for widget in &widgets {
                                     if let Some(products) = &ace_products {
                                         let wsfc = products
@@ -5328,6 +5333,7 @@ export default router
             self.tree_index_css().as_ref(),
             self.collect_tree_themes_js().as_deref(),
         )?;
+        self.write_ace_vue_rt()?;
 
         // Generate router files if routes detected
         if self.has_routes {

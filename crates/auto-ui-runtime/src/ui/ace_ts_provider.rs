@@ -313,6 +313,10 @@ pub(crate) struct LaneHandlerFacts {
     /// 域外体标记（let/if/非头参数调用——检查函数不铸，lane 缺席）。
     pub body_foreign: bool,
     /// 赋值语句数（语言侧投影——纯通道体=0：不需要发射函数）。
+    /// PLAN-1072 残余记账（981 r21 漂移项）：取自 `handler_assigns`
+    /// （`flat_handler_assigns(&stmts)` 跨分支深平铺）；唯一消费者
+    /// `needs_fn` 据此要求含分支赋值的 handler 必发射函数，语义保守
+    /// 正确，无 census 计数或执行语义漂移。
     pub n_assigns: usize,
 }
 
@@ -387,7 +391,9 @@ impl ComponentFragmentLane {
             ds_src,
             // PLAN-980 WEB #6p：通道事实随描述出口透出（selected node；
             // 单 node 形——`compile_at` 已选一编译）。n_assigns 取
-            // `handler_assigns`（语言侧投影的赋值语句计数）。
+            // `handler_assigns`（语言侧投影经 `flat_handler_assigns` 深平铺
+            // 后的赋值计数；PLAN-1072 记账：仅喂 `needs_fn` 判定，对含分支
+            // 赋值 handler 保守正确，无执行或 census 漂移）。
             channel_facts: compiled
                 .description
                 .nodes
