@@ -198,6 +198,24 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 50 | from: work | t
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 2/2；prep 6/6。
 
 **下一刀（S1 host API 面）**：给组件面一条**宿主 API/效果面**——调用语句按能力分派（`ac.runtime.host.api.v1`），AV 宿主提供内存实现（013/015 的 todo/notes 后端），失败/未接线一律具名拒。`next_responsible_role: work（T-02 W48）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 51 | from: work | to: work | status: executing | outcome: pass（状态盘点）| worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 无代码提交 | next: work
+
+2026-11-19 stage: work（T-02 W48：六例真实渲染面盘点 + 下一步排序）| PLAN-105 r1 | outcome: pass | task_ids: T-02/T-04 盘点 | evidence: `plan-artifacts/plan-105/e15.json`/`e18.json`/`e22.json`（当前真窗 leaf 计数）
+
+**盘点（真窗 leaf 数，新构建）**：
+| 例 | 真窗 | 已渲染 leaf | 结构 | 主缺口 |
+|---|---|---|---|---|
+| 015-notes | OK（frames=1） | 7（Notes / New note / No notes yet …） | 单 widget + store（已内联） | 宿主 API（`list_notes()` 等） |
+| 018-book-reader | OK | 13（📖 / AutoRead / 📚 …） | **routes + outlet**（11 个 .at） | 页面组合（outlet 渲染子页） |
+| 022-kanban | OK | 8（☰ / Project Board / Kanban …） | **routes + outlet** + BoardStore | 页面组合 + 看板列表 |
+| 013-todo | 失败 | — | 单 widget + store（已内联） | 宿主 API（`update_todo`/`list_todos`/…） |
+| 016-calendar | 失败 | — | 单 widget + 依赖 util | view-for over computed 列表 |
+| 012-clock | 失败 | — | 单 widget | computed 写入（`w_rows`） |
+
+**结构事实**：018/022 用 `routes { "/" -> use page }` + `outlet`（页面在 `src/front/pages/*.at`，故「真窗只渲染壳件」是**结构性**的，不是遗漏）；013/015/016 用 `store`（已可内联）；六例中 5 个需要**宿主 API/后端**或**页面组合**之一。
+
+**下一步排序（按解锁面）**：①**页面组合**（routes/outlet → 渲染 `pages/*.at` 的 widget，共享 store）——一次解锁 018/022 两个例；②**宿主 API 面**（S1）——解锁 013/015；③**view-for over state 列表**——解锁 016/022 内容；④computed 写入——解锁 012。①与②可并行推进；先做①（面更大且不改语言语义）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
