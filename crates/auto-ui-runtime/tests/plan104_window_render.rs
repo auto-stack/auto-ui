@@ -182,9 +182,10 @@ fn p104_005_real_window_login_oracles() {
         shown.contains("Welcome back!"),
         "login copy applied: {shown}"
     );
+    // PLAN-104 第③件：提交后动态文本叶随状态刷新（错误文案进入叶值）。
     assert!(
-        !shown.contains("Email is required"),
-        "hidden error-branch leaf must not be presented at open: {shown}"
+        shown.contains("Email is required") && shown.contains("Password is required"),
+        "dynamic error leaves must refresh after Submit: {shown}"
     );
 
     let log = json["dispatch_log"].as_array().cloned().unwrap_or_default();

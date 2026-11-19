@@ -40,6 +40,7 @@ use ace_av::age_component::{
     observe_component_texts, project_component_candidates, ComponentInitials, ComponentScenario,
     LegacyWidgetAlias,
 };
+use ace_core::source::age_component::ScenarioOp;
 use ace_core::source::packages::PackageModuleInput;
 
 /// PLAN-980 ④-A #2b：桥的后端面——组件面单源引擎 / AGE 包闭包引擎。
@@ -835,6 +836,9 @@ pub struct NodeDesktopBridge {
     tick_no: usize,
     /// PLAN-104：装载时的 view 树（条件可见性求值用；叶序与 texts 一致）。
     view_items: Vec<ace_core::source::age_component::ComponentViewItem>,
+    /// PLAN-104：源与逐实例场景 op 历史（文本叶随状态刷新用）。
+    src: String,
+    ops: Vec<Vec<ace_core::source::age_component::ScenarioOp>>,
 }
 
 /// view 树投影：文本叶计数 + 按钮目标（label=StrLit、onclick=.Msg）+
@@ -1216,6 +1220,8 @@ impl NodeDesktopBridge {
             script: Vec::new(),
             tick_no: 0,
             view_items: node.view.tree.clone(),
+            src: src.to_string(),
+            ops: vec![Vec::new(); instances],
         })
     }
 
@@ -1315,6 +1321,8 @@ impl NodeDesktopBridge {
             script: Vec::new(),
             tick_no: 0,
             view_items: node.view.tree.clone(),
+            src: entry_src.clone(),
+            ops: vec![Vec::new(); instances],
         })
     }
 
@@ -1535,6 +1543,14 @@ impl NodeDesktopBridge {
         };
         match dispatch_result {
             Ok(DispatchOutcome::Delivered(states)) => {
+                // PLAN-104：记录场景 op（文本叶刷新需按同一历史重放），并在
+                // 状态提交后把**动态文本叶**重新求值/提交（`text .field` 文案）。
+                self.ops
+                    .get_mut(instance)
+                    .map(|v| v.push(ScenarioOp::Send { instance, msg: msg_name.clone() }));
+                if let Err(e) = self.refresh_texts(instance) {
+                    self.errors.push(format!("text refresh: {e}"));
+                }
                 let snapshot: Vec<(String, String)> = states
                     .iter()
                     .map(|(n, v)| (n.clone(), state_display(v)))
@@ -1558,6 +1574,80 @@ impl NodeDesktopBridge {
                 StepOutcome::DispatchRefused(e)
             }
         }
+    }
+
+    /// PLAN-104：按实例 op 历史重放求值 flat 文本叶，只对**变化**的叶发
+    /// `ui_apply_text`（`text .field` 的文案随 dispatch 更新）。失败记录错误，
+    /// 不吞掉（文本面不是状态面，不因它回滚消息）。
+    fn refresh_texts(&mut self, instance: usize) -> Result<(), String> {
+        let scenario = ComponentScenario {
+            instances: self.instances.max(1),
+            ops: self.ops.iter().flatten().cloned().collect(),
+        };
+        let initials = ComponentInitials {
+            per_instance: vec![Vec::new(); self.instances.max(1)],
+        };
+        let caps = ["ac.runtime.text.v1".to_string()];
+        let compiled = compile_component_scenario_with_initials(
+            &self.src,
+            &self.path,
+            LegacyWidgetAlias::Accept,
+            &caps,
+            &scenario,
+            None,
+            &initials,
+        )
+        .map_err(|ds| {
+            ds.iter()
+                .map(|d| format!("{}: {}", d.code, d.message))
+                .collect::<Vec<_>>()
+                .join("; ")
+        })?;
+        let (_states, texts) = observe_component_states_and_texts_flat(&compiled)?;
+        let Some(row) = texts.get(instance) else {
+            return Ok(());
+        };
+        let prev = self
+            .load_texts
+            .get(..)
+            .map(|_| ())
+            .map(|_| ());
+        let _ = prev;
+        // 逐叶 diff：以宿主 session 当前值为基准（open 已提交 load_texts）。
+        let current: Vec<String> = host()
+            .read()
+            .ok()
+            .and_then(|h| {
+                h.current.and_then(|id| {
+                    h.sessions
+                        .iter()
+                        .find(|s| s.id == id)
+                        .and_then(|s| s.texts.get(instance).cloned())
+                })
+            })
+            .unwrap_or_default();
+        for (leaf, text) in row.iter().enumerate() {
+            let same = current.get(leaf).map(|c| c == text).unwrap_or(false);
+            if same {
+                continue;
+            }
+            let rc = av_call(&format!(
+                "ui_apply_text({}, {}, 0)",
+                escape(text),
+                instance * 1000 + leaf
+            ))?;
+            if rc != ui980_status::OK {
+                return Err(format!("refresh text leaf {leaf} refused: {rc}"));
+            }
+        }
+        // 桥面基准同步（下一次 diff 以最终值为准）。
+        if self.load_texts.len() < row.len() {
+            self.load_texts.resize(row.len(), String::new());
+        }
+        for (leaf, text) in row.iter().enumerate() {
+            self.load_texts[leaf] = text.clone();
+        }
+        Ok(())
     }
 
     /// 差量提交：只对变化的 (实例, 字段) 发 AV apply（实际 UI 效果载体）。
