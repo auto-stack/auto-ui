@@ -459,6 +459,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 34 | from: work | t
 **验证**：auto-ui prep 6/6；auto-lang plan105 25/25、104 3/3、1072 19/19、980 39/39、981 248/248、979 24/24。
 
 **下一刀**：016 的 leaf-expr `self` 定位（view 树重写是否覆盖其文本叶形态）、013 store 块解析（其 `on` 体语句形态）、012 局部列表。`next_responsible_role: work（T-02 W32）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 35 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: (本轮) | next: work
+
+2026-11-19 stage: work（T-02 W32：computed 内联）| PLAN-105 r1 | outcome: pass（本刀完成；T-02 未整体完成）| code_commit: auto-lang 本轮提交 | task_ids: T-02（W32）| evidence: 25/25 + 6/6
+
+**交付**：`inline_computed_members`——`computed Name => expr` 成员在文本叶/树/处理器里以 `.Name` 引用，但 computed 不是模型字段（无 `self.Name` 绑定）；投影出口把引用**内联替换**成成员值表达式（递归、深度上限 8、循环 computed 具名拒），保持"每次渲染按当前状态求值"的纯函数语义。
+
+**效果**：016-calendar 越过 `month_label` 一墙（原 `leaf-expr: no local named self` 变为 `no function named month_name`——其 computed 表达式调用**模块级 helper fn**，组件面当前不含模块函数）。013-todo 的 store 块 `on` 体仍含列表操作（`todos.push(...)` 等）不可解析（列表语义未接线）。013/016 的下一步分别是**模块 helper fn 进组件校验面**与**列表操作语义**。
+
+**验证**：plan105 25/25；auto-ui prep 6/6。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
