@@ -110,6 +110,11 @@ pub fn generate_package_sfc_with_root(
                 ace_core::source::age_component::ComponentStmt::For { .. } => {
                     return Some("for");
                 }
+                // PLAN-105 T-02：调用语句（store 方法已在 store 内联时展开；
+                // 残余调用=域外）——本车道只复放平铺赋值，整句具名拒。
+                ace_core::source::age_component::ComponentStmt::Call { .. } => {
+                    return Some("call");
+                }
             }
         }
         None
