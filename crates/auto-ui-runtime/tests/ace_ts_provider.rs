@@ -1190,9 +1190,12 @@ fn p980_web_param_environment() {
     assert_eq!(q_body.field, "last");
     assert_eq!(q_body.params, vec!["q".to_string()]);
     let q_text = q_body.lines.join("\n");
+    // PLAN-1072 刀C 具名修订（str 边界统一）：宿主形参读=`a2x_str_lit` 包裹
+    //（宿主裸串 ↔ rt 文本边界；写=解码+释放 owned 副本）。
     assert!(
-        q_text.contains("a2x_str_clone(q)") && q_text.contains("last.value = "),
-        "str param read with owned-transfer clone: {q_text}"
+        q_text.contains("a2x_str_clone(a2x_str_lit(q))")
+            && q_text.contains("last.value = a2x_str_utf8("),
+        "str param read with owned-transfer clone (marshalled boundary): {q_text}"
     );
     assert!(
         !q_text.contains("___age_hv_")
@@ -1994,13 +1997,19 @@ fn p980_on_if_param_handler_if_body_derives_structured() {
 }
 ";
     let (sfc, bodies, absent) = generate_sfc_with_lane(src, "p980-onif.at").expect("SFC");
-    assert!(absent.is_empty(), "if-body param handler derives: {absent:?}");
-    assert_eq!(bodies.len(), 1);
-    let text = bodies[0].lines.join("
-");
     assert!(
-        text.contains("a2x_str_eq(t, a2x_str_lit(\"light\"))"),
-        "str comparison condition emits via a2x_str_eq with the mapped param: {text}"
+        absent.is_empty(),
+        "if-body param handler derives: {absent:?}"
+    );
+    assert_eq!(bodies.len(), 1);
+    let text = bodies[0].lines.join(
+        "
+",
+    );
+    // PLAN-1072 刀C 具名修订（str 边界统一）：形参读包裹 a2x_str_lit(t)。
+    assert!(
+        text.contains("a2x_str_eq(a2x_str_lit(t), a2x_str_lit(\"light\"))"),
+        "str comparison condition emits via a2x_str_eq with the marshalled param: {text}"
     );
     assert!(text.contains("if ("), "branch structure is emitted: {text}");
     assert!(

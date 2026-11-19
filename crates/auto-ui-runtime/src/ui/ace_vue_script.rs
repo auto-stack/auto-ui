@@ -122,6 +122,136 @@ fn map_emitted_with(line: &str, params: &[String]) -> String {
     out
 }
 
+/// PLAN-1072 刀C（str 边界统一）：lane 发射体的**宿主文本边界 marshal**。
+///
+/// 裁定（证据=005 产品浏览器档：`a2x_str_ne(email.value, …)` 对宿主裸串
+/// trap "text value is not UTF-8 bytes"；`a2x_str_free(旧串)` trap "cannot
+/// free a non-text value"——原 980 §10-1 owned-wrap 统一决策点）：宿主
+/// （Vue ref/SFC 形参）以**普通 JS 字符串**承载 str 状态与 str 形参；rt
+/// 文本值（`Uint8Array`/`A2xOwnedStr`）只存在于表达式求值内部。宿主映
+/// 射层据此改写发射器确定的 owned-swap 形状（lang 侧 rt 语义发射对 rt
+/// 世界正确，本层只做宿主边界）：
+/// - 读：`a2x_str_*` 调用行内的 `F.value`/形参名 → `a2x_str_lit(x)` 包裹；
+/// - 写：`F.value = <tmp>;`（tmp=owned 临时）→ `F.value = a2x_str_utf8(<tmp>); a2x_str_free(<tmp>);`
+/// - 删：owned-swap 快照行（`const <tmp> = F.value;`）与旧值释放块
+///   （`if (<tmp> !== null && … a2x_ret_owned_skip) { a2x_str_free(<tmp>); }`）
+///   ——宿主 GC 拥有字符串。
+/// int/bool/f32 字段与通道实参不经本层（宿主原生类型）。
+fn marshal_str_boundary(lines: &[String], str_fields: &[String], params: &[String]) -> Vec<String> {
+    let is_temp = |w: &str| -> bool {
+        w.len() > 1 && w.starts_with('t') && w[1..].chars().all(|c| c.is_ascii_digit() || c == '_')
+    };
+    // str 宿主名集：字段（映射后 `F.value`）+ SFC 形参。
+    let host_names: Vec<String> = str_fields
+        .iter()
+        .map(|f| format!("{f}.value"))
+        .chain(params.iter().cloned())
+        .collect();
+    // owned-swap 快照临时（`const <tmp> = <host>;`）——唯一消费者是旧值
+    // 释放块，两处一并删。
+    let mut snapshot_temps: Vec<String> = Vec::new();
+    for l in lines {
+        let t = l.trim();
+        let Some(rest) = t.strip_prefix("const ") else {
+            continue;
+        };
+        let Some((tmp, rhs)) = rest.split_once(" = ") else {
+            continue;
+        };
+        let rhs = rhs.trim_end_matches(';').trim();
+        if is_temp(tmp) && host_names.iter().any(|h| h == rhs) {
+            snapshot_temps.push(tmp.to_string());
+        }
+    }
+    let mut out: Vec<String> = Vec::with_capacity(lines.len());
+    let mut drop_depth: i32 = 0;
+    for l in lines {
+        let t = l.trim();
+        if drop_depth > 0 {
+            drop_depth += t.matches('{').count() as i32 - t.matches('}').count() as i32;
+            if drop_depth <= 0 {
+                drop_depth = 0;
+            }
+            continue;
+        }
+        // ① owned-swap 快照行 → 删。
+        if let Some(rest) = t.strip_prefix("const ") {
+            if let Some((tmp, rhs)) = rest.split_once(" = ") {
+                let rhs = rhs.trim_end_matches(';').trim();
+                if is_temp(tmp) && host_names.iter().any(|h| h == rhs) {
+                    continue;
+                }
+            }
+        }
+        // ② 旧值释放块头（引用已删快照临时）→ 整块删（单行形同删）。
+        if t.starts_with("if (") && snapshot_temps.iter().any(|tmp| t.contains(tmp.as_str())) {
+            let opens = t.matches('{').count() as i32;
+            let closes = t.matches('}').count() as i32;
+            if opens > 0 && opens - closes > 0 {
+                drop_depth = opens - closes;
+            }
+            continue;
+        }
+        // ③ 写行：`F.value = <tmp>;`（tmp=owned 临时）→ 解码+释放（原缩进
+        // 保持）。
+        if !l.contains("a2x_str_") {
+            if let Some(eq) = l.find(" = ") {
+                let lhs = l[..eq].trim();
+                let rhs = l[eq + 3..].trim_end_matches(';').trim();
+                if host_names.iter().any(|h| *h == lhs) && is_temp(rhs) {
+                    let indent = &l[..l.len() - l.trim_start().len()];
+                    out.push(format!(
+                        "{indent}{lhs} = a2x_str_utf8({rhs}); a2x_str_free({rhs});"
+                    ));
+                    continue;
+                }
+            }
+        }
+        // ④ 读行：`a2x_str_*` 调用行内的宿主名 → `a2x_str_lit(…)` 包裹
+        //（写 LHS 行不含 `a2x_str_`，由 ③ 承载）。
+        if l.contains("a2x_str_") {
+            let mut mapped = l.clone();
+            for h in &host_names {
+                mapped = wrap_host_reads(&mapped, h);
+            }
+            out.push(mapped);
+            continue;
+        }
+        out.push(l.clone());
+    }
+    out
+}
+
+/// 行内整词包裹：`host` 的每次出现（非已包裹——`a2x_str_lit(` 紧前缀除
+/// 外，幂等）→ `a2x_str_lit(host)`。按字符边界扫描（UTF-8 安全）。
+fn wrap_host_reads(line: &str, host: &str) -> String {
+    let is_word = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '.';
+    let mut out = String::with_capacity(line.len() + 16);
+    let chars: Vec<char> = line.chars().collect();
+    let needle: Vec<char> = host.chars().collect();
+    let n = chars.len();
+    let h = needle.len();
+    let mut i = 0usize;
+    while i < n {
+        if i + h <= n && chars[i..i + h] == needle[..] {
+            let before_ok = i == 0 || !is_word(chars[i - 1]);
+            let after_ok = i + h >= n || !is_word(chars[i + h]);
+            let prefix: String = chars[i.saturating_sub(12)..i].iter().collect();
+            let already = prefix.ends_with("a2x_str_lit(");
+            if before_ok && after_ok && !already {
+                out.push_str("a2x_str_lit(");
+                out.push_str(host);
+                out.push(')');
+                i += h;
+                continue;
+            }
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
 /// 切片#6l：k>0 片段的临时名整词改号（`t3` → `t2_3`）——多片段同域拼
 /// 接防 `const t0` 重复声明。片段文本里裸 `t<digits>` 只可能是发射器临时
 /// 名（其它名字族走 `l<i>_*`/`p<i>_*`/宿主映射名），整词边界安全。
@@ -430,6 +560,13 @@ pub fn lane_handler_bodies_spec_at(
                 Ev::Assign(block) => lines.extend(block),
                 Ev::Channel(line) => lines.push(line),
             }
+        }
+        // PLAN-1072 刀C：str 边界 marshal（宿主裸串 ↔ rt 文本；见
+        // `marshal_str_boundary` doc——005 产品浏览器档实证的统一裁定）。
+        // int/bool/f32 字段零影响（str_fields 只含 is_text 返回面）。
+        let str_fields = lane.str_fields();
+        if !str_fields.is_empty() || !spec.params.is_empty() {
+            lines = marshal_str_boundary(&lines, &str_fields, spec.params);
         }
         // 976 片段接口缺口（#6l 实测）：owned 局部的赋值/返回语句片段引用
         // 函数域 skip 簿记变量 `a2x_ret_owned_skip`——其 `let` 声明只在整函

@@ -520,6 +520,24 @@ impl ComponentFragmentLane {
             .unwrap_or_default()
     }
 
+    /// PLAN-1072 刀C（str 边界统一，证据=005 产品浏览器档）：实例 0 的
+    /// **str 族状态字段**（`__age_state_0_<field>` 返回 `Ty::is_text`）。
+    /// 宿主（Vue ref）以普通 JS 字符串承载 str 状态；lane 体里的 rt 文本
+    /// 操作经宿主映射层做边界 marshal（读=`a2x_str_lit` 包裹、写=
+    /// `a2x_str_utf8` 解码+释放 owned 副本；owned-swap 快照/旧值释放行删
+    /// ——宿主 GC 拥有字符串，rt `a2x_str_free` 对宿主串=所有权误用）。
+    pub fn str_fields(&self) -> Vec<String> {
+        ace_a2x_core::SemanticView::from_checked(&self.checked)
+            .map(|v| {
+                v.functions()
+                    .iter()
+                    .filter(|f| f.source_name.starts_with("__age_state_0_") && f.result.is_text())
+                    .map(|f| f.source_name["__age_state_0_".len()..].to_string())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// PLAN-981（IF-981-PARAMS-B，B-W1）**声明级检查函数**发现：组件面为
     /// 每个 handler 铸 `__age_hv_<n>_<h>_<pos>` 形参=真 handler 形参的检
     /// 查函数（载荷类型来自声明拼写；不可承载载荷如 float 不铸——fail-

@@ -283,9 +283,12 @@ fn p980_ace_vue_tool_wiring_key_gate_and_named_rejects() {
         ws6.join("gen/front/vue/src/components/FpNoteEditorLite.vue"),
     )
     .expect("components channel writes the widget artifact");
+    // PLAN-1072 刀C 具名修订（str 边界统一）：形参读=a2x_str_lit 包裹、
+    // 写=解码+释放 owned 副本（宿主裸串 ↔ rt 文本边界）。
     assert!(
-        fp_artifact.contains("a2x_str_clone(v)") && fp_artifact.contains("last_text.value = t0;"),
-        "component artifact carries the DraftEdit lane body"
+        fp_artifact.contains("a2x_str_clone(a2x_str_lit(v))")
+            && fp_artifact.contains("last_text.value = a2x_str_utf8(t0);"),
+        "component artifact carries the DraftEdit lane body (marshalled)"
     );
     assert!(
         fp_artifact.contains("../a2x_rt.mjs"),
@@ -303,8 +306,9 @@ fn p980_ace_vue_tool_wiring_key_gate_and_named_rejects() {
         .iter()
         .find(|(_, _, _, w)| w == "FpNoteEditorLite")
         .expect("components entry");
+    // PLAN-1072 刀C 具名修订：同 ⑨a 的 marshal 包裹形。
     assert!(
-        fp_entry.2.contains("a2x_str_clone(v)") && fp_entry.2.contains("../a2x_rt.mjs"),
+        fp_entry.2.contains("a2x_str_clone(a2x_str_lit(v))") && fp_entry.2.contains("../a2x_rt.mjs"),
         "full-path components entry is the lane product"
     );
 
@@ -325,8 +329,9 @@ fn p980_ace_vue_tool_wiring_key_gate_and_named_rejects() {
             ws6b.join("gen/front/vue/src/components/FpNoteEditor.vue"),
         )
         .expect("original FpNoteEditor artifact written");
+        // PLAN-1072 刀C 具名修订：同 ⑨a（marshal 包裹形）。
         assert!(
-            fp_orig.contains("a2x_str_clone(v)") && fp_orig.contains("../a2x_rt.mjs"),
+            fp_orig.contains("a2x_str_clone(a2x_str_lit(v))") && fp_orig.contains("../a2x_rt.mjs"),
             "original fp_editor artifact carries the DraftEdit lane body + component href"
         );
         let _ = std::fs::remove_dir_all(&ws6b);

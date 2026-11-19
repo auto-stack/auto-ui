@@ -30,9 +30,15 @@ fn p1072_005_lane_whole_source_derives() {
         .find(|b| b.pattern.trim_start_matches('.') == "Submit")
         .unwrap();
     let joined = submit.lines.join("\n");
+    // 刀C marshal 形：宿主裸串读 → a2x_str_lit 包裹（边界统一裁定）。
     assert!(
-        joined.contains("a2x_str_eq(email.value") && joined.contains("a2x_str_eq(password.value"),
-        "Submit body carries both if-else arms: {joined}"
+        joined.contains("a2x_str_eq(a2x_str_lit(email.value")
+            && joined.contains("a2x_str_eq(a2x_str_lit(password.value"),
+        "Submit body carries both if-else arms (marshalled reads): {joined}"
+    );
+    assert!(
+        !joined.contains("a2x_ret_owned_skip"),
+        "the owned-swap old-value free block is dropped at the boundary (host GC owns strings)"
     );
     // λ-if 体：`!=` 条件+分支赋值（lambda-if 刀面在真源整例上的承载）。
     for pat in ["__evt_oninput_1", "__evt_oninput_2"] {
@@ -121,5 +127,88 @@ fn p1072_010_lane_whole_source_derives() {
     assert!(
         sfc.contains("gap-1.5 w-full") && !sfc.contains(":style=\"field_col\""),
         "field_col recipe expands to the literal class"
+    );
+}
+
+/// T-03（V-B-WEB 真浏览器档·005）：lane 产品产物（`generate_sfcs_with_lane_
+/// product` 原样落盘，零注入）→ @vue/compiler-sfc+esbuild+HTTP+chromium——
+/// 必填校验（Submit 双 if-else 受检体）/λ-if 错误清理（`!=` 体）/主题按钮/
+/// 零 page error。排窗档（AUTO_UI_ACE_WEB_E2E=1）。
+#[test]
+fn p1072_005_product_browser_mount() {
+    if std::env::var("AUTO_UI_ACE_WEB_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "p1072_005_product_browser_mount: not scheduled (set AUTO_UI_ACE_WEB_E2E=1; \
+             browser tier, playwright required)"
+        );
+        return;
+    }
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product;
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let at = manifest.join("../../examples/ui/005-login/src/front/app.at");
+    let src = std::fs::read_to_string(&at).unwrap_or_else(|e| panic!("005: {e}"));
+    let product =
+        generate_sfcs_with_lane_product(&src, "p1072-005.at", "./a2x_rt.mjs", "./a2x_rt.mjs")
+            .expect("005 product derives");
+    assert!(product.widgets.iter().all(|w| w.absent.is_empty()));
+    let dir = std::env::temp_dir().join(format!("p1072-005-mount-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("component.sfc"), &product.widgets[0].sfc).unwrap();
+    std::fs::write(dir.join("a2x_rt.mjs"), &product.runtime_mjs).unwrap();
+    let rig = manifest.join("../../examples/ui/ace-web-lane/tests/test_005_login.mjs");
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg(rig.to_str().unwrap())
+        .arg(dir.to_str().unwrap())
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("P1072_005_LOGIN_OK"),
+        "005 lane-product browser mount: {stdout} / {stderr}"
+    );
+}
+
+/// T-03（V-B-WEB 真浏览器档·010）：**同一行为 oracle**（test_010_form.mjs：
+/// 三字段输入绑定+提交回执+零 page error——980 ④-A #9 的 legacy 基线判据）
+/// 在 **lane 受检产物**上复放——"对照页面事件与源 expected" 的实证件。
+#[test]
+fn p1072_010_product_browser_mount() {
+    if std::env::var("AUTO_UI_ACE_WEB_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "p1072_010_product_browser_mount: not scheduled (set AUTO_UI_ACE_WEB_E2E=1; \
+             browser tier, playwright required)"
+        );
+        return;
+    }
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product;
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let at = manifest.join("../../examples/ui/010-contact-form/src/front/app.at");
+    let src = std::fs::read_to_string(&at).unwrap_or_else(|e| panic!("010: {e}"));
+    let product =
+        generate_sfcs_with_lane_product(&src, "p1072-010.at", "./a2x_rt.mjs", "./a2x_rt.mjs")
+            .expect("010 product derives");
+    assert!(product.widgets.iter().all(|w| w.absent.is_empty()));
+    let dir = std::env::temp_dir().join(format!("p1072-010-mount-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("App.sfc"), &product.widgets[0].sfc).unwrap();
+    std::fs::write(dir.join("a2x_rt.mjs"), &product.runtime_mjs).unwrap();
+    let rig = manifest.join("../../examples/ui/ace-web-lane/tests/test_010_form.mjs");
+    let node = std::env::var("A2TS_NODE").unwrap_or_else(|_| "node".into());
+    let out = std::process::Command::new(&node)
+        .arg(rig.to_str().unwrap())
+        .arg(dir.to_str().unwrap())
+        .output()
+        .expect("node spawn");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        out.status.success() && stdout.contains("P980_010_FORM_OK"),
+        "010 lane-product browser mount (same oracle as legacy): {stdout} / {stderr}"
     );
 }
