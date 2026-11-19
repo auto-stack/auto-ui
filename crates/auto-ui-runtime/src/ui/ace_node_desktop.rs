@@ -1644,6 +1644,68 @@ impl NodeDesktopBridge {
         let trial_initials = ComponentInitials {
             per_instance: vec![Vec::new()],
         };
+        let per_node_texts = if node.view.texts.is_empty() {
+            // PLAN-104：无模块作用域文本叶（循环体模板叶）——按视图数据把
+            // 循环体展开为具体叶值（010 的 FAQ 列表）；states-only 面照常。
+            let expanded = expand_view_for_leaves(node)?;
+            if expanded.is_empty() {
+                vec![vec![String::new(); 0]]
+            } else {
+                shape.text_leaf_count = expanded.len();
+                vec![expanded]
+            }
+        } else {
+            match compile_component_scenario_with_initials(
+            src,
+            path,
+            LegacyWidgetAlias::Accept,
+            &caps,
+            &trial,
+            None,
+            &trial_initials,
+        ) {
+            Ok(compiled) => {
+                // 状态真值经事件引擎（mount 后 read_all）取；此处只消费文本叶。
+                let (_states0, texts0) = observe_component_states_and_texts_flat(&compiled)?;
+                let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
+                if observed_leaves != shape.text_leaf_count {
+                    // PLAN-105 T-02（U03 真语料 015/018/022）：编译侧把**循环体
+                    // 模板叶**按视图数据展开，而 shape 只数模块作用域叶——两者
+                    // 差恰为可展开的循环叶数时以编译值真值为准（不静默丢项：
+                    // 展开不支持的形状仍由 expand_view_for_leaves 具名拒）。
+                    let expanded = expand_view_for_leaves(node)?;
+                    let expected = node.view.texts.len() + expanded.len();
+                    if observed_leaves != expected {
+                        return Err(format!(
+                            "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
+                            shape.text_leaf_count
+                        ));
+                    }
+                    shape.text_leaf_count = observed_leaves;
+                }
+                texts0
+            }
+            Err(ds)
+                if ds
+                    .iter()
+                    .any(|d| d.message.contains("requires at least one")) =>
+            {
+                // Hello 类（无 model 字段）：静态观察面（带 on 的源在此被
+                // 具名拒——`on` handler 属场景面，不属静态面）。
+                let texts0 = observe_component_texts(src, path, LegacyWidgetAlias::Accept)?;
+                let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
+                if observed_leaves != shape.text_leaf_count {
+                    return Err(format!(
+                        "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
+                        shape.text_leaf_count
+                    ));
+                }
+                texts0
+            }
+            Err(ds) => return Err(diags(&ds)),
+            }
+        };
+
         // 事件引擎：有 model 的源挂 N 实例；Hello 类（无 model 字段可观察）
         // 为静态面（engine=None——点击/键入无从产生，事件面缺席具名可辨）。
         let mut engine = None;

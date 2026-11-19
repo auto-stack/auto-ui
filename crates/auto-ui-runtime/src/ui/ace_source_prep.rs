@@ -388,4 +388,23 @@ mod tests {
         assert!(failed.is_empty(), "still failing: {failed:?}");
     }
 
-}
+
+    /// 真语料 → AV 桥装载（不开窗）：015/018/022 必须能经源准备后进入
+    /// `NodeDesktopBridge`（T-04 低层证据）。013/016 仍卡文本叶 `.store.*` 引用链
+    /// （`leaf-expr: no local named self`），按缺口表跟踪，不在本测断言内。
+    #[test]
+    fn real_u03_apps_load_through_desktop_bridge() {
+        let ui_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
+        for app in ["015-notes", "018-book-reader", "022-kanban"] {
+            let app_root = ui_root.join(app);
+            let path = app_root.join("src/front/app.at");
+            let src = std::fs::read_to_string(&path).expect("app source");
+            let prepared = prepare_component_source(&app_root, &src).expect("prepare");
+            crate::ui::ace_node_desktop::NodeDesktopBridge::load(
+                &prepared.source,
+                path.to_str().unwrap(),
+                1,
+            )
+            .unwrap_or_else(|e| panic!("{app} must load through the AV bridge: {e}"));
+        }
+    }}
