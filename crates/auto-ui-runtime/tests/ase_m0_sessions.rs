@@ -22,7 +22,10 @@ use auto_ui_runtime::ui::ace_node_desktop::{
 use auto_ui_runtime::ui::ace_state_bridge::{
     AceAlias, AceInitialValue, AceStateEngine, AceStateValue, DispatchOutcome,
 };
-use auto_ui_runtime::ui::ase_m0_sessions::{AseApp, AseMetrics, AseSessionHost};
+use auto_ui_runtime::ui::ase_m0_sessions::{
+    AseApp, AseM0SessionsWindow, AseMetrics, AseSessionHost,
+};
+use auto_ui_runtime::ui::Component;
 use std::time::Instant;
 
 /// T-01 内联 Counter 源（与 980 MIN-A-UI fixture 同构：无参 Inc/Dec/Reset +
@@ -436,4 +439,99 @@ fn p1023_t02_fixture_counter_sources_load_and_verify() {
         "counter-b text leaf truth"
     );
     eprintln!("p1023_t02 elapsed: {:?}", started.elapsed());
+}
+
+/// V-03 核心（T-03）：同 app 双会话隔离——A1×3/A2×7 独立；ASE 级关闭 A1
+/// （释放引擎 owner）后 A2 仍 7；重开 counter-a = 新会话新代次种子 0 且真实
+/// 执行 handler；窗口 view/tab/frame 纯渲染冒烟（真窗点击/e2e 归 T-06 档）。
+#[test]
+fn p1023_t03_same_app_isolation_close_reopen_zero() {
+    let started = Instant::now();
+    let apps = fixture_apps();
+    let counter_a = apps
+        .iter()
+        .find(|a| a.key == "counter-a")
+        .cloned()
+        .expect("counter-a fixture");
+    let mut host = AseSessionHost::new(vec![counter_a]);
+
+    let a1 = host.open_session("counter-a").expect("open a1");
+    let a2 = host.open_session("counter-a").expect("open a2 (same app)");
+    assert_ne!(a1, a2, "same-app dual context = two sessions");
+    host.select(a1).expect("select a1");
+    for _ in 0..3 {
+        host.click(TARGET_INC).expect("inc a1");
+        match host.step_selected() {
+            StepOutcome::Dispatched { .. } => {}
+            other => panic!("inc a1: {other:?}"),
+        }
+    }
+    host.select(a2).expect("select a2");
+    for _ in 0..7 {
+        host.click(TARGET_INC).expect("inc a2");
+        match host.step_selected() {
+            StepOutcome::Dispatched { .. } => {}
+            other => panic!("inc a2: {other:?}"),
+        }
+    }
+    assert_eq!(engine_count(&host, a1), 3, "a1 = 3");
+    assert_eq!(engine_count(&host, a2), 7, "a2 = 7 (isolated from a1)");
+
+    // ASE 级关闭 A1：释放引擎 owner（会话记录保留为证据）。
+    host.close_session(a1).expect("close a1");
+    assert_eq!(host.live_ids(), vec![a2], "only a2 remains live");
+    assert_eq!(host.engine_states(a1), None, "a1 engine owner released");
+    assert_eq!(engine_count(&host, a2), 7, "a2 untouched by a1's close");
+    let ev = host.evidence();
+    let closed = ev["closed"].as_array().unwrap();
+    assert_eq!(closed.len(), 1, "one closed record");
+    assert_eq!(closed[0]["id"].as_u64(), Some(a1 as u64));
+    assert_eq!(closed[0]["generation"].as_u64(), Some(1));
+
+    // 重开 counter-a：新会话、新代次、种子 0；一次 Inc 证新模型真实执行。
+    // 代次语义（冻结）：generation=该 app 的会话序号（每次 open 递增）——
+    // a1=1、a2=2（同 app 双上下文各自成代）、重开 a3=3（必然新代次）。
+    let loads_before = host.metrics.loads;
+    let a3 = host.open_session("counter-a").expect("reopen counter-a");
+    assert_ne!(a3, a1, "reopen is a new session id");
+    assert_eq!(
+        host.evidence()["live"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["id"].as_u64() == Some(a3 as u64))
+            .unwrap()["generation"]
+            .as_u64(),
+        Some(3),
+        "reopen is a new (third) generation for counter-a"
+    );
+    assert_eq!(engine_count(&host, a3), 0, "reopen seeds 0 (fresh model)");
+    assert_eq!(host.metrics.loads, loads_before + 1, "one new compile");
+    host.click(TARGET_INC).expect("inc a3");
+    match host.step_selected() {
+        StepOutcome::Dispatched { .. } => {}
+        other => panic!("inc a3: {other:?}"),
+    }
+    assert_eq!(engine_count(&host, a3), 1, "fresh model executes handlers");
+    assert_eq!(
+        engine_count(&host, a2),
+        7,
+        "a2 still 7 across a1 close/reopen"
+    );
+    assert!(host.errors.is_empty(), "errors: {:?}", host.errors);
+
+    // 窗口绑定冒烟：宿主装入全局槽后一次 view 纯渲染不 panic（tab 行、
+    // frame 区、业务按钮构造；渲染帧计数 +1）。真窗档归 T-06。
+    let frames_before = auto_ui_runtime::ui::ase_m0_sessions::ASE_M0_SESSIONS_FRAMES
+        .load(std::sync::atomic::Ordering::Relaxed);
+    auto_ui_runtime::ui::ase_m0_sessions::install_ase_sessions_host(host);
+    let window = AseM0SessionsWindow;
+    let _view = window.view();
+    assert_eq!(
+        auto_ui_runtime::ui::ase_m0_sessions::ASE_M0_SESSIONS_FRAMES
+            .load(std::sync::atomic::Ordering::Relaxed),
+        frames_before + 1,
+        "window view rendered one frame"
+    );
+    eprintln!("p1023_t03 elapsed: {:?}", started.elapsed());
 }

@@ -16,7 +16,9 @@
 //!
 //! ASE 只管理 app/session/frame 映射与关闭代次：ASE 级关闭撤显示车道并
 //!   **释放引擎 owner**（bridge drop）——重开为新代次、种子 0；同 app 双
-//!   会话 = 两次独立装载（双 engine，模型互不合并）。本模块不复制 FFI/
+//!   会话 = 两次独立装载（双 engine，模型互不合并）。代次语义（冻结）：
+//!   `generation` = 该 app 的会话序号（每次 open 递增；同 app 双上下文各
+//!   自成代，关闭重开必然新代次且高于被关者）。本模块不复制 FFI/
 //!   解析/窗口，不修改 980/981 模块。
 //!
 //! 观察口（T-01 冻结，负控与真实路径共用同一观察语义；全部在真实调用
@@ -25,9 +27,12 @@
 //! 与引擎重建可区分）、`metrics.clicks_offered`（注入 980 队列的真实点击）、
 //! `dispatches*`（真实 handler 执行计数，`dispatch_log` 同源）。
 
-use crate::ui::ace_node_desktop::{push_event, NodeDesktopBridge, StepOutcome};
+use crate::ui::ace_node_desktop::{current_session, push_event, NodeDesktopBridge, StepOutcome};
 use crate::ui::ace_state_bridge::AceStateValue;
+use crate::ui::{Component, View};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{OnceLock, RwLock};
 
 /// 本 profile 的活会话上限（第三个请求具名 `session.limit` 拒）。
 pub const ASE_M0_SESSION_LIMIT: usize = 2;
@@ -368,5 +373,173 @@ impl AseSessionHost {
             "log": self.log,
             "errors": self.errors,
         })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 窗口组件（T-03 tab/frame 绑定）：app 打开行 + 会话 tab 行 + frame 区
+// （选中会话显示模型 + 真实按钮点击入 980 队列）
+// ---------------------------------------------------------------------------
+
+static ASE_SESSIONS_HOST: OnceLock<RwLock<Option<AseSessionHost>>> = OnceLock::new();
+/// ASE 会话窗口渲染帧计数（真实渲染观察面）。
+pub static ASE_M0_SESSIONS_FRAMES: AtomicUsize = AtomicUsize::new(0);
+
+/// 安装 ASE 会话宿主（窗口进程一次；本槽独占会话/车道轮换）。
+pub fn install_ase_sessions_host(host: AseSessionHost) {
+    let cell = ASE_SESSIONS_HOST.get_or_init(|| RwLock::new(None));
+    *cell.write().unwrap() = Some(host);
+}
+
+/// 访问 ASE 会话宿主（窗口 tick/按钮与收口线程共用）。
+pub fn with_ase_sessions_host<R>(f: impl FnOnce(&mut AseSessionHost) -> R) -> Option<R> {
+    let cell = ASE_SESSIONS_HOST.get()?;
+    let mut guard = cell.write().ok()?;
+    guard.as_mut().map(f)
+}
+
+#[derive(Clone, Debug)]
+pub enum AseSessionsMsg {
+    /// 打开 app 的新会话（app 注册序索引）。
+    OpenApp(usize),
+    /// 切换选中会话（会话 id）。
+    Select(usize),
+    /// ASE 级关闭会话（会话 id；释放引擎 owner）。
+    CloseSession(usize),
+    /// frame 内业务按钮（声明序 target；真实 980 队列注入）。
+    FrameClick(usize),
+    SessionTick,
+}
+
+/// ASE M0 交互会话窗口：单真实宿主 + tab 行 + frame 区。frame 区渲染**选中**
+/// 会话的显示模型（全局 HOST 当前 session 的 AV 真值）；业务按钮经
+/// [`push_event`] 入真实 typed 队列（与脚本注入同一边界）；受控步进只在
+/// 窗口 tick 主线程。无选中会话 → 空 frame。
+#[derive(Debug, Default)]
+pub struct AseM0SessionsWindow;
+
+impl Component for AseM0SessionsWindow {
+    type Msg = AseSessionsMsg;
+
+    fn on(&mut self, msg: Self::Msg) {
+        match msg {
+            AseSessionsMsg::OpenApp(idx) => {
+                let key = with_ase_sessions_host(|h| h.app_keys().get(idx).map(|k| k.to_string()))
+                    .flatten();
+                if let Some(key) = key {
+                    // 拒绝/错误进 host.errors（view 错误行展示；具名可辨）。
+                    let _ = with_ase_sessions_host(|h| h.open_session(&key));
+                }
+            }
+            AseSessionsMsg::Select(id) => {
+                let _ = with_ase_sessions_host(|h| h.select(id));
+            }
+            AseSessionsMsg::CloseSession(id) => {
+                let _ = with_ase_sessions_host(|h| h.close_session(id));
+            }
+            AseSessionsMsg::FrameClick(target) => {
+                let _ = with_ase_sessions_host(|h| h.click(target));
+            }
+            AseSessionsMsg::SessionTick => {
+                with_ase_sessions_host(|h| h.step_selected());
+            }
+        }
+    }
+
+    fn tick_interval_ms(&self) -> Option<u32> {
+        Some(20)
+    }
+
+    fn tick_msg(&self) -> Option<Self::Msg> {
+        Some(AseSessionsMsg::SessionTick)
+    }
+
+    fn view(&self) -> View<Self::Msg> {
+        ASE_M0_SESSIONS_FRAMES.fetch_add(1, Ordering::Relaxed);
+        let (app_keys, live, selected, error) = with_ase_sessions_host(|h| {
+            (
+                h.app_keys()
+                    .iter()
+                    .map(|k| k.to_string())
+                    .collect::<Vec<_>>(),
+                h.live_ids(),
+                h.selected_id(),
+                h.errors.last().cloned(),
+            )
+        })
+        .unwrap_or((Vec::new(), Vec::new(), None, None));
+
+        let mut root = View::col().spacing(10).padding(16);
+        // app 打开行。
+        let mut apps_row = View::row().spacing(8);
+        for (idx, key) in app_keys.iter().enumerate() {
+            apps_row = apps_row.child(View::button_styled(
+                format!("打开{key}"),
+                AseSessionsMsg::OpenApp(idx),
+                "px-3 py-1.5 rounded-lg bg-primary text-primary-foreground",
+            ));
+        }
+        root = root.child(apps_row.build());
+        if let Some(error) = error {
+            root = root.child(View::text(format!("error: {error}")));
+        }
+
+        // 会话 tab 行：选中高亮；每 tab 可关闭（ASE 级，释放引擎 owner）。
+        let mut tabs = View::row().spacing(8);
+        for id in &live {
+            let is_selected = selected == Some(*id);
+            let style = if is_selected {
+                "px-3 py-1.5 rounded-lg bg-accent text-accent-foreground"
+            } else {
+                "px-3 py-1.5 rounded-lg bg-muted text-foreground"
+            };
+            tabs = tabs.child(View::button_styled(
+                format!("会话{id}{}", if is_selected { "●" } else { "" }),
+                AseSessionsMsg::Select(*id),
+                style,
+            ));
+            tabs = tabs.child(View::button_styled(
+                format!("关{id}"),
+                AseSessionsMsg::CloseSession(*id),
+                "px-2 py-1.5 rounded-lg bg-destructive text-destructive-foreground",
+            ));
+        }
+        root = root.child(tabs.build());
+
+        // frame 区：选中会话显示模型（AV 真值经 ui980 FFI 提交）+ 业务按钮
+        // （点击=真实 typed 队列注入）。无活动 → 空 frame。
+        if let Some((texts, states, buttons, generation)) = current_session(|s| {
+            (
+                s.texts.clone(),
+                s.states.clone(),
+                s.buttons.clone(),
+                s.generation,
+            )
+        }) {
+            let mut frame = View::col().spacing(6).padding(12);
+            frame = frame.child(View::text_styled(
+                &format!("frame session generation {generation}"),
+                "text-sm",
+            ));
+            for i in 0..texts.len().max(states.len()) {
+                for (leaf, text) in texts.get(i).into_iter().flatten().enumerate() {
+                    frame = frame.child(View::text(format!("t{leaf}: {text}")));
+                }
+                for (_slot, (name, value)) in states.get(i).into_iter().flatten().enumerate() {
+                    frame = frame.child(View::text(format!("{name} = {value}")));
+                }
+            }
+            let mut row = View::row().spacing(8);
+            for (target, (label, _msg)) in buttons.iter().enumerate() {
+                row = row.child(View::button_styled(
+                    label.clone(),
+                    AseSessionsMsg::FrameClick(target),
+                    "px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground",
+                ));
+            }
+            frame = frame.child(row.build());
+            root = root.child(frame.build());
+        }
+        root.build()
     }
 }
