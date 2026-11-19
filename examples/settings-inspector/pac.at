@@ -1,0 +1,16 @@
+name: "settings-inspector"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "SettingsInspector"
+title_zh: "阅读与外观设置"
+# PLAN-092 T-04：普通设置消费示例（阅读与外观）——PropertyInspector 受控面板、
+# 实际参数预览、应用 handler 经 Storage 持久化；产品门 verify_property_inspector.py
+# 以本示例为夹具（隔离目录运行）。
+window: "980x720"
+# 前端端口避开已用档位（087=4389/088=4399）。
+front_port: 4397
+# T-01 D-3：消费方声明全部依赖包（跨包 depth-2 实例解析所需）。
+dep property_inspector { path: "../../packages/property-inspector" }
+dep numeric_fields { path: "../../packages/numeric-fields" }
+dep color_picker { path: "../../packages/color-picker" }

@@ -1,0 +1,228 @@
+use auto.json
+
+// PLAN-092 T-04 — 普通设置消费示例「阅读与外观」。
+// PropertyInspector 为受控面板：fields/values 由应用发布；changeRequested 按
+// baseRevision 验证后原子接受（values/revision 推进），业务拒绝只反馈
+// fieldErrors，正式值不动；接受即 storage.set（应用自己的持久化合同），
+// Init 读回。预览区用真实参数渲染（字号/行距/对齐/文本色实际生效）——
+// 设置值同步到专用视图状态（view 不能调用 handler，故接受/读回时双写）。
+//
+// T-01 D-3：widget 级声明全部依赖包（跨包 depth-2 实例解析所需）。
+widget App {
+    use { package: property_inspector from "../../../../packages/property-inspector" }
+    use { package: numeric_fields from "../../../../packages/numeric-fields" }
+    use { package: color_picker from "../../../../packages/color-picker" }
+    msg { Init, ChangeRequested(str), PreviewRequested(str), PreviewCancelled(str), Err(str), ToggleStrict, ResetAll, Quit }
+    model {
+        var targetId str = "reading"
+        var rev int = 1
+        var schema_rev int = 1
+        var fields List = []
+        var values List = []
+        var groups List = []
+        var ferrs List = []
+        var strict bool = false
+        var saved_note str = ""
+        var seq_log int = 0
+        var log List = []
+        // 预览用视图状态（受控 values 的接受侧同步）
+        var font_size str = "16"
+        var line_height str = "1.50"
+        var show_hints bool = false
+        var align_v str = "left"
+        var ink str = "#3974E6FF"
+        var excerpt str = "窗含西岭千秋雪，门泊东吴万里船。"
+    }
+    view {
+        col (style: "w-full h-full bg-background text-foreground") {
+            row (style: "items-center gap-2 px-3 py-1.5 border-b border-border shrink-0") {
+                text "阅读与外观" { style: "text-sm font-medium" }
+                row (style: "flex-1") {}
+                checkbox { text: "受理暂停", checked: .strict, onclick: .ToggleStrict, title: "开启后所有修改被业务拒绝" }
+                button "重置全部" { onclick: .ResetAll, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+                button "退出" { onclick: .Quit, style: "px-2 py-0.5 text-xs rounded-md border border-border" }
+            }
+            row (style: "flex-1 min-h-0 items-stretch w-full") {
+                col (style: "w-96 shrink-0 border-r border-border p-3 gap-2 overflow-y-auto") {
+                    PropertyInspector (fields: .fields, values: .values, groups: .groups, fieldErrors: .ferrs, targetId: .targetId, revision: .rev, schemaRevision: .schema_rev, onchangeRequested: .ChangeRequested($event), onpreviewRequested: .PreviewRequested($event), onpreviewCancelled: .PreviewCancelled, onerror: .Err($event)) {}
+                }
+                col (style: "flex-1 min-w-0 p-4 gap-3 overflow-y-auto") {
+                    text "预览（实际参数生效）" { style: "text-xs font-medium text-muted-foreground" }
+                    if .align_v == "center" {
+                        text .excerpt { style: f"w-full p-2 rounded-md border border-border text-[${.font_size}px] leading-[${.line_height}] text-center break-all" }
+                    } else {
+                        if .align_v == "right" {
+                            text .excerpt { style: f"w-full p-2 rounded-md border border-border text-[${.font_size}px] leading-[${.line_height}] text-right break-all" }
+                        } else {
+                            text .excerpt { style: f"w-full p-2 rounded-md border border-border text-[${.font_size}px] leading-[${.line_height}] text-left break-all" }
+                        }
+                    }
+                    if .show_hints {
+                        text "提示：这里是随设置变化的辅助说明文字。" { style: "text-xs text-muted-foreground" }
+                    }
+                    row (style: "items-center gap-2") {
+                        text "文本色样本" { style: "text-xs text-muted-foreground" }
+                        row (style: "w-8 h-8 rounded-md border border-border items-center justify-center") {
+                            text "A" { style: f"text-lg font-semibold text-[${.ink}]" }
+                        }
+                        text .ink { style: "text-xs text-muted-foreground" }
+                    }
+                    text .saved_note { style: "text-xs text-muted-foreground" }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .groups.push({ id: "appearance", label: "阅读与外观" })
+            .fields.push({ id: "fontSize", label: "字号", kind: "integer", groupId: "appearance", help: "8..72 的整数字号", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: "16", precision: 0, min: "8", max: "72", step: "1", unitGroup: "", unit: "", options: [] })
+            .fields.push({ id: "lineHeight", label: "行距", kind: "number", groupId: "appearance", help: "1.0..3.0 倍行距", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: "1.50", precision: 2, min: "1.00", max: "3.00", step: "0.10", unitGroup: "", unit: "", options: [] })
+            .fields.push({ id: "showHints", label: "显示辅助提示", kind: "bool", groupId: "appearance", help: "在预览中显示辅助说明", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: false, precision: 0, min: "", max: "", step: "", unitGroup: "", unit: "", options: [] })
+            .fields.push({ id: "align", label: "对齐", kind: "enum", groupId: "appearance", help: "段落对齐方式", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: "left", precision: 0, min: "", max: "", step: "", unitGroup: "", unit: "", options: [{ id: "left", label: "左" }, { id: "center", label: "中" }, { id: "right", label: "右" }] })
+            .fields.push({ id: "ink", label: "文本色", kind: "color", groupId: "appearance", help: "预览文本颜色（8位HEX）", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: "#3974E6FF", precision: 0, min: "", max: "", step: "", unitGroup: "", unit: "", options: [] })
+            .fields.push({ id: "excerpt", label: "预览文本", kind: "string", groupId: "appearance", help: "预览区显示的句子", required: false, readOnly: false, disabled: false, hasDefault: true, defaultValue: "窗含西岭千秋雪，门泊东吴万里船。", precision: 0, min: "", max: "", step: "", unitGroup: "", unit: "", options: [] })
+            // 应用自己的持久化合同：Storage 读回；无记录用默认值
+            var raw str = storage.get("settings-inspector.values")
+            if raw != "" {
+                var data = json.parse(raw)
+                .values = data.values
+                .rev = .rev + 1
+                .saved_note = f"已从本地存储读回（${.values.len()} 项）"
+                .seq_log = .seq_log + 1
+                .log.push(f"[${.seq_log}] storage 读回 ${.values.len()} 项")
+            } else {
+                .values = []
+                .values.push({ id: "fontSize", value: "16" })
+                .values.push({ id: "lineHeight", value: "1.50" })
+                .values.push({ id: "showHints", value: false })
+                .values.push({ id: "align", value: "left" })
+                .values.push({ id: "ink", value: "#3974E6FF" })
+                .values.push({ id: "excerpt", value: "窗含西岭千秋雪，门泊东吴万里船。" })
+                .saved_note = "使用默认设置"
+            }
+            // 受控 values → 预览视图状态（视图不能调用 handler，读回时同步）
+            for v in .values {
+                if v.id == "fontSize" {
+                    .font_size = v.value
+                }
+                if v.id == "lineHeight" {
+                    .line_height = v.value
+                }
+                if v.id == "showHints" {
+                    .show_hints = v.value
+                }
+                if v.id == "align" {
+                    .align_v = v.value
+                }
+                if v.id == "ink" {
+                    .ink = v.value
+                }
+                if v.id == "excerpt" {
+                    .excerpt = v.value
+                }
+            }
+        }
+        .ChangeRequested(ev str) -> {
+            var req = json.parse(ev)
+            if .strict {
+                // 业务拒绝：fieldErrors 反馈（匹配当前目标/版本），values/revision 不动
+                .ferrs = []
+                .ferrs.push({ targetId: .targetId, fieldId: req.fieldId, baseRevision: req.baseRevision, seq: req.seq, code: "biz_rejected", message: "受理暂停，本次修改未保存" })
+                .seq_log = .seq_log + 1
+                .log.push(f"[${.seq_log}] 拒绝 ${req.fieldId} = ${req.value}")
+            } else {
+                var out List = []
+                for v in .values {
+                    if v.id == req.fieldId {
+                        out.push({ id: v.id, value: req.value })
+                    } else {
+                        out.push(v)
+                    }
+                }
+                .values = out
+                .ferrs = []
+                .rev = .rev + 1
+                storage.set("settings-inspector.values", json.stringify({ values: .values }))
+                .saved_note = "已保存到本地存储"
+                .seq_log = .seq_log + 1
+                .log.push(f"[${.seq_log}] 接受 ${req.fieldId} = ${req.value} ${req.source}")
+                // 受控 values → 预览视图状态（视图不能调用 handler，接受时同步）
+                for v in .values {
+                    if v.id == "fontSize" {
+                        .font_size = v.value
+                    }
+                    if v.id == "lineHeight" {
+                        .line_height = v.value
+                    }
+                    if v.id == "showHints" {
+                        .show_hints = v.value
+                    }
+                    if v.id == "align" {
+                        .align_v = v.value
+                    }
+                    if v.id == "ink" {
+                        .ink = v.value
+                    }
+                    if v.id == "excerpt" {
+                        .excerpt = v.value
+                    }
+                }
+            }
+        }
+        .PreviewRequested(ev str) -> {
+            // 预览只用于临时可见反馈，不写 Storage、不改正式 values（合同 §5）
+        }
+        .PreviewCancelled -> {
+        }
+        .Err(ev str) -> {
+            .seq_log = .seq_log + 1
+            .log.push(f"[${.seq_log}] 错误 ${ev}")
+        }
+        .ToggleStrict -> {
+            .strict = !.strict
+            if !.strict {
+                .ferrs = []
+            }
+        }
+        .ResetAll -> {
+            // 应用侧等价于逐字段恢复默认：清 Storage + 默认值集 + 原子推进
+            storage.set("settings-inspector.values", "")
+            .values = []
+            .values.push({ id: "fontSize", value: "16" })
+            .values.push({ id: "lineHeight", value: "1.50" })
+            .values.push({ id: "showHints", value: false })
+            .values.push({ id: "align", value: "left" })
+            .values.push({ id: "ink", value: "#3974E6FF" })
+            .values.push({ id: "excerpt", value: "窗含西岭千秋雪，门泊东吴万里船。" })
+            .rev = .rev + 1
+            .ferrs = []
+            .saved_note = "已恢复默认设置"
+            .seq_log = .seq_log + 1
+            .log.push(f"[${.seq_log}] 恢复全部默认")
+            // 受控 values → 预览视图状态（视图不能调用 handler，重置时同步）
+            for v in .values {
+                if v.id == "fontSize" {
+                    .font_size = v.value
+                }
+                if v.id == "lineHeight" {
+                    .line_height = v.value
+                }
+                if v.id == "showHints" {
+                    .show_hints = v.value
+                }
+                if v.id == "align" {
+                    .align_v = v.value
+                }
+                if v.id == "ink" {
+                    .ink = v.value
+                }
+                if v.id == "excerpt" {
+                    .excerpt = v.value
+                }
+            }
+        }
+        .Quit -> {
+            ui.close()
+        }
+    }
+}
