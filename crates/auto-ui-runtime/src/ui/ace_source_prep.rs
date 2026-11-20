@@ -544,6 +544,24 @@ pub fn prepare_component_source(
     let mut fn_blocks: Vec<String> = Vec::new();
     // PLAN-105 T-02（U03 真语料 013）：`use <unit>: <Record>` 的 record 声明。
     let mut type_blocks: Vec<String> = Vec::new();
+    // PLAN-105 T-02（U03 真语料 012）：**本文件**的 `style <name> = "<classes>"`
+    // 声明——组件面没有 style 绑定表，故把声明行空白化，并把 `style: <name>`
+    // 引用替换为引号字面量（与依赖样式同一条消费语义）。
+    let mut local_styles: Vec<(String, String)> = Vec::new();
+    for line in src.lines() {
+        let t = line.trim_start();
+        let Some(rest) = t.strip_prefix("style ") else {
+            continue;
+        };
+        let Some((name, value)) = rest.split_once('=') else {
+            continue;
+        };
+        let name = name.trim();
+        let value = value.trim();
+        if !name.is_empty() && value.starts_with('"') && value.contains('"') {
+            local_styles.push((name.to_string(), value.to_string()));
+        }
+    }
     let mut out = String::with_capacity(src.len());
     for line in src.split_inclusive('\n') {
         let (body, nl) = match line.strip_suffix('\n') {
@@ -551,6 +569,17 @@ pub fn prepare_component_source(
             None => (line, ""),
         };
         let t = body.trim_start();
+        // 本地 `style` 声明行：空白化（等长，保持 span）。
+        if t.starts_with("style ") && t.contains('=') && local_styles.iter().any(|(n, _)| {
+            t.strip_prefix("style ")
+                .and_then(|r| r.split_once('='))
+                .map(|(k, _)| k.trim() == n.as_str())
+                .unwrap_or(false)
+        }) {
+            out.push_str(&" ".repeat(body.len()));
+            out.push_str(nl);
+            continue;
+        }
         let Some(rest) = t.strip_prefix("use ") else {
             // 非 use 行：按需改写类型化列表数据字段（`var x []T = [...]`）。
             if let Some(rewritten) = rewrite_typed_list_field(body) {
@@ -697,7 +726,15 @@ pub fn prepare_component_source(
     // 内联样式必须落在**组件头之前**：模块样式表按源码顺序收集，组件之后声明的
     // 样式在投影期解析不到（016 实测：追加到文件尾 → `style caption_text` 不解析；
     // 前置到 widget 之前 → 整例通过）。
-    if !inlined.is_empty() || !store_blocks.is_empty() || !fn_blocks.is_empty() || !type_blocks.is_empty() {
+    // 本地样式引用替换：`style: <name>` → `style: "<classes>"`（声明已空白化）。
+    for (name, literal) in &local_styles {
+        for pat in [format!("style: {name}"), format!("style:{name}")] {
+            if out.contains(&pat) {
+                let repl = pat.replacen(name.as_str(), literal, 1);
+                out = out.replace(&pat, &repl);
+            }
+        }
+    }    if !inlined.is_empty() || !store_blocks.is_empty() || !fn_blocks.is_empty() || !type_blocks.is_empty() {
         let mut decls: Vec<String> = inlined
             .iter()
             .map(|s| format!("style {} = {}", s.name, s.literal))
@@ -794,6 +831,22 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    #[test]
+    fn inlines_local_style_declarations() {
+        let root = temp_project();
+        let src = "style caption = \"text-xs text-muted-foreground\"\nwidget App {\n    view {\n        text \"x\" { style: caption }\n    }\n}\n";
+        let prepared = prepare_component_source(&root, src).expect("prepare");
+        assert!(
+            prepared.source.contains("style: \"text-xs text-muted-foreground\""),
+            "local style reference becomes a literal: {}",
+            prepared.source
+        );
+        assert!(
+            !prepared.source.contains("style caption ="),
+            "local style declaration line is blanked"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
     #[test]
     fn unknown_dep_style_is_not_inlined() {        let root = temp_project();
         let prepared = prepare_component_source(
@@ -937,7 +990,6 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 }
-
 
 
 
