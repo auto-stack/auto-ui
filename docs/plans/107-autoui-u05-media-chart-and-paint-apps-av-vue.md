@@ -177,6 +177,23 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ac5f6a01, lang c941db401 | evidence: real libmpv counterexample closed and 9 focused cases passed | next: work`
 
+**原样图表与 Carousel 源码接入切片（T-02 进行中）。** AutoLang `d414aec0eb8a9603c3308869416b896f9b518581`，AutoUI `ac5f6a01`。在 `c941db401` 用两个实际 AGE 源入口分别回放固定原页和组件，发现画廊 AreaChart 等图表组件把中文块注释报成非 ASCII 词法错误。Carousel 页拆取 20 个未改动的直属子块，仅 `carousel-options` 在两个入口拒绝；材料副本只改 `loop` 为普通标识符时整页准入。`carousel-original-children.json` SHA256 `bee24801e58669042451b59f454db0a0de35bebedf86a4454ad311b7250433c7`。PLAN-105/114 在制分支未修改这两个语法接面，各自已有共有路线保持原分工。后续汇合需要从最终语法重算两项身份。
+
+AGE Component/Package 使用现有 block-comment 扫描器保留非嵌套 `/* … */` 注释与原 span，未闭合注释在两个实际入口具名为 `source.lex.block-comment` 并定位至文件末尾。`loop` 只新增为视图属性键，保留原值和普通属性分类。冻结身份更新为 AgeComponent `d320a674ac1359ce52c85af23082c90323c42bea5241c7296746e97043d2125e`、AgePackage `5b71fa58c4e1abddd4373a17a87f180637da106ce6275c5aa4df428d17cc93d4`，相邻 profile 的旧身份断言均通过。
+
+| 测试与输入 | 实际结果 | 墙钟执行 |
+|---|---|---:|
+| 新增 `plan979_component_profile::p107_age_views_preserve_labels_across_block_comments` | 1/1，保留两个文本叶、引号内 `/*…*/` 与原字节位置，注释内的假文本和 `$event` 无语义 | 0.149 s |
+| 新增 `plan979_component_profile::p107_age_views_reject_unterminated_block_comments` | 1/1，内层与尾随未闭合注释均按完整 span 拒绝 | 0.106 s |
+| 新增 `plan979_component_profile::p107_carousel_loop_is_a_view_property` | 1/1，两个入口都投影 Carousel 原 `loop: "true"` 属性及值 | 0.067 s |
+| `plan979_component_profile::p979_component`、`plan981_grammar_scope`、`plan981_age_package`、`source_frontend::text_stage_rejections` | 24/24、4/4、3/3、1/1，0 跳过。最后一组含相邻语言 profile 的旧块注释负例 | 0.113 / 0.392 / 0.088 / 0.054 s |
+| 固定 024 与画廊四类图表作者组件，及 Carousel 页与组件，分别回放实际 AGE 前门 | 图表均转过注释词法拒绝，下一拒绝点在声明/类型语法。Carousel 原页两个入口均准入，组件的 `text \| Slide` 仍在包面被拒 | 0.170 s |
+| 原样 Carousel 页，`ace_node_desktop_window --package` 与直连 `generate_package_sfc` | 单页 Iced 2 帧/exit 0，生成 SFC/exit 0。加入固定 `official::carousel` 后两端 exit 4，均为 `source.lex` 拒 `\|`。只在材料副本改三句为带引号文本，包面进入下一层语法失败 | Iced 3.048 / 0.189 s，SFC 0.305 / 0.144 s |
+
+测试准备 `cargo test --locked --offline -j 4 -p ace-core --test conformance --no-run` 冷 32.307 s，最终增量 1.853 s。首次未闭合注释在组件面被结构诊断覆盖，已优先保留该词法证据。AutoUI 工具和真窗入口同树重建 29.743 s，源与 SFC 探针分别链接 0.407 s、4.745 s，发现与清理未单计。`age-view-final-runs.json` SHA256 `d7b209dff78022f7bce0becbef548732c18bc80108041cf09f827fc27b6a8bd6`，`source-diagnostics-final.log` SHA256 `1517f70b76592c0340fab2d44cdb9bbc497b9296ac54615dc908812a7d0c39c`，`age-view-window-runs.json` SHA256 `ccde39338952e054812f44f66ae490f83204c3691b691b4ed1a8d6892990d444`，`age-view-package-sfc-runs.json` SHA256 `b30e4b6dd6dce8da374081c4bb946d813cef30ea62335de88b7944a523990908`。Carousel 单页结果供定位，完整组件运行、交互、访问性和卸载待 §5 同源验收。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ac5f6a01, lang d414aec0e | evidence: 35 focused cases pass and original Carousel page reaches both host endpoints in isolation | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
