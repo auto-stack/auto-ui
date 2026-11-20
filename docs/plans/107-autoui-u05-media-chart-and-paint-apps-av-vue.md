@@ -579,6 +579,14 @@ Iced `round37-original-gallery-carousel-window.json` 与同名 `.log` SHA256 分
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 37 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 3dceaa13, lang 5950a6222 | evidence: original Carousel route and real native controls plus production browser replay | next: work`
 
+### 第 38 轮｜原画廊静态数据绑定图表列表输入
+
+组件包绑定器识别作为必填裸 `List` 传入的静态 model 字面列表，并沿用受检记录推导。仅重投影实际输入涉及的字段和组件，保留原源码和语法标识。AV 组件包回归移除测试专用的 handler 循环后仍实测切换 `7 → 13`，异形输入保留具名拒绝。Core PLAN-981 251、AV PLAN-981 71、组件包 12、路由 4、SFC 20 均通过。
+
+按固定原字节重跑 Area、Bar、Donut、Line 四个画廊页。四条闭包均越过必填列表诊断，首项推进到 `source.index-base` 动态记录键。`round38-gallery-{area,bar,donut,line}-with-component.log` 的 SHA256 依次为 `ea23404333c5290ae925bc2c04235a5350dcd5388fd2c23b2011e2f3529f27ca`、`2091fa702b1ddc3d40d1f2ccd9888af8755e25b3ef698d9257034befb129928f`、`3b92e5b5e9bab704190dcdd538f65893c4e0513630ab745e5d04aa2a1aa61f95`、`a2c858e9669ef25903b67d03eb2c952c893be7f96335fd70813b03e68c66bc9c`。原 `024-charts` 命中与第 31 轮相同的诊断日志哈希 `d4fc69664dc669a475ff6d05531198e53265779e0a0dbc2c4b838ebd1e4149be`。两端的原图表窗口回放仍待准入。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 38 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a674e157, lang ba467d71c | evidence: static record model inputs, checked Iced frame and all four original gallery chart closures reach record indexing | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
