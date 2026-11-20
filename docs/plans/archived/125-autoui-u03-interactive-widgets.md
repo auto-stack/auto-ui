@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-20
 plan_revision: 2
-current_step: 6
+current_step: 7
 total_steps: 7
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -119,7 +119,7 @@ touched_goals: []
   - owner_stage: review。AC-03。正反例与证据全部绑定冻结版本。
 - [x] T-07 修复 AutoLang debug/test 合并门
   - owner_stage: work/review。AC-05。显式 debug 工具准备沿用固定组、nextest archive、工具收据和运行库内容身份。独立验证旧预期、合法准备、产物变更拒绝及只读运行。此项完成后执行 T-06。
-- [ ] T-06 正式交付并回填 U03
+- [x] T-06 正式交付并回填 U03
   - owner_stage: merge。AC-04。按仓规落主、归档与清理。AV 可先独立复审交 W1，A2Vue 沿原两端合同继续收口。
 
 ## 9. 复审记录
@@ -157,6 +157,12 @@ touched_goals: []
 读回 AutoLang `docs/specs/ace-migration/m2-autoui.md` SHA256 `F045D0823403E5C86C24922DDF18783AF30B828CDE579FC32A69FFF8F2EAB386`、`docs/specs/auto-test-case/module-selection.md` `B9BAEA06864DADB5B0FC5F84828711EC171F9E11A5D801E618202C38AF1A7790`，AutoUI `docs/specs/runtime/ace-package-widgets.md` `F85E9C1A0A07FFB1F70F7C9B6083CE2F9E65072D62A98BED38FA2B8ABAC15C01`；三份在 master 与各自复审工作树逐字节一致。
 
 2026-11-20 stage: merge | key: PLAN-125:r2 | checkpoint: archived | outcome: delivered, cleanup pending。归档文件实际位置为 `docs/plans/archived/125-autoui-u03-interactive-widgets.md`，检查了原页、105、1071、1072 和规范链接。任务 6/7，T-06 待清理后关闭。PLAN-105 §9 和计划 README 指向本档，PLAN-105 的既有编辑另外留在原工作区。
+
+2026-11-20 stage: merge | key: PLAN-125:r2 | checkpoint: cleaned | outcome: pass | archive_commit: `41b2a0b2fd561a641723ca65b25bab7d2f0416ac`。四个工作树按绝对路径、Git 注册、预期提交、干净状态和独立 wt-guard 检查通过后移除。确认两条已落主的 `plan-125-dev`、四个工作树和空组目录均已消失。证据折入本档，已登记的 `plan-artifacts/plan-125` 经 guard 后删除，保留登记状态为 `deleted-at-merge`。AC-04 和 T-06 已交付，全项 7/7。其他进行中计划的既有主检出文件没有随归档提交。
+
+发布产物检查。AutoOS Gallery 的现存 `gen/front/vue` 时间为 2026-09-28 21:41，早于此次交付。AutoUI 和 AutoLang 主检出的标准 release 路径未发现本次验证用的工具和 AV worker。验收基于独立 debug/test 产物。AutoLang 批量回归收据为 `2026-11-20T00:00:00Z`，`last_covered_plan_id=1098`，本次 AutoUI 编号及收据年龄未触发批量回归。
+
+2026-11-20 stage: goal | plan_id: PLAN-125 | plan_revision: r2 | from: merge | to: done | status: archived | outcome: pass | AutoUI `e99e6d99` / AutoLang `a7ce84eff`。
 
 2026-11-20 stage: new | PLAN-125 r1 | outcome: pass（计划及原页静态核对） | task_ids: T-01..T-06 | acceptance_ids: AC-01..04 | next: work/T-01。
 
