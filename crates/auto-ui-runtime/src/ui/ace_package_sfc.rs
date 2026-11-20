@@ -15,6 +15,7 @@ use ace_core::source::packages::PackageModuleInput;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use super::ace_route::{front_package_units, package_candidates, prepare_page, RouteSource, RouteTable};
+pub use super::ace_route::front_route_modules;
 use super::ace_svg;
 use ace_core::source::age_package::{FILE_LIST_BINDING, FILE_MUTATE_BINDING, FILE_OPEN_BINDING, WIDGET_CONTEXT_BINDING};
 use super::ace_widget_packages::append_widget_packages;

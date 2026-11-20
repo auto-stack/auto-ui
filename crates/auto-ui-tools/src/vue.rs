@@ -8304,19 +8304,22 @@ fn ace_front(front_dir: &Path) -> AutoResult<Option<AceFront>> {
         if !is_routed && !imports_package && !has_timers && !has_host_bindings {
             return Ok(None);
         }
-        let mut modules = Vec::new();
-        if is_routed {
-            VueProject::collect_at_files_recursive(&front_dir.join("pages"), &mut modules);
-        }
-        for entry in fs::read_dir(front_dir)? {
-            let path = entry?.path();
-            if path != app_at && path.file_name().is_some_and(|name| name != "pac.at")
-                && path.extension().is_some_and(|ext| ext == "at")
-            {
-                modules.push(path);
+        let modules = if is_routed {
+            auto_ui_runtime::ui::ace_package_sfc::front_route_modules(&app_at)?
+        } else {
+            let mut modules = Vec::new();
+            for entry in fs::read_dir(front_dir)? {
+                let path = entry?.path();
+                if path != app_at
+                    && path.file_name().is_some_and(|name| name != "pac.at")
+                    && path.extension().is_some_and(|ext| ext == "at")
+                {
+                    modules.push(path);
+                }
             }
-        }
-        modules.sort();
+            modules.sort();
+            modules
+        };
         use auto_ui_runtime::ui::ace_package_sfc::{generate_linked_front_sfc, generate_routed_front_sfc};
         let product = if is_routed {
             Some(generate_routed_front_sfc(&app_at, &source, &modules)?

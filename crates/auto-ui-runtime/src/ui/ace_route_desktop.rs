@@ -150,33 +150,6 @@ impl DesktopRoutes {
     }
 }
 
-pub(super) fn front_route_modules(app: &Path) -> Result<Vec<PathBuf>, String> {
-    let front = app.parent().filter(|path| !path.as_os_str().is_empty()).unwrap_or(Path::new("."));
-    let pages = front.join("pages");
-    let mut pending = vec![(front.to_path_buf(), false)];
-    if pages.is_dir() {
-        pending.push((pages, true));
-    }
-    let mut modules = Vec::new();
-    while let Some((dir, recursive)) = pending.pop() {
-        let error = |err| format!("ace.route.module: {}: {err}", dir.display());
-        for entry in std::fs::read_dir(&dir).map_err(error)? {
-            let entry = entry.map_err(error)?;
-            let path = entry.path();
-            if recursive && entry.file_type().map_err(error)?.is_dir() {
-                pending.push((path, true));
-            } else if path != app
-                && path.extension().is_some_and(|ext| ext == "at")
-                && path.file_name().is_some_and(|name| name != "pac.at" && (recursive || name != "app.at"))
-            {
-                modules.push(path);
-            }
-        }
-    }
-    modules.sort();
-    Ok(modules)
-}
-
 pub(super) fn route_links(node: &ComponentNode) -> Result<Vec<(String, String)>, String> {
     let mut links = Vec::new();
     let mut items: Vec<&ComponentViewItem> = node.view.tree.iter().rev().collect();

@@ -11,6 +11,33 @@ use ace_core::source::packages::{
     parse_package_source_age, PackageModuleInput, PackageSyntax, PACKAGES_CAPABILITY,
 };
 
+pub fn front_route_modules(app: &Path) -> Result<Vec<PathBuf>, String> {
+    let front = app.parent().filter(|path| !path.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let pages = front.join("pages");
+    let mut pending = vec![(front.to_path_buf(), false)];
+    if pages.is_dir() {
+        pending.push((pages, true));
+    }
+    let mut modules = Vec::new();
+    while let Some((dir, recursive)) = pending.pop() {
+        let error = |err| format!("ace.route.module: {}: {err}", dir.display());
+        for entry in std::fs::read_dir(&dir).map_err(error)? {
+            let entry = entry.map_err(error)?;
+            let path = entry.path();
+            if recursive && entry.file_type().map_err(error)?.is_dir() {
+                pending.push((path, true));
+            } else if path != app
+                && path.extension().is_some_and(|ext| ext == "at")
+                && path.file_name().is_some_and(|name| name != "pac.at" && (recursive || name != "app.at"))
+            {
+                modules.push(path);
+            }
+        }
+    }
+    modules.sort();
+    Ok(modules)
+}
+
 pub(super) type RouteModulePaths = BTreeMap<String, PathBuf>;
 
 pub(super) fn front_package_units(
@@ -295,6 +322,26 @@ mod tests {
     const APP: &str = include_str!("../../tests/fixtures/plan124/app.at");
     const KANBAN: &str = include_str!("../../tests/fixtures/plan124/kanban.at");
     const BOARD: &str = include_str!("../../tests/fixtures/plan124/board.at");
+
+    #[test]
+    fn authored_front_resolves_nested_pages_and_source_paths() {
+        let project = tempfile::tempdir().unwrap();
+        let front = project.path().join("src/front");
+        let pages = front.join("pages/nested");
+        std::fs::create_dir_all(&pages).unwrap();
+        let app = front.join("app.at");
+        std::fs::write(&app, KANBAN).unwrap();
+        std::fs::write(front.join("pac.at"), "ignored").unwrap();
+        std::fs::write(pages.join("board.at"), BOARD).unwrap();
+        std::fs::write(pages.join("index.ts"), "ignored").unwrap();
+        let modules = front_route_modules(&app).unwrap();
+        assert_eq!(modules, [pages.join("board.at")]);
+        let (units, paths) = front_package_units(&app, KANBAN, &modules).unwrap();
+        assert_eq!(paths["app::app"], app);
+        assert_eq!(paths["app::board"], modules[0]);
+        let table = routes(&units);
+        assert_eq!(table.routes()[0].page.as_deref(), Ok("app::board"));
+    }
 
     fn unit(id: &str, source: &str) -> PackageModuleInput {
         PackageModuleInput {

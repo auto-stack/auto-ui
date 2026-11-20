@@ -153,7 +153,11 @@ fn run_internal_vm_session(entry: &str) -> i32 {
     match result {
         Ok(_) => 0,
         Err(e) => {
-            eprintln!("vm session failed: {e}");
+            if std::env::var("AUTO_UI_ENGINE").ok().as_deref() == Some("ace") {
+                eprintln!("{}{e}", auto_ui_tools::proc_host::VM_SESSION_FATAL_PREFIX);
+            } else {
+                eprintln!("vm session failed: {e}");
+            }
             // PLAN-081 T-04c-12: 现场存证——三层 stderr 转发链可能吞行
             // （grandchild stderr=pipe→parent log stream），错误对象直落
             // env 指定文件（probe 侧注入，随会话 env 传播）。

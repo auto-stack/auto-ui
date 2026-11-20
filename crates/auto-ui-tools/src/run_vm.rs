@@ -57,6 +57,8 @@ pub fn run_entry_file(path: &str) -> auto_lang_core::AutoResult<String> {
 /// 执行动态 UI 入口：托管时交宿主主线程，未托管在当前线程（= CLI 的
 /// OS 主线程，迁移前行为）。
 fn execute_vm_entry(code: &str, path: Option<&str>) -> auto_lang_core::AutoResult<String> {
+    // The hosted worker dispatches both engines to the session child's main
+    // thread. The child inherits AUTO_UI_ENGINE and selects its engine there.
     if let Some(hook) = proc_host::vm_main_hook() {
         return hook(code, path);
     }
