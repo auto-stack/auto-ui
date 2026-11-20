@@ -246,6 +246,18 @@ AutoLang 准备 5.65 s，最后重链 1.83 s。AutoUI 测试准备 44.10 s、探
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 7 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui f5ea801f, lang defb95510 | evidence: original Carousel page mounts and dispatches five preview controls through the live Iced widget and accessibility message paths | next: work`
 
+**图表与 FlowDiagram 的 SVG 渲染接面（T-03 进行中）。** AutoUI `ea71a751c7eecd2ee82fe2cc3ca32724d866aa3f`，AutoLang `defb95510`。基线包 SFC 输出空的 `<path></path><line></line>`。现从已受检视图保留 SVG 命名空间、几何、样式、标签和绑定。Iced 走现有 `svgdoc:` 渲染通路，A2Vue 输出原生 SVG 元素。另修正 A2Vue 包初值发射，常量 fragment 没有语句时沿已验证的标量表达式取值，闭合原 `gridPath` 生成 `ref()` 导致浏览器路径长度为 0 的反例。
+
+| 执行 | 结果 | 墙钟执行 |
+|---|---|---:|
+| `ui::ace_node_desktop::widgets` 过滤 | 6/6，新增用真实受检包 AV handler 将线段终点 4→18，经 Iced 的 SVG 文档与 resvg 栅格化，像素 (12, 4) 从透明变为 RGBA (255, 0, 0, 255) | 0.181 s |
+| 包模板非浏览器用例与已交 VM SVG 回归 | 12/12、1/1。含动态属性、受检字符串初值、标签转义和不支持属性的具名拒绝；两个既有浏览器用例未选 | 0.172 / 0.124 s |
+| `AUTO_UI_ACE_VUE=1 auto build --render vue --gen-only` → `pnpm build` → Chrome | 材料路由复用原 LineChart `gridPath` 和 PLAN-123 `allowJs`，全链 exit 0。SVG 命名空间正确、四段原网格总长 2040，点击后线长 50→510，标签完整，卸载且零页面异常 | 1.871 / 2.122 / 0.994 s |
+
+测试最终增量准备 14.57 s，工具最终增量准备 10.88 s，首次离线安装 9.90 s，发现/清理未单计。浏览器失败日志 `svg-geometry-browser.log` SHA256 `63199c9e8f74bf30158ebd0cc25d48746555f8eb32c3c47e6e7f1136e8cd87d4`，最终日志 `svg-geometry-browser-final.log` SHA256 `e3d5b26a627b4964b9b4693b22372b9db54b4dc0b98db9338b821cd20f972104`，最终定向测试日志 `svg-geometry-test-{native,sfc}-final.log` SHA256 `54a45537d77c46e883cbd67ec80ea26864a934895d80250e954408828e04c113`、`382fe900170242a6d0b88ce0a122a4f6f60aec3bcb339f340942aa8907ce7905`。实测覆盖几何消费和数据更新。原组件的列表循环、条件图元、图例及指针仍待共享包闭包与事件接线，桌面遇到未求值的 SVG 控制流具名显示诊断。PLAN-114 已推进至 `e65a1d5a9` 的受检遍历与文本谓词，固定发布面依赖仍沿 B-107-01 跟进。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 8 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ea71a751, lang defb95510 | evidence: AV state drives SVG pixels and production-generated Vue renders and updates the canonical grid fragment in Chrome | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
