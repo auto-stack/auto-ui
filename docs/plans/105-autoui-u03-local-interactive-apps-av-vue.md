@@ -402,6 +402,19 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 68 | from: work | t
 **结论/下一刀**：查 resolver 的 `List<T>` 泛型实参归一（`ty_use`/`intern` 路径）以及 push 实参对接收位的类型收敛——目标：让「非空字面量初值 + 逐元素 push」的 `List<Str>` 局部保持 owned 元素，从而消掉 `list_get` 的 view-escape。
 
 **验证**：plan105 25/25、980 39/39、981 248/248；av list handlers 4/4；调试钩子已移除。
+
+### 六例剩余工作（2026-11-20 状态表，供 T-03/T-04 排期）
+
+| 例 | 已达成 | 剩余（按依赖排序） |
+|---|---|---|
+| 015-notes | 真窗渲染 7 叶；store 内联；样式/记录类型/宿主 storage 仿真 | ①宿主 API 面（`list_notes` 等）或 prep 内联 api 单元；②动态列表渲染（note 行） |
+| 018-book-reader | 真窗渲染 13 叶（壳件） | ①routes/outlet 页面组合；②页面数据面 |
+| 022-kanban | 真窗渲染 8 叶（壳件）+ 主题切换可交互 | ①routes/outlet 组合；②看板列表渲染；③后端 api 面 |
+| 013-todo | store 内联；表达式面（下标/记录） | ①宿主 API 面（`list_todos`/`update_todo`/…）；②动态列表渲染 |
+| 016-calendar | 组件面投影通过；util 内联 | ①view-for over computed 列表；②宿主 API 面 |
+| 012-clock | 表达式/循环/文本谓词/宿主 storage 仿真；列表初值展开 | ①列表元素 owned 化（resolver 泛型实参归一）；②动态列表渲染；③时间宿主 |
+
+**共同大件**：动态列表渲染（视图循环叶按运行时列表展开）——012/013/015/016/022 五例共用。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
