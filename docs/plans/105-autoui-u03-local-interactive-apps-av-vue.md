@@ -336,6 +336,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 62 | from: work | t
 **效果**：012 的真窗错误从 **Atom 绑定**阶段（`no accepted case expr.text_slice` 等一串）推进到 **verify** 阶段：`eq operands must both be i32 or both be bool (found str / Str)`、`local l98 has text type str; text types exist only in the text-i32-draft profile`、`immutable-write`。→ 下一刀是 **verify_collections 的文本类型面**（借用 str 视图与 Str 混比较、局部文本类型）而非描述符。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3（collections 文本面加入后原理事例全部保持）。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 63 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 694bd808f | next: work
+
+2026-11-19 stage: work（T-02 W60：collections 文本类型面入域）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `694bd808f` | task_ids: T-02（W60）| evidence: 012 推进到 immutable-write 面
+
+**交付**：①`verify` 的 collections 域**放行借用文本/字符**（类型表白名单 + 局部类型：`str`/`char`）；②AGE 入口的**跨借用/owned 文本**规则——相等比较（`age_eq`，经新的 `verify_collection_family_age` 入口）与**调用实参**（`str` ↔ `Str` 内容语义）；③`typecheck` 的调用实参同样放行 AGE 跨文本；④组件面改用 AGE collections 验器入口。
+
+**效果**：012 真窗错误从 verify 的文本类型面（`local has text type str`、`param 0 (str) does not match eval_args[0] (Str)`）**全部消失**，推进到 `verify.immutable-write`（一批局部 `l103…l106` 被赋值但声明不可变）。下一刀 = 这些局部的可变性来源（很可能是 prep 注入的宿主仿真字段或 C-for 索引局部的标记路径）。
+
+**纪律**：过程中一次 `age_eq` 归位脚本误改了 `verify_function` 的 `Verifier` 初始化并删掉一行 `let m = …`，已修复并跑全绿（教训：按行号改代码前先确认锚点唯一）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
