@@ -601,6 +601,40 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 84 | from: work | t
 
 **需要决策**：A 继续在 AV 侧补 `Str`（保持原口径，5–10 轮）；B 先以 A2Vue 端交付 013（浏览器可用即算该例端到端），AV 端列为已知缺口；C 收窄到"少量真正完整"的应用（用户此前首选 C 的条件成立时）。
 
+### D-105-C（2026-11-19，用户决定：**暂停并交接**）
+
+**状态**：本计划在 T-02 中段暂停（用户决定）。以下为可直接续做的交接事实。
+
+#### 1. 已交付并稳定的能力（core，两侧共用；均有永久回归）
+- 组件面表达式：比较/逻辑/算术/一元/文本拼接/`f"…"`/显示、`if` 条件与链、条件样式。
+- 控制流：handler 级 `for`（列表迭代与 C 风格条件 `for`）、`while`（归一为条件 `for`）、嵌套 `if`。
+- 列表：`List<T>.new()`、`push`（含整局部 `.move` 语义）、`get`/`set`/`insert`/`remove`/`len`/`clear`/空列表归一；**元素视图** `xs[i].f` / `xs.get(i).f`（字段投影读、`len()` 消费、文本字段读值）在 AGE 车道放行。
+- 记录：`type` 声明（`type X { }` 与 `pub type X = { }`）、`CtorNamed` 构造、字段投影、记录列表。
+- store：同源 store 内联（字段/消息/处理器）、`store.<Msg>()` 展开、store 字段映射（含构造/对象字面量内部）。
+- 诊断：未声明 model 字段具名拒；未接线调用点名（方法名）。
+- prep（auto-ui）：依赖样式/本地样式内联、`use` 空白化、`type`/`fn`/`const` 内联、store 块内联、`str.contains` 直译、宿主 storage 仿真、列表初值展开、记录文本字段 owned 化、model 文本字段 owned 化、`routes`/`outlet` 页面组合第一片（开关 `P105_ROUTE_PAGES`）、纯 Auto 内存后端内联（开关 `P105_MEM_BACKEND`）。
+
+#### 2. 具体阻断（D-105-B）
+- 013 组件源码**已全部编译通过**，卡在 **AV（Iced）后端 lowering**：`lower.type-use: type kind Str is outside the av.collections/1 source surface`。
+- 根因：`av.collections/1` 的 MIR 仅支持 i32/bool 标量（`scalar_shape_of_use`），无 owned 文本 `Str`（类型/值/concat/clone/len）。
+- 影响：六例（012/013/015/016/018/022）**全部**含「列表 + 文本」，AV 真窗全拦；A2Vue（TS）端不经 AV MIR，不受此限。
+
+#### 3. 续做路线（任选其一）
+- **A**：在 AV collections MIR 增加 `Str`（与 text-record 面共享字符串堆）≈ 5–10 轮；完成后 Iced 端可交付。
+- **B**：先走 A2Vue（TS）端交付 013，AV 端列已知缺口；需先打通 T-05 的**整包单元装配**（`PackageModuleInput` 多单元；单单元会报 `source.module-identity`）。
+- **C**：收窄到 1–2 例真正完整（用户预置条件）。
+
+#### 4. 工作树与分支
+- auto-ui：`D:/autostack/.wt/ui-105/auto-ui`，分支 `plan-105-dev`；auto-lang：`D:/autostack/.wt/ui-105/auto-lang`，分支 `plan-105-dev`。
+- 两棵树均已提交、工作区干净；最近提交：auto-ui `e3883ae5`、auto-lang `0a0872b18`。
+- 开关：`P105_ROUTE_PAGES=1`（路由页面组合）、`P105_MEM_BACKEND=1`（内存后端内联）。
+- 构建：`CARGO_TARGET_DIR=D:\autostack\plan-artifacts\plan-105\target`（auto-lang）与 `...\target-ui`（auto-ui）。
+
+#### 5. 证据锚
+- 门：plan105 26/26、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 7/7；auto-ui prep 8/8。
+- 基线：本分支全量 `ace-core conformance` 基线 834 passed / 36 failed（预存在，stash 对照实证），本轮改动零新增失败。
+- 六例真窗现状：015 7 叶、018 11 叶（壳件）、022 8 叶（壳件+主题可交互）；013 组件编译通过、卡 AV lowering；016 卡 view-for over computed；012 卡未定型列表元素 owned 化。
+
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -727,6 +761,40 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 84 | from: work | t
 **重估**：在 AV collections MIR 增加 `Str`（类型、值表示、concat/clone/len、与 text-record 面共享字符串堆）≈ 5–10 轮且有风险；或改走 **A2Vue（TS）端**先交付 013（不受此阻），Iced 端后补。
 
 **需要决策**：A 继续在 AV 侧补 `Str`（保持原口径，5–10 轮）；B 先以 A2Vue 端交付 013（浏览器可用即算该例端到端），AV 端列为已知缺口；C 收窄到"少量真正完整"的应用（用户此前首选 C 的条件成立时）。
+
+### D-105-C（2026-11-19，用户决定：**暂停并交接**）
+
+**状态**：本计划在 T-02 中段暂停（用户决定）。以下为可直接续做的交接事实。
+
+#### 1. 已交付并稳定的能力（core，两侧共用；均有永久回归）
+- 组件面表达式：比较/逻辑/算术/一元/文本拼接/`f"…"`/显示、`if` 条件与链、条件样式。
+- 控制流：handler 级 `for`（列表迭代与 C 风格条件 `for`）、`while`（归一为条件 `for`）、嵌套 `if`。
+- 列表：`List<T>.new()`、`push`（含整局部 `.move` 语义）、`get`/`set`/`insert`/`remove`/`len`/`clear`/空列表归一；**元素视图** `xs[i].f` / `xs.get(i).f`（字段投影读、`len()` 消费、文本字段读值）在 AGE 车道放行。
+- 记录：`type` 声明（`type X { }` 与 `pub type X = { }`）、`CtorNamed` 构造、字段投影、记录列表。
+- store：同源 store 内联（字段/消息/处理器）、`store.<Msg>()` 展开、store 字段映射（含构造/对象字面量内部）。
+- 诊断：未声明 model 字段具名拒；未接线调用点名（方法名）。
+- prep（auto-ui）：依赖样式/本地样式内联、`use` 空白化、`type`/`fn`/`const` 内联、store 块内联、`str.contains` 直译、宿主 storage 仿真、列表初值展开、记录文本字段 owned 化、model 文本字段 owned 化、`routes`/`outlet` 页面组合第一片（开关 `P105_ROUTE_PAGES`）、纯 Auto 内存后端内联（开关 `P105_MEM_BACKEND`）。
+
+#### 2. 具体阻断（D-105-B）
+- 013 组件源码**已全部编译通过**，卡在 **AV（Iced）后端 lowering**：`lower.type-use: type kind Str is outside the av.collections/1 source surface`。
+- 根因：`av.collections/1` 的 MIR 仅支持 i32/bool 标量（`scalar_shape_of_use`），无 owned 文本 `Str`（类型/值/concat/clone/len）。
+- 影响：六例（012/013/015/016/018/022）**全部**含「列表 + 文本」，AV 真窗全拦；A2Vue（TS）端不经 AV MIR，不受此限。
+
+#### 3. 续做路线（任选其一）
+- **A**：在 AV collections MIR 增加 `Str`（与 text-record 面共享字符串堆）≈ 5–10 轮；完成后 Iced 端可交付。
+- **B**：先走 A2Vue（TS）端交付 013，AV 端列已知缺口；需先打通 T-05 的**整包单元装配**（`PackageModuleInput` 多单元；单单元会报 `source.module-identity`）。
+- **C**：收窄到 1–2 例真正完整（用户预置条件）。
+
+#### 4. 工作树与分支
+- auto-ui：`D:/autostack/.wt/ui-105/auto-ui`，分支 `plan-105-dev`；auto-lang：`D:/autostack/.wt/ui-105/auto-lang`，分支 `plan-105-dev`。
+- 两棵树均已提交、工作区干净；最近提交：auto-ui `e3883ae5`、auto-lang `0a0872b18`。
+- 开关：`P105_ROUTE_PAGES=1`（路由页面组合）、`P105_MEM_BACKEND=1`（内存后端内联）。
+- 构建：`CARGO_TARGET_DIR=D:\autostack\plan-artifacts\plan-105\target`（auto-lang）与 `...\target-ui`（auto-ui）。
+
+#### 5. 证据锚
+- 门：plan105 26/26、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 7/7；auto-ui prep 8/8。
+- 基线：本分支全量 `ace-core conformance` 基线 834 passed / 36 failed（预存在，stash 对照实证），本轮改动零新增失败。
+- 六例真窗现状：015 7 叶、018 11 叶（壳件）、022 8 叶（壳件+主题可交互）；013 组件编译通过、卡 AV lowering；016 卡 view-for over computed；012 卡未定型列表元素 owned 化。
 
 ## 10. 下游交接
 
