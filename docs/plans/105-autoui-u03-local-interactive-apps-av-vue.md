@@ -316,6 +316,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 60 | from: work | t
 **验证**：plan105 25/25、980 39/39、981 248/248；prep 7/7（清理探针后复跑）。
 
 **下一刀**：文本运算的 `str`/`Str` 双通（拼接、slice 链、`TextDisplay` 操作数），或在组件面把「文本字段参与运算」统一切到 owned 车道。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 61 | from: work | to: work | status: executing | outcome: pass（负结果）| worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 无代码提交 | next: work
+
+2026-11-19 stage: work（T-02 W58：文本谓词落点勘察）| PLAN-105 r1 | outcome: pass（负结果记录）| task_ids: T-02（W58）| evidence: 012 atom bind 明细
+
+**尝试**：把 `__p105_str_contains` helper 的形参从借用 `str` 改成 owned `Str`（期望消掉 `expected str, found Str`）。结果：helper 内的 `hay.slice(…)` 在 **collections 描述符**里被拒——`atom:290:30 bind.unknown-case: no accepted case expr.text_slice`、`unknown field end/start`、以及 `t_str` 悬挂引用。说明 collections 域的 Atom 面**没有 `text_slice`**（借用文本的切片族整体不在该域）。
+
+**结论（下一刀定界）**：`Str.contains` 类文本谓词不能靠 prep helper 在 collections 域实现——必须在**语言/描述符层**补 `text_contains`（HIR `ExprKind` + collections descriptor case + MIR 降低 + AV 解释器），或让组件面文本运算留在 text-record 车道（与 collections 列表并存的双域方案）。
+
+**本轮无代码提交**（tweak 已回滚）；prep 7/7、plan105 25/25、980 39/39、981 248/248 保持。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
