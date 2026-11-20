@@ -4,7 +4,7 @@ status: executing
 feature_name: AutoUI U05 媒体、图表与绘制 AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
-updated_at: 2026-11-20
+updated_at: 2026-11-21
 plan_revision: 1
 current_step: 1
 total_steps: 8
@@ -207,6 +207,19 @@ AGE Component/Package 使用现有 block-comment 扫描器保留非嵌套 `/* �
 编译准备分别为 conformance 6.72 s、最终增量 3.82 s，runtime 测试最终增量 1.75 s，同树 AutoUI 工具及窗口 47.11 s，两探针链接 0.532 / 5.872 s。发现和清理未单独计时。测试材料 `inline-text-runs.json` SHA256 `f656dc3880b2d4a16813156bc0050a3c75db2825d1dd7b20459ac6c734b2f84a`，原样回放 `inline-text-original-replay.json` SHA256 `2f4da0f123dc316bac293df06da79b2a92eb57f4b337fd87c3069abb34619717`。逐件材料对照 `carousel-individual-closure.json` SHA256 `bcfc5cbc2fa7394131a078e5d20f8f14b4e5f22d902ab7b2e85e7a481d3014c1`，另定位多行消息声明、计算样式及引号属性键。两端整页行为仍待 §5 同源验收。
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 4 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ac5f6a01, lang 9f4a65ad3 | evidence: original CarouselDemo parses in both AGE profiles and full closure advances to declaration diagnostics | next: work`
+
+**Carousel 引号属性与 A2Vue 无障碍接面（T-02/T-03 进行中）。** AutoLang `defb955107bc60ce7ff19da59f15e0f6c9f1862b`，AutoUI `27ae0d33a50a6b6d9ab3315d827110d8109e87c6`。两个 AGE 前端对引号里的普通属性名投影同一受检键，具名拒绝含空白、事件前缀或转义的键。A2Vue 包模板输出 `role` 和 `aria-*`，保留字面值、响应式表达式与 HTML 转义。新身份为 AgeComponent `32ecce68ef1a4345d8079fc8cdd4556a3c813452506e2a00d0fdd979bf3c7c38`、AgePackage `7398b1d210df247c779db16f1992e03e92baaca8987e6a0ab898ba89c9f6ea94`。
+
+| 实际测试或材料 | 结果 | 墙钟执行 |
+|---|---|---:|
+| Component、grammar scope、AGE package 过滤 | 29/29、4/4、12/12，包含新增双前门属性正反例 | 0.15 / 0.37 / 0.14 s |
+| A2Vue 包模板测试二进制 | 新增测试 1/1，锚定角色、描述、转义和绑定；非浏览器用例合计 10/10，两个既有浏览器测试留给其独立环境 | 0.195 / 0.149 s |
+| 材料对照保留官方引号键，使用逗号消息与字面样式 | 原先 `source.syntax`；现在受检生成带 `role="region"` 和 `aria-roledescription="carousel"` 的 SFC | 0.077 / 0.067 s |
+| Chrome 对照载入实际生成 SFC | 从无障碍树取得具名区域和按钮，空格触发 `aria-pressed` 从 `false` 到 `true`，卸载后区域消失，零页面异常并关闭 | 0.914 s |
+
+AutoLang 准备 5.65 s，最后重链 1.83 s。AutoUI 测试准备 44.10 s、探针链接 4.24 s、生成浏览器对照 0.198 s、离线安装 9.49 s。复用 002 的 TypeScript 配置初建 1.25 s，`vue-tsc` 报包 SFC 的 JS 默认语言缺类型声明；材料项目通过 `allowJs` 消费原生成 SFC，保留 TypeScript 的严格检查，构建 2.04 s。此设置仅在材料项目。发现和清理未单独计时。材料 `quoted-attr-lang-runs.json` SHA256 `2b0c2fb7c8ff5b8f4e0ab17e310fd063e639553f2cda157ddd09fe8265673db7`，`quoted-attr-sfc-regression.log` SHA256 `c0833ccf961f82098ace0c14f2866c7eedfea32db941c52df9dbE69AA59B70D7`，`quoted-attr-browser-run.log` SHA256 `0a0bc953be09c0b5010db3d8c6bc0c0fe567784b06e1671518ef5ae4431ce40c`。官方整包与 Iced 无障碍及交互验收待完成。PLAN-114 已在分支 `466af4251` 接入受检组件属性，其中 `6559fb2b1` 覆盖包面格式化文本，本计划继续沿该 owner 的固定发布面消费共享计算值和消息解析。PLAN-105 的 `31013d31` 记录 013 实际挂载及 016 的模块 helper/循环作用域缺口，U05 的跨单元 Store 门仍在。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 27ae0d33, lang defb95510 | evidence: projected quoted ARIA and observed generated SFC keyboard binding and unmount in Chrome | next: work`
 
 ## 10. 下游交接
 
