@@ -786,6 +786,21 @@ fn generate_widget_with_lane(
     path: &str,
     node_index: usize,
 ) -> Result<(String, String, Vec<LaneHandlerBody>, Vec<String>), String> {
+    generate_widget_with_lane_stores(decl, src, path, node_index, &[], &Default::default())
+}
+
+/// PLAN-105 T-02（U03 013/015/016/022）：带 **store 依赖**的 widget 生成——
+/// 与 `generate_widget_with_lane` 同一条 SFC 管线，但把 store 名交给
+/// `VueGenerator::with_store_deps/with_store_surface`，模板里的 `store.<f>` /
+/// `store.<Msg>()` 因此拿到 `const store = use<X>Store()` 绑定。
+fn generate_widget_with_lane_stores(
+    decl: &auto_ui_dialect::ast::WidgetDecl,
+    src: &str,
+    path: &str,
+    node_index: usize,
+    store_deps: &[String],
+    store_surface: &std::collections::HashMap<String, Vec<String>>,
+) -> Result<(String, String, Vec<LaneHandlerBody>, Vec<String>), String> {
     use auto_ui_dialect::UiStmt;
     let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl)
         .map_err(|e| format!("extract: {e:?}"))?;
@@ -794,6 +809,11 @@ fn generate_widget_with_lane(
     // 同病同修——PLAN-075 臂）；此处与该链同款收集（UiDialect→lower→
     // core Stmt::Fn→`extract_module_fn`），失败取 None=链上行为。
     let mut gen = auto_ui_compiler::ui_gen::VueGenerator::new();
+    if !store_deps.is_empty() {
+        gen = gen
+            .with_store_deps(store_deps.to_vec())
+            .with_store_surface(store_surface.clone());
+    }
     if let Some(module_fns) = same_file_module_fns(src) {
         gen = gen.with_module_fns(module_fns);
     }
@@ -1074,6 +1094,12 @@ pub struct WidgetLaneSfc {
 
 /// 多 widget 产品集合（`generate_sfcs_with_lane_product` 返回）。
 #[derive(Clone, Debug)]
+/// PLAN-105 T-02：`store` 声明生成的 Vue composable（state refs + actions）。
+pub struct LaneStoreComposable {
+    pub name: String,
+    pub code: String,
+}
+
 pub struct LaneSfcProductMulti {
     /// 声明序逐 widget（首件=根/App 位）。
     pub widgets: Vec<WidgetLaneSfc>,
@@ -1084,12 +1110,25 @@ pub struct LaneSfcProductMulti {
 /// 多 widget 产品生成入口（④-A #8：工具完整/增量双道的多 widget 接入）。
 /// `rt_href_root`=根产物（src/App.vue 位）的相对引用；`rt_href_component`
 /// =组件产物（src/components/{W}.vue 位）的相对引用。
+/// 旧入口（只要 widget 产品；store composable 丢弃）。
 pub fn generate_sfcs_with_lane_product(
     src: &str,
     path: &str,
     rt_href_root: &str,
     rt_href_component: &str,
 ) -> Result<LaneSfcProductMulti, String> {
+    generate_sfcs_with_lane_product_stores(src, path, rt_href_root, rt_href_component)
+        .map(|(multi, _stores)| multi)
+}
+
+/// PLAN-105 T-02（U03 store 驱动 app）：同一产品 + 每个 `store X { … }` 的 Vue
+/// composable（`generate_store_composable`），widget SFC 带 store 依赖/暴露面。
+pub fn generate_sfcs_with_lane_product_stores(
+    src: &str,
+    path: &str,
+    rt_href_root: &str,
+    rt_href_component: &str,
+) -> Result<(LaneSfcProductMulti, Vec<LaneStoreComposable>), String> {
     use auto_ui_dialect::UiStmt;
     // PLAN-1072 刀A：style 配方 prepare→parse→replay（产品道与测试道同序）。
     let recipe_imports = prepare_file_style_recipes(src, path)?;
@@ -1110,10 +1149,40 @@ pub fn generate_sfcs_with_lane_product(
     if decls.is_empty() {
         return Err("no widget decl".to_string());
     }
+    // PLAN-105 T-02：`store X { … }` → Vue composable + widget 的 store 绑定。
+    let mut stores: Vec<LaneStoreComposable> = Vec::new();
+    let mut store_deps: Vec<String> = Vec::new();
+    let mut store_surface: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for stmt in ast.domain_stmts() {
+        if let UiStmt::StoreDecl(d) = stmt {
+            let store = auto_ui_compiler::aura::extract_store_from_decl(d)
+                .map_err(|e| format!("store extract: {e:?}"))?;
+            let code = auto_ui_compiler::ui_gen::VueGenerator::generate_store_composable(&store);
+            store_deps.push(store.name.clone());
+            let methods: Vec<String> = store
+                .handlers
+                .keys()
+                .map(|k| k.split('(').next().unwrap_or(k).to_string())
+                .collect();
+            store_surface.insert(store.name.clone(), methods);
+            stores.push(LaneStoreComposable {
+                name: store.name.clone(),
+                code,
+            });
+        }
+    }
     let runtime_mjs = ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]);
     let mut widgets = Vec::with_capacity(decls.len());
     for (wi, decl) in decls.iter().enumerate() {
-        let (name, sfc, bodies, absent) = generate_widget_with_lane(decl, src, path, wi)?;
+        let (name, sfc, bodies, absent) = generate_widget_with_lane_stores(
+            decl,
+            src,
+            path,
+            wi,
+            &store_deps,
+            &store_surface,
+        )?;
         let href = if wi == 0 {
             rt_href_root
         } else {
@@ -1127,10 +1196,13 @@ pub fn generate_sfcs_with_lane_product(
             absent,
         });
     }
-    Ok(LaneSfcProductMulti {
-        widgets,
-        runtime_mjs,
-    })
+    Ok((
+        LaneSfcProductMulti {
+            widgets,
+            runtime_mjs,
+        },
+        stores,
+    ))
 }
 
 /// 单文件 lane 路径的产品生成入口（982 的 `auto run`（Vue）后续经 CLI
