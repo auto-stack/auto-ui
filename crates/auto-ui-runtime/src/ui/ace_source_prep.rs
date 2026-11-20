@@ -569,6 +569,15 @@ pub fn prepare_component_source(
     src: &str,
 ) -> Result<PreparedComponentSource, String> {
     let deps = pac_dep_roots(project_root);
+    // PLAN-105 T-02（U03 真语料 018/022）：`routes`/`outlet` 页面组合第一片。
+    // 路由页面组合默认**关闭**：018 的页面单元仍带未定型 `List` 字段（组件面
+    // 只收 `[]T`/`[N]T`）等墙；用 `P105_ROUTE_PAGES=1` 打开以便逐墙推进。
+    let merged_routes = if std::env::var("P105_ROUTE_PAGES").is_ok() {
+        inline_route_page(project_root, src)
+    } else {
+        None
+    };
+    let src: &str = merged_routes.as_deref().unwrap_or(src);
     let mut inlined: Vec<InlinedStyle> = Vec::new();
     // PLAN-105 T-02（U03 真语料 013/016）：跨单元 store 声明——组件面只能看见
     // 本源；`use <unit>: <StoreType>` 指向的单元里若有同名 `store` 声明，就把
@@ -775,6 +784,7 @@ pub fn prepare_component_source(
     // 方法，改写为 prep 注入的文本谓词 helper（`len`/`slice`/`==` 皆既有内建）。
     let mut need_str_contains = false;
     out = rewrite_str_contains(&out, &mut need_str_contains);
+    out = rewrite_while_to_for(&out);
     if need_str_contains {
         fn_blocks.push(STR_CONTAINS_HELPER.to_string());
     }    // PLAN-105 T-02（U03 真语料 012）：`var NAME []T = []` 的空列表初值改为
@@ -819,6 +829,9 @@ pub fn prepare_component_source(
             }
         }
     }
+    // 注入的依赖块（fn/type/const）同样做组件面语法归一：`while` → 条件 `for`，
+    // 并去掉显式 `as int` 转换。
+    out = rewrite_while_to_for(&out);
     Ok(PreparedComponentSource {
         source: out,
         inlined,
@@ -871,6 +884,160 @@ fn rewrite_str_contains(src: &str, need: &mut bool) -> String {
         *need = true;
     }
     out
+}
+/// 首个路由映射的页面单元源码（`routes { "/" -> use bookshelf }`）。
+fn first_route_page(app_root: &Path, src: &str) -> Option<String> {
+    let mut in_routes = false;
+    for line in src.lines() {
+        let t = line.trim();
+        if !in_routes && t.starts_with("routes") && t.contains('{') {
+            in_routes = true;
+            continue;
+        }
+        if !in_routes {
+            continue;
+        }
+        if t.starts_with('}') {
+            break;
+        }
+        if let Some(i) = t.find("-> use ") {
+            let page = t[i + "-> use ".len()..].trim().trim_end_matches(',').to_string();
+            for rel in [
+                format!("src/front/pages/{page}.at"),
+                format!("src/front/components/{page}.at"),
+                format!("src/front/{page}.at"),
+            ] {
+                if let Ok(s) = std::fs::read_to_string(app_root.join(&rel)) {
+                    return Some(s);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// 把源拆成（widget 外的顶层文本, widget 体内部文本）。
+fn split_widget(src: &str) -> (String, String) {
+    let mut top = String::new();
+    let mut body = String::new();
+    let mut depth = 0i32;
+    let mut in_widget = false;
+    for line in src.split_inclusive('\n') {
+        let t = line.trim_start();
+        if !in_widget && t.starts_with("widget ") {
+            in_widget = true;
+            depth = line.matches('{').count() as i32 - line.matches('}').count() as i32;
+            continue;
+        }
+        if in_widget {
+            let d = line.matches('{').count() as i32 - line.matches('}').count() as i32;
+            if depth + d <= 0 {
+                in_widget = false;
+                depth = 0;
+                continue;
+            }
+            depth += d;
+            body.push_str(line);
+        } else {
+            top.push_str(line);
+        }
+    }
+    (top, body)
+}
+
+/// 取 `<kw> { … }` 块内部文本（花括号配对）。
+fn block_inner(src: &str, kw: &str) -> Option<String> {
+    let open = src.find(&format!("{kw} {{"))?;
+    let start = open + kw.len() + 2;
+    let bytes = src.as_bytes();
+    let mut depth = 1i32;
+    let mut i = start;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(src[start..i].to_string());
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// 路由/outlet 页面组合（第一片）：首个路由页面的顶层声明与 `model` 字段并入
+/// 外壳，`outlet` 换成页面 `view` 体。
+fn inline_route_page(app_root: &Path, src: &str) -> Option<String> {
+    if !src.contains("outlet") {
+        return None;
+    }
+    let page_src = first_route_page(app_root, src)?;
+    let (page_top, page_body) = split_widget(&page_src);
+    let page_model = block_inner(&page_body, "model").unwrap_or_default();
+    let page_view = block_inner(&page_body, "view").unwrap_or_default();
+    let (shell_top, shell_body) = split_widget(src);
+    let name = src
+        .lines()
+        .find(|l| l.trim_start().starts_with("widget "))
+        .and_then(|l| l.trim_start().strip_prefix("widget "))
+        .and_then(|r| r.split_whitespace().next())
+        .unwrap_or("App")
+        .to_string();
+    let mut body = shell_body;
+    if let Some(open) = body.find("model {") {
+        let mut depth = 1i32;
+        let bytes = body.as_bytes();
+        let mut j = open + "model {".len();
+        let mut close = None;
+        while j < bytes.len() {
+            match bytes[j] {
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close = Some(j);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            j += 1;
+        }
+        if let Some(close) = close {
+            body.insert_str(close, &page_model);
+        }
+    }
+    let body = body.replace("outlet", &page_view);
+    let mut out = String::with_capacity(src.len() + page_top.len() + body.len());
+    out.push_str(&shell_top);
+    out.push('\n');
+    out.push_str(&page_top);
+    out.push_str("widget ");
+    out.push_str(&name);
+    out.push_str(" {\n");
+    out.push_str(&body);
+    out.push_str("\n}\n");
+    Some(out)
+}
+/// `while <cond> {` 行首 → `for <cond> {`（组件面只收条件 `for`）；`<expr> as int`
+/// 的显式整数转换在组件面无需保留（两侧都是 `int`）。
+fn rewrite_while_to_for(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    for line in src.split_inclusive('\n') {
+        let t = line.trim_start();
+        if let Some(rest) = t.strip_prefix("while ") {
+            let indent = &line[..line.len() - t.len()];
+            out.push_str(indent);
+            out.push_str("for ");
+            out.push_str(rest);
+        } else {
+            out.push_str(line);
+        }
+    }
+    out.replace(" as int", "")
 }
 /// 记录类型块里的文本字段类型改写成 owned `Str`（`<field> str` → `<field> Str`）。
 fn rewrite_record_text_fields(block: &str) -> String {
@@ -1251,5 +1418,3 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 }
-
-
