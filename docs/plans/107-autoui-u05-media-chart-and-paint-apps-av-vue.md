@@ -541,6 +541,16 @@ A2TS 集合种子为 `F32` 字段和列表元素保存 `f32` 类型，复用按�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 33 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui afd90665, lang 0f16585f7 | evidence: checked production standard component directory, cold/incremental regressions and Chrome replay | next: work`
 
+### 第 34 轮｜受检画廊外壳、抽屉与路由挂载
+
+合入 AutoLang `cc393e7a3` 与 AutoUI `9a916217`，并接入 `668abc15d` 的受检单位回调。保留连字符模块、外壳 outlet 属性和现有复选框及图表闭包。语法身份实测更新 `AgeComponent` 与 `AgePackage`，邻接裁剪冻结测试通过。
+
+Iced 路由回归验证嵌套 outlet、页面切换、关闭后的消息拒绝及回到页面重新初始化。生产 Vue 材料通过 `vue-tsc` 和 Vite，Chrome `157.0.8103.80` 实测关闭抽屉、进入 `/charts-page`、执行数值动作 `0/0 → 1/1` 并卸载。`round34-vue-browser-verified.log` SHA256 为 `dd0340b8431c44aea7bfca9f6a3fa7da65088230f53526de7d00b3e0506b9afe`。Core PLAN-981 251、AV PLAN-981 70、组件包 12、路由 4、SFC 20、Vue 路由与工具综合各 1 通过。Windows 并行构建遇分页文件错误，串行重跑通过。
+
+固定 AutoOS 原外壳及 SettingsPanel 已从语法错误推进到 `SetAccent(name)` 缺少消息载荷声明。原闭包日志 SHA256 为 `223f24b7ef704d17053b9ba16d7655d01f05e7cc2973029613e9667189a8cb2c`，仅给材料副本增加 `SetAccent(str)` 后闭包通过。继续用受检的旧式直接赋值推导重放不改写的原闭包。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 34 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 50e010f1, lang 889033418 | evidence: scoped gallery navigation, drawer, typed callback and actual shell admission advances | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
