@@ -761,6 +761,17 @@ stage: work（MIR 两道墙）| plan_id: PLAN-105 | plan_revision: r1 | round: 9
 **013 当前墙**：`verify MIR `d___age_state_0_input`: mir.field-type — list-field-get of owned field type 0 (fields ride records; use LIST_REMOVE first)`。
 
 **下一步**：定位 `__age_state_0_input` 的 lowering 形状，把 owned 元素的 `list-field-get` 改写为契约允许的两步（LIST_REMOVE/record field）形状。
+
+stage: work（能力缺口定位）| plan_id: PLAN-105 | plan_revision: r1 | round: 93 | from: work | to: work | status: executing | outcome: pass（定位）| worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `b987e2c23` | next: work
+
+2026-11-21 stage: work（T-02 W88：013 抵达 collections 表达力缺口）| outcome: pass（定位）
+
+**落地**：`ac.age.elem-view.v1` 能力（av-core contract + mir_verify 白名单）+ `lower_checked_collections_age_component` + `extra_caps` 贯通 + `LIST_FIELD_GET` 仅标量终态 + av 求值走 AGE 变体。门：census 4/4、981 248、core plan105 26/26；av plan105 6/7。
+
+**013 新墙（能力缺口）**：`mir.list-type — place-get of owned element type 4 (places read Copy elements; use LIST_REMOVE)`。
+→ AV `av.collections/1` 的 place 只读 Copy 元素，`LIST_REMOVE` 是破坏性读；**缺「非破坏性读 owned 元素文本」指令**。
+
+**下一里程碑**：给 `av.collections/1` 增元素文本视图指令（`LIST_FIELD_VIEW -> StrView`，配 verify/execute/ABC/回归），或改状态函数取「LIST_REMOVE + 插回」的成对形状。此项超出 105 装配范围，建议单独立计划（105 侧可作为依赖项跟踪）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1048,6 +1059,17 @@ stage: work（MIR 两道墙）| plan_id: PLAN-105 | plan_revision: r1 | round: 9
 **013 当前墙**：`verify MIR `d___age_state_0_input`: mir.field-type — list-field-get of owned field type 0 (fields ride records; use LIST_REMOVE first)`。
 
 **下一步**：定位 `__age_state_0_input` 的 lowering 形状，把 owned 元素的 `list-field-get` 改写为契约允许的两步（LIST_REMOVE/record field）形状。
+
+stage: work（能力缺口定位）| plan_id: PLAN-105 | plan_revision: r1 | round: 93 | from: work | to: work | status: executing | outcome: pass（定位）| worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `b987e2c23` | next: work
+
+2026-11-21 stage: work（T-02 W88：013 抵达 collections 表达力缺口）| outcome: pass（定位）
+
+**落地**：`ac.age.elem-view.v1` 能力（av-core contract + mir_verify 白名单）+ `lower_checked_collections_age_component` + `extra_caps` 贯通 + `LIST_FIELD_GET` 仅标量终态 + av 求值走 AGE 变体。门：census 4/4、981 248、core plan105 26/26；av plan105 6/7。
+
+**013 新墙（能力缺口）**：`mir.list-type — place-get of owned element type 4 (places read Copy elements; use LIST_REMOVE)`。
+→ AV `av.collections/1` 的 place 只读 Copy 元素，`LIST_REMOVE` 是破坏性读；**缺「非破坏性读 owned 元素文本」指令**。
+
+**下一里程碑**：给 `av.collections/1` 增元素文本视图指令（`LIST_FIELD_VIEW -> StrView`，配 verify/execute/ABC/回归），或改状态函数取「LIST_REMOVE + 插回」的成对形状。此项超出 105 装配范围，建议单独立计划（105 侧可作为依赖项跟踪）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
