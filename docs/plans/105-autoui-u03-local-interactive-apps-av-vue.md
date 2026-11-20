@@ -534,6 +534,19 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 80 | from: work | t
 **下一刀（两个候选实验）**：①`update` 改 `.todos.set(i, Todo{…})`（避免 `remove` 到局部）；②`delete`/清空改用能丢弃返回值或绑定形态的 `remove`（先在 av 里验 `var x T = list.remove(i)` 是否触发 view-escape）。
 
 **验证**：prep 7/7；core plan105 25/25；av 5/5。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 81 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: c58b4a692 | next: work
+
+2026-11-19 stage: work（T-02 W78：013 的 view-escape 归因）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `c58b4a692` | task_ids: T-02（W78）| evidence: 最小复现落到 bind 层
+
+**本轮结论（把 013 的最后一个大墙归因清楚）**：
+1. `var gone Todo = .todos.remove(0)` **可用**；`.todos.set(0, Todo { … })` **可用** → 两者都进永久回归（新增 `p105_list_set_element_replaces_value`）。
+2. 013 的 `view-escape` 来自**句柄语义**：`.todos[i].done` 与 `.todos[i].text`（以及 `get(i).f` 形态）在**bind 层**就被拒——`resolve` 的 Index/list-get 分支在 `!aggregates_admission` 时直接报错（消息文案却建议 `xs[i].f`，属误导）。最小复现：`for i < .todos.len() { if .todos[i].done == false { … .todos[i].text … } }` → `source.view-escape`（stage: Bind）。
+3. 与之相对，verify 层（`check_collections_rules`）**已有**正确的 ElemView 规则：`ListGet` 仅允许作 `FieldGet` 基或 `.len()` 操作数、owned 终态字段只允许 `.len()` 消费。也就是说：**bind 层过严、verify 层已就绪**。
+
+**下一刀（明确）**：把 AGE 组件卫生道的 `aggregates_admission` 打开（或在 Index/list-get 分支对 AGE 域放行 ElemView），让 `.todos[i].f` 走到 verify 层按现有规则判定；先补 3 个永久用例（字段投影读、`if` 条件里的 bool 字段、文本字段作拼接），再跑 248 例 + 六例门确认没有回归。
+
+**验证**：av list handlers 7/7；prep 7/7；core plan105 25/25。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -594,6 +607,19 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 80 | from: work | t
 **下一刀（两个候选实验）**：①`update` 改 `.todos.set(i, Todo{…})`（避免 `remove` 到局部）；②`delete`/清空改用能丢弃返回值或绑定形态的 `remove`（先在 av 里验 `var x T = list.remove(i)` 是否触发 view-escape）。
 
 **验证**：prep 7/7；core plan105 25/25；av 5/5。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 81 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: c58b4a692 | next: work
+
+2026-11-19 stage: work（T-02 W78：013 的 view-escape 归因）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `c58b4a692` | task_ids: T-02（W78）| evidence: 最小复现落到 bind 层
+
+**本轮结论（把 013 的最后一个大墙归因清楚）**：
+1. `var gone Todo = .todos.remove(0)` **可用**；`.todos.set(0, Todo { … })` **可用** → 两者都进永久回归（新增 `p105_list_set_element_replaces_value`）。
+2. 013 的 `view-escape` 来自**句柄语义**：`.todos[i].done` 与 `.todos[i].text`（以及 `get(i).f` 形态）在**bind 层**就被拒——`resolve` 的 Index/list-get 分支在 `!aggregates_admission` 时直接报错（消息文案却建议 `xs[i].f`，属误导）。最小复现：`for i < .todos.len() { if .todos[i].done == false { … .todos[i].text … } }` → `source.view-escape`（stage: Bind）。
+3. 与之相对，verify 层（`check_collections_rules`）**已有**正确的 ElemView 规则：`ListGet` 仅允许作 `FieldGet` 基或 `.len()` 操作数、owned 终态字段只允许 `.len()` 消费。也就是说：**bind 层过严、verify 层已就绪**。
+
+**下一刀（明确）**：把 AGE 组件卫生道的 `aggregates_admission` 打开（或在 Index/list-get 分支对 AGE 域放行 ElemView），让 `.todos[i].f` 走到 verify 层按现有规则判定；先补 3 个永久用例（字段投影读、`if` 条件里的 bool 字段、文本字段作拼接），再跑 248 例 + 六例门确认没有回归。
+
+**验证**：av list handlers 7/7；prep 7/7；core plan105 25/25。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
