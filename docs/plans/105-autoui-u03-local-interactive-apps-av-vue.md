@@ -326,6 +326,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 61 | from: work | t
 **结论（下一刀定界）**：`Str.contains` 类文本谓词不能靠 prep helper 在 collections 域实现——必须在**语言/描述符层**补 `text_contains`（HIR `ExprKind` + collections descriptor case + MIR 降低 + AV 解释器），或让组件面文本运算留在 text-record 车道（与 collections 列表并存的双域方案）。
 
 **本轮无代码提交**（tweak 已回滚）；prep 7/7、plan105 25/25、980 39/39、981 248/248 保持。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 62 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 6f655acd6 | next: work
+
+2026-11-19 stage: work（T-02 W59：collections 描述符补齐文本面）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `6f655acd6` | task_ids: T-02（W59）| evidence: 012 从 bind 失败推进到 **verify** 面
+
+**交付**：collections 描述符（`schema/collections.atom`）补齐**文本表达面**——`ExprKind` 增 `text_slice/text_char_at/text_concat/text_display/fstr`，`TypeKind` 增 `str/char`（含 `branch(type.str)`/`branch(type.char)`），`expr` 节点增 `start/end/parts` 字段；adapter 的 collections 类型表补发 `t_str`/`t_char`。
+
+**效果**：012 的真窗错误从 **Atom 绑定**阶段（`no accepted case expr.text_slice` 等一串）推进到 **verify** 阶段：`eq operands must both be i32 or both be bool (found str / Str)`、`local l98 has text type str; text types exist only in the text-i32-draft profile`、`immutable-write`。→ 下一刀是 **verify_collections 的文本类型面**（借用 str 视图与 Str 混比较、局部文本类型）而非描述符。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3（collections 文本面加入后原理事例全部保持）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
