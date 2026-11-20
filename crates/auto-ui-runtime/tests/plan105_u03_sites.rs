@@ -322,12 +322,7 @@ fn build_site(app: &str, units: &[&str]) -> Result<PathBuf, String> {
 
 #[test]
 fn p105_build_u03_sites() {
-    let apps: Vec<(&str, Vec<&str>)> = vec![
-        ("013-todo", vec!["src/front/app.at", "src/front/todo_list.at"]),
-        ("015-notes", vec!["src/front/app.at", "src/front/editor.at", "src/front/sidebar.at"]),
-        ("016-calendar", vec!["src/front/app.at"]),
-        ("022-kanban", vec!["src/front/app.at"]),
-    ];
+    let apps = u03_apps();
     let mut built = Vec::new();
     let mut failed = Vec::new();
     for (app, units) in &apps {
@@ -337,4 +332,148 @@ fn p105_build_u03_sites() {
         }
     }
     println!("SITES built={:?} failed={:?}", built, failed.iter().map(|(a, _)| *a).collect::<Vec<_>>());
+    assert!(failed.is_empty(), "站点构建失败: {failed:?}");
 }
+
+fn u03_apps() -> Vec<(&'static str, Vec<&'static str>)> {
+    vec![
+        ("013-todo", vec!["src/front/app.at", "src/front/todo_list.at"]),
+        ("015-notes", vec!["src/front/app.at", "src/front/editor.at", "src/front/sidebar.at"]),
+        ("016-calendar", vec!["src/front/app.at"]),
+        ("022-kanban", vec!["src/front/app.at"]),
+    ]
+}
+
+/// 浏览器验收脚本（静态服务 + Playwright；与上游 app 用例同口径的最小集）。
+const VERIFY_MJS: &str = r#"import http from 'node:http'
+import fs from 'node:fs'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+const root = path.resolve('dist')
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
+const server = http.createServer((req, res) => {
+  const p = req.url === '/' ? '/index.html' : req.url.split('?')[0]
+  const file = path.join(root, p)
+  if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return }
+  res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream' })
+  res.end(fs.readFileSync(file))
+})
+await new Promise(r => server.listen(0, '127.0.0.1', r))
+const port = server.address().port
+const m = await import(pathToFileURL(process.env.P105_PLAYWRIGHT || 'd:/autostack/auto-os-config/node_modules/playwright/index.mjs').href)
+const browser = await m.chromium.launch({ headless: true })
+const page = await (await browser.newContext({ viewport: { width: 1280, height: 960 } })).newPage()
+const errors = []
+page.on('pageerror', e => errors.push(e.message))
+await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(700)
+let failures = 0
+const check = (name, ok) => { console.log(`${ok ? '[+] OK' : '[-] FAIL'}: ${name}`); if (!ok) failures++ }
+const body = (await page.textContent('body')) || ''
+check('渲染了文本内容（body 非空）', body.trim().length > 10)
+check('有可交互元素（button/input）', (await page.locator('button, input').count()) > 0)
+check('无页面异常', errors.length === 0)
+if (errors.length) console.log('ERRORS:', errors.slice(0, 3))
+await browser.close(); server.close()
+console.log(`RESULT ${JSON.stringify({ failures })}`)
+process.exit(failures === 0 ? 0 : 1)
+"#;
+
+/// 依赖已经备好的 app → 需要额外 junction 的包。
+fn extra_deps(app: &str) -> &'static [(&'static str, &'static str)] {
+    match app {
+        "015-notes" => &[(
+            "lucide-vue-next",
+            "D:/autostack/auto-lang/packages/auto-forge-ui/node_modules/lucide-vue-next",
+        )],
+        _ => &[],
+    }
+}
+
+fn node_modules_dir() -> &'static str {
+    "D:/autostack/auto-os-config/node_modules"
+}
+
+/// 写验收脚本 + 建 `node_modules` junction（已存在则跳过；`mklink /J` 免管理员）。
+fn scaffold_site(out: &std::path::Path, app: &str) -> Result<(), String> {
+    std::fs::write(out.join("verify.mjs"), VERIFY_MJS).map_err(|e| e.to_string())?;
+    let nm = out.join("node_modules");
+    if !nm.exists() {
+        let status = std::process::Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(&nm)
+            .arg(node_modules_dir())
+            .status()
+            .map_err(|e| e.to_string())?;
+        if !status.success() {
+            return Err(format!("{app}: node_modules junction 创建失败"));
+        }
+    }
+    for (name, target) in extra_deps(app) {
+        let link = nm.join(name);
+        if !link.exists() {
+            let _ = std::process::Command::new("cmd")
+                .args(["/c", "mklink", "/J"])
+                .arg(&link)
+                .arg(target)
+                .status();
+        }
+    }
+    Ok(())
+}
+
+/// 浏览器腿的**可跑门**：构建站点 → `vite build` → `node verify.mjs`。
+/// 022-kanban 不在此列：它的板块页由 `<router-view/>` 承载，单页站点无路由
+/// （需要 vue-router 集成，见 §96）。
+/// 默认忽略（依赖本机 node_modules/Playwright）；手动跑：
+/// `cargo test -p auto-ui-runtime --features ace-bridge --test plan105_u03_sites -- --ignored --nocapture`
+#[test]
+#[ignore = "浏览器门：需要本机 node_modules junction + Playwright"]
+fn p105_u03_browser_gate() {
+    let apps: Vec<(&str, Vec<&str>)> = u03_apps()
+        .into_iter()
+        .filter(|(app, _)| *app != "022-kanban")
+        .collect();
+    let mut failures: Vec<(String, String)> = Vec::new();
+    for (app, units) in &apps {
+        let out = match build_site(app, units) {
+            Ok(p) => p,
+            Err(e) => { failures.push((app.to_string(), format!("build_site: {e}"))); continue; }
+        };
+        if let Err(e) = scaffold_site(&out, app) {
+            failures.push((app.to_string(), e));
+            continue;
+        }
+        let build = std::process::Command::new("node")
+            .current_dir(&out)
+            .args(["node_modules/vite/bin/vite.js", "build"])
+            .output()
+            .map_err(|e| e.to_string());
+        match build {
+            Ok(o) if o.status.success() => {}
+            Ok(o) => {
+                let tail = String::from_utf8_lossy(&o.stderr);
+                failures.push((app.to_string(), format!("vite build: {}", tail.lines().take(6).collect::<Vec<_>>().join(" | "))));
+                continue;
+            }
+            Err(e) => { failures.push((app.to_string(), format!("vite spawn: {e}"))); continue; }
+        }
+        let run = std::process::Command::new("node")
+            .current_dir(&out)
+            .arg("verify.mjs")
+            .output()
+            .map_err(|e| e.to_string());
+        match run {
+            Ok(o) => {
+                let stdout = String::from_utf8_lossy(&o.stdout);
+                println!("--- {app} ---\n{stdout}");
+                if !stdout.contains("\"failures\":0") {
+                    failures.push((app.to_string(), "浏览器断言失败".to_string()));
+                }
+            }
+            Err(e) => failures.push((app.to_string(), format!("verify spawn: {e}"))),
+        }
+    }
+    assert!(failures.is_empty(), "浏览器门失败: {failures:#?}");
+}
+
