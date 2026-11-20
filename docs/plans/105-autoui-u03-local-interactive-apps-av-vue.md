@@ -93,6 +93,8 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 
 ## 9. 复审记录
 
+2026-11-20 接入 [PLAN-125 r2 七页双端交付收据](archived/125-autoui-u03-interactive-widgets.md#u03-逐页交付收据)。accordion、collapsible、scroll、scrollarea、pagination、progress、slider 的 AV/Iced 和 A2Vue 各通过 7/7，逐页原源、操作与交付提交见归档表。这些行计入 U03 原十四页，AV 可供 W1 汇总，A2Vue 可供 1072 与 CLI 联验消费。
+
 2026-11-19 stage: new，drafting 0/8。U03 的原样示例、Widgets、AutoLang 支持和组件补齐均处于待实施状态。
 
 2026-11-19 stage: work（T-01 冻结矩阵与首阻断）| PLAN-105 r1 | outcome: pass | worktree: `D:/autostack/.wt/ui-105/auto-ui` @ `plan-105-dev`（基 `plan-104-dev` = `d2e7d7a4`）/ `D:/autostack/.wt/ui-105/auto-lang` @ `plan-105-dev`（基 `plan-104-dev` = `2b829c5d1`）/ 路径依赖 auto-web detached `3d328a3`、auto-down detached `72b0970` | task_ids: T-01 | evidence: `D:/autostack/plan-artifacts/plan-105/t01-matrix.md` + `t01-probe.log`（SHA256 `0C9D0E11C1CC0EFE36C5BFC7CF601524C7C9C25FF692EF8C638DAEBEFCFBE8A3`，4344B）

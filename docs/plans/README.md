@@ -16,6 +16,8 @@ U02 可先用 005-login 验证表单与主题。各组按实际接口并行，�
 
 [PLAN-124 U03 路由与页面挂载（归档）](archived/124-autoui-u03-routes-and-outlet.md) 已交付 AV/Iced 与 A2Vue 的 routes/outlet，由 PLAN-105 接入 018 和 022 的原应用。
 
+[PLAN-125 U03 独立交互 Widgets（归档）](archived/125-autoui-u03-interactive-widgets.md) 的七个原页 AV/Iced 与 A2Vue 各通过 7/7，正式收据供 PLAN-105 汇总。
+
 ## AGE三路线执行合同更新（2026-11-17，仅规划）
 
 [统一strategy](../../../auto-lang/docs/design/strategy/age-m2-three-route-strategy.md) / [公共设计](../../../auto-lang/docs/design/autographics/age-m2-three-route-architecture.md)为当前入口。原计划ID/已完成项保持；UI058 r7/executing 3-10（T-01..T-03完成：分离机制+预算/GPU同Tick+新profile `topdown2d/1`+scene/9 render-only行层；981 f32 AV/A2R已落主）、AG023 r4、AG029 r2（executing 2/10、原暂停不自动恢复）、AG030 r2、AG031 r2：首批可AV正式phase交接，随后AC/A2R，原整项全验收不减。**UI080已归档10/10**，旧表仍pending的记录已过时；物理内容仓现age-examples，旧ag-examples是历史路径/身份。
