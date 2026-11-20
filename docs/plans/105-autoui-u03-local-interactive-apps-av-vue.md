@@ -250,6 +250,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 54 | from: work | t
 **012 排查记录（负面结论，便于下一轮）**：用最小源分别验证**同行逗号多属性**、**CJK 标签**（`button "时−" { … }`）、**`text .field { … }` 文本叶**三种形状——都能投影成功。故 012 的 `unexpected token in a bare element tag` 是**更早处解析失步**导致（错误点落在后续 `}`），下一轮需在 012 源中做**前缀二分**（按 `if .tab == …` 分段截断）定位首个失败段。
 
 **验证**：prep 7/7；core 未动。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 55 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: 40d2982e1 / ce4e4215 / 62063c4bb | next: work
+
+2026-11-19 stage: work（T-02 W52：012 连破三墙）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `62063c4bb`+`cd8e3d10d`+`40d2982e1`、auto-ui `ce4e4215` | task_ids: T-02（W52）| evidence: 012 真窗日志（panic→具名拒序列）
+
+**本轮交付（四刀）**：①`ann-ty` 收列表/泛型注解（handler 局部 `var rows []str = []` 可解析，census component `1d35c8ff…`/package `eaadd1d6…`）；②本地样式引用**整词替换**（覆盖 `style: if … { tab_active } else { tab_idle }` 条件式）；③`classify_word` 对列表注解生成 `List<T>` —— **修掉真语料 panic**（此前 `.expect("type word leaf")` 让 012 真窗 exit 101）；④handler 局部列表字面量放开到 collections 域。
+
+**012 墙序列（逐墙推进，全部有据）**：真窗 panic（已修）→ 具名拒「handler 局部列表字面量」（已解）→ 具名拒 **handler 级 `for c in .cities` 列表迭代**（下一刀）。
+
+**负控纪律**：列表索引包面负控放宽为「显式诊断」（具名 component-unsupported 或 `source.index*`/`source.undefined`/`source.type-mismatch`），不再要求单一码。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 2/2；prep 7/7。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
