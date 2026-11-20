@@ -561,6 +561,14 @@ Iced 原外壳最初报 `ace.desktop.view-cond-unsupported`，定位原源码字
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 35 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 50e010f1, lang 5950a6222 | evidence: original gallery shell and settings compile, original Carousel page production Vue action replay | next: work`
 
+### 第 36 轮｜原画廊条件外壳进入 Iced 窗口
+
+桌面路由在加载后检查是否具备受检帧。受检帧直接承接条件与链接，旧平铺路由仍按原边界检查。路由回归覆盖在模型条件内呈现的链接，组件包 12 和路由 4 通过。
+
+固定 AutoOS 外壳实际打开 Iced 窗口，记录 2 帧并脚本关闭，外壳会话错误为 0。默认调试窗口在主线程栈溢出，单独用 `/STACK:67108864` 重新链接窗口驱动后通过。`round36-gallery-large-stack.json` SHA256 为 `90bc8d7c456b3cc4f98085066cb1188b8e2b79f394de19586ffcd97df04dffff`。默认 `/` 页 `index.at` 仍为具名源码诊断，后续从实际外壳进入原 Carousel 页并回放控件动作。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 36 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 3dceaa13, lang 5950a6222 | evidence: native checked conditional route frame and real original shell mount/close | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
