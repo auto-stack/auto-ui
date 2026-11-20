@@ -189,14 +189,40 @@ pub(super) const KEYS: &[&str] = &[
     "End",
 ];
 
-enum KeyboardTarget {
-    Activate(Action),
+struct Control {
+    key: usize,
+    label: String,
+    target: Target,
+}
+
+enum Target {
+    Button {
+        action: Option<Action>,
+        expanded: Option<bool>,
+        selected: Option<bool>,
+    },
     Slider {
         min: f32,
         max: f32,
         step: f32,
         value: f32,
     },
+    Progress {
+        max: f32,
+        value: f32,
+    },
+}
+
+impl Target {
+    fn takes_focus(&self) -> bool {
+        matches!(
+            self,
+            Self::Button {
+                action: Some(_),
+                ..
+            } | Self::Slider { .. }
+        )
+    }
 }
 
 pub(super) fn keyboard_action(
@@ -206,19 +232,14 @@ pub(super) fn keyboard_action(
     state: &State,
     key: &str,
 ) -> Option<Action> {
-    let mut renderer = Renderer {
-        session: 0,
-        instance: 0,
-        texts: texts.iter(),
-        values,
-        state,
-        targets: Vec::new(),
-    };
-    renderer.items(tree);
-    let targets = renderer.targets;
+    let controls = controls(tree, texts, values, state);
+    let targets: Vec<_> = controls
+        .iter()
+        .filter(|control| control.target.takes_focus())
+        .collect();
     let focus = state
         .focus
-        .and_then(|focus| targets.iter().position(|(id, _)| *id == focus));
+        .and_then(|focus| targets.iter().position(|control| control.key == focus));
     if matches!(key, "Tab" | "Shift+Tab") {
         let n = targets.len();
         if n == 0 {
@@ -229,12 +250,12 @@ pub(super) fn keyboard_action(
         } else {
             focus.map_or(0, |i| (i + 1) % n)
         };
-        return Some(Action::Focus(targets[next].0));
+        return Some(Action::Focus(targets[next].key));
     }
-    let (id, target) = &targets[focus?];
-    match target {
-        KeyboardTarget::Activate(action) if matches!(key, "Enter" | " ") => Some(action.clone()),
-        KeyboardTarget::Slider {
+    let control = targets[focus?];
+    match &control.target {
+        Target::Button { action, .. } if matches!(key, "Enter" | " ") => action.clone(),
+        Target::Slider {
             min,
             max,
             step,
@@ -248,9 +269,186 @@ pub(super) fn keyboard_action(
                 _ => return None,
             }
             .clamp(*min, *max);
-            Some(Action::Slide { key: *id, value })
+            Some(Action::Slide {
+                key: control.key,
+                value,
+            })
         }
         _ => None,
+    }
+}
+
+fn controls(
+    tree: &[ComponentViewItem],
+    texts: &[String],
+    values: &[(String, String)],
+    state: &State,
+) -> Vec<Control> {
+    let mut renderer = Renderer {
+        session: 0,
+        instance: 0,
+        texts: texts.iter(),
+        values,
+        state,
+        targets: Vec::new(),
+    };
+    renderer.items(tree);
+    renderer.targets
+}
+
+#[cfg(windows)]
+pub(super) fn accessibility_tree(
+    session: i32,
+    tree: &[ComponentViewItem],
+    texts: &[String],
+    values: &[(String, String)],
+    state: &State,
+) -> accesskit::TreeUpdate {
+    use accesskit::{Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate};
+
+    let root = NodeId(1);
+    let mut window = Node::new(Role::Window);
+    window.set_label("AutoUI Widgets");
+    let mut children = Vec::new();
+    let mut focus = root;
+    for control in controls(tree, texts, values, state) {
+        let id = NodeId((session as u64) << 32 | control.key as u64);
+        if state.focus == Some(control.key) && control.target.takes_focus() {
+            focus = id;
+        }
+        children.push((id, control.accesskit_node()));
+    }
+    window.set_children(children.iter().map(|(id, _)| *id).collect::<Vec<_>>());
+    children.push((root, window));
+    TreeUpdate {
+        nodes: children,
+        tree: Some(TreeInfo::new(root)),
+        tree_id: TreeId::ROOT,
+        focus,
+    }
+}
+
+#[cfg(windows)]
+pub(super) fn accessibility_action(
+    session: i32,
+    tree: &[ComponentViewItem],
+    texts: &[String],
+    values: &[(String, String)],
+    state: &State,
+    request: accesskit::ActionRequest,
+) -> Option<Action> {
+    use accesskit::{Action as Request, ActionData};
+
+    if request.target_tree != accesskit::TreeId::ROOT
+        || request.target_node.0 >> 32 != session as u64
+    {
+        return None;
+    }
+    let key = request.target_node.0 as u32 as usize;
+    let control = controls(tree, texts, values, state)
+        .into_iter()
+        .find(|control| control.key == key)?;
+    if !control.accesskit_node().supports_action(request.action) {
+        return None;
+    }
+    match control.target {
+        _ if request.action == Request::Focus => Some(Action::Focus(key)),
+        Target::Button { action, .. } => action,
+        Target::Slider {
+            min,
+            max,
+            step,
+            value,
+        } => {
+            let target = match (request.action, request.data) {
+                (Request::Increment, _) => value + step,
+                (Request::Decrement, _) => value - step,
+                (Request::SetValue, Some(ActionData::NumericValue(value))) => value as f32,
+                (Request::SetValue, Some(ActionData::Value(value))) => value.parse().ok()?,
+                _ => return None,
+            };
+            if !target.is_finite() {
+                return None;
+            }
+            let value = if target >= max {
+                max
+            } else {
+                (min + ((target - min) / step).round() * step).clamp(min, max)
+            };
+            Some(Action::Slide { key, value })
+        }
+        Target::Progress { .. } => None,
+    }
+}
+
+#[cfg(windows)]
+impl Control {
+    fn accesskit_node(&self) -> accesskit::Node {
+        use accesskit::{Action as Request, Node, Role};
+
+        let mut node = match &self.target {
+            Target::Button {
+                action,
+                expanded,
+                selected,
+            } => {
+                let mut node = Node::new(Role::Button);
+                if let Some(value) = expanded {
+                    node.set_expanded(*value);
+                    let cannot_collapse = matches!(
+                        action,
+                        Some(Action::Accordion {
+                            multiple: false,
+                            collapsible: false,
+                            ..
+                        })
+                    );
+                    if action.is_some() && (!value || !cannot_collapse) {
+                        node.add_action(if *value {
+                            Request::Collapse
+                        } else {
+                            Request::Expand
+                        });
+                    }
+                }
+                if let Some(value) = selected {
+                    node.set_selected(*value);
+                }
+                if action.is_some() {
+                    node.add_action(Request::Click);
+                    node.add_action(Request::Focus);
+                } else {
+                    node.set_disabled();
+                }
+                node
+            }
+            Target::Slider {
+                min,
+                max,
+                step,
+                value,
+            } => {
+                let mut node = Node::new(Role::Slider);
+                node.set_min_numeric_value(*min as f64);
+                node.set_max_numeric_value(*max as f64);
+                node.set_numeric_value_step(*step as f64);
+                node.set_numeric_value(*value as f64);
+                node.add_action(Request::Focus);
+                node.add_action(Request::SetValue);
+                node.add_action(Request::Increment);
+                node.add_action(Request::Decrement);
+                node
+            }
+            Target::Progress { max, value } => {
+                let mut node = Node::new(Role::ProgressIndicator);
+                node.set_min_numeric_value(0.0);
+                node.set_max_numeric_value(*max as f64);
+                node.set_numeric_value(*value as f64);
+                node
+            }
+        };
+        node.set_label(self.label.as_str());
+        node
     }
 }
 
@@ -260,7 +458,7 @@ struct Renderer<'a> {
     texts: std::slice::Iter<'a, String>,
     values: &'a [(String, String)],
     state: &'a State,
-    targets: Vec<(usize, KeyboardTarget)>,
+    targets: Vec<Control>,
 }
 
 impl Renderer<'_> {
@@ -278,11 +476,18 @@ impl Renderer<'_> {
         label: String,
         classes: &str,
         action: Option<Action>,
+        expanded: Option<bool>,
+        selected: Option<bool>,
     ) -> WidgetView {
-        if let Some(action) = &action {
-            self.targets
-                .push((key, KeyboardTarget::Activate(action.clone())));
-        }
+        self.targets.push(Control {
+            key,
+            label: label.clone(),
+            target: Target::Button {
+                action: action.clone(),
+                expanded,
+                selected,
+            },
+        });
         let classes = if self.state.focus == Some(key) {
             format!("{classes} border-2 border-blue-700")
         } else {
@@ -349,6 +554,11 @@ impl Renderer<'_> {
             "progress" => {
                 let max = self.number(el, "max", 100.0).max(f32::EPSILON);
                 let value = self.number(el, "value", 0.0).clamp(0.0, max);
+                self.targets.push(Control {
+                    key,
+                    label: "Progress".into(),
+                    target: Target::Progress { max, value },
+                });
                 View::col()
                     .spacing(5)
                     .child(View::ProgressBar {
@@ -370,15 +580,16 @@ impl Renderer<'_> {
                     .copied()
                     .unwrap_or_else(|| self.number(el, "value", min))
                     .clamp(min, max);
-                self.targets.push((
+                self.targets.push(Control {
                     key,
-                    KeyboardTarget::Slider {
+                    label: "Slider".into(),
+                    target: Target::Slider {
                         min,
                         max,
                         step,
                         value,
                     },
-                ));
+                });
                 let (session, instance) = (self.session, self.instance);
                 let slider = View::slider(min..=max, value)
                     .step(step)
@@ -546,16 +757,21 @@ impl Renderer<'_> {
                 }
                 let open = selected.is_some_and(|items| items.contains(&index));
                 let key_for_header = item.span.start;
-                self.targets.push((
-                    key_for_header,
-                    KeyboardTarget::Activate(Action::Accordion {
-                        key,
-                        item: index,
-                        open: !open,
-                        multiple,
-                        collapsible,
-                    }),
-                ));
+                self.targets.push(Control {
+                    key: key_for_header,
+                    label: title.clone(),
+                    target: Target::Button {
+                        action: Some(Action::Accordion {
+                            key,
+                            item: index,
+                            open: !open,
+                            multiple,
+                            collapsible,
+                        }),
+                        expanded: Some(open),
+                        selected: None,
+                    },
+                });
                 if self.state.focus == Some(key_for_header) {
                     title.insert_str(0, "› ");
                 }
@@ -605,6 +821,8 @@ impl Renderer<'_> {
                         label,
                         &format!("{} bg-slate-100 text-slate-900 rounded-md", style(child)),
                         action,
+                        Some(open),
+                        None,
                     ));
                 }
                 "collapsible-content" => {
@@ -660,6 +878,8 @@ impl Renderer<'_> {
                     label,
                     classes,
                     target.map(|page| Action::Page { key, page }),
+                    None,
+                    (child.tag == "pagination-item").then_some(selected),
                 ));
             }
         }
@@ -720,9 +940,7 @@ mod tests {
     use super::*;
     use ace_core::source::age_component::project_component_candidates;
 
-    #[test]
-    fn native_widget_keyboard_targets_the_bound_disclosure_and_bounded_slider() {
-        let source = r#"
+    const WIDGETS: &str = r#"
 widget Preview {
     model { var isOpen bool = false }
     view {
@@ -732,11 +950,15 @@ widget Preview {
                 collapsible-content { text "Open" {} }
             }
             slider (min: 2, max: 20, step: 3, value: 8) {}
+            progress (value: 33) {}
         }
     }
 }
 "#;
-        let original = project_component_candidates(source).expect("widget source");
+
+    #[test]
+    fn native_widget_keyboard_targets_the_bound_disclosure_and_bounded_slider() {
+        let original = project_component_candidates(WIDGETS).expect("widget source");
         let tree = &original[0].view.tree;
         let mut state = State::new(initial_bools(&original[0].fields));
         assert!(contains_preview(tree));
@@ -771,5 +993,42 @@ widget Preview {
         }
         press("Shift+Tab");
         assert_eq!(press("Enter")["bindings"]["isOpen"], true);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_widget_accessibility_shares_live_values_and_rejects_closed_sessions() {
+        use accesskit::{Action as Request, ActionData, ActionRequest, Role, TreeId};
+
+        let original = project_component_candidates(WIDGETS).expect("widget source");
+        let tree = &original[0].view.tree;
+        let mut state = State::new(initial_bools(&original[0].fields));
+        let snapshot = accessibility_tree(7, tree, &[], &[], &state);
+        let (disclosure_id, disclosure) = &snapshot.nodes[0];
+        let (slider_id, slider) = &snapshot.nodes[1];
+        let (_, progress) = &snapshot.nodes[2];
+        assert_eq!(disclosure.is_expanded(), Some(false));
+        assert_eq!(slider.numeric_value(), Some(8.0));
+        assert_eq!(progress.role(), Role::ProgressIndicator);
+        assert_eq!(progress.numeric_value(), Some(33.0));
+        assert_eq!(progress.max_numeric_value(), Some(100.0));
+
+        let request = |action, target_node, data| ActionRequest {
+            action,
+            target_tree: TreeId::ROOT,
+            target_node,
+            data,
+        };
+        let expand = || request(Request::Expand, *disclosure_id, None);
+        assert!(accessibility_action(8, tree, &[], &[], &state, expand()).is_none());
+        state.apply(accessibility_action(7, tree, &[], &[], &state, expand()).unwrap());
+        assert_eq!(state.evidence()["bindings"]["isOpen"], true);
+        assert!(accessibility_action(7, tree, &[], &[], &state, expand()).is_none());
+
+        let set = request(Request::SetValue, *slider_id, Some(ActionData::NumericValue(19.0)));
+        state.apply(accessibility_action(7, tree, &[], &[], &state, set).unwrap());
+        let updated = accessibility_tree(7, tree, &[], &[], &state);
+        assert_eq!(updated.nodes[0].1.is_expanded(), Some(true));
+        assert_eq!(updated.nodes[1].1.numeric_value(), Some(20.0));
     }
 }

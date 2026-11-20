@@ -5031,6 +5031,10 @@ where
             };
             // PLAN-022 T-03:窗口尺寸面(Resized → thread_local,见枚举注)。
             let win = iced::event::listen_with(|event, _status, _window_id| match event {
+                #[cfg(windows)]
+                iced::Event::Window(iced::window::Event::Opened { .. }) => {
+                    Some(TickWrapMsg::WindowOpened(_window_id))
+                }
                 iced::Event::Window(iced::window::Event::Resized(size)) => {
                     Some(TickWrapMsg::<C::Msg>::WindowResized(
                         size.width,
@@ -5045,6 +5049,8 @@ where
             size: seed,
             level: startup_window_level(),
             position: startup_window_position().unwrap_or_default(),
+            #[cfg(windows)]
+            visible: !C::native_accessibility_enabled(),
             ..Default::default()
         })
         // Plan 411 P1-C: 内嵌 Inter 三字重 + 默认 family(中文字形回退系统)。
@@ -5073,6 +5079,10 @@ where
         };
         // PLAN-022 T-03:窗口尺寸面(Resized → thread_local,见枚举注)。
         let win = iced::event::listen_with(|event, _status, _window_id| match event {
+            #[cfg(windows)]
+            iced::Event::Window(iced::window::Event::Opened { .. }) => {
+                Some(TickWrapMsg::WindowOpened(_window_id))
+            }
             iced::Event::Window(iced::window::Event::Resized(size)) => Some(
                 TickWrapMsg::<C::Msg>::WindowResized(size.width, size.height),
             ),
@@ -5084,6 +5094,8 @@ where
         size: seed,
         level: startup_window_level(),
         position: startup_window_position().unwrap_or_default(),
+        #[cfg(windows)]
+        visible: !C::native_accessibility_enabled(),
         ..Default::default()
     })
     .font(INTER_FONT_REGULAR)
@@ -5114,6 +5126,8 @@ enum TickWrapMsg<M: Clone + Debug> {
     Inner(M),
     Tick,
     Key(String),
+    #[cfg(windows)]
+    WindowOpened(iced::window::Id),
     /// PLAN-022 T-03 窗口尺寸面(逻辑 px):iced Resized 事件直通。普通
     /// run_app 路径不走 dynamic_view_impl 的尺寸同步——theme thread_local
     /// 停在默认 1024×768,mux_window_width/height(020 T-00b D7 面)读到
@@ -5126,6 +5140,8 @@ enum TickWrapMsg<M: Clone + Debug> {
 #[derive(Debug)]
 struct TickWrap<C: Component> {
     inner: C,
+    #[cfg(windows)]
+    accessible_window: Option<iced::window::Id>,
 }
 
 impl<C: Component + 'static> TickWrap<C>
@@ -5164,9 +5180,20 @@ where
         })
     }
 
-    fn update(&mut self, msg: TickWrapMsg<C::Msg>) {
+    fn update(&mut self, msg: TickWrapMsg<C::Msg>) -> iced::Task<TickWrapMsg<C::Msg>> {
         match msg {
             TickWrapMsg::Inner(m) => self.inner.on(m),
+            #[cfg(windows)]
+            TickWrapMsg::WindowOpened(window) => {
+                if C::native_accessibility_enabled() {
+                    if let Some(tree) = self.inner.native_accessibility_tree() {
+                        super::native_accessibility::set_typed_tree(window, tree);
+                        self.accessible_window = Some(window);
+                        return super::native_accessibility::install_task(window, true).discard();
+                    }
+                    return iced::window::set_mode(window, iced::window::Mode::Windowed);
+                }
+            }
             TickWrapMsg::Key(key) => {
                 if let Some(message) = self.inner.key_message(&key) {
                     self.inner.on(message);
@@ -5174,6 +5201,14 @@ where
             }
             // 运行时铸造真实 tick 消息(此处的值不进任何 const 上下文)。
             TickWrapMsg::Tick => {
+                #[cfg(windows)]
+                if let Some(window) = self.accessible_window {
+                    for request in super::native_accessibility::take_typed_actions(window) {
+                        if let Some(message) = self.inner.native_accessibility_message(request) {
+                            self.inner.on(message);
+                        }
+                    }
+                }
                 if let Some(m) = self.inner.tick_msg() {
                     self.inner.on(m);
                 }
@@ -5189,6 +5224,22 @@ where
                 }
             }
         }
+        #[cfg(windows)]
+        if let Some(window) = self.accessible_window {
+            let tree = self.inner.native_accessibility_tree().unwrap_or_else(|| {
+                let root = accesskit::NodeId(1);
+                accesskit::TreeUpdate {
+                    nodes: vec![(root, accesskit::Node::new(accesskit::Role::Window))],
+                    tree: Some(accesskit::TreeInfo::new(root)),
+                    tree_id: accesskit::TreeId::ROOT,
+                    focus: root,
+                }
+            });
+            if super::native_accessibility::set_typed_tree(window, tree) {
+                return super::native_accessibility::publish_typed(window);
+            }
+        }
+        iced::Task::none()
     }
 }
 
@@ -5196,6 +5247,17 @@ impl<C: Component + Default> Default for TickWrap<C> {
     fn default() -> Self {
         Self {
             inner: C::default(),
+            #[cfg(windows)]
+            accessible_window: None,
+        }
+    }
+}
+
+#[cfg(windows)]
+impl<C: Component> Drop for TickWrap<C> {
+    fn drop(&mut self) {
+        if let Some(window) = self.accessible_window {
+            super::native_accessibility::remove(window);
         }
     }
 }
@@ -5207,7 +5269,7 @@ where
     type Msg = TickWrapMsg<C::Msg>;
 
     fn on(&mut self, msg: Self::Msg) {
-        TickWrap::update(self, msg);
+        let _ = TickWrap::update(self, msg);
     }
 
     fn tick_interval_ms(&self) -> Option<u32> {

@@ -53,6 +53,21 @@ pub trait Component: Sized + Debug {
         None
     }
 
+    #[cfg(windows)]
+    fn native_accessibility_enabled() -> bool {
+        false
+    }
+
+    #[cfg(windows)]
+    fn native_accessibility_tree(&self) -> Option<accesskit::TreeUpdate> {
+        None
+    }
+
+    #[cfg(windows)]
+    fn native_accessibility_message(&self, _request: accesskit::ActionRequest) -> Option<Self::Msg> {
+        None
+    }
+
     /// PLAN-060 扩展：按名字派发一条组件消息（桌面协议 `InputMsg::Action`
     /// 的 child 侧入口；默认不消费——只有动态组件实现）。
     fn dispatch_named(&mut self, _name: &str, _arg: Option<&str>) -> bool {

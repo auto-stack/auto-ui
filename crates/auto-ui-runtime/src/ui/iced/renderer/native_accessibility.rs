@@ -102,6 +102,8 @@ struct WindowState {
     sender: mpsc::UnboundedSender<()>,
     receiver: Option<mpsc::UnboundedReceiver<()>>,
     actions: VecDeque<Envelope>,
+    typed_tree: Option<TreeUpdate>,
+    typed_actions: VecDeque<ActionRequest>,
 }
 impl WindowState {
     fn new() -> Self {
@@ -119,6 +121,8 @@ impl WindowState {
             sender,
             receiver: Some(receiver),
             actions: VecDeque::new(),
+            typed_tree: None,
+            typed_actions: VecDeque::new(),
         }
     }
     fn wake(&mut self) {
@@ -128,6 +132,9 @@ impl WindowState {
         }
     }
     fn snapshot(&self) -> Option<TreeUpdate> {
+        if let Some(tree) = &self.typed_tree {
+            return Some(tree.clone());
+        }
         if !self.ready {
             return None;
         }
@@ -173,13 +180,23 @@ impl ActionHandler for Actions {
         if request.target_tree != TreeId::ROOT {
             return;
         }
+        let mut state = self.0.lock().unwrap();
+        if let Some(tree) = &state.typed_tree {
+            if state.typed_actions.len() < QUEUE_CAP
+                && tree.nodes.iter().any(|(id, node)| {
+                    *id == request.target_node && node.supports_action(request.action)
+                })
+            {
+                state.typed_actions.push_back(request);
+            }
+            return;
+        }
         let action = match (request.action, request.data) {
             (Action::Click, _) => Requested::Click,
             (Action::Focus, _) => Requested::Focus,
             (Action::SetValue, Some(ActionData::Value(value))) => Requested::Value(value.into()),
             _ => return,
         };
-        let mut state = self.0.lock().unwrap();
         if state.actions.len() >= QUEUE_CAP {
             log::warn!("native accessibility action queue full");
             return;
@@ -252,6 +269,27 @@ fn publish(window: iced::window::Id) {
     if let Some(events) = events {
         events.raise();
     }
+}
+
+pub(super) fn set_typed_tree(window: iced::window::Id, tree: TreeUpdate) -> bool {
+    let shared = shared(window);
+    let mut state = shared.lock().unwrap();
+    if state.typed_tree.as_ref() == Some(&tree) {
+        return false;
+    }
+    state.typed_tree = Some(tree);
+    true
+}
+
+pub(super) fn publish_typed<M: Send + 'static>(window: iced::window::Id) -> iced::Task<M> {
+    iced::window::run(window, move |_| publish(window)).discard()
+}
+
+pub(super) fn take_typed_actions(window: iced::window::Id) -> Vec<ActionRequest> {
+    let state = windows().lock().unwrap().get(&window).cloned();
+    state
+        .map(|state| state.lock().unwrap().typed_actions.drain(..).collect())
+        .unwrap_or_default()
 }
 pub(super) fn remove(window: iced::window::Id) {
     let others = {

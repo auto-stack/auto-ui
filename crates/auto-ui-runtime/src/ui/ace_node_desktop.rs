@@ -2537,22 +2537,38 @@ impl Component for AceNodeDesktopWindow {
     }
 
     fn key_message(&self, key: &str) -> Option<Self::Msg> {
-        let session = widget_keyboard_session()?;
-        let host = host().read().ok()?;
-        let target = host
-            .sessions
-            .iter()
-            .find(|entry| entry.id == session && !entry.closed)?;
-        let tree = target.widget_tree.as_deref()?;
-        let state = target.widget_instances.first()?;
-        let texts = target.texts.first().map(Vec::as_slice).unwrap_or_default();
-        let values = target.states.first().map(Vec::as_slice).unwrap_or_default();
-        let action = widgets::keyboard_action(tree, texts, values, state, key)?;
-        Some(NodeDesktopMsg::Widget {
-            session,
-            instance: 0,
-            action,
+        with_widget_view(|session, tree, texts, values, state| {
+            let action = widgets::keyboard_action(tree, texts, values, state, key)?;
+            Some(NodeDesktopMsg::Widget {
+                session,
+                instance: 0,
+                action,
+            })
         })
+        .flatten()
+    }
+
+    #[cfg(windows)]
+    fn native_accessibility_enabled() -> bool {
+        widget_keyboard_session().is_some()
+    }
+
+    #[cfg(windows)]
+    fn native_accessibility_tree(&self) -> Option<accesskit::TreeUpdate> {
+        with_widget_view(widgets::accessibility_tree)
+    }
+
+    #[cfg(windows)]
+    fn native_accessibility_message(&self, request: accesskit::ActionRequest) -> Option<Self::Msg> {
+        with_widget_view(|session, tree, texts, values, state| {
+            let action = widgets::accessibility_action(session, tree, texts, values, state, request)?;
+            Some(NodeDesktopMsg::Widget {
+                session,
+                instance: 0,
+                action,
+            })
+        })
+        .flatten()
     }
 
     fn on(&mut self, msg: Self::Msg) {
@@ -2641,6 +2657,28 @@ fn widget_keyboard_session() -> Option<i32> {
         .iter()
         .any(|entry| entry.id == session && !entry.closed && entry.widget_tree.is_some())
         .then_some(session)
+}
+
+fn with_widget_view<R>(
+    f: impl FnOnce(
+        i32,
+        &[ace_core::source::age_component::ComponentViewItem],
+        &[String],
+        &[(String, String)],
+        &widgets::State,
+    ) -> R,
+) -> Option<R> {
+    let session = widget_keyboard_session()?;
+    let host = host().read().ok()?;
+    let target = host
+        .sessions
+        .iter()
+        .find(|entry| entry.id == session && !entry.closed)?;
+    let tree = target.widget_tree.as_deref()?;
+    let state = target.widget_instances.first()?;
+    let texts = target.texts.first().map(Vec::as_slice).unwrap_or_default();
+    let values = target.states.first().map(Vec::as_slice).unwrap_or_default();
+    Some(f(session, tree, texts, values, state))
 }
 
 struct HostFrame {
