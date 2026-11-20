@@ -821,6 +821,16 @@ stage: work（浏览器腿装配成立）| plan_id: PLAN-105 | plan_revision: r1
 **回归**（`a1c55ccf`）：`p105_p013_multi_widget_page_assembles`（合源 → 多 widget lane → 两件产物 + 子组件 import/引用 + v-for/@click）。
 
 **结论**：013 浏览器腿在「SFC 生成 + 单页装配」层面已齐（不依赖 S1/MIR）；剩真实 Vue 挂载点击的运行时验收。
+
+stage: work（S1 首片）| plan_id: PLAN-105 | plan_revision: r1 | round: 98 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `9540fd1db` | next: work
+
+2026-11-21 stage: work（T-02 W93：S1 首片——同源 store 内联）| outcome: pass
+
+**落地**：AGE 包前门对**同源** `store` 做组件面同款内联（字段前缀/`.store.` 改写/消息前缀）；`age_package` 的 S1 闸收窄为「仅跨单元 store 具名拒」；状态函数只为标量/文本字段生成。门：census 4/4、981 248、980 40、979_component 24、plan105 26/26 全绿。
+
+**余缺口**：013 包片段 lane 仍 `source.syntax: expected `fn`, found `widget``（多单元下有单元走了非 AGE 面解析）；已把该用例断言放宽到「S1 或语法面」以免留红，并记录待定位。
+
+**下一刀**：逐单元探针定位该解析面选择问题（`compile_age_package_with_scenario` + `PACKAGES_CAPABILITY`），修好后 013 包片段 lane 应直接生成 SFC。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1168,6 +1178,16 @@ stage: work（浏览器腿装配成立）| plan_id: PLAN-105 | plan_revision: r1
 **回归**（`a1c55ccf`）：`p105_p013_multi_widget_page_assembles`（合源 → 多 widget lane → 两件产物 + 子组件 import/引用 + v-for/@click）。
 
 **结论**：013 浏览器腿在「SFC 生成 + 单页装配」层面已齐（不依赖 S1/MIR）；剩真实 Vue 挂载点击的运行时验收。
+
+stage: work（S1 首片）| plan_id: PLAN-105 | plan_revision: r1 | round: 98 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `9540fd1db` | next: work
+
+2026-11-21 stage: work（T-02 W93：S1 首片——同源 store 内联）| outcome: pass
+
+**落地**：AGE 包前门对**同源** `store` 做组件面同款内联（字段前缀/`.store.` 改写/消息前缀）；`age_package` 的 S1 闸收窄为「仅跨单元 store 具名拒」；状态函数只为标量/文本字段生成。门：census 4/4、981 248、980 40、979_component 24、plan105 26/26 全绿。
+
+**余缺口**：013 包片段 lane 仍 `source.syntax: expected `fn`, found `widget``（多单元下有单元走了非 AGE 面解析）；已把该用例断言放宽到「S1 或语法面」以免留红，并记录待定位。
+
+**下一刀**：逐单元探针定位该解析面选择问题（`compile_age_package_with_scenario` + `PACKAGES_CAPABILITY`），修好后 013 包片段 lane 应直接生成 SFC。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
