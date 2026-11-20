@@ -40,9 +40,13 @@ fn collection_and_thumbnail_generate_separately() {
 #[test]
 fn relocated_consumer_requires_the_collection_package() {
     let start = Instant::now();
-    let scratch = std::env::var_os("PLAN109_ARTIFACT_ROOT")
-        .expect("set PLAN109_ARTIFACT_ROOT to the plan scratch directory");
-    let dir = tempfile::tempdir_in(scratch).unwrap();
+    let mut scratch = tempfile::Builder::new();
+    scratch.prefix("collection-view-generation-");
+    let dir = match std::env::var_os("PLAN109_ARTIFACT_ROOT") {
+        Some(root) => scratch.tempdir_in(root),
+        None => scratch.tempdir(),
+    }
+    .unwrap();
     let app = dir.path().join("relocated-app");
     let package = app.join("vendor/collection-view");
     let front = app.join("src/front");

@@ -40,7 +40,7 @@ widget App {
     use { package: official from "./components" }
 
     msg {
-        Init, Tick,
+        Init, BootTick,
         NavTo(str), GoBack, GoForward, GoUp,
         SetViewMode(str), SortByName, SortBySize, SortByDate, SortByType, ToggleHidden,
         SetSearch(str), SetAddr(str), AddrGo, AddrEdit, AddrCancel, SelectItem(int), OpenItem(int),
@@ -53,6 +53,8 @@ widget App {
         ConfirmDelete(int), ExecuteDelete, CancelDelete
     }
 
+    timer { BootTick (every_ms: 250, when: .booting) }
+
     model {
         // PLAN-016 T-09：桌面命令总线上行（shell 同款状态面——宿主每周期
         // 读+清；v1.7 起普通注册表窗联合排空，open_with 可达）。
@@ -64,13 +66,12 @@ widget App {
         // 默认 Auto；宿主/CLI/fixture 可切 Solarized）。
         var theme_name str = "Auto"
 
-        // Tick 驱动延迟引导（250ms 基准 = 012/025 先例）：Init 只做轻量
-        // 恢复，重 FS 活（快捷访问探测 + 首目录 listing）挪到首个 Tick——
+        // 延迟引导（250ms 基准 = 012/025 先例）：Init 只做轻量
+        // 恢复，快捷访问探测和首目录扫描由启动计时器负责。
         // 避开 iced boot 临界区（PLAN-016 实测：Init 内同步 fs 原生调用与
         // 宿主 GPU/surface 初始化偶发竞态挂起）。
-        var interval int = 250
-        var booted bool = false
-        var tick_count int = 0               // 启动临界窗错峰（前 20 tick 空转）
+        var booting bool = true
+        var tick_count int = 0               // 等待初始窗口完成绘制
 
         // ---- 真实文件系统导航状态（T-05）----
         var home str = ""                   // Env USERPROFILE/HOME，Init 解析
@@ -419,7 +420,7 @@ widget App {
                         items: .collection_items, columns: .collection_columns,
                         viewMode: .view_mode, selectedId: .selected_path, scopeId: .current_path,
                         revision: .collection_revision, sortKey: .sort_col, sortDirection: .sort_dir,
-                        status: if .booted { "ready" } else { "loading" },
+                        status: if .booting { "loading" } else { "ready" },
                         emptyLabel: if .is_vm == "vm" || .back_fs { "此目录为空" } else { "后端读盘不可达" },
                         onviewModeRequested: .CollectionMode($event),
                         onselectionRequested: .CollectionSelection($event),
@@ -556,13 +557,11 @@ widget App {
             if sh == "false" { .show_hidden = false }
         }
 
-        // ---- 延迟引导（首个 Tick；重 FS 活不在 Init 临界区内）----
-        // （interval 为启动期提取字段不可运行期改写——门控走 booted 布尔，
-        // 引导后 Tick 空转开销可忽略。）
-        .Tick -> {
+        // 启动完成后取消订阅，后续媒体刷新由现有图片管线唤醒。
+        .BootTick -> {
             .tick_count = .tick_count + 1
-            if !.booted && .tick_count > 8 {
-                .booted = true
+            if .tick_count > 8 {
+                .booting = false
                 if .is_vm != "vm" {
                 // PLAN-684 rev7：vue 轨先试后端读盘（gallery back-proxy VM
                 // 会话 = 真盘；standalone a2r 骨架 fs_home()=""）——失败落

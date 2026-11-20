@@ -63,7 +63,7 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                         }
                     }
                 }
-                if .items.len() == 0 {
+                if .items.len() == 0 && .emptyLabel != "" {
                     text .emptyLabel { style: "p-3 text-sm text-muted-foreground" }
                 }
                 col (class: "flex-1 min-h-0 min-w-0 w-full overflow-auto",

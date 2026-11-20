@@ -14,6 +14,7 @@ widget App {
         var sort_key str = ""
         var sort_direction str = ""
         var result str = "尚未选择"
+        var action_result str = ""
     }
     view {
         col (style: "w-full h-full min-h-0 bg-background text-foreground p-3") {
@@ -25,6 +26,9 @@ widget App {
                 }
             }
             text .result { style: "text-sm" }
+            if .action_result != "" {
+                text .action_result { style: "text-sm" }
+            }
             col (style: "flex-1 min-h-0") {
                 CollectionView (
                     items: .items, columns: .columns, viewMode: .mode, selectedId: .selected,
@@ -77,12 +81,13 @@ widget App {
         .Act(payload str) -> {
             try {
                 let request = json.parse(payload)
-                if request.scopeId == .scope && request.baseRevision == .revision && request.instanceToken != "" {
+                if request.scopeId == .scope && request.baseRevision == .revision && request.instanceToken != "" && (.collection_token == "" || request.instanceToken == .collection_token) {
                     var i int = 0
                     while i < .items.len() {
                         let item = .items[i]
                         if item.id == request.id && item.itemRevision == request.itemRevision && !item.disabled && request.actionId == "open" {
-                            .result = "已打开 " + item.id
+                            .collection_token = request.instanceToken
+                            .action_result = "已打开 " + item.id
                         }
                         i = i + 1
                     }
@@ -92,7 +97,8 @@ widget App {
         .Sort(payload str) -> {
             try {
                 let request = json.parse(payload)
-                if request.scopeId == .scope && request.baseRevision == .revision && request.instanceToken != "" && request.sortKey == "name" {
+                if request.scopeId == .scope && request.baseRevision == .revision && request.instanceToken != "" && (.collection_token == "" || request.instanceToken == .collection_token) && request.sortKey == "name" {
+                    .collection_token = request.instanceToken
                     let a = .items[0]
                     let b = .items[1]
                     let c = .items[2]
@@ -104,9 +110,9 @@ widget App {
             } catch {}
         }
         .Replace -> {
-            let a = .items[0]
             let b = .items[1]
             let c = .items[2]
+            let a = {id: "a", itemRevision: "2", label: "同名条目", kind: "folder", icon: "folder", thumbnailUri: "", thumbnailState: "missing", disabled: false, cells: [{key: "kind", text: "文件夹"}], actions: [{id: "open", label: "打开", enabled: true}], defaultActionId: "open"}
             .items = [b, c, a]
             .revision = .revision + 1
         }

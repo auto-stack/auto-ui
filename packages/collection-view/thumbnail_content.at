@@ -8,11 +8,17 @@ widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName:
     computed {
         actual_icon => if .iconName != "" { .iconName } else { .kind }
         bad_image => .failed || .state == "error"
+        native_http => Env.track() == "vm" && !.src.starts_with("/api/__auto/media/") && (.src.starts_with("/api/") || .src.starts_with("http://") || .src.starts_with("https://"))
     }
     view {
         col (style: "w-full h-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-md bg-muted") {
             if .state == "ready" && .src != "" && !.failed {
-                image_surface (src: .src, alt: .alt, fit: .fit, onerror: .ImageFailed, style: "w-full h-full") {}
+                if .native_http {
+                    // Existing API images (for example Gallery) use the native Image loader.
+                    image (src: .src, alt: .alt, fit: .fit, style: "w-full h-full") {}
+                } else {
+                    image_surface (src: .src, alt: .alt, fit: .fit, onerror: .ImageFailed, style: "w-full h-full") {}
+                }
             } else {
                 row (style: "items-center justify-center gap-1 text-muted-foreground") {
                     if .state == "loading" {

@@ -285,21 +285,17 @@ class Session:
         return ''
 
     def type_into_search(self, text):
-        ids = []
+        field = re.compile(r'input #(vnode_\d+) \{\s*placeholder: "搜索资源…"\s*value: "([^"\n]*)"')
+        result = ''
         for _ in range(6):
-            s = self.snapshot()
-            ids = re.findall(r'input #(vnode_\d+)', s)
-            if ids:
-                break
-            time.sleep(0.8)
-        vfd.require(len(ids) > 0, f'no search input; snapshot {len(s)}B')
-        out = ''
-        for _ in range(3):
-            out = self.call('autoui_type', allow_error=True, element_id=ids[0], value=text, text=text)
-            if not out.startswith('Error'):
-                break
-            time.sleep(0.5)
-        vfd.require(not out.startswith('Error'), f'type failed: {out[:160]}')
+            match = field.search(self.snapshot())
+            if match:
+                if match[2] == text:
+                    return
+                result = self.call('autoui_type', allow_error=True, element_id=match[1], text=text)
+            time.sleep(0.3)
+        match = field.search(self.snapshot())
+        vfd.require(match and match[2] == text, f'search input did not render {text!r}: {result[:160]}')
 
     def key(self, name):
         return self.call('autoui_keyboard', key=name)
@@ -369,7 +365,7 @@ class Session:
         + provider 终态硬断言——静默超时会污染后续段落）。"""
         for _ in range(4):
             s0 = self.snapshot()
-            kind_btns = [h for h in self.vnodes('全部', s0) if h[0] == 'button']
+            kind_btns = [h for h in self.vnodes('全部类型', s0) if h[0] == 'button']
             if kind_btns:
                 out = self.call('autoui_action', allow_error=True, element_id=kind_btns[0][1], action='press')
                 if 'handler:' not in out:
@@ -475,19 +471,22 @@ class Session:
 
     def screenshot(self, name):
         # 首帧重截图可能超时（50 卡页 + 媒体图同帧解码）——重试一次。
+        out = ''
         for attempt in range(2):
             try:
-                out = self.call('autoui_screenshot', allow_error=True,
-                                path=str(self.out / f'{name}.png'))
+                out = self.call('autoui_screenshot', allow_error=True)
                 if 'Error' not in out:
                     break
                 time.sleep(1.5)
             except Exception:
                 time.sleep(1.5)
-        m = re.search(r'saved to:\s*(\\\?\[^\s"]+\.png|[^\s"]+\.png)', out)
-        p = Path(m.group(1)) if m else (self.out / f'{name}.png')
-        h = hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else ''
-        return {'path': str(p), 'sha256': h}
+        match = re.search(r'saved to:[ \t]*(.+\.png)', out)
+        if not match:
+            return {'path': '', 'sha256': ''}
+        capture = Path(match[1]).read_bytes()
+        destination = self.out / f'{name}.png'
+        destination.write_bytes(capture)
+        return {'path': str(destination), 'sha256': hashlib.sha256(capture).hexdigest()}
 
     def resize(self, w, h):
         import ctypes
@@ -495,8 +494,8 @@ class Session:
         user.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int,
                                       ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
         handle = None
-        for hwnd, _title in self.windows:
-            handle = hwnd
+        for window in self.windows:
+            handle = window['handle']
             break
         vfd.require(handle is not None, 'no window handle for resize')
         user.SetWindowPos(ctypes.c_void_p(handle), None, 0, 0, w, h, 0x0004)
@@ -607,7 +606,8 @@ def run_picker_matrix(args, out, cases, report):
 
         s.trace('after-kind-image')
         # folder filter via TreeView row (文档 = 998 附件；先复位 kind)
-        s.ensure_effect('全部类型', lambda f: f.get('provider', ['', ''])[8] == '')
+        cleared_kind = s.ensure_effect('全部类型', lambda f: f.get('provider', [''] * 10)[8] == '')
+        vfd.require(cleared_kind['provider'][8] == '', 'all types did not restore the unfiltered kind')
         rb = {}
         ok = False
         for attempt in range(5):
@@ -753,14 +753,15 @@ def run_picker_matrix(args, out, cases, report):
         time.sleep(1.2)
         s.select_card('Asset-004.bin', '"att-4"')
         c0 = int(s.readback().get('counts', ['0'] * 8)[3])
-        s.press_ok('确认')
-        s.press_ok('确认')
+        confirm = s.button('确认')
+        s.call('autoui_action', element_id=confirm, action='press')
+        s.call('autoui_action', allow_error=True, element_id=confirm, action='press')
         rb = s.wait_rb(lambda f: 'accepted' in f.get('confirmation', ''), timeout=6)
         c1 = int(rb.get('counts', ['0'] * 8)[3])
         conf = rb.get('confirmation', '')
         cases.add('V-03 重开会话递增 + 双按单发', 'reopen → 附件-4 → 确认×2',
                   'session=2；confirm 计数只 +1（锁定防重）',
-                  'accepted' in conf and (c1 - c0) == 1)
+                  [conf, c1 - c0], 'accepted' in conf and '"session":2' in conf and c1 - c0 == 1)
 
     except Exception as e:
         report['prep'].append({'stage': 'picker matrix crashed', 'error': repr(e)[:200]})
@@ -825,7 +826,7 @@ def run_picker_stale(args, out, cases, report):
               [attach_before, attach_after], attach_after == attach_before)
 
         # stale vnode rejection: old card vnode after query change
-        s.open_picker()
+        vfd.require(s.ensure_closed() and s.open_picker(), 'picker did not reopen after cancellation')
         time.sleep(1.2)
         snap = s.snapshot()
         hits = s.vnodes('Asset-006.bin', snap)
@@ -834,19 +835,22 @@ def run_picker_stale(args, out, cases, report):
             if tag in ('button', 'row'):
                 old_vid = vid
                 break
-        s.press_ok('图片')
-        s.wait_rb(lambda f: f.get('provider', ['', ''])[8] == 'image', timeout=6)
+        vfd.require(old_vid, 'old card was not discoverable before changing the query')
+        s.press_ok('图片类型')
+        filtered = s.wait_rb(lambda f: f.get('provider', ['', ''])[8] == 'image', timeout=6)
+        vfd.require(filtered['provider'][8] == 'image', 'image filter was not applied')
         sel_before = s.readback().get('selection', '')
         outp = s.call('autoui_action', allow_error=True, element_id=old_vid, action='press')
         time.sleep(1.0)
         sel_after = s.readback().get('selection', '')
         cases.add('V-03 旧节点 action 拒绝', 'old vnode press after query change',
               '旧 vnode 不产生新选择（被拒或 no-op），新正例可用',
-              [sel_after[:60]], sel_after == sel_before and 'att-6' not in sel_after)
-        s.press_ok('全部')
+                  [outp[:160], sel_after[:60]], sel_after == sel_before and 'att-6' not in sel_after)
+        s.select_card('Lake.jpg', '"lake"')
+        s.press_ok('全部类型')
 
         # V-06: reopen clears stale confirmation feedback
-        s.open_picker()
+        vfd.require(s.close_picker_retry() and s.open_picker(), 'picker did not reopen for feedback check')
         time.sleep(1.0)
         rb = s.readback()
         cases.add('V-06 重开清空旧确认反馈', 'reopen',
@@ -896,11 +900,12 @@ def run_visual_and_reopen(args, out, cases, report):
         time.sleep(0.8)
         s.open_picker()
         time.sleep(1.0)
-        s.select_card('附件-2', '"att-2"')
+        s.select_card('Asset-002.bin', '"att-2"')
         time.sleep(0.6)
         shot = s.screenshot('v06-selected-light-native')
         cases.add('V-06 浅色主题选中态', 'ToggleDark → select → screenshot',
-                  '浅色下选择态/摘要/确认栏可辨', [shot['sha256'][:16]], bool(shot['sha256']))
+                  '浅色下选择态/摘要/确认栏可辨', [shot['sha256'][:16]],
+                  '"att-2"' in s.readback().get('selection', '') and bool(shot['sha256']))
         # empty vs error distinguishable (light)
         s.type_into_search('zzzz')
         s.press_ok('搜索')
@@ -914,12 +919,15 @@ def run_visual_and_reopen(args, out, cases, report):
         snap = s.snapshot()
         cases.add('V-06 provider 错误态（浅色）', 'search fail', '模拟故障 具名错误可见',
                   ['模拟故障' in snap], '模拟故障' in snap)
-        s.ensure_closed()
+        vfd.require(s.close_picker_retry(), 'picker did not close after provider error')
         s.press_ok('切换明暗')
         # narrow window 420×560
         s.resize(420, 560)
-        s.open_picker()
-        time.sleep(1.2)
+        vfd.require(s.open_picker(), 'picker did not reopen at 420×560')
+        s.type_into_search('')
+        restored = s.ensure_effect('搜索', lambda f: f.get('provider', [''] * 10)[4] == '1003'
+                                   and f.get('provider', [''] * 10)[7] == '')
+        vfd.require(restored['provider'][4] == '1003', 'normal results were not restored after error')
         snap = s.snapshot()
         need = ['搜索', '图片', '网格', '确认', '取消', '关闭']
         missing = [m for m in need if m not in snap]
@@ -928,11 +936,16 @@ def run_visual_and_reopen(args, out, cases, report):
                   '搜索/过滤/视图/确认/取消/关闭在快照中可达', [missing, shot['sha256'][:16]],
                   not missing)
         s.press_ok('列表')
-        time.sleep(0.8)
         snap = s.snapshot()
-        cases.add('V-05 窄窗列表视图', 'press 列表', '列表视图切换生效（行渲染）',
-                  ['Asset-' in snap], 'Asset-' in snap)
-        s.ensure_closed()
+        for _ in range(12):
+            if '"名称"' in snap and 'Asset-' in snap:
+                break
+            time.sleep(0.1)
+            snap = s.snapshot()
+        listed = '"名称"' in snap
+        cases.add('V-05 窄窗列表视图', 'press 列表', '列表视图切换生效（名称表头与行同时出现）',
+                  [listed, 'Asset-' in snap], listed and 'Asset-' in snap)
+        vfd.require(s.close_picker_retry(), 'picker did not close after the narrow-window action')
         s.resize(1080, 800)
         # exit & reopen (fresh session; attach ledger persists via storage)
         cases.pause_timer()
@@ -983,16 +996,11 @@ def run_029_legs(args, out, cases, report):
     sub = proot / 'trip-2024'
     proot.mkdir(parents=True, exist_ok=True)
     sub.mkdir(exist_ok=True)
-    fx = ROOT / 'examples' / 'asset-picker' / 'tests' / 'fixtures'
+    fx = ROOT / 'examples/asset-picker/src/front/public/asset-fixtures'
     import shutil
     for name in ['scenic-320x240.png', 'corner-marked.png']:
         shutil.copyfile(fx / name, proot / name)
     shutil.copyfile(fx / 'orientation-6.jpg', sub / 'sub-photo.jpg')
-    # 旧 back 实例占端口 = 新会话连到无 env 的旧后端（空图库）——先清。
-    subprocess.run(['powershell', '-NoProfile', '-Command',
-                    "Get-Process | Where-Object { $_.ProcessName -like 'app-029*' } | Stop-Process -Force"],
-                   capture_output=True)
-    time.sleep(1.0)
     s = None
     try:
         cases.pause_timer()
@@ -1002,9 +1010,10 @@ def run_029_legs(args, out, cases, report):
         snap = s.snapshot()
         (out / 'v04-029.txt').write_text(snap, encoding='utf-8')
         mounted = 'AssetBrowser' in snap or ('全部' in snap and '收藏' in snap and '搜索' in snap)
+        photo_grid = s.screenshot('v04-029-grid')
         cases.add('V-04 029 库面消费 AssetBrowser（真实 scan）', 'launch 029',
                   '分类树（全部/收藏）+ 搜索/网格在真实 photo scan 上渲染',
-                  [mounted, snap[:120]], mounted)
+                  [mounted, snap[:120]], mounted, evidence=photo_grid['path'])
         def press_tree_row(label, expect_text, timeout=4.0):
             deadline = time.time() + timeout
             last_snap = ''
@@ -1219,8 +1228,10 @@ def main():
     failed = sum(1 for r in cases.rows if r['result'] == 'fail')
     not_run = sum(1 for r in cases.rows if r['result'] == 'not_run')
     # 完整性下限：native 矩阵含 picker(V-01..03) + visual/reopen(V-05/06) 腿（≥12），
-    # vue 轨为 5 例。少于下限 = 会话早期崩溃，不得按空真值判 pass。
-    complete = len(cases.rows) >= (12 if args.backend == 'native' else 5)
+    # vue 轨为 6 例。少于下限或有用例未运行，不能判 pass。
+    complete = not_run == 0 and len(cases.rows) >= (12 if args.backend == 'native' else 6)
+    if args.backend == 'native' and args.runs == 1:
+        complete = complete and not any('error' in step for step in report['prep'])
     report['result'] = 'pass' if (cases.all_pass() and complete) else ('fail' if failed or not complete else 'not_run')
     report['seconds'] = round(time.monotonic() - t0, 1)
     (out / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding='utf-8')
@@ -1229,7 +1240,7 @@ def main():
         for r in cases.rows:
             if r['result'] == 'fail':
                 print(f"  FAIL {r['id']}: {str(r['observed'])[:200]}")
-    return 0 if cases.all_pass() else 1
+    return 0 if report['result'] == 'pass' else 1
 
 
 if __name__ == '__main__':

@@ -15,7 +15,7 @@ widget App {
     use { package: asset_browser from "../../../../packages/asset-browser" }
     msg {
         Init, Tick,
-        OpenPicker, ReloadLog, InvalidateSelected, HookInv,
+        OpenPicker, ReloadLog, HookInv, ToggleDark,
         OnQuery(str), OnSel(str), OnPrev(str), OnConfirm(str), OnCancel,
         ApplyQuery, SlowFire
     }
@@ -53,8 +53,6 @@ widget App {
         var slow_records = []
         var slow_total int = 0
         var slow_ticks int = 0
-        // ---- 媒体 URI（front 进程内建 auto.image 会话；探针实证零 emit
-        // 丢失拓扑——PLAN-089 P1 同款。back media-uris 端点保留给 vue 轨）----
         // ---- 业务写读回 ----
         var attach_count int = 0
         var last_attach str = ""
@@ -81,6 +79,7 @@ widget App {
                 button "打开选择器" { onclick: .OpenPicker, style: "h-8 px-3 text-xs rounded-md border border-primary text-primary" }
                 button "刷新附件日志" { onclick: .ReloadLog, style: "h-8 px-2 text-xs rounded-md border border-border" }
                 button "使选中失效" { onclick: .HookInv, style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "切换明暗" { onclick: .ToggleDark, style: "h-8 px-2 text-xs rounded-md border border-border" }
             }
             col (style: "gap-1") {
                 text f"status=${.status}" { style: "text-xs text-foreground" }
@@ -217,11 +216,12 @@ widget App {
                     } else {
                         .last_accepted_seq = req.seq
                         .querySeq = req.seq
+                        let invalidate = q.text == "invalidate"
                         var clear_sel bool = false
                         if q.folderId != .qf_folder {
                             clear_sel = true
                         }
-                        if q.text != .qf_text {
+                        if !invalidate && q.text != .qf_text {
                             clear_sel = true
                         }
                         if q.kind != .qf_kind {
@@ -231,38 +231,19 @@ widget App {
                             .selection = ""
                         }
                         .qf_folder = q.folderId
-                        .qf_text = q.text
+                        .qf_text = if invalidate { "" } else { q.text }
                         .qf_kind = q.kind
                         .qf_page = q.page
                         .qf_pageSize = q.pageSize
-                        // provider 故障演练触发词：text=invalidate 时静默 bump
-                        // 当前选中身份（同 ID 换 revision），随后以空文本恢复查询。
-                        if .qf_text == "invalidate" {
-                            if .selection != "" {
-                                try {
-                                    let sl2 = json.parse(.selection)
-                                    var ki2 int = 0
-                                    while ki2 < .catalog.len() {
-                                        if .catalog[ki2].id == sl2.id {
-                                            var cur2 str = .catalog[ki2].revision
-                                            .catalog[ki2].revision = cur2 + "-x"
-                                        }
-                                        ki2 = ki2 + 1
-                                    }
-                                    .qf_text = ""
-                                } catch {
-                                }
-                            } else {
-                                .qf_text = ""
-                            }
-                        }
                         .qid_counter = .qid_counter + 1
                         .qf_id = "q" + .qid_counter.str()
                         .query = json.stringify({id: .qf_id, folderId: .qf_folder, text: .qf_text, kind: .qf_kind, page: .qf_page, pageSize: .qf_pageSize})
                         .revision = .revision + 1
                         .errorMessage = ""
                         .loading = true
-                        if .qf_text == "fail" {
+                        if invalidate {
+                            .HookInv()
+                        } else if .qf_text == "fail" {
                             .loading = false
                             .errorMessage = "asset-provider: 模拟故障（provider_error）"
                             .status = "provider error published"
@@ -529,7 +510,6 @@ widget App {
                         }
                         i = i + 1
                     }
-                    .ApplyQuery()
                     var nid str = sl.id
                     .status = "selected identity invalidated: " + nid
                 } catch {
@@ -538,13 +518,13 @@ widget App {
             } else {
                 .status = "invalidate: no selection"
             }
+            .ApplyQuery()
         }
         .OpenPicker -> {
             .open = true
             .confirmation = ""
             .status = "picker opened"
         }
+        .ToggleDark -> { .dark_mode = !.dark_mode }
     }
 }
-
-// cache-bust 2026-11-20T02:35

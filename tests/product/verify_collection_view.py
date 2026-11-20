@@ -1,5 +1,5 @@
 
-"""PLAN-109 direct collection demo gate using the current accessibility trees.
+"""PLAN-109 collection demo and FileManager gate using current accessibility trees.
 
 Prepare the CLI and UI tool before running. The Vue leg takes a prepared URL
 and a Playwright MCP stdio configuration (command and args). Consumer-level
@@ -127,7 +127,8 @@ def browser_button(snapshot, name, occurrence=0):
     return matches[occurrence][1]
 
 
-def test_core_browser(args, report):
+@contextmanager
+def browser_session(args):
     config = json.loads(args.browser_mcp_config.read_text(encoding="utf-8-sig"))
     with (args.out_dir / "browser.log").open("w", encoding="utf-8") as log:
         browser = BrowserMcp(config, log, args.out_dir)
@@ -138,26 +139,103 @@ def test_core_browser(args, report):
             })
             browser.write({"method": "notifications/initialized"})
             browser.call("browser_navigate", url=args.url)
-            inspect = lambda: browser.call("browser_snapshot")
-            first = wait_for(inspect, lambda s: s.count('button "同名条目"') == 2)
-            report["initial_snapshot"] = first
-            row_b = browser_button(first, "同名条目", 1)
-            browser.call("browser_click", target=row_b, element="第二个同名条目")
-            chosen = wait_for(inspect, lambda s: "已选择 b" in s)
-            browser.call("browser_click", target=browser_button(chosen, "列表"), element="列表")
-            current = wait_for(inspect, lambda s: "文档" in s and "已选择 b" in s)
-            browser.call("browser_click", target=browser_button(current, "同名条目", 1),
-                         element="列表中的第二个同名条目")
-            browser.call("browser_press_key", key="ArrowUp")
-            browser.call("browser_press_key", key="Space")
-            report["final_snapshot"] = wait_for(inspect, lambda s: "已选择 a" in s)
-            assert any(
-                "button " in line and "不可用条目" in line and "[disabled]" in line
-                for line in report["final_snapshot"].splitlines()
-            ), "the unavailable entry is missing or enabled"
-            browser.call("browser_close")
+            yield browser
         finally:
             browser.close()
+
+
+def test_core_browser(args, report):
+    with browser_session(args) as browser:
+        inspect = lambda: browser.call("browser_snapshot")
+        first = wait_for(inspect, lambda s: s.count('button "同名条目"') == 2)
+        report["initial_snapshot"] = first
+        row_b = browser_button(first, "同名条目", 1)
+        browser.call("browser_click", target=row_b, element="第二个同名条目")
+        chosen = wait_for(inspect, lambda s: "已选择 b" in s)
+        browser.call("browser_click", target=browser_button(chosen, "列表"), element="列表")
+        current = wait_for(inspect, lambda s: "文档" in s and "已选择 b" in s)
+        browser.call("browser_click", target=browser_button(current, "打开"), element="打开第一项")
+        current = wait_for(inspect, lambda s: "已选择 b" in s and "已打开 a" in s)
+        browser.call("browser_click", target=browser_button(current, "同名条目", 1),
+                     element="列表中的第二个同名条目")
+        browser.call("browser_press_key", key="ArrowUp")
+        browser.call("browser_press_key", key="Space")
+        report["final_snapshot"] = wait_for(inspect, lambda s: "已选择 a" in s)
+        assert any(
+            "button " in line and "不可用条目" in line and "[disabled]" in line
+            for line in report["final_snapshot"].splitlines()
+        ), "the unavailable entry is missing or enabled"
+        browser.call("browser_close")
+
+
+def test_file_manager_browser(args, report):
+    with browser_session(args) as browser:
+        snapshot = lambda: browser.call("browser_snapshot")
+
+        def click(tree, label, **arguments):
+            return browser.call("browser_click", target=browser_button(tree, label),
+                                element=label, **arguments)
+
+        ready = wait_for(snapshot, lambda s: 'button "编辑地址"' in s, 3)
+        click(ready, "编辑地址")
+        editing = wait_for(snapshot, lambda s: 'textbox "输入路径后回车...' in s)
+        line = next(line for line in editing.splitlines() if 'textbox "输入路径后回车...' in line)
+        browser.call("browser_type", target=re.search(r"\[ref=(\w+)\]", line)[1],
+                     element="目录地址", text=args.fixture_dir.as_posix())
+        click(snapshot(), "跳转")
+        listed = wait_for(snapshot, lambda s: 'button "notes.txt"' in s and "sample.png" in s)
+        click(listed, "notes.txt")
+        chosen = wait_for(snapshot, lambda s: "选定: notes.txt" in s)
+        click(chosen, "名称")
+        sorted_tree = wait_for(snapshot, lambda s: "选定: notes.txt" in s and
+                               0 <= s.find("sample.png") < s.find("broken.png"))
+        click(sorted_tree, "网格")
+        grid = wait_for(snapshot, lambda s: "选定: notes.txt" in s and 'button "名称"' not in s)
+        click(grid, "folder", doubleClick=True)
+        report["readback"] = wait_for(snapshot, lambda s: 'button "inside.txt"' in s)
+        report["selection_after_sort_and_view_change"] = grid
+        browser.call("browser_close")
+
+
+def test_file_manager_native(args, report):
+    owned = set(product.owned_tree(args.native_pid)) | {args.native_pid}
+    windows = product.windows_for(owned)
+    assert windows, "no visible window owned by the prepared FileManager"
+    report["window"] = windows
+    snapshot = lambda: native_call(args.native_port, "autoui_snapshot")
+    report["actions"] = []
+
+    def press(tree, label):
+        result = native_call(args.native_port, "autoui_action", action="press",
+                             element_id=native_button(tree, label))
+        report["actions"].append({"label": label, "response": result})
+
+    ready = wait_for(snapshot, lambda s: ".AddrEdit" in s and "主目录" in s, 3)
+    press(ready, "编辑地址")
+    editing = wait_for(snapshot, lambda s: ".SetAddr" in s)
+    field = re.search(
+        r"input #(vnode_\d+)[^\n]*\n(?:(?!^\s*\}).*\n)*?\s*oninput: \.SetAddr",
+        editing, re.MULTILINE,
+    )
+    assert field, "address input has no native node"
+    native_call(args.native_port, "autoui_type", element_id=field[1], text=args.fixture_dir.as_posix())
+    press(snapshot(), "跳转")
+    listed = wait_for(snapshot, lambda s: "sample.png" in s and "notes.txt" in s)
+    press(listed, "notes.txt")
+    chosen = wait_for(snapshot, lambda s: "选定: notes.txt" in s)
+    if '"名称"' not in chosen:
+        press(chosen, "列表")
+        chosen = wait_for(snapshot, lambda s: "选定: notes.txt" in s and '"名称"' in s)
+    press(chosen, "名称")
+    sorted_tree = wait_for(snapshot, lambda s: "选定: notes.txt" in s and
+                           0 <= s.find("sample.png") < s.find("broken.png"))
+    folder = re.search(r'button #vnode_\d+ "folder[^"\n]*"', sorted_tree)
+    assert folder, "folder action cannot be bound to its row"
+    press(sorted_tree[folder.start():], "菜单")
+    menu = wait_for(snapshot, lambda s: "关闭菜单" in s and "选定: notes.txt" in s)
+    report["selection_after_sort_and_menu"] = menu
+    press(menu, "打开")
+    report["readback"] = wait_for(snapshot, lambda s: "inside.txt" in s)
 
 
 def stage_core(out):
@@ -231,13 +309,15 @@ def test_core_native(args, report):
             assert process.wait(timeout=3) == 0, "normal exit returned a failure"
             report["sessions"].append({"window": windows, "port": port, "actions": response,
                                        "readback": current})
-        try:
-            native_call(port, "autoui_snapshot", timeout=2.6)
-        except urllib.error.URLError as error:
-            if not isinstance(error.reason, ConnectionRefusedError):
-                raise
-        else:
-            raise AssertionError(f"closed process left its MCP endpoint live on {port}")
+        if index == 1:
+            try:
+                native_call(port, "autoui_snapshot", timeout=2.6)
+            except urllib.error.URLError as error:
+                if not isinstance(error.reason, ConnectionRefusedError):
+                    raise
+                report["closed_endpoint"] = {"port": port, "result": "connection refused"}
+            else:
+                raise AssertionError(f"closed process left its MCP endpoint live on {port}")
 
 
 def main():
@@ -246,24 +326,41 @@ def main():
     parser.add_argument("--ui-tool-bin", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--backend", choices=("native", "vue"), required=True)
+    parser.add_argument("--consumer", choices=("demo", "file-manager"), default="demo")
     parser.add_argument("--browser-mcp-config", type=Path)
-    parser.add_argument("--url", help="prepared Vue demo URL")
+    parser.add_argument("--url", help="prepared Vue application URL")
+    parser.add_argument("--fixture-dir", type=Path, help="isolated FileManager fixture directory")
+    parser.add_argument("--native-port", type=int, help="MCP port of the prepared native FileManager")
+    parser.add_argument("--native-pid", type=int, help="CLI PID of the prepared native FileManager")
     args = parser.parse_args()
+    if args.backend == "vue" and not (args.browser_mcp_config and args.url):
+        parser.error("prepare Vue and set --browser-mcp-config and --url")
+    if args.consumer == "file-manager":
+        if not args.fixture_dir:
+            parser.error("--fixture-dir is required for FileManager")
+        args.fixture_dir = args.fixture_dir.resolve(strict=True)
+        files = ("notes.txt", "sample.png", "broken.png", "folder/inside.txt")
+        if not all((args.fixture_dir / name).is_file() for name in files):
+            parser.error("FileManager requires isolated notes.txt, sample.png, broken.png and folder/inside.txt")
+        if args.backend == "native" and not (args.native_pid and args.native_port):
+            parser.error("--native-pid and --native-port are required for the prepared FileManager")
     args.auto_bin = args.auto_bin.resolve(strict=True)
     args.ui_tool_bin = args.ui_tool_bin.resolve(strict=True)
     args.out_dir = args.out_dir.resolve()
-    args.out_dir.mkdir(parents=True)
+    args.out_dir.mkdir(parents=True, exist_ok=True)
     start = time.monotonic()
     report = {
-        "plan": "109", "revision": 2, "scope": "core demo", "backend": args.backend,
+        "plan": "109", "revision": 2, "scope": args.consumer, "backend": args.backend,
         "platform": sys.platform, "cli_sha256": product.sha(args.auto_bin),
         "tool_sha256": product.sha(args.ui_tool_bin), "sessions": [],
     }
     try:
-        if args.backend == "native":
+        if args.consumer == "file-manager":
+            run = test_file_manager_native if args.backend == "native" else test_file_manager_browser
+            run(args, report)
+        elif args.backend == "native":
             test_core_native(args, report)
         else:
-            assert args.browser_mcp_config and args.url, "prepare Vue and set the MCP stdio config and URL"
             test_core_browser(args, report)
         report["result"] = "pass"
     except (AssertionError, IndexError, KeyError, OSError, ValueError,

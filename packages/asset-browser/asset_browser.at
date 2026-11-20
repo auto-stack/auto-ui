@@ -82,7 +82,7 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
         // 请求待反馈：已发出但应用尚未回灌 querySeq。
         request_pending => if .last_emitted_seq == 0 { false } else if .querySeq != .last_emitted_seq { true } else { false }
         has_filter => if .q_text != "" { true } else if .q_kind != "" { true } else if .q_folder != "" { true } else { false }
-        empty_label => if .loading { "加载中…" } else { if .q_text != "" { "无匹配资源" } else { if .q_kind != "" { "无匹配资源" } else { if .q_folder != "" { "无匹配资源" } else { "资源库为空" } } } }
+        empty_label => if .errorMessage != "" { "" } else if .loading { "加载中…" } else { if .q_text != "" { "无匹配资源" } else { if .q_kind != "" { "无匹配资源" } else { if .q_folder != "" { "无匹配资源" } else { "资源库为空" } } } }
         empty_hint => if .loading { "" } else { if .q_text != "" { "试着调整搜索关键字或过滤条件" } else { "该分类下暂无可用资源" } }
     }
     view {
@@ -101,9 +101,9 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                 button (text: "搜索", title: "执行搜索", onclick: .DoSearch, disabled: .locked, style: "h-8 px-2 text-xs rounded-md border border-border hover:bg-muted disabled:opacity-40") {}
                 row (style: "items-center gap-1 ml-2") {
                     if .q_kind == "" {
-                        button (text: "全部", title: "全部类型", onclick: .SetKind(""), disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
+                        button (text: "全部", title: "全部类型", onclick: .SetKind("all"), disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
                     } else {
-                        button (text: "全部", title: "全部类型", onclick: .SetKind(""), disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
+                        button (text: "全部", title: "全部类型", onclick: .SetKind("all"), disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
                     }
                     if .q_kind == "image" {
                         button (text: "图片", title: "图片类型", onclick: .SetKind("image"), disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
@@ -137,11 +137,11 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                 }
             } else {
             row (style: "flex-1 min-h-0 w-full") {
-                col (style: "w-40 shrink-0 h-full border-r border-border overflow-y-auto p-2") {
+                col (style: "w-24 sm:w-40 shrink-0 h-full border-r border-border overflow-y-auto p-2") {
                     TreeView (nodes: .folder_nodes, expanded: .fold_expanded, selected: .q_folder, on_toggle: .FoldToggle($event), on_select: .FoldSelect($event)) {}
                 }
                 col (style: "flex-1 min-w-0 min-h-0 h-full flex flex-col") {
-                    // ---- 状态行：计数 / loading / 待反馈 / 过期 / 错误 / 选择摘要 ----
+                    // ---- 状态行：计数 / loading / 待反馈 / 过期 / 选择摘要 ----
                     row (style: "h-8 shrink-0 items-center gap-3 px-3 border-b border-border/60 text-xs") {
                         if .total <= 0 {
                             text "0 项" { style: "text-muted-foreground whitespace-nowrap" }
@@ -159,17 +159,17 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                         if .result_stale {
                             text "结果已过期" { style: "text-amber-600 whitespace-nowrap" }
                         }
-                        if .provider_error {
-                            text .errorMessage { style: "text-destructive break-all" }
-                        }
                         if .locked {
                             text "选择已锁定（确认处理中）" { style: "text-muted-foreground whitespace-nowrap" }
                         }
                         if .sel_id != "" {
-                            text f"已选: ${.sel_label} (${.sel_id} @ ${.sel_rev})" { style: "ml-auto text-foreground truncate max-w-60" }
+                            text f"已选: ${.sel_label} (${.sel_id} @ ${.sel_rev})" { style: "ml-auto min-w-0 text-foreground truncate max-w-60" }
                         } else {
-                            text "未选择" { style: "ml-auto text-muted-foreground" }
+                            text "未选择" { style: "ml-auto text-muted-foreground whitespace-nowrap" }
                         }
+                    }
+                    if .provider_error {
+                        text .errorMessage { style: "w-full px-3 py-1 text-xs text-destructive break-all" }
                     }
                     col (style: "flex-1 min-h-0 min-w-0 overflow-hidden") {
                         if .rec_error_state != "" {
@@ -192,7 +192,7 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                                 onselectionRequested: .CollectionSelect($event),
                                 onitemActionRequested: .CollectionAction($event)
                             ) {}
-                            if .records.len() == 0 && !.loading {
+                            if .records.len() == 0 && !.loading && !.provider_error {
                                 text .empty_hint { style: "px-3 pb-2 text-xs text-muted-foreground" }
                             }
                         }
@@ -279,8 +279,9 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                 }
             }
         }
-        .SetKind(k str) -> {
+        .SetKind(kind str) -> {
             if !.locked {
+                let k = if kind == "all" { "" } else { kind }
                 if k != .q_kind {
                     .last_emitted_seq = .last_emitted_seq + 1
                     try {

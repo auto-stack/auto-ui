@@ -12,7 +12,7 @@
 
 ## 缩略图
 
-`Thumbnail` 接收 `src`、`alt`、`kind`、`icon`、`state`、`fit`、`resourceId` 与 `resourceRevision`。支持 `missing`、`loading`、`ready` 和 `error`。应用发布 ready 时，图片仍须经渲染器加载。缺图显示类型图标，加载失败有可观察的占位。更换资源或来源时替换图像绑定。原生继续消费现有媒体票据，Vue 消费应用已授权的 URI。原尺寸查看、缩放和平移沿用 ImageViewport。
+`Thumbnail` 接收 `src`、`alt`、`kind`、`icon`、`state`、`fit`、`resourceId` 与 `resourceRevision`。支持 `missing`、`loading`、`ready` 和 `error`。应用发布 ready 时，图片仍须经渲染器加载。缺图显示类型图标，加载失败有可观察的占位。更换资源或来源时替换图像绑定。原生媒体票据由 ImageSurface 消费，原生 Gallery 的授权 HTTP 缩略图沿用现有 Image 加载器。Vue 消费应用已授权的 URI。原尺寸查看、缩放和平移沿用 ImageViewport。
 
 ## 消费与验收
 
