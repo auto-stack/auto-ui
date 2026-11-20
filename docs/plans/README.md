@@ -37,11 +37,11 @@ U02 可先用 005-login 验证表单与主题。各组按实际接口并行，�
 
 ## 轻量交互组件补齐（2026-11-14，仅立项）
 
-PromptDialog、TaskProgressDialog、CommandPalette、TagInput已分别补为094–097，再次复核为drafting r2、0/8。[strategy r6](../design/autoui/component-library-extension-strategy.md)持唯一持续路线；各Plan写明已有实现复用、接口/状态、真实消费者、跨平台MCP和无人值守测试、Spec增量及8步交付合同。
+PromptDialog、TaskProgressDialog、CommandPalette、TagInput已分别补为094–097，立项时复核为 drafting r2、0/8。[strategy r6](../design/autoui/component-library-extension-strategy.md)持唯一持续路线；各Plan写明已有实现复用、接口/状态、真实消费者、跨平台MCP和无人值守测试、Spec增量及8步交付合同。
 
 | 本仓号 | 实施计划 | 首版消费者 / 边界 |
 |---|---|---|
-| 094 | [PromptDialog](094-prompt-dialog.md) | 027重命名/新建与普通名称管理；失败留窗，应用持文件写入，Vue权限边界保留 |
+| 094 | [PromptDialog（归档）](archived/094-prompt-dialog.md) | r3 已交付，Windows Native VM 与 Vue 已验收； 027重命名/新建与普通名称管理；失败留窗，应用持文件写入，Vue权限边界保留 |
 | 095 | [TaskProgressDialog](095-task-progress-dialog.md) | 普通实际记录校验任务；参考Reader导入/批处理，取消请求须由任务owner确认 |
 | 096 | [CommandPalette](096-command-palette.md) | 028 Launcher及普通设置；复用原排序/recent/环绕，组件不持启动总线 |
 | 097 | [TagInput](097-tag-input.md) | 015 Notes与普通设置；复用update_tags/vocab，稳定noteId防迟到错写 |

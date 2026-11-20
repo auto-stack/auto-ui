@@ -9,7 +9,7 @@
 | FileDialog目录选择/保存 | 文件导航图上方两区，含覆盖确认 | [PLAN-084归档](../../plans/archived/084-file-dialog-folder-and-save-modes.md)；既有打开模式仍看[原UI改进与实拍](file-dialog-ui-polish.md) |
 | TreeView | 文件导航图左下 | [PLAN-085](../../plans/085-official-tree-view-component.md) |
 | PaginationControl | 文件导航图右下四个状态 | [PLAN-086归档](../../plans/archived/086-shared-pagination-control.md)；代码交付，保留待补验证门 |
-| PromptDialog | 轻量交互图左上 | [PLAN-094](../../plans/094-prompt-dialog.md)，drafting r2，0/8 |
+| PromptDialog | 轻量交互图左上 | [PLAN-094](../../plans/archived/094-prompt-dialog.md)，Windows r3 已交付 |
 | TaskProgressDialog | 轻量交互图右上 | [PLAN-095](../../plans/095-task-progress-dialog.md)，drafting r2，0/8 |
 | CommandPalette | 轻量交互图左下 | [PLAN-096](../../plans/096-command-palette.md)，drafting r2，0/8 |
 | TagInput | 轻量交互图右下 | [PLAN-097](../../plans/097-tag-input.md)，drafting r2，0/8 |

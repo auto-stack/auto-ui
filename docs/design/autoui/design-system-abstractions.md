@@ -264,7 +264,7 @@ Vector/Transform、Gradient、Layer/SceneTree、Ruler/Guide/Grid、Gizmo、Timel
 
 ### 10.2 轻量交互组件接续（2026-11-14）
 
-PromptDialog、TaskProgressDialog、CommandPalette、TagInput已分别补齐[094](../../plans/094-prompt-dialog.md)、[095](../../plans/095-task-progress-dialog.md)、[096](../../plans/096-command-palette.md)、[097](../../plans/097-tag-input.md)实施合同；经再次审核均drafting r2、0/8。直接引用[已生成四组件图及指南](file-navigation-and-interaction-visual-guide.md)，当前没有新增组件实现。
+PromptDialog、TaskProgressDialog、CommandPalette、TagInput已分别补齐[094](../../plans/archived/094-prompt-dialog.md)、[095](../../plans/095-task-progress-dialog.md)、[096](../../plans/096-command-palette.md)、[097](../../plans/097-tag-input.md)实施合同。2026-11-14 立项复审时均为 drafting r2、0/8。直接引用[已生成四组件图及指南](file-navigation-and-interaction-visual-guide.md)。PLAN-094 后续已交付 Windows r3。
 
 | 组件 | 部件/状态 | 应用owner与可复用边界 |
 |---|---|---|
