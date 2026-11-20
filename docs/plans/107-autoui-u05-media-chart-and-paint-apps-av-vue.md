@@ -523,6 +523,14 @@ Iced 视图回放通过子组件 `Init` 循环求和 7，确认复选框由已�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 31 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bfa24e2c, lang bc07e75e9 | evidence: AV numeric list builders and exact chart diagnostics, named Vue seed and standalone scan rejections | next: work`
 
+### 第 32 轮｜A2TS 集合种子保留 f32
+
+A2TS 集合种子为 `F32` 字段和列表元素保存 `f32` 类型，复用按值复制及现有单精度算术。集合种子往返和 Node 运行时回归通过，A2TS 单元 20、运行时与 provider 4 通过。
+
+使用第 31 轮显式依赖目录材料生成生产 Vue 路由，`vue-tsc` 和 Vite 通过。Chrome `157.0.8103.80` 点击后读到 `0/0 → 1/1`，卸载后无异常。`round32-vue-browser-final.log` SHA256 为 `ffbafe1d67cf3fbee76beee2a7a944fb00bb5a774545c7307a309a766becd4f3`。原材料的 `components/` 扫描仍需接入已生成的受检路由闭包状态，原 `024-charts` 动态记录键及整体挂载仍待验收。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 32 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bfa24e2c, lang 0f16585f7 | evidence: f32 collection seed and exact numeric action in the production Vue browser material | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
