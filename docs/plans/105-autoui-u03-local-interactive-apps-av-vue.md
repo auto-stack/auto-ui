@@ -467,6 +467,22 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 74 | from: work | t
 **矛盾点（下一刀）**：诊断仍报 `move-required`（span = `push` 方法名，正是 `check_push_value(.., name.span)` 的锚点）→ 说明 resolver 拿到的实参 `moved == false`，即 **`MovePos` 在「AST → resolver 入口」之间被某处归一成 `Pos`**（候选：desugar/`resolve_method_call` 的实参预解析、或 adapter 的 desugar 阶段）。下一刀直接 dump atom 的 `call` 节点看是否带 `move` 标记，定位归一发生点。
 
 **验证**：plan105 25/25、980 39/39、981 248/248；av list handlers 4/4；trace 已移除。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 75 | from: work | to: work | status: executing | outcome: pass（诊断检查点）| worktree: D:/autostack/.wt/ui-105/auto-lang | commit: bfed5b9a7 | next: work
+
+2026-11-19 stage: work（T-02 W72：`.move` 标记全链路 + 诊断检查点）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `bfed5b9a7` | task_ids: T-02（W72）
+
+**本轮交付**：`Task::MethodOut` 现在**携带每个实参的 `.move` 标记**（`moved_flags`），并在 AGE 域（AgeComponent/AgePackage/AgeH0）保留该标记——此前迭代机器把 `Arg::MovePos` 归一成 `moved=false`，导致列表 `push(<整局部>)` 永远拿不到所有权转移语义。
+
+**诊断检查点（连续三轮同一现象无进展，按 work 技能要求停下诊断）**：
+- 现象：`type Todo { text Str }` + `var t Todo = Todo{…}` + `.todos.push(t)` 仍报 `source.move-required`，span 恒为方法名（`check_push_value(.., name.span)` 的锚点）。
+- 已排除：①组件面发射（trace 证实 `MovePos(Var(__age_hl_0_0_0_t))`）；②`resolve_args` 的 moved 置位；③`MethodOut` 的 moved 归一（本轮已补）；④`resolve_list_method` 的 `move_marked_value` 包装（已存在）。
+- 剩余假设：该调用在**检查函数/场景两条铸造路径**中的一条走的是 `RecordMethodOut`（其 `moved` 仍是旧式子句，且 task 无 `moved_flags`）；或 `check_push_value` 在包装**之前**就被另一处（`ListMethod` 预解析）调用。
+- 下一步（一次到位）：在 `RecordMethodOut` 上也补 `moved_flags`，并给 `check_push_value` 加临时 trace（打印 `value.kind` 判别式），一次跑通后立即移除 trace。
+
+**排期决定**：为避免继续在同一子特性上空转，下一轮**先换刀**——推进 018/022 的 routes/outlet 页面组合（与 `.move` 无关、可独立验证），把 `.move` 收回队列第二优先。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 4/4。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
