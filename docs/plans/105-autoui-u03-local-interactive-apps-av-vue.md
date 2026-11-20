@@ -748,6 +748,19 @@ stage: work（013 穿透到 MIR）| plan_id: PLAN-105 | plan_revision: r1 | roun
 **下一刀（二选一）**：(A) 铸 state 函数时把文本状态收成 i32 句柄并在调用点配对 load/store；(B) 放宽 AGE 生成模块的 `mir.entry-sig`（视为内部函数）。
 
 **余 1 红**：`p105_elem_view_field_projection_compiles`——owned record push 需 `.move`，AGE pratt 尚不支持该前缀。
+
+stage: work（MIR 两道墙）| plan_id: PLAN-105 | plan_revision: r1 | round: 92 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `4ee2835e4` | next: work
+
+2026-11-21 stage: work（T-02 W87：013 过 entry-sig，抵 field-type 墙）| outcome: pass
+
+**落地**：
+- `mir_verify`（`is_data` + `collections_surface` 两分支）：entry 参数仍标量，**结果放行 owned `Str`**——组件文本状态函数 `__age_state_0_<field>() str` 的契约放宽（record/视图不跨边界）。
+- `resolve`：AGE 组件面 `implicit_push_transfer`——组件自持列表 `push(<整局部>)` 按所有者转移接受，其它 profile 仍要 `.move`。
+- 门：census 4/4、981 248、979_component 24、104 3、1072 19、980 40、core plan105 **26/26**、av plan980_state_face 8/8 全绿；av plan105 6/7。
+
+**013 当前墙**：`verify MIR `d___age_state_0_input`: mir.field-type — list-field-get of owned field type 0 (fields ride records; use LIST_REMOVE first)`。
+
+**下一步**：定位 `__age_state_0_input` 的 lowering 形状，把 owned 元素的 `list-field-get` 改写为契约允许的两步（LIST_REMOVE/record field）形状。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1022,6 +1035,19 @@ stage: work（013 穿透到 MIR）| plan_id: PLAN-105 | plan_revision: r1 | roun
 **下一刀（二选一）**：(A) 铸 state 函数时把文本状态收成 i32 句柄并在调用点配对 load/store；(B) 放宽 AGE 生成模块的 `mir.entry-sig`（视为内部函数）。
 
 **余 1 红**：`p105_elem_view_field_projection_compiles`——owned record push 需 `.move`，AGE pratt 尚不支持该前缀。
+
+stage: work（MIR 两道墙）| plan_id: PLAN-105 | plan_revision: r1 | round: 92 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `4ee2835e4` | next: work
+
+2026-11-21 stage: work（T-02 W87：013 过 entry-sig，抵 field-type 墙）| outcome: pass
+
+**落地**：
+- `mir_verify`（`is_data` + `collections_surface` 两分支）：entry 参数仍标量，**结果放行 owned `Str`**——组件文本状态函数 `__age_state_0_<field>() str` 的契约放宽（record/视图不跨边界）。
+- `resolve`：AGE 组件面 `implicit_push_transfer`——组件自持列表 `push(<整局部>)` 按所有者转移接受，其它 profile 仍要 `.move`。
+- 门：census 4/4、981 248、979_component 24、104 3、1072 19、980 40、core plan105 **26/26**、av plan980_state_face 8/8 全绿；av plan105 6/7。
+
+**013 当前墙**：`verify MIR `d___age_state_0_input`: mir.field-type — list-field-get of owned field type 0 (fields ride records; use LIST_REMOVE first)`。
+
+**下一步**：定位 `__age_state_0_input` 的 lowering 形状，把 owned 元素的 `list-field-get` 改写为契约允许的两步（LIST_REMOVE/record field）形状。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
