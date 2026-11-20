@@ -372,6 +372,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 65 | from: work | t
 **清理**：移除上一轮临时诊断探针，prep 测试 7 例保持。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3；prep 7/7。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 66 | from: work | to: work | status: executing | outcome: pass（占位面）| worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W63：循环变量文本叶占位）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang（本轮）| task_ids: T-02（W63）| evidence: 回归全绿；012 仍有非叶 view-escape
+
+**交付**：组件面把**未绑定文本叶**（视图循环变量 `text r`，含 `.name` 字段形态）改为**空串占位叶**——叶序与叶数保持（不静默丢叶），动态列表展开作为独立里程碑后续接入。
+
+**012 现状**：占位叶生效后仍报 `verify.view-escape: expr e565: a whole owned element is not a value`，说明该诊断**不是文本叶**（叶已占位），而是循环体里另一处整元素求值；需按 expr id 反查所属函数（下一轮用 atom 文本定位 e565 所在 body）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
