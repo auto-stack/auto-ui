@@ -505,9 +505,19 @@ AV 组件帧回放读到子图例 `7 → 13`，Vue 产品 CLI 路由通过 `vue-
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 29 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 9624d1bd, lang 9ba35fe8b | evidence: caller record list, AV frame, production Vue browser replay, exact 024 closure reaches downstream checks | next: work`
 
+### 第 30 轮｜图表复选框与处理器参数作用域
+
+AGE 处理器的内部赋值、`for`、`while` 和效果表达式沿用同一个受检组件参数作用域。视图 `checked` 用布尔条件求值，非布尔输入具名拒绝。AV 组件帧把同一受检值和当前消息映射到 Iced `View::Checkbox`，Vue 输出原生复选框。
+
+Iced 视图回放通过子组件 `Init` 循环求和 7，确认复选框由已选变为未选。Vue 生产 CLI、`vue-tsc` 和 Vite 通过，Chrome `157.0.8103.80` 实测 `true → false → true`，初始化求和值保持 7，卸载后无异常。`round30-vue-browser.log` SHA256 为 `4ebcb1492a1de523b41623747ff57661540811fd9bf83b6a1633820464de91c3`。Core PLAN-981 251、AV PLAN-981 69、组件包 10、路由 2 和 SFC 20 通过。上一轮启动的扩展 AV 全量运行持有旧测试可执行文件，已结束该进程并重链本轮定向测试。
+
+原 `024-charts` 的布尔属性和参数作用域诊断已清除，首项推进到 AreaChart 的动态记录键读取。原闭包 `round30-chart-admission/original-with-stylekit.log` SHA256 为 `6cec7bff34db0235659972bbbd9680c70783d76ae43a5d0a017cdb78028fe967`。在固定 AutoOS 原 CodeEditor 页重跑，消息错误已通过旧式 widget 的单位消息接线消除，当前首报缺 `code_editor_cursor_line`。`round30-code-editor-original.log` SHA256 为 `296f8f07bb07565f0a7498b4b6a32c6def85d8a47e246f6c168046d8da35f87a`。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 30 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bfa24e2c, lang 9bae6413d | evidence: checked native and browser checkbox, child input loop, exact chart and CodeEditor probes | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
 
 - **B-107-01｜共享生产基线。** 019/020/030 的原 Store、页面模块与前端绑定依赖 PLAN-105 的共有实现；029/031/031-paint 的 `$event`、图表和原画廊的类型列表与包闭包依赖 PLAN-114 的受检实现；原桌面树形挂载需要 PLAN-123 的生产入口与路由源发现。对应在途提交分别为 AutoLang `b987e2c23`、`7d6eabe4c` 与 AutoUI `ffbb488c`/`9d5ea5b3`，它们未形成 107 所需的稳定发布基面。恢复条件是相应 owner 提供可消费并且包含原形态正反例的固定提交，随后在 107 两树接入并重放 §5 矩阵。030 的第一个条件读取 `.store.has_current`，需要共享受检状态与真实控件树共同实现。
-- **B-107-02｜原 CodeEditor 源归属承接。** 同源双端均在 `QueryChanged` 缺少消息声明被拒；补声明的材料对照由受检编译转报缺 `code_editor_cursor_line`。请确认允许 107 增加 AutoOS 原画廊页的最小迁移，或由 AutoOS 负责人提供固定页提交并由 107 消费。之后由 107 接入编辑器光标的 AV/A2TS 能力并核编辑、搜索与卸载。材料对照保持独立，固定原页仍用 §9 的 AutoOS 提交。
+- **B-107-02｜原 CodeEditor 受检宿主能力。** 第 30 轮重跑固定原页，`QueryChanged` 已通过旧式单位消息的受检接线，当前首报缺 `code_editor_cursor_line`。继续按 §9 固定 AutoOS 源，由 107 接入编辑器光标的 AV/A2TS 能力并核编辑、搜索与卸载。
