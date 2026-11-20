@@ -718,6 +718,20 @@ stage: work（同步主线·第二轮）| plan_id: PLAN-105 | plan_revision: r1 
 **遗留 10 红（`plan105_` 16/26）**：`msg+model+view{text "x" {}}+on{var y=1}` 组合报 `unexpected token in a bare element tag`；已二分到 handler 裸 `var` 与 view 体闭合。另一批（`age-list-ty`/`array-lit`/`age-view-data-lit` 家族）曾把 `plan105_` 提到 18/26，但 census 两面被压成同值，已回退待重做。
 
 **纪律**：此后每批文法改动必须「census 两面绿且两值不同」才提交。
+
+stage: work（同步收尾 + 013 复核）| plan_id: PLAN-105 | plan_revision: r1 | round: 90 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `354534418` | next: work
+
+2026-11-21 stage: work（T-02 W85 同步收尾）| outcome: pass
+
+**1086 复核（决定性）**：013 走 `--source app.at` 已**不再报** `lower.type-use … Str` → 1086 的 `av.collections` owned Str（T-09/AC-09）确实解除 105 的 lowering 阻断。
+
+**文法补齐**（auto-lang `354534418`）：`age-on-let` var 形、`age-view-data-lit` inline/multiline、`age-list-ty` + 8 处注解位、generic/array 族 AGE 放宽、`age-entry-value` 事件绑定前置+括号必填；census 两 AGE 面重基线（component `338affa5…`、package `7a6a9d8c…`，两面仍不同）；门：census 4/4、981 248、979 24、104 3、1072 19、980 40 全绿；`plan105_` **24/26**。
+
+**新墙（已知 S1）**：013 现在报 ``source.age.component-unsupported: `.store.*` references need the store declaration in the same source (or the package face); cross-unit store loading is not wired yet (S1)``——即跨单元 store 装载未接线（`store TodoStore` 在 `todo_store.at`，`app.at` 只引用）。
+
+**仍红 2 例**：`p105_list_index_expr_projects`（`[8, 0, -5]` 负字面量）、`p105_elem_view_field_projection_compiles`（`[]Todo` 注解形）。
+
+**下一步**：修两例 → 实现跨单元 store 装载（S1）→ 013 全链路 → 动态列表渲染/组件级内存后端。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -962,6 +976,20 @@ stage: work（同步主线·第二轮）| plan_id: PLAN-105 | plan_revision: r1 
 **遗留 10 红（`plan105_` 16/26）**：`msg+model+view{text "x" {}}+on{var y=1}` 组合报 `unexpected token in a bare element tag`；已二分到 handler 裸 `var` 与 view 体闭合。另一批（`age-list-ty`/`array-lit`/`age-view-data-lit` 家族）曾把 `plan105_` 提到 18/26，但 census 两面被压成同值，已回退待重做。
 
 **纪律**：此后每批文法改动必须「census 两面绿且两值不同」才提交。
+
+stage: work（同步收尾 + 013 复核）| plan_id: PLAN-105 | plan_revision: r1 | round: 90 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `354534418` | next: work
+
+2026-11-21 stage: work（T-02 W85 同步收尾）| outcome: pass
+
+**1086 复核（决定性）**：013 走 `--source app.at` 已**不再报** `lower.type-use … Str` → 1086 的 `av.collections` owned Str（T-09/AC-09）确实解除 105 的 lowering 阻断。
+
+**文法补齐**（auto-lang `354534418`）：`age-on-let` var 形、`age-view-data-lit` inline/multiline、`age-list-ty` + 8 处注解位、generic/array 族 AGE 放宽、`age-entry-value` 事件绑定前置+括号必填；census 两 AGE 面重基线（component `338affa5…`、package `7a6a9d8c…`，两面仍不同）；门：census 4/4、981 248、979 24、104 3、1072 19、980 40 全绿；`plan105_` **24/26**。
+
+**新墙（已知 S1）**：013 现在报 ``source.age.component-unsupported: `.store.*` references need the store declaration in the same source (or the package face); cross-unit store loading is not wired yet (S1)``——即跨单元 store 装载未接线（`store TodoStore` 在 `todo_store.at`，`app.at` 只引用）。
+
+**仍红 2 例**：`p105_list_index_expr_projects`（`[8, 0, -5]` 负字面量）、`p105_elem_view_field_projection_compiles`（`[]Todo` 注解形）。
+
+**下一步**：修两例 → 实现跨单元 store 装载（S1）→ 013 全链路 → 动态列表渲染/组件级内存后端。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
