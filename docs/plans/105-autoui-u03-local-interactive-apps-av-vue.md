@@ -262,6 +262,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 55 | from: work | t
 **负控纪律**：列表索引包面负控放宽为「显式诊断」（具名 component-unsupported 或 `source.index*`/`source.undefined`/`source.type-mismatch`），不再要求单一码。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 2/2；prep 7/7。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 56 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: ce4c62b73 | next: work
+
+2026-11-19 stage: work（T-02 W53：handler 级 for-each 降级）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `ce4c62b73` | task_ids: T-02（W53）| evidence: 012 真窗诊断面推进（具名拒 → 语义诊断清单）
+
+**交付**：handler 级 `for <v> in <list> { … }` 降级为**索引 while 循环**（`i = 0` + `while i < list.len()` + `let v = list[i]` + 循环体 + `i += 1`；元素名进作用域供体内引用），循环体共用同一 hook 降级通道；沿路修掉「列表字段不得进状态观测通道」（状态函数按内建类型返回，列表字段由视图/循环消费）。包面负控同步放宽为「显式诊断」。
+
+**012 真窗推进（本轮结果）**：不再停在该 for 墙，装载进入语义诊断清单，暴露出**两个新面**：①**宿主服务** `storage.get/set`（闹钟持久化）与 `Time.now_sec()`——即 **S1 宿主 API 面**；②空列表字面量 `[]` 在 `[]T` 注解下的元素类型推断（`source.array-lit-empty`）。这两项是 012 的剩余主墙（也覆盖 013/015/016 的部分）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 2/2；prep 7/7。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
