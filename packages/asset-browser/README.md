@@ -1,6 +1,6 @@
 # packages/asset-browser — AssetBrowser & AssetPicker（PLAN-091）
 
-通用应用内授权资源浏览与选择组件（`AssetBrowser` / `AssetPicker`）。用于附件、图片素材、封面等**应用内既有授权资源库**的浏览与选择；组合 `packages/tree-view`（PLAN-085 分类树）、`packages/pagination`（PLAN-086 分页）与 `packages/image-viewer`（PLAN-089 同面板预览）。
+通用应用内授权资源浏览与选择组件（`AssetBrowser` / `AssetPicker`）。用于附件、图片素材、封面等**应用内既有授权资源库**的浏览与选择。分类使用 `packages/tree-view`，分页使用 `packages/pagination`，条目和缩略图使用 `packages/collection-view`，同面板预览使用 `packages/image-viewer`。
 
 本包**不**承担本地磁盘枚举、文件上传/删除或替代 `packages/file-dialog`（本地路径选择仍归 `FileDialog`）。
 

@@ -214,12 +214,15 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                 let q = json.parse(.query)
                 .q_id = q.id ?? ""
                 .q_folder = q.folderId ?? ""
-                .q_text = q.text ?? ""
+                let query_text str = q.text ?? ""
+                if .search_draft == .q_text {
+                    .search_draft = query_text
+                }
+                .q_text = query_text
                 .q_kind = q.kind ?? ""
                 .q_page = q.page ?? 1
                 .q_pageSize = q.pageSize ?? 50
                 .q_error = ""
-                .search_draft = q.text ?? ""
             } catch {
                 .q_error = "asset-browser: query 解析失败（invalid_query）"
             }
@@ -235,12 +238,16 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                     let q = json.parse(.query)
                     .q_id = q.id ?? ""
                     .q_folder = q.folderId ?? ""
-                    .q_text = q.text ?? ""
+                    let query_text str = q.text ?? ""
+                    // Query feedback may arrive after the user starts the next search.
+                    if .search_draft == .q_text {
+                        .search_draft = query_text
+                    }
+                    .q_text = query_text
                     .q_kind = q.kind ?? ""
                     .q_page = q.page ?? 1
                     .q_pageSize = q.pageSize ?? 50
                     .q_error = ""
-                    .search_draft = q.text ?? ""
                 } catch {
                     .q_error = "asset-browser: query 解析失败（invalid_query）"
                 }

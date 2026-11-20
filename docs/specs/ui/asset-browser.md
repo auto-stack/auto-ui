@@ -1,6 +1,6 @@
 # AssetBrowser & AssetPicker — 通用资源浏览与选择（docs/specs/ui/asset-browser.md）
 
-来源：PLAN-091 r2（SD-01 / SD-02）。组件源 `packages/asset-browser/`；示例 `examples/asset-picker/` 与 `examples/ui/029-photo-gallery/`；产品门 `tests/product/verify_asset_picker.py`（native / vue）与 tools 门 `crates/auto-ui-tools/tests/asset_browser_component.rs`。
+公开合同来源为 PLAN-091 r2，PLAN-109 r2 将结果区迁移到 CollectionView。组件源为 `packages/asset-browser/`。示例为 `examples/asset-picker/` 与 `examples/ui/029-photo-gallery/`。产品门为 `tests/product/verify_asset_picker.py`（native / Vue），生成门为 `crates/auto-ui-tools/tests/asset_browser_component.rs`。
 
 ## 身份与边界（SD-01）
 
@@ -37,7 +37,7 @@
 
 ### 事件
 
-- `"queryRequested"(str)`：`{"seq":N,"baseRevision":R,"query":{folderId,text,kind,page,pageSize}}`。搜索由 Enter/按钮触发，分类/类型/分页即时触发。
+- `"queryRequested"(str)`：`{"seq":N,"baseRevision":R,"query":{folderId,text,kind,page,pageSize}}`。搜索由 Enter 或按钮触发，分类、类型与分页即时触发。请求的未修改字段取自应用当前发布的查询。查询反馈保留尚未提交的搜索草稿。
 - `"selectionRequested"(str)`：`{"queryId":…,"id":…,"revision":…,"label":…}` 或 `{"queryId":…,"clear":true}`。
 - `"previewRequested"(str)`：`{"id":…,"revision":…,"label":…,"kind":…,"src":…}`；打开同面板 `ImageViewport`，不改变 `selection`。
 - `"confirmRequested"(str)`：`{"seq":S,"session":K,"baseRevision":R,"id":…,"revision":…,"queryId":…}`。点击确认同步锁定本地请求，一轮最多一次；应用在唯一接受 handler 重新校验身份与权限后回灌 `confirmation`；`rejected` 解锁并显示错误，`accepted` 由父级关闭 `open=false`。
@@ -45,12 +45,12 @@
 
 ## 消费与依赖闭包（SD-02）
 
-- 消费方 `pac.at` 声明 `asset_browser`、`tree_view`、`pagination`、`image_viewer` 四包 `dep`；在 `widget` **内部** `use { package: asset_browser from "…" }`（不可置于文件顶层）。
-- 移根/vendor 时四包整目录字节一致复制到第二根；缺依赖在 build/Vue 轨具名失败（`asset_browser_component.rs` 负例门验证）。
+- 消费方 `pac.at` 声明 `asset_browser`、`tree_view`、`pagination`、`image_viewer` 与 `collection_view` 五个 `dep`，在 `widget` 内部使用 `use { package: asset_browser from "…" }`。
+- 将消费项目迁到第二根时，要把五包一起复制。Vue 生成器报告缺失包名，负例见 `asset_browser_component.rs`。
 
 ## 交付门（SD-02）
 
 - tools 门：`cargo test -p auto-ui-tools --test asset_browser_component`（双生成器 + 移根闭包 + 缺依赖具名失败）。
 - Win native VM 产品门：`tests/product/verify_asset_picker.py --backend native`（1003 规模/搜索/过滤/分类树/尾页/空错/慢 A 后 B/跨页选择/确认接受与拒绝/取消重开/双实例/深浅与窄窗截图 + `029-photo-gallery` 真实扫描/查看器/收藏/目录导航）。
-- Vue 产品门：`tests/product/verify_asset_picker.py --backend vue`（Playwright 真实浏览器挂载/选择/确认落账/截图）。
-- Linux native：无本机 runner，单列 `not_run`，不并入总绿。
+- Windows Vue 产品门使用 `tests/product/verify_asset_picker.py --backend vue`，通过真实浏览器核验挂载、缩略图解码、预览往返、选择、确认落账及截图。
+- PLAN-109 的 Linux 原生与 Vue 后续验收见 [DEBT-011](../../plans/debts.md#debt-011-collectionview-的-linux-平台验收)。
