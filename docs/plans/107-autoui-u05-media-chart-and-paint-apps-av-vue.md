@@ -435,6 +435,16 @@ A2Vue 把原 CSS 发射为 Vue `<style scoped>`，在普通元素和 SVG 模板�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 22 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui cdc1fd94, lang 67947b9cf | evidence: AV replays the legacy unit handler on one instance, and all original chart components advance to the public style binding boundary | next: work`
 
+### 第 23 轮｜真实 stylekit 公共样式绑定
+
+包绑定器根据解析后的公共符号和可见性折叠跨模块的字面量 style。Vue 与桌面包入口消费同一份已绑定的组件树。真实 stylekit 的未被引用的公共参数化配方保留其具名诊断，依赖方实际引用时仍报告配方原位置。入口包原有的默认值与插值诊断继续通过回归测试。
+
+真实 `stylekit::styles` 在闭包里提供 `caption_text`，SFC 对照产生原类串 `text-xs text-muted-foreground`。四份原图表连同真实 stylekit 和 `chart_geom` 均推进到共享类型验证。各自首个诊断位于 Area 的 `.legend`（14072）、Bar 的 `.legend`（12803）、Donut 的 `.data`（11905）、Line 的 `.legend`（18014），均为未绑定的 `self`。完整 024 同时暴露 `.data`、`.fields` 等构造参数、迭代局部值和借用问题。未修改原组件和依赖源码。
+
+Core 249 + 30 + 11、AV 66 + 33、SFC 20、路由 2、桌面闭包 4 通过。`round23-chart-admission-summary.log`、原闭包 `round23-chart-admission/original-with-stylekit.log`、Area 原组件闭包 `round23-chart-admission/area_chart-with-dependencies.log` 的 SHA256 依次为 `bb8267fa364c56ca860640f8b9841fdfe6bb9c1c998ff520ba5436d8895c5c6d`、`036e5d9b4f48fe4cc7cd9e9682f739f7398ca217aba3c9d4f087ded3a7a86984`、`1bbde347488de6abace95347288469083c3312939ca09bccd0862c3087f0677a`。下一步按原组件和调用者核对参数类型与作用域，包括必填的裸 `List` 数据及带默认值的只读属性。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 23 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang 21f406eb9 | evidence: real stylekit literals bind into the checked tree for both lanes, original charts advance to widget parameter and view-loop verification | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
