@@ -469,6 +469,41 @@ fn extract_store_block(src: &str, type_name: &str) -> Option<String> {
     None
 }
 
+/// 整词替换（标识符边界）：把 `name` 的出现替换为 `repl`（前后不得为
+/// 标识符字符）。用于 prep 的本地样式引用替换。
+fn replace_word(src: &str, name: &str, repl: &str) -> String {
+    if name.is_empty() {
+        return src.to_string();
+    }
+    let mut out = String::with_capacity(src.len());
+    let mut i = 0usize;
+    while i < src.len() {
+        if src[i..].starts_with(name) {
+            let before_ok = i == 0
+                || !src[..i]
+                    .chars()
+                    .next_back()
+                    .map(|c| c.is_alphanumeric() || c == '_')
+                    .unwrap_or(false);
+            let after = i + name.len();
+            let after_ok = after >= src.len()
+                || !src[after..]
+                    .chars()
+                    .next()
+                    .map(|c| c.is_alphanumeric() || c == '_')
+                    .unwrap_or(false);
+            if before_ok && after_ok {
+                out.push_str(repl);
+                i = after;
+                continue;
+            }
+        }
+        let ch = src[i..].chars().next().unwrap();
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+    out
+}
 fn rewrite_typed_list_field(line: &str) -> Option<String> {
     let bytes = line.as_bytes();
     let mut i = 0usize;
@@ -726,14 +761,11 @@ pub fn prepare_component_source(
     // 内联样式必须落在**组件头之前**：模块样式表按源码顺序收集，组件之后声明的
     // 样式在投影期解析不到（016 实测：追加到文件尾 → `style caption_text` 不解析；
     // 前置到 widget 之前 → 整例通过）。
-    // 本地样式引用替换：`style: <name>` → `style: "<classes>"`（声明已空白化）。
+    // 本地样式引用替换：**整词**命中即换成字面量（声明行已空白化，故不会自替换）
+    // ——覆盖 `style: <name>`、条件式 `style: if … { <name> } else { <name> }`
+    // 等所有引用位（012 的 tab_active/tab_idle）。
     for (name, literal) in &local_styles {
-        for pat in [format!("style: {name}"), format!("style:{name}")] {
-            if out.contains(&pat) {
-                let repl = pat.replacen(name.as_str(), literal, 1);
-                out = out.replace(&pat, &repl);
-            }
-        }
+        out = replace_word(&out, name, literal);
     }    if !inlined.is_empty() || !store_blocks.is_empty() || !fn_blocks.is_empty() || !type_blocks.is_empty() {
         let mut decls: Vec<String> = inlined
             .iter()
@@ -990,8 +1022,6 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 }
-
-
 
 
 
