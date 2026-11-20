@@ -784,6 +784,23 @@ stage: work（两腿缺口收敛）| plan_id: PLAN-105 | plan_revision: r1 | rou
 **回归**：`tests/plan105_p013_sfc.rs`（`af07f17e`）用真实五单元走 prep→包片段 lane，钉住 S1 具名拒绝；S1 落地后自动切换为 `<template>`/`v-for`/`@click` 结构断言。
 
 **下一刀（S1）**：`bind_packages_age` 收 store（字段→共享状态、`store.X`→跨单元读、`msg`→通道）；去掉 `compile_age_package_with_scenario` 的「见 store 即拒」；SFC lane 映射 `ref` + handler；验收：013 SFC 结构绿 + 浏览器真实挂载点击。
+
+stage: work（S1 杠杆确认）| plan_id: PLAN-105 | plan_revision: r1 | round: 95 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `ff549eb5` | next: work
+
+2026-11-21 stage: work（T-02 W90：U03 app 级 SFC 扫描 → S1 是四例共同闸）| outcome: pass
+
+**扫描（真实源 + prep + `generate_package_sfc`，已钉成回归 `tests/plan105_u03_sfc_status.rs`）**：
+| app | 首个阻断 |
+|---|---|
+| 013-todo | S1：`package-level store semantics are not wired yet` |
+| 016-calendar | 同一条 S1 闸（`CalendarStore`） |
+| 015-notes | `source.undefined: model has no field `store``（`.store` 引用缺前置声明内联） |
+| 022-kanban | `source.syntax: expected `fn`, found `store`` |
+| 012-clock | `source.syntax: unbracketed expression cannot continue across a newline`（prep 归一缺口） |
+
+**结论**：**S1（包级 store 共享实例语义）是 013/015/016/022 四例共同闸门**——105 内最高杠杆的一刀；012 另有 prep 归一缺口一项。
+
+**S1 切口已写入交接**：store 单元→包级状态表（声明序初始化）+ 消息表；`.store.<f>`/`store.X.<f>` 绑定改写成状态单元字段读写；`store.Msg(...)` 派发到状态单元 `on`；去掉「见 store 即拒」；验收=本回归翻转为结构断言 + SFC 结构断言 + 真实 Vue 挂载点击。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1094,6 +1111,23 @@ stage: work（两腿缺口收敛）| plan_id: PLAN-105 | plan_revision: r1 | rou
 **回归**：`tests/plan105_p013_sfc.rs`（`af07f17e`）用真实五单元走 prep→包片段 lane，钉住 S1 具名拒绝；S1 落地后自动切换为 `<template>`/`v-for`/`@click` 结构断言。
 
 **下一刀（S1）**：`bind_packages_age` 收 store（字段→共享状态、`store.X`→跨单元读、`msg`→通道）；去掉 `compile_age_package_with_scenario` 的「见 store 即拒」；SFC lane 映射 `ref` + handler；验收：013 SFC 结构绿 + 浏览器真实挂载点击。
+
+stage: work（S1 杠杆确认）| plan_id: PLAN-105 | plan_revision: r1 | round: 95 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `ff549eb5` | next: work
+
+2026-11-21 stage: work（T-02 W90：U03 app 级 SFC 扫描 → S1 是四例共同闸）| outcome: pass
+
+**扫描（真实源 + prep + `generate_package_sfc`，已钉成回归 `tests/plan105_u03_sfc_status.rs`）**：
+| app | 首个阻断 |
+|---|---|
+| 013-todo | S1：`package-level store semantics are not wired yet` |
+| 016-calendar | 同一条 S1 闸（`CalendarStore`） |
+| 015-notes | `source.undefined: model has no field `store``（`.store` 引用缺前置声明内联） |
+| 022-kanban | `source.syntax: expected `fn`, found `store`` |
+| 012-clock | `source.syntax: unbracketed expression cannot continue across a newline`（prep 归一缺口） |
+
+**结论**：**S1（包级 store 共享实例语义）是 013/015/016/022 四例共同闸门**——105 内最高杠杆的一刀；012 另有 prep 归一缺口一项。
+
+**S1 切口已写入交接**：store 单元→包级状态表（声明序初始化）+ 消息表；`.store.<f>`/`store.X.<f>` 绑定改写成状态单元字段读写；`store.Msg(...)` 派发到状态单元 `on`；去掉「见 store 即拒」；验收=本回归翻转为结构断言 + SFC 结构断言 + 真实 Vue 挂载点击。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
