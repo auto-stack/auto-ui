@@ -128,7 +128,7 @@ class ProductSession:
 
     def start(self):
         log = self.log_file("service.log")
-        if self.args.case == "system":
+        if self.args.case.startswith("system-"):
             script = self.output / "system-tree.ps1"
             script.write_text(SYSTEM_READER, encoding="utf-8-sig")
             self.system_helper = subprocess.Popen(
@@ -353,7 +353,7 @@ class ProductSession:
                 if failed or not self.ready:
                     stop_tree(self.process)
                 elif (self.args.backend == "native" and self.args.consumer == "demo"
-                      and self.args.case not in {"system", "reopen", "nested", "scroll"}):
+                      and self.args.case not in {"system-input", "system-invoke", "reopen", "nested", "scroll"}):
                     try:
                         self.press("退出示例")
                     except (ConnectionResetError, TimeoutError):
@@ -587,23 +587,29 @@ foreach ($node in $nodes) {
                               x=$rect.X; y=$rect.Y; width=$rect.Width; height=$rect.Height}
 }
 if ($null -eq $input -or $null -eq $confirm) { throw 'real system patterns are missing' }
-$input.SetValue('系统输入')
-$until = [DateTime]::UtcNow.AddSeconds(2)
-while ($input.Current.Value -ne '系统输入') {
-    if ([DateTime]::UtcNow -ge $until) { throw 'system SetValue failed' }
-    Start-Sleep -Milliseconds 30
+if ($window[2] -eq 'system-input') {
+    $input.SetValue('系统输入')
+    $action = 'ValuePattern.SetValue'
+} elseif ($window[2] -eq 'system-invoke') {
+    $confirm.Invoke()
+    $action = 'InvokePattern.Invoke'
+} else {
+    throw 'unknown UIA check'
 }
-$confirm.Invoke()
-[Console]::WriteLine((@{nodes=$rows; action='ValuePattern.SetValue and InvokePattern.Invoke'} | ConvertTo-Json -Depth 4))
+[Console]::WriteLine((@{nodes=$rows; action=$action} | ConvertTo-Json -Depth 4))
 '''
 
 
 def demo_system(session):
     session.press("重命名分组")
     session.wait_text("例如 项目分类")
+    invoke = session.args.case == "system-invoke"
+    if invoke:
+        session.enter_text("系统输入", "分组名称")
+        session.wait_text("系统输入", "例如 项目分类")
     window = session.windows[0]
     identity = session.output / "system-window.pending"
-    identity.write_text(f'{window["handle"]} {window["pid"]}', encoding="ascii")
+    identity.write_text(f'{window["handle"]} {window["pid"]} {session.args.case}', encoding="ascii")
     identity.replace(session.output / "system-window.txt")
     raw, _ = session.system_helper.communicate(timeout=6)
     assert session.system_helper.returncode == 0, "Windows UIA helper failed"
@@ -613,9 +619,13 @@ def demo_system(session):
     )
     field = next(row for row in evidence["nodes"] if row["role"] == "ControlType.Edit")
     confirm = next(row for row in evidence["nodes"] if row["role"] == "ControlType.Button")
-    assert field["value"] == "Research" and field["focus"] and field["width"] > 0 and field["height"] > 0, field
+    expected_value = "系统输入" if invoke else "Research"
+    assert field["value"] == expected_value and field["focus"] and field["width"] > 0 and field["height"] > 0, field
     assert confirm["name"] == "保存分组" and confirm["enabled"] and confirm["width"] > 0 and confirm["height"] > 0, confirm
-    session.wait_text("group-1: 系统输入", "已保存 1 次")
+    if invoke:
+        session.wait_text("group-1: 系统输入", "已保存 1 次")
+    else:
+        session.wait_text("系统输入", "例如 项目分类", "已保存 0 次", absent=("group-1: 系统输入",))
 
 
 def file_manager_directory(session):
@@ -769,7 +779,8 @@ CASES = {
     "visual-light": demo_visual_light,
     "visual-dark": demo_visual_dark,
     "pending": demo_pending,
-    "system": demo_system,
+    "system-input": demo_system,
+    "system-invoke": demo_system,
     "reopen": reopened_controls,
     "nested": nested_modal_fences_lower_controls_and_wraps_focus,
     "scroll": scroll_long_dialog_keeps_footer_reachable,
@@ -864,7 +875,7 @@ def main():
         report.update(result="not_run", error="File Manager VM backend source directory required")
     elif args.case == "ime" and args.backend != "vue":
         report.update(result="not_run", error="this composition case targets the Vue input adapter")
-    elif args.case == "system" and args.backend != "native":
+    elif args.case.startswith("system-") and args.backend != "native":
         report.update(result="not_run", error="this system tree case targets the Windows native provider")
     elif args.case.endswith("-rejected") and args.backend != "native":
         report.update(result="not_run", error="this file-system error case requires Windows native write access")
