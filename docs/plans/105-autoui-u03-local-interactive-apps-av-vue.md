@@ -694,6 +694,18 @@ stage: merge（共享语法批单独交付）| plan_id: PLAN-105 | plan_revision
 **未随本批落地的 105 内容**：`ace_source_prep`（prep）、Store/列表/后端内联、元素视图与容器语义等仍在 `plan-105-dev`（两仓），按原计划继续；125 已可解除解析阻塞。
 
 **证据**：`D:/autostack/plan-artifacts/plan-105/p125check/*.json`（七页各一份 evidence）。
+
+stage: work（同步主线）| plan_id: PLAN-105 | plan_revision: r1 | round: 88 | from: work | to: work | status: executing | outcome: pass（部分）| worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 0a0872b18 | next: work
+
+2026-11-20 stage: work（T-02 同步主线：代码侧已通，文法待手工重建）| outcome: pass（部分）
+
+**核实**：1086 已交付并归档（9/9，T-09/AC-09/COLL-STR 全 `[x]`，`collections-str` 真实 AV 跑通返回 42）。
+
+**本轮完成**：与主线（含 1082/1086 重构）的**代码侧**合并——`resolve.rs`（`resolve_with_view`/`elem_view`/`move_marked_value`/`coll.elem_view_admission` 在主线新结构上重插）、`verify.rs`（`elem_view_owned` 与 `ordinary_auto` 并存）、`adapter.rs`（`.as` 分支 + `t_str/t_char`）、`collections.atom`（取 105 超集）、`age_component.rs`（`FnItem.proto`、`hidden_fn` 5 参、`Verifier.ordinary_auto`）。**`cargo check -p ace-core` 通过**；产物存 `plan-artifacts/plan-105/sync-merge/`。
+
+**未完成**：文法 19 个 hunk 的合并。启发式「按 profiles 求并」产生两类错（AGE 引用未对 AGE 声明的 token、规则混入非 alt 子步），已放弃该产物；结论是**文法必须手工合并**（master 基座 + 逐块插入 105 的 6 组特性，再做定点 profile 放宽）。盘点见 `plan-artifacts/plan-105/t02-gap-map.md` §78。
+
+**状态**：合并已 reset 干净（`plan-105-dev` `0a0872b18`），下一轮从文法重建继续。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -914,6 +926,18 @@ stage: merge（共享语法批单独交付）| plan_id: PLAN-105 | plan_revision
 **未随本批落地的 105 内容**：`ace_source_prep`（prep）、Store/列表/后端内联、元素视图与容器语义等仍在 `plan-105-dev`（两仓），按原计划继续；125 已可解除解析阻塞。
 
 **证据**：`D:/autostack/plan-artifacts/plan-105/p125check/*.json`（七页各一份 evidence）。
+
+stage: work（同步主线）| plan_id: PLAN-105 | plan_revision: r1 | round: 88 | from: work | to: work | status: executing | outcome: pass（部分）| worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 0a0872b18 | next: work
+
+2026-11-20 stage: work（T-02 同步主线：代码侧已通，文法待手工重建）| outcome: pass（部分）
+
+**核实**：1086 已交付并归档（9/9，T-09/AC-09/COLL-STR 全 `[x]`，`collections-str` 真实 AV 跑通返回 42）。
+
+**本轮完成**：与主线（含 1082/1086 重构）的**代码侧**合并——`resolve.rs`（`resolve_with_view`/`elem_view`/`move_marked_value`/`coll.elem_view_admission` 在主线新结构上重插）、`verify.rs`（`elem_view_owned` 与 `ordinary_auto` 并存）、`adapter.rs`（`.as` 分支 + `t_str/t_char`）、`collections.atom`（取 105 超集）、`age_component.rs`（`FnItem.proto`、`hidden_fn` 5 参、`Verifier.ordinary_auto`）。**`cargo check -p ace-core` 通过**；产物存 `plan-artifacts/plan-105/sync-merge/`。
+
+**未完成**：文法 19 个 hunk 的合并。启发式「按 profiles 求并」产生两类错（AGE 引用未对 AGE 声明的 token、规则混入非 alt 子步），已放弃该产物；结论是**文法必须手工合并**（master 基座 + 逐块插入 105 的 6 组特性，再做定点 profile 放宽）。盘点见 `plan-artifacts/plan-105/t02-gap-map.md` §78。
+
+**状态**：合并已 reset 干净（`plan-105-dev` `0a0872b18`），下一轮从文法重建继续。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
