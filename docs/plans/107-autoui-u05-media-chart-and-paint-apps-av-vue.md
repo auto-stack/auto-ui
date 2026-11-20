@@ -387,6 +387,18 @@ AutoLang 增量准备 9.85 s，AutoUI 首次增量准备 31.10 s，严格工具�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 18 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 57f995fd, lang 5fc2d7648 | evidence: original chart handlers now project, checked handler loops preserve borrowed seed rows across AV/A2TS and desktop reopening, raw contextual types and clock binding remain open | next: work`
 
+**024 原入口的记录列表推导与 Tick 声明（T-02/T-03 进行中）。** AutoLang `b863cb6428eeb543791e57259c00be38846ae2b7`，AutoUI 基线 `57f995fd3ae89e1cbe216288d7039b280dd10c8a`。AGE 包从 handler 直接迭代的同构标量记录列表推导模型类型，同名同类型的字段按稳定顺序归一。`var out = []` 从整值写回的列表字段取得类型，`push({ … })` 的字段由既有名义记录检查校验。旧 widget 的零载荷 `.Tick` 与正整数 `interval` 形成同一受检描述里的消息和定时条目。`chart-inferred-metadata.log` 从原入口投影读回 `seed` 与 `monthly` 的同一记录类型、空载荷 `Tick` 和 `400 ms` 定时条目。宿主的自动派发仍待接线。
+
+| 执行 | 结果 |
+|---|---|
+| 未改动的 024 入口与原包闭包 | 固定 `app.at` 本身通过投影。带五模块闭包的首报为 `official::area_chart` 原组件头的 `source.syntax`，字节 `1458..1464`。只提供原入口时，具名检查要求 `official` 组件包链接。四个原组件各自的完整准入进一步待验。 |
+| 源码对账、AV 和 A2TS | 材料中的 `seed`、`monthly`、`.Tick`、`.Reset`、`interval` 与原入口对应片段逐字核对一致。独立视图用于观察，两个实例各 7 个检查点通过。滑窗达到 8 条后依次滑出 Jan 和 Feb，暂停后的 Tick 保持数据，复位恢复原六条。把原追加项的 `tablet` 改为 `"invalid"` 时具名报告 `i32` 与 `str` 不匹配，原位置字节 `2281..2298`。 |
+| 真窗与定向回归 | Iced 材料由手动派发脚本驱动，11 次派发、11 次文本更新、12 帧，两个会话各丢弃 1 次迟到事件，重开保留两个实例的独立文本，无错误，耗时 21.18 s。Core `plan981` 248/248 与 `plan1072_component_style` 29/29，AV `plan981` 64/64 与 `aggregates_t01_probe` 33/33，AutoUI `plan980_package_sfc` 18/18、`plan124_routes` 2/2、包窗口闭包 4/4。零间隔与错型记录反例通过。 |
+
+AutoLang 集合发射与定向测试准备为 16.13 / 25.61 s，AutoUI 测试与真窗准备为 100 / 17.36 s。`chart-inferred-controls/original.log`、`chart-inferred-controls/bad-record.log`、`chart-inferred-source-parity.log`、`chart-inferred-material-av-final.log`、`chart-inferred-material-a2ts-final.log`、`chart-inferred-native-final.json` 的 SHA256 依次为 `dfe23da42dae3afef704779ea48096db28183d697b60422048131777c8461e17`、`a32a485c9d64a5ffa0f4113c5e70eca1dd00253f4721574313aba22d6739d718`、`ed91dce3decf7f1e238ae64e567e5388b83b20bdf65c5ccfad577050183189df`、`9192f126c2e8b6d4db2eb0b9a4d2bf5120d48c62ed30b3faa5045325003f5adf`、`ac5f3ae8b98f63cb2af4a3c9f67c3d47062a8832502cb8d20f2228250e30b331`、`04124519fe2eafd6a11a43f28f2c8d8d830cdb86f3dfce36d709c3fb473f0cab`。下一批继续接入原组件列表参数、动态布局与正式两宿主的计时及集合执行。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 19 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 57f995fd, lang b863cb642 | evidence: unchanged 024 entry projects with inferred record lists and a 400 ms Tick declaration, original handlers replay in AV/A2TS/Iced material, and original closure now stops at AreaChart | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
