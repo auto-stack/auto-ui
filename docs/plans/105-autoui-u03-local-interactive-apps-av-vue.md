@@ -284,6 +284,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 57 | from: work | t
 **发现（下一刀定界）**：组件面需要 `Str.contains(sub) -> bool` 一类文本谓词与「`[]T` 注解 → List<T> 局部类型」的可靠传播；后者与 `age-model-ty` 只收 `age-list-ty`（不收 `List<T>` 泛型拼写）有关，改文法或改投影二选一。
 
 **验证**：auto-ui prep 7/7；core 未动。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 58 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: ec26a2f2b | next: work
+
+2026-11-19 stage: work（T-02 W55：列表初值规范化）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `ec26a2f2b` | task_ids: T-02（W55）| evidence: `p105_local_list_binding_pushes_and_reads_back`（局部列表 push/len → n=2）
+
+**交付**：①组件面对**列表类型位**的数组字面量做规范化——`[]` / `[...]` → `List<T>.new(…)`（model 字段与 handler 局部 Let 两处；元素类型取自注解）；②`[]str` 的元素类型在投影处归一为 owned `Str`（822 元素域不收借用 `str`）；③新增永久回归：handler 局部 `var rows []str = []` + `rows.push("a")` ×2 + `.n = rows.len()` → **n=2**。
+
+**012 真窗推进**：`array-lit-empty` 与局部列表类型问题消失，剩余两墙：①`Str.contains(sub)`（语言无该内建方法）②`rows.push(拼接表达式)` 触发 `source.move-required`（owned 元素实参需 `.move` 或新建构造）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3；prep 7/7。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
