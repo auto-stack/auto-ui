@@ -370,6 +370,10 @@ class Session:
         """kind=全部（工具栏第一个全部按钮）+ folder=全部（树根 row）+ 清搜索。
         kind/folder 过滤在 provider 侧持续生效，跨段需显式复位（handler 实证
         + provider 终态硬断言——静默超时会污染后续段落）。"""
+        def unfiltered(readback):
+            provider = readback.get('provider', [])
+            return len(provider) > 8 and provider[4] == '1003' and provider[6:9] == ['all', '', '']
+
         for _ in range(4):
             s0 = self.snapshot()
             kind_btns = [h for h in self.vnodes('全部类型', s0) if h[0] == 'button']
@@ -382,10 +386,8 @@ class Session:
             time.sleep(0.7)
             self.type_into_search('')
             self.press_ok('搜索')
-            rb = self.wait_rb(lambda f: f.get('provider', ['', '', '', ''])[6] == 'all'
-                              and f.get('provider', ['', '', '', '', ''])[4] == '1003', timeout=8)
-            pv = rb.get('provider', [])
-            if len(pv) > 4 and pv[6] == 'all' and pv[4] == '1003':
+            rb = self.wait_rb(unfiltered, timeout=8)
+            if unfiltered(rb):
                 return
         vfd.require(False, f'reset_filters failed to converge; provider={rb.get("provider")}')
 
@@ -578,7 +580,7 @@ def run_picker_matrix(args, out, cases, report):
         snap = s.snapshot()
         (out / 'v01-picker.txt').write_text(snap, encoding='utf-8')
         cases.add('V-01 多包整链挂载（1003 规模）', 'open picker',
-                  'AssetBrowser+TreeView+PaginationControl+卡片网格同屏（共 1003 项/第 1 / 21 页）',
+                  'AssetBrowser+TreeView+PaginationControl+卡片网格同屏（共 1003 项/第 1 / 41 页）',
                   ['共 1003 项' in snap, '第 1 / 41 页' in snap, 'Lake.jpg' in snap],
                   '共 1003 项' in snap and '第 1 / 41 页' in snap and 'Lake.jpg' in snap)
         shot = s.screenshot('v01-picker-native')
@@ -601,9 +603,7 @@ def run_picker_matrix(args, out, cases, report):
 
         s.trace('after-search-50')
         # kind filter
-        s.type_into_search('')
-        s.press_ok('搜索')
-        s.wait_rb(lambda f: f.get('provider', ['', ''])[7] == '', timeout=6)
+        s.reset_filters()
         rb = s.ensure_effect('图片类型', lambda f: f.get('provider', ['', ''])[8] == 'image'
                              and f.get('provider', ['', ''])[4] == '5', occurrence=1)
         p = rb.get('provider', [])
