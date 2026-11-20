@@ -3067,14 +3067,57 @@ impl DynamicComponent {
         {
             Ok(()) => {
                 self.dirty = true;
+                // A parent called through this path does not go through the
+                // top-level input epilogue. Drain its explicit emit while
+                // the actual emitting instance is still known.
+                if state_id == self.bridge.state_obj_id() {
+                    self.take_pending_emit();
+                } else {
+                    self.dispatch_pending_emit(state_id, &route.parent_widget);
+                }
             }
             Err(e) => {
+                self.take_pending_emit();
                 eprintln!(
                     "[VM-EMIT] {}.{} -> {}.{} failed: {}",
                     child, event, route.parent_widget, route.handler, e
                 );
             }
         }
+    }
+
+    fn take_pending_emit(&mut self) -> Option<(String, auto_val::Value)> {
+        let Ok(auto_val::Value::Str(event)) = self.bridge.read_state("__emit_msg") else {
+            return None;
+        };
+        if event.is_empty() {
+            return None;
+        }
+        let payload = self
+            .bridge
+            .read_state("__emit_payload")
+            .unwrap_or(auto_val::Value::Nil);
+        let _ = self
+            .bridge
+            .write_state("__emit_msg", auto_val::Value::str(""));
+        Some((event.to_string(), payload))
+    }
+
+    fn dispatch_pending_emit(&mut self, state_id: u64, widget: &str) {
+        let Some((event, payload)) = self.take_pending_emit() else {
+            return;
+        };
+        let Some(route) = self.bridge.instance_callback(state_id, widget, &format!("on{event}"))
+        else {
+            return;
+        };
+        if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
+            eprintln!(
+                "[VM-EMIT] {widget}.{event} -> {}.{} (quoted, in-body) payload={payload:?}",
+                route.parent_widget, route.handler
+            );
+        }
+        self.dispatch_parent_route(widget, state_id, &event, &route, payload);
     }
 
     /// PLAN-051 T8 诊断辅助：暴露 bridge 的 VM fn 调用与列表展开。
@@ -3645,44 +3688,7 @@ impl DynamicComponent {
                 // 对子件自身 handler 的内联直调，父侧 on<msg> 路由不触发
                 // （043②②）。v1 限度：单 pending 槽（同 handler 多次 emit
                 // 末次生效）；多实参取首个位置实参（桥函数侧截取）。
-                if let Ok(auto_val::Value::Str(pending_msg)) = self.bridge.read_state("__emit_msg")
-                {
-                    if !pending_msg.is_empty() {
-                        let payload = self
-                            .bridge
-                            .read_state("__emit_payload")
-                            .unwrap_or(auto_val::Value::Nil);
-                        let _ = self
-                            .bridge
-                            .write_state("__emit_msg", auto_val::Value::str(""));
-                        let emit_key = format!("on{}", pending_msg);
-                        match self
-                            .bridge
-                            .instance_callback(state_obj_id, &emit_widget, &emit_key)
-                        {
-                            Some(route) => {
-                                if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
-                                    eprintln!(
-                                        "[VM-EMIT] {}.{} -> {}.{} (quoted, in-body) payload={:?}",
-                                        emit_widget,
-                                        pending_msg,
-                                        route.parent_widget,
-                                        route.handler,
-                                        payload
-                                    );
-                                }
-                                self.dispatch_parent_route(
-                                    &emit_widget,
-                                    state_obj_id,
-                                    &pending_msg,
-                                    &route,
-                                    payload,
-                                );
-                            }
-                            None => {}
-                        }
-                    }
-                }
+                self.dispatch_pending_emit(state_obj_id, &emit_widget);
                 // PLAN-051 C2 ①: 声明式——子 msg 变体派发后回送宿主
                 // `on<name>` 绑定（musk `send(str)` + `onsend: .SendInput($event)`
                 // 形态；载荷 = 子 handler 收到的首实参，无实参回落输入值）。
