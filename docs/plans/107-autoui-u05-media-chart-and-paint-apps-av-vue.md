@@ -284,6 +284,18 @@ AutoLang 准备 41.49 s，AutoUI 测试最终准备 45.70 s，真窗驱动链接
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 10 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b4e52146, lang bd449b391 | evidence: mounted Iced pointer callbacks send ordered F32 payloads to the correct checked package instance and drop stale callbacks | next: work`
 
+**A2Vue 指针载荷和离开复位（T-02/T-03 进行中）。** AutoLang `20573cdf047d1e7f5e102c0719fa4e95a7cefe11`、AutoUI `c5a159923fbf741b6c361e0b3d7fdc84e52d5fa4`。AGE 包描述登记受检载荷处理器的绑定符号。A2Vue 复用检查函数的完整受检语句和两个位置参数，把当前实例的响应式标量字段传入处理器，执行完成后提交状态。`mouse-area` 将指针坐标按声明幅面换算为 f32，以 33 ms 和半像素采样门发送。Chrome 的悬停子图元被换掉后实测未向容器发送原生 `mouseleave`，容器使用文档级鼠标移动核对离开，组件卸载时清理该监听。
+
+| 执行 | 结果 | 墙钟执行 |
+|---|---|---:|
+| `plan980_package_sfc` 定向回归 | 15/15。含两参数与多字段 `let`/`if`、错误幅面和错误载荷来源的诊断 | 0.150 s |
+| `auto build --render vue --gen-only` 加前端构建 | 严格 ACE 生成通过。生成目录中对照 PLAN-123 启用 `allowJs` 后，`vue-tsc` 和 Vite 构建通过 | 2.647 / 2.085 s |
+| Chrome 157 中移动真实鼠标输入 | 600×120 CSS 幅面换算到 120×44。测点的 CSS `x > y` 而逻辑 `x < y` 时回普通态。高亮、离开复位、同点重进和卸载通过。无页面异常 | 1.143 s |
+
+AutoUI 测试准备 13.42 s，工具准备 17.97 s，首次离线安装 9.7 s，发现与清理未单计。浏览器材料和第 10 轮 Iced 材料页逐字节相同，SHA256 `9ec95820222124938e907c41e999cdb74e4c850bf3c4854f86eb7df1f6cbcd32`。`svg-pointer-vue-final-browser.log`、首次离开失败对照 `svg-pointer-vue-browser-debug.log`、`svg-pointer-vue-final-regression.log` 的 SHA256 分别为 `6198e88ecd21383f29ce9c65d713aec651822f04a9c700a87c15a696a424b004`、`fa83fc33f7ef0ad3463f906a6f506f48f65b2336b0588bbd399a83b90de7664e`、`c72c52d60e1367bfb9fa1d728d6ac9313c57c6ae018b3062fcf11413158bea35`。此切片支持复制型标量及浏览器坐标绑定，处理器需要额外脚本 helper、拥有型字段或其它载荷来源时给出具名诊断。PLAN-114 的 `e784c0e1f` 已有受检组件视图组装，生产宿主接线继续追踪 B-107-01。后续原图表需要受检表达式载荷、运行时 helper 和集合视图接入后的双端重放。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 11 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui c5a15992, lang 20573cdf0 | evidence: Chrome mouse input updates checked typed model state, resets after SVG child replacement and stops on unmount | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
