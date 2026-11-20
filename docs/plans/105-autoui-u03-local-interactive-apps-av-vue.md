@@ -732,6 +732,22 @@ stage: work（同步收尾 + 013 复核）| plan_id: PLAN-105 | plan_revision: r
 **仍红 2 例**：`p105_list_index_expr_projects`（`[8, 0, -5]` 负字面量）、`p105_elem_view_field_projection_compiles`（`[]Todo` 注解形）。
 
 **下一步**：修两例 → 实现跨单元 store 装载（S1）→ 013 全链路 → 动态列表渲染/组件级内存后端。
+
+stage: work（013 穿透到 MIR）| plan_id: PLAN-105 | plan_revision: r1 | round: 91 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `59669debc` | next: work
+
+2026-11-21 stage: work（T-02 W86：013 首次穿透到 MIR）| outcome: pass
+
+**文法收口**（auto-lang `59669debc`）：`[index]` 步开 AGE、`condition-atom` 增 AGE 列表字面量、`cfg-empty-array-lit` 开 AGE、`age-on-assign` 收复合运算符、修 `age-model-ty` 规则行粘连；census 两 AGE 面重基线（component `51b49135…`、package `17294031…`，两面仍不同）。门：census 4/4、981 248、979 24、104 3、1072 19、980 40 绿；`plan105_` **25/26**。
+
+**013 穿透链（每步都有实证）**：
+1. `lower.type-use … Str` —— 1086 已解（不再出现）；
+2. `.store.*` 需同源 store（S1）—— **prep 的 store 块内联已生效**（文法补齐后 store 块可过组件面解析）；
+3. `handler body call create_todo is not wired` —— `P105_MEM_BACKEND=1` 内存后端改写生效；
+4. **当前墙**：`verify MIR `d___age_state_0_input`: mir.entry-sig — collections/closures-family module entry params/result must be scalar`。
+
+**下一刀（二选一）**：(A) 铸 state 函数时把文本状态收成 i32 句柄并在调用点配对 load/store；(B) 放宽 AGE 生成模块的 `mir.entry-sig`（视为内部函数）。
+
+**余 1 红**：`p105_elem_view_field_projection_compiles`——owned record push 需 `.move`，AGE pratt 尚不支持该前缀。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -990,6 +1006,22 @@ stage: work（同步收尾 + 013 复核）| plan_id: PLAN-105 | plan_revision: r
 **仍红 2 例**：`p105_list_index_expr_projects`（`[8, 0, -5]` 负字面量）、`p105_elem_view_field_projection_compiles`（`[]Todo` 注解形）。
 
 **下一步**：修两例 → 实现跨单元 store 装载（S1）→ 013 全链路 → 动态列表渲染/组件级内存后端。
+
+stage: work（013 穿透到 MIR）| plan_id: PLAN-105 | plan_revision: r1 | round: 91 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `59669debc` | next: work
+
+2026-11-21 stage: work（T-02 W86：013 首次穿透到 MIR）| outcome: pass
+
+**文法收口**（auto-lang `59669debc`）：`[index]` 步开 AGE、`condition-atom` 增 AGE 列表字面量、`cfg-empty-array-lit` 开 AGE、`age-on-assign` 收复合运算符、修 `age-model-ty` 规则行粘连；census 两 AGE 面重基线（component `51b49135…`、package `17294031…`，两面仍不同）。门：census 4/4、981 248、979 24、104 3、1072 19、980 40 绿；`plan105_` **25/26**。
+
+**013 穿透链（每步都有实证）**：
+1. `lower.type-use … Str` —— 1086 已解（不再出现）；
+2. `.store.*` 需同源 store（S1）—— **prep 的 store 块内联已生效**（文法补齐后 store 块可过组件面解析）；
+3. `handler body call create_todo is not wired` —— `P105_MEM_BACKEND=1` 内存后端改写生效；
+4. **当前墙**：`verify MIR `d___age_state_0_input`: mir.entry-sig — collections/closures-family module entry params/result must be scalar`。
+
+**下一刀（二选一）**：(A) 铸 state 函数时把文本状态收成 i32 句柄并在调用点配对 load/store；(B) 放宽 AGE 生成模块的 `mir.entry-sig`（视为内部函数）。
+
+**余 1 红**：`p105_elem_view_field_projection_compiles`——owned record push 需 `.move`，AGE pratt 尚不支持该前缀。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
