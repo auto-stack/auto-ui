@@ -374,6 +374,19 @@ AutoLang 增量准备 9.85 s，AutoUI 首次增量准备 31.10 s，严格工具�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 17 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 213368da, lang ccb98e942 | evidence: checked record list material preserves original chart data and sliding-window values across AV/A2TS, Iced publishes the complete text sequence and preserves each instance on reopen, raw chart and A2Vue blockers isolated | next: work`
 
+**024 原处理器的循环与列表追加（T-02/T-03 进行中）。** AutoLang `5fc2d7648bd349cfe5b63b0a97421798cd7ac250`，AutoUI `57f995fd3ae89e1cbe216288d7039b280dd10c8a`。AGE 包处理器的 `for` 沿既有受检集合循环执行，绑定按词法作用域，`push` 走共享类型与所有权检查。将借用的记录项追加到另一列表时创建新记录，源列表保持可读，遍历期间结构性修改源列表仍具名拒绝。A2TS 集合语义视图接受受检记录复制，复用现有记录复制发射与模板。未被局部绑定遮蔽的 `router.push` 保留已有宿主路由处理。
+
+| 执行 | 结果 |
+|---|---|
+| 固定原 024 入口与五个组件模块重跑 | 原 `.Tick`、`.Reset` 完整语法均通过投影。原入口首报推进为 `source.age.msg-unknown`，覆盖 `.Tick` 字节 4176..4914。材料副本只声明 `Tick` 后，首次具名拒绝推进到原 `.monthly = out`，`monthly` 未进入受检模型字段。类型记录材料移除 `out` 注解时首报 `source.array-lit-empty`，移除追加项的名义记录类型时首报 `source.move-required`。四个组件本体仍有独立语法拒绝。 |
+| 直接从处理器跑原 024 的滑窗和复位 | 材料沿用原月份数据、原循环、`out.push(d)`、原流式算式和两条 `.monthly = out`，为 `seed`、`monthly` 与 `out` 补类型，并为追加的新记录补构造类型。两个实例的 7 个检查点在 AV 与 A2TS 集合生成均通过。seed 始终 6 条，Tick 3 与 4 分别滑出 Jan 与 Feb，暂停和复位结果与独立预期一致。 |
+| Iced 真窗 | 11 次派发、11 次文本提交和 12 帧通过，重开仍保留两个实例不同的文本，各会话丢弃 1 次迟到事件，无错误；本次耗时 15.31 s。现行包宿主按场景重放，400 ms 计时及正式源的运行性能仍待验收。 |
+| 定向回归 | Core `plan981` 248/248、`plan1072_component_style` 29/29，AV `plan981` 64/64、`aggregates_t01_probe` 33/33，A2X Core 2/2、`ts_ui_fragment` 4/4，AutoUI `plan980_package_sfc` 18/18、`plan124_routes` 2/2、窗口闭包 4/4。AgePackage 文法身份为 `76930bede5ca4fce8e2a8f4ebfc2206ccbb6b9c23553e9195397a46794627a35`，冻结邻接面通过。Vue 平铺发射对循环和效果要求完整受检处理器，正式 A2Vue 集合状态接线仍待完成。 |
+
+最终语言、AutoUI 测试和真窗准备为 28.01 / 97 / 29.21 s。`chart-for-controls/original.log`、`chart-for-controls/declared-tick.log`、`chart-for-material-av-final.log`、`chart-for-material-a2ts-final.log`、`chart-for-native-final.json` 的 SHA256 依次为 `b3df75cbfb4c3d35cc6cf2b5b4ac42e7db2aa827748bf42390e3b27bba6af748`、`b943ed7e1160f3b57f861d59e2e1e4476928e01c4c02d0ceb50b873f0de6e8dd`、`9192f126c2e8b6d4db2eb0b9a4d2bf5120d48c62ed30b3faa5045325003f5adf`、`ac5f3ae8b98f63cb2af4a3c9f67c3d47062a8832502cb8d20f2228250e30b331`、`4d99518c261dbded326628a51d50a503fcfc06e59f370c79d43b12d70ac4539b`。PLAN-114 的 Vue 宿主和 A2TS 挂载级运行时已前进至 AutoUI `f0ac2e40` 与 AutoLang `0a525158f`，继续核对可消费提交和原 024 的定型与计时接面。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 18 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 57f995fd, lang 5fc2d7648 | evidence: original chart handlers now project, checked handler loops preserve borrowed seed rows across AV/A2TS and desktop reopening, raw contextual types and clock binding remain open | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
