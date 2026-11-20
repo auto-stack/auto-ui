@@ -382,6 +382,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 66 | from: work | t
 **012 现状**：占位叶生效后仍报 `verify.view-escape: expr e565: a whole owned element is not a value`，说明该诊断**不是文本叶**（叶已占位），而是循环体里另一处整元素求值；需按 expr id 反查所属函数（下一轮用 atom 文本定位 e565 所在 body）。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 67 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W64：列表状态出口 + 初值展开）| PLAN-105 r1 | outcome: pass | task_ids: T-02（W64）| evidence: 新增回归 `p105_list_local_to_field_assign`
+
+**交付**：①**列表字段不进状态出口**（`instance_states` 只发内建类型字段——此前 `__age_state_0_xs` 让观察器报「narrow ComponentFieldValue 不承载 []str」）；②**非空列表初值展开**：`var xs []str = ["a","b"]` 在组件面展开为 `List<Str>.new()` + 逐元素 `push`（数组字面量不能做 `new` 的实参）；③新增永久回归：**局部列表赋给字段**（`var rows []str = []` + push + `.xs = rows`）。
+
+**012 现状**：`.w_rows = rows` 不再是墙（该形状已被回归覆盖）；剩余 `verify.view-escape: expr e565` 经 atom 反查 = `list_get { type: t_str; list: e563(t_list_str) }`——即某列表的类型被视为 **`List<str>`（借用元素）**，读整元素被判成非值。下一轮需找出该 `t_list_str` 的来源（`.cities` 的字段注解 vs 推断），并让列表元素类型统一为 owned。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 4/4。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
