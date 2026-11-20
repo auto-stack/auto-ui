@@ -272,6 +272,18 @@ AutoLang 冷准备 102.36 s、最终增量 4.04 s，AutoUI 测试最终增量 17
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 86aec6c2, lang a0fb51825 | evidence: installed Iced buttons switch checked SVG per instance, with matching browser geometry and an unchanged flat-observation guard | next: work`
 
+**Iced 指针载荷和包派发（T-02/T-03 进行中）。** AutoLang `bd449b3919d6b2929cb1459a3bea5b5cf6fd5390`、AutoUI `b4e52146df3e3c1506af6bd65087dc49941719bd`。`float/f32` 消息沿同一受检事件槽验证，已有 int、bool、str 保持原行为。包桥将宿主值按声明位置抬升为 AGE 场景实参，按入口组件与实例定向，只在检查和 AV 观察成功后追加重放记录。Iced 的 `mouse-area` 使用已有指针坐标换算和限频入口，按视图声明绑定 `PointerMove` 的两项逻辑坐标及离开事件，消息保留会话与实例身份。
+
+| 执行 | 结果 | 墙钟执行 |
+|---|---|---:|
+| AGE Core 和 AV 的 `plan981_event_b` 过滤 | 9/9、8/8。域外载荷对照仍具名拒绝 | 0.151 / 0.296 s |
+| 包桥、桌面控件、Iced 指针投影与撤权用例 | 3/3、6/6、6/6、1/1。含错型、少参数、非有限值无状态效果，两个入口实例交换小数坐标后取得独立结果 | 0.752 / 0.209 / 0.074 / 0.318 s |
+| 材料页 Iced 真窗回放，触发挂载的实际 `on_move` 与 `on_exit` 回调 | exit 0，10 帧，零错误。两实例绑定同一声明幅面 120×44，三次小数移动和一次离开后终回普通态，两个晚到事件丢弃 | 2.068 s |
+
+AutoLang 准备 41.49 s，AutoUI 测试最终准备 45.70 s，真窗驱动链接 4.34 s。发现/清理未单计。`svg-pointer-window.json` SHA256 `daceb8d0e59ffffd9e9a8eb8f6e3de46942e0bfe30fd3e2033775ed9f4d89ecc`，`svg-pointer-window.log` SHA256 `3e80654b0432d654f502bebc5c7cdf1930ca49f49b5ae89009abf97b76134344`。材料页沿原图表的 `onmousemove: .PointerMove`、双 float 参数与离开恢复形式，运行时仍走现有场景重放，每次高频事件的长期成本待整体验收。原页物理输入、捕获列表元素参数、A2Vue 带载荷事件与完整依赖闭包继续跟进。PLAN-114 共享分支已推进至 `872441620` 的受检子组件输入绑定。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 10 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b4e52146, lang bd449b391 | evidence: mounted Iced pointer callbacks send ordered F32 payloads to the correct checked package instance and drop stale callbacks | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
