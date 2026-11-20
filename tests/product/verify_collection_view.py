@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import queue
 import re
+import shutil
 import subprocess
 import sys
 from threading import Thread
@@ -250,13 +251,16 @@ def stage_core(out):
     app = out / "core"
     front = app / "src/front"
     front.mkdir(parents=True)
-    package = (ROOT / "packages/collection-view").resolve().as_posix()
+    shutil.copytree(ROOT / "packages/collection-view", app / "vendor/collection-view")
     manifest = (src / "pac.at").read_text(encoding="utf-8")
-    (app / "pac.at").write_text(manifest.replace("../../packages/collection-view", package),
-                                encoding="utf-8")
+    (app / "pac.at").write_text(
+        manifest.replace("../../packages/collection-view", "vendor/collection-view"), encoding="utf-8"
+    )
     entry = (src / "src/front/app.at").read_text(encoding="utf-8")
-    (front / "app.at").write_text(entry.replace("../../../../packages/collection-view", package),
-                                  encoding="utf-8")
+    (front / "app.at").write_text(
+        entry.replace("../../../../packages/collection-view", "../../vendor/collection-view"),
+        encoding="utf-8",
+    )
     return app
 
 

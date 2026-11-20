@@ -286,16 +286,23 @@ class Session:
 
     def type_into_search(self, text):
         field = re.compile(r'input #(vnode_\d+) \{\s*placeholder: "搜索资源…"\s*value: "([^"\n]*)"')
-        result = ''
-        for _ in range(6):
+        responses = []
+        for _ in range(3):
             match = field.search(self.snapshot())
             if match:
                 if match[2] == text:
                     return
-                result = self.call('autoui_type', allow_error=True, element_id=match[1], text=text)
-            time.sleep(0.3)
-        match = field.search(self.snapshot())
-        vfd.require(match and match[2] == text, f'search input did not render {text!r}: {result[:160]}')
+                responses.append(self.call('autoui_type', allow_error=True, element_id=match[1], text=text))
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                snap = self.snapshot()
+                match = field.search(snap)
+                if match and match[2] == text:
+                    return
+                time.sleep(0.15)
+        (self.out / 'debug-search-action.txt').write_text('\n'.join(responses), encoding='utf-8')
+        (self.out / 'debug-search-tree.txt').write_text(snap, encoding='utf-8')
+        vfd.require(False, f'search input did not render {text!r} after {len(responses)} input actions')
 
     def key(self, name):
         return self.call('autoui_keyboard', key=name)
@@ -1227,9 +1234,9 @@ def main():
     passed = sum(1 for r in cases.rows if r['result'] == 'pass')
     failed = sum(1 for r in cases.rows if r['result'] == 'fail')
     not_run = sum(1 for r in cases.rows if r['result'] == 'not_run')
-    # 完整性下限：native 矩阵含 picker(V-01..03) + visual/reopen(V-05/06) 腿（≥12），
-    # vue 轨为 6 例。少于下限或有用例未运行，不能判 pass。
-    complete = not_run == 0 and len(cases.rows) >= (12 if args.backend == 'native' else 6)
+    # Check the complete matrix even when a segment exits before recording its cases.
+    expected_cases = 6 if args.backend == 'vue' else 26 + (0 if args.skip_029 else 4)
+    complete = not_run == 0 and len(cases.rows) == expected_cases
     if args.backend == 'native' and args.runs == 1:
         complete = complete and not any('error' in step for step in report['prep'])
     report['result'] = 'pass' if (cases.all_pass() and complete) else ('fail' if failed or not complete else 'not_run')
