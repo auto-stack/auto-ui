@@ -1,5 +1,9 @@
 # auto-ui 计划管理
 
+## 共用资源视图（2026-11-20）
+
+[PLAN-109 CollectionView / Thumbnail（归档）](archived/109-collection-view-and-thumbnail.md) 已交付 r2。交付提交为 `a6b16627`。AssetBrowser 与 027 FileManager 已迁移共用包，Windows 原生 VM 和 Vue 已验收。Linux 两轨随统一 Linux 开发补验，见 [DEBT-011](debts.md#debt-011-collectionview-的-linux-平台验收)。见[组件扩展路线](../design/autoui/component-library-extension-strategy.md#33-共用资源视图接续)。
+
 ## U02–U06 示例与 Widgets 双端交付（2026-11-19）
 
 五组独立承接 980/1071 的原应用和 Widgets 验收。AutoUI 持合同，各计划承担所需 AutoLang 实现与用例、AutoUI 缺失组件和现有组件缺口，逐组交付 AV/Iced 和 A2Vue/浏览器。A2R、AC 后续沿同源验收另立计划。

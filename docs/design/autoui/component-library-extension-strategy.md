@@ -51,6 +51,7 @@
 | CL-24 | 专业储备 CurveEditor | 后续图形绘制/数值输入 | 控制点/切线/插值；动画缓动和图像色调曲线可能需不同领域适配 | 仅候选，未立计划 |
 | CL-25 | 专业储备 NodeGraphEditor | 后续通用图形交互和应用图模型 | 节点/端口/连线/分组；等材质/流程/脚本应用明确类型/连线规则后设计 | 仅候选，未立计划 |
 | CL-26 | 专业储备 CanvasViewport / SceneViewport | 已有Canvas/AGE混合区域；图片部分先由CL-09收拢 | 通用绘图/场景视口、坐标/选择覆盖层；等图像创作或游戏/CAD应用再设计，不重复图片查看器 | 仅候选，未立计划 |
+| CL-27 | CollectionView / Thumbnail | 091 的资源卡片和列表、027 的明细与网格、现有缩略图渲染 | 共用网格、列表、缩略图、焦点与条目动作。AssetBrowser 和 FileManager 均已迁移 | [PLAN-109（归档）](../../plans/archived/109-collection-view-and-thumbnail.md)，已交付 r2，`a6b16627` |
 
 未标外仓的复用定位均为本仓相对路径：示例在 `examples/ui/`，schema 在 `crates/auto-ui-compiler/schema/aura.at`。Reader外仓只读来源在095/097 §4列出完整位置和版本。Blueprint 单源仍是语言仓 `packages/blueprints`，不得因抽取 UI 包而产生第二份可编辑通用工具实现。
 
@@ -111,6 +112,10 @@ CL-18…26当前只保留目的、来源和重新讨论的触发条件，不冻�
 | 097 TagInput | 015 Notes持update_tags/vocab；新增普通设置示例 | 稳定noteId+revision防错写，业务拒绝保留草稿，计数仅看已接受tags |
 
 已有四组件图存仓库assets，四个Plan直接链接同一PNG/指南和各自区域；不重复生成图片。实现后应逐Plan登记源码/包/工具身份和真实窗口证据，交付后才把本页阶段改为已支持。
+
+### 3.3 共用资源视图接续
+
+CollectionView 与 Thumbnail 由正式包提供。AssetBrowser 在 091 交付基线上复用集合视图，027 FileManager 保持真实目录、排序、权限与缩略图路径。Windows 原生 VM 与 Vue 验收记录见 [PLAN-109 归档](../../plans/archived/109-collection-view-and-thumbnail.md)。Linux 补验见 [DEBT-011](../../plans/debts.md#debt-011-collectionview-的-linux-平台验收)。
 
 ## 4. 统一组件合同
 
@@ -173,3 +178,4 @@ Q-01 原始消费证据现可在Reader主检出的[实测报告及同目录截�
 
 | 2026-11-14 | r6：再次审查094–097并修r2，补挂载身份/显式确认、现有Init/焦点限制、保留跨组评分、GUI/MCP/IME证据分层与失败清理；对账084交付并推荐085 | 四项drafting r2、0/8；静态计划审核。084交付7ea71f0c/归档8/8，Linux（VMware）/统一回归/DEBT-006仍待补；无组件实施 |
 | 2026-11-16 | r7：CL-13/PLAN-087 交付——numeric-fields 官方包（NumericField/UnitField 十进制定点引擎）+examples/numeric-fields 消费示例+双轨产品门；编译器两处最小适配（a2ts range 助手内联、camelCase 事件名保形） | 087 delivered：r3，T-01…06 完成 6/8，交付45a80058归档；Win native（20+1not_run）/vue（21）门全绿；Linux not_run 待补；088/092 可消费 087 基础（版本/摘要见归档证据） |
+| 2026-11-20 | CL-27 / PLAN-109 CollectionView 与 Thumbnail 交付 | r2，`a6b16627`。Windows 原生与 Vue 通过，Linux 两轨按 DEBT-011 补验 |
