@@ -31,6 +31,7 @@ widget PromptDialog (open: bool = false, contextId: str = "", revision: int = 0,
         invalid => .required && .trimmed_draft == ""
         confirm_disabled => !.open || .phase != "editing" || .pending || .target != .contextId || .base_revision != .revision || .base_value != .initialValue || .edit_required || .config_code != "" || (.required && .trimmed_draft == "")
         field_caption => if .label == "" { "名称" } else { .label }
+        field_error => if .config_message != "" { .config_message } else if .invalid { "请输入名称" } else if .rejection != "" { .rejection } else if .target == .contextId && .base_revision == .revision && .base_value == .initialValue { .errorMessage } else { "" }
         heading => if .title == "" { "输入名称" } else { .title }
         confirm_caption => if .config_code == "empty-accept-label" { "确定" } else { .acceptLabel }
         dismiss_caption => if .config_code == "empty-cancel-label" { "取消" } else { .cancelLabel }
@@ -39,28 +40,19 @@ widget PromptDialog (open: bool = false, contextId: str = "", revision: int = 0,
     view {
         for action_binding in .bindings key: action_binding {
             dialog (open: .open, onclose: .Close(action_binding, "escape"), closeOnOutside: false) {
-                dialog-content (showCloseButton: false, style: "w-full max-w-md max-h-[90vh] overflow-y-auto p-4 gap-2 rounded-md") {
+                dialog-content (showCloseButton: false, portalToTheme: true, style: "w-96 max-w-full p-4 gap-2 rounded-md") {
                     dialog-header (style: "gap-2") {
                         dialog-title .heading
                         if .description != "" {
                             dialog-description .description
                         }
                     }
-                    col (style: "gap-2 [&_input]:h-8") {
+                    col (style: "gap-2 max-h-60 overflow-y-auto [&_input]:h-8") {
                         text .field_caption { style: "text-sm font-medium" }
-                        input (value: .draft + "", placeholder: .placeholder, label: .field_caption,
+                        input (value: .draft + "", placeholder: .placeholder, label: .field_caption, validationMessage: .field_error,
                             oninput: .Edit(action_binding, $event), onenter: .Submit(action_binding), disabled: !.ready) {}
-                        if .config_message != "" {
-                            text .config_message { style: "text-sm text-foreground pl-2 border-l-2 border-destructive" }
-                        }
-                        if .invalid {
-                            text "请输入名称" { style: "text-sm text-foreground pl-2 border-l-2 border-destructive" }
-                        }
-                        if .rejection != "" {
-                            text .rejection { style: "text-sm text-foreground pl-2 border-l-2 border-destructive" }
-                        }
-                        if .errorMessage != "" && .target == .contextId && .base_revision == .revision && .base_value == .initialValue {
-                            text .errorMessage { style: "text-sm text-foreground pl-2 border-l-2 border-destructive" }
+                        if .field_error != "" {
+                            text .field_error { style: "text-sm text-foreground pl-2 border-l-2 border-destructive" }
                         }
                         if .pending || .phase == "submitting" || .phase == "accepted" {
                             text "正在提交…" { style: "text-sm text-muted-foreground" }
@@ -71,7 +63,7 @@ widget PromptDialog (open: bool = false, contextId: str = "", revision: int = 0,
                         button .confirm_caption {
                             onclick: .Submit(action_binding)
                             disabled: .confirm_disabled
-                            style: if .confirm_disabled { "h-8 rounded-md bg-muted text-foreground" } else { "h-8 rounded-md bg-primary text-primary-foreground" }
+                            style: if .confirm_disabled { "h-8 rounded-md bg-muted text-foreground disabled:opacity-100" } else { "h-8 rounded-md bg-primary text-primary-foreground" }
                         }
                     }
                 }

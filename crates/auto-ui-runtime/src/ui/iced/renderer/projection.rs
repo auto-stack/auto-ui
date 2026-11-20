@@ -1364,6 +1364,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 password,
                 style,
                 disabled,
+                ..
             } => {
                 let mut input_widget = build_input_shape(
                     &placeholder,

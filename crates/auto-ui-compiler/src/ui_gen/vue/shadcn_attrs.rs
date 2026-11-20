@@ -912,9 +912,14 @@ impl VueGenerator {
                         }
                     }
                 }
-                if let Some(AuraPropValue::Expr(expr)) = props.get("label") {
-                    if let Ok(label) = self.expr_to_vue_bound_value(expr) {
-                        attrs.push(format!(":aria-label=\"{label}\""));
+                for (source, target) in [
+                    ("label", "aria-label"),
+                    ("validationMessage", "aria-description"),
+                ] {
+                    if let Some(AuraPropValue::Expr(expr)) = props.get(source) {
+                        if let Ok(value) = self.expr_to_vue_bound_value(expr) {
+                            attrs.push(format!(":{target}=\"{value}\""));
+                        }
                     }
                 }
                 // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
@@ -1520,9 +1525,14 @@ impl VueGenerator {
             }
             "dialogcontent" | "dialog_content" | "dialog-content" => {
                 self.push_style_class(&mut attrs, props);
-                if let Some(AuraPropValue::Expr(expr)) = props.get("showCloseButton") {
-                    if let Ok(value) = self.expr_to_vue_bound_value(expr) {
-                        attrs.push(format!(":show-close-button=\"{value}\""));
+                for (source, target) in [
+                    ("showCloseButton", "show-close-button"),
+                    ("portalToTheme", "portal-to-theme"),
+                ] {
+                    if let Some(AuraPropValue::Expr(expr)) = props.get(source) {
+                        if let Ok(value) = self.expr_to_vue_bound_value(expr) {
+                            attrs.push(format!(":{target}=\"{value}\""));
+                        }
                     }
                 }
             }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DialogContentEmits, DialogContentProps } from "reka-ui"
 import type { HTMLAttributes } from "vue"
-import { inject, ref } from "vue"
+import { computed, inject, ref } from "vue"
 import { reactiveOmit } from "@vueuse/core"
 import { X } from "lucide-vue-next"
 import {
@@ -13,15 +13,17 @@ import {
 } from "reka-ui"
 import { cn } from "@/lib/utils"
 
-const props = withDefaults(defineProps<DialogContentProps & { class?: HTMLAttributes["class"]; showCloseButton?: boolean }>(), {
+const props = withDefaults(defineProps<DialogContentProps & { class?: HTMLAttributes["class"]; showCloseButton?: boolean; portalToTheme?: boolean }>(), {
   showCloseButton: true,
 })
 const emits = defineEmits<DialogContentEmits>()
 
-const delegatedProps = reactiveOmit(props, "class", "showCloseButton")
+const delegatedProps = reactiveOmit(props, "class", "showCloseButton", "portalToTheme")
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
 const closeOnOutside = inject("autoui:dialog-close-on-outside", ref(true))
+const themeAnchor = ref<HTMLElement | null>(null)
+const portalTarget = computed(() => themeAnchor.value?.closest<HTMLElement>("[data-auto-theme-root]") ?? undefined)
 
 function keepOpenOnOutside(event: Event) {
   if (!closeOnOutside.value) event.preventDefault()
@@ -29,7 +31,8 @@ function keepOpenOnOutside(event: Event) {
 </script>
 
 <template>
-  <DialogPortal>
+  <span v-if="props.portalToTheme" ref="themeAnchor" hidden />
+  <DialogPortal :to="portalTarget">
     <DialogOverlay
       class="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
     />

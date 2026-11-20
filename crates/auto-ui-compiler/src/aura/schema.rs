@@ -642,6 +642,20 @@ impl AuraSchema {
                         description: "Placeholder text",
                     },
                     PropDef {
+                        name: "label",
+                        type_: PropType::String,
+                        required: false,
+                        default: None,
+                        description: "Accessible name for the input",
+                    },
+                    PropDef {
+                        name: "validationMessage",
+                        type_: PropType::String,
+                        required: false,
+                        default: None,
+                        description: "Current validation error announced with the input",
+                    },
+                    PropDef {
                         name: "type",
                         type_: PropType::OneOf(vec!["text", "password", "email", "number"]),
                         required: false,

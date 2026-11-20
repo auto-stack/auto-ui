@@ -1,6 +1,7 @@
 """Windows product checks for the prepared PromptDialog demo or File Manager."""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import ctypes
 import hashlib
 import json
@@ -38,15 +39,25 @@ class ProductSession:
         self.port = bindable_port(free_port()) if args.backend == "native" else available_port()
         self.process = None
         self.backend_process = None
+        self.system_helper = None
         self.backend_port = None
         self.browser = None
         self.last_snapshot = ""
         self.windows = []
+        self.owned = {}
         self.logs = []
         self.ready = False
 
     def start(self):
         log = self.log_file("service.log")
+        if self.args.case == "system":
+            script = self.output / "system-tree.ps1"
+            script.write_text(SYSTEM_READER, encoding="utf-8-sig")
+            self.system_helper = subprocess.Popen(
+                ["powershell.exe", "-NoProfile", "-STA", "-File", str(script)],
+                stdout=subprocess.PIPE, stderr=self.log_file("system-tree.log"),
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
         env = os.environ.copy()
         if self.args.consumer == "file-manager":
             env["USERPROFILE"] = str(self.args.fixture_dir)
@@ -92,9 +103,14 @@ class ProductSession:
             )
             self.port = int(listening.search(startup_log)[1])
             title = "名称管理" if self.args.consumer == "demo" else "主目录"
-            wait_for(self.snapshot, lambda tree: title in tree, seconds=self.args.startup_timeout)
-            self.windows = windows_for(set(owned_tree(self.process.pid)) | {self.process.pid})
-            assert self.windows, "MCP localhost tree has no owned OS window"
+            with ThreadPoolExecutor(max_workers=1) as discovery:
+                process_tree = discovery.submit(owned_tree, self.process.pid)
+                wait_for(self.snapshot, lambda tree: title in tree, seconds=self.args.startup_timeout)
+                self.owned = process_tree.result(timeout=self.args.startup_timeout)
+            if len(self.owned) < 2:
+                self.owned = owned_tree(self.process.pid)
+            self.windows = wait_for(lambda: windows_for(self.owned), bool,
+                                    seconds=self.args.startup_timeout)
         else:
             env["BROWSER"] = "none"
             command = ["node", "node_modules/vite/bin/vite.js", "--port", str(self.port), "--strictPort"]
@@ -226,16 +242,17 @@ class ProductSession:
             if self.process is not None and self.process.poll() is None:
                 if failed or not self.ready:
                     stop_tree(self.process)
-                elif self.args.backend == "native" and self.args.consumer == "demo":
+                elif (self.args.backend == "native" and self.args.consumer == "demo"
+                      and self.args.case != "system"):
                     try:
                         self.press("退出示例")
                     except (ConnectionResetError, TimeoutError):
                         pass
                     assert self.process.wait(timeout=5) == 0, "demo exit failed"
                 elif self.ready and self.args.backend == "native":
-                    assert len(self.windows) == 1, "File Manager must own exactly one visible window"
+                    assert len(self.windows) == 1, "Native app must own exactly one visible window"
                     assert ctypes.windll.user32.PostMessageW(self.windows[0]["handle"], 0x0010, 0, 0)
-                    assert self.process.wait(timeout=5) == 0, "File Manager window exit failed"
+                    assert self.process.wait(timeout=5) == 0, "Native app window exit failed"
                 else:
                     stop_tree(self.process)
             if self.args.backend == "native" and self.process is not None:
@@ -254,6 +271,8 @@ class ProductSession:
         finally:
             if self.process is not None:
                 stop_tree(self.process)
+            if self.system_helper is not None:
+                stop_tree(self.system_helper)
             if self.backend_process is not None:
                 stop_tree(self.backend_process)
                 assert not self.port_open(self.backend_port), "prepared API port survived cleanup"
@@ -283,13 +302,21 @@ def demo_names(session):
 
 def demo_cancel(session):
     session.press("重命名笔记本")
-    session.wait_text("Inbox", "重命名笔记本")
+    session.wait_text("Inbox", "例如 Reading journal")
     old_id = session.button("重命名")
     session.enter_text("Should not survive", "笔记本名称")
     session.key("Escape")
-    session.wait_text("已取消笔记本重命名", "notebook-7: Inbox")
+    session.wait_text("已取消笔记本重命名", "notebook-7: Inbox", absent=("例如 Reading journal",))
+    if session.browser is not None:
+        focused = session.browser.result_value("browser_run_code_unsafe", code="""async (page) => {
+          await page.waitForFunction(() => document.activeElement?.textContent?.trim() === '重命名笔记本',
+                                     undefined, { timeout: 1500 });
+          return await page.evaluate(() =>
+            document.activeElement?.textContent?.trim() === '重命名笔记本');
+        }""")
+        assert focused is True, focused
     session.press("重命名笔记本")
-    session.wait_text("Inbox", absent=("Should not survive",))
+    session.wait_text("Inbox", "例如 Reading journal", absent=("Should not survive",))
     current_id = session.button("重命名")
     assert old_id != current_id, "old confirmation retained its address after reopen"
     if session.browser is None:
@@ -297,6 +324,20 @@ def demo_cancel(session):
         assert response.startswith("Error:"), response
     session.press("取消")
     session.wait_text("notebook-7: Inbox", "已保存 0 次")
+
+
+def demo_tab(session):
+    session.press("重命名笔记本")
+    session.wait_text("例如 Reading journal")
+    if session.browser is None:
+        # MCP acknowledges queueing while Iced completes the focus operations
+        # on its render loop. Space cannot submit from the starting input.
+        time.sleep(0.35)
+    session.key("Tab")
+    if session.browser is None:
+        time.sleep(0.35)
+    session.key("Space")
+    session.wait_text("已取消笔记本重命名", "notebook-7: Inbox", "已保存 0 次")
 
 
 def demo_ime(session):
@@ -333,37 +374,89 @@ def demo_visual(session):
     session.press("重命名分组")
     session.enter_text(" ", "分组名称")
     session.wait_text("请输入名称")
+    if session.browser is not None:
+        appearance = session.browser.result_value("browser_run_code_unsafe", code="""async (page) => {
+          const dialog = page.getByRole('dialog', { name: '重命名分组' });
+          return await dialog.evaluate(async el => {
+            const animations = el.getAnimations({ subtree: true });
+            await Promise.race([Promise.allSettled(animations.map(animation => animation.finished)),
+                                new Promise(resolve => setTimeout(resolve, 400))]);
+            return { background: getComputedStyle(el).backgroundColor,
+                     fieldError: el.querySelector('input')?.getAttribute('aria-description') };
+          });
+        }""")
+        assert max(map(int, re.findall(r"\d+", appearance["background"]))) < 64, appearance
+        assert appearance["fieldError"] == "请输入名称", appearance
     session.screenshot("dark-required")
     session.press("取消")
 
 
-def demo_system(session):
+def demo_pending(session):
     session.press("重命名笔记本")
-    session.wait_text("例如 Reading journal")
-    window = session.windows[0]
-    script = session.output / "system-tree.ps1"
-    script.write_text(r'''
+    session.enter_text("待确认的名称", "笔记本名称")
+    confirm = session.button("重命名")
+    session.key("Enter")
+    pending = session.wait_text("正在提交…", "已保存 0 次")
+    if session.browser is None:
+        response = session.call("autoui_action", element_id=confirm, action="press")
+        assert response.startswith("Error:"), response
+    else:
+        assert 'button "重命名" [disabled]' in pending, pending
+        assert 'button "取消" [disabled]' in pending, pending
+    session.key("Escape")
+    session.screenshot("pending")
+    session.wait_text("notebook-7: 待确认的名称", "已保存 1 次", absent=("已取消笔记本重命名",))
+
+
+SYSTEM_READER = r'''
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
-$root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]HANDLE)
-if ($root.Current.ProcessId -ne PID_VALUE) { throw 'system window owner changed' }
-$nodes = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants,
-                       [System.Windows.Automation.Condition]::TrueCondition)
+$ErrorActionPreference = 'Stop'
+$identity = Join-Path $PSScriptRoot 'system-window.txt'
+$deadline = [DateTime]::UtcNow.AddSeconds(20)
+while (!(Test-Path -LiteralPath $identity)) {
+    if ([DateTime]::UtcNow -ge $deadline) { throw 'system window identity unavailable' }
+    Start-Sleep -Milliseconds 30
+}
+$window = (Get-Content -Raw -LiteralPath $identity) -split " "
+$root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]([long]$window[0]))
+if ($root.Current.ProcessId -ne [int]$window[1]) { throw 'system window owner changed' }
+$fieldName = [System.Windows.Automation.PropertyCondition]::new(
+    [System.Windows.Automation.AutomationElement]::NameProperty, '分组名称')
+$confirmName = [System.Windows.Automation.PropertyCondition]::new(
+    [System.Windows.Automation.AutomationElement]::NameProperty, '保存分组')
+$targets = [System.Windows.Automation.OrCondition]::new($fieldName, $confirmName)
+$cache = [System.Windows.Automation.CacheRequest]::new()
+$element = [System.Windows.Automation.AutomationElement]
+$cache.Add($element::NameProperty)
+$cache.Add($element::ControlTypeProperty)
+$cache.Add($element::BoundingRectangleProperty)
+$cache.Add($element::HasKeyboardFocusProperty)
+$cache.Add($element::IsEnabledProperty)
+$cache.Add([System.Windows.Automation.ValuePattern]::ValueProperty)
+$cache.Add([System.Windows.Automation.ValuePattern]::Pattern)
+$cache.Add([System.Windows.Automation.InvokePattern]::Pattern)
+$cache.Push()
+try {
+    $nodes = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $targets)
+} finally {
+    $cache.Pop()
+}
 $rows = @()
 $input = $null
 $confirm = $null
 foreach ($node in $nodes) {
-    $current = $node.Current
+    $current = $node.Cached
     $rect = $current.BoundingRectangle
     $role = $current.ControlType.ProgrammaticName
     $value = $null
-    if ($role -eq 'ControlType.Edit' -and $current.Name -eq '例如 Reading journal') {
-        $input = $node.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-        $value = $input.Current.Value
+    if ($role -eq 'ControlType.Edit' -and $current.Name -eq '分组名称') {
+        $input = $node.GetCachedPattern([System.Windows.Automation.ValuePattern]::Pattern)
+        $value = $input.Cached.Value
     }
-    if ($role -eq 'ControlType.Button' -and $current.Name -eq '重命名') {
-        $confirm = $node.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+    if ($role -eq 'ControlType.Button' -and $current.Name -eq '保存分组') {
+        $confirm = $node.GetCachedPattern([System.Windows.Automation.InvokePattern]::Pattern)
     }
     $rows += [pscustomobject]@{role=$role; name=$current.Name; value=$value;
                               focus=$current.HasKeyboardFocus; enabled=$current.IsEnabled;
@@ -378,19 +471,27 @@ while ($input.Current.Value -ne '系统输入') {
 }
 $confirm.Invoke()
 [Console]::WriteLine((@{nodes=$rows; action='ValuePattern.SetValue and InvokePattern.Invoke'} | ConvertTo-Json -Depth 4))
-'''.replace("HANDLE", str(window["handle"])).replace("PID_VALUE", str(window["pid"])),
-        encoding="utf-8-sig")
-    raw = subprocess.check_output(
-        ["powershell.exe", "-NoProfile", "-STA", "-File", str(script)],
-        timeout=6, creationflags=subprocess.CREATE_NO_WINDOW,
-    )
+'''
+
+
+def demo_system(session):
+    session.press("重命名分组")
+    session.wait_text("例如 项目分类")
+    window = session.windows[0]
+    identity = session.output / "system-window.pending"
+    identity.write_text(f'{window["handle"]} {window["pid"]}', encoding="ascii")
+    identity.replace(session.output / "system-window.txt")
+    raw, _ = session.system_helper.communicate(timeout=6)
+    assert session.system_helper.returncode == 0, "Windows UIA helper failed"
     evidence = json.loads(raw.decode("utf-8-sig"))
     (session.output / "system-tree.json").write_text(
         json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8",
     )
     field = next(row for row in evidence["nodes"] if row["role"] == "ControlType.Edit")
-    assert field["value"] == "Inbox" and field["focus"] and field["width"] > 0 and field["height"] > 0, field
-    session.wait_text("notebook-7: 系统输入", "已保存 1 次")
+    confirm = next(row for row in evidence["nodes"] if row["role"] == "ControlType.Button")
+    assert field["value"] == "Research" and field["focus"] and field["width"] > 0 and field["height"] > 0, field
+    assert confirm["name"] == "保存分组" and confirm["enabled"] and confirm["width"] > 0 and confirm["height"] > 0, confirm
+    session.wait_text("group-1: 系统输入", "已保存 1 次")
 
 
 def file_manager_directory(session):
@@ -460,8 +561,10 @@ def file_manager_create(session):
 CASES = {
     "names": demo_names,
     "cancel": demo_cancel,
+    "tab": demo_tab,
     "ime": demo_ime,
     "visual": demo_visual,
+    "pending": demo_pending,
     "system": demo_system,
     "file-rename": file_manager_rename,
     "file-create": file_manager_create,
@@ -500,7 +603,8 @@ def main():
     args.out_dir.mkdir(parents=True)
     started = time.monotonic()
     report = {"plan": "PLAN-094", "revision": 3, "platform": platform.system(), "backend": args.backend,
-              "consumer": args.consumer, "case": args.case}
+              "consumer": args.consumer, "case": args.case,
+              "runner_sha256": digest(__file__)}
     if os.name != "nt" or not args.auto_bin.is_file() or not args.ui_tool_bin.is_file() or not args.app_dir.is_dir():
         report.update(result="not_run", error="Windows and prepared source-bound tools and project required")
     elif args.backend == "vue" and (not args.browser_mcp_config or not args.browser_mcp_config.is_file()
@@ -517,7 +621,8 @@ def main():
     else:
         report["tools"] = {"auto": digest(args.auto_bin), "auto-ui-tool": digest(args.ui_tool_bin)}
         entries = ("pac.at", "src/front/app.at") if args.backend == "native" else (
-            "package.json", "src/App.vue", "src/components/PromptDialog.vue",
+            "package.json", "pnpm-lock.yaml", "src/App.vue", "src/components/PromptDialog.vue",
+            "src/components/ui/dialog/Dialog.vue", "src/components/ui/dialog/DialogContent.vue",
         )
         report["source"] = {name: digest(args.app_dir / name)
                             for name in entries if (args.app_dir / name).is_file()}
@@ -529,6 +634,7 @@ def main():
                 session.start()
                 report["startup_seconds"] = time.monotonic() - started
                 report["windows"] = session.windows
+                report["owned_pids"] = list(session.owned)
                 if session.browser is not None:
                     report["provider"] = session.provider
                 action_started = time.monotonic()
@@ -546,6 +652,11 @@ def main():
                 except Exception as error:
                     report.update(result="fail", cleanup=repr(error))
                 report["cleanup_seconds"] = time.monotonic() - cleanup_started
+        report["artifacts"] = {
+            path.name: digest(path) for path in sorted(args.out_dir.iterdir())
+            if path.is_file() and (path.suffix in {".png", ".log", ".ndjson"} or path.name in
+                                   {"last-tree.txt", "system-tree.json"})
+        }
     report["wall_seconds"] = time.monotonic() - started
     (args.out_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))

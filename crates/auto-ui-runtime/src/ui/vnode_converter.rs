@@ -1098,6 +1098,7 @@ mod tests {
     fn test_input_conversion() {
         let view: View<TestMsg> = View::Input {
             placeholder: "Enter text".to_string(),
+            accessibility: None,
             value: "".to_string(),
             on_change: None,
             on_submit: None,

@@ -6792,6 +6792,7 @@ mod tests_314 {
         // 017-chat 形态: input onenter → on_submit
         let input = View::Input {
             placeholder: "Type a message...".into(),
+            accessibility: None,
             value: "hello".into(),
             on_change: None,
             on_submit: Some(DynamicMessage::Typed {
@@ -6844,6 +6845,7 @@ mod tests_314 {
         // 无声明: None
         let bare = View::Input {
             placeholder: String::new(),
+            accessibility: None,
             value: String::new(),
             on_change: None,
             on_submit: None,
@@ -6883,6 +6885,7 @@ mod tests_plan483_d4 {
     fn input(placeholder: &str, event: &str) -> View<DynamicMessage> {
         View::Input {
             placeholder: placeholder.to_string(),
+            accessibility: None,
             value: String::new(),
             on_change: Some(typed_msg(event)),
             on_submit: None,
@@ -7954,6 +7957,7 @@ mod tests_plan069_f2 {
     fn input_view() -> View<DynamicMessage> {
         View::Input {
             placeholder: "搜索书籍…".to_string(),
+            accessibility: None,
             value: String::new(),
             on_change: Some(typed("QueryChanged")),
             on_submit: None,

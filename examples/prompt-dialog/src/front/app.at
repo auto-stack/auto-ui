@@ -60,7 +60,7 @@ widget App {
                 initialValue: .notebook_name, pending: .notebook_busy, response: .notebook_reply,
                 onsubmitRequested: .SaveNotebook, oncancelled: .CancelNotebook) {}
             PromptDialog (open: .group_open, contextId: "group-1", revision: .group_revision,
-                title: "重命名分组", description: "输入分组的新名称。",
+                title: "重命名分组", description: "分组名称用于工作区侧栏中的分组导航和笔记归类。",
                 label: "分组名称", placeholder: "例如 项目分类", acceptLabel: "保存分组",
                 initialValue: .group_name, trimInput: true, response: .group_reply,
                 onsubmitRequested: .SaveGroup, oncancelled: .CancelGroup) {}

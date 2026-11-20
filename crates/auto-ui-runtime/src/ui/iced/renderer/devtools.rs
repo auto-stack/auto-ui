@@ -3554,6 +3554,7 @@ fn render_dynamic_view_inner(
             password,
             style,
             disabled,
+            ..
         } => {
             let dbg_props = debug_style_props(style.as_ref());
             // Plan 483: Id 主键在 on_change/on_submit 被 move 进闭包前取好

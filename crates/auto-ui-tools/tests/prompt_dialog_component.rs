@@ -154,6 +154,20 @@ fn model_retains_its_lock_and_rejects_retired_bindings_and_foreign_feedback() {
     assert_eq!(read(&current, "phase"), Value::str("accepted"));
     act(&mut current, "Submit", &[binding]);
     assert_eq!(read(&current, "seq"), Value::Int(3));
+
+    current.write_state("shown", Value::Bool(false)).unwrap();
+    let _ = current.view();
+    act(&mut current, "Tick", &[]);
+    assert_eq!(read(&current, "seq"), Value::Int(3));
+    current.write_state("shown", Value::Bool(true)).unwrap();
+    let _ = current.view();
+    act(&mut current, "Tick", &[]);
+    assert_eq!(read(&current, "session"), Value::Int(2));
+    let binding = read(&current, "binding");
+    act(&mut current, "Close", &[binding.clone(), Value::str("cancel")]);
+    act(&mut current, "Close", &[binding, Value::str("escape")]);
+    assert_eq!(read(&current, "phase"), Value::str("cancelled"));
+    assert_eq!(read(&current, "seq"), Value::Int(4));
 }
 
 #[test]
@@ -206,5 +220,6 @@ fn relocated_prompt_dialog_generates_the_consumer_and_shared_text_logic() {
     assert!(component.contains("function prompt_trim("));
     assert!(component.contains("globalThis.crypto.getRandomValues"));
     assert!(component.contains(":close-on-outside=\"false\""));
+    assert!(component.contains(":aria-description=\"field_error\""));
     assert!(!component.contains("v-model=\"draft\""));
 }

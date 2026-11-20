@@ -1671,6 +1671,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
 
         AbstractView::Input {
             placeholder,
+            accessibility,
             value,
             on_change,
             on_submit,
@@ -1680,6 +1681,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             disabled,
         } => AbstractView::Input {
             placeholder,
+            accessibility,
             value,
             on_change: on_change.map(|m| IcedMessage::from_dynamic(&m)),
             on_submit: on_submit.map(|m| IcedMessage::from_dynamic(&m)),
@@ -8600,6 +8602,7 @@ mod tests {
             gap: 4,
             cells: vec![AbstractView::Input {
                 placeholder: "type".to_string(),
+                accessibility: None,
                 value: String::new(),
                 on_change: Some(DynamicMessage::String("name".to_string())),
                 on_submit: None,
@@ -9188,6 +9191,7 @@ mod line_edit_tests {
     fn p483_two_input_view() -> AbstractView<IcedMessage> {
         let user = AbstractView::Input {
             placeholder: "Enter username".to_string(),
+            accessibility: None,
             value: String::new(),
             on_change: Some(IcedMessage {
                 widget: "LoginChild".to_string(),
@@ -9202,6 +9206,7 @@ mod line_edit_tests {
         };
         let pass = AbstractView::Input {
             placeholder: "Enter password".to_string(),
+            accessibility: None,
             value: String::new(),
             on_change: Some(IcedMessage {
                 widget: "LoginChild".to_string(),
@@ -10118,6 +10123,7 @@ widget LoginChild {
     fn p491_single_input_view() -> AbstractView<IcedMessage> {
         AbstractView::Input {
             placeholder: "Only box".to_string(),
+            accessibility: None,
             value: String::new(),
             on_change: Some(IcedMessage {
                 widget: "Solo".to_string(),
@@ -10811,6 +10817,7 @@ mod plan082_focus_tests {
     fn input() -> AbstractView<IcedMessage> {
         AbstractView::Input {
             placeholder: "Path".into(),
+            accessibility: None,
             value: String::new(),
             on_change: Some(msg("PathChanged")),
             on_submit: Some(msg("Navigate")),

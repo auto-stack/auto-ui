@@ -795,6 +795,7 @@ pub enum View<M: Clone + Debug> {
     /// Text input field with optional styling
     Input {
         placeholder: String,
+        accessibility: Option<Box<InputAccessibility>>,
         value: String,
         on_change: Option<M>,
         on_submit: Option<M>, // Fires on Enter key press
@@ -2221,6 +2222,7 @@ impl<M: Clone + Debug> View<M> {
     pub fn input(placeholder: impl Into<String>) -> ViewInputBuilder<M> {
         ViewInputBuilder {
             placeholder: placeholder.into(),
+            accessibility: None,
             value: String::new(),
             on_change: None,
             on_submit: None,
@@ -2774,6 +2776,7 @@ impl<M: Clone + Debug> View<M> {
             },
             View::Input {
                 placeholder,
+                accessibility,
                 value,
                 on_change,
                 on_submit,
@@ -2783,6 +2786,7 @@ impl<M: Clone + Debug> View<M> {
                 disabled,
             } => View::Input {
                 placeholder,
+                accessibility,
                 value,
                 on_change: on_change.map(|m| f(m)),
                 on_submit: on_submit.map(|m| f(m)),
@@ -3406,8 +3410,15 @@ impl<M: Clone + Debug> ViewListBuilder<M> {
 }
 
 /// Builder for Input with fluent API
+#[derive(Clone, Debug)]
+pub struct InputAccessibility {
+    pub label: String,
+    pub validation_message: String,
+}
+
 pub struct ViewInputBuilder<M: Clone + Debug> {
     placeholder: String,
+    accessibility: Option<Box<InputAccessibility>>,
     value: String,
     on_change: Option<M>,
     on_submit: Option<M>,
@@ -3419,6 +3430,13 @@ pub struct ViewInputBuilder<M: Clone + Debug> {
 }
 
 impl<M: Clone + Debug> ViewInputBuilder<M> {
+    pub fn accessibility(mut self, label: String, validation_message: String) -> Self {
+        if !label.is_empty() || !validation_message.is_empty() {
+            self.accessibility = Some(Box::new(InputAccessibility { label, validation_message }));
+        }
+        self
+    }
+
     /// Set input value
     pub fn value(mut self, val: impl Into<String>) -> Self {
         self.value = val.into();
@@ -3518,6 +3536,7 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
     pub fn build(self) -> View<M> {
         View::Input {
             placeholder: self.placeholder,
+            accessibility: self.accessibility,
             value: self.value,
             on_change: self.on_change,
             on_submit: self.on_submit,

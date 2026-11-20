@@ -791,6 +791,8 @@ element input {
     props: [
         { name: "value", type: "state_ref", description: "Bound value (two-way binding)" }
         { name: "placeholder", type: "string", description: "Placeholder text" }
+        { name: "label", type: "string", description: "Accessible name for the input" }
+        { name: "validationMessage", type: "string", description: "Current validation error announced with the input" }
         { name: "type", type: "one_of:text,password,email,number", default: "text", description: "Input type" }
         { name: "onchange", type: "msg_ref", description: "Message on value change" }
         { name: "onenter", type: "msg_ref", description: "Message on Enter key" }

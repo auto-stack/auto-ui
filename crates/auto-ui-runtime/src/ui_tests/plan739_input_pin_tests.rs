@@ -166,6 +166,7 @@ mod plan739_input_pin_tests {
 
         let mut input = View::<DynamicMessage>::Input {
             placeholder: "p".to_string(),
+            accessibility: None,
             value: String::new(),
             on_change: Some(DynamicMessage::String(".Edit".to_string())),
             on_submit: None,

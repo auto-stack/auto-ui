@@ -622,6 +622,7 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
                 ),
                 AbstractView::Input {
                     placeholder,
+                    accessibility,
                     value,
                     on_change,
                     on_submit,
@@ -639,7 +640,10 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
                     );
                     (
                         Role::TextInput,
-                        placeholder.clone(),
+                        accessibility.as_ref()
+                            .filter(|field| !field.label.is_empty())
+                            .map(|field| field.label.clone())
+                            .unwrap_or_else(|| placeholder.clone()),
                         if *password { None } else { Some(value.clone()) },
                         None,
                         on_change.as_ref(),
@@ -838,6 +842,11 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
         let mut node = Node::new(role);
         if !name.is_empty() {
             node.set_label(name);
+        }
+        if let AbstractView::Input { accessibility: Some(field), .. } = view {
+            if !field.validation_message.is_empty() {
+                node.set_description(field.validation_message.clone());
+            }
         }
         if let Some(value) = value {
             node.set_value(value);

@@ -668,7 +668,13 @@ impl<'a> AuraViewBuilder<'a> {
             .extract_string_with(props, "disabled", bindings)
             .map(|v| v == "true" || v == "1")
             .unwrap_or(false);
-        let mut builder = View::<DynamicMessage>::input(placeholder).value(value);
+        let label = self.extract_string_with(props, "label", bindings).unwrap_or_default();
+        let validation_message = self
+            .extract_string_with(props, "validationMessage", bindings)
+            .unwrap_or_default();
+        let mut builder = View::<DynamicMessage>::input(placeholder)
+            .value(value)
+            .accessibility(label, validation_message);
         if disabled {
             builder = builder.disabled(true);
         }
