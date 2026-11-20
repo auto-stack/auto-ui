@@ -194,6 +194,20 @@ AGE Component/Package 使用现有 block-comment 扫描器保留非嵌套 `/* �
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 3 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ac5f6a01, lang d414aec0e | evidence: 35 focused cases pass and original Carousel page reaches both host endpoints in isolation | next: work`
 
+**Carousel 行内文本（T-02 进行中）。** AutoLang `9f4a65ad3783d2b38537837b8105ac2e3c4eb0b7`。两个 AGE 前端通过正式词法与 CST 投影收录 `text | …`。语法只在视图文本叶启用，保留原字节位置；CRLF 和同行闭合花括号仍结束文本，`||` 保持逻辑运算符。新 matcher 经过语言包二进制往返。两项身份为 AgeComponent `0e7f902d5e21f68cded1a6626252793ebb55d95aac2b669379975cc7ca03c83a`、AgePackage `58d31db5dd4a4bdb239c84b869bfeb85b435ff6953ec88bdd1c99af18b92fad9`，相邻 profile 的冻结断言通过。
+
+| 实际测试或原源回放 | 结果 | 墙钟执行 |
+|---|---|---:|
+| `p107_age_inline_text_preserves_labels_and_view_boundaries` | 1/1，两个前端逐一检查标签、span、同行条件块和两项非法位置 | 0.084 s |
+| Component、grammar scope、AGE package、相邻 text 过滤 | 28/28（含上述新增项）、4/4、12/12、1/1 | 0.146 / 0.398 / 0.146 / 0.069 s |
+| Runtime codec 与 lexer 过滤 | 1/1、6/6 | 0.012 / 0.014 s |
+| 固定官方组件中的 `CarouselDemo` 原字节片段，附三个 `Slide` | 两条 AGE 前端均准入 | 0.061 s |
+| 完整官方组件文件与原文档页经 Iced `--package` 及直连 `generate_package_sfc` | 两端均已越过 `|` 词法错误，仍在根件 `Carousel` 的声明结构以 exit 4 拒绝 | 0.252 / 0.139 s |
+
+编译准备分别为 conformance 6.72 s、最终增量 3.82 s，runtime 测试最终增量 1.75 s，同树 AutoUI 工具及窗口 47.11 s，两探针链接 0.532 / 5.872 s。发现和清理未单独计时。测试材料 `inline-text-runs.json` SHA256 `f656dc3880b2d4a16813156bc0050a3c75db2825d1dd7b20459ac6c734b2f84a`，原样回放 `inline-text-original-replay.json` SHA256 `2f4da0f123dc316bac293df06da79b2a92eb57f4b337fd87c3069abb34619717`。逐件材料对照 `carousel-individual-closure.json` SHA256 `bcfc5cbc2fa7394131a078e5d20f8f14b4e5f22d902ab7b2e85e7a481d3014c1`，另定位多行消息声明、计算样式及引号属性键。两端整页行为仍待 §5 同源验收。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 4 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ac5f6a01, lang 9f4a65ad3 | evidence: original CarouselDemo parses in both AGE profiles and full closure advances to declaration diagnostics | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
