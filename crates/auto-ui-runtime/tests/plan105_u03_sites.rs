@@ -309,7 +309,7 @@ fn build_site(app: &str, units: &[&str]) -> Result<PathBuf, String> {
     .map_err(|e| e.to_string())?;
     std::fs::write(
         out.join("main.js"),
-        "import { createApp } from 'vue'\nimport App from './App.vue'\ncreateApp(App).mount('#app')\n",
+        &main_js_for(&root, &merged),
     )
     .map_err(|e| e.to_string())?;
     std::fs::write(
@@ -335,12 +335,52 @@ fn p105_build_u03_sites() {
     assert!(failed.is_empty(), "站点构建失败: {failed:?}");
 }
 
+/// `main.js`：应用带 `routes { "…" -> use <page> }` 时装配 vue-router（单页站点
+/// 也要把板块/页面挂到 `/`），否则直接 mount App。
+fn main_js_for(root: &Path, merged: &str) -> String {
+    let mut routes: Vec<(String, String)> = Vec::new();
+    if let Some(start) = merged.find("routes {") {
+        for line in merged[start..].lines().skip(1) {
+            let t = line.trim();
+            if t.starts_with('}') {
+                break;
+            }
+            let Some((path_part, target)) = t.split_once("->") else { continue };
+            let path = path_part.trim().trim_matches(|c| c == '"' || c == '\'').to_string();
+            let target = target.trim().trim_start_matches("use ").trim().to_string();
+            if !path.is_empty() && !target.is_empty() {
+                routes.push((path, target));
+            }
+        }
+    }
+    if routes.is_empty() {
+        return "import { createApp } from 'vue'\nimport App from './App.vue'\ncreateApp(App).mount('#app')\n".to_string();
+    }
+    let mut imports = String::new();
+    let mut table = String::new();
+    for (i, (_path, target)) in routes.iter().enumerate() {
+        let file = root
+            .join("src/front/pages")
+            .join(format!("{target}.at"));
+        let comp = if file.exists() {
+            format!("Page{i}")
+        } else {
+            format!("{target}")
+        };
+        imports.push_str(&format!("import {comp} from './components/{target}.vue'\n"));
+        table.push_str(&format!("  {{ path: '{_path}', component: {comp} }},\n", _path = routes[i].0));
+    }
+    format!(
+        "import {{ createApp }} from 'vue'\nimport {{ createRouter, createWebHashHistory }} from 'vue-router'\nimport App from './App.vue'\n{imports}const router = createRouter({{ history: createWebHashHistory(), routes: [\n{table}] }})\ncreateApp(App).use(router).mount('#app')\n"
+    )
+}
+
 fn u03_apps() -> Vec<(&'static str, Vec<&'static str>)> {
     vec![
         ("013-todo", vec!["src/front/app.at", "src/front/todo_list.at"]),
         ("015-notes", vec!["src/front/app.at", "src/front/editor.at", "src/front/sidebar.at"]),
         ("016-calendar", vec!["src/front/app.at"]),
-        ("022-kanban", vec!["src/front/app.at"]),
+        ("022-kanban", vec!["src/front/app.at", "src/front/pages/board.at"]),
     ]
 }
 
@@ -386,6 +426,10 @@ fn extra_deps(app: &str) -> &'static [(&'static str, &'static str)] {
             "lucide-vue-next",
             "D:/autostack/auto-lang/packages/auto-forge-ui/node_modules/lucide-vue-next",
         )],
+        "022-kanban" => &[(
+            "vue-router",
+            "D:/autostack/auto-lang/examples/vue-gallery/node_modules/vue-router",
+        )],
         _ => &[],
     }
 }
@@ -422,18 +466,13 @@ fn scaffold_site(out: &std::path::Path, app: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 浏览器腿的**可跑门**：构建站点 → `vite build` → `node verify.mjs`。
-/// 022-kanban 不在此列：它的板块页由 `<router-view/>` 承载，单页站点无路由
-/// （需要 vue-router 集成，见 §96）。
+/// 浏览器腿的**可跑门**：构建四 app 站点 → `vite build` → `node verify.mjs`。
 /// 默认忽略（依赖本机 node_modules/Playwright）；手动跑：
 /// `cargo test -p auto-ui-runtime --features ace-bridge --test plan105_u03_sites -- --ignored --nocapture`
 #[test]
 #[ignore = "浏览器门：需要本机 node_modules junction + Playwright"]
 fn p105_u03_browser_gate() {
-    let apps: Vec<(&str, Vec<&str>)> = u03_apps()
-        .into_iter()
-        .filter(|(app, _)| *app != "022-kanban")
-        .collect();
+    let apps = u03_apps();
     let mut failures: Vec<(String, String)> = Vec::new();
     for (app, units) in &apps {
         let out = match build_site(app, units) {
