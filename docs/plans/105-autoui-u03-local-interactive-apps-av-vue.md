@@ -635,6 +635,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 84 | from: work | t
 - 基线：本分支全量 `ace-core conformance` 基线 834 passed / 36 failed（预存在，stash 对照实证），本轮改动零新增失败。
 - 六例真窗现状：015 7 叶、018 11 叶（壳件）、022 8 叶（壳件+主题可交互）；013 组件编译通过、卡 AV lowering；016 卡 view-for over computed；012 卡未定型列表元素 owned 化。
 
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 85 | from: work | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: e3883ae5 / 0a0872b18 | next: user
+
+2026-11-19 stage: work（T-02 W82 + 交接）| PLAN-105 r1 | outcome: waiting（用户决定暂停）| code_commit: auto-ui `e22b9c5c`/`e3883ae5`、auto-lang `0a0872b18` | task_ids: T-02
+
+**本轮交付**：①局部写只在**文本局部**补 `.clone()`（此前 bool 局部被 clone → `clone on bool`）；②prep 把组件 **model 文本字段**改写为 owned `Str`（AV collections 面只承载 owned 文本的字段声明形态）；③**决策项 D-105-B** + **交接文档 D-105-C** 写入 §10（能力清单、阻断、续做路线、工作树、证据锚）。
+
+**013 终态**：组件源码**全部编译通过**（组件面/verify/store/后端内联 OK），卡在 **AV（Iced）后端 lowering**：`lower.type-use: type kind Str is outside the av.collections/1 source surface`——`av.collections/1` MIR 只有 i32/bool 标量。六例全部受此限（A2Vue/TS 端不受限）。
+
+**用户决定（D-105-B 答复）**：**暂停并交接**。不需要再跑检查或开工；按 §10 的 D-105-C 续做即可。
+
+**状态**：两棵工作树干净且已提交（auto-ui `f0ca8841`、auto-lang `0a0872b18`）；计划文件保留 `status: executing`（未交付），交接事实在 §10。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -796,6 +808,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 84 | from: work | t
 - 基线：本分支全量 `ace-core conformance` 基线 834 passed / 36 failed（预存在，stash 对照实证），本轮改动零新增失败。
 - 六例真窗现状：015 7 叶、018 11 叶（壳件）、022 8 叶（壳件+主题可交互）；013 组件编译通过、卡 AV lowering；016 卡 view-for over computed；012 卡未定型列表元素 owned 化。
 
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 85 | from: work | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: e3883ae5 / 0a0872b18 | next: user
+
+2026-11-19 stage: work（T-02 W82 + 交接）| PLAN-105 r1 | outcome: waiting（用户决定暂停）| code_commit: auto-ui `e22b9c5c`/`e3883ae5`、auto-lang `0a0872b18` | task_ids: T-02
+
+**本轮交付**：①局部写只在**文本局部**补 `.clone()`（此前 bool 局部被 clone → `clone on bool`）；②prep 把组件 **model 文本字段**改写为 owned `Str`（AV collections 面只承载 owned 文本的字段声明形态）；③**决策项 D-105-B** + **交接文档 D-105-C** 写入 §10（能力清单、阻断、续做路线、工作树、证据锚）。
+
+**013 终态**：组件源码**全部编译通过**（组件面/verify/store/后端内联 OK），卡在 **AV（Iced）后端 lowering**：`lower.type-use: type kind Str is outside the av.collections/1 source surface`——`av.collections/1` MIR 只有 i32/bool 标量。六例全部受此限（A2Vue/TS 端不受限）。
+
+**用户决定（D-105-B 答复）**：**暂停并交接**。不需要再跑检查或开工；按 §10 的 D-105-C 续做即可。
+
+**状态**：两棵工作树干净且已提交（auto-ui `f0ca8841`、auto-lang `0a0872b18`）；计划文件保留 `status: executing`（未交付），交接事实在 §10。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
