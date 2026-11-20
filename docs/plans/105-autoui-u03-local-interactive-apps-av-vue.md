@@ -272,6 +272,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 56 | from: work | t
 **012 真窗推进（本轮结果）**：不再停在该 for 墙，装载进入语义诊断清单，暴露出**两个新面**：①**宿主服务** `storage.get/set`（闹钟持久化）与 `Time.now_sec()`——即 **S1 宿主 API 面**；②空列表字面量 `[]` 在 `[]T` 注解下的元素类型推断（`source.array-lit-empty`）。这两项是 012 的剩余主墙（也覆盖 013/015/016 的部分）。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 2/2；prep 7/7。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 57 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W54：宿主服务仿真第一刀）| PLAN-105 r1 | outcome: pass | task_ids: T-02（W54）| evidence: 012 诊断面（storage/Time 消失，剩 Str.contains / push）
+
+**交付**：prep 新增**宿主服务仿真**（S1 的 prep 侧最小实现）——①`storage.get("k")` → `.__st_k`（键 → 稳定字段名）；②`storage.set("k", v)` → `.__st_k = v`（语句位改写）；③`Time.now_sec()` → `.__now_sec`；④把用到的字段注入 `model {` 块尾（`str`/`int` 初值）。另加 `var NAME []T = []` → `List<T>.new()`（元素 `str` 归一为 `Str`，822 元素域不收借用 str）。
+
+**效果**：012 真窗的 `storage`/`Time` 诊断**全部消失**，剩余墙变为 ①`Str.contains(...)`（语言无此内建方法）②`rows.push(...)`（局部列表注解 `[]str` 未生效 → 接收位判成 i32）。
+
+**发现（下一刀定界）**：组件面需要 `Str.contains(sub) -> bool` 一类文本谓词与「`[]T` 注解 → List<T> 局部类型」的可靠传播；后者与 `age-model-ty` 只收 `age-list-ty`（不收 `List<T>` 泛型拼写）有关，改文法或改投影二选一。
+
+**验证**：auto-ui prep 7/7；core 未动。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
