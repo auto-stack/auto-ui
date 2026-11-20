@@ -399,6 +399,18 @@ AutoLang 集合发射与定向测试准备为 16.13 / 25.61 s，AutoUI 测试与
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 19 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 57f995fd, lang b863cb642 | evidence: unchanged 024 entry projects with inferred record lists and a 400 ms Tick declaration, original handlers replay in AV/A2TS/Iced material, and original closure now stops at AreaChart | next: work`
 
+**024 四个图表的参数、索引循环和定时守卫（T-02/T-03 进行中）。** AutoLang `cd91223cd8ef23d80e1ec84a9642224530265d5c`，AutoUI `ee142965bd66f08459abd8ba3883db8463cd0bda`。AGE 包投影保留 `List<str>` 元素类型、默认值顺序与空列表，以及 BarChart 原 `type` 参数和 `.type` 引用。处理器 `while` 走共享受检循环，索引读写走现有集合操作。显式 `timer { Msg (every_ms: n, when: …) }` 在两个 AGE 文法投影守卫，在包面由共享检查确认布尔类型。Vue 采用完整受检处理器接面识别 `while`。
+
+| 执行 | 结果 |
+|---|---|
+| 四个原组件及闭包 | 四份原参数头、模型块和处理器块分别通过语法投影，Line 和 Donut 的原定时块也通过。整包首报仍为 `official::area_chart` 字节 1458..1464 的组件声明语法拒绝。分别隔离出四份原 `style { … }` 以及条件类列表，两种形状各自重现语法拒绝。替换视图、移除局部样式块的材料中，Line 通过投影，Area、Bar、Donut 首报原 `HoverOut` 缺少消息声明。仅在材料补该声明后，三者同样通过投影。 |
+| AV、A2TS 和桌面受检索引材料 | 原处理器的 `while`、整数索引读写及 `every_ms: 33, when:` 形态经正式包入口执行。AV 与 A2TS 的三组双实例文本为 `0/0 → 0/31 → 31/31`。在真实 Iced 窗口手动触发两次，重开保留实例各自状态，8 帧，两会话各丢弃 1 次迟到事件，无错误，耗时 3.12 s。错型列表默认值、非布尔守卫和错型索引赋值均具名拒绝。 |
+| 回归与身份 | Core `plan981` 248/248、`plan1072_component_style` 30/30，AV `plan981` 65/65、`aggregates_t01_probe` 33/33，AutoUI `plan980_package_sfc` 18/18、`plan124_routes` 2/2、包窗口闭包 4/4。AgeComponent `c070f84f2364c3ae46c7a4f626eeba090f6bc69a2f6fe089b182ebb0111d674e`，AgePackage `368e8a0c253e661f0c38ace5c0bc005e34e65132390791f01faa4e7cae31def0`，相邻冻结面通过。 |
+
+语言定向测试和 A2TS 准备为 19.16 / 12.02 s，AutoUI 定向测试和真窗准备为 88 / 44.55 s。`chart-params-original-final.log`、`chart-params-final-probes.log`、`chart-params-style-boundary.log`、`chart-loop-material-av-final.log`、`chart-loop-material-a2ts-final.log`、`chart-loop-native-final.json` 的 SHA256 依次为 `c6251b3201a7aaf2053bb788fe27f588e53e8383c0e6e54c52159c71f2a002f1`、`e3ef8e6fd1df7a13c03d6c874453974cacd9a8e145b1ffd1b1d04ab1ac3a81c3`、`d2b413089c9ec3a5fa15e0aa0eb6e6a800cac43b4cf27ce952bda9795f4a0435`、`b538b55039a156dd629a87fbc027fe9c906553d3af0cb470f8d82107ad4517ce`、`596e722113b0c3b86b7b5031c14e010836f846672fd97d2618e989caec60d1a6`、`3fddd2e0a7fe7b901fe888de1bb7aea3879fd6e7c5a846dcf67dce4c45ec7e27`。接下来核对原组件 CSS、条件类列表、消息约定和受检属性挂载，之后用正式宿主验计时和图形行为。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 20 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ee142965, lang cd91223cd | evidence: original chart parameter, handler and guarded timer fragments project, indexed loop material agrees in AV/A2TS/Iced, and exact style, conditional class and message blockers are isolated | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
