@@ -1,4 +1,4 @@
-use reading_math: triple
+use chapter_math: triple
 
 widget ChapterWidget {
     msg { Score }

@@ -24,8 +24,8 @@ fn ace_route_project_emits_and_refreshes_the_full_page_set() {
     }
 
     std::fs::copy(
-        fixtures.join("reading_math.at"),
-        front.join("reading_math.at"),
+        fixtures.join("chapter_math.at"),
+        front.join("chapter_math.at"),
     )
     .unwrap();
 

@@ -303,8 +303,8 @@ mod tests {
                 include_str!("../../tests/fixtures/plan124/reading.at"),
             ),
             unit(
-                "reading_math",
-                include_str!("../../tests/fixtures/plan124/reading_math.at"),
+                "chapter_math",
+                include_str!("../../tests/fixtures/plan124/chapter_math.at"),
             ),
             unit(
                 "broken",

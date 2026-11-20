@@ -15,6 +15,7 @@ use ace_core::source::packages::PackageModuleInput;
 /// 包片段 lane：受检模块 + 脱糖源（span 基准）。
 pub struct PackageFragmentLane {
     ds_src: String,
+    entry_offset: usize,
     checked: ace_core::verify::CheckedModule,
 }
 
@@ -71,8 +72,16 @@ impl PackageFragmentLane {
                 .collect::<Vec<_>>()
                 .join("; ")
         })?;
+        let entry_offset = compiled
+            .description
+            .modules
+            .iter()
+            .find(|module| module.key == entry)
+            .ok_or_else(|| format!("compiled package has no entry module {entry:?}"))?
+            .flat_start;
         Ok(Self {
             ds_src,
+            entry_offset,
             checked: compiled.checked,
         })
     }
@@ -119,9 +128,10 @@ impl PackageFragmentLane {
             .iter()
             .find(|f| f.source_name.ends_with(fn_suffix))
             .ok_or_else(|| format!("no function ending with `{fn_suffix}` in the package view"))?;
+        let compiled_span = span.start + self.entry_offset..span.end + self.entry_offset;
         let mut best: Option<(usize, ace_core::hir::ExprId)> = None;
         for (i, e) in facts.body.exprs.iter().enumerate() {
-            if e.span.start == span.start && e.span.end == span.end {
+            if e.span.start == compiled_span.start && e.span.end == compiled_span.end {
                 best = Some((i, ace_core::hir::ExprId(i as u32)));
             }
         }

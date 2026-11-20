@@ -24,8 +24,8 @@ fn reader() -> Vec<PackageModuleInput> {
         unit("broken", include_str!("fixtures/plan124/broken.at")),
         unit("reading", include_str!("fixtures/plan124/reading.at")),
         unit(
-            "reading_math",
-            include_str!("fixtures/plan124/reading_math.at"),
+            "chapter_math",
+            include_str!("fixtures/plan124/chapter_math.at"),
         ),
     ]
 }
