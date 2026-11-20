@@ -361,6 +361,19 @@ AutoLang 增量准备 9.85 s，AutoUI 首次增量准备 31.10 s，严格工具�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 16 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 707b9e5d, lang 0c10b6a5f | evidence: checked mutable local scope and structured unit handlers run in Iced and Chrome with matching tick and reset values; full original chart package still rejects list and record forms | next: work`
 
+**024 的受检记录列表、滑窗对照与桌面文本更新（T-02/T-03 进行中）。** AutoLang `ccb98e942492d43cc19b8c151c020822e4927151`，AutoUI `213368da193d1ff7a2074f05402e77f8e429bf1d`。接入 PLAN-114 `35142ba50`、`6559fb2b1`、`e9bd89553`、`af933b9ca`、`652c6ba7f`、`1cee3518e`、`7d6eabe4c`、`b3316dc86` 的参数默认值、格式化文本、类型列表、嵌套记录、辅助函数与 AV 标量观察。合并保留了普通 Auto 条件数组及错误溯源。AGE 的分离表达式语句通过受检单元类型约束，值函数的根尾值维持既有规则。桌面包桥从同次派发观察提交标量状态和变化的文本叶，并按实例保留重开时的显示值。
+
+| 执行 | 结果 |
+|---|---|
+| 编译与定向回归 | Core `plan981` 248/248、`plan1072_component_style` 29/29，AV `plan981` 63/63、`aggregates_t01_probe` 33/33，AutoUI `plan980_package_sfc` 18/18、`plan124_routes` 2/2、包窗口闭包 4/4。两张 AGE 文法身份更新为 AgeComponent `2d612124f0c0cdd84e06260f055a3e8db64f480828addcb646775c2e930a3c2b`、AgePackage `a9c41104708789945f3d9de104da48668d0c43b46de975f6a528bfb781b1b31d`，冻结邻接身份通过。 |
+| 取原 024 的两份月度列表和流式算式 | 材料页的 `seed`、`monthly` 逐字复制原记录列表，补 `List<Month>` 类型，以受检辅助函数逐条复制与计算，复位逐条读取六条 seed 记录。AV 与专用 A2TS 集合发射在两个实例、7 个状态检查点与独立预期一致。长度 `6→7→8→8→8`，首月 `Jan→Feb→Mar`，暂停后 Tick 保持状态，复位恢复六条记录且另一实例保持 `t1`。直接把 `.seed` 交给按值辅助函数的反例在 MIR 报 `mir.use-after-move`，表明实际 `for` 仍需借用并逐条重建。 |
+| Iced 真窗及重开 | 基线提交了流式标量，文本只显示初值。修复后 11 次真实派发和 11 次文本提交逐项对账，12 帧，两个会话各丢弃 1 次迟到事件。重开保留实例 0 的原六条和实例 1 的七条及 `t1`，无错误，耗时 5.55 s。 |
+| 严格 ACE Vue 工具和固定原包 | 材料路由生成具名错误页 `source.age.sfc-handler: Tick: checked handlers require copyable int, bool or f32 bindings`，说明 A2TS 的受检集合执行尚未接入 A2Vue 响应式状态。原 `app.at` 与五模块重跑首报仍为入口字节 1217..1223，单独保留原 `out.push` 记录式的对照前进到 `source.age.msg-unknown`。原 `for`、四个组件的 `List<str>` 参数头、Donut/Line 的原 `timer` 块，各自单独缩减时仍在语法前门被拒绝。 |
+
+最终语言测试、AutoUI 测试和真窗二进制增量构建为 22.52 / 58.14 / 15.16 s。`chart-collection-material-av.log`、`chart-collection-material-a2ts-final.log`、`chart-collection-native-final.json`、`chart-collection-component-probes.log`、`ace-route-error-0.vue` 的 SHA256 依次为 `ae5bfb4b952b63c741a5b18ba08ae423f793cfc37312cfef78b581be3e14af02`、`60efe2a6d1487746d3d33856a5646ba30067e44f31019c909c0f2e96563e6b68`、`4d99518c261dbded326628a51d50a503fcfc06e59f370c79d43b12d70ac4539b`、`34748cf565404d4a17dc6432c3b3fc811e0dbabf4cdaa0d70c85d26838ffcb7a`、`e3c5be847b0ddca2df002e428b060b22733748562661fa8c7f309e9ab1e49583`。继续按原 024 的处理器迭代、未标注记录列表、组件列表参数、响应式集合与计时接面逐项联验。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 17 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 213368da, lang ccb98e942 | evidence: checked record list material preserves original chart data and sliding-window values across AV/A2TS, Iced publishes the complete text sequence and preserves each instance on reopen, raw chart and A2Vue blockers isolated | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
