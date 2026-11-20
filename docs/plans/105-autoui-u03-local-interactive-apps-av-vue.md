@@ -647,6 +647,10 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 85 | from: work | t
 **用户决定（D-105-B 答复）**：**暂停并交接**。不需要再跑检查或开工；按 §10 的 D-105-C 续做即可。
 
 **状态**：两棵工作树干净且已提交（auto-ui `f0ca8841`、auto-lang `0a0872b18`）；计划文件保留 `status: executing`（未交付），交接事实在 §10。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 86 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 5e5170ae | next: user
+
+2026-11-19 stage: waiting（用户决定暂停；本轮不做事、不跑检查）| 续做入口：§10 D-105-C（A 补 AV `Str` / B 先走 A2Vue / C 收窄）。恢复方式：顶层说「继续计划105」或选择路线。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -820,6 +824,10 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 85 | from: work | t
 **用户决定（D-105-B 答复）**：**暂停并交接**。不需要再跑检查或开工；按 §10 的 D-105-C 续做即可。
 
 **状态**：两棵工作树干净且已提交（auto-ui `f0ca8841`、auto-lang `0a0872b18`）；计划文件保留 `status: executing`（未交付），交接事实在 §10。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 86 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 5e5170ae | next: user
+
+2026-11-19 stage: waiting（用户决定暂停；本轮不做事、不跑检查）| 续做入口：§10 D-105-C（A 补 AV `Str` / B 先走 A2Vue / C 收窄）。恢复方式：顶层说「继续计划105」或选择路线。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
