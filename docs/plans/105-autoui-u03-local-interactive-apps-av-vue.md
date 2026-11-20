@@ -360,6 +360,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 64 | from: work | t
 **下一刀**：for-each 降级改为 AST 级**元素内联替换**（文本元素视图语义），替换后再走同一 hook 降级；`List<Record>` 元素仍可绑定（字段投影合法）。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 65 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: 8524e770b / c6c41e1f | next: work
+
+2026-11-19 stage: work（T-02 W62：for-each 元素内联）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `8524e770b`、auto-ui `c6c41e1f` | task_ids: T-02（W62）| evidence: 012 墙从 view-escape 推进到 view 文本叶
+
+**交付**：①for-each 降级改为**元素内联替换**——整元素在 collections 域是**视图**，不绑局部，改为把元素名替换成 `iter[i]` 表达式（复用 store 展开的 `subst_params_stmts`）；②`mark_lets_mutable` 补 `Stmt::While` 递归（循环体内的再赋值局部此前漏标，产生 `immutable-write`）。
+
+**012 墙序列推进**：`immutable-write` 与 `view-escape`（整元素绑定）**全部消失**；新墙 = `verify.view-escape: expr e565: a whole owned element is not a value`，落在 **view 的 `text r` 文本叶**——即「视图循环变量作文本叶」需要 view-for 的动态展开（与 016/022 的列表渲染同一能力）。
+
+**清理**：移除上一轮临时诊断探针，prep 测试 7 例保持。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3；prep 7/7。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
