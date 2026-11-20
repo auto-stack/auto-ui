@@ -348,6 +348,19 @@ AutoLang 增量准备 9.85 s，AutoUI 首次增量准备 31.10 s，严格工具�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 15 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 596482e1, lang 3e4cfa6e2 | evidence: original chart view and package declarations project, checked kebab chart aliases bind, and exact source controls isolate the remaining Tick and Reset blockers | next: work`
 
+**024 的处理器可变局部与受检分支（T-02/T-03 进行中）。** AutoLang `0c10b6a5f276766b45382148a470e4895fe4a572`，AutoUI `707b9e5d318e35ac68fb97b11025a3d54e7854c3`。AGE 包处理器支持 `var` 和裸名局部写入，按声明序和分支作用域绑定；显式 `.field` 与未被局部遮蔽的旧式裸名模型写入保持原语义。`let` 和消息参数保持不可变。Vue 对含局部或分支的无载荷处理器发射完整受检函数，并继续复用 A2TS 运行时运算。当前结构化发射覆盖标量模型；遇到所有权状态仍具名拒绝。
+
+| 执行 | 结果 |
+|---|---|
+| ACE Core、AV 与 AutoUI 回归 | `plan981` Core 248/248，AV 59/59，`plan1072_component_style` 20/20，`plan980_package_sfc` 18/18，`plan124_routes` 用已准备 provider 2/2。原 Tick 算式、两层同名局部、模型与局部遮蔽，以及 `let` 写入拒绝均有检查。 |
+| AV/Iced 正式桌面窗口 | 材料页保留同一 Tick/Reset 体，用固定文本叶启用包状态观察。两实例的派发记录为实例 0 的 `187 → 224`、实例 1 的 `187`、实例 0 复位后 `0 → 187`。渲染 8 帧，关窗后丢弃 1 次迟到事件，错误为空，耗时 1.81 s。桌面直接条件文本入口仍具名拒绝。 |
+| 严格 ACE CLI 生成、Vue 构建及 Chrome | 材料页通过真实按钮得到 `Ready → 187 → 224 → Ready → 187`，卸载后按钮离开 DOM，错误为空，浏览器核验耗时 1.16 s。按既有材料验收，在生成目录启用 `allowJs`。 |
+| 原 024 入口与五个原组件模块重跑 | 原 `.Tick` 的 `var nd`、`var lbl` 单独保留时，均通过语法进入 `source.age.msg-unknown`。保留列表迭代或记录构造的对照仍报语法错；完整原包的首个诊断仍为入口字节 1217..1223 的 `expected fn, found widget`。布局、列表写回与 400 ms 自动 Tick 尚需在原包联验。 |
+
+最终语言、CLI 和桌面示例的增量准备分别为 3.64 / 38.00 / 5.23 s。本轮仅更新 AgePackage 文法 ID 为 `da9a638f8bf25128274dcf4af0e71c7d5e66f406d0c16316d7d94f4406dc3eff`。`chart-entry-block-mutable.log`、`chart-mutable-original-final.log`、`chart-mutable-native-final.json`、`chart-mutable-vue-browser-final.log` 的 SHA256 依次为 `e2a931c6ca9fc88d7bcd6a63644bfe71a2cea6e68172acada86c8f58556671a1`、`d2328943389ccaef4ba3fbebad4901a3773db61f08f781f49e151e9a6e66f5ae`、`237cc917d0ce21dc7217d44d5785d19440fb93c389e703e6ea2da6c858d75f87`、`9f7012db57cf4133bd71cc0765417c7c7f09d420515901777d8bbbaf2d72fe1d`。PLAN-114 后续列表提交的预检在文法、前门、投影、绑定和 HIR 适配重叠，待在共同受检基线上逐项接入后重测原 `.Tick` 和 `.Reset`。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 16 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 707b9e5d, lang 0c10b6a5f | evidence: checked mutable local scope and structured unit handlers run in Iced and Chrome with matching tick and reset values; full original chart package still rejects list and record forms | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
