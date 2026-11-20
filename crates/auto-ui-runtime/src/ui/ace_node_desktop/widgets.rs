@@ -746,6 +746,8 @@ impl Renderer<'_> {
             .filter(|item| item.tag == "accordion-item")
             .enumerate()
             .map(|(index, item)| {
+                let open = selected.is_some_and(|items| items.contains(&index));
+                let panel_targets = self.targets.len();
                 let mut title = String::new();
                 let mut panels = Vec::new();
                 for child in element_children(item) {
@@ -755,23 +757,28 @@ impl Renderer<'_> {
                         _ => {}
                     }
                 }
-                let open = selected.is_some_and(|items| items.contains(&index));
+                if !open {
+                    self.targets.truncate(panel_targets);
+                }
                 let key_for_header = item.span.start;
-                self.targets.push(Control {
-                    key: key_for_header,
-                    label: title.clone(),
-                    target: Target::Button {
-                        action: Some(Action::Accordion {
-                            key,
-                            item: index,
-                            open: !open,
-                            multiple,
-                            collapsible,
-                        }),
-                        expanded: Some(open),
-                        selected: None,
+                self.targets.insert(
+                    panel_targets,
+                    Control {
+                        key: key_for_header,
+                        label: title.clone(),
+                        target: Target::Button {
+                            action: Some(Action::Accordion {
+                                key,
+                                item: index,
+                                open: !open,
+                                multiple,
+                                collapsible,
+                            }),
+                            expanded: Some(open),
+                            selected: None,
+                        },
                     },
-                });
+                );
                 if self.state.focus == Some(key_for_header) {
                     title.insert_str(0, "› ");
                 }
@@ -826,9 +833,12 @@ impl Renderer<'_> {
                     ));
                 }
                 "collapsible-content" => {
+                    let panel_targets = self.targets.len();
                     let panel = self.items(&child.items);
                     if open {
                         view = view.children(panel);
+                    } else {
+                        self.targets.truncate(panel_targets);
                     }
                 }
                 _ => {}
@@ -1065,5 +1075,71 @@ widget Pager {
         let after = accessibility_tree(1, tree, &[], &[], &state);
         assert_eq!(after.nodes[0].1.aria_current(), None);
         assert_eq!(after.nodes[1].1.aria_current(), Some(AriaCurrent::Page));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_disclosure_excludes_closed_panel_controls_from_keyboard_and_accessibility() {
+        use accesskit::{Action as Request, ActionRequest, Role, TreeId};
+
+        let original = project_component_candidates(r#"
+widget Preview {
+    view {
+        collapsible {
+            collapsible-trigger { text "Collapsible" {} }
+            collapsible-content { slider (value: 45) {} }
+        }
+        accordion (type: "single", collapsible: true) {
+            accordion-item (value: "first") {
+                accordion-trigger { text "Accordion" {} }
+                accordion-content { progress (value: 35) {} }
+            }
+        }
+    }
+}
+"#).expect("nested disclosure source");
+        let tree = &original[0].view.tree;
+        let mut state = State::new(BTreeMap::new());
+        let roles = |snapshot: &accesskit::TreeUpdate| {
+            snapshot
+                .nodes
+                .iter()
+                .map(|(_, node)| node.role())
+                .collect::<Vec<_>>()
+        };
+        let request = |action, target_node| ActionRequest {
+            action,
+            target_tree: TreeId::ROOT,
+            target_node,
+            data: None,
+        };
+        let closed = accessibility_tree(7, tree, &[], &[], &state);
+        assert_eq!(roles(&closed), [Role::Button, Role::Button, Role::Window]);
+        state.apply(keyboard_action(tree, &[], &[], &state, "Tab").unwrap());
+        state.apply(keyboard_action(tree, &[], &[], &state, "Tab").unwrap());
+        assert_eq!(
+            accessibility_tree(7, tree, &[], &[], &state).focus,
+            closed.nodes[1].0
+        );
+
+        for (button, _) in &closed.nodes[..2] {
+            let action = accessibility_action(
+                7, tree, &[], &[], &state, request(Request::Expand, *button),
+            )
+            .unwrap();
+            state.apply(action);
+        }
+        let opened = accessibility_tree(7, tree, &[], &[], &state);
+        assert_eq!(
+            roles(&opened),
+            [Role::Button, Role::Slider, Role::Button, Role::ProgressIndicator, Role::Window]
+        );
+        assert_eq!(opened.nodes[1].1.numeric_value(), Some(45.0));
+        assert_eq!(opened.nodes[3].1.numeric_value(), Some(35.0));
+
+        let collapse = request(Request::Collapse, closed.nodes[0].0);
+        state.apply(accessibility_action(7, tree, &[], &[], &state, collapse).unwrap());
+        let queued = request(Request::Increment, opened.nodes[1].0);
+        assert!(accessibility_action(7, tree, &[], &[], &state, queued).is_none());
     }
 }
