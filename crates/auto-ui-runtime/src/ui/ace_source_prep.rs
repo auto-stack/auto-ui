@@ -743,6 +743,22 @@ pub fn prepare_component_source(
                         // 原地维护，再尝试内联 store 块。
                         let unit_src = inline_memory_backend(project_root, &unit_src)
                             .unwrap_or_else(|| unit_src.clone());
+                        // store 单元引用的记录类型（含 `pub type X = { … }`）。
+                        for tb in collect_type_blocks(&unit_src) {
+                            // 只收组件面**可解析**的记录块（015 的某些后端类型带
+                            // `List<..>` 字段，注入即红，不能制造语法错）。
+                            let probe = format!(
+                                "{tb}\nwidget __TypeProbe {{\n    model {{ var __n int = 0 }}\n    view {{ text \"x\" {{}} }}\n}}\n"
+                            );
+                            if ace_core::source::age_component::project_component_candidates(&probe)
+                                .is_err()
+                            {
+                                continue;
+                            }
+                            if !type_blocks.iter().any(|b| b == &tb) {
+                                type_blocks.push(tb);
+                            }
+                        }
                         if let Some(block) = extract_store_block(&unit_src, item) {
                             // 只有该 store 片断在组件面**可解析**时才内联；含
                             // 组件面尚不支持的 `on` 语句（if/for/局部 var 等）时
@@ -1049,7 +1065,96 @@ fn rewrite_while_to_for(src: &str) -> String {
 /// `list_todos()` → 列表已是真值（删行）、`create_todo(x)` → push、
 /// `update_todo(...)` → 下标搜索后整条替换、`delete_todo(id)`／
 /// `remove_completed(_)` → 下标搜索后 `remove`。
+fn mb_rule(on: &str) -> bool {
+    match std::env::var("P105_MB_RULES") {
+        Ok(v) => v.split(',').any(|r| r.trim() == on),
+        Err(_) => true,
+    }
+}
+
+/// 从单元源码收集**所有**记录类型声明块（支持 `type X { … }` 与
+/// `pub type X = { … }`），统一重排为组件面可吃的 `type X { … }`。
+fn collect_type_blocks(src: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let lines: Vec<&str> = src.lines().collect();
+    let mut i = 0;
+    while i < lines.len() {
+        let t = lines[i].trim_start();
+        let t = t.strip_prefix("pub ").unwrap_or(t);
+        let Some(rest) = t.strip_prefix("type ") else {
+            i += 1;
+            continue;
+        };
+        let Some(name) = rest
+            .split(|c: char| c.is_whitespace() || c == '=' || c == '{')
+            .next()
+        else {
+            i += 1;
+            continue;
+        };
+        if name.is_empty() {
+            i += 1;
+            continue;
+        }
+        let mut depth = 0i32;
+        let mut started = false;
+        let mut body: Vec<String> = Vec::new();
+        let mut j = i;
+        while j < lines.len() {
+            let line = lines[j];
+            let mut opened = false;
+            for ch in line.chars() {
+                match ch {
+                    '{' => {
+                        depth += 1;
+                        opened = true;
+                    }
+                    '}' => depth -= 1,
+                    _ => {}
+                }
+            }
+            if !started {
+                if opened {
+                    started = true;
+                    let after = line.split_once('{').map(|(_, a)| a.trim()).unwrap_or("");
+                    if !after.is_empty() && !after.starts_with('}') {
+                        body.push(after.to_string());
+                    }
+                    if depth == 0 {
+                        break;
+                    }
+                }
+            } else {
+                if depth == 0 {
+                    let before = line.split('}').next().unwrap_or("").trim();
+                    if !before.is_empty() {
+                        body.push(before.to_string());
+                    }
+                    break;
+                }
+                body.push(line.trim().to_string());
+            }
+            j += 1;
+        }
+        let mut block = format!("type {name} {{\n");
+        for b in &body {
+            block.push_str("    ");
+            block.push_str(b);
+            block.push('\n');
+        }
+        block.push_str("}\n");
+        out.push(block);
+        i = j + 1;
+    }
+    out
+}
+
 fn inline_memory_backend(app_root: &Path, store_src: &str) -> Option<String> {
+    // 默认关闭：该内联会改写 store 单元，其他例子（015 等）尚未验证；用
+    // `P105_MEM_BACKEND=1` 打开（013 走这条路线）。
+    if std::env::var("P105_MEM_BACKEND").is_err() {
+        return None;
+    }
     let has_api_use = store_src.lines().any(|l| {
         let t = l.trim();
         t.starts_with("use back.api") || t.starts_with("use api:")
@@ -1058,7 +1163,7 @@ fn inline_memory_backend(app_root: &Path, store_src: &str) -> Option<String> {
         return None;
     }
     let read = |rel: &str| std::fs::read_to_string(app_root.join(rel)).ok();
-    let _api_src = read("src/back/api.at").or_else(|| read("src/api.at"))?;
+    let api_src = read("src/back/api.at").or_else(|| read("src/api.at"))?;
     let db_src = read("src/back/db.at").or_else(|| read("src/db.at"))?;
     // 列表字段与元素类型（store model 的第一条 `var <name> []<Elem> = …`）。
     let (list_field, elem) = store_src.lines().find_map(|l| {
@@ -1098,6 +1203,11 @@ fn inline_memory_backend(app_root: &Path, store_src: &str) -> Option<String> {
         })
         .unwrap_or(0);
     let mut out = String::with_capacity(store_src.len() + 512);
+    // 后端单元里的记录类型（`pub type Todo = { … }`）前置进来——组件面单模块
+    // 需要自带的记录声明。
+    for tb in collect_type_blocks(&api_src) {
+        out.push_str(&rewrite_record_text_fields(&tb));
+    }
     let mut tmp = 0usize;
     for line in store_src.split_inclusive('\n') {
         let (body, nl) = match line.strip_suffix('\n') {
@@ -1124,11 +1234,19 @@ fn inline_memory_backend(app_root: &Path, store_src: &str) -> Option<String> {
             out.push_str(nl);
             continue;
         }
+        if !mb_rule("create") {
+            out.push_str(line);
+            continue;
+        }
         if let Some(rest) = t.strip_prefix("create_todo(") {
             let arg = rest.trim_end_matches(')').trim();
             out.push_str(&format!(
                 "{indent}.{list_field}.push({elem} {{ id: .next_id, text: {arg}, done: false }}){nl}{indent}.next_id = .next_id + 1{nl}"
             ));
+            continue;
+        }
+        if !mb_rule("update") {
+            out.push_str(line);
             continue;
         }
         if let Some(rest) = t.strip_prefix("update_todo(") {
@@ -1140,14 +1258,21 @@ fn inline_memory_backend(app_root: &Path, store_src: &str) -> Option<String> {
             if args.len() == 3 {
                 let i = format!("__mb_u{tmp}");
                 tmp += 1;
+                // 整条替换走 `remove` + `insert`（下标赋值带记录字面量在 store 块
+                // 语法里不可解析；remove 返回物化元素、insert 收新值）。
+                let old = format!("__mb_o{tmp}");
                 out.push_str(&format!(
-                    "{indent}var {i} int = 0{nl}{indent}for {i} < .{list_field}.len() {{{nl}{indent}    if .{list_field}[{i}].id == {id} {{{nl}{indent}        .{list_field}[{i}] = {elem} {{ id: {id}, text: {text}, done: {done} }}{nl}{indent}    }}{nl}{indent}    {i} = {i} + 1{nl}{indent}}}{nl}",
+                    "{indent}var {i} int = 0{nl}{indent}for {i} < .{list_field}.len() {{{nl}{indent}    if .{list_field}[{i}].id == {id} {{{nl}{indent}        var {old} {elem} = .{list_field}.remove({i}){nl}{indent}        .{list_field}.insert({i}, {elem} {{ id: {id}, text: {text}, done: {done} }}){nl}{indent}    }}{nl}{indent}    {i} = {i} + 1{nl}{indent}}}{nl}",
                     id = args[0],
                     text = args[1],
                     done = args[2]
                 ));
                 continue;
             }
+        }
+        if !mb_rule("delete") {
+            out.push_str(line);
+            continue;
         }
         if let Some(rest) = t.strip_prefix("delete_todo(") {
             let id = rest.trim_end_matches(')').trim();
@@ -1157,6 +1282,10 @@ fn inline_memory_backend(app_root: &Path, store_src: &str) -> Option<String> {
             out.push_str(&format!(
                 "{indent}var {i} int = 0{nl}{indent}for {i} < .{list_field}.len() {{{nl}{indent}    if .{list_field}[{i}].id == {id} {{{nl}{indent}        var {gone} {elem} = .{list_field}.remove({i}){nl}{indent}    }}{nl}{indent}    {i} = {i} + 1{nl}{indent}}}{nl}"
             ));
+            continue;
+        }
+        if !mb_rule("remove") {
+            out.push_str(line);
             continue;
         }
         if let Some(_rest) = t.strip_prefix("remove_completed(") {
@@ -1183,6 +1312,8 @@ fn rewrite_record_text_fields(block: &str) -> String {
         // 形如 `<name> str` / `<name> str,`（字段行）：首个空白后的类型词是 str。
         let mut replaced = None;
         if let Some((name, ty)) = t.split_once(char::is_whitespace) {
+            // 两种字段写法：`text str`（AGE record）与 `text: str`（`pub type` 形态）。
+            let name = name.trim_end_matches(':');
             let ty_trim = ty.trim_end_matches(',').trim();
             if ty_trim == "str" && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
                 let suffix = if ty.trim_end().ends_with(',') { "," } else { "" };
