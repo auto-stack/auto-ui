@@ -457,6 +457,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 73 | from: work | t
 **未解现象**：手工用例（`type Todo{text Str}` + `var t Todo = …` + `.todos.push(t)`）**仍报** `move-required`（span 落在 `t` 上）。说明该语句的发射走的可能不是 `hook_stmts_lower` 的 `Call` 分支（或 `is_list_method` 未命中）；下一轮加一次性 trace（在 Call 分支打印 msg/形态）确认路径，再决定是补 `Method` 形态识别还是改在检查函数铸造处。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 4/4。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 74 | from: work | to: work | status: executing | outcome: pass（定位推进）| worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W71：push 路径 trace）| PLAN-105 r1 | outcome: pass | task_ids: T-02（W71）| evidence: `[call-out]` 轨迹（`MovePos(Var(__age_hl_0_0_0_t))` 确实发射）
+
+**实证（trace 结论）**：`hook_stmts_lower` 的 `Call` 分支**确实命中**（`is_list_method=true`，形态 `MethodCall`），且发射出的实参**就是 `MovePos(Var(__age_hl_0_0_0_t))`**。而 resolver 侧：`resolve_args` 对 `MovePos` 置 `moved: true`，`check_push_value` 前有新增的 `move_marked_value` 包装成 `RExprKind::Move`。
+
+**矛盾点（下一刀）**：诊断仍报 `move-required`（span = `push` 方法名，正是 `check_push_value(.., name.span)` 的锚点）→ 说明 resolver 拿到的实参 `moved == false`，即 **`MovePos` 在「AST → resolver 入口」之间被某处归一成 `Pos`**（候选：desugar/`resolve_method_call` 的实参预解析、或 adapter 的 desugar 阶段）。下一刀直接 dump atom 的 `call` 节点看是否带 `move` 标记，定位归一发生点。
+
+**验证**：plan105 25/25、980 39/39、981 248/248；av list handlers 4/4；trace 已移除。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
