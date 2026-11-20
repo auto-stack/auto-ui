@@ -857,6 +857,18 @@ stage: work（浏览器腿扩面）| plan_id: PLAN-105 | plan_revision: r1 | rou
 **回归**（`f59204c3`）：`p105_u03_apps_lane_sfc_generate`；包片段 lane 的按 app 钉住断言放宽到已知缺口，保持仓库全绿。
 
 **结论**：浏览器腿（A2Vue lane）在 U03 范围内已覆盖五个 app 的生成；包片段 lane 单入口合成仍需 S1 + AGE 包面 collections 域。
+
+stage: work（浏览器真实构建诊断）| plan_id: PLAN-105 | plan_revision: r1 | round: 101 | from: work | to: work | status: executing | outcome: pass（诊断）| worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `f59204c3` | next: work
+
+2026-11-21 stage: work（T-02 W96：013 页面真实构建 + 运行时诊断）| outcome: pass（诊断）
+
+**已做**：lane 产物落成站点 `plan-artifacts/plan-105/p013-site/`（App.vue/TodoList.vue/a2x_rt.mjs + vite 脚手架），`vite build` 成功（16 modules / 190 kB）。
+
+**运行时诊断**（Playwright + 静态服务）：mount 抛 `ReferenceError: store is not defined`——模板引用 `store.*`，但 SFC 脚本无 `store` 绑定。
+
+**根因**：A2Vue lane 只承载 widget 本地状态；`store` 由 **A2R / vm_bridge**（`component_a2r_fileset` 等）桥接为 JS store 类。
+
+**结论**：浏览器腿分两层——①SFC 生成（五 app 已通，`f59204c3`）；②store 桥接的真实挂载（下一里程碑；站点脚手架与 Playwright 脚本已留在 `p013-site/` 可直接复用）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1240,6 +1252,18 @@ stage: work（浏览器腿扩面）| plan_id: PLAN-105 | plan_revision: r1 | rou
 **回归**（`f59204c3`）：`p105_u03_apps_lane_sfc_generate`；包片段 lane 的按 app 钉住断言放宽到已知缺口，保持仓库全绿。
 
 **结论**：浏览器腿（A2Vue lane）在 U03 范围内已覆盖五个 app 的生成；包片段 lane 单入口合成仍需 S1 + AGE 包面 collections 域。
+
+stage: work（浏览器真实构建诊断）| plan_id: PLAN-105 | plan_revision: r1 | round: 101 | from: work | to: work | status: executing | outcome: pass（诊断）| worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `f59204c3` | next: work
+
+2026-11-21 stage: work（T-02 W96：013 页面真实构建 + 运行时诊断）| outcome: pass（诊断）
+
+**已做**：lane 产物落成站点 `plan-artifacts/plan-105/p013-site/`（App.vue/TodoList.vue/a2x_rt.mjs + vite 脚手架），`vite build` 成功（16 modules / 190 kB）。
+
+**运行时诊断**（Playwright + 静态服务）：mount 抛 `ReferenceError: store is not defined`——模板引用 `store.*`，但 SFC 脚本无 `store` 绑定。
+
+**根因**：A2Vue lane 只承载 widget 本地状态；`store` 由 **A2R / vm_bridge**（`component_a2r_fileset` 等）桥接为 JS store 类。
+
+**结论**：浏览器腿分两层——①SFC 生成（五 app 已通，`f59204c3`）；②store 桥接的真实挂载（下一里程碑；站点脚手架与 Playwright 脚本已留在 `p013-site/` 可直接复用）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
