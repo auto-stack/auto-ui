@@ -651,6 +651,10 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 85 | from: work | t
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 86 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 5e5170ae | next: user
 
 2026-11-19 stage: waiting（用户决定暂停；本轮不做事、不跑检查）| 续做入口：§10 D-105-C（A 补 AV `Str` / B 先走 A2Vue / C 收窄）。恢复方式：顶层说「继续计划105」或选择路线。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 87 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 9dd311b6 | next: user
+
+2026-11-19 stage: waiting（第 3 个等待轮；无新指令，不做事不跑检查）| 待用户选择路线 A/B/C 或说「继续计划105」。按技能规则，连续三轮等待后目标转 blocked。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -828,6 +832,10 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 85 | from: work | t
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 86 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 5e5170ae | next: user
 
 2026-11-19 stage: waiting（用户决定暂停；本轮不做事、不跑检查）| 续做入口：§10 D-105-C（A 补 AV `Str` / B 先走 A2Vue / C 收窄）。恢复方式：顶层说「继续计划105」或选择路线。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 87 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 9dd311b6 | next: user
+
+2026-11-19 stage: waiting（第 3 个等待轮；无新指令，不做事不跑检查）| 待用户选择路线 A/B/C 或说「继续计划105」。按技能规则，连续三轮等待后目标转 blocked。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
