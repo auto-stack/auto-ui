@@ -869,6 +869,16 @@ stage: work（浏览器真实构建诊断）| plan_id: PLAN-105 | plan_revision:
 **根因**：A2Vue lane 只承载 widget 本地状态；`store` 由 **A2R / vm_bridge**（`component_a2r_fileset` 等）桥接为 JS store 类。
 
 **结论**：浏览器腿分两层——①SFC 生成（五 app 已通，`f59204c3`）；②store 桥接的真实挂载（下一里程碑；站点脚手架与 Playwright 脚本已留在 `p013-site/` 可直接复用）。
+
+stage: work（浏览器 store 桥接）| plan_id: PLAN-105 | plan_revision: r1 | round: 102 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `07d4277e` | next: work
+
+2026-11-21 stage: work（T-02 W97：A2Vue lane 接 store 桥接）| outcome: pass
+
+**落地**：`generate_sfcs_with_lane_product_stores`（store 声明→Vue composable；widget SFC 经 `with_store_deps/with_store_surface` 拿到 `store` 绑定）；旧入口保留为薄包装。回归 `plan105_p013_store_lane`（composable 出口 + App 绑定 + 子组件共享 + v-for）。
+
+**真实挂载**（vite build + Playwright）：页面渲染 5 个复选框 / `3 items left` / **无 JS 异常**；`add`、`toggle` 未生效——模板输入框绑定的是本地 ref，store 的 `AddTodo` 读 store 自己的 `input`；lane 侧缺 `.store.<f>` → 字段改写。
+
+**下一步**：lane 源准备加 `.store.<f>`→`st_<f>` + 字段注入的同款改写，随后 add/toggle 验收转绿。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1264,6 +1274,16 @@ stage: work（浏览器真实构建诊断）| plan_id: PLAN-105 | plan_revision:
 **根因**：A2Vue lane 只承载 widget 本地状态；`store` 由 **A2R / vm_bridge**（`component_a2r_fileset` 等）桥接为 JS store 类。
 
 **结论**：浏览器腿分两层——①SFC 生成（五 app 已通，`f59204c3`）；②store 桥接的真实挂载（下一里程碑；站点脚手架与 Playwright 脚本已留在 `p013-site/` 可直接复用）。
+
+stage: work（浏览器 store 桥接）| plan_id: PLAN-105 | plan_revision: r1 | round: 102 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `07d4277e` | next: work
+
+2026-11-21 stage: work（T-02 W97：A2Vue lane 接 store 桥接）| outcome: pass
+
+**落地**：`generate_sfcs_with_lane_product_stores`（store 声明→Vue composable；widget SFC 经 `with_store_deps/with_store_surface` 拿到 `store` 绑定）；旧入口保留为薄包装。回归 `plan105_p013_store_lane`（composable 出口 + App 绑定 + 子组件共享 + v-for）。
+
+**真实挂载**（vite build + Playwright）：页面渲染 5 个复选框 / `3 items left` / **无 JS 异常**；`add`、`toggle` 未生效——模板输入框绑定的是本地 ref，store 的 `AddTodo` 读 store 自己的 `input`；lane 侧缺 `.store.<f>` → 字段改写。
+
+**下一步**：lane 源准备加 `.store.<f>`→`st_<f>` + 字段注入的同款改写，随后 add/toggle 验收转绿。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
