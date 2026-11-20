@@ -296,9 +296,24 @@ AutoUI 测试准备 13.42 s，工具准备 17.97 s，首次离线安装 9.7 s，
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 11 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui c5a15992, lang 20573cdf0 | evidence: Chrome mouse input updates checked typed model state, resets after SVG child replacement and stops on unmount | next: work`
 
+**正式 A2TS 运行时与原图表闭包对账（T-02/T-03 进行中）。** AutoUI `a9c4dec1a0c6b83e7ece5bd4ecf38a586b3a517c`，AutoLang 维持 `20573cdf047d1e7f5e102c0719fa4e95a7cefe11`。包 SFC 从受检语句收集 A2TS 正式运行时导出，存在引用时由原 `auto-ui-tool` 同步写出 `a2x_rt.mjs` 和 `a2x_rt.d.mts`。同名整数 helper 仅保留一份定义。增量生成能在 SFC 未变化时恢复缺失的配套运行时。
+
+| 执行 | 结果 |
+|---|---|
+| `plan980_package_sfc`、`plan124_routes` | 16/16、2/2，分别用时 0.215 / 0.657 s，后者使用已准备的 ui980 provider。 |
+| 新目录 `auto build --render vue --gen-only`，随后移出生成的运行时及声明再执行 | 首次发布两文件，后续命中 SFC 缓存并恢复两文件。运行时内容 SHA256 `bd9adfde09fe0740391f4a20f1b8fba0d752605eb5212d6901c4cf07b739baef`。 |
+| Vue 构建和 Chrome 157 鼠标输入 | 材料加入 `x + 150.0`、`y + 160.0`，同一测点的原逻辑坐标比较与带偏移比较相反，真实 SVG 颜色与状态按受检算术改变。八个观测状态、离开及卸载通过。构建仍在生成目录对照启用 `allowJs`。构建 2.592 s，浏览器 1.476 s。 |
+| 固定原页及组件重跑 | 107 当前编译器在四张原图表页和 FlowDiagram 页都报 `expected fn, found widget`。现有 PLAN-114 构建能解析四张原图表页，接着在组件 `style` 内的块注释处报 `source.unsupported`。仅以等字节空白替换该注释的对照仍报组件 `expected fn, found widget`。原 FlowDiagram 和 024 入口在两构建中仍报该错误；024 的 `chart_geom.at` 函数签名另报不接受 `float`。固定原输入保持原样。 |
+| `git merge-tree --write-tree --name-only --messages HEAD e784c0e1f` | exit 1，七个内容冲突，涉及文法、前门、包绑定、lowering 和 AV 观察。仅校验合入，计划分支没有合并在途代码。 |
+
+Rust 测试增量准备 4.73 s，工具准备 20.01 s，前端首次离线安装 10.470 s。`vue-runtime-helper-browser.log`、`original-age-114-donut-chart.log`、`original-age-114-donut-chart-comment-control.log`、`plan114-lang-composition.log` 的 SHA256 依次为 `073bfaec4553377a5b7916e52adeb67056899e78b915ab7a8f148f10eee717e6`、`73aa8328331d0301ae788d3affedc017416d979218ad0e5ee80e19f794d7c2cf`、`44f03ceef4c68f5dd9dc78dc4dbd3848b76c0a84faead9f88217ffc8f9912ac0`、`50fd89192e6c5c6660e96efb9b51bc2d2a99f3f64a499ce2c73fca869bdf71bf`。第一轮路由测试缺少 provider 环境变量，使用已准备的 provider 后两例通过。原应用和画廊的 AV/A2Vue 证据仍按 §5 收口。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 12 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a9c4dec1, lang 20573cdf0 | evidence: official Vue ABI restored after cached generation, verified f32 pointer arithmetic in Chrome, and identified remaining admission and shared integration gaps | next: user`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
 
 - **B-107-01｜共享生产基线。** 019/020/030 的原 Store、页面模块与前端绑定依赖 PLAN-105 的共有实现；029/031/031-paint 的 `$event`、图表和原画廊的类型列表与包闭包依赖 PLAN-114 的受检实现；原桌面树形挂载需要 PLAN-123 的生产入口与路由源发现。对应在途提交分别为 AutoLang `b987e2c23`、`7d6eabe4c` 与 AutoUI `ffbb488c`/`9d5ea5b3`，它们未形成 107 所需的稳定发布基面。恢复条件是相应 owner 提供可消费并且包含原形态正反例的固定提交，随后在 107 两树接入并重放 §5 矩阵。030 的第一个条件读取 `.store.has_current`，需要共享受检状态与真实控件树共同实现。
 - **B-107-02｜原 CodeEditor 源归属承接。** 同源双端均在 `QueryChanged` 缺少消息声明被拒；补声明的材料对照由受检编译转报缺 `code_editor_cursor_line`。请确认允许 107 增加 AutoOS 原画廊页的最小迁移，或由 AutoOS 负责人提供固定页提交并由 107 消费。之后由 107 接入编辑器光标的 AV/A2TS 能力并核编辑、搜索与卸载。材料对照保持独立，固定原页仍用 §9 的 AutoOS 提交。
+- **自动执行轮数。** `auto-plan-goal` 的默认 12 轮已用完。r1 保持执行中，待用户授权增加自动执行轮数。已验证的切片与原矩阵的未完成项按原范围交接。
