@@ -475,6 +475,16 @@ Core 251 + 30 + 11、AV 67 + 33、SFC 20、路由 2、桌面闭包 4 通过。�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 26 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang 2aecf2157 | evidence: exact native chart builders infer shared typed records and advance to record bracket reads, AV confirms instance-local appends | next: work`
 
+### 第 27 轮｜图表记录文本键读取
+
+AGE 包中，静态文本键读取已知记录局部名时复用点号字段的类型和借用规则。该规则覆盖列表循环绑定，原字符串键的 span 保留给未知字段诊断。AV 用同一材料检查 `band["i"]` 的整数值和 `band["s"].len()` 的字符串字段，并验证错误键拒绝及两实例列表长度 0 与 1。
+
+完整的四份原图表首次同时推进到 handler 参数读取。Area、Donut 和 Line 在 `.data` 处，Bar 在 `.type` 处报 `self` 未绑定。原闭包证据 `round27-chart-admission/original-with-stylekit.log` 的 SHA256 为 `90c24d32704c0192202be39316fd66accdc77995ff3db501ae1ec16386424ccf`。Core 251 + 30 + 11、AV 67 + 33、SFC 20、路由 2、桌面闭包 4 通过。
+
+PLAN-114 的 `872441620` 已有处理器参数降层和 AV 调用的共享路径。单提交合并树对照有五个重叠文件。该实现覆盖显式集合类型或有默认值的裸文本列表，024 必填的裸 `.data` 仍需要从调用点绑定数据元素类型。下一轮验证共享接线能否作为该绑定的基面。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 27 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang 8988a6ee8 | evidence: checked record bracket reads advance all four exact chart closures to handler widget inputs | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
