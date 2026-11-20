@@ -415,6 +415,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 68 | from: work | t
 | 012-clock | 表达式/循环/文本谓词/宿主 storage 仿真；列表初值展开 | ①列表元素 owned 化（resolver 泛型实参归一）；②动态列表渲染；③时间宿主 |
 
 **共同大件**：动态列表渲染（视图循环叶按运行时列表展开）——012/013/015/016/022 五例共用。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 70 | from: work | to: work | status: executing | outcome: pass（设计边界发现，已回滚）| worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 无代码提交 | next: work
+
+2026-11-19 stage: work（T-02 W67：动态列表渲染的设计边界）| PLAN-105 r1 | outcome: pass（负结果，边界确定）| task_ids: T-02（W67）| evidence: 试作的逐元素文本导出被 bind 层拒绝
+
+**尝试**：为动态列表渲染实现第一片——组件面为**文本元素列表**（`[]str`）导出逐下标文本函数 `__age_lt_<i>_<field>_<k>() -> Str`（越界空串），并挂到 `ComponentNodeOut.list_texts` 供渲染腿展开。
+
+**结果（被设计边界挡住）**：`xs.get(k).clone()` 在 **bind 层**被判 `source.view-escape: a whole owned element is not a value; project a field (xs.get(i).f) or use xs.remove(i)`。即**owned 元素的列表不允许把整元素读成值**（借视图只能在表达式内联消费，函数返回需要 owned → clone 被拒）。文本元素没有可投影字段，**整元素文本导出在该语义下不可行**；记录元素可以**投影字段**（`xs.get(i).f`）。
+
+**结论/下一刀**：动态列表渲染改走**记录元素投影**路线——①对 `List<Record>` 导出 `xs.get(i).<text-field>` 文本（记录元素允许字段投影）；②文本元素列表（012 的 cities/w_rows）需要另找 sanctioned 路径（例如新增「视图→owned 拷贝」内建，或让渲染腿在视图内联处消费而不经函数返回）；③设计前先在 `plan-artifacts/plan-105` 写一页设计说明再动工。
+
+**回滚**：试作代码已整体回滚（`age_component.rs` 复原），plan105 25/25、av list handlers 4/4 保持。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
