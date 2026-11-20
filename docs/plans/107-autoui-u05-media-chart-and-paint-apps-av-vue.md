@@ -485,6 +485,16 @@ PLAN-114 的 `872441620` 已有处理器参数降层和 AV 调用的共享路径
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 27 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang 8988a6ee8 | evidence: checked record bracket reads advance all four exact chart closures to handler widget inputs | next: work`
 
+### 第 28 轮｜共享组件输入与实时子图例
+
+两计划工作树分别接入 PLAN-114 的 AutoLang `fa1daa2dc` 和 AutoUI `f9254500`，另纳入 `0a525158f` 的浏览器组件运行时作用域。组件包发现与绑定共用标签匹配规则。AV 使用受检组件帧求值，A2Vue 由产品 CLI 生成挂载路由，已接入子组件的条件类名及字符串所有权修复。
+
+同一份父级切换材料通过 AV 组件帧断言。生产 CLI 生成 Vue，`vue-tsc` 和 Vite 构建通过。Chrome `157.0.8103.80` 回放图例计算透明度 `1 → 0.4 → 1`，组件卸载后无页面异常。`round28-vue-browser-owned.log` SHA256 为 `b700495144037a4b89accd76f9126e76414dfe7e6b81aaf6c81cacafcddb08fc`。修复前浏览器超时日志 SHA256 为 `c7e04bed9b12270084900e61b5727f416341c4164bf278f098427d817ca69cb3`，调试见 `Str` 释放后读取。Core 251 + 30 + 11、AV 69，组件包 8、路由 2、SFC 20、桌面闭包 4 和运行时独立挂载 1 通过，`p107_` AV 定向复验 7 通过。
+
+原始 `024-charts` 闭包首报官方 LineChart 的必填 `data: List` 缺元素类型，Bar 也已推进到 `data`。原包证据 `round28-chart-admission/original-with-stylekit.log` SHA256 为 `d0e8675a4d55f6cd8e7d1553af9b48353a7a8eac53b48c1013582cec27d757da`。同入口对照的显式 `List<ChartRow>` 通过，裸 `List` 复现，后续从实际调用范围绑定数据形状。图例回放证据适用于本轮验收材料。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 28 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 855c387e, lang f2f524ef9 | evidence: checked child aliases, live class updates, AV frame and production Vue browser replay | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
