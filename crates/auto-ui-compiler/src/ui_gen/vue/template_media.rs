@@ -394,7 +394,7 @@ impl VueGenerator {
                 self.handler_to_function_call_with_params(&aura_event.handler, &aura_event.params);
             self.used_handlers
                 .insert(self.handler_to_function_call(&aura_event.handler));
-            let call = Self::ime_guard_enter_handler(&vue_event, call);
+            let call = self.ime_guard_enter_handler(&vue_event, call);
             attrs.push(format!("{}=\"{}\"", vue_event, call));
         }
         if spec.up_time.is_some() {
@@ -1147,7 +1147,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                 }
             }
             self.used_handlers.insert(handler_name);
-            let handler_fn = Self::ime_guard_enter_handler(&vue_event, handler_fn);
+            let handler_fn = self.ime_guard_enter_handler(&vue_event, handler_fn);
             attrs.push(format!("{}=\"{}\"", vue_event, handler_fn));
         }
 
@@ -2798,7 +2798,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                             }
                         }
                         self.used_handlers.insert(handler_name);
-                        let handler_fn = Self::ime_guard_enter_handler(&vue_event, handler_fn);
+                        let handler_fn = self.ime_guard_enter_handler(&vue_event, handler_fn);
                         attrs.push(format!("{}=\"{}\"", vue_event, handler_fn));
                     }
                     // Auto-wire child Delete event to parent handler
@@ -3498,7 +3498,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                                 .starts_with("__bind_");
                         if !is_auto_sync_mint {
                             self.used_handlers.insert(handler_name);
-                            let handler_fn = Self::ime_guard_enter_handler(&vue_event, handler_fn);
+                            let handler_fn = self.ime_guard_enter_handler(&vue_event, handler_fn);
                             attrs.push(format!("{}=\"{}\"", vue_event, handler_fn));
                         }
                     }
@@ -4009,7 +4009,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                     // Track used handler (without params for matching)
                     let handler_name = self.handler_to_function_call(&aura_event.handler);
                     self.used_handlers.insert(handler_name);
-                    let handler_fn = Self::ime_guard_enter_handler(&vue_event, handler_fn);
+                    let handler_fn = self.ime_guard_enter_handler(&vue_event, handler_fn);
                     attrs.push(format!("{}=\"{}\"", vue_event, handler_fn));
                 }
 

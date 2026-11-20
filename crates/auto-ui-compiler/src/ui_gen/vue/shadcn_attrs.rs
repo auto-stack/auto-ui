@@ -891,6 +891,10 @@ impl VueGenerator {
                         } else {
                             attrs.push(format!("v-model=\"{}\"", model));
                         }
+                    } else if let AuraPropValue::Expr(expr) = value {
+                        if let Ok(value) = self.expr_to_vue_bound_value(expr) {
+                            attrs.push(format!(":modelValue=\"{value}\""));
+                        }
                     }
                 }
                 // type prop
@@ -900,8 +904,18 @@ impl VueGenerator {
                 }
                 // placeholder
                 if let Some(value) = props.get("placeholder") {
-                    let placeholder = self.extract_string_value(value).unwrap_or("");
-                    attrs.push(format!("placeholder=\"{}\"", placeholder));
+                    if let Some(placeholder) = self.extract_string_value(value) {
+                        attrs.push(format!("placeholder=\"{}\"", placeholder));
+                    } else if let AuraPropValue::Expr(expr) = value {
+                        if let Ok(placeholder) = self.expr_to_vue_bound_value(expr) {
+                            attrs.push(format!(":placeholder=\"{placeholder}\""));
+                        }
+                    }
+                }
+                if let Some(AuraPropValue::Expr(expr)) = props.get("label") {
+                    if let Ok(label) = self.expr_to_vue_bound_value(expr) {
+                        attrs.push(format!(":aria-label=\"{label}\""));
+                    }
                 }
                 // disabled（PLAN-086 T-05：表达式形态同按钮臂绑定，不再静默丢弃）
                 if let Some(value) = props.get("disabled") {
@@ -1506,6 +1520,11 @@ impl VueGenerator {
             }
             "dialogcontent" | "dialog_content" | "dialog-content" => {
                 self.push_style_class(&mut attrs, props);
+                if let Some(AuraPropValue::Expr(expr)) = props.get("showCloseButton") {
+                    if let Ok(value) = self.expr_to_vue_bound_value(expr) {
+                        attrs.push(format!(":show-close-button=\"{value}\""));
+                    }
+                }
             }
             "dialogheader" | "dialog_header" | "dialog-header" | "dialogfooter"
             | "dialog_footer" | "dialog-footer" => {
@@ -1639,14 +1658,23 @@ impl VueGenerator {
 
             // === Dialog/Modal ===
             "dialog" | "modal" => {
-                // v-model:open for dialog state
+                // An explicit close handler owns the open/close transaction.
+                // Reka must not write the model before the handler runs.
+                let explicit_close = events
+                    .keys()
+                    .any(|event| matches!(Self::split_event_key(event).0, "onclose" | "onClose"));
                 if let Some(value) = props.get("open") {
-                    if let Some(model) = self.extract_state_ref(value) {
+                    if let Some(model) = self.extract_state_ref(value).filter(|_| !explicit_close) {
                         attrs.push(format!("v-model:open=\"{}\"", model));
                     } else if let AuraPropValue::Expr(expr) = value {
                         if let Ok(js_expr) = self.expr_to_vue_bound_value(expr) {
                             attrs.push(format!(":open=\"{}\"", js_expr));
                         }
+                    }
+                }
+                if let Some(AuraPropValue::Expr(expr)) = props.get("closeOnOutside") {
+                    if let Ok(value) = self.expr_to_vue_bound_value(expr) {
+                        attrs.push(format!(":close-on-outside=\"{value}\""));
                     }
                 }
                 // title for DialogTitle
@@ -3724,7 +3752,23 @@ impl VueGenerator {
                 );
             }
             self.used_handlers.insert(handler_name);
-            let handler_fn = Self::ime_guard_enter_handler(&vue_event, handler_fn);
+            if matches!(tag, "dialog" | "modal") && vue_event == "@close" {
+                let argument = if self.use_typescript {
+                    "$event: boolean"
+                } else {
+                    "$event"
+                };
+                let invoke = if handler_fn.contains('(') {
+                    handler_fn
+                } else {
+                    format!("{handler_fn}()")
+                };
+                attrs.push(format!(
+                    "@update:open=\"({argument}) => {{ if (!$event) {{ {invoke} }} }}\""
+                ));
+                continue;
+            }
+            let handler_fn = self.ime_guard_enter_handler(&vue_event, handler_fn);
             attrs.push(format!("{}=\"{}\"", vue_event, handler_fn));
         }
 
@@ -4016,7 +4060,7 @@ impl VueGenerator {
 
     /// IME guard for `@keyup.enter` handlers (LAUNCHER-001 R-02 / 452 spike).
     /// Composition confirm Enter must not fire onenter actions.
-    pub(super) fn ime_guard_enter_handler(vue_event: &str, handler_fn: String) -> String {
+    pub(super) fn ime_guard_enter_handler(&self, vue_event: &str, handler_fn: String) -> String {
         if vue_event.starts_with("@keyup.enter") {
             // handler_fn is either `Name` (0-arity) or `Name(...)` (call form).
             let invoke = if handler_fn.contains('(') {
@@ -4024,8 +4068,13 @@ impl VueGenerator {
             } else {
                 format!("{handler_fn}()")
             };
+            let argument = if self.use_typescript {
+                "$event: KeyboardEvent"
+            } else {
+                "$event"
+            };
             format!(
-                "($event) => {{ if (!($event.isComposing || $event.keyCode === 229)) {{ {invoke} }} }}"
+                "({argument}) => {{ if (!($event.isComposing || $event.keyCode === 229)) {{ {invoke} }} }}"
             )
         } else {
             handler_fn

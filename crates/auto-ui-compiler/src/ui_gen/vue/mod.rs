@@ -3832,7 +3832,7 @@ widget Probe {
         );
         // …and the IME guard still wraps the forwarded invoke.
         assert!(
-            sfc.contains("@keyup.enter=\"($event) => { if (!($event.isComposing || $event.keyCode === 229)) { CommitChannel(($event.target as HTMLInputElement).value) } }\""),
+            sfc.contains("@keyup.enter=\"($event: KeyboardEvent) => { if (!($event.isComposing || $event.keyCode === 229)) { CommitChannel(($event.target as HTMLInputElement).value) } }\""),
             "IME guard wraps forwarded invoke:\n{sfc}"
         );
         // arity-0 bare binding stays a plain invoke.
@@ -5740,6 +5740,32 @@ widget App {
             sfc.contains("<Dialog v-model:open=\"show\""),
             "dialog → <Dialog v-model:open>:\n{}",
             sfc
+        );
+    }
+
+    #[test]
+    fn controlled_dialog_routes_dismiss_without_mutating_open() {
+        let sfc = gen_sfc_from_widget_src_shadcn(
+            r#"
+widget App {
+    msg { Dismiss }
+    model { var show bool = true }
+    view {
+        dialog (open: .show, onclose: .Dismiss, closeOnOutside: false) {
+            dialog-content { dialog-title "Name" }
+        }
+    }
+    on { .Dismiss -> { .show = false } }
+}
+"#,
+        );
+
+        assert!(sfc.contains("<Dialog :open=\"show\""), "{sfc}");
+        assert!(!sfc.contains("v-model:open"), "{sfc}");
+        assert!(sfc.contains(":close-on-outside=\"false\""), "{sfc}");
+        assert!(
+            sfc.contains("@update:open=\"($event: boolean) => { if (!$event) { Dismiss() } }\""),
+            "{sfc}"
         );
     }
 
