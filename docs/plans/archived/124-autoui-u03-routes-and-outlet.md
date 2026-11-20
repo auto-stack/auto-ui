@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-20
 plan_revision: 1
-current_step: 5
+current_step: 6
 total_steps: 6
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -97,7 +97,7 @@ T-01 从主线冻结一个两页、独立标量状态的原路由形状回归。
   - owner_stage: work。AC-01、AC-02。实际构建并运行浏览器，记录同源结果和 V-04 可回接边界。
 - [x] T-05 独立复审与冻结
   - owner_stage: review。AC-02。复验两端、单页兼容、失败用例及实现归属。
-- [ ] T-06 落地并交 105 消费
+- [x] T-06 落地并交 105 消费
   - owner_stage: merge。AC-03。版本固定后按仓规沉淀、归档及清理。
 
 ## 9. 复审记录
@@ -245,6 +245,14 @@ D-1098-01 的两个 host_console 名称与断言与 1083 已记录的父基线�
 
 实际归档位置、状态、任务计数 5/6、归档与规范的所有计划本地链接、计划导航与 105 回接引用已核对。T-06 待清理后勾选。
 
+2026-11-20 stage: merge | checkpoint: cleaned | plan_id: PLAN-124 | plan_revision: r1 | outcome: pass | archive_commit: 46f3bd686423f42b381e0385d8d8992b3b0a0723
+
+依路径、Git 注册及不可跟随链接的 wt-guard 分别复核后，已删除 ui-124 组的四个工作树、两条已合入的 plan-124-dev 和空组目录。临时材料摘要已归入本档案。登记的 plan-artifacts/plan-124 已删除，两处保留登记表均更新为 deleted-at-merge，无持有项。归档文件、链接、代码祖先关系、规范摘要和 T-01 至 T-06 六项均核对完成。
+
+产物核对：主检出标准 release 位置未发现 auto-ui-tool、桌面示例和 av 可执行文件。018/022 的现有 gen/front/vue 目录时间分别为 2026-11-10 14:44/14:46，早于本次交付。双端实证使用本计划的独立调试产物。批量回归收据 2026-11-20T00:00:00Z，last_covered_plan_id=1098，本次合入计划号不触发批门且距收据未满 48 小时。
+
+stage: goal | plan_id: PLAN-124 | plan_revision: r1 | round: 8 | from: merge | to: done | status: archived | outcome: pass | commit: AutoUI a69eb8b2cc64bda380248f1507db8e3c83e053fd / AutoLang dcd4fdafd412be911dc44ba1fee911a916d9c198 | next: done
+
 ## 10. 待澄清事项
 
-无待澄清。已进入工作树、临时分支与准备材料清理。
+无。固定回归的三项父基线失败已保留在上述收据中，PLAN-105 按 §5 使用本计划覆盖的原路由和双端入口。
