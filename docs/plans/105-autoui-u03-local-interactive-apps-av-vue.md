@@ -437,6 +437,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 71 | from: work | t
 **记录列表用例推进（三次定位）**：①`Todo { … }` 未接线（已解，AST 形为 `CtorNamed`）；②`type Todo { text str }` 的借用字段导致 AV lowering 拒（`type kind Str is outside the av.collections/1 source surface`）→ 记录文本字段需 `Str`（prep 侧改写方向已定）；③`xs.push(t)` 的整局部 → `move-required`（已改为 `.move` 发射，但复测仍报，需核对 `MovePos` 在 atom 的发射形态）。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 4/4。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 72 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 1df6ecb52 | next: work
+
+2026-11-19 stage: work（T-02 W69：记录文本字段 owned 化 + push 局部）| PLAN-105 r1 | outcome: pass | code_commit: auto-ui `待记`、auto-lang `1df6ecb52` | task_ids: T-02（W69）| evidence: prep 7/7、回归全绿
+
+**交付**：①prep 把**内联记录类型块**的文本字段改写为 **owned `Str`**（`text str` → `text Str`；组件面 collections 域的 AV lowering 不接受借用 `str` 字段）；②组件面 `push(<局部>)` 尝试用「该局部的构造值表达式」替代（按值复制语义），但**未生效**（解析后仍是 `ReadLocal` → `move-required`）。
+
+**关键发现（下一刀入口）**：列表方法在 AST 里有 `Method` 与 `MethodCall` **两种形态**，且 `push(local)` 的 owned 元素转移**在该语义下没有 sanctioned 形式**——`Arg::MovePos` 在 resolver 里与 `Pos` 同处理（无 move 语义），`check_push_value` 只认 `RExprKind::Move`（该 kind 只由形参 `.move` 调用位产生）。要么在 resolver 给 `MovePos` 补 move 语义（局部→Move 包装 + 消费标记），要么在组件面把「构造后 push」改写成一次性构造。
+
+**验证**：prep 7/7；plan105 25/25、980 39/39、981 248/248；av list handlers 4/4。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
