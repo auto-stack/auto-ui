@@ -522,6 +522,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 79 | from: work | t
 **定位结果**：`extract_store_block` 对**原始** store 块的探针通过；对**改写后**的块探针报 `source.syntax: expected fn, found store`。→ 生成的语句（`var __mb_* int = …`、`for … { if … { .todos[i] = Todo { … } } }`、`var __g Todo = .todos.remove(i)`）在 **store 块上下文**里不被接受（或块边界被改写影响）。下一刀：先查 age-component 文法里 `store` 块允许的语句面，再决定是「把 shim 生成物放到组件级 handler」还是「放宽 store 块语句面」。
 
 **验证**：prep 7/7（六例 load/project 门保持绿；开关未改动）。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 80 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: cc394cf1 / 0f13a24b5 | next: work
+
+2026-11-19 stage: work（T-02 W77：013 后端内联五连墙）| PLAN-105 r1 | outcome: pass | code_commit: auto-ui `cc394cf1`、auto-lang `0f13a24b5` | task_ids: T-02（W77）| evidence: 013 墙序列见下
+
+**本轮交付**：①列表方法面补 `insert`/`remove`（组件面语句门 + 诊断点名：`handler body method \`x\` is not wired yet`）；②`update_todo` 生成物改走 **`remove`+`insert`**（下标赋值带记录字面量在 store 块语法不可解析——这是 bisect 出来的）；③后端记录类型收集 `collect_type_blocks`（支持 `pub type X = { … }` 与冒号字段），并按**解析探针**过滤（015 的 `List<..>` 后端类型会被跳过）；④`rewrite_record_text_fields` 支持冒号字段形态；⑤`inline_memory_backend` 与环境开关 `P105_MEM_BACKEND`（默认关，避免影响其它例子）。
+
+**013 墙序列（本轮推进 5 格）**：`store 块未内联(S1)` → `method insert 未接线` → `no record type named Todo`（`pub type` 形态） → `field text of Todo has type str, found Str`（冒号字段） → **`view-escape: a whole owned element is not a value`**。
+
+**下一刀（两个候选实验）**：①`update` 改 `.todos.set(i, Todo{…})`（避免 `remove` 到局部）；②`delete`/清空改用能丢弃返回值或绑定形态的 `remove`（先在 av 里验 `var x T = list.remove(i)` 是否触发 view-escape）。
+
+**验证**：prep 7/7；core plan105 25/25；av 5/5。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -570,6 +582,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 79 | from: work | t
 **定位结果**：`extract_store_block` 对**原始** store 块的探针通过；对**改写后**的块探针报 `source.syntax: expected fn, found store`。→ 生成的语句（`var __mb_* int = …`、`for … { if … { .todos[i] = Todo { … } } }`、`var __g Todo = .todos.remove(i)`）在 **store 块上下文**里不被接受（或块边界被改写影响）。下一刀：先查 age-component 文法里 `store` 块允许的语句面，再决定是「把 shim 生成物放到组件级 handler」还是「放宽 store 块语句面」。
 
 **验证**：prep 7/7（六例 load/project 门保持绿；开关未改动）。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 80 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: cc394cf1 / 0f13a24b5 | next: work
+
+2026-11-19 stage: work（T-02 W77：013 后端内联五连墙）| PLAN-105 r1 | outcome: pass | code_commit: auto-ui `cc394cf1`、auto-lang `0f13a24b5` | task_ids: T-02（W77）| evidence: 013 墙序列见下
+
+**本轮交付**：①列表方法面补 `insert`/`remove`（组件面语句门 + 诊断点名：`handler body method \`x\` is not wired yet`）；②`update_todo` 生成物改走 **`remove`+`insert`**（下标赋值带记录字面量在 store 块语法不可解析——这是 bisect 出来的）；③后端记录类型收集 `collect_type_blocks`（支持 `pub type X = { … }` 与冒号字段），并按**解析探针**过滤（015 的 `List<..>` 后端类型会被跳过）；④`rewrite_record_text_fields` 支持冒号字段形态；⑤`inline_memory_backend` 与环境开关 `P105_MEM_BACKEND`（默认关，避免影响其它例子）。
+
+**013 墙序列（本轮推进 5 格）**：`store 块未内联(S1)` → `method insert 未接线` → `no record type named Todo`（`pub type` 形态） → `field text of Todo has type str, found Str`（冒号字段） → **`view-escape: a whole owned element is not a value`**。
+
+**下一刀（两个候选实验）**：①`update` 改 `.todos.set(i, Todo{…})`（避免 `remove` 到局部）；②`delete`/清空改用能丢弃返回值或绑定形态的 `remove`（先在 av 里验 `var x T = list.remove(i)` 是否触发 view-escape）。
+
+**验证**：prep 7/7；core plan105 25/25；av 5/5。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
