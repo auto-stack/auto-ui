@@ -3,6 +3,7 @@ use crate::ui::ace_widget_props::{
     element_children, expression, flag, literal, self_field, square_style, style,
 };
 use ace_core::source::age_component::ComponentViewElement;
+use ace_core::source::ast::ExprKind;
 
 pub(super) fn render(
     element: &ComponentViewElement,
@@ -12,6 +13,31 @@ pub(super) fn render(
         "accordion" => accordion(element, ctx)?,
         "collapsible" => collapsible(element, ctx)?,
         "pagination" => pagination(element, ctx)?,
+        "center" => {
+            let classes = style(element);
+            let margin = if classes.split_whitespace().any(|name| name.starts_with("max-w-")) {
+                " mx-auto"
+            } else {
+                ""
+            };
+            let height = if classes.split_whitespace().any(|name| name.starts_with("h-")) {
+                ""
+            } else {
+                " h-full"
+            };
+            ctx.push_str(&format!(
+                "<div class=\"flex flex-col items-center justify-center{height}{margin} {}\">",
+                escape_attr(&classes)
+            ));
+            render_items(&element.items, ctx)?;
+            ctx.push_str("</div>");
+        }
+        "grid" => grid(element, ctx)?,
+        "spacer" => {
+            let classes = style(element);
+            let classes = if classes.is_empty() { "flex-1" } else { &classes };
+            ctx.push_str(&format!("<div class=\"{}\"></div>", escape_attr(classes)));
+        }
         "preview-card" => {
             ctx.push_str("<section");
             if let Some(id) = literal(element, "id") {
@@ -45,6 +71,39 @@ pub(super) fn render(
         _ => return Ok(false),
     }
     Ok(true)
+}
+
+fn grid(element: &ComponentViewElement, ctx: &mut TmplCtx<'_>) -> Result<(), String> {
+    let mut classes = vec!["grid".to_owned()];
+    let mut dynamic = Vec::new();
+    match expression(element, "cols").or_else(|| expression(element, "columns")) {
+        Some(expr) => match &expr.kind {
+            ExprKind::IntLit(cols) => classes.push(format!("grid-cols-{}", (*cols).max(1))),
+            _ => dynamic.push(format!(
+                "gridTemplateColumns: 'repeat(' + Math.max(1, {}) + ', minmax(0, 1fr))'",
+                expr_to_template_js(expr)?
+            )),
+        },
+        None => classes.push("grid-cols-1".into()),
+    }
+    if let Some(expr) = expression(element, "gap") {
+        match &expr.kind {
+            ExprKind::IntLit(gap) if *gap >= 0 && gap % 4 == 0 => {
+                classes.push(format!("gap-{}", gap / 4));
+            }
+            ExprKind::IntLit(gap) => classes.push(format!("gap-[{}px]", (*gap).max(0))),
+            _ => dynamic.push(format!("gap: Math.max(0, {}) + 'px'", expr_to_template_js(expr)?)),
+        }
+    }
+    classes.push(style(element));
+    ctx.push_str(&format!("<div class=\"{}\"", escape_attr(classes.join(" ").trim())));
+    if !dynamic.is_empty() {
+        ctx.push_str(&format!(" :style=\"{{ {} }}\"", escape_attr(&dynamic.join(", "))));
+    }
+    ctx.push_str(">");
+    render_items(&element.items, ctx)?;
+    ctx.push_str("</div>");
+    Ok(())
 }
 
 fn widget_ref(ctx: &mut TmplCtx<'_>, value: &str) -> String {

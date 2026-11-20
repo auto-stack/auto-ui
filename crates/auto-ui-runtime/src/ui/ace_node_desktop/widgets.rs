@@ -3,7 +3,11 @@ use crate::ui::ace_widget_props::{
     conditional_classes, element_children, expression, flag, literal, self_field, square_style,
     style,
 };
+use crate::ui::aura_view_builder::{
+    extract_absolute_position, fold_floats, rederive_layout, RederivedLayout,
+};
 use crate::ui::scroll::ScrollAxes;
+use crate::ui::style::StyleClass;
 use crate::ui::view::{AccordionItem, ScrollMetrics};
 use crate::ui::{Style, View};
 use ace_core::source::age_component::{
@@ -152,12 +156,23 @@ pub(super) fn initial_bools(fields: &[ComponentField]) -> BTreeMap<String, bool>
 }
 
 pub(super) fn contains_preview(items: &[ComponentViewItem]) -> bool {
-    items.iter().any(|item| match item {
-        ComponentViewItem::Element(element) if element.tag == "preview-card" => {
-            contains_control(&element.items)
-        }
-        ComponentViewItem::Element(element) => contains_preview(&element.items),
-        _ => false,
+    fn find_preview(items: &[ComponentViewItem], allow_static: bool) -> bool {
+        items.iter().any(|item| match item {
+            ComponentViewItem::Element(element) if element.tag == "preview-card" => {
+                allow_static || contains_control(&element.items)
+            }
+            ComponentViewItem::Element(element) => find_preview(&element.items, allow_static),
+            _ => false,
+        })
+    }
+    find_preview(items, static_layout(items))
+}
+
+fn static_layout(items: &[ComponentViewItem]) -> bool {
+    items.iter().all(|item| match item {
+        ComponentViewItem::Element(element) => static_layout(&element.items),
+        ComponentViewItem::Cond(_) | ComponentViewItem::For(_) => false,
+        _ => true,
     })
 }
 
@@ -601,19 +616,30 @@ impl Renderer<'_> {
                         .unwrap_or_default();
                     Some(View::text(text))
                 }
-                ComponentViewItem::Element(el) => Some(self.element(el)),
+                ComponentViewItem::Element(el) => {
+                    let mut classes = style(el);
+                    if let Err(error) = self.append_conditional_classes(el, &mut classes) {
+                        return Some(View::text(error));
+                    }
+                    let parsed = native_style(&classes);
+                    let hidden = parsed.is_hidden();
+                    let first_target = self.targets.len();
+                    let view = self.element(el, &classes, parsed);
+                    if hidden {
+                        // Keep the AV text cursor aligned with the checked view tree.
+                        self.targets.truncate(first_target);
+                        None
+                    } else {
+                        Some(view)
+                    }
+                }
                 _ => None,
             })
             .collect()
     }
 
-    fn element(&mut self, el: &ComponentViewElement) -> WidgetView {
+    fn element(&mut self, el: &ComponentViewElement, classes: &str, parsed: Style) -> WidgetView {
         let key = el.span.start;
-        let mut classes = style(el);
-        if let Err(error) = self.append_conditional_classes(el, &mut classes) {
-            return View::text(error);
-        }
-        let parsed = native_style(&classes);
         match el.tag.as_str() {
             "accordion" => self.accordion(el, key),
             "svg" => self.svg(el),
@@ -622,7 +648,7 @@ impl Renderer<'_> {
                 let target = self.state.button_targets[&key];
                 let label = el.label.as_ref().or_else(|| expression(el, "text"))
                     .and_then(|label| self.display(label)).unwrap_or_default();
-                self.button(key, label, &classes, Some(Action::DispatchButton(target)), None, None)
+                self.button(key, label, classes, Some(Action::DispatchButton(target)), None, None)
             }
             "collapsible" => self.collapsible(el, key),
             "pagination" => self.pagination(el, key),
@@ -703,6 +729,10 @@ impl Renderer<'_> {
                     selectable: false,
                 }
             }
+            "button" => {
+                let label = self.label(el);
+                self.button(key, label, classes, None, None, None)
+            }
             "square" => {
                 let mut children = self.items(&el.items);
                 if children.is_empty() {
@@ -716,6 +746,26 @@ impl Renderer<'_> {
                     .with_style(Style::parse(&square_style(el)).unwrap_or_default())
                     .build()
             }
+            "center" => {
+                let mut children = self.items(&el.items);
+                let child = match children.as_mut_slice() {
+                    [] => View::empty(),
+                    [_] => children.remove(0),
+                    _ => View::col().style("items-center").children(children).build(),
+                };
+                View::container(child)
+                    .center_x()
+                    .center_y()
+                    .with_style(native_style(&format!("w-full h-full {classes}")))
+                    .build()
+            }
+            "spacer" => View::container(View::empty())
+                .with_style(if classes.is_empty() {
+                    native_style("flex-1")
+                } else {
+                    parsed
+                })
+                .build(),
             "codeblock" => {
                 View::text_styled(literal(el, "code").unwrap_or_default(), "text-sm font-mono")
             }
@@ -737,7 +787,7 @@ impl Renderer<'_> {
                     };
                     children.insert(0, View::text_styled(label, heading));
                 }
-                if let Some(axes) = scroll_axes(el, &classes) {
+                if let Some(axes) = scroll_axes(el, classes) {
                     let inner = if axes == ScrollAxes::X {
                         View::row().spacing(8)
                     } else {
@@ -754,18 +804,49 @@ impl Renderer<'_> {
                         })
                         .build();
                 }
-                if let Some(cols) = classes.split_whitespace().find_map(|name| {
-                    name.strip_prefix("grid-cols-")
-                        .and_then(|n| n.parse::<usize>().ok())
-                }) {
-                    return View::grid()
+                let mut floats = Vec::new();
+                let children = children
+                    .into_iter()
+                    .filter_map(|child| match extract_absolute_position(&child) {
+                        Some(position) => {
+                            floats.push((child, position));
+                            None
+                        }
+                        None => Some(child),
+                    })
+                    .collect::<Vec<_>>();
+                let styled_cols = parsed.classes.iter().rev().find_map(|class| match class {
+                    StyleClass::GridCols(cols) => Some(usize::from(*cols).max(1)),
+                    _ => None,
+                });
+                if el.tag == "grid" || styled_cols.is_some() {
+                    let cols = styled_cols.unwrap_or_else(|| {
+                        let columns = self.number(el, "columns", 1.0);
+                        self.number(el, "cols", columns).clamp(1.0, u16::MAX as f32) as usize
+                    });
+                    let gap = parsed
+                        .classes
+                        .iter()
+                        .rev()
+                        .find_map(|class| match class {
+                            StyleClass::Gap(size) => Some(size.to_pixels()),
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| self.number(el, "gap", 0.0) as u16);
+                    let grid = View::grid()
                         .cols(cols)
-                        .spacing(8)
+                        .spacing(gap)
                         .with_style(parsed)
                         .children(children)
                         .build();
+                    return fold_floats(grid, floats);
                 }
-                if matches!(el.tag.as_str(), "row" | "tr") {
+                let is_row = match rederive_layout(Some(&parsed)) {
+                    Some(RederivedLayout::Row) => true,
+                    Some(RederivedLayout::Column) => false,
+                    _ => matches!(el.tag.as_str(), "row" | "tr"),
+                };
+                let base = if is_row {
                     View::row()
                         .spacing(8)
                         .with_style(parsed)
@@ -782,7 +863,8 @@ impl Renderer<'_> {
                         .with_style(parsed)
                         .children(children)
                         .build()
-                }
+                };
+                fold_floats(base, floats)
             }
         }
     }
@@ -1032,6 +1114,67 @@ fn scroll_axes(element: &ComponentViewElement, classes: &str) -> Option<ScrollAx
 mod tests {
     use super::*;
     use ace_core::source::age_component::project_component_candidates;
+
+    #[test]
+    fn native_layout_preview_projects_absolute_children_without_changing_flow() {
+        let source = r#"
+widget Layout {
+    view {
+        preview-card (id: "layout") {
+            row (style: "relative w-full") {
+                text "flow" {}
+                button "close" { style: "absolute top-2 right-2 z-10" }
+                col (style: "absolute inset-0") { text "still in flow" {} }
+            }
+        }
+    }
+}
+"#;
+        let nodes = project_component_candidates(source).expect("layout projects");
+        let tree = &nodes[0].view.tree;
+        assert!(contains_preview(tree));
+        let state = State::new(BTreeMap::new());
+        let View::Column { children, .. } = view(1, 0, tree, &[], &[], &state) else {
+            panic!("expected preview view");
+        };
+        let View::Container { child, .. } = &children[0] else {
+            panic!("expected preview card");
+        };
+        let View::Column { children, .. } = child.as_ref() else {
+            panic!("expected preview card contents");
+        };
+        let View::Overlay { base, content, position } = &children[0] else {
+            panic!("expected the close button to float");
+        };
+        assert!(position.top.is_some() && position.right.is_some());
+        assert!(matches!(content.as_ref(), View::Button { label, .. } if label == "close"));
+        assert!(matches!(base.as_ref(), View::Row { children, .. } if children.len() == 2));
+    }
+
+    #[test]
+    fn native_layout_hidden_views_preserve_following_av_text() {
+        let source = r#"
+widget Layout {
+    view {
+        col {
+            row (style: "hidden") { text "Hidden" {} }
+            text "Visible" {}
+        }
+    }
+}
+"#;
+        let nodes = project_component_candidates(source).expect("layout projects");
+        let texts = vec!["AV hidden".into(), "AV visible".into()];
+        let state = State::new(BTreeMap::new());
+        let View::Column { children, .. } = view(1, 0, &nodes[0].view.tree, &texts, &[], &state)
+        else {
+            panic!("expected frame");
+        };
+        let View::Column { children, .. } = &children[0] else {
+            panic!("expected authored column");
+        };
+        assert!(matches!(&children[..], [View::Text { content, .. }] if content == "AV visible"));
+    }
 
     const WIDGETS: &str = r#"
 widget Preview {

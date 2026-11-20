@@ -977,7 +977,9 @@ pub(crate) fn rederive_layout(style: Option<&crate::ui::style::Style>) -> Option
 /// a one-line-tall `text("")` spacer in iced).
 /// Plan 409 §10 续 5: 读 View 的 style,若 position:absolute 返回其
 /// top/right/bottom/left offset(用于 Overlay 浮层定位)。
-fn extract_absolute_position(v: &View<DynamicMessage>) -> Option<crate::ui::view::OverlayPosition> {
+pub(super) fn extract_absolute_position<M: Clone + std::fmt::Debug>(
+    v: &View<M>,
+) -> Option<crate::ui::view::OverlayPosition> {
     // PLAN-814 R9-03：改为直接消费 compiler StyleClass IR 的纯扫描
     // （headless 构建同轨；与 style_iced_adapter 同一单源输入，仅取
     // overlay 相关四族变体——解析单源在 compiler，双消费不构成第二解析）。
@@ -1051,10 +1053,10 @@ fn is_visually_empty(v: &View<DynamicMessage>) -> bool {
 /// Overlay 折叠(首个最外=栈序最低,后续逐层叠上,对齐 CSS 同 z 源序)。
 /// 此前四处 hoist 臂(col/row × tracked/untracked)只取 `.next()` 首个,
 /// 其余 absolute 子节点已被滤出流内却未进任何浮层,整体丢弃。
-fn fold_floats(
-    base: View<DynamicMessage>,
-    floats: Vec<(View<DynamicMessage>, crate::ui::view::OverlayPosition)>,
-) -> View<DynamicMessage> {
+pub(super) fn fold_floats<M: Clone + std::fmt::Debug>(
+    base: View<M>,
+    floats: Vec<(View<M>, crate::ui::view::OverlayPosition)>,
+) -> View<M> {
     let mut acc = base;
     for (content, position) in floats {
         acc = View::Overlay {

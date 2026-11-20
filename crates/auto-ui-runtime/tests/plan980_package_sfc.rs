@@ -37,6 +37,37 @@ fn gen() -> String {
 }
 
 #[test]
+fn p123_package_sfc_projects_layout_primitives() {
+    let source = r#"
+widget Layout {
+    model { var columns int = 2 }
+    view {
+        col {
+            grid (cols: 3, gap: 16) { text "Three tracks" }
+            grid (cols: .columns, gap: 13) { text "Bound tracks" }
+            center (style: "h-32") { text "Centered" }
+            row {
+                text "Left"
+                spacer
+                text "Right"
+            }
+        }
+    }
+}
+"#;
+    let sfc = generate_package_sfc(&[unit("app", "main", source)], "app::main")
+        .expect("layout package generates");
+    for expected in [
+        r#"<div class="grid grid-cols-3 gap-4">Three tracks</div>"#,
+        r#"<div class="grid gap-[13px]" :style="{ gridTemplateColumns:"#,
+        r#"<div class="flex flex-col items-center justify-center h-32">Centered</div>"#,
+        r#"Left<div class="flex-1"></div>Right"#,
+    ] {
+        assert!(sfc.contains(expected), "missing {expected}: {sfc}");
+    }
+}
+
+#[test]
 fn p107_package_sfc_uses_the_checked_public_stylekit_literal() {
     let source = r#"
 use stylekit.styles: caption_text
