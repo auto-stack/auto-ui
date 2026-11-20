@@ -586,6 +586,21 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 84 | from: work | t
 **下一刀**：查 `.clone()` 落在 bool 上的来源（大概率是组件面 `wrap_owned_transfer` 对非文本字段也加了 clone，或 shim 的 `!current_done` 实参被克隆），改成只对 owned 文本/记录加 clone。
 
 **验证**：plan105 26/26、980 39/39、981 248/248、104 3/3、1072 19/19；av list handlers 7/7。
+### D-105-B（2026-11-19，013 暴露的共享接口阻断，等待用户决策）
+
+**具体阻断（可复现）**：013 的组件源码现在**编译通过**（组件面/verify 全绿），卡在 **AV（Iced）后端 lowering**：
+`lower `d___age_state_0_input`: Unsupported { code: "lower.type-use", message: "type kind Str is outside the av.collections/1 source surface" }`。
+
+**根因**：`av.collections/1` 的 MIR 只承载 **i32/bool 标量**（`scalar_shape_of_use`），没有 owned 文本 `Str` 的类型/值/操作；而任何"列表 + 文本"的应用（012/013/015/016/018/022 全部）都需要它。
+
+**影响范围**：所有含 owned 文本的列表应用（六例全部）；A2Vue 侧不受此限（TS 发射不经 AV MIR），但 AV 真窗（Iced）全拦。
+
+**可复用结果（已实证）**：组件面表达式/循环/记录/构造/列表（push/get/set/insert/remove/索引字段投影）/store 内联/后端内联/属性诊断——这些都在 core（两侧共用），013 已推进到"只剩后端 lowering"。
+
+**重估**：在 AV collections MIR 增加 `Str`（类型、值表示、concat/clone/len、与 text-record 面共享字符串堆）≈ 5–10 轮且有风险；或改走 **A2Vue（TS）端**先交付 013（不受此阻），Iced 端后补。
+
+**需要决策**：A 继续在 AV 侧补 `Str`（保持原口径，5–10 轮）；B 先以 A2Vue 端交付 013（浏览器可用即算该例端到端），AV 端列为已知缺口；C 收窄到"少量真正完整"的应用（用户此前首选 C 的条件成立时）。
+
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -698,6 +713,21 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 84 | from: work | t
 **下一刀**：查 `.clone()` 落在 bool 上的来源（大概率是组件面 `wrap_owned_transfer` 对非文本字段也加了 clone，或 shim 的 `!current_done` 实参被克隆），改成只对 owned 文本/记录加 clone。
 
 **验证**：plan105 26/26、980 39/39、981 248/248、104 3/3、1072 19/19；av list handlers 7/7。
+### D-105-B（2026-11-19，013 暴露的共享接口阻断，等待用户决策）
+
+**具体阻断（可复现）**：013 的组件源码现在**编译通过**（组件面/verify 全绿），卡在 **AV（Iced）后端 lowering**：
+`lower `d___age_state_0_input`: Unsupported { code: "lower.type-use", message: "type kind Str is outside the av.collections/1 source surface" }`。
+
+**根因**：`av.collections/1` 的 MIR 只承载 **i32/bool 标量**（`scalar_shape_of_use`），没有 owned 文本 `Str` 的类型/值/操作；而任何"列表 + 文本"的应用（012/013/015/016/018/022 全部）都需要它。
+
+**影响范围**：所有含 owned 文本的列表应用（六例全部）；A2Vue 侧不受此限（TS 发射不经 AV MIR），但 AV 真窗（Iced）全拦。
+
+**可复用结果（已实证）**：组件面表达式/循环/记录/构造/列表（push/get/set/insert/remove/索引字段投影）/store 内联/后端内联/属性诊断——这些都在 core（两侧共用），013 已推进到"只剩后端 lowering"。
+
+**重估**：在 AV collections MIR 增加 `Str`（类型、值表示、concat/clone/len、与 text-record 面共享字符串堆）≈ 5–10 轮且有风险；或改走 **A2Vue（TS）端**先交付 013（不受此阻），Iced 端后补。
+
+**需要决策**：A 继续在 AV 侧补 `Str`（保持原口径，5–10 轮）；B 先以 A2Vue 端交付 013（浏览器可用即算该例端到端），AV 端列为已知缺口；C 收窄到"少量真正完整"的应用（用户此前首选 C 的条件成立时）。
+
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
