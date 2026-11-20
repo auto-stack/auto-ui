@@ -587,6 +587,14 @@ Iced `round37-original-gallery-carousel-window.json` 与同名 `.log` SHA256 分
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 38 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a674e157, lang ba467d71c | evidence: static record model inputs, checked Iced frame and all four original gallery chart closures reach record indexing | next: work`
 
+### 第 39 轮｜原 FlowDiagram 页解析边记录的 `to` 键
+
+包面在静态 model 记录键位置接收路由保留字 `to`。AV 两实例回归按 `edge["to"]` 统计原形态的目标节点，仅收到消息的实例由 `0` 变到 `1`。Core 完整 conformance 867、AV PLAN-981 72 通过。AgePackage 语法标识更新为 `364ebfe7c4e0a9bc0ffc7de6ffca626327109b516156750dd03ddaebcc690c9d`，其余冻结语法面通过逐字节对照。
+
+原 `pages/flow-diagram.at` 已按固定字节解析出组件。闭包下一项诊断在真实 `components/flow_diagram.at` 的 widget 入口，`round39-original-flow-closure.log` SHA256 为 `3011e704716d796a7a8c33193ff6de1250bf10a5b084cf2e71ec917339484bdb`。原页布局与交互仍待端到端回放。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 39 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a674e157, lang 300f50f5b | evidence: exact FlowDiagram page parses and AV executes graph edge destination reads | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
