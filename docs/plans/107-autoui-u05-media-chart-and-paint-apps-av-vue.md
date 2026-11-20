@@ -605,6 +605,14 @@ Iced 受检帧点击子组件后，父状态读取到 `docs/计划`。Vue 产品
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 40 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 46b78613, lang ee32dd1b4 | evidence: checked named event forwarding in Iced and production Vue, three original app entries advance past event lexing | next: work`
 
+### 第 41 轮｜处理器保留并校验原形参类型
+
+接入 PLAN-114 `bb0aaf2d0` 的形参注解部分，复用本组已有的作用域和循环降层。注解在原 span 按载荷槽核对。AV 两实例测试以 `str, i32` 接收声明的 `str, int`，定向实例由 `/1` 更新为 `图像/2`，异型注解在 `bool` 原 span 具名拒绝。Core PLAN-981 251、AV PLAN-981 73 通过，AgePackage 语法标识为 `78d6c6bb79eab93920e5241124acf42d9efe9fcb6e5c51b852139b62302de36f`。
+
+从原 `031-image-viewer` 提取的 `.ApplyView(ev str)` 片段越过语法门，缩减材料在未保留消息声明处具名拒绝。原项目整体仍有后续语法诊断。隔离探针同时定位了原 FlowDiagram 组件的 `stack.pop()` 和局部 `take`，以及默认画廊页的连字符 `to:` 标签及带属性文本体。探针 `round41-shape-probes.log` SHA256 为 `97b9ba48d6fcb8a0c79381a3b95e6e712cb8844cc6cc66aa1e53653a2b9a85d0`。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 41 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 46b78613, lang c10dc8ed0 | evidence: media handler type annotations checked by AV and original source forms isolated | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
