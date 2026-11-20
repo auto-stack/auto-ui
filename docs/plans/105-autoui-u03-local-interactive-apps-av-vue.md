@@ -427,6 +427,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 70 | from: work | t
 **结论/下一刀**：动态列表渲染改走**记录元素投影**路线——①对 `List<Record>` 导出 `xs.get(i).<text-field>` 文本（记录元素允许字段投影）；②文本元素列表（012 的 cities/w_rows）需要另找 sanctioned 路径（例如新增「视图→owned 拷贝」内建，或让渲染腿在视图内联处消费而不经函数返回）；③设计前先在 `plan-artifacts/plan-105` 写一页设计说明再动工。
 
 **回滚**：试作代码已整体回滚（`age_component.rs` 复原），plan105 25/25、av list handlers 4/4 保持。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 71 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 9be4d0042 | next: work
+
+2026-11-19 stage: work（T-02 W68：记录构造/自由调用进组件面）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `9be4d0042` | task_ids: T-02（W68）| evidence: 记录列表用例从「表达式未接线」推进到 `.move` 与 lower.type-use 面
+
+**交付**：①`rename_expr_with_params` 收 **`CtorNamed`**（`Todo { id: 1, text: "a" }` 的字段值递归重命名）与 **`Call`**（自由调用/构造实参，含具名实参 span）；②handler 列表方法 `push(<整局部>)` 按 **`.move`** 形式发射（`Arg::MovePos`）。
+
+**记录列表用例推进（三次定位）**：①`Todo { … }` 未接线（已解，AST 形为 `CtorNamed`）；②`type Todo { text str }` 的借用字段导致 AV lowering 拒（`type kind Str is outside the av.collections/1 source surface`）→ 记录文本字段需 `Str`（prep 侧改写方向已定）；③`xs.push(t)` 的整局部 → `move-required`（已改为 `.move` 发射，但复测仍报，需核对 `MovePos` 在 atom 的发射形态）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 4/4。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
