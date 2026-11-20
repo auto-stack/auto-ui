@@ -7,7 +7,8 @@ widget Thumbnail (src: str = "", alt: str = "", kind: str = "", icon: str = "", 
         ThumbnailContent (
             key: "" + .resourceId.len() + ":" + .resourceId + .resourceRevision.len() + ":" + .resourceRevision + .src.len() + ":" + .src + .state.len() + ":" + .state + .fit,
             src: .src, alt: .alt, kind: .kind,
-            iconName: .icon, state: .state, fit: .fit
+            iconName: .icon, state: .state, fit: .fit,
+            resourceId: .resourceId, resourceRevision: .resourceRevision
         ) {}
     }
 }

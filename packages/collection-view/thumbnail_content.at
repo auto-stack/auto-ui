@@ -1,24 +1,28 @@
+use auto.json
+
 // The keyed child owns the load status of one image. Its callbacks update
 // that child only, so a discarded image cannot change its replacement.
-widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName: str = "", state: str = "missing", fit: str = "cover") {
+widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName: str = "", state: str = "missing", fit: str = "cover", resourceId: str = "", resourceRevision: str = "") {
     msg { Init, ImageFailed }
     model {
         var failed bool = false
         var native_track bool = false
+        var http_source str = ""
     }
     computed {
         actual_icon => if .iconName != "" { .iconName } else { .kind }
         bad_image => .failed || .state == "error"
         native_http => .native_track && !.src.starts_with("/api/__auto/media/") && (.src.starts_with("/api/") || .src.starts_with("http://") || .src.starts_with("https://"))
+        cache_identity => "" + .resourceId.len() + ":" + .resourceId + .resourceRevision
     }
     view {
         col (style: "w-full h-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-md bg-muted") {
             if .state == "ready" && .src != "" && !.failed {
                 if .native_http {
                     // Keep Gallery's authorized HTTP loader and surface its decode result.
-                    image_surface (src: "native-http-image:" + .src, alt: .alt, fit: .fit, onerror: .ImageFailed, style: "w-full h-full") {}
+                    image_surface (src: .http_source, alt: .alt, fit: .fit, onerror: .ImageFailed, style: "w-full h-full") {}
                 } else {
-                    image_surface (src: .src, alt: .alt, fit: .fit, onerror: .ImageFailed, style: "w-full h-full") {}
+                    image_surface (src: .src, cache_identity: .cache_identity, alt: .alt, fit: .fit, onerror: .ImageFailed, style: "w-full h-full") {}
                 }
             } else {
                 row (style: "items-center justify-center gap-1 text-muted-foreground") {
@@ -46,7 +50,12 @@ widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName:
         }
     }
     on {
-        .Init -> { .native_track = Env.track() == "vm" }
+        .Init -> {
+            .native_track = Env.track() == "vm"
+            if .native_track {
+                .http_source = "native-http-image:" + json.stringify({uri: .src, resource_id: .resourceId, revision: .resourceRevision})
+            }
+        }
         .ImageFailed -> { .failed = true }
     }
 }

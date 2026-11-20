@@ -16,6 +16,8 @@
 
 `Thumbnail` 接收 `src`、`alt`、`kind`、`icon`、`state`、`fit`、`resourceId` 与 `resourceRevision`。支持 `missing`、`loading`、`ready` 和 `error`。应用发布 ready 时，图片仍须经渲染器加载。缺图显示类型图标，加载失败有可观察的占位。更换资源或来源时替换图像绑定。原生媒体票据由 ImageSurface 消费，原生 Gallery 的授权 HTTP 缩略图复用现有 HTTP 读取链，读取或解码失败投递给当前缩略图实例。Vue 消费应用已授权的 URI。原尺寸查看、缩放和平移沿用 ImageViewport。
 
+同一 HTTP URI 发布新资源版本时，两轨会重新验证图像。原生按实际 URI、资源 ID 和版本缓存解码结果，Vue 更换绑定时释放旧对象 URL 并使旧读取失效。读取仍发送到应用授权的原 HTTP 地址。
+
 ## 消费与验收
 
 FileManager 持有目录、排序、真实路径、文件权限和缩略图生产。AssetBrowser 保留树、查询、分页、选择与 ImageViewport，沿用 AssetPicker 的确认和权限合同。Windows native VM 与 Windows Vue 分别验证业务读回，Linux 验收计划见 [DEBT-011](../../plans/debts.md#debt-011-collectionview-的-linux-平台验收)。

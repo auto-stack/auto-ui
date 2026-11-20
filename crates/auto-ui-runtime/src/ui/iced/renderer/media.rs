@@ -459,20 +459,8 @@ pub(crate) fn load_image_bytes(url: &str) -> Option<Vec<u8>> {
         // `reqwest::blocking::get` 在网络不可达时把渲染线程挂到 TCP
         // 超时（bounds 不更新/截图超时/导航无响应，avatar 家族接通
         // 网络图源后实机复现）。结果仍按 URL 缓存，阻塞每 URL 至多一次。
-        static HTTP: std::sync::OnceLock<reqwest::blocking::Client> = std::sync::OnceLock::new();
-        let client = HTTP.get_or_init(|| {
-            reqwest::blocking::Client::builder()
-                .timeout(std::time::Duration::from_secs(3))
-                .build()
-                .unwrap_or_default()
-        });
-        client
-            .get(url)
-            .send()
-            .ok()?
-            .bytes()
-            .ok()
-            .map(|b| b.to_vec())
+        let response = request_http_image(url).send().ok()?;
+        response.bytes().ok().map(|bytes| bytes.to_vec())
     } else {
         // Try loading from local file path
         std::fs::read(url).ok()
@@ -495,25 +483,49 @@ pub(crate) fn load_image_bytes(url: &str) -> Option<Vec<u8>> {
     result
 }
 
-pub(super) fn native_http_image_source(src: &str) -> Option<&str> {
-    src.strip_prefix("native-http-image:").filter(|url| {
-        url.starts_with("http://") || url.starts_with("https://") || url.starts_with("/api/")
+fn request_http_image(url: &str) -> reqwest::blocking::RequestBuilder {
+    static HTTP: std::sync::OnceLock<reqwest::blocking::Client> = std::sync::OnceLock::new();
+    HTTP.get_or_init(|| {
+        reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(3))
+            .build()
+            .unwrap_or_default()
     })
+    .get(url)
+}
+
+#[derive(serde::Deserialize, PartialEq, Eq, Hash)]
+pub(super) struct NativeHttpImage {
+    uri: String,
+    resource_id: String,
+    revision: String,
+}
+
+pub(super) fn native_http_image_source(src: &str) -> Option<NativeHttpImage> {
+    let mut source: NativeHttpImage =
+        serde_json::from_str(src.strip_prefix("native-http-image:")?).ok()?;
+    source.uri = auto_lang_core::vm::ffi::stdlib::resolve_http_base_url(&source.uri);
+    (source.uri.starts_with("http://") || source.uri.starts_with("https://") || source.uri.starts_with("/api/"))
+        .then_some(source)
 }
 
 type HttpBitmap = (u32, u32, iced::widget::image::Handle);
 
-pub(super) fn native_http_image(url: &str) -> Option<HttpBitmap> {
+pub(super) fn native_http_image(source: NativeHttpImage) -> Option<HttpBitmap> {
     use std::collections::HashMap;
     use std::sync::{Mutex, OnceLock};
 
-    static CACHE: OnceLock<Mutex<HashMap<String, Option<HttpBitmap>>>> = OnceLock::new();
-    let source = auto_lang_core::vm::ffi::stdlib::resolve_http_base_url(url);
+    static CACHE: OnceLock<Mutex<HashMap<NativeHttpImage, Option<HttpBitmap>>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     if let Some(entry) = cache.lock().unwrap().get(&source) {
         return entry.clone();
     }
-    let bitmap = load_image_bytes(&source)
+    let bitmap = request_http_image(&source.uri)
+        .header(reqwest::header::CACHE_CONTROL, "no-cache")
+        .send()
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .and_then(reqwest::blocking::Response::bytes)
+        .ok()
         .and_then(|data| image::load_from_memory(&data).ok())
         .map(|image| {
             let (width, height) = (image.width(), image.height());

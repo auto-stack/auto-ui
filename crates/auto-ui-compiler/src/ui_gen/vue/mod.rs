@@ -699,6 +699,7 @@ pub struct VueGenerator {
     /// script 臂发包装函数——DOM 无 pan 事件,裸 @pan 既不触发也过不了
     /// vue-tsc)。
     surface_pans: Vec<(String, bool)>,
+    versioned_images: bool,
 
     /// Subset of `template_refs` attached to child components (not DOM
     /// elements) via `ref: "canvasRef"` on a sub-widget instantiation.
@@ -1027,6 +1028,7 @@ impl VueGenerator {
             global_listeners: Vec::new(),
             template_refs: Vec::new(),
             surface_pans: Vec::new(),
+            versioned_images: false,
             component_ref_names: HashSet::new(),
             scroll_auto_scroll: Vec::new(),
             scroll_ctl_helpers_needed: false,
@@ -1446,6 +1448,7 @@ impl VueGenerator {
         self.global_listeners.clear();
         self.template_refs.clear();
         self.surface_pans.clear();
+        self.versioned_images = false;
         self.canvas_specs.clear();
         self.video_specs.clear();
         self.progress_seek_specs.clear();

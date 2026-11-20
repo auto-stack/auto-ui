@@ -1955,7 +1955,11 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
             "class=\"max-w-full max-h-full select-none\"".to_string(),
             "draggable=\"false\"".to_string(),
         ];
+        let revalidate = props.contains_key("cache_identity");
         for key in ["src", "alt", "width", "height", "quality"] {
+            if key == "src" && revalidate {
+                continue;
+            }
             if let Some(attr) = image_attr(key, props.get(key))? {
                 image_attrs.push(attr);
             }
@@ -1974,12 +1978,19 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                 })
                 .unwrap_or_else(|| default_value.to_string())
         };
+        if revalidate {
+            let source = bound_prop("src", "''");
+            let identity = bound_prop("cache_identity", "''");
+            image_attrs.push(format!(":data-auto-image-src=\"{source}\""));
+            image_attrs.push(format!("v-auto-versioned-image=\"[{source}, {identity}]\""));
+        }
         let fit = bound_prop("fit", "'contain'");
         let zoom = bound_prop("zoom", "1");
         let offset_x = bound_prop("offset_x", "0");
         let offset_y = bound_prop("offset_y", "0");
         let rotation = bound_prop("rotation", "0");
         let filter = bound_prop("filter", "'none'");
+        self.versioned_images |= revalidate;
         let transform = format!(
             "'translate(' + ({}) + 'px, ' + ({}) + 'px) rotate(' + ({}) + 'deg) scale(' + ({}) + ')'",
             offset_x, offset_y, rotation, zoom

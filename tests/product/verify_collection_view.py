@@ -256,7 +256,8 @@ def test_picker_browser(args, report):
         browser.call("browser_click", target=browser_button(page, "打开选择器"), element="打开选择器")
         picker = wait_for(snapshot, lambda s: "Lake.jpg" in s and "共 1003 项" in s, 3)
         decoded = browser.evaluate("""() => [...document.images].some(img =>
-            img.currentSrc.includes('scenic-320x240.png') && img.complete && img.naturalWidth === 320)""")
+            (img.dataset.autoImageSrc || img.currentSrc).includes('scenic-320x240.png') &&
+            img.complete && img.naturalWidth === 320)""")
         assert decoded is True, "authorized image did not decode at its expected natural width"
         def provider_readback():
             return browser.evaluate("""() => document.body.innerText.split('\\n').filter(line =>
