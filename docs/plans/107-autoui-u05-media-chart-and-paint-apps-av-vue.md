@@ -495,6 +495,16 @@ PLAN-114 的 `872441620` 已有处理器参数降层和 AV 调用的共享路径
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 28 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 855c387e, lang f2f524ef9 | evidence: checked child aliases, live class updates, AV frame and production Vue browser replay | next: work`
 
+### 第 29 轮｜必填图表列表采用调用端记录类型
+
+绑定器从已解析组件调用的 `model` 字段取得必填裸 `List` 的元素类型。跨模块的生成形参和求值函数使用同一名义记录类型，类型查找复用声明和导入绑定。子模块从保留的 CST 补投影，源码及语法标识保持原样。所有调用表达式仍经过共享受检编译。
+
+AV 组件帧回放读到子图例 `7 → 13`，Vue 产品 CLI 路由通过 `vue-tsc` 和 Vite，Chrome `157.0.8103.80` 实测 `7 → 13 → 7` 并卸载，无页面异常。浏览器日志 `round29-vue-browser.log` SHA256 为 `d27a3e28ae2e52668e73e2ae4cde0a3b9613a74384b578fbc2992f74b1975b7d`。导入记录类型通过，空列表无来源及同一参数收到不同记录形状均具名拒绝。Core 完整 conformance 866、AV PLAN-981 69、组件包 9、路由 2 和 SFC 20 通过。
+
+四个原图表闭包均越过 `data` 类型错误。`round29-chart-admission/original-with-stylekit.log` SHA256 为 `fc4d933d142864f76e2a644e6cf7740b6bbf7a6c84cf6283b9ad239de5b2e4c0`。首项新错误是原页 `checkbox checked` 布尔值被当成字符串插值，另有处理器循环参数读取、动态记录键和内部列表等共享诊断。原 `024-charts` 的整体挂载及页矩阵仍待验证。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 29 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 9624d1bd, lang 9ba35fe8b | evidence: caller record list, AV frame, production Vue browser replay, exact 024 closure reaches downstream checks | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
