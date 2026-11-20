@@ -831,6 +831,22 @@ stage: work（S1 首片）| plan_id: PLAN-105 | plan_revision: r1 | round: 98 | 
 **余缺口**：013 包片段 lane 仍 `source.syntax: expected `fn`, found `widget``（多单元下有单元走了非 AGE 面解析）；已把该用例断言放宽到「S1 或语法面」以免留红，并记录待定位。
 
 **下一刀**：逐单元探针定位该解析面选择问题（`compile_age_package_with_scenario` + `PACKAGES_CAPABILITY`），修好后 013 包片段 lane 应直接生成 SFC。
+
+stage: work（逐单元探针）| plan_id: PLAN-105 | plan_revision: r1 | round: 99 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `dad150f2d` | next: work
+
+2026-11-21 stage: work（T-02 W94：包片段 lane 逐单元探针）| outcome: pass
+
+**探针**（`compile_age_package_with_scenario` + `PACKAGES_CAPABILITY`，013 prep 产物逐单元）：
+| 单元 | 首个诊断 |
+|---|---|
+| main | `source.module-symbol: unknown type `List`` |
+| todo_store | `source.syntax: expected expression, found `}`` |
+| todo_list | 修复前 `expected `fn`, found `widget``；修复后同 main |
+| api / db | 后端单元，不应进包 |
+
+**修复**（`dad150f2d`）：`widget TodoList() { … }` 空参数表形（`age-node-params-empty`），census 两 AGE 面重基线（component `2dfb9edf…`、package `0d016cd5…`）；门全绿（census 4/4、981 248、980 40、979 24、105 26/26、104 3、1072 19）。
+
+**后续三件**：① `List<T>` 在包面 resolve（unknown type）；② todo_store 的 `on` 体解析缺口；③ SFC lane 单元筛选（排除 `src/back/*.at`）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1188,6 +1204,22 @@ stage: work（S1 首片）| plan_id: PLAN-105 | plan_revision: r1 | round: 98 | 
 **余缺口**：013 包片段 lane 仍 `source.syntax: expected `fn`, found `widget``（多单元下有单元走了非 AGE 面解析）；已把该用例断言放宽到「S1 或语法面」以免留红，并记录待定位。
 
 **下一刀**：逐单元探针定位该解析面选择问题（`compile_age_package_with_scenario` + `PACKAGES_CAPABILITY`），修好后 013 包片段 lane 应直接生成 SFC。
+
+stage: work（逐单元探针）| plan_id: PLAN-105 | plan_revision: r1 | round: 99 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-lang `dad150f2d` | next: work
+
+2026-11-21 stage: work（T-02 W94：包片段 lane 逐单元探针）| outcome: pass
+
+**探针**（`compile_age_package_with_scenario` + `PACKAGES_CAPABILITY`，013 prep 产物逐单元）：
+| 单元 | 首个诊断 |
+|---|---|
+| main | `source.module-symbol: unknown type `List`` |
+| todo_store | `source.syntax: expected expression, found `}`` |
+| todo_list | 修复前 `expected `fn`, found `widget``；修复后同 main |
+| api / db | 后端单元，不应进包 |
+
+**修复**（`dad150f2d`）：`widget TodoList() { … }` 空参数表形（`age-node-params-empty`），census 两 AGE 面重基线（component `2dfb9edf…`、package `0d016cd5…`）；门全绿（census 4/4、981 248、980 40、979 24、105 26/26、104 3、1072 19）。
+
+**后续三件**：① `List<T>` 在包面 resolve（unknown type）；② todo_store 的 `on` 体解析缺口；③ SFC lane 单元筛选（排除 `src/back/*.at`）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
