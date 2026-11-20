@@ -515,6 +515,14 @@ Iced 视图回放通过子组件 `Init` 循环求和 7，确认复选框由已�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 30 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bfa24e2c, lang 9bae6413d | evidence: checked native and browser checkbox, child input loop, exact chart and CodeEditor probes | next: work`
 
+### 第 31 轮｜图表临时数值列表推导
+
+复用 AGE 的 handler 列表推导，空列表构建器在追加项一致时取得标量类型。后续索引和算术可使用先前推导的列表元素类型，提交给 model 时沿用共享检查。AV 定向用例检查两个实例分别为 `0/0` 与 `1/1`，异构追加具名拒绝。Core 完整 conformance 866、AV PLAN-981 70 通过。
+
+原 `024-charts` 的空列表类型诊断由 18 处降至 7 处，首项仍在动态记录键。原闭包日志 SHA256 为 `d4fc69664dc669a475ff6d05531198e53265779e0a0dbc2c4b838ebd1e4149be`。Vue 路由材料的 `components/` 独立扫描拒 `ChartLegend.Build`，日志 SHA256 为 `73a2e731350d8c115fc2404f8043999534a379dd3cc4ea6f199e183061273fc5`。从显式依赖目录生成的同材料保留闭包，路由报告 A2TS 集合种子缺 `F32`，诊断页 SHA256 为 `d1fdbdc1d62116d0d0180dce879fdd605c95e4f05744f6416455fe3dbc78c57e`。本轮浏览器验收仍待补齐。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 31 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bfa24e2c, lang bc07e75e9 | evidence: AV numeric list builders and exact chart diagnostics, named Vue seed and standalone scan rejections | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
