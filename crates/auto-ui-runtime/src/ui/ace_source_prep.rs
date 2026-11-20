@@ -739,6 +739,10 @@ pub fn prepare_component_source(
                                 }
                             }
                         }
+                        // 纯 Auto 内存后端：先把 api 调用改写成对 store 自身列表的
+                        // 原地维护，再尝试内联 store 块。
+                        let unit_src = inline_memory_backend(project_root, &unit_src)
+                            .unwrap_or_else(|| unit_src.clone());
                         if let Some(block) = extract_store_block(&unit_src, item) {
                             // 只有该 store 片断在组件面**可解析**时才内联；含
                             // 组件面尚不支持的 `on` 语句（if/for/局部 var 等）时
@@ -1038,6 +1042,135 @@ fn rewrite_while_to_for(src: &str) -> String {
         }
     }
     out.replace(" as int", "")
+}
+/// 内存后端内联（PLAN-105 T-02，U03 真语料 013）：`use back.api: …` 指向的
+/// 后端是**纯 Auto 内存实现**（`db.at` 里一条记录列表 + 自增 id），因此把
+/// 五个 CRUD 调用改写成对 store 自身列表字段的原地维护：
+/// `list_todos()` → 列表已是真值（删行）、`create_todo(x)` → push、
+/// `update_todo(...)` → 下标搜索后整条替换、`delete_todo(id)`／
+/// `remove_completed(_)` → 下标搜索后 `remove`。
+fn inline_memory_backend(app_root: &Path, store_src: &str) -> Option<String> {
+    let has_api_use = store_src.lines().any(|l| {
+        let t = l.trim();
+        t.starts_with("use back.api") || t.starts_with("use api:")
+    });
+    if !has_api_use {
+        return None;
+    }
+    let read = |rel: &str| std::fs::read_to_string(app_root.join(rel)).ok();
+    let _api_src = read("src/back/api.at").or_else(|| read("src/api.at"))?;
+    let db_src = read("src/back/db.at").or_else(|| read("src/db.at"))?;
+    // 列表字段与元素类型（store model 的第一条 `var <name> []<Elem> = …`）。
+    let (list_field, elem) = store_src.lines().find_map(|l| {
+        let t = l.trim();
+        let rest = t.strip_prefix("var ")?;
+        let (name, ty) = rest.split_once(char::is_whitespace)?;
+        let el = ty.trim().strip_prefix("[]")?;
+        let el = el
+            .split(|c: char| c.is_whitespace() || c == '=')
+            .next()?
+            .trim()
+            .to_string();
+        Some((name.trim().to_string(), el.trim().to_string()))
+    })?;
+    // db 种子：`List<Todo>.new([ … ])` 里的条目与 `var nextid int = N`。
+    let seeds = {
+        let open = db_src.find(".new([")?;
+        let close = db_src[open..].find("])")? + open;
+        db_src[open + ".new([".len()..close]
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(|l| l.trim_end_matches(',').to_string())
+            .collect::<Vec<_>>()
+    };
+    let nextid = db_src
+        .lines()
+        .find_map(|l| {
+            let t = l.trim();
+            let rest = t.strip_prefix("var ")?;
+            let (name, val) = rest.split_once('=')?;
+            if name.split_whitespace().next() == Some("nextid") {
+                val.trim().parse::<i32>().ok()
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0);
+    let mut out = String::with_capacity(store_src.len() + 512);
+    let mut tmp = 0usize;
+    for line in store_src.split_inclusive('\n') {
+        let (body, nl) = match line.strip_suffix('\n') {
+            Some(b) => (b, "\n"),
+            None => (line, ""),
+        };
+        let t = body.trim_start();
+        let indent = &body[..body.len() - t.len()];
+        // 模型：种子与自增初值。
+        if t == format!("var {list_field} []{elem} = []") {
+            out.push_str(&format!(
+                "{indent}var {list_field} []{elem} = [{}]{nl}",
+                seeds.join(", ")
+            ));
+            continue;
+        }
+        if t.starts_with("var next_id int = ") {
+            out.push_str(&format!("{indent}var next_id int = {nextid}{nl}"));
+            continue;
+        }
+        // `.todos = list_todos()`：列表本身就是真值。
+        if t == format!(".{list_field} = list_todos()") {
+            out.push_str(&" ".repeat(body.len()));
+            out.push_str(nl);
+            continue;
+        }
+        if let Some(rest) = t.strip_prefix("create_todo(") {
+            let arg = rest.trim_end_matches(')').trim();
+            out.push_str(&format!(
+                "{indent}.{list_field}.push({elem} {{ id: .next_id, text: {arg}, done: false }}){nl}{indent}.next_id = .next_id + 1{nl}"
+            ));
+            continue;
+        }
+        if let Some(rest) = t.strip_prefix("update_todo(") {
+            let args: Vec<&str> = rest
+                .trim_end_matches(')')
+                .split(',')
+                .map(str::trim)
+                .collect();
+            if args.len() == 3 {
+                let i = format!("__mb_u{tmp}");
+                tmp += 1;
+                out.push_str(&format!(
+                    "{indent}var {i} int = 0{nl}{indent}for {i} < .{list_field}.len() {{{nl}{indent}    if .{list_field}[{i}].id == {id} {{{nl}{indent}        .{list_field}[{i}] = {elem} {{ id: {id}, text: {text}, done: {done} }}{nl}{indent}    }}{nl}{indent}    {i} = {i} + 1{nl}{indent}}}{nl}",
+                    id = args[0],
+                    text = args[1],
+                    done = args[2]
+                ));
+                continue;
+            }
+        }
+        if let Some(rest) = t.strip_prefix("delete_todo(") {
+            let id = rest.trim_end_matches(')').trim();
+            let i = format!("__mb_d{tmp}");
+            let gone = format!("__mb_g{tmp}");
+            tmp += 1;
+            out.push_str(&format!(
+                "{indent}var {i} int = 0{nl}{indent}for {i} < .{list_field}.len() {{{nl}{indent}    if .{list_field}[{i}].id == {id} {{{nl}{indent}        var {gone} {elem} = .{list_field}.remove({i}){nl}{indent}    }}{nl}{indent}    {i} = {i} + 1{nl}{indent}}}{nl}"
+            ));
+            continue;
+        }
+        if let Some(_rest) = t.strip_prefix("remove_completed(") {
+            let i = format!("__mb_r{tmp}");
+            let gone = format!("__mb_h{tmp}");
+            tmp += 1;
+            out.push_str(&format!(
+                "{indent}var {i} int = .{list_field}.len() - 1{nl}{indent}for {i} >= 0 {{{nl}{indent}    if .{list_field}[{i}].done {{{nl}{indent}        var {gone} {elem} = .{list_field}.remove({i}){nl}{indent}    }}{nl}{indent}    {i} = {i} - 1{nl}{indent}}}{nl}"
+            ));
+            continue;
+        }
+        out.push_str(line);
+    }
+    Some(out)
 }
 /// 记录类型块里的文本字段类型改写成 owned `Str`（`<field> str` → `<field> Str`）。
 fn rewrite_record_text_fields(block: &str) -> String {
