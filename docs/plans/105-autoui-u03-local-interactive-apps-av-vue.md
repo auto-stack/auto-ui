@@ -915,6 +915,16 @@ stage: work（两 app 挂载通过）| plan_id: PLAN-105 | plan_revision: r1 | r
 **验收**：013-todo `failures=0`（`p013-browser-evidence.txt`）、016-calendar `failures=0`（`p016-browser-evidence.txt`）。
 
 **余两例**：015-notes 卡 `view fn NoteRow`（嵌套视图函数未发射子组件；`lucide-vue-next` 已用 junction 解决）；022-kanban 需 `vue-router`（`<router-view/>`）。
+
+stage: work（三 app 挂载通过）| plan_id: PLAN-105 | plan_revision: r1 | round: 106 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `d1f089c3` | next: work
+
+2026-11-21 stage: work（T-02 W101：013/015/016 三 app 浏览器真实挂载通过）| outcome: **pass**
+
+**修复**：① lane 生成 widget 前登记 `view fn` 视图片段（015 的 `NoteRow` 不再 import 缺失子组件）；② 构建器在 prep 跳过大 store 时回补同目录 store 块（015 的 `NotesStore`）。
+
+**验收**：013、015、016 三站 `failures=0`（`p013-/p015-/p016-browser-evidence.txt`）。
+
+**余**：022-kanban 需 `vue-router`（`<router-view/>` 承载板块页）；Iced 腿仍等 AV collections 元素文本视图。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1356,6 +1366,16 @@ stage: work（两 app 挂载通过）| plan_id: PLAN-105 | plan_revision: r1 | r
 **验收**：013-todo `failures=0`（`p013-browser-evidence.txt`）、016-calendar `failures=0`（`p016-browser-evidence.txt`）。
 
 **余两例**：015-notes 卡 `view fn NoteRow`（嵌套视图函数未发射子组件；`lucide-vue-next` 已用 junction 解决）；022-kanban 需 `vue-router`（`<router-view/>`）。
+
+stage: work（三 app 挂载通过）| plan_id: PLAN-105 | plan_revision: r1 | round: 106 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `d1f089c3` | next: work
+
+2026-11-21 stage: work（T-02 W101：013/015/016 三 app 浏览器真实挂载通过）| outcome: **pass**
+
+**修复**：① lane 生成 widget 前登记 `view fn` 视图片段（015 的 `NoteRow` 不再 import 缺失子组件）；② 构建器在 prep 跳过大 store 时回补同目录 store 块（015 的 `NotesStore`）。
+
+**验收**：013、015、016 三站 `failures=0`（`p013-/p015-/p016-browser-evidence.txt`）。
+
+**余**：022-kanban 需 `vue-router`（`<router-view/>` 承载板块页）；Iced 腿仍等 AV collections 元素文本视图。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
