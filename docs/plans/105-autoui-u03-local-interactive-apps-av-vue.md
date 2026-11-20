@@ -547,6 +547,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 81 | from: work | t
 **下一刀（明确）**：把 AGE 组件卫生道的 `aggregates_admission` 打开（或在 Index/list-get 分支对 AGE 域放行 ElemView），让 `.todos[i].f` 走到 verify 层按现有规则判定；先补 3 个永久用例（字段投影读、`if` 条件里的 bool 字段、文本字段作拼接），再跑 248 例 + 六例门确认没有回归。
 
 **验证**：av list handlers 7/7；prep 7/7；core plan105 25/25。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 82 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 78b8b063d | next: work
+
+2026-11-19 stage: work（T-02 W79：元素视图放行）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `78b8b063d` | task_ids: T-02（W79）
+
+**交付（`xs[i].f` 全链路放行）**：①`resolve_with_view` 入口 + `resolve_detailed_inner(..., elem_view)`：AGE 车道在 bind 层不再一刀切拒元素视图；②`verify_collection_family_age_elem_view` 入口 + `Verifier.elem_view_owned`：AGE 车道允许 owned 文本字段投影**读成值**（`preview = .todos[i].text`），冻结 profile 保持 `.len()` 消费；③组件面组件入口改用 `compile_program_parts_age_elem_view` 变体（能力表不动，避免 Atom 类型表重复）；④新增永久回归 `p105_elem_view_field_projection_compiles`（26/26）。
+
+**基线校准（重要）**：全量 `cargo test -p ace-core --test conformance` 在本分支**基线**就是 834 passed / 36 failed（stash 对照实证），本轮 835/36——即**零新增失败**，新增用例通过。av 全量 1051/264 亦为分支既有基线。
+
+**013 现状**：元素视图墙已过；新墙 = `no local named self in scope` + `field access ... found i32` + `indexing requires a List receiver, found i32`——即**后端内联 shim 的生成语句落在 store 块里**，经 store 展开后作用域不对（`self` 不存在、`.todos` 被解析成 i32）。下一刀：把 shim 生成物从 `store` 块挪到**组件级 handler 体**（或让 store 展开支持生成语句的作用域），并核对 `.next_id` 的字段归属。
+
+**验证**：plan105 26/26、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 7/7；prep 7/7。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -620,6 +632,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 81 | from: work | t
 **下一刀（明确）**：把 AGE 组件卫生道的 `aggregates_admission` 打开（或在 Index/list-get 分支对 AGE 域放行 ElemView），让 `.todos[i].f` 走到 verify 层按现有规则判定；先补 3 个永久用例（字段投影读、`if` 条件里的 bool 字段、文本字段作拼接），再跑 248 例 + 六例门确认没有回归。
 
 **验证**：av list handlers 7/7；prep 7/7；core plan105 25/25。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 82 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 78b8b063d | next: work
+
+2026-11-19 stage: work（T-02 W79：元素视图放行）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `78b8b063d` | task_ids: T-02（W79）
+
+**交付（`xs[i].f` 全链路放行）**：①`resolve_with_view` 入口 + `resolve_detailed_inner(..., elem_view)`：AGE 车道在 bind 层不再一刀切拒元素视图；②`verify_collection_family_age_elem_view` 入口 + `Verifier.elem_view_owned`：AGE 车道允许 owned 文本字段投影**读成值**（`preview = .todos[i].text`），冻结 profile 保持 `.len()` 消费；③组件面组件入口改用 `compile_program_parts_age_elem_view` 变体（能力表不动，避免 Atom 类型表重复）；④新增永久回归 `p105_elem_view_field_projection_compiles`（26/26）。
+
+**基线校准（重要）**：全量 `cargo test -p ace-core --test conformance` 在本分支**基线**就是 834 passed / 36 failed（stash 对照实证），本轮 835/36——即**零新增失败**，新增用例通过。av 全量 1051/264 亦为分支既有基线。
+
+**013 现状**：元素视图墙已过；新墙 = `no local named self in scope` + `field access ... found i32` + `indexing requires a List receiver, found i32`——即**后端内联 shim 的生成语句落在 store 块里**，经 store 展开后作用域不对（`self` 不存在、`.todos` 被解析成 i32）。下一刀：把 shim 生成物从 `store` 块挪到**组件级 handler 体**（或让 store 展开支持生成语句的作用域），并核对 `.next_id` 的字段归属。
+
+**验证**：plan105 26/26、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 7/7；prep 7/7。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
