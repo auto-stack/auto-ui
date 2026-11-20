@@ -772,6 +772,18 @@ stage: work（能力缺口定位）| plan_id: PLAN-105 | plan_revision: r1 | rou
 → AV `av.collections/1` 的 place 只读 Copy 元素，`LIST_REMOVE` 是破坏性读；**缺「非破坏性读 owned 元素文本」指令**。
 
 **下一里程碑**：给 `av.collections/1` 增元素文本视图指令（`LIST_FIELD_VIEW -> StrView`，配 verify/execute/ABC/回归），或改状态函数取「LIST_REMOVE + 插回」的成对形状。此项超出 105 装配范围，建议单独立计划（105 侧可作为依赖项跟踪）。
+
+stage: work（两腿缺口收敛）| plan_id: PLAN-105 | plan_revision: r1 | round: 94 | from: work | to: work | status: executing | outcome: pass（定位+回归）| worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `af07f17e` | next: work
+
+2026-11-21 stage: work（T-02 W89：Iced 腿与浏览器腿在 S1 收敛）| outcome: pass（定位 + 回归落地）
+
+**Iced 腿**：`mir.list-type — place-get of owned element type`（place 只读 Copy；`LIST_REMOVE` 破坏性）→ **AV collections 缺「owned 元素文本非破坏性读」指令**，属 MIR 契约级新增，应在 av-core 侧单独立计划（105 只装配）。
+
+**浏览器腿**：013 真实源经组件面 prep + `generate_package_sfc` 停在 `store `TodoStore` … package-level store semantics are not wired yet (S1)` → **S1（包级 store 共享实例语义）**。
+
+**回归**：`tests/plan105_p013_sfc.rs`（`af07f17e`）用真实五单元走 prep→包片段 lane，钉住 S1 具名拒绝；S1 落地后自动切换为 `<template>`/`v-for`/`@click` 结构断言。
+
+**下一刀（S1）**：`bind_packages_age` 收 store（字段→共享状态、`store.X`→跨单元读、`msg`→通道）；去掉 `compile_age_package_with_scenario` 的「见 store 即拒」；SFC lane 映射 `ref` + handler；验收：013 SFC 结构绿 + 浏览器真实挂载点击。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1070,6 +1082,18 @@ stage: work（能力缺口定位）| plan_id: PLAN-105 | plan_revision: r1 | rou
 → AV `av.collections/1` 的 place 只读 Copy 元素，`LIST_REMOVE` 是破坏性读；**缺「非破坏性读 owned 元素文本」指令**。
 
 **下一里程碑**：给 `av.collections/1` 增元素文本视图指令（`LIST_FIELD_VIEW -> StrView`，配 verify/execute/ABC/回归），或改状态函数取「LIST_REMOVE + 插回」的成对形状。此项超出 105 装配范围，建议单独立计划（105 侧可作为依赖项跟踪）。
+
+stage: work（两腿缺口收敛）| plan_id: PLAN-105 | plan_revision: r1 | round: 94 | from: work | to: work | status: executing | outcome: pass（定位+回归）| worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `af07f17e` | next: work
+
+2026-11-21 stage: work（T-02 W89：Iced 腿与浏览器腿在 S1 收敛）| outcome: pass（定位 + 回归落地）
+
+**Iced 腿**：`mir.list-type — place-get of owned element type`（place 只读 Copy；`LIST_REMOVE` 破坏性）→ **AV collections 缺「owned 元素文本非破坏性读」指令**，属 MIR 契约级新增，应在 av-core 侧单独立计划（105 只装配）。
+
+**浏览器腿**：013 真实源经组件面 prep + `generate_package_sfc` 停在 `store `TodoStore` … package-level store semantics are not wired yet (S1)` → **S1（包级 store 共享实例语义）**。
+
+**回归**：`tests/plan105_p013_sfc.rs`（`af07f17e`）用真实五单元走 prep→包片段 lane，钉住 S1 具名拒绝；S1 落地后自动切换为 `<template>`/`v-for`/`@click` 结构断言。
+
+**下一刀（S1）**：`bind_packages_age` 收 store（字段→共享状态、`store.X`→跨单元读、`msg`→通道）；去掉 `compile_age_package_with_scenario` 的「见 store 即拒」；SFC lane 映射 `ref` + handler；验收：013 SFC 结构绿 + 浏览器真实挂载点击。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
