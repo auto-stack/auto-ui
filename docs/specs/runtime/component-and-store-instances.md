@@ -55,7 +55,9 @@
   一份；跨 App 天然隔离。子件 handler 体内 `store.Method()`/`.store.X` 与
   父属字段统一经 `__state.__auto_root.<f>` 指向共享态（`router.param` 同跳）；
   emit 账面（`__emit_msg`/`__emit_payload`，三写点：桥函数体、空体引号
-  handler 两路）同跳落根——清算侧（on_with_input_for 尾部）读 root。
+  handler 两路）同跳落根。派发器消费 emit 槽并调用实际父实例的绑定。父
+  handler 同步发出的下一条消息在同一次输入内继续沿该实例的父绑定派发。
+  一跳只消费一次，未绑定的消息终止，根处理器结束后清空待发标记。
 - 方法归属路由（Plan 370/446）不变；实例不静默分叉 store。
 - **store（Vue 轨）**：store composable 呈厂形——state refs/watchers/sibling
   facades/SSE/timer 守卫/accent bootstrap 全部在 `create{Name}Store()` 内

@@ -1,0 +1,12 @@
+name: "collection-view-demo"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "CollectionView Demo"
+title_zh: "资源视图演示"
+front_port: 4319
+window: "780x620"
+
+dep collection_view {
+    path: "../../packages/collection-view"
+}

@@ -1,0 +1,221 @@
+use auto.json
+use auto.math
+use thumbnail: Thumbnail
+use collection_view_util: cv_index, cv_sortable, cv_invalid, cv_enabled, cv_binding, cv_header, cv_rows, cv_move, cv_focused, cv_last
+
+widget CollectionView (items: List = [], columns: List = [], viewMode: str = "grid", selectedId: str = "", scopeId: str = "", revision: int = 0, disabled: bool = false, status: str = "ready", emptyLabel: str = "没有条目", errorMessage: str = "", sortKey: str = "", sortDirection: str = "") {
+    msg {
+        Init, Move(str), Activate(bool), FocusItem(str),
+        ItemInput(str, str, str), ViewInput(str, str, int, str), SortInput(str, str, int, str),
+        "viewModeRequested"(str), "selectionRequested"(str),
+        "itemActionRequested"(str), "sortRequested"(str)
+    }
+    model {
+        var instance_token str = ""
+        var seq int = 0
+        var focus_id str = ""
+        var focus_scope str = ""
+    }
+    computed {
+        config_error => cv_invalid(.items, .columns, .viewMode)
+        header => cv_header(.columns)
+        rows => cv_rows(.items, .columns, .selectedId, if .focus_scope == .scopeId { .focus_id } else { "" }, .scopeId, .revision, .instance_token)
+    }
+    view {
+        col (class: "w-full h-full min-h-0 min-w-0 overflow-hidden flex flex-col text-foreground") {
+            row (style: "w-full h-9 gap-1 px-2 items-center border-b border-border") {
+                button (text: "网格", title: "网格视图", disabled: .disabled,
+                        onclick: .ViewInput("grid", .scopeId, .revision, .instance_token),
+                        style: if .viewMode == "grid" { "h-7 px-2 bg-card text-foreground border border-primary rounded" } else { "h-7 px-2 rounded" }) {}
+                button (text: "列表", title: "列表视图", disabled: .disabled,
+                        onclick: .ViewInput("list", .scopeId, .revision, .instance_token),
+                        style: if .viewMode == "list" { "h-7 px-2 bg-card text-foreground border border-primary rounded" } else { "h-7 px-2 rounded" }) {}
+            }
+            if .config_error != "" {
+                text .config_error { style: "p-3 text-sm text-destructive" }
+            } else if .status == "error" {
+                if .errorMessage != "" {
+                    text .errorMessage { style: "p-3 text-sm text-destructive" }
+                } else {
+                    text "条目加载失败" { style: "p-3 text-sm text-destructive" }
+                }
+            } else if .status == "loading" {
+                text "条目加载中" { style: "p-3 text-sm text-muted-foreground" }
+            } else {
+                if .viewMode == "list" {
+                    row (style: "w-full h-8 px-2 items-center gap-1 border-b border-border") {
+                        for column in .header {
+                            row (style: if column.key == "name" { "flex-1 min-w-0 items-center gap-1" } else { "w-24 items-center gap-1" }) {
+                                if column.sortable {
+                                    button (text: column.label, disabled: .disabled,
+                                            onclick: .SortInput(column.key, .scopeId, .revision, .instance_token), style: "h-7 px-2 text-xs truncate") {}
+                                } else {
+                                    text column.label { style: "text-xs text-muted-foreground truncate" }
+                                }
+                                if .sortKey == column.key {
+                                    if .sortDirection == "asc" {
+                                        icon (name: "arrow-up", size: 12) {}
+                                    } else if .sortDirection == "desc" {
+                                        icon (name: "arrow-down", size: 12) {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if .items.len() == 0 {
+                    text .emptyLabel { style: "p-3 text-sm text-muted-foreground" }
+                }
+                col (class: "flex-1 min-h-0 min-w-0 w-full overflow-auto",
+                     onkeydown.left: .Move("left"), onkeydown.right: .Move("right"),
+                     onkeydown.up: .Move("up"), onkeydown.down: .Move("down"),
+                     onkeydown.home: .Move("home"), onkeydown.end: .Move("end"),
+                     onkeydown.space.prevent: .Activate(false), onkeydown.enter.prevent: .Activate(true)) {
+                    grid (style: if .viewMode == "list" { "grid grid-cols-1 gap-1 w-full p-2" } else { "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 w-full p-2" }) {
+                        for item in .rows {
+                            col (style: if item.selected { "w-full min-w-0 border border-primary rounded-md bg-accent" } else { if item.focused { "w-full min-w-0 border border-primary rounded-md bg-card" } else { "w-full min-w-0 border border-border rounded-md bg-card" } }) {
+                                row (style: if .viewMode == "list" { "w-full items-center gap-1 px-1" } else { "w-full flex-col gap-1 p-1" }) {
+                                    mouse-area (ondblclick: .ItemInput(item.binding, "default", ""),
+                                                oncontextmenu.prevent: .ItemInput(item.binding, "action", "menu"),
+                                                style: "flex-1 min-w-0") {
+                                        button (title: item.id, disabled: .disabled || item.disabled,
+                                                onclick: .ItemInput(item.binding, "selection", ""),
+                                                onfocus: .FocusItem(item.binding),
+                                                style: if .viewMode == "list" { "w-full min-w-0 justify-start gap-2 px-1 h-10" } else { "w-full min-w-0 h-auto flex-col items-stretch p-0 gap-1 text-left" }) {
+                                            col (style: if .viewMode == "list" { "w-7 h-7 shrink-0" } else { "w-full h-24 overflow-hidden" }) {
+                                                Thumbnail (key: item.id, src: item.src, kind: item.kind, icon: item.icon,
+                                                           state: item.imageState, resourceId: item.id, resourceRevision: item.itemRevision) {}
+                                            }
+                                            text item.label { style: "text-sm truncate" }
+                                        }
+                                    }
+                                    if .viewMode == "list" {
+                                        for cell in item.cells {
+                                            text cell.text { style: if cell.align == "right" { "w-24 text-right text-xs truncate" } else { "w-24 text-xs truncate" } }
+                                        }
+                                    }
+                                    row (style: "items-center gap-1") {
+                                        for action in item.actions {
+                                            button (text: action.label, disabled: .disabled || item.disabled || !action.enabled,
+                                                    onclick: .ItemInput(item.binding, "action", action.id),
+                                                    onkeydown.enter.stop.prevent: .ItemInput(item.binding, "action", action.id),
+                                                    onkeydown.space.stop.prevent: .ItemInput(item.binding, "action", action.id),
+                                                    style: "h-7 px-1 text-xs shrink-0") {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            // Vue can replay Init on a prop update. Keep the token for this
+            // mount until the component instance is actually replaced.
+            if .instance_token == "" {
+                .instance_token = "" + Time.now_ms() + "/" + math.random()
+            }
+        }
+        .ViewInput(mode str, scope str, base int, token str) -> {
+            if !.disabled && token != "" && token == .instance_token && scope == .scopeId && base == .revision {
+                if cv_invalid(.items, .columns, .viewMode) == "" && mode != .viewMode {
+                    .seq = .seq + 1
+                    try {
+                        ."viewModeRequested"(json.stringify({seq: .seq, instanceToken: token, scopeId: scope, baseRevision: base, viewMode: mode}))
+                    } catch {}
+                }
+            }
+        }
+        .SortInput(key str, scope str, base int, token str) -> {
+            if !.disabled && .status == "ready" && token != "" && token == .instance_token && scope == .scopeId && base == .revision {
+                if cv_invalid(.items, .columns, .viewMode) == "" && cv_sortable(.columns, key) {
+                    .seq = .seq + 1
+                    try {
+                        ."sortRequested"(json.stringify({seq: .seq, instanceToken: token, scopeId: scope, baseRevision: base, sortKey: key}))
+                    } catch {}
+                }
+            }
+        }
+        .ItemInput(binding str, kind str, action_id str) -> {
+            if !.disabled && .status == "ready" && .instance_token != "" && cv_invalid(.items, .columns, .viewMode) == "" {
+                try {
+                    let request = json.parse(binding)
+                    let index = cv_index(.items, request.id)
+                    if index >= 0 {
+                        let item = .items[index]
+                        if !(item.disabled ?? false) && binding == cv_binding(item, index, .instance_token, .scopeId, .revision) {
+                            var action str = action_id
+                            if kind == "default" { action = item.defaultActionId ?? "" }
+                            if kind == "selection" {
+                                .focus_id = item.id
+                                .focus_scope = .scopeId
+                                .seq = .seq + 1
+                                ."selectionRequested"(json.stringify({seq: .seq, instanceToken: .instance_token, scopeId: .scopeId, baseRevision: .revision, id: item.id, itemRevision: item.itemRevision}))
+                            } else if cv_enabled(item, action) {
+                                .seq = .seq + 1
+                                ."itemActionRequested"(json.stringify({seq: .seq, instanceToken: .instance_token, scopeId: .scopeId, baseRevision: .revision, id: item.id, itemRevision: item.itemRevision, actionId: action}))
+                            }
+                        }
+                    }
+                } catch {}
+            }
+        }
+        .FocusItem(binding str) -> {
+            if !.disabled && .status == "ready" && cv_invalid(.items, .columns, .viewMode) == "" {
+                try {
+                    let request = json.parse(binding)
+                    let index = cv_index(.items, request.id)
+                    if index >= 0 {
+                        let item = .items[index]
+                        if !(item.disabled ?? false) && binding == cv_binding(item, index, .instance_token, .scopeId, .revision) {
+                            .focus_id = item.id
+                            .focus_scope = .scopeId
+                        }
+                    }
+                } catch {}
+            }
+        }
+        .Move(direction str) -> {
+            if !.disabled && .status == "ready" && cv_invalid(.items, .columns, .viewMode) == "" {
+                if .focus_scope != .scopeId {
+                    .focus_scope = .scopeId
+                    .focus_id = ""
+                }
+                var target int = -1
+                if direction == "home" { target = cv_move(.items, "", 1) }
+                if direction == "end" { target = cv_last(.items) }
+                if .viewMode == "grid" {
+                    let width = storage.get("vm.window_inner_width").to_int()
+                    let columns = if width >= 1024 { 3 } else if width >= 640 { 2 } else { 1 }
+                    if direction == "left" { target = cv_move(.items, .focus_id, -1) }
+                    if direction == "right" { target = cv_move(.items, .focus_id, 1) }
+                    if direction == "up" { target = cv_move(.items, .focus_id, 0 - columns) }
+                    if direction == "down" { target = cv_move(.items, .focus_id, columns) }
+                } else {
+                    if direction == "up" { target = cv_move(.items, .focus_id, -1) }
+                    if direction == "down" { target = cv_move(.items, .focus_id, 1) }
+                }
+                if target >= 0 { .focus_id = .items[target].id }
+            }
+        }
+        .Activate(use_default bool) -> {
+            if !.disabled && .status == "ready" && cv_invalid(.items, .columns, .viewMode) == "" {
+                var index int = -1
+                if .focus_scope == .scopeId { index = cv_focused(.items, .focus_id) }
+                if index < 0 { index = cv_move(.items, "", 1) }
+                if index >= 0 {
+                    let item = .items[index]
+                    let binding = cv_binding(item, index, .instance_token, .scopeId, .revision)
+                    if use_default && (item.defaultActionId ?? "") != "" {
+                        .ItemInput(binding, "default", "")
+                    } else {
+                        .ItemInput(binding, "selection", "")
+                    }
+                }
+            }
+        }
+    }
+}

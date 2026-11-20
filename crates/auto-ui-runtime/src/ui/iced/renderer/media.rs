@@ -77,8 +77,10 @@ pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
     } else {
         is.as_ref().and_then(|s| s.height.as_ref().map(iced_length))
     };
-    let object_fit = match ImageSurfaceFit::parse(&fit) {
+    let fit = ImageSurfaceFit::parse(&fit);
+    let object_fit = match fit {
         ImageSurfaceFit::Contain => iced::ContentFit::Contain,
+        ImageSurfaceFit::Cover => iced::ContentFit::Cover,
         ImageSurfaceFit::Width => iced::ContentFit::Contain,
         ImageSurfaceFit::OneToOne => iced::ContentFit::None,
         ImageSurfaceFit::Free => iced::ContentFit::None,
@@ -109,7 +111,7 @@ pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
             let geometry = crate::ui::iced::image_surface::image_surface_geometry(
                 viewport,
                 iced::Size::new(source_width as f32, source_height as f32),
-                ImageSurfaceFit::parse(&fit),
+                fit,
                 zoom,
                 offset_x,
                 offset_y,
@@ -127,14 +129,14 @@ pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
             .content_fit(object_fit)
             .filter_method(filter_method)
             .rotation(iced::Radians::from(radians));
-            if width > 0 {
+            if width > 0 && fit != ImageSurfaceFit::Cover {
                 image = image.width(iced::Length::Fixed(
                     display_width.max(width as f32 + offset_x.abs()),
                 ));
             } else if let Some(w) = width_hint {
                 image = image.width(w);
             }
-            if height > 0 {
+            if height > 0 && fit != ImageSurfaceFit::Cover {
                 image = image.height(iced::Length::Fixed(
                     display_height.max(height as f32 + offset_y.abs()),
                 ));

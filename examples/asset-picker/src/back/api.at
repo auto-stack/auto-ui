@@ -23,10 +23,10 @@ pub fn health() str {
 #[api(method = "GET", path = "/api/assets/media-uris")]
 pub fn media_uris() []AssetUri {
     var out []AssetUri = []
-    out.push({ id: "lake", uri: image.current_uri(image.open_session("tests/fixtures/scenic-320x240.png")) })
-    out.push({ id: "corner", uri: image.current_uri(image.open_session("tests/fixtures/corner-marked.png")) })
-    out.push({ id: "rgb", uri: image.current_uri(image.open_session("tests/fixtures/rgb-1x1.png")) })
-    out.push({ id: "alpha", uri: image.current_uri(image.open_session("tests/fixtures/alpha-2x1.png")) })
-    out.push({ id: "orient", uri: image.current_uri(image.open_session("tests/fixtures/orientation-6.jpg")) })
+    out.push({ id: "lake", uri: image.current_uri(image.open_session("src/front/public/asset-fixtures/scenic-320x240.png")) })
+    out.push({ id: "corner", uri: image.current_uri(image.open_session("src/front/public/asset-fixtures/corner-marked.png")) })
+    out.push({ id: "rgb", uri: image.current_uri(image.open_session("src/front/public/asset-fixtures/rgb-1x1.png")) })
+    out.push({ id: "alpha", uri: image.current_uri(image.open_session("src/front/public/asset-fixtures/alpha-2x1.png")) })
+    out.push({ id: "orient", uri: image.current_uri(image.open_session("src/front/public/asset-fixtures/orientation-6.jpg")) })
     return out
 }

@@ -141,8 +141,8 @@ class AppPatch:
                       f'from "{packages}/\\1"', text)
         text = re.sub(r'from\s*"\.\./\.\./packages/([a-z-]+)"',
                       f'from "{packages}/\\1"', text)
-        fixtures = str((self.app_dir / 'tests' / 'fixtures').resolve()).replace(chr(92), '/')
-        text = text.replace('"tests/fixtures/', f'"{fixtures}/')
+        fixtures = (self.app_dir / 'src/front/public/asset-fixtures').resolve().as_posix()
+        text = text.replace('"public/asset-fixtures/', f'"{fixtures}/')
         app.write_bytes(text.encode('utf-8'))
         self.files[str(app)] = original
 
@@ -607,7 +607,7 @@ def run_picker_matrix(args, out, cases, report):
 
         s.trace('after-kind-image')
         # folder filter via TreeView row (文档 = 998 附件；先复位 kind)
-        s.ensure_effect('全部', lambda f: f.get('provider', ['', ''])[8] == '', occurrence=0)
+        s.ensure_effect('全部类型', lambda f: f.get('provider', ['', ''])[8] == '')
         rb = {}
         ok = False
         for attempt in range(5):
@@ -1101,6 +1101,28 @@ def run_vue_track(args, out, cases, report):
         cases.add('V-01(vue) 选择器挂载（1003 规模）', 'open picker',
                   '共 1003 项 + Lake.jpg', ['共 1003 项' in body and 'Lake.jpg' in body],
                   '共 1003 项' in body and 'Lake.jpg' in body)
+        # The first record has a real image. Preview must leave provider state alone.
+        observed = []
+        original_selection = next(line for line in body.splitlines() if line.startswith('selection='))
+        try:
+            b.page.wait_for_function(
+                """() => [...document.images].some(img =>
+                    img.currentSrc.includes('scenic-320x240.png') &&
+                    img.complete && img.naturalWidth === 320)""", timeout=4000)
+            observed.append('thumbnail decoded')
+            b.press('预览')
+            b.page.get_by_role('button', name=re.compile('关闭预览')).first.wait_for(timeout=4000)
+            preview = b.snapshot()
+            assert original_selection in preview.splitlines() and '附件日志: 0 条' in preview, preview
+            observed.append('preview left selection and attachments untouched')
+            b.press('关闭预览')
+            b.page.get_by_role('button', name=re.compile('Lake.jpg')).first.wait_for(timeout=4000)
+            observed.append('picker visible after closing preview')
+        except Exception as error:
+            observed.append(repr(error)[:240])
+        cases.add('V-02(vue) 真实缩略图与预览往返', 'preview Lake.jpg, close',
+                  '缩略图解码，预览不更改选择或附件，关闭返回选择器', observed,
+                  observed[-1] == 'picker visible after closing preview')
         # select via DOM click on the card button
         ok = False
         try:

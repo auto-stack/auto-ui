@@ -241,3 +241,10 @@
   ②包父层子件按钮 press 的 delivered=received 且嵌套 input Enter 派发
   committed（PLAN-092 复现脚本可复用）。修复后 PropertyInspector 交互
   折叠双轨补齐（合同文本不变）。
+
+## DEBT-011 CollectionView 的 Linux 平台验收
+
+- **来源**为 PLAN-109 r2。用户于 2026-11-20 批准将 Linux 平台验收随统一 Linux 开发补跑。
+- **状态**为待补验。Linux native VM 与 Linux Vue 均记录为 `not_run`。
+- **责任方**为 AutoUI 统一 Linux 开发与验收。
+- **关闭条件**为在 VMware 的目标自制发行版上按 109 的 V-01…09 运行适用用例，分别验证独立组件、027 FileManager、AssetPicker 和 029 Gallery。保留真实窗口或浏览器、MCP 操作、实际状态读回、失败清理、退出重开的证据，记录工具和源码版本。

@@ -1,0 +1,172 @@
+use auto.json
+
+pub fn cv_index(items List, id str) int {
+    var i int = 0
+    while i < items.len() {
+        if items[i].id == id { return i }
+        i = i + 1
+    }
+    return -1
+}
+
+pub fn cv_sortable(columns List, key str) bool {
+    let index = cv_column_index(columns, key)
+    if index < 0 { return false }
+    return columns[index].sortable ?? false
+}
+
+fn cv_column_index(columns List, key str) int {
+    var i int = 0
+    while i < columns.len() {
+        if columns[i].key == key { return i }
+        i = i + 1
+    }
+    return -1
+}
+
+pub fn cv_invalid(items List, columns List, mode str) str {
+    if mode != "grid" && mode != "list" { return "CollectionView: invalid_view_mode" }
+
+    var i int = 0
+    while i < columns.len() {
+        let column = columns[i]
+        if column.key == "" { return "CollectionView: empty_column_key" }
+        if cv_column_index(columns, column.key) != i { return "CollectionView: duplicate_column_key" }
+        i = i + 1
+    }
+
+    i = 0
+    while i < items.len() {
+        let item = items[i]
+        if item.id == "" { return "CollectionView: empty_item_id" }
+        if cv_index(items, item.id) != i { return "CollectionView: duplicate_item_id" }
+        let actions = item.actions ?? []
+        var j int = 0
+        while j < actions.len() {
+            let action = actions[j]
+            if action.id == "" { return "CollectionView: empty_action_id" }
+            if cv_index(actions, action.id) != j { return "CollectionView: duplicate_action_id" }
+            j = j + 1
+        }
+        let default_id = item.defaultActionId ?? ""
+        if default_id != "" && cv_index(actions, default_id) < 0 {
+            return "CollectionView: unknown_default_action"
+        }
+        i = i + 1
+    }
+    return ""
+}
+
+pub fn cv_header(columns List) List {
+    var result List = []
+    let name = cv_column_index(columns, "name")
+    if name < 0 {
+        result.push({key: "name", label: "名称", align: "left", sortable: false})
+    } else {
+        result.push(columns[name])
+    }
+    var i int = 0
+    while i < columns.len() {
+        if i != name { result.push(columns[i]) }
+        i = i + 1
+    }
+    return result
+}
+
+fn cv_cells(cells List, columns List) List {
+    var result List = []
+    var i int = 0
+    while i < columns.len() {
+        let column = columns[i]
+        if column.key != "name" {
+            var value str = ""
+            var j int = 0
+            while j < cells.len() {
+                if cells[j].key == column.key { value = cells[j].text }
+                j = j + 1
+            }
+            result.push({key: column.key, text: value, align: column.align ?? "left"})
+        }
+        i = i + 1
+    }
+    return result
+}
+
+pub fn cv_enabled(item, action_id str) bool {
+    if item.disabled ?? false { return false }
+    let actions = item.actions ?? []
+    let index = cv_index(actions, action_id)
+    if index < 0 { return false }
+    return actions[index].enabled ?? true
+}
+
+pub fn cv_binding(item, index int, token str, scope str, revision int) str {
+    return json.stringify({
+        index: index, instanceToken: token, scopeId: scope, baseRevision: revision,
+        id: item.id, itemRevision: item.itemRevision, version: json.stringify(item)
+    })
+}
+
+pub fn cv_rows(items List, columns List, selected str, focus str, scope str, revision int, token str) List {
+    var result List = []
+    var i int = 0
+    while i < items.len() {
+        let item = items[i]
+        let src = item.thumbnailUri ?? ""
+        var image_state str = item.thumbnailState ?? ""
+        if image_state == "" {
+            image_state = if src != "" { "ready" } else { "missing" }
+        }
+        let raw_actions = item.actions ?? []
+        var actions List = []
+        var j int = 0
+        while j < raw_actions.len() {
+            let action = raw_actions[j]
+            actions.push({id: action.id, label: action.label, enabled: action.enabled ?? true})
+            j = j + 1
+        }
+        result.push({
+            id: item.id, label: item.label, itemRevision: item.itemRevision,
+            kind: item.kind ?? "", icon: item.icon ?? "", src: src, imageState: image_state,
+            cells: cv_cells(item.cells ?? [], columns), actions: actions,
+            defaultId: item.defaultActionId ?? "", disabled: item.disabled ?? false,
+            binding: cv_binding(item, i, token, scope, revision),
+            selected: item.id == selected, focused: item.id == focus
+        })
+        i = i + 1
+    }
+    return result
+}
+
+pub fn cv_move(items List, focus str, step int) int {
+    let current = cv_index(items, focus)
+    if current < 0 || (items[current].disabled ?? false) {
+        var i int = 0
+        while i < items.len() {
+            if !(items[i].disabled ?? false) { return i }
+            i = i + 1
+        }
+        return -1
+    }
+    var next int = current + step
+    while next >= 0 && next < items.len() {
+        if !(items[next].disabled ?? false) { return next }
+        next = next + step
+    }
+    return current
+}
+
+pub fn cv_focused(items List, focus str) int {
+    let current = cv_index(items, focus)
+    if current >= 0 && !(items[current].disabled ?? false) { return current }
+    return cv_move(items, "", 1)
+}
+
+pub fn cv_last(items List) int {
+    var i int = items.len() - 1
+    while i >= 0 {
+        if !(items[i].disabled ?? false) { return i }
+        i = i - 1
+    }
+    return -1
+}

@@ -49,3 +49,19 @@ dep image_viewer {
 dep themes {
     path: "../../../packages/themes"
 }
+
+dep asset_browser {
+    path: "../../../packages/asset-browser"
+}
+
+dep tree_view {
+    path: "../../../packages/tree-view"
+}
+
+dep pagination {
+    path: "../../../packages/pagination"
+}
+
+dep collection_view {
+    path: "../../../packages/collection-view"
+}

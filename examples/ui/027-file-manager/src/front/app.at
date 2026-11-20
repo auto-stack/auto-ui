@@ -14,6 +14,7 @@
 // - 持久化：storage.get/set 保持视图模式、排序字段、排序方向与隐藏文件状态
 
 use components.fs_util: format_size, type_label, hidden_name, fmt_date, app_for_ext, is_image_ext, parent_of, base_name, ext_of, build_crumbs, sort_files
+use components.collection_items: fm_collection_items, fm_path_index
 use back.api: fs_list, fs_home, fs_drives
 use auto.process
 use auto.fs
@@ -32,22 +33,19 @@ style sidebar_item = "h-8 w-full justify-start px-3 text-xs text-foreground hove
 style dim_xs = "shrink-0 text-xs text-muted-foreground/60"
 style col_tight = "items-center gap-0.5 shrink-0"
 style search_input = "w-full text-xs px-3 py-2 bg-background border border-border rounded-lg text-foreground mb-1 outline-none focus:border-primary"
-style fade_text = "opacity-30 text-muted-foreground"
 style row_gap3 = "items-center gap-3"
-style empty_state = "flex-1 items-center justify-center p-12 gap-3"
 
 widget App {
+    use { package: collection_view from "../../../../../packages/collection-view" }
     use { package: official from "./components" }
 
-    // PLAN-016 R4-T21：选中项 Enter 打开（键盘面；handler 内弹层守卫）
-    actions {
-        action (id: "list.open_selected", handler: .OpenSelected, title: "打开选中项", shortcut: "Enter")
-    }
     msg {
         Init, Tick,
         NavTo(str), GoBack, GoForward, GoUp,
         SetViewMode(str), SortByName, SortBySize, SortByDate, SortByType, ToggleHidden,
-        SetSearch(str), SetAddr(str), AddrGo, AddrEdit, AddrCancel, SelectItem(int), OpenItem(int), OpenSelected,
+        SetSearch(str), SetAddr(str), AddrGo, AddrEdit, AddrCancel, SelectItem(int), OpenItem(int),
+        CollectionMode(str), CollectionSort(str), CollectionSelection(str), CollectionAction(str),
+        CollectionItem(str, bool), PublishCollection,
         CrumbsExpand,
         StartRename(int), SetEditName(str), CommitRename, CancelRename,
         ItemCtx(int), CtxClose, CtxOpen, CtxRename, CtxCopy, CtxCut, CtxPaste, CtxDelete,
@@ -106,14 +104,13 @@ widget App {
         var search_q str = ""
         var addr str = ""                    // 地址编辑值（Phase 2：点击面包屑区进入编辑态）
         var addr_editing bool = false
-        // R5：行 hover 高亮（mouseenter/leave 显式驱动）
-        var hover_id int = -1
         // R7：桌面在场标记（宿主 AUTO_UI_IN_DESKTOP）——open_with 仅桌面内可达；
         // 独立窗口走系统默认程序
         var in_desktop bool = false
 
         // 选中与重命名
         var selected_id int = -1
+        var selected_path str = ""
         var selected_name str = ""
         var selected_info str = "未选中任何项目"
         var editing_id int = -1
@@ -121,8 +118,9 @@ widget App {
         var rename_open bool = false
         var rename_path str = ""            // StartRename 捕获（排序后 id 会漂移）
 
-        // ---- 右键菜单（锚定 popover，open 按 ctx_id 匹配行）----
+        // 右键和显式菜单按钮共同指向当前目录中的目标。
         var ctx_id int = -1
+        var ctx_name str = ""
 
         // ---- 新建文件/文件夹模态（alert-dialog）----
         var new_modal_open bool = false
@@ -134,6 +132,7 @@ widget App {
         var confirm_del_id int = -1
         var confirm_del_path str = ""       // ConfirmDelete 捕获
         var confirm_del_name str = ""
+        var confirm_del_is_dir bool = false
         var confirm_del_desc str = "确定要删除选中的项目吗？"
 
         // ---- 剪贴板状态（真实路径）----
@@ -146,7 +145,14 @@ widget App {
         // ---- 状态栏 ----
         var item_count_str str = "0 个项目"
         var total_size_str str = "0 B"
-        var has_items bool = false
+        var collection_revision int = 0
+        var collection_token str = ""
+        var collection_columns List = [
+            {key: "name", label: "名称", align: "left", sortable: true},
+            {key: "size", label: "大小", align: "right", sortable: true},
+            {key: "type", label: "类型", align: "left", sortable: true},
+            {key: "date", label: "修改日期", align: "left", sortable: true}
+        ]
 
         // 渲染视图模型（NavTo 从真实目录物化；行 schema 与视图绑定一一对应）
         var files_view = [
@@ -164,6 +170,10 @@ widget App {
                 thumb_src: ""
             }
         ]
+    }
+
+    computed {
+        collection_items => fm_collection_items(.files_view, "" + .collection_revision)
     }
 
     // PLAN-046 T-03：主题/模式绑定（C-14 数据绑定形态；宿主 SetTheme 回写
@@ -232,6 +242,9 @@ widget App {
                             }
                         }
                     } else {
+                        button (title: "编辑地址", onclick: .AddrEdit, style: "h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground") {
+                            icon (name: "pencil", size: 15) {}
+                        }
                         // R4-1：mouse-area 包单行子件——空白点击进编辑态
                         //（crumb 按钮自身消费点击，空白区域落到 mouse-area）
                         // PLAN-023 坍缩三面：crumbs_head + [ ... ] + crumbs_tail
@@ -288,21 +301,6 @@ widget App {
                         style: "w-40 text-xs px-3 py-1.5 bg-background/80 border border-border rounded-lg text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
                     }
 
-
-                    // 视图模式切换（List ↔ Grid）
-                    row {
-                        style: "bg-background/80 border border-border rounded-lg p-0.5 gap-0.5"
-                        button (variant: "ghost") {
-                            onclick: .SetViewMode("list")
-                            style: if .view_mode == "list" { "h-7 w-7 rounded-md bg-accent text-foreground flex items-center justify-center shadow-sm" } else { "h-7 w-7 rounded-md text-muted-foreground hover:text-foreground flex items-center justify-center" }
-                            icon (name: "align-justify", size: 14) {}
-                        }
-                        button (variant: "ghost") {
-                            onclick: .SetViewMode("grid")
-                            style: if .view_mode == "grid" { "h-7 w-7 rounded-md bg-accent text-foreground flex items-center justify-center shadow-sm" } else { "h-7 w-7 rounded-md text-muted-foreground hover:text-foreground flex items-center justify-center" }
-                            icon (name: "layout-grid", size: 14) {}
-                        }
-                    }
 
                     // 隐藏文件开关（icon-only + tooltip；Phase 2 T-13）
                     button (title: "显示/隐藏隐藏项") {
@@ -404,243 +402,30 @@ widget App {
                     }
                 }
 
-                // ---- 右侧主要内容区（详细列表 vs 图标网格）----
-                col {
-                    style: "flex-1 bg-background flex flex-col min-h-0 overflow-y-auto"
-
-                    // 模式 A：详细列表视图
-                    if .view_mode == "list" {
-                        col {
-                            style: "w-full flex-1 min-h-0"
-
-                            // 列表表头（可点击排序）
-                            row {
-                                style: "h-9 border-b border-border px-4 items-center bg-card/30 text-xs font-medium text-muted-foreground select-none sticky top-0 z-10"
-                                button (variant: "ghost") {
-                                    onclick: .SortByName
-                                    style: "w-1/3 justify-start px-2 text-xs text-foreground/80 hover:text-foreground"
-                                    row {
-                                        style: row_gap1
-                                        text "名称" { style: "text-xs" }
-                                        if .sort_col == "name" {
-                                            if .sort_dir == "asc" {
-                                                icon (name: "arrow-up", size: 12) {}
-                                            } else {
-                                                icon (name: "arrow-down", size: 12) {}
-                                            }
-                                        }
-                                    }
-                                }
-                                button (variant: "ghost") {
-                                    onclick: .SortBySize
-                                    style: "w-32 justify-end pr-5 text-xs text-foreground/80 hover:text-foreground"
-                                    row {
-                                        style: row_gap1
-                                        text "大小" { style: "text-xs" }
-                                        if .sort_col == "size" {
-                                            if .sort_dir == "asc" {
-                                                icon (name: "arrow-up", size: 12) {}
-                                            } else {
-                                                icon (name: "arrow-down", size: 12) {}
-                                            }
-                                        }
-                                    }
-                                }
-                                button (variant: "ghost") {
-                                    onclick: .SortByType
-                                    style: "w-36 justify-center text-xs text-foreground/80 hover:text-foreground"
-                                    row {
-                                        style: row_gap1
-                                        text "类型" { style: "text-xs" }
-                                        if .sort_col == "type" {
-                                            if .sort_dir == "asc" {
-                                                icon (name: "arrow-up", size: 12) {}
-                                            } else {
-                                                icon (name: "arrow-down", size: 12) {}
-                                            }
-                                        }
-                                    }
-                                }
-                                button (variant: "ghost") {
-                                    onclick: .SortByDate
-                                    style: "flex-1 justify-start px-2 text-xs text-foreground/80 hover:text-foreground"
-                                    row {
-                                        style: row_gap1
-                                        text "修改日期" { style: "text-xs" }
-                                        if .sort_col == "date" {
-                                            if .sort_dir == "asc" {
-                                                icon (name: "arrow-up", size: 12) {}
-                                            } else {
-                                                icon (name: "arrow-down", size: 12) {}
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // 列表行项目
-                            if .has_items {
-                                col {
-                                    style: "divide-y divide-border"
-                                    for item in .files_view {
-                                        // R4-4/5/6：整行 mouse-area——单击选中、双击
-                                        // 打开、右键出菜单（任意位置）；名称去按钮化，
-                                        // 整行高亮
-                                        row {
-                                            style: "h-11 items-center"
-                                            mouse-area (onclick: .SelectItem(item.id), ondblclick: .OpenItem(item.id), oncontextmenu.prevent: .ItemCtx(item.id), onmouseenter: .RowHover(item.id), onmouseleave: .RowLeave, style: if item.id == .selected_id { "flex-1 h-11 px-4 items-center bg-accent border-l-2 border-primary" } else { if .hover_id == item.id { "flex-1 h-11 px-4 items-center bg-accent/30" } else { "flex-1 h-11 px-4 items-center" } }) {
-                                                row {
-                                                    style: "h-11 items-center w-full"
-
-                                                // 名称列（图标 + 名称）
-                                                row {
-                                                    style: "w-1/3 items-center gap-2 px-2 min-w-0"
-                                                    FileIcon (is_dir: item.is_dir, ext: item.file_ext, size: 16) {}
-                                                    text item.name { style: if item.is_hidden { "text-sm text-muted-foreground font-medium truncate" } else { "text-sm text-foreground font-medium truncate" } }
-                                                }
-
-                                                // 大小列
-                                                text item.size_str {
-                                                    style: "w-32 text-right pr-5 text-xs font-mono text-muted-foreground"
-                                                }
-
-                                                // 类型列
-                                                text item.type_name {
-                                                    style: "w-36 text-center text-xs text-muted-foreground truncate"
-                                                }
-
-                                                    // 修改日期列
-                                                    text item.date {
-                                                        style: "flex-1 px-2 text-xs text-muted-foreground font-mono"
-                                                    }
-                                                }
-                                            }
-
-                                            // ··· 单元格（popover 宿主——F-2：popover 不可入
-                                            // mouse-area 子树，closed 态内容会泄漏参与布局）
-                                            row {
-                                                style: "w-16 h-11 items-center justify-center"
-                                                popover (open: .ctx_id == item.id, placement: "bottom-end", ondismiss: .CtxClose,
-                                                         class: "w-44 p-1.5 rounded-xl border border-border bg-card shadow-xl z-50") {
-                                                    // R5-2：first-child = 锚件就地渲染不进菜单
-                                                    //（"打开"消失 + 菜单锚错位根因）——
-                                                    // trigger/content 子标签强制拆分
-                                                    popover-trigger {
-                                                        button (variant: "ghost") {
-                                                            onclick: .ItemCtx(item.id)
-                                                            oncontextmenu.prevent: .ItemCtx(item.id)
-                                                            style: "h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md flex items-center justify-center"
-                                                            icon (name: "more-horizontal", size: 16) {}
-                                                        }
-                                                    }
-                                                    popover-content {
-                                                    button (variant: "ghost") {
-                                                        onclick: .CtxOpen
-                                                        style: sidebar_item
-                                                        icon (name: "folder-open", size: 14) {}
-                                                        text "打开" { style: "text-xs" }
-                                                    }
-                                                    button (variant: "ghost") {
-                                                        onclick: .CtxRename
-                                                        style: sidebar_item
-                                                        icon (name: "pencil", size: 14) {}
-                                                        text "重命名" { style: "text-xs" }
-                                                    }
-                                                    button (variant: "ghost") {
-                                                        onclick: .CtxCopy
-                                                        style: sidebar_item
-                                                        icon (name: "copy", size: 14) {}
-                                                        text "复制" { style: "text-xs" }
-                                                    }
-                                                    button (variant: "ghost") {
-                                                        onclick: .CtxCut
-                                                        style: sidebar_item
-                                                        icon (name: "scissors", size: 14) {}
-                                                        text "剪切" { style: "text-xs" }
-                                                    }
-                                                    button (variant: "ghost") {
-                                                        onclick: .CtxDelete
-                                                        style: "h-8 w-full justify-start px-3 text-xs text-destructive hover:bg-accent rounded-md flex items-center gap-2"
-                                                        icon (name: "trash-2", size: 14) {}
-                                                        text "删除" { style: "text-xs" }
-                                                    }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                // 空目录占位
-                                col {
-                                    style: empty_state
-                                    icon (name: "folder-open", size: 44, style: fade_text) {}
-                                    if .booted {
-                                        if .is_vm == "vm" || .back_fs {
-                                            text "此目录为空" { style: breadcrumb_label }
-                                        } else {
-                                            text "后端读盘不可达 — 演示目录仅静态展示，真盘请使用 auto run -r vm" { style: breadcrumb_label }
-                                        }
-                                        } else {
-                                            text "正在加载..." { style: breadcrumb_label }
-                                        }
-                                }
-                            }
+                // 目录与业务操作仍由应用持有，网格与明细共用当前结果。
+                col (style: "flex-1 min-w-0 min-h-0 bg-background") {
+                    if .ctx_id >= 0 {
+                        row (style: "w-full items-center gap-1 px-2 py-1 border-b border-border bg-card") {
+                            text .ctx_name { style: "flex-1 min-w-0 text-xs truncate" }
+                            button (text: "打开", onclick: .CtxOpen, style: "h-7 px-2 text-xs") {}
+                            button (text: "重命名", onclick: .CtxRename, style: "h-7 px-2 text-xs") {}
+                            button (text: "复制", onclick: .CtxCopy, style: "h-7 px-2 text-xs") {}
+                            button (text: "剪切", onclick: .CtxCut, style: "h-7 px-2 text-xs") {}
+                            button (text: "删除", onclick: .CtxDelete, style: "h-7 px-2 text-xs text-destructive") {}
+                            button (text: "关闭菜单", onclick: .CtxClose, style: "h-7 px-2 text-xs") {}
                         }
                     }
-
-                    // 模式 B：图标网格视图
-                    if .view_mode == "grid" {
-                        col {
-                            style: "w-full flex-1 p-5 min-h-0"
-                            if .has_items {
-                                // Phase 2 T-17：grid 多列（VM flex-wrap 降级单行，
-                                // 025 performance grid 先例）；整卡 mouse-area
-                                // 单击选中/双击打开；卡内 popover 移除（closed 态
-                                // 内容在 grid 子树泄漏参与布局，F-2 框架债）。
-                                row (style: "grid grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-4") {
-                                    for item in .files_view {
-                                        mouse-area (onclick: .SelectItem(item.id), ondblclick: .OpenItem(item.id), oncontextmenu.prevent: .ItemCtx(item.id), style: "cursor-pointer") {
-                                            col {
-                                                style: if item.id == .selected_id { "h-40 bg-accent border-2 border-primary rounded-xl p-3 items-center justify-center gap-2 shadow-lg" } else { "h-40 bg-card/60 border border-border rounded-xl p-3 items-center justify-center gap-2 hover:bg-accent/40" }
-
-                                                // PLAN-023：图片文件 → 媒体管线缩略图
-                                                //（256px rendition，cover 裁切入卡，
-                                                // 未就绪本帧空、随 Tick 渐进浮现）；
-                                                // 非图片/失败回落 FileIcon 原样
-                                                if item.thumb_src != "" {
-                                                    col {
-                                                        style: "h-20 w-full rounded-lg overflow-hidden bg-muted"
-                                                        image_surface (src: item.thumb_src, fit: "cover", style: "w-full h-full") {}
-                                                    }
-                                                } else {
-                                                    FileIcon (is_dir: item.is_dir, ext: item.file_ext, size: 36) {}
-                                                }
-
-                                                text item.name { style: if item.is_hidden { "text-xs text-muted-foreground font-medium truncate w-full text-center" } else { "text-xs text-foreground font-medium truncate w-full text-center" } }
-
-                                                text item.size_str { style: "text-[10px] text-muted-foreground font-mono" }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                col {
-                                    style: empty_state
-                                    icon (name: "folder-open", size: 44, style: fade_text) {}
-                                    if .booted {
-                                        if .is_vm == "vm" || .back_fs {
-                                            text "此目录为空" { style: breadcrumb_label }
-                                        } else {
-                                            text "后端读盘不可达 — 演示目录仅静态展示，真盘请使用 auto run -r vm" { style: breadcrumb_label }
-                                        }
-                                        } else {
-                                            text "正在加载..." { style: breadcrumb_label }
-                                        }
-                                }
-                            }
-                        }
-                    }
+                    CollectionView (
+                        items: .collection_items, columns: .collection_columns,
+                        viewMode: .view_mode, selectedId: .selected_path, scopeId: .current_path,
+                        revision: .collection_revision, sortKey: .sort_col, sortDirection: .sort_dir,
+                        status: if .booted { "ready" } else { "loading" },
+                        emptyLabel: if .is_vm == "vm" || .back_fs { "此目录为空" } else { "后端读盘不可达" },
+                        onviewModeRequested: .CollectionMode($event),
+                        onselectionRequested: .CollectionSelection($event),
+                        onitemActionRequested: .CollectionAction($event),
+                        onsortRequested: .CollectionSort($event)
+                    ) {}
                 }
             }
 
@@ -836,7 +621,7 @@ widget App {
                 demo.push({ id: 4, name: "report.pdf", path: "demo://home/report.pdf", is_dir: false, size: 245760, size_str: "240 KB", file_ext: "pdf", type_name: "PDF", date: "2026-09-19 11:05", is_hidden: false, thumb_src: "" })
                 demo.push({ id: 5, name: "photo.png", path: "demo://home/photo.png", is_dir: false, size: 1048576, size_str: "1 MB", file_ext: "png", type_name: "图片", date: "2026-09-17 16:44", is_hidden: false, thumb_src: "" })
                 .files_view = demo
-                .has_items = true
+                .PublishCollection()
                 .item_count_str = "6 个项目"
                 .total_size_str = "1.2 MB"
                 }
@@ -893,6 +678,7 @@ widget App {
                     // 变更放在其后，失败时保留原视图）
                     var names = json.parse(fs.read_dir(can))
 
+                    if .current_path != can { .selected_path = "" }
                     .current_path = can
                     .addr = can
                     .crumbs_expanded = false
@@ -1027,7 +813,7 @@ widget App {
                     } else {
                         .item_count_str = kept.str() + " 个项目"
                     }
-                    .has_items = (kept > 0)
+                    .PublishCollection()
                     .total_size_str = format_size(total_bytes)
                 }
             }
@@ -1040,6 +826,7 @@ widget App {
                     if !res.ok {
                         toast.error("无法打开: " + target_path)
                     } else {
+                        if .current_path != res.path { .selected_path = "" }
                         .current_path = res.path
                         .addr = res.path
                         .crumbs_expanded = false
@@ -1151,7 +938,7 @@ widget App {
                         } else {
                             .item_count_str = kept.str() + " 个项目"
                         }
-                        .has_items = (kept > 0)
+                        .PublishCollection()
                         .total_size_str = format_size(total_bytes)
                     }
                 }
@@ -1192,6 +979,59 @@ widget App {
                     .NavTo(up2)
                 }
             }
+        }
+
+        // 校验结果代次与当前挂载后再解析目标路径。旧业务处理器仍接收当前行号。
+        .CollectionMode(payload str) -> {
+            try {
+                let request = json.parse(payload)
+                if request.scopeId == .current_path && request.baseRevision == .collection_revision && request.instanceToken != "" && (.collection_token == "" || request.instanceToken == .collection_token) {
+                    if request.viewMode == "grid" || request.viewMode == "list" {
+                        .collection_token = request.instanceToken
+                        .SetViewMode(request.viewMode)
+                    }
+                }
+            } catch {}
+        }
+
+        .CollectionSort(payload str) -> {
+            try {
+                let request = json.parse(payload)
+                if request.scopeId == .current_path && request.baseRevision == .collection_revision && request.instanceToken != "" && (.collection_token == "" || request.instanceToken == .collection_token) {
+                    .collection_token = request.instanceToken
+                    if request.sortKey == "name" { .SortByName() }
+                    if request.sortKey == "size" { .SortBySize() }
+                    if request.sortKey == "type" { .SortByType() }
+                    if request.sortKey == "date" { .SortByDate() }
+                }
+            } catch {}
+        }
+
+        .CollectionSelection(payload str) -> { .CollectionItem(payload, false) }
+        .CollectionAction(payload str) -> { .CollectionItem(payload, true) }
+
+        .CollectionItem(payload str, is_action bool) -> {
+            try {
+                let request = json.parse(payload)
+                if request.scopeId == .current_path && request.baseRevision == .collection_revision && request.itemRevision == ("" + .collection_revision) && request.instanceToken != "" && (.collection_token == "" || request.instanceToken == .collection_token) {
+                    let index = fm_path_index(.files_view, request.id)
+                    if index >= 0 {
+                        .collection_token = request.instanceToken
+                        if !is_action {
+                            .SelectItem(index)
+                        } else if request.actionId == "open" {
+                            .OpenItem(index)
+                        } else if request.actionId == "menu" {
+                            .ItemCtx(index)
+                        }
+                    }
+                }
+            } catch {}
+        }
+
+        .PublishCollection -> {
+            .collection_revision = .collection_revision + 1
+            .SelectItem(fm_path_index(.files_view, .selected_path))
         }
 
         // ---- 视图与排序 ----
@@ -1295,8 +1135,13 @@ widget App {
             var n int = .files_view.len()
             if id >= 0 && id < n {
                 let r = .files_view[id]
+                .selected_path = r.path
                 .selected_name = r.name
                 .selected_info = "选定: " + r.name + " (" + r.size_str + ")"
+            } else {
+                .selected_path = ""
+                .selected_name = ""
+                .selected_info = "未选中任何项目"
             }
         }
 
@@ -1380,10 +1225,12 @@ widget App {
             .rename_open = false
         }
 
-        // ---- 右键菜单（锚定 popover）----
+        // ---- 条目菜单 ----
         .ItemCtx(id) -> {
-            .ctx_id = id
-            .SelectItem(id)
+            if id >= 0 && id < .files_view.len() {
+                .ctx_id = id
+                .ctx_name = .files_view[id].name
+            }
         }
 
         .CtxClose -> {
@@ -1527,6 +1374,7 @@ widget App {
                 .confirm_del_id = id
                 .confirm_del_path = r.path
                 .confirm_del_name = r.name
+                .confirm_del_is_dir = r.is_dir
                 .confirm_del_desc = "确定要永久删除「" + r.name + "」吗？此操作不可撤销。"
                 .confirm_del_open = true
             }
@@ -1535,7 +1383,7 @@ widget App {
         .ExecuteDelete -> {
             let del_path str = .confirm_del_path
             let del_name str = .confirm_del_name
-            let del_id int = .confirm_del_id
+            let is_dir_target bool = .confirm_del_is_dir
             .confirm_del_open = false
             .confirm_del_id = -1
             .confirm_del_path = ""
@@ -1544,11 +1392,6 @@ widget App {
                 toast("写操作仅在 VM 轨可用 — 请使用 auto run -r vm")
             } else {
             if del_path != "" {
-                var is_dir_target bool = false
-                if del_id >= 0 && del_id < .files_view.len() {
-                    let r = .files_view[del_id]
-                    is_dir_target = r.is_dir
-                }
                 if is_dir_target {
                     // D-4：非空目录拒绝（stdlib 无递归删除；walk 逆序删除有
                     // 误删风险，v1 不做）。
@@ -1580,20 +1423,5 @@ widget App {
             .confirm_del_path = ""
         }
 
-        // ---- R5：行 hover 高亮驱动 ----
-        .RowHover(id) -> {
-            .hover_id = id
-        }
-
-        .RowLeave -> {
-            .hover_id = -1
-        }
-
-        // ---- R4-T21：Enter 打开选中项（弹层/编辑态守卫）----
-        .OpenSelected -> {
-            if !.addr_editing && !.rename_open && !.new_modal_open && !.confirm_del_open && .selected_id >= 0 {
-                .OpenItem(.selected_id)
-            }
-        }
     }
 }

@@ -4,7 +4,7 @@
 
 本包**不**承担本地磁盘枚举、文件上传/删除或替代 `packages/file-dialog`（本地路径选择仍归 `FileDialog`）。
 
-视觉参考：[通用组件执行与视觉指南 §3](../../docs/design/autoui/common-components-execution-and-visual-guide.md)；合同与执行记录：[PLAN-091](../../docs/plans/091-asset-browser-and-picker.md)。
+视觉参考见[通用组件执行与视觉指南 §3](../../docs/design/autoui/common-components-execution-and-visual-guide.md)。原始选择器合同见 [PLAN-091](../../docs/plans/archived/091-asset-browser-and-picker.md)。
 
 ## 组件与文件
 
@@ -12,8 +12,7 @@
 |---|---|
 | `asset_browser.at` | `widget AssetBrowser` — 浏览面（分类树、搜索、类型过滤、grid/list 视图、分页、单选、同面板图片预览） |
 | `asset_picker.at` | `widget AssetPicker` — 组合 `AssetBrowser` 与 `dialog` 的受控模态选择器（会话/防重锁/确认反馈/取消） |
-| `asset_kind_icon.at` | `widget KindIcon` — 缩略图缺失/非图片类型的图标兜底 |
-| `asset_browser_util.at` | 记录校验、分类树节点适配、索引查找与派生辅助 |
+| `asset_browser_util.at` | 记录校验、分类树节点适配及 CollectionView 条目投影 |
 | `package.at` | 包清单 |
 | `pac.at` | dep 物化描述 |
 
@@ -59,20 +58,21 @@
 
 ## 消费方式（依赖闭包与可运行样例）
 
-1. 在消费方 `pac.at` 声明四包依赖（或整组 vendor 到第二根后指向同一绝对/相对目录）：
+1. 在消费方 `pac.at` 声明五包依赖。整组迁移时保留这些包的相邻关系。
 
 ```at
 dep asset_browser { path: "../../packages/asset-browser" }
 dep tree_view     { path: "../../packages/tree-view" }
 dep pagination    { path: "../../packages/pagination" }
 dep image_viewer  { path: "../../packages/image-viewer" }
+dep collection_view { path: "../../packages/collection-view" }
 ```
 
 2. 在消费方 `widget` **内部**导入（勿放在文件顶层）并绑定受控 props 与事件：
 
 ```at
 widget App {
-    use { package: asset_browser from "../../packages/asset-browser" }
+    use { package: asset_browser from "../../../../packages/asset-browser" }
     // ...
     view {
         AssetPicker (
@@ -106,6 +106,6 @@ widget App {
 
 ## 已知边界（v1）
 
-- 依赖闭包需 `asset-browser` + `tree-view` + `pagination` + `image-viewer` 四包齐备；缺依赖在 Vue/build 轨具名失败，native 轨静默缺席（由 `crates/auto-ui-tools/tests/asset_browser_component.rs` 兜底）。
+- 依赖闭包包含 `asset-browser`、`tree-view`、`pagination`、`image-viewer` 和 `collection-view`。严格生成门检查所需包是否齐备。见 `crates/auto-ui-tools/tests/asset_browser_component.rs`。
 - 缩略图与预览 `src` 必须为应用提供的授权媒体 URI（opaque），组件不持有原始字节或拼接本地磁盘路径。
 - Linux native 轨未在本机环境运行（门脚本已保留 `native` 入口，无 Linux runner 时单列 `not_run`）。

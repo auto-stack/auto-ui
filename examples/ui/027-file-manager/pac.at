@@ -31,3 +31,7 @@ dep stylekit {
 dep themes {
     path: "../../../packages/themes"
 }
+
+dep collection_view {
+    path: "../../../packages/collection-view"
+}

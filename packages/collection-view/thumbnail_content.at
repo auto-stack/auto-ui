@@ -1,0 +1,44 @@
+// The keyed child owns the load status of one image. Its callbacks update
+// that child only, so a discarded image cannot change its replacement.
+widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName: str = "", state: str = "missing", fit: str = "cover") {
+    msg { ImageFailed }
+    model {
+        var failed bool = false
+    }
+    computed {
+        actual_icon => if .iconName != "" { .iconName } else { .kind }
+        bad_image => .failed || .state == "error"
+    }
+    view {
+        col (style: "w-full h-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-md bg-muted") {
+            if .state == "ready" && .src != "" && !.failed {
+                image_surface (src: .src, alt: .alt, fit: .fit, onerror: .ImageFailed, style: "w-full h-full") {}
+            } else {
+                row (style: "items-center justify-center gap-1 text-muted-foreground") {
+                    if .state == "loading" {
+                        icon (name: "loader-circle", size: 16) {}
+                    } else if .actual_icon == "image" {
+                        icon (name: "image", size: 16) {}
+                    } else if .actual_icon == "folder" || .actual_icon == "dir" {
+                        icon (name: "folder", size: 16) {}
+                    } else if .actual_icon == "file-text" {
+                        icon (name: "file-text", size: 16) {}
+                    } else {
+                        icon (name: "file", size: 16) {}
+                    }
+                    if .bad_image {
+                        text "缩略图不可用" { style: "text-xs" }
+                    } else if .state == "loading" {
+                        text "缩略图加载中" { style: "text-xs" }
+                    }
+                    if .alt != "" {
+                        text .alt { style: "text-xs truncate" }
+                    }
+                }
+            }
+        }
+    }
+    on {
+        .ImageFailed -> { .failed = true }
+    }
+}

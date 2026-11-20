@@ -1988,8 +1988,8 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
         // 表达式)在 vue-tsc 的模板检查下类型收窄失败(StyleValue 被解析
         // 为 undefined,TS2345 实证);CSS 声明串语义等价且类型稳定。
         image_attrs.push(format!(
-            ":style=\"'transform:' + ({}) + ';object-fit:' + ({}) + ';filter:' + ({}) + ';'\"",
-            transform, fit, filter
+            ":style=\"'transform:' + ({}) + ';object-fit:' + ({}) + ';filter:' + ({}) + ';' + (({}) === 'cover' ? 'width:100%;height:100%;' : '')\"",
+            transform, fit, filter, fit
         ));
 
         // Normalize the five ImageSurface event aliases explicitly. This is

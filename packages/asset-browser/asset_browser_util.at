@@ -96,77 +96,24 @@ pub fn ab_kind_icon(kind str) str {
     return "file-text"
 }
 
-/// 卡片派生：records + 受控选择 + 键盘焦点 → 带旗标卡片记录。
-/// sel/focused/has_thumb/can_preview/icon 为渲染旗标（视图只做字面量分支，
-/// PLAN-085 class f-string 不插值循环字段的同族规避）。
-pub fn ab_derive_cards(records List, sel_id str, focus int) List {
-    var out List = []
+/// 将授权记录投影成 CollectionView 条目。可预览性由 091 的授权 URI 决定，
+/// 与缩略图是否成功渲染分开。
+pub fn ab_collection_items(records List) List {
+    var result List = []
     var i int = 0
     while i < records.len() {
-        let r = records[i]
-        var sel bool = false
-        if sel_id != "" {
-            if r.id == sel_id {
-                sel = true
-            }
+        let record = records[i]
+        var actions List = []
+        if record.kind == "image" && record.thumbnailUri != "" {
+            actions.push({id: "preview", label: "预览", enabled: true})
         }
-        var focused bool = false
-        if i == focus {
-            focused = true
-        }
-        var has_thumb bool = false
-        if r.thumbnailUri != "" {
-            has_thumb = true
-        }
-        var can_preview bool = false
-        if r.kind == "image" {
-            if r.thumbnailUri != "" {
-                can_preview = true
-            }
-        }
-        out.push({
-            id: r.id,
-            revision: r.revision,
-            label: r.label,
-            kind: r.kind,
-            thumbnailUri: r.thumbnailUri,
-            resourceRef: r.resourceRef,
-            sel: sel,
-            focused: focused,
-            has_thumb: has_thumb,
-            can_preview: can_preview,
-            icon: ab_kind_icon(r.kind)
+        result.push({
+            id: record.id, itemRevision: record.revision, label: record.label,
+            kind: record.kind, icon: ab_kind_icon(record.kind), thumbnailUri: record.thumbnailUri,
+            thumbnailState: if record.thumbnailUri != "" { "ready" } else { "missing" },
+            cells: [], actions: actions, defaultActionId: "", disabled: false
         })
         i = i + 1
     }
-    return out
-}
-
-/// 键盘焦点前移（cols 为行宽格；越界钳到末项；空列表 -1）。
-pub fn ab_step(cards List, index int, cols int) int {
-    var n int = cards.len()
-    if n == 0 {
-        return -1
-    }
-    var nxt int = index + cols
-    if index < 0 {
-        nxt = 0
-    }
-    if nxt > n - 1 {
-        nxt = n - 1
-    }
-    return nxt
-}
-
-/// 键盘焦点后移（越界钳到首项）。
-pub fn ab_step_back(cards List, index int, cols int) int {
-    var n int = cards.len()
-    if n == 0 {
-        return -1
-    }
-    var prv int = index - cols
-    if prv < 0 {
-        prv = 0
-    }
-    return prv
+    return result
 }

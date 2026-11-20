@@ -2591,6 +2591,14 @@ fn try_transpile_builtin_call(
         // 可对结果安全调用方法（split/len 等；028 头注 TS18047 陷阱收口）。
         "storage" => {
             if method == "get" {
+                // The native renderer publishes this host-owned measurement.
+                // Read the equivalent browser value at the point of use.
+                if let [arg] = args.args.as_slice() {
+                    if matches!(arg.get_expr(), Expr::Str(key) if key.as_str() == "vm.window_inner_width") {
+                        write!(out, "String(window.innerWidth)").ok();
+                        return true;
+                    }
+                }
                 write!(out, "(localStorage.getItem(").ok();
                 for (i, arg) in args.args.iter().enumerate() {
                     if i > 0 {

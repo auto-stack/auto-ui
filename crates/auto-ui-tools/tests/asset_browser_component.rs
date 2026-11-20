@@ -1,6 +1,6 @@
 //! PLAN-091 official asset-browser package admission tests: both generators,
 //! the r2 event payload surface (queryRequested/selectionRequested/
-//! previewRequested/confirmRequested/cancelled), the four-package dependency
+//! previewRequested/confirmRequested/cancelled), the five-package dependency
 //! closure at a second absolute root (named failure when broken), and the
 //! builder-track negative (missing dependency = named strict failure, never a
 //! silent fallback). The behavioral matrix (V-01..V-06) lives in the live
@@ -41,7 +41,7 @@ fn official_asset_browser_compiles_through_both_generators() {
 }
 
 /// AC-01/02/03/06: the vendored closure generates from a second absolute root —
-/// asset-browser + tree-view + pagination + image-viewer copied byte-equal,
+/// asset-browser + tree-view + pagination + image-viewer + collection-view copied byte-equal,
 /// consumer binds queryRequested/selectionRequested/confirmRequested; deleting
 /// the dependency is a NAMED failure in strict generation, never a silent
 /// fallback to a foreign checkout.
@@ -54,7 +54,7 @@ fn vendored_closure_generates_and_missing_dependency_fails_named() {
     let vendor_root = root.join("vendor");
     std::fs::create_dir_all(&vendor_root).unwrap();
     let official = official_package();
-    for pkg in ["asset-browser", "tree-view", "pagination", "image-viewer"] {
+    for pkg in ["asset-browser", "tree-view", "pagination", "image-viewer", "collection-view"] {
         let src_dir = if pkg == "asset-browser" {
             official.clone()
         } else {
@@ -76,7 +76,8 @@ fn vendored_closure_generates_and_missing_dependency_fails_named() {
          dep asset_browser { path: \"vendor/asset-browser\" }\n\
          dep tree_view { path: \"vendor/tree-view\" }\n\
          dep pagination { path: \"vendor/pagination\" }\n\
-         dep image_viewer { path: \"vendor/image-viewer\" }\n",
+         dep image_viewer { path: \"vendor/image-viewer\" }\n\
+         dep collection_view { path: \"vendor/collection-view\" }\n",
     )
     .unwrap();
     std::fs::write(
@@ -127,7 +128,8 @@ widget demo {
     assert!(browser.contains("PaginationControl"), "browser must compose the pagination package");
     assert!(browser.contains("TreeView"), "browser must compose the tree-view package");
     assert!(browser.contains("ImageViewport"), "browser must compose the image-viewer preview");
-    for pkg in ["asset-browser", "tree-view", "pagination", "image-viewer"] {
+    assert!(browser.contains("CollectionView"), "browser must compose the shared collection");
+    for pkg in ["asset-browser", "tree-view", "pagination", "image-viewer", "collection-view"] {
         let src_dir = if pkg == "asset-browser" {
             official.clone()
         } else {

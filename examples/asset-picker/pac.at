@@ -21,17 +21,21 @@ theme: "dark"
 window: "1080x800"
 
 # PLAN-091：官方包 dep 根（vue 轨物化扫描；native 轨由 widget 级 use 传递
-# 装载）。依赖闭包整组交付：asset-browser + tree-view + pagination +
+# 装载）。依赖闭包整组交付：asset-browser + tree-view + pagination + collection-view +
 # image-viewer（缺依赖 = vue 轨具名构建失败）。
 dep asset_browser {
-    path: "D:/autostack/.wt/ui-091/auto-ui/packages/asset-browser"
+    path: "../../packages/asset-browser"
 }
 dep tree_view {
-    path: "D:/autostack/.wt/ui-091/auto-ui/packages/tree-view"
+    path: "../../packages/tree-view"
 }
 dep pagination {
-    path: "D:/autostack/.wt/ui-091/auto-ui/packages/pagination"
+    path: "../../packages/pagination"
 }
 dep image_viewer {
-    path: "D:/autostack/.wt/ui-091/auto-ui/packages/image-viewer"
+    path: "../../packages/image-viewer"
+}
+
+dep collection_view {
+    path: "../../packages/collection-view"
 }

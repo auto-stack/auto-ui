@@ -21,35 +21,21 @@
 // pending）时禁用查询/选择变更——功能性拦截在 handler 内 + 容器弱化/状态行
 // 文字；普通按钮走 disabled。
 //
-// 视图纪律（PLAN-085 同族实证，逐字面量分支）：卡片/行视觉状态用字面量
-// class 分支——class 的 f-string 不插值 for 循环记录字段；图标只用字面量名
-// （KindIcon 调色板）。单击选择与预览是兄弟命中区，避免 Vue 冒泡双触发。
-//
-// # Usage
-// use { package: asset_browser from "<resolved package dir>" }
-// AssetBrowser (records: .recs, folders: .fds, query: .query, querySeq: .qseq,
-//               resultQueryId: .rqid, total: .total, selection: .sel,
-//               revision: .rev, loading: .loading, errorMessage: .err,
-//               onqueryRequested: .OnQuery($event),
-//               onselectionRequested: .OnSel($event),
-//               onpreviewRequested: .OnPrev($event)) {}
-//
-// 依赖闭包（整组 vendor，字节一致）：asset-browser + tree-view + pagination +
-// asset_kind_icon/asset_browser_util（包内模块）；缺依赖 = vue 轨具名构建
-// 失败 / native 轨静默缺席（build 轨负例门兜底）。
-use asset_browser_util: ab_check_records, ab_adapt_folders, ab_top_ids, ab_find_index, ab_derive_cards, ab_step, ab_step_back
-use asset_kind_icon: KindIcon
+// 结果区由 CollectionView 渲染。查询、旧公开载荷和预览留在本组件，
+// CollectionView 的条目请求须先按当前 query / revision 验证。
+use auto.json
+use asset_browser_util: ab_check_records, ab_adapt_folders, ab_top_ids, ab_find_index, ab_collection_items
 
 widget AssetBrowser (records: List = [], folders: List = [], query: str = "", querySeq: int = 0, resultQueryId: str = "", total: int = 0, selection: str = "", revision: int = 0, loading: bool = false, errorMessage: str = "", viewMode: str = "grid", locked: bool = false) {
     use { package: tree_view from "../tree-view" }
     use { package: pagination from "../pagination" }
     use { package: image_viewer from "../image-viewer" }
+    use { package: collection_view from "../collection-view" }
     msg {
         Init, Tick,
-        SearchInput(str), DoSearch, SetKind(str), ToggleView,
+        SearchInput(str), DoSearch, SetKind(str), CollectionMode(str),
         FoldToggle(str), FoldSelect(str), PageChanged(str),
-        CardSelect(str), CardPreview(str),
-        KUp, KDown, KLeft, KRight, KHome, KEnd, KEnter,
+        CollectionSelect(str), CollectionAction(str), CardSelect(str), CardPreview(str),
         "queryRequested"(str), "selectionRequested"(str), "previewRequested"(str)
     }
     model {
@@ -69,20 +55,14 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
         var fold_expanded = []
         // ---- 视图形态镜像（受控 prop + 本地切换投影）----
         var vm str = "grid"
-        // ---- 键盘焦点（当前页内下标；-1 = 无）----
-        var k_index int = -1
+        var view_prop str = "grid"
         // ---- 请求代次（本实例递增；baseRevision 取受控 revision）----
         var last_emitted_seq int = 0
         // ---- selection 镜像 ----
         var sel_id str = ""
         var sel_label str = ""
         var sel_rev str = ""
-        // ---- 结果区分支条件镜像（Tick 守卫写；VM 轨 if 条件里的 computed
-        // 比较恒假——grid 走 final-else 可渲染、if 分支静默缺席，r27/r28/r29
-        // 探针实录。条件一律用 state 镜像。）----
-        var rec_len int = -1
         var rec_error_state str = ""
-        var cards_empty bool = false
         var pv_open bool = false
         var pv_src str = ""
         var pv_id str = ""
@@ -92,9 +72,8 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
     }
     computed {
         // 平铺无互引（PLAN-536 T3 / PLAN-086 实证纪律）。
-        record_error => ab_check_records(.records)
         folder_nodes => ab_adapt_folders(.folders)
-        cards => ab_derive_cards(.records, .sel_id, .k_index)
+        collection_items => ab_collection_items(.records)
         provider_error => if .errorMessage != "" { true } else { false }
         // 数据可信：结果 id 匹配当前 query 且最后请求已反馈且无错误。
         data_current => if .q_error != "" { false } else if .q_id == "" { false } else if .resultQueryId != .q_id { false } else if .querySeq != .last_emitted_seq { false } else if .errorMessage != "" { false } else { true }
@@ -103,12 +82,11 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
         // 请求待反馈：已发出但应用尚未回灌 querySeq。
         request_pending => if .last_emitted_seq == 0 { false } else if .querySeq != .last_emitted_seq { true } else { false }
         has_filter => if .q_text != "" { true } else if .q_kind != "" { true } else if .q_folder != "" { true } else { false }
-        page_label => if .total <= 0 { "0 项" } else { f"共 ${.total} 项" }
         empty_label => if .loading { "加载中…" } else { if .q_text != "" { "无匹配资源" } else { if .q_kind != "" { "无匹配资源" } else { if .q_folder != "" { "无匹配资源" } else { "资源库为空" } } } }
         empty_hint => if .loading { "" } else { if .q_text != "" { "试着调整搜索关键字或过滤条件" } else { "该分类下暂无可用资源" } }
     }
     view {
-        col (class: "w-full h-full min-h-0 overflow-hidden flex flex-col bg-background text-foreground", onkeydown.up: .KUp, onkeydown.down: .KDown, onkeydown.left: .KLeft, onkeydown.right: .KRight, onkeydown.home: .KHome, onkeydown.end: .KEnd, onkeydown.enter: .KEnter, onkeydown.escape: .KEscape) {
+        col (class: "w-full h-full min-h-0 overflow-hidden flex flex-col bg-background text-foreground", onkeydown.escape: .KEscape) {
             // ---- 工具行：搜索 / 类型过滤 / 视图切换 ----
             row (style: "h-12 shrink-0 items-center gap-2 px-3 border-b border-border") {
                 input {
@@ -136,18 +114,6 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                         button (text: "文件", title: "文件类型", onclick: .SetKind("file"), disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
                     } else {
                         button (text: "文件", title: "文件类型", onclick: .SetKind("file"), disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
-                    }
-                }
-                row (style: "items-center gap-1 ml-auto") {
-                    if .vm == "grid" {
-                        button (text: "网格", title: "网格视图", onclick: .ToggleView, disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
-                    } else {
-                        button (text: "网格", title: "网格视图", onclick: .ToggleView, disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
-                    }
-                    if .vm == "list" {
-                        button (text: "列表", title: "列表视图", onclick: .ToggleView, disabled: .locked, style: "h-7 px-2 text-xs rounded-md bg-background text-foreground font-semibold border border-border shadow-sm") {}
-                    } else {
-                        button (text: "列表", title: "列表视图", onclick: .ToggleView, disabled: .locked, style: "h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground") {}
                     }
                 }
             }
@@ -205,190 +171,29 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                             text "未选择" { style: "ml-auto text-muted-foreground" }
                         }
                     }
-                    // ---- 结果区 ----
-                    col (style: if .locked { "flex-1 min-h-0 overflow-y-auto p-3 opacity-60" } else { "flex-1 min-h-0 overflow-y-auto p-3" }) {
-                        if .rec_error_state == "<empty-id>" {
-                            text "asset-browser: 记录结构非法（存在空 id）" { style: "text-xs text-destructive" }
-                        } else {
-                            if .rec_error_state == "<no-revision>" {
+                    col (style: "flex-1 min-h-0 min-w-0 overflow-hidden") {
+                        if .rec_error_state != "" {
+                            if .rec_error_state == "<empty-id>" {
+                                text "asset-browser: 记录结构非法（存在空 id）" { style: "text-xs text-destructive" }
+                            } else if .rec_error_state == "<no-revision>" {
                                 text "asset-browser: 记录结构非法（存在空 revision）" { style: "text-xs text-destructive" }
                             } else {
-                                if .rec_error_state != "" {
-                                    text f"asset-browser: 重复记录 ID ${.rec_error_state}" { style: "text-xs text-destructive" }
-                                } else {
-                                    if .q_error != "" {
-                                        text .q_error { style: "text-xs text-destructive" }
-                                    } else {
-                                        if .cards_empty {
-                                            col (style: "w-full flex flex-col items-center justify-center py-16 gap-2") {
-                                                text .empty_label { style: "text-sm font-semibold" }
-                                                text .empty_hint { style: "text-xs text-muted-foreground" }
-                                            }
-                                        } else {
-                                            if .vm == "grid" {
-                                                grid {
-                                                    cols: 4
-                                                    gap: 12
-                                                    for c in .cards {
-                                                        col {
-                                                            if c.sel {
-                                                                if c.focused {
-                                                                    col (class: "rounded-lg overflow-hidden border-2 border-primary bg-accent text-accent-foreground flex flex-col ab-card ab-sel ab-focus") {
-                                                                        button (onclick: .CardSelect(c.id), class: "w-full h-auto p-0 border-0 rounded-none bg-transparent flex flex-col items-stretch cursor-pointer text-left") {
-                                                                            if c.has_thumb {
-                                                                                col (style: "h-24 w-full overflow-hidden bg-muted") {
-                                                                                    image (src: c.thumbnailUri, alt: c.label, fit: "cover") {
-                                                                                        style: "w-full h-full"
-                                                                                    }
-                                                                                }
-                                                                            } else {
-                                                                                col (style: "h-24 w-full items-center justify-center bg-muted") {
-                                                                                    KindIcon (name: c.icon) {}
-                                                                                }
-                                                                            }
-                                                                            text c.label { style: "text-xs font-medium truncate px-2 pt-1" }
-                                                                        }
-                                                                        row (style: "items-center justify-between px-2 py-1") {
-                                                                            text c.kind { style: "text-[11px] text-muted-foreground" }
-                                                                            if c.can_preview {
-                                                                                button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground") {}
-                                                                            } else {
-                                                                                col (style: "h-6 w-12") {}
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                } else {
-                                                                    col (class: "rounded-lg overflow-hidden border-2 border-primary bg-accent text-accent-foreground flex flex-col ab-card ab-sel") {
-                                                                        button (onclick: .CardSelect(c.id), class: "w-full h-auto p-0 border-0 rounded-none bg-transparent flex flex-col items-stretch cursor-pointer text-left") {
-                                                                            if c.has_thumb {
-                                                                                col (style: "h-24 w-full overflow-hidden bg-muted") {
-                                                                                    image (src: c.thumbnailUri, alt: c.label, fit: "cover") {
-                                                                                        style: "w-full h-full"
-                                                                                    }
-                                                                                }
-                                                                            } else {
-                                                                                col (style: "h-24 w-full items-center justify-center bg-muted") {
-                                                                                    KindIcon (name: c.icon) {}
-                                                                                }
-                                                                            }
-                                                                            text c.label { style: "text-xs font-medium truncate px-2 pt-1" }
-                                                                        }
-                                                                        row (style: "items-center justify-between px-2 py-1") {
-                                                                            text c.kind { style: "text-[11px] text-muted-foreground" }
-                                                                            if c.can_preview {
-                                                                                button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground") {}
-                                                                            } else {
-                                                                                col (style: "h-6 w-12") {}
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            } else {
-                                                                if c.focused {
-                                                                    col (class: "rounded-lg overflow-hidden border-2 border-primary bg-card flex flex-col ab-card ab-focus") {
-                                                                        button (onclick: .CardSelect(c.id), class: "w-full h-auto p-0 border-0 rounded-none bg-transparent flex flex-col items-stretch cursor-pointer text-left") {
-                                                                            if c.has_thumb {
-                                                                                col (style: "h-24 w-full overflow-hidden bg-muted") {
-                                                                                    image (src: c.thumbnailUri, alt: c.label, fit: "cover") {
-                                                                                        style: "w-full h-full"
-                                                                                    }
-                                                                                }
-                                                                            } else {
-                                                                                col (style: "h-24 w-full items-center justify-center bg-muted") {
-                                                                                    KindIcon (name: c.icon) {}
-                                                                                }
-                                                                            }
-                                                                            text c.label { style: "text-xs font-medium truncate px-2 pt-1" }
-                                                                        }
-                                                                        row (style: "items-center justify-between px-2 py-1") {
-                                                                            text c.kind { style: "text-[11px] text-muted-foreground" }
-                                                                            if c.can_preview {
-                                                                                button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground") {}
-                                                                            } else {
-                                                                                col (style: "h-6 w-12") {}
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                } else {
-                                                                    col (class: "rounded-lg overflow-hidden border border-border bg-card hover:border-primary/60 flex flex-col ab-card") {
-                                                                        button (onclick: .CardSelect(c.id), class: "w-full h-auto p-0 border-0 rounded-none bg-transparent flex flex-col items-stretch cursor-pointer text-left") {
-                                                                            if c.has_thumb {
-                                                                                col (style: "h-24 w-full overflow-hidden bg-muted") {
-                                                                                    image (src: c.thumbnailUri, alt: c.label, fit: "cover") {
-                                                                                        style: "w-full h-full"
-                                                                                    }
-                                                                                }
-                                                                            } else {
-                                                                                col (style: "h-24 w-full items-center justify-center bg-muted") {
-                                                                                    KindIcon (name: c.icon) {}
-                                                                                }
-                                                                            }
-                                                                            text c.label { style: "text-xs font-medium truncate px-2 pt-1" }
-                                                                        }
-                                                                        row (style: "items-center justify-between px-2 py-1") {
-                                                                            text c.kind { style: "text-[11px] text-muted-foreground" }
-                                                                            if c.can_preview {
-                                                                                button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground") {}
-                                                                            } else {
-                                                                                col (style: "h-6 w-12") {}
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            } else {
-                                                col (class: "w-full flex flex-col gap-1") {
-                                                    for c in .cards {
-                                                        if c.sel {
-                                                            if c.focused {
-                                                                row (onclick: .CardSelect(c.id), class: "flex flex-row items-center gap-2 px-2 py-1.5 rounded-md bg-accent text-accent-foreground border-2 border-primary cursor-pointer ab-row ab-sel ab-focus") {
-                                                                    KindIcon (name: c.icon) {}
-                                                                    text c.label { style: "text-xs font-medium truncate flex-1" }
-                                                                    text c.kind { style: "text-[11px] text-muted-foreground" }
-                                                                    if c.can_preview {
-                                                                        button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground shrink-0") {}
-                                                                    }
-                                                                }
-                                                            } else {
-                                                                row (onclick: .CardSelect(c.id), class: "flex flex-row items-center gap-2 px-2 py-1.5 rounded-md bg-accent text-accent-foreground border border-primary cursor-pointer ab-row ab-sel") {
-                                                                    KindIcon (name: c.icon) {}
-                                                                    text c.label { style: "text-xs font-medium truncate flex-1" }
-                                                                    text c.kind { style: "text-[11px] text-muted-foreground" }
-                                                                    if c.can_preview {
-                                                                        button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground shrink-0") {}
-                                                                    }
-                                                                }
-                                                            }
-                                                        } else {
-                                                            if c.focused {
-                                                                row (onclick: .CardSelect(c.id), class: "flex flex-row items-center gap-2 px-2 py-1.5 rounded-md border-2 border-primary cursor-pointer ab-row ab-focus") {
-                                                                    KindIcon (name: c.icon) {}
-                                                                    text c.label { style: "text-xs font-medium truncate flex-1" }
-                                                                    text c.kind { style: "text-[11px] text-muted-foreground" }
-                                                                    if c.can_preview {
-                                                                        button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground shrink-0") {}
-                                                                    }
-                                                                }
-                                                            } else {
-                                                                row (onclick: .CardSelect(c.id), class: "flex flex-row items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 border border-transparent cursor-pointer ab-row") {
-                                                                    KindIcon (name: c.icon) {}
-                                                                    text c.label { style: "text-xs font-medium truncate flex-1" }
-                                                                    text c.kind { style: "text-[11px] text-muted-foreground" }
-                                                                    if c.can_preview {
-                                                                        button (text: "预览", title: "预览图片", onclick: .CardPreview(c.id), style: "h-6 px-1.5 text-[11px] rounded border border-border text-muted-foreground hover:text-foreground shrink-0") {}
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                                text f"asset-browser: 重复记录 ID ${.rec_error_state}" { style: "text-xs text-destructive" }
+                            }
+                        } else if .q_error != "" {
+                            text .q_error { style: "text-xs text-destructive" }
+                        } else {
+                            CollectionView (
+                                items: .collection_items, viewMode: .vm, selectedId: .sel_id,
+                                scopeId: .q_id, revision: .revision,
+                                disabled: .locked || !.data_current || .loading,
+                                emptyLabel: .empty_label,
+                                onviewModeRequested: .CollectionMode($event),
+                                onselectionRequested: .CollectionSelect($event),
+                                onitemActionRequested: .CollectionAction($event)
+                            ) {}
+                            if .records.len() == 0 && !.loading {
+                                text .empty_hint { style: "px-3 pb-2 text-xs text-muted-foreground" }
                             }
                         }
                     }
@@ -419,14 +224,11 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                 .q_error = "asset-browser: query 解析失败（invalid_query）"
             }
             .vm = .viewMode
+            .view_prop = .viewMode
+            .rec_error_state = ab_check_records(.records)
         }
         .Tick -> {
-            var rl int = .records.len()
-            if .rec_len != rl {
-                .rec_len = rl
-                .rec_error_state = ab_check_records(.records)
-                .cards_empty = rl == 0
-            }
+            .rec_error_state = ab_check_records(.records)
             if .q_raw != .query {
                 .q_raw = .query
                 try {
@@ -439,12 +241,12 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                     .q_pageSize = q.pageSize ?? 50
                     .q_error = ""
                     .search_draft = q.text ?? ""
-                    .k_index = -1
                 } catch {
                     .q_error = "asset-browser: query 解析失败（invalid_query）"
                 }
             }
-            if .vm != .viewMode {
+            if .view_prop != .viewMode {
+                .view_prop = .viewMode
                 .vm = .viewMode
             }
             if .selection == "" {
@@ -527,7 +329,38 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
             }
             .fold_expanded = next
         }
-        // ---- 选择 / 预览（单选；再点已选项 = 请求清空）----
+        .CollectionMode(payload str) -> {
+            try {
+                let request = json.parse(payload)
+                if !.locked && request.instanceToken != "" && request.scopeId == .q_id && request.baseRevision == .revision {
+                    if request.viewMode == "grid" || request.viewMode == "list" { .vm = request.viewMode }
+                }
+            } catch {}
+        }
+        .CollectionSelect(payload str) -> {
+            try {
+                let request = json.parse(payload)
+                if !.locked && !.loading && .q_id != "" && .q_id == .resultQueryId && .querySeq == .last_emitted_seq && .errorMessage == "" && request.scopeId == .q_id && request.baseRevision == .revision && request.instanceToken != "" && ab_check_records(.records) == "" {
+                    let index = ab_find_index(.records, request.id)
+                    if index >= 0 && .records[index].revision == request.itemRevision {
+                        .CardSelect(request.id)
+                    }
+                }
+            } catch {}
+        }
+        .CollectionAction(payload str) -> {
+            try {
+                let request = json.parse(payload)
+                if !.locked && !.loading && .q_id != "" && .q_id == .resultQueryId && .querySeq == .last_emitted_seq && .errorMessage == "" && request.scopeId == .q_id && request.baseRevision == .revision && request.instanceToken != "" && ab_check_records(.records) == "" {
+                    let index = ab_find_index(.records, request.id)
+                    if index >= 0 && .records[index].revision == request.itemRevision && request.actionId == "preview" {
+                        .CardPreview(request.id)
+                    }
+                }
+            } catch {}
+        }
+
+        // 继续使用 091 的选择和预览载荷。
         .CardSelect(id str) -> {
             var idx int = ab_find_index(.records, id)
             if !.locked {
@@ -574,55 +407,5 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
                 .pv_open = false
             }
         }
-        // ---- 视图切换（呈现态镜像；资源身份不变）----
-        .ToggleView -> {
-            if !.locked {
-                if .vm == "grid" {
-                    .vm = "list"
-                } else {
-                    .vm = "grid"
-                }
-            }
-        }
-        // ---- 键盘：移动焦点；Enter 发选择请求（不直接确认）----
-        .KDown -> {
-            var cols int = 1
-            if .vm == "grid" {
-                cols = 4
-            }
-            .k_index = ab_step(.cards, .k_index, cols)
-        }
-        .KUp -> {
-            var cols int = 1
-            if .vm == "grid" {
-                cols = 4
-            }
-            .k_index = ab_step_back(.cards, .k_index, cols)
-        }
-        .KRight -> {
-            .k_index = ab_step(.cards, .k_index, 1)
-        }
-        .KLeft -> {
-            .k_index = ab_step_back(.cards, .k_index, 1)
-        }
-        .KHome -> {
-            if .cards.len() > 0 {
-                .k_index = 0
-            }
-        }
-        .KEnd -> {
-            if .cards.len() > 0 {
-                .k_index = .cards.len() - 1
-            }
-        }
-        .KEnter -> {
-            if .k_index >= 0 {
-                if .k_index < .cards.len() {
-                    .CardSelect(.cards[.k_index].id)
-                }
-            }
-        }
     }
 }
-
-// plan091 cache-key bump 2026-11-20

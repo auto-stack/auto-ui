@@ -10,6 +10,8 @@ use iced::{Color, Point, Rectangle, Size};
 pub enum ImageSurfaceFit {
     /// Preserve aspect ratio and fit the whole image in the viewport.
     Contain,
+    /// Preserve aspect ratio and fill the viewport, cropping the excess.
+    Cover,
     /// Preserve aspect ratio and fit the image width to the viewport.
     Width,
     /// Draw source pixels one-for-one before applying the interactive zoom.
@@ -22,6 +24,7 @@ impl ImageSurfaceFit {
     /// Parse the stable names used by Auto/Vue/Rust generators.
     pub fn parse(value: &str) -> Self {
         match value.trim().to_ascii_lowercase().as_str() {
+            "cover" => Self::Cover,
             "width" | "fit-width" | "fit_width" => Self::Width,
             "1:1" | "one-to-one" | "one_to_one" | "actual" => Self::OneToOne,
             "free" | "none" => Self::Free,
@@ -52,7 +55,7 @@ impl ImageSurfaceGeometry {
     }
 }
 
-/// Compute contain/width/1:1/free geometry, including translation and
+/// Compute fitted geometry, including translation and
 /// rotation. Zero-sized source images intentionally produce a zero image
 /// rectangle while retaining the viewport clip for placeholder/error paint.
 pub fn image_surface_geometry(
@@ -72,6 +75,9 @@ pub fn image_surface_geometry(
         match fit {
             ImageSurfaceFit::Contain => {
                 (viewport.width / source_width).min(viewport.height / source_height)
+            }
+            ImageSurfaceFit::Cover => {
+                (viewport.width / source_width).max(viewport.height / source_height)
             }
             ImageSurfaceFit::Width => viewport.width / source_width,
             ImageSurfaceFit::OneToOne | ImageSurfaceFit::Free => 1.0,

@@ -9,10 +9,10 @@ use auto.image
 // handler 重验资源当前身份后写 confirmation 并 POST 附件引用日志（真实业务
 // 写入跨进程读回）；取消/拒绝不落账。
 //
-// 目录合成：5 条图片夹具（back 媒体会话真实 URI，Init 轮询回填）+ 998 条
+// 目录合成：5 条授权图片夹具（VM 媒体票据或 Vue 公共夹具 URI）+ 998 条
 // 合成附件 = 1003 条（V-01 代表规模；尾页可选由产品门断言）。
 widget App {
-    use { package: asset_browser from "D:/autostack/.wt/ui-091/auto-ui/packages/asset-browser" }
+    use { package: asset_browser from "../../../../packages/asset-browser" }
     msg {
         Init, Tick,
         OpenPicker, ReloadLog, InvalidateSelected, HookInv,
@@ -55,13 +55,6 @@ widget App {
         var slow_ticks int = 0
         // ---- 媒体 URI（front 进程内建 auto.image 会话；探针实证零 emit
         // 丢失拓扑——PLAN-089 P1 同款。back media-uris 端点保留给 vue 轨）----
-        var uris_ready bool = false
-        var uri_polls int = 0
-        var sess_lake str = ""
-        var sess_corner str = ""
-        var sess_rgb str = ""
-        var sess_alpha str = ""
-        var sess_orient str = ""
         // ---- 业务写读回 ----
         var attach_count int = 0
         var last_attach str = ""
@@ -118,13 +111,25 @@ widget App {
             // ---- 分类夹具（r2 形状 {id,label,children}）----
             var cat_all = [{id: "all", label: "全部", children: [{id: "images", label: "图片", children: []}, {id: "docs", label: "文档", children: []}]}, {id: "archive", label: "归档", children: []}]
             .folders = cat_all
-            // ---- 图片夹具（真实媒体 URI；先占位后轮询回填）----
+            // 浏览器从公开资源目录读取，原生使用媒体管线生成的票据。
             var cat = []
-            cat.push({id: "lake", revision: "r3", label: "Lake.jpg", kind: "image", folder: "images", resourceRef: "asset:lake", thumbnailUri: ""})
-            cat.push({id: "corner", revision: "r1", label: "Corner.png", kind: "image", folder: "images", resourceRef: "asset:corner", thumbnailUri: ""})
-            cat.push({id: "rgb", revision: "r2", label: "Rgb.png", kind: "image", folder: "images", resourceRef: "asset:rgb", thumbnailUri: ""})
-            cat.push({id: "alpha", revision: "r1", label: "Alpha.png", kind: "image", folder: "images", resourceRef: "asset:alpha", thumbnailUri: ""})
-            cat.push({id: "orient", revision: "r2", label: "Orient.jpg", kind: "image", folder: "images", resourceRef: "asset:orient", thumbnailUri: ""})
+            var lake_uri str = "/asset-fixtures/scenic-320x240.png"
+            var corner_uri str = "/asset-fixtures/corner-marked.png"
+            var rgb_uri str = "/asset-fixtures/rgb-1x1.png"
+            var alpha_uri str = "/asset-fixtures/alpha-2x1.png"
+            var orient_uri str = "/asset-fixtures/orientation-6.jpg"
+            if Env.track() == "vm" {
+                lake_uri = image.thumb("public/asset-fixtures/scenic-320x240.png", 768)
+                corner_uri = image.thumb("public/asset-fixtures/corner-marked.png", 768)
+                rgb_uri = image.thumb("public/asset-fixtures/rgb-1x1.png", 768)
+                alpha_uri = image.thumb("public/asset-fixtures/alpha-2x1.png", 768)
+                orient_uri = image.thumb("public/asset-fixtures/orientation-6.jpg", 768)
+            }
+            cat.push({id: "lake", revision: "r3", label: "Lake.jpg", kind: "image", folder: "images", resourceRef: "asset:lake", thumbnailUri: lake_uri})
+            cat.push({id: "corner", revision: "r1", label: "Corner.png", kind: "image", folder: "images", resourceRef: "asset:corner", thumbnailUri: corner_uri})
+            cat.push({id: "rgb", revision: "r2", label: "Rgb.png", kind: "image", folder: "images", resourceRef: "asset:rgb", thumbnailUri: rgb_uri})
+            cat.push({id: "alpha", revision: "r1", label: "Alpha.png", kind: "image", folder: "images", resourceRef: "asset:alpha", thumbnailUri: alpha_uri})
+            cat.push({id: "orient", revision: "r2", label: "Orient.jpg", kind: "image", folder: "images", resourceRef: "asset:orient", thumbnailUri: orient_uri})
             // ---- 合成附件 998 条（确定性身份：att-N / r{N%3} 循环）----
             var i int = 1
             while i <= 998 {
@@ -146,7 +151,6 @@ widget App {
             }
             .catalog = cat
             .total = .catalog.len()
-            .FetchUris()
             .ReloadLog()
             // ---- 初始查询（无请求发布：querySeq=0，resultQueryId=q1）----
             .qf_id = "q1"
@@ -160,13 +164,6 @@ widget App {
             .status = "ready"
         }
         .Tick -> {
-            // 媒体 URI 就绪轮询（rendition 后台 lane 发布）。
-            if !.uris_ready {
-                .uri_polls = .uri_polls + 1
-                if .uri_polls % 12 == 0 {
-                    .FetchUris()
-                }
-            }
             // 慢查询延迟释放 + 代次门。
             if .slow_ticks > 0 {
                 .slow_ticks = .slow_ticks - 1
@@ -184,55 +181,6 @@ widget App {
                     .slow_id = ""
                 }
             }
-        }
-        // ---- 图片夹具 URI 回填（front 进程会话；rendition 发布后即就绪停轮询）----
-        .FetchUris -> {
-        try {
-            // 轮询封顶 + 异常隔离：rendition 未就绪时不无限开会话拖垮 Tick
-            //（会话累积曾令慢释放块饿死——staleDrop 恒 0 的根因）。
-            if .uri_polls > 60 {
-                .uris_ready = true
-            }
-            if .sess_lake == "" {
-                .sess_lake = image.open_session("tests/fixtures/scenic-320x240.png")
-            }
-            if .sess_corner == "" {
-                .sess_corner = image.open_session("tests/fixtures/corner-marked.png")
-            }
-            if .sess_rgb == "" {
-                .sess_rgb = image.open_session("tests/fixtures/rgb-1x1.png")
-            }
-            if .sess_alpha == "" {
-                .sess_alpha = image.open_session("tests/fixtures/alpha-2x1.png")
-            }
-            if .sess_orient == "" {
-                .sess_orient = image.open_session("tests/fixtures/orientation-6.jpg")
-            }
-            var ready bool = true
-            var pairs = [{id: "lake", uri: image.current_uri(.sess_lake)}, {id: "corner", uri: image.current_uri(.sess_corner)}, {id: "rgb", uri: image.current_uri(.sess_rgb)}, {id: "alpha", uri: image.current_uri(.sess_alpha)}, {id: "orient", uri: image.current_uri(.sess_orient)}]
-            var ci int = 0
-            while ci < pairs.len() {
-                var uri str = pairs[ci].uri ?? ""
-                if uri == "" {
-                    ready = false
-                }
-                var ki int = 0
-                while ki < .catalog.len() {
-                    if .catalog[ki].id == pairs[ci].id {
-                        if uri != "" {
-                            .catalog[ki].thumbnailUri = uri
-                        }
-                    }
-                    ki = ki + 1
-                }
-                ci = ci + 1
-            }
-            if ready {
-                .uris_ready = true
-                .ApplyQuery()
-            }
-        } catch {
-        }
         }
         // ---- 业务写读回（接受 handler 落账后刷新；应用 Storage 承载）----
         .ReloadLog -> {

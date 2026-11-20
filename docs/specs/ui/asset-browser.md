@@ -6,10 +6,11 @@
 
 - 高层入口为 **`AssetBrowser`**（页面内嵌浏览面）与 **`AssetPicker`**（组合 `AssetBrowser` 与 `dialog` 的受控模态选择器）。
 - 用于应用内既有授权资源库的分类、搜索、类型过滤、分页、单选、同面板图片预览与确认选择；**不**替代 `packages/file-dialog`（本地磁盘路径选择仍归 `FileDialog`），不枚举原始磁盘、不持有原始字节。
-- 依赖三件套唯一源（禁止内嵌副本）：
+- 组件依赖使用各自的正式包源码。
   - `packages/tree-view/`（PLAN-085 `TreeView`）— 分类侧栏 `{id, label, children}` 薄适配；
   - `packages/pagination/`（PLAN-086 `PaginationControl`）— 1-based 结果分页；
   - `packages/image-viewer/`（PLAN-089 `ImageViewport`，pin=`5dbc3661`）— 同面板/同 Dialog 临时预览视口。
+  - `packages/collection-view/`（PLAN-109 `CollectionView`、`Thumbnail`）提供条目网格、列表、缩略图和普通条目交互。AssetBrowser 在当前查询、结果版本和授权资源身份校验后继续发出已有公开事件。
 
 ## Props 与事件契约（r2 冻结）
 
