@@ -240,6 +240,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 53 | from: work | t
 **A2Vue 入口勘察**：`generate_package_sfc_with_root` 只传入口单元会报 `source.module-identity: invalid or duplicate package/module identity`；带 store 的例（013/016）报「package-level store semantics are not wired yet (S1)」。→ A2Vue 的真入口需要**整包单元装配**（app + store + pages + types…），当前 runtime 只有测试消费者，生产装配在 auto-ui-tools，下一轮勘查。
 
 **验证**：auto-ui prep 6/6；plan105/980/979/981 等核心回归未受影响（本轮未动 core）。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 54 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W51：本地 style 声明内联）| PLAN-105 r1 | outcome: pass | code_commit: auto-ui（本轮）| task_ids: T-02（W51）| evidence: prep 7/7（新增 `inlines_local_style_declarations`）
+
+**交付**：prep 现在也内联**本文件**的 `style <name> = "<classes>"` 声明——声明行等长空白化，`style: <name>` 引用替换为引号字面量（与依赖样式同一条消费语义）。012 这类「文件内样式表 + 引用」的真语料不再把裸标识符喂给元素属性文法。新增正面测试锁定该行为。
+
+**012 排查记录（负面结论，便于下一轮）**：用最小源分别验证**同行逗号多属性**、**CJK 标签**（`button "时−" { … }`）、**`text .field { … }` 文本叶**三种形状——都能投影成功。故 012 的 `unexpected token in a bare element tag` 是**更早处解析失步**导致（错误点落在后续 `}`），下一轮需在 012 源中做**前缀二分**（按 `if .tab == …` 分段截断）定位首个失败段。
+
+**验证**：prep 7/7；core 未动。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
