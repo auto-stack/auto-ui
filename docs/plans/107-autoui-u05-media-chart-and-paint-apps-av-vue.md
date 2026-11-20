@@ -310,10 +310,21 @@ Rust 测试增量准备 4.73 s，工具准备 20.01 s，前端首次离线安装
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 12 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a9c4dec1, lang 20573cdf0 | evidence: official Vue ABI restored after cached generation, verified f32 pointer arithmetic in Chrome, and identified remaining admission and shared integration gaps | next: user`
 
+**024 原图表函数签名与尾值（T-02 进行中）。** AutoLang `efe49ea3858e8fa73fad5141dbd45b012aa9847d`，AutoUI `a9c4dec1a0c6b83e7ece5bd4ecf38a586b3a517c`。AGE 包面将 `float` 和 `f32` 归到同一内建类型，用在函数参数、返回值和局部注解。声明了返回值的函数把最外层末尾表达式交给既有返回值检查。错型尾值、混宽算术和中间位置的表达式语句继续具名拒绝。AgePackage 文法 ID 更新为 `b17f6885b7a7ed5b3b3cd8ed9370589a97add95520b74e13c0da5a71bc143910`，冻结邻接面全部通过。
+
+| 执行 | 结果 | 墙钟执行 |
+|---|---|---:|
+| ACE Core、AV 的 `plan981` 定向回归 | 248/248、57/57。AV 的两个实例分别用 11 和 9.5 调用同一跨模块 helper，观察值分出 `wide` 和 `narrow` | 0.647 / 0.371 s |
+| 同一几何材料函数通过 A2TS 受检片段与正式脚本运行时，在 Node 25.2.1 执行 JS、TS | 两个目标都读取数值 5.5、4.75 及文本 `wide`、`narrow` | 未单计 |
+| 固定原 `024-charts/src/front/components/chart_geom.at` | AGE 语法投影通过。包绑定首错是字节 390..394 的 `math` 缺少注册，`math.cos` / `math.sin` 的受检数值接口仍缺。原文件 SHA256 `78a02b598d169d0caa278a32aa913be1800ab76a02084a9c389f3ea64aa58863` | 未单计 |
+
+最终 Rust 增量准备 9.92 s。`chart-helper-exact-original.log`、`chart-helper-core-final.log`、`chart-helper-av-final.log`、`chart-helper-script-js-final.log`、`chart-helper-script-ts-final.log` 的 SHA256 依次为 `d976505324c628828021cf766fee9e4b00b111dfc9d75e9f82a5554ed6f16e39`、`f4dabf6e188ae3cbcb7ccf9759e82a374c610c349971f0a796d4d20ed4f1c870`、`a8a032f5dd70ad7bc6a6e8ae2f3f896ab444b69e95bd17d694716231542e1baf`、`e32a33dd7ec4dc8df3802fd1a4c2338d93230d7ca4d0d7f2db793d715c228a31`、`b5d180d1d2b541f45e45be4631c1e989c413c54d13d0d31b25c12afab9f76e94`。下一切片核对原图表的 `math.cos`、`math.sin`、`math.atan2` 与已交数值库的签名及精度约定，再走原包绑定和两个正式宿主。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 13 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a9c4dec1, lang efe49ea38 | evidence: unchanged chart geometry module parses and reaches the missing checked math binding, with AV and A2TS tail result evidence | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
 
 - **B-107-01｜共享生产基线。** 019/020/030 的原 Store、页面模块与前端绑定依赖 PLAN-105 的共有实现；029/031/031-paint 的 `$event`、图表和原画廊的类型列表与包闭包依赖 PLAN-114 的受检实现；原桌面树形挂载需要 PLAN-123 的生产入口与路由源发现。对应在途提交分别为 AutoLang `b987e2c23`、`7d6eabe4c` 与 AutoUI `ffbb488c`/`9d5ea5b3`，它们未形成 107 所需的稳定发布基面。恢复条件是相应 owner 提供可消费并且包含原形态正反例的固定提交，随后在 107 两树接入并重放 §5 矩阵。030 的第一个条件读取 `.store.has_current`，需要共享受检状态与真实控件树共同实现。
 - **B-107-02｜原 CodeEditor 源归属承接。** 同源双端均在 `QueryChanged` 缺少消息声明被拒；补声明的材料对照由受检编译转报缺 `code_editor_cursor_line`。请确认允许 107 增加 AutoOS 原画廊页的最小迁移，或由 AutoOS 负责人提供固定页提交并由 107 消费。之后由 107 接入编辑器光标的 AV/A2TS 能力并核编辑、搜索与卸载。材料对照保持独立，固定原页仍用 §9 的 AutoOS 提交。
-- **自动执行轮数。** `auto-plan-goal` 的默认 12 轮已用完。r1 保持执行中，待用户授权增加自动执行轮数。已验证的切片与原矩阵的未完成项按原范围交接。
