@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-107
-status: drafting
+status: executing
 feature_name: AutoUI U05 媒体、图表与绘制 AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
-updated_at: 2026-11-19
+updated_at: 2026-11-20
 plan_revision: 1
-current_step: 0
+current_step: 1
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -49,14 +49,38 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 ## 4. 来源与前置
 
 - [980 原 W1 和 ④-A 设计](../../../auto-lang/docs/plans/archive/980-ace-m2-autoui.md)、[981 基础](../../../auto-lang/docs/plans/archive/981-ace-m2-age.md) 和 [1071 示例/Widgets 冻结](../../../auto-lang/docs/plans/archive/1071-autoui-w1-av.md)。已有运行收据按实际输入、范围和版本复用。
-- [AV 宿主及 W1 收据](../../../auto-lang/docs/specs/ace-migration/m2-autoui.md)、[1072 Vue 生产计划](../../../auto-lang/docs/plans/1072-autoui-vue-web.md)、[976 TS/JS 交付](../../../auto-lang/docs/plans/archive/976-ace-m2-typescript.md)、[978 构建交付](../../../auto-lang/docs/plans/archive/978-ace-m2-build.md)。
+- [AV 宿主及 W1 收据](../../../auto-lang/docs/specs/ace-migration/m2-autoui.md)、[1072 Vue 生产计划](../../../auto-lang/docs/plans/archive/1072-autoui-vue-web.md)、[976 TS/JS 交付](../../../auto-lang/docs/plans/archive/976-ace-m2-typescript.md)、[978 构建交付](../../../auto-lang/docs/plans/archive/978-ace-m2-build.md)。
 - U02–U06 按用例所需接口推进。遇到共享的 ④-A、事件、集合、外部服务接面或组件缺口，记录具体接口、实现负责人、交付版本与消费测试，已具备前置的样例继续验收。1072 的 982 联合 CLI 验收可消费本计划的 A2Vue 证据。
+- 2026-11-20 用户以 `/goal 完成计划107` 授权 r1 原范围的实施、独立复审、限定修复和落地归档清理。
 
 ## 5. 实施与交付边界
 
 先冻结 U05 矩阵，逐行绑定项目原源、Widget 页和组件、预期、失败反例、权限、资源、版本和 AV/A2Vue 状态。从原项目的第一个失败处建立可复跑入口，修所用能力或组件，回同一项目完成两端验收。公共语义走原 owner 的统一接口，源级修复覆盖 AV 和 A2TS 的实际消费者。
 
 实施使用 `D:/autostack/.wt/ui-107/{auto-ui,auto-lang}` 的关联工作树。用到其他仓版本时明确固定提交，按组内路径或既有显式覆盖解析。合同、进度和归档在 AutoUI 主检出管理，实施和构建在工作树。跨仓落地顺序以实际生产者和消费者验证为准。
+
+### T-01 原样回放矩阵
+
+应用入口均为 `examples/ui/<行名>/pac.at`、`src/front/app.at` 及其原始模块。画廊入口为 AutoOS `widgets-gallery/pac.at`、`src/front/app.at` 与 `src/front/pages/<行名>.at`，组件从原 `components/package.at` 解析。下表基于 §9 的 Git 来源。两端保留原有适用性，CodeEditor 的 vi 模式和系统 IME 按原 native 条件检查。首轮顺序为 002 对照、031-paint、024-charts、其余应用、画廊；同一 Iced 工具串行排窗。
+
+| 原样输入 | 实际闭包及独立预期来源 | AV 与 A2Vue 必验状态及负控 |
+|---|---|---|
+| `031-paint` | `paint_color.at`、ColorPicker、NumericFields、Canvas；`SPEC.md`、`tests/desktop_mcp.py` | 真实指针落笔，像素 42 按选色变化，Undo/Redo 回放，取消选色保正式色，存储往返后卸载 |
+| `024-charts` | `components/{line_chart,bar_chart,area_chart,donut_chart,chart_geom}.at`；`SPEC.md`、`tests/desktop_mcp.py`、`tests/test_024_vue.mjs` | 四类图有实际几何，更新数据后几何变化，指针命中、图例操作及空数据 |
+| `019-video-app` | `pages/{home,watch}.at`、`video_store.at`、`settings.at`、`back/{api,db}.at`；`tests/{acceptance.atd,smoke.spec.ts,vm-smoke.mjs}` | 卡片进入 `/watch/:id`，真实解码与时间推进，切换相关视频，坏 URL 后恢复；仅向已选用例开放媒体请求 |
+| `020-music-player` | `player_store.at`、`viewport.at`、`controls.at`、队列/导航与 `back/api.at`；`README.md`、`tests/test_020_vm.py` | 固定两首 1.5 秒 WAV，播放/暂停、换曲、到尾策略与设备释放；扫描根仅指向样本目录 |
+| `029-photo-gallery` | `back/api.at`、ImageViewer、AssetBrowser、TreeView、Pagination、CollectionView；`SPEC.md` 的 scan/thumb/full 与 UI 行为 | 缩略图与原图身份、相册和查看器切换，坏图失效后可打开同目录好图；`AUTO_PHOTO_ROOT` 指向固定图片目录，撤根或未授权路径不能被读取 |
+| `030-video-player` | `player_store.at`、`viewport.at`、`controls.at`、`playlist.at`、`file_picker.vue` 与 `back/api.at`；`tests/{smoke.spec.ts,vm-smoke.mjs}` | 真实帧与时间、暂停、seek 至 50%（时长 ±5%）、坏媒体后恢复及关闭；保留原用例媒体目录与真实 Chrome 编码支持条件 |
+| `031-image-viewer` | `back/{api,directory_index,image_service,types}.at`、ImageViewer；`tests/{vm_matrix.py,vue-actions.json,fixtures/manifest.json}` | JPEG/PNG/WebP、Alpha/EXIF、缩放/平移和可见区，坏图具名失败后恢复，关闭会话不残留图像请求 |
+| `area-chart` | `components/area_chart.at`；原页 `area-chart-overlay`、图表 `plan484` 与 `plan499` 回归族 | 叠加区填充和顶边几何、数据与指针回放、空数据 |
+| `bar-chart` | `components/bar_chart.at`；原页 `bar-chart-basic`、`bar-chart-grouped` 与 `plan484`/`plan499` | 单组/分组柱几何，命中与更新，空数据 |
+| `donut-chart` | `components/donut_chart.at`；原页 `donut-chart-basic` 与 `plan484`/`plan499` | 各段弧、指针/图例状态，空数据 |
+| `line-chart` | `components/line_chart.at`；原页 `line-chart-basic`、`line-chart-multi` 与 `plan484`/`plan499` | 单/多列路径、指针提示、更新与空数据 |
+| `flow-diagram` | `components/flow_diagram.at`；原页 `flow-diagram-lr`、`flow-diagram-basic` 与 `plan502_diagram_tests.rs` | 左右、上下两方向独立布局；节点命中，高亮/提示及指针离开复原 |
+| `carousel` | 外壳 `official` → `components/carousel.at` 五个同族组件；原页 `carousel-{basic,sizes,spacing,orientation,options}`，`component_registry_test.rs` | 指针与键盘改变滑页；横/竖、多个可见项、边界与循环可观察；关闭后无遗留事件 |
+| `code-editor` | 原页 `code-editor-{basic,auto}`、本仓 `ui/code_editor` 和 Vue CodeMirror；`plan413_code_editor_natives.rs`、原页 Props 表 | 编辑/撤销、光标、搜索、换行、内容回写与关闭，native vi/IME 按原条件 |
+
+单写面从实际代码分工。PLAN-105 继续负责通用 Store、组件面源准备及其 collections 接线；PLAN-114 负责正被其原树页消费的 AGE 包闭包、可变类型列表、计算值和事件参数；PLAN-123 负责在途桌面项目入口和路由源发现。PLAN-107 持有这些提交的 U05 消费复验、媒体/绘制/图表/编辑器实际使用的受检能力与该组原项目端到端证据。ImageViewer 沿 PLAN-089 已交包，PLAN-090 的通用 MediaPlayer/TransportControls 为独立草拟抽取；本组沿现有受控 `video` 契约验证原播放器。Gallery 源与闭包固定为 AutoOS 只读输入。
 
 ## 6. 测试设计
 
@@ -80,7 +104,7 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 
 ## 8. 执行步骤
 
-- [ ] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。
+- [x] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。见 §5 矩阵及 §9 基线与首轮回放。
 - [ ] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
 - [ ] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
 - [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
@@ -93,6 +117,52 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 
 2026-11-19 stage: new，drafting 0/8。U05 的原样示例、Widgets、AutoLang 支持和组件补齐均处于待实施状态。
 
+2026-11-20 stage: work | plan_id: PLAN-107 | plan_revision: r1 | T-01 基线 | 授权链：`/goal 完成计划107`，实施、独立复审、限定修复、合入归档清理。主检出 AutoUI 干净，AutoLang 既有在制改动限文档与计划。独立工作树 `D:/autostack/.wt/ui-107/{auto-ui,auto-lang}`，两仓 `plan-107-dev`，基面分别 `514c27113e1aaebd683a72aaf5d6196099869214`、`c941db401fffe08abae1e1f198238adec46d4f5c`。只读 Cargo 兄弟树：AutoDown `45b642dadcbd4fb71a8c7f2e6f09435faf7a65f5`，AutoWeb `26d085f7e54ea20c6997edf2dc23eef0cb57faf6`，AutoMan `4a30483a590d81d5724cb453a0fd1fbc98d9aaf2`。只读 AutoOS 源 `efcfced51b58a1174f0b4fd3c0288c589495f70e`，`widgets-gallery` Git 子树 `d78f0ef4a67c69cab402f2a2d3d2a815162fa7f2`。`cargo tree --locked --offline -p auto-ui-tools --features ace-vue --depth 1` 退出 0，实际依赖落到组内检出。
+
+**输入与工具。** 材料根 `D:/autostack/plan-artifacts/plan-107/` 已登记，Git 文件树按固定提交导出到 `clean-source/`。`input-sha256.txt` 包含 306 项，SHA256 `48fc70b5e6e1ee04deee55e1ed3a37fac6a0e716046c3af10e5981db1f66dd7d`。020 使用独立合成的 16 kHz 单声道 PCM 440/660 Hz 音轨，SHA256 分别为 `6597c395421e3c01f4297e5c9c9c56c0afe769c300c4a075f9447557a76d0c09`、`019505cf956e1143925ecd4fe4ed42b06f2c6b9a9df842c01c7a4f1269e2fadf`。030 复制原测试指定的 `caelestia.mp4`，SHA256 `f619e2a111080267cd00cca7135947ad0dd4d978fe38381d46b75ba6d2b80153`。图片沿 031 原测试素材和损坏对照。019 固定原视频目录 API 及代码座标，源解码待两端准入后回放。Windows x64，Rust MSVC 1.98.0 `88d9e12ae`，ACE host 0.1.0，Node v25.2.1、pnpm 11.6.0、Chrome 157.0.8103.80。Auto CLI `0.1.0+plan-890-verified-r7-t19-116-gc879b3e`，SHA256 `eddb2cce50fd8afe08cd26959c2fe52e090eb833b5c8b9a3f27538b28d947fcf`，锁文件 SHA256 `2411b8a65fb03cdd33898b8d97a05e4a6e0b7d27ca941548fdaaac781137341be`。
+
+**T-02/T-04/T-05 首个拒绝点（已执行）。** 基线用 `cargo build --locked --offline -j 4 -p auto-ui-tools -p auto-ui-runtime --features auto-ui-tools/ace-vue,auto-ui-runtime/ace-bridge --bin auto-ui-tool --example ace_node_desktop_window`。全程 dev/debug 无调试符号，显式开启增量。初次 sccache 拒绝增量，当前进程移除 wrapper 后 214.241 s、exit 0。AV 基线 exe SHA256 `8da4513cda1d72a2e10a91e0b5fc839a6ad634bfdea2b1f15e85183cb5a32feb`，Vue 工具 `2aec578c891e31da78dc0bac9c8949942cd95033d613bf1c35a5a36c941693b4`。用 `first-admission.py` 运行原应用 `--source` 与 `--package`、原画廊页最小包，以及 `AUTO_UI_ACE_VUE=1 AUTO_UI_TOOL_BIN=<冻结工具> auto build --render vue --gen-only`。`admission.json` SHA256 `945ba7a20c45cf7b6039e143b480f93e045213e301daa0052f008dd5a716c6c8`。每行均停在实际验收前。
+
+| 输入 | AV 原源包入口，exit 4 | 严格 A2Vue 实际生成，exit 1 |
+|---|---|---|
+| 031-paint、029-photo-gallery、031-image-viewer | `source.lex` 拒 `$event` | `ace.vue-lane-unsupported`，各自业务 handler 缺席 |
+| 024-charts | 包面 `source.syntax`，`expected fn, found widget`；组件面模型声明槽拒绝 | `.SetLine`、`.Tick` 等 handler 缺席 |
+| 019-video-app | 包面 `source.syntax`，`expected fn, found widget`；组件面 `use` 拒绝 | 入口 `app.at` 同样在包面拒绝 |
+| 020-music-player | 包面 `source.syntax`，`expected fn, found widget`；组件面 `use` 拒绝 | `.NextTrack/.PlayPause/.PrevTrack/.ToggleDarkMode` 缺席 |
+| 030-video-player | `ace.desktop.view-cond-unsupported`，首个条件是 `.store.has_current`；当前按实例只过滤文本叶，清除门会暴露未走真实树的控件 | `.ToggleDarkMode/.TogglePlaylist` 缺席，`playlist.at` 另有解析跳过 |
+| 图表四页、FlowDiagram、Carousel | 六个逐页包输入均为 `source.syntax`，`expected fn, found widget` | 画廊原外壳在包面拒绝；直连 `generate_package_sfc` 六页分别重现同一首诊断 |
+| CodeEditor | `source.age.msg-unknown`，`QueryChanged` 无声明 | 直连包 SFC 复现该诊断。材料副本仅补消息后，两端均转为 `source.module-symbol`，缺 `code_editor_cursor_line`，去掉重复空光标处理器对该诊断无影响 |
+
+**对照、范围及时间。** Provider 准备 0.769 s。AV 22 次，共 3.610 s，原应用和画廊包 21 次 exit 4；首个标量对照虽 exit 0 但 0 帧。按 `--hold-ms 8000 --script 3:click:0:2,7:close` 复跑，4 帧、1 次点击、会话关闭、零错误，JSON SHA256 `01b742db86f65e06eda1d8bf6ea238a2d4ff787e814307e8204fe915ae7f3ee9`。严格 Vue 生成 9 次共 30.394 s，002 exit 0，其余 8 次 exit 1。SFC 直连对照以同树已编库链接，首次缺 SDK import-lib 路径，补路径后构建 6.470 s；执行 SFC 10 次加 AV 探针 2 次，002 生成 SFC，通过对照以外 11 次 exit 4。`direct-package.json` SHA256 `08e7836c57606651c0d3c7f9fd4e2079da03e411fe548d571419bf8e9275c088`。应用和画廊的媒体、画布、浏览器行为以及资源终态仍待验收。发现/清理未单独计时。
+
+**窗口验证切片。** AutoUI `81771ad12f8146c55ad514c672c1df41ea6b996a`。修复前在 1 s 截止、目标 1,000,000 帧下只观察到 5 帧却 exit 0。原样反例现在 exit 6 并写出部分证据；输出路径无效 exit 8。首次修复仍按成功派发计数，已有 U01 反例因此 exit 6；现按实际取自会话队列的事件计数，合法拒绝的 `abc` 也计入已处理输入，保留原诊断与四次成功派发。`pageclick` 指向无可用页面复跑 19/2 帧、0 派发、仍 exit 6，证明空轮询或帧充足不能替代事件。`window-fix-v2-execution.json` SHA256 `43af4cffce869a91f5d2c62f20f327405029c7476045c9ef73aac5b48cd88fc4`。未汇成 T-04 通过。
+
+| 窗口测试（`ace_node_desktop` 实际单进程 `--exact`） | 实测墙钟 | 结果 |
+|---|---:|---|
+| 新增 `p107_window_deadline_fails_with_partial_evidence` | 1.16 s | 1/1，≤10 s，检查 exit 6、具名截止、Counter 部分 JSON 与帧短缺 |
+| `p980_node_desktop_window_e2e_counter_full_script` | 1.68 s | 1/1，原计数与关闭重开脚本 |
+| `p980_u01_window_input_e2e` | 1.19 s | 1/1，拒绝 `abc`、四次派发、两个实例状态 |
+
+最终增量工具准备 32.828 s、测试编译 9.338 s；直接执行三个准备好的二进制过滤，每次 11 项未选，发现/清理未单独计时。额外窗口实验为脚本未到达 5.310 s（首次短排窗 0 帧，未用于该断言）及证据写盘失败 1.129 s。统一影响面回归留待相关生产接面齐备。
+
+**A2Vue 干净构建切片。** AutoUI `b409acd977ac363c252398a07c9d9141711e4d15`。002 初版项目生成成功，但 `pnpm build` 在 `vue-tsc` 以 exit 2 拒缺 `a2x_rt.d.mts`、`reka-ui` 和 `class-variance-authority`。根件已经使用原生 `<button>`，临时旧 SFC 的预扫描却把 shadcn 按钮复制到了产物。现采用最终 SFC 语料收集组件，A2Vue 工具全量、增量根件及增量组件出盘共用 A2TS 的官方类型声明。开关键关闭的旧根件继续使用 shadcn 按钮，仍无 ACE 运行时文件。
+
+| 测试范围 | 结果 | 准备 | 执行 |
+|---|---|---:|---:|
+| `plan980_ace_vue_tool_wiring`，`--exact p980_ace_vue_tool_wiring_key_gate_and_named_rejects`，dev/test 不在测试体编译依赖 | 1/1，补断言：旧件真实需要 shadcn、ACE 原生按钮无旧件、冷及增量声明逐字等于 A2TS 来源 | `auto-ui-tool` 19.247 s；测试编译 6.211 s | 2.847 s（≤10 s），发现/清理未另计 |
+| 从新导出的 002 原样目录，`auto build --render vue --gen-only` → `pnpm install --offline` → `pnpm build` → Playwright Chrome | 4/4 exit 0，`vue-tsc`/Vite 通过，状态 `0 → 1 → 2 → 1 → 0`，0 页面异常且浏览器页关闭 | 生成 1.559 s；安装 10.389 s；构建 4.630 s | 浏览器 2.267 s，含关闭；单独的集成准备，无新增构建型日常用例 |
+
+`vue-replay-status.json` SHA256 `3e15eeacd4a8ec36c2f692cd0773961d564bd0f99f9b69818049db5d4533c967`，浏览器输出 `vue-replay-browser.log` SHA256 `6265960ad5ec97fa0dfa4703a3a746719a8cb7b48d43212fbcbdffe0dbabf5be`。此对照验证工具链，U05 原项目仍保持首轮拒绝待实现状态。
+
+**Schema/资源补核。** 同树 `ace_core` 运行探针所得 AgeComponent `3abe2d4a53c607fee4ba474de2ee1cf3d8fc6e79d7f8b04648a632b0d9a30be7`，AgePackage `42b6eedec484000eeff74717d8159ac514b9905eda18ea95dab9e87c63f672e5`。Chrome 直接解码素材，2.894 s、exit 0：`caelestia.mp4` 1920×1080、时长 49.429 s，实际时间推进，暂停后 seek 到 24.7145 s；两首 WAV 各 1.5 s，首曲到尾、换源恢复到 0；PNG 320×240；页面关闭。`media-preflight.log` SHA256 `978f3d2f410157985c87d96dcb8ea718dd1a631c9bd744f08e9bff328b2963c2`。素材预检独立于各端应用。Windows libmpv 本地候选 `D:/autostack/tools/mpv/libmpv-2.dll`，SHA256 `673e6397920ab64a9c5b3a618f7f16d38854efe72b58665f1f84e4e873b763a4`，原应用尚未装载。019 原源的三个 HTTP HEAD 各 8 s 超时，另一公开存储入口返回 403。下载/原 URL 播放待可达媒体与准入同时具备。
+
+`stage: work | plan_id: PLAN-107 | plan_revision: r1 | outcome: blocked | worktree_path: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | branch: plan-107-dev | base_commit: ui 514c2711, lang c941db401 | code_commit: ui b409acd977ac363c252398a07c9d9141711e4d15, lang c941db401 | task_ids: T-01 pass, T-02..T-06 open | evidence: page and app admissions, window and Vue tool repairs, real controls above | blockers: B-107-01 and B-107-02 in §10 | next_responsible_role: shared producers and source decision, then work`
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 1 | from: work | to: work | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b409acd9, lang c941db401 | next: user`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
+
+- **B-107-01｜共享生产基线。** 019/020/030 的原 Store、页面模块与前端绑定依赖 PLAN-105 的共有实现；029/031/031-paint 的 `$event`、图表和原画廊的类型列表与包闭包依赖 PLAN-114 的受检实现；原桌面树形挂载需要 PLAN-123 的生产入口与路由源发现。对应在途提交分别为 AutoLang `b987e2c23`、`7d6eabe4c` 与 AutoUI `ffbb488c`/`9d5ea5b3`，它们未形成 107 所需的稳定发布基面。恢复条件是相应 owner 提供可消费并且包含原形态正反例的固定提交，随后在 107 两树接入并重放 §5 矩阵。030 的第一个条件读取 `.store.has_current`，需要共享受检状态与真实控件树共同实现。
+- **B-107-02｜原 CodeEditor 源归属承接。** 同源双端均在 `QueryChanged` 缺少消息声明被拒；补声明的材料对照由受检编译转报缺 `code_editor_cursor_line`。请确认允许 107 增加 AutoOS 原画廊页的最小迁移，或由 AutoOS 负责人提供固定页提交并由 107 消费。之后由 107 接入编辑器光标的 AV/A2TS 能力并核编辑、搜索与卸载。材料对照保持独立，固定原页仍用 §9 的 AutoOS 提交。
