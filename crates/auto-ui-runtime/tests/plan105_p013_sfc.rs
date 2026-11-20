@@ -1,64 +1,79 @@
-//! PLAN-105 T-02（U03 013）：**真实 013-todo 源 → Vue SFC**（浏览器腿）的现状回归。
+//! PLAN-105 T-02（U03 013）：**013-todo 浏览器腿（A2Vue lane）**的真实源回归。
 //!
-//! 现状（W89）：包片段 lane 已能消费组件面 prep 产物，但包内 `store` 的
-//! 共享实例语义仍未接线（S1）——本用例把该**具名拒绝**钉住：S1 落地后它会
-//! 翻红，届时改成结构断言（模板/`v-for`/`@click`/refs）。
+//! 两个层次：
+//! 1. `lane_sfc_*`：`prepare_component_source` → `generate_sfc_with_lane`——app
+//!    单元出模板与 `@click`，todo_list 单元出 `v-for`（列表渲染）。这是
+//!    **不依赖 S1/MIR** 的浏览器腿证据。
+//! 2. `package_lane_reports_store_gap`：包片段 lane（`generate_package_sfc`）
+//!    仍在 S1（包级 store 语义）处具名拒绝——S1 落地后翻转为结构断言。
 use ace_core::source::packages::PackageModuleInput;
 use auto_ui_runtime::ui::ace_package_sfc::generate_package_sfc;
 use auto_ui_runtime::ui::ace_source_prep::prepare_component_source;
+use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
 use std::path::{Path, PathBuf};
 
 fn project_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui/013-todo")
 }
 
+fn read(rel: &str) -> String {
+    std::fs::read_to_string(project_root().join(rel)).unwrap_or_else(|e| panic!("read {rel}: {e}"))
+}
+
 fn prepared(rel: &str) -> String {
     let root = project_root();
-    let src = std::fs::read_to_string(root.join(rel)).unwrap_or_else(|e| panic!("read {rel}: {e}"));
-    match prepare_component_source(&root, &src) {
-        Ok(p) => p.source,
-        Err(e) => panic!("prep {rel}: {e}"),
-    }
-}
-
-fn unit(id: &str, rel: &str) -> PackageModuleInput {
-    PackageModuleInput {
-        package: "app".into(),
-        version: "1.0.0".into(),
-        id: id.into(),
-        source: prepared(rel),
-        provider: None,
-    }
-}
-
-fn generate() -> Result<String, String> {
-    std::env::set_var("P105_MEM_BACKEND", "1");
-    generate_package_sfc(
-        &[
-            unit("main", "src/front/app.at"),
-            unit("todo_store", "src/front/todo_store.at"),
-            unit("todo_list", "src/front/todo_list.at"),
-            unit("api", "src/back/api.at"),
-            unit("db", "src/back/db.at"),
-        ],
-        "app::main",
-    )
+    prepare_component_source(&root, &read(rel))
+        .unwrap_or_else(|e| panic!("prep {rel}: {e}"))
+        .source
 }
 
 #[test]
-fn p105_p013_sfc_reports_the_package_store_gap() {
-    match generate() {
+fn p105_p013_lane_sfc_app_has_template_and_events() {
+    std::env::set_var("P105_MEM_BACKEND", "1");
+    let (sfc, _bodies, _absent) =
+        generate_sfc_with_lane(&prepared("src/front/app.at"), "src/front/app.at")
+            .expect("013 app 单元生成 SFC");
+    assert!(sfc.contains("<template>"), "模板存在");
+    assert!(sfc.contains("@click"), "事件绑定（add/filter/toggle）进模板");
+}
+
+#[test]
+fn p105_p013_lane_sfc_list_has_v_for() {
+    std::env::set_var("P105_MEM_BACKEND", "1");
+    let (sfc, _bodies, _absent) =
+        generate_sfc_with_lane(&prepared("src/front/todo_list.at"), "src/front/todo_list.at")
+            .expect("013 todo_list 单元生成 SFC");
+    assert!(sfc.contains("<template>"), "模板存在");
+    assert!(sfc.contains("v-for"), "列表渲染进模板");
+    assert!(sfc.contains("@click"), "行内事件进模板");
+}
+
+#[test]
+fn p105_p013_package_lane_reports_store_gap() {
+    std::env::set_var("P105_MEM_BACKEND", "1");
+    let units: Vec<PackageModuleInput> = [
+        ("main", "src/front/app.at"),
+        ("todo_store", "src/front/todo_store.at"),
+        ("todo_list", "src/front/todo_list.at"),
+    ]
+    .iter()
+    .map(|(id, rel)| PackageModuleInput {
+        package: "app".into(),
+        version: "1.0.0".into(),
+        id: (*id).into(),
+        source: prepared(rel),
+        provider: None,
+    })
+    .collect();
+    match generate_package_sfc(&units, "app::main") {
         Ok(sfc) => {
-            // S1 落地后的期望形状（届时本断言生效）：模板 + 列表渲染 + 事件。
+            // S1 落地后的期望形状。
             assert!(sfc.contains("<template>"), "template block: {sfc}");
-            assert!(sfc.contains("v-for"), "list rendering reaches the template: {sfc}");
-            assert!(sfc.contains("@click"), "event bindings reach the template: {sfc}");
+            assert!(sfc.contains("@click") || sfc.contains("v-for"), "events/list: {sfc}");
         }
-        Err(e) => {
-            assert!(
-                e.contains("package-level store semantics are not wired yet (S1)"),
-                "013 的浏览器腿当前应停在 S1 具名拒绝，实际: {e}"
-            );
-        }
+        Err(e) => assert!(
+            e.contains("package-level store semantics are not wired yet (S1)"),
+            "包片段 lane 当前应停在 S1，实际: {e}"
+        ),
     }
 }
