@@ -897,15 +897,16 @@ def run_visual_and_reopen(args, out, cases, report):
                   '选中边框+选择摘要+确认栏同帧', [shot['sha256'][:16]], bool(shot['sha256']))
         # pending state
         s.press_ok('确认')
-        rb = s.wait_rb(lambda f: 'accepted' in f.get('confirmation', '') or 'rejected' in f.get('confirmation', ''), timeout=6)
+        rb = s.wait_rb(lambda f: f.get('status') == 'confirm accepted', timeout=8)
+        accepted = rb.get('status') == 'confirm accepted' and 'accepted' in rb.get('confirmation', '')
         cases.add('V-06 pending 反馈后终态回灌', '确认 → wait',
-                  'accepted/rejected 回灌（pending 有文字且合同锁定）',
-                  [rb.get('confirmation', '')[:100]], rb.get('confirmation', '') != '')
-        # light theme（主页面按钮——对话框必须已关）
-        s.close_picker_retry()
+                  '确认反馈 accepted，应用完成业务写入',
+                  [rb.get('confirmation', '')[:100], rb.get('attach', '')], accepted)
+        # Reopen only after this acceptance closed its own picker.
+        vfd.require(accepted and s.ensure_closed(), 'acceptance did not close the picker')
         s.press_ok('切换明暗')
         time.sleep(0.8)
-        s.open_picker()
+        vfd.require(s.open_picker(), 'picker did not reopen in the light theme')
         time.sleep(1.0)
         s.select_card('Asset-002.bin', '"att-2"')
         time.sleep(0.6)
