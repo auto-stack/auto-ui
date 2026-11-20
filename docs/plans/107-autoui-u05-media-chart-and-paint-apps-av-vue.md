@@ -425,6 +425,16 @@ A2Vue 把原 CSS 发射为 Vue `<style scoped>`，在普通元素和 SVG 模板�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 21 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui cdc1fd94, lang bf6fdd8af | evidence: original chart scoped CSS passes and original closure advances to message/style imports, route builds and Chrome verifies scoped transitions and reactive class | next: work`
 
+### 第 22 轮｜旧图表 widget 零载荷消息
+
+受检包在旧 `widget` 兼容入口补齐由零载荷 `on` handler 引入的消息，显式签名优先。无声明的定时 `Tick` 继续由正 `interval` 规则接入。载荷 handler 与规范 `node` 仍按显式声明校验。对照通过 AV 派发给第二个实例，两个实例的数值和文本分别为 100 与 40。Core 定向 249 + 30、AV 66 + 33 通过。
+
+四份未修改的 024 图表均推进到导入 `caption_text` 的 `source.age.style-call`。把真实 `stylekit::styles` 一同列入闭包后，入口仍在 Area 的原引用处报该诊断。真实 stylekit 独立投影还在 `pill` 参数默认值的 bytes 726..738 报 `source.age.style-defaults`，后续需要同时解决公共字面量样式绑定和依赖样式模块中未用配方的处理。
+
+`round22-chart-admission-summary.log`、`round22-chart-admission/original-with-stylekit.log`、`round22-chart-admission/stylekit-original.log` 的 SHA256 依次为 `41c1555e885d56c4a3a7c46b3c45241bbd3d002dc17a15ad8467738c3676b53f`、`65568b058d9b16992275c5ead1959dc09744110dcd5f5f9e83cf3c40247c7295`、`4b7a33f3ca4f16343afa4959e53f4c812689d1dbf247f3b4bf655a76cc27f955`。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 22 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui cdc1fd94, lang 67947b9cf | evidence: AV replays the legacy unit handler on one instance, and all original chart components advance to the public style binding boundary | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
