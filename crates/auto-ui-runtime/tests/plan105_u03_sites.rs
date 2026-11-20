@@ -119,6 +119,32 @@ fn dedupe_functions(src: &str) -> String {
 /// 把 `use <unit>: f1, f2` 引用的单元里的 `pub fn` 补齐到合并源（prep 只内联
 /// 可通过组件面探针的那部分；工具函数常含 `var xs = []`/record 字面量而缺席，
 /// lane 的 SFC 仍会引用它们）。
+///
+/// 取 `store <Name> { … }` 整块（大括号配平）。
+fn extract_store_block_text(src: &str, name: &str) -> Option<String> {
+    let needle = format!("store {name}");
+    let pos = src.find(&needle)?;
+    let start = src[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let bytes = src.as_bytes();
+    let open = start + src[start..].find('{')?;
+    let mut depth = 0i32;
+    let mut j = open;
+    while j < bytes.len() {
+        match bytes[j] {
+            123 => depth += 1,
+            125 => {
+                depth -= 1;
+                if depth == 0 {
+                    j += 1;
+                    break;
+                }
+            }
+            _ => {}
+        }
+        j += 1;
+    }
+    Some(src[start..j].to_string())
+}
 fn append_used_module_fns(root: &Path, app_src: &str, merged: &mut String) {
     let mut wanted: Vec<String> = Vec::new();
     for line in app_src.lines() {
@@ -220,6 +246,37 @@ fn build_site(app: &str, units: &[&str]) -> Result<PathBuf, String> {
     }
     let mut merged = dedupe_store_blocks(&joined);
     append_used_module_fns(&root, &std::fs::read_to_string(root.join("src/front/app.at")).unwrap_or_default(), &mut merged);
+    // prep 的 store 内联要过组件面探针；大 store（015 的 NotesStore）可能被跳过——
+    // 合并源里没有 store 声明时，把同目录单元里的 store 块补进来（保持单份）。
+    if !merged.lines().any(|l| l.starts_with("store ")) {
+        let mut found: Option<String> = None;
+        for entry in std::fs::read_dir(root.join("src/front"))
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("at") {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            let Some(line) = text.lines().find(|l| l.starts_with("store ")) else { continue };
+            let name = line
+                .trim_start_matches("store ")
+                .split(|c: char| !(c.is_alphanumeric() || c == '_'))
+                .next()
+                .unwrap_or("")
+                .to_string();
+            if let Some(block) = extract_store_block_text(&text, &name) {
+                found = Some(block);
+                break;
+            }
+        }
+        if let Some(block) = found {
+            merged.push('\n');
+            merged.push_str(&block);
+        }
+    }
     let (multi, stores) = generate_sfcs_with_lane_product_stores(
         &merged,
         "src/front/app.at",

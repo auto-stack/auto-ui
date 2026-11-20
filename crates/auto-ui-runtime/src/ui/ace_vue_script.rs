@@ -1172,6 +1172,13 @@ pub fn generate_sfcs_with_lane_product_stores(
             });
         }
     }
+    // PLAN-105 T-02（U03 015）：`view fn <Name>(…) { … }` 片段先登记——widget
+    // 抽取时按名字解析成内联视图片段（否则 SFC 会 import 一个不存在的子组件）。
+    for stmt in ast.domain_stmts() {
+        if let UiStmt::ViewFragmentDecl(frag) = stmt {
+            auto_ui_compiler::aura::register_view_fragment(frag);
+        }
+    }
     let runtime_mjs = ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]);
     let mut widgets = Vec::with_capacity(decls.len());
     for (wi, decl) in decls.iter().enumerate() {
