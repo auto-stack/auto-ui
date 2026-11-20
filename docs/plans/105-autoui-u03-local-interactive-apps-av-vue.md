@@ -801,6 +801,16 @@ stage: work（S1 杠杆确认）| plan_id: PLAN-105 | plan_revision: r1 | round:
 **结论**：**S1（包级 store 共享实例语义）是 013/015/016/022 四例共同闸门**——105 内最高杠杆的一刀；012 另有 prep 归一缺口一项。
 
 **S1 切口已写入交接**：store 单元→包级状态表（声明序初始化）+ 消息表；`.store.<f>`/`store.X.<f>` 绑定改写成状态单元字段读写；`store.Msg(...)` 派发到状态单元 `on`；去掉「见 store 即拒」；验收=本回归翻转为结构断言 + SFC 结构断言 + 真实 Vue 挂载点击。
+
+stage: work（浏览器腿打通）| plan_id: PLAN-105 | plan_revision: r1 | round: 96 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `a3d5e881` | next: work
+
+2026-11-21 stage: work（T-02 W91：013 浏览器腿打通）| outcome: pass
+
+**关键发现**：`ace_vue_script::generate_sfc_with_lane`（A2Vue lane）对 013 真实单元直接生成 SFC——`app.at` 出 `<template>`+`@click`，`todo_list.at` 出 `<template>`+**`v-for`**+`@click`。**浏览器腿不依赖 S1/MIR**。
+
+**回归**（`a3d5e881`）：`tests/plan105_p013_sfc.rs` 三条——app 模板/事件、todo_list 的 v-for、包片段 lane 继续钉 S1（S1 落地后翻转）。
+
+**下一步**：两 SFC 组装成单页（子组件注册与 props/事件桥）+ 真实 Vue 挂载点击（add/filter/toggle）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1128,6 +1138,16 @@ stage: work（S1 杠杆确认）| plan_id: PLAN-105 | plan_revision: r1 | round:
 **结论**：**S1（包级 store 共享实例语义）是 013/015/016/022 四例共同闸门**——105 内最高杠杆的一刀；012 另有 prep 归一缺口一项。
 
 **S1 切口已写入交接**：store 单元→包级状态表（声明序初始化）+ 消息表；`.store.<f>`/`store.X.<f>` 绑定改写成状态单元字段读写；`store.Msg(...)` 派发到状态单元 `on`；去掉「见 store 即拒」；验收=本回归翻转为结构断言 + SFC 结构断言 + 真实 Vue 挂载点击。
+
+stage: work（浏览器腿打通）| plan_id: PLAN-105 | plan_revision: r1 | round: 96 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `a3d5e881` | next: work
+
+2026-11-21 stage: work（T-02 W91：013 浏览器腿打通）| outcome: pass
+
+**关键发现**：`ace_vue_script::generate_sfc_with_lane`（A2Vue lane）对 013 真实单元直接生成 SFC——`app.at` 出 `<template>`+`@click`，`todo_list.at` 出 `<template>`+**`v-for`**+`@click`。**浏览器腿不依赖 S1/MIR**。
+
+**回归**（`a3d5e881`）：`tests/plan105_p013_sfc.rs` 三条——app 模板/事件、todo_list 的 v-for、包片段 lane 继续钉 S1（S1 落地后翻转）。
+
+**下一步**：两 SFC 组装成单页（子组件注册与 props/事件桥）+ 真实 Vue 挂载点击（add/filter/toggle）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
