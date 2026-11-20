@@ -1,14 +1,15 @@
 // The keyed child owns the load status of one image. Its callbacks update
 // that child only, so a discarded image cannot change its replacement.
 widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName: str = "", state: str = "missing", fit: str = "cover") {
-    msg { ImageFailed }
+    msg { Init, ImageFailed }
     model {
         var failed bool = false
+        var native_track bool = false
     }
     computed {
         actual_icon => if .iconName != "" { .iconName } else { .kind }
         bad_image => .failed || .state == "error"
-        native_http => Env.track() == "vm" && !.src.starts_with("/api/__auto/media/") && (.src.starts_with("/api/") || .src.starts_with("http://") || .src.starts_with("https://"))
+        native_http => .native_track && !.src.starts_with("/api/__auto/media/") && (.src.starts_with("/api/") || .src.starts_with("http://") || .src.starts_with("https://"))
     }
     view {
         col (style: "w-full h-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-md bg-muted") {
@@ -45,6 +46,7 @@ widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName:
         }
     }
     on {
+        .Init -> { .native_track = Env.track() == "vm" }
         .ImageFailed -> { .failed = true }
     }
 }

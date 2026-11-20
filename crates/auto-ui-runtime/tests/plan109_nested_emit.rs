@@ -93,8 +93,13 @@ fn root_state(app: &DynamicComponent, observed: &str, count: i32) {
 #[test]
 fn nested_explicit_emit_follows_the_live_owner_chain() {
     let start = Instant::now();
-    let scratch = std::env::var_os("PLAN109_ARTIFACT_ROOT").unwrap();
-    let dir = tempfile::tempdir_in(scratch).unwrap();
+    let mut scratch = tempfile::Builder::new();
+    scratch.prefix("nested-collection-emit-");
+    let dir = match std::env::var_os("PLAN109_ARTIFACT_ROOT") {
+        Some(root) => scratch.tempdir_in(root),
+        None => scratch.tempdir(),
+    }
+    .unwrap();
     let mut app = build(&dir);
     let leaf = |app: &DynamicComponent, parent| {
         app.bridge()

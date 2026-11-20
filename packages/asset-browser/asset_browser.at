@@ -272,42 +272,59 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
         }
         .DoSearch -> {
             if !.locked {
-                .last_emitted_seq = .last_emitted_seq + 1
                 try {
-                    ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: .q_folder, text: .search_draft, kind: .q_kind, page: 1, pageSize: .q_pageSize}}))
+                    let q = json.parse(.query)
+                    let folder str = q.folderId ?? ""
+                    let kind str = q.kind ?? ""
+                    let size int = q.pageSize ?? 50
+                    .last_emitted_seq = .last_emitted_seq + 1
+                    ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: folder, text: .search_draft, kind: kind, page: 1, pageSize: size}}))
                 } catch {
                 }
             }
         }
         .SetKind(kind str) -> {
             if !.locked {
-                let k = if kind == "all" { "" } else { kind }
-                if k != .q_kind {
-                    .last_emitted_seq = .last_emitted_seq + 1
-                    try {
-                        ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: .q_folder, text: .q_text, kind: k, page: 1, pageSize: .q_pageSize}}))
-                    } catch {
+                try {
+                    let q = json.parse(.query)
+                    let k = if kind == "all" { "" } else { kind }
+                    let current_kind str = q.kind ?? ""
+                    if k != current_kind {
+                        let folder str = q.folderId ?? ""
+                        let text str = q.text ?? ""
+                        let size int = q.pageSize ?? 50
+                        .last_emitted_seq = .last_emitted_seq + 1
+                        ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: folder, text: text, kind: k, page: 1, pageSize: size}}))
                     }
-                }
+                } catch {}
             }
         }
         .FoldSelect(id str) -> {
             if !.locked {
-                if id != .q_folder {
-                    .last_emitted_seq = .last_emitted_seq + 1
-                    try {
-                        ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: id, text: .q_text, kind: .q_kind, page: 1, pageSize: .q_pageSize}}))
-                    } catch {
+                try {
+                    // Filter actions can arrive before Tick updates the displayed fields.
+                    let q = json.parse(.query)
+                    let folder str = q.folderId ?? ""
+                    if id != folder {
+                        let text str = q.text ?? ""
+                        let kind str = q.kind ?? ""
+                        let size int = q.pageSize ?? 50
+                        .last_emitted_seq = .last_emitted_seq + 1
+                        ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: id, text: text, kind: kind, page: 1, pageSize: size}}))
                     }
-                }
+                } catch {}
             }
         }
         .PageChanged(ev str) -> {
             if !.locked {
                 try {
                     let p = json.parse(ev)
+                    let q = json.parse(.query)
+                    let folder str = q.folderId ?? ""
+                    let text str = q.text ?? ""
+                    let kind str = q.kind ?? ""
                     .last_emitted_seq = .last_emitted_seq + 1
-                    ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: .q_folder, text: .q_text, kind: .q_kind, page: p.page, pageSize: p.pageSize}}))
+                    ."queryRequested"(json.stringify({seq: .last_emitted_seq, baseRevision: .revision, query: {folderId: folder, text: text, kind: kind, page: p.page, pageSize: p.pageSize}}))
                 } catch {
                 }
             }

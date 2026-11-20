@@ -6,9 +6,10 @@
 |---|---|
 | 包导入 | 独立的 CollectionView 与 Thumbnail 经 Rust、Vue 生成。完整包移至第二绝对根后生成，取走包时严格生成具名失败。Windows VM 产品探针在隔离目录解析与运行，按 091 的现有测试规程把消费入口指向绝对包目录。 |
 | 原生多层事件 | 修复前按重名 B，`Inner.changed` 到 `Middle.Forward`，App 仍显示 `waiting`。修复 `5c9df17c` 以实际 receiver 的父绑定继续处理同步重发。修复后同一控件经过三跳，App 显示 B。永久用例覆盖当前接收者、同型另一实例、未绑定、释放后迟到与直接回调。 |
-| Thumbnail | 原生通过 `image.thumb` 票据触发真实解码与失败状态。原生 Gallery 的授权 HTTP 缩略图沿用 Image。浏览器使用授权 URI。子视图以资源 ID、revision、URI、状态和 fit 为 key，切换时重新建立图片和事件绑定。Vue 窄窗实测原图延迟返回后，替换图仍呈正确像素，坏文件呈占位。 |
-| 实例与结果身份 | Windows Vue 生成器会在 props 变化时重跑 Init。首次初始化后保留 mount token，FileManager 在发布结果时推进 revision，并按文件路径重新解析当前序号。排序与切换模式不更换有效选择。FileManager 的启动计时器以 `.booting` 为门，首目录加载之后解除。 |
+| Thumbnail | 原生通过 `image.thumb` 票据触发真实解码与失败状态。媒体扫描进入条目按钮的内容，媒体回调后标记宿主视图更新。原生 Gallery 的授权 HTTP 缩略图沿用 Image。子视图以资源 ID、revision、URI、状态和 fit 为 key。原生换图保留新图像素并显示坏图占位。Vue 窄窗实测旧图延迟返回后，新图像素仍然正确。 |
+| 实例与结果身份 | Windows Vue 生成器会在 props 变化时重跑 Init。首次初始化后保留 mount token，FileManager 在发布结果时推进 revision，并按文件路径重新解析当前序号。排序与切换模式不更换有效选择。FileManager 的启动计时器以 `.booting` 为门，派发首目录加载时解除。 |
 | 布局与键盘 | Grid 按 640 和 1024 逻辑像素在一、二、三列之间选择，方向键读取同一断点所用的窗口宽度。原生沿宿主 `vm.window_inner_width`，Vue 读取浏览器视口宽度。 |
+| 受控筛选 | 分类、类型、搜索、分页请求读取应用当前 `query`。实测应用已经清除图片筛选而界面的轮询字段尚未更新时，点「文档」曾带回旧类型，返回 0 条。调整后同一顺序返回 998 条文档。 |
 | 四格平台覆盖 | 用户批准 Windows 原生和 Vue 为本轮必验，Linux 原生和 Vue 随统一 Linux 开发补跑，见 [DEBT-011](../../plans/debts.md#debt-011-collectionview-的-linux-平台验收)。 |
 
 原生嵌套复现在 `D:/autostack/plan-artifacts/plan-109/t01/distinct/`。修复前 `current-result.txt` 的 SHA256 为 `FB4E26F128E262BCD4F7BEE86B699E150D826999479125DA435393AB0C532516`。首次修复后探针已读回 B，紧邻退出的 HTTP 探针收到 connection reset。后续独立组件门实测两次正常退出后的旧端口均拒绝同一 MCP 方法调用。

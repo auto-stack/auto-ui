@@ -3065,7 +3065,7 @@ impl MediaSurfaceRef {
 
 /// 收集当前视图中带 on_loaded/on_error 的 ImageSurface（遍历面与
 /// collect_input_ids 同族——Column/Row/List/MouseArea/Popover/Container/
-/// Scrollable/Grid/Overlay；更外层容器中的 surface 与 focus 登记同边界）。
+/// Scrollable/Grid/Overlay/Button；带内容的按钮也可能显示缩略图）。
 fn collect_media_surfaces(view: &AbstractView<IcedMessage>, out: &mut Vec<MediaSurfaceRef>) {
     match view {
         AbstractView::ImageSurface {
@@ -3089,7 +3089,11 @@ fn collect_media_surfaces(view: &AbstractView<IcedMessage>, out: &mut Vec<MediaS
                 collect_media_surfaces(child, out);
             }
         }
-        AbstractView::MouseArea { content, .. } => collect_media_surfaces(content, out),
+        AbstractView::MouseArea { content, .. }
+        | AbstractView::Button {
+            content: Some(content),
+            ..
+        } => collect_media_surfaces(content, out),
         AbstractView::Popover {
             anchor, content, ..
         } => {

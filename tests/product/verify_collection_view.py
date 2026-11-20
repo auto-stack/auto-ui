@@ -176,21 +176,28 @@ def test_file_manager_browser(args, report):
             return browser.call("browser_click", target=browser_button(tree, label),
                                 element=label, **arguments)
 
-        ready = wait_for(snapshot, lambda s: 'button "编辑地址"' in s, 3)
+        report["stage"] = "open address editor"
+        ready = wait_for(snapshot, lambda s: 'button "编辑地址"' in s and
+                         'button "主目录"' in s and '条目加载中' not in s, 4)
         click(ready, "编辑地址")
         editing = wait_for(snapshot, lambda s: 'textbox "输入路径后回车...' in s)
         line = next(line for line in editing.splitlines() if 'textbox "输入路径后回车...' in line)
         browser.call("browser_type", target=re.search(r"\[ref=(\w+)\]", line)[1],
                      element="目录地址", text=args.fixture_dir.as_posix())
+        report["stage"] = "navigate to directory fixture"
         click(snapshot(), "跳转")
         listed = wait_for(snapshot, lambda s: 'button "notes.txt"' in s and "sample.png" in s)
+        report["stage"] = "select file"
         click(listed, "notes.txt")
         chosen = wait_for(snapshot, lambda s: "选定: notes.txt" in s)
+        report["stage"] = "reverse name sort"
         click(chosen, "名称")
         sorted_tree = wait_for(snapshot, lambda s: "选定: notes.txt" in s and
                                0 <= s.find("sample.png") < s.find("broken.png"))
+        report["stage"] = "switch to grid"
         click(sorted_tree, "网格")
         grid = wait_for(snapshot, lambda s: "选定: notes.txt" in s and 'button "名称"' not in s)
+        report["stage"] = "open subdirectory"
         click(grid, "folder", doubleClick=True)
         report["readback"] = wait_for(snapshot, lambda s: 'button "inside.txt"' in s)
         report["selection_after_sort_and_view_change"] = grid

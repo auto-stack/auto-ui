@@ -4443,6 +4443,10 @@ fn run_session(
         // 失败单次派发 on_error（fn(str) 收原因串）。表项随视图存在性生死
         // （卸载即退订）；不在 view 构建/paint 期重入 handler。
         media_notify_sweep(&mut state.component, &state.app);
+        // Media handlers run after the regular dirty check above.
+        if state.component.is_dirty() {
+            *state.app.view_dirty.borrow_mut() = true;
+        }
 
         // PLAN-095 T-04: ui.focus(target_key) 消费——native 请求槽 → 当前
         // 视图 Input/Textarea 稳定 Id 解析 → iced focus 任务；结果落
