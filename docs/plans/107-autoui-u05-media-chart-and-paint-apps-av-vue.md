@@ -569,6 +569,16 @@ Iced 原外壳最初报 `ace.desktop.view-cond-unsupported`，定位原源码字
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 36 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 3dceaa13, lang 5950a6222 | evidence: native checked conditional route frame and real original shell mount/close | next: work`
 
+### 第 37 轮｜原 Carousel 从画廊进入并完成双端控件回放
+
+原 AutoOS 外壳与原 Carousel 页挂在独立窗口。脚本读取 Iced 实际按钮并触发其当前受检路由消息，`/carousel` 成功开出页面会话 2。7 帧中验证五组区域，初始可见项数 `[1,3,2,2,3]`，横向键盘和真实拖拽推进到第 3 项并禁用下一项，无障碍点击与纵向焦点得到 `[2,3]`，循环回退得到 `[5,1,2]`。关闭后外壳和页面会话均关闭，页面拒绝一次迟到的轨道回调。
+
+Iced `round37-original-gallery-carousel-window.json` 与同名 `.log` SHA256 分别为 `0e4643c8e0fafe4c8e3de3f78c15ae4a5ef982e69d0ca03f1e80108e86f86248` 和 `6d38958e175b6f42cabf6f2742ed288117e9655dc7e89efcb6897f872f7bdd35`。沿用第 36 轮窗口驱动栈设置。默认 `/` 页仍报告 `index.at` 源码诊断，Iced 记录 `sticky` 与 `fixed` 的既有平台降级。与第 35 轮 Chrome 证据共同覆盖 Carousel 原页的两端交互。
+
+重跑四个原画廊图表页及其组件，首项均为裸 `data: List` 尚未取用页面的静态记录数据。LineChart 的两个实际调用分别使用 `{m,v}` 与 `{m,desktop,mobile}`，后续需逐调用核对元素形状和组件实例。FlowDiagram 与 CodeEditor 仍有原页准入诊断。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 37 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 3dceaa13, lang 5950a6222 | evidence: original Carousel route and real native controls plus production browser replay | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
