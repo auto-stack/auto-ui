@@ -613,6 +613,16 @@ Iced 受检帧点击子组件后，父状态读取到 `docs/计划`。Vue 产品
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 41 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 46b78613, lang c10dc8ed0 | evidence: media handler type annotations checked by AV and original source forms isolated | next: work`
 
+### 第 42 轮｜原 FlowDiagram 组件进入数据形状检查
+
+包面支持布局代码的局部 `take` 和丢弃结果的 `stack.pop()`。后者沿用受检列表读写，空栈保持为空。仅在 handler 中用到列表时也启用同一集合验证器。Core PLAN-981 251、AV PLAN-981 74 通过，AgePackage 语法标识为 `74629b0eda27ec57619d61ef26c55bc5c57630b23b6b57745935e36c033af9c8`。
+
+AV 定向实例栈计算结果为 `0 → 8`。生产 Vue CLI 冷生成两个路由，经固定依赖的 `vue-tsc` 和 Vite 构建。Chrome `157.0.8103.80` 核栈结果同为 `0 → 8`，另核带显式类型的父处理器收到 `detail/图像`。两个路由分别卸载且无页面异常。默认生成路由采用 hash history，以实际路由地址复验通过。浏览器日志 SHA256 为 `9f21e81118280e37f9617408867f595d9dd5d4872c62488291c78687e62c3907`。
+
+固定原 FlowDiagram 页和实际组件各解析出一个 widget。原闭包推进到 `nodes: List` 的异形记录绑定。原节点有缺省 `shape` 的行，边记录的 `line`、`label`、`head`、`tail` 也有缺省值语义。原闭包日志 SHA256 为 `61300d5cabbd938f66d7c96db42d7137f1a75a1aafbcd7dcc8c336430aa556b8`，真实双布局及悬停仍待回放。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 42 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 46b78613, lang 4a808bbac | evidence: original FlowDiagram component parses, checked stack effects replay in AV and Chrome | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
