@@ -78,3 +78,14 @@
 - 允许进入：T-02 收尾（README 前）+ T-03（树/分页/预览/Dialog 接入已随包实现，逐项过 V 腿）+ T-04（examples/asset-picker + 029 网格/搜索迁移）。
 - 前置缺口：无阻塞性缺口。P-1/P-2/P-4 为具名运行时观察，按本页决议绕行，不混入 T-02 自由设计。
 - 未决机制：Escape 双达定案（§3.3）；门版驱动在 T-05 重建。
+
+
+## 9. T-05 运行期发现补充（2026-11-20 续，P-12/P-13）
+
+| # | 发现 | 证据 | 决议/状态 |
+|---|---|---|---|
+| P-12 | **handler 体内 f-string 参数插值（${param}）使 handler 静默中止**：InvalidateSelected 的 `.status = f"...${nid}"`（nid 为 handler 参数）执行后后续语句全部不执行（无报错） | 钩子按压 handler 命中但 status 无变化；改串拼接后立即生效 | 示例已改串拼接；f-string 参数插值缺口具名（auto-lang owner），本包内未再用该形态 |
+| P-13 | **split 模式 front 解析间歇竞态（029 LBrace）**：同一 app.at 多次 boot，`Expected identifier, got LBrace` 约 50% 出现；二分排除包内容（空 widget 也复现）、清 AutoCache、换 cache root、换 cache-key 均无效；对照轮 `tool host closed the control stream before answering` + Rust server 双次生成 | boot029_1..4（2 无 1 有对照）、bisect029a–e 系列 | 同 P-4 运行时族（tool host/VM 传输与生成管线并发）。029 迁移腿的阻断，组件侧无改动空间 |
+| P-14 | **delivery 普查方法**：MCP ActionResult 的 `delivery: sent=N delivered=M` 是可观测的投递丢失探针（delivered=0 = 状态写不落）；主页面裸按压 2/10、分段隔离/降频/清缓存均无效——丢失窗与组件、对话框、包层数无关 | guardtest/rate*.log 普查 | 门驱动以 delivered 计数 + provider 读回双重校验；运行时修复由 delivery 计数器直接验收 |
+
+native 门最终证据：`gate-native-final2` 四轮连绿 14/14（report sha 92e2172c4cb51838）+ `gate-native-r53` 双轮连绿（13f1a9a9dcaa4f6f），均含 V-06 截图腿；best-of-N 会话重试语义（--runs）已入门。
