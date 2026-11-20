@@ -445,6 +445,16 @@ Core 249 + 30 + 11、AV 66 + 33、SFC 20、路由 2、桌面闭包 4 通过。`r
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 23 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang 21f406eb9 | evidence: real stylekit literals bind into the checked tree for both lanes, original charts advance to widget parameter and view-loop verification | next: work`
 
+### 第 24 轮｜视图的只读参数作用域
+
+包视图的值检查与事件参数检查从已声明签名读取只读参数，覆盖图表用到的 `bool`、`str`、`int` 及带元素类型的 `List`。这些参数进入共享验证器的检查函数。测试验证了合法的图例条件、列表长度和整数消息载荷，以及将文本当布尔条件、将布尔当整数载荷时保留原引用位置的类型诊断。构造参数的运行时传递和 handler 内的 props 读取仍待接入。
+
+带完整真实依赖的 Area、Bar 和 Line 已跨过原先的 `.legend` 属性失败，首个诊断依次落在视图循环内的 `b`、`seg`、`p`。Donut 的首个诊断则在 handler 读取必填的裸 `List` 参数 `.data`。Core 250 + 30 + 11、AV 66 + 33 通过。完整原闭包证据 `round24-chart-admission/original-with-stylekit.log` 的 SHA256 为 `792deaa11ec9138eb63bb5b10400887cba2e2fbe351be8a2edd32f5e9ed9910b`。
+
+PLAN-114 的固定在途提交已有受检子组件输入、双端挂载、原路由视图和条件 props 的实现及测试。AutoLang `872441620`、`e784c0e1f`、`fa1daa2dc` 和 AutoUI `b2d9e05a`、`f9254500`、`9a916217` 需要对照 PLAN-107 当前代码检查可消费边界。下一步同时核对现有运行时输入接线和循环局部值的共享检查路径，并用原图表重放。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 24 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang f7630b7dd | evidence: declared chart view properties type-check and original components advance to loop locals and required List handler input | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
