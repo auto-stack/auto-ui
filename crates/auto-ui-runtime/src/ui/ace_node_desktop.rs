@@ -27,6 +27,8 @@
 //! typed 事件）。001/002 完整主题/选择/全部组件与 Widgets 归 W1 B-AV。
 
 use crate::ui::ace_package_bridge::PackageStateEngine;
+use super::ace_route::{RouteAction, RouteNavigation, RouteTable};
+use super::ace_route_desktop::{DesktopRoutes, RouteHandlers, route_links};
 use crate::ui::ace_state_bridge::{
     AceStateEngine, AceStateValue, DispatchOutcome, EngineExecutionAudit,
 };
@@ -374,6 +376,24 @@ pub fn current_session<R>(f: impl FnOnce(&HostSession) -> R) -> Option<R> {
     let h = host().read().ok()?;
     let id = h.current?;
     h.sessions.iter().find(|s| s.id == id).map(f)
+}
+
+fn select_host_session(id: i32) {
+    let mut host = host().write().unwrap();
+    if host.get(id).is_some_and(|session| !session.closed) {
+        host.current = Some(id);
+    }
+}
+
+pub fn push_session_event(id: i32, instance: usize, target: usize) {
+    let mut host = host().write().unwrap();
+    if let Some(session) = host.get(id) {
+        if session.closed {
+            session.late_dropped += 1;
+        } else {
+            session.queue.push_back((instance, target));
+        }
+    }
 }
 
 /// 向当前 session 推入 typed 事件（窗口点击/脚本注入的同一队列边界）。
@@ -832,6 +852,7 @@ pub enum ScriptStep {
         instance: usize,
         target: usize,
     },
+    ClickPage { instance: usize, target: usize },
     /// PLAN-980 B-AV U01：文本输入事件（键入全文；目标=输入目标编号，
     /// 接 buttons 之后）。真实键入（窗口）与脚本注入同一边界。
     TypeText {
@@ -875,6 +896,9 @@ pub struct NodeDesktopBridge {
     /// 状态驱动的叶刷新。（PLAN-1106 T-05：源串与场景 op 历史随增量会话
     /// 接线退役——文本叶改由会话纯读 `AceStateEngine::read_texts`。）
     expanded_static: bool,
+    routes: Option<Box<DesktopRoutes>>,
+    route_actions: std::collections::BTreeMap<usize, RouteAction>,
+    route_request: Option<RouteNavigation>,
 }
 
 /// view 树投影：文本叶计数 + 按钮目标（label=StrLit、onclick=.Msg）+
@@ -1642,6 +1666,9 @@ impl NodeDesktopBridge {
             tick_no: 0,
             view_items: node.view.tree.clone(),
             expanded_static,
+            routes: None,
+            route_actions: Default::default(),
+            route_request: None,
         })
     }
 
@@ -1655,6 +1682,31 @@ impl NodeDesktopBridge {
     /// 边界（具名）：包面场景无 props/initials——实例种子为空；状态只含 int
     /// 字段；带载荷 dispatch 本片未接线；非 int 输入绑定在装载期具名拒。
     pub fn load_package(
+        units: Vec<PackageModuleInput>,
+        entry: &str,
+        instances: usize,
+    ) -> Result<Self, String> {
+        let unit = units.iter().find(|unit| format!("{}::{}", unit.package, unit.id) == entry)
+            .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
+        let candidates = project_component_candidates(&unit.source).map_err(|ds| diags(&ds))?;
+        let node = candidates.first()
+            .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
+        let Some(table) = RouteTable::from_root(node, &units, unit)? else {
+            return Self::load_package_leaf(units, entry, instances);
+        };
+        let links = route_links(node)?;
+        let prepared = super::ace_route::prepare_page(&unit.source, Some(&Default::default()))?;
+        let mut shell_units = table.entry_units(&units, entry);
+        let shell_unit = shell_units.iter_mut().find(|unit| format!("{}::{}", unit.package, unit.id) == entry)
+            .expect("entry was present in the package units");
+        shell_unit.source = prepared.source;
+        let mut bridge = Self::load_package_leaf(shell_units, entry, instances)?;
+        bridge.set_route_controls(prepared.commands, links);
+        bridge.routes = Some(Box::new(DesktopRoutes::new(table, units)));
+        Ok(bridge)
+    }
+
+    pub(super) fn load_package_leaf(
         units: Vec<PackageModuleInput>,
         entry: &str,
         instances: usize,
@@ -1743,7 +1795,33 @@ impl NodeDesktopBridge {
             tick_no: 0,
             view_items: node.view.tree.clone(),
             expanded_static: false,
+            routes: None,
+            route_actions: Default::default(),
+            route_request: None,
         })
+    }
+
+    pub(super) fn set_route_controls(&mut self, handlers: RouteHandlers, links: Vec<(String, String)>) {
+        for (index, button) in self.buttons.iter().enumerate() {
+            if let Some(action) = handlers.get(&button.msg) {
+                self.route_actions.insert(index, action.clone());
+            }
+        }
+        for (label, path) in links {
+            self.route_actions.insert(self.buttons.len(), RouteAction::literal(path));
+            self.buttons.push(ButtonSpec { label, msg: "navigate".into() });
+        }
+    }
+
+    pub(super) fn initialize_route_page(&mut self) -> Result<(), String> {
+        for instance in 0..self.instances {
+            match self.dispatch_event(instance, "Init", None) {
+                StepOutcome::Dispatched { .. } => {}
+                StepOutcome::DispatchRefused(error) | StepOutcome::LaneError(error) => return Err(error),
+                StepOutcome::Idle => return Err("page Init did not dispatch".into()),
+            }
+        }
+        Ok(())
     }
 
     /// 事件目标清单（声明序；测试/证据消费）。
@@ -1759,7 +1837,9 @@ impl NodeDesktopBridge {
     /// B-AV U01：文本输入事件注入（真实键入与脚本同一边界）——provider
     /// 队列取 (instance, target) 码、桥面 FIFO 配对键入全文。
     pub fn inject_text(&mut self, instance: usize, target: usize, text: &str) {
-        push_event(instance, target);
+        if let Some(session) = self.session {
+            push_session_event(session, instance, target);
+        }
         self.pending_texts
             .push_back((instance, target, text.to_string()));
     }
@@ -1767,7 +1847,16 @@ impl NodeDesktopBridge {
     /// open：AV `ui_open` → session；就位显示模型并提交文本叶与状态初值
     /// （FFI 实效果——UI 创建/提交效果经 provider 车道承载）。
     pub fn open(&mut self) -> Result<i32, String> {
-        self.open_lane(false)
+        let shell = self.open_lane(false)?;
+        if let Some(routes) = self.routes.as_mut() {
+            let result = routes.navigate(RouteNavigation::Push("/".to_string()), self.instances);
+            select_host_session(shell);
+            if let Err(error) = result {
+                let _ = self.close_for_shutdown();
+                return Err(error);
+            }
+        }
+        Ok(shell)
     }
 
     /// Open the frame layout and defer its values until a fresh event arrives.
@@ -1906,6 +1995,34 @@ impl NodeDesktopBridge {
     pub fn step(&mut self) -> StepOutcome {
         self.tick_no += 1;
         self.run_due_script();
+        let shell_outcome = self.step_lane();
+        let Some(routes) = self.routes.as_mut() else {
+            return shell_outcome;
+        };
+        let Some(shell_session) = self.session else {
+            return shell_outcome;
+        };
+        let (outcome, action) = if let Some(action) = self.route_request.take() {
+            (shell_outcome, Some(action))
+        } else if let (StepOutcome::Idle, Some(page)) = (&shell_outcome, routes.page_mut()) {
+            if let Some(session) = page.session {
+                select_host_session(session);
+            }
+            let outcome = page.step_lane();
+            (outcome, page.route_request.take())
+        } else {
+            (shell_outcome, None)
+        };
+        let result = action.map_or(Ok(()), |action| routes.navigate(action, self.instances));
+        select_host_session(shell_session);
+        if let Err(error) = result {
+            self.errors.push(error.clone());
+            return StepOutcome::LaneError(error);
+        }
+        outcome
+    }
+
+    fn step_lane(&mut self) -> StepOutcome {
         let Some(session) = self.session else {
             return StepOutcome::Idle;
         };
@@ -1926,6 +2043,18 @@ impl NodeDesktopBridge {
         }
         let instance = (code / 1000) as usize - 1;
         let target = (code % 1000) as usize - 1;
+        if let Some(action) = self.route_actions.get(&target) {
+            let Some(state) = self.last_states.get(instance) else {
+                return StepOutcome::DispatchRefused(format!("ace.route.event: unknown instance {instance}"));
+            };
+            return match action.native(state) {
+                Ok(navigation) => {
+                    self.route_request = Some(navigation);
+                    StepOutcome::Idle
+                }
+                Err(error) => StepOutcome::DispatchRefused(error),
+            };
+        }
         // B-AV U01：目标编号统一解析——buttons 段（0..buttons.len()）走
         // unit 点击；inputs 段（buttons.len() 起）走 typed 键入（载荷=桥面
         // FIFO 配对的键入全文；int 绑定桥面解析，非数值=非法输入具名拒零
@@ -2173,6 +2302,8 @@ impl NodeDesktopBridge {
         let Some(session) = self.session else {
             return Ok(());
         };
+        let route_result = self.routes.as_mut().map_or(Ok(()), |routes| routes.close());
+        self.route_request = None;
         let rc = av_call(&format!("ui_close(\"close\", {session}, 0)"))?;
         if rc != ui980_status::OK {
             return Err(format!("ui_close refused: {rc}"));
@@ -2181,7 +2312,7 @@ impl NodeDesktopBridge {
         // B-AV U01：键入配对随 session 关闭一并丢弃（provider 队列已清，
         // 残留文本会成为无码孤儿）。
         self.pending_texts.clear();
-        Ok(())
+        route_result
     }
 
     /// Release the host-owned copy at shutdown even when its provider refuses closure.
@@ -2216,6 +2347,11 @@ impl NodeDesktopBridge {
         for step in due {
             match step {
                 ScriptStep::Click { instance, target } => push_event(instance, target),
+                ScriptStep::ClickPage { instance, target } => {
+                    if let Some(session) = self.routes.as_ref().and_then(|routes| routes.page_session()) {
+                        push_session_event(session, instance, target);
+                    }
+                }
                 ScriptStep::TypeText {
                     instance,
                     target,
@@ -2301,6 +2437,7 @@ impl NodeDesktopBridge {
             .unwrap_or_default();
         serde_json::json!({
             "source_path": self.path,
+            "session": self.session,
             "node": self.node_name,
             "buttons": self.buttons.iter().map(|b| serde_json::json!({
                 "label": b.label, "msg": b.msg,
@@ -2312,6 +2449,7 @@ impl NodeDesktopBridge {
             "errors": self.errors,
             "sessions": sessions,
             "frames_rendered": NODE_DESKTOP_FRAMES.load(Ordering::Relaxed),
+            "routes": self.routes.as_ref().map(|routes| routes.evidence()),
         })
     }
 }
@@ -2355,6 +2493,8 @@ pub enum NodeDesktopMsg {
         instance: usize,
         target: usize,
     },
+    SessionClick { session: i32, instance: usize, target: usize },
+    SessionType { session: i32, instance: usize, target: usize },
     BridgeTick,
 }
 
@@ -2375,6 +2515,21 @@ impl Component for AceNodeDesktopWindow {
                 let text = crate::ui::iced::renderer::last_input_text();
                 with_bridge(|b| b.inject_text(instance, target, &text));
             }
+            NodeDesktopMsg::SessionClick { session, instance, target } => {
+                push_session_event(session, instance, target);
+            }
+            NodeDesktopMsg::SessionType { session, instance, target } => {
+                let text = crate::ui::iced::renderer::last_input_text();
+                with_bridge(|bridge| {
+                    if bridge.session == Some(session) {
+                        bridge.inject_text(instance, target, &text);
+                    } else if let Some(page) = bridge.routes.as_mut().and_then(|routes| routes.page_mut()) {
+                        if page.session == Some(session) {
+                            page.inject_text(instance, target, &text);
+                        }
+                    }
+                });
+            }
             NodeDesktopMsg::BridgeTick => {
                 with_bridge(|b| b.step());
             }
@@ -2391,28 +2546,64 @@ impl Component for AceNodeDesktopWindow {
 
     fn view(&self) -> View<Self::Msg> {
         NODE_DESKTOP_FRAMES.fetch_add(1, Ordering::Relaxed);
-        let Some(session) = current_session(|s| {
-            (
-                s.texts.clone(),
-                s.states.clone(),
-                s.buttons.clone(),
-                s.inputs.clone(),
-                s.generation,
-                s.visibility.clone(),
-                s.labels.clone(),
-            )
-        }) else {
+        let mounted = with_bridge(|bridge| {
+            bridge.routes.as_ref().map(|routes| {
+                (routes.outlet_after(), routes.page_session(), routes.error().map(str::to_owned))
+            })
+        }).flatten();
+        let Some(shell) = current_session(host_frame) else {
             return View::col()
                 .padding(30)
                 .child(View::text("ace-node-desktop: no session"))
                 .build();
         };
-        let (texts, states, buttons, inputs, generation, visibility, labels) = session;
-        let mut root = View::col().spacing(10).padding(24);
-        root = root.child(View::text_styled(
-            &format!("session generation {generation}"),
-            "text-sm",
-        ));
+        let outlet = mounted.map(|(after, page_id, diagnostic)| {
+            let page = page_id.and_then(|id| {
+                let host = host().read().ok()?;
+                host.sessions.iter().find(|session| session.id == id && !session.closed).map(host_frame)
+            });
+            let view = page.map(|frame| render_host_frame(frame, None))
+                .or_else(|| diagnostic.map(View::text))
+                .unwrap_or_else(View::empty);
+            (after, view)
+        });
+        View::col().padding(24).child(render_host_frame(shell, outlet)).build()
+    }
+}
+
+struct HostFrame {
+    id: i32,
+    generation: u64,
+    texts: Vec<Vec<String>>,
+    states: Vec<Vec<(String, String)>>,
+    buttons: Vec<(String, String)>,
+    inputs: Vec<(String, bool)>,
+    visibility: Vec<Vec<bool>>,
+    labels: Vec<Vec<String>>,
+}
+
+fn host_frame(session: &HostSession) -> HostFrame {
+    HostFrame {
+        id: session.id,
+        generation: session.generation,
+        texts: session.texts.clone(),
+        states: session.states.clone(),
+        buttons: session.buttons.clone(),
+        inputs: session.inputs.clone(),
+        visibility: session.visibility.clone(),
+        labels: session.labels.clone(),
+    }
+}
+
+fn render_host_frame(
+    frame: HostFrame,
+    mut outlet: Option<(usize, View<NodeDesktopMsg>)>,
+) -> View<NodeDesktopMsg> {
+    let HostFrame { id, generation, texts, states, buttons, inputs, visibility, labels } = frame;
+    let mut root = View::col().spacing(10).child(View::text_styled(
+        &format!("session generation {generation}"),
+        "text-sm",
+    ));
         for i in 0..texts.len().max(states.len()) {
             let mut col = View::col().spacing(6);
             col = col.child(View::text_styled(
@@ -2420,6 +2611,9 @@ impl Component for AceNodeDesktopWindow {
                 "text-lg font-semibold",
             ));
             for (leaf, text) in texts.get(i).into_iter().flatten().enumerate() {
+                if outlet.as_ref().is_some_and(|(after, _)| *after == leaf) {
+                    col = col.child(outlet.take().expect("outlet present").1);
+                }
                 // PLAN-104：条件分支的隐藏叶不渲染（可见性按实例状态求值）。
                 let shown = visibility
                     .get(i)
@@ -2447,7 +2641,8 @@ impl Component for AceNodeDesktopWindow {
                 col = col.child(
                     View::input(format!("{field}:"))
                         .value(value)
-                        .on_change(NodeDesktopMsg::Type {
+                        .on_change(NodeDesktopMsg::SessionType {
+                            session: id,
                             instance: i,
                             target: buttons.len() + idx,
                         })
@@ -2458,7 +2653,8 @@ impl Component for AceNodeDesktopWindow {
             for (target, (label, _msg)) in buttons.iter().enumerate() {
                 row = row.child(View::button_styled(
                     label.clone(),
-                    NodeDesktopMsg::Click {
+                    NodeDesktopMsg::SessionClick {
+                        session: id,
                         instance: i,
                         target,
                     },
@@ -2466,10 +2662,12 @@ impl Component for AceNodeDesktopWindow {
                 ));
             }
             col = col.child(row.build());
+            if let Some((_, page)) = outlet.take() {
+                col = col.child(page);
+            }
             root = root.child(col.build());
         }
         root.build()
-    }
 }
 
 /// MIN-A-UI 入口（`AUTO_UI_ENGINE=ace` 消费）：装载→open（FFI 实效果）→

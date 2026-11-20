@@ -1,0 +1,13 @@
+widget LibraryPage {
+    msg { Open }
+    model { var selected_id int = 17 }
+    view {
+        col {
+            text "Bookshelf page"
+            button "Open book" { onclick: .Open }
+        }
+    }
+    on {
+        .Open -> { router.push("/book/" + .selected_id.to_string()) }
+    }
+}

@@ -1,0 +1,13 @@
+widget App {
+    routes {
+        "/" -> use board
+    }
+    view {
+        col {
+            text "Kanban shell"
+            col {
+                outlet
+            }
+        }
+    }
+}

@@ -1,0 +1,15 @@
+widget ProjectBoard {
+    msg { Move }
+    model {
+        var moved int = 0
+    }
+    view {
+        col {
+            text "Board page"
+            button "Move card" { onclick: .Move }
+        }
+    }
+    on {
+        .Move -> { .moved = .moved + 1 }
+    }
+}

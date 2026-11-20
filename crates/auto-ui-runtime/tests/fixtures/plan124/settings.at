@@ -1,0 +1,8 @@
+widget PreferencesPage {
+    view {
+        col {
+            text "Settings page"
+            link (to: "/") { text "Library" }
+        }
+    }
+}

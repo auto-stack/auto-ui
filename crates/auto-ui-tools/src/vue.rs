@@ -3640,6 +3640,7 @@ pub struct VueProject {
     pub shadcn_components: Vec<String>,
     /// Whether routes are detected
     pub has_routes: bool,
+    pub ace_routed: bool,
     /// Generated App.vue code
     pub app_vue_code: String,
     /// PLAN-980 ④-A #7：ACE lane 产物的官方 a2x 运行时（Some=产品 lane 生成
@@ -3686,6 +3687,9 @@ impl VueProject {
     /// Generate router file with support for nested page directories.
     /// Maps route modules to actual file paths under src/pages/.
     pub fn generate_router_file(&self) -> String {
+        if self.ace_routed {
+            return ace_router_file(&self.routes);
+        }
         // Build a map from file stem -> pages subdirectory path
         // e.g., "login_01" -> "blocks/login_01"
         let mut page_paths: HashMap<String, String> = HashMap::new();
@@ -4133,7 +4137,8 @@ export default router
         // PLAN-980 ④-A #7：ACE 键在场时根 widget SFC 换产品 lane 产物；
         // 官方 rt 随 Self 携带（generate/regenerate 写盘点落 src/a2x_rt.mjs）。
         let mut ace_vue_rt: Option<String> = None;
-        if app_at.exists() {
+        let ace_route_product = ace_routed_front(&front_dir)?;
+        if app_at.exists() && ace_route_product.is_none() {
             match crate::shadcn_build::ui_build_shadcn_with_sub_widgets_and_stores_full(
                 app_at.to_str().unwrap(),
                 None,
@@ -4427,7 +4432,15 @@ export default router
         }
 
         let pages_dir = front_dir.join("pages");
-        if pages_dir.exists() {
+        let ace_routed = ace_route_product.is_some();
+        if let Some(product) = ace_route_product {
+            let root = ("".into(), "app".into(), product.app, product.name);
+            all_components.push(root);
+            all_routes.extend(product.routes);
+            for (module, sfc) in product.pages {
+                all_components.push(("pages".into(), module.clone(), sfc, module));
+            }
+        } else if pages_dir.exists() {
             scan_pages_dir(
                 &pages_dir,
                 &front_dir,
@@ -4959,6 +4972,7 @@ export default router
             has_routes,
             app_vue_code,
             ace_vue_rt,
+            ace_routed,
             mini_face: root_widget_name_minis,
             components: all_components,
             routes: all_routes,
@@ -7654,7 +7668,8 @@ pub fn incremental_compile_changed(
     // Phase 2: Check app.at for changes (with sub-widget names known)
     let app_at = front_dir.join("app.at");
     let app_output_path = output_dir.join("src").join("App.vue");
-    if app_at.exists() {
+    let ace_route_product = ace_routed_front(&front_dir)?;
+    if app_at.exists() && ace_route_product.is_none() {
         if let Ok(content) = fs::read_to_string(&app_at) {
             let hash = hash_string(&content);
             let source_changed = cache.is_dirty(&app_at, hash);
@@ -7807,9 +7822,22 @@ pub fn incremental_compile_changed(
         }
     }
 
-    // Phase 4: Check pages/ directory for changes
+    // Phase 4: Check pages/ directory for changes.
     let pages_dir = front_dir.join("pages");
-    if pages_dir.exists() {
+    if let Some(product) = ace_route_product {
+        let src = output_dir.join("src");
+        let router = src.join("router/index.ts");
+        let mut queue = |path: PathBuf, code: String, name: String| {
+            if fs::read_to_string(&path).ok().as_deref() != Some(&code) {
+                changed_files.push((path, code, name));
+            }
+        };
+        queue(src.join("App.vue"), product.app, product.name);
+        queue(router, ace_router_file(&product.routes), "router".into());
+        for (module, sfc) in product.pages {
+            queue(src.join("pages").join(format!("{module}.vue")), sfc, module);
+        }
+    } else if pages_dir.exists() {
         if let Ok(entries) = fs::read_dir(&pages_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -8099,6 +8127,83 @@ fn handle_compile_error_with_dep_shape(
 /// 返回 `Ok(None)`=键未设（legacy 生成道逐字不变）；`Ok(Some((sfc, rt)))`
 /// =产品产物。lane 缺席/生成失败=**具名拒绝**（run 键下双轨收紧——不静默
 /// 落 legacy）；工具未按 `--features ace-vue` 构建同样具名拒绝。
+struct AceRoutedFront {
+    app: String,
+    name: String,
+    pages: std::collections::BTreeMap<String, String>,
+    routes: Vec<AuraRoute>,
+}
+
+fn ace_routed_front(front_dir: &Path) -> AutoResult<Option<AceRoutedFront>> {
+    #[cfg(feature = "ace-vue")]
+    {
+        if std::env::var("AUTO_UI_ACE_VUE").ok().as_deref() != Some("1") {
+            return Ok(None);
+        }
+        let app_at = front_dir.join("app.at");
+        if !app_at.is_file() {
+            return Ok(None);
+        }
+        let source = fs::read_to_string(&app_at)?;
+        let session = auto_lang_core::session::CompilerSession::ui();
+        let mut parser = auto_lang_core::parser::Parser::from(&source).with_session(session);
+        let is_routed = parser
+            .parse_domain(&auto_ui_dialect::UiDialect)
+            .ok()
+            .map(auto_ui_dialect::UiCode)
+            .is_some_and(|ast| {
+                ast.domain_stmts().any(|stmt| {
+                    matches!(stmt, auto_ui_dialect::UiStmt::WidgetDecl(widget)
+                        if widget.routes.as_ref().is_some_and(|routes| !routes.routes.is_empty()))
+                })
+            });
+        if !is_routed {
+            return Ok(None);
+        }
+        let mut modules = Vec::new();
+        VueProject::collect_at_files_recursive(&front_dir.join("pages"), &mut modules);
+        for entry in fs::read_dir(front_dir)? {
+            let path = entry?.path();
+            if path != app_at && path.file_name().is_some_and(|name| name != "pac.at")
+                && path.extension().is_some_and(|ext| ext == "at")
+            {
+                modules.push(path);
+            }
+        }
+        modules.sort();
+        let product = auto_ui_runtime::ui::ace_package_sfc::generate_routed_front_sfc(
+            &app_at, &source, &modules,
+        )?
+        .ok_or_else(|| format!("ace.route.admission: {} routes were not projected", app_at.display()))?;
+        Ok(Some(AceRoutedFront {
+            app: product.app,
+            name: product.app_name,
+            pages: product.pages,
+            routes: product.paths.into_iter().map(|(path, module)| AuraRoute {
+                widget_name: module.clone(),
+                path,
+                module,
+                params: Vec::new(),
+            }).collect(),
+        }))
+    }
+    #[cfg(not(feature = "ace-vue"))]
+    {
+        let _ = front_dir;
+        Ok(None)
+    }
+}
+
+fn ace_router_file(routes: &[AuraRoute]) -> String {
+    let rows = routes.iter().map(|route| {
+        let path = serde_json::to_string(&route.path).expect("serialize route path");
+        let module = serde_json::to_string(&format!("@/pages/{}.vue", route.module))
+            .expect("serialize route module");
+        format!("  {{ path: {path}, component: () => import({module}) }}")
+    }).collect::<Vec<_>>().join(",\n");
+    format!("import {{ createRouter, createWebHashHistory }} from 'vue-router'\n\nexport default createRouter({{\n  history: createWebHashHistory(),\n  strict: true,\n  sensitive: true,\n  routes: [\n{rows}\n  ],\n}})\n")
+}
+
 struct AceVueProducts {
     /// 声明序逐 widget（name, sfc；首件=根/App 位）。
     widgets: Vec<(String, String)>,
@@ -13064,6 +13169,7 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
             has_routes: false,
             app_vue_code: String::new(),
             ace_vue_rt: None,
+            ace_routed: false,
             mini_face: None,
             components: vec![],
             routes: vec![],
@@ -13101,6 +13207,7 @@ styles: ["src/front/autodown-editor.css", "src/front/theme.css"]
             has_routes: false,
             app_vue_code: String::new(),
             ace_vue_rt: None,
+            ace_routed: false,
             mini_face: None,
             components: vec![],
             routes: vec![],
@@ -13223,6 +13330,7 @@ widget App {
             has_routes: false,
             app_vue_code: String::new(),
             ace_vue_rt: None,
+            ace_routed: false,
             mini_face: None,
             components: vec![],
             routes: vec![],
@@ -13261,6 +13369,7 @@ widget App {
             has_routes: false,
             app_vue_code: String::new(),
             ace_vue_rt: None,
+            ace_routed: false,
             mini_face: None,
             components: vec![],
             routes: vec![],

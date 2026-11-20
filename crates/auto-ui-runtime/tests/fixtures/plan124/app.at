@@ -1,0 +1,22 @@
+widget App {
+    routes {
+        "/" -> use bookshelf
+        "/book/:id" -> use book_detail
+        "/settings" -> use settings
+        "/missing" -> use missing
+        "/broken" -> use broken
+    }
+
+    view {
+        col {
+            text "Reader shell"
+            link (to: "/book/17") { text "Book 17" }
+            link (to: "/book/42") { text "Book 42" }
+            sidebar_menu_button (to: "/settings", exact: true) { text "Settings" }
+            link (to: "/unknown") { text "Unmatched" }
+            link (to: "/missing") { text "Missing" }
+            link (to: "/broken") { text "Broken" }
+            outlet
+        }
+    }
+}

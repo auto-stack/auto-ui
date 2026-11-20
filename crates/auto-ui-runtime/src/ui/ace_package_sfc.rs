@@ -11,11 +11,110 @@
 //! 字段/算术/比较/helper 调用表达式；f-string/backtick 文本叶与列表/存储/
 //! 组件引用不在本刀（`source.age.sfc-*` 具名拒）。
 use ace_core::source::packages::PackageModuleInput;
+use super::ace_route::{RouteSource, RouteTable, prepare_page};
 
 use crate::ui::ace_package_lane::PackageFragmentLane;
 
 /// 生成一份可直接挂载的 Vue SFC（template + script setup）。
 pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result<String, String> {
+    if let Some(product) = generate_routed_package_sfcs(units, entry)? {
+        return Ok(product.app);
+    }
+    generate_package_sfc_leaf(units, entry, None, false)
+}
+
+/// Publish the app and page SFCs together. The project supplies the Vue Router
+/// instance with the same module aliases as the declared routes.
+pub struct RoutedPackageSfc {
+    pub app: String,
+    pub app_name: String,
+    pub pages: std::collections::BTreeMap<String, String>,
+    pub paths: Vec<(String, String)>,
+}
+
+/// Resolve a routed app from the standard front/app.at and front/pages layout.
+pub fn generate_routed_front_sfc(
+    app_at: &std::path::Path,
+    source: &str,
+    modules: &[std::path::PathBuf],
+) -> Result<Option<RoutedPackageSfc>, String> {
+    let unit = |id: String, source: String| PackageModuleInput {
+        package: "app".into(),
+        version: "1.0.0".into(),
+        id,
+        source,
+        provider: None,
+    };
+    let mut units = vec![unit("app".into(), source.into())];
+    for module in modules {
+        if let Some(id) = module.file_stem().and_then(|name| name.to_str()) {
+            let source = std::fs::read_to_string(module)
+                .map_err(|error| format!("ace.route.module: {}: {error}", module.display()))?;
+            units.push(unit(id.into(), source));
+        }
+    }
+    generate_routed_package_sfcs(&units, "app::app")
+        .map_err(|error| format!("{}: {error}", app_at.display()))
+}
+
+pub fn generate_routed_package_sfcs(
+    units: &[PackageModuleInput],
+    entry: &str,
+) -> Result<Option<RoutedPackageSfc>, String> {
+    let shell = units.iter().find(|unit| format!("{}::{}", unit.package, unit.id) == entry)
+        .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
+    let candidates = age_component_candidates(&shell.source)?;
+    let root = candidates.first().ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
+    let Some(table) = RouteTable::from_root(root, units, shell)? else {
+        return Ok(None);
+    };
+
+    let app = generate_route_file(&table, units, entry, true)?;
+    let mut pages = std::collections::BTreeMap::new();
+    let mut paths = Vec::new();
+    for route in table.routes() {
+        // A failed page component is per declaration so its diagnostic keeps
+        // the originating pattern when multiple routes use the same alias.
+        let result = route.page.as_ref().map_err(Clone::clone).and_then(|page| {
+            generate_route_file(&table, units, page, false).map_err(|error| {
+                format!("ace.route.page: pattern {:?} module {:?}: {error}", route.pattern, route.module)
+            })
+        });
+        let name = match result {
+            Ok(sfc) => {
+                pages.insert(route.module.clone(), sfc);
+                route.module.clone()
+            }
+            Err(diagnostic) => {
+                let name = format!("ace-route-error-{}", paths.len());
+                pages.insert(name.clone(), format!("<template><pre>{}</pre></template>\n", escape_html(&diagnostic)));
+                name
+            }
+        };
+        paths.push((route.pattern.clone(), name));
+    }
+    Ok(Some(RoutedPackageSfc { app, app_name: root.name.name.clone(), pages, paths }))
+}
+
+fn generate_route_file(
+    table: &RouteTable,
+    units: &[PackageModuleInput],
+    entry: &str,
+    shell: bool,
+) -> Result<String, String> {
+    let mut scoped = table.entry_units(units, entry);
+    let unit = scoped.first_mut().ok_or_else(|| format!("route entry `{entry}` is missing"))?;
+    let context = prepare_page(&unit.source, None)?;
+    unit.source = context.source.clone();
+    generate_package_sfc_leaf(&scoped, entry, Some(context), shell)
+}
+
+fn generate_package_sfc_leaf(
+    units: &[PackageModuleInput],
+    entry: &str,
+    route: Option<RouteSource>,
+    shell: bool,
+) -> Result<String, String> {
     let entry_src = units
         .iter()
         .find(|u| format!("{}::{}", u.package, u.id) == entry)
@@ -99,10 +198,30 @@ pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result
     }
     let mut script = String::new();
     script.push_str("import { ref } from 'vue'\n");
+    if let Some(route) = &route {
+        script.push_str("import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'\n");
+        script.push_str("const aceRoute = useRoute()\nconst aceRouter = useRouter()\n");
+        if !route.commands.is_empty() {
+            script.push_str("import { onBeforeUnmount } from 'vue'\nlet aceRouteActive = true\nonBeforeUnmount(() => { aceRouteActive = false })\n");
+        }
+        if route.has_init {
+            script.push_str("import { onMounted } from 'vue'\n");
+        }
+        if !route.web_params.is_empty() {
+            script.push_str("function aceParam(key, kind) {\n  const value = aceRoute.params[key];\n  if (typeof value !== 'string') throw new Error('ace.route.param: missing ' + key);\n  if (kind === 'str') return value;\n  const number = Number(value);\n  if (!/^[+-]?\\d+$/.test(value) || !Number.isInteger(number) || number < -2147483648 || number > 2147483647) throw new Error('ace.route.param: invalid int for ' + key);\n  return number;\n}\n");
+        }
+    }
     for (name, js) in &inits {
-        script.push_str(&format!("const {name} = ref({js})\n"));
+        if let Some((key, kind)) = route.as_ref().and_then(|route| route.web_params.get(name)) {
+            script.push_str(&format!("const {name} = ref(aceParam({key:?}, {kind:?}))\n"));
+        } else {
+            script.push_str(&format!("const {name} = ref({js})\n"));
+        }
     }
     for (msg, assigns) in &component.handler_assigns {
+        if route.as_ref().is_some_and(|route| route.commands.contains_key(msg)) {
+            continue;
+        }
         let fn_name = handler_fn_name(msg);
         script.push_str(&format!("function {fn_name}() {{\n"));
         for (field, rhs) in assigns {
@@ -127,6 +246,16 @@ pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result
         }
         script.push_str("}\n");
     }
+    if let Some(route) = &route {
+        for (message, action) in &route.commands {
+            let handler = handler_fn_name(message);
+            let operation = action.vue();
+            script.push_str(&format!("function {handler}() {{ if (aceRouteActive) {operation}; }}\n"));
+        }
+        if route.has_init {
+            script.push_str("onMounted(onInit)\n");
+        }
+    }
     // helper 定义在 handler 之后统一发射（函数声明提升；遍历 helper_fns 已是全集）。
     for helper in &helper_fns {
         // a2x_fn_* = 包内函数（lane 发射定义）；其余 a2x_* 是 runtime helper，
@@ -141,6 +270,7 @@ pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result
     let state_entries: Vec<String> = component
         .fields
         .iter()
+        .filter(|(name, _)| !route.as_ref().is_some_and(|route| route.web_params.contains_key(name)))
         .map(|(name, _)| format!("{name}: {name}.value"))
         .collect();
     script.push_str(&format!(
@@ -150,7 +280,7 @@ pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result
 
     // ---- template ----
     let mut template = String::new();
-    let mut ctx = TmplCtx { out: &mut template };
+    let mut ctx = TmplCtx { out: &mut template, routed: route.is_some(), shell };
     ctx.push_str("<div class=\"age-sfc\">");
     render_items(&node.view.tree, &mut ctx)?;
     ctx.push_str("</div>");
@@ -162,6 +292,8 @@ pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result
 
 struct TmplCtx<'a> {
     out: &'a mut String,
+    routed: bool,
+    shell: bool,
 }
 
 impl TmplCtx<'_> {
@@ -447,6 +579,28 @@ fn render_items(
                 }
             }
             ComponentViewItem::Element(el) => {
+                if ctx.shell && el.tag == "outlet" {
+                    ctx.push_str(r#"<RouterView v-slot="{ Component, route }"><component v-if="Component" :is="Component" :key="route.path" /><pre v-else>ace.route.no-match: no route for {{ route.path }}</pre></RouterView>"#);
+                    continue;
+                }
+                if ctx.routed && matches!(el.tag.as_str(), "link" | "sidebar_menu_button") {
+                    let target = el.items.iter().find_map(|item| match item {
+                        ComponentViewItem::Entry(entry) if entry.key == "to" => match &entry.value {
+                            ComponentEntryValue::Expr(expr) => Some(expr),
+                            _ => None,
+                        },
+                        _ => None,
+                    });
+                    if let Some(target) = target {
+                        ctx.push_str(&format!("<RouterLink :to=\"{}\">", escape_attr(&expr_to_template_js(target)?)));
+                        if let Some(label) = &el.label {
+                            ctx.push_str(&format!("{{{{ {} }}}}", expr_to_template_js(label)?));
+                        }
+                        render_items(&el.items, ctx)?;
+                        ctx.push_str("</RouterLink>");
+                        continue;
+                    }
+                }
                 let tag = match el.tag.as_str() {
                     "col" => "div",
                     "row" => "div",
@@ -598,7 +752,7 @@ mod p980_cond_render_tests {
 
     fn render(items: &[ComponentViewItem]) -> String {
         let mut out = String::new();
-        let mut ctx = TmplCtx { out: &mut out };
+        let mut ctx = TmplCtx { out: &mut out, routed: false, shell: false };
         render_items(items, &mut ctx).expect("render ok");
         out
     }

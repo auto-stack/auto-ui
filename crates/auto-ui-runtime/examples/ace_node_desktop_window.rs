@@ -165,10 +165,14 @@ fn parse_script(spec: &str) -> Vec<(usize, ScriptStep)> {
         };
         let action = fields.next().unwrap_or("");
         let step = match action {
-            "click" => {
+            "click" | "pageclick" => {
                 let instance = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
                 let target = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
-                ScriptStep::Click { instance, target }
+                if action == "pageclick" {
+                    ScriptStep::ClickPage { instance, target }
+                } else {
+                    ScriptStep::Click { instance, target }
+                }
             }
             // B-AV U01：键入事件——tick:type:实例:目标:文本（文本=余段，
             // 不含逗号；中文可用）。

@@ -75,3 +75,7 @@ required-features = ["ace-vue"]
 name = "plan980_010_form_short"
 path = "tests/plan980_010_form_short.rs"
 required-features = ["ace-vue"]
+
+[[test]]
+name = "plan124_ace_vue_routes"
+required-features = ["ace-vue"]

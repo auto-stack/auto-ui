@@ -227,6 +227,10 @@ wry = { version = "=0.57.0", optional = true }
 #（lib --test 目标触发 rustc ICE，PLAN-617 T-16债务 P617-D1 原注释随迁）；
 # required-features 与 auto-lang 侧原声明逐位一致。
 [[test]]
+name = "plan124_routes"
+required-features = ["ace-bridge"]
+
+[[test]]
 name = "mpv_engine"
 path = "tests/mpv_engine.rs"
 required-features = ["mpv-native"]
