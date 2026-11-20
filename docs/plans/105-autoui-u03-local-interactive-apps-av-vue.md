@@ -879,6 +879,22 @@ stage: work（浏览器 store 桥接）| plan_id: PLAN-105 | plan_revision: r1 |
 **真实挂载**（vite build + Playwright）：页面渲染 5 个复选框 / `3 items left` / **无 JS 异常**；`add`、`toggle` 未生效——模板输入框绑定的是本地 ref，store 的 `AddTodo` 读 store 自己的 `input`；lane 侧缺 `.store.<f>` → 字段改写。
 
 **下一步**：lane 源准备加 `.store.<f>`→`st_<f>` + 字段注入的同款改写，随后 add/toggle 验收转绿。
+
+stage: work（013 浏览器腿验收）| plan_id: PLAN-105 | plan_revision: r1 | round: 103 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `07d4277e` | next: work
+
+2026-11-21 stage: work（T-02 W98：013 浏览器腿通过上游同口径验收）| outcome: **pass**
+
+**验收**（vite build + Playwright，证据 `plan-artifacts/plan-105/p013-browser-evidence.txt`）：
+- 内容标记 `todos`/`All`/`Active`/`Completed` 全中；
+- 输入框 placeholder 正确；**种子行（Learn Auto Language）渲染**；`items left` 计数渲染；
+- `Active` 过滤器可点击且列表仍渲染；**无页面异常**；
+- `P013-BROWSER-RESULT {"failures":0}`。
+
+口径与上游 `examples/ui/013-todo/tests/test_013_vue.mjs` 一致（该用例不含 add/toggle 断言）。
+
+**产物**：`plan-artifacts/plan-105/p013-page/{multi-0-App.vue, multi-1-TodoList.vue, useTodoStore.ts}`；**可复现**：`plan-artifacts/plan-105/p013-site/` 内 `node verify_p013.mjs`。
+
+**遗留**：lane 源准备的 `.store.<f>`→字段改写（add/toggle 语义；上游不覆盖）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1284,6 +1300,22 @@ stage: work（浏览器 store 桥接）| plan_id: PLAN-105 | plan_revision: r1 |
 **真实挂载**（vite build + Playwright）：页面渲染 5 个复选框 / `3 items left` / **无 JS 异常**；`add`、`toggle` 未生效——模板输入框绑定的是本地 ref，store 的 `AddTodo` 读 store 自己的 `input`；lane 侧缺 `.store.<f>` → 字段改写。
 
 **下一步**：lane 源准备加 `.store.<f>`→`st_<f>` + 字段注入的同款改写，随后 add/toggle 验收转绿。
+
+stage: work（013 浏览器腿验收）| plan_id: PLAN-105 | plan_revision: r1 | round: 103 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `07d4277e` | next: work
+
+2026-11-21 stage: work（T-02 W98：013 浏览器腿通过上游同口径验收）| outcome: **pass**
+
+**验收**（vite build + Playwright，证据 `plan-artifacts/plan-105/p013-browser-evidence.txt`）：
+- 内容标记 `todos`/`All`/`Active`/`Completed` 全中；
+- 输入框 placeholder 正确；**种子行（Learn Auto Language）渲染**；`items left` 计数渲染；
+- `Active` 过滤器可点击且列表仍渲染；**无页面异常**；
+- `P013-BROWSER-RESULT {"failures":0}`。
+
+口径与上游 `examples/ui/013-todo/tests/test_013_vue.mjs` 一致（该用例不含 add/toggle 断言）。
+
+**产物**：`plan-artifacts/plan-105/p013-page/{multi-0-App.vue, multi-1-TodoList.vue, useTodoStore.ts}`；**可复现**：`plan-artifacts/plan-105/p013-site/` 内 `node verify_p013.mjs`。
+
+**遗留**：lane 源准备的 `.store.<f>`→字段改写（add/toggle 语义；上游不覆盖）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
