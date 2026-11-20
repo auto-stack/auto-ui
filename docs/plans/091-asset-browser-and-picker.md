@@ -161,6 +161,15 @@ T-04新`examples/asset-picker/`及授权资源provider夹具，T-05新`crates/au
 精确 unblock：运行时 owner 修复 VM 派发队列投递丢失（MCP press 的 delivery 计数器已可观测）；修复后 T-05 剩余腿（stale/visual/029/vue 轨）在本门（--runs 3）内完成，预计无组件侧改动。
 已保全：组件/示例/门全部提交于 codex/ui-091-asset-browser（14dd89d2 + 门韧性 + dlg_open 守卫）；计划/decisions 同步。当前 5/8（T-05 part，blocked on runtime）。
 
+2026-11-20（续3）：stage: goal（work 第4轮）；from: work | to: work | outcome: blocked（同前，运行时缺陷族扩大证据）；worktree: D:/autostack/.wt/ui-091/auto-ui | code: db76e0ad | next: work（待运行时 owner）。
+达成：invalidate 触发改搜索通道（text=invalidate 高成功率链）+ stale 段对话框内触发 + close_picker_retry + 树行走查 row 校验 + 段间独立 try；**native 门 14/14 全绿复现两次**（final2 四轮连绿 sha 92e2172c4cb51838；r53 双轮连绿 sha 13f1a9a9dcaa4f6f，均含 V-06 截图腿）。
+运行时缺陷族扩大（同根异面，全部实录于 plan-artifacts/plan-091/probe/boot029_*.log 与 bisect029*）：
+1) P-4 delivery=0 窗（按压 handler 命中而派发队列为 0，数十秒窗，空间/频率隔离无效）；
+2) **029 LBrace 间歇解析竞态**：同一 app.at 多次 boot，LBrace 出现约 50%（boot029_1/4 有、2/3 无；二分排除包内容——空 widget 也复现、清 AutoCache、换 cache root 均无效；对照 boot2 'tool host closed the control stream' 双次生成 Rust server 竞态）。
+两者的共同面 = tool host/VM 消息传输与生成管线并发。组件侧修复已尽（P-1 remedy 全量 + 门韧性），继续在驱动层打补丁收益归零。
+精确 unblock：运行时 owner 修复（a）VM 派发队列投递丢失（delivery 计数器可观测）、(b) split 模式 front 解析与生成管线并发竞态；修复后本门 --runs 2 即可完成 stale/visual 后半/029 腿（组件侧预计零改动），随后 vue 轨、T-06/07/08。
+已保全：全部代码/门/证据提交（db76e0ad）；native 门最佳证据 final2 报告 sha 92e2172c4cb51838 与 r53 报告 sha 13f1a9a9dcaa4f6f 存 plan-artifacts/plan-091/。当前 5/8（T-05 part，blocked on runtime）。
+
 ## 10. 待澄清事项
 
 r2已固定provider查询和确认反馈协议；T-01验证真实事件/状态接线、Gallery读回、依赖解析与runner。没有阻碍立项的用户决策。多选、模型/音视频深度预览和导入服务保留后续需求，不通过本计划偷偷扩大范围；越界服务依赖需明确owner。
