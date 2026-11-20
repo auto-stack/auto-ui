@@ -1,6 +1,6 @@
-# PLAN-094 规范增量提案
+# PromptDialog 文本输入对话框
 
-拟沉淀到 `docs/specs/ui/prompt-dialog.md`，对应 SD-01 和 SD-02。
+来源为 PLAN-094 r3 的 SD-01 和 SD-02。实现见[正式包](../../../packages/prompt-dialog/README.md)和[名称管理示例](../../../examples/prompt-dialog/README.md)。
 
 ## 包及应用责任
 
