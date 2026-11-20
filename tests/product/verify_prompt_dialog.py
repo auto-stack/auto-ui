@@ -483,7 +483,7 @@ def demo_ime(session):
     session.wait_text("notebook-7: 读书日志", "已保存 1 次")
 
 
-def demo_visual(session):
+def demo_visual_light(session):
     session.press("重命名笔记本")
     session.enter_text("Notes", "笔记本名称")
     session.key("Enter")
@@ -491,6 +491,9 @@ def demo_visual(session):
     session.screenshot("light-duplicate")
     session.press("取消")
     session.wait_text("已取消笔记本重命名")
+
+
+def demo_visual_dark(session):
     session.press("切换明暗")
     session.press("重命名分组")
     session.enter_text(" ", "分组名称")
@@ -639,14 +642,11 @@ def file_manager_rename(session):
     occupied = digest(directory / "occupied.txt")
     file_manager_menu(session, "old.txt")
     session.press("重命名")
-    session.enter_text("occupied.txt", "名称")
-    session.key("Enter")
     expected = "已存在同名项目" if session.browser is None else "写操作仅在 VM 轨可用"
-    session.wait_text(expected)
-    assert digest(directory / "old.txt") == original and digest(directory / "occupied.txt") == occupied
-    session.enter_text("new.txt", "名称")
+    conflict = session.args.case == "file-rename-conflict"
+    session.enter_text("occupied.txt" if conflict else "new.txt", "名称")
     session.key("Enter")
-    if session.browser is None:
+    if session.browser is None and not conflict:
         session.wait_text("new.txt", absent=("old.txt",))
         assert not (directory / "old.txt").exists()
         assert digest(directory / "new.txt") == original
@@ -654,6 +654,7 @@ def file_manager_rename(session):
         session.wait_text(expected)
         assert digest(directory / "old.txt") == original and not (directory / "new.txt").exists()
         session.press("取消")
+    assert digest(directory / "occupied.txt") == occupied
 
 
 def file_manager_create(session):
@@ -765,13 +766,15 @@ CASES = {
     "cancel": demo_cancel,
     "tab": demo_tab,
     "ime": demo_ime,
-    "visual": demo_visual,
+    "visual-light": demo_visual_light,
+    "visual-dark": demo_visual_dark,
     "pending": demo_pending,
     "system": demo_system,
     "reopen": reopened_controls,
     "nested": nested_modal_fences_lower_controls_and_wraps_focus,
     "scroll": scroll_long_dialog_keeps_footer_reachable,
     "file-rename": file_manager_rename,
+    "file-rename-conflict": file_manager_rename,
     "file-create": file_manager_create,
     "file-write-rejected": file_creation_rejected,
     "file-folder-rejected": file_creation_rejected,
