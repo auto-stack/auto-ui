@@ -234,6 +234,18 @@ AutoLang 准备 5.65 s，最后重链 1.83 s。AutoUI 测试准备 44.10 s、探
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 6 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 6e8f8d89, lang defb95510 | evidence: checked original Carousel page in a route replay with five Embla previews and real browser interactions | next: work`
 
+**Carousel 的 Iced 实际组件（T-03/T-04 进行中）。** AutoUI `f5ea801f0fab4d9d0d2a4786a3a85627accad714`，AutoLang `defb95510`。沿现有 AGE 桌面控件树和窗口消息实现独立滑页状态、横竖布局、响应式 `basis` 可见数量、方向键、边界、循环、鼠标拖拽和焦点。AccessKit 区域名称、可见滑页顺序与按钮可用性从同一状态导出。页面仍为固定 AutoOS 原页，原文 SHA256 与 round 6 相同。
+
+| 执行 | 结果 | 墙钟执行 |
+|---|---|---:|
+| `auto_ui_runtime` 的 `ui::ace_node_desktop::widgets` | 5/5，新增覆盖循环可见顺序、无障碍焦点和点击、纵轴、拖拽消息及 700/900 px 断点 | 0.119 s |
+| 生产运行时示例，`ace_node_desktop_window --package` 原页及会话关闭脚本 | exit 0，12 帧，零错误会话关闭，JSON SHA256 `3333d0f0c607e9e2b3a25c6a9497e6d6c389ec02834daf6f86c421fb2b25ebf7` | 1.946 s |
+| 原页真窗加材料驱动，调用挂载控件的实际 keyboard、MouseArea 和 AccessKit 消息入口 | exit 0，8 帧，五组可见项分别为 1/3/2/2/3，Basic 键盘到第 2 项、拖拽回调到第 3 项并禁用下一页；竖向到第 2/3 项，循环回绕至第 5/1/2 项。关闭后无可访问树，捕获的晚到 Carousel 回调拒绝 1 次，零错误 | 2.141 s |
+
+测试增量准备 19.25 s。普通 debug 示例的 Windows 主线程默认栈在原页实际渲染时报 `STATUS_STACK_OVERFLOW`，材料命令用 `cargo rustc --locked --offline -p auto-ui-runtime --features ace-bridge --example ace_node_desktop_window -- -C link-arg=/STACK:67108864`，沿 `auto-ui-tool` 已有 64 MiB 主栈口径，最终准备 11.62 s。材料驱动链接 4.42 s，发现/清理未单计。回放 JSON `iced-carousel-replay-final.json` SHA256 `63dc2bd6620f585381f28a97fa759ad0334508686a4dd661de26662a156a55ca`，日志 `iced-carousel-replay-final.log` SHA256 `722e469e43502ab9f0079cc1ec0cc4d67763c56d875e4c694fbb0b79410de310`。Computer Use 找到测试窗口，激活失败，重新观察确认 Windows 锁屏。现场物理指针及键盘输入待解锁复测，官方画廊组件闭包继续沿共享基面恢复。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 7 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui f5ea801f, lang defb95510 | evidence: original Carousel page mounts and dispatches five preview controls through the live Iced widget and accessibility message paths | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
