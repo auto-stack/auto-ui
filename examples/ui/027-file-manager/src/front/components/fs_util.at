@@ -337,3 +337,12 @@ pub fn app_for_ext(ext str) str {
     }
     return ""
 }
+// The dialog accepts arbitrary text. File Manager requires one local path entry.
+pub fn valid_entry_name(name str) bool {
+    return name != "" && name != "." && name != ".." &&
+        !name.ends_with(" ") && !name.ends_with(".") &&
+        !name.contains("/") && !name.contains("\\") && !name.contains(":") &&
+        !name.contains("*") && !name.contains("?") && !name.contains("\"") &&
+        !name.contains("<") && !name.contains(">") && !name.contains("|") &&
+        !name.contains("\r") && !name.contains("\n") && !name.contains("\t")
+}

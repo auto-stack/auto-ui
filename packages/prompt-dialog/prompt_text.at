@@ -1,0 +1,17 @@
+// The public contract trims only these four ASCII characters. Boundary
+// offsets are measured in the same units as the backend's string slicing.
+fn prompt_trim(text str) str {
+    var start int = 0
+    var end int = text.len()
+    while start < end {
+        let ch str = text.substr(start, 1)
+        if ch != " " && ch != "\t" && ch != "\r" && ch != "\n" { break }
+        start = start + 1
+    }
+    while end > start {
+        let ch str = text.substr(end - 1, 1)
+        if ch != " " && ch != "\t" && ch != "\r" && ch != "\n" { break }
+        end = end - 1
+    }
+    return text.substr(start, end - start)
+}

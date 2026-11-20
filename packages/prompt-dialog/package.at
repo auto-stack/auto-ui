@@ -1,0 +1,4 @@
+name: "prompt-dialog"
+version: "0.1.0"
+namespace: "auto"
+description: "Controlled in-app text prompt"

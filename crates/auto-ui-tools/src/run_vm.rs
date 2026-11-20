@@ -337,8 +337,10 @@ pub fn run_vm_ui_flow(
             // api.rs + types.rs from #[api] annotations (idempotent).
             // PLAN-734 T-06：Err 传播（split 生成失败不再 warn 后仍启动——
             // start_api_server 内的二次生成同错误也会硬传，此处提前终结）。
-            auto_web::generate_api(project_dir, "rust")
-                .map_err(|e| format!("Failed to generate Rust backend: {}", e))?;
+            if std::env::var("AUTO_REUSE_BACKEND").as_deref() != Ok("require") {
+                auto_web::generate_api(project_dir, "rust")
+                    .map_err(|e| format!("Failed to generate Rust backend: {}", e))?;
+            }
             let child = match start_api_server(project_dir) {
                 Ok(child) => child,
                 // PLAN-026 T-05: ready 失败显式中止(不进组件构建/Init)。

@@ -1,0 +1,145 @@
+use auto.json
+use themes.themes: Auto
+
+widget App {
+    use { package: prompt_dialog from "../../../../packages/prompt-dialog" }
+
+    msg { Init, ToggleTheme, RenameNotebook, RenameGroup, SaveNotebook(str), SaveGroup(str), CancelNotebook(str), CancelGroup(str), FinishNotebook, Exit }
+
+    model {
+        var dark_mode bool = false
+        var theme_name str = "Auto"
+        var runtime_track str = ""
+        var notebook_open bool = false
+        var notebook_name str = "Inbox"
+        var notebook_revision int = 0
+        var notebook_reply str = ""
+        var notebook_busy bool = false
+        var notebook_request str = ""
+        var group_open bool = false
+        var group_name str = "Research"
+        var group_revision int = 0
+        var group_reply str = ""
+        var changes int = 0
+        var status_text str = ""
+    }
+
+    timer { FinishNotebook (every_ms: 600, when: .notebook_busy) }
+
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
+    }
+
+    view {
+        col (style: "w-full h-full p-4 gap-4 bg-background text-foreground") {
+            row (style: "items-center justify-between gap-2") {
+                text "名称管理" { style: "text-lg font-semibold" }
+                button "切换明暗" { onclick: .ToggleTheme }
+            }
+            col (style: "rounded-md border border-border p-4 gap-2") {
+                text "笔记本" { style: "text-sm font-semibold" }
+                text f"notebook-7: ${.notebook_name}"
+                text "notebook-8: Notes"
+                button "重命名笔记本" { onclick: .RenameNotebook }
+            }
+            col (style: "rounded-md border border-border p-4 gap-2") {
+                text "分组" { style: "text-sm font-semibold" }
+                text f"group-1: ${.group_name}"
+                button "重命名分组" { onclick: .RenameGroup }
+            }
+            text f"已保存 ${.changes} 次" { style: "text-sm text-muted-foreground" }
+            if .status_text != "" {
+                text .status_text { style: "text-sm text-muted-foreground" }
+            }
+            if .runtime_track == "vm" { button "退出示例" { onclick: .Exit } }
+
+            PromptDialog (open: .notebook_open, contextId: "notebook-7", revision: .notebook_revision,
+                title: "重命名笔记本", description: "输入笔记本的新名称。",
+                label: "笔记本名称", placeholder: "例如 Reading journal", acceptLabel: "重命名",
+                initialValue: .notebook_name, pending: .notebook_busy, response: .notebook_reply,
+                onsubmitRequested: .SaveNotebook, oncancelled: .CancelNotebook) {}
+            PromptDialog (open: .group_open, contextId: "group-1", revision: .group_revision,
+                title: "重命名分组", description: "输入分组的新名称。",
+                label: "分组名称", placeholder: "例如 项目分类", acceptLabel: "保存分组",
+                initialValue: .group_name, trimInput: true, response: .group_reply,
+                onsubmitRequested: .SaveGroup, oncancelled: .CancelGroup) {}
+        }
+    }
+
+    on {
+        .Init -> { .runtime_track = Env.track() }
+        .ToggleTheme -> { .dark_mode = !.dark_mode }
+        .RenameNotebook -> {
+            .notebook_reply = ""
+            .notebook_open = true
+        }
+        .RenameGroup -> {
+            .group_reply = ""
+            .group_open = true
+        }
+        .SaveNotebook(payload) -> {
+            let request = json.parse(payload)
+            if .notebook_open && !.notebook_busy && request.contextId == "notebook-7" && request.baseRevision == .notebook_revision {
+                .notebook_request = payload
+                .notebook_busy = true
+            }
+        }
+        .FinishNotebook -> {
+            if .notebook_busy {
+                let request = json.parse(.notebook_request)
+                if .notebook_open && request.contextId == "notebook-7" && request.baseRevision == .notebook_revision {
+                    if request.value == "Notes" {
+                        .notebook_reply = json.stringify({
+                            instanceToken: request.instanceToken, session: request.session, seq: request.seq,
+                            contextId: request.contextId, status: "rejected", message: "名称 Notes 已存在", retryable: false
+                        })
+                    } else {
+                        .notebook_reply = json.stringify({
+                            instanceToken: request.instanceToken, session: request.session, seq: request.seq,
+                            contextId: request.contextId, status: "accepted", message: "", retryable: false
+                        })
+                        .notebook_name = request.value
+                        .notebook_revision = .notebook_revision + 1
+                        .changes = .changes + 1
+                        .status_text = "笔记本名称已保存"
+                        .notebook_open = false
+                    }
+                }
+                .notebook_busy = false
+                .notebook_request = ""
+            }
+        }
+        .SaveGroup(payload) -> {
+            let request = json.parse(payload)
+            if .group_open && request.contextId == "group-1" && request.baseRevision == .group_revision {
+                .group_reply = json.stringify({
+                    instanceToken: request.instanceToken, session: request.session, seq: request.seq,
+                    contextId: request.contextId, status: "accepted", message: "", retryable: false
+                })
+                .group_name = request.value
+                .group_revision = .group_revision + 1
+                .changes = .changes + 1
+                .status_text = "分组名称已保存"
+                .group_open = false
+            }
+        }
+        .CancelNotebook(payload) -> {
+            let request = json.parse(payload)
+            if .notebook_open && !.notebook_busy && request.contextId == "notebook-7" && request.baseRevision == .notebook_revision {
+                .notebook_open = false
+                .status_text = "已取消笔记本重命名"
+            }
+        }
+        .CancelGroup(payload) -> {
+            let request = json.parse(payload)
+            if .group_open && request.contextId == "group-1" && request.baseRevision == .group_revision {
+                .group_open = false
+                .status_text = "已取消分组重命名"
+            }
+        }
+        .Exit -> {
+            if .runtime_track == "vm" { Process.exit(0) }
+        }
+    }
+}

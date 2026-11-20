@@ -35,3 +35,7 @@ dep themes {
 dep collection_view {
     path: "../../../packages/collection-view"
 }
+
+dep prompt_dialog {
+    path: "../../../packages/prompt-dialog"
+}

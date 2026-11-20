@@ -7408,7 +7408,9 @@ fn start_api_server_inner(
     // AUTO_REUSE_BACKEND=1 且端口已有活监听时直接复用——不杀（Plan 354 的
     // kill 会打断产品链先起好的真后端）、不重生成、不再 spawn 生成的
     // axum stub。缺省行为不变（kill + 重生成 + spawn）。
-    if clear_port && std::env::var("AUTO_REUSE_BACKEND").as_deref() == Ok("1") {
+    let reuse = std::env::var("AUTO_REUSE_BACKEND");
+    let require_prepared = reuse.as_deref() == Ok("require");
+    if clear_port && matches!(reuse.as_deref(), Ok("1" | "require")) {
         let port = crate::util::http_port();
         let probe_addr: std::net::SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
         if std::net::TcpStream::connect_timeout(&probe_addr, std::time::Duration::from_secs(1))
@@ -7425,6 +7427,9 @@ fn start_api_server_inner(
                     port
                 );
             } else {
+                if require_prepared {
+                    return Err("prepared API backend has stale generation metadata".into());
+                }
                 println!(
                     "  ⛔ Backend port {} serves a STALE generation (source hash mismatch) — regenerating",
                     port
@@ -7435,6 +7440,9 @@ fn start_api_server_inner(
                 std::env::set_var("AUTO_HTTP_BASE", format!("http://127.0.0.1:{}", port));
             }
             return Ok(None);
+        }
+        if require_prepared {
+            return Err(format!("prepared API backend is unavailable on port {port}"));
         }
     }
     // PLAN-007 T-03/T-05：无 back 契约（src/back/api.at | back/ | pac

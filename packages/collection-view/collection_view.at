@@ -142,7 +142,8 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                     try {
                         ."viewModeRequested"(json.stringify({seq: .seq, instanceToken: token, scopeId: scope, baseRevision: base, viewMode: mode}))
                     } catch {}
-                    if .focus_requested && Env.track() == "vm" { .RestoreFocus() }
+                    let track str = Env.track()
+                    if .focus_requested && track == "vm" { .RestoreFocus() }
                 }
             }
         }
@@ -154,7 +155,8 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                     try {
                         ."sortRequested"(json.stringify({seq: .seq, instanceToken: token, scopeId: scope, baseRevision: base, sortKey: key}))
                     } catch {}
-                    if .focus_requested && Env.track() == "vm" { .RestoreFocus() }
+                    let track str = Env.track()
+                    if .focus_requested && track == "vm" { .RestoreFocus() }
                 }
             }
         }

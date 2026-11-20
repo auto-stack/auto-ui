@@ -1,0 +1,14 @@
+name: "prompt-dialog-demo"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "PromptDialog 名称管理"
+window: "420x560"
+
+dep prompt_dialog {
+    path: "../../packages/prompt-dialog"
+}
+
+dep themes {
+    path: "../../packages/themes"
+}

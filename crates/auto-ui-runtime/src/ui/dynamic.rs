@@ -3492,71 +3492,37 @@ impl DynamicComponent {
 
         // Run the handler via VM. call_handler_for looks up the namespaced fn.
         let mut args: Vec<auto_val::Value> = payload;
-        // Plan 370 (Issue 4): input events (oninput/onupdate) carry the typed
-        // text in `input_value`. If there are no payload-encoded args, pass the
-        // input_value as a string argument so handlers like
-        // `.EditTitle(t) -> { .edit_title = t }` receive it as parameter `t`.
-        if args.is_empty() {
-            if let Some(text) = &input_value {
-                // Audit B12(b): only pass the typed text as a handler argument
-                // when the handler DECLARES a parameter. A phantom arg at a
-                // no-param handler (e.g. 013-todo's `onenter: .AddTodo`) shifts
-                // the VM call frame — the handler's later state writes land on
-                // a garbage object id. Unknown arity keeps the legacy behavior.
-                let param_count = self.bridge.handler_param_count(widget_name, &clean_name);
-                let declares_param = param_count.map(|n| n > 0).unwrap_or(true);
-                // Plan 446 批四 B3: 多参 handler 的输入分发显式化。输入文本
-                // 只能作为第一实参，其余参数（循环变量/$event 等）无从取得——
-                // 此前静默置换，handler 以错位实参运行（os-config 被迫"输入框
-                // handler 一律单参"）。现改为诊断 + 丢弃该次分发（不调用），
-                // 错误可定位而非静默腐坏。
-                if let Some(n) = param_count {
-                    if n > 1 {
-                        eprintln!(
-                            "[VM-INPUT] {}.{} declares {} params — typed text can only fill the 1st; \
-                             remaining args have no source (plan-446 B3). Dropping this input dispatch. \
-                             Use a single-param handler (+ Apply) or pass args explicitly.",
-                            if widget_name.is_empty() { &self.widget_name } else { widget_name },
-                            clean_name, n
-                        );
-                        return;
+        // A text event may carry static arguments from the rendered binding
+        // followed by one live text argument. Never add text to a full call
+        // frame (including a zero-argument onenter).
+        if let Some(text) = &input_value {
+            let bound = args.len();
+            let param_count = self.bridge.handler_param_count(widget_name, &clean_name);
+            if param_count.is_some_and(|count| count > bound + 1) {
+                eprintln!(
+                    "[VM-INPUT] {}.{} needs more parameters than the binding and text can provide",
+                    widget_name, clean_name
+                );
+                return;
+            }
+            if param_count.map_or(bound == 0, |count| count == bound + 1) {
+                let types = self.bridge.handler_param_types(widget_name, &clean_name);
+                let tag = types.as_ref().and_then(|types| types.get(bound));
+                let as_text = || auto_val::Value::Str(text.clone().into());
+                let coerced = match tag.map(|tag| tag.as_str()) {
+                    Some("int" | "i64" | "uint" | "u64" | "usize" | "byte") => {
+                        text.trim().parse::<i32>().map(auto_val::Value::Int).unwrap_or_else(|_| as_text())
                     }
-                }
-                if declares_param {
-                    // PLAN-046 F-3: coerce the input string by the handler's
-                    // DECLARED payload type (msg-block variant, e.g.
-                    // `ItemCtx(int)`). A raw Str arg aborts typed handlers
-                    // (027 file-manager's fixture-driven ItemCtx/OpenItem
-                    // probes); unknown declarations keep legacy Str.
-                    let coerced = self
-                        .bridge
-                        .handler_param_types(widget_name, &clean_name)
-                        .and_then(|types| types.first().cloned())
-                        .map(|tag| match tag.as_str() {
-                            // Int width matters: the UI VM pipeline tags
-                            // ints as Value::Int(i32) (decode_payload "i"
-                            // arm) — an I64 arg decodes as 0 inside the
-                            // handler frame (027 ItemCtx probe: ctx_id
-                            // stuck at 0 with args=[I64(n)]).
-                            "int" | "i64" | "uint" | "u64" | "usize" | "byte" => text
-                                .trim()
-                                .parse::<i32>()
-                                .map(auto_val::Value::Int)
-                                .unwrap_or_else(|_| auto_val::Value::Str(text.clone().into())),
-                            "float" | "double" => text
-                                .trim()
-                                .parse::<f64>()
-                                .map(auto_val::Value::Float)
-                                .unwrap_or_else(|_| auto_val::Value::Str(text.clone().into())),
-                            "bool" => auto_val::Value::Bool(matches!(
-                                text.trim(),
-                                "true" | "1" | "on" | "yes"
-                            )),
-                            _ => auto_val::Value::Str(text.clone().into()),
-                        })
-                        .unwrap_or_else(|| auto_val::Value::Str(text.clone().into()));
-                    args.push(coerced);
-                }
+                    Some("float" | "double") => {
+                        text.trim().parse::<f64>().map(auto_val::Value::Float).unwrap_or_else(|_| as_text())
+                    }
+                    Some("bool") => auto_val::Value::Bool(matches!(
+                        text.trim(),
+                        "true" | "1" | "yes"
+                    )),
+                    _ => as_text(),
+                };
+                args.push(coerced);
             }
         }
         let is_trace = clean_name == "DeleteNote"

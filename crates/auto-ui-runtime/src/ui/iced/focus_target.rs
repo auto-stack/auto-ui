@@ -424,3 +424,33 @@ pub fn guarded_focus<T>(
         expected,
     }
 }
+
+pub fn guarded_select_all<T>(
+    target: iced::widget::Id,
+    generation: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    expected: u64,
+) -> impl widget::Operation<T> {
+    struct SelectAll {
+        target: iced::widget::Id,
+        generation: std::sync::Arc<std::sync::atomic::AtomicU64>,
+        expected: u64,
+    }
+    impl<T> widget::Operation<T> for SelectAll {
+        fn text_input(
+            &mut self,
+            id: Option<&iced::widget::Id>,
+            _bounds: Rectangle,
+            state: &mut dyn widget::operation::TextInput,
+        ) {
+            if id == Some(&self.target)
+                && self.generation.load(std::sync::atomic::Ordering::Acquire) == self.expected
+            {
+                state.select_all();
+            }
+        }
+        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn widget::Operation<T>)) {
+            operate(self);
+        }
+    }
+    SelectAll { target, generation, expected }
+}

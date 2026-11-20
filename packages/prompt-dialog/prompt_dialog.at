@@ -1,0 +1,183 @@
+use auto.json
+use prompt_text: prompt_trim
+
+widget PromptDialog (open: bool = false, contextId: str = "", revision: int = 0, title: str = "", description: str = "", label: str = "", placeholder: str = "", acceptLabel: str = "确定", cancelLabel: str = "取消", initialValue: str = "", required: bool = true, trimInput: bool = false, pending: bool = false, errorMessage: str = "", response: str = "") {
+    msg { Tick, Edit(str, str), Submit(str), Close(str, str), "submitRequested"(str), "cancelled"(str), "error"(str) }
+
+    model {
+        var interval int = 50
+        var instance_token str = ""
+        var session int = 0
+        var seq int = 0
+        var phase str = "closed"
+        var binding str = ""
+        var bindings List = []
+        var target str = ""
+        var base_revision int = 0
+        var base_value str = ""
+        var draft str = ""
+        var trimmed_draft str = ""
+        var seen_response str = ""
+        var rejection str = ""
+        var edit_required bool = false
+        var config_code str = ""
+        var config_message str = ""
+        var seen_accept_label str = ""
+        var seen_cancel_label str = ""
+    }
+
+    computed {
+        ready => .open && .phase == "editing" && !.pending && .target == .contextId && .base_revision == .revision && .base_value == .initialValue
+        invalid => .required && .trimmed_draft == ""
+        confirm_disabled => !.open || .phase != "editing" || .pending || .target != .contextId || .base_revision != .revision || .base_value != .initialValue || .edit_required || .config_code != "" || (.required && .trimmed_draft == "")
+        field_caption => if .label == "" { "名称" } else { .label }
+        heading => if .title == "" { "输入名称" } else { .title }
+        confirm_caption => if .config_code == "empty-accept-label" { "确定" } else { .acceptLabel }
+        dismiss_caption => if .config_code == "empty-cancel-label" { "取消" } else { .cancelLabel }
+    }
+
+    view {
+        for action_binding in .bindings key: action_binding {
+            dialog (open: .open, onclose: .Close(action_binding, "escape"), closeOnOutside: false) {
+                dialog-content (showCloseButton: false, style: "w-full max-w-md max-h-[90vh] overflow-y-auto p-4 gap-2 rounded-md") {
+                    dialog-header (style: "gap-2") {
+                        dialog-title .heading
+                        if .description != "" {
+                            dialog-description .description
+                        }
+                    }
+                    col (style: "gap-2 [&_input]:h-8") {
+                        text .field_caption { style: "text-sm font-medium" }
+                        input (value: .draft + "", placeholder: .placeholder, label: .field_caption,
+                            oninput: .Edit(action_binding, $event), onenter: .Submit(action_binding), disabled: !.ready) {}
+                        if .config_message != "" {
+                            text .config_message { style: "text-sm text-foreground pl-2 border-l-2 border-destructive" }
+                        }
+                        if .invalid {
+                            text "请输入名称" { style: "text-sm text-foreground pl-2 border-l-2 border-destructive" }
+                        }
+                        if .rejection != "" {
+                            text .rejection { style: "text-sm text-foreground pl-2 border-l-2 border-destructive" }
+                        }
+                        if .errorMessage != "" && .target == .contextId && .base_revision == .revision && .base_value == .initialValue {
+                            text .errorMessage { style: "text-sm text-foreground pl-2 border-l-2 border-destructive" }
+                        }
+                        if .pending || .phase == "submitting" || .phase == "accepted" {
+                            text "正在提交…" { style: "text-sm text-muted-foreground" }
+                        }
+                    }
+                    dialog-footer (style: "gap-2") {
+                        button .dismiss_caption { onclick: .Close(action_binding, "cancel"), disabled: !.ready, style: "h-8 rounded-md" }
+                        button .confirm_caption {
+                            onclick: .Submit(action_binding)
+                            disabled: .confirm_disabled
+                            style: if .confirm_disabled { "h-8 rounded-md bg-muted text-foreground" } else { "h-8 rounded-md bg-primary text-primary-foreground" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    on {
+        .Tick -> {
+            if .instance_token == "" { .instance_token = str.uuid() }
+
+            var code str = ""
+            var message str = ""
+            if prompt_trim(.acceptLabel) == "" {
+                code = "empty-accept-label"
+                message = "确认按钮需要可读的名称"
+            } else if prompt_trim(.cancelLabel) == "" {
+                code = "empty-cancel-label"
+                message = "取消按钮需要可读的名称"
+            }
+            if .acceptLabel != .seen_accept_label || .cancelLabel != .seen_cancel_label || code != .config_code {
+                .seen_accept_label = .acceptLabel
+                .seen_cancel_label = .cancelLabel
+                .config_code = code
+                .config_message = message
+                if code != "" { ."error"(json.stringify({code: code, message: message})) }
+            }
+
+            if !.open {
+                if .phase != "closed" {
+                    .bindings = []
+                    .binding = ""
+                    .phase = "closed"
+                }
+                .seen_response = .response
+            } else {
+                let same_target bool = .target == .contextId
+                let same_base bool = same_target && .base_revision == .revision && .base_value == .initialValue
+                if .phase == "submitting" && same_target && .response != "" && .response != .seen_response {
+                    .seen_response = .response
+                    try {
+                        let feedback = json.parse(.response)
+                        if feedback.instanceToken == .instance_token && feedback.session == .session && feedback.seq == .seq && feedback.contextId == .target {
+                            if feedback.status == "accepted" {
+                                .phase = "accepted"
+                            } else if feedback.status == "rejected" && same_base {
+                                .phase = "editing"
+                                .rejection = feedback.message
+                                .edit_required = feedback.retryable == false
+                            }
+                        }
+                    } catch {
+                        // A malformed response never settles the active request.
+                    }
+                }
+
+                let awaiting_close bool = (.phase == "accepted" || .phase == "cancelled") && same_target
+                if .phase == "closed" || (!same_base && !awaiting_close) {
+                    if .phase == "closed" { .session = .session + 1 }
+                    .target = .contextId
+                    .base_revision = .revision
+                    .base_value = .initialValue
+                    .draft = .initialValue
+                    .trimmed_draft = prompt_trim(.initialValue)
+                    .rejection = ""
+                    .edit_required = false
+                    .seen_response = .response
+                    .phase = "editing"
+                    .binding = str.uuid()
+                    .bindings = [.binding]
+                }
+            }
+        }
+
+        .Edit(action_binding, value) -> {
+            if action_binding == .binding && .ready && value != .draft {
+                .draft = value
+                .trimmed_draft = prompt_trim(value)
+                .edit_required = false
+                .rejection = ""
+            }
+        }
+
+        .Submit(action_binding) -> {
+            if action_binding == .binding && !.confirm_disabled {
+                // Set the lock before notifying the application. The response
+                // must echo this mount, session, target, and request.
+                .phase = "submitting"
+                .seq = .seq + 1
+                let value str = if .trimInput { .trimmed_draft } else { .draft }
+                ."submitRequested"(json.stringify({
+                    instanceToken: .instance_token, session: .session, seq: .seq,
+                    contextId: .target, baseRevision: .base_revision, value: value
+                }))
+            }
+        }
+
+        .Close(action_binding, reason) -> {
+            if action_binding == .binding && .ready {
+                .phase = "cancelled"
+                .seq = .seq + 1
+                ."cancelled"(json.stringify({
+                    instanceToken: .instance_token, session: .session, seq: .seq,
+                    contextId: .target, baseRevision: .base_revision, reason: reason
+                }))
+            }
+        }
+    }
+}

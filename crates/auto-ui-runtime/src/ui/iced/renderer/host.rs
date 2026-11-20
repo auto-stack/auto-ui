@@ -4326,7 +4326,7 @@ fn run_session(
                         .iter()
                         .find(|c| c.is_input)
                         .or_else(|| scoped.first())
-                        .map(|c| c.id.clone());
+                        .map(|c| (c.id.clone(), c.is_input));
                     let requested_restore = state.app.mcp_activation_focus.borrow_mut().take();
                     let restore = state.app.modal_restore.clone();
                     let guard = state.app.modal_focus_generation.clone();
@@ -4344,14 +4344,24 @@ fn run_session(
                                 }
                                 first
                                     .clone()
-                                    .map(|target| {
-                                        iced::advanced::widget::operate(
+                                    .map(|(target, select_text)| {
+                                        let focus = iced::advanced::widget::operate(
                                             crate::ui::iced::focus_target::guarded_focus(
+                                                target.clone(),
+                                                guard.clone(),
+                                                generation,
+                                            ),
+                                        );
+                                        if !select_text {
+                                            return focus;
+                                        }
+                                        focus.chain(iced::advanced::widget::operate(
+                                            crate::ui::iced::focus_target::guarded_select_all(
                                                 target,
                                                 guard.clone(),
                                                 generation,
                                             ),
-                                        )
+                                        ))
                                     })
                                     .unwrap_or_else(iced::Task::none)
                             },

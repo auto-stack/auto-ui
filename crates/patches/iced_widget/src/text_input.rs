@@ -1049,6 +1049,10 @@ where
 
                     match modified_key.as_ref() {
                         keyboard::Key::Named(key::Named::Enter) => {
+                            if state.preedit.as_ref().is_some_and(|preedit| !preedit.content.is_empty()) {
+                                shell.capture_event();
+                                return;
+                            }
                             if let Some(on_submit) = self.on_submit.clone() {
                                 shell.publish(on_submit);
                                 shell.capture_event();
@@ -1233,6 +1237,10 @@ where
                             shell.capture_event();
                         }
                         keyboard::Key::Named(key::Named::Escape) => {
+                            if state.preedit.as_ref().is_some_and(|preedit| !preedit.content.is_empty()) {
+                                shell.capture_event();
+                                return;
+                            }
                             state.is_focused = None;
                             state.is_dragging = None;
                             state.is_pasting = None;
@@ -1291,6 +1299,7 @@ where
                     let state = state::<Renderer>(tree);
 
                     if let Some(focus) = &mut state.is_focused {
+                        state.preedit = None;
                         let Some(on_input) = &self.on_input else {
                             return;
                         };

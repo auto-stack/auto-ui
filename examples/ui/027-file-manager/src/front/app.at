@@ -13,7 +13,7 @@
 //   （PLAN-016 crates 扩展；旧宿主二进制该列显示 "--"）
 // - 持久化：storage.get/set 保持视图模式、排序字段、排序方向与隐藏文件状态
 
-use components.fs_util: format_size, type_label, hidden_name, fmt_date, app_for_ext, is_image_ext, parent_of, base_name, ext_of, build_crumbs, sort_files
+use components.fs_util: format_size, type_label, hidden_name, fmt_date, app_for_ext, is_image_ext, parent_of, base_name, ext_of, build_crumbs, sort_files, valid_entry_name
 use components.collection_items: fm_collection_items, fm_path_index
 use back.api: fs_list, fs_home, fs_drives
 use auto.process
@@ -36,6 +36,7 @@ style search_input = "w-full text-xs px-3 py-2 bg-background border border-borde
 style row_gap3 = "items-center gap-3"
 
 widget App {
+    use { package: prompt_dialog from "../../../../../packages/prompt-dialog" }
     use { package: collection_view from "../../../../../packages/collection-view" }
     use { package: official from "./components" }
 
@@ -47,9 +48,9 @@ widget App {
         CollectionMode(str), CollectionSort(str), CollectionSelection(str), CollectionAction(str),
         CollectionItem(str, bool), PublishCollection,
         CrumbsExpand,
-        StartRename(int), SetEditName(str), CommitRename, CancelRename,
+        StartRename(int), BeginName(str, str, str), CommitName(str), CancelName(str),
         ItemCtx(int), CtxClose, CtxOpen, CtxRename, CtxCopy, CtxCut, CtxPaste, CtxDelete,
-        NewFolderOpen, NewFileOpen, NewModalClose, SetNewName(str), CommitNew,
+        NewFolderOpen, NewFileOpen,
         ConfirmDelete(int), ExecuteDelete, CancelDelete
     }
 
@@ -114,19 +115,17 @@ widget App {
         var selected_path str = ""
         var selected_name str = ""
         var selected_info str = "未选中任何项目"
-        var editing_id int = -1
-        var edit_name str = ""
-        var rename_open bool = false
-        var rename_path str = ""            // StartRename 捕获（排序后 id 会漂移）
+        var name_dialog_open bool = false
+        var name_dialog_mode str = ""
+        var name_dialog_initial str = ""
+        var name_dialog_context str = ""
+        var name_dialog_directory str = ""
+        var name_dialog_revision int = 0
+        var name_dialog_response str = ""
 
         // 右键和显式菜单按钮共同指向当前目录中的目标。
         var ctx_id int = -1
         var ctx_name str = ""
-
-        // ---- 新建文件/文件夹模态（alert-dialog）----
-        var new_modal_open bool = false
-        var new_modal_type str = "folder"   // "folder" | "file"
-        var new_modal_name str = ""
 
         // ---- 删除确认模态（alert-dialog）----
         var confirm_del_open bool = false
@@ -462,52 +461,14 @@ widget App {
             // 模态弹层（PLAN-016 T-03：alert-dialog，025-sys-monitor 形态）
             // ══════════════════════════════════════════════════════════════
 
-            // 1. 新建文件/文件夹
-            alert-dialog (open: .new_modal_open) {
-                alert-dialog-content {
-                    alert-dialog-header {
-                        if .new_modal_type == "folder" {
-                            alert-dialog-title "新建文件夹"
-                            alert-dialog-description "在当前目录下创建一个新的子文件夹"
-                        } else {
-                            alert-dialog-title "新建文件"
-                            alert-dialog-description "在当前目录下创建一个新的空文件"
-                        }
-                    }
-                    input {
-                        value: .new_modal_name
-                        oninput: .SetNewName
-                        onenter: .CommitNew
-                        placeholder: "请输入名称..."
-                        style: search_input
-                    }
-                    alert-dialog-footer {
-                        alert-dialog-cancel "取消" { onclick: .NewModalClose }
-                        alert-dialog-action "创建" { onclick: .CommitNew }
-                    }
-                }
-            }
-
-            // 2. 重命名
-            alert-dialog (open: .rename_open) {
-                alert-dialog-content {
-                    alert-dialog-header {
-                        alert-dialog-title "重命名"
-                        alert-dialog-description f"将「${.selected_name}」重命名为："
-                    }
-                    input {
-                        value: .edit_name
-                        oninput: .SetEditName
-                        onenter: .CommitRename
-                        placeholder: "请输入新名称..."
-                        style: search_input
-                    }
-                    alert-dialog-footer {
-                        alert-dialog-cancel "取消" { onclick: .CancelRename }
-                        alert-dialog-action "重命名" { onclick: .CommitRename }
-                    }
-                }
-            }
+            PromptDialog (open: .name_dialog_open, contextId: .name_dialog_context, revision: .name_dialog_revision,
+                title: if .name_dialog_mode == "rename" { "重命名" } else { if .name_dialog_mode == "folder" { "新建文件夹" } else { "新建文件" } },
+                description: if .name_dialog_mode == "rename" { "输入选中项目的新名称。" } else { "在当前目录下创建一个项目。" },
+                label: "名称", placeholder: "请输入名称",
+                acceptLabel: if .name_dialog_mode == "rename" { "重命名" } else { "创建" },
+                initialValue: .name_dialog_initial, response: .name_dialog_response,
+                errorMessage: if .is_vm == "vm" { "" } else { "写操作仅在 VM 轨可用" },
+                onsubmitRequested: .CommitName, oncancelled: .CancelName) {}
 
             // 3. 删除确认
             alert-dialog (open: .confirm_del_open) {
@@ -684,7 +645,6 @@ widget App {
                     .selected_id = -1
                     .selected_name = ""
                     .selected_info = "未选中任何项目"
-                    .editing_id = -1
                     .ctx_id = -1
 
                     // 维护历史栈
@@ -832,7 +792,6 @@ widget App {
                         .selected_id = -1
                         .selected_name = ""
                         .selected_info = "未选中任何项目"
-                        .editing_id = -1
                         .ctx_id = -1
 
                         // 历史栈（VM 轨同款维护）
@@ -1170,58 +1129,76 @@ widget App {
             }
         }
 
-        // ---- 重命名（alert-dialog 模态；T-06 真实 fs.rename）----
         .StartRename(id) -> {
             if id >= 0 && id < .files_view.len() {
-                let r = .files_view[id]
-                .editing_id = id
-                .edit_name = r.name
-                .rename_path = r.path
-                .selected_name = r.name
-                .rename_open = true
+                let item = .files_view[id]
+                .selected_name = item.name
+                .BeginName("rename", item.path, item.name)
             }
         }
 
-        .SetEditName(name) -> {
-            .edit_name = name
+        .BeginName(mode, context, initial) -> {
+            .name_dialog_mode = mode
+            .name_dialog_context = context
+            .name_dialog_directory = .current_path
+            .name_dialog_initial = initial
+            .name_dialog_revision = .name_dialog_revision + 1
+            .name_dialog_response = ""
+            .name_dialog_open = true
         }
 
-        .CommitRename -> {
-            let old_path str = .rename_path
-            .rename_open = false
-            // PLAN-684 rev7：vue 轨读盘无写面（fs.rename 等 VM native）——
-            // 写操作统一守卫，后端写端点为后续债务（债册 P684 登记）。
-            if .is_vm != "vm" {
-                toast("写操作仅在 VM 轨可用 — 请使用 auto run -r vm")
-                .editing_id = -1
-                .rename_path = ""
-            } else {
-            if .editing_id >= 0 && .edit_name != "" && old_path != "" {
-                let new_path str = fs.join(.current_path, .edit_name)
-                if new_path == old_path {
-                    // 未改名
+        .CommitName(payload) -> {
+            let request = json.parse(payload)
+            if .name_dialog_open && request.contextId == .name_dialog_context && request.baseRevision == .name_dialog_revision {
+                let name str = request.value
+                let target str = .name_dialog_context
+                var problem str = ""
+                var retryable bool = false
+                if .is_vm != "vm" {
+                    problem = "写操作仅在 VM 轨可用"
+                } else if .name_dialog_directory != .current_path || !file.exists(target) {
+                    problem = "项目或目录已变化，请关闭对话框后重新选择"
+                } else if !valid_entry_name(name) {
+                    problem = "请输入有效的文件或文件夹名称"
                 } else {
-                    if file.exists(new_path) {
-                        toast.error("已存在同名项目: " + .edit_name)
-                    } else {
-                        fs.rename(old_path, new_path)
-                        toast.success("已重命名为: " + .edit_name)
+                    let destination str = fs.join(.name_dialog_directory, name)
+                    if .name_dialog_mode != "rename" || destination != target {
+                        if file.exists(destination) {
+                            problem = "已存在同名项目: " + name
+                        } else {
+                            try {
+                                if .name_dialog_mode == "rename" {
+                                    fs.rename(target, destination)
+                                } else if .name_dialog_mode == "folder" {
+                                    file.create_dir(destination)
+                                } else {
+                                    file.write_text(destination, "")
+                                }
+                            } catch {
+                                problem = "操作失败，请检查权限或项目是否正在使用"
+                                retryable = true
+                            }
+                        }
                     }
                 }
-                .editing_id = -1
-                .rename_path = ""
-                .NavTo(.current_path)
-            } else {
-                .editing_id = -1
-                .rename_path = ""
-            }
+                .name_dialog_response = json.stringify({
+                    instanceToken: request.instanceToken, session: request.session, seq: request.seq,
+                    contextId: request.contextId, status: if problem == "" { "accepted" } else { "rejected" },
+                    message: problem, retryable: retryable
+                })
+                if problem == "" {
+                    .name_dialog_open = false
+                    .name_dialog_revision = .name_dialog_revision + 1
+                    .NavTo(.current_path)
+                }
             }
         }
 
-        .CancelRename -> {
-            .editing_id = -1
-            .rename_path = ""
-            .rename_open = false
+        .CancelName(payload) -> {
+            let request = json.parse(payload)
+            if .name_dialog_open && request.contextId == .name_dialog_context && request.baseRevision == .name_dialog_revision {
+                .name_dialog_open = false
+            }
         }
 
         // ---- 条目菜单 ----
@@ -1320,51 +1297,9 @@ widget App {
             }
         }
 
-        // ---- 新建模态（T-06 真实落盘）----
-        .NewFolderOpen -> {
-            .new_modal_type = "folder"
-            .new_modal_name = "新建文件夹"
-            .new_modal_open = true
-        }
+        .NewFolderOpen -> { .BeginName("folder", .current_path, "新建文件夹") }
 
-        .NewFileOpen -> {
-            .new_modal_type = "file"
-            .new_modal_name = "新建文档.txt"
-            .new_modal_open = true
-        }
-
-        .NewModalClose -> {
-            .new_modal_open = false
-        }
-
-        .SetNewName(name) -> {
-            .new_modal_name = name
-        }
-
-        .CommitNew -> {
-            let name str = .new_modal_name
-            .new_modal_open = false
-            // PLAN-684 rev7：vue 轨读盘已达（back_fs）——写面仍 VM 专属。
-            if .is_vm != "vm" {
-                toast("写操作仅在 VM 轨可用 — 请使用 auto run -r vm")
-            } else {
-            if name != "" {
-                let p str = fs.join(.current_path, name)
-                if file.exists(p) {
-                    toast.error("已存在同名项目: " + name)
-                } else {
-                    if .new_modal_type == "folder" {
-                        file.create_dir(p)
-                        toast.success("已创建文件夹: " + name)
-                    } else {
-                        file.write_text(p, "")
-                        toast.success("已创建文件: " + name)
-                    }
-                    .NavTo(.current_path)
-                }
-            }
-            }
-        }
+        .NewFileOpen -> { .BeginName("file", .current_path, "新建文档.txt") }
 
         // ---- 删除确认（T-06；D-4 口径：文件 + 空目录，非空目录拒绝）----
         .ConfirmDelete(id) -> {
