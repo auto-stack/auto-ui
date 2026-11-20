@@ -3518,7 +3518,7 @@ impl DynamicComponent {
                     }
                     Some("bool") => auto_val::Value::Bool(matches!(
                         text.trim(),
-                        "true" | "1" | "yes"
+                        "true" | "1" | "on" | "yes"
                     )),
                     _ => as_text(),
                 };

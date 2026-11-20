@@ -1166,16 +1166,22 @@ widget App {
                         if file.exists(destination) {
                             problem = "已存在同名项目: " + name
                         } else {
+                            var failed bool = false
                             try {
                                 if .name_dialog_mode == "rename" {
                                     fs.rename(target, destination)
                                 } else if .name_dialog_mode == "folder" {
                                     file.create_dir(destination)
+                                    failed = !file.is_dir(destination)
                                 } else {
                                     file.write_text(destination, "")
+                                    failed = !file.exists(destination) || file.is_dir(destination)
                                 }
                             } catch {
-                                problem = "操作失败，请检查权限或项目是否正在使用"
+                                failed = true
+                            }
+                            if failed {
+                                problem = "操作失败，请检查名称、权限或项目是否正在使用"
                                 retryable = true
                             }
                         }

@@ -308,17 +308,30 @@ pub fn run_vm_ui_flow(
     // （VM+VM split）或 a2r 转译的 Rust axum server（VM+Rust）。
     // AUTO_BACKEND_IMPL=rust → Rust 后端（start_api_server）
     step(1, "resolve backend");
+    let pac_path = project_dir.join("pac.at");
     // PLAN-036 T-04（AC-01/V-01）：VM 源码运行轨与 Vue/Rust 轨同律准入——
     // 编译将经模块解析真实读取所声明的官方包；声明了官方包就必须先校验
     // 通过（错版/缺件/篡改具名中止），未声明零变化（旧行为）。源码 VM 不
     // 强造产物 receipt，但由此证明本次运行所读包即校验过的包。
-    if project_dir.join("pac.at").is_file() {
+    if pac_path.is_file() {
+        let descriptor = auto_project_model::parse_file(&pac_path)
+            .map_err(|error| format!("Unable to read project manifest {}: {error}", pac_path.display()))?;
+        for dependency in &descriptor.deps {
+            if let Some(path) = dependency.path.as_deref() {
+                let resolved = project_dir.join(path);
+                if !resolved.exists() {
+                    return Err(format!(
+                        "Declared local dependency '{}' does not exist: {}",
+                        dependency.name, resolved.display()
+                    ).into());
+                }
+            }
+        }
         crate::theme_package::admit_generation_theme_inputs(project_dir)?;
     }
     // PLAN-815 T-06 R1：split 模式 api.at 的模块搜索种子同样消费请求
     // 声明的前端目录（在 split 分支前求值一次）。
     let front_seed = source.declared_front_dir(project_dir);
-    let pac_path = project_dir.join("pac.at");
     let has_rust_api = source.api_is_rust(&pac_path);
     let backend_impl = std::env::var("AUTO_BACKEND_IMPL").unwrap_or_else(|_| {
         if has_rust_api {

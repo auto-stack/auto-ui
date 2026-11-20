@@ -12,9 +12,6 @@ fn repository() -> PathBuf {
 }
 
 fn mount_model() -> DynamicComponent {
-    let package = repository().join("packages/prompt-dialog");
-    let model = fs::read_to_string(package.join("prompt_dialog.at")).unwrap();
-    let text = fs::read_to_string(package.join("prompt_text.at")).unwrap();
     let consumer = r#"
 widget App {
     model {
@@ -35,11 +32,24 @@ widget App {
     }
 }
 "#;
+    let mut component = mount_prompt(consumer);
+    act(&mut component, "Tick", &[]);
+    component
+}
+
+fn mount_prompt(consumer: &str) -> DynamicComponent {
+    let package = repository().join("packages/prompt-dialog");
+    let model = fs::read_to_string(package.join("prompt_dialog.at")).unwrap();
+    let text = fs::read_to_string(package.join("prompt_text.at")).unwrap();
     let source = format!(
         "{text}\n{consumer}\n{}",
         model.replace("use prompt_text: prompt_trim\n", "")
     );
-    let ast = Parser::from(source.as_str())
+    mount_source(&source)
+}
+
+fn mount_source(source: &str) -> DynamicComponent {
+    let ast = Parser::from(source)
         .with_session(CompilerSession::ui())
         .parse_domain(&auto_ui_dialect::UiDialect)
         .map(auto_ui_dialect::UiCode)
@@ -54,7 +64,9 @@ widget App {
         .collect();
     let widget = auto_ui_compiler::aura::extract_widget_from_decl(&declarations[0]).unwrap();
     let mut registry = WidgetRegistry::new();
-    registry.register(auto_ui_compiler::aura::extract_widget_from_decl(&declarations[1]).unwrap());
+    for declaration in &declarations[1..] {
+        registry.register(auto_ui_compiler::aura::extract_widget_from_decl(declaration).unwrap());
+    }
     let mut component = DynamicComponent::with_registry_and_imports_from_decls(
         &declarations[0],
         &declarations[1..],
@@ -66,7 +78,6 @@ widget App {
     )
     .unwrap();
     let _ = component.view();
-    act(&mut component, "Tick", &[]);
     component
 }
 
@@ -81,6 +92,121 @@ fn read(model: &DynamicComponent, field: &str) -> Value {
     let instances = bridge.child_instance_identities_of_type("PromptDialog");
     assert_eq!(instances.len(), 1);
     bridge.read_instance_state(&instances[0], field).unwrap()
+}
+
+fn read_at(model: &DynamicComponent, id: &str, field: &str) -> Value {
+    model.bridge().read_instance_state(id, field).unwrap()
+}
+
+fn act_at(model: &mut DynamicComponent, id: &str, event: &str, args: &[Value]) {
+    let state = model.bridge().child_instance_state_id(id).unwrap();
+    model.bridge_mut().call_handler_for("PromptDialog", event, state, args).unwrap();
+}
+
+#[test]
+fn same_label_instances_recover_configuration_and_reject_a_previous_target_response() {
+    let mut model = mount_prompt(r#"
+widget App {
+    msg { ShowConfigError(str) }
+    model {
+        var label str = ""
+        var target str = "a"
+        var reply str = ""
+        var errors int = 0
+    }
+    view {
+        col {
+            PromptDialog (open: true, contextId: .target, title: "重命名",
+                initialValue: "Shared", acceptLabel: .label, response: .reply,
+                onerror: .ShowConfigError) {}
+            PromptDialog (open: true, contextId: "other", title: "重命名",
+                initialValue: "Shared", acceptLabel: "重命名") {}
+        }
+    }
+    on { .ShowConfigError(payload) -> { .errors = .errors + 1 } }
+}
+"#);
+    let ids = model.bridge().child_instance_identities_of_type("PromptDialog");
+    assert_eq!(ids.len(), 2);
+    for _ in 0..2 {
+        for id in &ids {
+            model.on_with_input_for_instance("PromptDialog", "Tick", None, Some(id));
+        }
+    }
+    let first = ids.iter().find(|id| read_at(&model, id, "target") == Value::str("a")).unwrap();
+    let other = ids.iter().find(|id| *id != first).unwrap();
+    assert_eq!(model.read_state("errors").unwrap(), Value::Int(1));
+    assert_eq!(read_at(&model, first, "config_code"), Value::str("empty-accept-label"));
+    let binding_a = read_at(&model, first, "binding");
+    act_at(&mut model, first, "Submit", std::slice::from_ref(&binding_a));
+    assert_eq!(read_at(&model, first, "seq"), Value::Int(0));
+
+    model.write_state("label", Value::str("重命名")).unwrap();
+    let _ = model.view();
+    model.on_with_input_for_instance("PromptDialog", "Tick", None, Some(first));
+    assert_eq!(read_at(&model, first, "config_code"), Value::str(""));
+    act_at(&mut model, first, "Submit", std::slice::from_ref(&binding_a));
+    assert_eq!(read_at(&model, first, "phase"), Value::str("submitting"));
+    let token = read_at(&model, first, "instance_token");
+    assert_ne!(token, read_at(&model, other, "instance_token"));
+    let reply_a = serde_json::json!({
+        "instanceToken": token.as_str(), "session": 1, "seq": 1, "contextId": "a",
+        "status": "rejected", "message": "old target", "retryable": false,
+    });
+    model.write_state("target", Value::str("b")).unwrap();
+    model.write_state("reply", Value::str(&reply_a.to_string())).unwrap();
+    let _ = model.view();
+    model.on_with_input_for_instance("PromptDialog", "Tick", None, Some(first));
+    assert_eq!(read_at(&model, first, "target"), Value::str("b"));
+    assert_eq!(read_at(&model, first, "draft"), Value::str("Shared"));
+    assert_eq!(read_at(&model, first, "rejection"), Value::str(""));
+    act_at(&mut model, first, "Submit", &[binding_a]);
+    assert_eq!(read_at(&model, first, "seq"), Value::Int(1));
+    let binding_b = read_at(&model, first, "binding");
+    act_at(&mut model, first, "Submit", &[binding_b]);
+    assert_eq!(read_at(&model, first, "seq"), Value::Int(2));
+    assert_eq!(read_at(&model, other, "seq"), Value::Int(0));
+
+    let other_binding = read_at(&model, other, "binding");
+    act_at(&mut model, other, "Submit", &[other_binding]);
+    assert_eq!(read_at(&model, other, "seq"), Value::Int(1));
+    assert_eq!(read_at(&model, first, "seq"), Value::Int(2));
+}
+
+#[test]
+fn typed_boolean_inputs_preserve_legacy_values_and_bound_text() {
+    let mut model = mount_source(r#"
+widget App {
+    msg { Plain(bool), Bound(str, bool), Enter }
+    model {
+        var checked str = ""
+        var scope str = ""
+        var enters int = 0
+    }
+    view { text "input dispatch fixture" }
+    on {
+        .Plain(value) -> { .checked = if value { "checked" } else { "unchecked" } }
+        .Bound(prefix, value) -> {
+            .scope = prefix
+            .checked = if value { "checked" } else { "unchecked" }
+        }
+        .Enter -> { .enters = .enters + 1 }
+    }
+}
+"#);
+    for text in ["on", "true", "1", "yes", "off"] {
+        model.on_with_input("Plain", Some(text.into()));
+        let expected = if text == "off" { "unchecked" } else { "checked" };
+        assert_eq!(model.read_state("checked").unwrap(), Value::str(expected));
+    }
+    model.on_with_input("Bound\u{1f}s\u{1f}source", Some("on".into()));
+    assert_eq!(model.read_state("scope").unwrap(), Value::str("source"));
+    assert_eq!(model.read_state("checked").unwrap(), Value::str("checked"));
+    model.on_with_input("Bound\u{1f}s\u{1f}explicit\u{1f}s\u{1f}$event.target.checked", Some("off".into()));
+    assert_eq!(model.read_state("scope").unwrap(), Value::str("explicit"));
+    assert_eq!(model.read_state("checked").unwrap(), Value::str("unchecked"));
+    model.on_with_input("Enter", Some("not an argument".into()));
+    assert_eq!(model.read_state("enters").unwrap(), Value::Int(1));
 }
 
 fn feedback(model: &mut DynamicComponent, token: &Value, status: &str, retryable: bool) {

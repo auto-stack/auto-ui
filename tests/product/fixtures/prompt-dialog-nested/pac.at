@@ -1,0 +1,10 @@
+name: "prompt-dialog-nested-check"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "PromptDialog 模态验收"
+window: "420x560"
+
+dep prompt_dialog {
+    path: "../../../../packages/prompt-dialog"
+}

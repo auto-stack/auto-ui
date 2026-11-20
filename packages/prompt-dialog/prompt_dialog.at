@@ -43,11 +43,11 @@ widget PromptDialog (open: bool = false, contextId: str = "", revision: int = 0,
                 dialog-content (showCloseButton: false, portalToTheme: true, style: "w-96 max-w-full p-4 gap-2 rounded-md") {
                     dialog-header (style: "gap-2") {
                         dialog-title .heading
+                    }
+                    col (style: "gap-2 max-h-60 overflow-y-auto [&_input]:h-8") {
                         if .description != "" {
                             dialog-description .description
                         }
-                    }
-                    col (style: "gap-2 max-h-60 overflow-y-auto [&_input]:h-8") {
                         text .field_caption { style: "text-sm font-medium" }
                         input (value: .draft + "", placeholder: .placeholder, label: .field_caption, validationMessage: .field_error,
                             oninput: .Edit(action_binding, $event), onenter: .Submit(action_binding), disabled: !.ready) {}

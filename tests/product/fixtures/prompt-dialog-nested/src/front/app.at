@@ -1,0 +1,74 @@
+use auto.json
+
+widget App {
+    use { package: prompt_dialog from "../../../../../../packages/prompt-dialog" }
+
+    msg { OpenOuter, CloseOuter, EditOuter(str), OpenInner, CancelInner(str),
+        SubmitInner(str), OpenLong, CancelLong(str), SaveLong(str), Bump }
+
+    model {
+        var outer bool = false
+        var inner bool = false
+        var long_open bool = false
+        var outside_changes int = 0
+        var inner_name str = "Inner"
+        var outer_name str = "Outer"
+        var saved str = ""
+        var long_description str = "名称会出现在侧栏和共享工作区中。修改后，已经存在的关联仍会指向当前对象。请选择容易与其他工作区区分的名称，并在确认前检查拼写。名称中可以使用中文、数字和空格。多人同时编辑时，列表会重新显示最新名称。正在归档的对象需要先恢复，然后才可编辑。已共享的旧链接仍然可用，复制新名称后可以继续分发。对话框底部的取消与确认按钮在阅读说明时始终可用。如果取消，本轮编辑不会改变原来的名称。"
+    }
+
+    view {
+        col (style: "p-4 gap-2") {
+            text "名称管理·模态验收"
+            text f"外层修改：${.outside_changes}"
+            text f"保存名称：${.saved}"
+            button "打开外层" { onclick: .OpenOuter }
+            button "查看长说明" { onclick: .OpenLong }
+            dialog (open: .outer, onclose: .CloseOuter, closeOnOutside: false) {
+                dialog-content (showCloseButton: false) {
+                    dialog-title "外层编辑"
+                    input (value: .outer_name, placeholder: "Outer value",
+                        label: "外层名称", oninput: .EditOuter) {}
+                    button "打开内层" { onclick: .OpenInner }
+                    button "底层修改" { onclick: .Bump }
+                    PromptDialog (open: .inner, contextId: "inner",
+                        title: "内层编辑", label: "内层名称", placeholder: "Inner value",
+                        initialValue: .inner_name, acceptLabel: "保存内层",
+                        onsubmitRequested: .SubmitInner, oncancelled: .CancelInner) {}
+                }
+            }
+            PromptDialog (open: .long_open, contextId: "long",
+                title: "下方内容可滚动",
+                label: "名称须能在共享工作区内与同类项目清楚区分",
+                placeholder: "Long value", description: .long_description + .long_description,
+                initialValue: "Long", acceptLabel: "保存长表单",
+                onsubmitRequested: .SaveLong, oncancelled: .CancelLong) {}
+        }
+    }
+
+    on {
+        .OpenOuter -> { .outer = true }
+        .CloseOuter -> { .outer = false }
+        .EditOuter(value) -> { .outer_name = value }
+        .OpenInner -> { .inner = true }
+        .CancelInner(payload) -> { .inner = false }
+        .SubmitInner(payload) -> {
+            let request = json.parse(payload)
+            if request.contextId == "inner" {
+                .inner_name = request.value
+                .saved = request.value
+                .inner = false
+            }
+        }
+        .OpenLong -> { .long_open = true }
+        .CancelLong(payload) -> { .long_open = false }
+        .SaveLong(payload) -> {
+            let request = json.parse(payload)
+            if request.contextId == "long" {
+                .saved = request.value
+                .long_open = false
+            }
+        }
+        .Bump -> { .outside_changes = .outside_changes + 1 }
+    }
+}
