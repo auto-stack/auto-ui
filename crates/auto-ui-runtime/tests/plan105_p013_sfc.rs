@@ -53,7 +53,6 @@ fn p105_p013_package_lane_reports_store_gap() {
     std::env::set_var("P105_MEM_BACKEND", "1");
     let units: Vec<PackageModuleInput> = [
         ("main", "src/front/app.at"),
-        ("todo_store", "src/front/todo_store.at"),
         ("todo_list", "src/front/todo_list.at"),
     ]
     .iter()
