@@ -2282,7 +2282,15 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
         // 「into_iced Rich 臂零命中」的真因：Rich 在本函数上游臂就被吞，
         // 永远到不了 into_iced）。RichSpanView 仅 content+style，无消息
         // 载荷需要转换，原样透传即可。
-        AbstractView::Rich { spans, style } => AbstractView::Rich { spans, style },
+        AbstractView::Rich { spans, style, on_selection } => AbstractView::Rich {
+            spans,
+            style,
+            on_selection: on_selection.map(|cb| {
+                crate::ui::view::RichSelectionCallback::new(move |a, b| {
+                    cb.call(a, b).map(|message| IcedMessage::from_dynamic(&message))
+                })
+            }),
+        },
 
         // PLAN-029 T-02：Custom（NativeWidgetRegistry Element 通道，View::
         // Custom）显式直通——此前漏臂落 `_ => Empty`（PLAN-082 Rich 同族
@@ -10442,6 +10450,7 @@ mod plan080_uat_cjk_bubble_tests {
                     children: vec![AbstractView::Rich {
                         spans: rich_spans,
                         style: None,
+                        on_selection: None,
                     }],
                     spacing: 0,
                     padding: 0,

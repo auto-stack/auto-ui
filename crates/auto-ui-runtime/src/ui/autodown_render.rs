@@ -17,10 +17,17 @@
 
 use crate::ui::autodown_blocks::{callout_kind_classes, family_of, heading_classes};
 use crate::ui::style::Style;
-use crate::ui::view::{ColResizeCallback, ColResizeMetrics, View};
+use crate::ui::view::{
+    ColResizeCallback, ColResizeMetrics, RichSelectionCallback, RichSpanView,
+    ScrollControllerBinding, View,
+};
 use autodown_core::block_model::{
     attrGet, attrGetBool, attrGetInt, attrGetStr, spansText, BlockNode, BlockType, InlineSpan,
     Mark, Value,
+};
+use autodown_core::book_reading::{
+    locateBookSelection, locateBookTarget, parseBookChapter, projectBookChapter, sliceBookText,
+    BookSelection,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -85,6 +92,101 @@ pub fn render_document_with<M: Clone + std::fmt::Debug + 'static>(
         style: None,
         onclick: None,
         on_right_click: None,
+    }
+}
+
+/// Render an opted-in book chapter using the same projected Markdown and
+/// stable targets as the web component.
+pub(crate) fn render_book_document<M: Clone + std::fmt::Debug + 'static>(
+    source: &str,
+    chapter_id: &str,
+    card_id: &str,
+    target_id: &str,
+    pane: Arc<str>,
+    is_final: bool,
+    on_selection: Option<Arc<dyn Fn(BookSelection) -> M + Send + Sync>>,
+) -> View<M> {
+    let chapter = Arc::new(parseBookChapter(source, chapter_id, is_final));
+    let Some(projection) = projectBookChapter(&chapter, card_id).map(Arc::new) else {
+        return View::Empty;
+    };
+    let target = if target_id.is_empty() {
+        None
+    } else {
+        locateBookTarget(&chapter, target_id)
+    };
+    let mut controller = ScrollControllerBinding::new(pane.clone());
+    let mut children = Vec::new();
+    if !projection.title.is_empty() {
+        children.push(View::Text {
+            content: projection.title.clone(),
+            style: Style::parse(heading_classes(2)).ok(),
+            selectable: false,
+        });
+    }
+    for (index, block) in chapter.blocks.iter().enumerate() {
+        let start = block.start.max(projection.start);
+        let end = block.end.min(projection.end);
+        if start >= end {
+            continue;
+        }
+        let markdown = sliceBookText(&chapter.markdown, start, end);
+        let root = autodown_core::markdown_parser::parse_projection_blocks(&markdown, is_final);
+        for parsed in &root.children {
+            let mut view = render_block(parsed, is_final, None, None, None);
+            if block.kind == "paragraph" && matches!(parsed.kind, BlockType::Paragraph) {
+                if let Some(callback) = on_selection.as_ref() {
+                    let chapter = Arc::clone(&chapter);
+                    let projection = Arc::clone(&projection);
+                    let block = block.clone();
+                    let callback = Arc::clone(callback);
+                    // Use a single shaped paragraph across formatting boundaries.
+                    let spans = parsed.inlines.iter().map(|span| RichSpanView {
+                        content: span.text.clone(),
+                        style: Style::parse(&span_class(span)).ok(),
+                    }).collect();
+                    view = View::Rich {
+                        spans,
+                        style: None,
+                        on_selection: Some(RichSelectionCallback::new(move |start, end| {
+                            locateBookSelection(
+                                &chapter, (*projection).clone(), block.clone(),
+                                start as i64, end as i64,
+                            ).map(|selection| callback(selection))
+                        })),
+                    };
+                }
+            }
+            let key: Arc<str> = format!("reading-{index}").into();
+            if target.as_ref().is_some_and(|target| {
+                block.start <= target.start && target.end <= block.end
+                    && start < target.end && target.start < end
+            }) {
+                let revision: Arc<str> = format!("{}:{}:{target_id}:{index}", chapter.id, card_id).into();
+                controller.anchor = Some((key.clone(), revision));
+            }
+            children.push(View::ScrollAnchorMark { pane: pane.clone(), key, child: Box::new(view) });
+        }
+    }
+    let document = View::Column {
+        children,
+        spacing: 8,
+        padding: 0,
+        style: None,
+        onclick: None,
+        on_right_click: None,
+    };
+    View::Scrollable {
+        child: Box::new(document),
+        width: None,
+        height: None,
+        style: Style::parse("w-full h-full").ok(),
+        auto_scroll: false,
+        offset: None,
+        on_scroll: None,
+        axes: crate::ui::scroll::ScrollAxes::Y,
+        scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
+        controller: Some(controller),
     }
 }
 
@@ -390,6 +492,7 @@ fn render_inlines<M: Clone + std::fmt::Debug>(inlines: &[InlineSpan]) -> View<M>
                 View::Rich {
                     spans: rich_spans,
                     style: None,
+                    on_selection: None,
                 }
             }
         })
@@ -1064,7 +1167,7 @@ mod tests {
         // 段落 = Rich 单段落（PLAN-082 T-02 跟 F-UAT-2 形态：纯文本+粗体+
         // 纯文本+斜体+纯文本+码 六 span，跨 span 连续折行；Row 摆多 Text
         // 不回流的散架形态已退役）。
-        let View::Rich { spans, style } = &children[1] else {
+        let View::Rich { spans, style, .. } = &children[1] else {
             panic!("expected inline rich paragraph, got {:?}", &children[1])
         };
         assert!(style.is_none(), "段落级 style 恒 None（mark 类落在 span）");

@@ -227,6 +227,7 @@ fn corpus() -> Vec<Case> {
                 },
             ],
             style: Style::parse("text-base").ok(),
+            on_selection: None,
         },
         note: "ready",
     });

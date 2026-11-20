@@ -1,3 +1,4 @@
+use std::ops::Range;
 use crate::core::alignment;
 use crate::core::layout;
 use crate::core::mouse;
@@ -11,6 +12,12 @@ use crate::core::{
     self, Clipboard, Color, Element, Event, Layout, Length, Pixels, Point,
     Rectangle, Shell, Size, Vector, Widget,
 };
+
+struct Selection<'a, P, Message> {
+    hit: Box<dyn Fn(&P, Point) -> usize + 'a>,
+    rectangles: Box<dyn Fn(&P, Range<usize>, Point) -> Vec<Rectangle> + 'a>,
+    release: Box<dyn Fn(Range<usize>) -> Option<Message> + 'a>,
+}
 
 /// A bunch of [`Rich`] text.
 pub struct Rich<
@@ -36,6 +43,7 @@ pub struct Rich<
     class: Theme::Class<'a>,
     hovered_link: Option<usize>,
     on_link_click: Option<Box<dyn Fn(Link) -> Message + 'a>>,
+    selection: Option<Selection<'a, Renderer::Paragraph, Message>>,
 }
 
 impl<'a, Link, Message, Theme, Renderer>
@@ -61,6 +69,7 @@ where
             class: Theme::default(),
             hovered_link: None,
             on_link_click: None,
+            selection: None,
         }
     }
 
@@ -145,6 +154,22 @@ where
         self
     }
 
+    /// Enables drag selection using the renderer's shaped paragraph. The
+    /// supplied functions use byte offsets into the concatenated span text.
+    pub fn on_selection(
+        mut self,
+        hit: impl Fn(&Renderer::Paragraph, Point) -> usize + 'a,
+        rectangles: impl Fn(&Renderer::Paragraph, Range<usize>, Point) -> Vec<Rectangle> + 'a,
+        release: impl Fn(Range<usize>) -> Option<Message> + 'a,
+    ) -> Self {
+        self.selection = Some(Selection {
+            hit: Box::new(hit),
+            rectangles: Box::new(rectangles),
+            release: Box::new(release),
+        });
+        self
+    }
+
     /// Sets the default style of the [`Rich`] text.
     #[must_use]
     pub fn style(mut self, style: impl Fn(&Theme) -> Style + 'a) -> Self
@@ -199,6 +224,8 @@ struct State<Link, P: Paragraph> {
     spans: Vec<Span<'static, Link, P::Font>>,
     span_pressed: Option<usize>,
     paragraph: P,
+    selection: Range<usize>,
+    drag_anchor: Option<usize>,
 }
 
 impl<Link, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
@@ -217,6 +244,8 @@ where
             spans: Vec::new(),
             span_pressed: None,
             paragraph: Renderer::Paragraph::default(),
+            selection: 0..0,
+            drag_anchor: None,
         })
     }
 
@@ -233,9 +262,16 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
+        let state = tree.state.downcast_mut::<State<Link, Renderer::Paragraph>>();
+        if self.selection.is_some() {
+            let spans = self.spans.as_ref().as_ref();
+            if !state.spans.iter().map(|span| &span.text).eq(spans.iter().map(|span| &span.text)) {
+                state.selection = 0..0;
+                state.drag_anchor = None;
+            }
+        }
         layout(
-            tree.state
-                .downcast_mut::<State<Link, Renderer::Paragraph>>(),
+            state,
             renderer,
             limits,
             self.width,
@@ -362,6 +398,19 @@ where
             }
         }
 
+        if let Some(selection) = &self.selection {
+            if !state.selection.is_empty() {
+                let bounds = layout.bounds();
+                let position = bounds.anchor(state.paragraph.min_bounds(),
+                    state.paragraph.align_x(), state.paragraph.align_y());
+                for bounds in (selection.rectangles)(&state.paragraph, state.selection.clone(), position) {
+                    renderer.fill_quad(
+                        renderer::Quad { bounds, ..Default::default() },
+                        Color::from_rgba(0.27, 0.51, 0.91, 0.25),
+                    );
+                }
+            }
+        }
         text::draw(
             renderer,
             defaults,
@@ -383,6 +432,54 @@ where
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
+        if let Some(selection) = &self.selection {
+            let state = tree.state.downcast_mut::<State<Link, Renderer::Paragraph>>();
+            let bounds = layout.bounds();
+            let origin = bounds.anchor(state.paragraph.min_bounds(),
+                state.paragraph.align_x(), state.paragraph.align_y());
+            let hit = |point: Point| {
+                (selection.hit)(&state.paragraph, Point::new(point.x - origin.x, point.y - origin.y))
+            };
+            let handled = match event {
+                Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                    if let Some(point) = cursor.position().filter(|point| bounds.contains(*point)) {
+                        let start = hit(point);
+                        state.drag_anchor = Some(start);
+                        state.selection = start..start;
+                        true
+                    } else {
+                        false
+                    }
+                }
+                Event::Mouse(mouse::Event::CursorMoved { position }) => {
+                    if let Some(start) = state.drag_anchor {
+                        let end = hit(*position);
+                        state.selection = start.min(end)..start.max(end);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                    if state.drag_anchor.take().is_some() {
+                        if !state.selection.is_empty() {
+                            if let Some(message) = (selection.release)(state.selection.clone()) {
+                                shell.publish(message);
+                            }
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+            if handled {
+                shell.request_redraw();
+                shell.capture_event();
+                return;
+            }
+        }
         let Some(on_link_clicked) = &self.on_link_click else {
             return;
         };

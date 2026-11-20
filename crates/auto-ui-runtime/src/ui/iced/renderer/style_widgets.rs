@@ -1920,6 +1920,9 @@ pub(super) fn build_scrollable<M: Clone + Debug + 'static>(
     let controller_widget_id = controller.map(|c| format!("scroll_ctl_{}", c.key()));
     if let (Some(c), Some(id)) = (controller, &controller_widget_id) {
         crate::ui::scroll::bind_controller(c.key(), id);
+        crate::ui::scroll::controller::set_declarative_anchor(
+            c.key(), c.anchor.as_ref().map(|(key, revision)| (key.as_ref(), revision.as_ref())),
+        );
         // F-4 终段：写臂重发注册表 offset（terminal/015 生产先例）。offset 在
         // 同构重建下由 iced Tree 状态保持（obs pane 无写臂跨重建保持滚动位，
         // 截图实证）；重发是结构性重建/极端序列下的防御，同值去抖使其在

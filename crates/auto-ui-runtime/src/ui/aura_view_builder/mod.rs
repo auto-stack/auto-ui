@@ -3476,6 +3476,59 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "autodown")]
+    #[test]
+    fn plan087_book_projection_selection_and_scroll_target() {
+        let widget = make_test_widget("Reader", vec![]);
+        let bridge = VmBridge::new(&widget).unwrap();
+        let builder = AuraViewBuilder::new(&bridge, "Reader");
+        let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"),
+            "/../../../auto-down/autodown/packages/engine/src/parser/__tests__/fixtures/book-reading/lunyu-001.ad"));
+
+        let reading_node = |card: &str, target: &str, source: &str| {
+            AuraNode::element("autodown")
+                .with_prop("content", Expr::Str(source.into()))
+                .with_prop("reading_mode", Expr::Bool(true))
+                .with_prop("reading_card_id", Expr::Str(card.into()))
+                .with_prop("reading_target_id", Expr::Str(target.into()))
+                .with_event("onbookselect", ".Selected")
+        };
+
+        let card = builder.build(&reading_node("lunyu-001-s003", "xy-u003", source));
+        let View::Scrollable { child, controller: Some(controller), .. } = card else {
+            panic!("native reading view must own a scrollable pane");
+        };
+        let View::Column { children, .. } = *child else { panic!("chapter column") };
+        assert_eq!(children.len(), 2, "card title and exactly one projected paragraph");
+        let View::ScrollAnchorMark { key, child, .. } = &children[1] else { panic!("reading anchor") };
+        assert_eq!(controller.anchor.as_ref().unwrap().0, *key);
+        let View::Rich { spans, on_selection: Some(selection), .. } = child.as_ref() else {
+            panic!("selectable rich paragraph");
+        };
+        assert_eq!(spans.iter().map(|s| s.content.as_str()).collect::<String>(), "子曰：“巧言令色，鲜矣仁！”");
+        let DynamicMessage::Typed { event_name, args, .. } = selection.call(4, 8).unwrap() else {
+            panic!("selection message");
+        };
+        assert_eq!(event_name, "Selected");
+        let payload: serde_json::Value = serde_json::from_str(args[0].as_str()).unwrap();
+        assert_eq!(payload["cardId"], "lunyu-001-s003");
+        assert_eq!(payload["paragraphId"], "xy-p01");
+        assert_eq!(payload["targetId"], "xy-u003");
+        assert_eq!(payload["text"], "巧言令色");
+        assert!(payload["after"].as_str().unwrap().contains("吾日三省吾身"));
+
+        let shiji = include_str!(concat!(env!("CARGO_MANIFEST_DIR"),
+            "/../../../auto-down/autodown/packages/engine/src/parser/__tests__/fixtures/book-reading/shiji-062.ad"));
+        let card = builder.build(&reading_node("shiji-062-s004", "yue-protest", shiji));
+        let View::Scrollable { child, controller: Some(controller), .. } = card else { panic!("Shiji card") };
+        let View::Column { children, .. } = *child else { panic!("Shiji chapter column") };
+        assert_eq!(children.len(), 3, "one title and the two actual card paragraphs");
+        let View::ScrollAnchorMark { key, child, .. } = &children[2] else { panic!("second paragraph") };
+        assert_eq!(controller.anchor.as_ref().unwrap().0, *key);
+        let View::Rich { spans, .. } = child.as_ref() else { panic!("Shiji paragraph") };
+        assert!(spans.iter().any(|span| span.content.contains("延入为上客")));
+    }
+
     fn test_autodown_widget_true_render() {
         let widget = make_test_widget("Test", vec![]);
         let bridge = VmBridge::new(&widget).unwrap();

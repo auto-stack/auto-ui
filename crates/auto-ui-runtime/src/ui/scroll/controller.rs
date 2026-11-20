@@ -89,6 +89,7 @@ struct ControllerRegistry {
     generations: HashMap<String, u64>,
     /// PLAN-781 T-01：锚点请求表（(handle, key) 寻址，后写覆盖重新 pending）。
     anchor_requests: HashMap<(String, String), AnchorRequest>,
+    declarative_anchors: HashMap<String, (String, String)>,
 }
 
 lazy_static::lazy_static! {
@@ -98,6 +99,7 @@ lazy_static::lazy_static! {
         prime_requests: Vec::new(),
         generations: HashMap::new(),
         anchor_requests: HashMap::new(),
+        declarative_anchors: HashMap::new(),
     });
 }
 
@@ -142,6 +144,26 @@ pub fn bind_controller(handle: &str, widget_id: &str) {
 pub fn mark_controller_managed(handle: &str) {
     let mut reg = REGISTRY.lock().unwrap();
     reg.panes.entry(handle.to_string()).or_default().managed = true;
+}
+
+/// Queue a changed declarative target after the pane has bound its widget ID.
+pub(crate) fn set_declarative_anchor(handle: &str, target: Option<(&str, &str)>) {
+    let mut reg = REGISTRY.lock().unwrap();
+    let previous = reg.declarative_anchors.get(handle);
+    if previous.map(|(key, revision)| (key.as_str(), revision.as_str())) == target {
+        return;
+    }
+    if let Some((key, _)) = reg.declarative_anchors.remove(handle) {
+        reg.anchor_requests.remove(&(handle.to_owned(), key));
+    }
+    if let Some((key, revision)) = target {
+        reg.declarative_anchors.insert(handle.to_owned(), (key.to_owned(), revision.to_owned()));
+        let generation = reg.generations.get(handle).copied().unwrap_or(0);
+        reg.anchor_requests.insert((handle.to_owned(), key.to_owned()), AnchorRequest {
+            generation,
+            state: AnchorRequestState::Pending,
+        });
+    }
 }
 
 /// PLAN-781 T-01 冻结：`auto.scroll.to_child(handle, key)` 入队面。

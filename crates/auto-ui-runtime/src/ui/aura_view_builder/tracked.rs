@@ -1892,6 +1892,11 @@ impl<'a> AuraViewBuilder<'a> {
                         })
                         .flatten()
                         .unwrap_or(true);
+                    if let Some(view) = self.autodown_book_view(
+                        props, events, bindings, &content, is_final, path,
+                    ) {
+                        return view;
+                    }
                     // Plan 040 契约扩展——VM v1 豁免收口（PLAN-044 T4）：
                     // streaming 恒按 final（豁免保留）；placeholder_*（ghost）
                     // 自本计划真消费（绑定求值传入 render）；scroll_sync
@@ -3536,6 +3541,57 @@ impl<'a> AuraViewBuilder<'a> {
             m.insert(u, widths);
         }
         Some(m)
+    }
+
+    /// Opt-in book input and selection on both VM view-building paths.
+    #[cfg(feature = "autodown")]
+    pub(super) fn autodown_book_view(
+        &self,
+        props: &HashMap<String, AuraPropValue>,
+        events: &HashMap<String, AuraEvent>,
+        bindings: &Bindings,
+        content: &str,
+        is_final: bool,
+        path: &[usize],
+    ) -> Option<View<DynamicMessage>> {
+        let reading = props.get("reading_mode").and_then(|value| match value {
+            AuraPropValue::Expr(expr) => self.resolve_expr_to_value(expr, bindings)
+                .map(|resolved| resolved.as_bool()),
+            _ => None,
+        }).unwrap_or(false);
+        if !reading {
+            return None;
+        }
+        let read = |key| self.extract_string_with(props, key, bindings).unwrap_or_default();
+        let chapter = read("reading_chapter_id");
+        let card = read("reading_card_id");
+        let target = read("reading_target_id");
+        let instance = self.instance_identity.as_deref().unwrap_or(&self.widget_name);
+        let pane = format!("autodown-book:{instance}:{path:?}").into();
+        type Selection = autodown_core::book_reading::BookSelection;
+        let callback = aura_events_get_base(events, "onbookselect").map(|event| {
+            let handler = extract_handler_name(&event.handler).to_owned();
+            let widget = self.widget_name.clone();
+            std::sync::Arc::new(move |selection: Selection| {
+                let payload = serde_json::json!({
+                    "chapterId": selection.chapterId,
+                    "cardId": selection.cardId,
+                    "paragraphId": selection.paragraphId,
+                    "targetId": selection.targetId,
+                    "text": selection.text,
+                    "before": selection.before,
+                    "after": selection.after,
+                });
+                DynamicMessage::Typed {
+                    widget_name: widget.clone(),
+                    event_name: handler.clone(),
+                    args: vec![auto_val::Value::str(payload.to_string())],
+                }
+            }) as std::sync::Arc<dyn Fn(Selection) -> DynamicMessage + Send + Sync>
+        });
+        Some(crate::ui::autodown_render::render_book_document(
+            content, &chapter, &card, &target, pane, is_final, callback,
+        ))
     }
 
     /// PLAN-045 T5：列宽落定消息通道——`oncolresize` 事件 → TableColResizeFn

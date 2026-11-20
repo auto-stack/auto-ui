@@ -667,6 +667,11 @@ impl<'a> AuraViewBuilder<'a> {
                         })
                         .flatten()
                         .unwrap_or(true);
+                    if let Some(view) = self.autodown_book_view(
+                        props, events, bindings, &content, is_final, &[],
+                    ) {
+                        return view;
+                    }
                     // Plan 040 契约扩展——VM v1 豁免收口（PLAN-044 T4）：
                     // streaming 恒按 final（豁免保留）；placeholder_*（ghost）
                     // 自本计划真消费（绑定求值传入 render，同 streamed 臂）；

@@ -16,16 +16,23 @@ use std::sync::Arc;
 /// 值面来源：DSL `scroll_controller()` 原生族返回的句柄字符串（Value::Str），
 /// view-builder 捕获后与 pane 的稳定 widget id 关联（renderer 侧注册表）。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ScrollControllerBinding(pub Arc<str>);
+pub struct ScrollControllerBinding {
+    key: Arc<str>,
+    pub(crate) anchor: Option<(Arc<str>, Arc<str>)>,
+}
 
 impl ScrollControllerBinding {
     pub fn new(key: impl Into<Arc<str>>) -> Self {
-        Self(key.into())
+        Self {
+            key: key.into(),
+            anchor: None,
+        }
     }
 
     pub fn key(&self) -> &str {
-        &self.0
+        &self.key
     }
+
 }
 
 /// Callback for select dropdown changes
@@ -657,6 +664,7 @@ pub struct RichSpanView {
     pub style: Option<Style>,
 }
 
+
 /// Key handlers that belong to one focusable button in the current view.
 #[derive(Debug, Clone)]
 pub struct ButtonKeyboard<M> {
@@ -674,6 +682,26 @@ impl<M> ButtonKeyboard<M> {
                 .map(|(key, message)| (key, map(message)))
                 .collect(),
         }
+    }
+}
+
+/// UTF-16 selection bounds within displayed rich text.
+#[derive(Clone)]
+pub struct RichSelectionCallback<M>(Arc<dyn Fn(usize, usize) -> Option<M> + Send + Sync>);
+
+impl<M> Debug for RichSelectionCallback<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RichSelectionCallback")
+    }
+}
+
+impl<M> RichSelectionCallback<M> {
+    pub fn new(f: impl Fn(usize, usize) -> Option<M> + Send + Sync + 'static) -> Self {
+        Self(Arc::new(f))
+    }
+
+    pub fn call(&self, start: usize, end: usize) -> Option<M> {
+        (self.0)(start, end)
     }
 }
 
@@ -715,6 +743,7 @@ pub enum View<M: Clone + Debug> {
     Rich {
         spans: Vec<RichSpanView>,
         style: Option<Style>,
+        on_selection: Option<RichSelectionCallback<M>>,
     },
 
     /// Button with label, click handler, and optional styling
@@ -2541,8 +2570,16 @@ impl<M: Clone + Debug> View<M> {
     {
         match self {
             View::Empty => View::Empty,
-            // F-UAT-2: Rich 无消息载荷（spans 纯内容），恒等映射。
-            View::Rich { spans, style } => View::Rich { spans, style },
+            View::Rich { spans, style, on_selection } => {
+                let f = Arc::clone(f);
+                View::Rich {
+                    spans,
+                    style,
+                    on_selection: on_selection.map(|cb| {
+                        RichSelectionCallback::new(move |a, b| cb.call(a, b).map(|msg| f(msg)))
+                    }),
+                }
+            }
             // PLAN-066: Custom 事件消息同源映射（name/props/style 原样透传）。
             View::Custom {
                 name,

@@ -3586,6 +3586,42 @@ widget DocStream {
         );
     }
 
+    #[test]
+    fn plan087_book_props_and_selection_emit() {
+        let sfc = gen_sfc_from_widget_src_shadcn(r##"
+widget Reader {
+    model {
+        var body str = "# 学而"
+        var card str = "lunyu-001-s003"
+        var target str = "xy-u003"
+        var selection str = ""
+    }
+    view {
+        autodown {
+            content: .body
+            reading_mode: true
+            reading_chapter_id: "lunyu-001"
+            reading_card_id: .card
+            reading_target_id: .target
+            onbookselect: .Selected
+        }
+    }
+    on {
+        .Selected(payload str) {
+        .selection = payload
+    }
+    }
+}
+"##);
+        for fragment in [
+            "<StreamingRenderer", ":reading-mode=\"true\"",
+            ":reading-chapter-id=\"'lunyu-001'\"", ":reading-card-id=\"card\"",
+            ":reading-target-id=\"target\"", "@bookselect=\"Selected($event)\"",
+        ] {
+            assert!(sfc.contains(fragment), "missing {fragment}: {sfc}");
+        }
+    }
+
     /// PLAN-051 T5：双轨组件主题声明入口——`dark_mode`/`accent` props 经
     /// autodown_editor/autodown 两臂发射为 `:dark-mode`/`:accent`（绑定）；
     /// 缺省 `:dark-mode="false"`（引擎默认档零差异）+ 无 accent 发射。

@@ -780,6 +780,28 @@ impl VueGenerator {
                         _ => attrs.push(":streaming=\"false\"".to_string()),
                     }
                 }
+                if props.contains_key("reading_mode") {
+                    attrs.push(self.bool_prop_binding(props, "reading_mode", "readingMode", false));
+                }
+                for (key, attr) in [
+                    ("reading_chapter_id", "reading-chapter-id"),
+                    ("reading_card_id", "reading-card-id"),
+                    ("reading_target_id", "reading-target-id"),
+                ] {
+                    match props.get(key) {
+                        Some(AuraPropValue::Expr(expr)) => {
+                            if let Ok(js_expr) = self.expr_to_vue_bound_value(expr) {
+                                attrs.push(format!(":{attr}=\"{js_expr}\""));
+                            }
+                        }
+                        Some(value) => {
+                            if let Some(value) = self.extract_string_value(value) {
+                                attrs.push(format!("{attr}=\"{value}\""));
+                            }
+                        }
+                        None => {}
+                    }
+                }
                 // placeholder_block_id → :placeholder-block-id（VM v1 忽略）。
                 match props.get("placeholder_block_id") {
                     Some(AuraPropValue::Expr(expr)) => {
@@ -3661,7 +3683,7 @@ impl VueGenerator {
             // scaffold shell's emit payload ({line, column} / {x, y}) when
             // the on-block handler declares params and the binding passes none.
             let payload_forwarded =
-                match self.code_editor_event_payload_call(tag, event, aura_event) {
+                match self.component_event_payload_call(tag, event, aura_event) {
                     Some(call) => {
                         handler_fn = call;
                         true
@@ -5202,18 +5224,19 @@ impl VueGenerator {
     /// Returns None when the binding is not a code_editor position event, the
     /// DSL already passes explicit args (they win), or the handler declares
     /// no params (nothing to forward — plain `@cursor="Handler"`).
-    pub(super) fn code_editor_event_payload_call(
+    pub(super) fn component_event_payload_call(
         &self,
         tag: &str,
         event: &str,
         aura_event: &AuraEvent,
     ) -> Option<String> {
-        if !matches!(tag, "code_editor" | "codeEditor") {
-            return None;
-        }
         let (base_key, _mods) = Self::split_event_key(event);
         let dom = Self::base_event_to_dom(base_key);
-        if !matches!(dom.as_str(), "cursor" | "contextmenu") {
+        let editor_position = matches!(tag, "code_editor" | "codeEditor")
+            && matches!(dom.as_str(), "cursor" | "contextmenu");
+        let book_selection = matches!(tag, "autodown" | "markdown" | "markdown_editor")
+            && dom == "bookselect";
+        if !editor_position && !book_selection {
             return None;
         }
         // Explicit DSL args at the binding site win over the emit payload.
@@ -5233,6 +5256,7 @@ impl VueGenerator {
         let args = match (declared.len(), dom.as_str()) {
             (0, _) => return None,
             (1, _) => "$event".to_string(),
+            (_, "bookselect") => return None,
             (_, "cursor") => "$event.line, $event.column".to_string(),
             _ => "$event.x, $event.y".to_string(),
         };

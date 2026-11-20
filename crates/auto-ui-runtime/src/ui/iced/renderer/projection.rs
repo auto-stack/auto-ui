@@ -8,6 +8,7 @@ use super::style_widgets::*;
 use super::subscriptions::*;
 use super::*;
 use iced::widget::column;
+use std::sync::Arc;
 
 impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
     fn into_iced(self) -> iced::Element<'static, M> {
@@ -114,7 +115,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
 
             // PLAN-080 UAT F-UAT-2: Rich 段落——单段落跨 span 连续折行
             // （markdown 行内序列唯一正确承载；Row 摆多 Text 不回流）。
-            AbstractView::Rich { spans, style } => {
+            AbstractView::Rich { spans, style, on_selection } => {
                 // F-UAT-2 勘误②：span 颜色仅在显式声明时设置（mark 类如
                 // text-primary/foreground），否则**不设色走 iced 祖先继承**
                 // ——与普通 Text 同链。曾加 OnBackground 强制回退，实测该
@@ -153,7 +154,26 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     }
                     spans_vec.push(span);
                 }
+                let text = on_selection.as_ref().map(|_| {
+                    spans_vec.iter().map(|span| span.text.as_ref()).collect::<String>()
+                });
                 let mut rich = iced::widget::text::Rich::<(), M>::with_spans(spans_vec);
+                if let (Some(on_selection), Some(text)) = (on_selection, text) {
+                    use crate::ui::iced::{selectable_text, selection::Selection};
+                    let line_starts = Arc::new(selectable_text::line_starts(&text));
+                    let hit_lines = Arc::clone(&line_starts);
+                    rich = rich.on_selection(
+                        move |paragraph, point| selectable_text::hit_global(paragraph.buffer(), &hit_lines, point),
+                        move |paragraph, range, position| selectable_text::selection_rects(
+                            paragraph.buffer(), &Selection { anchor: range.start, head: range.end },
+                            &line_starts, position),
+                        move |range| {
+                            let start = text.get(..range.start)?.encode_utf16().count();
+                            let end = start + text.get(range)?.encode_utf16().count();
+                            on_selection.call(start, end)
+                        },
+                    );
+                }
                 if let Some(ref s) = style {
                     let is = IcedStyle::from_style(s);
                     if let Some(fs) = effective_font_size(&is) {
@@ -4630,4 +4650,39 @@ fn fit_aware_root(
             .height(iced::Length::Fill)
             .into()
     }
+}
+
+#[cfg(test)]
+#[test]
+fn plan087_rich_drag_emits_utf16_selection() {
+    let view = AbstractView::Rich {
+        spans: vec![
+            crate::ui::view::RichSpanView {
+                content: "Hello ".into(),
+                style: None,
+            },
+            crate::ui::view::RichSpanView {
+                content: "world".into(),
+                style: Style::parse("font-bold").ok(),
+            },
+        ],
+        style: Style::parse("text-base").ok(),
+        on_selection: Some(crate::ui::view::RichSelectionCallback::new(|start, end| {
+            Some((start, end))
+        })),
+    };
+    let mut sim = iced_test::simulator(view.into_iced());
+    sim.point_at(iced::Point::new(1.0, 8.0));
+    let statuses = sim.simulate([
+        iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+        iced::Event::Mouse(iced::mouse::Event::CursorMoved {
+            position: iced::Point::new(70.0, 8.0),
+        }),
+        iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)),
+    ]);
+    assert!(statuses.iter().all(|status| *status == iced::event::Status::Captured));
+    let ranges: Vec<_> = sim.into_messages().collect();
+    assert_eq!(ranges.len(), 1);
+    assert_eq!(ranges[0].0, 0);
+    assert!(ranges[0].1 > 6, "drag must cross both rich spans: {ranges:?}");
 }
