@@ -669,7 +669,10 @@ pub fn prepare_component_source(
                         // 记录类型声明（`use types: Todo` → `type Todo { … }`）
                         // 内联：组件面单模块需要记录类型才可声明列表字段。
                         if let Some(block) = extract_unit_type(&unit_src, item) {
-                            type_blocks.push(block);
+                            // PLAN-105 T-02（U03 真语料 013/015）：组件面/collections
+                            // 域的记录文本字段用 **owned** `Str`（借用 `str` 字段会让
+                            // AV lowering 拒：`type kind Str outside av.collections/1`）。
+                            type_blocks.push(rewrite_record_text_fields(&block));
                             handled = true;
                             continue;
                         }
@@ -866,6 +869,30 @@ fn rewrite_str_contains(src: &str, need: &mut bool) -> String {
         let call = format!("__p105_str_contains({recv}, {arg})");
         out.replace_range(start..end + 1, &call);
         *need = true;
+    }
+    out
+}
+/// 记录类型块里的文本字段类型改写成 owned `Str`（`<field> str` → `<field> Str`）。
+fn rewrite_record_text_fields(block: &str) -> String {
+    let mut out = String::with_capacity(block.len());
+    for line in block.split_inclusive('\n') {
+        let trimmed_end = line.trim_end_matches(['\n', '\r']);
+        let nl = &line[trimmed_end.len()..];
+        let t = trimmed_end.trim_start();
+        let indent = &trimmed_end[..trimmed_end.len() - t.len()];
+        // 形如 `<name> str` / `<name> str,`（字段行）：首个空白后的类型词是 str。
+        let mut replaced = None;
+        if let Some((name, ty)) = t.split_once(char::is_whitespace) {
+            let ty_trim = ty.trim_end_matches(',').trim();
+            if ty_trim == "str" && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                let suffix = if ty.trim_end().ends_with(',') { "," } else { "" };
+                replaced = Some(format!("{indent}{name} Str{suffix}{nl}"));
+            }
+        }
+        match replaced {
+            Some(r) => out.push_str(&r),
+            None => out.push_str(line),
+        }
     }
     out
 }
