@@ -455,6 +455,16 @@ PLAN-114 的固定在途提交已有受检子组件输入、双端挂载、原�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 24 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang f7630b7dd | evidence: declared chart view properties type-check and original components advance to loop locals and required List handler input | next: work`
 
+### 第 25 轮｜视图循环中的普通属性检查
+
+普通视图属性、元素标签和条件样式引用循环变量时，复用事件载荷的受检循环降层，按作用域和元素类型检查循环值、下标及其派生表达式。相同的类型规则接受整数循环值与下标，并拒绝把整数元素与文本比较。其余值沿原检查路径。
+
+真实依赖齐备的 Area、Bar 和 Line 已跨过循环局部名未绑定。Area 的 `b["i"]` 和 Line 的 `p["x"]` 现收到元素为 `Str` 的索引类型诊断，Bar 的 `seg.g` 收到同一元素类型的记录投影诊断。三者的原列表均从空的裸 `List` 开始，由 handler 构造记录并写回。Donut 仍先在 handler 的必填 `.data` 处失败。原始源码保持输入哈希。
+
+Core 251 + 30 + 11、AV 66 + 33、SFC 20、路由 2、桌面闭包 4 通过。完整原输入 `round25-chart-admission/original-with-stylekit.log` 的 SHA256 为 `78a3c629ba9421b90425aaeb99e969304b271abf47f12558bb6f50a8a9c9c5a4`。合并树对照发现 PLAN-114 的运行时提交与当前工作在 AutoLang 13 个、AutoUI 6 个文件重叠。下一轮需要保留已核对的图表路径，并以真实构造、记录元素形状和输入传递为判据逐项兼容。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 25 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang 18d325284 | evidence: ordinary view expressions use checked loop locals, exact charts advance to authored record element and input typing | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
