@@ -495,6 +495,21 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 76 | from: work | t
 **开关**：路由组合默认关闭（`P105_ROUTE_PAGES=1` 打开）——保证六例 load 门保持绿，同时可继续逐墙推进；下一刀：页面未定型 `List` 字段的定型（按 `store` 返回值/元素用法推断元素类型）。
 
 **验证**：prep 7/7（含 `real_u03_apps_*` 两例）；018 走开关后墙位前移（壳件 11 叶 → 页面并入）。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 78 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 9add1b719 | next: work
+
+2026-11-19 stage: work（T-02 W75：`push(整局部)` 打通 + 用户口径落定）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `9add1b719` | task_ids: T-02（W75）
+
+**用户口径（D-105-A 答复）**：保留原验收口径；**先集中打通 013 Todo 一个完整应用**（对象元素列表 + 动态列表渲染 + 真实后端 API；Iced 与浏览器两端验证新增/筛选/切换状态、列表刷新与失败恢复），据此判断 Notes/Calendar/Kanban 的可复用面；124/125 另行并行。若 013 暴露需重做的共享接口，再按具体阻断重估。
+
+**本轮交付（关键解锁）**：`Task::RecordMethodOut` 也携带 `moved_flags`，并在构造 `ResolvedArg` 时按标记置 `moved`——**记录接收者**（`.todos.push(t)`）上的列表方法此前丢失 `.move` 语义，是所有记录列表用例的卡点。修好后：
+- `var t Todo = Todo { … }` + `.todos.push(t)` **通过**；
+- `todos.get(0).text.len()` 的**字段投影读取**也通过（`List<Record>` 的 sanctioned 读法）。
+- 新增永久回归 `p105_record_list_push_and_project_field`。
+
+**013 复用判断（首轮）**：store（`TodoStore`）的列表维护、记录构造、字段投影、条件 `for` 已可用；剩余两件是**动态列表渲染**（视图循环按运行时列表展开）与**后端 API 面**（`list_todos/create_todo/update_todo/delete_todo/remove_completed` —— 后端是纯 Auto 内存实现，可走「包级 store / 同进程调用」路线）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers **5/5**。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -516,6 +531,21 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 77 | from: work | t
 
 **需要用户决策（D-105-A）**：是否收窄交付口径，或继续深挖，或收敛到少数例做完整深交付。
 
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 78 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 9add1b719 | next: work
+
+2026-11-19 stage: work（T-02 W75：`push(整局部)` 打通 + 用户口径落定）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `9add1b719` | task_ids: T-02（W75）
+
+**用户口径（D-105-A 答复）**：保留原验收口径；**先集中打通 013 Todo 一个完整应用**（对象元素列表 + 动态列表渲染 + 真实后端 API；Iced 与浏览器两端验证新增/筛选/切换状态、列表刷新与失败恢复），据此判断 Notes/Calendar/Kanban 的可复用面；124/125 另行并行。若 013 暴露需重做的共享接口，再按具体阻断重估。
+
+**本轮交付（关键解锁）**：`Task::RecordMethodOut` 也携带 `moved_flags`，并在构造 `ResolvedArg` 时按标记置 `moved`——**记录接收者**（`.todos.push(t)`）上的列表方法此前丢失 `.move` 语义，是所有记录列表用例的卡点。修好后：
+- `var t Todo = Todo { … }` + `.todos.push(t)` **通过**；
+- `todos.get(0).text.len()` 的**字段投影读取**也通过（`List<Record>` 的 sanctioned 读法）。
+- 新增永久回归 `p105_record_list_push_and_project_field`。
+
+**013 复用判断（首轮）**：store（`TodoStore`）的列表维护、记录构造、字段投影、条件 `for` 已可用；剩余两件是**动态列表渲染**（视图循环按运行时列表展开）与**后端 API 面**（`list_todos/create_todo/update_todo/delete_todo/remove_completed` —— 后端是纯 Auto 内存实现，可走「包级 store / 同进程调用」路线）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers **5/5**。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
