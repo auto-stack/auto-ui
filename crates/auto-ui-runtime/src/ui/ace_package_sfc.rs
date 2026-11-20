@@ -15,6 +15,8 @@ use super::ace_route::{package_candidates, prepare_page, RouteSource, RouteTable
 
 use crate::ui::ace_package_lane::PackageFragmentLane;
 
+mod widgets;
+
 /// 生成一份可直接挂载的 Vue SFC（template + script setup）。
 pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result<String, String> {
     if let Some(product) = generate_routed_package_sfcs(units, entry)? {
@@ -282,10 +284,11 @@ fn generate_package_sfc_leaf(
 
     // ---- template ----
     let mut template = String::new();
-    let mut ctx = TmplCtx { out: &mut template, routed: route.is_some(), shell };
+    let mut ctx = TmplCtx::new(&mut template, route.is_some(), shell);
     ctx.push_str("<div class=\"age-sfc\">");
     render_items(&node.view.tree, &mut ctx)?;
     ctx.push_str("</div>");
+    script.push_str(&ctx.widget_state);
 
     Ok(format!(
         "<template>\n{template}\n</template>\n\n<script setup>\n{script}</script>\n"
@@ -296,9 +299,23 @@ struct TmplCtx<'a> {
     out: &'a mut String,
     routed: bool,
     shell: bool,
+    widget_state: String,
+    widget_count: usize,
+    scroll_depth: usize,
 }
 
-impl TmplCtx<'_> {
+impl<'a> TmplCtx<'a> {
+    fn new(out: &'a mut String, routed: bool, shell: bool) -> Self {
+        Self {
+            out,
+            routed,
+            shell,
+            widget_state: String::new(),
+            widget_count: 0,
+            scroll_depth: 0,
+        }
+    }
+
     fn push_str(&mut self, s: &str) {
         self.out.push_str(s);
     }
@@ -572,11 +589,17 @@ fn render_items(
     for it in items {
         match it {
             ComponentViewItem::Text(leaf) => {
+                if ctx.scroll_depth > 0 {
+                    ctx.push_str("<span>");
+                }
                 if let ace_core::source::ast::ExprKind::StrLit(s) = &leaf.expr.kind {
                     ctx.push_str(&escape_html(s));
                 } else {
                     let js = expr_to_template_js(&leaf.expr)?;
                     ctx.push_str(&format!("{{{{ {js} }}}}"));
+                }
+                if ctx.scroll_depth > 0 {
+                    ctx.push_str("</span>");
                 }
             }
             // PLAN-1072 刀B：循环项（`for <i>, <v> in <view-data>`）——
@@ -630,9 +653,12 @@ fn render_items(
                         continue;
                     }
                 }
+                if widgets::render(el, ctx)? {
+                    continue;
+                }
                 let tag = match el.tag.as_str() {
-                    "col" => "div",
-                    "row" => "div",
+                    "col" | "row" | "scroll" => "div",
+                    "text" if ctx.scroll_depth > 0 => "span",
                     "slider" => "input",
                     other => other,
                 };
@@ -643,11 +669,14 @@ fn render_items(
                 if el.tag == "row" {
                     classes.push("flex flex-row".into());
                 }
+                if el.tag == "scroll" {
+                    classes.push("overflow-y-auto".into());
+                }
                 let mut events: Vec<(String, String)> = Vec::new();
                 for sub in &el.items {
                     if let ComponentViewItem::Entry(en) = sub {
                         match en.key.as_str() {
-                            "style" => {
+                            "style" | "class" => {
                                 if let ComponentEntryValue::Expr(e) = &en.value {
                                     if let ace_core::source::ast::ExprKind::StrLit(s) = &e.kind {
                                         classes.push(s.clone());
@@ -683,6 +712,15 @@ fn render_items(
                     }
                 }
                 ctx.push_str(&format!("<{tag}"));
+                let scroll = el.tag == "scroll"
+                    || classes.iter().any(|class| {
+                        class.split_whitespace().any(|name| {
+                            matches!(name, "overflow-auto" | "overflow-x-auto" | "overflow-y-auto")
+                        })
+                    });
+                if scroll {
+                    ctx.push_str(" tabindex=\"0\"");
+                }
                 if !classes.is_empty() {
                     ctx.push_str(&format!(" class=\"{}\"", escape_attr(&classes.join(" "))));
                 }
@@ -711,7 +749,10 @@ fn render_items(
                         ctx.push_str(&escape_html(s));
                     }
                 }
-                render_items(&el.items, ctx)?;
+                ctx.scroll_depth += usize::from(scroll);
+                let children = render_items(&el.items, ctx);
+                ctx.scroll_depth -= usize::from(scroll);
+                children?;
                 ctx.push_str(&format!("</{tag}>"));
             }
             ComponentViewItem::Entry(_) => {}
@@ -786,7 +827,7 @@ mod p980_cond_render_tests {
 
     fn render(items: &[ComponentViewItem]) -> String {
         let mut out = String::new();
-        let mut ctx = TmplCtx { out: &mut out, routed: false, shell: false };
+        let mut ctx = TmplCtx::new(&mut out, false, false);
         render_items(items, &mut ctx).expect("render ok");
         out
     }

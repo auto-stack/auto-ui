@@ -95,6 +95,52 @@ widget SliderView {
     }
 }
 
+#[test]
+fn p125_package_sfc_widget_slots_keep_their_state_and_native_roles() {
+    let source = r#"
+widget Preview {
+    model { var shown bool = false }
+    view {
+        col {
+            accordion (type: "single", collapsible: "true") {
+                accordion-item (value: "first") {
+                    accordion-trigger "First"
+                    accordion-content { text "Answer" {} }
+                }
+            }
+            collapsible (open: .shown) {
+                collapsible-trigger { text "Toggle" {} }
+                collapsible-content { text "Open" {} }
+            }
+            scroll (style: "h-20") { text "Item" {} }
+            pagination (total: 100, per_page: 10) {
+                pagination-list {
+                    pagination-previous {}
+                    pagination-item (value: 10) { text "10" {} }
+                    pagination-next {}
+                }
+            }
+        }
+    }
+}
+"#;
+    let sfc = generate_package_sfc(&[unit("app", "main", source)], "app::main")
+        .expect("controls generate through the package route");
+    for expected in [
+        "const __ace_widget_1 = ref(null)",
+        ":aria-expanded=\"__ace_widget_1 === 0\"",
+        "? null : 0",
+        ":aria-expanded=\"shown\"",
+        "@click=\"shown = !shown\"",
+        "v-show=\"shown\"",
+        "tabindex=\"0\" class=\"overflow-y-auto h-20\"",
+        "Math.ceil(Number(100) / Math.max(1, Number(10)))",
+        ":aria-current=\"__ace_widget_3 === Number(10)",
+    ] {
+        assert!(sfc.contains(expected), "missing {expected}: {sfc}");
+    }
+}
+
 /// ①生成物结构：模板按钮/事件、refs、handler、helper 定义与公开状态。
 #[test]
 fn p980_package_sfc_has_template_script_and_state() {

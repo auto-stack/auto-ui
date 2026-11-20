@@ -36,7 +36,7 @@ use crate::ui::{Component, View};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 use ace_av::age_component::InitialValue as EngineInitialValue;
 use ace_av::age_component::{
@@ -45,6 +45,9 @@ use ace_av::age_component::{
     LegacyWidgetAlias,
 };
 use ace_core::source::packages::PackageModuleInput;
+
+mod widgets;
+pub use widgets::Action as WidgetAction;
 
 /// PLAN-980 ④-A #2b：桥的后端面——组件面单源引擎 / AGE 包闭包引擎。
 enum BridgeEngine {
@@ -301,6 +304,8 @@ pub struct HostSession {
     /// 之后编号）：(绑定字段名, 数值型？)。渲染值取该实例状态行——受控单
     /// 向数据流（键入→typed 事件→AV 重放→apply→回显）。
     pub inputs: Vec<(String, bool)>,
+    widget_tree: Option<Arc<[ace_core::source::age_component::ComponentViewItem]>>,
+    widget_instances: Vec<widgets::State>,
     queue: VecDeque<(usize, usize)>,
     closed: bool,
     /// 证据：实际 UI 提交计数/轨迹、poll 计数、late/stale 拒绝计数。
@@ -323,6 +328,8 @@ impl HostSession {
             labels: vec![Vec::new(); instances],
             buttons: Vec::new(),
             inputs: Vec::new(),
+            widget_tree: None,
+            widget_instances: Vec::new(),
             queue: VecDeque::new(),
             closed: false,
             applies: 0,
@@ -739,6 +746,7 @@ fn close_host_session(session: i32) -> i32 {
     }
     s.closed = true;
     s.queue.clear();
+    s.widget_tree = None;
     if h.current == Some(session) {
         h.current = None;
         h.stale_targets.push(session);
@@ -892,6 +900,7 @@ pub struct NodeDesktopBridge {
     tick_no: usize,
     /// PLAN-104：装载时的 view 树（条件可见性求值用；叶序与 texts 一致）。
     view_items: Vec<ace_core::source::age_component::ComponentViewItem>,
+    widget_initial_bools: std::collections::BTreeMap<String, bool>,
     /// PLAN-104：文本叶来自循环体模板展开（视图数据，非状态派生）——不参与
     /// 状态驱动的叶刷新。（PLAN-1106 T-05：源串与场景 op 历史随增量会话
     /// 接线退役——文本叶改由会话纯读 `AceStateEngine::read_texts`。）
@@ -1665,6 +1674,7 @@ impl NodeDesktopBridge {
             script: Vec::new(),
             tick_no: 0,
             view_items: node.view.tree.clone(),
+            widget_initial_bools: widgets::initial_bools(&node.fields),
             expanded_static,
             routes: None,
             route_actions: Default::default(),
@@ -1794,6 +1804,7 @@ impl NodeDesktopBridge {
             script: Vec::new(),
             tick_no: 0,
             view_items: node.view.tree.clone(),
+            widget_initial_bools: widgets::initial_bools(&node.fields),
             expanded_static: false,
             routes: None,
             route_actions: Default::default(),
@@ -1924,6 +1935,13 @@ impl NodeDesktopBridge {
                     .iter()
                     .map(|i| (i.field.clone(), i.numeric))
                     .collect();
+                if self.routes.is_none() && self.buttons.is_empty() && self.inputs.is_empty()
+                    && widgets::contains_preview(&self.view_items)
+                {
+                    s.widget_tree = Some(self.view_items.clone().into());
+                    s.widget_instances =
+                        vec![widgets::State::new(self.widget_initial_bools.clone()); instances];
+                }
             }
         }
         if deferred_snapshot {
@@ -2426,6 +2444,7 @@ impl NodeDesktopBridge {
                             "texts": s.texts,
                             "labels": s.labels,
                             "states": s.states,
+                            "widget_state": s.widget_instances.iter().map(widgets::State::evidence).collect::<Vec<_>>(),
                             "applied": s.applied.iter().map(|a| serde_json::json!({
                                 "instance": a.instance, "kind": a.kind,
                                 "slot": a.slot, "value": a.value,
@@ -2495,6 +2514,7 @@ pub enum NodeDesktopMsg {
     },
     SessionClick { session: i32, instance: usize, target: usize },
     SessionType { session: i32, instance: usize, target: usize },
+    Widget { session: i32, instance: usize, action: WidgetAction },
     BridgeTick,
 }
 
@@ -2505,6 +2525,35 @@ pub struct AceNodeDesktopWindow;
 
 impl Component for AceNodeDesktopWindow {
     type Msg = NodeDesktopMsg;
+
+    fn key_bindings(&self) -> std::collections::HashMap<String, String> {
+        if widget_keyboard_session().is_none() {
+            return Default::default();
+        }
+        widgets::KEYS
+            .iter()
+            .map(|key| (key.to_string(), key.to_string()))
+            .collect()
+    }
+
+    fn key_message(&self, key: &str) -> Option<Self::Msg> {
+        let session = widget_keyboard_session()?;
+        let host = host().read().ok()?;
+        let target = host
+            .sessions
+            .iter()
+            .find(|entry| entry.id == session && !entry.closed)?;
+        let tree = target.widget_tree.as_deref()?;
+        let state = target.widget_instances.first()?;
+        let texts = target.texts.first().map(Vec::as_slice).unwrap_or_default();
+        let values = target.states.first().map(Vec::as_slice).unwrap_or_default();
+        let action = widgets::keyboard_action(tree, texts, values, state, key)?;
+        Some(NodeDesktopMsg::Widget {
+            session,
+            instance: 0,
+            action,
+        })
+    }
 
     fn on(&mut self, msg: Self::Msg) {
         match msg {
@@ -2532,6 +2581,16 @@ impl Component for AceNodeDesktopWindow {
             }
             NodeDesktopMsg::BridgeTick => {
                 with_bridge(|b| b.step());
+            }
+            NodeDesktopMsg::Widget { session, instance, action } => {
+                let mut host = host().write().unwrap();
+                if let Some(target) = host.get(session) {
+                    if target.closed {
+                        target.stale_rejected += 1;
+                    } else if let Some(state) = target.widget_instances.get_mut(instance) {
+                        state.apply(action);
+                    }
+                }
             }
         }
     }
@@ -2571,6 +2630,19 @@ impl Component for AceNodeDesktopWindow {
     }
 }
 
+fn widget_keyboard_session() -> Option<i32> {
+    let page = with_bridge(|bridge| {
+        bridge.routes.as_deref().and_then(DesktopRoutes::page_session)
+    })
+    .flatten();
+    let host = host().read().ok()?;
+    let session = page.or(host.current)?;
+    host.sessions
+        .iter()
+        .any(|entry| entry.id == session && !entry.closed && entry.widget_tree.is_some())
+        .then_some(session)
+}
+
 struct HostFrame {
     id: i32,
     generation: u64,
@@ -2580,6 +2652,8 @@ struct HostFrame {
     inputs: Vec<(String, bool)>,
     visibility: Vec<Vec<bool>>,
     labels: Vec<Vec<String>>,
+    widget_tree: Option<Arc<[ace_core::source::age_component::ComponentViewItem]>>,
+    widget_instances: Vec<widgets::State>,
 }
 
 fn host_frame(session: &HostSession) -> HostFrame {
@@ -2592,6 +2666,8 @@ fn host_frame(session: &HostSession) -> HostFrame {
         inputs: session.inputs.clone(),
         visibility: session.visibility.clone(),
         labels: session.labels.clone(),
+        widget_tree: session.widget_tree.clone(),
+        widget_instances: session.widget_instances.clone(),
     }
 }
 
@@ -2599,7 +2675,21 @@ fn render_host_frame(
     frame: HostFrame,
     mut outlet: Option<(usize, View<NodeDesktopMsg>)>,
 ) -> View<NodeDesktopMsg> {
-    let HostFrame { id, generation, texts, states, buttons, inputs, visibility, labels } = frame;
+    let HostFrame {
+        id, generation, texts, states, buttons, inputs, visibility, labels, widget_tree,
+        widget_instances,
+    } = frame;
+    if let Some(tree) = widget_tree {
+        let children = widget_instances
+            .iter()
+            .enumerate()
+            .map(|(instance, widget_state)| {
+                let text = texts.get(instance).map(Vec::as_slice).unwrap_or_default();
+                let values = states.get(instance).map(Vec::as_slice).unwrap_or_default();
+                widgets::view(id, instance, &tree, text, values, widget_state)
+            });
+        return View::scrollable(View::col().children(children).build()).build();
+    }
     let mut root = View::col().spacing(10).child(View::text_styled(
         &format!("session generation {generation}"),
         "text-sm",

@@ -5039,7 +5039,7 @@ where
                 }
                 _ => None,
             });
-            iced::Subscription::batch(vec![tick, win])
+            iced::Subscription::batch(vec![tick, win, c.keyboard_subscription()])
         })
         .window(iced::window::Settings {
             size: seed,
@@ -5078,7 +5078,7 @@ where
             ),
             _ => None,
         });
-        iced::Subscription::batch(vec![tick, win])
+        iced::Subscription::batch(vec![tick, win, c.keyboard_subscription()])
     })
     .window(iced::window::Settings {
         size: seed,
@@ -5113,6 +5113,7 @@ where
 enum TickWrapMsg<M: Clone + Debug> {
     Inner(M),
     Tick,
+    Key(String),
     /// PLAN-022 T-03 窗口尺寸面(逻辑 px):iced Resized 事件直通。普通
     /// run_app 路径不走 dynamic_view_impl 的尺寸同步——theme thread_local
     /// 停在默认 1024×768,mux_window_width/height(020 T-00b D7 面)读到
@@ -5131,9 +5132,46 @@ impl<C: Component + 'static> TickWrap<C>
 where
     C::Msg: Clone + Debug + Send + 'static,
 {
+    fn keyboard_subscription(&self) -> iced::Subscription<TickWrapMsg<C::Msg>> {
+        if self.inner.key_bindings().is_empty() {
+            return iced::Subscription::none();
+        }
+        iced::event::listen_with(|event, status, _window_id| {
+            use iced::keyboard::{key::Named, Event, Key};
+            if status == iced::event::Status::Captured {
+                return None;
+            }
+            let iced::Event::Keyboard(Event::KeyPressed { key: Key::Named(key), modifiers, .. }) = event else {
+                return None;
+            };
+            if modifiers.control() || modifiers.alt() || modifiers.logo() {
+                return None;
+            }
+            let name = match key {
+                Named::Tab if modifiers.shift() => "Shift+Tab",
+                Named::Tab => "Tab",
+                Named::Enter => "Enter",
+                Named::Space => " ",
+                Named::ArrowLeft => "ArrowLeft",
+                Named::ArrowRight => "ArrowRight",
+                Named::ArrowUp => "ArrowUp",
+                Named::ArrowDown => "ArrowDown",
+                Named::Home => "Home",
+                Named::End => "End",
+                _ => return None,
+            };
+            Some(TickWrapMsg::Key(name.to_owned()))
+        })
+    }
+
     fn update(&mut self, msg: TickWrapMsg<C::Msg>) {
         match msg {
             TickWrapMsg::Inner(m) => self.inner.on(m),
+            TickWrapMsg::Key(key) => {
+                if let Some(message) = self.inner.key_message(&key) {
+                    self.inner.on(message);
+                }
+            }
             // 运行时铸造真实 tick 消息(此处的值不进任何 const 上下文)。
             TickWrapMsg::Tick => {
                 if let Some(m) = self.inner.tick_msg() {
