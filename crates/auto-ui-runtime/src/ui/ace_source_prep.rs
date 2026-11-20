@@ -794,10 +794,155 @@ pub fn prepare_component_source(
             }
         }
     }
+    // PLAN-105 T-02（U03 真语料 012）：`var NAME []T = []` 的空列表初值改为
+    // `List<T>.new()`（共享 resolver 要求空字面量带元素类型）。
+    out = rewrite_empty_list_inits(&out);
+    // PLAN-105 T-02（U03 真语料 012）：**宿主服务仿真**——`storage.get/set(<key>)`
+    // 与 `Time.now_sec()` 在组件面没有宿主表，改写成**模型字段**（键 → 字段名
+    // 稳定映射）：`storage.get("k")` → `.__st_k`；`storage.set("k", v)` →
+    // `.__st_k = v`；`Time.now_sec()` → `.__now_sec`（宿主装载时种子注入）。
+    let mut host_fields: Vec<(String, String)> = Vec::new();
+    out = rewrite_host_storage(&out, &mut host_fields);
+    if !host_fields.is_empty() {
+        out = inject_model_fields(&out, &host_fields);
+    }
     Ok(PreparedComponentSource {
         source: out,
         inlined,
     })
+}
+
+/// `var NAME []T = []` → `var NAME []T = List<T>.new()`（空列表字面量需元素类型）。
+fn rewrite_empty_list_inits(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    for line in src.split_inclusive('\n') {
+        let trimmed_end = line.trim_end_matches(['\n', '\r']);
+        let nl = &line[trimmed_end.len()..];
+        let t = trimmed_end.trim_start();
+        let indent = &trimmed_end[..trimmed_end.len() - t.len()];
+        let replaced = (|| {
+            let rest = t.strip_prefix("var ")?;
+            let (name, rest) = rest.split_once(' ')?;
+            let (ty, init) = rest.split_once('=')?;
+            let ty = ty.trim();
+            let init = init.trim();
+            if init != "[]" || !ty.starts_with('[') {
+                return None;
+            }
+            let elem = ty.trim_start_matches('[').trim_start_matches(']').trim();
+            if elem.is_empty() {
+                return None;
+            }
+            // 元素域用 owned 文本（`str` → `Str`；822 元素域不收借用 str）。
+            let elem = if elem == "str" { "Str" } else { elem };
+            let _ = &ty;
+            Some(format!("{indent}var {name} {ty} = List<{elem}>.new(){nl}"))
+        })();
+        match replaced {
+            Some(r) => out.push_str(&r),
+            None => out.push_str(line),
+        }
+    }
+    out
+}
+/// 键 → 稳定字段名（非标识符字符折成 `_`）。
+fn host_field_name(key: &str) -> String {
+    let mut s = String::from("__st_");
+    for c in key.chars() {
+        if c.is_alphanumeric() || c == '_' {
+            s.push(c);
+        } else {
+            s.push('_');
+        }
+    }
+    s
+}
+
+/// `storage.get/set(<literal key>, …)` 与 `Time.now_sec()` 的组件面改写。
+fn rewrite_host_storage(src: &str, fields: &mut Vec<(String, String)>) -> String {
+    let mut out = src.to_string();
+    // Time.now_sec() → .__now_sec（模型 int 字段，宿主装载时种子注入）。
+    if out.contains("Time.now_sec()") {
+        out = out.replace("Time.now_sec()", ".__now_sec");
+        if !fields.iter().any(|(n, _)| n == "__now_sec") {
+            fields.push(("__now_sec".to_string(), "int".to_string()));
+        }
+    }
+    // storage.set("key", <expr>) → .__st_key = <expr>
+    loop {
+        let Some(pos) = out.find("storage.set(") else { break };
+        let rest = &out[pos + "storage.set(".len()..];
+        let Some(q) = rest.find('"') else { break };
+        let after_q = &rest[q + 1..];
+        let Some(q2) = after_q.find('"') else { break };
+        let key = after_q[..q2].to_string();
+        // 逗号后到配对的 ')'。
+        let args = &after_q[q2 + 1..];
+        let Some(comma) = args.find(',') else { break };
+        let mut depth = 0i32;
+        let mut end = None;
+        for (i, ch) in args[comma + 1..].char_indices() {
+            match ch {
+                '(' | '[' | '{' => depth += 1,
+                ')' if depth == 0 => {
+                    end = Some(i);
+                    break;
+                }
+                ')' | ']' | '}' => depth -= 1,
+                _ => {}
+            }
+        }
+        let Some(end) = end else { break };
+        let value = args[comma + 1..comma + 1 + end].trim().to_string();
+        let name = host_field_name(&key);
+        if !fields.iter().any(|(n, _)| n == &name) {
+            fields.push((name.clone(), "str".to_string()));
+        }
+        let stmt = format!(".{name} = {value}");
+        let whole_end = pos + "storage.set(".len() + q + 1 + q2 + 1 + comma + 1 + end + 1;
+        out.replace_range(pos..whole_end, &stmt);
+    }
+    // storage.get("key") → .__st_key
+    loop {
+        let Some(pos) = out.find("storage.get(") else { break };
+        let rest = &out[pos + "storage.get(".len()..];
+        let Some(q) = rest.find('"') else { break };
+        let after_q = &rest[q + 1..];
+        let Some(q2) = after_q.find('"') else { break };
+        let key = after_q[..q2].to_string();
+        let tail = &after_q[q2 + 1..];
+        let Some(close) = tail.find(')') else { break };
+        if !tail[..close].trim().is_empty() {
+            break;
+        }
+        let name = host_field_name(&key);
+        if !fields.iter().any(|(n, _)| n == &name) {
+            fields.push((name.clone(), "str".to_string()));
+        }
+        let whole_end = pos + "storage.get(".len() + q + 1 + q2 + 1 + close + 1;
+        out.replace_range(pos..whole_end, &format!(".{name}"));
+    }
+    out
+}
+
+/// 把宿主仿真字段插进 `model {` 块尾（无 model 块则不插）。
+fn inject_model_fields(src: &str, fields: &[(String, String)]) -> String {
+    let Some(model_at) = src.find("model {") else {
+        return src.to_string();
+    };
+    let Some(close) = src[model_at..].find('}').map(|i| model_at + i) else {
+        return src.to_string();
+    };
+    let indent_at = src[..model_at].rfind('\n').map(|i| model_at - i - 1).unwrap_or(0);
+    let indent = " ".repeat(indent_at + 4);
+    let mut block = String::new();
+    for (name, ty) in fields {
+        let default = if ty == "int" { "0" } else { "\"\"" };
+        block.push_str(&format!("{indent}var {name} {ty} = {default}\n"));
+    }
+    let mut out = src.to_string();
+    out.insert_str(close, &format!("\n{block}"));
+    out
 }
 
 #[cfg(test)]
