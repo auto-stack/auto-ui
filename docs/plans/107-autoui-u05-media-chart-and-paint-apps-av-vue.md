@@ -221,6 +221,19 @@ AutoLang 准备 5.65 s，最后重链 1.83 s。AutoUI 测试准备 44.10 s、探
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 27ae0d33, lang defb95510 | evidence: projected quoted ARIA and observed generated SFC keyboard binding and unmount in Chrome | next: work`
 
+**Carousel 的 A2Vue 实际组件（T-03/T-05 进行中）。** AutoUI `6e8f8d89641e25fc3c3b5da8c8391eb8a81d0973`，AutoLang `defb95510`。基线以同一原页生成标签 `<carousel>`，没有组件实现。受检包模板现在复用仓内 Embla 的 Carousel、Content、Item、Previous、Next，保留 orientation、align、loop、样式与 `span/td` 的字面文本。Vue 脚手架从最终 SFC 收集 Carousel 及其 Button 依赖，初次离线安装包含 Embla、VueUse、Reka 和 CVA。验证使用独立单路由应用，复制原画廊页逐字不改，原页 SHA256 `f43f17c29a83924abc3061494e873f54140982ba828367a4a33f820cae891bf1`。
+
+| 实际命令或操作 | 结果 | 墙钟执行 |
+|---|---|---:|
+| 严格入口 `AUTO_UI_ACE_VUE=1 auto build --render vue --gen-only` | exit 0，生成主件及实际路由页，物化 10 个组件文件 | 1.784 s |
+| `pnpm install --offline` → `pnpm build` | 安装 exit 0。原生成配置下 `vue-tsc` exit 2，缺 JS SFC 模块类型。对照配置复用 PLAN-123 `ad522af8` 的 `allowJs` 后 `vue-tsc`/Vite 均 exit 0 | 6.886 / 1.920 / 4.728 s |
+| Chrome 真实指针、键盘、拖拽和卸载 | 五组可访问区域挂载，Basic 从首项前进、回退，末项禁用下一页；拖拽后滑轨位移超过宽度 75%。Sizes 比例约 1/3，Spacing 为 1/2。Orientation 的 `ArrowDown` 仅移动纵轴，Options 首项可回绕。零页面异常，卸载成功，页面关闭 | 3.248 s |
+| `plan980_package_sfc` 及 `vue::tests::package_json_component_groups_conditional` | 11/11、1/1，覆盖 Carousel 属性、标签、内容和 Button 传递依赖，另两个既有浏览器用例未选 | 0.159 / 0.250 s |
+
+工具最终增量准备 13.88 s，两个测试编译 16.32 / 10.58 s，发现/清理未单独计时。首次 `align` 将引号做 HTML 实体导致 `vue-tsc` 语法检查失败，已改用经过校验的 Embla 对齐选项值。后续 build 对照只加 PLAN-123 已有的 `allowJs` 配置。生成、原配置构建、配置对照构建、浏览器日志 SHA256 依次为 `46a23bb16087452c39817b4fca627cc6930cdb0589e9f2de4c52503b8e95c755`、`45be3aa5deb3bc341b3688e78402205559548c49c8b987046c3958b593fc09c8`、`347baf9db0423a697f6479595785f5c8392e651788d1745d401fe38eac1be973`、`496077fa9740e1db075b7e3ea9ce9cf78b79ceee1787a03f48d2fb9d1174a0d2`（`carousel-route-final-{generate,unadapted,build}.log`、`carousel-route-browser-final.log`）。整画廊与官方源闭包、Iced Carousel 仍待 §5 验收。CodeEditor 原调用可复用现行 Iced 编辑器注册表与 Vue `editorBridge`，AGE 包面需要受检绑定和真实挂载；原页消息与归属门继续按 B-107-02 追踪。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 6 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 6e8f8d89, lang defb95510 | evidence: checked original Carousel page in a route replay with five Embla previews and real browser interactions | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
