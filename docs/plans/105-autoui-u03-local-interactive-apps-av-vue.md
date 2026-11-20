@@ -304,6 +304,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 59 | from: work | t
 **012 真窗推进**：`contains` 与 `array-lit-empty` 诊断消失；剩余墙 = `rows.push(<拼接表达式>)` 的 `source.move-required`（owned 元素实参需 `.move` 形式或新建构造，且 `array-lit-position` 限制数组字面量只在初值位）。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3；prep 7/7。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 60 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 2453bbd56 | next: work
+
+2026-11-19 stage: work（T-02 W57：push 新值面 + 012 新墙定位）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `2453bbd56` | task_ids: T-02（W57）| evidence: 012 诊断 span 定位
+
+**交付**：`check_push_value` 的「owned 元素实参」接受面扩到**新值**——`Binary`（文本拼接）/`CallFn`/`StrLit`/`VariantCtor` 均视为 fresh rvalue 提交（`rows.push(a + " " + b)` 不再要求 `.move`）。`ReadLocal` 仍按原规则具名拒。
+
+**012 真窗推进（带 span 的定位证据）**：`move-required` 消失；新墙 = **`str`/`Str` 混用**：诊断 `expected str, found Str` 的 span 落在 012 的**填充字面量**上（`"      "` / `"   "`），即文本拼接/文本方法把 owned `Str` 与借用 `str` 混在一处。根因方向：组件面把 model `str` 字段映射为 **StrOwned**，而文本运算/方法链的期望位仍按借用 `str` 推。
+
+**验证**：plan105 25/25、980 39/39、981 248/248；prep 7/7（清理探针后复跑）。
+
+**下一刀**：文本运算的 `str`/`Str` 双通（拼接、slice 链、`TextDisplay` 操作数），或在组件面把「文本字段参与运算」统一切到 owned 车道。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
