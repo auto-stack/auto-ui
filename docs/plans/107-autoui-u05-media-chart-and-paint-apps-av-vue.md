@@ -465,6 +465,16 @@ Core 251 + 30 + 11、AV 66 + 33、SFC 20、路由 2、桌面闭包 4 通过。�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 25 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang 18d325284 | evidence: ordinary view expressions use checked loop locals, exact charts advance to authored record element and input typing | next: work`
 
+### 第 26 轮｜从 handler 构造推断旧图表的记录列表
+
+旧 widget 的空模型 `List` 如果从 handler 中接受局部列表，且该局部列表中追加的记录字段及类型一致，则投影为共享的名义记录列表。模型和 builder 使用同一类型，追加和赋值仍由共享验证器检查。派发对照在两实例中得到列表长度 0 与 1，混合追加形状被拒。
+
+逐字节原组件的 Area `bands`、Bar `segs0..3` 与 `bands`、Line `pts0..3` 均得到正确的记录元素类型，同形元素共享名义类型。Area、Bar 和 Line 的首错推进到文本键索引，验证器明确看到接收者为 record。Donut 仍先在 handler 的必填 `.data` 处失败。原闭包证据 `round26-chart-admission/original-with-stylekit.log` 的 SHA256 为 `fb93aa0d87cbc69f4bf72a6354cffab31131b1dc0cbedb8e210ecce4168a9a02`。
+
+Core 251 + 30 + 11、AV 67 + 33、SFC 20、路由 2、桌面闭包 4 通过。下一步支持已知记录的静态键读取及拥有型字段借用，再联结构造调用者提供的裸 `List` 数据。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 26 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b2c795c4, lang 2aecf2157 | evidence: exact native chart builders infer shared typed records and advance to record bracket reads, AV confirms instance-local appends | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
