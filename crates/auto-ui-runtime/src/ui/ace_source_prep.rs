@@ -803,6 +803,7 @@ pub fn prepare_component_source(
     // PLAN-105 T-02（U03 真语料 012）：`<text>.contains(<sub>)`——语言无该内建
     // 方法，改写为 prep 注入的文本谓词 helper（`len`/`slice`/`==` 皆既有内建）。
     let mut need_str_contains = false;
+    out = rewrite_model_text_fields(&out);
     out = rewrite_str_contains(&out, &mut need_str_contains);
     out = rewrite_while_to_for(&out);
     if need_str_contains {
@@ -1301,6 +1302,48 @@ fn inline_memory_backend(app_root: &Path, store_src: &str) -> Option<String> {
     }
     Some(out)
 }
+/// 组件面 `model` 块的文本字段类型改写成 owned `Str`（`var x str = …` →
+/// `var x Str = …`）：AV lowering 的 collections 面不承载借用 `Str`。
+fn rewrite_model_text_fields(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    let mut model_depth = 0i32;
+    for line in src.split_inclusive('\n') {
+        let t = line.trim_start();
+        if model_depth == 0 && t.starts_with("model") && t.contains('{') {
+            model_depth = 1;
+            out.push_str(line);
+            continue;
+        }
+        if model_depth > 0 {
+            let opens = line.matches('{').count() as i32;
+            let closes = line.matches('}').count() as i32;
+            // `var <name> str …` 的字段行：把类型词换成 Str。
+            let mut rewritten = line.to_string();
+            if opens == 0 && closes == 0 {
+                if let Some(pos) = t.find("var ") {
+                    let rest = &t[pos + 4..];
+                    let mut parts = rest.splitn(3, char::is_whitespace);
+                    let name = parts.next().unwrap_or("");
+                    let ty = parts.next().unwrap_or("");
+                    if ty == "str" && !name.is_empty() {
+                        let indent = &line[..line.len() - t.len()];
+                        let after = parts.next().unwrap_or("");
+                        rewritten = if after.is_empty() {
+                            format!("{indent}var {name} Str\n")
+                        } else {
+                            format!("{indent}var {name} Str {after}")
+                        };
+                    }
+                }
+            }
+            model_depth += opens - closes;
+            out.push_str(&rewritten);
+            continue;
+        }
+        out.push_str(line);
+    }
+    out
+}
 /// 记录类型块里的文本字段类型改写成 owned `Str`（`<field> str` → `<field> Str`）。
 fn rewrite_record_text_fields(block: &str) -> String {
     let mut out = String::with_capacity(block.len());
@@ -1640,6 +1683,31 @@ mod tests {
 
     /// PLAN-105 T-02：带工程根的 SFC 生成——entry 的 `use`/依赖样式先过源准备，
     /// 组件投影才拿得到可吃进的单源（真语料形态的最小复现）。
+    #[test]
+    fn diagw82_span_013() {
+        std::env::set_var("P105_MEM_BACKEND", "1");
+        let ui_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
+        let app_root = ui_root.join("013-todo");
+        let path = app_root.join("src/front/app.at");
+        let src = std::fs::read_to_string(&path).unwrap();
+        let prepared = prepare_component_source(&app_root, &src).unwrap();
+        let caps = vec!["ac.runtime.text.v1".to_string()];
+        let sc = ace_core::source::age_component::ComponentScenario { instances: 1, ops: Vec::new() };
+        if let Err(ds) = ace_core::source::age_component::compile_component_scenario(
+            &prepared.source,
+            path.to_str().unwrap(),
+            ace_core::source::age_h0::LegacyWidgetAlias::Accept,
+            &caps,
+            &sc,
+        ) {
+            for d in ds.iter().take(3) {
+                let a = d.span.start.saturating_sub(80).min(prepared.source.len());
+                let b = (d.span.end + 80).min(prepared.source.len());
+                println!("[d82] {} :: {:?}", d.message, &prepared.source[a..b]);
+            }
+        }
+        std::env::remove_var("P105_MEM_BACKEND");
+    }
     #[test]
     fn sfc_generation_prepares_entry_source() {
         let root = std::env::temp_dir().join(format!(
