@@ -348,6 +348,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 63 | from: work | t
 **纪律**：过程中一次 `age_eq` 归位脚本误改了 `verify_function` 的 `Verifier` 初始化并删掉一行 `let m = …`，已修复并跑全绿（教训：按行号改代码前先确认锚点唯一）。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 64 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: b564a8ae1 | next: work
+
+2026-11-19 stage: work（T-02 W61：检查函数路径的列表初值 + 013/012 迭代语义定位）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `b564a8ae1` | task_ids: T-02（W61）| evidence: 012 诊断 span（view-escape）
+
+**交付**：handler **检查函数**路径同样把列表字段的空数组初值规范化成 `List<T>.new()`（此前只有场景路径做，导致 `source.array-lit-empty` 在检查函数里仍命中）；列表回归整理回三例。
+
+**012 墙序列推进**：`immutable-write` 的根因定位到 **`for c in .cities` 的元素绑定**——`List<Str>` 的整元素是**视图**，绑定到局部会触发 `source.view-escape`（"a whole owned element is not a value; project a field or use remove"）。012 的用法是 `rows.push(c + "  " + …)`（元素在表达式内联使用），因此**正解**是 for-each 降级时**不做 `let` 绑定**，而把元素表达式**内联替换**进循环体（每个使用点展开成 `iter[i]`）。
+
+**下一刀**：for-each 降级改为 AST 级**元素内联替换**（文本元素视图语义），替换后再走同一 hook 降级；`List<Record>` 元素仍可绑定（字段投影合法）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
