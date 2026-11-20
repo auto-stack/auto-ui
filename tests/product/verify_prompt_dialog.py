@@ -15,9 +15,28 @@ import time
 import urllib.error
 import urllib.request
 
-from verify_collection_view import BrowserMcp, browser_button, native_button, native_call, stop_tree, wait_for
+from prompt_dialog_preview import RECEIPT, checked_preview
+from verify_collection_view import (
+    BrowserMcp, browser_button, browser_result, native_button, native_call, stop_tree, wait_for,
+)
 from verify_file_dialog import free_port, windows_for
 from verify_pagination import bindable_port
+
+
+PREVIEW_SERVER = """
+import { preview } from 'vite';
+const target = process.env.AUTO_HTTP_PROXY;
+await preview({
+    configFile: false,
+    preview: {
+        host: '127.0.0.1',
+        port: Number(process.argv[1]),
+        strictPort: true,
+        open: false,
+        proxy: target ? { '/api': { target, changeOrigin: true } } : {},
+    },
+});
+"""
 
 
 def available_port():
@@ -183,9 +202,7 @@ class ProductSession:
             self.windows = wait_for(self.discover_native_window, bool,
                                     seconds=self.args.startup_timeout)
         else:
-            env["TAURI_ENV"] = "1"
-            command = ["node", "node_modules/vite/bin/vite.js", "preview",
-                       "--host", "127.0.0.1", "--port", str(self.port), "--strictPort"]
+            command = ["node", "--input-type=module", "--eval", PREVIEW_SERVER, str(self.port)]
             self.process = subprocess.Popen(
                 command, cwd=self.args.app_dir, env=env, stdout=log, stderr=subprocess.STDOUT,
                 creationflags=subprocess.CREATE_NO_WINDOW,
@@ -206,6 +223,7 @@ class ProductSession:
             expected = "名称管理" if self.args.consumer == "demo" else "主目录"
             self.wait_text(expected)
             self.owned = self.processes.owned(self.process.pid, self.browser.process.pid)
+            assert not any(name.lower() == "esbuild.exe" for _, name, _ in self.owned.values())
         if self.backend_process is not None:
             self.owned.update(self.processes.owned(self.backend_process.pid))
         if self.system_helper is not None:
@@ -268,6 +286,9 @@ class ProductSession:
         tool = "browser_snapshot" if self.browser is not None else "autoui_snapshot"
         self.last_snapshot = self.call(tool)
         return self.last_snapshot
+
+    def browser_result(self, tool, **arguments):
+        return browser_result(self.call(tool, **arguments))
 
     def wait_text(self, *fragments, absent=()):
         return wait_for(self.snapshot, lambda tree: all(part in tree for part in fragments)
@@ -340,15 +361,25 @@ class ProductSession:
                 try:
                     if self.process is not None:
                         stop_tree(self.process)
-                        if self.ready and not failed:
+                        if self.ready:
                             try:
                                 refused = self.call("browser_navigate", url=f"http://127.0.0.1:{self.port}/")
                             except AssertionError as error:
                                 refused = str(error)
                             assert "ERR_CONNECTION_REFUSED" in refused, refused
-                    self.call("browser_close")
                 finally:
+                    started = time.monotonic()
+                    # The provider closes its isolated browser when stdin ends.
+                    # A separate browser_close RPC performs redundant shutdown.
                     self.browser.close()
+                    browser_exit = self.browser.process.returncode
+                    self.journal.write(json.dumps({
+                        "lifecycle": "browser provider stdin close",
+                        "exit_code": browser_exit,
+                        "elapsed": time.monotonic() - started,
+                    }) + "\n")
+                    if self.ready and not failed:
+                        assert browser_exit == 0, f"Browser MCP did not exit normally ({browser_exit})"
             if self.process is not None and self.process.poll() is None:
                 if failed or not self.ready:
                     stop_tree(self.process)
@@ -379,26 +410,42 @@ class ProductSession:
             if self.args.backend == "vue" and self.process is not None:
                 assert not self.port_open(self.port), "Vue service port survived cleanup"
         finally:
-            if self.process is not None:
-                stop_tree(self.process)
-            if self.system_helper is not None:
-                stop_tree(self.system_helper)
-            if self.backend_process is not None:
-                stop_tree(self.backend_process)
-                assert not self.port_open(self.backend_port), "prepared API port survived cleanup"
-            for log in self.logs:
-                log.close()
-        self.verify_closed()
+            try:
+                errors = []
+                browser_process = self.browser.process if self.browser else None
+                for process in (self.process, self.system_helper, self.backend_process, browser_process):
+                    if process is not None:
+                        try:
+                            stop_tree(process)
+                        except Exception as error:
+                            errors.append(f"PID {process.pid}: {error!r}")
+                self.verify_closed()
+                assert not errors, errors
+            finally:
+                for log in self.logs:
+                    log.close()
 
     def verify_closed(self):
+        evidence = {"lifecycle": "owned process and port release", "released_pids": [],
+                    "rebound_ports": [], "errors": []}
         for pid, (_, _, expected_creation) in self.owned.items():
-            observed = self.processes.inspect(pid, check_exited=True)
-            if observed is not None and observed[0] == expected_creation:
-                assert observed[1], f"Owned PID {pid} survived cleanup"
+            try:
+                observed = self.processes.inspect(pid, check_exited=True)
+                if observed is not None and observed[0] == expected_creation and not observed[1]:
+                    raise RuntimeError(f"Owned PID {pid} survived cleanup")
+                evidence["released_pids"].append(pid)
+            except (OSError, RuntimeError) as error:
+                evidence["errors"].append(str(error))
         for port in (self.port if self.ready else None, self.backend_port):
             if port is not None:
-                with socket.socket() as listener:
-                    listener.bind(("127.0.0.1", port))
+                try:
+                    with socket.socket() as listener:
+                        listener.bind(("127.0.0.1", port))
+                    evidence["rebound_ports"].append(port)
+                except OSError as error:
+                    evidence["errors"].append(f"Port {port}: {error}")
+        self.journal.write(json.dumps(evidence) + "\n")
+        assert not evidence["errors"], evidence["errors"]
 
 
 def demo_names(session):
@@ -429,7 +476,7 @@ def demo_cancel(session):
     session.key("Escape")
     session.wait_text("已取消笔记本重命名", "notebook-7: Inbox", absent=("例如 Reading journal",))
     if session.browser is not None:
-        focused = session.browser.result_value("browser_run_code_unsafe", code="""async (page) => {
+        focused = session.browser_result("browser_run_code_unsafe", code="""async (page) => {
           await page.waitForFunction(() => document.activeElement?.textContent?.trim() === '重命名笔记本',
                                      undefined, { timeout: 1500 });
           return await page.evaluate(() =>
@@ -465,7 +512,7 @@ def demo_ime(session):
     session.press("重命名笔记本")
     session.wait_text("笔记本名称")
     assert session.browser is not None
-    result = session.browser.result_value("browser_run_code_unsafe", code="""async (page) => {
+    result = session.browser_result("browser_run_code_unsafe", code="""async (page) => {
       const box = page.getByRole('textbox', { name: '笔记本名称' });
       return await box.evaluate(el => {
         el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
@@ -499,7 +546,7 @@ def demo_visual_dark(session):
     session.enter_text(" ", "分组名称")
     session.wait_text("请输入名称")
     if session.browser is not None:
-        appearance = session.browser.result_value("browser_run_code_unsafe", code="""async (page) => {
+        appearance = session.browser_result("browser_run_code_unsafe", code="""async (page) => {
           const dialog = page.getByRole('dialog', { name: '重命名分组' });
           return await dialog.evaluate(async el => {
             const animations = el.getAnimations({ subtree: true });
@@ -707,6 +754,13 @@ def file_creation_rejected(session):
 def reopened_controls(session):
     session.press("重命名分组")
     session.wait_text("分组名称", "Research", "已保存 0 次")
+    session.key("Escape")
+    session.wait_text("已取消分组重命名", "group-1: Research", "已保存 0 次", absent=("例如 项目分类",))
+
+
+def rejected_control_action(session):
+    result = session.call("autoui_action", element_id="vnode_0", action="press")
+    assert not result.startswith("Error:"), result
 
 
 def nested_modal_fences_lower_controls_and_wraps_focus(session):
@@ -720,7 +774,7 @@ def nested_modal_fences_lower_controls_and_wraps_focus(session):
         assert blocked.startswith("Error:"), blocked
         time.sleep(0.35)
     else:
-        trapped = session.browser.result_value("browser_run_code_unsafe", code="""async (page) => {
+        trapped = session.browser_result("browser_run_code_unsafe", code="""async (page) => {
           return await page.evaluate(() => {
             document.querySelector('input[placeholder="Outer value"]').focus();
             return document.activeElement?.getAttribute('placeholder') === 'Inner value';
@@ -752,7 +806,7 @@ def scroll_long_dialog_keeps_footer_reachable(session):
         assert not response.startswith("Error:"), response
         wait_for(overflow, lambda value: value and value["offset"][1] > 0, seconds=3)
     else:
-        moved = session.browser.result_value("browser_run_code_unsafe", code="""async (page) => {
+        moved = session.browser_result("browser_run_code_unsafe", code="""async (page) => {
           const body = page.getByRole('dialog').locator('.overflow-y-auto');
           const before = await body.evaluate(el => el.scrollTop);
           await body.hover();
@@ -782,6 +836,7 @@ CASES = {
     "system-input": demo_system,
     "system-invoke": demo_system,
     "reopen": reopened_controls,
+    "cleanup-negative": rejected_control_action,
     "nested": nested_modal_fences_lower_controls_and_wraps_focus,
     "scroll": scroll_long_dialog_keeps_footer_reachable,
     "file-rename": file_manager_rename,
@@ -863,12 +918,19 @@ def main():
               "scope": "case", "lifecycle_case": "reopen",
               "app_dir": str(args.app_dir), "startup_timeout": args.startup_timeout,
               "runner_sha256": digest(__file__)}
+    preview_error = None
+    if args.backend == "vue" and args.app_dir.is_dir():
+        try:
+            checked_preview(args.app_dir)
+        except (OSError, ValueError) as error:
+            preview_error = str(error)
     if os.name != "nt" or not args.auto_bin.is_file() or not args.ui_tool_bin.is_file() or not args.app_dir.is_dir():
         report.update(result="not_run", error="Windows and prepared source-bound tools and project required")
     elif args.backend == "vue" and (not args.browser_mcp_config or not args.browser_mcp_config.is_file()
-                                    or not (args.app_dir / "node_modules/vite/bin/vite.js").is_file()
-                                    or not (args.app_dir / "dist/index.html").is_file()):
-        report.update(result="not_run", error="prepared Vue preview bundle and browser MCP configuration required")
+                                    or not (args.app_dir / "node_modules/vite/bin/vite.js").is_file()):
+        report.update(result="not_run", error="installed Vite and browser MCP configuration required")
+    elif preview_error is not None:
+        report.update(result="not_run", error=preview_error)
     elif args.consumer == "file-manager" and args.backend == "native" and (not args.api_bin or not args.api_bin.is_file()):
         report.update(result="not_run", error="prepared File Manager API binary required")
     elif args.consumer == "file-manager" and args.backend == "vue" and (not args.api_dir or not args.api_dir.is_dir()):
@@ -877,6 +939,8 @@ def main():
         report.update(result="not_run", error="this composition case targets the Vue input adapter")
     elif args.case.startswith("system-") and args.backend != "native":
         report.update(result="not_run", error="this system tree case targets the Windows native provider")
+    elif args.case == "cleanup-negative" and args.backend != "native":
+        report.update(result="not_run", error="this action failure control targets native MCP")
     elif args.case.endswith("-rejected") and args.backend != "native":
         report.update(result="not_run", error="this file-system error case requires Windows native write access")
     else:
@@ -892,6 +956,8 @@ def main():
             report["tools"]["file-manager-api"] = digest(args.api_bin)
         if args.browser_mcp_config:
             report["tools"]["browser-mcp-config"] = digest(args.browser_mcp_config)
+        if args.backend == "vue":
+            report["preview_receipt_sha256"] = digest(args.app_dir / RECEIPT)
         if args.fixture_dir:
             report["fixture_before"] = {name: digest(args.fixture_dir / name)
                                         for name in ("old.txt", "occupied.txt")

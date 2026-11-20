@@ -105,10 +105,7 @@ class BrowserMcp:
         return self.result_value("browser_evaluate", function=function)
 
     def result_value(self, tool, **arguments):
-        result = self.call(tool, **arguments)
-        match = re.search(r"^### Result\s*\n(.*?)(?=\n### |\Z)", result, re.MULTILINE | re.DOTALL)
-        assert match, result
-        return json.loads(match[1].strip())
+        return browser_result(self.call(tool, **arguments))
 
     def close(self):
         try:
@@ -119,6 +116,12 @@ class BrowserMcp:
             self.process.wait(timeout=2)
         except subprocess.TimeoutExpired:
             stop_tree(self.process)
+
+
+def browser_result(result):
+    match = re.search(r"^### Result\s*\n(.*?)(?=\n### |\Z)", result, re.MULTILINE | re.DOTALL)
+    assert match, result
+    return json.loads(match[1].strip())
 
 
 def stop_tree(process):
