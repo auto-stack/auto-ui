@@ -131,6 +131,7 @@ pub fn cv_rows(items List, columns List, selected str, focus str, scope str, rev
             cells: cv_cells(item.cells ?? [], columns), actions: actions,
             defaultId: item.defaultActionId ?? "", disabled: item.disabled ?? false,
             binding: cv_binding(item, i, token, scope, revision),
+            focusKey: "cv-" + token + "-" + i.str(),
             selected: item.id == selected, focused: item.id == focus
         })
         i = i + 1
@@ -154,12 +155,6 @@ pub fn cv_move(items List, focus str, step int) int {
         next = next + step
     }
     return current
-}
-
-pub fn cv_focused(items List, focus str) int {
-    let current = cv_index(items, focus)
-    if current >= 0 && !(items[current].disabled ?? false) { return current }
-    return cv_move(items, "", 1)
 }
 
 pub fn cv_last(items List) int {

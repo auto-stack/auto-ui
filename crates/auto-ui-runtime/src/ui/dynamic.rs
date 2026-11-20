@@ -4327,10 +4327,13 @@ fn scan_node_for_onkeydown(
 ) {
     match node {
         auto_ui_compiler::aura::AuraNode::Element {
-            events, children, ..
+            tag, events, children, ..
         } => {
             for (key, ev) in events {
                 if let Some(rest) = key.strip_prefix("onkeydown.") {
+                    if tag == "button" && rest.split('.').any(|modifier| modifier == "self") {
+                        continue;
+                    }
                     let parts: Vec<&str> = rest.split('.').collect();
                     let suffix = if parts.len() >= 2 && (parts[0] == "ctrl" || parts[0] == "alt") {
                         format!("{}.{}", parts[0], parts[1])

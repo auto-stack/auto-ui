@@ -10,6 +10,8 @@
 
 `viewModeRequested`、`selectionRequested`、`itemActionRequested`、`sortRequested` 发送 JSON 字符串。所有请求包含 `seq`、`instanceToken`、`scopeId` 与 `baseRevision`，条目请求另带 `id` 与 `itemRevision`。普通选中、预览、打开、菜单和排序仍由应用执行业务校验。当前结果身份、位置或条目内容变化后的旧绑定不能发有效请求。显示与键盘操作共用相同结果、顺序和控件实例。
 
+方向键与 Home/End 移动实际键盘焦点并跳过禁用条目。Space 请求选中有焦点的条目。Enter 执行可用的默认动作，未配置默认动作时请求选择。Tab 依次到达主条目和可用附加按钮。原生与 Vue 都通过有焦点的按钮派发这些键。同屏多个集合和分类树分别保留自己的事件接收方。
+
 ## 缩略图
 
 `Thumbnail` 接收 `src`、`alt`、`kind`、`icon`、`state`、`fit`、`resourceId` 与 `resourceRevision`。支持 `missing`、`loading`、`ready` 和 `error`。应用发布 ready 时，图片仍须经渲染器加载。缺图显示类型图标，加载失败有可观察的占位。更换资源或来源时替换图像绑定。原生媒体票据由 ImageSurface 消费，原生 Gallery 的授权 HTTP 缩略图沿用现有 Image 加载器。Vue 消费应用已授权的 URI。原尺寸查看、缩放和平移沿用 ImageViewport。

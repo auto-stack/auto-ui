@@ -311,6 +311,7 @@ fn convert_button(node: &Node) -> ConversionResult<View<String>> {
 
     if let Some(style) = style {
         Ok(View::Button {
+            keyboard: None,
             disabled: false,
             label,
             onclick, // Store as string message ID

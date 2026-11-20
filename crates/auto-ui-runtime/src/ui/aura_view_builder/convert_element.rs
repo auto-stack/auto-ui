@@ -966,6 +966,7 @@ impl<'a> AuraViewBuilder<'a> {
                     // 左缘溢出;文字内边距写在 Text 上无效(py 丢失致高度塌陷)。
                     let mk_tab = |label: &str, tab_str: &str, active: bool| {
                         let btn = View::Button {
+                            keyboard: None,
                             disabled: false,
                             label: label.to_string(),
                             content: None,
@@ -1027,6 +1028,7 @@ impl<'a> AuraViewBuilder<'a> {
                     };
                     let icon_btn_style = "px-2 py-1.5 text-xs text-muted-foreground bg-transparent";
                     let copy_btn = View::Button {
+                        keyboard: None,
                         disabled: false,
                         label: format!(
                             "\u{EE01}{}\u{EE02}",
@@ -1042,6 +1044,7 @@ impl<'a> AuraViewBuilder<'a> {
                         on_right_click: None,
                     };
                     let toggle = View::Button {
+                        keyboard: None,
                         disabled: false,
                         label: format!(
                             "\u{EE01}{}\u{EE02}",
@@ -1322,6 +1325,7 @@ impl<'a> AuraViewBuilder<'a> {
                         if let Some(event) = aura_events_get_base(events, "onclick") {
                             if let View::Text { content, .. } = &content {
                                 return View::Button {
+                                    keyboard: None,
                                     disabled: false,
                                     label: content.clone(),
                                     onclick: self.event_to_message_with(event, bindings),
@@ -1635,6 +1639,7 @@ impl<'a> AuraViewBuilder<'a> {
                         on_right_click: None,
                     };
                     return View::Button {
+                        keyboard: None,
                         disabled: false,
                         label: name,
                         content: Some(Box::new(content)),
@@ -1802,6 +1807,7 @@ impl<'a> AuraViewBuilder<'a> {
             label = format!("\u{EE01}{}\u{EE02}{}", icon, label);
         }
         View::Button {
+            keyboard: None,
             disabled: false,
             label,
             content,

@@ -570,6 +570,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 style,
                 on_right_click,
                 disabled,
+                ..
             } => {
                 // Plan 418 P2-3 续: EE03 PUA marker carries an icon-button
                 // tooltip (synthesized toolbar buttons embed the action title

@@ -3,6 +3,20 @@
 use super::view::{PopoverAnchor, View};
 use super::vnode_converter::extract_children_ref;
 
+pub(crate) fn has_scoped_key<M: Clone + std::fmt::Debug>(view: &View<M>, key: &str) -> bool {
+    match view {
+        View::Button { keyboard: Some(scope), disabled: false, .. }
+            if scope.bindings.iter().any(|(name, _)| name == key) => return true,
+        View::Popover { open: false, anchor, .. } => {
+            return matches!(anchor, PopoverAnchor::Widget(button) if has_scoped_key(button, key));
+        }
+        _ => {}
+    }
+    extract_children_ref(view)
+        .into_iter()
+        .any(|child| has_scoped_key(child, key))
+}
+
 /// The last painted open modal owns input. Nested modals further narrow it.
 pub fn active_content_path<M: Clone + std::fmt::Debug>(view: &View<M>) -> Option<Vec<u16>> {
     fn visit<M: Clone + std::fmt::Debug>(

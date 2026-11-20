@@ -2397,6 +2397,40 @@ fn run_session(
                     .unwrap_or_else(iced::Task::none)
             });
         }
+        if msg.event == "__focused_button_key" {
+            let Some(request) = msg.input_value.as_deref().and_then(|payload| {
+                serde_json::from_str::<crate::ui::mcp_server::ScopedKeyRequest>(payload).ok()
+            }) else {
+                return iced::Task::none();
+            };
+            let mut fallback = request.fallback.map(|(widget, event, input_value)| IcedMessage {
+                widget,
+                event,
+                input_value,
+            });
+            let (view, _, _) = state.component.view_with_debug_gated(false);
+            let active_modal = crate::ui::modal::active_content_path(&view).map(|_| {
+                let converted = convert_view_messages(view);
+                let mut controls = Vec::new();
+                collect_focusable_inputs(&converted, &mut controls);
+                controls
+                    .into_iter()
+                    .map(|control| control.id)
+                    .collect::<std::collections::HashSet<_>>()
+            });
+            return iced::advanced::widget::operate(
+                crate::ui::iced::focus_target::ActivateFocused::<IcedMessage>::for_key(request.key),
+            )
+            .then(move |(focused, scoped)| {
+                if active_modal.as_ref().is_some_and(|controls| {
+                    focused.as_ref().is_none_or(|id| !controls.contains(id))
+                }) {
+                    return iced::Task::none();
+                }
+                let message = scoped.or_else(|| fallback.take());
+                message.map(iced::Task::done).unwrap_or_else(iced::Task::none)
+            });
+        }
 
         // Plan 057 (ash-gui): global uncaptured Tab → focus the prompt editor
         // (terminal-style). Resolve the focus Id the same way the update-tail

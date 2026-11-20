@@ -2606,6 +2606,7 @@ mod plan095_focus_tests {
 
     fn input(widget: &str, event: &str) -> FocusableInput {
         FocusableInput {
+            focus_key: None,
             is_input: true,
             id: iced::widget::Id::from(format!("textarea_{widget}_{event}")),
             widget: widget.to_string(),
@@ -2671,6 +2672,7 @@ pub(crate) struct FocusableInput {
     pub id: iced::widget::Id,
     pub widget: String,
     pub event: String,
+    pub focus_key: Option<String>,
 }
 
 pub(super) fn collect_focusable_inputs(
@@ -2695,8 +2697,9 @@ pub(super) fn collect_focusable_controls(
         AbstractView::Button {
             onclick: message,
             disabled: false,
+            keyboard,
             ..
-        } if actions => {
+        } if actions || keyboard.as_ref().is_some_and(|scope| !scope.focus_key.is_empty()) => {
             out.push(FocusableInput {
                 id: iced::widget::Id::from(crate::ui::iced::focus_target::action_key(
                     &message.widget,
@@ -2705,6 +2708,7 @@ pub(super) fn collect_focusable_controls(
                 widget: message.widget.clone(),
                 event: message.event.clone(),
                 is_input: false,
+                focus_key: keyboard.as_ref().map(|scope| scope.focus_key.clone()),
             });
         }
         AbstractView::Checkbox {
@@ -2719,6 +2723,7 @@ pub(super) fn collect_focusable_controls(
                 widget: message.widget.clone(),
                 event: message.event.clone(),
                 is_input: false,
+                focus_key: None,
             });
         }
         AbstractView::Input {
@@ -2739,6 +2744,7 @@ pub(super) fn collect_focusable_controls(
                 });
             out.push(FocusableInput {
                 is_input: true,
+                focus_key: None,
                 id: derive_input_id(primary, placeholder, *width, *password),
                 widget: primary.map(|(w, _)| w.to_string()).unwrap_or_default(),
                 event: primary.map(|(_, e)| e.to_string()).unwrap_or_default(),
@@ -2766,6 +2772,7 @@ pub(super) fn collect_focusable_controls(
                 widget,
                 event,
                 is_input: true,
+                focus_key: None,
             });
         }
         AbstractView::Column { children, .. }
@@ -2812,6 +2819,12 @@ pub(super) fn collect_focusable_controls(
 /// 目标键解析：剥 `.` 前缀与 `($event)` 实参尾后与 (event) 或 "widget.event"
 /// 限定形比较（大小写敏感；web 形 CSS 选择器在 VM 轨无对应物，不猜测）。
 fn resolve_focus_target(inputs: &[FocusableInput], key: &str) -> Option<iced::widget::Id> {
+    if let Some(id) = key.strip_prefix("[id='").and_then(|key| key.strip_suffix("']")) {
+        return inputs
+            .iter()
+            .find(|item| item.focus_key.as_deref() == Some(id))
+            .map(|item| item.id.clone());
+    }
     let normalized = key
         .trim()
         .trim_start_matches('.')

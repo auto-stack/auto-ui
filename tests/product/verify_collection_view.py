@@ -283,8 +283,22 @@ def native_session(args, app, index):
 
 def test_core_native(args, report):
     app = stage_core(args.out_dir)
+    endpoint_result = queue.Queue(maxsize=1)
+    closed_port = None
+
+    def inspect_closed_endpoint(port):
+        try:
+            native_call(port, "autoui_snapshot", timeout=2.6)
+        except urllib.error.URLError as error:
+            endpoint_result.put(error.reason)
+        except OSError as error:
+            endpoint_result.put(error)
+        else:
+            endpoint_result.put("endpoint still responds")
+
     for index, select in enumerate(("b", "a"), start=1):
         with native_session(args, app, index) as (process, port):
+            assert port != closed_port, "reopen reused the endpoint under verification"
             inspect = lambda: native_call(port, "autoui_snapshot")
             initial = wait_for(inspect, lambda s: '同名条目' in s and '退出演示' in s, 3.2)
             owned = set(product.owned_tree(process.pid)) | {process.pid}
@@ -308,6 +322,13 @@ def test_core_native(args, report):
                 assert "not found" in rejected.lower(), rejected
                 assert "已选择 b" in inspect(), "old binding changed the application selection"
                 report["stale_action"] = rejected
+            else:
+                response += "\n" + native_call(port, "autoui_keyboard", key="ArrowRight")
+                # The native focus operation is applied on the next rendered frame.
+                time.sleep(0.7)
+                assert "已选择 a" in inspect(), "arrow movement changed selection"
+                response += "\n" + native_call(port, "autoui_keyboard", key="Space")
+                current = wait_for(inspect, lambda s: "已选择 b" in s)
             try:
                 native_call(port, "autoui_action", action="press",
                             element_id=native_button(current, "退出演示"))
@@ -321,14 +342,13 @@ def test_core_native(args, report):
             report["sessions"].append({"window": windows, "port": port, "actions": response,
                                        "readback": current})
         if index == 1:
-            try:
-                native_call(port, "autoui_snapshot", timeout=2.6)
-            except urllib.error.URLError as error:
-                if not isinstance(error.reason, ConnectionRefusedError):
-                    raise
-                report["closed_endpoint"] = {"port": port, "result": "connection refused"}
-            else:
-                raise AssertionError(f"closed process left its MCP endpoint live on {port}")
+            closed_port = port
+            # The first process has exited. Check its endpoint while the second
+            # process starts on its own endpoint.
+            Thread(target=inspect_closed_endpoint, args=(port,), daemon=True).start()
+    refusal = endpoint_result.get(timeout=2.7)
+    assert isinstance(refusal, ConnectionRefusedError), f"old endpoint {closed_port}: {refusal!r}"
+    report["closed_endpoint"] = {"port": closed_port, "result": "connection refused"}
 
 
 def main():

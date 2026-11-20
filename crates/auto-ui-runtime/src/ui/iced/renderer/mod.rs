@@ -1516,6 +1516,7 @@ fn build_todo_rows(items: &[TodoItem], widget_name: &str) -> Vec<AbstractView<Dy
                         selectable: false,
                     },
                     AbstractView::Button {
+                        keyboard: None,
                         disabled: false,
                         label: "x".into(),
                         onclick: DynamicMessage::Typed {
@@ -1622,6 +1623,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             style,
             on_right_click,
             disabled,
+            keyboard,
         } => AbstractView::Button {
             label,
             content: content.map(|c| Box::new(convert_view_messages(*c))),
@@ -1629,6 +1631,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             style,
             disabled,
             on_right_click: on_right_click.map(|rc| IcedMessage::from_dynamic(&rc)),
+            keyboard: keyboard.map(|bindings| bindings.map(|msg| IcedMessage::from_dynamic(&msg))),
         },
 
         AbstractView::Row {
@@ -8629,6 +8632,7 @@ mod tests {
                     selectable: false,
                 },
                 AbstractView::Button {
+                    keyboard: None,
                     disabled: false,
                     label: "1".to_string(),
                     onclick: DynamicMessage::String("pick".to_string()),
@@ -10786,6 +10790,7 @@ mod plan082_focus_tests {
     }
     fn button(event: &str, disabled: bool) -> AbstractView<IcedMessage> {
         AbstractView::Button {
+            keyboard: None,
             label: event.into(),
             onclick: msg(event),
             style: None,

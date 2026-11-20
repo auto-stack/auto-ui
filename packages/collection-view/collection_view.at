@@ -1,11 +1,12 @@
 use auto.json
 use auto.math
+use auto.ui
 use thumbnail: Thumbnail
-use collection_view_util: cv_index, cv_sortable, cv_invalid, cv_enabled, cv_binding, cv_header, cv_rows, cv_move, cv_focused, cv_last
+use collection_view_util: cv_index, cv_sortable, cv_invalid, cv_enabled, cv_binding, cv_header, cv_rows, cv_move, cv_last
 
 widget CollectionView (items: List = [], columns: List = [], viewMode: str = "grid", selectedId: str = "", scopeId: str = "", revision: int = 0, disabled: bool = false, status: str = "ready", emptyLabel: str = "没有条目", errorMessage: str = "", sortKey: str = "", sortDirection: str = "") {
     msg {
-        Init, Move(str), Activate(bool), FocusItem(str),
+        Init, Move(str), FocusItem(str), Keyboard(str, str),
         ItemInput(str, str, str), ViewInput(str, str, int, str), SortInput(str, str, int, str),
         "viewModeRequested"(str), "selectionRequested"(str),
         "itemActionRequested"(str), "sortRequested"(str)
@@ -66,11 +67,7 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                 if .items.len() == 0 && .emptyLabel != "" {
                     text .emptyLabel { style: "p-3 text-sm text-muted-foreground" }
                 }
-                col (class: "flex-1 min-h-0 min-w-0 w-full overflow-auto",
-                     onkeydown.left: .Move("left"), onkeydown.right: .Move("right"),
-                     onkeydown.up: .Move("up"), onkeydown.down: .Move("down"),
-                     onkeydown.home: .Move("home"), onkeydown.end: .Move("end"),
-                     onkeydown.space.prevent: .Activate(false), onkeydown.enter.prevent: .Activate(true)) {
+                col (class: "flex-1 min-h-0 min-w-0 w-full overflow-auto") {
                     grid (style: if .viewMode == "list" { "grid grid-cols-1 gap-1 w-full p-2" } else { "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 w-full p-2" }) {
                         for item in .rows {
                             col (style: if item.selected { "w-full min-w-0 border border-primary rounded-md bg-accent" } else { if item.focused { "w-full min-w-0 border border-primary rounded-md bg-card" } else { "w-full min-w-0 border border-border rounded-md bg-card" } }) {
@@ -78,9 +75,17 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                                     mouse-area (ondblclick: .ItemInput(item.binding, "default", ""),
                                                 oncontextmenu.prevent: .ItemInput(item.binding, "action", "menu"),
                                                 style: "flex-1 min-w-0") {
-                                        button (title: item.id, disabled: .disabled || item.disabled,
+                                        button (id: item.focusKey, title: item.id, disabled: .disabled || item.disabled,
                                                 onclick: .ItemInput(item.binding, "selection", ""),
                                                 onfocus: .FocusItem(item.binding),
+                                                onkeydown.left.self.prevent: .Keyboard(item.binding, "left"),
+                                                onkeydown.right.self.prevent: .Keyboard(item.binding, "right"),
+                                                onkeydown.up.self.prevent: .Keyboard(item.binding, "up"),
+                                                onkeydown.down.self.prevent: .Keyboard(item.binding, "down"),
+                                                onkeydown.home.self.prevent: .Keyboard(item.binding, "home"),
+                                                onkeydown.end.self.prevent: .Keyboard(item.binding, "end"),
+                                                onkeydown.space.self.prevent: .Keyboard(item.binding, "space"),
+                                                onkeydown.enter.self.prevent: .Keyboard(item.binding, "enter"),
                                                 style: if .viewMode == "list" { "w-full min-w-0 justify-start gap-2 px-1 h-10" } else { "w-full min-w-0 h-auto flex-col items-stretch p-0 gap-1 text-left" }) {
                                             col (style: if .viewMode == "list" { "w-7 h-7 shrink-0" } else { "w-full h-24 overflow-hidden" }) {
                                                 Thumbnail (key: item.id, src: item.src, kind: item.kind, icon: item.icon,
@@ -98,8 +103,8 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                                         for action in item.actions {
                                             button (text: action.label, disabled: .disabled || item.disabled || !action.enabled,
                                                     onclick: .ItemInput(item.binding, "action", action.id),
-                                                    onkeydown.enter.stop.prevent: .ItemInput(item.binding, "action", action.id),
-                                                    onkeydown.space.stop.prevent: .ItemInput(item.binding, "action", action.id),
+                                                    onkeydown.enter.self.stop.prevent: .ItemInput(item.binding, "action", action.id),
+                                                    onkeydown.space.self.stop.prevent: .ItemInput(item.binding, "action", action.id),
                                                     style: "h-7 px-1 text-xs shrink-0") {}
                                         }
                                     }
@@ -178,6 +183,28 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                 } catch {}
             }
         }
+        .Keyboard(binding str, key str) -> {
+            if !.disabled && .status == "ready" && cv_invalid(.items, .columns, .viewMode) == "" {
+                try {
+                    let request = json.parse(binding)
+                    let index = cv_index(.items, request.id)
+                    if index >= 0 {
+                        let item = .items[index]
+                        if !(item.disabled ?? false) && binding == cv_binding(item, index, .instance_token, .scopeId, .revision) {
+                            .focus_id = item.id
+                            .focus_scope = .scopeId
+                            if key == "enter" && (item.defaultActionId ?? "") != "" {
+                                .ItemInput(binding, "default", "")
+                            } else if key == "space" || key == "enter" {
+                                .ItemInput(binding, "selection", "")
+                            } else {
+                                .Move(key)
+                            }
+                        }
+                    }
+                } catch {}
+            }
+        }
         .Move(direction str) -> {
             if !.disabled && .status == "ready" && cv_invalid(.items, .columns, .viewMode) == "" {
                 if .focus_scope != .scopeId {
@@ -198,22 +225,9 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                     if direction == "up" { target = cv_move(.items, .focus_id, -1) }
                     if direction == "down" { target = cv_move(.items, .focus_id, 1) }
                 }
-                if target >= 0 { .focus_id = .items[target].id }
-            }
-        }
-        .Activate(use_default bool) -> {
-            if !.disabled && .status == "ready" && cv_invalid(.items, .columns, .viewMode) == "" {
-                var index int = -1
-                if .focus_scope == .scopeId { index = cv_focused(.items, .focus_id) }
-                if index < 0 { index = cv_move(.items, "", 1) }
-                if index >= 0 {
-                    let item = .items[index]
-                    let binding = cv_binding(item, index, .instance_token, .scopeId, .revision)
-                    if use_default && (item.defaultActionId ?? "") != "" {
-                        .ItemInput(binding, "default", "")
-                    } else {
-                        .ItemInput(binding, "selection", "")
-                    }
+                if target >= 0 {
+                    .focus_id = .items[target].id
+                    ui.focus("[id='cv-" + .instance_token + "-" + target.str() + "']")
                 }
             }
         }

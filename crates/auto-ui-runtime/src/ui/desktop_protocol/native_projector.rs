@@ -4067,6 +4067,7 @@ mod tests {
                 // 禁用态直接构造变体（builder 无 disabled 槽——a2r 生成器
                 // 同样直填字段）。
                 View::Button {
+                    keyboard: None,
                     label: "x".into(),
                     onclick: DMsg::Go,
                     style: None,
@@ -5471,6 +5472,7 @@ mod tests {
             fn view(&self) -> View<Self::Msg> {
                 View::col()
                     .child(View::Button {
+                        keyboard: None,
                         label: "ctx".into(),
                         onclick: RMsg::Left,
                         style: None,

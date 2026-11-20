@@ -133,6 +133,7 @@ fn w7_icon_lucide_chip_glyph_centered() {
 #[test]
 fn w7_icon_taskbar_button_glyph_centered() {
     let btn: View<()> = View::Button {
+        keyboard: None,
         label: String::new(),
         onclick: (),
         style: Style::parse("h-10 w-10 px-0 text-lg rounded-xl bg-transparent").ok(),
@@ -639,6 +640,7 @@ fn row_ml_auto_pushes_right() {
 fn nested_row_button_keeps_bounds() {
     let inner = View::Row {
         children: vec![View::Button {
+            keyboard: None,
             label: "NESTEDBTN".to_string(),
             onclick: (),
             disabled: false,
@@ -730,6 +732,7 @@ fn all_button_bounds(view: View<()>) -> Vec<(f32, f32, f32)> {
 #[test]
 fn nested_row_icon_button_keeps_bounds() {
     let icon_btn = |label: &str| View::<()>::Button {
+        keyboard: None,
         label: label.to_string(),
         onclick: (),
         disabled: false,
@@ -741,6 +744,7 @@ fn nested_row_icon_button_keeps_bounds() {
         children: vec![
             icon_btn("\u{EE01}file-plus\u{EE02}"),
             View::Button {
+                keyboard: None,
                 label: "TB1".to_string(),
                 onclick: (),
                 disabled: false,
@@ -793,6 +797,7 @@ fn popover_view(placement: PopoverPlacement, anchor_style: &str, panel_width: u1
     View::Column {
         children: vec![View::Popover {
             anchor: PopoverAnchor::Widget(Box::new(View::Button {
+                keyboard: None,
                 label: "ANCHORBTN".to_string(),
                 onclick: (),
                 disabled: false,
@@ -930,6 +935,7 @@ fn popover_closed_hides_panel() {
     let view = View::Column {
         children: vec![View::Popover {
             anchor: PopoverAnchor::Widget(Box::new(View::Button {
+                keyboard: None,
                 label: "CLOSEDBTN".to_string(),
                 onclick: (),
                 disabled: false,
@@ -972,6 +978,7 @@ fn popover_closed_hides_panel() {
 fn dock_menu_popover_view(open: bool) -> View<()> {
     let popover = View::Popover {
         anchor: PopoverAnchor::Widget(Box::new(View::Button {
+            keyboard: None,
             label: "DOCKICON".to_string(),
             onclick: (),
             disabled: false,
@@ -981,6 +988,7 @@ fn dock_menu_popover_view(open: bool) -> View<()> {
         })),
         content: Box::new(View::Column {
             children: vec![View::Button {
+                keyboard: None,
                 label: "MENUITEM".to_string(),
                 onclick: (),
                 disabled: false,
@@ -1019,6 +1027,7 @@ fn dock_swap_popover_view(open: bool) -> View<()> {
     };
     let menu = View::Column {
         children: vec![View::Button {
+            keyboard: None,
             label: "MENUITEM".to_string(),
             onclick: (),
             disabled: false,
@@ -1034,6 +1043,7 @@ fn dock_swap_popover_view(open: bool) -> View<()> {
     };
     let popover = View::Popover {
         anchor: PopoverAnchor::Widget(Box::new(View::Button {
+            keyboard: None,
             label: "DOCKICON".to_string(),
             onclick: (),
             disabled: false,
@@ -1260,6 +1270,7 @@ enum PopMsg {
 /// 消息断言用的小视图:锚按钮 TRIGBTN + 开启面板(项按钮 PANELITEM)。
 fn popover_semantics_view() -> View<PopMsg> {
     let panel_item = |label: &str| View::<PopMsg>::Button {
+        keyboard: None,
         label: label.to_string(),
         onclick: PopMsg::Item,
         disabled: false,
@@ -1270,6 +1281,7 @@ fn popover_semantics_view() -> View<PopMsg> {
     View::Column {
         children: vec![View::Popover {
             anchor: PopoverAnchor::Widget(Box::new(View::Button {
+                keyboard: None,
                 label: "TRIGBTN".to_string(),
                 onclick: PopMsg::Trig,
                 disabled: false,
@@ -1373,6 +1385,7 @@ fn popover_modal_places_panel_centered() {
     let view = View::Column {
         children: vec![View::Popover {
             anchor: PopoverAnchor::Widget(Box::new(View::Button {
+                keyboard: None,
                 label: "MODALTRIG".to_string(),
                 onclick: (),
                 disabled: false,
@@ -1588,6 +1601,7 @@ fn popover_modal_empty_anchor_places_panel_centered() {
 /// Modal 语义视图：与 popover_semantics_view 同构，仅 placement 换 Modal。
 fn popover_modal_view() -> View<PopMsg> {
     let panel_item = View::<PopMsg>::Button {
+        keyboard: None,
         label: "PANELITEM".to_string(),
         onclick: PopMsg::Item,
         disabled: false,
@@ -1598,6 +1612,7 @@ fn popover_modal_view() -> View<PopMsg> {
     View::Column {
         children: vec![View::Popover {
             anchor: PopoverAnchor::Widget(Box::new(View::Button {
+                keyboard: None,
                 label: "TRIGBTN".to_string(),
                 onclick: PopMsg::Trig,
                 disabled: false,
@@ -2374,6 +2389,7 @@ fn n6d_launcher_mouse_area_wrap_layout_probe() {
 #[test]
 fn button_label_line_box_clamped_to_font_size() {
     let view = View::Button {
+        keyboard: None,
         label: "7".to_string(),
         onclick: (),
         disabled: false,
@@ -2582,6 +2598,7 @@ fn plan619_icon_box_follows_style_size() {
 fn f2_sidebar_scroll_probe() {
     let nav_btn = |label: &str| -> View<()> {
         View::Button {
+            keyboard: None,
             label: String::new(),
             onclick: (),
             style: Style::parse("nav-item flex w-full items-start justify-start gap-3 rounded-md px-3 py-[10px] text-sm text-left text-foreground select-none cursor-pointer transition-colors").ok(),
@@ -2737,6 +2754,7 @@ fn f2_sidebar_scroll_probe() {
 fn p625_uigallery_sidebar_pills_visible() {
     fn pill(label: &'static str, style: &str) -> View<()> {
         View::Button {
+            keyboard: None,
             label: String::new(),
             onclick: (),
             style: Style::parse(style).ok(),
@@ -2976,6 +2994,7 @@ fn p642_t11_008_feat_rows_visible_in_distributed_cards() {
                 },
                 feat_list,
                 View::Button {
+                    keyboard: None,
                     label: format!("buy{idx}"),
                     onclick: (),
                     style: Style::parse(
@@ -3462,6 +3481,7 @@ fn p655_stretch_equal_height_dual_window_sizes() {
 #[test]
 fn p035_taskbar_right_group_right_aligned() {
     let icon_btn = |label: &str, extra: &str| View::<()>::Button {
+        keyboard: None,
         label: label.to_string(),
         onclick: (),
         disabled: false,

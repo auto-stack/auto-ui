@@ -2955,6 +2955,16 @@ pub(super) fn collect_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<
         out.extend(controls.into_iter().map(|control| control.id));
         return;
     }
+    if crate::ui::modal::has_scoped_key(view, "enter") {
+        let mut controls = Vec::new();
+        collect_focusable_controls(view, &mut controls, true);
+        out.extend(controls.into_iter().map(|control| control.id));
+        return;
+    }
+    collect_legacy_input_ids(view, out);
+}
+
+fn collect_legacy_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<iced::widget::Id>) {
     match view {
         AbstractView::Input {
             placeholder,
@@ -2984,14 +2994,14 @@ pub(super) fn collect_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<
             items: children, ..
         } => {
             for child in children {
-                collect_input_ids(child, out);
+                collect_legacy_input_ids(child, out);
             }
         }
         // PLAN-013 W2：MouseArea/Popover 容器穿透——launcher search input
         // 包在 scrim mouse-area 内，缺臂使收集器永远到不了它（派生 None →
         // 回退 prompt_input 死 Id → 不聚焦+无法输入的真根因）。
         AbstractView::MouseArea { content, .. } => {
-            collect_input_ids(content, out);
+            collect_legacy_input_ids(content, out);
         }
         AbstractView::Popover {
             anchor,
@@ -3000,14 +3010,14 @@ pub(super) fn collect_input_ids(view: &AbstractView<IcedMessage>, out: &mut Vec<
             ..
         } => {
             if let crate::ui::view::PopoverAnchor::Widget(w) = anchor {
-                collect_input_ids(w, out);
+                collect_legacy_input_ids(w, out);
             }
             if *open {
-                collect_input_ids(content, out);
+                collect_legacy_input_ids(content, out);
             }
         }
         AbstractView::Container { child, .. } | AbstractView::Scrollable { child, .. } => {
-            collect_input_ids(child, out);
+            collect_legacy_input_ids(child, out);
         }
         AbstractView::Grid { cells, .. } => {
             for cell in cells {
@@ -3442,21 +3452,30 @@ pub(super) fn render_dynamic_view(
         AbstractView::Button {
             onclick,
             disabled: false,
+            keyboard,
             ..
-        } => Some(onclick.clone()),
+        } => Some((
+            onclick.clone(),
+            keyboard
+                .as_ref()
+                .map(|scope| scope.bindings.clone())
+                .unwrap_or_default(),
+        )),
         AbstractView::Checkbox {
             on_toggle: Some(message),
             ..
-        } => Some(message.clone()),
+        } => Some((message.clone(), Vec::new())),
         _ => None,
     };
     let element = render_dynamic_view_inner(view, debug_ctx, path);
-    let element = if let Some(message) = activation {
+    let element = if let Some((message, bindings)) = activation {
         let id = iced::widget::Id::from(crate::ui::iced::focus_target::action_key(
             &message.widget,
             &message.event,
         ));
-        crate::ui::iced::focus_target::FocusTarget::new(element, id, message).into()
+        crate::ui::iced::focus_target::FocusTarget::new(element, id, message)
+            .key_bindings(bindings)
+            .into()
     } else {
         element
     };

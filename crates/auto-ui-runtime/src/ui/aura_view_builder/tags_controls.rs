@@ -102,6 +102,7 @@ impl<'a> AuraViewBuilder<'a> {
         {
             let onclick = self.event_to_message_with(event, bindings);
             return View::Button {
+                keyboard: None,
                 disabled: false,
                 label: styled_content,
                 onclick,
@@ -519,8 +520,26 @@ impl<'a> AuraViewBuilder<'a> {
             }
         };
 
+        let scoped_keys = events
+            .iter()
+            .filter_map(|(key, event)| {
+                let suffix = key.strip_prefix("onkeydown.")?;
+                if !suffix.split('.').any(|modifier| modifier == "self") {
+                    return None;
+                }
+                let key = suffix.split('.').next()?.to_string();
+                Some((key, self.event_to_message_with(event, bindings)))
+            })
+            .collect::<Vec<_>>();
+        let keyboard = (!disabled && !scoped_keys.is_empty()).then(|| {
+            crate::ui::view::ButtonKeyboard {
+                focus_key: self.extract_string_with(props, "id", bindings).unwrap_or_default(),
+                bindings: scoped_keys,
+            }
+        });
         View::Button {
             disabled,
+            keyboard,
             // PLAN-054 T1: EE03 title 尾段在此统一拼入(renderer/snapshot 按
             // EE03 拆分);label 本体保持干净,内容子树 leading Text 不受污染。
             label: if pua_title.is_empty() {

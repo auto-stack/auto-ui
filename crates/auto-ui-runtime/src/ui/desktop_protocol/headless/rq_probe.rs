@@ -233,6 +233,7 @@ fn corpus() -> Vec<Case> {
     cases.push(Case {
         id: "button",
         view: View::Button {
+            keyboard: None,
             label: "保存".to_string(),
             onclick: (),
             style: Style::parse("px-4 py-2 rounded bg-blue-500 text-white").ok(),
@@ -1573,6 +1574,7 @@ impl Component for Counter {
         View::col()
             .spacing(4)
             .child(View::Button {
+                keyboard: None,
                 label: "inc".to_string(),
                 onclick: CounterMsg::Inc,
                 style: Style::parse("px-3 py-1 rounded bg-blue-500 text-white").ok(),

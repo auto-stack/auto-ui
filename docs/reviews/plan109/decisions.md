@@ -9,6 +9,7 @@
 | Thumbnail | 原生通过 `image.thumb` 票据触发真实解码与失败状态。媒体扫描进入条目按钮的内容，媒体回调后标记宿主视图更新。原生 Gallery 的授权 HTTP 缩略图沿用 Image。子视图以资源 ID、revision、URI、状态和 fit 为 key。原生换图保留新图像素并显示坏图占位。Vue 窄窗实测旧图延迟返回后，新图像素仍然正确。 |
 | 实例与结果身份 | Windows Vue 生成器会在 props 变化时重跑 Init。首次初始化后保留 mount token，FileManager 在发布结果时推进 revision，并按文件路径重新解析当前序号。排序与切换模式不更换有效选择。FileManager 的启动计时器以 `.booting` 为门，派发首目录加载时解除。 |
 | 布局与键盘 | Grid 按 640 和 1024 逻辑像素在一、二、三列之间选择，方向键读取同一断点所用的窗口宽度。原生沿宿主 `vm.window_inner_width`，Vue 读取浏览器视口宽度。 |
+| 原生焦点 | 按钮的 `onkeydown.<键>.self` 在当前有焦点的原生控件上解析，保留条目的带参绑定。MCP 和普通键事件都使用实际焦点。普通按钮和既有全局快捷键继续走原有分派；集合的按键经过条目绑定校验。 |
 | 受控筛选 | 分类、类型、搜索、分页请求读取应用当前 `query`。实测应用已经清除图片筛选而界面的轮询字段尚未更新时，点「文档」曾带回旧类型，返回 0 条。调整后同一顺序返回 998 条文档。 |
 | 四格平台覆盖 | 用户批准 Windows 原生和 Vue 为本轮必验，Linux 原生和 Vue 随统一 Linux 开发补跑，见 [DEBT-011](../../plans/debts.md#debt-011-collectionview-的-linux-平台验收)。 |
 

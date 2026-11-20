@@ -832,6 +832,7 @@ mod tests {
     #[test]
     fn test_button_conversion() {
         let view: View<TestMsg> = View::Button {
+            keyboard: None,
             disabled: false,
             label: "Click Me".to_string(),
             onclick: TestMsg::Click,
@@ -859,6 +860,7 @@ mod tests {
     #[test]
     fn test_button_content_subtree_serializes() {
         let view: View<TestMsg> = View::Button {
+            keyboard: None,
             disabled: false,
             label: "card".to_string(),
             onclick: TestMsg::Click,
@@ -1308,6 +1310,7 @@ mod tests {
                     on_right_click: None,
                 },
                 View::Button {
+                    keyboard: None,
                     disabled: false,
                     label: "Click".to_string(),
                     onclick: TestMsg::Click,
@@ -1366,6 +1369,7 @@ mod tests {
                     selectable: false,
                 },
                 View::Button {
+                    keyboard: None,
                     disabled: false,
                     label: "Click".to_string(),
                     onclick: TestMsg::Click,
@@ -1411,6 +1415,7 @@ mod tests {
                 },
                 View::Row {
                     children: vec![View::Button {
+                        keyboard: None,
                         label: "b".into(),
                         onclick: 0,
                         style: None,

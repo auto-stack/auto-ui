@@ -4135,6 +4135,31 @@ fn enter_dispatch_for_input(shared: &SharedState) -> Option<ActionMessage> {
     })
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(crate) struct ScopedKeyRequest {
+    pub key: String,
+    pub fallback: Option<(String, String, Option<String>)>,
+}
+
+fn scoped_key_action(key: &str, fallback: Option<ActionMessage>) -> ActionMessage {
+    let fallback = fallback.and_then(|message| match message.target {
+        ActionTarget::Event { widget, event } => Some((widget, event, message.value)),
+        _ => None,
+    });
+    ActionMessage {
+        target: ActionTarget::Event {
+            widget: String::new(),
+            event: "__focused_button_key".into(),
+        },
+        action: UiActionType::Press,
+        value: serde_json::to_string(&ScopedKeyRequest {
+            key: key.into(),
+            fallback,
+        })
+        .ok(),
+    }
+}
+
 fn tool_keyboard(shared_handle: &SharedStateHandle, args: serde_json::Value) -> serde_json::Value {
     let key = match args.get("key").and_then(|v| v.as_str()) {
         Some(k) => k,
@@ -4152,13 +4177,32 @@ fn tool_keyboard(shared_handle: &SharedStateHandle, args: serde_json::Value) -> 
 
     let shared = shared_handle.lock().unwrap();
     let widget_name = shared.widget_name.clone();
-    if key != "F12"
-        && shared
-            .view
-            .as_ref()
-            .and_then(crate::ui::modal::active_content_path)
-            .is_some()
-    {
+    let modal = shared.view.as_ref().and_then(crate::ui::modal::active_content_path);
+    let active_view = shared.view.as_ref().and_then(|view| match &modal {
+        Some(path) => crate::ui::modal::at_path(view, path),
+        None => Some(view),
+    });
+    let scoped_key = if _modifiers.is_empty() && !shared.headless_render {
+        match key {
+            "ArrowUp" => Some("up"),
+            "ArrowDown" => Some("down"),
+            "ArrowLeft" => Some("left"),
+            "ArrowRight" => Some("right"),
+            "Home" => Some("home"),
+            "End" => Some("end"),
+            "Enter" => Some("enter"),
+            "Space" | " " => Some("space"),
+            _ => None,
+        }
+        .filter(|name| active_view.is_some_and(|view| crate::ui::modal::has_scoped_key(view, name)))
+    } else {
+        None
+    };
+    let scoped_tab = key == "Tab"
+        && !shared.headless_render
+        && _modifiers.iter().all(|name| name.eq_ignore_ascii_case("shift"))
+        && active_view.is_some_and(|view| crate::ui::modal::has_scoped_key(view, "enter"));
+    if key != "F12" && (modal.is_some() || scoped_tab) {
         let event = match key {
             "Tab" if _modifiers.iter().any(|m| m.eq_ignore_ascii_case("shift")) => {
                 "__focus_prev_input"
@@ -4166,22 +4210,28 @@ fn tool_keyboard(shared_handle: &SharedStateHandle, args: serde_json::Value) -> 
             "Tab" => "__focus_next_input",
             "Enter" | "Space" | " " => "__activate_focused_control",
             "Escape" => "__modal_escape",
+            _ if scoped_key.is_some() => "",
             _ => {
                 return error_result(
                     "Modal dialog owns keyboard input; background shortcuts are unavailable",
                 )
             }
         };
-        let message = ActionMessage {
+        let default = (!event.is_empty()).then(|| ActionMessage {
             target: ActionTarget::Event {
                 widget: String::new(),
                 event: event.into(),
             },
             action: UiActionType::Press,
             value: Some(key.into()),
+        });
+        let message = match scoped_key {
+            Some(name) => scoped_key_action(name, default),
+            None => default.expect("an ordinary modal key has a handler"),
         };
         return match shared.send_action(message) {
-            Ok(()) => text_result(format!("Key sent in active modal: {key}")),
+            Ok(()) if modal.is_some() => text_result(format!("Key sent in active modal: {key}")),
+            Ok(()) => text_result(format!("Key sent: {key}")),
             Err(error) => error_result(error),
         };
     }
@@ -4282,6 +4332,10 @@ fn tool_keyboard(shared_handle: &SharedStateHandle, args: serde_json::Value) -> 
         }
     };
 
+    let msg = match scoped_key {
+        Some(name) => scoped_key_action(name, Some(msg)),
+        None => msg,
+    };
     match shared.send_action(msg) {
         Ok(()) => text_result(format!(
             "Key sent: {}{}",
@@ -6911,6 +6965,7 @@ mod tests_plan483_d4 {
     #[test]
     fn plan483_input_inside_button_content_resolves() {
         let view = column(vec![View::Button {
+            keyboard: None,
             label: "Card".to_string(),
             onclick: typed_msg("Pressed"),
             style: None,
@@ -8046,6 +8101,7 @@ mod plan082_modal_tests {
     }
     fn button(label: &str, event: &str) -> View<DynamicMessage> {
         View::Button {
+            keyboard: None,
             label: label.into(),
             onclick: message(event),
             style: None,

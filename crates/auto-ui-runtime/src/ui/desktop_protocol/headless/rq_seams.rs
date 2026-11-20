@@ -658,6 +658,7 @@ fn rq_seam_text_glyph_vs_cached() {
 
     // Cached：只有字符串+字体身份，无 glyph 几何 → Host 必重排（信息损失证据）
     let layers = record_view(View::Button {
+        keyboard: None,
         label: "保存".to_string(),
         onclick: (),
         style: crate::ui::style::Style::parse("px-3 py-1 rounded bg-blue-500 text-white").ok(),

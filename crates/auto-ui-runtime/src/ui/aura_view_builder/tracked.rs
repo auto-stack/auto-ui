@@ -3258,6 +3258,7 @@ impl<'a> AuraViewBuilder<'a> {
         {
             let onclick = self.event_to_message_with(event, bindings);
             return View::Button {
+                keyboard: None,
                 disabled: false,
                 label: content,
                 onclick,

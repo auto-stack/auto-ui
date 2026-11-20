@@ -258,6 +258,7 @@ impl<'a> AuraViewBuilder<'a> {
         }
 
         View::Button {
+            keyboard: None,
             disabled,
             label,
             content,
@@ -345,6 +346,7 @@ impl<'a> AuraViewBuilder<'a> {
                 }
             }
             View::Button {
+                keyboard: None,
                 disabled: false,
                 label,
                 content: Some(content),
@@ -717,6 +719,7 @@ impl<'a> AuraViewBuilder<'a> {
                     .unwrap_or(true)
             });
         let toggle = View::Button {
+            keyboard: None,
             disabled: false,
             label: label_text.clone(),
             content: Some(Box::new(View::Row {
@@ -885,6 +888,7 @@ impl<'a> AuraViewBuilder<'a> {
                 .unwrap_or_default()
         };
         View::Button {
+            keyboard: None,
             disabled: false,
             label,
             content,
@@ -1095,6 +1099,7 @@ impl<'a> AuraViewBuilder<'a> {
         };
 
         View::Button {
+            keyboard: None,
             disabled,
             label,
             content,

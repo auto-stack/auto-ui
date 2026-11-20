@@ -1698,6 +1698,7 @@ widget App {
         // A delayed converted view still carries B's explicit identity. Only A
         // remains live; a unique-type fallback must not retarget this action.
         let stale_view = AbstractView::Button {
+            keyboard: None,
             label: "Released second".into(),
             onclick: IcedMessage {
                 widget: "Probe\u{1}/Probe#b".into(),
@@ -1850,6 +1851,7 @@ widget App {
                     style: None,
                 },
                 AbstractView::Button {
+                    keyboard: None,
                     label: "Disabled action".into(),
                     onclick: message,
                     style: None,

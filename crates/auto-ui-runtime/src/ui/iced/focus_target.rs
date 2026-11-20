@@ -17,6 +17,7 @@ pub struct State<M> {
     pub focused: bool,
     id: iced::widget::Id,
     activation: M,
+    key_bindings: Vec<(String, M)>,
 }
 impl<M> widget::operation::Focusable for State<M> {
     fn is_focused(&self) -> bool {
@@ -34,6 +35,7 @@ pub struct FocusTarget<'a, Message> {
     content: Element<'a, Message>,
     id: iced::widget::Id,
     activation: Message,
+    key_bindings: Vec<(String, Message)>,
 }
 impl<'a, Message> FocusTarget<'a, Message> {
     pub fn new(
@@ -45,7 +47,29 @@ impl<'a, Message> FocusTarget<'a, Message> {
             content: content.into(),
             id,
             activation,
+            key_bindings: Vec::new(),
         }
+    }
+
+    pub fn key_bindings(mut self, bindings: Vec<(String, Message)>) -> Self {
+        self.key_bindings = bindings;
+        self
+    }
+}
+
+fn scoped_key_name(key: &iced::keyboard::Key) -> Option<&str> {
+    use iced::keyboard::{key::Named, Key};
+    match key {
+        Key::Named(Named::ArrowLeft) => Some("left"),
+        Key::Named(Named::ArrowRight) => Some("right"),
+        Key::Named(Named::ArrowUp) => Some("up"),
+        Key::Named(Named::ArrowDown) => Some("down"),
+        Key::Named(Named::Home) => Some("home"),
+        Key::Named(Named::End) => Some("end"),
+        Key::Named(Named::Enter) => Some("enter"),
+        Key::Named(Named::Space) => Some("space"),
+        Key::Character(text) if text.as_str() == " " => Some("space"),
+        _ => None,
     }
 }
 
@@ -62,6 +86,7 @@ where
             focused: false,
             id: self.id.clone(),
             activation: self.activation.clone(),
+            key_bindings: self.key_bindings.clone(),
         })
     }
 
@@ -76,6 +101,7 @@ where
         }
         state.id = self.id.clone();
         state.activation = self.activation.clone();
+        state.key_bindings.clone_from(&self.key_bindings);
         tree.diff_children(&[self.content.as_widget()]);
     }
 
@@ -115,6 +141,21 @@ where
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
         ) {
             state.focused = cursor.is_over(layout.bounds());
+        }
+        let scoped_message = match event {
+            Event::Keyboard(iced::keyboard::Event::KeyPressed { key, modifiers, .. })
+                if state.focused && modifiers.is_empty() =>
+            {
+                scoped_key_name(key).and_then(|name| {
+                    self.key_bindings.iter().find(|(key, _)| key == name)
+                })
+            }
+            _ => None,
+        };
+        if let Some((_, message)) = scoped_message {
+            shell.publish(message.clone());
+            shell.capture_event();
+            return;
         }
         if state.focused
             && matches!(event, Event::Keyboard(iced::keyboard::Event::KeyPressed { key, .. })
@@ -235,12 +276,22 @@ where
 pub struct ActivateFocused<M> {
     result: Option<M>,
     focused: Option<iced::widget::Id>,
+    key: Option<String>,
 }
 impl<M> Default for ActivateFocused<M> {
     fn default() -> Self {
         Self {
             result: None,
             focused: None,
+            key: None,
+        }
+    }
+}
+impl<M> ActivateFocused<M> {
+    pub fn for_key(key: String) -> Self {
+        Self {
+            key: Some(key),
+            ..Self::default()
         }
     }
 }
@@ -265,7 +316,14 @@ impl<M: Clone + Send + 'static> widget::Operation<(Option<iced::widget::Id>, Opt
     ) {
         if let Some(state) = state.downcast_ref::<State<M>>() {
             if state.focused {
-                self.result = Some(state.activation.clone());
+                self.result = if let Some(key) = &self.key {
+                    state
+                        .key_bindings
+                        .iter()
+                        .find_map(|(name, msg)| (name == key).then(|| msg.clone()))
+                } else {
+                    Some(state.activation.clone())
+                };
             }
         }
     }

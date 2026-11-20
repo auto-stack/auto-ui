@@ -110,6 +110,7 @@ impl<'a> AuraViewBuilder<'a> {
             };
         };
         View::Button {
+            keyboard: None,
             disabled: !enabled,
             label: title.to_string(),
             onclick,
@@ -378,6 +379,7 @@ impl<'a> AuraViewBuilder<'a> {
                         selectable: false,
                     };
                     let trigger = View::Button {
+                        keyboard: None,
                         disabled: false,
                         label: sub_title,
                         onclick: toggle_msg.clone(),
@@ -597,6 +599,7 @@ impl<'a> AuraViewBuilder<'a> {
             // 桌面 menubar 惯例悬停标题应有反馈,资产侧 MenubarTrigger.vue
             // 同批补齐,两轨同词汇。
             let trigger_btn = View::Button {
+                keyboard: None,
                 disabled: false,
                 label: trigger_title.clone(),
                 onclick: DynamicMessage::Typed {
@@ -774,6 +777,7 @@ impl<'a> AuraViewBuilder<'a> {
             // PLAN-695 T-05：开态 accent 高亮 + hover-switch（声明式臂同款，
             // 见 convert_menubar_component 注）。
             let trigger_btn = View::Button {
+                keyboard: None,
                 disabled: false,
                 label: menu.title.clone(),
                 onclick: DynamicMessage::Typed {
@@ -2197,6 +2201,7 @@ impl<'a> AuraViewBuilder<'a> {
                         format!("\u{EE01}{}\u{EE02}\u{EE03}{}", icon, a.title)
                     };
                     children.push(View::Button {
+                        keyboard: None,
                         // Plan 423 P3: enabled-if → disabled 态(表达式引擎)。
                         disabled: !a
                             .enabled_if

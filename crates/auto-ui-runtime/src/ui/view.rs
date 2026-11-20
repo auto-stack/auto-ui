@@ -657,6 +657,26 @@ pub struct RichSpanView {
     pub style: Option<Style>,
 }
 
+/// Key handlers that belong to one focusable button in the current view.
+#[derive(Debug, Clone)]
+pub struct ButtonKeyboard<M> {
+    pub focus_key: String,
+    pub bindings: Vec<(String, M)>,
+}
+
+impl<M> ButtonKeyboard<M> {
+    pub fn map<N>(self, mut map: impl FnMut(M) -> N) -> ButtonKeyboard<N> {
+        ButtonKeyboard {
+            focus_key: self.focus_key,
+            bindings: self
+                .bindings
+                .into_iter()
+                .map(|(key, message)| (key, map(message)))
+                .collect(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum View<M: Clone + Debug> {
     /// Empty placeholder
@@ -712,6 +732,7 @@ pub enum View<M: Clone + Debug> {
         /// Plan 423 P3: disabled 态 —— iced on_press=None(点击无消息)+ 灰
         /// 样式;onclick 保留(§8.4 探针事件仍记录,快照带 disabled 标记)。
         disabled: bool,
+        keyboard: Option<ButtonKeyboard<M>>,
     },
 
     /// Horizontal layout with optional styling
@@ -1911,6 +1932,7 @@ impl<M: Clone + Debug> ViewBuilder<M> {
             },
             ViewBuilderKind::Button => View::Button {
                 disabled: false,
+                keyboard: None,
                 label: self.button_label,
                 onclick: self
                     .button_onclick
@@ -2141,6 +2163,7 @@ impl<M: Clone + Debug> View<M> {
     pub fn button_styled(label: impl Into<String>, onclick: M, style_str: &str) -> Self {
         View::Button {
             disabled: false,
+            keyboard: None,
             label: label.into(),
             onclick,
             style: Some(Style::parse(style_str).expect("Invalid style")),
@@ -2655,6 +2678,7 @@ impl<M: Clone + Debug> View<M> {
                 style,
                 on_right_click,
                 disabled,
+                keyboard,
             } => View::Button {
                 label,
                 content: content.map(|c| Box::new(c.map_msg_with_arc(f))),
@@ -2662,6 +2686,7 @@ impl<M: Clone + Debug> View<M> {
                 style,
                 on_right_click: on_right_click.map(|rc| f(rc)),
                 disabled,
+                keyboard: keyboard.map(|bindings| bindings.map(|msg| f(msg))),
             },
             View::Row {
                 children,
@@ -4306,6 +4331,7 @@ impl<M: Clone + Debug> ButtonArg<M> for (String, M) {
     type Output = View<M>;
     fn into_button(self) -> View<M> {
         View::Button {
+            keyboard: None,
             disabled: false,
             label: self.0,
             onclick: self.1,
@@ -5602,6 +5628,7 @@ mod tests {
             gap: 4,
             cells: vec![
                 View::Button {
+                    keyboard: None,
                     disabled: false,
                     label: "A".to_string(),
                     onclick: TestMsg::Click,
@@ -5610,6 +5637,7 @@ mod tests {
                     content: None,
                 },
                 View::Button {
+                    keyboard: None,
                     disabled: false,
                     label: "B".to_string(),
                     onclick: TestMsg::Change,
