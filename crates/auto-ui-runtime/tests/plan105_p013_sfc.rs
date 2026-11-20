@@ -9,7 +9,7 @@
 use ace_core::source::packages::PackageModuleInput;
 use auto_ui_runtime::ui::ace_package_sfc::generate_package_sfc;
 use auto_ui_runtime::ui::ace_source_prep::prepare_component_source;
-use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
+use auto_ui_runtime::ui::ace_vue_script::{generate_sfc_with_lane, generate_sfcs_with_lane_product};
 use std::path::{Path, PathBuf};
 
 fn project_root() -> PathBuf {
@@ -76,4 +76,26 @@ fn p105_p013_package_lane_reports_store_gap() {
             "包片段 lane 当前应停在 S1，实际: {e}"
         ),
     }
+}
+
+/// 013 浏览器腿的**单页装配**：app + todo_list 合源走多 widget lane，产出
+/// 根 SFC（App）与子组件 SFC（TodoList），并带子组件 import/引用。
+#[test]
+fn p105_p013_multi_widget_page_assembles() {
+    std::env::set_var("P105_MEM_BACKEND", "1");
+    let merged = format!(
+        "{}\n{}\n",
+        prepared("src/front/app.at"),
+        prepared("src/front/todo_list.at")
+    );
+    let multi = generate_sfcs_with_lane_product(&merged, "src/front/app.at", "./a2x_rt.mjs", "./a2x_rt.mjs")
+        .expect("013 双 widget 源生成 SFC 产品");
+    assert_eq!(multi.widgets.len(), 2, "App + TodoList 两件产物");
+    let app = multi.widgets.iter().find(|w| w.name == "App").expect("App 产物");
+    let list = multi.widgets.iter().find(|w| w.name == "TodoList").expect("TodoList 产物");
+    assert!(app.sfc.contains("import TodoList from"), "根 SFC 注册子组件: {}", app.sfc.lines().take(6).collect::<Vec<_>>().join(" | "));
+    assert!(app.sfc.contains("<TodoList"), "根 SFC 渲染子组件");
+    assert!(app.sfc.contains("@click"), "根 SFC 承载事件");
+    assert!(list.sfc.contains("v-for"), "子组件 SFC 承载列表渲染");
+    assert!(list.sfc.contains("@click"), "子组件 SFC 承载行内事件");
 }
