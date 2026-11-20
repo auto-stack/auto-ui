@@ -502,6 +502,7 @@ impl Renderer<'_> {
             on_right_click: None,
             style: Some(Style::parse(&classes).unwrap_or_default()),
             content: None,
+            keyboard: None,
         }
     }
 
