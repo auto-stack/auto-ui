@@ -335,6 +335,19 @@ AutoLang 增量准备 9.85 s，AutoUI 首次增量准备 31.10 s，严格工具�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 14 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 8e236a3f, lang e9d77f0a2 | evidence: unchanged chart_geom runs in verified AV and A2TS with matching numeric bits, and its Vue pointer consumer runs in Chrome | next: work`
 
+**024 入口的组件包声明和标签绑定（T-02/T-03 进行中）。** AutoLang `3e4cfa6e275749ca4a2b23706e0febc141d1596e`，AutoUI `596482e1a0c5ce1673b9b42cc62374b71b482bda`。消费 PLAN-114 `f0284bc09` 至 `b84a0a39c` 的包声明、列表投影和受检组件引用。`use { package: official from "components" }` 保留目录、包名和作者位置。`line-chart` 通过既有组件注册规则的折叠形在声明包作用域内绑定到 `official::line_chart` 的 `LineChart`。缺包与别名冲突具名拒绝。当前 AV 布局观察与 A2Vue SFC 在遇到已绑定的子组件时具名拒绝挂载，待完整的受检子树执行接入。
+
+| 执行 | 结果 |
+|---|---|
+| ACE Core、AV 与 AutoUI 定向回归 | `plan981` Core 248/248，AV 58/58，`plan1072_component_style` 20/20，`plan980_package_sfc` 18/18，`plan124_routes` 用已准备 provider 2/2。覆盖别名、包作用域、缺包和冲突。 |
+| 原 `024-charts` 的入口块单独投影 | 实际包声明、`model`、`design`、完整 `view` 均通过。原 `fields` 和 `labels` 的字符串列表保留源码顺序。 |
+| 保留入口其余内容的定向对照 | 从材料副本只移除 `.Tick` 和 `.Reset` 后通过投影。将 `.Tick` 单独换成空体并保留其余入口时，以 `source.age.msg-unknown` 定位到 `Tick`。原 `.Tick` 和 `.Reset` 各自含尚未受检的可变局部、列表遍历与写回。 |
+| 原 `app.at` 与五个组件模块全量重跑 | 原入口 SHA256 `b89e1aad4741b1a75bd1eb0cbce19d582d798ed0ae8569c0b45f91466867b020`。无改动入口仍报 `expected fn, found widget`，四张组件本体也仍有解析拒绝，`chart_geom.at` 继续通过。 |
+
+最终语言准备 25.01 s，AutoUI 测试准备 60 s。新 AgePackage 和 AgeComponent 文法 ID 分别为 `7ab01bf6f3795fe688fd4ceae3f20f624f52fdaf73e84695b5f4ce1941dfdc9a` 与 `620bfa50490a1bd81197c09bdbbdac18f4106a68c3854ce85a3ea44d8323236f`，相邻冻结身份通过。`chart-entry-block-final.log`、`chart-entry-full-original-final.log`、`chart-entry-block-final/without-Tick-and-Reset.log`、`chart-entry-block-final/unit-Tick-without-Reset.log` 的 SHA256 依次为 `59f436d8beca1c136677ef53dcb74e8d898b50554cd1089daed5c0f919985143`、`d2328943389ccaef4ba3fbebad4901a3773db61f08f781f49e151e9a6e66f5ae`、`72691546177703d05df62a4645cf8d6fd33f8592b49b9d09616dec22aa3de499`、`a37ca4b2d6e992a658eb9997e731c99ceed6a3be4c8b4705e0657db9d8ff90b5`。现有自动计时入口仍需对接原 `interval` 和 `.Tick`，之后结合受检的列表更新和组件刷新验证 400 ms 流式行为。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 15 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 596482e1, lang 3e4cfa6e2 | evidence: original chart view and package declarations project, checked kebab chart aliases bind, and exact source controls isolate the remaining Tick and Reset blockers | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
