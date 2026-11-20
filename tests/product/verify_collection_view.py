@@ -2,8 +2,8 @@
 """PLAN-109 collection demo and FileManager gate using current accessibility trees.
 
 Prepare the CLI and UI tool before running. The Vue leg takes a prepared URL
-and a Playwright MCP stdio configuration (command and args). Consumer-level
-gates for AssetPicker and Gallery remain under verify_asset_picker.py.
+and a Playwright MCP stdio configuration (command and args). This gate
+uses prepared providers. The 091 integration build has its own entrypoint.
 """
 import argparse
 from contextlib import contextmanager
@@ -79,10 +79,10 @@ class BrowserMcp:
         for line in self.process.stdout:
             self.messages.put(json.loads(line))
 
-    def request(self, method, params):
+    def request(self, method, params, timeout=4):
         self.sequence += 1
         self.write({"id": self.sequence, "method": method, "params": params})
-        deadline = time.monotonic() + 4
+        deadline = time.monotonic() + timeout
         while (remaining := deadline - time.monotonic()) > 0:
             result = self.messages.get(timeout=remaining)
             if result.get("id") == self.sequence:
@@ -95,14 +95,26 @@ class BrowserMcp:
         self.process.stdin.write(json.dumps({"jsonrpc": "2.0", **message}) + "\n")
         self.process.stdin.flush()
 
-    def call(self, name, **arguments):
-        result = self.request("tools/call", {"name": name, "arguments": arguments})
+    def call(self, name, *, reply_timeout=4, **arguments):
+        result = self.request("tools/call", {"name": name, "arguments": arguments}, reply_timeout)
         if result.get("isError"):
             raise AssertionError(result)
         return "\n".join(entry["text"] for entry in result["content"] if entry["type"] == "text")
 
+    def evaluate(self, function):
+        return self.result_value("browser_evaluate", function=function)
+
+    def result_value(self, tool, **arguments):
+        result = self.call(tool, **arguments)
+        match = re.search(r"^### Result\s*\n(.*?)(?=\n### |\Z)", result, re.MULTILINE | re.DOTALL)
+        assert match, result
+        return json.loads(match[1].strip())
+
     def close(self):
-        self.process.stdin.close()
+        try:
+            self.process.stdin.close()
+        except BrokenPipeError:
+            pass
         try:
             self.process.wait(timeout=2)
         except subprocess.TimeoutExpired:
@@ -129,24 +141,38 @@ def browser_button(snapshot, name, occurrence=0):
 
 
 @contextmanager
-def browser_session(args):
+def browser_session(args, report):
     config = json.loads(args.browser_mcp_config.read_text(encoding="utf-8-sig"))
-    with (args.out_dir / "browser.log").open("w", encoding="utf-8") as log:
+    index = len(report["sessions"]) + 1
+    with (args.out_dir / f"browser-{index}.log").open("w", encoding="utf-8") as log:
         browser = BrowserMcp(config, log, args.out_dir)
+        session = {"pid": browser.process.pid, "prepared_url": args.url, "owns_service": False}
+        report["sessions"].append(session)
         try:
             browser.request("initialize", {
                 "protocolVersion": "2024-11-05", "capabilities": {},
                 "clientInfo": {"name": "plan109-product", "version": "1"},
             })
             browser.write({"method": "notifications/initialized"})
-            browser.call("browser_navigate", url=args.url)
+            try:
+                browser.call("browser_navigate", url=args.url)
+            except (AssertionError, queue.Empty) as error:
+                raise AssertionError(f"preparation failure: cannot open {args.url}: {error}") from error
             yield browser
+        except BaseException:
+            try:
+                session["failure_snapshot"] = browser.call("browser_snapshot")
+                browser.call("browser_take_screenshot", type="png", filename=f"failure-{index}.png")
+            except (AssertionError, BrokenPipeError, queue.Empty):
+                pass
+            raise
         finally:
             browser.close()
+            session["closed"] = browser.process.poll() is not None
 
 
 def test_core_browser(args, report):
-    with browser_session(args) as browser:
+    with browser_session(args, report) as browser:
         inspect = lambda: browser.call("browser_snapshot")
         first = wait_for(inspect, lambda s: s.count('button "同名条目"') == 2)
         report["initial_snapshot"] = first
@@ -155,54 +181,166 @@ def test_core_browser(args, report):
         chosen = wait_for(inspect, lambda s: "已选择 b" in s)
         browser.call("browser_click", target=browser_button(chosen, "列表"), element="列表")
         current = wait_for(inspect, lambda s: "文档" in s and "已选择 b" in s)
-        browser.call("browser_click", target=browser_button(current, "打开"), element="打开第一项")
-        current = wait_for(inspect, lambda s: "已选择 b" in s and "已打开 a" in s)
-        browser.call("browser_click", target=browser_button(current, "同名条目", 1),
-                     element="列表中的第二个同名条目")
+        assert browser.evaluate("() => document.activeElement.title") == "b", "view change lost the item focus"
         browser.call("browser_press_key", key="ArrowUp")
         browser.call("browser_press_key", key="Space")
-        report["final_snapshot"] = wait_for(inspect, lambda s: "已选择 a" in s)
+        current = wait_for(inspect, lambda s: "已选择 a" in s)
+        browser.call("browser_click", target=browser_button(current, "同名条目", 1), element="第二个同名条目")
+        current = wait_for(inspect, lambda s: "已选择 b" in s)
+        browser.call("browser_click", target=browser_button(current, "名称"), element="按名称排序")
+        assert browser.evaluate("() => document.activeElement.title") == "b", "sort lost the item focus"
+        ordered = browser.evaluate("() => [...document.querySelectorAll('button[id^=cv-][title]')].map(node => node.title)")
+        assert ordered == ["b", "a", "c"], ordered
+        browser.evaluate("() => { [...document.querySelectorAll('button')].find(b => b.textContent.trim() === '移除所选').click(); return null }")
+        assert browser.evaluate("() => document.activeElement.title") == "a", "removed focus did not move to the first enabled item"
+        browser.call("browser_press_key", key="Space")
+        current = wait_for(inspect, lambda s: "已选择 a" in s)
+        browser.call("browser_click", target=browser_button(current, "打开"), element="打开第一项")
+        report["final_snapshot"] = wait_for(inspect, lambda s: "已选择 a" in s and "已打开 a" in s)
         assert any(
             "button " in line and "不可用条目" in line and "[disabled]" in line
             for line in report["final_snapshot"].splitlines()
         ), "the unavailable entry is missing or enabled"
         browser.call("browser_close")
+    with browser_session(args, report) as browser:
+        inspect = lambda: browser.call("browser_snapshot")
+        first = wait_for(inspect, lambda s: s.count('button "同名条目"') == 2)
+        browser.call("browser_click", target=browser_button(first, "同名条目"), element="第一个同名条目")
+        report["reopen_readback"] = wait_for(inspect, lambda s: "已选择 a" in s)
+        browser.call("browser_close")
+    assert report["sessions"][0]["pid"] != report["sessions"][1]["pid"]
+    assert all(session["closed"] for session in report["sessions"]), "browser service did not exit"
 
 
 def test_file_manager_browser(args, report):
-    with browser_session(args) as browser:
+    with browser_session(args, report) as browser:
+        directory = json.dumps(args.fixture_dir.as_posix())
+        result = browser.result_value("browser_run_code_unsafe", reply_timeout=7, code=f"""async (page) => {{
+            const button = name => page.getByRole('button', {{ name, exact: true }}).first();
+            const text = value => page.getByText(value, {{ exact: true }}).first();
+            const selectedNotes = page.getByText(/选定:\\s*notes\\.txt/).first();
+            await button('主目录').waitFor({{ timeout: 4000 }});
+            await text('条目加载中').waitFor({{ state: 'hidden', timeout: 4000 }});
+            await button('编辑地址').click();
+            await page.getByPlaceholder('输入路径后回车...').first().fill({directory});
+            await button('跳转').click();
+            await button('notes.txt').click();
+            await selectedNotes.waitFor({{ timeout: 2000 }});
+            await button('名称').click();
+            await page.waitForFunction(() => {{
+                const names = [...document.querySelectorAll('button')].map(node => node.textContent.trim());
+                return names.includes('sample.png') && names.includes('broken.png') &&
+                       names.indexOf('sample.png') < names.indexOf('broken.png');
+            }}, undefined, {{ timeout: 2000 }});
+            await selectedNotes.waitFor({{ timeout: 2000 }});
+            await button('folder').click({{ button: 'right' }});
+            await button('关闭菜单').waitFor({{ timeout: 2000 }});
+            await selectedNotes.waitFor({{ timeout: 2000 }});
+            await button('关闭菜单').click();
+            await button('网格').click();
+            await button('名称').waitFor({{ state: 'hidden', timeout: 2000 }});
+            await selectedNotes.waitFor({{ timeout: 2000 }});
+            const summary = await selectedNotes.textContent();
+            await button('folder').dblclick();
+            await button('inside.txt').waitFor({{ timeout: 2000 }});
+            return {{ selectionBeforeOpen: summary,
+                      openedDirectoryEntry: (await button('inside.txt').innerText()).trim() }};
+        }}""")
+        report["readback"] = result
+        assert "选定: notes.txt" in result["selectionBeforeOpen"] and result["openedDirectoryEntry"] == "inside.txt", result
+
+def test_picker_browser(args, report):
+    with browser_session(args, report) as browser:
         snapshot = lambda: browser.call("browser_snapshot")
-
-        def click(tree, label, **arguments):
-            return browser.call("browser_click", target=browser_button(tree, label),
-                                element=label, **arguments)
-
-        report["stage"] = "open address editor"
-        ready = wait_for(snapshot, lambda s: 'button "编辑地址"' in s and
-                         'button "主目录"' in s and '条目加载中' not in s, 4)
-        click(ready, "编辑地址")
-        editing = wait_for(snapshot, lambda s: 'textbox "输入路径后回车...' in s)
-        line = next(line for line in editing.splitlines() if 'textbox "输入路径后回车...' in line)
-        browser.call("browser_type", target=re.search(r"\[ref=(\w+)\]", line)[1],
-                     element="目录地址", text=args.fixture_dir.as_posix())
-        report["stage"] = "navigate to directory fixture"
-        click(snapshot(), "跳转")
-        listed = wait_for(snapshot, lambda s: 'button "notes.txt"' in s and "sample.png" in s)
-        report["stage"] = "select file"
-        click(listed, "notes.txt")
-        chosen = wait_for(snapshot, lambda s: "选定: notes.txt" in s)
-        report["stage"] = "reverse name sort"
-        click(chosen, "名称")
-        sorted_tree = wait_for(snapshot, lambda s: "选定: notes.txt" in s and
-                               0 <= s.find("sample.png") < s.find("broken.png"))
-        report["stage"] = "switch to grid"
-        click(sorted_tree, "网格")
-        grid = wait_for(snapshot, lambda s: "选定: notes.txt" in s and 'button "名称"' not in s)
-        report["stage"] = "open subdirectory"
-        click(grid, "folder", doubleClick=True)
-        report["readback"] = wait_for(snapshot, lambda s: 'button "inside.txt"' in s)
-        report["selection_after_sort_and_view_change"] = grid
+        page = wait_for(snapshot, lambda s: 'button "打开选择器"' in s, 3)
+        browser.call("browser_click", target=browser_button(page, "打开选择器"), element="打开选择器")
+        picker = wait_for(snapshot, lambda s: "Lake.jpg" in s and "共 1003 项" in s, 3)
+        decoded = browser.evaluate("""() => [...document.images].some(img =>
+            img.currentSrc.includes('scenic-320x240.png') && img.complete && img.naturalWidth === 320)""")
+        assert decoded is True, "authorized image did not decode at its expected natural width"
+        def provider_readback():
+            return browser.evaluate("""() => document.body.innerText.split('\\n').filter(line =>
+                line.startsWith('selection=') || line.startsWith('附件日志:'))""")
+        before = provider_readback()
+        assert before == ["selection=", "附件日志: 0 条 · 最近="], before
+        browser.call("browser_click", target=browser_button(picker, "预览"), element="首项预览")
+        preview = wait_for(snapshot, lambda s: 'button "关闭预览"' in s)
+        assert provider_readback() == before, "preview changed the selection or attach log"
+        browser.call("browser_click", target=browser_button(preview, "关闭预览"), element="关闭预览")
+        report["readback"] = wait_for(snapshot, lambda s: "Lake.jpg" in s and 'button "关闭预览"' not in s)
+        assert provider_readback() == before, "closing preview changed the selection or attach log"
+        report["thumbnail_decoded"] = decoded
         browser.call("browser_close")
+
+
+def test_consumer_browser_reopen(args, report):
+    for _ in range(2):
+        with browser_session(args, report) as browser:
+            inspect = lambda: browser.call("browser_snapshot")
+            page = wait_for(inspect, lambda s: 'button "打开选择器"' in s, 3)
+            browser.call("browser_click", target=browser_button(page, "打开选择器"), element="打开选择器")
+            report["sessions"][-1]["readback"] = wait_for(inspect, lambda s: "共 1003 项" in s)
+            browser.call("browser_close")
+    require_browser_reopened(report)
+
+
+def test_file_manager_browser_reopen(args, report):
+    directory = json.dumps(args.fixture_dir.as_posix())
+    with browser_session(args, report) as browser:
+        actions = browser.result_value("browser_run_code_unsafe", reply_timeout=8, code=f"""async (page) => {{
+            const control = (p, name) => p.getByRole('button', {{ name, exact: true }}).first();
+            const ready = async p => {{
+                await control(p, '主目录').waitFor({{ timeout: 3000 }});
+                await p.getByText('条目加载中', {{ exact: true }}).waitFor({{ state: 'hidden', timeout: 3000 }});
+            }};
+            await ready(page);
+            await control(page, '名称').waitFor({{ timeout: 2000 }});
+            await control(page, '网格').click();
+            await control(page, '名称').waitFor({{ state: 'hidden', timeout: 2000 }});
+            const old = page.context();
+            const next = await old.browser().newContext({{ storageState: await old.storageState(), viewport: page.viewportSize() }});
+            const url = page.url();
+            await page.close();
+            if (!page.isClosed()) throw Error('first application page still exists');
+            try {{
+                const reopened = await next.newPage();
+                await reopened.goto(url, {{ waitUntil: 'domcontentloaded' }});
+                await ready(reopened);
+                if (await control(reopened, '名称').count() !== 0) throw Error('grid mode was not restored');
+                await control(reopened, '编辑地址').click();
+                await reopened.getByPlaceholder('输入路径后回车...').first().fill({directory});
+                await control(reopened, '跳转').click();
+                const row = control(reopened, 'notes.txt');
+                await row.waitFor({{ timeout: 2500 }});
+                return {{ firstPageClosed: page.isClosed(), freshContext: reopened.context() !== old,
+                          restoredGrid: true, realDirectoryEntry: (await row.innerText()).trim() }};
+            }} finally {{
+                await next.close();
+            }}
+        }}""")
+        report["reopen_readback"] = actions
+        assert actions == {"firstPageClosed": True, "freshContext": True,
+                           "restoredGrid": True, "realDirectoryEntry": "notes.txt"}, actions
+    assert report["sessions"][0]["closed"], "prepared browser session leaked"
+
+def require_browser_reopened(report):
+    assert report["sessions"][0]["pid"] != report["sessions"][1]["pid"]
+    assert all(session["closed"] for session in report["sessions"])
+
+
+def test_browser_failure(args, report):
+    try:
+        with browser_session(args, report) as browser:
+            inspect = lambda: browser.call("browser_snapshot")
+            wait_for(inspect, lambda s: 'button "列表"' in s)
+            browser.call("browser_click", target="missing-ref", element="不存在的条目")
+            raise AssertionError("unexpected successful action")
+    except AssertionError as error:
+        assert str(error) != "unexpected successful action", error
+        report["expected_failure"] = str(error)
+    session = report["sessions"][0]
+    assert 'button "列表"' in session.get("failure_snapshot", "") and session["closed"], session
+    assert args.out_dir.joinpath("failure-1.png").stat().st_size > 0, "missing failure screenshot"
 
 
 def test_file_manager_native(args, report):
@@ -351,13 +489,51 @@ def test_core_native(args, report):
     report["closed_endpoint"] = {"port": closed_port, "result": "connection refused"}
 
 
+def test_native_failure(args, report):
+    app = stage_core(args.out_dir)
+    with native_session(args, app, 1) as (process, port):
+        inspect = lambda: native_call(port, "autoui_snapshot")
+        wait_for(inspect, lambda s: "同名条目" in s and "退出演示" in s, 3.2)
+        owned = set(product.owned_tree(process.pid)) | {process.pid}
+        rejected = native_call(port, "autoui_action", element_id="vnode_0", action="press")
+        assert "not found" in rejected.lower(), rejected
+        report["expected_failure"] = rejected
+        report["failure_snapshot"] = inspect()
+        shot = native_call(port, "autoui_screenshot", timeout=2.6)
+        path = re.search(r"saved to:[ \t]*(.+\.png)", shot)
+        assert path, shot
+        copied = shutil.copyfile(path[1], args.out_dir / "failure.png")
+        report["failure_screenshot"] = product.sha(copied)
+    assert process.poll() is not None and not product.windows_for(owned), "failed session still owns a window"
+    require_closed_endpoint(port)
+    report["sessions"].append({"pid": process.pid, "port": port, "closed": True, "endpoint": "connection refused"})
+
+
+def require_closed_endpoint(port):
+    deadline = time.monotonic() + 3
+    while (remaining := deadline - time.monotonic()) > 0:
+        try:
+            native_call(port, "autoui_snapshot", timeout=remaining)
+        except (ConnectionResetError, urllib.error.URLError) as error:
+            reason = error.reason if isinstance(error, urllib.error.URLError) else error
+            if isinstance(reason, ConnectionRefusedError):
+                return
+            if not isinstance(reason, ConnectionResetError):
+                raise
+        else:
+            raise AssertionError(f"closed endpoint {port} still responds")
+        time.sleep(0.06)
+    raise AssertionError(f"closed endpoint {port} did not refuse a fresh connection")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--auto-bin", type=Path, required=True)
     parser.add_argument("--ui-tool-bin", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--backend", choices=("native", "vue"), required=True)
-    parser.add_argument("--consumer", choices=("demo", "file-manager"), default="demo")
+    parser.add_argument("--consumer", choices=("demo", "file-manager", "asset-picker"), default="demo")
+    parser.add_argument("--scenario", choices=("main", "reopen", "failure"), default="main")
     parser.add_argument("--browser-mcp-config", type=Path)
     parser.add_argument("--url", help="prepared Vue application URL")
     parser.add_argument("--fixture-dir", type=Path, help="isolated FileManager fixture directory")
@@ -365,7 +541,15 @@ def main():
     parser.add_argument("--native-pid", type=int, help="CLI PID of the prepared native FileManager")
     args = parser.parse_args()
     if args.backend == "vue" and not (args.browser_mcp_config and args.url):
-        parser.error("prepare Vue and set --browser-mcp-config and --url")
+        parser.error("preparation failure: prepare Vue and set --browser-mcp-config and --url")
+    if args.backend == "vue" and not args.browser_mcp_config.is_file():
+        parser.error("preparation failure: browser MCP config is missing")
+    if args.consumer == "asset-picker" and args.backend != "vue":
+        parser.error("this prepared AssetPicker gate takes a Vue URL")
+    if args.scenario == "reopen" and (args.backend != "vue" or args.consumer == "demo"):
+        parser.error("select a prepared Vue consumer for the reopen scenario")
+    if args.scenario == "failure" and args.consumer != "demo":
+        parser.error("the failure scenario owns the independent demo session")
     if args.consumer == "file-manager":
         if not args.fixture_dir:
             parser.error("--fixture-dir is required for FileManager")
@@ -381,14 +565,20 @@ def main():
     args.out_dir.mkdir(parents=True, exist_ok=True)
     start = time.monotonic()
     report = {
-        "plan": "109", "revision": 2, "scope": args.consumer, "backend": args.backend,
+        "plan": "109", "revision": 2, "scope": args.consumer, "scenario": args.scenario, "backend": args.backend,
         "platform": sys.platform, "cli_sha256": product.sha(args.auto_bin),
         "tool_sha256": product.sha(args.ui_tool_bin), "sessions": [],
     }
     try:
-        if args.consumer == "file-manager":
+        if args.scenario == "reopen":
+            (test_file_manager_browser_reopen if args.consumer == "file-manager" else test_consumer_browser_reopen)(args, report)
+        elif args.scenario == "failure":
+            (test_native_failure if args.backend == "native" else test_browser_failure)(args, report)
+        elif args.consumer == "file-manager":
             run = test_file_manager_native if args.backend == "native" else test_file_manager_browser
             run(args, report)
+        elif args.consumer == "asset-picker":
+            test_picker_browser(args, report)
         elif args.backend == "native":
             test_core_native(args, report)
         else:

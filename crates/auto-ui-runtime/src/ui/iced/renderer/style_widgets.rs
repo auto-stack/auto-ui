@@ -2701,10 +2701,11 @@ pub(super) fn collect_focusable_controls(
             ..
         } if actions || keyboard.as_ref().is_some_and(|scope| !scope.focus_key.is_empty()) => {
             out.push(FocusableInput {
-                id: iced::widget::Id::from(crate::ui::iced::focus_target::action_key(
+                id: crate::ui::iced::focus_target::control_id(
                     &message.widget,
                     &message.event,
-                )),
+                    keyboard.as_ref().map(|scope| scope.focus_key.as_str()),
+                ),
                 widget: message.widget.clone(),
                 event: message.event.clone(),
                 is_input: false,

@@ -15,8 +15,8 @@ widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName:
         col (style: "w-full h-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-md bg-muted") {
             if .state == "ready" && .src != "" && !.failed {
                 if .native_http {
-                    // Existing API images (for example Gallery) use the native Image loader.
-                    image (src: .src, alt: .alt, fit: .fit, style: "w-full h-full") {}
+                    // Keep Gallery's authorized HTTP loader and surface its decode result.
+                    image_surface (src: "native-http-image:" + .src, alt: .alt, fit: .fit, onerror: .ImageFailed, style: "w-full h-full") {}
                 } else {
                     image_surface (src: .src, alt: .alt, fit: .fit, onerror: .ImageFailed, style: "w-full h-full") {}
                 }

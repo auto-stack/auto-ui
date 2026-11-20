@@ -584,20 +584,18 @@ pub(super) fn enter(view: &AbstractView<IcedMessage>, path: &[usize]) -> Option<
             AbstractView::Button {
                 onclick,
                 disabled: false,
+                keyboard,
                 ..
-            } => Some(onclick),
+            } => Some((onclick, keyboard.as_ref().map(|scope| scope.focus_key.as_str()))),
             AbstractView::Checkbox {
                 on_toggle: Some(message),
                 ..
-            } => Some(message),
+            } => Some((message, None)),
             _ => None,
         }
-        .map(|message| {
-            iced::widget::Id::from(crate::ui::iced::focus_target::action_key(
-                &message.widget,
-                &message.event,
-            ))
-        });
+        .map(|(message, focus_key)| crate::ui::iced::focus_target::control_id(
+            &message.widget, &message.event, focus_key,
+        ));
         let (role, name, value, click, change, focus, disabled, toggled, selected, button_focus) =
             match view {
                 AbstractView::Button {

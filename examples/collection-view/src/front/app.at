@@ -2,7 +2,7 @@ use auto.json
 
 widget App {
     use { package: collection_view from "../../../../packages/collection-view" }
-    msg { Init, ChangeView(str), Select(str), Act(str), Sort(str), Replace, Quit }
+    msg { Init, ChangeView(str), Select(str), Act(str), Sort(str), Replace, Remove, Quit }
     model {
         var items List = []
         var columns List = []
@@ -22,6 +22,7 @@ widget App {
                 text "资源视图演示" { style: "text-base font-semibold" }
                 row (style: "items-center gap-2") {
                     button (text: "替换条目", onclick: .Replace, style: "h-8 px-2 border border-border rounded-md") {}
+                    button (text: "移除所选", onclick: .Remove, disabled: .selected == "", style: "h-8 px-2 border border-border rounded-md") {}
                     button (text: "退出演示", onclick: .Quit, style: "h-8 px-2 border border-border rounded-md") {}
                 }
             }
@@ -110,10 +111,21 @@ widget App {
             } catch {}
         }
         .Replace -> {
-            let b = .items[1]
-            let c = .items[2]
             let a = {id: "a", itemRevision: "2", label: "同名条目", kind: "folder", icon: "folder", thumbnailUri: "", thumbnailState: "missing", disabled: false, cells: [{key: "kind", text: "文件夹"}], actions: [{id: "open", label: "打开", enabled: true}], defaultActionId: "open"}
-            .items = [b, c, a]
+            var remaining List = []
+            for item in .items {
+                if item.id != "a" { remaining.push(item) }
+            }
+            remaining.push(a)
+            .items = remaining
+            .revision = .revision + 1
+        }
+        .Remove -> {
+            var remaining List = []
+            for item in .items {
+                if item.id != .selected { remaining.push(item) }
+            }
+            .items = remaining
             .revision = .revision + 1
         }
         .Quit -> { Process.exit(0) }

@@ -131,7 +131,7 @@ pub fn cv_rows(items List, columns List, selected str, focus str, scope str, rev
             cells: cv_cells(item.cells ?? [], columns), actions: actions,
             defaultId: item.defaultActionId ?? "", disabled: item.disabled ?? false,
             binding: cv_binding(item, i, token, scope, revision),
-            focusKey: "cv-" + token + "-" + i.str(),
+            focusKey: "cv-" + token + "-" + item.id,
             selected: item.id == selected, focused: item.id == focus
         })
         i = i + 1

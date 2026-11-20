@@ -3218,7 +3218,15 @@ pub(super) fn media_notify_sweep(
                     table.last_mut().expect("entry just pushed")
                 }
             };
-            match auto_media_core::image_pipeline::media_surface_status(&surf.src) {
+            let http = native_http_image_source(&surf.src).map(native_http_image);
+            let status = match &http {
+                Some(Some(_)) => auto_media_core::image_pipeline::MediaSurfaceStatus::Ready,
+                Some(None) => auto_media_core::image_pipeline::MediaSurfaceStatus::Failed(
+                    "HTTP image could not be read or decoded".into(),
+                ),
+                None => auto_media_core::image_pipeline::media_surface_status(&surf.src),
+            };
+            match status {
                 auto_media_core::image_pipeline::MediaSurfaceStatus::Ready => {
                     if !entry.ready_seen {
                         // 第一拍：只记录可消费；渲染帧在两拍之间消费 rendition。
@@ -3226,10 +3234,12 @@ pub(super) fn media_notify_sweep(
                     } else if !entry.loaded_emitted {
                         entry.loaded_emitted = true;
                         if let Some(msg) = surf.on_loaded.clone() {
-                            let (w, h) =
-                                auto_media_core::image_pipeline::resolve_media_render(&surf.src)
-                                    .map(|(_, w, h, _)| (w, h))
-                                    .unwrap_or((0, 0));
+                            let (w, h) = http
+                                .flatten()
+                                .map(|(w, h, _)| (w, h))
+                                .or_else(|| auto_media_core::image_pipeline::resolve_media_render(&surf.src)
+                                    .map(|(_, w, h, _)| (w, h)))
+                                .unwrap_or((0, 0));
                             // URI 末段 = 入队时资产 revision（parse_media_path 同形）。
                             let revision = surf
                                 .src
@@ -3460,21 +3470,21 @@ pub(super) fn render_dynamic_view(
                 .as_ref()
                 .map(|scope| scope.bindings.clone())
                 .unwrap_or_default(),
+            keyboard.as_ref().map(|scope| scope.focus_key.clone()),
         )),
         AbstractView::Checkbox {
             on_toggle: Some(message),
             ..
-        } => Some((message.clone(), Vec::new())),
+        } => Some((message.clone(), Vec::new(), None)),
         _ => None,
     };
     let element = render_dynamic_view_inner(view, debug_ctx, path);
-    let element = if let Some((message, bindings)) = activation {
-        let id = iced::widget::Id::from(crate::ui::iced::focus_target::action_key(
-            &message.widget,
-            &message.event,
-        ));
+    let element = if let Some((message, bindings, focus_key)) = activation {
+        let id = crate::ui::iced::focus_target::control_id(
+            &message.widget, &message.event, focus_key.as_deref(),
+        );
         crate::ui::iced::focus_target::FocusTarget::new(element, id, message)
-            .key_bindings(bindings)
+            .key_bindings(bindings, focus_key.is_some_and(|key| !key.is_empty()))
             .into()
     } else {
         element
@@ -4290,13 +4300,15 @@ fn render_dynamic_view_inner(
                 els.push((render_dynamic_view(cell, debug_ctx, path), spec));
                 path.pop();
             }
-            let widget_id = Some(format!(
+            let widget_id = format!(
                 "vnode_{}",
                 crate::ui::vnode::id_from_path(
                     &path.iter().map(|&s| s as u16).collect::<Vec<u16>>()
                 )
-            ));
-            let el = build_grid(cols, gap, els, style.as_ref(), widget_id);
+            );
+            let group_id = iced::widget::Id::from(format!("grid_focus:{widget_id}"));
+            let el = build_grid(cols, gap, els, style.as_ref(), Some(widget_id));
+            let el = crate::ui::iced::focus_target::FocusTarget::group(el, group_id).into();
             if let Some(ctx) = debug_ctx {
                 ctx.wrap_debug(path, "grid", el, dbg_props, style.as_ref())
             } else {

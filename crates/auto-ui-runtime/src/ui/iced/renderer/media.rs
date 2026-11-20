@@ -46,10 +46,8 @@ fn cached_media_handle(
     handle
 }
 
-/// Render an ImageSurface without entering the legacy Image loader/cache.
-/// Media tickets are resolved only through the process-local registry; a
-/// pending/expired ticket therefore renders a stable placeholder instead of
-/// performing synchronous file or HTTP I/O on the UI thread.
+/// Render an ImageSurface. Media tickets use the process-local registry.
+/// Thumbnail's explicit native HTTP transport reuses the existing URL loader.
 pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
     src: String,
     alt: String,
@@ -91,16 +89,16 @@ pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
         iced::widget::image::FilterMethod::Linear
     };
 
-    // ImageSurface's contract is an opaque media URI. Consume only pixels
-    // that a background resize lane has already decoded and cached; this path
-    // never opens a file or decodes encoded bytes on the UI thread.
-    let pixels = if src.starts_with("/api/__auto/media/") {
+    // Tickets consume pixels already decoded by the media worker. The HTTP
+    // marker is reserved for sources already supported by the Image loader.
+    let bitmap = if src.starts_with("/api/__auto/media/") {
         auto_media_core::image_pipeline::resolve_media_render(&src)
+            .map(|(asset_id, w, h, rgba)| (w, h, cached_media_handle(asset_id, w, h, rgba)))
     } else {
-        None
+        native_http_image_source(&src).and_then(native_http_image)
     };
     let mut inner: iced::Element<'static, M> =
-        if let Some((asset_id, source_width, source_height, rgba)) = pixels {
+        if let Some((source_width, source_height, handle)) = bitmap {
             let zoom = zoom.clamp(0.05, 64.0);
             let viewport = iced::Rectangle {
                 x: 0.0,
@@ -120,12 +118,7 @@ pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
             let display_width = geometry.rotated_bounds.width.max(1.0);
             let display_height = geometry.rotated_bounds.height.max(1.0);
             let radians = (rotation.rem_euclid(360) as f32).to_radians();
-            let mut image = iced::widget::image(cached_media_handle(
-                asset_id,
-                source_width,
-                source_height,
-                rgba,
-            ))
+            let mut image = iced::widget::image(handle)
             .content_fit(object_fit)
             .filter_method(filter_method)
             .rotation(iced::Radians::from(radians));
@@ -500,6 +493,41 @@ pub(crate) fn load_image_bytes(url: &str) -> Option<Vec<u8>> {
         cache.lock().unwrap().insert(url.to_string(), None);
     }
     result
+}
+
+pub(super) fn native_http_image_source(src: &str) -> Option<&str> {
+    src.strip_prefix("native-http-image:").filter(|url| {
+        url.starts_with("http://") || url.starts_with("https://") || url.starts_with("/api/")
+    })
+}
+
+type HttpBitmap = (u32, u32, iced::widget::image::Handle);
+
+pub(super) fn native_http_image(url: &str) -> Option<HttpBitmap> {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+
+    static CACHE: OnceLock<Mutex<HashMap<String, Option<HttpBitmap>>>> = OnceLock::new();
+    let source = auto_lang_core::vm::ffi::stdlib::resolve_http_base_url(url);
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(entry) = cache.lock().unwrap().get(&source) {
+        return entry.clone();
+    }
+    let bitmap = load_image_bytes(&source)
+        .and_then(|data| image::load_from_memory(&data).ok())
+        .map(|image| {
+            let (width, height) = (image.width(), image.height());
+            let handle = iced::widget::image::Handle::from_rgba(
+                width, height, image.into_rgba8().into_raw(),
+            );
+            (width, height, handle)
+        });
+    let mut cache = cache.lock().unwrap();
+    if cache.len() >= 128 {
+        cache.clear();
+    }
+    cache.insert(source, bitmap.clone());
+    bitmap
 }
 
 /// Cache image::Handle by URL and radius to avoid flickering.

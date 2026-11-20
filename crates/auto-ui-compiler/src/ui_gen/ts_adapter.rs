@@ -2690,9 +2690,9 @@ fn try_transpile_builtin_call(
         // web 形即 CSS 选择器，musk 平台端口保留既有 TS 逃生舱不强制迁移）。
         "ui" => match method {
             "focus" => {
-                write!(out, "(document.querySelector(").ok();
+                write!(out, "((target: string) => {{ if (target.startsWith(\"[id='\") && target.endsWith(\"']\")) {{ queueMicrotask(() => document.getElementById(target.slice(5, -2))?.focus()) }} else {{ (document.querySelector(target) as HTMLElement | null)?.focus() }} }})(").ok();
                 transpile_expr(&args.args[0].get_expr(), ctx, out);
-                write!(out, ") as HTMLElement | null)?.focus()").ok();
+                write!(out, ")").ok();
                 true
             }
             // PLAN-092 T-01 B-3: ui.close() closes the native window; the vue

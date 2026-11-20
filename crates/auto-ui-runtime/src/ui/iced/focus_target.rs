@@ -13,11 +13,19 @@ pub fn action_key(widget: &str, event: &str) -> String {
     format!("action_focus:{widget}:{event}")
 }
 
+pub fn control_id(widget: &str, event: &str, focus_key: Option<&str>) -> iced::widget::Id {
+    iced::widget::Id::from(match focus_key.filter(|key| !key.is_empty()) {
+        Some(key) => key.to_owned(),
+        None => action_key(widget, event),
+    })
+}
+
 pub struct State<M> {
     pub focused: bool,
     id: iced::widget::Id,
-    activation: M,
+    activation: Option<M>,
     key_bindings: Vec<(String, M)>,
+    retain: bool,
 }
 impl<M> widget::operation::Focusable for State<M> {
     fn is_focused(&self) -> bool {
@@ -34,8 +42,9 @@ impl<M> widget::operation::Focusable for State<M> {
 pub struct FocusTarget<'a, Message> {
     content: Element<'a, Message>,
     id: iced::widget::Id,
-    activation: Message,
+    activation: Option<Message>,
     key_bindings: Vec<(String, Message)>,
+    retain: bool,
 }
 impl<'a, Message> FocusTarget<'a, Message> {
     pub fn new(
@@ -46,15 +55,42 @@ impl<'a, Message> FocusTarget<'a, Message> {
         Self {
             content: content.into(),
             id,
-            activation,
+            activation: Some(activation),
             key_bindings: Vec::new(),
+            retain: false,
         }
     }
 
-    pub fn key_bindings(mut self, bindings: Vec<(String, Message)>) -> Self {
+    pub fn key_bindings(mut self, bindings: Vec<(String, Message)>, retain: bool) -> Self {
         self.key_bindings = bindings;
+        self.retain = retain;
         self
     }
+
+    pub fn group(content: Element<'a, Message>, id: iced::widget::Id) -> Self {
+        Self { content, id, activation: None, key_bindings: Vec::new(), retain: false }
+    }
+}
+
+fn retained_focus<M: 'static>(tree: &Tree) -> Option<iced::widget::Id> {
+    if tree.tag == widget::tree::Tag::of::<State<M>>() {
+        let state = tree.state.downcast_ref::<State<M>>();
+        if state.retain && state.focused {
+            return Some(state.id.clone());
+        }
+    }
+    tree.children.iter().find_map(retained_focus::<M>)
+}
+
+fn restore_focus<M: 'static>(tree: &mut Tree, target: Option<&iced::widget::Id>) -> bool {
+    if tree.tag == widget::tree::Tag::of::<State<M>>() {
+        let state = tree.state.downcast_mut::<State<M>>();
+        if state.retain && target.is_none_or(|id| &state.id == id) {
+            state.focused = true;
+            return true;
+        }
+    }
+    tree.children.iter_mut().any(|child| restore_focus::<M>(child, target))
 }
 
 fn scoped_key_name(key: &iced::keyboard::Key) -> Option<&str> {
@@ -87,6 +123,7 @@ where
             id: self.id.clone(),
             activation: self.activation.clone(),
             key_bindings: self.key_bindings.clone(),
+            retain: self.retain,
         })
     }
 
@@ -95,6 +132,7 @@ where
     }
 
     fn diff(&self, tree: &mut Tree) {
+        let target = self.activation.is_none().then(|| retained_focus::<Message>(&tree.children[0])).flatten();
         let state = tree.state.downcast_mut::<State<Message>>();
         if state.id != self.id {
             state.focused = false;
@@ -102,7 +140,13 @@ where
         state.id = self.id.clone();
         state.activation = self.activation.clone();
         state.key_bindings.clone_from(&self.key_bindings);
+        state.retain = self.retain;
         tree.diff_children(&[self.content.as_widget()]);
+        if let Some(target) = target.as_ref() {
+            let restored = restore_focus::<Message>(&mut tree.children[0], Some(target))
+                || restore_focus::<Message>(&mut tree.children[0], None);
+            tree.state.downcast_mut::<State<Message>>().focused = !restored;
+        }
     }
 
     fn size(&self) -> Size<iced::Length> {
@@ -136,7 +180,7 @@ where
         viewport: &Rectangle,
     ) {
         let state = tree.state.downcast_mut::<State<Message>>();
-        if matches!(
+        if self.activation.is_some() && matches!(
             event,
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
         ) {
@@ -161,9 +205,11 @@ where
             && matches!(event, Event::Keyboard(iced::keyboard::Event::KeyPressed { key, .. })
             if matches!(key, iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter | iced::keyboard::key::Named::Space)) || matches!(key, iced::keyboard::Key::Character(text) if text.as_str() == " "))
         {
-            shell.publish(self.activation.clone());
-            shell.capture_event();
-            return;
+            if let Some(message) = &self.activation {
+                shell.publish(message.clone());
+                shell.capture_event();
+                return;
+            }
         }
         self.content.as_widget_mut().update(
             &mut tree.children[0],
@@ -237,8 +283,10 @@ where
         operation: &mut dyn widget::Operation,
     ) {
         let state = tree.state.downcast_mut::<State<Message>>();
-        operation.focusable(Some(&self.id), layout.bounds(), state);
-        operation.custom(Some(&self.id), layout.bounds(), state);
+        if self.activation.is_some() || state.focused {
+            operation.focusable(Some(&self.id), layout.bounds(), state);
+            operation.custom(Some(&self.id), layout.bounds(), state);
+        }
         self.content
             .as_widget_mut()
             .operate(&mut tree.children[0], layout, renderer, operation);
@@ -322,7 +370,7 @@ impl<M: Clone + Send + 'static> widget::Operation<(Option<iced::widget::Id>, Opt
                         .iter()
                         .find_map(|(name, msg)| (name == key).then(|| msg.clone()))
                 } else {
-                    Some(state.activation.clone())
+                    state.activation.clone()
                 };
             }
         }

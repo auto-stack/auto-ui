@@ -6,7 +6,7 @@ use collection_view_util: cv_index, cv_sortable, cv_invalid, cv_enabled, cv_bind
 
 widget CollectionView (items: List = [], columns: List = [], viewMode: str = "grid", selectedId: str = "", scopeId: str = "", revision: int = 0, disabled: bool = false, status: str = "ready", emptyLabel: str = "没有条目", errorMessage: str = "", sortKey: str = "", sortDirection: str = "") {
     msg {
-        Init, Move(str), FocusItem(str), Keyboard(str, str),
+        Init, Move(str), FocusItem(str), BlurItem(str), RestoreFocus, Keyboard(str, str),
         ItemInput(str, str, str), ViewInput(str, str, int, str), SortInput(str, str, int, str),
         "viewModeRequested"(str), "selectionRequested"(str),
         "itemActionRequested"(str), "sortRequested"(str)
@@ -16,6 +16,8 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
         var seq int = 0
         var focus_id str = ""
         var focus_scope str = ""
+        var focus_active bool = false
+        var focus_requested bool = false
     }
     computed {
         config_error => cv_invalid(.items, .columns, .viewMode)
@@ -23,7 +25,8 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
         rows => cv_rows(.items, .columns, .selectedId, if .focus_scope == .scopeId { .focus_id } else { "" }, .scopeId, .revision, .instance_token)
     }
     view {
-        col (class: "w-full h-full min-h-0 min-w-0 overflow-hidden flex flex-col text-foreground") {
+        col (id: "cv-" + .instance_token, tabindex: -1,
+             class: "w-full h-full min-h-0 min-w-0 overflow-hidden flex flex-col text-foreground") {
             row (style: "w-full h-9 gap-1 px-2 items-center border-b border-border") {
                 button (text: "网格", title: "网格视图", disabled: .disabled,
                         onclick: .ViewInput("grid", .scopeId, .revision, .instance_token),
@@ -43,8 +46,8 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
             } else if .status == "loading" {
                 text "条目加载中" { style: "p-3 text-sm text-muted-foreground" }
             } else {
-                if .viewMode == "list" {
-                    row (style: "w-full h-8 px-2 items-center gap-1 border-b border-border") {
+                row (style: if .viewMode == "list" { "w-full h-8 px-2 items-center gap-1 border-b border-border" } else { "w-full h-0 overflow-hidden" }) {
+                    if .viewMode == "list" {
                         for column in .header {
                             row (style: if column.key == "name" { "flex-1 min-w-0 items-center gap-1" } else { "w-24 items-center gap-1" }) {
                                 if column.sortable {
@@ -64,13 +67,10 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                         }
                     }
                 }
-                if .items.len() == 0 && .emptyLabel != "" {
-                    text .emptyLabel { style: "p-3 text-sm text-muted-foreground" }
-                }
                 col (class: "flex-1 min-h-0 min-w-0 w-full overflow-auto") {
                     grid (style: if .viewMode == "list" { "grid grid-cols-1 gap-1 w-full p-2" } else { "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 w-full p-2" }) {
                         for item in .rows {
-                            col (style: if item.selected { "w-full min-w-0 border border-primary rounded-md bg-accent" } else { if item.focused { "w-full min-w-0 border border-primary rounded-md bg-card" } else { "w-full min-w-0 border border-border rounded-md bg-card" } }) {
+                            col (key: item.id, style: if item.selected { "w-full min-w-0 border border-primary rounded-md bg-accent" } else { if item.focused { "w-full min-w-0 border border-primary rounded-md bg-card" } else { "w-full min-w-0 border border-border rounded-md bg-card" } }) {
                                 row (style: if .viewMode == "list" { "w-full items-center gap-1 px-1" } else { "w-full flex-col gap-1 p-1" }) {
                                     mouse-area (ondblclick: .ItemInput(item.binding, "default", ""),
                                                 oncontextmenu.prevent: .ItemInput(item.binding, "action", "menu"),
@@ -78,6 +78,7 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                                         button (id: item.focusKey, title: item.id, disabled: .disabled || item.disabled,
                                                 onclick: .ItemInput(item.binding, "selection", ""),
                                                 onfocus: .FocusItem(item.binding),
+                                                onblur: .BlurItem(item.id),
                                                 onkeydown.left.self.prevent: .Keyboard(item.binding, "left"),
                                                 onkeydown.right.self.prevent: .Keyboard(item.binding, "right"),
                                                 onkeydown.up.self.prevent: .Keyboard(item.binding, "up"),
@@ -112,8 +113,17 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                             }
                         }
                     }
+                    if .items.len() == 0 && .emptyLabel != "" {
+                        text .emptyLabel { style: "p-3 text-sm text-muted-foreground" }
+                    }
                 }
             }
+        }
+    }
+    watch {
+        .items, .viewMode, .scopeId, .status, .disabled -> {
+            if .focus_active || .focus_requested { .RestoreFocus() }
+            .focus_requested = false
         }
     }
     on {
@@ -127,20 +137,24 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
         .ViewInput(mode str, scope str, base int, token str) -> {
             if !.disabled && token != "" && token == .instance_token && scope == .scopeId && base == .revision {
                 if cv_invalid(.items, .columns, .viewMode) == "" && mode != .viewMode {
+                    .focus_requested = .focus_id != "" && .focus_scope == .scopeId
                     .seq = .seq + 1
                     try {
                         ."viewModeRequested"(json.stringify({seq: .seq, instanceToken: token, scopeId: scope, baseRevision: base, viewMode: mode}))
                     } catch {}
+                    if .focus_requested && Env.track() == "vm" { .RestoreFocus() }
                 }
             }
         }
         .SortInput(key str, scope str, base int, token str) -> {
             if !.disabled && .status == "ready" && token != "" && token == .instance_token && scope == .scopeId && base == .revision {
                 if cv_invalid(.items, .columns, .viewMode) == "" && cv_sortable(.columns, key) {
+                    .focus_requested = .focus_id != "" && .focus_scope == .scopeId
                     .seq = .seq + 1
                     try {
                         ."sortRequested"(json.stringify({seq: .seq, instanceToken: token, scopeId: scope, baseRevision: base, sortKey: key}))
                     } catch {}
+                    if .focus_requested && Env.track() == "vm" { .RestoreFocus() }
                 }
             }
         }
@@ -178,10 +192,26 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                         if !(item.disabled ?? false) && binding == cv_binding(item, index, .instance_token, .scopeId, .revision) {
                             .focus_id = item.id
                             .focus_scope = .scopeId
+                            .focus_active = true
                         }
                     }
                 } catch {}
             }
+        }
+        .BlurItem(id str) -> {
+            if .focus_id == id { .focus_active = false }
+        }
+        .RestoreFocus -> {
+            let key = "cv-" + .instance_token
+            var id str = ""
+            if !.disabled && .status == "ready" && .config_error == "" {
+                let current = if .focus_scope == .scopeId { cv_index(.items, .focus_id) } else { -1 }
+                let target = if current >= 0 && !(.items[current].disabled ?? false) { current } else { cv_move(.items, "", 1) }
+                if target >= 0 { id = .items[target].id }
+            }
+            .focus_scope = .scopeId
+            .focus_id = id
+            ui.focus("[id='" + key + (if id == "" { "" } else { "-" + id }) + "']")
         }
         .Keyboard(binding str, key str) -> {
             if !.disabled && .status == "ready" && cv_invalid(.items, .columns, .viewMode) == "" {
@@ -227,7 +257,7 @@ widget CollectionView (items: List = [], columns: List = [], viewMode: str = "gr
                 }
                 if target >= 0 {
                     .focus_id = .items[target].id
-                    ui.focus("[id='cv-" + .instance_token + "-" + target.str() + "']")
+                    ui.focus("[id='cv-" + .instance_token + "-" + .focus_id + "']")
                 }
             }
         }

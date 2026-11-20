@@ -7,6 +7,9 @@ browser on the vue track. Exit 0 only when every required case passes and
 cleanup/reopen succeeded; missing platforms are recorded not_run per case and
 never merged into a green total.
 
+Integration build lane: this legacy gate generates and builds its actual providers.
+Prepared daily PLAN-109 cases run in verify_collection_view.py.
+
 Probe-earned conventions baked in (plan091 decisions.md P-1..P-10):
 - package use paths + fixture paths are rewritten to ABSOLUTE for the run
   (finally-restored byte-equal); committed sources keep repo-relative forms;
@@ -246,6 +249,19 @@ class Session:
         if occurrence >= len(hits):
             occurrence = -1
         return hits[occurrence][1]
+
+    def enabled_button(self, label, timeout=5):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            tree = self.snapshot()
+            for _, node, attributes in re.findall(
+                r'(?m)^( *)button #(vnode_\d+) "' + re.escape(label) +
+                r'(?:\uee03[^"\n]*)?" \{\n((?:\1 +[^\n]*\n)*)', tree
+            ):
+                if not any(field.strip() == 'disabled: true' for field in attributes.splitlines()):
+                    return node
+            time.sleep(0.1)
+        vfd.require(False, f'button {label!r} did not become enabled')
 
     def press(self, label, snap=None, occurrence=-1):
         vid = self.button(label, snap, occurrence)
@@ -760,7 +776,7 @@ def run_picker_matrix(args, out, cases, report):
         time.sleep(1.2)
         s.select_card('Asset-004.bin', '"att-4"')
         c0 = int(s.readback().get('counts', ['0'] * 8)[3])
-        confirm = s.button('确认')
+        confirm = s.enabled_button('确认')
         s.call('autoui_action', element_id=confirm, action='press')
         s.call('autoui_action', allow_error=True, element_id=confirm, action='press')
         rb = s.wait_rb(lambda f: 'accepted' in f.get('confirmation', ''), timeout=6)
@@ -1118,28 +1134,6 @@ def run_vue_track(args, out, cases, report):
         cases.add('V-01(vue) 选择器挂载（1003 规模）', 'open picker',
                   '共 1003 项 + Lake.jpg', ['共 1003 项' in body and 'Lake.jpg' in body],
                   '共 1003 项' in body and 'Lake.jpg' in body)
-        # The first record has a real image. Preview must leave provider state alone.
-        observed = []
-        original_selection = next(line for line in body.splitlines() if line.startswith('selection='))
-        try:
-            b.page.wait_for_function(
-                """() => [...document.images].some(img =>
-                    img.currentSrc.includes('scenic-320x240.png') &&
-                    img.complete && img.naturalWidth === 320)""", timeout=4000)
-            observed.append('thumbnail decoded')
-            b.press('预览')
-            b.page.get_by_role('button', name=re.compile('关闭预览')).first.wait_for(timeout=4000)
-            preview = b.snapshot()
-            assert original_selection in preview.splitlines() and '附件日志: 0 条' in preview, preview
-            observed.append('preview left selection and attachments untouched')
-            b.press('关闭预览')
-            b.page.get_by_role('button', name=re.compile('Lake.jpg')).first.wait_for(timeout=4000)
-            observed.append('picker visible after closing preview')
-        except Exception as error:
-            observed.append(repr(error)[:240])
-        cases.add('V-02(vue) 真实缩略图与预览往返', 'preview Lake.jpg, close',
-                  '缩略图解码，预览不更改选择或附件，关闭返回选择器', observed,
-                  observed[-1] == 'picker visible after closing preview')
         # select via DOM click on the card button
         ok = False
         try:
@@ -1236,7 +1230,7 @@ def main():
     failed = sum(1 for r in cases.rows if r['result'] == 'fail')
     not_run = sum(1 for r in cases.rows if r['result'] == 'not_run')
     # Check the complete matrix even when a segment exits before recording its cases.
-    expected_cases = 6 if args.backend == 'vue' else 26 + (0 if args.skip_029 else 4)
+    expected_cases = 5 if args.backend == 'vue' else 26 + (0 if args.skip_029 else 4)
     complete = not_run == 0 and len(cases.rows) == expected_cases
     if args.backend == 'native' and args.runs == 1:
         complete = complete and not any('error' in step for step in report['prep'])
