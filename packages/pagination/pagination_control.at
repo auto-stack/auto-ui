@@ -116,27 +116,42 @@ widget PaginationControl (page: int = 1, pageSize: int = 10, total: int = 0, hid
         }
         .First -> {
             if .can_prev && !.disabled {
-                ."changed"(json.stringify({page: 1, pageSize: .pageSize}))
+                try {
+                    ."changed"(json.stringify({page: 1, pageSize: .pageSize}))
+                } catch {
+                }
             }
         }
         .Prev -> {
             if .can_prev && !.disabled {
-                ."changed"(json.stringify({page: .current - 1, pageSize: .pageSize}))
+                try {
+                    ."changed"(json.stringify({page: .current - 1, pageSize: .pageSize}))
+                } catch {
+                }
             }
         }
         .Next -> {
             if .can_next && !.disabled {
-                ."changed"(json.stringify({page: .current + 1, pageSize: .pageSize}))
+                try {
+                    ."changed"(json.stringify({page: .current + 1, pageSize: .pageSize}))
+                } catch {
+                }
             }
         }
         .Last -> {
             if .can_next && !.disabled {
-                ."changed"(json.stringify({page: .page_count, pageSize: .pageSize}))
+                try {
+                    ."changed"(json.stringify({page: .page_count, pageSize: .pageSize}))
+                } catch {
+                }
             }
         }
         .SetSize(n int) -> {
             if !.disabled && n > 0 && n != .pageSize {
-                ."changed"(json.stringify({page: 1, pageSize: n}))
+                try {
+                    ."changed"(json.stringify({page: 1, pageSize: n}))
+                } catch {
+                }
             }
         }
     }

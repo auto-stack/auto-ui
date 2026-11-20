@@ -1,0 +1,245 @@
+// packages/asset-browser/asset_picker.at — AssetPicker 模态选择器（PLAN-091）。
+//
+// 组合 AssetBrowser 与 Dialog（PLAN-088 ColorDialog / PLAN-089 ImagePreviewDialog
+// 同构：受控 open、事件纯转发、无第二份业务状态）。确认表达选择意图：
+// confirmRequested 携带 `{seq, session, baseRevision, id, revision, queryId}`，
+// 应用在真实接受 handler 重新验证资源当前身份和业务权限后写 confirmation =
+// `{"session":N,"seq":S,"status":"accepted"|"rejected","code":…,"message":…}`。
+//
+// 会话与锁定（r2 冻结）：
+// - 每次 open false→true 递增 session；错 session/seq 的反馈被忽略。
+// - 发确认时同步锁定本地请求（不等 pending prop）；一轮确认只发一次；
+//   rejected 反馈解锁并显示错误，可重试；accepted 保持锁定（父应 open=false）。
+// - pending（父状态反馈期）与本地锁定同样禁用 query/selection 变更——经
+//   AssetBrowser.locked 传导；取消/关闭始终可用。
+// - 关闭/取消令旧确认失效（cancel_armed 每次开启武装一次）。
+//
+// 预览：复用 089 ImageViewport 作为同 Dialog 预览视图（不嵌套第二个 Dialog）；
+// 预览为组件局部临时视口，不改变 selection；Escape 先退出预览再走取消
+// （dialog onclose 单一分支，避免双重处理）。
+//
+// # Usage
+// use { package: asset_browser from "<resolved package dir>" }
+// AssetPicker (open: .open, title: "选择资源", pending: .pending,
+//              confirmation: .confirm_fb, records:…, query:…,
+//              onqueryRequested: .OnQuery($event),
+//              onselectionRequested: .OnSel($event),
+//              onpreviewRequested: .OnPrev($event),
+//              onconfirmRequested: .OnConfirm($event),
+//              oncancelled: .OnCancel) {}
+use auto.json
+
+widget AssetPicker (records: List = [], folders: List = [], query: str = "", querySeq: int = 0, resultQueryId: str = "", total: int = 0, selection: str = "", revision: int = 0, loading: bool = false, errorMessage: str = "", viewMode: str = "grid", open: bool = false, title: str = "选择资源", pending: bool = false, confirmation: str = "") {
+    msg {
+        Init, Tick, Close, RequestClose, Confirm,
+        OnChildQuery(str), OnChildSelection(str), OnChildPreview(str),
+        "queryRequested"(str), "selectionRequested"(str), "previewRequested"(str),
+        "confirmRequested"(str), "cancelled"
+    }
+    model {
+        var interval int = 500
+        // 内建 dialog 的 open 绑定用本地镜像（vue 生成器 v-model-on-prop
+        // 缺口适配；Tick 从受控 prop 同步——FileDialog fd_active 同款）。
+        var dlg_open bool = false
+        var seen_open bool = false
+        var cancel_armed bool = false
+        // ---- 确认会话与锁定 ----
+        var session int = 0
+        var confirm_seq int = 0
+        var confirm_lock bool = false
+        var pending_seq int = -1
+        var pending_session int = -1
+        var confirm_error str = ""
+        var last_confirm_feedback str = ""
+        // ---- query/selection 镜像（确认载荷与可确认性派生用）----
+        var q_id str = ""
+        var sel_id str = ""
+        var sel_label str = ""
+        var sel_rev str = ""
+        // ---- 同 Dialog 预览（组件局部临时视口）----
+    }
+    computed {
+        // 可确认：有受控选择、结果可信（结果 id == 当前 query id）、无错误、
+        // 非加载、非锁定。最终身份/权限校验归应用接受 handler（r2）。
+        can_confirm => if .confirm_lock { false } else if .pending { false } else if .sel_id == "" { false } else if .loading { false } else if .errorMessage != "" { false } else if .q_id == "" { false } else if .resultQueryId != .q_id { false } else { true }
+        has_selection => if .sel_id != "" { true } else { false }
+    }
+    view {
+        dialog (open: .dlg_open, onclose: .RequestClose, closeOnOutside: false) {
+            dialog-content (style: "w-[900px] max-w-[95vw] h-[680px] max-h-[92vh] p-0 gap-0 rounded-xl bg-background text-foreground overflow-hidden flex flex-col") {
+                col (style: "w-full h-full min-h-0 overflow-hidden flex flex-col") {
+                    row (style: "h-12 shrink-0 items-center justify-between px-4 border-b border-border bg-card") {
+                        text .title { style: "text-base font-semibold text-foreground truncate" }
+                        button (icon: "x", title: "关闭", onclick: .Close, style: "h-8 w-8 shrink-0 justify-center rounded-md text-muted-foreground hover:bg-muted") {}
+                    }
+                    col (style: "flex-1 min-h-0 w-full overflow-hidden") {
+                        AssetBrowser (
+                            records: .records, folders: .folders, query: .query,
+                            querySeq: .querySeq, resultQueryId: .resultQueryId,
+                            total: .total, selection: .selection, revision: .revision,
+                            loading: .loading, errorMessage: .errorMessage,
+                            viewMode: .viewMode, locked: .confirm_lock || .pending,
+                            onqueryRequested: .OnChildQuery($event),
+                            onselectionRequested: .OnChildSelection($event),
+                            onpreviewRequested: .OnChildPreview($event)
+                        ) {}
+                    }
+                    // ---- 确认栏（固定可达；窄窗不挤出）----
+                    row (style: "h-14 shrink-0 items-center gap-3 px-4 border-t border-border bg-card") {
+                        col (style: "flex-1 min-w-0 gap-0.5") {
+                            if .has_selection {
+                                text f"将选择: ${.sel_label} (${.sel_id} @ ${.sel_rev})" { style: "text-xs text-foreground truncate" }
+                            } else {
+                                text "未选择资源" { style: "text-xs text-muted-foreground" }
+                            }
+                            if .confirm_error != "" {
+                                text .confirm_error { style: "text-xs text-destructive break-all" }
+                            } else {
+                                if .pending {
+                                    text "确认处理中…" { style: "text-xs text-muted-foreground" }
+                                }
+                            }
+                        }
+                        button (text: "取消", title: "取消选择", onclick: .RequestClose, style: "h-8 px-3 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground shrink-0") {}
+                        button (text: "确认", title: "确认选择", onclick: .Confirm, disabled: !.can_confirm, style: "h-8 px-4 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 shrink-0") {}
+                    }
+                }
+            }
+        }
+    }
+    on {
+        .Init -> {
+            .seen_open = .open
+            if .open {
+                .cancel_armed = true
+                .session = .session + 1
+            }
+            if .dlg_open != .open {
+                .dlg_open = .open
+            }
+            .AbSync()
+        }
+        .Tick -> {
+            if .dlg_open != .open {
+                .dlg_open = .open
+            }
+            if .open != .seen_open {
+                .seen_open = .open
+                if .open {
+                    // 每次开启递增会话并复位确认/预览/关闭武装（r2）。
+                    .session = .session + 1
+                    .confirm_lock = false
+                    .pending_seq = -1
+                    .pending_session = -1
+                    .confirm_error = ""
+                    .cancel_armed = true
+                }
+            }
+            .AbSync()
+            // 确认反馈（错 session/seq 忽略；处理后清位防重放）。
+            if .confirm_lock {
+                if .confirmation != "" {
+                    try {
+                        let fb = json.parse(.confirmation)
+                        if fb.session == .pending_session {
+                            if fb.seq == .pending_seq {
+                                .last_confirm_feedback = .confirmation
+                                .pending_seq = -1
+                                .pending_session = -1
+                                if fb.status == "rejected" {
+                                    .confirm_lock = false
+                                    .confirm_error = fb.message ?? "确认被拒绝"
+                                } else {
+                                    // accepted：保持锁定；父应将 open=false。
+                                    .confirm_error = ""
+                                }
+                            }
+                        }
+                    } catch {
+                    }
+                }
+            }
+        }
+        // 关闭单一分支：武装内发一次 cancelled。关闭按钮/Escape/程序性关闭
+        // 同路径（预览为 AssetBrowser 内部临时视口，其 Escape 由浏览器面
+        // 的 onkeydown.escape 消费；若宿主同时收到关闭请求，以宿主规则为准）。
+        .RequestClose -> {
+            if .cancel_armed {
+                .cancel_armed = false
+                try {
+                    ."cancelled"()
+                } catch {
+                }
+            }
+        }
+        .Close -> {
+            .RequestClose()
+        }
+        // 确认：同步锁定，一轮一次；载荷带会话/代次/精确身份（r2）。
+        .Confirm -> {
+            if !.confirm_lock {
+                if !.pending {
+                    if .sel_id != "" {
+                        .confirm_seq = .confirm_seq + 1
+                        .pending_seq = .confirm_seq
+                        .pending_session = .session
+                        .confirm_lock = true
+                        .confirm_error = ""
+                        try {
+                            ."confirmRequested"(json.stringify({seq: .pending_seq, session: .session, baseRevision: .revision, id: .sel_id, revision: .sel_rev, queryId: .q_id}))
+                        } catch {
+                        }
+                    }
+                }
+            }
+        }
+        // 子件事件纯转发（preview 额外驱动同 Dialog 预览）。
+        .OnChildQuery(ev str) -> {
+            try {
+                ."queryRequested"(ev)
+            } catch {
+            }
+        }
+        .OnChildSelection(ev str) -> {
+            try {
+                ."selectionRequested"(ev)
+            } catch {
+            }
+        }
+        .OnChildPreview(ev str) -> {
+            try {
+                ."previewRequested"(ev)
+            } catch {
+            }
+        }
+        // query/selection 镜像同步（Init/Tick 共用臂）。
+        .AbSync -> {
+            if .query != "" {
+                try {
+                    let q = json.parse(.query)
+                    .q_id = q.id ?? ""
+                } catch {
+                    .q_id = ""
+                }
+            } else {
+                .q_id = ""
+            }
+            if .selection == "" {
+                .sel_id = ""
+                .sel_label = ""
+                .sel_rev = ""
+            } else {
+                try {
+                    let s = json.parse(.selection)
+                    .sel_id = s.id ?? ""
+                    .sel_label = s.label ?? ""
+                    .sel_rev = s.revision ?? ""
+                } catch {
+                    .sel_id = ""
+                    .sel_label = ""
+                    .sel_rev = ""
+                }
+            }
+        }
+    }
+}

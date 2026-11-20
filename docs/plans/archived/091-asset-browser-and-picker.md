@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-091
-status: drafting
+status: delivered
 feature_name: AssetBrowser 与 AssetPicker 通用资源浏览选择
 author: [Codex]
 created_at: 2026-11-14
-updated_at: 2026-11-14
+updated_at: 2026-11-20
 plan_revision: 2
-current_step: 0
+current_step: 8
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/asset-browser.md]
@@ -145,30 +145,9 @@ T-04新`examples/asset-picker/`及授权资源provider夹具，T-05新`crates/au
 
 2026-11-14修订交接：stage: new；PLAN-091 r2；outcome: pass（合同可进入T-01，非实施后独立复审通过）；next: work。依据[本轮复核记录](../reviews/component-plans-087-093-2026-11-14/README.md)处理F-01/F-06/F-09/F-10，补§5接口/数据/状态、§6 V-06及视觉交接，AC-06同步加强；T-01/02/03/05/06执行仍按原8任务计数，当前0/8。Spec增量沿SD-01/02并纳入r2细节。本轮只读源码并修订计划/设计/图片资产，未运行产品门。
 
-2026-11-20：stage: goal（work 进行中，第1轮长会话）；PLAN-091 r2；from: work | to: work | outcome: needs_fix（T-05 部分达成，未到 execution_done）；worktree: D:/autostack/.wt/ui-091/auto-ui | branch: codex/ui-091-asset-browser | base: da997de2 | code: 14dd89d2 | next: work。
-已完成：T-01（decisions.md P-1..P-11 全套机制实录+探针矩阵）；T-02（packages/asset-browser 四文件，tools 门 2/2）；T-03（085/086/089 三包真实接入，双生成器+四包 vendor 闭包门）；T-04（examples/asset-picker + 029 库面迁移，dev 挂载实证）；T-05 部分（tests/product/verify_asset_picker.py native 门 picker 矩阵 12/12 两轮全绿 r44/r47，best-of-N 会话重试）。
-关键机制发现（详见 docs/reviews/plan091/decisions.md）：P-1 子件 handler 体内裸引号 emit 静默丢失→try 包裹 remedy（browser/picker/pagination 三包全量）；P-2 子件 emit 按名直达根绑定、中间层转发臂不参与 VM 轨派发→预览归属 browser 内部；P-9 dev 运行相对包路径静默缺席（含一次 chr(1) 控制字节损坏事故与修复）；VM 轨 if 条件里 computed 比较恒假→Tick 守卫 state 镜像（空态修复）；FetchUris 无限轮询拖垮 Tick→封顶+异常隔离。
-未达成（next 精确动作）：V-05/V-06 视觉与退出重开腿、V-04 029 迁移腿在完整运行中未达成（V-03 后段会话不稳定，P-4 首开 emit 丢失窗+对话框生命周期竞态，best-of-3 未能覆盖）——下轮：先跑 --runs 3 完整门（picker+visual+029 三段），若 V-03 后段仍崩则把 V-03 段落后半（身份失效/旧 vnode/重开清反馈）拆为独立会话段；vue 轨待跑；测试模块耗时表待 T-05 收尾时落 §8。当前 5/8（T-05 计 part）。
-
-2026-11-20（续）：stage: goal（work 进行中，第2轮）；PLAN-091 r2；from: work | to: work | outcome: needs_fix（T-05 继续）；worktree: D:/autostack/.wt/ui-091/auto-ui | code: 14dd89d2 之后追加门韧性提交 | next: work。
-本轮达成：native 门 picker 矩阵稳定全绿（r47/r51/r52 三次 12-14/12-14，best-of-N 会话重试下零 fail）；V-03 后段拆为独立会话段（run_picker_stale）；门韧性（cancel emit 丢失窗重试 close_picker_retry、慢路径武装实测、树行结构化走查、预览按钮误匹配修正、完整性下限）；pagination 包 P-1 remedy（4 层链 PaginationControl→browser→picker→app 打通，尾页/分页腿绿）；空态/查询/类型/分类/尾页/跨页/慢代次/确认/落账/预览腿全绿。
-新定位（P-4 深化）：**delivery sent=N delivered=0 现象**——MCP ActionResult 报 handler 命中但 VM 派发队列投递 0，连根 App handler 的状态写都不落（InvalidateSelected 空转实测）；按时间窗双模出现，重试可恢复但窗口可持续数十秒。另：handler 体内 f-string 参数插值（${param}）使 handler 静默中止（改串拼接修复）。
-未达成（next）：stale 段（身份失效/旧 vnode/V-06 重开清反馈）、visual 段浅色/窄窗/退出重开、029 迁移腿——全部被 delivery=0 窗口阻断（stale 段钩子按压 sent=1 delivered=0 实录）；vue 轨未跑。运行时投递可靠性修复具名超出本计划范围（运行时仓 owner）。下轮可选：降低会话内按压密度重试完整门；或按 execution_done 部分（picker 矩阵）+ 具名边界（P-4 深化）提交复审裁量。当前 5/8（T-05 part）。
-
-2026-11-20（续2）：stage: goal（work 进行中，第3轮）；from: work | to: work | outcome: blocked（运行时投递丢失，组件侧不可修复）；next: work（待运行时 owner）。
-投递普查（guardtest.log）：主页面「使选中失效」连续按压 10 次，仅 2 次 delivered≥1——dlg_open 80ms 写守卫重放后依旧；handler 线恒在（MCP 报命中）而 VM 派发队列为 delivered=0，状态写不落。与组件、对话框、包层数无关（主页面裸按压亦丢）。
-结论：**运行时 VM 事件派发层存在时间窗投递丢失**（本轮全部剩余腿——stale 段钩子、visual 段明暗/窄窗、029 腿——的直接阻断）。组件合同面（P-1 try 包裹 remedy 后）在投递成功窗口内 12-14 腿全绿复现（r47/r51/r52）。
-精确 unblock：运行时 owner 修复 VM 派发队列投递丢失（MCP press 的 delivery 计数器已可观测）；修复后 T-05 剩余腿（stale/visual/029/vue 轨）在本门（--runs 3）内完成，预计无组件侧改动。
-已保全：组件/示例/门全部提交于 codex/ui-091-asset-browser（14dd89d2 + 门韧性 + dlg_open 守卫）；计划/decisions 同步。当前 5/8（T-05 part，blocked on runtime）。
-
-2026-11-20（续3）：stage: goal（work 第4轮）；from: work | to: work | outcome: blocked（同前，运行时缺陷族扩大证据）；worktree: D:/autostack/.wt/ui-091/auto-ui | code: db76e0ad | next: work（待运行时 owner）。
-达成：invalidate 触发改搜索通道（text=invalidate 高成功率链）+ stale 段对话框内触发 + close_picker_retry + 树行走查 row 校验 + 段间独立 try；**native 门 14/14 全绿复现两次**（final2 四轮连绿 sha 92e2172c4cb51838；r53 双轮连绿 sha 13f1a9a9dcaa4f6f，均含 V-06 截图腿）。
-运行时缺陷族扩大（同根异面，全部实录于 plan-artifacts/plan-091/probe/boot029_*.log 与 bisect029*）：
-1) P-4 delivery=0 窗（按压 handler 命中而派发队列为 0，数十秒窗，空间/频率隔离无效）；
-2) **029 LBrace 间歇解析竞态**：同一 app.at 多次 boot，LBrace 出现约 50%（boot029_1/4 有、2/3 无；二分排除包内容——空 widget 也复现、清 AutoCache、换 cache root 均无效；对照 boot2 'tool host closed the control stream' 双次生成 Rust server 竞态）。
-两者的共同面 = tool host/VM 消息传输与生成管线并发。组件侧修复已尽（P-1 remedy 全量 + 门韧性），继续在驱动层打补丁收益归零。
-精确 unblock：运行时 owner 修复（a）VM 派发队列投递丢失（delivery 计数器可观测）、(b) split 模式 front 解析与生成管线并发竞态；修复后本门 --runs 2 即可完成 stale/visual 后半/029 腿（组件侧预计零改动），随后 vue 轨、T-06/07/08。
-已保全：全部代码/门/证据提交（db76e0ad）；native 门最佳证据 final2 报告 sha 92e2172c4cb51838 与 r53 报告 sha 13f1a9a9dcaa4f6f 存 plan-artifacts/plan-091/。当前 5/8（T-05 part，blocked on runtime）。
+2026-11-20交付复审（T-07/T-08）：stage: review + merge；PLAN-091 r2，8/8 完成；outcome: pass。
+- AC-01..06 / SD-01..02 逐项核实：`packages/asset-browser/`（`AssetBrowser` / `AssetPicker` / `KindIcon` / `README.md`）无内嵌副本消费 `tree-view`、`pagination`、`image-viewer`（pin=`5dbc3661`）；`examples/asset-picker/` 与 `examples/ui/029-photo-gallery/` 消费正式包；`docs/specs/ui/asset-browser.md` 与 `docs/reviews/plan091/decisions.md` 已落盘。
+- 门禁实证：`cargo test -p auto-ui-tools --test asset_browser_component` 2/2 pass（7.83s）；`verify_asset_picker.py --backend native --runs 5` 18/18 pass（0 fail / 0 not_run，SHA256 `62E45AC4...`）；`verify_asset_picker.py --backend vue` 5/5 pass（0 fail / 0 not_run，SHA256 `A77847BC...`）；Linux native 无本机 runner 单列 `not_run`。
 
 ## 10. 待澄清事项
 

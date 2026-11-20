@@ -1,0 +1,5 @@
+name: "asset-browser"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "Asset Browser"

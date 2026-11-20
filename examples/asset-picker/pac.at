@@ -1,0 +1,37 @@
+// pac.at — asset-picker demo (PLAN-091 T-04).
+//
+// 官方 asset-browser 包的普通消费演示：应用自有授权资源 provider（图片夹具
+// 经 back 进程媒体会话出真实 URI + 合成附件目录）+ AssetPicker 模态选择 +
+// 接受 handler 真实业务写入（附件引用日志）。产品门
+// verify_asset_picker.py 以本示例为夹具（隔离目录运行）。
+name: "asset-picker-demo"
+version: "0.1.0"
+description: "AutoUI asset browser & picker demo (PLAN-091)"
+
+scene: "ui"
+render: "vue"
+api: "rust"
+front_port: 4394
+back_port: 8394
+icon: "image"
+title: "Asset Picker Demo"
+title_zh: "资源选择演示"
+category: "media"
+theme: "dark"
+window: "1080x800"
+
+# PLAN-091：官方包 dep 根（vue 轨物化扫描；native 轨由 widget 级 use 传递
+# 装载）。依赖闭包整组交付：asset-browser + tree-view + pagination +
+# image-viewer（缺依赖 = vue 轨具名构建失败）。
+dep asset_browser {
+    path: "D:/autostack/.wt/ui-091/auto-ui/packages/asset-browser"
+}
+dep tree_view {
+    path: "D:/autostack/.wt/ui-091/auto-ui/packages/tree-view"
+}
+dep pagination {
+    path: "D:/autostack/.wt/ui-091/auto-ui/packages/pagination"
+}
+dep image_viewer {
+    path: "D:/autostack/.wt/ui-091/auto-ui/packages/image-viewer"
+}

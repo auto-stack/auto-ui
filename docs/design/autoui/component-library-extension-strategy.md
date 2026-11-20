@@ -39,7 +39,7 @@
 | CL-12 | 储备研究 FontPicker / FontDialog | Reader 字号预设、字体资源及主题接口 | 先调查字体枚举、可用字体与回退；现有字号选择不等于完整字体选择器 | 待调查 |
 | CL-13 | 通用扩展批 NumericField / UnitField | Input/Button、number_field声明、示例数值设置 | 十进制草稿/验证/步进/范围、明确单位换算；原builtin兼容 | 已交付 [PLAN-087归档](../../plans/archived/087-numeric-and-unit-fields.md)，r3、6/8（T-07/08归复审/合并），交付45a80058；[Spec](../../specs/ui/numeric-fields.md)；[包](../../../packages/numeric-fields/README.md)；Win native+vue双轨门全绿，Linux轨not_run如实待补 |
 | CL-14 | 通用扩展批 PropertyInspector | 标准表单控件、087/088 | 数据描述的分组设置/属性面板；类型验证、默认值恢复、目标修订；无任意反射/eval | 已立 [PLAN-092](../../plans/092-property-inspector.md)，drafting r2，0/8 |
-| CL-15 | 通用扩展批 AssetBrowser / AssetPicker | 029 Gallery、085树、086分页、089图片预览 | 授权资源库分类/搜索/过滤/单选/预览；不复制本地FileDialog或文件服务 | 已立 [PLAN-091](../../plans/091-asset-browser-and-picker.md)，drafting r2，0/8 |
+| CL-15 | 通用扩展批 AssetBrowser / AssetPicker | 029 Gallery、085树、086分页、089图片预览 | 授权资源库分类/搜索/过滤/单选/预览；不复制本地FileDialog或文件服务 | 已归档 [PLAN-091](../../plans/archived/091-asset-browser-and-picker.md)（delivered r2，8/8：包 `packages/asset-browser/` + 规范 [docs/specs/ui/asset-browser.md](../specs/ui/asset-browser.md)；`examples/asset-picker/` + 029 Gallery 迁移 + Win native 18/18 & Vue 5/5 & tools 2/2 全绿；Linux native 无 runner 单列 `not_run`） |
 | CL-16 | 通用扩展批 DockLayout / DockPanel | resizable/tabs/slots、041布局 | 同窗口分割、标签分组、移靠/resize/隐藏恢复、布局数据保存；非OS窗口dock | 已立 [PLAN-093](../../plans/093-dock-layout-and-panels.md)，drafting r2，0/8 |
 | CL-17 | 通用扩展批 MediaPlayer / TransportControls | 020/030媒体视口和控制条、现有video/mpv | 音视频普通播放/定位/音量/倍速、真实回灌/失败；不造解码器或媒体库 | 已立 [PLAN-090](../../plans/090-media-player-and-transport-controls.md)，drafting r2，0/8 |
 | CL-18 | 专业储备 VectorField / TransformEditor | 后续复用087、AGE变换数据 | XY/XYZ及位置/旋转/缩放；等首次游戏/CAD对象编辑明确坐标/单位语义后设计 | 仅候选，未立计划 |

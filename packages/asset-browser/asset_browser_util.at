@@ -1,0 +1,172 @@
+// packages/asset-browser/asset_browser_util.at — AssetBrowser 纯派生函数
+// （PLAN-091 T-02）。
+//
+// ⚠ VM 轨遍历纪律（PLAN-614/PLAN-085 实证，本包沿用）：`for-in` 对函数参数
+// 列表迭代零次，因此所有列表遍历一律 `while` + 索引。
+//
+// ⚠ 包内模块文件不会被自动导入：使用方必须显式
+// `use asset_browser_util: <fn…>`；漏写时 `computed => fn(...)` 静默产出空
+// 列表且无诊断（PLAN-085 T-01 实测，同族约束）。
+//
+// 记录 schema（r2 冻结，provider 全键提供；VM Obj 形状锁定——缺键字段访问是
+// 硬错，与 085 树节点同约束）：
+// { id: str, revision: str, label: str, kind: str, thumbnailUri: str,
+//   resourceRef: str }
+// folders schema（r2：沿 085 嵌套形状，薄适配为 TreeView 全键节点）：
+// { id: str, label: str, children: List }
+
+/// 记录结构校验："" = 合法；"<empty-id>" = 存在空 id；"<no-revision>" =
+/// 存在空 revision；其余返回值 = 首个重复 id（子串 token 法，PLAN-085 同款：
+/// 起始 ""、`!`→`!0` 先于 `|`→`!1` 的单射转义、空 id 不入 token 流）。
+pub fn ab_check_records(records List) str {
+    var seen str = ""
+    var i int = 0
+    while i < records.len() {
+        let r = records[i]
+        if r.id == "" {
+            return "<empty-id>"
+        }
+        if r.revision == "" {
+            return "<no-revision>"
+        }
+        var esc str = r.id.replace("!", "!0").replace("|", "!1")
+        var token str = "|" + esc + "|"
+        if seen.contains(token) {
+            return r.id
+        }
+        seen = seen + token
+        i = i + 1
+    }
+    return ""
+}
+
+/// folders（{id,label,children}）→ TreeView 全键节点薄适配。
+/// kind/icon/is_leaf/badge 由适配补默认；不另造磁盘目录模型。
+pub fn ab_adapt_folders(folders List) List {
+    var out List = []
+    var i int = 0
+    while i < folders.len() {
+        let nd = folders[i]
+        out.push({
+            id: nd.id,
+            label: nd.label,
+            children: ab_adapt_folders(nd.children),
+            kind: "dir",
+            icon: "folder",
+            is_leaf: false,
+            badge: ""
+        })
+        i = i + 1
+    }
+    return out
+}
+
+/// 顶层分类 id 列表（Init 默认展开用）。
+pub fn ab_top_ids(folders List) List {
+    var out List = []
+    var i int = 0
+    while i < folders.len() {
+        out.push(folders[i].id)
+        i = i + 1
+    }
+    return out
+}
+
+/// 按 id 精确查找记录下标；未命中 -1。
+pub fn ab_find_index(records List, id str) int {
+    var i int = 0
+    while i < records.len() {
+        if records[i].id == id {
+            return i
+        }
+        i = i + 1
+    }
+    return -1
+}
+
+/// 类型 → 有界图标名（字面量分支消费，vue 轨动态名落占位）。
+/// image → image；folder → folder；其余（普通附件）→ file-text。
+pub fn ab_kind_icon(kind str) str {
+    if kind == "image" {
+        return "image"
+    }
+    if kind == "folder" {
+        return "folder"
+    }
+    return "file-text"
+}
+
+/// 卡片派生：records + 受控选择 + 键盘焦点 → 带旗标卡片记录。
+/// sel/focused/has_thumb/can_preview/icon 为渲染旗标（视图只做字面量分支，
+/// PLAN-085 class f-string 不插值循环字段的同族规避）。
+pub fn ab_derive_cards(records List, sel_id str, focus int) List {
+    var out List = []
+    var i int = 0
+    while i < records.len() {
+        let r = records[i]
+        var sel bool = false
+        if sel_id != "" {
+            if r.id == sel_id {
+                sel = true
+            }
+        }
+        var focused bool = false
+        if i == focus {
+            focused = true
+        }
+        var has_thumb bool = false
+        if r.thumbnailUri != "" {
+            has_thumb = true
+        }
+        var can_preview bool = false
+        if r.kind == "image" {
+            if r.thumbnailUri != "" {
+                can_preview = true
+            }
+        }
+        out.push({
+            id: r.id,
+            revision: r.revision,
+            label: r.label,
+            kind: r.kind,
+            thumbnailUri: r.thumbnailUri,
+            resourceRef: r.resourceRef,
+            sel: sel,
+            focused: focused,
+            has_thumb: has_thumb,
+            can_preview: can_preview,
+            icon: ab_kind_icon(r.kind)
+        })
+        i = i + 1
+    }
+    return out
+}
+
+/// 键盘焦点前移（cols 为行宽格；越界钳到末项；空列表 -1）。
+pub fn ab_step(cards List, index int, cols int) int {
+    var n int = cards.len()
+    if n == 0 {
+        return -1
+    }
+    var nxt int = index + cols
+    if index < 0 {
+        nxt = 0
+    }
+    if nxt > n - 1 {
+        nxt = n - 1
+    }
+    return nxt
+}
+
+/// 键盘焦点后移（越界钳到首项）。
+pub fn ab_step_back(cards List, index int, cols int) int {
+    var n int = cards.len()
+    if n == 0 {
+        return -1
+    }
+    var prv int = index - cols
+    if prv < 0 {
+        prv = 0
+    }
+    return prv
+}
