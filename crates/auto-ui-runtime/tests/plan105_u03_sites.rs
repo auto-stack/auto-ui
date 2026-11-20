@@ -116,6 +116,95 @@ fn dedupe_functions(src: &str) -> String {
     out.push_str(&src[cursor..]);
     out
 }
+/// 把 `use <unit>: f1, f2` 引用的单元里的 `pub fn` 补齐到合并源（prep 只内联
+/// 可通过组件面探针的那部分；工具函数常含 `var xs = []`/record 字面量而缺席，
+/// lane 的 SFC 仍会引用它们）。
+fn append_used_module_fns(root: &Path, app_src: &str, merged: &mut String) {
+    let mut wanted: Vec<String> = Vec::new();
+    for line in app_src.lines() {
+        let t = line.trim_start();
+        let Some(rest) = t.strip_prefix("use ") else { continue };
+        let Some((module, items)) = rest.split_once(':') else { continue };
+        let module = module.trim();
+        if module.contains('.') {
+            continue; // 依赖包（themes/stylekit/datetime）不在此处补
+        }
+        for item in items.split(',') {
+            let name = item.trim();
+            if name.is_empty() {
+                continue;
+            }
+            wanted.push(name.to_string());
+        }
+    }
+    if wanted.is_empty() {
+        return;
+    }
+    let dir = root.join("src/front");
+    let mut extra = String::new();
+    // 先按 `use` 显式引用补，再**全量**补同目录单元的顶层 fn（工具函数内部还会
+    // 调用 `weekday_of`/`days_in_month` 等未在 `use` 里点名的兄弟函数）。
+    let mut names: Vec<String> = wanted.clone();
+    let mut units: Vec<(std::path::PathBuf, String)> = Vec::new();
+    for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("at") {
+            continue;
+        }
+        if path.file_name().and_then(|n| n.to_str()) == Some("app.at") {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        for line in text.lines() {
+            let t = line.trim_start();
+            if let Some(rest) = t.strip_prefix("pub fn ").or_else(|| t.strip_prefix("fn ")) {
+                if let Some(paren) = rest.find('(') {
+                    names.push(rest[..paren].trim().to_string());
+                }
+            }
+        }
+        units.push((path, text));
+    }
+    for (_path, text) in &units {
+        for name in &names {
+            if merged.contains(&format!("fn {name}(")) || extra.contains(&format!("fn {name}(")) {
+                continue;
+            }
+            if let Some(block) = extract_fn_block(text, name) {
+                extra.push_str(&block);
+                extra.push('\n');
+            }
+        }
+    }
+    merged.push('\n');
+    merged.push_str(&extra);
+}
+
+/// 取 `pub fn <name>(…) { … }`（大括号配平）整块。
+fn extract_fn_block(src: &str, name: &str) -> Option<String> {
+    let needle = format!("fn {name}(");
+    let pos = src.find(&needle)?;
+    let start = src[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let bytes = src.as_bytes();
+    let open = start + src[start..].find('{')?;
+    let mut depth = 0i32;
+    let mut j = open;
+    while j < bytes.len() {
+        match bytes[j] {
+            123 => depth += 1,
+            125 => {
+                depth -= 1;
+                if depth == 0 {
+                    j += 1;
+                    break;
+                }
+            }
+            _ => {}
+        }
+        j += 1;
+    }
+    Some(src[start..j].to_string())
+}
 fn build_site(app: &str, units: &[&str]) -> Result<PathBuf, String> {
     std::env::set_var("P105_MEM_BACKEND", "1");
     let root = examples().join(app);
@@ -129,7 +218,8 @@ fn build_site(app: &str, units: &[&str]) -> Result<PathBuf, String> {
         joined.push_str(&prepped);
         joined.push('\n');
     }
-    let merged = dedupe_store_blocks(&joined);
+    let mut merged = dedupe_store_blocks(&joined);
+    append_used_module_fns(&root, &std::fs::read_to_string(root.join("src/front/app.at")).unwrap_or_default(), &mut merged);
     let (multi, stores) = generate_sfcs_with_lane_product_stores(
         &merged,
         "src/front/app.at",
