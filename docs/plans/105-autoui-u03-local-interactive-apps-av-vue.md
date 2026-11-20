@@ -905,6 +905,16 @@ stage: work（站点构建器 + 扩面）| plan_id: PLAN-105 | plan_revision: r1
 **真实挂载**：013 ✅（上游同口径 `failures=0`）；016 构建 ✅ 但运行时空（`build_month_grid is not defined`、`t is not defined`）；015/022 构建报错（待读 message）。
 
 **lane 缺口（新增）**：① 模块级 helper 未发射（`build_month_grid`）；② 循环变量作用域（`t`）；③ 015/022 构建错误待定位。
+
+stage: work（两 app 挂载通过）| plan_id: PLAN-105 | plan_revision: r1 | round: 105 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `31337912` | next: work
+
+2026-11-21 stage: work（T-02 W100：013+016 浏览器真实挂载通过）| outcome: **pass**
+
+**构建器补强**：`use <unit>: f` 的工具函数补齐扩展为「同目录非 app 单元全量 fn 注入（去重）」，修复 016 的 `build_month_grid`/`weekday_of` 缺失。
+
+**验收**：013-todo `failures=0`（`p013-browser-evidence.txt`）、016-calendar `failures=0`（`p016-browser-evidence.txt`）。
+
+**余两例**：015-notes 卡 `view fn NoteRow`（嵌套视图函数未发射子组件；`lucide-vue-next` 已用 junction 解决）；022-kanban 需 `vue-router`（`<router-view/>`）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1336,6 +1346,16 @@ stage: work（站点构建器 + 扩面）| plan_id: PLAN-105 | plan_revision: r1
 **真实挂载**：013 ✅（上游同口径 `failures=0`）；016 构建 ✅ 但运行时空（`build_month_grid is not defined`、`t is not defined`）；015/022 构建报错（待读 message）。
 
 **lane 缺口（新增）**：① 模块级 helper 未发射（`build_month_grid`）；② 循环变量作用域（`t`）；③ 015/022 构建错误待定位。
+
+stage: work（两 app 挂载通过）| plan_id: PLAN-105 | plan_revision: r1 | round: 105 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `31337912` | next: work
+
+2026-11-21 stage: work（T-02 W100：013+016 浏览器真实挂载通过）| outcome: **pass**
+
+**构建器补强**：`use <unit>: f` 的工具函数补齐扩展为「同目录非 app 单元全量 fn 注入（去重）」，修复 016 的 `build_month_grid`/`weekday_of` 缺失。
+
+**验收**：013-todo `failures=0`（`p013-browser-evidence.txt`）、016-calendar `failures=0`（`p016-browser-evidence.txt`）。
+
+**余两例**：015-notes 卡 `view fn NoteRow`（嵌套视图函数未发射子组件；`lucide-vue-next` 已用 junction 解决）；022-kanban 需 `vue-router`（`<router-view/>`）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
