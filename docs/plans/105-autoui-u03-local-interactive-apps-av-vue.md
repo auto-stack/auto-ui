@@ -559,6 +559,21 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 82 | from: work | t
 **013 现状**：元素视图墙已过；新墙 = `no local named self in scope` + `field access ... found i32` + `indexing requires a List receiver, found i32`——即**后端内联 shim 的生成语句落在 store 块里**，经 store 展开后作用域不对（`self` 不存在、`.todos` 被解析成 i32）。下一刀：把 shim 生成物从 `store` 块挪到**组件级 handler 体**（或让 store 展开支持生成语句的作用域），并核对 `.next_id` 的字段归属。
 
 **验证**：plan105 26/26、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 7/7；prep 7/7。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 83 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W80：013 shim 作用域归因）| PLAN-105 r1 | outcome: pass | task_ids: T-02（W80）| evidence: 失败语句上下文（`.todos.push/.insert`）
+
+**本轮结论（把 013 新墙归因到具体构造）**：失败诊断的上下文已抓取——
+1. `no local named `self` in scope` 落在 `if .input != "" { .todos.push(Todo { id: .next_id, … }) … }`；
+2. `field access requires a record-typed value, found i32` 落在同一句（`.next_id` 位置）；
+3. 另一处 `.todos.insert(__mb_u2, Todo { id: .todos[i].id, … })` 同样报 `self`。
+
+→ 即：**shim 生成的列表方法调用语句落在 store 的 handler 里**，经 store 展开后其字段引用被写成 `self.*`，而**检查函数/场景体的降级通道不会重命名 `self`**（该通道只重命名 `ComponentStmt` 的表达式，`self` 是 store 展开阶段引入的）。附带 `.next_id` 被判成 `i32` 也源于同一映射（`.field` 被当成裸值）。
+
+**下一刀（明确）**：查 `expand_store_calls` 里的字段映射（`store_field_prefixed` 与 `rewrite_store_expr`），确认它把 store 字段映射成什么；两种修法：①让展开后的语句通过同一 `rename_expr` 通道（保留 `Field{self,…}` 语义到组件层）；②shim 不在 store 里生成列表方法语句，而是生成**组件级 handler**（`.AddTodo -> { … }` 直接操作组件字段）。
+
+**验证**：prep 7/7（探针已清理）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -644,6 +659,21 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 82 | from: work | t
 **013 现状**：元素视图墙已过；新墙 = `no local named self in scope` + `field access ... found i32` + `indexing requires a List receiver, found i32`——即**后端内联 shim 的生成语句落在 store 块里**，经 store 展开后作用域不对（`self` 不存在、`.todos` 被解析成 i32）。下一刀：把 shim 生成物从 `store` 块挪到**组件级 handler 体**（或让 store 展开支持生成语句的作用域），并核对 `.next_id` 的字段归属。
 
 **验证**：plan105 26/26、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 7/7；prep 7/7。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 83 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W80：013 shim 作用域归因）| PLAN-105 r1 | outcome: pass | task_ids: T-02（W80）| evidence: 失败语句上下文（`.todos.push/.insert`）
+
+**本轮结论（把 013 新墙归因到具体构造）**：失败诊断的上下文已抓取——
+1. `no local named `self` in scope` 落在 `if .input != "" { .todos.push(Todo { id: .next_id, … }) … }`；
+2. `field access requires a record-typed value, found i32` 落在同一句（`.next_id` 位置）；
+3. 另一处 `.todos.insert(__mb_u2, Todo { id: .todos[i].id, … })` 同样报 `self`。
+
+→ 即：**shim 生成的列表方法调用语句落在 store 的 handler 里**，经 store 展开后其字段引用被写成 `self.*`，而**检查函数/场景体的降级通道不会重命名 `self`**（该通道只重命名 `ComponentStmt` 的表达式，`self` 是 store 展开阶段引入的）。附带 `.next_id` 被判成 `i32` 也源于同一映射（`.field` 被当成裸值）。
+
+**下一刀（明确）**：查 `expand_store_calls` 里的字段映射（`store_field_prefixed` 与 `rewrite_store_expr`），确认它把 store 字段映射成什么；两种修法：①让展开后的语句通过同一 `rename_expr` 通道（保留 `Field{self,…}` 语义到组件层）；②shim 不在 store 里生成列表方法语句，而是生成**组件级 handler**（`.AddTodo -> { … }` 直接操作组件字段）。
+
+**验证**：prep 7/7（探针已清理）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
