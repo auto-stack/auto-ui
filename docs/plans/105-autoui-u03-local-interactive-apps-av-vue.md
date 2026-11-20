@@ -392,6 +392,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 67 | from: work | t
 **012 现状**：`.w_rows = rows` 不再是墙（该形状已被回归覆盖）；剩余 `verify.view-escape: expr e565` 经 atom 反查 = `list_get { type: t_str; list: e563(t_list_str) }`——即某列表的类型被视为 **`List<str>`（借用元素）**，读整元素被判成非值。下一轮需找出该 `t_list_str` 的来源（`.cities` 的字段注解 vs 推断），并让列表元素类型统一为 owned。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 4/4。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 68 | from: work | to: work | status: executing | outcome: pass（负结果 + 精确现象）| worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W65：列表元素 owned 化的现象定位）| PLAN-105 r1 | outcome: pass | task_ids: T-02（W65）| evidence: atom 快照（cities `t_list_str` vs w_rows `t_list_Str`）
+
+**现象（关键）**：同一 model 里两个 `[]str` 字段——`cities`（**非空**字面量初值，走 push 展开）被解析成 `t_list_str`（借用元素），`w_rows`（**空**字面量，走 `List<Str>.new()`）是 `t_list_Str`（owned）。`field_ann` 对两者都返回 `List<StrOwned>`（用 `P105_DUMP_FIELDS` 实证），即使把 push 展开处的元素注解**强制为 StrOwned**，解析结果仍是 `t_list_str` → 说明**降级发生在共享 resolver/adapter 侧**（`List<Str>` 注解在值/泛型实参位被归一到借用 `str`），而不是组件面的注解构造。
+
+**结论/下一刀**：查 resolver 的 `List<T>` 泛型实参归一（`ty_use`/`intern` 路径）以及 push 实参对接收位的类型收敛——目标：让「非空字面量初值 + 逐元素 push」的 `List<Str>` 局部保持 owned 元素，从而消掉 `list_get` 的 view-escape。
+
+**验证**：plan105 25/25、980 39/39、981 248/248；av list handlers 4/4；调试钩子已移除。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
