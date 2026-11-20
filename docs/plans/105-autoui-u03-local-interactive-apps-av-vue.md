@@ -655,6 +655,23 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 86 | from: user | t
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 87 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 9dd311b6 | next: user
 
 2026-11-19 stage: waiting（第 3 个等待轮；无新指令，不做事不跑检查）| 待用户选择路线 A/B/C 或说「继续计划105」。按技能规则，连续三轮等待后目标转 blocked。
+
+stage: merge（尝试）| plan_id: PLAN-105 | plan_revision: r1 | round: 88 | from: user | to: user | status: executing | outcome: blocked（并发计划冲突）| worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: c2802cac / 0a0872b18 | next: user
+
+2026-11-19 stage: merge（用户要求把已完成部分并回主分支）| outcome: blocked | evidence: `git merge-tree --write-tree` 试合并
+
+**已做的核实**
+- 主检出（两仓）**无 WIP 代码**（只有其它计划的 docs 改动）；工作树两棵干净。
+- 分支差异：auto-ui `master..plan-105-dev` = 57/74；auto-lang = 153/57。
+- 试合并冲突数（`merge-tree --write-tree`）：**auto-ui 3 处、auto-lang 3 处**，其余文件按内容自动合并。
+
+**具体冲突**
+- auto-ui：`ace_node_desktop.rs`（2 处，均为本分支**新增块**，好解）、`ace_package_sfc.rs`（2 处——master 已重构为 **routed SFC**（PLAN-124/125），本分支加了 `generate_package_sfc_with_root` + prep 入口，需手工合并）、`docs/plans/105-*.md`（取本分支）。
+- auto-lang：`resolve.rs`（1 处）、`plan981_grammar_scope.rs`（2 处，**文法 census 哈希**需按合并后文法重算）、`grammars/auto-source.at`（4 处，**语义冲突**：master 新增 `age-route-link-block`（路由 link），本分支新增 `age-element-link-block` + AGE 的 `array-lit`/空数组 profile 收录）。
+
+**结论**：并回主分支**不是一次机械合并**——文法里的 link 元素与 124/125 的路由 link 是同一语法的两种实现，必须选定/融合一套，否则会影响所有 AGE profile 的解析（248 例 census + 全量 conformance 需重跑）。故本轮按规模停下来报告，未在主分支上留下任何提交。
+
+**建议路线**：①先等 124/125 合并，再把 105 分支 rebase 上去（冲突面会变小）；②或以「work 阶段」做文法融合（预计 2–4 轮：选定 link 元素、重算 census、跑 248+六例门），然后 ff-only 落地。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -836,6 +853,23 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 86 | from: user | t
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 87 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 9dd311b6 | next: user
 
 2026-11-19 stage: waiting（第 3 个等待轮；无新指令，不做事不跑检查）| 待用户选择路线 A/B/C 或说「继续计划105」。按技能规则，连续三轮等待后目标转 blocked。
+
+stage: merge（尝试）| plan_id: PLAN-105 | plan_revision: r1 | round: 88 | from: user | to: user | status: executing | outcome: blocked（并发计划冲突）| worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: c2802cac / 0a0872b18 | next: user
+
+2026-11-19 stage: merge（用户要求把已完成部分并回主分支）| outcome: blocked | evidence: `git merge-tree --write-tree` 试合并
+
+**已做的核实**
+- 主检出（两仓）**无 WIP 代码**（只有其它计划的 docs 改动）；工作树两棵干净。
+- 分支差异：auto-ui `master..plan-105-dev` = 57/74；auto-lang = 153/57。
+- 试合并冲突数（`merge-tree --write-tree`）：**auto-ui 3 处、auto-lang 3 处**，其余文件按内容自动合并。
+
+**具体冲突**
+- auto-ui：`ace_node_desktop.rs`（2 处，均为本分支**新增块**，好解）、`ace_package_sfc.rs`（2 处——master 已重构为 **routed SFC**（PLAN-124/125），本分支加了 `generate_package_sfc_with_root` + prep 入口，需手工合并）、`docs/plans/105-*.md`（取本分支）。
+- auto-lang：`resolve.rs`（1 处）、`plan981_grammar_scope.rs`（2 处，**文法 census 哈希**需按合并后文法重算）、`grammars/auto-source.at`（4 处，**语义冲突**：master 新增 `age-route-link-block`（路由 link），本分支新增 `age-element-link-block` + AGE 的 `array-lit`/空数组 profile 收录）。
+
+**结论**：并回主分支**不是一次机械合并**——文法里的 link 元素与 124/125 的路由 link 是同一语法的两种实现，必须选定/融合一套，否则会影响所有 AGE profile 的解析（248 例 census + 全量 conformance 需重跑）。故本轮按规模停下来报告，未在主分支上留下任何提交。
+
+**建议路线**：①先等 124/125 合并，再把 105 分支 rebase 上去（冲突面会变小）；②或以「work 阶段」做文法融合（预计 2–4 轮：选定 link 元素、重算 census、跑 248+六例门），然后 ff-only 落地。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
