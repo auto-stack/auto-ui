@@ -574,6 +574,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 83 | from: work | t
 **下一刀（明确）**：查 `expand_store_calls` 里的字段映射（`store_field_prefixed` 与 `rewrite_store_expr`），确认它把 store 字段映射成什么；两种修法：①让展开后的语句通过同一 `rename_expr` 通道（保留 `Field{self,…}` 语义到组件层）；②shim 不在 store 里生成列表方法语句，而是生成**组件级 handler**（`.AddTodo -> { … }` 直接操作组件字段）。
 
 **验证**：prep 7/7（探针已清理）。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 84 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 76b86b49c | next: work
+
+2026-11-19 stage: work（T-02 W81：013 诊断与 store 映射修复）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `76b86b49c` | task_ids: T-02（W81）
+
+**交付**：①`rename_expr` 对**未声明的 model 字段**改为具名拒（`model has no field \`x\``），不再留成 `self.x` 让共享 verify 报误导性的 `no local named self`；②`rewrite_store_expr` 补 **`CtorNamed`/`ObjectLit`** 分支——store 字段映射现在能覆盖构造字面量里的 `.field`（`Todo { id: .next_id, text: .input, … }`）。
+
+**013 墙序列（本轮推进 2 格）**：`no local named self`（误导）→ **`model has no field next_id`**（具名）→ 补 ctor 映射后 → **`no builtin method clone on receiver type bool`**。
+
+**下一刀**：查 `.clone()` 落在 bool 上的来源（大概率是组件面 `wrap_owned_transfer` 对非文本字段也加了 clone，或 shim 的 `!current_done` 实参被克隆），改成只对 owned 文本/记录加 clone。
+
+**验证**：plan105 26/26、980 39/39、981 248/248、104 3/3、1072 19/19；av list handlers 7/7。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -674,6 +686,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 83 | from: work | t
 **下一刀（明确）**：查 `expand_store_calls` 里的字段映射（`store_field_prefixed` 与 `rewrite_store_expr`），确认它把 store 字段映射成什么；两种修法：①让展开后的语句通过同一 `rename_expr` 通道（保留 `Field{self,…}` 语义到组件层）；②shim 不在 store 里生成列表方法语句，而是生成**组件级 handler**（`.AddTodo -> { … }` 直接操作组件字段）。
 
 **验证**：prep 7/7（探针已清理）。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 84 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 76b86b49c | next: work
+
+2026-11-19 stage: work（T-02 W81：013 诊断与 store 映射修复）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `76b86b49c` | task_ids: T-02（W81）
+
+**交付**：①`rename_expr` 对**未声明的 model 字段**改为具名拒（`model has no field \`x\``），不再留成 `self.x` 让共享 verify 报误导性的 `no local named self`；②`rewrite_store_expr` 补 **`CtorNamed`/`ObjectLit`** 分支——store 字段映射现在能覆盖构造字面量里的 `.field`（`Todo { id: .next_id, text: .input, … }`）。
+
+**013 墙序列（本轮推进 2 格）**：`no local named self`（误导）→ **`model has no field next_id`**（具名）→ 补 ctor 映射后 → **`no builtin method clone on receiver type bool`**。
+
+**下一刀**：查 `.clone()` 落在 bool 上的来源（大概率是组件面 `wrap_owned_transfer` 对非文本字段也加了 clone，或 shim 的 `!current_done` 实参被克隆），改成只对 owned 文本/记录加 clone。
+
+**验证**：plan105 26/26、980 39/39、981 248/248、104 3/3、1072 19/19；av list handlers 7/7。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
