@@ -706,6 +706,18 @@ stage: work（同步主线）| plan_id: PLAN-105 | plan_revision: r1 | round: 88
 **未完成**：文法 19 个 hunk 的合并。启发式「按 profiles 求并」产生两类错（AGE 引用未对 AGE 声明的 token、规则混入非 alt 子步），已放弃该产物；结论是**文法必须手工合并**（master 基座 + 逐块插入 105 的 6 组特性，再做定点 profile 放宽）。盘点见 `plan-artifacts/plan-105/t02-gap-map.md` §78。
 
 **状态**：合并已 reset 干净（`plan-105-dev` `0a0872b18`），下一轮从文法重建继续。
+
+stage: work（同步主线·第二轮）| plan_id: PLAN-105 | plan_revision: r1 | round: 89 | from: work | to: work | status: executing | outcome: pass（部分）| worktree: D:/autostack/.wt/ui-105/auto-lang | commit: a1c6db4b4 | next: work
+
+2026-11-20 stage: work（T-02 W84 同步合并第二轮）| outcome: pass（部分）
+
+**已落地**（auto-lang `plan-105-dev` `a1c6db4b4`）：代码侧全通（`resolve/verify/adapter/collections.atom/age_component` 适配主线 1082/1086/124）；文法以 master 为基座手工重建 105 的 6 组特性；census 两 AGE 值重基线；门：census 4/4、plan981 248、plan979_component 24、plan104 3、plan1072 19、plan980 40 全绿。
+
+**1086 复核**：Str 阻断已解除的证据是——013 现在不再报 `lower.type-use … Str`（该诊断已消失），新墙在文法/投影形状（见下）。
+
+**遗留 10 红（`plan105_` 16/26）**：`msg+model+view{text "x" {}}+on{var y=1}` 组合报 `unexpected token in a bare element tag`；已二分到 handler 裸 `var` 与 view 体闭合。另一批（`age-list-ty`/`array-lit`/`age-view-data-lit` 家族）曾把 `plan105_` 提到 18/26，但 census 两面被压成同值，已回退待重做。
+
+**纪律**：此后每批文法改动必须「census 两面绿且两值不同」才提交。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -938,6 +950,18 @@ stage: work（同步主线）| plan_id: PLAN-105 | plan_revision: r1 | round: 88
 **未完成**：文法 19 个 hunk 的合并。启发式「按 profiles 求并」产生两类错（AGE 引用未对 AGE 声明的 token、规则混入非 alt 子步），已放弃该产物；结论是**文法必须手工合并**（master 基座 + 逐块插入 105 的 6 组特性，再做定点 profile 放宽）。盘点见 `plan-artifacts/plan-105/t02-gap-map.md` §78。
 
 **状态**：合并已 reset 干净（`plan-105-dev` `0a0872b18`），下一轮从文法重建继续。
+
+stage: work（同步主线·第二轮）| plan_id: PLAN-105 | plan_revision: r1 | round: 89 | from: work | to: work | status: executing | outcome: pass（部分）| worktree: D:/autostack/.wt/ui-105/auto-lang | commit: a1c6db4b4 | next: work
+
+2026-11-20 stage: work（T-02 W84 同步合并第二轮）| outcome: pass（部分）
+
+**已落地**（auto-lang `plan-105-dev` `a1c6db4b4`）：代码侧全通（`resolve/verify/adapter/collections.atom/age_component` 适配主线 1082/1086/124）；文法以 master 为基座手工重建 105 的 6 组特性；census 两 AGE 值重基线；门：census 4/4、plan981 248、plan979_component 24、plan104 3、plan1072 19、plan980 40 全绿。
+
+**1086 复核**：Str 阻断已解除的证据是——013 现在不再报 `lower.type-use … Str`（该诊断已消失），新墙在文法/投影形状（见下）。
+
+**遗留 10 红（`plan105_` 16/26）**：`msg+model+view{text "x" {}}+on{var y=1}` 组合报 `unexpected token in a bare element tag`；已二分到 handler 裸 `var` 与 view 体闭合。另一批（`age-list-ty`/`array-lit`/`age-view-data-lit` 家族）曾把 `plan105_` 提到 18/26，但 census 两面被压成同值，已回退待重做。
+
+**纪律**：此后每批文法改动必须「census 两面绿且两值不同」才提交。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
