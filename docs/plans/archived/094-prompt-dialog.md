@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-20
 plan_revision: 3
-current_step: 7
+current_step: 8
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/prompt-dialog.md]
@@ -18,7 +18,7 @@ touched_goals: []
 
 ## 0. 变更摘要
 
-补齐组件库路线 CL-04 的文本输入对话框，提供标题、说明、单文本输入、本地必填校验、业务错误、确认/取消和提交中状态。用于重命名、创建名称和分组命名，文件名规则、唯一性、权限与实际写入由应用负责。见[持续跟踪 strategy](../../design/autoui/component-library-extension-strategy.md)。r3 按用户决定仅交付 Windows。Windows Native VM 与 Vue 已通过独立复审并落入主分支。交付和归档已核对，T-08 清理待完成。
+补齐组件库路线 CL-04 的文本输入对话框，提供标题、说明、单文本输入、本地必填校验、业务错误、确认/取消和提交中状态。用于重命名、创建名称和分组命名，文件名规则、唯一性、权限与实际写入由应用负责。见[持续跟踪 strategy](../../design/autoui/component-library-extension-strategy.md)。r3 按用户决定仅交付 Windows。Windows Native VM 与 Vue 已通过独立复审并落入主分支。交付、归档和清理均已核对，8/8。
 
 ## 1. 目标
 
@@ -186,7 +186,7 @@ native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--
 | AC-05 | work | 普通名称集合与027原生真实重命名/新建读回一致；027 Vue 保留写操作不可用，Windows 双端普通消费者成功；只改弹窗文案不足以通过。 | T-04,T-05；[x] 见修复收据 |
 | AC-06 | work | X-01/03/06/07、移根、必要公共/消费者回归及真实截图通过；中文/暗色/窄窗可用，Q-01若影响本组件则闭环；README/待沉淀Spec与证据齐 | T-05,T-06；[x] 准备、实际行为和资源回收的定向复验通过 |
 | AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定 Plan r3和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[x] `b71ff791`，独立最终复审通过 |
-| AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，不把未运行平台标为支持 | T-08；[ ] |
+| AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，不把未运行平台标为支持 | T-08；[x] 交付、规范、归档与清理见 §9 |
 
 ## 8. 执行步骤
 
@@ -199,7 +199,7 @@ native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--
 | T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/prompt_dialog_component.rs`、`tests/product/verify_prompt_dialog.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；Windows 两门、必需 case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[x] `b71ff791`，修复定向验证见 §9 |
 | T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan094/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[x] 最新准备入口、证据绑定及原始收据在 §6/9 |
 | T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[x] `b71ff791`，独立复审 AC-01…06、SD-01/02 通过 |
-| T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/prompt-dialog.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[ ] |
+| T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/prompt-dialog.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[x] 检入 `a5e12d3b`，归档与清理见 §9 |
 
 任务只保留本表一份当前进度；每项完成写实际证据，不预先勾选评审/合并。Windows 必需门缺口留在对应 AC，不能把产品正确性转给merge阶段兜底。
 
@@ -314,6 +314,12 @@ native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--
 - 2026-11-20。stage: merge | merge_key: PLAN-094:r3 | checkpoint: canonical_verified | outcome: pass。核验 [PromptDialog 规范](../../specs/ui/prompt-dialog.md) SHA256 `def5c2bb72ad8979e9c5e64a4dee8fdeeacf9ac1e5c6387816312bbd19200b95`，正文与复审提案一致。未写知识索引或旧台账。合并后从主检出复制示例和包到隔离目录，使用复审的同一组调试工具执行 `verify_prompt_dialog.py --backend native --case reopen --startup-timeout 5`，exit 0，进程墙时 8.530 s，报告内墙时 8.271 s。首轮/重开启动分别 1.340/1.079 s，重开后输入和取消及应用读回 0.364 s，首轮/重开清理 2.658/2.593 s。报告 SHA256 `12cd9121c1225e2b99cf3228c091489092d0da2da018ff9c7ffa65a3d60b3e3e`。本阶段无新增测试用例或构建，Vue 和其他 Native 结果沿用绑定交付代码的最终复审。
 
 - 2026-11-20。stage: merge | merge_key: PLAN-094:r3 | checkpoint: archived | outcome: pass | archive: `docs/plans/archived/094-prompt-dialog.md`。实际归档路径与状态一致，T-01…08 和 AC-01…08 编号各 8 条，已核验每表 7 条完成且仅清理待办。主检出中 5 处计划导航及历史引用解析到本归档。归档中 9 处相对链接和正式规范中 2 处相对链接均解析成功。规范 SHA256 与交付提交一致。
+
+- 2026-11-20。stage: merge | merge_key: PLAN-094:r3 | checkpoint: cleaned | outcome: pass。归档提交 `15f88456c54b7b0315557621404545a953beaa6a`。AutoUI 实施树及 auto-lang、auto-web、auto-down、auto-man 四个固定依赖树均为干净状态，逐树执行路径核对、`wt-guard.ps1` 与普通 `git worktree remove`，确认全部解除登记，已合入分支及空组目录移除。五次 Git 移除的进程墙时合计约 10.23 s。实施、复审和冒烟证据已折叠入本节。临时目录 `D:/autostack/plan-artifacts/plan-094/` 清理前有 135228 个文件、3956 个重解析点、3956277151 字节去重文件数据。清理逐项核对路径句柄，不跟随重解析点，核验目录和父目录中的条目均已消失，登记 `scopes.plan-094` 于 22:52:02 +08:00 关闭。清理脚本在目录移除后遇到登记行缩进不符，随后单独修复条目，删除精确计时未留存。无产物保留事项。23 条其他改动仍存于具名本地 Git stash。
+
+- 2026-11-20。交付后检查了生产产物。主检出的 `target/release/auto-ui-tool.exe`、AutoMan 的 `target/release/auto.exe` 和名称管理例的 `dist` 均缺失。027 的 `dist` 目录最后修改于 2026-11-18 22:59:21 +08:00，早于交付，内无可部署文件。发布构建和重启沿用用户本次范围，均未运行。AutoLang 批量回归到期检查不适用，本次交付只涉及 AutoUI 仓。
+
+- 2026-11-20。stage: goal | plan_id: PLAN-094 | plan_revision: r3 | from: merge | to: done | status: archived | outcome: pass | commit: `a5e12d3b2cdfe1b6371f567cef80acc617f58686`。T-08/AC-08 完成，Windows Native VM 与 Vue 均经独立复审通过，计划 8/8。
 
 ## 10. 待澄清事项
 
