@@ -411,6 +411,20 @@ AutoLang 集合发射与定向测试准备为 16.13 / 25.61 s，AutoUI 测试与
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 20 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ee142965, lang cd91223cd | evidence: original chart parameter, handler and guarded timer fragments project, indexed loop material agrees in AV/A2TS/Iced, and exact style, conditional class and message blockers are isolated | next: work`
 
+### 第 21 轮｜图表局部样式和条件类列表
+
+AGE Package 在组件成员位置保留 `style { … }` 的原 CSS 和范围。条件类列表只在 `style` 与 `class` 属性接纳，列表项为文本字面量，条件经共享验证器核为 `bool`。普通列表仍走原表达式投影。AGE Component 及周边语法指纹保持冻结。
+
+A2Vue 把原 CSS 发射为 Vue `<style scoped>`，在普通元素和 SVG 模板中绑定条件类。受检 Vue 项目开启 `allowJs` 以编译生成的 JavaScript SFC。Iced 的包控件树按实例状态选择类分支并将选中类交给样式适配层，容器子树的整体透明度仍待真窗核验。
+
+四份原始 CSS 独立投影通过，完整 024 原闭包已跨过此前第一个样式语法阻断。Area、Bar、Donut 在 `HoverOut` 未声明处报 `source.age.msg-unknown`。仅在对照材料声明 `HoverOut` 后，三者都推进到 Line 原文件同样报出的导入 `caption_text` 的 `source.age.style-call`。四份原文件保持原始字节。对照验证了把条件列表用于 `value` 或把整数用于条件会被拒绝。
+
+从独立目录用 `auto build --render vue --gen-only` 生成路由材料，复用相同依赖的固定锁文件离线安装并通过 `vue-tsc && vite build`。Chrome 157 实测 SVG 路径有 scoped 属性且计算样式包含 `stroke-width, fill-opacity`，点击图例按钮使计算透明度从 1 到 0.4 再恢复为 1，随后卸载，浏览器错误为零。Core 定向 248 + 30、AV 65 + 33、UI SFC 19、路由 2、桌面闭包 4 通过。
+
+`round21-chart-admission-summary.log`、原闭包投影 `round21-chart-admission/original-closure.log`、`round21-vue-browser.log`、`round21-vue-build-final.log` 的 SHA256 依次为 `788b13415b99de54fa09937f0fb892415090f3baa3cde1d249160631a7f423f5`、`011b1acb91b64ff0c7fb4d3517945ea92feae3f1509a663511148ac633da1d7a`、`f99433c66597a9b0b6f03d8f08c9da6ba991f676e4909197757878e449da8cd6`、`a32ef23164194de99bfa13b7e54286d5574e9db6f8b9db2bf5486e1cb8f7f610`。下一步核对旧 widget 的零载荷 handler 补变体约定和 stylekit 公共样式绑定，再对未修改的 024 闭包运行双端。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 21 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui cdc1fd94, lang bf6fdd8af | evidence: original chart scoped CSS passes and original closure advances to message/style imports, route builds and Chrome verifies scoped transitions and reactive class | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
