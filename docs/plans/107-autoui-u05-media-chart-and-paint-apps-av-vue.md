@@ -258,6 +258,20 @@ AutoLang 准备 5.65 s，最后重链 1.83 s。AutoUI 测试准备 44.10 s、探
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 8 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ea71a751, lang defb95510 | evidence: AV state drives SVG pixels and production-generated Vue renders and updates the canonical grid fragment in Chrome | next: work`
 
+**SVG 条件图元与 AV 事件（T-02/T-03 进行中）。** AutoLang `a0fb51825de1a4ab0edf32ad6214158cea2a283f`、AutoUI `86aec6c21ab81d986c7c88106f8a95b56284170a`。AV 的平铺观察入口仍具名拒绝条件视图。新增布局输入入口提供受检状态和含两支的文本槽，Iced 按实例的已提交状态选择 SVG 分支，并跳过隐藏分支的文本槽。实例文本分组沿 PLAN-114 `6559fb2b1` 的源序分块方式，解决两实例多叶交叉取值。源按钮沿原 AV 会话队列派发。A2Vue 模板支持短路逻辑表达式。材料页复用 FlowDiagram 的 `.hoverDg == 999` 普通态/高亮态结构。
+
+| 执行 | 结果 | 墙钟执行 |
+|---|---|---:|
+| 普通 AV 条件观察及包观察用例 | 5/5、9/9。两实例各得到正确文本槽，原观察口保持具名拒绝 | 0.087 / 0.088 s |
+| Iced 控件、A2Vue 包模板及四条桌面桥回归 | 6/6、12/12、4/4。AV handler 切换后复验栅格像素、分支标签和后续文本；桌面桥覆盖两实例、重开、类型输入与 provider 撤权 | 0.218 / 0.182 / 0.127–0.367 s |
+| Iced 真窗材料驱动，调用实际挂载按钮的消息 | exit 0，9 帧、零错误。两实例依次为普通/普通、高亮/普通、普通/普通、普通/高亮。每个 SVG 只有一个 rect，SVG 和预览尾标签对齐。关闭后访问树消失，晚到按钮和脚本事件均丢弃 | 1.863 s |
+| 非 SVG 顶层条件对照 | exit 4，锚定 `ace.desktop.view-cond-unsupported` | 0.127 s |
+| A2Vue 真实生成、`pnpm build`、Chrome | 独立材料路由复用 PLAN-123 `allowJs`。普通→高亮→普通三帧分别只有一个实际 SVG rect，描边变化正确，保留标签并成功卸载，零页面异常 | 1.101 / 2.606 / 1.007 s |
+
+AutoLang 冷准备 102.36 s、最终增量 4.04 s，AutoUI 测试最终增量 17.60 s，工具准备 52.44 s，Iced 材料驱动最终链接 4.29 s，Vue 首次离线安装 10.12 s。撤权测试需要其自身 provider 注册模式，移除回放用的 `ACE_NODE_DESKTOP_PREPARED_RUSTC` 后原测试通过。发现/清理未单计。`svg-conditions-window-final.json` SHA256 `968dc9fb89c009579f2d66d59e79d9ff1b4091ac4d787d752cb47b9c25c4c5a2`，回放日志 SHA256 `25b07257c5c9d6cf4fc87e567db7d53bb5bea8808aed702b8af23625d4b690f3`，`svg-conditions-browser-final.log` SHA256 `34127100cb344e5cc669b72b32882419e47cdabb0a155da3d9e033af1f4b726e`。原页完整列表闭包、列表循环以及原指针载荷仍沿 B-107-01 跟进，材料回放使用按钮事件触发状态。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 86aec6c2, lang a0fb51825 | evidence: installed Iced buttons switch checked SVG per instance, with matching browser geometry and an unchanged flat-observation guard | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
