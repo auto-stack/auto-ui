@@ -531,6 +531,16 @@ A2TS 集合种子为 `F32` 字段和列表元素保存 `f32` 类型，复用按�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 32 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bfa24e2c, lang 0f16585f7 | evidence: f32 collection seed and exact numeric action in the production Vue browser material | next: work`
 
+### 第 33 轮｜Vue 项目构建复用受检路由组件
+
+组件发现保留模块的规范文件路径。路由编译记录模块内全部 widget 已由受检运行时发射的文件，全量和增量构建据此复用路由产物。增量路径沿用已有缓存产物清理，独立组件的缺席负控仍报告具名错误。
+
+第 31 轮标准 `components/` 目录材料已通过生产 `auto build --render vue --gen-only`、`vue-tsc` 和 Vite，页面内为 `<AcePackageView />`。Chrome `157.0.8103.80` 实测 `0/0 → 1/1`，卸载后无异常。`round33-vue-browser.log` SHA256 为 `ffbafe1d67cf3fbee76beee2a7a944fb00bb5a774545c7307a309a766becd4f3`。组件包 10、路由 2、SFC 20、全量及增量工具综合回归 1 通过。
+
+固定 AutoOS 画廊外壳仍在 `widget App` 附近报 `source.syntax`。下一阶段接入 owner 的连字符路由模块和受检 outlet，重放实际画廊入口。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 33 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui afd90665, lang 0f16585f7 | evidence: checked production standard component directory, cold/incremental regressions and Chrome replay | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
