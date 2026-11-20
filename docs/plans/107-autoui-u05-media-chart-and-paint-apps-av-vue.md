@@ -322,6 +322,19 @@ Rust 测试增量准备 4.73 s，工具准备 20.01 s，前端首次离线安装
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 13 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a9c4dec1, lang efe49ea38 | evidence: unchanged chart geometry module parses and reaches the missing checked math binding, with AV and A2TS tail result evidence | next: work`
 
+**024 原几何模块运行和 Vue 传递函数闭包（T-02/T-03 进行中）。** AutoLang `e9d77f0a274c9791c6878d680d97b64e0b701b79`，AutoUI `8e236a3f123e5acec28f19a5146ad62f9227dd14`。AGE 包将图表的隐式 `math` 绑定到固定的纯 Auto `std::age_math` 源，显式导入、同包模块和局部名字保留其作用域。新模块提供 f32 的 `sin`、`cos`、`atan2`、`sqrt`，复用装配库的级数和二进制归一化方法，按图表角度和有限坐标作精度验证。A2TS 的 f32 除法保留 f32 舍入。Vue 消费 PLAN-114 `af933b9ca`、`f7957fb6` 的完整函数发射切片，以受检符号追传递函数并去重，运行时随正式生成工具发布。
+
+| 执行 | 结果 |
+|---|---|
+| 固定原 `024-charts` 的 `chart_geom.at` | SHA256 `78a02b598d169d0caa278a32aa913be1800ab76a02084a9c389f3ea64aa58863`。原模块受检包绑定通过。用原 `dc`、`ds` 和同一模块解析链下的 `atan2`、`sqrt` 跑 39 个测点，AV 与 A2TS 数值位型全部相同，与独立数值基准的最大绝对误差 `1.75e-7`。 |
+| ACE Core、AV、A2TS 片段和 AutoUI 回归 | `plan981` 248/248 与 58/58，`ts_ui_fragment` 4/4，`plan980_package_sfc` 17/17，`plan124_routes` 用已准备 provider 为 2/2。含同包 `math` 遮蔽、递归 helper 去重和运行时导入。 |
+| 严格 ACE CLI 生成、Vue 构建和 Chrome 真实鼠标 | 材料页引用逐字节相同的 `chart_geom.at`，通过极角和半径搭配 `dc`/`ds` 计算高亮阈值。八个状态、离开复位及卸载通过，无页面错误。生成目录对照启用 `allowJs`。传统目录扫描对无 widget 的 helper 报警，实际 SFC 引用和产物执行均通过。 |
+| 重跑完整 `024-charts` 原包 | 原几何模块通过，整包仍首报入口 `app.at` 字节 1217..1223 的 `expected fn, found widget`。四个原图表组件仍有同族解析拒绝，整包运行继续沿 B-107-01。 |
+
+AutoLang 增量准备 9.85 s，AutoUI 首次增量准备 31.10 s，严格工具准备 30.05 s。严格生成、前端构建、Chrome 真跑分别为 1.422 / 3.657 / 1.664 s。`chart-math-exact-av.log`、`chart-math-exact-a2ts.log`、`chart-math-vue-browser.log`、`chart-math-full-original-admission.log` 的 SHA256 分别为 `2be0365aab666eabe93e8473f215de2b84385b90fb1edd070bc4c8924d6c8931`、`41ff187d78f1fab159edc85d18f2a43b8a0df9b54ecab3987d8e9d6811ed616c`、`aae94f40dec6ac065d32ad494bc4d355715ccb5d8a00767ec1328eab2674ee7a`、`d2328943389ccaef4ba3fbebad4901a3773db61f08f781f49e151e9a6e66f5ae`。PLAN-114 已推进到 AutoLang `4d1883bb1` 和 AutoUI `b2d9e05a` 的受检展开视图及桌面绑定，仍需在共同基线复验原 024 入口和组件，按 §5 重跑完整项目。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 14 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 8e236a3f, lang e9d77f0a2 | evidence: unchanged chart_geom runs in verified AV and A2TS with matching numeric bits, and its Vue pointer consumer runs in Chrome | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
