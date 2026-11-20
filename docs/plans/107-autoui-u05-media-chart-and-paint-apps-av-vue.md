@@ -551,6 +551,16 @@ Iced 路由回归验证嵌套 outlet、页面切换、关闭后的消息拒绝�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 34 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 50e010f1, lang 889033418 | evidence: scoped gallery navigation, drawer, typed callback and actual shell admission advances | next: work`
 
+### 第 35 轮｜原画廊 Carousel 的生产 Vue 回放
+
+旧式 widget 的直接 model 赋值可确定隐式消息的标量载荷。原 AutoOS 外壳及 SettingsPanel 的受检闭包通过，原字节闭包日志 SHA256 为 `473845513e120e23c6027121926177882ebf21e70e24aa1e7dd8d3231df98f2e`。AV 两实例实测只有收到 `SetAccent("ocean")` 的实例更新，载荷被不同类型字段约束时具名拒绝。Core PLAN-981 251、AV PLAN-981 71 通过。
+
+生产 CLI 在隔离输入中保留固定 AutoOS `pac.at`、外壳、Carousel 页及 SettingsPanel 和 Carousel 组件源，生成 70 条路由。固定 AutoDown `45b642dad` 的源码重建后通过产物新鲜度校验。`vue-tsc` 和 Vite 构建通过，Chrome `157.0.8103.80` 经实际侧栏进入 `/carousel`，验证五组区域、横向点击和键盘、拖拽、宽度比例 `1/3` 与 `1/2`、纵向位移、循环及卸载，页面异常为 0。`round35-gallery-ready-browser.log` SHA256 为 `48d35a1034e92d355e4d6684eacd333cc509d5e474d4e525c3ea3b71bb4b5ca9`。镜像包含本轮测试使用的画廊页和组件，其他路由仍待回放。
+
+Iced 原外壳最初报 `ace.desktop.view-cond-unsupported`，定位原源码字节 6371，后续需要由已受检的路由帧承接该条件。原 Carousel 的 Iced 路由入口、指针回放及会话终态继续验收。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 35 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 50e010f1, lang 5950a6222 | evidence: original gallery shell and settings compile, original Carousel page production Vue action replay | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
