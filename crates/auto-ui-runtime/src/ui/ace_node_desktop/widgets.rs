@@ -384,7 +384,7 @@ pub(super) fn accessibility_action(
 #[cfg(windows)]
 impl Control {
     fn accesskit_node(&self) -> accesskit::Node {
-        use accesskit::{Action as Request, Node, Role};
+        use accesskit::{Action as Request, AriaCurrent, Node, Role};
 
         let mut node = match &self.target {
             Target::Button {
@@ -411,8 +411,8 @@ impl Control {
                         });
                     }
                 }
-                if let Some(value) = selected {
-                    node.set_selected(*value);
+                if *selected == Some(true) {
+                    node.set_aria_current(AriaCurrent::Page);
                 }
                 if action.is_some() {
                     node.add_action(Request::Click);
@@ -1030,5 +1030,40 @@ widget Preview {
         let updated = accessibility_tree(7, tree, &[], &[], &state);
         assert_eq!(updated.nodes[0].1.is_expanded(), Some(true));
         assert_eq!(updated.nodes[1].1.numeric_value(), Some(20.0));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_widget_accessibility_marks_only_the_current_page() {
+        use accesskit::{Action as Request, ActionRequest, AriaCurrent, TreeId};
+
+        let original = project_component_candidates(r#"
+widget Pager {
+    view {
+        pagination (total: 20, per_page: 10) {
+            pagination-list {
+                pagination-item (value: 1) { text "1" {} }
+                pagination-item (value: 2) { text "2" {} }
+            }
+        }
+    }
+}
+"#).expect("pagination source");
+        let tree = &original[0].view.tree;
+        let mut state = State::new(BTreeMap::new());
+        let initial = accessibility_tree(1, tree, &[], &[], &state);
+        assert_eq!(initial.nodes[0].1.aria_current(), Some(AriaCurrent::Page));
+        assert_eq!(initial.nodes[1].1.aria_current(), None);
+
+        let request = ActionRequest {
+            action: Request::Click,
+            target_tree: TreeId::ROOT,
+            target_node: initial.nodes[1].0,
+            data: None,
+        };
+        state.apply(accessibility_action(1, tree, &[], &[], &state, request).unwrap());
+        let after = accessibility_tree(1, tree, &[], &[], &state);
+        assert_eq!(after.nodes[0].1.aria_current(), None);
+        assert_eq!(after.nodes[1].1.aria_current(), Some(AriaCurrent::Page));
     }
 }
