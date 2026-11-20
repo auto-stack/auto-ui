@@ -53,7 +53,7 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
         "queryRequested"(str), "selectionRequested"(str), "previewRequested"(str)
     }
     model {
-        var interval int = 80
+        var interval int = 500
         // ---- query 镜像（Tick 按原串快照增量重解析）----
         var q_raw str = ""
         var q_id str = ""
@@ -620,3 +620,5 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
         }
     }
 }
+
+// plan091 cache-key bump 2026-11-20

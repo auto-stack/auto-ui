@@ -385,6 +385,21 @@ class Session:
                 return
         vfd.require(False, f'reset_filters failed to converge; provider={rb.get("provider")}')
 
+    def close_picker_retry(self, timeout=8.0):
+        """Press 取消 until the dialog closes (cancel emit drops in P-4
+        windows); Escape as fallback."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if self.ensure_closed(timeout=1.5):
+                return True
+            cancel = [h for h in self.vnodes('取消', self.snapshot()) if h[0] == 'button']
+            if cancel:
+                self.call('autoui_action', allow_error=True, element_id=cancel[0][1], action='press')
+            else:
+                self.key('escape')
+            time.sleep(0.6)
+        return self.ensure_closed(timeout=2.0)
+
     def press_tree_row(self, label, occurrence=0):
         """Press a TreeView row by walking UP from its label text (rows carry
         no quoted snapshot name; the naive vnodes lookup silently no-ops)."""
@@ -405,13 +420,18 @@ class Session:
                         break
                     hits += 1
             if target:
+                # 行元素校验：'全部' 也命中工具栏按钮文本——走查父必须是 row，
+                # 否则按到工具栏（kind 复位）而非树根（folder 复位）。
+                tln = next((l for l in tlines if f'row #{target}' in l), None)
+                if tln is None:
+                    continue
                 out = self.call('autoui_action', allow_error=True, element_id=target, action='press')
                 if 'handler:' in out:
                     return out
             time.sleep(0.6)
         return ''
 
-    def ensure_effect(self, press_label, effect_fn, tries=5, occurrence=-1,
+    def ensure_effect(self, press_label, effect_fn, tries=8, occurrence=-1,
                       wait=3.0, settle=0.5):
         """Press `press_label` until `effect_fn(readback)` is truthy. Handles
         the P-4 emit-drop windows: each retry re-presses (repeated user action)
@@ -769,13 +789,15 @@ def run_picker_stale(args, out, cases, report):
         time.sleep(1.2)
         s.select_card('Asset-005.bin', '"att-5"')
         attach_before = int(re.findall(r'\d+', s.readback().get('attach', '0 条'))[0]) if re.findall(r'\d+', s.readback().get('attach', '')) else 0
-        rb_inv = s.ensure_effect('使选中失效', lambda f: 'invalidated' in f.get('status', ''))
+        # 身份失效经搜索通道触发（text=invalidate；搜索框在 picker 内——
+        # 保持对话框开启直接触发，provider bump 后自动恢复空文本查询）。
+        s.type_into_search('invalidate')
+        rb_inv = s.ensure_effect('搜索', lambda f: 'invalidated' in f.get('status', ''),
+                                 tries=8, wait=2.5)
         vfd.require('invalidated' in rb_inv.get('status', ''),
-                f'invalidate hook did not apply; status={rb_inv.get("status")!r:.120}')
+                    f'invalidate did not apply; status={rb_inv.get("status")!r:.120}')
+        s.wait_rb(lambda f: f.get('provider', ['', ''])[4] == '1003', timeout=6)
         time.sleep(0.8)
-        ok_re = s.open_picker()
-        vfd.require(ok_re, 'picker did not reopen after invalidate')
-        time.sleep(0.6)
         s.press_ok('确认')
         rb = s.wait_rb(lambda f: 'rejected' in f.get('confirmation', ''), timeout=6)
         conf = rb.get('confirmation', '')
@@ -864,7 +886,7 @@ def run_visual_and_reopen(args, out, cases, report):
                   'accepted/rejected 回灌（pending 有文字且合同锁定）',
                   [rb.get('confirmation', '')[:100]], rb.get('confirmation', '') != '')
         # light theme（主页面按钮——对话框必须已关）
-        s.ensure_closed()
+        s.close_picker_retry()
         s.press_ok('切换明暗')
         time.sleep(0.8)
         s.open_picker()
@@ -1111,15 +1133,23 @@ def main():
             for run_no in range(1, args.runs + 1):
                 cases.run_no = run_no
                 completed = True
-                try:
-                    run_picker_matrix(args, out, cases, report)
-                    run_picker_stale(args, out, cases, report)
-                    run_visual_and_reopen(args, out, cases, report)
-                    if not args.skip_029:
+                # 段间独立（P-4 窗口按段独立命中，一段崩溃不拖累其余段）
+                for seg_name, seg_fn in [('matrix', run_picker_matrix),
+                                         ('stale', run_picker_stale),
+                                         ('visual', run_visual_and_reopen)]:
+                    try:
+                        seg_fn(args, out, cases, report)
+                    except Exception as e:
+                        completed = False
+                        report['prep'].append({'stage': f'run{run_no}/{seg_name} crashed',
+                                               'error': repr(e)[:260]})
+                if not args.skip_029:
+                    try:
                         run_029_legs(args, out, cases, report)
-                except Exception as e:
-                    completed = False
-                    report['prep'].append({'stage': f'run{run_no} crashed', 'error': repr(e)[:260]})
+                    except Exception as e:
+                        completed = False
+                        report['prep'].append({'stage': f'run{run_no}/029 crashed',
+                                               'error': repr(e)[:260]})
                 passed_now = sum(1 for r in cases.rows if r['result'] == 'pass')
                 print(f"== run {run_no}/{args.runs}: {passed_now}/{len(cases.rows)} cases pass ==", flush=True)
                 if completed and cases.all_pass():

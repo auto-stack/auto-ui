@@ -37,7 +37,7 @@ widget AssetPicker (records: List = [], folders: List = [], query: str = "", que
         "confirmRequested"(str), "cancelled"
     }
     model {
-        var interval int = 80
+        var interval int = 500
         // 内建 dialog 的 open 绑定用本地镜像（vue 生成器 v-model-on-prop
         // 缺口适配；Tick 从受控 prop 同步——FileDialog fd_active 同款）。
         var dlg_open bool = false

@@ -15,12 +15,12 @@ widget App {
     use { package: asset_browser from "D:/autostack/.wt/ui-091/auto-ui/packages/asset-browser" }
     msg {
         Init, Tick,
-        OpenPicker, ReloadLog, InvalidateSelected,
+        OpenPicker, ReloadLog, InvalidateSelected, HookInv,
         OnQuery(str), OnSel(str), OnPrev(str), OnConfirm(str), OnCancel,
         ApplyQuery, SlowFire
     }
     timer {
-        Tick (every_ms: 80)
+        Tick (every_ms: 500)
     }
     model {
         var dark_mode bool = true
@@ -87,7 +87,7 @@ widget App {
             row (style: "items-center gap-2") {
                 button "打开选择器" { onclick: .OpenPicker, style: "h-8 px-3 text-xs rounded-md border border-primary text-primary" }
                 button "刷新附件日志" { onclick: .ReloadLog, style: "h-8 px-2 text-xs rounded-md border border-border" }
-                button "使选中失效" { onclick: .InvalidateSelected, style: "h-8 px-2 text-xs rounded-md border border-border" }
+                button "使选中失效" { onclick: .HookInv, style: "h-8 px-2 text-xs rounded-md border border-border" }
             }
             col (style: "gap-1") {
                 text f"status=${.status}" { style: "text-xs text-foreground" }
@@ -287,6 +287,27 @@ widget App {
                         .qf_kind = q.kind
                         .qf_page = q.page
                         .qf_pageSize = q.pageSize
+                        // provider 故障演练触发词：text=invalidate 时静默 bump
+                        // 当前选中身份（同 ID 换 revision），随后以空文本恢复查询。
+                        if .qf_text == "invalidate" {
+                            if .selection != "" {
+                                try {
+                                    let sl2 = json.parse(.selection)
+                                    var ki2 int = 0
+                                    while ki2 < .catalog.len() {
+                                        if .catalog[ki2].id == sl2.id {
+                                            var cur2 str = .catalog[ki2].revision
+                                            .catalog[ki2].revision = cur2 + "-x"
+                                        }
+                                        ki2 = ki2 + 1
+                                    }
+                                    .qf_text = ""
+                                } catch {
+                                }
+                            } else {
+                                .qf_text = ""
+                            }
+                        }
                         .qid_counter = .qid_counter + 1
                         .qf_id = "q" + .qid_counter.str()
                         .query = json.stringify({id: .qf_id, folderId: .qf_folder, text: .qf_text, kind: .qf_kind, page: .qf_page, pageSize: .qf_pageSize})
@@ -548,7 +569,7 @@ widget App {
             .status = "picker cancelled"
         }
         // provider 故障演练钩子：同 ID 换 revision（V-03 身份失效拒绝腿）。
-        .InvalidateSelected -> {
+        .HookInv -> {
             if .selection != "" {
                 try {
                     let sl = json.parse(.selection)
