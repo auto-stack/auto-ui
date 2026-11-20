@@ -4,7 +4,7 @@ The ACE package desktop bridge and Vue project generator consume the AGE
 route rows from the app widget. A route such as `"/book/:id" -> use book_detail`
 resolves the module alias `book_detail` in the application's package. A Vue
 project supplies those modules from `src/front/pages/`. The module's primary
-view widget can use a different name. Each routed shell has one `outlet`.
+view widget can use a different name. The page and its imported helper modules share the checked package binding. Each routed shell has one `outlet`.
 
 ## Navigation and page lifetime
 

@@ -4,7 +4,38 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use ace_av::age_component::project_component_candidates;
 use ace_core::source::age_component::ComponentNode;
-use ace_core::source::packages::PackageModuleInput;
+use ace_core::source::age_component::ComponentScenario;
+use ace_core::source::cst::FrontBudget;
+use ace_core::source::packages::{
+    parse_package_source_age, PackageModuleInput, PACKAGES_CAPABILITY,
+};
+
+pub(super) fn package_candidates(source: &str) -> Result<Vec<ComponentNode>, String> {
+    parse_package_source_age(
+        source,
+        &[PACKAGES_CAPABILITY.to_string()],
+        FrontBudget::WORK_OWNED_64MIB,
+        &ComponentScenario {
+            instances: 0,
+            ops: Vec::new(),
+        },
+        0,
+    )
+    .map(|syntax| {
+        syntax
+            .age_components
+            .into_iter()
+            .map(|(node, _, _)| node)
+            .collect()
+    })
+    .map_err(|diagnostics| {
+        diagnostics
+            .into_iter()
+            .map(|d| format!("{}: {}", d.code, d.message))
+            .collect::<Vec<_>>()
+            .join(", ")
+    })
+}
 
 #[derive(Debug)]
 pub(crate) struct RouteTable {
@@ -214,14 +245,8 @@ fn resolve_page(
     if target.id == entry.id {
         return Err(format!("{id}: page refers to the app entry"));
     }
-    let components = project_component_candidates(&target.source).map_err(|diagnostics| {
-        let message = diagnostics
-            .iter()
-            .map(|diagnostic| format!("{}: {}", diagnostic.code, diagnostic.message))
-            .collect::<Vec<_>>()
-            .join(", ");
-        format!("{id}: projection failed: {message}")
-    })?;
+    let components = package_candidates(&target.source)
+        .map_err(|reason| format!("{id}: projection failed: {reason}"))?;
     if !components
         .first()
         .is_some_and(|component| component.view.exits.iter().any(|exit| exit.kind == "view"))
@@ -251,7 +276,7 @@ mod tests {
 
     fn routes(units: &[PackageModuleInput]) -> RouteTable {
         let shell = &units[0];
-        let candidates = project_component_candidates(&shell.source).unwrap();
+        let candidates = package_candidates(&shell.source).unwrap();
         RouteTable::from_root(&candidates[0], units, shell)
             .unwrap()
             .expect("route rows")
@@ -274,12 +299,20 @@ mod tests {
                 include_str!("../../tests/fixtures/plan124/settings.at"),
             ),
             unit(
+                "reading",
+                include_str!("../../tests/fixtures/plan124/reading.at"),
+            ),
+            unit(
+                "reading_math",
+                include_str!("../../tests/fixtures/plan124/reading_math.at"),
+            ),
+            unit(
                 "broken",
                 include_str!("../../tests/fixtures/plan124/broken.at"),
             ),
         ];
         let table = routes(&units);
-        assert_eq!(table.routes().len(), 5);
+        assert_eq!(table.routes().len(), 6);
         let (first, parameters) = table.resolve("/").unwrap();
         assert_eq!(first.page.as_deref(), Ok("fixture::bookshelf"));
         assert!(parameters.is_empty());
@@ -318,7 +351,7 @@ mod tests {
         );
 
         let page = &units[1];
-        let candidates = project_component_candidates(&page.source).unwrap();
+        let candidates = package_candidates(&page.source).unwrap();
         assert!(RouteTable::from_root(&candidates[0], &units, page)
             .unwrap()
             .is_none());
@@ -409,13 +442,7 @@ pub(super) fn prepare_page(
 ) -> Result<RouteSource, String> {
     use ace_core::source::ast::{Arg, ExprKind};
 
-    let candidates = project_component_candidates(source).map_err(|diagnostics| {
-        diagnostics
-            .into_iter()
-            .map(|d| format!("{}: {}", d.code, d.message))
-            .collect::<Vec<_>>()
-            .join(", ")
-    })?;
+    let candidates = package_candidates(source)?;
     let widget = candidates
         .first()
         .ok_or_else(|| "page widget is missing".to_string())?;
@@ -436,6 +463,8 @@ pub(super) fn prepare_page(
             if let Some(command) = route_command(body, widget)? {
                 commands.insert(handler.msg.clone(), command);
                 replacements.push((span, format!(".{} -> {{}}", handler.msg)));
+            } else {
+                return Err(format!("ace.route.handler: handler {:?} contains a call outside the checked route commands", handler.msg));
             }
         }
         for assign in &handler.assigns {
@@ -499,6 +528,13 @@ pub(super) fn prepare_page(
                         expressions.extend([lhs.as_ref(), rhs.as_ref()])
                     }
                     ExprKind::Unary { operand, .. } => expressions.push(operand),
+                    ExprKind::Call { args, .. } => {
+                        expressions.extend(args.iter().map(|arg| match arg {
+                            Arg::Pos(value) | Arg::MovePos(value) | Arg::Named { value, .. } => {
+                                value
+                            }
+                        }));
+                    }
                     _ => {}
                 }
             }

@@ -27,7 +27,7 @@
 //! typed 事件）。001/002 完整主题/选择/全部组件与 Widgets 归 W1 B-AV。
 
 use crate::ui::ace_package_bridge::PackageStateEngine;
-use super::ace_route::{RouteAction, RouteNavigation, RouteTable};
+use super::ace_route::{package_candidates, RouteAction, RouteNavigation, RouteTable};
 use super::ace_route_desktop::{DesktopRoutes, RouteHandlers, route_links};
 use crate::ui::ace_state_bridge::{
     AceStateEngine, AceStateValue, DispatchOutcome, EngineExecutionAudit,
@@ -1688,7 +1688,7 @@ impl NodeDesktopBridge {
     ) -> Result<Self, String> {
         let unit = units.iter().find(|unit| format!("{}::{}", unit.package, unit.id) == entry)
             .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
-        let candidates = project_component_candidates(&unit.source).map_err(|ds| diags(&ds))?;
+        let candidates = package_candidates(&unit.source)?;
         let node = candidates.first()
             .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
         let Some(table) = RouteTable::from_root(node, &units, unit)? else {
@@ -1719,7 +1719,7 @@ impl NodeDesktopBridge {
             .find(|u| format!("{}::{}", u.package, u.id) == entry)
             .map(|u| u.source.clone())
             .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
-        let candidates = project_component_candidates(&entry_src).map_err(|ds| diags(&ds))?;
+        let candidates = package_candidates(&entry_src)?;
         let node = candidates
             .first()
             .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;

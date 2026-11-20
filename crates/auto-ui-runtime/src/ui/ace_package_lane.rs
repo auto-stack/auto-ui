@@ -23,6 +23,7 @@ pub struct PackageFragmentLane {
 pub struct PackageFragment {
     /// 逐行文本（976 fragment 的原始行序）。
     pub text: Vec<String>,
+    pub expr: String,
     pub helpers: Vec<String>,
     /// 该 body 上下文的局部/参数名（发射侧命名权威）。
     pub locals: Vec<ace_a2x_ts::FragmentLocal>,
@@ -141,6 +142,7 @@ impl PackageFragmentLane {
         .map_err(|e| format!("expr fragment: {e:?}"))?;
         Ok(PackageFragment {
             text: raw.text,
+            expr: raw.expr.ok_or_else(|| "expression fragment returned no value".to_string())?,
             helpers: raw.helpers,
             locals: raw.locals,
         })

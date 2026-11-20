@@ -5,6 +5,7 @@ widget App {
         "/settings" -> use settings
         "/missing" -> use missing
         "/broken" -> use broken
+        "/book/:id/chapter/:ch" -> use reading
     }
 
     view {
@@ -16,6 +17,7 @@ widget App {
             link (to: "/unknown") { text "Unmatched" }
             link (to: "/missing") { text "Missing" }
             link (to: "/broken") { text "Broken" }
+            link (to: "/book/23/chapter/8") { text "Chapter eight" }
             outlet
         }
     }

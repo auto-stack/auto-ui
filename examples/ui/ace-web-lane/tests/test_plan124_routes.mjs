@@ -75,6 +75,11 @@ try {
       await page.waitForFunction(value => window.location.hash === '#' + value, route);
       await page.getByText(diagnostic, { exact: false }).waitFor();
     }
+    await click('link', 'Chapter eight');
+    await location('/book/23/chapter/8', 'Chapter page');
+    await click('button', 'Score chapter');
+    assert.deepEqual(await state(), { score: 77 });
+
     await click('link', 'Settings');
     await location('/settings', 'Settings page');
     await click('link', 'Library');

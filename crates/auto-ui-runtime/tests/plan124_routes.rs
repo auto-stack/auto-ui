@@ -22,6 +22,11 @@ fn reader() -> Vec<PackageModuleInput> {
         ),
         unit("settings", include_str!("fixtures/plan124/settings.at")),
         unit("broken", include_str!("fixtures/plan124/broken.at")),
+        unit("reading", include_str!("fixtures/plan124/reading.at")),
+        unit(
+            "reading_math",
+            include_str!("fixtures/plan124/reading_math.at"),
+        ),
     ]
 }
 
@@ -58,6 +63,15 @@ fn route_sfc_publishes_pages_and_local_diagnostics() {
     assert!(product.pages[path("/missing")].contains("module is missing"));
     assert!(product.pages[path("/broken")].contains("module has no page widget"));
     assert!(product.pages[path("/settings")].contains("Settings page"));
+    let chapter = &product.pages[path("/book/:id/chapter/:ch")];
+    assert!(
+        chapter.contains("Chapter page") && chapter.contains("a2x_fn_"),
+        "{chapter}"
+    );
+    assert!(
+        chapter.contains("aceParam(\"id\"") && chapter.contains("aceParam(\"ch\""),
+        "{chapter}"
+    );
 }
 
 #[test]
@@ -120,6 +134,20 @@ fn av_package_routes_preserve_owner_across_navigation_and_reopen() {
         .contains("ace.route.no-match"));
     click(&mut app, shell, 2);
     assert_eq!(app.evidence()["routes"]["current_path"], "/settings");
+    click(&mut app, shell, 6);
+    let chapter = page_id(&app);
+    click(&mut app, chapter, 0);
+    let observed = app.evidence();
+    let chapter_state = observed["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|session| session["id"] == chapter)
+        .unwrap();
+    assert_eq!(
+        chapter_state["states"][0],
+        serde_json::json!([["score", "77"]])
+    );
     let old_page = page_id(&app);
     app.close_session().unwrap();
     assert!(app.evidence()["routes"]["current_path"].is_null());

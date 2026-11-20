@@ -11,7 +11,7 @@
 //! 字段/算术/比较/helper 调用表达式；f-string/backtick 文本叶与列表/存储/
 //! 组件引用不在本刀（`source.age.sfc-*` 具名拒）。
 use ace_core::source::packages::PackageModuleInput;
-use super::ace_route::{RouteSource, RouteTable, prepare_page};
+use super::ace_route::{package_candidates, prepare_page, RouteSource, RouteTable};
 
 use crate::ui::ace_package_lane::PackageFragmentLane;
 
@@ -63,7 +63,7 @@ pub fn generate_routed_package_sfcs(
 ) -> Result<Option<RoutedPackageSfc>, String> {
     let shell = units.iter().find(|unit| format!("{}::{}", unit.package, unit.id) == entry)
         .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
-    let candidates = age_component_candidates(&shell.source)?;
+    let candidates = package_candidates(&shell.source)?;
     let root = candidates.first().ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
     let Some(table) = RouteTable::from_root(root, units, shell)? else {
         return Ok(None);
@@ -120,7 +120,7 @@ fn generate_package_sfc_leaf(
         .find(|u| format!("{}::{}", u.package, u.id) == entry)
         .map(|u| u.source.clone())
         .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
-    let node = age_component_candidates(&entry_src)?
+    let node = package_candidates(&entry_src)?
         .into_iter()
         .next()
         .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
@@ -230,18 +230,20 @@ fn generate_package_sfc_leaf(
             let frag = lane.emit_expr_at_span(&state_fn, span).map_err(|e| {
                 format!("source.age.sfc-expr: handler `{msg}` field `{field}`: {e}")
             })?;
-            let defines_t0 = frag.text.iter().any(|l| l.contains("const t0"));
-            for line in &frag.text {
-                script.push_str("  ");
-                script.push_str(&rewrite_lane_locals(line));
-                script.push('\n');
-            }
-            helper_fns.extend(frag.helpers.iter().cloned());
-            if defines_t0 {
-                script.push_str(&format!("  {field}.value = t0;\n"));
-            } else {
-                // 常量/简单表达式：lane 不铸临时绑定——用同一 AST 打印（域内标量）。
+            if frag.text.is_empty() {
+                // Keep the existing scalar representation for inline constants and fields.
                 script.push_str(&format!("  {field}.value = {};\n", expr_to_js(rhs)?));
+            } else {
+                // A fragment may emit several temporaries. Use the value returned by
+                // the lane, and give its temporaries their own assignment scope.
+                script.push_str("  {\n");
+                for line in &frag.text {
+                    script.push_str("    ");
+                    script.push_str(&rewrite_lane_locals(line));
+                    script.push('\n');
+                }
+                helper_fns.extend(frag.helpers.iter().cloned());
+                script.push_str(&format!("    {field}.value = {};\n  }}\n", rewrite_lane_locals(&frag.expr)));
             }
         }
         script.push_str("}\n");
@@ -682,18 +684,6 @@ fn escape_html(s: &str) -> String {
 
 fn escape_attr(s: &str) -> String {
     escape_html(s).replace('"', "&quot;")
-}
-
-/// 组件面候选（view 树 + 文本叶表达式）——与包前门同一次解析的公开投影。
-fn age_component_candidates(
-    src: &str,
-) -> Result<Vec<ace_core::source::age_component::ComponentNode>, String> {
-    ace_av::age_component::project_component_candidates(src).map_err(|ds| {
-        ds.iter()
-            .map(|d| format!("{}: {}", d.code, d.message))
-            .collect::<Vec<_>>()
-            .join("; ")
-    })
 }
 
 #[cfg(test)]

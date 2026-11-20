@@ -1,0 +1,15 @@
+use reading_math: triple
+
+widget ChapterWidget {
+    msg { Score }
+    model { var score int = 0 }
+    view {
+        col {
+            text "Chapter page"
+            button "Score chapter" { onclick: .Score }
+        }
+    }
+    on {
+        .Score -> { .score = triple(router.param("id")) + router.param("ch") }
+    }
+}

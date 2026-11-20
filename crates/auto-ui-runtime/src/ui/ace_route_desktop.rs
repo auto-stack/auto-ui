@@ -73,8 +73,7 @@ impl DesktopRoutes {
                 .ok_or_else(|| format!("resolved module {entry:?} disappeared"))?;
             let prepared = super::ace_route::prepare_page(&unit.source, Some(&params))?;
             unit.source = prepared.source;
-            let nodes = ace_av::age_component::project_component_candidates(&unit.source)
-                .map_err(|diagnostics| format!("{diagnostics:?}"))?;
+            let nodes = super::ace_route::package_candidates(&unit.source)?;
             let links = route_links(&nodes[0])?;
             let mut bridge = NodeDesktopBridge::load_package_leaf(units, entry, instances)?;
             bridge.set_route_controls(prepared.commands, links);

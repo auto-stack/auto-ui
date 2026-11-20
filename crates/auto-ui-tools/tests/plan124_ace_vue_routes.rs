@@ -18,10 +18,16 @@ fn ace_route_project_emits_and_refreshes_the_full_page_set() {
     let fixtures =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../auto-ui-runtime/tests/fixtures/plan124");
     std::fs::copy(fixtures.join("app.at"), front.join("app.at")).unwrap();
-    for module in ["bookshelf", "book_detail", "settings", "broken"] {
+    for module in ["bookshelf", "book_detail", "settings", "broken", "reading"] {
         let file = format!("{module}.at");
         std::fs::copy(fixtures.join(&file), pages.join(&file)).unwrap();
     }
+
+    std::fs::copy(
+        fixtures.join("reading_math.at"),
+        front.join("reading_math.at"),
+    )
+    .unwrap();
 
     let project = VueProject::from_workspace(root).expect("ACE routed production project");
     project.generate().expect("publish the full route product");
@@ -29,6 +35,7 @@ fn ace_route_project_emits_and_refreshes_the_full_page_set() {
     let read = |path: &str| std::fs::read_to_string(generated.join(path)).unwrap();
     assert!(read("App.vue").contains("<RouterView"));
     assert!(read("router/index.ts").contains("@/pages/book_detail.vue"));
+    assert!(read("pages/reading.vue").contains("a2x_fn_"));
     assert!(read("pages/book_detail.vue").contains("aceRouter.back()"));
     assert!(read("pages/ace-route-error-3.vue").contains("module is missing"));
 
