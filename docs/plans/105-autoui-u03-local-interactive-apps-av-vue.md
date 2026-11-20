@@ -510,6 +510,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 78 | from: work | t
 **013 复用判断（首轮）**：store（`TodoStore`）的列表维护、记录构造、字段投影、条件 `for` 已可用；剩余两件是**动态列表渲染**（视图循环按运行时列表展开）与**后端 API 面**（`list_todos/create_todo/update_todo/delete_todo/remove_completed` —— 后端是纯 Auto 内存实现，可走「包级 store / 同进程调用」路线）。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers **5/5**。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 79 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W76：013 内存后端内联）| PLAN-105 r1 | outcome: pass | code_commit: auto-ui（本轮）| task_ids: T-02（W76）| evidence: prep 7/7；013 墙从「handler 非 store 调用」推进到「store 块内联探针拒绝」
+
+**交付**：`inline_memory_backend`——把 `use back.api: …` 指向的**纯 Auto 内存后端**内联进 store 单元：`list_todos()`（列表即真值，删行）、`create_todo(x)`（push + `.next_id` 自增）、`update_todo(id,text,done)`（下标搜索后整条替换）、`delete_todo(id)` / `remove_completed(_)`（下标搜索后 `remove`）；并从 `db.at` 取**种子数据**与 **nextid 初值**写回 store model（`var todos []Todo = [Todo { … } …]`、`var next_id int = 4`）。
+
+**013 墙序列**：`handler body call statements are only wired for store.<Msg>()`（= store 里的 api 调用）→ **`.store.*` 需要同源 store 声明（S1）**，即 store 块没被内联。
+
+**定位结果**：`extract_store_block` 对**原始** store 块的探针通过；对**改写后**的块探针报 `source.syntax: expected fn, found store`。→ 生成的语句（`var __mb_* int = …`、`for … { if … { .todos[i] = Todo { … } } }`、`var __g Todo = .todos.remove(i)`）在 **store 块上下文**里不被接受（或块边界被改写影响）。下一刀：先查 age-component 文法里 `store` 块允许的语句面，再决定是「把 shim 生成物放到组件级 handler」还是「放宽 store 块语句面」。
+
+**验证**：prep 7/7（六例 load/project 门保持绿；开关未改动）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -546,6 +558,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 78 | from: work | t
 **013 复用判断（首轮）**：store（`TodoStore`）的列表维护、记录构造、字段投影、条件 `for` 已可用；剩余两件是**动态列表渲染**（视图循环按运行时列表展开）与**后端 API 面**（`list_todos/create_todo/update_todo/delete_todo/remove_completed` —— 后端是纯 Auto 内存实现，可走「包级 store / 同进程调用」路线）。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers **5/5**。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 79 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 待记 | next: work
+
+2026-11-19 stage: work（T-02 W76：013 内存后端内联）| PLAN-105 r1 | outcome: pass | code_commit: auto-ui（本轮）| task_ids: T-02（W76）| evidence: prep 7/7；013 墙从「handler 非 store 调用」推进到「store 块内联探针拒绝」
+
+**交付**：`inline_memory_backend`——把 `use back.api: …` 指向的**纯 Auto 内存后端**内联进 store 单元：`list_todos()`（列表即真值，删行）、`create_todo(x)`（push + `.next_id` 自增）、`update_todo(id,text,done)`（下标搜索后整条替换）、`delete_todo(id)` / `remove_completed(_)`（下标搜索后 `remove`）；并从 `db.at` 取**种子数据**与 **nextid 初值**写回 store model（`var todos []Todo = [Todo { … } …]`、`var next_id int = 4`）。
+
+**013 墙序列**：`handler body call statements are only wired for store.<Msg>()`（= store 里的 api 调用）→ **`.store.*` 需要同源 store 声明（S1）**，即 store 块没被内联。
+
+**定位结果**：`extract_store_block` 对**原始** store 块的探针通过；对**改写后**的块探针报 `source.syntax: expected fn, found store`。→ 生成的语句（`var __mb_* int = …`、`for … { if … { .todos[i] = Todo { … } } }`、`var __g Todo = .todos.remove(i)`）在 **store 块上下文**里不被接受（或块边界被改写影响）。下一刀：先查 age-component 文法里 `store` 块允许的语句面，再决定是「把 shim 生成物放到组件级 handler」还是「放宽 store 块语句面」。
+
+**验证**：prep 7/7（六例 load/project 门保持绿；开关未改动）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
