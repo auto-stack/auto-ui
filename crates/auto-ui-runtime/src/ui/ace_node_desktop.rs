@@ -3733,8 +3733,18 @@ pub(crate) fn run_ace_node_desktop_ui_with_access(
     install_bridge(bridge);
     #[cfg(windows)]
     let _pointer_clock = crate::ui::iced::native_pointer_time::Capture::start();
-    let result = crate::ui::iced::run_app::<AceNodeDesktopWindow>()
+    use crate::ui::iced::renderer::{run_app_with_theme, shadcn_theme};
+    use crate::ui::style::theme::{dark_mode, set_dark_mode, theme_pref_from_env};
+    let previous_dark = dark_mode();
+    let dark = match theme_pref_from_env() {
+        "light" => false,
+        "system" => crate::ui::system_theme::system_prefers_dark().unwrap_or(previous_dark),
+        _ => true,
+    };
+    set_dark_mode(dark);
+    let result = run_app_with_theme::<AceNodeDesktopWindow>(shadcn_theme(dark))
         .map_err(|e| format!("node desktop window: {e:?}"));
+    set_dark_mode(previous_dark);
     let bridge = BRIDGE.get().expect("installed desktop bridge")
         .write().unwrap().take();
     let close = bridge.map_or(Ok(()), |mut bridge| bridge.close_for_shutdown());

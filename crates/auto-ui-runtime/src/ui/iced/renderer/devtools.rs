@@ -5049,6 +5049,22 @@ where
     C: Component + Default + 'static,
     C::Msg: Clone + Debug + Send + 'static,
 {
+    run_app_window::<C>(title, None)
+}
+
+pub(crate) fn run_app_with_theme<C>(theme: iced::Theme) -> AppResult<()>
+where
+    C: Component + Default + 'static,
+    C::Msg: Clone + Debug + Send + 'static,
+{
+    run_app_window::<C>(None, Some(theme))
+}
+
+fn run_app_window<C>(title: Option<&str>, theme: Option<iced::Theme>) -> AppResult<()>
+where
+    C: Component + Default + 'static,
+    C::Msg: Clone + Debug + Send + 'static,
+{
     if let Some(t) = title {
         let t: String = t.to_string();
         // PLAN-022 T-03:窗口尺寸面启动种子——thread_local 先落 startup 值,
@@ -5099,6 +5115,7 @@ where
         .font(INTER_FONT_SEMIBOLD)
         .default_font(INTER_FONT)
         .title(title_fn::<C>(t))
+        .theme(move |_: &TickWrap<C>| theme.clone())
         .run()
         .map_err(|e| e.into());
     }
@@ -5142,6 +5159,7 @@ where
     .font(INTER_FONT_MEDIUM)
     .font(INTER_FONT_SEMIBOLD)
     .default_font(INTER_FONT)
+    .theme(move |_: &TickWrap<C>| theme.clone())
     .run()
     .map_err(|e| e.into())
 }

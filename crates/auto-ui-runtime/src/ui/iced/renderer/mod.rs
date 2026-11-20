@@ -1196,6 +1196,7 @@ pub(crate) use devtools::{
     retain_input_values_after_handler, track_input_text, DebugElementInfo, DebugTreeNode,
 };
 pub(crate) use media::{load_image_bytes, lucide_svg_doc_with, shadcn_theme};
+pub(crate) use devtools::run_app_with_theme;
 pub(crate) use shell_state::{
     build_dashboard_snapshot, build_desktop_surface_snapshot, build_launcher_snapshot,
     build_notes_snapshot, build_shell_projection, build_switcher_snapshot, drain_desktop_bus_inbox,

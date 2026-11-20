@@ -781,9 +781,9 @@ impl Renderer<'_> {
                 });
                 if let Some(label) = label.and_then(|expr| self.display(expr)) {
                     let heading = match el.tag.as_str() {
-                        "h1" => "text-2xl font-bold text-slate-900",
-                        "h2" => "text-lg font-semibold text-slate-900",
-                        _ => "text-slate-900",
+                        "h1" => "text-2xl font-bold text-foreground",
+                        "h2" => "text-lg font-semibold text-foreground",
+                        _ => "text-foreground",
                     };
                     children.insert(0, View::text_styled(label, heading));
                 }
