@@ -847,6 +847,16 @@ stage: work（逐单元探针）| plan_id: PLAN-105 | plan_revision: r1 | round:
 **修复**（`dad150f2d`）：`widget TodoList() { … }` 空参数表形（`age-node-params-empty`），census 两 AGE 面重基线（component `2dfb9edf…`、package `0d016cd5…`）；门全绿（census 4/4、981 248、980 40、979 24、105 26/26、104 3、1072 19）。
 
 **后续三件**：① `List<T>` 在包面 resolve（unknown type）；② todo_store 的 `on` 体解析缺口；③ SFC lane 单元筛选（排除 `src/back/*.at`）。
+
+stage: work（浏览器腿扩面）| plan_id: PLAN-105 | plan_revision: r1 | round: 100 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `f59204c3` | next: work
+
+2026-11-21 stage: work（T-02 W95：五个 app 的 A2Vue lane SFC 全部可生成）| outcome: pass
+
+**实测**：013（+todo_list 的 v-for）、015、016（v-for）、022、012（v-for）——五 app 的 app 单元均生成含 `<template>`+`@click` 的 SFC。
+
+**回归**（`f59204c3`）：`p105_u03_apps_lane_sfc_generate`；包片段 lane 的按 app 钉住断言放宽到已知缺口，保持仓库全绿。
+
+**结论**：浏览器腿（A2Vue lane）在 U03 范围内已覆盖五个 app 的生成；包片段 lane 单入口合成仍需 S1 + AGE 包面 collections 域。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1220,6 +1230,16 @@ stage: work（逐单元探针）| plan_id: PLAN-105 | plan_revision: r1 | round:
 **修复**（`dad150f2d`）：`widget TodoList() { … }` 空参数表形（`age-node-params-empty`），census 两 AGE 面重基线（component `2dfb9edf…`、package `0d016cd5…`）；门全绿（census 4/4、981 248、980 40、979 24、105 26/26、104 3、1072 19）。
 
 **后续三件**：① `List<T>` 在包面 resolve（unknown type）；② todo_store 的 `on` 体解析缺口；③ SFC lane 单元筛选（排除 `src/back/*.at`）。
+
+stage: work（浏览器腿扩面）| plan_id: PLAN-105 | plan_revision: r1 | round: 100 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `f59204c3` | next: work
+
+2026-11-21 stage: work（T-02 W95：五个 app 的 A2Vue lane SFC 全部可生成）| outcome: pass
+
+**实测**：013（+todo_list 的 v-for）、015、016（v-for）、022、012（v-for）——五 app 的 app 单元均生成含 `<template>`+`@click` 的 SFC。
+
+**回归**（`f59204c3`）：`p105_u03_apps_lane_sfc_generate`；包片段 lane 的按 app 钉住断言放宽到已知缺口，保持仓库全绿。
+
+**结论**：浏览器腿（A2Vue lane）在 U03 范围内已覆盖五个 app 的生成；包片段 lane 单入口合成仍需 S1 + AGE 包面 collections 域。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
