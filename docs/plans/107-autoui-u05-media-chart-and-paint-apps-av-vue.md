@@ -595,6 +595,16 @@ Iced `round37-original-gallery-carousel-window.json` 与同名 `.log` SHA256 分
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 39 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a674e157, lang 300f50f5b | evidence: exact FlowDiagram page parses and AV executes graph edge destination reads | next: work`
 
+### 第 40 轮｜按原拼写绑定受检子组件事件
+
+接入 PLAN-114 的 AutoLang `53f36cc3a` 和 AutoUI `1bed1330`，保留本组的包别名匹配、列表绑定及条件类名。两种组件标签形式均验证命名事件。原样 `$event` 转发要求子组件声明出站事件且父消息载荷类型一致。缺少可见子组件、未知事件或目标、重复绑定与异型载荷均具名拒绝。AgePackage 语法标识为 `288491af2724439e9445ff2d901cd26327719cca1be82f850bf47a1e3132b3e4`，邻接冻结通过。
+
+Iced 受检帧点击子组件后，父状态读取到 `docs/计划`。Vue 产品 CLI 冷生成路由，经固定依赖的 `vue-tsc` 和 Vite 构建，Chrome `157.0.8103.80` 点击子组件后显示载荷 `detail/图像`，卸载后无页面异常。首次 Chrome 回放的文本定位器超时，调试确认实际文本已更新，按可见文本行复验通过。最终浏览器日志 SHA256 为 `03ebd5bb4942ae1e5279e11f5d3fcb8e844ede6cc458c36e1a26cde0c183329d`。Core PLAN-981 251、AV PLAN-981 72、组件包 13、路由 4、SFC 20 通过。
+
+原 `029-photo-gallery`、`031-image-viewer` 和 `031-paint` 入口从 `$event` 词法错误推进到 widget 语法诊断，探针日志 SHA256 依次为 `4510ab10d2eeaaa508545a029c366ec24efacfdc1dd99942ef2eab3b80228b55`、`2145d3bcad8507622bd1668e5b6d921b171a0eb96d14bfed851796fc8ade277b`、`c46f8cc39b41932f803f10e51eef40742137dbc718c88cac35da45e3b33ec0f1`。原 030 控制条和图像视口另有 `$0` 等宿主参数，原组件处理器的出站调用仍待接入。两端通过项适用于本轮定向材料。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 40 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 46b78613, lang ee32dd1b4 | evidence: checked named event forwarding in Iced and production Vue, three original app entries advance past event lexing | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
