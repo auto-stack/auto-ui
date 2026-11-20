@@ -447,6 +447,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 72 | from: work | t
 **关键发现（下一刀入口）**：列表方法在 AST 里有 `Method` 与 `MethodCall` **两种形态**，且 `push(local)` 的 owned 元素转移**在该语义下没有 sanctioned 形式**——`Arg::MovePos` 在 resolver 里与 `Pos` 同处理（无 move 语义），`check_push_value` 只认 `RExprKind::Move`（该 kind 只由形参 `.move` 调用位产生）。要么在 resolver 给 `MovePos` 补 move 语义（局部→Move 包装 + 消费标记），要么在组件面把「构造后 push」改写成一次性构造。
 
 **验证**：prep 7/7；plan105 25/25、980 39/39、981 248/248；av list handlers 4/4。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 73 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 8d7163dd8 | next: work
+
+2026-11-19 stage: work（T-02 W70：resolver 的 `.move` 实参语义）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `8d7163dd8` | task_ids: T-02（W70）| evidence: 回归全绿；记录 push 仍报
+
+**交付**：①`resolve_list_method` 的 `push`/`insert`/`set` 尊重调用实参的 **`.move` 标记**——新增 `move_marked_value`，把 `ResolvedArg.moved` 的实参包成 `RExprKind::Move`（整局部所有权转移的 sanctioned 形态）；②组件面对未记录构造值的 `push(<局部>)` 回退发射 `Arg::MovePos`。
+
+**未解现象**：手工用例（`type Todo{text Str}` + `var t Todo = …` + `.todos.push(t)`）**仍报** `move-required`（span 落在 `t` 上）。说明该语句的发射走的可能不是 `hook_stmts_lower` 的 `Call` 分支（或 `is_list_method` 未命中）；下一轮加一次性 trace（在 Call 分支打印 msg/形态）确认路径，再决定是补 `Method` 形态识别还是改在检查函数铸造处。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 4/4。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
