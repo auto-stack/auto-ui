@@ -483,6 +483,18 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 75 | from: work | t
 **排期决定**：为避免继续在同一子特性上空转，下一轮**先换刀**——推进 018/022 的 routes/outlet 页面组合（与 `.move` 无关、可独立验证），把 `.move` 收回队列第二优先。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 4/4。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 76 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: caf89d90 | next: work
+
+2026-11-19 stage: work（T-02 W73：routes/outlet 页面组合第一片）| PLAN-105 r1 | outcome: pass | code_commit: auto-ui `caf89d90` | task_ids: T-02（W73）| evidence: 018 从「只有壳件 11 叶」推进到「页面已并入，墙为未定型 `List` 字段」
+
+**交付**：①`first_route_page`（解析 `routes { "/" -> use <page> }` 的首个映射并定位 `src/front/pages|components|<page>.at`）；②`split_widget` / `block_inner`（widget 体与 `model`/`view` 块切分）；③`inline_route_page`（页面**顶层声明**（use/style/fn/type/const）并入外壳顶部、页面 `model` 字段并入外壳 model、`outlet` 换成页面 `view` 体）；④组件面语法归一：`while <cond>` → 条件 `for`、去掉显式 `as int` 转换（含**注入的依赖块**）。
+
+**018 推进链（每步实证）**：`expected fn, found col`（widget 未闭合 → 修）→ `` `while` 不受支持 ``（归一）→ `expected ;, found as`（归一）→ **`field cards is List`**（页面模型的未定型 `List` 字段；组件面只收 `[]T`/`[N]T`）。
+
+**开关**：路由组合默认关闭（`P105_ROUTE_PAGES=1` 打开）——保证六例 load 门保持绿，同时可继续逐墙推进；下一刀：页面未定型 `List` 字段的定型（按 `store` 返回值/元素用法推断元素类型）。
+
+**验证**：prep 7/7（含 `real_u03_apps_*` 两例）；018 走开关后墙位前移（壳件 11 叶 → 页面并入）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
