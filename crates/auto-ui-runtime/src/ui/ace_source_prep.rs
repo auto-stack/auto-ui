@@ -766,7 +766,29 @@ pub fn prepare_component_source(
     // 等所有引用位（012 的 tab_active/tab_idle）。
     for (name, literal) in &local_styles {
         out = replace_word(&out, name, literal);
-    }    if !inlined.is_empty() || !store_blocks.is_empty() || !fn_blocks.is_empty() || !type_blocks.is_empty() {
+    }
+
+    // PLAN-105 T-02（U03 真语料 012）：`<text>.contains(<sub>)`——语言无该内建
+    // 方法，改写为 prep 注入的文本谓词 helper（`len`/`slice`/`==` 皆既有内建）。
+    let mut need_str_contains = false;
+    out = rewrite_str_contains(&out, &mut need_str_contains);
+    if need_str_contains {
+        fn_blocks.push(STR_CONTAINS_HELPER.to_string());
+    }    // PLAN-105 T-02（U03 真语料 012）：`var NAME []T = []` 的空列表初值改为
+    // `List<T>.new()`（共享 resolver 要求空字面量带元素类型）。
+    out = rewrite_empty_list_inits(&out);
+    // PLAN-105 T-02（U03 真语料 012）：**宿主服务仿真**——`storage.get/set(<key>)`
+    // 与 `Time.now_sec()` 在组件面没有宿主表，改写成**模型字段**（键 → 字段名
+    // 稳定映射）：`storage.get("k")` → `.__st_k`；`storage.set("k", v)` →
+    // `.__st_k = v`；`Time.now_sec()` → `.__now_sec`（宿主装载时种子注入）。
+    let mut host_fields: Vec<(String, String)> = Vec::new();
+    out = rewrite_host_storage(&out, &mut host_fields);
+    if !host_fields.is_empty() {
+        out = inject_model_fields(&out, &host_fields);
+    }
+    // 声明（内联样式 / 记录类型 / helper 函数 / store 块）必须落在**组件头之前**：
+    // 两条消费面都按源码顺序收集，组件之后声明的符号在投影期解析不到。
+    if !inlined.is_empty() || !store_blocks.is_empty() || !fn_blocks.is_empty() || !type_blocks.is_empty() {
         let mut decls: Vec<String> = inlined
             .iter()
             .map(|s| format!("style {} = {}", s.name, s.literal))
@@ -794,24 +816,59 @@ pub fn prepare_component_source(
             }
         }
     }
-    // PLAN-105 T-02（U03 真语料 012）：`var NAME []T = []` 的空列表初值改为
-    // `List<T>.new()`（共享 resolver 要求空字面量带元素类型）。
-    out = rewrite_empty_list_inits(&out);
-    // PLAN-105 T-02（U03 真语料 012）：**宿主服务仿真**——`storage.get/set(<key>)`
-    // 与 `Time.now_sec()` 在组件面没有宿主表，改写成**模型字段**（键 → 字段名
-    // 稳定映射）：`storage.get("k")` → `.__st_k`；`storage.set("k", v)` →
-    // `.__st_k = v`；`Time.now_sec()` → `.__now_sec`（宿主装载时种子注入）。
-    let mut host_fields: Vec<(String, String)> = Vec::new();
-    out = rewrite_host_storage(&out, &mut host_fields);
-    if !host_fields.is_empty() {
-        out = inject_model_fields(&out, &host_fields);
-    }
     Ok(PreparedComponentSource {
         source: out,
         inlined,
     })
 }
 
+/// prep 注入的文本谓词实现（`contains` 的等价展开）。
+const STR_CONTAINS_HELPER: &str = "fn __p105_str_contains(hay str, needle str) bool {\n    if needle.len() == 0 {\n        return true\n    }\n    if needle.len() > hay.len() {\n        return false\n    }\n    var i int = 0\n    for i + needle.len() <= hay.len() {\n        if hay.slice(i, i + needle.len()) == needle {\n            return true\n        }\n        i = i + 1\n    }\n    return false\n}\n";
+
+/// `<recv>.contains(<arg>)` → `__p105_str_contains(<recv>, <arg>)`；`need` 置真
+/// 时调用方需注入 [`STR_CONTAINS_HELPER`]。
+fn rewrite_str_contains(src: &str, need: &mut bool) -> String {
+    let mut out = src.to_string();
+    loop {
+        let Some(pos) = out.find(".contains(") else { break };
+        // 接收位：从 `.contains(` 前往回扫标识符/点链（允许前导空格中断）。
+        let bytes = out.as_bytes();
+        let mut start = pos;
+        while start > 0 {
+            let c = bytes[start - 1] as char;
+            if c.is_alphanumeric() || c == '_' || c == '.' || c == ')' || c == ']' {
+                start -= 1;
+            } else {
+                break;
+            }
+        }
+        if start == pos {
+            break;
+        }
+        let recv = out[start..pos].to_string();
+        // 实参：`(` 后到配对 `)`。
+        let args_at = pos + ".contains(".len();
+        let mut depth = 0i32;
+        let mut end = None;
+        for (i, ch) in out[args_at..].char_indices() {
+            match ch {
+                '(' | '[' | '{' => depth += 1,
+                ')' if depth == 0 => {
+                    end = Some(args_at + i);
+                    break;
+                }
+                ')' | ']' | '}' => depth -= 1,
+                _ => {}
+            }
+        }
+        let Some(end) = end else { break };
+        let arg = out[args_at..end].trim().to_string();
+        let call = format!("__p105_str_contains({recv}, {arg})");
+        out.replace_range(start..end + 1, &call);
+        *need = true;
+    }
+    out
+}
 /// `var NAME []T = []` → `var NAME []T = List<T>.new()`（空列表字面量需元素类型）。
 fn rewrite_empty_list_inits(src: &str) -> String {
     let mut out = String::with_capacity(src.len());
