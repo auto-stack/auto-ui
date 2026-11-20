@@ -160,6 +160,23 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 1 | from: work | to: work | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui b409acd9, lang c941db401 | next: user`
 
+**原生媒体换源切片（T-03 进行中）。** AutoUI `ac5f6a011ff70c256a84c8a6c8484bb81933db8d`，AutoLang `c941db401`。固定 §9 的 MP4 与 libmpv client API 2.5，实测 `MediaContract` 在旧坏源完成后、事件出队前切回原好源。修复前同一次 poll 先为好源上报 `MediaError`，随后又报告真实 `LoadedMetadata(49.429)`，用例 exit 101、0.128 s。`media-switch-red.log` SHA256 `5bbc52238427741a6089ef3a3874e6e807d8f722f643ba499e260c446e1b1fc1`。
+
+原生适配器现在从 `loadfile` 成功返回的 node map 读取播放条目 ID，对 `END_FILE` 中的实际条目 ID 过滤迟到的失败与结束事件。对当前播放列表重定向加入解码器返回的子条目范围，保留有效子项错误。当前坏源读取 `mpv_event_end_file.error`，实测返回 `-13`（`loading failed`）；缺事件 ID 或命令返回能力的旧库沿原行为。见 [mpv 事件说明](https://mpv.io/manual/master/#list-of-events) 与固定 SDK `include/mpv/client.h`。
+
+| 实际测试（`--exact --nocapture --test-threads=1`） | 数量和结果 | 墙钟执行 |
+|---|---|---:|
+| 新增 `mpv_contract::replacement_source_does_not_inherit_previous_decoder_error`，旧坏源出队后有效源仍有时长且无错误 | 1/1，0 跳过，≤10 s | 0.26 s |
+| 新增 `mpv_contract::redirected_playlist_keeps_active_child_errors`，有效列表子项先载入，切至缺失子项必须获得实际错误 | 1/1，0 跳过，≤10 s | 0.12 s |
+| `mpv_contract` 既有起播暂停、真实 seek、元数据只发一次、EOF、坏源 | 5/5，0 跳过，逐次 14 项未选 | 1.24 / 0.09 / 3.11 / 0.34 / 0.09 s |
+| `mpv_engine` 渲染 context 建拆重建、软件帧实际写入缓冲 | 2/2，0 跳过，逐次 10 项未选 | 0.15 / 0.39 s |
+
+测试准备 `cargo test --locked --offline -j 2 -p auto-ui-runtime --features ace-bridge,autodown,mpv-native --test mpv_contract --test mpv_engine --no-run` 初次 90.726 s，修复后增量 20.872 s。反例编译 13.480 s。`native-media-switch.json` SHA256 `a076a2978fa87eaeF34bc9e1d353663f3d02f0a921f07f6d4c6a0f9a1961cd3c`，最后一组进程总耗时约 6.076 s，发现与清理未单计。实际 seek 从 49.43 s 素材对 19.77 s 的请求落在 19.77 s。此次验证覆盖原生内核与契约，AV/Iced 的原应用窗口、A2Vue 原项目和整条资源生命周期仍待同源验收。
+
+共享基线复核。PLAN-105 新提交 `9540fd1db` 已接通同文件内的 Store，`48498d60a` 补 `List<T>` 名义类型；该分支的 `age_package.rs` 仍具名拒绝跨单元 Store。019 的 `video_store.at`、020/030 的 `player_store.at` 各与入口处于不同模块，当前仍需要跨单元支持。PLAN-114/123 的有效发布门与 CodeEditor 原页的负责方决策仍待齐备。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 2 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ac5f6a01, lang c941db401 | evidence: real libmpv counterexample closed and 9 focused cases passed | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
