@@ -536,6 +536,33 @@ fn runtime_helpers(_helpers: &std::collections::BTreeSet<String>) -> Result<Stri
     Ok("function a2x_add(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a + b)) throw new RangeError('a2x_add overflow');\n  return a + b;\n}\nfunction a2x_sub(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a - b)) throw new RangeError('a2x_sub overflow');\n  return a - b;\n}\nfunction a2x_mul(a, b) {\n  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || !Number.isSafeInteger(a * b)) throw new RangeError('a2x_mul overflow');\n  return a * b;\n}\n".to_string())
 }
 
+fn render_numeric_attributes(
+    ctx: &mut TmplCtx<'_>,
+    items: &[ace_core::source::age_component::ComponentViewItem],
+    defaults: &[(&str, &str)],
+) -> Result<(), String> {
+    use ace_core::source::age_component::{ComponentEntryValue, ComponentViewItem};
+    use ace_core::source::ast::ExprKind;
+
+    for &(key, default) in defaults {
+        let entry = items.iter().rev().find_map(|item| match item {
+            ComponentViewItem::Entry(entry) if entry.key == key => Some(&entry.value),
+            _ => None,
+        });
+        let (prefix, value) = match entry {
+            Some(ComponentEntryValue::Expr(expr)) => match &expr.kind {
+                ExprKind::StrLit(value) => ("", value.clone()),
+                ExprKind::IntLit(value) => ("", value.to_string()),
+                _ => (":", expr_to_template_js(expr)?),
+            },
+            None => ("", default.to_owned()),
+            _ => return Err(format!("source.age.sfc-number: unsupported `{key}` binding")),
+        };
+        ctx.push_str(&format!(" {prefix}{key}=\"{}\"", escape_attr(&value)));
+    }
+    Ok(())
+}
+
 /// 模板渲染：逐 view 项。
 fn render_items(
     items: &[ace_core::source::age_component::ComponentViewItem],
@@ -606,6 +633,7 @@ fn render_items(
                 let tag = match el.tag.as_str() {
                     "col" => "div",
                     "row" => "div",
+                    "slider" => "input",
                     other => other,
                 };
                 let mut classes: Vec<String> = Vec::new();
@@ -660,6 +688,22 @@ fn render_items(
                 }
                 for (ev, handler) in &events {
                     ctx.push_str(&format!(" @{ev}=\"{handler}\""));
+                }
+                match el.tag.as_str() {
+                    "progress" => {
+                        render_numeric_attributes(ctx, &el.items, &[("value", "0"), ("max", "100")])?;
+                    }
+                    "slider" => {
+                        ctx.push_str(" type=\"range\"");
+                        render_numeric_attributes(
+                            ctx,
+                            &el.items,
+                            &[("min", "0"), ("max", "100"), ("step", "1"), ("value", "0")],
+                        )?;
+                        ctx.push_str(" />");
+                        continue;
+                    }
+                    _ => {}
                 }
                 ctx.push_str(">");
                 if let Some(label) = &el.label {

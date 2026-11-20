@@ -36,6 +36,65 @@ fn gen() -> String {
     .expect("derived counter SFC generates")
 }
 
+#[test]
+fn p125_package_sfc_progress_preserves_percent_scale_and_bound_value() {
+    let source = r#"
+widget ProgressView {
+    model { var current int = 3 }
+    view {
+        col {
+            progress { value: "33" }
+            progress {
+                value: .current
+                max: 12
+            }
+            progress {}
+        }
+    }
+}
+"#;
+    let sfc = generate_package_sfc(&[unit("app", "main", source)], "app::main")
+        .expect("progress widget generates through the package route");
+    for expected in [
+        r#"<progress value="33" max="100"></progress>"#,
+        r#"<progress :value="current" max="12"></progress>"#,
+        r#"<progress value="0" max="100"></progress>"#,
+    ] {
+        assert!(sfc.contains(expected), "missing {expected}: {sfc}");
+    }
+}
+
+#[test]
+fn p125_package_sfc_slider_emits_native_range_with_constraints() {
+    let source = r#"
+widget SliderView {
+    view {
+        col {
+            slider {
+                min: "0"
+                max: "100"
+                value: "50"
+            }
+            slider {
+                min: 2
+                max: 20
+                step: 3
+                value: 8
+            }
+        }
+    }
+}
+"#;
+    let sfc = generate_package_sfc(&[unit("app", "main", source)], "app::main")
+        .expect("slider widget generates through the package route");
+    for expected in [
+        r#"<input type="range" min="0" max="100" step="1" value="50" />"#,
+        r#"<input type="range" min="2" max="20" step="3" value="8" />"#,
+    ] {
+        assert!(sfc.contains(expected), "missing {expected}: {sfc}");
+    }
+}
+
 /// ①生成物结构：模板按钮/事件、refs、handler、helper 定义与公开状态。
 #[test]
 fn p980_package_sfc_has_template_script_and_state() {
