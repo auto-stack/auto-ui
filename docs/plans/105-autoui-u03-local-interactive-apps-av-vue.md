@@ -672,6 +672,28 @@ stage: merge（尝试）| plan_id: PLAN-105 | plan_revision: r1 | round: 88 | fr
 **结论**：并回主分支**不是一次机械合并**——文法里的 link 元素与 124/125 的路由 link 是同一语法的两种实现，必须选定/融合一套，否则会影响所有 AGE profile 的解析（248 例 census + 全量 conformance 需重跑）。故本轮按规模停下来报告，未在主分支上留下任何提交。
 
 **建议路线**：①先等 124/125 合并，再把 105 分支 rebase 上去（冲突面会变小）；②或以「work 阶段」做文法融合（预计 2–4 轮：选定 link 元素、重算 census、跑 248+六例门），然后 ff-only 落地。
+
+stage: merge（共享语法批单独交付）| plan_id: PLAN-105 | plan_revision: r1 | round: 90 | from: work | to: work | status: executing | outcome: pass（本批）| worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: auto-lang master `384609645` | next: work
+
+2026-11-19 stage: merge（用户裁定：105 先交付共享语法批，解除 125 阻塞）| outcome: pass（本批）
+
+**交付内容（auto-lang master，ff-only 落地）**
+- `ba462cee5`：AGE **包面**括号属性元素（`age-element-props-block` 由 component-only 放开到 age-package）+ **连字符属性键**（`age-event-key` 增 `ident ('-' ident)*`；键名改取键节点源文本切片，`onclick.self` 与 `stroke-width` 同源）。
+- `384609645`：**连字符元素标签**（`age-element-tag` = `ident ('-' ident)*`，四个元素体规则的标签位改用它；`preview-card`/`grid-item`/`code-block` 等）。
+- 适配当前主线：原补丁不能直接套用（主线已有 PLAN-124 的 `age-route-link-block`），本批**保留主线的路由 link 元素**、去掉 105 的重复 `age-element-link-block`；grammar census 具名重基线为 age-component `3351886c…`、age-package `b7b7acef…`。
+- 落地验证（master 上）：census 4/4、plan981 248/248；主检出无 WIP 代码。
+
+**125 冻结七原页验证（用本批 core 构建的 `ace_node_desktop_window --package`）**
+| 页 | 结果 |
+|---|---|
+| accordion / scroll / scrollarea / pagination / progress / slider | **开窗成功，errors=0** |
+| collapsible | **解析通过**，卡在投影后的表达式面：`source.age.component-unsupported: this expression shape is not wired`（其入口值 `collapsible (open: .isOpen)` 的字段引用形状；**不是**语法批的一部分） |
+
+→ 七页**解析 7/7 成功**；投影保留原标签与属性（无语法/未知标签诊断；`texts` 为该页模块作用域叶，元素标签走元素项、label 走 label 位）。
+
+**未随本批落地的 105 内容**：`ace_source_prep`（prep）、Store/列表/后端内联、元素视图与容器语义等仍在 `plan-105-dev`（两仓），按原计划继续；125 已可解除解析阻塞。
+
+**证据**：`D:/autostack/plan-artifacts/plan-105/p125check/*.json`（七页各一份 evidence）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -870,6 +892,28 @@ stage: merge（尝试）| plan_id: PLAN-105 | plan_revision: r1 | round: 88 | fr
 **结论**：并回主分支**不是一次机械合并**——文法里的 link 元素与 124/125 的路由 link 是同一语法的两种实现，必须选定/融合一套，否则会影响所有 AGE profile 的解析（248 例 census + 全量 conformance 需重跑）。故本轮按规模停下来报告，未在主分支上留下任何提交。
 
 **建议路线**：①先等 124/125 合并，再把 105 分支 rebase 上去（冲突面会变小）；②或以「work 阶段」做文法融合（预计 2–4 轮：选定 link 元素、重算 census、跑 248+六例门），然后 ff-only 落地。
+
+stage: merge（共享语法批单独交付）| plan_id: PLAN-105 | plan_revision: r1 | round: 90 | from: work | to: work | status: executing | outcome: pass（本批）| worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: auto-lang master `384609645` | next: work
+
+2026-11-19 stage: merge（用户裁定：105 先交付共享语法批，解除 125 阻塞）| outcome: pass（本批）
+
+**交付内容（auto-lang master，ff-only 落地）**
+- `ba462cee5`：AGE **包面**括号属性元素（`age-element-props-block` 由 component-only 放开到 age-package）+ **连字符属性键**（`age-event-key` 增 `ident ('-' ident)*`；键名改取键节点源文本切片，`onclick.self` 与 `stroke-width` 同源）。
+- `384609645`：**连字符元素标签**（`age-element-tag` = `ident ('-' ident)*`，四个元素体规则的标签位改用它；`preview-card`/`grid-item`/`code-block` 等）。
+- 适配当前主线：原补丁不能直接套用（主线已有 PLAN-124 的 `age-route-link-block`），本批**保留主线的路由 link 元素**、去掉 105 的重复 `age-element-link-block`；grammar census 具名重基线为 age-component `3351886c…`、age-package `b7b7acef…`。
+- 落地验证（master 上）：census 4/4、plan981 248/248；主检出无 WIP 代码。
+
+**125 冻结七原页验证（用本批 core 构建的 `ace_node_desktop_window --package`）**
+| 页 | 结果 |
+|---|---|
+| accordion / scroll / scrollarea / pagination / progress / slider | **开窗成功，errors=0** |
+| collapsible | **解析通过**，卡在投影后的表达式面：`source.age.component-unsupported: this expression shape is not wired`（其入口值 `collapsible (open: .isOpen)` 的字段引用形状；**不是**语法批的一部分） |
+
+→ 七页**解析 7/7 成功**；投影保留原标签与属性（无语法/未知标签诊断；`texts` 为该页模块作用域叶，元素标签走元素项、label 走 label 位）。
+
+**未随本批落地的 105 内容**：`ace_source_prep`（prep）、Store/列表/后端内联、元素视图与容器语义等仍在 `plan-105-dev`（两仓），按原计划继续；125 已可解除解析阻塞。
+
+**证据**：`D:/autostack/plan-artifacts/plan-105/p125check/*.json`（七页各一份 evidence）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
