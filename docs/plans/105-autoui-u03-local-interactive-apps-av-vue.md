@@ -497,6 +497,27 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 76 | from: work | t
 **验证**：prep 7/7（含 `real_u03_apps_*` 两例）；018 走开关后墙位前移（壳件 11 叶 → 页面并入）。
 ## 10. 下游交接
 
+### D-105-A（2026-11-19，等待用户决策）
+
+- 背景：见 §9 round 77 收据。
+- 选项：A 继续深挖（40–80 轮，不确定）；B 收窄到「壳件+可交互状态」口径（页面级内容列 KNOWN-DEBT）；C 收敛到 2–3 例做完整深交付；D 暂停并归档当前进度。
+- 影响：option B/C 需修订计划验收标准（属范围变更，需用户授权）。
+- 最新收据：
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 77 | from: work | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: f7ab49a8 | next: user
+
+2026-11-19 stage: work（T-02 W74：可行性评估 + 决策请求）| PLAN-105 r1 | outcome: waiting | task_ids: T-02 | evidence: 见 §10 决策项 D-105-A
+
+**018 页面组合再前进一步后遇到的墙**：页面 `cards` 是**对象元素列表**（`var cards List = []` + `.cards.push({ id: …, title: … })`，元素类型为 `Object{…}`）。组件面只收 `[]T`/`[N]T` 模型字段，且渲染需要**动态列表 + 对象元素字段投影**——与 012/013/015/016/022 的「动态列表渲染」是同一大件，且额外要对象元素支持。
+
+**可行性评估（本会话实测口径）**：
+- 已完成：核心表达式面、文本谓词、宿主 storage 仿真、store 内联、记录类型/构造函数、样式/依赖内联、列表基础（push/get/len/索引/条件 for）、路由页面组合第一片。
+- 未完成的大件：①**动态列表渲染**（owned 元素不可读值 → 需新 sanctioned 路径或运行期展开，5 例共用）②**宿主 API 面**（013/015/016）③**对象元素列表**（018/022 页面）④T-03 双端接线 ⑤T-04/T-05 六例真窗/A2Vue 全量 ⑥T-06..T-08。
+- 实测速率：单个子系统墙平均 3–5 轮；按当前速率，剩余 40–80 轮且仍有不确定性。
+
+**需要用户决策（D-105-A）**：是否收窄交付口径，或继续深挖，或收敛到少数例做完整深交付。
+
+## 10. 下游交接
+
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
 
 2026-11-19 停放与恢复：按用户裁定暂停过本计划开发；104 已交付并合入 master（ui `5a862d46` / lang `2fb094483`）后，已按裁定从 master 重建工作树（不共享 104 分支）并完成 T-02 W1。恢复/续做时先读 §9 的 W1 收据与 `plan-artifacts/plan-105/t02-gap-map.md`（S1–S10 缺口与顺序在案）。
