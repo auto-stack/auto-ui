@@ -26,9 +26,6 @@ use stylekit.styles: caption_text
 // ToggleDark/SetAccent 原 handler 全保留；scan/thumb/full 与收藏业务零改动）。
 use themes.themes: Auto, Solarized
 
-// PLAN-091 T-04：库面消费官方包（查看区消费 image_viewer 保持不变）。
-use { package: asset_browser from "../../../../../packages/asset-browser" }
-
 style label_xs_medium = "text-xs font-medium"
 style glass_btn_a = "h-9 px-4 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center gap-1.5 border border-white/10"
 style glass_btn_b = "h-9 px-3.5 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center gap-1.5 backdrop-blur-md border border-white/10"
@@ -37,6 +34,8 @@ style icon_btn = "h-8 w-8 rounded-lg bg-transparent hover:bg-muted text-muted-fo
 widget App {
     // PLAN-089：查看区（原图展示）消费正式包（widget 内 use；收藏/目录/
     // 扫描业务仍归 Gallery）。
+    // PLAN-091 T-04：库面消费官方包（查看区消费 image_viewer 保持不变）。
+    use { package: asset_browser from "../../../../../packages/asset-browser" }
     use { package: image_viewer from "../../../../../packages/image-viewer" }
     msg {
         Init,
@@ -283,6 +282,9 @@ widget App {
             } catch {
                 .fav_records = []
             }
+            // 初始 query 先于首次 scan 发布（浏览器 Tick 的 q_raw 守卫只在
+            // query 变化时清 q_error——空串 query 会让 invalid_query 常驻）。
+            .query = json.stringify({id: .qf_id, folderId: .qf_folder, text: .qf_text, kind: .qf_kind, page: .qf_page, pageSize: .qf_pageSize})
             .ReloadDir()
         }
 

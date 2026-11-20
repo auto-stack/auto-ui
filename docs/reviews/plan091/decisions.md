@@ -85,7 +85,12 @@
 | # | 发现 | 证据 | 决议/状态 |
 |---|---|---|---|
 | P-12 | **handler 体内 f-string 参数插值（${param}）使 handler 静默中止**：InvalidateSelected 的 `.status = f"...${nid}"`（nid 为 handler 参数）执行后后续语句全部不执行（无报错） | 钩子按压 handler 命中但 status 无变化；改串拼接后立即生效 | 示例已改串拼接；f-string 参数插值缺口具名（auto-lang owner），本包内未再用该形态 |
-| P-13 | **split 模式 front 解析间歇竞态（029 LBrace）**：同一 app.at 多次 boot，`Expected identifier, got LBrace` 约 50% 出现；二分排除包内容（空 widget 也复现）、清 AutoCache、换 cache root、换 cache-key 均无效；对照轮 `tool host closed the control stream before answering` + Rust server 双次生成 | boot029_1..4（2 无 1 有对照）、bisect029a–e 系列 | 同 P-4 运行时族（tool host/VM 传输与生成管线并发）。029 迁移腿的阻断，组件侧无改动空间 |
+| P-13 | **029 LBrace 根因订正（非间歇竞态）**：`use { package: asset_browser ... }` 误置于 `029/src/front/app.at` 顶层而非 `widget App` 体内（对比 picker demo / image-viewer 均在 widget 体内）导致 LBrace 解析失败；另 029 `Init` 未发布初始 `.query` 致 `q_error` 常驻、旧 `app-029*-back.exe` 占端口致 `AUTO_PHOTO_ROOT` 夹具失效 | 移入 `widget App` + `Init` 先发布 `.query` + 清旧 back 进程后，029 迁移 4 腿（库面/查看器/收藏/目录导航）全部稳定通过 | 纯 `.at` 与门夹具修复已落地；取消“间歇竞态”挂起 |
 | P-14 | **delivery 普查方法**：MCP ActionResult 的 `delivery: sent=N delivered=M` 是可观测的投递丢失探针（delivered=0 = 状态写不落）；主页面裸按压 2/10、分段隔离/降频/清缓存均无效——丢失窗与组件、对话框、包层数无关 | guardtest/rate*.log 普查 | 门驱动以 delivered 计数 + provider 读回双重校验；运行时修复由 delivery 计数器直接验收 |
+| P-15 | **Vue 轨 `computed` f-string 与 `DialogContent` 网格约束**：`computed` 内 `f"共 ${.total} 项"` 在 `vue.rs` 生成 `undefined`；`DialogContent` 默认 `display: grid` 下子节点未设 `min-h-0 overflow-hidden` 导致 25 卡网格将分页条与底栏 `确认`/`取消` 挤出 680px 视口 | `gate-vue-r1/r2/r3` 截图与 DOM 断言对照 | `asset_browser.at` 改用视图层条件插值；`asset_picker.at` 与 `asset_browser.at` 补 `min-h-0 overflow-hidden` 约束后 Vue 轨 5/5 全绿 |
 
-native 门最终证据：`gate-native-final2` 四轮连绿 14/14（report sha 92e2172c4cb51838）+ `gate-native-r53` 双轮连绿（13f1a9a9dcaa4f6f），均含 V-06 截图腿；best-of-N 会话重试语义（--runs）已入门。
+最终门证据（2026-11-20）：
+- **tools 生成门**：`cargo test -p auto-ui-tools --test asset_browser_component` → **2/2 pass**（7.83s）。
+- **native 产品门**：`gate-native-final/report.json` → **18 pass / 0 fail / 0 not_run**（1075.6s，含 `asset-picker` V-01..V-06 与 `029-photo-gallery` V-04 四腿），SHA256 `62E45AC4F2CE0D8E3CC1591F429A204627B88D972DD9CFF3F0CBFA733B0CD1E8`。
+- **vue 产品门**：`gate-vue-final/report.json` → **5 pass / 0 fail / 0 not_run**（66.6s，含 `v01-picker-vue.png` 整面截图），SHA256 `A77847BCCDEE44F700D5AA7F58D92AC5BFFF9E1A09812844C56F91A26A5E4D34`。
+- **Linux native**：无本机 Linux runner，单列 `not_run`（不并入总绿）。

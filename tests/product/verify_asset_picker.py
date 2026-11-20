@@ -163,7 +163,8 @@ class Session:
     """Native `auto run -r vm` window driven through MCP (numeric-fields
     pattern; this fixture's ready text is 资源选择演示, no FileDialog env)."""
 
-    def __init__(self, args, out, index, app_dir, env_extra=None):
+    def __init__(self, args, out, index, app_dir, env_extra=None, ready_text=None):
+        self.ready_text = ready_text or READY_TEXT
         self.app_dir = Path(app_dir)
         self.port = bindable_port(vfd.free_port())
         self.out = out
@@ -193,7 +194,7 @@ class Session:
         while time.time() < deadline:
             try:
                 last = self.snapshot()
-                if READY_TEXT in last:
+                if self.ready_text in last:
                     break
             except Exception as e:
                 last = f'ERR {e!r}'
@@ -543,7 +544,7 @@ def run_picker_matrix(args, out, cases, report):
         cases.pause_timer()
         warm_ok = False
         warm_t0 = time.monotonic()
-        for attempt in range(12):
+        for attempt in range(4):
             up = s.open_picker(timeout=10)
             if up:
                 try:
@@ -748,7 +749,7 @@ def run_picker_matrix(args, out, cases, report):
         # session 2 + double-press single request（接受 handler 的 storage 写
         # park 恢复后再重开——恢复中的 .open=false 会覆盖过早的重开）
         time.sleep(2.0)
-        s.open_picker()
+        vfd.require(s.open_picker(), 'picker did not reopen for double-press leg')
         time.sleep(1.2)
         s.select_card('Asset-004.bin', '"att-4"')
         c0 = int(s.readback().get('counts', ['0'] * 8)[3])
@@ -791,9 +792,13 @@ def run_picker_stale(args, out, cases, report):
         attach_before = int(re.findall(r'\d+', s.readback().get('attach', '0 条'))[0]) if re.findall(r'\d+', s.readback().get('attach', '')) else 0
         # 身份失效经搜索通道触发（text=invalidate；搜索框在 picker 内——
         # 保持对话框开启直接触发，provider bump 后自动恢复空文本查询）。
-        s.type_into_search('invalidate')
-        rb_inv = s.ensure_effect('搜索', lambda f: 'invalidated' in f.get('status', ''),
-                                 tries=8, wait=2.5)
+        rb_inv = {}
+        for _t in range(8):
+            s.type_into_search('invalidate')
+            rb_inv = s.ensure_effect('搜索', lambda f: 'invalidated' in f.get('status', ''),
+                                     tries=4, wait=2.5)
+            if 'invalidated' in rb_inv.get('status', ''):
+                break
         vfd.require('invalidated' in rb_inv.get('status', ''),
                     f'invalidate did not apply; status={rb_inv.get("status")!r:.120}')
         s.wait_rb(lambda f: f.get('provider', ['', ''])[4] == '1003', timeout=6)
@@ -983,10 +988,16 @@ def run_029_legs(args, out, cases, report):
     for name in ['scenic-320x240.png', 'corner-marked.png']:
         shutil.copyfile(fx / name, proot / name)
     shutil.copyfile(fx / 'orientation-6.jpg', sub / 'sub-photo.jpg')
+    # 旧 back 实例占端口 = 新会话连到无 env 的旧后端（空图库）——先清。
+    subprocess.run(['powershell', '-NoProfile', '-Command',
+                    "Get-Process | Where-Object { $_.ProcessName -like 'app-029*' } | Stop-Process -Force"],
+                   capture_output=True)
+    time.sleep(1.0)
     s = None
     try:
         cases.pause_timer()
-        s = Session(args, out, 9, app_dir, env_extra={'AUTO_PHOTO_ROOT': str(proot.resolve())})
+        s = Session(args, out, 9, app_dir, env_extra={'AUTO_PHOTO_ROOT': str(proot.resolve())},
+                    ready_text='Photos')
         cases.resume_timer()
         snap = s.snapshot()
         (out / 'v04-029.txt').write_text(snap, encoding='utf-8')
@@ -994,29 +1005,57 @@ def run_029_legs(args, out, cases, report):
         cases.add('V-04 029 库面消费 AssetBrowser（真实 scan）', 'launch 029',
                   '分类树（全部/收藏）+ 搜索/网格在真实 photo scan 上渲染',
                   [mounted, snap[:120]], mounted)
+        def press_tree_row(label, expect_text, timeout=4.0):
+            deadline = time.time() + timeout
+            last_snap = ''
+            for _ in range(4):
+                sn = s.snapshot()
+                lines = sn.splitlines()
+                target = None
+                for i, ln in enumerate(lines):
+                    if f'"{label}"' in ln and 'text #' in ln:
+                        indent = len(ln) - len(ln.lstrip())
+                        for j in range(i - 1, -1, -1):
+                            ind = len(lines[j]) - len(lines[j].lstrip())
+                            if ind < indent and re.search(r'#(vnode_\d+)\s*\{', lines[j]):
+                                target = re.search(r'#(vnode_\d+)', lines[j]).group(1)
+                                break
+                        break
+                if target:
+                    s.call('autoui_action', allow_error=True, element_id=target, action='press')
+                    t_end = min(deadline, time.time() + 1.5)
+                    while time.time() < t_end:
+                        last_snap = s.snapshot()
+                        if expect_text in last_snap:
+                            return True, last_snap
+                        time.sleep(0.3)
+                time.sleep(0.4)
+            return expect_text in last_snap, last_snap
+
         # select a real photo (first photo card) by its title text if present
-        m = re.search(r'text #vnode_\d+ "([^"]+\.(?:png|jpg|jpeg|webp))"', snap)
+        m = re.search(r'text #vnode_\d+ "(scenic[^"]*|corner[^"]*)"', snap)
         photo_label = m.group(1) if m else None
         if photo_label:
             s.press_card(photo_label)
-            rb_sel = s.wait_rb(lambda f: '已选' in f.get('status', ''), timeout=4)
+            time.sleep(0.8)
             s.press_ok('查看大图')
             time.sleep(1.2)
             snap2 = s.snapshot()
             viewer_ok = '返回网格' in snap2
             cases.add('V-04 029 选择身份→查看器', f'select {photo_label!r} → 查看大图',
                       '按选择身份进入 PLAN-089 查看区（展示图身份正确）',
-                      [rb_sel.get('status', ''), viewer_ok], viewer_ok)
+                      [photo_label, viewer_ok], viewer_ok)
             s.press_ok('返回网格')
             time.sleep(1.0)
             s.press_card(photo_label)
-            s.wait_rb(lambda f: '已选' in f.get('status', ''), timeout=4)
+            time.sleep(0.8)
             s.press_ok('收藏选中')
-            time.sleep(1.2)
-            snap3 = s.snapshot()
-            fav_ok = ('收藏夹' in snap3)
-            cases.add('V-04 029 收藏控制不回退', '收藏选中',
-                      'fav 落账（收藏夹可见/持久化由退出重开腿承担）', [fav_ok], fav_ok)
+            time.sleep(0.8)
+            fav_switched, snap3 = press_tree_row('❤ 收藏', '收藏夹')
+            fav_ok = fav_switched and (photo_label in snap3)
+            cases.add('V-04 029 收藏控制不回退', '收藏选中 → ❤ 收藏',
+                      'fav 落账且收藏夹切入可见该照片', [fav_switched, photo_label in snap3], fav_ok)
+            press_tree_row('全部', '全部')
         else:
             cases.not_run('V-04 029 选择/查看器/收藏腿', 'no photo in scan root',
                           'photo_root 无图片（AUTO_PHOTO_ROOT 未提供）——非本计划缺口，单列')
@@ -1025,14 +1064,10 @@ def run_029_legs(args, out, cases, report):
         dirm = re.search(r'text #vnode_\d+ "📂 ([^"]+)"', snap)
         if dirm:
             label = f'📂 {dirm.group(1)}'
-            rows = [h for h in s.vnodes(label, snap) if h[0] in ('row',)]
-            if rows:
-                s.call('autoui_action', allow_error=True, element_id=rows[0][1], action='press')
-                time.sleep(1.5)
-                snap2 = s.snapshot()
-                cases.add('V-04 029 目录导航不回退', f'tree row {label!r}',
-                          '进入子目录（scan 语义）+ 上一级可用',
-                          ['上一级' in snap2], '上一级' in snap2)
+            dir_ok, snap2 = press_tree_row(label, '上一级')
+            cases.add('V-04 029 目录导航不回退', f'tree row {label!r}',
+                      '进入子目录（scan 语义）+ 上一级可用',
+                      [dir_ok], dir_ok)
         else:
             cases.not_run('V-04 029 目录导航腿', 'no subdirectory in scan root',
                           'photo_root 无子目录——单列，不并入总绿')
@@ -1077,6 +1112,8 @@ def run_vue_track(args, out, cases, report):
             ok = False
         cases.add('V-02(vue) 卡片选择→provider 读回', 'click Lake.jpg',
                   '选择摘要/读回更新（vue emit 链）', [ok], ok)
+        shot = b.screenshot('v01-picker-vue')
+        cases.add('V-05(vue) 选择器截图', 'screenshot', 'vue 轨整面截图（含分页与确认栏）', [shot['sha256'][:16]], bool(shot['sha256']))
         # confirm
         ok = False
         try:
@@ -1089,8 +1126,6 @@ def run_vue_track(args, out, cases, report):
         cases.add('V-03(vue) 确认接受 + 附件落账', 'press 确认',
                   'confirmation accepted + 附件日志 1 条（vue 轨真实业务写）',
                   [ok], ok)
-        shot = b.screenshot('v01-picker-vue')
-        cases.add('V-05(vue) 选择器截图', 'screenshot', 'vue 轨整面截图', [shot['sha256'][:16]], bool(shot['sha256']))
     except Exception as e:
         cases.not_run('vue track', 'prewarm/browser', f'{e!r:.260}')
     finally:
@@ -1161,9 +1196,9 @@ def main():
     passed = sum(1 for r in cases.rows if r['result'] == 'pass')
     failed = sum(1 for r in cases.rows if r['result'] == 'fail')
     not_run = sum(1 for r in cases.rows if r['result'] == 'not_run')
-    # 完整性下限：native 矩阵含 picker(V-01..03) + visual/reopen(V-05/06) 腿，
-    # 少于 12 个唯一 case = 会话早期崩溃，不得按空真值判 pass。
-    complete = len(cases.rows) >= 12
+    # 完整性下限：native 矩阵含 picker(V-01..03) + visual/reopen(V-05/06) 腿（≥12），
+    # vue 轨为 5 例。少于下限 = 会话早期崩溃，不得按空真值判 pass。
+    complete = len(cases.rows) >= (12 if args.backend == 'native' else 5)
     report['result'] = 'pass' if (cases.all_pass() and complete) else ('fail' if failed or not complete else 'not_run')
     report['seconds'] = round(time.monotonic() - t0, 1)
     (out / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding='utf-8')

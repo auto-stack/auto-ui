@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-091
-status: drafting
+status: delivered
 feature_name: AssetBrowser 与 AssetPicker 通用资源浏览选择
 author: [Codex]
 created_at: 2026-11-14
-updated_at: 2026-11-14
+updated_at: 2026-11-20
 plan_revision: 2
-current_step: 0
+current_step: 8
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/asset-browser.md]
@@ -144,6 +144,10 @@ T-04新`examples/asset-picker/`及授权资源provider夹具，T-05新`crates/au
 2026-11-14：stage: new；PLAN-091 r1；outcome: pass（规划可交接）；next: work，从T-01开始，T-03等待085/086/089。新增T-01…08、AC-01…08、SD-01/02，0/8；拟代码与测试未执行。
 
 2026-11-14修订交接：stage: new；PLAN-091 r2；outcome: pass（合同可进入T-01，非实施后独立复审通过）；next: work。依据[本轮复核记录](../reviews/component-plans-087-093-2026-11-14/README.md)处理F-01/F-06/F-09/F-10，补§5接口/数据/状态、§6 V-06及视觉交接，AC-06同步加强；T-01/02/03/05/06执行仍按原8任务计数，当前0/8。Spec增量沿SD-01/02并纳入r2细节。本轮只读源码并修订计划/设计/图片资产，未运行产品门。
+
+2026-11-20交付复审（T-07/T-08）：stage: review + merge；PLAN-091 r2，8/8 完成；outcome: pass。
+- AC-01..06 / SD-01..02 逐项核实：`packages/asset-browser/`（`AssetBrowser` / `AssetPicker` / `KindIcon` / `README.md`）无内嵌副本消费 `tree-view`、`pagination`、`image-viewer`（pin=`5dbc3661`）；`examples/asset-picker/` 与 `examples/ui/029-photo-gallery/` 消费正式包；`docs/specs/ui/asset-browser.md` 与 `docs/reviews/plan091/decisions.md` 已落盘。
+- 门禁实证：`cargo test -p auto-ui-tools --test asset_browser_component` 2/2 pass（7.83s）；`verify_asset_picker.py --backend native --runs 5` 18/18 pass（0 fail / 0 not_run，SHA256 `62E45AC4...`）；`verify_asset_picker.py --backend vue` 5/5 pass（0 fail / 0 not_run，SHA256 `A77847BC...`）；Linux native 无本机 runner 单列 `not_run`。
 
 ## 10. 待澄清事项
 
