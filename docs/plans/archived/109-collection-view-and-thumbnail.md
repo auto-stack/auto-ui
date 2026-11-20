@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-20
 plan_revision: 2
-current_step: 9
+current_step: 10
 total_steps: 10
 supersedes_spec_components: [docs/specs/ui/asset-browser.md, docs/specs/runtime/component-and-store-instances.md]
 new_spec_components: [docs/specs/ui/collection-view.md]
@@ -161,7 +161,7 @@ python tests/product/verify_collection_view.py --auto-bin <cli> --ui-tool-bin <t
   - owner_stage: work。依赖 T-06。新增包 README、实施报告及规范增量提案，核验真实命令、包闭包、状态矩阵和证据完整性。AC-07。
 - [x] T-08 独立复审
   - owner_stage: review。依赖 T-01…07。在同一实施树核对提交、必需用例及规范增量，记录逐项结论。AC-08。
-- [ ] T-09 合并与归档
+- [x] T-09 合并与归档
   - owner_stage: merge。依赖 T-08 pass。按复审版本落主，沉淀规范，更新 strategy/交付 pin 和归档，核验实际清理。AC-09。
 
 ## 9. 复审记录
@@ -254,7 +254,7 @@ Windows Vue Picker 已补同版 420×560 深色、浅色和错误态。默认 CS
 
 2026-11-20。stage: review | review_scope: final | reviewer: /root/review109 | plan_id: PLAN-109 | plan_revision: r2 | reviewed_commit: 8a0e381d696eedfd430ee1a11decb653f2025c67 | base_commit: 15fa7857a411707c44ceb6e1a37d1822808bef53 | outcome: needs_fix | next: work/F109-R2b。F109-R1、R3、R4 已关闭。AC-01/02/05/06/07 pass，AC-03/08 fail，AC-04 partial。四依赖 pin、实施树、基线及 `git diff --check` 复核通过。SD-01/03 blob `a50a545eed25e4a63598e638c0eb38cc6a06695a`，SD-02 `01f6e4e4b6570a03fa11fdb6b505c4b494ec2786`，SD-04 `ca9fd87387c4610979d8ba8020a12d9e7f3f8de7`。独立原生失败保全和旧端口拒绝通过，5.391 s。其余已关闭证据保持上述收据。
 
-F109-R2b 反例。同一授权 URI 和资源 ID 发布 revision 2 后，原生和 Vue 均继续显示 revision 1 的红图。原生原地址 `/unchanged.png` 返回 `no-store`，实际 MCP 读回 revision 2 和新节点，服务只收到最初红图请求，重绘为 90396 红、0 蓝，6.313 s，退出 1，`review109/native-http-stable-url/report.json`。在生成的 Vue Thumbnail 中，`no-store` 和 `max-age=3600` 都只有初次请求，DOM 虽重挂载但中心仍是 (230,20,30)，1.781 s，退出 1，`review109/vue-http-stable-url-report.json`。闭环需复验原地址新像素，并保留原坏图、迟到不同来源、正常 HTTP 与 Galllery 路径。
+F109-R2b 反例。同一授权 URI 和资源 ID 发布 revision 2 后，原生和 Vue 均继续显示 revision 1 的红图。原生原地址 `/unchanged.png` 返回 `no-store`，实际 MCP 读回 revision 2 和新节点，服务只收到最初红图请求，重绘为 90396 红、0 蓝，6.313 s，退出 1，`review109/native-http-stable-url/report.json`。在生成的 Vue Thumbnail 中，`no-store` 和 `max-age=3600` 都只有初次请求，DOM 虽重挂载但中心仍是 (230,20,30)，1.781 s，退出 1，`review109/vue-http-stable-url-report.json`。闭环需复验原地址新像素，并保留原坏图、迟到不同来源、正常 HTTP 与 Gallery 路径。
 
 2026-11-20。stage: work | plan_id: PLAN-109 | plan_revision: r2 | outcome: execution_done | code_commit: 27441ee91171caeea810239e5cd90787ed0a4ec2 | finding: F109-R2b | next: affected final review。两条独立反例将原因定位为实际取图缓存，而非组件 key 或当前版本的 VM 读回。原生按已解析 URI、资源 ID 与 revision 保留有界的解码结果，新版本绕开旧的 URI 字节缓存并保留原授权 HTTP 请求地址和客户端。Vue 以新绑定读取原地址，重新验证 HTTP 结果和解码缓存。可读响应使用本次请求的对象 URL，跨域透明图片复用标准图片权限，先重新验证同一个 HTTP 地址。释放绑定时取消旧读并释放对象 URL。原生媒体票据路径仍使用原有注册表。
 
@@ -285,6 +285,8 @@ F109-R2b 反例。同一授权 URI 和资源 ID 发布 revision 2 后，原生�
 2026-11-20。stage: merge | checkpoint: canonical_verified | plan_id: PLAN-109 | plan_revision: r2 | delivery_commit: a6b166278dbdf59f5e7a3ac65955e20d579fa2f7 | outcome: pass。实际 master 三份 Spec 与已评审的 canonical blob 一致。CollectionView `3496240ce93b22a25b4f5bbc4d5fc71d5fe1c6e7`，AssetBrowser `01f6e4e4b6570a03fa11fdb6b505c4b494ec2786`，组件实例 `ca9fd87387c4610979d8ba8020a12d9e7f3f8de7`。正式包及两个使用者入口可读，DEBT-011 在 master。引用的 091 归档、组件指南与参考图均存在。
 
 2026-11-20。stage: merge | checkpoint: archived | plan_id: PLAN-109 | plan_revision: r2 | delivery_commit: a6b166278dbdf59f5e7a3ac65955e20d579fa2f7 | outcome: delivered。实施和复审已完成，T-09 的清理待验证。归档文件为 `docs/plans/archived/109-collection-view-and-thumbnail.md`。CL-27、计划入口和 Linux DEBT-011 已连接到正式交付。
+
+2026-11-20。stage: merge | checkpoint: cleaned | plan_id: PLAN-109 | plan_revision: r2 | outcome: pass | completion_kind: delivered | delivery_commit: a6b166278dbdf59f5e7a3ac65955e20d579fa2f7 | archive_commit: af0a06a2c934dc54499de54bbebd26b81e32e40a。实际归档、计划入口与 CL-27 路线已提交并核对。五个专用工作树各自核对已知 pin、干净状态、真实路径、登记和 `wt-guard.ps1`，均已移除，`codex/ui-109-collection-view-thumbnail` 已删除，组目录不存在。预备的应用服务已退出。证据已折入本文件，`D:/autostack/plan-artifacts/plan-109` 已整目录删除，保留登记确认无 artifact hold。DEBT-011 继续跟踪 Linux 原生 VM 与 Linux Vue 补验，关闭条件保存在正式债务文件。T-09 验证通过，实际任务计 10/10。
 
 ## 10. 待澄清事项
 
