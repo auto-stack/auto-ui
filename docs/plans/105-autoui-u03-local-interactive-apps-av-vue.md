@@ -294,6 +294,16 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 58 | from: work | t
 **012 真窗推进**：`array-lit-empty` 与局部列表类型问题消失，剩余两墙：①`Str.contains(sub)`（语言无该内建方法）②`rows.push(拼接表达式)` 触发 `source.move-required`（owned 元素实参需 `.move` 或新建构造）。
 
 **验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3；prep 7/7。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 59 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: 5c599d678 / c01a4f2e | next: work
+
+2026-11-19 stage: work（T-02 W56：Str.contains 谓词 + 初值规范化收窄）| PLAN-105 r1 | outcome: pass | code_commit: auto-lang `5c599d678`、auto-ui `c01a4f2e` | task_ids: T-02（W56）| evidence: 012 墙序列推进（contains 消失）
+
+**交付**：①prep 把 `<text>.contains(<sub>)` 改写为注入的文本谓词 helper `__p105_str_contains`（用 `len`/`slice`/`==` 既有内建 + **C 风格 for** 展开，语言零改动）；②声明注入（样式/记录/helper/store 块）移到**全部改写之后**再插到组件头之前（否则后注入的 helper 不落地）；③空列表初值规范化收窄为**仅空字面量**（非空数组字面量保持 let/var 初值位，避免 `array-lit-position`）。
+
+**012 真窗推进**：`contains` 与 `array-lit-empty` 诊断消失；剩余墙 = `rows.push(<拼接表达式>)` 的 `source.move-required`（owned 元素实参需 `.move` 形式或新建构造，且 `array-lit-position` 限制数组字面量只在初值位）。
+
+**验证**：plan105 25/25、980 39/39、979 24/24、981 248/248、104 3/3、1072 19/19；av list handlers 3/3；prep 7/7。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
