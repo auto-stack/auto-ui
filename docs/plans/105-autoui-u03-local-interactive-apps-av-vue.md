@@ -925,6 +925,14 @@ stage: work（三 app 挂载通过）| plan_id: PLAN-105 | plan_revision: r1 | r
 **验收**：013、015、016 三站 `failures=0`（`p013-/p015-/p016-browser-evidence.txt`）。
 
 **余**：022-kanban 需 `vue-router`（`<router-view/>` 承载板块页）；Iced 腿仍等 AV collections 元素文本视图。
+
+stage: work（浏览器门固化）| plan_id: PLAN-105 | plan_revision: r1 | round: 107 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `527af22a` | next: work
+
+2026-11-21 stage: work（T-02 W102：浏览器腿固化为可跑门）| outcome: **pass**
+
+**门**：`p105_build_u03_sites`（默认，四 app 站点构建）+ `p105_u03_browser_gate`（`#[ignore]`，构建→vite build→node verify.mjs，断言 failures=0）。站点自包含（自动写 verify.mjs、建 node_modules junction、补 015 的 lucide）。
+
+**实测**：013/015/016 三站 `RESULT {"failures":0}`，门通过。022 不入门（`<router-view/>` 需 vue-router）。
 ## 10. 下游交接
 
 ### D-105-A（2026-11-19，等待用户决策）
@@ -1376,6 +1384,14 @@ stage: work（三 app 挂载通过）| plan_id: PLAN-105 | plan_revision: r1 | r
 **验收**：013、015、016 三站 `failures=0`（`p013-/p015-/p016-browser-evidence.txt`）。
 
 **余**：022-kanban 需 `vue-router`（`<router-view/>` 承载板块页）；Iced 腿仍等 AV collections 元素文本视图。
+
+stage: work（浏览器门固化）| plan_id: PLAN-105 | plan_revision: r1 | round: 107 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-lang,auto-ui} | commit: auto-ui `527af22a` | next: work
+
+2026-11-21 stage: work（T-02 W102：浏览器腿固化为可跑门）| outcome: **pass**
+
+**门**：`p105_build_u03_sites`（默认，四 app 站点构建）+ `p105_u03_browser_gate`（`#[ignore]`，构建→vite build→node verify.mjs，断言 failures=0）。站点自包含（自动写 verify.mjs、建 node_modules junction、补 015 的 lucide）。
+
+**实测**：013/015/016 三站 `RESULT {"failures":0}`，门通过。022 不入门（`<router-view/>` 需 vue-router）。
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
