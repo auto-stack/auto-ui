@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-19
 plan_revision: 1
-current_step: 5
+current_step: 6
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -85,7 +85,7 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 - [x] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。收据见 §9（2026-11-19 T-01）：六例原源事实、组件面/包面首阻断、缺口台账 G1–G11、共享实现线与唯一写面已冻结；矩阵与原始日志在 `D:/autostack/plan-artifacts/plan-105/t01-matrix.md` + `t01-probe.log`。
 - [x] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。（W105–W108：文法回归、S1 包面 store、LIST_FIELD_VIEW、元素位/字段位 owned Str、concat/调用点调和；正反例 = av plan105 13 例 + core plan105 26 例，收据见 §9。）
 - [x] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。（组件页由 125 七页双端交付；本计划的组件行为（store/列表/view-for/checkbox/动态叶）双端接线完成，消费者回归 = prep 8/8 + 五 app 浏览器门 + 桥装载五例，收据见 §9。）
-- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。（**受阻**：013/016 真点击 + 015/018/022 装载已验；**012 余墙 = ownership 分析 bound ~29.5MB 超冻结 16MB 预算**——目标授权不含阈值/预算变更，待裁定；打字两段语义记 KNOWN-DEBT。详见 §10 与冻结矩阵。）
+- [x] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。（W110/W111：预算分档 + 桥栈修复后六例全链——012 ADnH×2 真点击 a_h 7→6→5、013 ToggleAll、016 PrevMonth、015/018/022 装载（W32 曾有点击）；frames≥1、errors=0 全例。具名缺口随终审裁定：打字两段语义、016 逐 dispatch 叶数漂移。）
 - [x] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。（W102–W109：五 app 浏览器门 failures=0（构建+挂载+渲染+无异常，上游同口径）；站点自包含可复跑（`plan-artifacts/plan-105/sites/` + `p105_u03_browser_gate`）。）
 - [x] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。（冻结 auto-ui `cc268baa` / auto-lang `ddbeecaa2`；受影响回归组全绿（矩阵见 `plan-artifacts/plan-105/frozen-delivery-matrix.md`，V-01..V-06 索引在案）；规范增量随 T-08 merge 沉淀 canonical docs/specs。）
 - [ ] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
@@ -1117,6 +1117,24 @@ stage: work（D-105-预算裁定执行：分档 (a)）| plan_id: PLAN-105 | plan
 `next_responsible_role: work（W111：012 handler 执行栈溢出定位（执行器递归深度/宿主栈）→ 012 交互验收；或按具名缺口转 execution_done 进终审）`
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 119 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 8809bccc9 | next: work
+
+stage: work（T-04 收口：012 交互全链）| plan_id: PLAN-105 | plan_revision: r1 | round: 120 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | code_commit: auto-ui `5c3be6b7` | task_ids: T-04（收口）| evidence: `plan-artifacts/plan-105/av-012-w111.json`（sha256 前 16 `F4528DDD725EC860`）+ av-013/015/016-w111.json | next: review
+
+2026-11-21 stage: work（W111：桥栈修复——012 交互全链，T-04 收口）| outcome: **pass**
+
+**定位（实证）**：harness 复现 012 派发求值**无溢出**（53 字段）——求值有限，溢出只在桥主线程栈（Windows 默认 /STACK 头）。
+
+**交付（auto-ui `5c3be6b7`）**：`.cargo/config.toml` 追加 Windows rustflags `/STACK:536870912`（512MB 虚拟预留、按需提交；测试线程另有 RUST_MIN_STACK 档；UI 保持主线程）。
+
+**验收（012 交互全链）**：`--script "5:click:0:9,7:click:0:9"` → **ADnH（时−）两次真派发，a_h 7→6→5**、frames≥1、errors=0；013 ToggleAll / 016 PrevMonth / 015 装载同批回归全绿。
+
+**门（新栈配置重建后全量复跑）**：prep 8/8、sfc_status 4/4、p013_sfc 1/1、p013_store_lane 3/3、sites 1/1、浏览器门五 app failures=0。
+
+**T-04 终态（六例）**：012 ADnH×2 真点击（状态推进可观察）、013 ToggleAll、016 PrevMonth、015/018/022 装载（018/022 W32 曾有点击）——frames≥1、errors=0 全例。**具名缺口（随终审裁定）**：打字两段语义、016 逐 dispatch 叶数漂移、SelectTab 载荷点击实参。
+
+**执行收口**：工作所有任务完成（6/8；T-07 review、T-08 merge 为阶段所有）。两树 clean：auto-ui `5c3be6b7` / auto-lang `8809bccc9`。**next：review（T-07，`review_scope: final`）**。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 120 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 5c3be6b7 / 8809bccc9 | next: review
 
 ## 10. 下游交接
 
