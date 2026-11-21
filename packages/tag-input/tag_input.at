@@ -404,7 +404,9 @@ widget TagInput (tags: List = [], contextId: str = "", revision: int = 0, sugges
         .Commit -> {
             if .phase == "pending" || .disabled || .readOnly || .config_code != "" { return }
             var t str = ""
-            if .candidates_visible && .active_tag != "" {
+            if .candidates_visible && .active_tag != "" && tag_contains(.active_tag, .draft) {
+                // 仅当活动候选仍匹配当前草稿查询时采用；草稿刚输入而候选
+                // 未及重算时回落草稿（防过期候选误提交）。
                 t = .active_tag
             } else {
                 t = .draft
