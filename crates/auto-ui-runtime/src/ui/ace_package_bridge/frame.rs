@@ -301,5 +301,5 @@ pub(super) fn child_site<'a>(
         .widget_refs
         .get(&(component.module.clone(), component.name.clone()))?
         .iter()
-        .find(|site| site.span.start == element.site && site.node == element.tag)
+        .find(|site| site.span.start == element.site && site.authored_node == element.tag)
 }

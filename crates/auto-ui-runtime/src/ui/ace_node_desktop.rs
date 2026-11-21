@@ -36,7 +36,7 @@ use crate::ui::{Component, View};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 use ace_av::age_component::InitialValue as EngineInitialValue;
 use ace_av::age_component::{
@@ -252,26 +252,33 @@ pub fn stable_ui980_root() -> PathBuf {
     p.join("ace-node-desktop")
 }
 
-/// 构建并注册 ui980 provider，返回 cdylib 路径（宿主安装 hooks 用）。
-/// 幂等：已注册时另行经缓存构建取回 cdylib 路径。
+/// Returns the process's registered provider, preparing it once when needed.
+static UI980_PROVIDER_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
+
 pub fn ensure_ui980_provider() -> Result<PathBuf, String> {
+    let mut cached = UI980_PROVIDER_PATH.lock()
+        .map_err(|_| "ui980 provider path lock was poisoned".to_string())?;
+    if let Some(path) = cached.as_ref() {
+        return Ok(path.clone());
+    }
     auto_lang_ace_host::install().map_err(|e| format!("ace host install: {e}"))?;
     let root = stable_ui980_root();
-    match auto_lang_ace_host::register_source_provider(
-        UI980_PROVIDER_NAME,
-        &root,
-        UI980_PROVIDER_SOURCE,
-    ) {
-        Ok(cdylib) => Ok(cdylib),
-        Err(e) if e.contains("already registered") => {
-            // 已注册（本进程早前会话）：同一构建根重放 build_source 只命中
-            // 新鲜度缓存，取回 cdylib 路径。
-            let build = ace_abi::rust_provider::build_source(&root, UI980_PROVIDER_SOURCE)
-                .map_err(|e| format!("ui980 cached build: {e}"))?;
-            Ok(build.cdylib)
-        }
-        Err(e) => Err(format!("ui980 provider register: {e}")),
-    }
+    let path = match std::env::var("ACE_NODE_DESKTOP_PREPARED_RUSTC") {
+        Ok(rustc) => auto_lang_ace_host::register_prepared_source_provider(
+            UI980_PROVIDER_NAME,
+            &root,
+            UI980_PROVIDER_SOURCE,
+            &rustc,
+        )?,
+        Err(std::env::VarError::NotPresent) => auto_lang_ace_host::register_source_provider(
+            UI980_PROVIDER_NAME,
+            &root,
+            UI980_PROVIDER_SOURCE,
+        )?,
+        Err(error) => return Err(error.to_string()),
+    };
+    *cached = Some(path.clone());
+    Ok(path)
 }
 
 // ---------------------------------------------------------------------------
@@ -825,19 +832,7 @@ pub fn install_ui980_lane() -> Result<(), String> {
     if HOOKS_INSTALLED.load(Ordering::SeqCst) == 1 {
         return Ok(());
     }
-    let cdylib = match std::env::var("ACE_NODE_DESKTOP_PREPARED_RUSTC") {
-        Ok(rustc) => {
-            auto_lang_ace_host::install().map_err(|e| format!("ace host install: {e}"))?;
-            auto_lang_ace_host::register_prepared_source_provider(
-                UI980_PROVIDER_NAME,
-                &stable_ui980_root(),
-                UI980_PROVIDER_SOURCE,
-                &rustc,
-            )?
-        }
-        Err(std::env::VarError::NotPresent) => ensure_ui980_provider()?,
-        Err(error) => return Err(error.to_string()),
-    };
+    let cdylib = ensure_ui980_provider()?;
     let lib = ace_abi::rust_provider::RawLibrary::load(&cdylib)
         .map_err(|e| format!("ui980 dll load: {e}"))?;
     let install_sym = lib
@@ -1342,7 +1337,7 @@ fn desktop_view_loop_keeps_item_order_and_optional_index() {
         (indexed.as_str(), vec!["index=0", "first", "second"]),
     ] {
         let bridge = NodeDesktopBridge::load(source, "list-page.at", 1).expect("load view");
-        assert_eq!(bridge.load_texts, expected);
+        assert_eq!(bridge.last_texts[0], expected);
     }
 }
 

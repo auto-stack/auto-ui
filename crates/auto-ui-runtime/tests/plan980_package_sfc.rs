@@ -98,10 +98,10 @@ widget ChartPreview {
     view {
         div {
             role: "region"
-            "aria-roledescription": "carousel"
+            "aria-roledescription": "chart"
             "aria-label": "Cards & \"photos\""
             "aria-pressed": .pressed
-            text | Slide 1
+            text "Series 1"
         }
     }
 }
@@ -110,13 +110,13 @@ widget ChartPreview {
         .expect("quoted accessibility attributes generate");
     for attribute in [
         r#"role="region""#,
-        r#"aria-roledescription="carousel""#,
+        r#"aria-roledescription="chart""#,
         r#"aria-label="Cards &amp; &quot;photos&quot;""#,
         r#":aria-pressed="pressed""#,
     ] {
         assert!(sfc.contains(attribute), "missing {attribute}: {sfc}");
     }
-    assert!(sfc.contains(">Slide 1</div>"), "{sfc}");
+    assert!(sfc.contains(">Series 1</div>"), "{sfc}");
 }
 
 #[test]

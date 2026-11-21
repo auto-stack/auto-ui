@@ -225,8 +225,8 @@ fn write_components(
                 .ok_or("checked widget site has no runtime component")?;
             writeln!(
                 script,
-                "{}: {{ node: {}, props: [",
-                site.span.start, child.node
+                "{}: {{ node: {}, tag: {}, props: [",
+                site.span.start, child.node, quoted(&site.authored_node)
             )
             .unwrap();
             let declaration = &compiled.description.components[child.node];

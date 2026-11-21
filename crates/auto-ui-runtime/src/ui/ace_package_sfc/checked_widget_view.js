@@ -326,7 +326,7 @@ function createCheckedWidgetView(root) {
         const key = element.properties.get('key');
         const path = parentPath + JSON.stringify([element.site, key ?? index]);
         const site = owner.definition.sites[element.site];
-        if (site !== undefined && aceComponents[site.node].name === element.tag) {
+        if (site !== undefined && site.tag === element.tag) {
           if (element.children.length !== 0) throw new Error('ace.widget.view: unexpected widget slot content');
           const inputs = site.props.map(prop => prop.get !== undefined
             ? prop.get(...(prop.defaulted ? [] : widgetArguments(owner)))
