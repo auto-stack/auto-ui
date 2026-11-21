@@ -811,10 +811,20 @@ AutoLang `ef7faf610ebad390a9e687ca1fbc6d70c3938b7a` 将静态 widget 实例绑�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 63 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 173993a7, lang 9d17e7b4f | evidence: Core PLAN-981 251 and AV PLAN-981 82 pass, original 024 Iced pointer and legend and late event rejection, real Bar/Line generation with gallery build diagnostic | next: work`
 
+### 第 64–65 轮｜Bar、Line 原页双端正向回放
+
+AutoUI `a002e7fc385648f8dddf416b3da06788eca31a54` 让生成器跳过诊断组件中的文本依赖。专项回归通过。18 个画廊原输入文件逐一核对哈希，正式工具冷生成并以锁定依赖通过 `vue-tsc`、Vite 和 Chrome 回放。Bar 的单组/分组为 5/8 根柱，分组指针显示 `sales 155`，非目标 6 根柱降透明，离开恢复，图例 `8 → 4 → 8`。Line 单/多组为 1/2 条折线、每线 5/6 点，多组指针显示 `desktop 186` 和双准线，离开恢复，图例 `2 → 1 → 2`。两页的目标图操作不改变另一张图的几何。路由离开、重开和卸载通过，浏览器异常 0。浏览器日志 SHA256 为 `454b9fde7fdf69c0f7a4577eaa7cb11c4b6d980afab5827ba3334c229d0d0249`。
+
+Iced 从同一原外壳经两个侧栏链接进入对应路由。实测图形、提示、离开、图例计数变化与另一实例不变，200 帧，目标页各 4 次事件提交。关闭后拒绝 1 次迟到指针输入，桥错误 0。首轮观察器读取了外壳的事件日志，错过子页面已成功的 Hover；修改观察器读子页面事件日志后，两条路由完成回放。初始非验收路由 `/` 仍有具名语法诊断，两个目标路由均正常进入。窗口 JSON SHA256 为 `4fab15bb63c2327d259323aff456d089703691b34f90db33296e077340b57345`。
+
+原 LineChart 组件 SHA256 `930e812e3cf52b435f2cec6a3cd5a43830ca2f29c6454b37e99bd9f0e2c47740`。额外的类型化数据夹具在真实 Chrome 执行空 → 三条记录 → 清空 → 再填，实际可绘制折线数 `0 → 2 → 0 → 2`，第二次填入几何逐字相同，卸载和错误计数通过。Chrome 日志 SHA256 为 `ad0d022ceafbb41af934b2bbdc3d6a8960ea8dadcbe1c9fe4e6655024b720c33`。Iced 数据变化控制和 Bar 空数据待复核。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 65 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a002e7fc, lang 9d17e7b4f plus uncommitted sparse FlowDiagram projection | evidence: original Bar/Line pages in Chrome and Iced, independent geometry and events, LineChart Chrome empty data and refill control | next: work`
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
 
-- 024 的四图切换、滑窗、指针、图例和关闭已有回放。继续验空数据、画廊 Line/Bar 双端交互及数据边界、FlowDiagram 节点类型与双布局。
+- 024 的四图切换、滑窗、指针、图例和关闭已有回放。Bar 和 Line 原页双端正向回放通过。继续验空数据、更新、FlowDiagram 节点类型与双布局。
 - 向 123 提供原全画廊需要的图表 handler/组件及证据绑定的版本。涉及 123 在途的桌面入口时，接已审路由/入口切片与 114 实际包、列表、事件接口，再跑 107 的整合行。
 - CodeEditor 的光标宿主缺口及原用例收据移交 120。媒体、图片和画布的旧观测按 §9 各归属接续。
