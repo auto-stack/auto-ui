@@ -48,6 +48,11 @@ store NotesStore {
         var all_tags []str = []
         var all_folders []str = []
 
+        // PLAN-097 T-04：TagInput 受控标签的修订与确认响应。
+        var tag_revision int = 0
+        var tag_response str = ""
+        var tag_context str = ""
+
         // 草稿（见文件头 ④）
         var draft_id int = 0
         var draft_title str = ""
@@ -73,7 +78,7 @@ store NotesStore {
         EditTitle(str), EditBody(str),
         DeleteArmed, DeleteConfirmed, DeleteCancelled, TogglePin(int), TogglePinActive,
         SetSearch(str), SelectFolder(str), SelectTag(str), ClearTag,
-        TagAdded(str), TagRemoved(str),
+        TagAdded(str), TagRemoved(str), TagRequested(str),
         ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings
     }
 
@@ -171,6 +176,7 @@ store NotesStore {
                 .draft_folder = .notes[.active_id].folder
                 .draft_pinned = .notes[.active_id].pinned
                 .draft_tags = .notes[.active_id].tags
+                .tag_context = "note-" + .draft_id
             } else {
                 // 无笔记时编辑栏不渲染（App 走空态），这里只清标量字段。
                 // 注意不要写 `.draft_tags = []`——空数组字面量赋值会撞 VM codegen
@@ -434,6 +440,58 @@ store NotesStore {
                 }
                 .LoadDraft()
                 .ApplyFilter()
+            }
+        }
+
+        // ── PLAN-097 T-04：TagInput changed 事件 ──────────────────────
+        // 事件载荷 {instanceToken, seq, contextId, baseRevision, action,
+        // tag, tags}。contextId 在渲染时按真实 noteId 构造（"note-<id>"）；
+        // 核对当前活动笔记后再落盘，切换笔记后的迟到请求被拒绝。
+        .TagRequested(payload) -> {
+            if .notes.len() > 0 {
+                let req = json.parse(payload)
+                var expect_id str = "note-" + .notes[.active_id].id
+                if req.contextId == expect_id && req.baseRevision == .tag_revision {
+                    var tl []str = []
+                    for tg in .notes[.active_id].tags {
+                        tl.push(tg)
+                    }
+                    if req.action == "add" {
+                        tl.push(req["tag"])
+                    } else {
+                        var tl2 []str = []
+                        for tg in tl {
+                            if tg != req["tag"] {
+                                tl2.push(tg)
+                            }
+                        }
+                        tl = tl2
+                    }
+                    update_tags(.notes[.active_id].id, tl)
+                    if req.action == "add" {
+                        var dup bool = false
+                        for e in .all_tags {
+                            if e == req["tag"] {
+                                dup = true
+                            }
+                        }
+                        if dup == false {
+                            .all_tags.push(req["tag"])
+                        }
+                    }
+                    if .search == "" {
+                        .notes = list_notes()
+                    } else {
+                        .notes = search_notes(.search)
+                    }
+                    .tag_revision = .tag_revision + 1
+                    .tag_response = json.stringify({
+                        instanceToken: req.instanceToken, seq: req.seq, contextId: req.contextId,
+                        status: "accepted", message: ""
+                    })
+                    .LoadDraft()
+                    .ApplyFilter()
+                }
             }
         }
 

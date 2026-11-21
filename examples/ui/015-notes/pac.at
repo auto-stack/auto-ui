@@ -23,4 +23,9 @@ dep themes {
     path: "../../../packages/themes"
 }
 
+# PLAN-097 T-04：TagInput 官方包（受控标签输入）。
+dep tag_input {
+    path: "../../../packages/tag-input"
+}
+
 desktop: "true"

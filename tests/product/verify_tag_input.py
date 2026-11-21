@@ -612,6 +612,74 @@ def step_vue_config(session):
 
 
 
+def case_notes_native(session):
+    """015-notes migration: add a tag through TagInput, verify backend readback
+    (chip persists after switching notes) and that the note body is unchanged."""
+    deadline = time.monotonic() + 240
+    snap = None
+    while time.monotonic() < deadline:
+        try:
+            snap = session.snapshot()
+            if "Notes" in snap and "添加标签" in snap:
+                break
+        except Exception:
+            time.sleep(0.5)
+            continue
+        time.sleep(0.5)
+    assert snap and "添加标签" in snap, "notes app did not render"
+
+    tag_input = input_vid(snap, "添加标签")
+    i = snap.find(tag_input)
+    add_btn = node_id(snap[i:i + 2500], r'button #(vnode_\d+) "[^"]*添加标签"')
+    body_before = re.search(r'textarea #[^}]*?value: "([^"]*)"', snap)
+    session.call("autoui_type", element_id=tag_input, text="PlanTag")
+    time.sleep(0.8)
+    session.press(add_btn)
+    time.sleep(2.5)
+    snap2 = session.snapshot()
+    assert "删除标签 PlanTag" in snap2, snap2[-1500:]
+    # switch to another note and back: tag must persist (backend readback)
+    m = re.search(r'button #(vnode_\d+) "([^"]*Quick Ideas[^"]*)"', snap2)
+    assert m, "no Quick Ideas button"
+    session.press(m.group(1))
+    time.sleep(1.5)
+    snap3 = session.snapshot()
+    m2 = re.search(r'button #(vnode_\d+) "([^"]*Welcome[^"]*)"', snap3)
+    if m2:
+        session.press(m2.group(1))
+        time.sleep(1.5)
+    snap4 = session.snapshot()
+    assert "删除标签 PlanTag" in snap4, snap4[-1500:]
+    body_after = re.search(r'textarea #[^}]*?value: "([^"]*)"', snap4)
+    if body_before and body_after:
+        assert body_before.group(1) == body_after.group(1), "note body changed"
+    return ["notes:add-readback-switch"]
+
+
+def case_notes_vue(session):
+    """015-notes Vue lane: the TagInput renders and the add button adds a tag."""
+    deadline = time.monotonic() + 90
+    snap = None
+    while time.monotonic() < deadline:
+        try:
+            snap = session.snapshot()
+            if "添加标签" in snap:
+                break
+        except AssertionError:
+            time.sleep(0.5)
+            continue
+        time.sleep(0.5)
+    assert snap and "添加标签" in snap, "notes vue did not render"
+    session.type_text("添加标签", "PlanVue")
+    time.sleep(1.0)
+    snap2 = session.snapshot()
+    ref = browser_add_button_near(snap2, browser_input_ref(snap2, "添加标签"))
+    session.browser.call("browser_click", element="添加标签", target=ref)
+    session.wait_text("删除标签 PlanVue")
+    return ["notes-vue:add-readback"]
+
+
+
 def main():
     parser = argparse.ArgumentParser(description="PLAN-097 TagInput product checks")
     parser.add_argument("--auto-bin", required=True)
@@ -621,6 +689,7 @@ def main():
     parser.add_argument("--app-dir", default=None)
     parser.add_argument("--browser-mcp-config", default=None)
     parser.add_argument("--startup-timeout", type=float, default=120)
+    parser.add_argument("--case", choices=["demo", "notes"], default="demo")
     args = parser.parse_args()
 
     out = Path(args.out_dir)
@@ -632,7 +701,10 @@ def main():
     }
     if args.app_dir is None:
         repo = Path(__file__).resolve().parents[2]
-        args.app_dir = str(repo / "examples" / "tag-input")
+        if args.case == "notes":
+            args.app_dir = str(repo / "examples" / "ui" / "015-notes")
+        else:
+            args.app_dir = str(repo / "examples" / "tag-input")
 
     report["tools"] = {
         "auto": digest(args.auto_bin),
@@ -653,7 +725,8 @@ def main():
         port = available_port()
         session = NativeSession(args.auto_bin, args.ui_tool_bin, args.app_dir, out, port, log, 180)
         try:
-            passed = case_native_core(session)
+            runner = case_notes_native if args.case == "notes" else case_native_core
+            passed = runner(session)
             report["result"] = "pass"
             for case in passed:
                 report["cases"].append({"id": case, "status": "pass"})
@@ -684,7 +757,8 @@ def main():
             port = available_port()
             session = VueSession(args.auto_bin, args.ui_tool_bin, args.app_dir, out, port, log, args.browser_mcp_config)
             try:
-                passed = case_vue_core(session)
+                runner = case_notes_vue if args.case == "notes" else case_vue_core
+                passed = runner(session)
                 report["result"] = "pass"
                 for case in passed:
                     report["cases"].append({"id": case, "status": "pass"})

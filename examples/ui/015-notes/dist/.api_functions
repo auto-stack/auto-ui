@@ -1,0 +1,8 @@
+list_notes
+get_note
+create_note
+update_note
+delete_note
+toggle_pin
+update_tags
+search_notes
