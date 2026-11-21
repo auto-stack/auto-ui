@@ -1178,6 +1178,8 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 122 | from: work | 
 
 stage: merge（归档检查点）| plan_id: PLAN-105:r1 | round: 125 | archived | delivery_commit: auto-lang `0b754af59` / auto-ui `fe2dd4f1`（均 ff 线性落地）| archive_path: docs/plans/archived/105-autoui-u03-local-interactive-apps-av-vue.md（git mv 已提交 `5ea4e182`，status: archived）| completion_kind: delivered（KNOWN-DEBT hold 在案：015 AV 腿回放车道 handler 调用特性，owner=后继 U03/回放车道计划，closure=该特性交付后复验 015 六 handler 链）| pending: wt-guard 清理两工作树与分支 + plan-artifacts 收口 + 落地核对
 
+stage: merge（cleaned 检查点）| plan_id: PLAN-105:r1 | round: 126 | cleaned | 2026-11-21 | worktree_path: D:/autostack/.wt/ui-105/{auto-ui,auto-lang,auto-web,auto-down} 全部移除；plan-105-dev 分支（两仓）已删；`.wt/ui-105` 组目录已删（含 auto-web/auto-down 路径依赖工作树，prune 完成）| guard: wt-guard.ps1 两工作树均报告 clean 后移除 | landing_checks: auto-lang master spec §16 在案；auto-ui master smoke（prep 7/8+KNOWN-DEBT、plan124 2/2 带 env、sfc_status 4/4、p013 1/1）| plan-artifacts/plan-105/ 已删除（矩阵等耐久证据已折叠入本件附录；`p015-storeblock-prep.at`/`frozen-delivery-matrix.md` 等随目录删除）| registry: 待刷新 | KNOWN-DEBT hold: 015 AV 腿回放车道 handler 调用特性（owner=后继 U03/回放车道计划；closure=该特性交付后复验 015 六 handler 链）
+
 2026-11-21 stage: blocked（015 回归的语法引擎修复超出本轮深度；精确诊断与两条路线在案）| **待用户裁定**：(i) 语法引擎专门刀修复 `.X()` 带点调用解析（独立会话，配 RUST_BACKTRACE 调 parse machine）；(ii) 015 AV 腿按已知缺口归档（其余五 app AV 腿 + 五 app 浏览器腿全绿 = 净能力增益，015 记 KNOWN-DEBT 随后继计划）。两仓落地保持（线性历史）；归档/清理等裁定后执行。
 
 ## 10. 下游交接
