@@ -765,6 +765,18 @@ Chrome 指针已实际命中原折线图覆盖层。原 `.PointerMove` 把 `0.64
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 57 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bc4e854a, lang e428ecc05 (cast change), AV closure projection under replay | evidence: three original Iced chart shapes, deadline receipt, checked JavaScript float cast regression | next: work`
 
+### 第 58 轮｜原 024 四图真窗切换及 Chrome 原折线命中
+
+受检包的标量投影每帧复用一次降层，再按目标函数切片。发现新组件、还需运行 Init 的临时帧不读取标量状态。AV PLAN-981 80、A2TS 真实 Node 5、AutoUI 生产工具构建通过。
+
+原 `024-charts` Iced 真窗依次观察 Line、Bar、Area、Donut，路径数 `4 → 19 → 7 → 4`。原按钮派发 `SetBar`、`SetArea`、`SetDonut`，发布 6 帧并执行关闭脚本，错误数组为空。延长观测期限至 240 秒，AV 内存和验证步数上限均维持冻结值。窗口 JSON SHA256 为 `1249e0b1d7981250386b1eb33968f450017ef6d0be8393360ee57fe3a156c0fb`。Iced 滑窗、指针及空数据仍待逐项核对。
+
+固定原项目生产 CLI 冷生成、固定依赖构建。Chrome `157.0.8103.80` 实际命中原折线覆盖层并显示 `Desktop 186`，离开后提示清除。原图例与四图切换继续通过，滑窗点数 `6 → 8 → 8`，重置及播放中卸载通过，无请求失败和页面异常。第一次额外淡入断言超时，随后的观测记录到 `opacity-0 → opacity-25` 后提示消失，已读取的计算样式不透明度均为 1，未计入实际淡入通过。浏览器日志 SHA256 为 `372a85e1ef49201709135c8c327dd58fe07b5980484fd49d6f5bbd4d66f9b4ca`。
+
+原画廊七页再冷生成。Carousel、DonutChart、AreaChart 生成实际页面。LineChart 与 BarChart 分别在多调用点的列表记录形状检查报告缺 `desktop/mobile`、`cost/sales`；FlowDiagram 仍拒未确定的 `nodes: List`；CodeEditor 仍缺 `code_editor_cursor_line`。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 58 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui df6a1b59, lang 8e3e91c6f | evidence: original 024 four-chart and close in Iced, original Chrome line pointer + streaming, exact remaining gallery diagnostics | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
