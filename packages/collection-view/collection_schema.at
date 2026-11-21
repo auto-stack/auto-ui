@@ -1,0 +1,31 @@
+pub type CollectionColumn {
+    key str
+    label str
+    align str
+    sortable bool
+}
+
+pub type CollectionCell {
+    key str
+    text str
+}
+
+pub type CollectionAction {
+    id str
+    label str
+    enabled bool
+}
+
+pub type CollectionItem {
+    id str
+    itemRevision str
+    label str
+    kind str
+    icon str
+    thumbnailUri str
+    thumbnailState str
+    cells List<CollectionCell>
+    actions List<CollectionAction>
+    defaultActionId str
+    disabled bool
+}

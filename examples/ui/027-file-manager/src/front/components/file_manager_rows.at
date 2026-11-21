@@ -1,0 +1,206 @@
+use file_manager_model: FileManagerRow
+use file_manager_metadata: format_bytes, format_modified
+
+pub fn hidden_name(name str) bool {
+    return name.len() > 0 && name.slice(0, 1) == "."
+}
+
+pub fn matches_file(name str, search str, include_dotfiles bool) bool {
+    return (include_dotfiles || !hidden_name(name)) && (search == "" || name.contains(search))
+}
+
+/// 类型列标签（目录/扩展名分派；未知扩展名加 " 文件"）
+pub fn type_label(extension str, is_dir bool) Str {
+    if is_dir {
+        return "文件夹"
+    }
+    if extension == "md" || extension == "txt" || extension == "log" || extension == "pdf" || extension == "doc" || extension == "docx" {
+        return "文档"
+    }
+    if extension == "toml" || extension == "json" || extension == "rs" || extension == "at" || extension == "js" || extension == "ts" || extension == "py" || extension == "sh" || extension == "yaml" || extension == "yml" || extension == "html" || extension == "css" {
+        return "代码"
+    }
+    if extension == "png" || extension == "jpg" || extension == "jpeg" || extension == "gif" || extension == "webp" || extension == "bmp" || extension == "svg" || extension == "ico" {
+        return "图像"
+    }
+    if extension == "zip" || extension == "gz" || extension == "tar" || extension == "rar" || extension == "7z" {
+        return "压缩包"
+    }
+    if extension == "csv" || extension == "xlsx" || extension == "xls" {
+        return "表格"
+    }
+    if extension == "mp3" || extension == "wav" || extension == "flac" || extension == "ogg" {
+        return "音频"
+    }
+    if extension == "mp4" || extension == "mkv" || extension == "avi" || extension == "mov" || extension == "webm" {
+        return "视频"
+    }
+    if extension == "exe" || extension == "msi" || extension == "dll" {
+        return "可执行"
+    }
+    if extension == "" {
+        return "文件"
+    }
+    return extension + " 文件"
+}
+
+pub fn listed_file_row(row_id int, entry_name str, entry_path str, directory bool, file_bytes u64, modified i64, extension str) FileManagerRow {
+    return FileManagerRow {
+        id: row_id,
+        name: entry_name.to(Str),
+        path: entry_path.to(Str),
+        is_dir: directory,
+        size: file_bytes,
+        size_str: format_bytes(file_bytes),
+        file_ext: extension.to(Str),
+        type_name: type_label(extension, directory),
+        date: format_modified(modified),
+        is_hidden: hidden_name(entry_name),
+        thumb_src: ""
+    }
+}
+
+pub fn file_count_label(count int, truncated bool) Str {
+    if truncated {
+        return "500+ 个项目（已截断）"
+    }
+    return f"${count} 个项目"
+}
+
+pub fn fm_path_index(rows List<FileManagerRow>, target str) int {
+    if target == "" {
+        return -1
+    }
+    var index int = 0
+    while index < rows.len() {
+        if rows[index].path == target {
+            return index
+        }
+        index = index + 1
+    }
+    return -1
+}
+
+// Compare Unicode scalar order using the longest common prefix.
+fn compare_text(left str, right str) int {
+    if left == right { return 0 }
+    let left_len int = left.len()
+    let right_len int = right.len()
+    var limit int = left_len
+    if right_len < limit { limit = right_len }
+    if limit == 0 { return left_len - right_len }
+    let first int = left.codepoint_at(0) - right.codepoint_at(0)
+    if first != 0 { return first }
+    var prefix int = 1
+    while prefix < limit {
+        let middle int = (prefix + limit + 1) / 2
+        if left.slice(0, middle) == right.slice(0, middle) {
+            prefix = middle
+        } else {
+            limit = middle - 1
+        }
+    }
+    if prefix == left_len || prefix == right_len {
+        return left_len - right_len
+    }
+    return left.codepoint_at(prefix) - right.codepoint_at(prefix)
+}
+
+// Sort indices first, then materialize each row once with its display ID.
+pub fn sort_files(rows List<FileManagerRow>, column str, direction str) List<FileManagerRow> {
+    let count int = rows.len()
+    let ascending bool = direction == "asc"
+    let sort_size bool = column == "size"
+    let sort_name bool = column == "name"
+    let sort_date bool = column == "date"
+    let sort_type bool = column == "type"
+    var direction_sign int = 1
+    if !ascending { direction_sign = -1 }
+    var order List<int> = []
+    var index int = 0
+    while index < count {
+        order.push(index)
+        index = index + 1
+    }
+    // Keep the table in this frame. Passing the whole list to each comparison
+    // repeatedly charges AV for every record in the list.
+    var width int = 1
+    while width < count {
+        var merged List<int> = []
+        var begin int = 0
+        while begin < count {
+            var middle int = begin + width
+            if middle > count { middle = count }
+            var end int = middle + width
+            if end > count { end = count }
+            var left int = begin
+            var right int = middle
+            while left < middle || right < end {
+                var take_left bool = right >= end
+                if left < middle && right < end {
+                    let lhs int = order[left]
+                    let rhs int = order[right]
+                    let lhs_directory bool = rows[lhs].is_dir
+                    let rhs_directory bool = rows[rhs].is_dir
+                    if lhs_directory != rhs_directory {
+                        take_left = lhs_directory
+                    } else {
+                        if sort_size {
+                            let lhs_size u64 = rows[lhs].size
+                            let rhs_size u64 = rows[rhs].size
+                            take_left = (ascending && lhs_size <= rhs_size) || (!ascending && lhs_size >= rhs_size)
+                        } else {
+                            var relation int = 0
+                            if sort_name {
+                                let lhs_key = "" + rows[lhs].name
+                                let rhs_key = "" + rows[rhs].name
+                                relation = compare_text(lhs_key.to(str), rhs_key.to(str))
+                            }
+                            if sort_date {
+                                let lhs_key = "" + rows[lhs].date
+                                let rhs_key = "" + rows[rhs].date
+                                relation = compare_text(lhs_key.to(str), rhs_key.to(str))
+                            }
+                            if sort_type {
+                                let lhs_key = "" + rows[lhs].type_name
+                                let rhs_key = "" + rows[rhs].type_name
+                                relation = compare_text(lhs_key.to(str), rhs_key.to(str))
+                            }
+                            take_left = relation * direction_sign <= 0
+                        }
+                    }
+                }
+                if take_left {
+                    merged.push(order[left])
+                    left = left + 1
+                } else {
+                    merged.push(order[right])
+                    right = right + 1
+                }
+            }
+            begin = end
+        }
+        order = merged
+        width = width * 2
+    }
+    var sorted List<FileManagerRow> = []
+    index = 0
+    while index < count {
+        let source int = order[index]
+        let name = "" + rows[source].name
+        let path = "" + rows[source].path
+        let size_text = "" + rows[source].size_str
+        let extension = "" + rows[source].file_ext
+        let kind = "" + rows[source].type_name
+        let date = "" + rows[source].date
+        let thumb = "" + rows[source].thumb_src
+        sorted.push(FileManagerRow {
+            id: index, name: name.to(str).to(Str), path: path.to(str).to(Str),
+            is_dir: rows[source].is_dir, size: rows[source].size, size_str: size_text.to(str).to(Str),
+            file_ext: extension.to(str).to(Str), type_name: kind.to(str).to(Str),
+            date: date.to(str).to(Str), is_hidden: rows[source].is_hidden, thumb_src: thumb.to(str).to(Str)
+        })
+        index = index + 1
+    }
+    return sorted
+}

@@ -174,6 +174,21 @@ impl VueGenerator {
                         }
                     }
                 }
+                if let Some(AuraPropValue::Expr(expr)) = props.get("id") {
+                    match expr {
+                        auto_lang_core::ast::Expr::Str(id) => {
+                            attrs.push(format!("id=\"{}\"", Self::escape_html_attr(id.as_str())));
+                        }
+                        _ => match self.expr_to_vue_bound_value(expr) {
+                            Ok(id) => attrs.push(format!(":id=\"{id}\"")),
+                            Err(error) => self.warn(
+                                "R013",
+                                crate::ui_gen::validators::Severity::Warning,
+                                format!("button id expression: {error}; binding not emitted"),
+                            ),
+                        },
+                    }
+                }
                 // Handle style/class prop
                 self.push_style_class(&mut attrs, props);
                 // Build slot children for icon + text

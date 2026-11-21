@@ -30,9 +30,9 @@ resolver = "2"
 # P041-D1 竞态族根治，2026-09-25 实证）。PLAN-900 时 auto-lang 注明"auto-ui
 # 侧由其自身 [patch] 接管（计划 D）"——本次补上（缺失窗口内 tool host 走
 # crates.io 原版，container.rs:291 布局空窗 unwrap 曾致 VM 会话崩溃族，
-# DATABASE-002 原生门消费者门实证复现）。补丁语义=布局空窗良性降级，
-# 与上游 0.14.2 唯一差异面为 container.rs 五处；升级 iced 时按补丁 README
-# 重审。
+# DATABASE-002 原生门消费者门实证复现）。container.rs 处理布局空窗。
+# PLAN-114 中 mouse_area.rs 让父区域识别子按钮捕获的双击。
+# 升级 iced 时按这两处重审。
 [patch.crates-io]
 iced_widget = { path = "crates/patches/iced_widget" }
 # PLAN-098 T-03（DEBT-008 形态②根修）：uncaptured wgpu 错误非 panic 化 +

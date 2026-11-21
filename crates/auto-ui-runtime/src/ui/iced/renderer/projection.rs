@@ -10,6 +10,14 @@ use super::*;
 use iced::widget::column;
 use std::sync::Arc;
 
+// View projection recurses through layout and widget content. Give each arm
+// its own frame so a nested view does not reserve space for every widget at
+// each level, especially in unoptimized builds on the Windows main thread.
+#[inline(never)]
+fn project_widget<M>(build: impl FnOnce() -> iced::Element<'static, M>) -> iced::Element<'static, M> {
+    build()
+}
+
 impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
     fn into_iced(self) -> iced::Element<'static, M> {
         match self {
@@ -22,7 +30,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 props,
                 events,
                 style,
-            } => {
+            } => project_widget(|| {
                 // PLAN-029 T-02：doc-surface 实验文档表面——组件 bounds 处挂
                 // wry WebView2 子表面（feature 同门，缺省保持零高 Space 防御
                 // 臂与 Empty 同款）。key/url 取已解析 props（派发期 Element
@@ -84,23 +92,32 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     .width(iced::Length::Shrink)
                     .height(iced::Length::Fixed(0.0))
                     .into()
-            }
+            }),
             // PLAN-063 T-04d-2: 锚槽 → 记录布局坐标的委托 wrapper。
-            AbstractView::AnchorSlot { index, child } => {
+            AbstractView::AnchorSlot { index, child } => project_widget(|| {
                 let el = child.into_iced();
                 iced::Element::new(crate::ui::anchor_slot::AnchorSlot {
                     index: index as usize,
                     child: el,
                 })
-            }
+            }),
             // PLAN-781 T-03: 锚点标记 → wrapper widget（operate 期以合成 id
             // 上报最终位置 bounds；layout/draw 全委托零布局）。
-            AbstractView::ScrollAnchorMark { pane, key, child } => {
+            AbstractView::ScrollAnchorMark { pane, key, child } => project_widget(|| {
                 let el = child.into_iced();
                 iced::Element::new(crate::ui::iced::scroll_anchor::ScrollAnchor::new(
                     &pane, &key, el,
                 ))
-            }
+            }),
+            AbstractView::FocusTarget { id, activation, keys, on_focus, on_blur, child } => project_widget(|| {
+                let content = child.into_iced();
+                let id = iced::widget::Id::from(id);
+                let target = match activation {
+                    Some(message) => crate::ui::iced::focus_target::FocusTarget::new(content, id, message),
+                    None => crate::ui::iced::focus_target::FocusTarget::group(content, id),
+                };
+                target.programmatic().key_bindings(keys, true).focus_events(on_focus, on_blur).into()
+            }),
             AbstractView::Empty => {
                 // Plan 370 (Issue 1): render Empty as a zero-height Space
                 // instead of text(""). A text("") still reserves one line of
@@ -115,7 +132,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
 
             // PLAN-080 UAT F-UAT-2: Rich 段落——单段落跨 span 连续折行
             // （markdown 行内序列唯一正确承载；Row 摆多 Text 不回流）。
-            AbstractView::Rich { spans, style, on_selection } => {
+            AbstractView::Rich { spans, style, on_selection } => project_widget(|| {
                 // F-UAT-2 勘误②：span 颜色仅在显式声明时设置（mark 类如
                 // text-primary/foreground），否则**不设色走 iced 祖先继承**
                 // ——与普通 Text 同链。曾加 OnBackground 强制回退，实测该
@@ -185,13 +202,13 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     el = wrap_with_margin(el, &IcedStyle::from_style(s));
                 }
                 el
-            }
+            }),
             AbstractView::Text {
                 content,
                 style,
                 selectable,
                 ..
-            } => {
+            } => project_widget(|| {
                 // Plan 409 §10 续 20: font-mono 的 Text 当代码 → Rich 语法高亮。
                 let is_code = style
                     .as_ref()
@@ -581,7 +598,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                         None => el,
                     }
                 }
-            }
+            }),
 
             AbstractView::Button {
                 label,
@@ -591,7 +608,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_right_click,
                 disabled,
                 ..
-            } => {
+            } => project_widget(|| {
                 // Plan 418 P2-3 续: EE03 PUA marker carries an icon-button
                 // tooltip (synthesized toolbar buttons embed the action title
                 // there — the label itself stays icon-only so the resting
@@ -1171,7 +1188,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 } else {
                     el
                 }
-            }
+            }),
 
             AbstractView::Row {
                 children,
@@ -1180,7 +1197,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 style,
                 onclick,
                 on_right_click,
-            } => {
+            } => project_widget(|| {
                 // 轴向修正(概要页对拍,EDGE-16 家族):见 axis_fix_row_child。
                 // PLAN-022 T-03:absolute 子脱流叠层(镜像 render_dynamic_view
                 // Row 臂/PLAN-530 步骤3)——into_iced 此前无分区,absolute 子
@@ -1250,7 +1267,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 // Plan 490 G4：布局件点击（row/col/div onclick parity）。
                 // PLAN-002 B：右键 + hover 同包装点（wrap_layout_events）。
                 wrap_layout_events(el, onclick, on_right_click, hover)
-            }
+            }),
 
             AbstractView::Column {
                 children,
@@ -1259,7 +1276,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 style,
                 onclick,
                 on_right_click,
-            } => {
+            } => project_widget(|| {
                 // 轴向修正:flex-1 主轴语义转写,见 axis_fix_col_child。
                 // PLAN-050 P2 #3: mt-auto → 列内弹性占位——此前 margin 系静默
                 // 跳过,`mt-auto` 工具行（rail 底部工具栏）失去贴底语义。
@@ -1353,19 +1370,20 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     stk.clip(clip).into()
                 };
                 wrap_layout_events(el, onclick, on_right_click, hover)
-            }
+            }),
 
             AbstractView::Input {
                 placeholder,
                 value,
                 on_change,
+                on_text,
                 on_submit,
                 width,
                 password,
                 style,
                 disabled,
                 ..
-            } => {
+            } => project_widget(|| {
                 let mut input_widget = build_input_shape(
                     &placeholder,
                     &value,
@@ -1379,7 +1397,9 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 // 表面由 style 的禁用呈现承担；与 Vue 侧原生 disabled 语义对齐。
                 if !disabled {
                     // Wire on_input for text change tracking
-                    if let Some(msg) = on_change {
+                    if let Some(callback) = on_text {
+                        input_widget = input_widget.on_input(move |text| callback.call(text));
+                    } else if let Some(msg) = on_change {
                         input_widget = input_widget.on_input(move |text| {
                             INPUT_TEXT.with(|t| *t.borrow_mut() = text.to_string());
                             msg.clone()
@@ -1399,7 +1419,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 } else {
                     el
                 }
-            }
+            }),
 
             AbstractView::Textarea {
                 placeholder,
@@ -1411,7 +1431,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 disabled,
                 keymap,
                 ..
-            } => {
+            } => project_widget(|| {
                 // Plan 446 批五 U3:超大内容降级只读预览(rust 模式同款守卫,
                 // 机理见 TEXTAREA_INLINE_EDIT_CAP)。
                 if textarea_needs_preview(&value) {
@@ -1522,7 +1542,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                         el
                     }
                 }
-            }
+            }),
 
             AbstractView::CodeEditor {
                 key,
@@ -1590,7 +1610,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 scheme,
                 shortcuts,
                 style,
-            } => {
+            } => project_widget(|| {
                 let core = crate::ui::terminal::terminal(&key, cols, rows);
                 // PLAN-018 D10:scheme prop 随帧落注册表(显式 ≥0 覆盖;
                 // -1 = 跟随主题,绘制期解析)。
@@ -1738,7 +1758,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 } else {
                     el
                 }
-            }
+            }),
 
             AbstractView::AutodownEditor {
                 key,
@@ -1764,7 +1784,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 label,
                 on_toggle,
                 style,
-            } => {
+            } => project_widget(|| {
                 let iced_style = style.as_ref().map(IcedStyle::from_style);
 
                 let cb_size = iced_style
@@ -1895,7 +1915,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 } else {
                     el
                 }
-            }
+            }),
 
             AbstractView::Container {
                 child,
@@ -1907,7 +1927,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 style,
                 onclick,
                 on_right_click,
-            } => {
+            } => project_widget(|| {
                 // Plan 490 G4：div/Container 点击（musk specs 树形态消费面）。
                 // PLAN-002 B：右键 + hover 同包装点。
                 let hover = layout_hover_flag(style.as_ref());
@@ -1927,7 +1947,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     on_right_click,
                     hover,
                 )
-            }
+            }),
 
             AbstractView::Scrollable {
                 child,
@@ -1940,7 +1960,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 axes,
                 scrollbar_policy,
                 controller,
-            } => {
+            } => project_widget(|| {
                 // Plan 049 → 057 续:仅 `auto_scroll` 标记的主列表挂固定 Id
                 // (snap_to_end 目标)。此前所有 Scrollable 共享该 Id,块内 max-h
                 // 滚动区会抢先命中 snap/scroll 操作 → 自动滚动失灵。
@@ -1973,14 +1993,14 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     scrollbar_policy,
                     controller.as_ref(),
                 )
-            }
+            }),
 
             AbstractView::Grid {
                 cols,
                 gap,
                 cells,
                 style,
-            } => {
+            } => project_widget(|| {
                 let els: Vec<(iced::Element<'static, M>, GridCellSpec)> = cells
                     .into_iter()
                     .map(|c| {
@@ -1989,7 +2009,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     })
                     .collect();
                 build_grid(cols, gap, els, style.as_ref(), None)
-            }
+            }),
 
             // Plan 409 §10 续 5: Overlay = iced Stack 分层。base 在底,content 浮
             // 在上层(按 position 定位),不挤压 base 布局。opaque 吃点击穿透。
@@ -1997,7 +2017,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 base,
                 content,
                 position,
-            } => {
+            } => project_widget(|| {
                 let base_el = base.into_iced();
                 // PLAN-023 T-02: build_floating_layer 已含 content 级 opaque,
                 // 不再包外层(spacer 空白区穿透到 base,命中=内容矩形)。
@@ -2011,7 +2031,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     overlay_units,
                 );
                 iced::widget::stack![base_el, content_el].into()
-            }
+            }),
 
             // Plan 484: hover 命中区 —— iced mouse_area 透明包裹,仅转发
             // enter/exit 消息(通用事件分发)。style(尺寸/定位类)经
@@ -2030,7 +2050,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_move,
                 logical_extent,
                 style,
-            } => {
+            } => project_widget(|| {
                 // PLAN-021 T-05 取证(AUTO_MA_DBG=1 门控):构建面接线状态。
                 if std::env::var("AUTO_MA_DBG")
                     .map(|v| v == "1")
@@ -2150,7 +2170,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     Some(flag) => crate::ui::iced::hover_area::HoverArea::new(built, flag).into(),
                     None => built,
                 }
-            }
+            }),
 
             // Plan 563: 状态驱动画布 —— CanvasPainter(canvas::Program 直绘,
             // DrawListPainter 形态参考但独立实现:不经 DrawOp 线协议,v1
@@ -2166,7 +2186,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_pen_end,
                 on_hit,
                 style,
-            } => {
+            } => project_widget(|| {
                 let painter = CanvasPainter {
                     scene: scene.clone(),
                     clear: clear.clone(),
@@ -2227,7 +2247,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     None,
                     None,
                 )
-            }
+            }),
 
             // Plan 422: 锚定弹层 —— wrapper widget(Tooltip 同型),open 时
             // 经 iced overlay 机制置顶;chrome 由 content 自带。inspect 捕获
@@ -2238,7 +2258,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 placement,
                 open,
                 on_dismiss,
-            } => {
+            } => project_widget(|| {
                 use crate::ui::iced::popover::Popover as PopoverWidget;
                 use crate::ui::view::PopoverAnchor;
                 let (anchor_point, anchor_is_empty, anchor_el): (
@@ -2275,14 +2295,14 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     p = p.on_dismiss(msg);
                 }
                 p.into()
-            }
+            }),
 
             AbstractView::Radio {
                 label,
                 is_selected,
                 on_select,
                 style,
-            } => {
+            } => project_widget(|| {
                 let checkbox_widget = checkbox(is_selected);
 
                 // Plan 309 续篇 II: drop the handler in inspect-capture mode.
@@ -2310,14 +2330,14 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 }
 
                 row![checkbox_with_handler, label_widget].spacing(4).into()
-            }
+            }),
 
             AbstractView::Select {
                 options,
                 selected_index,
                 on_select,
                 style: _,
-            } => {
+            } => project_widget(|| {
                 let selected_value = selected_index.and_then(|i| options.get(i).cloned());
 
                 // Plan 309 续篇 II: in inspect-capture mode, render as static
@@ -2346,13 +2366,13 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                         text(display_text).into()
                     }
                 }
-            }
+            }),
 
             AbstractView::List {
                 items,
                 spacing,
                 style,
-            } => {
+            } => project_widget(|| {
                 let eff_spacing = effective_spacing(spacing, style.as_ref(), false);
                 let eff_padding = if let Some(ref s) = style {
                     let iced_style = IcedStyle::from_style(s);
@@ -2372,7 +2392,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 }
 
                 col_widget.into()
-            }
+            }),
 
             AbstractView::Table {
                 headers,
@@ -2383,7 +2403,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 table_key: _,
                 col_widths,
                 on_col_resize,
-            } => {
+            } => project_widget(|| {
                 // Plan 045 T3 + PLAN-082 T-05: 表格统一分派 TableResize 自持
                 // 网格 widget——on_col_resize Some=拖拽臂（临时宽实时重排 +
                 // 松手 publish）；None=纯展示臂（自然宽列对齐——每列宽=该列
@@ -2409,7 +2429,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     on_col_resize,
                 )
                 .into();
-            }
+            }),
 
             AbstractView::Slider {
                 min,
@@ -2418,7 +2438,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_change,
                 step,
                 style: _,
-            } => {
+            } => project_widget(|| {
                 // Plan 309 续篇 II: in inspect-capture mode render a static
                 // read-out instead of the interactive slider (iced's slider
                 // requires a callback). Cosmetic-only; 015-notes has no sliders.
@@ -2441,13 +2461,13 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
 
                     slider_widget.into()
                 }
-            }
+            }),
 
             AbstractView::ProgressBar {
                 progress,
                 style,
                 on_seek,
-            } => {
+            } => project_widget(|| {
                 use iced::widget::progress_bar;
                 let (is, height, width, radius) = if let Some(ref s) = style {
                     let is = IcedStyle::from_style(s);
@@ -2518,7 +2538,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 } else {
                     seekable
                 }
-            }
+            }),
 
             // Plan 010: Unified Navigation Components
             AbstractView::Accordion {
@@ -2526,7 +2546,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 allow_multiple: _,
                 on_toggle,
                 style: _,
-            } => {
+            } => project_widget(|| {
                 use iced::widget::container;
 
                 let mut accordion_widget = column([]);
@@ -2561,7 +2581,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 }
 
                 container(accordion_widget).padding(10).into()
-            }
+            }),
 
             AbstractView::Sidebar {
                 content,
@@ -2569,7 +2589,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 collapsible: _,
                 position: _,
                 style: _,
-            } => {
+            } => project_widget(|| {
                 use iced::widget::container;
                 use iced::Length;
 
@@ -2578,7 +2598,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     .height(Length::Fill);
 
                 sidebar_container.into()
-            }
+            }),
 
             AbstractView::Tabs {
                 labels,
@@ -2588,7 +2608,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_select,
                 style,
                 variant,
-            } => {
+            } => project_widget(|| {
                 use iced::widget::container;
 
                 // PLAN-641：enclosed 圆角 token——tabs 根 style 的 rounded-*
@@ -2790,7 +2810,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                         tabs_widget.into()
                     }
                 }
-            }
+            }),
 
             AbstractView::NavigationRail {
                 items,
@@ -2799,7 +2819,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 show_labels,
                 on_select: _,
                 style: _,
-            } => {
+            } => project_widget(|| {
                 use iced::widget::container;
                 use iced::Length;
 
@@ -2827,7 +2847,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     .height(Length::Fill)
                     .padding(10)
                     .into()
-            }
+            }),
 
             // Plan 497: 每窗口真缩略渲染臂——T1 定案裁剪式整窗快照的
             // 消费端。命中进程级快照缓存 → image(Handle::from_rgba) 直绘
@@ -2842,7 +2862,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 wid,
                 fallback_icon,
                 style,
-            } => {
+            } => project_widget(|| {
                 let is = style.as_ref().map(|s| IcedStyle::from_style(s));
                 let eff_w = is
                     .as_ref()
@@ -2918,7 +2938,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     }
                     .into_iced()
                 }
-            }
+            }),
 
             // PLAN-760: 宿主侧远程帧消费 leaf 渲染——canvas RemoteFramePainter
             //（draw = 注册表最新 DisplayList 等比 fit 直绘 / 相位占位；
@@ -2926,7 +2946,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
             // （url 退场 = 租约到期断连，remote_frame_registry 生命周期）。
             // style chrome（边框/圆角/宽高）走容器包装（window_thumbnail
             // 同款纪律）。
-            AbstractView::RemoteFrame { url, style } => {
+            AbstractView::RemoteFrame { url, style } => project_widget(|| {
                 use crate::ui::iced::remote_frame_registry::RemoteFramePainter;
                 let _ = crate::ui::iced::remote_frame_registry::note(&url);
                 let canvas_el: iced::Element<'static, M> =
@@ -2951,7 +2971,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     });
                 }
                 surface.into()
-            }
+            }),
             // PLAN-012 W3：整桌面等比预览渲染臂——宿主合成（SD-02）。
             // 分层 = 壁纸基色底（#hex 直铺 / None → 主色占位）→ 该分区
             // 逐窗 snapshot tile（Contain 等比贴盒居中；SWR 续帧 + miss
@@ -2963,7 +2983,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 ws,
                 fallback_icon,
                 style,
-            } => {
+            } => project_widget(|| {
                 use crate::ui::iced::workspace_preview as wp;
                 let is = style.as_ref().map(|s| IcedStyle::from_style(s));
                 let box_w = is
@@ -3124,9 +3144,9 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     ..Default::default()
                 })
                 .into()
-            }
+            }),
 
-            AbstractView::Image { src, style } => {
+            AbstractView::Image { src, style } => project_widget(|| {
                 // PLAN-018：iconfile:<stem> = 双主题位图（回退链首位）。
                 // Plan 515 D1：hicon:<slot> = native 真图标 raster
                 //（window_thumbnail 的 fallback_icon / image 直挂两消费面）。
@@ -3494,7 +3514,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     });
                     cont.into()
                 }
-            }
+            }),
 
             AbstractView::ImageSurface {
                 src,
@@ -3514,7 +3534,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_pan,
                 on_double_click,
                 style,
-            } => {
+            } => project_widget(|| {
                 // PLAN-089 T-02: native 输入适配接线（Plan 547 Task 25 缺口
                 // 落地）——wheel/pan/dblclick 载荷回调挂上输入包装 widget。
                 // loaded/error 通知仍由媒体门 sweep 派发，本 paint pass 不
@@ -3553,7 +3573,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     )
                     .into()
                 }
-            }
+            }),
 
             // PLAN-617 T-19: `video` —— 原生播放面。
             //
@@ -3576,7 +3596,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_media_error,
                 media_key,
                 style,
-            } => {
+            } => project_widget(|| {
                 // PLAN-721 T-19：build-time trace——T-19 定案最后一轴。同一
                 // binding 的两次相邻构建烤出相反 paused（TogglePlay 写 false
                 // 后的 OnTime 重建烤回 true）即「读侧世界分裂/陈旧 memo 回放」
@@ -3606,7 +3626,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     media_key,
                     style,
                 )
-            }
+            }),
         }
     }
 }

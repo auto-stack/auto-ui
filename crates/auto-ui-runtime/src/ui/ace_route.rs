@@ -8,7 +8,7 @@ use ace_core::source::age_component::ComponentNode;
 use ace_core::source::age_component::ComponentScenario;
 use ace_core::source::cst::FrontBudget;
 use ace_core::source::packages::{
-    parse_package_source_age, PackageModuleInput, PACKAGES_CAPABILITY,
+    parse_package_source_age, PackageModuleInput, PackageSyntax, PACKAGES_CAPABILITY,
 };
 
 pub(super) type RouteModulePaths = BTreeMap<String, PathBuf>;
@@ -39,6 +39,12 @@ pub(super) fn front_package_units(
 }
 
 pub(super) fn package_candidates(source: &str) -> Result<Vec<ComponentNode>, String> {
+    package_syntax(source).map(|syntax| {
+        syntax.age_components.into_iter().map(|(node, _, _)| node).collect()
+    })
+}
+
+pub(super) fn package_syntax(source: &str) -> Result<PackageSyntax, String> {
     parse_package_source_age(
         source,
         &[PACKAGES_CAPABILITY.to_string()],
@@ -49,13 +55,6 @@ pub(super) fn package_candidates(source: &str) -> Result<Vec<ComponentNode>, Str
         },
         0,
     )
-    .map(|syntax| {
-        syntax
-            .age_components
-            .into_iter()
-            .map(|(node, _, _)| node)
-            .collect()
-    })
     .map_err(|diagnostics| {
         diagnostics
             .into_iter()

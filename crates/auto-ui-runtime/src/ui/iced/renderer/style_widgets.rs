@@ -1887,6 +1887,7 @@ pub(super) fn content_is_managed_bridge<M: Clone + Debug + 'static>(v: &Abstract
             AbstractView::Container { child, .. }
             | AbstractView::AnchorSlot { child, .. }
             | AbstractView::ScrollAnchorMark { child, .. }
+            | AbstractView::FocusTarget { child, .. }
             | AbstractView::MouseArea { content: child, .. } => walk(child, depth - 1),
             AbstractView::Column { children, .. } | AbstractView::Row { children, .. } => {
                 children.iter().any(|c| walk(c, depth - 1))

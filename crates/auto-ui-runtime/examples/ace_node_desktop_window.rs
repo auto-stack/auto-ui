@@ -4,9 +4,11 @@
 //!
 //! 用法：ace_node_desktop_window.exe --source <app.at> --evidence <out.json>
 //!   [--instances 2] [--hold-ms 8000] [--min-frames 4]
+//!   [--file-root <directory>] [--file-writes <create,copy,rename,delete>]
 //!   [--script "3:click:0:2,5:click:0:2,7:click:1:2,9:close,11:late,13:reopen"]
 //!   （脚本语法 tick:动作[:实例:目标]；动作 click/close/late/reopen。）
 
+use auto_lang_core::file_session::FileWritePermissions;
 use auto_ui_runtime::ui::ace_node_desktop::{
     install_bridge, AceNodeDesktopWindow, NodeDesktopBridge, ScriptStep,
 };
@@ -26,6 +28,8 @@ fn main() {
     // PLAN-980 ④-A #2b：AGE 包闭包输入（多单元 + 入口）——与 --source 二选一。
     let mut package_spec: Option<String> = None;
     let mut package_entry: Option<String> = None;
+    let mut file_root: Option<String> = None;
+    let mut file_writes = FileWritePermissions::default();
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -37,6 +41,14 @@ fn main() {
             "--script" => script_spec = args.next(),
             "--package" => package_spec = args.next(),
             "--entry" => package_entry = args.next(),
+            "--file-root" => file_root = Some(args.next().expect("--file-root <directory>")),
+            "--file-writes" => {
+                let value = args.next().expect("--file-writes <create,copy,rename,delete>");
+                file_writes = value.parse().unwrap_or_else(|error| {
+                    eprintln!("ace_node_desktop_window: {error}");
+                    std::process::exit(2);
+                });
+            }
             "--prep-only" => {
                 // 预构建档：注册 provider（构建/命中缓存）后即退出——排窗前的
                 // 准备阶段，不真开窗。
@@ -118,7 +130,11 @@ fn main() {
     if let Some(spec) = &script_spec {
         bridge.install_script(parse_script(spec));
     }
-    if let Err(e) = bridge.open() {
+    let opened = match &file_root {
+        Some(root) => bridge.open_with_file_access(std::path::Path::new(root), file_writes),
+        None => bridge.open(),
+    };
+    if let Err(e) = opened {
         eprintln!("ace_node_desktop_window: open failed: {e}");
         std::process::exit(5);
     }

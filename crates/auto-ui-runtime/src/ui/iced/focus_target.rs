@@ -22,6 +22,7 @@ pub fn control_id(widget: &str, event: &str, focus_key: Option<&str>) -> iced::w
 
 pub struct State<M> {
     pub focused: bool,
+    reported_focus: bool,
     id: iced::widget::Id,
     activation: Option<M>,
     key_bindings: Vec<(String, M)>,
@@ -45,6 +46,9 @@ pub struct FocusTarget<'a, Message> {
     activation: Option<Message>,
     key_bindings: Vec<(String, Message)>,
     retain: bool,
+    programmatic: bool,
+    on_focus: Option<Message>,
+    on_blur: Option<Message>,
 }
 impl<'a, Message> FocusTarget<'a, Message> {
     pub fn new(
@@ -58,6 +62,9 @@ impl<'a, Message> FocusTarget<'a, Message> {
             activation: Some(activation),
             key_bindings: Vec::new(),
             retain: false,
+            programmatic: false,
+            on_focus: None,
+            on_blur: None,
         }
     }
 
@@ -68,7 +75,21 @@ impl<'a, Message> FocusTarget<'a, Message> {
     }
 
     pub fn group(content: Element<'a, Message>, id: iced::widget::Id) -> Self {
-        Self { content, id, activation: None, key_bindings: Vec::new(), retain: false }
+        Self {
+            content, id, activation: None, key_bindings: Vec::new(), retain: false,
+            programmatic: false, on_focus: None, on_blur: None,
+        }
+    }
+
+    pub fn programmatic(mut self) -> Self {
+        self.programmatic = true;
+        self
+    }
+
+    pub fn focus_events(mut self, on_focus: Option<Message>, on_blur: Option<Message>) -> Self {
+        self.on_focus = on_focus;
+        self.on_blur = on_blur;
+        self
     }
 }
 
@@ -104,6 +125,7 @@ fn scoped_key_name(key: &iced::keyboard::Key) -> Option<&str> {
         Key::Named(Named::End) => Some("end"),
         Key::Named(Named::Enter) => Some("enter"),
         Key::Named(Named::Space) => Some("space"),
+        Key::Named(Named::Escape) => Some("escape"),
         Key::Character(text) if text.as_str() == " " => Some("space"),
         _ => None,
     }
@@ -120,6 +142,7 @@ where
     fn state(&self) -> widget::tree::State {
         widget::tree::State::new(State {
             focused: false,
+            reported_focus: false,
             id: self.id.clone(),
             activation: self.activation.clone(),
             key_bindings: self.key_bindings.clone(),
@@ -136,6 +159,7 @@ where
         let state = tree.state.downcast_mut::<State<Message>>();
         if state.id != self.id {
             state.focused = false;
+            state.reported_focus = false;
         }
         state.id = self.id.clone();
         state.activation = self.activation.clone();
@@ -184,7 +208,22 @@ where
             event,
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
         ) {
-            state.focused = cursor.is_over(layout.bounds());
+            let focused = cursor.is_over(layout.bounds());
+            if state.focused != focused {
+                state.focused = focused;
+                shell.request_redraw();
+            }
+        }
+        // Report the settled focus after the whole tree has handled the input
+        // or the guarded focus operation has finished.
+        if matches!(event, Event::Window(iced::window::Event::RedrawRequested(_)))
+            && state.focused != state.reported_focus
+        {
+            state.reported_focus = state.focused;
+            let message = if state.focused { &self.on_focus } else { &self.on_blur };
+            if let Some(message) = message {
+                shell.publish(message.clone());
+            }
         }
         let scoped_message = match event {
             Event::Keyboard(iced::keyboard::Event::KeyPressed { key, modifiers, .. })
@@ -283,7 +322,7 @@ where
         operation: &mut dyn widget::Operation,
     ) {
         let state = tree.state.downcast_mut::<State<Message>>();
-        if self.activation.is_some() || state.focused {
+        if self.activation.is_some() || state.focused || self.programmatic {
             operation.focusable(Some(&self.id), layout.bounds(), state);
             operation.custom(Some(&self.id), layout.bounds(), state);
         }

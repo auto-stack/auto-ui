@@ -915,7 +915,7 @@ fn eval_initial_without_vm(expr: &Expr) -> Value {
 /// `flex-col`,`flex-col` 优先于 `flex`。`*-reverse` 只影响渲染方向
 /// (build_row/build_column 反序),不改变派生出的 View 类型。
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum RederivedLayout {
+pub(crate) enum RederivedLayout {
     /// flex / flex-row / flex-row-reverse → 横向
     Row,
     /// flex-col / flex-col-reverse → 纵向
@@ -926,7 +926,7 @@ enum RederivedLayout {
 
 /// Plan 412 F1: 从 style 类重派生布局语义。无显式布局类 → None(元素默认)。
 /// 响应式前缀(md:grid-cols-2)已在 StyleClass::parse_single 剥离,自动参与。
-fn rederive_layout(style: Option<&crate::ui::style::Style>) -> Option<RederivedLayout> {
+pub(crate) fn rederive_layout(style: Option<&crate::ui::style::Style>) -> Option<RederivedLayout> {
     use crate::ui::style::StyleClass;
     let s = style?;
     let has = |pred: &dyn Fn(&StyleClass) -> bool| s.classes.iter().any(pred);

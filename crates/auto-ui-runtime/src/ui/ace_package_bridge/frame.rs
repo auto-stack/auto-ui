@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use ace_av::age_package::{WidgetElement, WidgetEvent, WidgetViewItem};
-use ace_core::source::age_package::{AgePackageCompilation, AgeWidgetProperty, AgeWidgetRef};
+use ace_av::age_package::live_session::WidgetFocusRequest;
+use ace_core::source::age_package::{
+    AgePackageCompilation, AgePackageDescription, AgeWidgetProperty, AgeWidgetRef, AgeWidgetRefs,
+};
 
 use crate::ui::ace_vue_script::channel_pascal;
 
@@ -14,27 +17,68 @@ pub struct PackageFrame {
     pub view: Vec<WidgetViewItem>,
     pub(super) states: Vec<(String, AceStateValue)>,
     pub(super) mounted: BTreeSet<usize>,
+    pub(super) timer_enabled: Vec<bool>,
+    pub(super) focus_requests: Vec<WidgetFocusRequest>,
     pub(super) actions: Vec<PackageAction>,
-    pub(super) timers: Vec<PackageTimer>,
-    clicks: BTreeMap<Vec<usize>, usize>,
+    pub(super) child_timers: Vec<ChildTimer>,
     pointers: BTreeMap<Vec<usize>, PointerEvents>,
+    clicks: BTreeMap<Vec<usize>, usize>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
     widgets: BTreeSet<Vec<usize>>,
+    controls: BTreeMap<Vec<usize>, PackageControl>,
+    focus_targets: BTreeMap<(Vec<usize>, String), Option<String>>,
+    focus_actions: BTreeMap<String, [Option<usize>; 2]>,
+    queued_actions: BTreeMap<String, Option<usize>>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct PackageControl {
+    pub focus: Option<String>,
+    pub keys: Vec<(String, usize)>,
+    pub context_menu: Option<usize>,
+    pub double_click: Option<usize>,
+    pub input: Option<usize>,
+    pub submit: Option<usize>,
+    pub on_focus: bool,
+    pub on_blur: bool,
+}
+
+#[derive(Debug)]
+pub(crate) struct PackageFocusNotice {
+    target: String,
+    gained: bool,
+    source: WidgetEvent,
+    node: usize,
+    message: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct PackageQueuedAction {
+    control: String,
+    node: usize,
+    instance: Vec<usize>,
+    message: String,
+    source: WidgetEvent,
 }
 
 #[derive(Debug)]
 pub struct PackageAction {
     pub source: WidgetEvent,
     pub(super) node: usize,
+    pub(super) instance: Vec<usize>,
     pub(super) message: String,
     pub(super) anchor: ace_core::atom_text::Span,
+    pub(super) input_value: bool,
+    disabled: bool,
+    queued_control: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct PackageTimer {
+pub(super) struct ChildTimer {
     pub owner_path: Vec<usize>,
     pub node: usize,
+    pub instance: Vec<usize>,
     pub message: String,
     pub every_ms: u32,
     pub anchor: usize,
@@ -48,6 +92,10 @@ pub(crate) struct PointerEvents {
 }
 
 impl PackageFrame {
+    pub fn focus_requests(&self) -> &[WidgetFocusRequest] {
+        &self.focus_requests
+    }
+
     pub fn actions(&self) -> &[PackageAction] {
         &self.actions
     }
@@ -69,12 +117,20 @@ impl PackageFrame {
         self.destinations.get(index).map(String::as_str)
     }
 
-    pub(crate) fn accepts_target(&self, target: usize) -> bool {
-        target < self.actions.len() + self.destinations.len()
+    pub(crate) fn accepts_target(&self, target: usize, has_text: bool) -> bool {
+        self.enabled_action(target).is_some_and(|action| {
+            !action.source.key.eq_ignore_ascii_case("onfocus")
+                && !action.source.key.eq_ignore_ascii_case("onblur")
+                && action.source.key.eq_ignore_ascii_case("oninput") == has_text
+        }) || (!has_text && self.navigation_target(target).is_some())
+    }
+
+    pub(super) fn enabled_action(&self, target: usize) -> Option<&PackageAction> {
+        self.actions.get(target).filter(|action| !action.disabled)
     }
 
     pub(crate) fn action_message(&self, target: usize) -> Option<&str> {
-        self.actions.get(target).map(|action| action.message.as_str())
+        self.enabled_action(target).map(|action| action.message.as_str())
     }
 
     pub(crate) fn model_values(&self) -> &[(String, AceStateValue)] {
@@ -84,6 +140,75 @@ impl PackageFrame {
     pub(crate) fn is_widget(&self, path: &[usize]) -> bool {
         self.widgets.contains(path)
     }
+
+    pub(crate) fn control(&self, path: &[usize]) -> Option<&PackageControl> {
+        self.controls.get(path)
+    }
+
+    pub(crate) fn focus_target(&self) -> Option<&str> {
+        self.focus_requests.iter().rev().find_map(|request| {
+            let target = focus_target_id(&request.target);
+            self.focus_targets.get(&(request.component.clone(), target.to_owned()))?.as_deref()
+        })
+    }
+
+    fn focus_action(&self, target: &str, gained: bool) -> Option<(usize, &PackageAction)> {
+        let action = self.focus_actions.get(target)?[usize::from(gained)]?;
+        Some((action, self.enabled_action(action)?))
+    }
+
+    pub(crate) fn focus_notice(&self, target: String, gained: bool) -> Option<PackageFocusNotice> {
+        let (_, action) = self.focus_action(&target, gained)?;
+        Some(PackageFocusNotice {
+            target,
+            gained,
+            source: action.source.clone(),
+            node: action.node,
+            message: action.message.clone(),
+        })
+    }
+
+    // A click or the other half of a focus transfer can publish first.
+    // Continue only if the same control still offers the exact checked event.
+    pub(crate) fn focus_notice_target(&self, notice: &PackageFocusNotice) -> Option<usize> {
+        let (target, action) = self.focus_action(&notice.target, notice.gained)?;
+        (action.node == notice.node && action.message == notice.message && action.source == notice.source)
+            .then_some(target)
+    }
+
+    pub(crate) fn queued_action(&self, target: usize) -> Option<PackageQueuedAction> {
+        let action = self.enabled_action(target)?;
+        Some(PackageQueuedAction {
+            control: action.queued_control.clone()?,
+            node: action.node,
+            instance: action.instance.clone(),
+            message: action.message.clone(),
+            source: action.source.clone(),
+        })
+    }
+
+    // Edits can share a frame with Enter, and selection with a double-click.
+    // Re-resolve only the same authored control and checked action.
+    pub(crate) fn queued_action_target(&self, notice: &PackageQueuedAction) -> Option<usize> {
+        let target = (*self.queued_actions.get(&notice.control)?)?;
+        let action = self.enabled_action(target)?;
+        (action.node == notice.node && action.instance == notice.instance
+            && action.message == notice.message && action.source == notice.source)
+            .then_some(target)
+    }
+}
+
+impl PackageFocusNotice {
+    pub(crate) fn gained(&self) -> bool {
+        self.gained
+    }
+}
+
+fn focus_target_id(target: &str) -> &str {
+    target.strip_prefix('#')
+        .or_else(|| target.strip_prefix("[id='")?.strip_suffix("']"))
+        .or_else(|| target.strip_prefix("[id=\"")?.strip_suffix("\"]"))
+        .unwrap_or(target)
 }
 
 pub(super) fn render(
@@ -91,89 +216,139 @@ pub(super) fn render(
     root: usize,
     revision: u64,
 ) -> Result<PackageFrame, String> {
-    let limits = super::view_limits();
+    let limits = super::frame_limits();
     let view = ace_av::age_package::evaluate_package_view(compiled, 0, &limits)?;
+    let states = ace_av::age_package::observe_package_scalar_states_with_limits(compiled, root, 0, &limits)?
+        .into_iter()
+        .map(|(name, value)| (name, AceStateValue::from(&value)))
+        .collect();
+    let timer_enabled = compiled.description.components[root].members.iter()
+        .filter(|row| row.role == "timer")
+        .enumerate()
+        .map(|(index, row)| match row.value {
+            Some(_) => ace_av::age_package::evaluate_package_timer(compiled, root, 0, index, &limits),
+            None => Ok(true),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    assemble(&compiled.description, &compiled.widget_refs, root, revision, view, states, timer_enabled, false)
+}
+
+pub(super) fn assemble(
+    description: &AgePackageDescription,
+    widget_refs: &AgeWidgetRefs,
+    root: usize,
+    revision: u64,
+    view: Vec<WidgetViewItem>,
+    states: Vec<(String, AceStateValue)>,
+    timer_enabled: Vec<bool>,
+    live_children: bool,
+) -> Result<PackageFrame, String> {
     let mut frame = ViewBindings {
-        compiled,
-        nodes: vec![(root, None)],
+        description,
+        widget_refs,
+        nodes: vec![(root, None, Vec::new())],
+        live_children,
         mounted: BTreeSet::from([root]),
         active_widgets: BTreeSet::new(),
         actions: Vec::new(),
-        timers: Vec::new(),
-        clicks: BTreeMap::new(),
+        child_timers: Vec::new(),
         pointers: BTreeMap::new(),
+        clicks: BTreeMap::new(),
         links: BTreeMap::new(),
         destinations: Vec::new(),
         widgets: BTreeSet::new(),
+        controls: BTreeMap::new(),
+        focus_targets: BTreeMap::new(),
+        focus_actions: BTreeMap::new(),
+        queued_actions: BTreeMap::new(),
+        outline: Vec::new(),
     };
     frame.walk(&view, &mut Vec::new())?;
     Ok(PackageFrame {
         revision,
         view,
-        states: Vec::new(),
+        states,
+        timer_enabled,
+        focus_requests: Vec::new(),
         mounted: frame.mounted,
         actions: frame.actions,
-        timers: frame.timers,
-        clicks: frame.clicks,
+        child_timers: frame.child_timers,
         pointers: frame.pointers,
+        clicks: frame.clicks,
         links: frame.links,
         destinations: frame.destinations,
         widgets: frame.widgets,
+        controls: frame.controls,
+        focus_targets: frame.focus_targets,
+        focus_actions: frame.focus_actions,
+        queued_actions: frame.queued_actions,
     })
 }
 
 struct ViewBindings<'a> {
-    compiled: &'a AgePackageCompilation,
-    nodes: Vec<(usize, Option<&'a AgeWidgetRef>)>,
+    description: &'a AgePackageDescription,
+    widget_refs: &'a AgeWidgetRefs,
+    nodes: Vec<(usize, Option<&'a AgeWidgetRef>, Vec<usize>)>,
+    live_children: bool,
     mounted: BTreeSet<usize>,
     active_widgets: BTreeSet<usize>,
     actions: Vec<PackageAction>,
-    timers: Vec<PackageTimer>,
-    clicks: BTreeMap<Vec<usize>, usize>,
+    child_timers: Vec<ChildTimer>,
     pointers: BTreeMap<Vec<usize>, PointerEvents>,
+    clicks: BTreeMap<Vec<usize>, usize>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
     widgets: BTreeSet<Vec<usize>>,
+    controls: BTreeMap<Vec<usize>, PackageControl>,
+    focus_targets: BTreeMap<(Vec<usize>, String), Option<String>>,
+    focus_actions: BTreeMap<String, [Option<usize>; 2]>,
+    queued_actions: BTreeMap<String, Option<usize>>,
+    outline: Vec<(usize, Option<String>, usize)>,
 }
 
 impl ViewBindings<'_> {
     fn walk(&mut self, items: &[WidgetViewItem], path: &mut Vec<usize>) -> Result<(), String> {
+        let mut occurrences = BTreeMap::<usize, usize>::new();
         for (index, item) in items.iter().enumerate() {
-            match item {
-                WidgetViewItem::Element(element) => {
-                    path.push(index);
-                    self.element(element, path)?;
-                    path.pop();
+            if let WidgetViewItem::Element(element) = item {
+                let occurrence = occurrences.entry(element.site).or_default();
+                let key = property(element, "key").map(str::to_owned);
+                self.outline.push((element.site, key.clone(), if key.is_some() { 0 } else { *occurrence }));
+                *occurrence += 1;
+                path.push(index);
+                self.element(element, path)?;
+                path.pop();
+                self.outline.pop();
+            } else if let WidgetViewItem::Timer(timer) = item {
+                if path.is_empty() || self.live_children {
+                    continue;
                 }
-                WidgetViewItem::Timer(timer) => {
-                    let (node, message) = self.route(&timer.message)?;
-                    let component = &self.compiled.description.components[node];
-                    if !component.messages.iter().any(|row| row.name == message && row.payload.is_empty()) {
-                        return Err(format!("ace.desktop.widget-timer: '{message}' must take no payload"));
-                    }
-                    let timer = PackageTimer {
-                        owner_path: path.clone(),
-                        node,
-                        message,
-                        every_ms: timer.every_ms,
-                        anchor: component.head_span.start,
-                    };
-                    if self.timers.contains(&timer) {
-                        return Err(format!("ace.desktop.widget-timer: duplicate '{}'", timer.message));
-                    }
-                    self.timers.push(timer);
+                let (node, message, instance) = self.route(&timer.message)?;
+                let component = &self.description.components[node];
+                if !component.messages.iter().any(|row| row.name == message && row.payload.is_empty()) {
+                    return Err(format!("ace.desktop.widget-timer: '{message}' must take no payload"));
                 }
-                WidgetViewItem::Text(_) => {}
+                let timer = ChildTimer {
+                    owner_path: path.clone(),
+                    node,
+                    instance,
+                    message,
+                    every_ms: timer.every_ms,
+                    anchor: component.head_span.start,
+                };
+                if self.child_timers.contains(&timer) {
+                    return Err(format!("ace.desktop.widget-timer: duplicate '{}'", timer.message));
+                }
+                self.child_timers.push(timer);
             }
         }
         Ok(())
     }
 
     fn element(&mut self, element: &WidgetElement, path: &mut Vec<usize>) -> Result<(), String> {
-        let (owner, _) = self.nodes.last().expect("view has an owner");
-        if let Some(site) = child_site(self.compiled, *owner, element) {
+        let (owner, _, _) = self.nodes.last().expect("view has an owner");
+        if let Some(site) = child_site(self.description, self.widget_refs, *owner, element) {
             let (index, child) = self
-                .compiled
                 .description
                 .components
                 .iter()
@@ -182,7 +357,7 @@ impl ViewBindings<'_> {
                 .ok_or("widget layout references an unknown component")?;
             let requires_unique_state = !child.handler_msgs.is_empty()
                 && (!child.fields.is_empty() || child.handler_msgs.len() != child.handler_forwards.len());
-            if requires_unique_state && !self.active_widgets.insert(index) {
+            if requires_unique_state && !self.live_children && !self.active_widgets.insert(index) {
                 return Err(format!(
                     "ace.desktop.widget-state-sites: repeated stateful component `{}`",
                     child.name,
@@ -190,7 +365,7 @@ impl ViewBindings<'_> {
             }
             self.mounted.insert(index);
             self.widgets.insert(path.clone());
-            self.nodes.push((index, Some(site)));
+            self.nodes.push((index, Some(site), path.clone()));
             self.walk(&element.children, path)?;
             self.nodes.pop();
             return Ok(());
@@ -201,12 +376,21 @@ impl ViewBindings<'_> {
                 self.destinations.push(to.clone());
             }
         }
+        if matches!(element.tag.as_str(), "drawer" | "alert-dialog")
+            && property(element, "open") != Some("true")
+        {
+            return Ok(());
+        }
         let event_key = if element.tag == "drawer" { "onclose" } else { "onclick" };
+        let disabled = property(element, "disabled") == Some("true");
         if let Some(event) = element.events.iter().find(|event| event.key.eq_ignore_ascii_case(event_key)) {
-            let target = self.bind_action(event)?;
+            let target = self.action(event, disabled)?;
             self.clicks.insert(path.clone(), target);
         }
-        if element.tag == "mouse-area" {
+        if !disabled {
+            self.control(element, path)?;
+        }
+        if !disabled && element.tag == "mouse-area" {
             let mut pointer = PointerEvents::default();
             for event in &element.events {
                 let key = event.key.to_ascii_lowercase();
@@ -219,10 +403,10 @@ impl ViewBindings<'_> {
                 if slot.is_some() {
                     return Err(format!("ace.desktop.pointer: repeated binding for `{key}`"));
                 }
-                let target = self.bind_action(event)?;
+                let target = self.action(event, false)?;
                 if key == "onmousemove" {
                     let action = &self.actions[target];
-                    let component = &self.compiled.description.components[action.node];
+                    let component = &self.description.components[action.node];
                     let typed = component.messages.iter().any(|message| {
                         message.name == action.message && message.payload.len() == 2
                             && message.payload.iter().all(|ty| matches!(ty.as_str(), "float" | "f32"))
@@ -238,29 +422,125 @@ impl ViewBindings<'_> {
         self.walk(&element.children, path)
     }
 
-    fn bind_action(&mut self, event: &WidgetEvent) -> Result<usize, String> {
-        let (node, message) = self.route(&event.message)?;
+    fn action(&mut self, event: &WidgetEvent, disabled: bool) -> Result<usize, String> {
+        let (node, message, instance) = self.route(&event.message)?;
         let target = self.actions.len();
         self.actions.push(PackageAction {
             source: event.clone(),
             node,
+            instance,
             message,
-            anchor: self.compiled.description.components[node].head_span,
+            anchor: self.description.components[node].head_span,
+            input_value: false,
+            disabled,
+            queued_control: None,
         });
         Ok(target)
     }
 
-    fn route(&self, message: &str) -> Result<(usize, String), String> {
+    fn control(&mut self, element: &WidgetElement, path: &[usize]) -> Result<(), String> {
+        let mut control = PackageControl::default();
+        for event in &element.events {
+            let name = event.key.to_ascii_lowercase();
+            let mut parts = name.split('.');
+            match parts.next() {
+                Some("oninput") if element.tag == "input" && name == "oninput" => {
+                    control.input = Some(self.editor_action(event, true)?);
+                }
+                Some("onenter") if element.tag == "input" && name == "onenter" => {
+                    control.submit = Some(self.editor_action(event, false)?);
+                }
+                Some("oncontextmenu") => control.context_menu = Some(self.action(event, false)?),
+                Some("ondblclick") => {
+                    let target = self.action(event, false)?;
+                    if self.outline.iter().any(|(_, key, _)| key.is_some()) {
+                        self.bind_queued_action(target, &event.key);
+                    }
+                    control.double_click = Some(target);
+                }
+                Some("onkeydown") => {
+                    if let Some(key) = parts.find(|key| matches!(*key,
+                        "left" | "right" | "up" | "down" | "home" | "end" | "enter" | "space" | "escape"))
+                    {
+                        control.keys.push((key.to_owned(), self.action(event, false)?));
+                    }
+                }
+                _ => {}
+            }
+        }
+        let focusable = matches!(element.tag.as_str(), "button" | "alert-dialog-action" | "alert-dialog-cancel")
+            && self.clicks.contains_key(path)
+            || element.tag == "input"
+            || property(element, "tabindex").is_some_and(|value| value.parse::<i32>().is_ok())
+            || !control.keys.is_empty();
+        if focusable {
+            let (_, _, scope) = self.nodes.last().expect("view has an owner");
+            let id = property(element, "id").filter(|id| !id.is_empty());
+            let on_focus = element.events.iter().find(|event| event.key.eq_ignore_ascii_case("onfocus"));
+            let on_blur = element.events.iter().find(|event| event.key.eq_ignore_ascii_case("onblur"));
+            if id.is_some() || !control.keys.is_empty() || on_focus.is_some() || on_blur.is_some() {
+                let focus = serde_json::to_string(&(&self.outline, id)).unwrap();
+                if let Some(id) = id {
+                    self.focus_targets.entry((scope.clone(), id.to_owned()))
+                        .and_modify(|previous| *previous = None)
+                        .or_insert_with(|| Some(focus.clone()));
+                }
+                let blur = on_blur.map(|event| self.action(event, false)).transpose()?;
+                let gain = on_focus.map(|event| self.action(event, false)).transpose()?;
+                control.on_blur = blur.is_some();
+                control.on_focus = gain.is_some();
+                if control.on_blur || control.on_focus {
+                    self.focus_actions.insert(focus.clone(), [blur, gain]);
+                }
+                control.focus = Some(focus);
+            }
+        }
+        if control.focus.is_some() || control.context_menu.is_some() || control.double_click.is_some()
+            || control.input.is_some() || control.submit.is_some()
+        {
+            self.controls.insert(path.to_vec(), control);
+        }
+        Ok(())
+    }
+
+    fn editor_action(&mut self, event: &WidgetEvent, input: bool) -> Result<usize, String> {
+        let target = self.action(event, false)?;
+        let action = &mut self.actions[target];
+        if input && event.args.is_empty() {
+            let component = &self.description.components[action.node];
+            if let Some(message) = component.messages.iter().find(|m| m.name == action.message) {
+                if !message.payload.is_empty() {
+                    let [kind] = message.payload.as_slice() else {
+                        return Err(format!("ace.desktop.widget-input: '{}' requires one text argument", action.message));
+                    };
+                    if !kind.eq_ignore_ascii_case("str") {
+                        return Err(format!("ace.desktop.widget-input: '{}' requires a text argument", action.message));
+                    }
+                    action.input_value = true;
+                }
+            }
+        }
+        self.bind_queued_action(target, &event.key);
+        Ok(target)
+    }
+
+    fn bind_queued_action(&mut self, target: usize, event: &str) {
+        let key = serde_json::to_string(&(&self.outline, event)).unwrap();
+        self.actions[target].queued_control = Some(key.clone());
+        self.queued_actions.entry(key).and_modify(|previous| *previous = None).or_insert(Some(target));
+    }
+
+    fn route(&self, message: &str) -> Result<(usize, String, Vec<usize>), String> {
         let mut message = message;
-        for &(node, site) in self.nodes.iter().rev() {
-            let component = &self.compiled.description.components[node];
+        for (node, site, position) in self.nodes.iter().rev() {
+            let component = &self.description.components[*node];
             let forward = component.handler_forwards.get(message);
             if forward.is_none() && component
                 .handler_msgs
                 .iter()
                 .any(|handler| handler == message)
             {
-                return Ok((node, message.to_owned()));
+                return Ok((*node, message.to_owned(), position.clone()));
             }
             message = site
                 .and_then(|site| {
@@ -291,14 +571,18 @@ impl ViewBindings<'_> {
     }
 }
 
+fn property<'a>(element: &'a WidgetElement, name: &str) -> Option<&'a str> {
+    element.properties.iter().rev().find_map(|(key, value)| (key == name).then_some(value.as_str()))
+}
+
 pub(super) fn child_site<'a>(
-    compiled: &'a AgePackageCompilation,
+    description: &'a AgePackageDescription,
+    widget_refs: &'a AgeWidgetRefs,
     owner: usize,
     element: &WidgetElement,
 ) -> Option<&'a AgeWidgetRef> {
-    let component = &compiled.description.components[owner];
-    compiled
-        .widget_refs
+    let component = &description.components[owner];
+    widget_refs
         .get(&(component.module.clone(), component.name.clone()))?
         .iter()
         .find(|site| site.span.start == element.site && site.authored_node == element.tag)

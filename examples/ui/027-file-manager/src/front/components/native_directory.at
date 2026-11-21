@@ -1,0 +1,101 @@
+use auto.fs
+use auto.file
+use auto.image
+use auto.path
+use fs_util: is_image_ext
+use file_manager_metadata: format_bytes, format_modified, summarize_bytes
+use file_manager_model: FileManagerDrive, FileManagerRow, FileManagerShortcut, PreparedListing
+use file_manager_rows: hidden_name, matches_file, sort_files, type_label
+
+// Legacy VM directory access. The checked lanes use their file:list session binding.
+pub fn native_shortcuts(home str) List<FileManagerShortcut> {
+    var shortcuts List<FileManagerShortcut> = []
+    shortcuts.push(FileManagerShortcut { path: home.to(Str), label: "主目录", is_home: true })
+    let names List<str> = ["桌面", "文档", "下载", "图片", "音乐"]
+    let folders List<str> = ["Desktop", "Documents", "Downloads", "Pictures", "Music"]
+    var index int = 0
+    while index < folders.len() {
+        let folder = "" + folders[index]
+        let path str = fs.join(home, folder.to(str))
+        if file.is_dir(path) {
+            let label = "" + names[index]
+            shortcuts.push(FileManagerShortcut { path: path.to(Str), label: label, is_home: false })
+        }
+        index = index + 1
+    }
+    return shortcuts
+}
+
+pub fn native_drives() List<FileManagerDrive> {
+    var drives List<FileManagerDrive> = []
+    let letters List<str> = ["C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+    var index int = 0
+    while index < letters.len() {
+        let label = letters[index] + ":"
+        let path = label + "/"
+        if file.is_dir(path.to(str)) {
+            drives.push(FileManagerDrive { path: path, label: label })
+        }
+        index = index + 1
+    }
+    return drives
+}
+
+fn native_file_row(entry_path str, name str, id int) FileManagerRow {
+    let is_dir bool = file.is_dir(entry_path)
+    let native_size i64 = file.size(entry_path)
+    var size u64 = (0).to(u64)
+    var size_str Str = "--"
+    if native_size >= (0).to(i64) {
+        size = native_size.to(u64)
+        size_str = format_bytes(size)
+    }
+    let modified int = fs.mtime(entry_path)
+    let extension str = path.extension(name)
+    var thumbnail str = ""
+    if id < 120 && is_image_ext(extension) {
+        thumbnail = image.thumb(entry_path, 256)
+    }
+    let row FileManagerRow = FileManagerRow {
+        id: id,
+        name: name.to(Str),
+        path: entry_path.to(Str),
+        is_dir: is_dir,
+        size: size,
+        size_str: size_str,
+        file_ext: extension.to(Str),
+        type_name: type_label(extension, is_dir),
+        date: format_modified(modified.to(i64)),
+        is_hidden: hidden_name(name),
+        thumb_src: thumbnail.to(Str)
+    }
+    return row
+}
+
+pub fn native_listing(directory str, query str, show_hidden bool, column str, direction str) PreparedListing {
+    let names List<str> = fs.read_dir_names(directory)
+    var rows List<FileManagerRow> = []
+    var truncated bool = false
+    var index int = 0
+    while index < names.len() {
+        let name = "" + names[index]
+        index = index + 1
+        if !matches_file(name.to(str), query, show_hidden) {
+            continue
+        }
+        let count int = rows.len()
+        if count >= 500 {
+            truncated = true
+            break
+        }
+        let path str = fs.join(directory, name.to(str))
+        rows.push(native_file_row(path, name.to(str), count))
+    }
+    let total_size Str = summarize_bytes(rows)
+    let listing PreparedListing = PreparedListing {
+        rows: sort_files(rows, column, direction),
+        truncated: truncated,
+        total_size: total_size
+    }
+    return listing
+}

@@ -57,3 +57,23 @@ A checked Iced route shell receives a bounded window viewport. Its authored
 scroll surfaces, including `sidebar_content`, constrain the viewport and
 let their contents scroll. The shell's responsive visibility controls apply
 to the sidebar and mobile navigation.
+
+## Gallery trees and File Manager controls
+
+The original `/filetree` page publishes nested nodes and their badge labels.
+Each branch owns its expansion state. The original `/treeview` page receives
+controlled expansion and selection values and publishes the checked node ID.
+Closing and reopening either page restores its authored defaults. Events
+from an earlier mount are discarded.
+
+The native File Manager uses a window-bounded fullscreen root, with authored
+scroll regions and a responsive grid. Vue keeps the checked model and its
+event targets for each mounted instance. Child widgets publish typed actions
+to their current parent. Focus requests apply to the control in the committed
+frame.
+
+The standalone Windows Iced host uses the original pointer-message time and
+the Windows double-click interval. The modal overlay handles each press
+before the underlying view receives any unconsumed press. A queued double
+click can survive a selection redraw if it still identifies the same keyed
+item, instance and checked action.

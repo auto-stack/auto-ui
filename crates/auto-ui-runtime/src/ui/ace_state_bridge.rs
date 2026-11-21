@@ -78,7 +78,7 @@ impl From<&ComponentFieldValue> for AceStateValue {
 
 impl AceStateValue {
     /// 桥值 → 会话载荷值（同一值域拷贝；int 域检查在 mount 侧）。
-    fn to_field_value(&self) -> ComponentFieldValue {
+    pub(crate) fn to_field_value(&self) -> ComponentFieldValue {
         match self {
             AceStateValue::Int(i) => ComponentFieldValue::Int(*i),
             AceStateValue::Bool(b) => ComponentFieldValue::Bool(*b),

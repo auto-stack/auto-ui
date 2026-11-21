@@ -2785,7 +2785,7 @@ pub(super) fn extract_view_style<M: Clone + std::fmt::Debug>(
         AbstractView::Overlay { .. } => None,
         // PLAN-063 T-04d-2: 锚槽无自有样式，读子件。
         AbstractView::AnchorSlot { child, .. } => extract_view_style(child),
-        AbstractView::ScrollAnchorMark { child, .. } => extract_view_style(child),
+        AbstractView::ScrollAnchorMark { child, .. } | AbstractView::FocusTarget { child, .. } => extract_view_style(child),
         // F-UAT-2: Rich 自带 style（段落级 base 尺寸/色）。
         AbstractView::Rich { style, .. } => style.as_ref(),
         // Plan 422: Popover 的 chrome 在 content 上(anchor 各自带)。
@@ -2907,6 +2907,7 @@ fn view_kind<M: Clone + std::fmt::Debug>(view: &AbstractView<M>) -> &'static str
         AbstractView::Overlay { .. } => "overlay",
         AbstractView::AnchorSlot { .. } => "anchor_slot",
         AbstractView::ScrollAnchorMark { .. } => "scroll_anchor",
+        AbstractView::FocusTarget { child, .. } => view_kind(child),
         AbstractView::Popover { .. } => "popover",
         AbstractView::MouseArea { .. } => "mouse_area",
         AbstractView::Canvas { .. } => "canvas",
@@ -3549,6 +3550,7 @@ fn render_dynamic_view_inner(
             placeholder,
             value,
             on_change,
+            on_text,
             on_submit,
             width,
             password,
@@ -3584,7 +3586,9 @@ fn render_dynamic_view_inner(
             } else {
                 on_change
             };
-            if let Some(msg) = on_change {
+            if let Some(callback) = on_text.filter(|_| !disabled && !inspect_capture_active()) {
+                input_widget = input_widget.on_input(move |text| callback.call(text));
+            } else if let Some(msg) = on_change {
                 let msg_clone = msg.clone();
                 input_widget = input_widget.on_input(move |text| IcedMessage {
                     widget: msg_clone.widget.clone(),
@@ -5153,7 +5157,14 @@ where
     C: Component + 'static,
     C::Msg: Clone + Debug + Send + 'static,
 {
-    view(&component.inner).map(TickWrapMsg::Inner)
+    let view = view(&component.inner).map(TickWrapMsg::Inner);
+    #[cfg(all(windows, feature = "ace-bridge"))]
+    if crate::ui::iced::native_pointer_time::enabled() {
+        return iced::widget::mouse_area(view)
+            .with_left_press_time(crate::ui::iced::native_pointer_time::next_left_press)
+            .into();
+    }
+    view
 }
 
 /// run_app 的内部消息包装:Tick 由订阅发射,update 时转铸真实 tick 消息。
@@ -5221,14 +5232,25 @@ where
             TickWrapMsg::Inner(m) => self.inner.on(m),
             #[cfg(windows)]
             TickWrapMsg::WindowOpened(window) => {
+                #[cfg(feature = "ace-bridge")]
+                let pointer_clock = if crate::ui::iced::native_pointer_time::enabled() {
+                    iced::window::run(window, |native| {
+                        crate::ui::iced::native_pointer_time::attach(native);
+                    }).discard()
+                } else {
+                    iced::Task::none()
+                };
+                #[cfg(not(feature = "ace-bridge"))]
+                let pointer_clock = iced::Task::none();
                 if C::native_accessibility_enabled() {
                     if let Some(tree) = self.inner.native_accessibility_tree() {
                         super::native_accessibility::set_typed_tree(window, tree);
                         self.accessible_window = Some(window);
-                        return super::native_accessibility::install_task(window, true).discard();
+                        return pointer_clock.chain(super::native_accessibility::install_task(window, true).discard());
                     }
-                    return iced::window::set_mode(window, iced::window::Mode::Windowed);
+                    return pointer_clock.chain(iced::window::set_mode(window, iced::window::Mode::Windowed));
                 }
+                return pointer_clock;
             }
             TickWrapMsg::Key(key) => {
                 if let Some(message) = self.inner.key_message(&key) {
@@ -5237,6 +5259,9 @@ where
             }
             // 运行时铸造真实 tick 消息(此处的值不进任何 const 上下文)。
             TickWrapMsg::Tick => {
+                if host_exit_generation() > current_host_exit_since() {
+                    return iced::exit();
+                }
                 #[cfg(windows)]
                 if let Some(window) = self.accessible_window {
                     for request in super::native_accessibility::take_typed_actions(window) {
@@ -5260,6 +5285,12 @@ where
                 }
             }
         }
+        let focus = self.inner.take_focus_request().map_or_else(iced::Task::none, |request| {
+            iced::advanced::widget::operate(request.operation())
+                .chain(iced_runtime::task::effect(iced_runtime::Action::Window(
+                    iced_runtime::window::Action::RedrawAll,
+                )))
+        });
         #[cfg(windows)]
         if let Some(window) = self.accessible_window {
             let tree = self.inner.native_accessibility_tree().unwrap_or_else(|| {
@@ -5272,10 +5303,10 @@ where
                 }
             });
             if super::native_accessibility::set_typed_tree(window, tree) {
-                return super::native_accessibility::publish_typed(window);
+                return iced::Task::batch([focus, super::native_accessibility::publish_typed(window)]);
             }
         }
-        iced::Task::none()
+        focus
     }
 }
 

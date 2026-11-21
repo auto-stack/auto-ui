@@ -111,14 +111,23 @@ pub fn run_ace_native_entry(code: &str, path: &str) -> Result<String, String> {
 /// widget 兼容源 → AV→ui980 受检 FFI 实际 UI 更新 → Iced 真窗 + typed 事件
 /// 回 AV）。r11 `run_ace_native_entry`（宿主直读快照面）保留给自己的测试。
 pub fn run_ace_node_desktop_entry(code: &str, path: &str) -> Result<String, String> {
+    run_ace_node_desktop_entry_with_access(code, path, None)
+}
+
+/// Run an ACE window with an optional file grant from the trusted application host.
+pub fn run_ace_node_desktop_entry_with_access(
+    code: &str,
+    path: &str,
+    access: Option<(&std::path::Path, auto_lang_core::file_session::FileWritePermissions)>,
+) -> Result<String, String> {
     #[cfg(feature = "ace-bridge")]
     {
-        crate::ui::ace_node_desktop::run_ace_node_desktop_ui(code, path, 1)
+        crate::ui::ace_node_desktop::run_ace_node_desktop_ui_with_access(code, path, 1, access)
             .map(|_| "ace node desktop window closed".to_string())
     }
     #[cfg(not(feature = "ace-bridge"))]
     {
-        let _ = (code, path);
+        let _ = (code, path, access);
         Err(
             "AUTO_UI_ENGINE=ace requires the ace-bridge feature (build auto-ui-runtime with              --features ace-bridge)"
                 .to_string(),

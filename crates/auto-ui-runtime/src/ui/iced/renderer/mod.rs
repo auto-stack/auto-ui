@@ -1674,6 +1674,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             accessibility,
             value,
             on_change,
+            on_text,
             on_submit,
             width,
             password,
@@ -1684,6 +1685,11 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             accessibility,
             value,
             on_change: on_change.map(|m| IcedMessage::from_dynamic(&m)),
+            on_text: on_text.map(|callback| {
+                crate::ui::view::TextInputCallback::new(move |text| {
+                    IcedMessage::from_dynamic(&callback.call(text))
+                })
+            }),
             on_submit: on_submit.map(|m| IcedMessage::from_dynamic(&m)),
             width,
             password,
@@ -1822,6 +1828,14 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
         AbstractView::ScrollAnchorMark { pane, key, child } => AbstractView::ScrollAnchorMark {
             pane,
             key,
+            child: Box::new(convert_view_messages(*child)),
+        },
+        AbstractView::FocusTarget { id, activation, keys, on_focus, on_blur, child } => AbstractView::FocusTarget {
+            id,
+            activation: activation.map(|value| IcedMessage::from_dynamic(&value)),
+            keys: keys.into_iter().map(|(key, value)| (key, IcedMessage::from_dynamic(&value))).collect(),
+            on_focus: on_focus.map(|value| IcedMessage::from_dynamic(&value)),
+            on_blur: on_blur.map(|value| IcedMessage::from_dynamic(&value)),
             child: Box::new(convert_view_messages(*child)),
         },
 
@@ -8605,6 +8619,7 @@ mod tests {
                 accessibility: None,
                 value: String::new(),
                 on_change: Some(DynamicMessage::String("name".to_string())),
+                on_text: None,
                 on_submit: None,
                 width: None,
                 password: false,
@@ -9198,6 +9213,7 @@ mod line_edit_tests {
                 event: "UserChanged".to_string(),
                 input_value: None,
             }),
+            on_text: None,
             on_submit: None,
             width: None,
             password: false,
@@ -9213,6 +9229,7 @@ mod line_edit_tests {
                 event: "PassChanged".to_string(),
                 input_value: None,
             }),
+            on_text: None,
             on_submit: None,
             width: None,
             password: true,
@@ -10130,6 +10147,7 @@ widget LoginChild {
                 event: "SoloChanged".to_string(),
                 input_value: None,
             }),
+            on_text: None,
             on_submit: None,
             width: None,
             password: false,
@@ -10820,6 +10838,7 @@ mod plan082_focus_tests {
             accessibility: None,
             value: String::new(),
             on_change: Some(msg("PathChanged")),
+            on_text: None,
             on_submit: Some(msg("Navigate")),
             width: None,
             password: false,

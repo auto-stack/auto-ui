@@ -4,6 +4,18 @@
 
 use colored::Colorize;
 
+pub(crate) fn file_manager_write_permissions(
+) -> auto_lang_core::AutoResult<auto_lang_core::file_session::FileWritePermissions> {
+    match std::env::var_os("AUTO_FILE_MANAGER_WRITES") {
+        Some(value) => value
+            .to_str()
+            .ok_or("AUTO_FILE_MANAGER_WRITES must be UTF-8")?
+            .parse()
+            .map_err(Into::into),
+        None => Ok(Default::default()),
+    }
+}
+
 /// Compute BLAKE3 hash of a string
 /// Returns the first 64 bits as u64 for compact storage
 pub fn hash_string(content: &str) -> u64 {

@@ -276,12 +276,18 @@ pub fn install(cwd: &Path) -> Result<(), String> {
 
 /// Run `bun run <script>` / `pnpm run <script>` / `npm run <script>`.
 pub fn run_script(script: &str, extra_args: &[&str], cwd: &Path) -> Result<(), String> {
+    run_script_with_env(script, extra_args, cwd, &[])
+}
+
+pub(crate) fn run_script_with_env(
+    script: &str, extra_args: &[&str], cwd: &Path, env: &[(&str, &str)],
+) -> Result<(), String> {
     let mut args = vec!["run", script];
     args.extend(extra_args);
     // Plan 346: dev server (vite) needs interactive mode — do NOT set CI=true
     // (CI=true disables Vite's TTY watcher, so `q` to quit stops working).
     // Also inherit stdin so the user can type `q` + Enter to stop Vite.
-    run_script_live(install_cmd(), &args, cwd)
+    run_script_live_with_env(install_cmd(), &args, cwd, env)
 }
 
 /// Run a package script (e.g., `pnpm run dev`) with full interactivity.
@@ -302,6 +308,10 @@ impl Drop for ChildGuard {
 }
 
 pub fn run_script_live(cmd: &str, args: &[&str], cwd: &Path) -> Result<(), String> {
+    run_script_live_with_env(cmd, args, cwd, &[])
+}
+
+fn run_script_live_with_env(cmd: &str, args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Result<(), String> {
     #[cfg(windows)]
     let mut full_args = vec!["/C", cmd];
     #[cfg(windows)]
@@ -315,6 +325,7 @@ pub fn run_script_live(cmd: &str, args: &[&str], cwd: &Path) -> Result<(), Strin
     #[cfg(not(windows))]
     command.args(args);
     command.current_dir(cwd);
+    command.envs(env.iter().copied());
 
     // PLAN-815 T-05 hosted mode: the dev server runs as a tracked child —
     // its stdout is forwarded to the host log stream (the sniffed URL
@@ -324,6 +335,9 @@ pub fn run_script_live(cmd: &str, args: &[&str], cwd: &Path) -> Result<(), Strin
         let mut spec =
             crate::proc_host::TrackedSpawn::new(cmd, args.iter().map(|a| a.to_string()).collect())
                 .with_cwd(cwd);
+        for (key, value) in env {
+            spec = spec.with_env(key, value);
+        }
         #[cfg(windows)]
         {
             spec.windows_cmd_shim = true;

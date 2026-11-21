@@ -16,10 +16,19 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use super::ace_route::{front_package_units, package_candidates, prepare_page, RouteSource, RouteTable};
 use super::ace_svg;
+use ace_core::source::age_package::{FILE_LIST_BINDING, FILE_MUTATE_BINDING, FILE_OPEN_BINDING, WIDGET_CONTEXT_BINDING};
 use super::ace_widget_packages::append_widget_packages;
 
 use crate::ui::ace_package_lane::PackageFragmentLane;
 use crate::ui::ace_widget_props::conditional_classes;
+
+fn checked_host_members(members: &[ace_core::source::age_component::ComponentMemberRow]) -> bool {
+    members.iter().any(|member| {
+        member.role == "timer" || (member.role == "bind"
+            && (matches!(member.name.as_str(), FILE_LIST_BINDING | FILE_MUTATE_BINDING | FILE_OPEN_BINDING | WIDGET_CONTEXT_BINDING)
+                || auto_ui_dialect::preferences::is_preference_binding(&member.name)))
+    })
+}
 
 mod checked_widgets;
 mod widgets;
@@ -32,6 +41,23 @@ pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result
         return Ok(product.app);
     }
     Ok(generate_package_sfc_leaf(units, entry, None, false)?.source)
+}
+
+/// Resolve the package closure of a standalone front/app.at.
+pub fn generate_package_front_sfc(
+    app_at: &Path,
+    source: &str,
+    modules: &[PathBuf],
+) -> Result<(String, String), String> {
+    let generate = || {
+        let (mut units, _) = front_package_units(app_at, source, modules)?;
+        let candidates = package_candidates(source)?;
+        let root = candidates.first().ok_or("no AGE node candidate in the entry module")?;
+        append_widget_packages(app_at, source, &candidates, &mut units)?;
+        let sfc = generate_package_sfc_leaf(&units, "app::app", None, false)?;
+        Ok::<_, String>((root.name.name.clone(), sfc.source))
+    };
+    generate().map_err(|error| format!("ace.package.app: {}: {error}", app_at.display()))
 }
 
 /// Publish the app and page SFCs together. The project supplies the Vue Router
@@ -71,12 +97,12 @@ pub fn generate_linked_front_sfc(
 ) -> Result<Option<RoutedPackageSfc>, String> {
     let candidates = package_candidates(source)?;
     let [root] = candidates.as_slice() else { return Ok(None) };
-    if root.package_imports.is_empty() {
+    if root.package_imports.is_empty() && !checked_host_members(&root.members) {
         return Ok(None);
     }
     let (mut units, _) = front_package_units(app_at, source, modules)?;
-    let widget_paths = append_widget_packages(app_at, &candidates, &mut units)?;
-    if widget_paths.is_empty() {
+    let widget_paths = append_widget_packages(app_at, source, &candidates, &mut units)?;
+    if widget_paths.is_empty() && !checked_host_members(&root.members) {
         return Ok(None);
     }
     let sfc = generate_package_sfc_leaf(&units, "app::app", None, false)
@@ -172,7 +198,7 @@ fn generate_route_file(
     unit.source = context.source.clone();
     let widget_paths = if let Some(path) = source_path {
         let candidates = package_candidates(&context.source)?;
-        append_widget_packages(path, &candidates, &mut scoped)?
+        append_widget_packages(path, &context.source, &candidates, &mut scoped)?
     } else {
         BTreeMap::new()
     };
@@ -209,7 +235,7 @@ fn generate_package_sfc_leaf(
     })?;
     let node = compiled.entry_node()
         .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
-    if compiled.first_widget_ref().is_some() {
+    if compiled.first_widget_ref().is_some() || checked_host_members(&node.members) {
         if route.as_ref().is_some_and(|page| {
             !page.commands.is_empty() || !page.web_params.is_empty()
         }) {
@@ -289,6 +315,9 @@ fn generate_package_sfc_leaf(
                     return Some("message call");
                 }
                 ace_core::source::age_component::ComponentStmt::Call { .. } => {}
+                ace_core::source::age_component::ComponentStmt::Focus { .. } => {
+                    return Some("focus request");
+                }
             }
         }
         None
@@ -1388,6 +1417,12 @@ fn escape_html(s: &str) -> String {
 
 fn escape_attr(s: &str) -> String {
     escape_html(s).replace('"', "&quot;")
+}
+
+fn text_directive(value: &str) -> String {
+    // Keep the double quotes of JavaScript string literals visible to vue-tsc.
+    let attr = escape_html(value).replace('\'', "&#39;");
+    format!("<span v-text='{attr}'></span>")
 }
 
 #[cfg(test)]

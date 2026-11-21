@@ -65,6 +65,26 @@ impl<M> SelectCallback<M> {
     }
 }
 
+/// Builds a message containing the text from this input event.
+#[derive(Clone)]
+pub struct TextInputCallback<M>(Arc<dyn Fn(String) -> M + Send + Sync>);
+
+impl<M> Debug for TextInputCallback<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("TextInputCallback")
+    }
+}
+
+impl<M> TextInputCallback<M> {
+    pub fn new(f: impl Fn(String) -> M + Send + Sync + 'static) -> Self {
+        Self(Arc::new(f))
+    }
+
+    pub fn call(&self, text: String) -> M {
+        (self.0)(text)
+    }
+}
+
 /// Plan 499: 指针移动回调(mouse-area onmousemove 臂)。
 ///
 /// 收 `(x, y)` **组件局部逻辑坐标**(coords 声明的 viewBox 系;缺省时为
@@ -726,6 +746,15 @@ pub enum View<M: Clone + Debug> {
         key: std::sync::Arc<str>,
         child: Box<View<M>>,
     },
+    /// A native focus target anchored to its rendered control.
+    FocusTarget {
+        id: String,
+        activation: Option<M>,
+        keys: Vec<(String, M)>,
+        on_focus: Option<M>,
+        on_blur: Option<M>,
+        child: Box<View<M>>,
+    },
 
     /// Text display with optional styling
     Text {
@@ -798,6 +827,7 @@ pub enum View<M: Clone + Debug> {
         accessibility: Option<Box<InputAccessibility>>,
         value: String,
         on_change: Option<M>,
+        on_text: Option<TextInputCallback<M>>,
         on_submit: Option<M>, // Fires on Enter key press
         width: Option<u16>,   // Legacy field
         password: bool,
@@ -2001,13 +2031,16 @@ impl<M: Clone + Debug> ViewBuilder<M> {
 }
 
 impl<M: Clone + Debug> View<M> {
-    /// Native generated row/column overflow lowering, after actual style evaluation.
+    /// Native generated layout overflow lowering, after actual style evaluation.
     pub fn with_overflow_scroll(mut self) -> Self {
         let original = match &mut self {
             View::Column {
                 style: Some(style), ..
             }
             | View::Row {
+                style: Some(style), ..
+            }
+            | View::Grid {
                 style: Some(style), ..
             } if style
                 .classes
@@ -2225,6 +2258,7 @@ impl<M: Clone + Debug> View<M> {
             accessibility: None,
             value: String::new(),
             on_change: None,
+            on_text: None,
             on_submit: None,
             width: None,
             password: false,
@@ -2614,6 +2648,14 @@ impl<M: Clone + Debug> View<M> {
                 key,
                 child: Box::new(child.map_msg_with_arc(f)),
             },
+            View::FocusTarget { id, activation, keys, on_focus, on_blur, child } => View::FocusTarget {
+                id,
+                activation: activation.map(|message| f(message)),
+                keys: keys.into_iter().map(|(key, message)| (key, f(message))).collect(),
+                on_focus: on_focus.map(|message| f(message)),
+                on_blur: on_blur.map(|message| f(message)),
+                child: Box::new(child.map_msg_with_arc(f)),
+            },
             // Plan 484: MouseArea 递归映射 content + enter/exit 消息。
             // Plan 496 M5: 增 on_double_click 映射。
             // Plan 498 M0: 增 on_click 映射。
@@ -2779,6 +2821,7 @@ impl<M: Clone + Debug> View<M> {
                 accessibility,
                 value,
                 on_change,
+                on_text,
                 on_submit,
                 width,
                 password,
@@ -2789,6 +2832,10 @@ impl<M: Clone + Debug> View<M> {
                 accessibility,
                 value,
                 on_change: on_change.map(|m| f(m)),
+                on_text: on_text.map(|callback| {
+                    let f = Arc::clone(f);
+                    TextInputCallback::new(move |text| f(callback.call(text)))
+                }),
                 on_submit: on_submit.map(|m| f(m)),
                 width,
                 password,
@@ -3421,6 +3468,7 @@ pub struct ViewInputBuilder<M: Clone + Debug> {
     accessibility: Option<Box<InputAccessibility>>,
     value: String,
     on_change: Option<M>,
+    on_text: Option<TextInputCallback<M>>,
     on_submit: Option<M>,
     width: Option<u16>,
     password: bool,
@@ -3446,6 +3494,14 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
     /// Set input change handler
     pub fn on_change(mut self, msg: M) -> Self {
         self.on_change = Some(msg);
+        self.on_text = None;
+        self
+    }
+
+    /// Send each edit with its own text payload.
+    pub fn on_text(mut self, callback: impl Fn(String) -> M + Send + Sync + 'static) -> Self {
+        self.on_text = Some(TextInputCallback::new(callback));
+        self.on_change = None;
         self
     }
 
@@ -3539,6 +3595,7 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
             accessibility: self.accessibility,
             value: self.value,
             on_change: self.on_change,
+            on_text: self.on_text,
             on_submit: self.on_submit,
             width: self.width,
             password: self.password,

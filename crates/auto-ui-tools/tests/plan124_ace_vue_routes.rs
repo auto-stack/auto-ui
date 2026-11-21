@@ -77,3 +77,89 @@ fn ace_route_project_emits_and_refreshes_the_full_page_set() {
     assert!(read("pages/missing.vue").contains("Restored page"));
     assert_eq!(incremental_compile_changed(root, None).unwrap(), 0);
 }
+
+#[test]
+fn ace_standalone_project_builds_and_refreshes_its_widget_package() {
+    std::env::set_var("AUTO_UI_ACE_VUE", "1");
+    let workspace = tempfile::tempdir().expect("temporary Vue project");
+    let root = workspace.path();
+    let manifest = root.join("pac.at");
+    std::fs::write(
+        &manifest,
+        "name: \"package_fixture\"\nrender: \"vue\"\nshadcn: off\n",
+    )
+    .unwrap();
+    let front = root.join("src/front");
+    let components = front.join("components");
+    std::fs::create_dir_all(&components).unwrap();
+    std::fs::write(
+        front.join("app.at"),
+        r#"widget App {
+    use { package: selection_widget from "./components" }
+    msg { Selected(str) }
+    model { selected str = "" }
+    on { .Selected(payload) -> { .selected = payload } }
+    view {
+        Picker (onselectionRequested: .Selected($event)) {}
+        text f"Selected: ${.selected}" {}
+    }
+}
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        components.join("package.at"),
+        "name: \"selection-widget\"\nversion: \"1.0.0\"\n",
+    )
+    .unwrap();
+    let picker = components.join("picker.at");
+    let source = r#"widget Picker (revision: int = 0) {
+    msg { "selectionRequested"(str) }
+    view {
+        button "Select" { onclick: .selectionRequested("docs/计划") }
+    }
+}
+"#;
+    std::fs::write(&picker, source).unwrap();
+    std::fs::write(
+        components.join("unrelated.at"),
+        "widget Unrelated { view { text \"Unrelated\" } }\n",
+    )
+    .unwrap();
+
+    let mut request = GenerationRequest::dynamic(SourceInfo::from_path(manifest));
+    request.identity.name = Some("package_fixture".into());
+    let project = VueProject::from_workspace_with_request(root, &request)
+        .expect("checked Vue package project");
+    project.generate().expect("publish the package product");
+    let generated = project.output_dir.join("src");
+    let read_app = || std::fs::read_to_string(generated.join("App.vue")).unwrap();
+    let sfc = read_app();
+    assert!(sfc.contains("<AcePackageView"));
+    let config = || std::fs::read_to_string(project.output_dir.join("tsconfig.json")).unwrap();
+    assert!(config().contains("\"allowJs\": true"));
+    assert!(sfc.contains("[\"selectionRequested\"]: \"Selected\""));
+    assert!(sfc.contains("docs/计划"));
+    assert!(!sfc.contains("<RouterView"));
+    assert!(!generated.join("components/Unrelated.vue").exists());
+
+    std::fs::write(&picker, source.replace("\"Select\"", "\"Select new\"")).unwrap();
+    assert!(incremental_compile_changed(root, None).unwrap() > 0);
+    assert!(read_app().contains("Select new"));
+    assert!(config().contains("\"allowJs\": true"));
+    std::fs::write(project.output_dir.join("tsconfig.json"), config().replace("\"allowJs\": true", "\"allowJs\": false")).unwrap();
+    assert_eq!(incremental_compile_changed(root, None).unwrap(), 0);
+    assert!(config().contains("\"allowJs\": true"));
+
+    std::fs::write(
+        components.join("package.at"),
+        "name: \"unrelated-widget\"\nversion: \"1.0.0\"\n",
+    )
+    .unwrap();
+    let error = incremental_compile_changed(root, None)
+        .expect_err("the authored package identity is required")
+        .to_string();
+    assert!(error.contains("ace.package.app"), "{error}");
+    assert!(error.contains("ace.widget.package-identity"), "{error}");
+    assert!(read_app().contains("Select new"));
+}

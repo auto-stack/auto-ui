@@ -1,0 +1,60 @@
+use auto.file
+use auto.fs
+use auto.process
+
+// The native VM owns these direct filesystem calls. The checked desktop and
+// browser use their session's request/reply binding.
+pub fn native_file_mutation(operation str, path str, target str) str {
+    try {
+        if operation == "rename" || operation == "copy" {
+            if file.exists(target) {
+                return "exists"
+            }
+            if operation == "rename" {
+                fs.rename(path, target)
+            } else {
+                fs.copy_recursive(path, target)
+            }
+            return ""
+        }
+        if operation == "create-directory" || operation == "create-file" {
+            if file.exists(path) {
+                return "exists"
+            }
+            if operation == "create-directory" {
+                file.create_dir(path)
+            } else {
+                file.write_text(path, "")
+            }
+            if file.exists(path) && file.is_dir(path) == (operation == "create-directory") {
+                return ""
+            }
+            return "failed"
+        }
+        if operation == "delete-directory" {
+            if fs.read_dir(path) != "[]" {
+                return "not-empty"
+            }
+            file.remove_dir(path)
+            return ""
+        }
+        if operation == "delete-file" {
+            if !file.exists(path) || file.is_dir(path) {
+                return "failed"
+            }
+            file.delete(path)
+            if !file.exists(path) {
+                return ""
+            }
+        }
+    } catch {}
+    return "failed"
+}
+
+pub fn native_open_default(path str) bool {
+    try {
+        process.spawn(["cmd", "/c", "start", "", path])
+        return true
+    } catch {}
+    return false
+}

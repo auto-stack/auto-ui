@@ -53,6 +53,11 @@ pub trait Component: Sized + Debug {
         None
     }
 
+    /// A one-shot focus operation owned by the current published frame.
+    fn take_focus_request(&mut self) -> Option<FocusRequest> {
+        None
+    }
+
     #[cfg(windows)]
     fn native_accessibility_enabled() -> bool {
         false
@@ -177,5 +182,32 @@ pub trait Component: Sized + Debug {
     /// collections and nested components.
     fn state_snapshot(&self) -> std::collections::HashMap<String, auto_val::Value> {
         std::collections::HashMap::new()
+    }
+}
+
+/// A native focus effect whose frame can be replaced before Iced visits its widgets.
+#[derive(Debug)]
+pub struct FocusRequest {
+    target: String,
+    epoch: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    expected: u64,
+}
+
+impl FocusRequest {
+    pub(crate) fn new(
+        target: String,
+        epoch: std::sync::Arc<std::sync::atomic::AtomicU64>,
+        expected: u64,
+    ) -> Self {
+        Self { target, epoch, expected }
+    }
+
+    #[cfg(feature = "ui-iced")]
+    pub fn operation<T>(self) -> impl iced::advanced::widget::Operation<T> {
+        crate::ui::iced::focus_target::guarded_focus(
+            iced::widget::Id::from(self.target),
+            self.epoch,
+            self.expected,
+        )
     }
 }

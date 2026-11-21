@@ -1,0 +1,117 @@
+use file_manager_model: FileManagerRow
+
+// The compatibility Vue emitter treats untyped JavaScript parameters as numbers.
+fn unsigned_quotient(numerator u64, divisor u64) u64 {
+    return (numerator / divisor).to(u64)
+}
+
+fn signed_quotient(numerator i64, divisor i64) i64 {
+    return (numerator / divisor).to(i64)
+}
+
+fn nine_digits(value int) Str {
+    let digits Str = f"${value}"
+    let zeros str = "000000000"
+    let padding str = zeros.slice(0, 9 - digits.len())
+    return f"${padding}${digits}"
+}
+
+fn decimal(value u64) Str {
+    let tail int = (value % (1000000000).to(u64)).to(int)
+    let prefix u64 = unsigned_quotient(value, (1000000000).to(u64))
+    if prefix == (0).to(u64) {
+        return f"${tail}"
+    }
+    let tail_text Str = nine_digits(tail)
+    let middle int = (prefix % (1000000000).to(u64)).to(int)
+    let head int = (prefix / (1000000000).to(u64)).to(int)
+    if head == 0 {
+        return f"${middle}${tail_text}"
+    }
+    let middle_text Str = nine_digits(middle)
+    return f"${head}${middle_text}${tail_text}"
+}
+
+fn scaled_bytes(whole u64, rest u64, unit u64, suffix str) Str {
+    let fraction int = (rest * (10).to(u64) / unit).to(int)
+    let integer Str = decimal(whole)
+    return f"${integer}.${fraction} ${suffix}"
+}
+
+// Keep the whole byte count out of the multiply used for the fractional digit.
+pub fn format_bytes(bytes u64) Str {
+    if bytes < (1024).to(u64) {
+        let integer int = bytes.to(int)
+        return f"${integer} B"
+    }
+    if bytes < (1048576).to(u64) {
+        return scaled_bytes(unsigned_quotient(bytes, (1024).to(u64)), bytes % (1024).to(u64), (1024).to(u64), "KB")
+    }
+    if bytes < (1073741824).to(u64) {
+        return scaled_bytes(unsigned_quotient(bytes, (1048576).to(u64)), bytes % (1048576).to(u64), (1048576).to(u64), "MB")
+    }
+    return scaled_bytes(unsigned_quotient(bytes, (1073741824).to(u64)), bytes % (1073741824).to(u64), (1073741824).to(u64), "GB")
+}
+
+// The accumulated complete GiB and residual bytes can exceed u64 in bytes.
+fn format_directory_total(complete_gib u64, residual_bytes u64) Str {
+    let whole u64 = complete_gib + unsigned_quotient(residual_bytes, (1073741824).to(u64))
+    if whole == (0).to(u64) {
+        return format_bytes(residual_bytes)
+    }
+    return scaled_bytes(whole, residual_bytes % (1073741824).to(u64), (1073741824).to(u64), "GB")
+}
+
+fn two_digits(value int) Str {
+    if value < 10 {
+        return f"0${value}"
+    }
+    return f"${value}"
+}
+
+// Hinnant civil-from-days over nonnegative UTC epochs.
+pub fn format_modified(seconds i64) Str {
+    if seconds <= (0).to(i64) {
+        return "--"
+    }
+    let days i64 = signed_quotient(seconds, (86400).to(i64))
+    let remainder i64 = seconds % (86400).to(i64)
+    let z i64 = days + (719468).to(i64)
+    let era i64 = signed_quotient(z, (146097).to(i64))
+    let doe i64 = z % (146097).to(i64)
+    let yoe i64 = signed_quotient(doe - signed_quotient(doe, (1460).to(i64)) + signed_quotient(doe, (36524).to(i64)) - signed_quotient(doe, (146096).to(i64)), (365).to(i64))
+    let doy i64 = doe - ((365).to(i64) * yoe + signed_quotient(yoe, (4).to(i64)) - signed_quotient(yoe, (100).to(i64)))
+    let mp i64 = signed_quotient((5).to(i64) * doy + (2).to(i64), (153).to(i64))
+    let day int = (doy - signed_quotient((153).to(i64) * mp + (2).to(i64), (5).to(i64)) + (1).to(i64)).to(int)
+    var month int = mp.to(int) + 3
+    var year i64 = yoe + era * (400).to(i64)
+    if mp >= (10).to(i64) {
+        month = month - 12
+        year = year + (1).to(i64)
+    }
+    let year_text Str = decimal(year.to(u64))
+    let month_text Str = two_digits(month)
+    let day_text Str = two_digits(day)
+    let hour_text Str = two_digits((remainder / (3600).to(i64)).to(int))
+    let minute_text Str = two_digits((remainder % (3600).to(i64) / (60).to(i64)).to(int))
+    return f"${year_text}-${month_text}-${day_text} ${hour_text}:${minute_text}"
+}
+
+pub fn summarize_bytes(file_rows List<FileManagerRow>) Str {
+    let gib u64 = (1073741824).to(u64)
+    var complete_gib u64 = (0).to(u64)
+    var residual_bytes u64 = (0).to(u64)
+    var index int = 0
+    let count int = file_rows.len()
+    while index < count {
+        let is_directory bool = file_rows[index].is_dir
+        let size u64 = file_rows[index].size
+        index = index + 1
+        if is_directory {
+            continue
+        }
+        complete_gib = complete_gib + unsigned_quotient(size, gib)
+        residual_bytes = residual_bytes + size % gib
+    }
+    return format_directory_total(complete_gib, residual_bytes)
+}

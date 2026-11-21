@@ -1,23 +1,26 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
-use ace_a2x_core::SemanticView;
-use ace_a2x_ts::seed::{decode_coll_seed, encode_coll_seed, render_coll_seed_helpers};
+use ace_a2x_core::{RecordFacts, SemanticView, Ty};
+use ace_a2x_ts::seed::{decode_coll_seed, encode_coll_seed, render_coll_seed_helpers, SeedCollTy};
 use ace_a2x_ts::{
     emit_function_body_fragment, script_widget_runtime_body, ts_fn_name, FragmentProgramContext,
     ScriptLang,
 };
-use ace_core::hir::ExprKind;
 use ace_core::source::age_component::ComponentViewItem;
 use ace_core::source::age_package::{
-    compile_age_package_widget_runtime, AgePackageCompilation, AgeWidgetProperty,
+    compile_age_package_widget_runtime, AgePackageCompilation, AgeWidgetProperty, AgeWidgetWatchSource,
+    WIDGET_FOCUS_FIELD, WIDGET_OUTBOUND_FIELD,
 };
 use ace_core::source::packages::PackageModuleInput;
 
-use crate::ui::ace_svg;
 use crate::ui::ace_vue_script::channel_pascal;
 use crate::ui::ace_widget_props::literal;
-
+use crate::ui::ace_package_bridge::file_directory::FileDirectoryBinding;
+use crate::ui::ace_package_bridge::file_mutation::FileMutationBinding;
+use crate::ui::ace_package_bridge::file_open::{FileOpenBinding, UNAVAILABLE};
+use ace_core::hir::ExprKind;
+use crate::ui::ace_svg;
 use super::PackageSfc;
 
 pub(super) fn generate(
@@ -51,9 +54,22 @@ pub(super) fn generate(
         .iter()
         .find(|runtime| compiled.description.components[runtime.node].module == entry)
         .map_or(root.node, |runtime| runtime.node);
+    let file_directory = directory_binding(&compiled, &view, root_index)?;
+    let file_mutation = FileMutationBinding::from_component(&compiled.description.components[root_index])?;
+    let file_open = FileOpenBinding::from_component(&compiled.description.components[root_index])?;
+    let preferences = crate::ui::ace_package_bridge::preferences::checked_bindings(
+        &compiled.description.components[root_index],
+    )?;
 
     let icons = icon_imports(&compiled);
-    let mut script = String::from("import { h, onBeforeUnmount, shallowRef } from 'vue'\n");
+    let mut script = String::from("import { Fragment, h, nextTick, onBeforeUnmount, onMounted, shallowRef } from 'vue'\n");
+    if file_directory.is_some() || file_mutation.is_some() {
+        let mut imports = Vec::new();
+        if file_directory.is_some() { imports.push("readFileDirectory"); }
+        if file_mutation.is_some() { imports.push("applyFileMutation"); }
+        imports.push("fileBrowserSignal");
+        writeln!(script, "import {{ {} }} from '@/lib/file-browser'", imports.join(", ")).unwrap();
+    }
     if shell {
         script.push_str("import { RouterLink, RouterView } from 'vue-router'\n");
     } else if routed {
@@ -63,7 +79,7 @@ pub(super) fn generate(
         writeln!(
             script,
             "import {{ {} }} from 'lucide-vue-next'",
-            icons.values().cloned().collect::<Vec<_>>().join(", ")
+            icons.values().cloned().collect::<BTreeSet<_>>().into_iter().collect::<Vec<_>>().join(", ")
         )
         .unwrap();
     }
@@ -93,7 +109,8 @@ pub(super) fn generate(
     for line in render_coll_seed_helpers(&seed, false).lines() {
         writeln!(script, "{}", line.strip_prefix("export ").unwrap_or(line)).unwrap();
     }
-    let roots = write_components(&compiled, &mut script)?;
+    let mut roots = write_components(&compiled, &mut script)?;
+    roots.extend(view.global_init_fns().into_iter().map(str::to_owned));
     let reachable = widget_functions(&view, &roots)?;
     let context = FragmentProgramContext::from_view(&view);
     for function in view.functions().iter().filter(|function| reachable.contains(&function.def_index)) {
@@ -119,6 +136,9 @@ pub(super) fn generate(
         )
         .unwrap();
     }
+    for initializer in view.global_init_fns() {
+        writeln!(script, "{}();", ts_fn_name(initializer)).unwrap();
+    }
     script.push_str("const aceIcons = {\n");
     for (name, symbol) in icons {
         writeln!(script, "  {}: {symbol},", quoted(&name)).unwrap();
@@ -126,9 +146,23 @@ pub(super) fn generate(
     script.push_str("};\n");
     script.push_str(super::POINTER_SAMPLE);
     script.push_str(include_str!("checked_widget_view.js"));
+    let file_directory = file_directory.map_or_else(|| "null".into(), |(reply, entry_tag, include_extension)| format!(
+        "{{ read: readFileDirectory, lease: fileBrowserSignal, reply: {}, entryTag: {}, includeExtension: {include_extension} }}",
+        quoted(&reply), quoted(&entry_tag),
+    ));
+    let file_mutation = file_mutation.map_or_else(|| "null".into(), |binding| format!(
+        "{{ apply: applyFileMutation, lease: fileBrowserSignal, reply: {} }}",
+        quoted(binding.reply_name()),
+    ));
+    let file_open = file_open.map_or_else(|| "null".into(), |binding| format!(
+        "{{ reply: {}, unavailable: {UNAVAILABLE} }}", quoted(binding.reply_name()),
+    ));
+    let preferences = preferences.iter().map(|entry| (&entry.key, &entry.field, &entry.restore))
+        .collect::<Vec<_>>();
+    let preferences = serde_json::to_string(&preferences).map_err(|error| error.to_string())?;
     writeln!(
         script,
-        "\nreturn createCheckedWidgetView({root_index});\n}})();"
+        "\nreturn createCheckedWidgetView({root_index}, {file_directory}, {file_mutation}, {preferences}, {file_open});\n}})();"
     )
     .unwrap();
     let source = format!(
@@ -144,6 +178,44 @@ pub(super) fn generate(
         .filter(|module| !other_modules.contains(module))
         .cloned().collect();
     Ok(PackageSfc { source, uses_runtime: false, embedded_widget_modules })
+}
+
+fn directory_binding(
+    compiled: &AgePackageCompilation,
+    view: &SemanticView<'_>,
+    root: usize,
+) -> Result<Option<(String, String, bool)>, String> {
+    let component = &compiled.description.components[root];
+    let Some(binding) = FileDirectoryBinding::from_package(compiled, component)? else { return Ok(None) };
+    let reply = binding.reply_name();
+    let bad_shape = || "source.age.sfc-file-binding: invalid DirListing reply record".to_string();
+    let handler = compiled.widget_runtime.iter().find(|runtime| runtime.node == root)
+        .and_then(|runtime| runtime.handlers.iter().find(|handler| handler.message == reply))
+        .and_then(|handler| compiled.symbol_of_in(&component.module, &handler.function))
+        .and_then(|symbol| view.functions().iter().find(|function| function.source_name == symbol))
+        .ok_or_else(bad_shape)?;
+    let Some(Ty::Record(listing)) = handler.params.last().map(|param| param.ty) else {
+        return Err(bad_shape());
+    };
+    let listing = view.record(listing).ok_or_else(bad_shape)?;
+    let field_type = |record: &RecordFacts, name: &str| {
+        record.fields.iter().find(|field| field.name == name).map(|field| field.ty)
+    };
+    let Some(Ty::List(entries)) = field_type(listing, "entries") else { return Err(bad_shape()) };
+    let Ok(Ty::Record(entry)) = view.list_elem(entries) else { return Err(bad_shape()) };
+    let entry = view.record(entry).ok_or_else(bad_shape)?;
+    if listing.fields.len() != 3 || field_type(listing, "ok") != Some(Ty::Bool)
+        || field_type(listing, "path") != Some(Ty::StrOwned)
+        || entry.fields.len() != 5 + usize::from(binding.include_extension)
+        || (binding.include_extension && field_type(entry, "extension") != Some(Ty::StrOwned))
+        || [
+            ("name", Ty::StrOwned), ("path", Ty::StrOwned), ("is_dir", Ty::Bool),
+            ("size", Ty::U64), ("mtime", Ty::I64),
+        ].into_iter().any(|(name, ty)| field_type(entry, name) != Some(ty))
+    {
+        return Err(bad_shape());
+    }
+    Ok(Some((reply.to_owned(), SeedCollTy::Record(entry.name.clone()).elem_tag(), binding.include_extension)))
 }
 
 fn widget_functions(view: &SemanticView<'_>, roots: &BTreeSet<String>) -> Result<BTreeSet<usize>, String> {
@@ -180,6 +252,8 @@ fn write_components(
         roots.insert(symbol.clone());
         Ok(ts_fn_name(&symbol))
     };
+    writeln!(script, "const checkedOutboundField = {};", quoted(WIDGET_OUTBOUND_FIELD)).unwrap();
+    writeln!(script, "const checkedFocusField = {};", quoted(WIDGET_FOCUS_FIELD)).unwrap();
     script.push_str("const aceComponents = {\n");
     for runtime in &compiled.widget_runtime {
         let owner = &compiled.description.components[runtime.node];
@@ -191,11 +265,13 @@ fn write_components(
             .transpose()?;
         writeln!(
             script,
-            "{}: {{ name: {}, init: {}, view: {}, handlers: {{",
+            "{}: {{ name: {}, init: {}, view: {}, focus: {}, contextHandler: {}, handlers: {{",
             runtime.node,
             quoted(&owner.name),
             init.as_deref().unwrap_or("null"),
-            symbol(&owner.module, &runtime.view)?
+            symbol(&owner.module, &runtime.view)?,
+            runtime.focus,
+            runtime.context_handler.as_deref().map_or_else(|| "null".into(), quoted),
         )
         .unwrap();
         for handler in &runtime.handlers {
@@ -213,7 +289,43 @@ fn write_components(
             )
             .unwrap();
         }
-        script.push_str("}, sites: {\n");
+        script.push_str("}, outbound: {\n");
+        if runtime.outbound {
+            for message in &owner.messages {
+                if !owner.handler_msgs.contains(&message.name) {
+                    writeln!(script, "[{}]: {},", quoted(&message.name), serde_json::to_string(&message.payload).unwrap()).unwrap();
+                }
+            }
+        }
+        script.push_str("}, watches: [\n");
+        for watch in &runtime.watches {
+            let sources = watch.sources.iter().map(|source| match source {
+                AgeWidgetWatchSource::Property(index) => serde_json::json!(index),
+                AgeWidgetWatchSource::Model(index) => serde_json::json!(owner.fields[*index].0),
+            }).collect::<Vec<_>>();
+            writeln!(
+                script,
+                "{{ sources: {}, immediate: {}, run: {} }},",
+                serde_json::to_string(&sources).unwrap(),
+                watch.immediate,
+                symbol(&owner.module, &watch.function)?,
+            ).unwrap();
+        }
+        script.push_str("], timers: [\n");
+        for timer in &runtime.timers {
+            let condition = timer.condition.as_deref()
+                .map(|name| symbol(&owner.module, name))
+                .transpose()?;
+            writeln!(
+                script,
+                "{{ message: {}, interval: {}, condition: {} }},",
+                quoted(&timer.message),
+                timer.interval_ms,
+                condition.as_deref().unwrap_or("null"),
+            )
+            .unwrap();
+        }
+        script.push_str("], sites: {\n");
         for site in compiled.widget_refs.get(&key).into_iter().flatten() {
             let child = compiled
                 .widget_runtime
@@ -345,7 +457,12 @@ fn icon_imports(compiled: &AgePackageCompilation) -> BTreeMap<String, String> {
     names
         .into_iter()
         .map(|name| {
-            let symbol = channel_pascal(&name.replace('-', "_"));
+            let symbol = match name.as_str() {
+                // The checked generator pins lucide-vue-next 0.312, where
+                // the same icon is exported under its former name.
+                "loader-circle" => "Loader2".to_owned(),
+                _ => channel_pascal(&name.replace('-', "_")),
+            };
             (name, symbol)
         })
         .collect()

@@ -24,7 +24,8 @@ fn temp_workspace(tag: &str) -> std::path::PathBuf {
     let _ = std::fs::remove_dir_all(&dir);
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let ex002 = manifest.join("../../examples/ui/002-counter");
-    copy_dir(&ex002, &dir);
+    copy_dir(&ex002.join("src"), &dir.join("src"));
+    std::fs::copy(ex002.join("pac.at"), dir.join("pac.at")).unwrap();
     dir
 }
 

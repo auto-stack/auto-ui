@@ -1,11 +1,22 @@
 use auto.json
+use collection_view.collection_schema: CollectionAction, CollectionCell, CollectionColumn, CollectionItem
+
+fn demo_item(id str, item_revision str, label str, kind str, icon str, state str, display_kind str, disabled bool) CollectionItem {
+    let cells List<CollectionCell> = [CollectionCell { key: "kind", text: display_kind }]
+    let actions List<CollectionAction> = [CollectionAction { id: "open", label: "打开", enabled: true }]
+    return CollectionItem {
+        id: id, itemRevision: item_revision, label: label, kind: kind, icon: icon,
+        thumbnailUri: "", thumbnailState: state, cells: cells, actions: actions,
+        defaultActionId: "open", disabled: disabled
+    }
+}
 
 widget App {
     use { package: collection_view from "../../../../packages/collection-view" }
     msg { Init, ChangeView(str), Select(str), Act(str), Sort(str), Replace, Remove, Quit }
     model {
-        var items List = []
-        var columns List = []
+        var items List<CollectionItem> = []
+        var columns List<CollectionColumn> = []
         var mode str = "grid"
         var selected str = ""
         var scope str = "demo"
@@ -42,15 +53,14 @@ widget App {
     }
     on {
         .Init -> {
-            let open = [{id: "open", label: "打开", enabled: true}]
             .columns = [
-                {key: "name", label: "名称", align: "left", sortable: true},
-                {key: "kind", label: "类型", align: "left", sortable: false}
+                CollectionColumn { key: "name", label: "名称", align: "left", sortable: true },
+                CollectionColumn { key: "kind", label: "类型", align: "left", sortable: false }
             ]
             .items = [
-                {id: "a", itemRevision: "1", label: "同名条目", kind: "folder", icon: "folder", thumbnailUri: "", thumbnailState: "missing", disabled: false, cells: [{key: "kind", text: "文件夹"}], actions: open, defaultActionId: "open"},
-                {id: "b", itemRevision: "1", label: "同名条目", kind: "file", icon: "file-text", thumbnailUri: "", thumbnailState: "missing", disabled: false, cells: [{key: "kind", text: "文档"}], actions: open, defaultActionId: "open"},
-                {id: "c", itemRevision: "1", label: "不可用条目", kind: "image", icon: "image", thumbnailUri: "", thumbnailState: "loading", disabled: true, cells: [{key: "kind", text: "图片"}], actions: open, defaultActionId: "open"}
+                demo_item("a", "1", "同名条目", "folder", "folder", "missing", "文件夹", false),
+                demo_item("b", "1", "同名条目", "file", "file-text", "missing", "文档", false),
+                demo_item("c", "1", "不可用条目", "image", "image", "loading", "图片", true)
             ]
         }
         .ChangeView(payload str) -> {
@@ -111,8 +121,8 @@ widget App {
             } catch {}
         }
         .Replace -> {
-            let a = {id: "a", itemRevision: "2", label: "同名条目", kind: "folder", icon: "folder", thumbnailUri: "", thumbnailState: "missing", disabled: false, cells: [{key: "kind", text: "文件夹"}], actions: [{id: "open", label: "打开", enabled: true}], defaultActionId: "open"}
-            var remaining List = []
+            let a = demo_item("a", "2", "同名条目", "folder", "folder", "missing", "文件夹", false)
+            var remaining List<CollectionItem> = []
             for item in .items {
                 if item.id != "a" { remaining.push(item) }
             }
@@ -121,7 +131,7 @@ widget App {
             .revision = .revision + 1
         }
         .Remove -> {
-            var remaining List = []
+            var remaining List<CollectionItem> = []
             for item in .items {
                 if item.id != .selected { remaining.push(item) }
             }

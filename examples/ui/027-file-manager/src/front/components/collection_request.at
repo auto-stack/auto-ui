@@ -1,0 +1,17 @@
+use std.json: json_object_text, json_object_i32
+
+pub fn collection_request_token(payload str, scope str, revision int, token str) Str {
+    let base int = json_object_i32(payload, "baseRevision", -1)
+    // A scope is empty during startup, an absolute path, or a demo URI.
+    let request_scope Str = json_object_text(payload, "scopeId", "invalid scope")
+    let current_scope Str = scope.to(Str)
+    if base != revision || request_scope != current_scope {
+        return ""
+    }
+    let instance Str = json_object_text(payload, "instanceToken", "")
+    let current_token Str = token.to(Str)
+    if token != "" && instance != current_token {
+        return ""
+    }
+    return instance
+}

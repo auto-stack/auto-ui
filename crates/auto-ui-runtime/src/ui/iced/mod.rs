@@ -4,6 +4,8 @@
 // into Iced's Element for rendering, with full style support via IcedStyle.
 
 mod layout_collector;
+#[cfg(all(windows, feature = "ace-bridge"))]
+pub(crate) mod native_pointer_time;
 // Plan 422: 锚定弹层原语(iced overlay wrapper,Tooltip 同型)。
 pub mod popover;
 // Plan 499 M2: 指针移动限频 widget(mouse-area onmousemove 臂承载,

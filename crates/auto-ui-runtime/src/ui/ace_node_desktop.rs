@@ -26,7 +26,7 @@
 //! 自己的测试/exe）；本模块 = r13 新范围（通用项目入口 + 实际 UI-FFI 效果与
 //! typed 事件）。001/002 完整主题/选择/全部组件与 Widgets 归 W1 B-AV。
 
-use crate::ui::ace_package_bridge::{PackageFrame, PackageStateEngine};
+use crate::ui::ace_package_bridge::{PackageFocusNotice, PackageFrame, PackageQueuedAction, PackageStateEngine};
 use super::ace_route::{front_package_units, package_candidates, RouteAction, RouteModulePaths, RouteNavigation, RouteTable};
 use super::ace_route_desktop::{front_route_modules, DesktopRoutes, RouteHandlers, route_links};
 use crate::ui::ace_state_bridge::{
@@ -318,7 +318,10 @@ pub struct HostSession {
     widget_instances: Vec<widgets::State>,
     widget_values: Vec<Arc<[(String, AceStateValue)]>>,
     package_frames: Vec<Arc<PackageFrame>>,
-    package_events: VecDeque<PackageInput>,
+    focus_epoch: Arc<AtomicU64>,
+    focus_request: Option<crate::ui::component::FocusRequest>,
+    package_events: VecDeque<QueuedPackageEvent>,
+    package_focus_notices: VecDeque<(usize, u64, PackageFocusNotice)>,
     queue: VecDeque<(usize, usize)>,
     closed: bool,
     /// 证据：实际 UI 提交计数/轨迹、poll 计数、late/stale 拒绝计数。
@@ -328,6 +331,16 @@ pub struct HostSession {
     consumed_events: usize,
     pub late_dropped: u64,
     pub stale_rejected: u64,
+}
+
+#[derive(Debug)]
+struct QueuedPackageEvent {
+    instance: usize,
+    revision: u64,
+    target: usize,
+    action: Option<PackageQueuedAction>,
+    text: Option<String>,
+    coordinates: Option<(f32, f32)>,
 }
 
 impl HostSession {
@@ -346,7 +359,10 @@ impl HostSession {
             widget_instances: Vec::new(),
             widget_values: Vec::new(),
             package_frames: Vec::new(),
+            focus_epoch: Arc::new(AtomicU64::new(0)),
+            focus_request: None,
             package_events: VecDeque::new(),
+            package_focus_notices: VecDeque::new(),
             queue: VecDeque::new(),
             closed: false,
             applies: 0,
@@ -361,6 +377,13 @@ impl HostSession {
     /// Checked view and click targets for the currently published revision.
     pub fn package_frame(&self, instance: usize) -> Option<&PackageFrame> {
         self.package_frames.get(instance).map(Arc::as_ref)
+    }
+
+    fn publish_focus(&mut self, target: Option<String>) {
+        let expected = self.focus_epoch.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
+        self.focus_request = target.map(|target| {
+            crate::ui::component::FocusRequest::new(target, Arc::clone(&self.focus_epoch), expected)
+        });
     }
 }
 
@@ -426,26 +449,38 @@ pub fn push_session_event(id: i32, instance: usize, target: usize) {
     }
 }
 
-#[derive(Debug)]
-struct PackageInput {
-    instance: usize,
-    revision: u64,
-    target: usize,
-    coordinates: Option<(f32, f32)>,
-}
-
-fn push_package_event(id: i32, input: PackageInput) {
+fn push_package_event(id: i32, instance: usize, revision: u64, target: usize, text: Option<String>, coordinates: Option<(f32, f32)>) {
     let mut host = host().write().unwrap();
     if let Some(session) = host.get(id) {
         if session.closed {
             session.late_dropped += 1;
-        } else if session.package_frame(input.instance).is_some_and(|frame| {
-            frame.revision == input.revision && frame.accepts_target(input.target)
+        } else if let Some(frame) = session.package_frame(instance).filter(|frame| {
+            frame.revision == revision && frame.accepts_target(target, text.is_some())
         }) {
-            session.package_events.push_back(input);
+            let action = frame.queued_action(target);
+            session.package_events.push_back(QueuedPackageEvent {
+                instance, revision, target, action, text, coordinates,
+            });
         } else {
             session.stale_rejected += 1;
         }
+    }
+}
+
+fn push_package_focus(id: i32, instance: usize, revision: u64, control: String, gained: bool) {
+    let mut host = host().write().unwrap();
+    let Some(session) = host.get(id) else { return };
+    if session.closed {
+        session.late_dropped += 1;
+        return;
+    }
+    let notice = session.package_frame(instance)
+        .filter(|frame| frame.revision == revision)
+        .and_then(|frame| frame.focus_notice(control, gained));
+    if let Some(notice) = notice {
+        session.package_focus_notices.push_back((instance, revision, notice));
+    } else {
+        session.stale_rejected += 1;
     }
 }
 
@@ -798,7 +833,9 @@ fn close_host_session(session: i32) -> i32 {
     s.widget_tree = None;
     s.widget_values.clear();
     s.package_frames.clear();
+    s.publish_focus(None);
     s.package_events.clear();
+    s.package_focus_notices.clear();
     if h.current == Some(session) {
         h.current = None;
         h.stale_targets.push(session);
@@ -1109,9 +1146,22 @@ fn project_view_shape(
                     // 可点击事件目标（013 的 ToggleAll 全选框）——此前落入通用
                     // 递归，checkbox 事件在脚本面不可达。
                     let mut msg = None;
+                    let mut payload = None;
                     for sub in &el.items {
                         if let ComponentViewItem::Entry(entry) = sub {
                             if entry.is_event && entry.key == "onclick" {
+                                if let Some((name, args)) = entry.message_call() {
+                                    if in_loop && !args.is_empty() {
+                                        return Err(format!(
+                                            "ace.desktop.event-payload: `{}` requires the current view-loop row",
+                                            name.name,
+                                        ));
+                                    }
+                                    msg = Some(name.name.clone());
+                                    payload = Some(args.iter().map(ButtonPayload::from_arg)
+                                        .collect::<Result<Vec<_>, _>>()?);
+                                    continue;
+                                }
                                 if let ace_core::source::age_component::ComponentEntryValue::Expr(
                                     expr,
                                 ) = &entry.value
@@ -1120,6 +1170,7 @@ fn project_view_shape(
                                         if matches!(&base.kind, ExprKind::Var(v) if v.name == "self")
                                         {
                                             msg = Some(name.name.clone());
+                                            payload = None;
                                         }
                                     }
                                 }
@@ -1130,7 +1181,7 @@ fn project_view_shape(
                         shape.buttons.push(ButtonSpec {
                             label: "checkbox".to_string(),
                             msg,
-                            payload: None,
+                            payload,
                         });
                         shape.button_spans.push(el.span.start);
                     }
@@ -1791,18 +1842,46 @@ fn diags(ds: &[ace_core::atom_text::Diagnostic]) -> String {
         .join("; ")
 }
 
+fn on_widget_stack<T: Send>(
+    label: &str,
+    task: impl FnOnce() -> Result<T, String> + Send,
+) -> Result<T, String> {
+    // Package compilation can require more stack than the window thread
+    // reserves. Keep the window on its owning thread.
+    std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .name(format!("ace-widget-{label}"))
+            .stack_size(16 * 1024 * 1024)
+            .spawn_scoped(scope, task)
+            .map_err(|error| format!("start widget {label}: {error}"))?
+            .join()
+            .map_err(|_| format!("widget {label} thread panicked"))?
+    })
+}
+
 impl NodeDesktopBridge {
     /// 装载：投影 view 形状（文本叶/按钮目标）+ 文本叶 AV 真值（静态观察面）
     /// + states-only 引擎挂载（keyed 实例、世代纪律；无 model/msg 的 Hello 类
     /// 源为静态面——事件面缺席具名可辨）。
     pub fn load(src: &str, path: &str, instances: usize) -> Result<Self, String> {
+        on_widget_stack("compile", || Self::load_source(src, path, instances))
+    }
+
+    fn load_source(src: &str, path: &str, instances: usize) -> Result<Self, String> {
+        use ace_core::source::age_package::{FILE_LIST_BINDING, FILE_MUTATE_BINDING, FILE_OPEN_BINDING};
+
         if let Ok(candidates) = package_candidates(src) {
             if candidates.first().is_some_and(|node| node.members.iter().any(|row| row.role == "route")) {
                 let app = std::path::Path::new(path);
                 let (units, paths) = front_package_units(app, src, &front_route_modules(app)?)?;
                 return Self::load_package_paths(units, "app::app", instances, paths);
             }
-            if candidates.iter().any(|node| !node.package_imports.is_empty()) {
+            if candidates.iter().any(|node| !node.package_imports.is_empty())
+                || candidates.first().is_some_and(|node| node.members.iter().any(|row| {
+                    row.role == "timer" || (row.role == "bind"
+                        && matches!(row.name.as_str(), FILE_LIST_BINDING | FILE_MUTATE_BINDING | FILE_OPEN_BINDING))
+                }))
+            {
                 let mut units = vec![ace_core::source::packages::PackageModuleInput {
                     package: "app".into(),
                     version: "1.0.0".into(),
@@ -1812,10 +1891,11 @@ impl NodeDesktopBridge {
                 }];
                 super::ace_widget_packages::append_widget_packages(
                     std::path::Path::new(path),
+                    src,
                     &candidates,
                     &mut units,
                 )?;
-                return Self::load_package(units, "app::app", instances);
+                return Self::load_package_paths(units, "app::app", instances, RouteModulePaths::new());
             }
         }
         // PLAN-104：harness 不消费 style 面（A2Vue 覆盖样式）；空白化保字节长。
@@ -2105,7 +2185,7 @@ impl NodeDesktopBridge {
         entry: &str,
         instances: usize,
     ) -> Result<Self, String> {
-        Self::load_package_paths(units, entry, instances, RouteModulePaths::new())
+        on_widget_stack("compile", || Self::load_package_paths(units, entry, instances, RouteModulePaths::new()))
     }
 
     fn load_package_paths(
@@ -2129,8 +2209,9 @@ impl NodeDesktopBridge {
             .expect("entry was present in the package units");
         shell_unit.source = prepared.source;
         if let Some(path) = paths.get(entry) {
-            let nodes = package_candidates(&shell_unit.source)?;
-            super::ace_widget_packages::append_widget_packages(path, &nodes, &mut shell_units)?;
+            let source = shell_unit.source.clone();
+            let nodes = package_candidates(&source)?;
+            super::ace_widget_packages::append_widget_packages(path, &source, &nodes, &mut shell_units)?;
         }
         let mut bridge = Self::load_package_leaf(shell_units, entry, instances)?;
         let links = if bridge.has_checked_package_view() {
@@ -2308,6 +2389,22 @@ impl NodeDesktopBridge {
         Ok(shell)
     }
 
+    /// Open a fresh session with file access supplied by the trusted window host.
+    pub fn open_with_file_access(
+        &mut self,
+        root: &std::path::Path,
+        writes: auto_lang_core::file_session::FileWritePermissions,
+    ) -> Result<i32, String> {
+        let session = self.open()?;
+        for instance in 0..self.instances {
+            if let Err(error) = self.grant_file_access(instance, root, writes) {
+                let _ = self.close_for_shutdown();
+                return Err(format!("ace.desktop.file-grant: {error}"));
+            }
+        }
+        Ok(session)
+    }
+
     /// Open the frame layout and defer its values until a fresh event arrives.
     pub(crate) fn open_awaiting_event(&mut self) -> Result<i32, String> {
         self.open_lane(true)
@@ -2381,7 +2478,11 @@ impl NodeDesktopBridge {
                     .iter()
                     .map(|i| (i.field.clone(), i.numeric))
                     .collect();
+                let focus = frames.iter().enumerate().rev().find_map(|(instance, frame)| {
+                    frame.focus_target().map(|target| package_view::focus_id(session, instance, target))
+                });
                 s.package_frames = frames;
+                s.publish_focus(focus);
                 if s.package_frames.is_empty() && self.routes.is_none()
                     && self.inputs.is_empty()
                     && unsupported_widget_condition(&self.view_items, false).is_none()
@@ -2411,12 +2512,14 @@ impl NodeDesktopBridge {
                 }
             }
         }
-        if deferred_snapshot {
-            return Ok(session);
+        if !deferred_snapshot {
+            if let Err(error) = self.apply_initial_snapshot() {
+                let _ = self.close_session();
+                return Err(error);
+            }
         }
-        if let Err(error) = self.apply_initial_snapshot() {
-            let _ = self.close_session();
-            return Err(error);
+        if let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() {
+            engine.start_timers(std::time::Instant::now());
         }
         Ok(session)
     }
@@ -2657,33 +2760,41 @@ impl NodeDesktopBridge {
     }
 
     fn step_package_lane(&mut self, session: i32) -> StepOutcome {
-        let Some(PackageInput { instance, revision, target, coordinates }) = ({
+        let Some((instance, revision, target, text, coordinates)) = ({
             let mut host = host().write().unwrap();
             host.get(session).and_then(|front| {
-                let input = front.package_events.pop_front()?;
-                front.polled += 1;
-                if front.package_frame(input.instance).is_some_and(|frame| frame.revision == input.revision) {
-                    Some(input)
-                } else {
+                if let Some(event) = front.package_events.pop_front() {
+                    front.polled += 1;
+                    let resolved = front.package_frame(event.instance).and_then(|frame| {
+                        let target = if frame.revision == event.revision {
+                            event.target
+                        } else {
+                            frame.queued_action_target(event.action.as_ref()?)?
+                        };
+                        Some((frame.revision, target))
+                    });
+                    if let Some((revision, target)) = resolved {
+                        return Some((event.instance, revision, target, event.text, event.coordinates));
+                    }
                     front.stale_rejected += 1;
-                    None
+                    return None;
                 }
+                let (instance, revision, _) = front.package_focus_notices.front()?;
+                let position = front.package_focus_notices.iter()
+                    .take_while(|(root, frame, _)| root == instance && frame == revision)
+                    .position(|(_, _, notice)| !notice.gained()).unwrap_or(0);
+                let (instance, _, notice) = front.package_focus_notices.remove(position)?;
+                front.polled += 1;
+                let target = front.package_frame(instance).and_then(|frame| {
+                    frame.focus_notice_target(&notice).map(|target| (instance, frame.revision, target, None, None))
+                });
+                if target.is_none() {
+                    front.stale_rejected += 1;
+                }
+                target
             })
         }) else {
-            let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() else {
-                unreachable!("package lane has a package engine");
-            };
-            return match engine.dispatch_due_timer(&self.identities, std::time::Instant::now()) {
-                Some(Ok((instance, message, DispatchOutcome::Delivered(states)))) =>
-                    self.publish_package_frame(instance, &message, states),
-                Some(Ok((_, _, DispatchOutcome::Dropped(reason)))) =>
-                    StepOutcome::DispatchRefused(format!("{reason:?}")),
-                Some(Err(error)) => {
-                    self.errors.push(error.clone());
-                    StepOutcome::DispatchRefused(error)
-                }
-                None => StepOutcome::Idle,
-            };
+            return self.step_package_timers();
         };
         let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() else {
             unreachable!("package lane has a package engine");
@@ -2708,11 +2819,28 @@ impl NodeDesktopBridge {
                 };
             }
         }
-        match engine.dispatch_frame(id, revision, target, coordinates) {
+        match engine.dispatch_frame(id, revision, target, text, coordinates) {
             Ok((message, DispatchOutcome::Delivered(states))) => {
                 self.publish_package_frame(instance, &message, states)
             }
             Ok((_, DispatchOutcome::Dropped(reason))) => StepOutcome::DispatchRefused(format!("{reason:?}")),
+            Err(error) => {
+                self.errors.push(error.clone());
+                StepOutcome::DispatchRefused(error)
+            }
+        }
+    }
+
+    fn step_package_timers(&mut self) -> StepOutcome {
+        let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() else {
+            unreachable!("package timers require a package engine");
+        };
+        let Some((instance, message, outcome)) = engine.dispatch_due_timer(std::time::Instant::now()) else {
+            return StepOutcome::Idle;
+        };
+        match outcome {
+            Ok(DispatchOutcome::Delivered(states)) => self.publish_package_frame(instance, &message, states),
+            Ok(DispatchOutcome::Dropped(reason)) => StepOutcome::DispatchRefused(format!("{reason:?}")),
             Err(error) => {
                 self.errors.push(error.clone());
                 StepOutcome::DispatchRefused(error)
@@ -2731,7 +2859,20 @@ impl NodeDesktopBridge {
         if let Some(session) = self.session {
             let mut host = host().write().unwrap();
             if let Some(front) = host.get(session) {
+                let focus = frame.focus_target().map(|target| package_view::focus_id(session, instance, target));
+                let pending_before = front.package_focus_notices.len();
+                front.package_focus_notices.retain(|(root, _, notice)| {
+                    *root != instance || frame.focus_notice_target(notice).is_some()
+                });
+                front.stale_rejected += (pending_before - front.package_focus_notices.len()) as u64;
+                let pending_before = front.package_events.len();
+                front.package_events.retain(|event| {
+                    event.instance != instance || event.action.as_ref()
+                        .is_none_or(|notice| frame.queued_action_target(notice).is_some())
+                });
+                front.stale_rejected += (pending_before - front.package_events.len()) as u64;
                 front.package_frames[instance] = frame;
+                front.publish_focus(focus);
                 front.applies += 1;
             }
         }
@@ -2750,6 +2891,34 @@ impl NodeDesktopBridge {
             return StepOutcome::LaneError("typed event refused: no current display lane".into());
         }
         self.dispatch_event(instance, msg, Some(args))
+    }
+
+    /// Grant a directory to one mounted checked widget instance.
+    pub fn grant_file_read(&self, instance: usize, root: &std::path::Path) -> Result<(), String> {
+        let (engine, identity) = self.file_instance(instance)?;
+        engine.grant_file_read(identity, root)
+    }
+
+    /// Grant the trusted host's selected operations to a mounted instance.
+    pub fn grant_file_access(
+        &self, instance: usize, root: &std::path::Path,
+        writes: auto_lang_core::file_session::FileWritePermissions,
+    ) -> Result<(), String> {
+        let (engine, identity) = self.file_instance(instance)?;
+        engine.grant_file_access(identity, root, writes)
+    }
+
+    pub fn revoke_file_read(&self, instance: usize) -> Result<(), String> {
+        let (engine, identity) = self.file_instance(instance)?;
+        engine.revoke_file_read(identity)
+    }
+
+    fn file_instance(&self, instance: usize) -> Result<(&PackageStateEngine, &str), String> {
+        let Some(BridgeEngine::Package(engine)) = self.engine.as_ref() else {
+            return Err("ace.desktop.file-session: no checked widget package is mounted".into());
+        };
+        let identity = self.identities.get(instance).ok_or("ace.desktop.file-session: unknown instance")?;
+        Ok((engine, identity))
     }
 
     pub(crate) fn can_dispatch_to_current_lane(&self) -> bool {
@@ -3141,6 +3310,8 @@ pub enum NodeDesktopMsg {
         x: f32,
         y: f32,
     },
+    PackageText { session: i32, instance: usize, revision: u64, target: usize, text: String },
+    PackageFocus { session: i32, instance: usize, revision: u64, control: String, gained: bool },
     Widget { session: i32, instance: usize, action: WidgetAction },
     BridgeTick,
 }
@@ -3152,6 +3323,17 @@ pub struct AceNodeDesktopWindow;
 
 impl Component for AceNodeDesktopWindow {
     type Msg = NodeDesktopMsg;
+
+    fn take_focus_request(&mut self) -> Option<crate::ui::component::FocusRequest> {
+        let page = with_bridge(|bridge| bridge.routes.as_deref().and_then(DesktopRoutes::page_session)).flatten();
+        let mut host = host().write().ok()?;
+        let current = host.current;
+        page.into_iter().chain(current).find_map(|session| {
+            let front = host.get(session)?;
+            if front.closed { return None }
+            front.focus_request.take()
+        })
+    }
 
     fn key_bindings(&self) -> std::collections::HashMap<String, String> {
         if widget_keyboard_session().is_none() {
@@ -3229,14 +3411,16 @@ impl Component for AceNodeDesktopWindow {
                 with_bridge(|b| b.step());
             }
             NodeDesktopMsg::PackageClick { session, instance, revision, target } => {
-                push_package_event(session, PackageInput {
-                    instance, revision, target, coordinates: None,
-                });
+                push_package_event(session, instance, revision, target, None, None);
             }
             NodeDesktopMsg::PackagePointer { session, instance, revision, target, x, y } => {
-                push_package_event(session, PackageInput {
-                    instance, revision, target, coordinates: Some((x, y)),
-                });
+                push_package_event(session, instance, revision, target, None, Some((x, y)));
+            }
+            NodeDesktopMsg::PackageText { session, instance, revision, target, text } => {
+                push_package_event(session, instance, revision, target, Some(text), None);
+            }
+            NodeDesktopMsg::PackageFocus { session, instance, revision, control, gained } => {
+                push_package_focus(session, instance, revision, control, gained);
             }
             NodeDesktopMsg::Widget { session, instance, action } => {
                 if let WidgetAction::DispatchButton(target) = action {
@@ -3276,18 +3460,20 @@ impl Component for AceNodeDesktopWindow {
                 .child(View::text("ace-node-desktop: no session"))
                 .build();
         };
+        let mut dialogs = Vec::new();
         let outlet = mounted.map(|(after, page_id, diagnostic)| {
             let page = page_id.and_then(|id| {
                 let host = host().read().ok()?;
                 host.sessions.iter().find(|session| session.id == id && !session.closed).map(host_frame)
             });
-            let view = page.map(|frame| render_host_frame(frame, None, true))
+            let view = page.map(|frame| render_host_frame(frame, None, true, &mut dialogs))
                 .or_else(|| diagnostic.map(View::text))
                 .unwrap_or_else(View::empty);
             (after, view)
         });
         let routed = outlet.is_some();
-        View::col().padding(24).child(render_host_frame(shell, outlet, routed)).build()
+        let content = render_host_frame(shell, outlet, routed, &mut dialogs);
+        View::col().padding(24).child(content).children(dialogs).build()
     }
 }
 
@@ -3413,25 +3599,26 @@ fn render_host_frame(
     frame: HostFrame,
     mut outlet: Option<(usize, View<NodeDesktopMsg>)>,
     routed: bool,
+    dialogs: &mut Vec<View<NodeDesktopMsg>>,
 ) -> View<NodeDesktopMsg> {
     let HostFrame {
         id, generation, texts, states, buttons, inputs, visibility, labels, widget_tree,
         widget_instances, widget_values, package_frames,
     } = frame;
     if !package_frames.is_empty() {
+        if let [frame] = package_frames.as_slice() {
+            if (!routed || outlet.is_some()) && package_view::owns_viewport(frame) {
+                let page = outlet.as_ref().map(|(_, page)| page);
+                return package_view::view(id, 0, frame, page, routed, dialogs);
+            }
+        }
         let views = package_frames.iter().enumerate()
             .map(|(index, frame)| {
                 let page = if index == 0 { outlet.take().map(|(_, page)| page) } else { None };
-                package_view::view(id, index, frame, page.as_ref(), routed)
+                package_view::view(id, index, frame, page.as_ref(), routed, dialogs)
             });
         let content = View::col().children(views).build();
-        // A routed shell owns its viewport and scroll surfaces. Wrapping it
-        // in another vertical scroll removes the height bound used by h-screen.
-        return if routed {
-            content
-        } else {
-            View::scrollable(content).build()
-        };
+        return if routed { content } else { View::scrollable(content).build() };
     }
     if let Some(tree) = widget_tree {
         let children = widget_instances
@@ -3529,12 +3716,28 @@ fn render_host_frame(
 /// MIN-A-UI 入口（`AUTO_UI_ENGINE=ace` 消费）：装载→open（FFI 实效果）→
 /// run_app 真窗（tick 驱动受控事件循环）。窗口阻塞至关闭。
 pub fn run_ace_node_desktop_ui(src: &str, path: &str, instances: usize) -> Result<(), String> {
+    run_ace_node_desktop_ui_with_access(src, path, instances, None)
+}
+
+pub(crate) fn run_ace_node_desktop_ui_with_access(
+    src: &str,
+    path: &str,
+    instances: usize,
+    access: Option<(&std::path::Path, auto_lang_core::file_session::FileWritePermissions)>,
+) -> Result<(), String> {
     let mut bridge = NodeDesktopBridge::load(src, path, instances)?;
-    bridge.open()?;
+    match access {
+        Some((root, writes)) => bridge.open_with_file_access(root, writes)?,
+        None => bridge.open()?,
+    };
     install_bridge(bridge);
+    #[cfg(windows)]
+    let _pointer_clock = crate::ui::iced::native_pointer_time::Capture::start();
     let result = crate::ui::iced::run_app::<AceNodeDesktopWindow>()
         .map_err(|e| format!("node desktop window: {e:?}"));
-    let close = with_bridge(NodeDesktopBridge::close_for_shutdown).unwrap_or(Ok(()));
+    let bridge = BRIDGE.get().expect("installed desktop bridge")
+        .write().unwrap().take();
+    let close = bridge.map_or(Ok(()), |mut bridge| bridge.close_for_shutdown());
     result.and(close)
 }
 

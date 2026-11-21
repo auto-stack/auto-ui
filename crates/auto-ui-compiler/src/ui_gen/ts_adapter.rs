@@ -1943,7 +1943,7 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                         // 有参 — 前后缀 / 字符 / 查找 / 子串 / 替换 / 重复：
                         // Plan 028 M1: 带闭包参数时不走字符串映射表 ——
                         // `.find(e => …)` 是 Array.find，不是 indexOf。
-                        "starts_with" | "ends_with" | "char_at" | "char_code_at" | "find"
+                        "starts_with" | "ends_with" | "char_at" | "char_code_at" | "codepoint_at" | "find"
                         | "substr" | "sub" | "slice" | "replace" | "repeat"
                             if !call
                                 .args
@@ -1959,6 +1959,7 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                                 "char_at" => "charAt",
                                 // Plan 028 F3: char_code_at → charCodeAt
                                 "char_code_at" => "charCodeAt",
+                                "codepoint_at" => "codePointAt",
                                 // find 返回 index 或 -1
                                 "find" => "indexOf",
                                 // substr/sub/slice 同一 native，start..end 子串
@@ -2533,7 +2534,54 @@ fn try_transpile_builtin_call(
         // 解析后的对象，恒等映射让 `json.to_value(Http.get_json(url))` 成为
         // 双端同源不分公司配方（030 player_store 即此写法）。
         "json" => {
-            if method == "to_value" {
+            if matches!(method, "object_text" | "object_i32") {
+                let [source, key, fallback] = args.args.as_slice() else {
+                    return false;
+                };
+                let read = if method == "object_text" {
+                    r#"(source: string, key: string, fallback: string) => {
+  try {
+    const object = JSON.parse(source);
+    if (object === null || typeof object !== 'object' || Array.isArray(object)) return fallback;
+    const value = Object.prototype.hasOwnProperty.call(object, key) ? object[key] : undefined;
+    return typeof value === 'string' && !/[\uD800-\uDFFF]/u.test(value) ? value : fallback;
+  } catch { return fallback; }
+}"#
+                } else {
+                    // Keep the original integer token. JS numbers alone cannot distinguish
+                    // an integer from a fraction or exponent that evaluates to the same value.
+                    r#"(source: string, key: string, fallback: number) => {
+  try {
+    const object = JSON.parse(source);
+    if (object === null || typeof object !== 'object' || Array.isArray(object)) return fallback;
+    let depth = 0;
+    let result = fallback;
+    const tokens = /"(?:\\[\s\S]|[^"\\])*"|[{}\[\]]/g;
+    for (let token = tokens.exec(source); token; token = tokens.exec(source)) {
+      const head = token[0][0];
+      if (head === '{' || head === '[') depth++;
+      else if (head === '}' || head === ']') depth--;
+      else if (depth === 1) {
+        const tail = source.slice(token.index + token[0].length);
+        if (!/^\s*:/.test(tail) || JSON.parse(token[0]) !== key) continue;
+        const match = /^\s*:\s*(-?(?:0|[1-9]\d*))\s*(?=[,}])/.exec(tail);
+        const value = match ? Number(match[1]) : NaN;
+        result = Number.isInteger(value) && value >= -2147483648 && value <= 2147483647 ? value : fallback;
+      }
+    }
+    return result;
+  } catch { return fallback; }
+}"#
+                };
+                write!(out, "({read})(").ok();
+                transpile_expr(&source.get_expr(), ctx, out);
+                write!(out, ", ").ok();
+                transpile_expr(&key.get_expr(), ctx, out);
+                write!(out, ", ").ok();
+                transpile_expr(&fallback.get_expr(), ctx, out);
+                write!(out, ")").ok();
+                true
+            } else if method == "to_value" {
                 match args.args.first() {
                     Some(a) => {
                         // PLAN-677 T-05b: 实参是 api 契约调用时恒等映射是错的——

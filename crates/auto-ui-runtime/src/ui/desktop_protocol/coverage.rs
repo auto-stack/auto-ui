@@ -688,7 +688,7 @@ pub fn native_kind_of<M: Clone + std::fmt::Debug>(view: &crate::ui::view::View<M
     match view {
         View::Empty => "empty",
         View::AnchorSlot { .. } => "anchorslot",
-        View::ScrollAnchorMark { child, .. } => native_kind_of(child),
+        View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } => native_kind_of(child),
         View::Text { .. } => "text",
         View::Rich { .. } => "text",
         View::Button { .. } => "button",
@@ -747,7 +747,7 @@ fn scan_native_node<M: Clone + std::fmt::Debug>(
     scan.tags.insert(kind.to_string());
     // 变体自带 style 的统一收集（typed StyleClass → 代表 token）。
     let styles: Vec<Option<&crate::ui::style::Style>> = match view {
-        View::Empty | View::AnchorSlot { .. } | View::ScrollAnchorMark { .. } => vec![],
+        View::Empty | View::AnchorSlot { .. } | View::ScrollAnchorMark { .. } | View::FocusTarget { .. } => vec![],
         View::ManagedScrollContent { .. } => vec![],
         View::Popover { .. } | View::Overlay { .. } => vec![],
         View::Text { style, .. }
@@ -791,6 +791,7 @@ fn scan_native_node<M: Clone + std::fmt::Debug>(
     // 子级递归（变体形状各异——逐一列出）。
     match view {
         View::AnchorSlot { child, .. }
+        | View::FocusTarget { child, .. }
         | View::Container { child, .. }
         | View::Scrollable { child, .. }
         | View::Sidebar { content: child, .. } => scan_native_node(child, scan),

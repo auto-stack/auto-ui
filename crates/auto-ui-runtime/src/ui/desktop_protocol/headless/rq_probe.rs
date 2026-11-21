@@ -73,6 +73,7 @@ fn capability_id(v: &View<()>) -> &'static str {
         Empty => "cap.view.empty",
         AnchorSlot { .. } => "cap.view.anchor_slot",
         ScrollAnchorMark { .. } => "cap.view.scroll_anchor_mark",
+        FocusTarget { .. } => "cap.view.focus_target",
         Text { .. } => "cap.view.text",
         Rich { .. } => "cap.view.rich",
         Button { .. } => "cap.view.button",
@@ -112,11 +113,12 @@ fn capability_id(v: &View<()>) -> &'static str {
     }
 }
 
-/// 分母：39 个 View 变体 + 平台服务/生成器入口（由 T-01 静态清单登记）。
-const ALL_VIEW_CAPABILITY_IDS: [&str; 39] = [
+/// 分母：40 个 View 变体 + 平台服务/生成器入口（由 T-01 静态清单登记）。
+const ALL_VIEW_CAPABILITY_IDS: [&str; 40] = [
     "cap.view.empty",
     "cap.view.anchor_slot",
     "cap.view.scroll_anchor_mark",
+    "cap.view.focus_target",
     "cap.view.text",
     "cap.view.rich",
     "cap.view.button",
@@ -177,7 +179,7 @@ fn styled_text(content: &str, style: &str) -> View<()> {
 fn corpus() -> Vec<Case> {
     let mut cases: Vec<Case> = Vec::new();
 
-    // 39 个 View 变体的分母补齐（V-01 逐项读数要求每个能力 ID 至少一例；
+    // 40 个 View 变体的分母补齐（V-01 逐项读数要求每个能力 ID 至少一例；
     // 缺例不能静默删分母，故 empty/column 这两条在此显式构造）。
     cases.push(Case {
         id: "empty",
@@ -494,6 +496,18 @@ fn corpus() -> Vec<Case> {
         note: "ready",
     });
 
+    cases.push(Case {
+        id: "focus_target",
+        view: View::FocusTarget {
+            id: "probe-focus".into(),
+            activation: Some(()),
+            keys: Vec::new(),
+            on_focus: None,
+            on_blur: None,
+            child: Box::new(View::button("Focus", ())),
+        },
+        note: "ready",
+    });
     cases.push(Case {
         id: "video_placeholder",
         view: View::Video {
@@ -1221,7 +1235,7 @@ fn rq_probe_t01_capability_denominator_is_complete() {
     );
 }
 
-/// PLAN-062 T-05 / AC-01：**39 个 View 能力 ID 的逐项读数**。
+/// PLAN-062 T-05 / AC-01：**40 个 View 能力 ID 的逐项读数**。
 ///
 /// 每个 ID 取语料首个例，走与产品同源的记录路径（`HeadlessSurface` →
 /// `render_frame_v2` → broker canvas 重放），与 direct 金样（同一 View 的 iced
@@ -1392,7 +1406,7 @@ fn rq_probe_t05_capability_rows() {
     assert_eq!(
         ok,
         ALL_VIEW_CAPABILITY_IDS.len(),
-        "39 个 ID 必须全部有成功读数"
+        "40 个 ID 必须全部有成功读数"
     );
 
     // AC-01 的关闭条件（逐 ID）：**真实输出 + 结构对拍**，不是“渲染没崩”。

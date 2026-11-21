@@ -1,4 +1,9 @@
-use auto.json
+use std.json: json_str
+
+fn thumbnail_icon(icon_name str, item_kind str) Str {
+    if icon_name != "" { return icon_name.to(Str) }
+    return item_kind.to(Str)
+}
 
 // The keyed child owns the load status of one image. Its callbacks update
 // that child only, so a discarded image cannot change its replacement.
@@ -10,10 +15,10 @@ widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName:
         var http_source str = ""
     }
     computed {
-        actual_icon => if .iconName != "" { .iconName } else { .kind }
+        actual_icon => thumbnail_icon(.iconName, .kind)
         bad_image => .failed || .state == "error"
         native_http => .native_track && !.src.starts_with("/api/__auto/media/") && (.src.starts_with("/api/") || .src.starts_with("http://") || .src.starts_with("https://"))
-        cache_identity => "" + .resourceId.len() + ":" + .resourceId + .resourceRevision
+        cache_identity => f"${.resourceId.len()}:${.resourceId}${.resourceRevision}"
     }
     view {
         col (style: "w-full h-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-md bg-muted") {
@@ -51,10 +56,13 @@ widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName:
     }
     on {
         .Init -> {
-            let track str = Env.track()
-            .native_track = track == "vm"
-            if .native_track {
-                .http_source = "native-http-image:" + json.stringify({uri: .src, resource_id: .resourceId, revision: .resourceRevision})
+            if Env.track() == "vm" {
+                .native_track = true
+                let source = "native-http-image:{\"uri\":" + json_str(.src.to(Str))
+                let resource = source + ",\"resource_id\":" + json_str(.resourceId.to(Str))
+                .http_source = resource + ",\"revision\":" + json_str(.resourceRevision.to(Str)) + "}"
+            } else {
+                .native_track = false
             }
         }
         .ImageFailed -> { .failed = true }

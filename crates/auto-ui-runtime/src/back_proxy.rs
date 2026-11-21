@@ -29,6 +29,7 @@ use std::sync::mpsc;
 use std::sync::Arc;
 
 use auto_lang_core::ast::Stmt;
+use auto_lang_core::file_session::{with_file_session, FileAccessError, FileSession};
 use auto_lang_core::vm::engine::AutoVM;
 use auto_lang_core::vm::ffi::http_server::{ApiParamSig, HttpRoute};
 use auto_lang_core::vm::loader::Linker;
@@ -47,6 +48,10 @@ const MODULE_INIT_FN: &str = "__module_init";
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 /// 请求体大小上限。
 const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
+const FILE_SESSION_PREFIX: &str = "file-session-";
+
+mod browser_files;
+pub use browser_files::{start_file_browser, start_file_browser_with_writes, BrowserFileServer};
 
 /// 一个 app 后端的装载描述。
 #[derive(Debug, Clone, PartialEq)]
@@ -108,14 +113,50 @@ pub struct RunningProxy {
     shared: Arc<ProxyShared>,
 }
 
+/// The private backend URL and directory authority for one file dialog or page.
+/// The host retains this value for the lifetime of that owner.
+pub struct FileBackendSession {
+    key: String,
+    port: u16,
+    access: Arc<FileSession>,
+    shared: Arc<ProxyShared>,
+}
+
+impl FileBackendSession {
+    pub fn base_url(&self) -> String {
+        format!("http://127.0.0.1:{}/apps/{}", self.port, self.key)
+    }
+
+    pub fn grant_read(&self, root: &std::path::Path) -> Result<(), FileAccessError> {
+        self.access.grant_read(root)
+    }
+
+    pub fn revoke(&self) {
+        self.access.revoke();
+    }
+
+    pub fn close(&self) -> Option<std::thread::JoinHandle<()>> {
+        self.access.close();
+        remove_session(&self.shared, &self.key)
+    }
+}
+
+impl Drop for FileBackendSession {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 /// PLAN-037 T-01: 一个已装载 session 的通道 + 线程句柄（remove_app 取出
 /// JoinHandle 供测试 join 断言线程退出；生产侧直接 drop = 分离线程）。
 struct SessionHandle {
     tx: mpsc::Sender<ProxyRequest>,
     join: Option<std::thread::JoinHandle<()>>,
+    file_access: Option<Arc<FileSession>>,
 }
 
 struct ProxyShared {
+    browser_files: Option<Arc<browser_files::BrowserFiles>>,
     /// app_id → session 请求通道。PLAN-037 T-01: listener 连接线程与宿主
     /// 线程（运行期 add/remove）双写，Mutex 化（658 boot 期单写者免锁形态
     /// 随桌面按需装载退役）。
@@ -201,6 +242,13 @@ impl ProxyReply {
 /// spawning，见 BackProxyConfig.lazy_sessions）、进入 accept 循环（listener
 /// 线程后台运行）。
 pub fn start(config: BackProxyConfig) -> std::io::Result<RunningProxy> {
+    start_proxy(config, None)
+}
+
+fn start_proxy(
+    config: BackProxyConfig,
+    browser_files: Option<Arc<browser_files::BrowserFiles>>,
+) -> std::io::Result<RunningProxy> {
     let want_port = if config.port != 0 {
         config.port
     } else {
@@ -209,7 +257,14 @@ pub fn start(config: BackProxyConfig) -> std::io::Result<RunningProxy> {
             .and_then(|v| v.trim().parse().ok())
             .unwrap_or(DEFAULT_PROXY_PORT)
     };
-    let (listener, port) = bind_with_fallback(want_port)?;
+    let (listener, port) = if browser_files.is_some() {
+        let listener = TcpListener::bind(("127.0.0.1", 0))?;
+        listener.set_nonblocking(true)?;
+        let port = listener.local_addr()?.port();
+        (listener, port)
+    } else {
+        bind_with_fallback(want_port)?
+    };
 
     let mut sessions = HashMap::new();
     let mut catalog: HashMap<String, SessionSpec> = HashMap::new();
@@ -220,11 +275,12 @@ pub fn start(config: BackProxyConfig) -> std::io::Result<RunningProxy> {
             catalog.insert(spec.app_id.clone(), spec.clone());
             continue;
         }
-        let handle = spawn_session(spec)?;
+        let handle = spawn_session(spec, None)?;
         sessions.insert(spec.app_id.clone(), handle);
     }
 
     let shared = Arc::new(ProxyShared {
+        browser_files,
         sessions: std::sync::Mutex::new(sessions),
         lazy: config.lazy_sessions,
         catalog: std::sync::Mutex::new(catalog),
@@ -308,14 +364,18 @@ fn bind_with_fallback(want: u16) -> std::io::Result<(TcpListener, u16)> {
 /// PLAN-675 T-08: 会话线程 spawn 提取共用（start eager 循环 / add_session /
 /// ensure_session 三臂同款——16MB 栈 + 线程名）。装载本身在会话线程进行，
 /// spawn 即返。
-fn spawn_session(spec: &SessionSpec) -> std::io::Result<SessionHandle> {
+fn spawn_session(
+    spec: &SessionSpec,
+    file_access: Option<Arc<FileSession>>,
+) -> std::io::Result<SessionHandle> {
     let (tx, rx) = mpsc::channel::<ProxyRequest>();
     let spawn_app_id = spec.app_id.clone();
     let entry = spec.back_entry.clone();
+    let access = file_access.clone();
     let join = std::thread::Builder::new()
         .name(format!("back-proxy-session:{}", spec.app_id))
         .stack_size(16 * 1024 * 1024)
-        .spawn(move || session_main(spawn_app_id, entry, rx))
+        .spawn(move || session_main(spawn_app_id, entry, access, rx))
         .map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -325,6 +385,7 @@ fn spawn_session(spec: &SessionSpec) -> std::io::Result<SessionHandle> {
     Ok(SessionHandle {
         tx,
         join: Some(join),
+        file_access,
     })
 }
 
@@ -340,7 +401,7 @@ fn ensure_session(shared: &ProxyShared, app_id: &str) -> bool {
     let Some(spec) = shared.catalog.lock().unwrap().get(app_id).cloned() else {
         return false;
     };
-    match spawn_session(&spec) {
+    match spawn_session(&spec, None) {
         Ok(handle) => {
             log::info!("[back-proxy:{app_id}] lazy session spawning on first request");
             sessions.insert(app_id.to_string(), handle);
@@ -354,6 +415,12 @@ fn ensure_session(shared: &ProxyShared, app_id: &str) -> bool {
 }
 
 impl RunningProxy {
+    /// Start an ungranted file backend on a fresh session URL. File lookups
+    /// require a trusted host to grant a directory on the returned handle.
+    pub fn open_file_session(&self, spec: SessionSpec) -> std::io::Result<FileBackendSession> {
+        open_file_session(&self.shared, self.port, &spec, Arc::new(FileSession::default()))
+    }
+
     /// app 是否已注册 session（020 这类仅宿主原生路由的 app 无 session）。
     /// PLAN-675 T-08: lazy 档下目录在册即可服务（未装载——首个请求触发
     /// ensure_session 同步装载），与 eager 的"已 spawn"并义。
@@ -379,7 +446,7 @@ impl RunningProxy {
                 ),
             ));
         }
-        let handle = spawn_session(&spec)?;
+        let handle = spawn_session(&spec, None)?;
         sessions.insert(spec.app_id.clone(), handle);
         Ok(())
     }
@@ -423,13 +490,7 @@ impl RunningProxy {
     /// 自然退出）。返回 session 线程 JoinHandle 供测试 join 断言退出；
     /// 无 session（仅原生 media 的 020 形态）返回 None，生产侧直接 drop。
     pub fn remove_app(&self, app_id: &str) -> Option<std::thread::JoinHandle<()>> {
-        let join = self
-            .shared
-            .sessions
-            .lock()
-            .unwrap()
-            .remove(app_id)
-            .and_then(|mut handle| handle.join.take());
+        let join = remove_session(&self.shared, app_id);
         self.shared.native_media.lock().unwrap().remove(app_id);
         self.shared.native_photos.lock().unwrap().remove(app_id);
         join
@@ -442,13 +503,50 @@ impl RunningProxy {
     }
 }
 
+fn file_nonce() -> std::io::Result<String> {
+    let mut nonce = [0; 16];
+    getrandom::fill(&mut nonce)
+        .map_err(|error| std::io::Error::other(format!("file session entropy: {error}")))?;
+    Ok(format!("{:032x}", u128::from_be_bytes(nonce)))
+}
+
+fn open_file_session(
+    shared: &Arc<ProxyShared>,
+    port: u16,
+    spec: &SessionSpec,
+    access: Arc<FileSession>,
+) -> std::io::Result<FileBackendSession> {
+    let key = format!("{FILE_SESSION_PREFIX}{}", file_nonce()?);
+    let mut sessions = shared.sessions.lock().unwrap();
+    let std::collections::hash_map::Entry::Vacant(slot) = sessions.entry(key.clone()) else {
+        return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "file session collision"));
+    };
+    slot.insert(spawn_session(spec, Some(access.clone()))?);
+    Ok(FileBackendSession { key, port, access, shared: shared.clone() })
+}
+
+fn remove_session(shared: &ProxyShared, key: &str) -> Option<std::thread::JoinHandle<()>> {
+    let mut handle = shared.sessions.lock().unwrap().remove(key)?;
+    if let Some(access) = handle.file_access.take() {
+        access.close();
+    }
+    handle.join.take()
+}
+
 // ---------------------------------------------------------------------------
 // HTTP 前端（listener 线程）
 // ---------------------------------------------------------------------------
 
 fn listener_main(listener: TcpListener, shared: Arc<ProxyShared>) {
-    for stream in listener.incoming() {
-        let Ok(stream) = stream else { continue };
+    while shared.browser_files.as_ref().is_none_or(|files| files.is_active()) {
+        let stream = match listener.accept() {
+            Ok((stream, _)) => stream,
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+                continue;
+            }
+            Err(_) => continue,
+        };
         let shared = shared.clone();
         std::thread::Builder::new()
             .name("back-proxy-conn".to_string())
@@ -467,15 +565,31 @@ struct ParsedRequest {
     body: Vec<u8>,
 }
 
-fn serve_connection(mut stream: TcpStream, shared: &ProxyShared) -> std::io::Result<()> {
+fn serve_connection(mut stream: TcpStream, shared: &Arc<ProxyShared>) -> std::io::Result<()> {
+    if shared.browser_files.is_some() {
+        stream.set_nonblocking(false)?;
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
+    }
     let req = match read_request(&mut stream)? {
         Some(r) => r,
         None => return Ok(()),
     };
 
     // 子前缀路由：/apps/<app_id>/<rest>
+    let no_store = req
+        .path
+        .strip_prefix("/apps/")
+        .is_some_and(|path| path.starts_with(FILE_SESSION_PREFIX));
+    if let Some(files) = &shared.browser_files {
+        if (no_store || req.path == browser_files::SESSION_PATH) && !files.permits(&req) {
+            return write_response(&mut stream, ProxyReply::json(404, error_json("file session unavailable")), true);
+        }
+        if req.path == browser_files::SESSION_PATH {
+            return files.serve_session(stream, shared, &req);
+        }
+    }
     let reply = route_request(shared, &req);
-    write_response(&mut stream, reply)?;
+    write_response(&mut stream, reply, no_store)?;
     Ok(())
 }
 
@@ -570,57 +684,16 @@ fn route_request(shared: &ProxyShared, req: &ParsedRequest) -> ProxyReply {
             )
         }
     };
-    // PLAN-658 T-03: 宿主原生 media 路由先于 session 分发（020 无 session）。
-    if let Some(reply) = shared.try_native_media(&app_id, &sub_path, req) {
-        return reply;
-    }
-    // PLAN-043 Part 1: 宿主原生 photo 路由（029 无 session，同 media 序位）。
-    if let Some(reply) = shared.try_native_photos(&app_id, &sub_path, req) {
-        return reply;
-    }
-    // PLAN-658 T-05: 031 族图片字节路由（image_pipeline 共享 registry 的
-    // 不透明 `/api/__auto/media/{id}/{rev}` URI，session 内 auto.image 原生
-    // 创建的条目同进程可读——字节保真 + ETag/304 语义直答）。
-    if sub_path.starts_with("/api/__auto/media/") {
-        let if_none = req
-            .headers
-            .iter()
-            .find(|(k, _)| k == "if-none-match")
-            .map(|(_, v)| v.clone());
-        if let Some(resp) = auto_lang_core::vm::ffi::stdlib::media_response_for_vm_request(
-            &req.method,
-            &sub_path,
-            if_none.as_deref(),
-        ) {
-            let mut content_type = "application/octet-stream".to_string();
-            let mut extra_headers = Vec::new();
-            for (k, v) in &resp.headers {
-                if k.eq_ignore_ascii_case("content-type") {
-                    content_type = v.clone();
-                } else {
-                    extra_headers.push((k.clone(), v.clone()));
-                }
-            }
-            let body = resp.body.unwrap_or_else(|| Arc::from(Vec::new()));
-            return ProxyReply::Stream {
-                status: resp.status,
-                content_type,
-                extra_headers,
-                content_length: body.len() as u64,
-                reader: Box::new(std::io::Cursor::new(body)),
-            };
+    if !app_id.starts_with(FILE_SESSION_PREFIX) {
+        if let Some(reply) = route_shared_resource(shared, req, &app_id, &sub_path) {
+            return reply;
         }
-    }
-    // PLAN-037 T-01: sessions 已 Mutex 化——锁内克隆 sender 即放（send
-    // 非阻塞，reply 等待不持锁）。PLAN-675 T-08: lazy 档未命中 → 同步装载
-    // （ensure_session 锁内查目录 spawn），请求随即在 mpsc 排队至装载就绪
-    // ——「点开 demo 即载」语义；装载失败走既有 degraded 503。
-    if shared.lazy {
-        let live = shared.sessions.lock().unwrap().contains_key(&app_id);
-        if !live {
+        // PLAN-675 T-08: lazy 档未命中时装载目录表中的普通应用。
+        if shared.lazy && !shared.sessions.lock().unwrap().contains_key(&app_id) {
             ensure_session(shared, &app_id);
         }
     }
+    // Clone the sender under the lock and release it before waiting on the VM.
     let tx = shared
         .sessions
         .lock()
@@ -657,7 +730,57 @@ fn route_request(shared: &ProxyShared, req: &ParsedRequest) -> ProxyReply {
     }
 }
 
-fn write_response(stream: &mut TcpStream, reply: ProxyReply) -> std::io::Result<()> {
+fn route_shared_resource(
+    shared: &ProxyShared,
+    req: &ParsedRequest,
+    app_id: &str,
+    sub_path: &str,
+) -> Option<ProxyReply> {
+    // PLAN-658 T-03: 宿主原生 media 路由先于 session 分发（020 无 session）。
+    if let Some(reply) = shared.try_native_media(app_id, sub_path, req) {
+        return Some(reply);
+    }
+    // PLAN-043 Part 1: 宿主原生 photo 路由（029 无 session，同 media 序位）。
+    if let Some(reply) = shared.try_native_photos(app_id, sub_path, req) {
+        return Some(reply);
+    }
+    // PLAN-658 T-05: 031 族图片字节路由（image_pipeline 共享 registry 的
+    // 不透明 `/api/__auto/media/{id}/{rev}` URI，session 内 auto.image 原生
+    // 创建的条目同进程可读——字节保真 + ETag/304 语义直答）。
+    if sub_path.starts_with("/api/__auto/media/") {
+        let if_none = req
+            .headers
+            .iter()
+            .find(|(k, _)| k == "if-none-match")
+            .map(|(_, v)| v.clone());
+        if let Some(resp) = auto_lang_core::vm::ffi::stdlib::media_response_for_vm_request(
+            &req.method,
+            sub_path,
+            if_none.as_deref(),
+        ) {
+            let mut content_type = "application/octet-stream".to_string();
+            let mut extra_headers = Vec::new();
+            for (k, v) in &resp.headers {
+                if k.eq_ignore_ascii_case("content-type") {
+                    content_type = v.clone();
+                } else {
+                    extra_headers.push((k.clone(), v.clone()));
+                }
+            }
+            let body = resp.body.unwrap_or_else(|| Arc::from(Vec::new()));
+            return Some(ProxyReply::Stream {
+                status: resp.status,
+                content_type,
+                extra_headers,
+                content_length: body.len() as u64,
+                reader: Box::new(std::io::Cursor::new(body)),
+            });
+        }
+    }
+    None
+}
+
+fn write_response(stream: &mut TcpStream, reply: ProxyReply, no_store: bool) -> std::io::Result<()> {
     // PLAN-658 T-04: SSE 长连接——头后逐帧 `data: <json>\n\n`，断写即退订。
     let reply = match reply {
         ProxyReply::Sse(rx) => {
@@ -717,6 +840,9 @@ fn write_response(stream: &mut TcpStream, reply: ProxyReply) -> std::io::Result<
     let mut head = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nConnection: close\r\n"
     );
+    if no_store {
+        head.push_str("Cache-Control: no-store\r\n");
+    }
     for (k, v) in &extra_headers {
         head.push_str(&format!("{k}: {v}\r\n"));
     }
@@ -1224,7 +1350,12 @@ fn panic_payload_msg(p: &Box<dyn std::any::Any + Send>) -> String {
 /// 不受影响由构造保证）；单请求 panic → 500 + 消息 → 指数退避重建 session
 /// （back 链重编译装载，状态归零——内存态后端语义诚实）；连续失败封顶
 /// 8s。重建失败维持降级应答（503），通道不关闭。
-fn session_main(app_id: String, back_entry: std::path::PathBuf, rx: mpsc::Receiver<ProxyRequest>) {
+fn session_main(
+    app_id: String,
+    back_entry: std::path::PathBuf,
+    file_access: Option<Arc<FileSession>>,
+    rx: mpsc::Receiver<ProxyRequest>,
+) {
     let mut rt = match load_back_session(&app_id, &back_entry) {
         Ok(rt) => {
             log::info!(
@@ -1247,7 +1378,12 @@ fn session_main(app_id: String, back_entry: std::path::PathBuf, rx: mpsc::Receiv
             Some(session) => {
                 let app_id_ref = &app_id;
                 match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    session.handle_request(&req)
+                    match &file_access {
+                        Some(access) => {
+                            with_file_session(access.clone(), || session.handle_request(&req))
+                        }
+                        None => session.handle_request(&req),
+                    }
                 })) {
                     Ok(reply) => {
                         panic_streak = 0;

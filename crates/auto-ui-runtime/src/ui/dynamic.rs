@@ -3165,6 +3165,9 @@ impl DynamicComponent {
                 );
             }
         }
+        if let Err(error) = self.bridge.restore_preferences() {
+            log::warn!("{} preference restore failed: {error}", self.widget_name);
+        }
     }
 
     /// PLAN-626 T-03: CloseRequest 生命周期探测（namespaced/legacy 双查，

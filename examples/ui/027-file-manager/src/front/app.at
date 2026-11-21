@@ -5,22 +5,28 @@
 // - 顶部栏：前进/后退 + 面包屑导航 + 搜索过滤 + 列表/网格视图切换 + 新建/隐藏开关
 // - 内容区：明细列表（表格/可排序列头） vs 图标网格
 // - 弹层（PLAN-016 T-03/T-04）：alert-dialog 模态（新建/重命名/删除确认）
-//   + 锚定 popover 右键菜单（shell dock 菜单同款）+ 框架 toast()
+//   + 锚定 popover 右键菜单（shell dock 菜单同款）+ 文件操作反馈
 // - 主题（PLAN-016 T-01）：全语义 token + dark_mode 声明——桌面 SetTheme 回写链
 //   即时换肤；vue 轨生成器按 dark_mode 绑根 class
 // - 真实文件系统（PLAN-016 T-05/T-06）：VM stdlib（fs/file/env/json）真实目录
 //   浏览与文件操作；mock 平行数组退役。改日期列依赖 metadata.modified
 //   （PLAN-016 crates 扩展；旧宿主二进制该列显示 "--"）
-// - 持久化：storage.get/set 保持视图模式、排序字段、排序方向与隐藏文件状态
+// - 持久化：宿主保存视图模式、排序字段、排序方向与隐藏文件状态
 
-use components.fs_util: format_size, type_label, hidden_name, fmt_date, app_for_ext, is_image_ext, parent_of, base_name, ext_of, build_crumbs, sort_files, valid_entry_name
-use components.collection_items: fm_collection_items, fm_path_index
-use back.api: fs_list, fs_home, fs_drives
-use auto.process
+use components.fs_util: app_for_ext, valid_entry_name
+use components.file_manager_rows: matches_file, file_count_label, fm_path_index, sort_files, listed_file_row
+use components.file_manager_metadata: summarize_bytes
+use components.file_manager_paths: parent_of, build_crumbs, slice_crumbs
+use components.collection_items: fm_collection_items
+use components.collection_request: collection_request_token
+use components.file_manager_model: FileManagerBreadcrumb, FileManagerShortcut, FileManagerDrive, FileManagerRow, PreparedListing, extend_history
+use components.native_directory: native_shortcuts, native_drives, native_listing
+use components.native_file_actions: native_file_mutation, native_open_default
+use std.json: json_object_text, json_object_i32
+use collection_view.collection_schema: CollectionColumn
+use back.api: fs_list, fs_home, fs_mutate
 use auto.fs
 use auto.file
-use auto.json
-use auto.image
 
 // PLAN-046 T-03：接入官方主题包（Auto/Solarized 两族；family 经
 // theme_name + design 绑定；dark_mode 既有契约（宿主 SetTheme 回写链）
@@ -35,25 +41,170 @@ style col_tight = "items-center gap-0.5 shrink-0"
 style search_input = "w-full text-xs px-3 py-2 bg-background border border-border rounded-lg text-foreground mb-1 outline-none focus:border-primary"
 style row_gap3 = "items-center gap-3"
 
+type DirEntry {
+    name str
+    path str
+    is_dir bool
+    size u64
+    mtime i64
+    extension str
+}
+
+type DirListing {
+    ok bool
+    path str
+    entries List<DirEntry>
+}
+
+fn prepare_file_listing(entries List<DirEntry>, query str, include_dotfiles bool, column str, direction str) PreparedListing {
+    var rows List<FileManagerRow> = []
+    var kept int = 0
+    var truncated bool = false
+    var index int = 0
+    while index < entries.len() && !truncated {
+        let entry_name = "" + entries[index].name
+        if matches_file(entry_name.to(str), query, include_dotfiles) {
+            if kept >= 500 {
+                truncated = true
+            } else {
+                let entry_path = "" + entries[index].path
+                let extension = "" + entries[index].extension
+                rows.push(listed_file_row(
+                    kept, entry_name.to(str), entry_path.to(str), entries[index].is_dir,
+                    entries[index].size, entries[index].mtime, extension.to(str)
+                ))
+                kept = kept + 1
+            }
+        }
+        index = index + 1
+    }
+    return PreparedListing {
+        rows: sort_files(rows, column, direction),
+        truncated: truncated,
+        total_size: summarize_bytes(rows)
+    }
+}
+
+fn root_shortcuts(root str) List<FileManagerShortcut> {
+    var items List<FileManagerShortcut> = []
+    items.push(FileManagerShortcut {path: root.to(Str), label: "主目录", is_home: true})
+    return items
+}
+
+fn directory_shortcuts(root str, entries List<DirEntry>) List<FileManagerShortcut> {
+    var items = root_shortcuts(root)
+    let folder_names List<str> = ["Desktop", "Documents", "Downloads", "Pictures", "Music"]
+    let folder_labels List<str> = ["桌面", "文档", "下载", "图片", "音乐"]
+    var which int = 0
+    while which < folder_names.len() {
+        var index int = 0
+        var found bool = false
+        let expected_name = "" + folder_names[which]
+        while index < entries.len() && !found {
+            if entries[index].is_dir && entries[index].name == expected_name {
+                let shortcut_path = "" + entries[index].path
+                let shortcut_label = "" + folder_labels[which]
+                items.push(FileManagerShortcut {
+                    path: shortcut_path.to(str).to(Str),
+                    label: shortcut_label.to(str).to(Str),
+                    is_home: false
+                })
+                found = true
+            }
+            index = index + 1
+        }
+        which = which + 1
+    }
+    return items
+}
+
+fn directory_roots(root str) List<FileManagerDrive> {
+    var items List<FileManagerDrive> = []
+    items.push(FileManagerDrive {path: root.to(Str), label: root.to(Str)})
+    return items
+}
+
+fn collection_status(booting bool) Str {
+    if booting { return "loading" }
+    return "ready"
+}
+
+fn collection_empty_label(track str, available bool) Str {
+    if track == "vm" || available { return "此目录为空" }
+    return "后端读盘不可达"
+}
+
+fn offline_shortcuts() List<FileManagerShortcut> {
+    return [
+        FileManagerShortcut {path: "demo://home", label: "主目录", is_home: true},
+        FileManagerShortcut {path: "demo://docs", label: "文档", is_home: false},
+        FileManagerShortcut {path: "demo://pics", label: "图片", is_home: false}
+    ]
+}
+
+fn offline_rows() List<FileManagerRow> {
+    return [
+        FileManagerRow {id: 0, name: "Documents", path: "demo://home/Documents", is_dir: true, size: (0).to(u64), size_str: "", file_ext: "", type_name: "文件夹", date: "2026-09-20 10:00", is_hidden: false, thumb_src: ""},
+        FileManagerRow {id: 1, name: "Pictures", path: "demo://home/Pictures", is_dir: true, size: (0).to(u64), size_str: "", file_ext: "", type_name: "文件夹", date: "2026-09-20 10:00", is_hidden: false, thumb_src: ""},
+        FileManagerRow {id: 2, name: "Downloads", path: "demo://home/Downloads", is_dir: true, size: (0).to(u64), size_str: "", file_ext: "", type_name: "文件夹", date: "2026-09-18 09:12", is_hidden: false, thumb_src: ""},
+        FileManagerRow {id: 3, name: "readme.md", path: "demo://home/readme.md", is_dir: false, size: (2048).to(u64), size_str: "2 KB", file_ext: "md", type_name: "Markdown", date: "2026-09-21 14:30", is_hidden: false, thumb_src: ""},
+        FileManagerRow {id: 4, name: "report.pdf", path: "demo://home/report.pdf", is_dir: false, size: (245760).to(u64), size_str: "240 KB", file_ext: "pdf", type_name: "PDF", date: "2026-09-19 11:05", is_hidden: false, thumb_src: ""},
+        FileManagerRow {id: 5, name: "photo.png", path: "demo://home/photo.png", is_dir: false, size: (1048576).to(u64), size_str: "1 MB", file_ext: "png", type_name: "图片", date: "2026-09-17 16:44", is_hidden: false, thumb_src: ""}
+    ]
+}
+
+fn child_path(directory str, name str) Str {
+    if directory == "" || name == "" || name == "." || name == ".." || name.contains("/") {
+        return ""
+    }
+    let windows bool = directory.slice(1, 2) == ":" || directory.contains("\\") && directory.slice(0, 1) != "/"
+    if windows && (name.contains("\\") || name.contains(":")) {
+        return ""
+    }
+    let last str = directory.slice(directory.len() - 1, directory.len())
+    if last == "/" || (windows && last == "\\") {
+        return directory + name
+    }
+    if windows {
+        return directory + "\\" + name
+    }
+    return directory + "/" + name
+}
+
 widget App {
     use { package: prompt_dialog from "../../../../../packages/prompt-dialog" }
     use { package: collection_view from "../../../../../packages/collection-view" }
     use { package: official from "./components" }
 
     msg {
-        Init, BootTick,
-        NavTo(str), GoBack, GoForward, GoUp,
+        Init, BootTick, AdvanceBoot, ShowOfflineDemo, DirectoryRootOpened(str),
+        NavTo(str), Navigate(str, int), NavigateInSession(str, int), RequestDirectory(str, int, bool), DirectoryListed(DirListing),
+        RequestMutation(str, str, str, str, bool), MutationApplied(bool),
+        CommitDirectoryPath(str, int),
+        CommitNavigation(str, int), GoBack, GoForward, GoUp,
         SetViewMode(str), SortByName, SortBySize, SortByDate, SortByType, ToggleHidden,
-        SetSearch(str), SetAddr(str), AddrGo, AddrEdit, AddrCancel, SelectItem(int), OpenItem(int),
+        RestoreViewMode(str), RestoreSortColumn(str), RestoreSortDirection(str), RestoreHidden(str),
+        SetSearch(str), SetAddr(str), AddrGo, AddrEdit, AddrCancel, SelectItem(int), OpenItem(int), FileOpened(int),
         CollectionMode(str), CollectionSort(str), CollectionSelection(str), CollectionAction(str),
         CollectionItem(str, bool), PublishCollection,
         CrumbsExpand,
         StartRename(int), BeginName(str, str, str), CommitName(str), CancelName(str),
+        SetEditName(str), CommitRename, CancelRename, NewModalClose, SetNewName(str), CommitNew,
         ItemCtx(int), CtxClose, CtxOpen, CtxRename, CtxCopy, CtxCut, CtxPaste, CtxDelete,
         NewFolderOpen, NewFileOpen,
         ConfirmDelete(int), ExecuteDelete, CancelDelete
     }
 
+    bind {
+        "file:list" -> .DirectoryListed
+        "file:root" -> .DirectoryRootOpened
+        "file:mutate" -> .MutationApplied
+        "file:open" -> .FileOpened
+        "storage:fileman.view_mode:view_mode" -> .RestoreViewMode
+        "storage:fileman.sort_col:sort_col" -> .RestoreSortColumn
+        "storage:fileman.sort_dir:sort_dir" -> .RestoreSortDirection
+        "storage:fileman.show_hidden:show_hidden" -> .RestoreHidden
+    }
     timer { BootTick (every_ms: 250, when: .booting) }
 
     model {
@@ -79,24 +230,39 @@ widget App {
         var is_vm str = ""                  // PLAN-680 Q1：轨别（Env.track），FS 能力守卫
         var back_fs bool = false            // PLAN-684 rev7：vue 轨后端读盘就绪（fs_home 非空；骨架/不可达=false→演示后备）
         var current_path str = ""
-        var history = []
+        var file_request_revision int = 0
+        var file_request_pending bool = false
+        var file_request_path str = ""
+        var file_request_history_index int = -1
+        var file_request_startup bool = false
+        var file_mutation_pending bool = false
+        var file_mutation_operation str = ""
+        var file_mutation_path str = ""
+        var file_mutation_target str = ""
+        var file_mutation_label str = ""
+        var file_mutation_move bool = false
+        var file_mutation_view_revision int = 0
+        var file_open_pending bool = false
+        var file_open_path str = ""
+        var file_open_name str = ""
+        var history List<str> = []
         var history_idx int = -1
         var can_back bool = false
         var can_forward bool = false
 
         // 面包屑段（父链回走生成；PLAN-023 坍缩：全链存 crumbs，视图取
         // crumbs_head + [...] + crumbs_tail 三面）
-        var crumbs = []
-        var crumbs_head = []
-        var crumbs_tail = []
+        var crumbs List<FileManagerBreadcrumb> = []
+        var crumbs_head List<FileManagerBreadcrumb> = []
+        var crumbs_tail List<FileManagerBreadcrumb> = []
         var crumb_gap bool = false
         var crumbs_expanded bool = false
 
         // 快捷访问（Tick 引导构建，exists 门控）：{ path: str, label: str, is_home: bool }
-        var quick = []
+        var quick List<FileManagerShortcut> = []
         // 此电脑：可用盘符（Tick 引导探测 C..Z）：{ path: str, label: str }
         //（PLAN-016 修订 r2：用户需求——跨盘切换入口）
-        var drives = []
+        var drives List<FileManagerDrive> = []
 
         // ---- 视图与过滤配置 ----
         var view_mode str = "list"          // "list" | "grid"
@@ -117,11 +283,19 @@ widget App {
         var selected_info str = "未选中任何项目"
         var name_dialog_open bool = false
         var name_dialog_mode str = ""
+        var name_dialog_title str = ""
         var name_dialog_initial str = ""
         var name_dialog_context str = ""
         var name_dialog_directory str = ""
         var name_dialog_revision int = 0
         var name_dialog_response str = ""
+        var editing_id int = -1
+        var edit_name str = ""
+        var rename_open bool = false
+        var rename_path str = ""            // StartRename 捕获（排序后 id 会漂移）
+        var new_modal_open bool = false
+        var new_modal_type str = "folder"   // "folder" | "file"
+        var new_modal_name str = ""
 
         // 右键和显式菜单按钮共同指向当前目录中的目标。
         var ctx_id int = -1
@@ -147,7 +321,10 @@ widget App {
         var total_size_str str = "0 B"
         var collection_revision int = 0
         var collection_token str = ""
-        var collection_columns List = [
+        var navigation_error str = ""
+        var mutation_notice str = ""
+        var mutation_error str = ""
+        var collection_columns List<CollectionColumn> = [
             {key: "name", label: "名称", align: "left", sortable: true},
             {key: "size", label: "大小", align: "right", sortable: true},
             {key: "type", label: "类型", align: "left", sortable: true},
@@ -155,13 +332,13 @@ widget App {
         ]
 
         // 渲染视图模型（NavTo 从真实目录物化；行 schema 与视图绑定一一对应）
-        var files_view = [
-            {
+        var files_view List<FileManagerRow> = [
+            FileManagerRow {
                 id: 0,
                 name: "",
                 path: "",
                 is_dir: false,
-                size: 0,
+                size: (0).to(u64),
                 size_str: "",
                 file_ext: "",
                 type_name: "",
@@ -173,7 +350,9 @@ widget App {
     }
 
     computed {
-        collection_items => fm_collection_items(.files_view, "" + .collection_revision)
+        collection_items => fm_collection_items(.files_view, f"${.collection_revision}")
+        listing_status => collection_status(.booting)
+        empty_listing_label => collection_empty_label(.is_vm, .back_fs)
     }
 
     // PLAN-046 T-03：主题/模式绑定（C-14 数据绑定形态；宿主 SetTheme 回写
@@ -198,21 +377,21 @@ widget App {
                     style: "items-center gap-1.5 flex-1 min-w-0"
 
                     // 后退
-                    button (variant: "ghost") {
+                    button (variant: "ghost", title: "后退") {
                         onclick: .GoBack
                         style: if .can_back { "h-8 w-8 rounded-lg bg-accent text-foreground hover:bg-accent/70 flex items-center justify-center" } else { "h-8 w-8 rounded-lg bg-accent/40 text-muted-foreground flex items-center justify-center opacity-40" }
                         icon (name: "arrow-left", size: 16) {}
                     }
 
                     // 前进
-                    button (variant: "ghost") {
+                    button (variant: "ghost", title: "前进") {
                         onclick: .GoForward
                         style: if .can_forward { "h-8 w-8 rounded-lg bg-accent text-foreground hover:bg-accent/70 flex items-center justify-center" } else { "h-8 w-8 rounded-lg bg-accent/40 text-muted-foreground flex items-center justify-center opacity-40" }
                         icon (name: "arrow-right", size: 16) {}
                     }
 
                     // 上一级
-                    button (variant: "ghost") {
+                    button (variant: "ghost", title: "上一级") {
                         onclick: .GoUp
                         style: if .current_path != "" && .current_path != .home { "h-8 w-8 rounded-lg bg-accent text-foreground hover:bg-accent/70 flex items-center justify-center mr-2" } else { "h-8 w-8 rounded-lg bg-accent/40 text-muted-foreground flex items-center justify-center mr-2 opacity-40" }
                         icon (name: "arrow-up", size: 16) {}
@@ -245,46 +424,42 @@ widget App {
                         button (title: "编辑地址", onclick: .AddrEdit, style: "h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground") {
                             icon (name: "pencil", size: 15) {}
                         }
-                        // R4-1：mouse-area 包单行子件——空白点击进编辑态
-                        //（crumb 按钮自身消费点击，空白区域落到 mouse-area）
-                        // PLAN-023 坍缩三面：crumbs_head + [ ... ] + crumbs_tail
-                        //（规避循环内条件节点纵向堆叠债——三片段平铺实证形态）
-                        mouse-area (onclick: .AddrEdit, style: "flex-1 min-w-0 h-9") {
-                            row {
-                                style: "h-9 items-center bg-background/80 border border-border rounded-lg px-2 gap-0.5 w-full overflow-hidden"
-                                for c in .crumbs_head {
-                                    // VM for 迭代单根元素纪律：按钮+分隔符包进行
-                                    // 片段（多根迭代纵向堆叠，chevron 掉行实证）
-                                    row {
-                                        style: col_tight
-                                        button (text: c.name, variant: "ghost", title: c.path) {
-                                            onclick: .NavTo(c.path)
-                                            style: if c.is_last { "h-7 shrink-0 max-w-[10rem] truncate text-xs font-medium text-foreground px-1.5" } else { "h-7 shrink-0 max-w-[10rem] truncate text-xs text-muted-foreground px-1.5" }
-                                        }
-                                        text c.sep { style: dim_xs }
+                        // 就地展开和目录跳转各自消费点击，尾部空白用于编辑地址。
+                        row {
+                            style: "h-9 items-center bg-background/80 border border-border rounded-lg px-2 gap-0.5 flex-1 min-w-0 overflow-hidden"
+                            for c in .crumbs_head {
+                                // VM for 迭代单根元素纪律：按钮+分隔符包进行
+                                // 片段（多根迭代纵向堆叠，chevron 掉行实证）
+                                row {
+                                    style: col_tight
+                                    button (text: c.name, variant: "ghost", title: c.path.clone()) {
+                                        onclick: .NavTo(c.path)
+                                        style: if c.is_last { "h-7 shrink-0 max-w-[10rem] truncate text-xs font-medium text-foreground px-1.5" } else { "h-7 shrink-0 max-w-[10rem] truncate text-xs text-muted-foreground px-1.5" }
                                     }
-                                }
-                                if .crumb_gap {
-                                    row {
-                                        style: col_tight
-                                        button (text: "...", variant: "ghost", title: "展开完整路径") {
-                                            onclick: .CrumbsExpand
-                                            style: "h-7 shrink-0 text-xs font-semibold text-primary px-1.5"
-                                        }
-                                        text "›" { style: dim_xs }
-                                    }
-                                }
-                                for c in .crumbs_tail {
-                                    row {
-                                        style: col_tight
-                                        button (text: c.name, variant: "ghost", title: c.path) {
-                                            onclick: .NavTo(c.path)
-                                            style: if c.is_last { "h-7 shrink-0 max-w-[10rem] truncate text-xs font-medium text-foreground px-1.5" } else { "h-7 shrink-0 max-w-[10rem] truncate text-xs text-muted-foreground px-1.5" }
-                                        }
-                                        text c.sep { style: dim_xs }
-                                    }
+                                    text c.separator { style: dim_xs }
                                 }
                             }
+                            if .crumb_gap {
+                                row {
+                                    style: col_tight
+                                    button (text: "...", variant: "ghost", title: "展开完整路径") {
+                                        onclick: .CrumbsExpand
+                                        style: "h-7 shrink-0 text-xs font-semibold text-primary px-1.5"
+                                    }
+                                    text "›" { style: dim_xs }
+                                }
+                            }
+                            for c in .crumbs_tail {
+                                row {
+                                    style: col_tight
+                                    button (text: c.name, variant: "ghost", title: c.path.clone()) {
+                                        onclick: .NavTo(c.path)
+                                        style: if c.is_last { "h-7 shrink-0 max-w-[10rem] truncate text-xs font-medium text-foreground px-1.5" } else { "h-7 shrink-0 max-w-[10rem] truncate text-xs text-muted-foreground px-1.5" }
+                                    }
+                                    text c.separator { style: dim_xs }
+                                }
+                            }
+                            mouse-area (onclick: .AddrEdit, style: "flex-1 h-8 min-w-2") {}
                         }
                     }
                 }
@@ -419,8 +594,7 @@ widget App {
                         items: .collection_items, columns: .collection_columns,
                         viewMode: .view_mode, selectedId: .selected_path, scopeId: .current_path,
                         revision: .collection_revision, sortKey: .sort_col, sortDirection: .sort_dir,
-                        status: if .booting { "loading" } else { "ready" },
-                        emptyLabel: if .is_vm == "vm" || .back_fs { "此目录为空" } else { "后端读盘不可达" },
+                        status: .listing_status, emptyLabel: .empty_listing_label,
                         onviewModeRequested: .CollectionMode($event),
                         onselectionRequested: .CollectionSelection($event),
                         onitemActionRequested: .CollectionAction($event),
@@ -454,6 +628,15 @@ widget App {
                         text "|" { style: "text-border" }
                     }
                     text .selected_info { style: "text-foreground" }
+                    if .navigation_error != "" {
+                        text .navigation_error { style: "text-destructive" }
+                    }
+                    if .mutation_error != "" {
+                        text .mutation_error { style: "text-destructive" }
+                    }
+                    if .mutation_notice != "" {
+                        text .mutation_notice { style: "text-muted-foreground" }
+                    }
                 }
             }
 
@@ -461,14 +644,63 @@ widget App {
             // 模态弹层（PLAN-016 T-03：alert-dialog，025-sys-monitor 形态）
             // ══════════════════════════════════════════════════════════════
 
-            PromptDialog (open: .name_dialog_open, contextId: .name_dialog_context, revision: .name_dialog_revision,
-                title: if .name_dialog_mode == "rename" { "重命名" } else { if .name_dialog_mode == "folder" { "新建文件夹" } else { "新建文件" } },
-                description: if .name_dialog_mode == "rename" { "输入选中项目的新名称。" } else { "在当前目录下创建一个项目。" },
-                label: "名称", placeholder: "请输入名称",
-                acceptLabel: if .name_dialog_mode == "rename" { "重命名" } else { "创建" },
-                initialValue: .name_dialog_initial, response: .name_dialog_response,
-                errorMessage: if .is_vm == "vm" { "" } else { "写操作仅在 VM 轨可用" },
-                onsubmitRequested: .CommitName, oncancelled: .CancelName) {}
+            if Env.track() == "vm" || Env.track() == "vue" {
+                PromptDialog (open: .name_dialog_open, contextId: .name_dialog_context, revision: .name_dialog_revision,
+                    title: .name_dialog_title,
+                    description: if .name_dialog_mode == "rename" { "输入选中项目的新名称。" } else { "在当前目录下创建一个项目。" },
+                    label: "名称", placeholder: "请输入名称",
+                    acceptLabel: if .name_dialog_mode == "rename" { "重命名" } else { "创建" },
+                    initialValue: .name_dialog_initial, response: .name_dialog_response,
+                    errorMessage: if .is_vm == "vm" { "" } else { "写操作仅在 VM 轨可用" },
+                    onsubmitRequested: .CommitName, oncancelled: .CancelName) {}
+            } else {
+                // 1. 新建文件/文件夹
+                alert-dialog (open: .new_modal_open) {
+                    alert-dialog-content {
+                        alert-dialog-header {
+                            if .new_modal_type == "folder" {
+                                alert-dialog-title "新建文件夹"
+                                alert-dialog-description "在当前目录下创建一个新的子文件夹"
+                            } else {
+                                alert-dialog-title "新建文件"
+                                alert-dialog-description "在当前目录下创建一个新的空文件"
+                            }
+                        }
+                        input {
+                            value: .new_modal_name
+                            oninput: .SetNewName
+                            onenter: .CommitNew
+                            placeholder: "请输入名称..."
+                            style: search_input
+                        }
+                        alert-dialog-footer {
+                            alert-dialog-cancel "取消" { onclick: .NewModalClose }
+                            alert-dialog-action "创建" { onclick: .CommitNew }
+                        }
+                    }
+                }
+
+                // 2. 重命名
+                alert-dialog (open: .rename_open) {
+                    alert-dialog-content {
+                        alert-dialog-header {
+                            alert-dialog-title "重命名"
+                            alert-dialog-description f"将「${.selected_name}」重命名为："
+                        }
+                        input {
+                            value: .edit_name
+                            oninput: .SetEditName
+                            onenter: .CommitRename
+                            placeholder: "请输入新名称..."
+                            style: search_input
+                        }
+                        alert-dialog-footer {
+                            alert-dialog-cancel "取消" { onclick: .CancelRename }
+                            alert-dialog-action "重命名" { onclick: .CommitRename }
+                        }
+                    }
+                }
+            }
 
             // 3. 删除确认
             alert-dialog (open: .confirm_del_open) {
@@ -488,503 +720,331 @@ widget App {
 
     on {
         .Init -> {
-            // ---- 轨别识别（PLAN-680 Q1：VM 轨 "vm" / vue 轨 "vue"）----
-            .is_vm = Env.track()
-
-            // ---- 真实主目录解析（轻量；重活延后到 Tick）----
-            .home = Env.get("USERPROFILE")
-            if .home == "" {
-                .home = Env.get("HOME")
+            // The compatibility VM reads its home directly. Checked hosts
+            // publish the granted root through the file session.
+            if Env.track() == "vm" {
+                .is_vm = "vm"
+                .home = Env.get("USERPROFILE")
+                if .home == "" {
+                    .home = Env.get("HOME")
+                }
+                .in_desktop = Env.get("AUTO_UI_IN_DESKTOP") != ""
             }
-            .in_desktop = Env.get("AUTO_UI_IN_DESKTOP") != ""
+        }
 
-            // ---- 配置恢复（storage 持久化）----
-            let vm = storage.get("fileman.view_mode")
-            if vm == "grid" { .view_mode = "grid" }
-            if vm == "list" { .view_mode = "list" }
+        .RestoreViewMode(value str) -> {
+            let saved str = value.to(str)
+            if saved == "grid" || saved == "list" { .view_mode = value }
+        }
 
-            let sc = storage.get("fileman.sort_col")
-            if sc == "name" { .sort_col = "name" }
-            if sc == "size" { .sort_col = "size" }
-            if sc == "date" { .sort_col = "date" }
-            if sc == "type" { .sort_col = "type" }
+        .RestoreSortColumn(value str) -> {
+            let saved str = value.to(str)
+            if saved == "name" || saved == "size" || saved == "date" || saved == "type" {
+                .sort_col = value
+            }
+        }
 
-            let sd = storage.get("fileman.sort_dir")
-            if sd == "asc" { .sort_dir = "asc" }
-            if sd == "desc" { .sort_dir = "desc" }
+        .RestoreSortDirection(value str) -> {
+            let saved str = value.to(str)
+            if saved == "asc" || saved == "desc" { .sort_dir = value }
+        }
 
-            let sh = storage.get("fileman.show_hidden")
-            if sh == "true" { .show_hidden = true }
-            if sh == "false" { .show_hidden = false }
+        .RestoreHidden(value str) -> {
+            let saved str = value.to(str)
+            if saved == "true" { .show_hidden = true }
+            if saved == "false" { .show_hidden = false }
         }
 
         // 启动完成后取消订阅，后续媒体刷新由现有图片管线唤醒。
         .BootTick -> {
-            .tick_count = .tick_count + 1
-            if .tick_count > 8 {
-                .booting = false
-                if .is_vm != "vm" {
-                // PLAN-684 rev7：vue 轨先试后端读盘（gallery back-proxy VM
-                // 会话 = 真盘；standalone a2r 骨架 fs_home()=""）——失败落
-                // 演示虚拟目录（仅后备）。
-                let h str = fs_home()
-                if h != "" {
-                    .home = h
-                    .back_fs = true
-                    .quick.push({ path: h, label: "主目录", is_home: true })
-                    // 快捷访问：主目录一次列目录的成员判定（fs.join 为
-                    // __vmOnly，路径直取条目自带的 path）
-                    let home_ls = fs_list(h)
-                    if home_ls.ok {
-                        var qnames = ["桌面", "文档", "下载", "图片", "音乐"]
-                        var qdirs = ["Desktop", "Documents", "Downloads", "Pictures", "Music"]
-                        var q int = 0
-                        while q < qdirs.len() {
-                            var qpath str = ""
-                            var e int = 0
-                            while e < home_ls.entries.len() {
-                                let en = home_ls.entries[e]
-                                if en.is_dir {
-                                    if en.name == qdirs[q] {
-                                        qpath = en.path
-                                    }
-                                }
-                                e = e + 1
-                            }
-                            if qpath != "" {
-                                .quick.push({ path: qpath, label: qnames[q], is_home: false })
-                            }
-                            q = q + 1
-                        }
+            let was_booting bool = .booting
+            .AdvanceBoot()
+            if Env.track() == "vm" {
+                if was_booting && !.booting {
+                    if .home != "" {
+                        .quick = native_shortcuts(.home)
+                        .drives = native_drives()
+                        .NavTo(.home)
+                    } else {
+                        .navigation_error = "无法定位主目录（USERPROFILE/HOME 均为空）"
                     }
-                    // 盘符探测走后端（C..Z exists 门控）
-                    let drv = fs_drives()
-                    var d int = 0
-                    while d < drv.len() {
-                        let de = drv[d]
-                        .drives.push({ path: de.path, label: de.name })
-                        d = d + 1
-                    }
-                    .NavTo(h)
-                } else {
-                .home = "demo://home"
-                .current_path = "demo://home"
-                .addr = "demo://home"
-                .quick.push({ path: "demo://home", label: "主目录", is_home: true })
-                .quick.push({ path: "demo://docs", label: "文档", is_home: false })
-                .quick.push({ path: "demo://pics", label: "图片", is_home: false })
-                var demo = []
-                demo.push({ id: 0, name: "Documents", path: "demo://home/Documents", is_dir: true, size: 0, size_str: "", file_ext: "", type_name: "文件夹", date: "2026-09-20 10:00", is_hidden: false, thumb_src: "" })
-                demo.push({ id: 1, name: "Pictures", path: "demo://home/Pictures", is_dir: true, size: 0, size_str: "", file_ext: "", type_name: "文件夹", date: "2026-09-20 10:00", is_hidden: false, thumb_src: "" })
-                demo.push({ id: 2, name: "Downloads", path: "demo://home/Downloads", is_dir: true, size: 0, size_str: "", file_ext: "", type_name: "文件夹", date: "2026-09-18 09:12", is_hidden: false, thumb_src: "" })
-                demo.push({ id: 3, name: "readme.md", path: "demo://home/readme.md", is_dir: false, size: 2048, size_str: "2 KB", file_ext: "md", type_name: "Markdown", date: "2026-09-21 14:30", is_hidden: false, thumb_src: "" })
-                demo.push({ id: 4, name: "report.pdf", path: "demo://home/report.pdf", is_dir: false, size: 245760, size_str: "240 KB", file_ext: "pdf", type_name: "PDF", date: "2026-09-19 11:05", is_hidden: false, thumb_src: "" })
-                demo.push({ id: 5, name: "photo.png", path: "demo://home/photo.png", is_dir: false, size: 1048576, size_str: "1 MB", file_ext: "png", type_name: "图片", date: "2026-09-17 16:44", is_hidden: false, thumb_src: "" })
-                .files_view = demo
-                .PublishCollection()
-                .item_count_str = "6 个项目"
-                .total_size_str = "1.2 MB"
                 }
-                }
-                if .is_vm == "vm" {
-                if .home != "" {
-                    .quick.push({ path: .home, label: "主目录", is_home: true })
-                    var names = ["桌面", "文档", "下载", "图片", "音乐"]
-                    var dirs = ["Desktop", "Documents", "Downloads", "Pictures", "Music"]
-                    var i int = 0
-                    while i < dirs.len() {
-                        let p str = fs.join(.home, dirs[i])
-                        if file.exists(p) {
-                            if file.is_dir(p) {
-                                .quick.push({ path: p, label: names[i], is_home: false })
-                            }
-                        }
-                        i = i + 1
+            }
+        }
+
+        .ShowOfflineDemo -> {
+            .file_request_pending = false
+            .file_request_startup = false
+            .home = "demo://home"
+            .current_path = "demo://home"
+            .addr = "demo://home"
+            .quick = offline_shortcuts()
+            .files_view = offline_rows()
+            .PublishCollection()
+            .item_count_str = "6 个项目"
+            .total_size_str = "1.2 MB"
+        }
+
+        .DirectoryRootOpened(root_path str) -> {
+            if root_path == "" {
+                .ShowOfflineDemo()
+            } else {
+                .home = root_path
+                .back_fs = true
+                .quick = root_shortcuts(root_path)
+                .drives = directory_roots(root_path)
+            }
+        }
+
+        .AdvanceBoot -> {
+            if .booting {
+                .tick_count = .tick_count + 1
+                if .tick_count > 8 {
+                    .booting = false
+                    if Env.track() != "vm" {
+                        .RequestDirectory("", -1, true)
                     }
-                    // 盘符探测（C..Z；file.exists 门控——盘根 path 形如 "D:/"，
-                    // PLAN-016 修订 r2：用户需求跨盘切换入口）
-                    var letters = ["C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
-                    var k int = 0
-                    while k < letters.len() {
-                        let root str = letters[k] + ":/"
-                        if file.exists(root) {
-                            if file.is_dir(root) {
-                                .drives.push({ path: root, label: letters[k] + ":" })
-                            }
-                        }
-                        k = k + 1
-                    }
-                    .NavTo(.home)
-                } else {
-                    toast.error("无法定位主目录（USERPROFILE/HOME 均为空）")
-                }
                 }
             }
         }
 
         // ---- 目录导航（真实 FS；T-05）----
         .NavTo(target_path) -> {
-            // PLAN-680 Q1：vue 调试轨无 FS 能力——导航/排序/搜索/隐藏切换
-            // 全汇聚本 handler，单点守卫保住纯视图交互与 storage 持久化。
-            if .is_vm == "vm" {
-            let can str = fs.canonical(target_path)
-            if can == "" {
-                toast.error("无法打开: " + target_path)
-            } else {
-                if !file.is_dir(can) {
-                    toast.error("不是目录: " + can)
+            .Navigate(target_path, -1)
+        }
+
+        .Navigate(target_path str, history_index int) -> {
+            if Env.track() == "vm" {
+                .file_request_revision = .file_request_revision + 1
+                let canonical str = fs.canonical(target_path)
+                if canonical == "" {
+                    .navigation_error = "无法打开: " + target_path
+                } else if !file.is_dir(canonical) {
+                    .navigation_error = "不是目录: " + canonical
                 } else {
-                    // 列目录先行（read_dir 失败会中止 handler——把一切状态
-                    // 变更放在其后，失败时保留原视图）
-                    var names = json.parse(fs.read_dir(can))
-
-                    if .current_path != can { .selected_path = "" }
-                    .current_path = can
-                    .addr = can
-                    .crumbs_expanded = false
-                    .selected_id = -1
-                    .selected_name = ""
-                    .selected_info = "未选中任何项目"
-                    .ctx_id = -1
-
-                    // 维护历史栈
-                    if .history_idx < 0 {
-                        .history = [can]
-                        .history_idx = 0
-                    } else {
-                        if .history[.history_idx] != can {
-                            var new_hist = []
-                            var hi int = 0
-                            while hi <= .history_idx {
-                                new_hist.push(.history[hi])
-                                hi = hi + 1
-                            }
-                            new_hist.push(can)
-                            .history = new_hist
-                            .history_idx = .history.len() - 1
-                        }
-                    }
-                    .can_back = (.history_idx > 0)
-                    .can_forward = (.history_idx + 1 < .history.len())
-
-                    // 面包屑：纯函数父链（PLAN-684 rev7 提取 build_crumbs
-                    // 双轨同源——vue 轨 fs.parent/__vmOnly 不可达；sep 字段
-                    // 化与根段回退全路径语义随函数体）
-                    var cs = build_crumbs(can)
-                    .crumbs = cs
-
-                    // PLAN-023 地址栏坍缩：段数 > 5 且未展开 → 首 1 段 +
-                    // "..."（CrumbsExpand 可展开）+ 末 2 段；展开态或短路径
-                    // 全链呈现。crumbs 恒存全链（展开幂等取自它）。
-                    if .crumbs_expanded {
-                        .crumbs_head = cs
-                        .crumbs_tail = []
-                        .crumb_gap = false
-                    } else {
-                        var tot2 int = cs.len()
-                        if tot2 > 5 {
-                            var head = []
-                            head.push(cs[0])
-                            var tail = []
-                            tail.push(cs[tot2 - 2])
-                            tail.push(cs[tot2 - 1])
-                            .crumbs_head = head
-                            .crumbs_tail = tail
-                            .crumb_gap = true
-                        } else {
-                            .crumbs_head = cs
-                            .crumbs_tail = []
-                            .crumb_gap = false
-                        }
-                    }
-
-                    // 条目物化：过滤（隐藏/搜索）→ 逐条 metadata（cap 500）
-                    var out = []
-                    var total_bytes int = 0
-                    var kept int = 0
-                    var truncated bool = false
-                    for raw in names {
-                        let nm str = "" + raw
-                        let hid bool = hidden_name(nm)
-                        if .show_hidden || !hid {
-                            let matches_q = (.search_q == "") || nm.contains(.search_q)
-                            if matches_q {
-                                if kept >= 500 {
-                                    truncated = true
-                                } else {
-                                    let pp str = fs.join(can, nm)
-                                    // 直连 native 三件套（不走 metadata JSON——
-                                    // JsonValue 可选字段在 VM 轨产出 None 级联
-                                    // TypeError，PLAN-016 D-3 实证）
-                                    let isd bool = file.is_dir(pp)
-                                    let sz int = file.size(pp)
-                                    let mt int = fs.mtime(pp)
-                                    let ext str = fs.ext(nm)
-                                    // PLAN-023：图片文件排队 256px 缩略图
-                                    // rendition（cap 120）——仅入队零解码，
-                                    // URI 未就绪渲染为空、随 Tick 渐进浮现
-                                    var thumb_src str = ""
-                                    if kept < 120 {
-                                        if is_image_ext(ext) {
-                                            thumb_src = image.thumb(pp, 256)
-                                        }
-                                    }
-                                    out.push({
-                                        name: nm,
-                                        path: pp,
-                                        is_dir: isd,
-                                        size: sz,
-                                        size_str: format_size(sz),
-                                        file_ext: ext,
-                                        type_name: type_label(ext, isd),
-                                        date: fmt_date(mt),
-                                        is_hidden: hid,
-                                        thumb_src: thumb_src
-                                    })
-                                    if !isd {
-                                        total_bytes = total_bytes + sz
-                                    }
-                                    kept = kept + 1
-                                }
-                            }
-                        }
-                    }
-
-                    // 排序：目录恒先；选择排序（PLAN-684 rev7 提取 sort_files
-                    // 双轨共用——name/date 字典序即序（date 为定宽时间串），
-                    // size 为 int；交换三行回写纪律随函数体，PLAN-016 初版
-                    // 交换漏回写事故注记存档）
-                    out = sort_files(out, .sort_col, .sort_dir)
-                    var n int = out.len()
-
-                    // R4-4：排序后重编 id（id = 显示序——排序前编号会让
-                    // files_view[id] 错位，"选定：xxx" 张冠李戴实证）
-                    var fv = []
-                    var f2 int = 0
-                    while f2 < n {
-                        let r = out[f2]
-                        fv.push({ id: f2, name: r.name, path: r.path, is_dir: r.is_dir, size: r.size, size_str: r.size_str, file_ext: r.file_ext, type_name: r.type_name, date: r.date, is_hidden: r.is_hidden, thumb_src: r.thumb_src })
-                        f2 = f2 + 1
-                    }
-                    .files_view = fv
-                    if truncated {
-                        .item_count_str = "500+ 个项目（已截断）"
-                    } else {
-                        .item_count_str = kept.str() + " 个项目"
-                    }
+                    let prepared = native_listing(canonical, .search_q, .show_hidden, .sort_col, .sort_dir)
+                    .navigation_error = ""
+                    .CommitDirectoryPath(canonical, history_index)
+                    .files_view = prepared.rows
+                    .item_count_str = file_count_label(.files_view.len(), prepared.truncated)
                     .PublishCollection()
-                    .total_size_str = format_size(total_bytes)
+                    .total_size_str = prepared.total_size
                 }
-            }
             } else {
-                // PLAN-684 rev7：vue 轨 HTTP 读盘（back-proxy VM 会话 = 真盘）。
-                // demo:// 静态演示无导航；骨架后端 fs_home()="" 时 boot 已落
-                // 演示态（back_fs=false），本分支不达。
-                if .back_fs && !target_path.contains("demo://") {
-                    let res = fs_list(target_path)
-                    if !res.ok {
-                        toast.error("无法打开: " + target_path)
-                    } else {
-                        if .current_path != res.path { .selected_path = "" }
-                        .current_path = res.path
-                        .addr = res.path
-                        .crumbs_expanded = false
-                        .selected_id = -1
-                        .selected_name = ""
-                        .selected_info = "未选中任何项目"
-                        .ctx_id = -1
+                .NavigateInSession(target_path, history_index)
+            }
+        }
 
-                        // 历史栈（VM 轨同款维护）
-                        if .history_idx < 0 {
-                            .history = [res.path]
-                            .history_idx = 0
-                        } else {
-                            if .history[.history_idx] != res.path {
-                                var new_hist = []
-                                var hi int = 0
-                                while hi <= .history_idx {
-                                    new_hist.push(.history[hi])
-                                    hi = hi + 1
-                                }
-                                new_hist.push(res.path)
-                                .history = new_hist
-                                .history_idx = .history.len() - 1
-                            }
-                        }
-                        .can_back = (.history_idx > 0)
-                        .can_forward = (.history_idx + 1 < .history.len())
+        .NavigateInSession(target_path str, history_index int) -> {
+            if .back_fs && !target_path.contains("demo://") {
+                .RequestDirectory(target_path, history_index, false)
+            } else {
+                .file_request_revision = .file_request_revision + 1
+                .file_request_pending = false
+                .file_request_startup = false
+            }
+        }
 
-                        // 面包屑（纯函数父链）+ 坍缩（VM 轨同款）
-                        var cs = build_crumbs(res.path)
-                        .crumbs = cs
-                        if .crumbs_expanded {
-                            .crumbs_head = cs
-                            .crumbs_tail = []
-                            .crumb_gap = false
-                        } else {
-                            var tot2 int = cs.len()
-                            if tot2 > 5 {
-                                var head = []
-                                head.push(cs[0])
-                                var tail = []
-                                tail.push(cs[tot2 - 2])
-                                tail.push(cs[tot2 - 1])
-                                .crumbs_head = head
-                                .crumbs_tail = tail
-                                .crumb_gap = true
-                            } else {
-                                .crumbs_head = cs
-                                .crumbs_tail = []
-                                .crumb_gap = false
-                            }
-                        }
+        .RequestDirectory(requested_path str, requested_index int, startup bool) -> {
+            .navigation_error = ""
+            .file_request_revision = .file_request_revision + 1
+            .file_request_path = requested_path
+            .file_request_history_index = requested_index
+            .file_request_startup = startup
+            .file_request_pending = true
+        }
 
-                        // 条目物化：后端 DirEntry → 展示行（隐藏/搜索过滤 +
-                        // 500 cap 同 VM；派生字段走 fs_util 纯函数——缩略图
-                        // 为 VM 轨媒体管线专属，vue 轨 FileIcon 回落）
-                        var out = []
-                        var total_bytes int = 0
-                        var kept int = 0
-                        var truncated bool = false
-                        var m int = 0
-                        while m < res.entries.len() {
-                            let en = res.entries[m]
-                            let hid bool = hidden_name(en.name)
-                            if .show_hidden || !hid {
-                                let matches_q = (.search_q == "") || en.name.contains(.search_q)
-                                if matches_q {
-                                    if kept >= 500 {
-                                        truncated = true
-                                    } else {
-                                        let isd bool = en.is_dir
-                                        let sz int = en.size
-                                        let ext str = ext_of(en.name)
-                                        out.push({
-                                            name: en.name,
-                                            path: en.path,
-                                            is_dir: isd,
-                                            size: sz,
-                                            size_str: format_size(sz),
-                                            file_ext: ext,
-                                            type_name: type_label(ext, isd),
-                                            date: fmt_date(en.mtime),
-                                            is_hidden: hid,
-                                            thumb_src: ""
-                                        })
-                                        if !isd {
-                                            total_bytes = total_bytes + sz
-                                        }
-                                        kept = kept + 1
-                                    }
-                                }
-                            }
-                            m = m + 1
+        .RequestMutation(operation str, source str, target str, label str, move_clipboard bool) -> {
+            if !.file_mutation_pending {
+                .mutation_notice = ""
+                .mutation_error = ""
+                if (!.back_fs && .is_vm != "vm") || .current_path == "" {
+                    .mutation_error = "文件会话未授权"
+                } else if source == "" || ((operation == "rename" || operation == "copy") && target == "") {
+                    .mutation_error = "无效的文件名"
+                } else {
+                    .file_mutation_operation = operation
+                    .file_mutation_path = source
+                    .file_mutation_target = target
+                    .file_mutation_label = label
+                    .file_mutation_move = move_clipboard
+                    .file_mutation_view_revision = .file_request_revision
+                    .file_mutation_pending = true
+                    if Env.track() == "vm" {
+                        let result str = native_file_mutation(operation, source, target)
+                        .MutationApplied(result == "")
+                        if result == "exists" {
+                            .mutation_error = "已存在同名项目: " + label
                         }
-                        out = sort_files(out, .sort_col, .sort_dir)
-
-                        // 排序后重编 id（id = 显示序，VM 轨同款）
-                        var fv = []
-                        var f2 int = 0
-                        while f2 < out.len() {
-                            let r = out[f2]
-                            fv.push({ id: f2, name: r.name, path: r.path, is_dir: r.is_dir, size: r.size, size_str: r.size_str, file_ext: r.file_ext, type_name: r.type_name, date: r.date, is_hidden: r.is_hidden, thumb_src: r.thumb_src })
-                            f2 = f2 + 1
+                        if result == "not-empty" {
+                            .mutation_error = "目录非空，仅支持删除空目录: " + label
                         }
-                        .files_view = fv
-                        if truncated {
-                            .item_count_str = "500+ 个项目（已截断）"
-                        } else {
-                            .item_count_str = kept.str() + " 个项目"
-                        }
-                        .PublishCollection()
-                        .total_size_str = format_size(total_bytes)
                     }
                 }
             }
+        }
+
+        .MutationApplied(ok bool) -> {
+            if .file_mutation_pending {
+                .file_mutation_pending = false
+                if ok {
+                    .mutation_notice = "操作完成: " + .file_mutation_label
+                    if .file_mutation_move && .clipboard_op == "cut" && .clipboard_path == .file_mutation_path {
+                        .clipboard_op = ""
+                        .clipboard_path = ""
+                        .clipboard_name = ""
+                        .clipboard_is_dir = false
+                        .clipboard_label = ""
+                    }
+                    if .file_mutation_view_revision == .file_request_revision && !.file_request_pending {
+                        if Env.track() == "vm" {
+                            .Navigate(.current_path, .history_idx)
+                        } else {
+                            .RequestDirectory(.current_path, .history_idx, false)
+                        }
+                    }
+                } else {
+                    .mutation_error = "文件操作失败: " + .file_mutation_label
+                }
+            }
+        }
+
+        .DirectoryListed(listing DirListing) -> {
+            if .file_request_pending {
+                let requested_index int = .file_request_history_index
+                let startup bool = .file_request_startup
+                .file_request_pending = false
+                .file_request_startup = false
+                if listing.ok {
+                    if startup {
+                        let root_path = "" + listing.path
+                        .home = root_path
+                        .back_fs = true
+                        .quick = directory_shortcuts(root_path.to(str), listing.entries)
+                        .drives = directory_roots(root_path.to(str))
+                    }
+                    .CommitDirectoryPath(listing.path, requested_index)
+                    let prepared = prepare_file_listing(listing.entries, .search_q, .show_hidden, .sort_col, .sort_dir)
+                    .files_view = prepared.rows
+                    .item_count_str = file_count_label(.files_view.len(), prepared.truncated)
+                    .PublishCollection()
+                    .total_size_str = prepared.total_size
+                } else {
+                    if startup {
+                        .navigation_error = "无法打开授权目录"
+                    } else {
+                        .navigation_error = "无法打开: " + .file_request_path
+                    }
+                }
+            }
+        }
+
+        // 文件会话确认可读后，一次提交路径、面包屑、选中状态和历史。
+        .CommitDirectoryPath(path str, history_index int) -> {
+            if .current_path != path { .selected_path = "" }
+            .current_path = path
+            .addr = path
+            .selected_id = -1
+            .selected_name = ""
+            .selected_info = "未选中任何项目"
+            .editing_id = -1
+            .ctx_id = -1
+            .crumbs_expanded = false
+            .crumbs = build_crumbs(path)
+            let count int = .crumbs.len()
+            .crumb_gap = count > 5
+            if .crumb_gap {
+                .crumbs_head = slice_crumbs(.crumbs, 0, 1)
+                .crumbs_tail = slice_crumbs(.crumbs, count - 2, count)
+            } else {
+                .crumbs_head = slice_crumbs(.crumbs, 0, count)
+                .crumbs_tail = []
+            }
+            .CommitNavigation(path, history_index)
+        }
+
+        // 只有目录读取成功才提交历史索引及可用方向。
+        .CommitNavigation(path str, history_index int) -> {
+            if history_index >= 0 {
+                .history_idx = history_index
+            } else if .history_idx < 0 || .history[.history_idx] != path {
+                .history = extend_history(.history, .history_idx, path)
+                .history_idx = .history.len() - 1
+            }
+            .can_back = .history_idx > 0
+            .can_forward = .history_idx + 1 < .history.len()
         }
 
         .GoBack -> {
             if .history_idx > 0 {
-                .history_idx = .history_idx - 1
-                let prev_path = .history[.history_idx]
-                .can_back = (.history_idx > 0)
-                .can_forward = true
-                .NavTo(prev_path)
+                let index int = .history_idx - 1
+                .Navigate(.history[index], index)
             }
         }
 
         .GoForward -> {
-            if .history_idx + 1 < .history.len() {
-                .history_idx = .history_idx + 1
-                let next_path = .history[.history_idx]
-                .can_back = true
-                .can_forward = (.history_idx + 1 < .history.len())
-                .NavTo(next_path)
+            let index int = .history_idx + 1
+            if index < .history.len() {
+                .Navigate(.history[index], index)
             }
         }
 
         .GoUp -> {
-            // PLAN-680 Q1：VM 轨 fs.parent；vue 轨纯函数 parent_of（rev7——
-            // fs.* 为 __vmOnly，读盘态面包屑/上行同源纯函数）。
-            if .is_vm == "vm" {
-            let up str = fs.parent(.current_path)
-            if up != "" && up != .current_path {
-                .NavTo(up)
-            }
-            } else {
-                let up2 str = parent_of(.current_path)
-                if up2 != "" && up2 != .current_path {
-                    .NavTo(up2)
+            if .current_path != .home {
+                let up str = parent_of(.current_path)
+                if up != "" {
+                    .NavTo(up)
                 }
             }
         }
 
-        // 校验结果代次与当前挂载后再解析目标路径。旧业务处理器仍接收当前行号。
+        // 校验 CollectionView 的 JSON 请求所属目录、结果代次和实例，再按路径定位当前行。
         .CollectionMode(payload str) -> {
-            try {
-                let request = json.parse(payload)
-                if request.scopeId == .current_path && request.baseRevision == .collection_revision && request.instanceToken != "" && (.collection_token == "" || request.instanceToken == .collection_token) {
-                    if request.viewMode == "grid" || request.viewMode == "list" {
-                        .collection_token = request.instanceToken
-                        .SetViewMode(request.viewMode)
-                    }
+            let token Str = collection_request_token(payload, .current_path, .collection_revision, .collection_token)
+            if token.len() > 0 {
+                let mode Str = json_object_text(payload, "viewMode", "")
+                if mode == "grid" || mode == "list" {
+                    .collection_token = token
+                    .SetViewMode(mode)
                 }
-            } catch {}
+            }
         }
 
         .CollectionSort(payload str) -> {
-            try {
-                let request = json.parse(payload)
-                if request.scopeId == .current_path && request.baseRevision == .collection_revision && request.instanceToken != "" && (.collection_token == "" || request.instanceToken == .collection_token) {
-                    .collection_token = request.instanceToken
-                    if request.sortKey == "name" { .SortByName() }
-                    if request.sortKey == "size" { .SortBySize() }
-                    if request.sortKey == "type" { .SortByType() }
-                    if request.sortKey == "date" { .SortByDate() }
-                }
-            } catch {}
+            let token Str = collection_request_token(payload, .current_path, .collection_revision, .collection_token)
+            if token.len() > 0 {
+                let key Str = json_object_text(payload, "sortKey", "")
+                .collection_token = token
+                if key == "name" { .SortByName() }
+                if key == "size" { .SortBySize() }
+                if key == "type" { .SortByType() }
+                if key == "date" { .SortByDate() }
+            }
         }
 
         .CollectionSelection(payload str) -> { .CollectionItem(payload, false) }
         .CollectionAction(payload str) -> { .CollectionItem(payload, true) }
 
         .CollectionItem(payload str, is_action bool) -> {
-            try {
-                let request = json.parse(payload)
-                if request.scopeId == .current_path && request.baseRevision == .collection_revision && request.itemRevision == ("" + .collection_revision) && request.instanceToken != "" && (.collection_token == "" || request.instanceToken == .collection_token) {
-                    let index = fm_path_index(.files_view, request.id)
+            let token Str = collection_request_token(payload, .current_path, .collection_revision, .collection_token)
+            if token.len() > 0 {
+                let item_revision Str = json_object_text(payload, "itemRevision", "")
+                let current_revision Str = f"${.collection_revision}"
+                if item_revision == current_revision {
+                    let requested_path Str = json_object_text(payload, "id", "")
+                    let index = fm_path_index(.files_view, requested_path.to(str))
                     if index >= 0 {
-                        .collection_token = request.instanceToken
+                        .collection_token = token
                         if !is_action {
                             .SelectItem(index)
-                        } else if request.actionId == "open" {
-                            .OpenItem(index)
-                        } else if request.actionId == "menu" {
-                            .ItemCtx(index)
+                        } else {
+                            let action Str = json_object_text(payload, "actionId", "")
+                            if action == "open" { .OpenItem(index) }
+                            if action == "menu" { .ItemCtx(index) }
                         }
                     }
                 }
-            } catch {}
+            }
         }
 
         .PublishCollection -> {
@@ -995,7 +1055,6 @@ widget App {
         // ---- 视图与排序 ----
         .SetViewMode(mode) -> {
             .view_mode = mode
-            storage.set("fileman.view_mode", mode)
         }
 
         .SortByName -> {
@@ -1005,8 +1064,6 @@ widget App {
                 .sort_col = "name"
                 .sort_dir = "asc"
             }
-            storage.set("fileman.sort_col", .sort_col)
-            storage.set("fileman.sort_dir", .sort_dir)
             .NavTo(.current_path)
         }
 
@@ -1017,8 +1074,6 @@ widget App {
                 .sort_col = "size"
                 .sort_dir = "asc"
             }
-            storage.set("fileman.sort_col", .sort_col)
-            storage.set("fileman.sort_dir", .sort_dir)
             .NavTo(.current_path)
         }
 
@@ -1029,8 +1084,6 @@ widget App {
                 .sort_col = "date"
                 .sort_dir = "asc"
             }
-            storage.set("fileman.sort_col", .sort_col)
-            storage.set("fileman.sort_dir", .sort_dir)
             .NavTo(.current_path)
         }
 
@@ -1041,14 +1094,11 @@ widget App {
                 .sort_col = "type"
                 .sort_dir = "asc"
             }
-            storage.set("fileman.sort_col", .sort_col)
-            storage.set("fileman.sort_dir", .sort_dir)
             .NavTo(.current_path)
         }
 
         .ToggleHidden -> {
             .show_hidden = !.show_hidden
-            storage.set("fileman.show_hidden", if .show_hidden { "true" } else { "false" })
             .NavTo(.current_path)
         }
 
@@ -1082,7 +1132,7 @@ widget App {
         // ---- PLAN-023：地址栏 "..." 就地展开全链（不导航；导航后重回坍缩态）----
         .CrumbsExpand -> {
             .crumbs_expanded = true
-            .crumbs_head = .crumbs
+            .crumbs_head = slice_crumbs(.crumbs, 0, .crumbs.len())
             .crumbs_tail = []
             .crumb_gap = false
         }
@@ -1092,10 +1142,9 @@ widget App {
             .selected_id = id
             var n int = .files_view.len()
             if id >= 0 && id < n {
-                let r = .files_view[id]
-                .selected_path = r.path
-                .selected_name = r.name
-                .selected_info = "选定: " + r.name + " (" + r.size_str + ")"
+                .selected_path = "" + .files_view[id].path
+                .selected_name = "" + .files_view[id].name
+                .selected_info = "选定: " + .selected_name + " (" + .files_view[id].size_str + ")"
             } else {
                 .selected_path = ""
                 .selected_name = ""
@@ -1103,42 +1152,81 @@ widget App {
             }
         }
 
-        .OpenItem(id) -> {
+        .OpenItem(id int) -> {
             .SelectItem(id)
             if id >= 0 && id < .files_view.len() {
                 let r = .files_view[id]
                 if r.is_dir {
                     .NavTo(r.path)
                 } else {
-                    if .is_vm != "vm" {
-                        // PLAN-684 rev7：vue 轨读盘无执行面——文件打开仅 VM 轨
-                        toast("文件打开仅在 VM 轨可用 — 请使用 auto run -r vm")
+                    .mutation_error = ""
+                    .mutation_notice = ""
+                    if Env.track() != "vm" {
+                        .file_open_path = "" + r.path
+                        .file_open_name = "" + r.name
+                        .file_open_pending = true
                     } else {
-                        // PLAN-016 T-09：文件 → 桌面 open_with 关联打开
                         let app str = app_for_ext(r.file_ext)
                         if app != "" && .in_desktop {
-                            .__desktop_cmd = "open_with	" + app + "	" + r.path
-                            toast.success("正在打开: " + r.name)
+                            .__desktop_cmd = "open_with\t" + app + "\t" + r.path
+                            .mutation_notice = "正在打开: " + r.name
                         } else {
-                            // R5：无关联 → 系统默认程序（cmd start 关联 verb）
-                            process.spawn(["cmd", "/c", "start", "", r.path])
-                            toast("已调用系统默认程序打开: " + r.name)
+                            let opened bool = native_open_default(r.path)
+                            if opened {
+                                .mutation_notice = "已调用系统默认程序打开: " + r.name
+                            } else {
+                                .mutation_error = "无法打开: " + r.name
+                            }
                         }
                     }
                 }
             }
         }
 
+        .FileOpened(status int) -> {
+            if .file_open_pending {
+                .file_open_pending = false
+                .file_open_path = ""
+                if status == 1 {
+                    .mutation_notice = "已调用系统默认程序打开: " + .file_open_name
+                } else if status == 0 {
+                    .mutation_notice = "文件打开仅在桌面可用 — 请使用 auto run -r vm"
+                } else {
+                    .mutation_error = "无法打开: " + .file_open_name
+                }
+                .file_open_name = ""
+            }
+        }
+
+        // ---- 重命名（alert-dialog 模态；T-06 真实 fs.rename）----
         .StartRename(id) -> {
-            if id >= 0 && id < .files_view.len() {
-                let item = .files_view[id]
-                .selected_name = item.name
-                .BeginName("rename", item.path, item.name)
+            if Env.track() == "vm" || Env.track() == "vue" {
+                if id >= 0 && id < .files_view.len() {
+                    let item = .files_view[id]
+                    .selected_name = item.name
+                    .BeginName("rename", item.path, item.name)
+                }
+            } else {
+                if id >= 0 && id < .files_view.len() {
+                    let r = .files_view[id]
+                    .editing_id = id
+                    .edit_name = r.name
+                    .rename_path = r.path
+                    .selected_name = r.name
+                    .rename_open = true
+                }
             }
         }
 
         .BeginName(mode, context, initial) -> {
             .name_dialog_mode = mode
+            if mode == "rename" {
+                .name_dialog_title = "重命名"
+            } else if mode == "folder" {
+                .name_dialog_title = "新建文件夹"
+            } else {
+                .name_dialog_title = "新建文件"
+            }
             .name_dialog_context = context
             .name_dialog_directory = .current_path
             .name_dialog_initial = initial
@@ -1148,63 +1236,91 @@ widget App {
         }
 
         .CommitName(payload) -> {
-            let request = json.parse(payload)
-            if .name_dialog_open && request.contextId == .name_dialog_context && request.baseRevision == .name_dialog_revision {
-                let name str = request.value
-                let target str = .name_dialog_context
-                var problem str = ""
-                var retryable bool = false
-                if .is_vm != "vm" {
-                    problem = "写操作仅在 VM 轨可用"
-                } else if .name_dialog_directory != .current_path || !file.exists(target) {
-                    problem = "项目或目录已变化，请关闭对话框后重新选择"
-                } else if !valid_entry_name(name) {
-                    problem = "请输入有效的文件或文件夹名称"
-                } else {
-                    let destination str = fs.join(.name_dialog_directory, name)
-                    if .name_dialog_mode != "rename" || destination != target {
-                        if file.exists(destination) {
-                            problem = "已存在同名项目: " + name
-                        } else {
-                            var failed bool = false
-                            try {
+            if Env.track() == "vm" || Env.track() == "vue" {
+                let request = json.parse(payload)
+                if .name_dialog_open && request.contextId == .name_dialog_context && request.baseRevision == .name_dialog_revision {
+                    let name str = request.value
+                    let target str = .name_dialog_context
+                    var problem str = ""
+                    var retryable bool = false
+                    if .is_vm != "vm" {
+                        problem = "写操作仅在 VM 轨可用"
+                    } else if .name_dialog_directory != .current_path || !file.exists(target) {
+                        problem = "项目或目录已变化，请关闭对话框后重新选择"
+                    } else if !valid_entry_name(name) {
+                        problem = "请输入有效的文件或文件夹名称"
+                    } else {
+                        let destination str = fs.join(.name_dialog_directory, name)
+                        if .name_dialog_mode != "rename" || destination != target {
+                            if file.exists(destination) {
+                                problem = "已存在同名项目: " + name
+                            } else {
+                                var result str = ""
                                 if .name_dialog_mode == "rename" {
-                                    fs.rename(target, destination)
+                                    result = native_file_mutation("rename", target, destination)
                                 } else if .name_dialog_mode == "folder" {
-                                    file.create_dir(destination)
-                                    failed = !file.is_dir(destination)
+                                    result = native_file_mutation("create-directory", destination, "")
                                 } else {
-                                    file.write_text(destination, "")
-                                    failed = !file.exists(destination) || file.is_dir(destination)
+                                    result = native_file_mutation("create-file", destination, "")
                                 }
-                            } catch {
-                                failed = true
-                            }
-                            if failed {
-                                problem = "操作失败，请检查名称、权限或项目是否正在使用"
-                                retryable = true
+                                if result == "exists" {
+                                    problem = "已存在同名项目: " + name
+                                } else if result != "" {
+                                    problem = "操作失败，请检查名称、权限或项目是否正在使用"
+                                    retryable = true
+                                }
                             }
                         }
                     }
-                }
-                .name_dialog_response = json.stringify({
-                    instanceToken: request.instanceToken, session: request.session, seq: request.seq,
-                    contextId: request.contextId, status: if problem == "" { "accepted" } else { "rejected" },
-                    message: problem, retryable: retryable
-                })
-                if problem == "" {
-                    .name_dialog_open = false
-                    .name_dialog_revision = .name_dialog_revision + 1
-                    .NavTo(.current_path)
+                    var status str = "rejected"
+                    if problem == "" {
+                        status = "accepted"
+                    }
+                    .name_dialog_response = json.stringify({
+                        instanceToken: request.instanceToken, session: request.session, seq: request.seq,
+                        contextId: request.contextId, status: status,
+                        message: problem, retryable: retryable
+                    })
+                    if problem == "" {
+                        .name_dialog_open = false
+                        .name_dialog_revision = .name_dialog_revision + 1
+                        .NavTo(.current_path)
+                    }
                 }
             }
         }
 
         .CancelName(payload) -> {
-            let request = json.parse(payload)
-            if .name_dialog_open && request.contextId == .name_dialog_context && request.baseRevision == .name_dialog_revision {
-                .name_dialog_open = false
+            if Env.track() == "vm" || Env.track() == "vue" {
+                let request = json.parse(payload)
+                if .name_dialog_open && request.contextId == .name_dialog_context && request.baseRevision == .name_dialog_revision {
+                    .name_dialog_open = false
+                }
             }
+        }
+
+        // ---- 条目菜单 ----
+        .SetEditName(name) -> {
+            .edit_name = name
+        }
+
+        .CommitRename -> {
+            let old_path Str = "" + .rename_path
+            .rename_open = false
+            if .editing_id >= 0 && old_path != "" {
+                let target_path Str = child_path(.current_path, .edit_name)
+                if target_path != old_path {
+                    .RequestMutation("rename", old_path, target_path, .edit_name, false)
+                }
+            }
+            .editing_id = -1
+            .rename_path = ""
+        }
+
+        .CancelRename -> {
+            .editing_id = -1
+            .rename_path = ""
+            .rename_open = false
         }
 
         // ---- 条目菜单 ----
@@ -1245,7 +1361,6 @@ widget App {
                 .clipboard_name = r.name
                 .clipboard_is_dir = r.is_dir
                 .clipboard_label = "已复制: " + r.name
-                toast("已复制: " + r.name)
             }
         }
 
@@ -1259,39 +1374,18 @@ widget App {
                 .clipboard_name = r.name
                 .clipboard_is_dir = r.is_dir
                 .clipboard_label = "已剪切: " + r.name
-                toast("已剪切: " + r.name)
             }
         }
 
         .CtxPaste -> {
             .ctx_id = -1
-            // PLAN-684 rev7：vue 轨写操作守卫（同 CommitRename）
-            if .is_vm != "vm" {
-                toast("写操作仅在 VM 轨可用 — 请使用 auto run -r vm")
-            } else {
             if .clipboard_path != "" {
-                let dst str = fs.join(.current_path, .clipboard_name)
-                if file.exists(dst) {
-                    toast.error("已存在同名项目: " + .clipboard_name)
-                } else {
-                    if .clipboard_op == "copy" {
-                        // copy 是 .at 关键字（TokenKind::Copy），.copy 不可
-                        // 调用——单文件与目录统一走 copy_recursive（native.rs
-                        // 对文件分支即 std::fs::copy）
-                        fs.copy_recursive(.clipboard_path, dst)
-                        toast.success("已粘贴: " + .clipboard_name)
-                    } else if .clipboard_op == "cut" {
-                        fs.rename(.clipboard_path, dst)
-                        toast.success("已移动: " + .clipboard_name)
-                        .clipboard_op = ""
-                        .clipboard_path = ""
-                        .clipboard_name = ""
-                        .clipboard_is_dir = false
-                        .clipboard_label = ""
-                    }
-                    .NavTo(.current_path)
+                let destination Str = child_path(.current_path, .clipboard_name)
+                if .clipboard_op == "copy" {
+                    .RequestMutation("copy", .clipboard_path, destination, .clipboard_name, false)
+                } else if .clipboard_op == "cut" {
+                    .RequestMutation("rename", .clipboard_path, destination, .clipboard_name, true)
                 }
-            }
             }
         }
 
@@ -1303,9 +1397,44 @@ widget App {
             }
         }
 
-        .NewFolderOpen -> { .BeginName("folder", .current_path, "新建文件夹") }
+        .NewFolderOpen -> {
+            if Env.track() == "vm" || Env.track() == "vue" {
+                .BeginName("folder", .current_path, "新建文件夹")
+            } else {
+                .new_modal_type = "folder"
+                .new_modal_name = "新建文件夹"
+                .new_modal_open = true
+            }
+        }
 
-        .NewFileOpen -> { .BeginName("file", .current_path, "新建文档.txt") }
+        .NewFileOpen -> {
+            if Env.track() == "vm" || Env.track() == "vue" {
+                .BeginName("file", .current_path, "新建文档.txt")
+            } else {
+                .new_modal_type = "file"
+                .new_modal_name = "新建文档.txt"
+                .new_modal_open = true
+            }
+        }
+
+        .NewModalClose -> {
+            .new_modal_open = false
+        }
+
+        .SetNewName(name) -> {
+            .new_modal_name = name
+        }
+
+        .CommitNew -> {
+            let name Str = "" + .new_modal_name
+            .new_modal_open = false
+            let target_path Str = child_path(.current_path, name.to(str))
+            if .new_modal_type == "folder" {
+                .RequestMutation("create-directory", target_path, "", name, false)
+            } else {
+                .RequestMutation("create-file", target_path, "", name, false)
+            }
+        }
 
         // ---- 删除确认（T-06；D-4 口径：文件 + 空目录，非空目录拒绝）----
         .ConfirmDelete(id) -> {
@@ -1321,39 +1450,18 @@ widget App {
         }
 
         .ExecuteDelete -> {
-            let del_path str = .confirm_del_path
-            let del_name str = .confirm_del_name
+            let del_path Str = "" + .confirm_del_path
+            let del_name Str = "" + .confirm_del_name
             let is_dir_target bool = .confirm_del_is_dir
             .confirm_del_open = false
             .confirm_del_id = -1
             .confirm_del_path = ""
-            // PLAN-684 rev7：vue 轨写操作守卫（同 CommitRename）
-            if .is_vm != "vm" {
-                toast("写操作仅在 VM 轨可用 — 请使用 auto run -r vm")
-            } else {
             if del_path != "" {
                 if is_dir_target {
-                    // D-4：非空目录拒绝（stdlib 无递归删除；walk 逆序删除有
-                    // 误删风险，v1 不做）。
-                    // 2026-09-15(F-8)：空判改 read_dir 原串 != "[]"——
-                    // json.parse("[]").len() 实测返回 20（应为 0，VM json/len
-                    // 语义缺陷，desktop_mcp 套件实证）导致空目录恒被误判
-                    // 非空、D-4 删除永不可达。
-                    var kids_src str = fs.read_dir(del_path)
-                    if kids_src != "[]" {
-                        toast.error("目录非空，仅支持删除空目录: " + del_name)
-                    } else {
-                        file.remove_dir(del_path)
-                        toast.success("已删除: " + del_name)
-                    }
+                    .RequestMutation("delete-directory", del_path, "", del_name, false)
                 } else {
-                    file.delete(del_path)
-                    toast.success("已删除: " + del_name)
+                    .RequestMutation("delete-file", del_path, "", del_name, false)
                 }
-                .SelectItem(-1)
-                .selected_info = "未选中任何项目"
-                .NavTo(.current_path)
-            }
             }
         }
 

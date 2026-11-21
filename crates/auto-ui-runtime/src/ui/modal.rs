@@ -7,6 +7,7 @@ pub(crate) fn has_scoped_key<M: Clone + std::fmt::Debug>(view: &View<M>, key: &s
     match view {
         View::Button { keyboard: Some(scope), disabled: false, .. }
             if scope.bindings.iter().any(|(name, _)| name == key) => return true,
+        View::FocusTarget { keys, .. } if keys.iter().any(|(name, _)| name == key) => return true,
         View::Popover { open: false, anchor, .. } => {
             return matches!(anchor, PopoverAnchor::Widget(button) if has_scoped_key(button, key));
         }
@@ -24,7 +25,7 @@ pub fn active_content_path<M: Clone + std::fmt::Debug>(view: &View<M>) -> Option
         path: &mut Vec<u16>,
         found: &mut Option<Vec<u16>>,
     ) {
-        if let View::AnchorSlot { child, .. } | View::ScrollAnchorMark { child, .. } = view {
+        if let View::AnchorSlot { child, .. } | View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } = view {
             visit(child, path, found);
             return;
         }
@@ -70,7 +71,7 @@ pub fn at_path<'a, M: Clone + std::fmt::Debug>(
     view: &'a View<M>,
     path: &[u16],
 ) -> Option<&'a View<M>> {
-    if let View::AnchorSlot { child, .. } | View::ScrollAnchorMark { child, .. } = view {
+    if let View::AnchorSlot { child, .. } | View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } = view {
         return at_path(child, path);
     }
     if path.is_empty() {

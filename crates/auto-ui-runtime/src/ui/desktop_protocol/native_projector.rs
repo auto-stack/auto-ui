@@ -1846,7 +1846,7 @@ fn layout_view_node<M: Clone + std::fmt::Debug>(
     match view {
         View::Empty => Laid { size: (0.0, 0.0) },
         // 块锚定槽：VM 轨专用透传壳（native 生成物不产——防御透传）。
-        View::AnchorSlot { child, .. } => layout_view_node(ctx, child, x, y, avail_w),
+        View::AnchorSlot { child, .. } | View::FocusTarget { child, .. } => layout_view_node(ctx, child, x, y, avail_w),
         View::Text { content, .. } => {
             if content.is_empty() {
                 return Laid { size: (0.0, 0.0) };

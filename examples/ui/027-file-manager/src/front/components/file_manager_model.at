@@ -1,0 +1,50 @@
+pub type FileManagerBreadcrumb {
+    name str
+    path str
+    is_last bool
+    separator str
+}
+
+pub type FileManagerShortcut {
+    path str
+    label str
+    is_home bool
+}
+
+pub type FileManagerDrive {
+    path str
+    label str
+}
+
+pub type FileManagerRow {
+    id int
+    name str
+    path str
+    is_dir bool
+    size u64
+    size_str str
+    file_ext str
+    type_name str
+    date str
+    is_hidden bool
+    thumb_src str
+}
+
+pub type PreparedListing {
+    rows List<FileManagerRow>
+    truncated bool
+    total_size Str
+}
+
+// 导航到新路径时截断前进历史，并保留已访问的前缀。
+pub fn extend_history(paths List<str>, through int, path str) List<str> {
+    var next List<str> = []
+    var index int = 0
+    while index <= through {
+        let item = "" + paths[index]
+        next.push(item.to(str).to(Str))
+        index = index + 1
+    }
+    next.push(path.to(Str))
+    return next
+}

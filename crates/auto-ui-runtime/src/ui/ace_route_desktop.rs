@@ -76,12 +76,12 @@ impl DesktopRoutes {
                 .find(|unit| format!("{}::{}", unit.package, unit.id) == *entry)
                 .ok_or_else(|| format!("resolved module {entry:?} disappeared"))?;
             let prepared = super::ace_route::prepare_page(&unit.source, Some(&params))?;
-            unit.source = prepared.source;
-            let nodes = super::ace_route::package_candidates(&unit.source)?;
+            unit.source = prepared.source.clone();
+            let nodes = super::ace_route::package_candidates(&prepared.source)?;
             let root = nodes.first().ok_or("prepared page widget is missing")?;
             let links = route_links(root)?;
             if let Some(source_path) = self.paths.get(entry) {
-                append_widget_packages(source_path, &nodes, &mut units)?;
+                append_widget_packages(source_path, &prepared.source, &nodes, &mut units)?;
             }
             let mut bridge = NodeDesktopBridge::load_package_leaf(units, entry, instances)?;
             bridge.set_route_controls(prepared.commands, links);

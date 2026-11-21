@@ -7,6 +7,59 @@ impl VueGenerator {
     /// Generate <script setup> content
     pub(super) fn generate_script(&mut self, widget: &AuraWidget) -> GenResult<String> {
         let mut script = String::new();
+        let bound_handler = |channel: &str| {
+            widget.key_bindings.iter()
+                .find(|(key, _)| key.trim_matches('"') == channel)
+                .map(|(_, handler)| handler.trim_start_matches('.'))
+        };
+        let directory_reply = bound_handler("file:list");
+        let directory_root = bound_handler("file:root");
+        let mutation_reply = bound_handler("file:mutate");
+        let preferences = auto_ui_dialect::preferences::preference_bindings(
+            widget.key_bindings.iter().map(|(key, handler)| (key.as_str(), handler.as_str())),
+        ).map_err(GenError::UnsupportedStmt)?;
+        for preference in &preferences {
+            if !widget.state_vars.iter().any(|state| state.name == preference.field)
+                || !widget.handlers.keys().any(|pattern| {
+                    self.pattern_to_handler_name(pattern) == preference.restore
+                })
+            {
+                return Err(GenError::UnsupportedStmt(format!(
+                    "storage binding for {} needs a model field and restore handler",
+                    preference.key
+                )));
+            }
+        }
+        if directory_reply.is_some() {
+            for field in ["file_request_pending", "file_request_path", "file_request_revision"] {
+                if !widget.state_vars.iter().any(|state| state.name == field) {
+                    return Err(GenError::UnsupportedStmt(format!(
+                        "file:list binding requires model field `{field}`"
+                    )));
+                }
+            }
+            if !["fs_home", "fs_list"].iter().all(|name| {
+                self.project_api_functions.iter().any(|function| function == name)
+            }) {
+                return Err(GenError::UnsupportedStmt(
+                    "file:list binding requires explicit fs_home and fs_list imports from back.api".into(),
+                ));
+            }
+        }
+        if mutation_reply.is_some() {
+            for field in ["file_mutation_pending", "file_mutation_operation", "file_mutation_path", "file_mutation_target"] {
+                if !widget.state_vars.iter().any(|state| state.name == field) {
+                    return Err(GenError::UnsupportedStmt(format!(
+                        "file:mutate binding requires model field `{field}`"
+                    )));
+                }
+            }
+            if !self.project_api_functions.iter().any(|function| function == "fs_mutate") {
+                return Err(GenError::UnsupportedStmt(
+                    "file:mutate binding requires an explicit fs_mutate import from back.api".into(),
+                ));
+            }
+        }
 
         // Determine needed imports
         // plan 443: only BOUND model channels compile to defineModel (a
@@ -179,8 +232,14 @@ impl VueGenerator {
             }
         }
         // Widget-level `watch { ... }` block → Vue watch() calls
-        if !widget.watchers.is_empty() && !imports.contains(&"watch") {
+        if (!widget.watchers.is_empty() || directory_reply.is_some() || mutation_reply.is_some()
+            || !preferences.is_empty())
+            && !imports.contains(&"watch")
+        {
             imports.push("watch");
+        }
+        if !preferences.is_empty() && !imports.contains(&"onMounted") {
+            imports.push("onMounted");
         }
         // Global (window/document-level) listeners are registered in onMounted
         // and removed in onUnmounted.
@@ -389,6 +448,12 @@ impl VueGenerator {
         // 下沉首件实证：on 块调用绿、watch 块调用 TS2304）。
         for w in &widget.watchers {
             self.extract_api_calls_from_payload(&w.payload);
+        }
+        if directory_reply.is_some() {
+            self.api_functions_used.extend(["fs_home".into(), "fs_list".into()]);
+        }
+        if mutation_reply.is_some() {
+            self.api_functions_used.insert("fs_mutate".into());
         }
 
         // Plan 053 M5/P5-6: identify debounced complete-handlers (body calls
@@ -1809,6 +1874,53 @@ if ((window as any).__AUTO_UI_THEME__ === 'light' || (window as any).__AUTO_UI_T
         // 段的裸名调用点可解析,调用点零改写。
         self.emit_use_module_fns(widget, &mut script);
 
+        if let Some(reply) = directory_reply {
+            let opened_root = directory_root.map_or_else(String::new, |handler| {
+                format!("        {handler}(target)\n        if (!current()) return\n")
+            });
+            script.push_str(&format!(
+                r#"watch([file_request_pending, file_request_path, file_request_revision],
+  async ([pending, path, revision], _, onCleanup) => {{
+    if (!pending) return
+    let active = true
+    onCleanup(() => {{ active = false }})
+    const current = () => active && file_request_pending.value && file_request_revision.value === revision
+    let target = path
+    let listing: Awaited<ReturnType<typeof fs_list>> = {{ ok: false, path: '', entries: [] }}
+    try {{
+      if (target === '') {{
+        target = await fs_home()
+        if (!current()) return
+{opened_root}      }}
+      if (target !== '') {{
+        listing = await fs_list(target)
+        if (path === '' && !listing.ok && current()) listing = await fs_list(target)
+      }}
+    }} catch {{ /* Deliver the unsuccessful directory reply below. */ }}
+    if (current()) {reply}(listing)
+  }}, {{ immediate: true }})
+
+"#
+            ));
+        }
+
+        if let Some(reply) = mutation_reply {
+            script.push_str(&format!(
+                r#"watch(file_mutation_pending, async (pending, _, onCleanup) => {{
+  if (!pending) return
+  let active = true
+  onCleanup(() => {{ active = false }})
+  let ok = false
+  try {{
+    ok = await fs_mutate(file_mutation_operation.value, file_mutation_path.value, file_mutation_target.value)
+  }} catch {{ /* Deliver an unsuccessful mutation below. */ }}
+  if (active && file_mutation_pending.value) {reply}(ok === true)
+}}, {{ immediate: true, flush: 'sync' }})
+
+"#
+            ));
+        }
+
         // Generate lifecycle hooks from widget.lifecycle
         // .Init → onMounted
         if let Some(init) = widget.lifecycle.iter().find(|l| l.name == "Init") {
@@ -1838,6 +1950,19 @@ if ((window as any).__AUTO_UI_THEME__ === 'light' || (window as any).__AUTO_UI_T
                     async_kw, indented
                 ));
             }
+        }
+        if !preferences.is_empty() {
+            script.push_str("onMounted(() => {\n");
+            for preference in &preferences {
+                let auto_ui_dialect::preferences::PreferenceBinding { key, field, restore } = preference;
+                script.push_str(&format!(
+                    "  try {{ const value = localStorage.getItem('{key}'); if (value !== null) {restore}(value) }} catch {{}}\n"
+                ));
+                script.push_str(&format!(
+                    "  watch({field}, value => {{ try {{ localStorage.setItem('{key}', String(value)) }} catch {{}} }}, {{ flush: 'post' }})\n"
+                ));
+            }
+            script.push_str("})\n\n");
         }
         // .Destroy → onUnmounted
         if let Some(destroy) = widget.lifecycle.iter().find(|l| l.name == "Destroy") {
@@ -2564,6 +2689,9 @@ onUnmounted(() => {{ if ({var} !== null) {{ clearInterval({var}); {var} = null }
             if let LogicPayload::AstStmts(stmts) = &l.payload {
                 collect_called_bare_names_stmts(stmts, &mut referenced);
             }
+        }
+        for function in &self.module_fns {
+            collect_called_bare_names_stmts(&function.body, &mut referenced);
         }
         // 2. 入口门控 + 闭包拉取(池内按名,迭代到不动点)。
         let mut pool_position: HashMap<&str, usize> = HashMap::new();

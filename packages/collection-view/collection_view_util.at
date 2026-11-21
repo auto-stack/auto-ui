@@ -1,6 +1,29 @@
-use auto.json
+use std.json: json_object_text, json_str
+use collection_layout: cv_item_style
+use collection_schema: CollectionAction, CollectionCell, CollectionColumn, CollectionItem
 
-pub fn cv_index(items List, id str) int {
+pub type CollectionViewCell {
+    text str
+    align str
+}
+
+pub type CollectionViewRow {
+    id str
+    label str
+    itemRevision str
+    kind str
+    icon str
+    src str
+    imageState str
+    cells List<CollectionViewCell>
+    actions List<CollectionAction>
+    disabled bool
+    binding str
+    focusKey str
+    rowStyle str
+}
+
+pub fn cv_index(items List<CollectionItem>, id str) int {
     var i int = 0
     while i < items.len() {
         if items[i].id == id { return i }
@@ -9,13 +32,13 @@ pub fn cv_index(items List, id str) int {
     return -1
 }
 
-pub fn cv_sortable(columns List, key str) bool {
+pub fn cv_sortable(columns List<CollectionColumn>, key str) bool {
     let index = cv_column_index(columns, key)
     if index < 0 { return false }
-    return columns[index].sortable ?? false
+    return columns[index].sortable
 }
 
-fn cv_column_index(columns List, key str) int {
+fn cv_column_index(columns List<CollectionColumn>, key str) int {
     var i int = 0
     while i < columns.len() {
         if columns[i].key == key { return i }
@@ -24,7 +47,16 @@ fn cv_column_index(columns List, key str) int {
     return -1
 }
 
-pub fn cv_invalid(items List, columns List, mode str) str {
+fn cv_action_index(actions List<CollectionAction>, id str) int {
+    var i int = 0
+    while i < actions.len() {
+        if actions[i].id == id { return i }
+        i = i + 1
+    }
+    return -1
+}
+
+pub fn cv_invalid(items List<CollectionItem>, columns List<CollectionColumn>, mode str) Str {
     if mode != "grid" && mode != "list" { return "CollectionView: invalid_view_mode" }
 
     var i int = 0
@@ -40,16 +72,15 @@ pub fn cv_invalid(items List, columns List, mode str) str {
         let item = items[i]
         if item.id == "" { return "CollectionView: empty_item_id" }
         if cv_index(items, item.id) != i { return "CollectionView: duplicate_item_id" }
-        let actions = item.actions ?? []
+        let actions = item.actions
         var j int = 0
         while j < actions.len() {
             let action = actions[j]
             if action.id == "" { return "CollectionView: empty_action_id" }
-            if cv_index(actions, action.id) != j { return "CollectionView: duplicate_action_id" }
+            if cv_action_index(actions, action.id) != j { return "CollectionView: duplicate_action_id" }
             j = j + 1
         }
-        let default_id = item.defaultActionId ?? ""
-        if default_id != "" && cv_index(actions, default_id) < 0 {
+        if item.defaultActionId != "" && cv_action_index(actions, item.defaultActionId) < 0 {
             return "CollectionView: unknown_default_action"
         }
         i = i + 1
@@ -57,110 +88,160 @@ pub fn cv_invalid(items List, columns List, mode str) str {
     return ""
 }
 
-pub fn cv_header(columns List) List {
-    var result List = []
+fn cv_column_copy(columns List<CollectionColumn>, index int) CollectionColumn {
+    let column = columns[index]
+    return CollectionColumn {
+        key: column.key, label: column.label, align: column.align, sortable: column.sortable
+    }
+}
+
+pub fn cv_header(columns List<CollectionColumn>) List<CollectionColumn> {
+    var result List<CollectionColumn> = []
     let name = cv_column_index(columns, "name")
     if name < 0 {
-        result.push({key: "name", label: "名称", align: "left", sortable: false})
+        result.push(CollectionColumn { key: "name", label: "名称", align: "left", sortable: false })
     } else {
-        result.push(columns[name])
+        result.push(cv_column_copy(columns, name))
     }
     var i int = 0
     while i < columns.len() {
-        if i != name { result.push(columns[i]) }
+        if i != name { result.push(cv_column_copy(columns, i)) }
         i = i + 1
     }
     return result
 }
 
-fn cv_cells(cells List, columns List) List {
-    var result List = []
+fn cv_cells(cells List<CollectionCell>, columns List<CollectionColumn>) List<CollectionViewCell> {
+    var result List<CollectionViewCell> = []
     var i int = 0
     while i < columns.len() {
         let column = columns[i]
         if column.key != "name" {
-            var value str = ""
+            var value Str = ""
             var j int = 0
             while j < cells.len() {
-                if cells[j].key == column.key { value = cells[j].text }
+                if cells[j].key == column.key { value = "" + cells[j].text }
                 j = j + 1
             }
-            result.push({key: column.key, text: value, align: column.align ?? "left"})
+            result.push(CollectionViewCell { text: value, align: column.align })
         }
         i = i + 1
     }
     return result
 }
 
-pub fn cv_enabled(item, action_id str) bool {
-    if item.disabled ?? false { return false }
-    let actions = item.actions ?? []
-    let index = cv_index(actions, action_id)
-    if index < 0 { return false }
-    return actions[index].enabled ?? true
+pub fn cv_enabled(items List<CollectionItem>, index int, action_id str) bool {
+    let item = items[index]
+    if item.disabled { return false }
+    let action_index = cv_action_index(item.actions, action_id)
+    if action_index < 0 { return false }
+    return item.actions[action_index].enabled
 }
 
-pub fn cv_binding(item, index int, token str, scope str, revision int) str {
-    return json.stringify({
-        index: index, instanceToken: token, scopeId: scope, baseRevision: revision,
-        id: item.id, itemRevision: item.itemRevision, version: json.stringify(item)
-    })
+fn cv_json_bool(value bool) Str {
+    if value { return "true" }
+    return "false"
 }
 
-pub fn cv_rows(items List, columns List, selected str, focus str, scope str, revision int, token str) List {
-    var result List = []
+// Every value in the offered item participates in stale-event validation,
+// including caller updates that reuse an item revision.
+fn cv_item_version(items List<CollectionItem>, index int) Str {
+    let item = items[index]
+    var version Str = "[" + json_str(item.id) + "," + json_str(item.itemRevision)
+    version = version + "," + json_str(item.label) + "," + json_str(item.kind)
+    version = version + "," + json_str(item.icon) + "," + json_str(item.thumbnailUri)
+    version = version + "," + json_str(item.thumbnailState) + "," + json_str(item.defaultActionId)
+    version = version + "," + cv_json_bool(item.disabled) + ",["
+    var i int = 0
+    while i < item.cells.len() {
+        if i > 0 { version = version + "," }
+        let cell = item.cells[i]
+        version = version + "[" + json_str(cell.key) + "," + json_str(cell.text) + "]"
+        i = i + 1
+    }
+    version = version + "],["
+    i = 0
+    while i < item.actions.len() {
+        if i > 0 { version = version + "," }
+        let action = item.actions[i]
+        version = version + "[" + json_str(action.id) + "," + json_str(action.label) + "," + cv_json_bool(action.enabled) + "]"
+        i = i + 1
+    }
+    return version + "]]"
+}
+
+pub fn cv_binding(items List<CollectionItem>, index int, token str, scope str, revision int) Str {
+    let item = items[index]
+    let binding = f"{\"index\":${index},\"instanceToken\":" + json_str(token.to(Str))
+    let scoped = binding + ",\"scopeId\":" + json_str(scope.to(Str)) + f",\"baseRevision\":${revision}"
+    let identified = scoped + ",\"id\":" + json_str(item.id) + ",\"itemRevision\":" + json_str(item.itemRevision)
+    return identified + ",\"version\":" + json_str(cv_item_version(items, index)) + "}"
+}
+
+pub fn cv_bound_index(items List<CollectionItem>, binding str, token str, scope str, revision int) int {
+    let requested_id = json_object_text(binding, "id", "")
+    if requested_id == "" { return -1 }
+    let index = cv_index(items, requested_id)
+    if index < 0 { return -1 }
+    let item = items[index]
+    if item.disabled { return -1 }
+    if binding != cv_binding(items, index, token, scope, revision) { return -1 }
+    return index
+}
+
+pub fn cv_rows(items List<CollectionItem>, columns List<CollectionColumn>, selected str, focus str, scope str, revision int, token str) List<CollectionViewRow> {
+    var result List<CollectionViewRow> = []
     var i int = 0
     while i < items.len() {
         let item = items[i]
-        let src = item.thumbnailUri ?? ""
-        var image_state str = item.thumbnailState ?? ""
+        let src = item.thumbnailUri
+        var image_state Str = "" + item.thumbnailState
         if image_state == "" {
-            image_state = if src != "" { "ready" } else { "missing" }
+            image_state = "missing"
+            if src != "" { image_state = "ready" }
         }
-        let raw_actions = item.actions ?? []
-        var actions List = []
+        var actions List<CollectionAction> = []
         var j int = 0
-        while j < raw_actions.len() {
-            let action = raw_actions[j]
-            actions.push({id: action.id, label: action.label, enabled: action.enabled ?? true})
+        while j < item.actions.len() {
+            let action = item.actions[j]
+            actions.push(CollectionAction { id: action.id, label: action.label, enabled: action.enabled })
             j = j + 1
         }
-        result.push({
+        result.push(CollectionViewRow {
             id: item.id, label: item.label, itemRevision: item.itemRevision,
-            kind: item.kind ?? "", icon: item.icon ?? "", src: src, imageState: image_state,
-            cells: cv_cells(item.cells ?? [], columns), actions: actions,
-            defaultId: item.defaultActionId ?? "", disabled: item.disabled ?? false,
-            binding: cv_binding(item, i, token, scope, revision),
+            kind: item.kind, icon: item.icon, src: src, imageState: image_state,
+            cells: cv_cells(item.cells, columns), actions: actions, disabled: item.disabled,
+            binding: cv_binding(items, i, token, scope, revision),
             focusKey: "cv-" + token + "-" + item.id,
-            selected: item.id == selected, focused: item.id == focus
+            rowStyle: cv_item_style(item.id == selected, item.id == focus).to(Str)
         })
         i = i + 1
     }
     return result
 }
 
-pub fn cv_move(items List, focus str, step int) int {
+pub fn cv_move(items List<CollectionItem>, focus str, step int) int {
     let current = cv_index(items, focus)
-    if current < 0 || (items[current].disabled ?? false) {
+    if current < 0 || items[current].disabled {
         var i int = 0
         while i < items.len() {
-            if !(items[i].disabled ?? false) { return i }
+            if !items[i].disabled { return i }
             i = i + 1
         }
         return -1
     }
     var next int = current + step
     while next >= 0 && next < items.len() {
-        if !(items[next].disabled ?? false) { return next }
+        if !items[next].disabled { return next }
         next = next + step
     }
     return current
 }
 
-pub fn cv_last(items List) int {
+pub fn cv_last(items List<CollectionItem>) int {
     var i int = items.len() - 1
     while i >= 0 {
-        if !(items[i].disabled ?? false) { return i }
+        if !items[i].disabled { return i }
         i = i - 1
     }
     return -1

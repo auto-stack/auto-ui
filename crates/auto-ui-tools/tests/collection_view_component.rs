@@ -13,6 +13,9 @@ const PACKAGE_FILES: &[&str] = &[
     "pac.at",
     "collection_view.at",
     "collection_view_util.at",
+    "collection_layout.at",
+    "collection_request.at",
+    "collection_schema.at",
     "thumbnail.at",
     "thumbnail_content.at",
 ];
@@ -101,6 +104,9 @@ widget App {
         collection.contains("<Thumbnail"),
         "CollectionView must use the shared Thumbnail"
     );
+    assert!(collection.contains("function cv_view_request("));
+    assert!(collection.contains("function json_str("));
+    assert!(collection.contains("function json_object_text("));
 
     fs::rename(&package, dir.path().join("withdrawn-collection-view")).unwrap();
     let options = GenerateOptions {

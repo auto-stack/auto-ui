@@ -1,0 +1,28 @@
+pub fn cv_scoped_focus(remembered_scope str, active_scope str, remembered_id str) str {
+    if remembered_scope == active_scope { return remembered_id }
+    return ""
+}
+
+pub fn cv_item_style(selected bool, focused bool) str {
+    if selected { return "w-full min-w-0 border border-primary rounded-md bg-accent" }
+    if focused { return "w-full min-w-0 border border-primary rounded-md bg-card" }
+    return "w-full min-w-0 border border-border rounded-md bg-card"
+}
+
+fn cv_grid_columns(width int) int {
+    if width >= 1024 { return 3 }
+    if width >= 640 { return 2 }
+    return 1
+}
+
+pub fn cv_focus_step(direction str, mode str, width int) int {
+    var columns int = 1
+    if mode == "grid" {
+        if direction == "left" { return -1 }
+        if direction == "right" { return 1 }
+        columns = cv_grid_columns(width)
+    }
+    if direction == "up" { return 0 - columns }
+    if direction == "down" { return columns }
+    return 0
+}

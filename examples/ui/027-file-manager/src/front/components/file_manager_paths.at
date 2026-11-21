@@ -1,0 +1,98 @@
+use file_manager_model: FileManagerBreadcrumb
+
+// Both separator spellings are accepted. A drive root keeps its separator.
+pub fn parent_of(path str) str {
+    let end int = last_segment_end(path)
+    let separator int = separator_before(path, end)
+    if separator < 0 {
+        return ""
+    }
+    if separator == 0 {
+        if end > 1 {
+            return path.slice(0, 1)
+        }
+        return ""
+    }
+    if separator == 2 && path.slice(1, 2) == ":" {
+        return path.slice(0, 3)
+    }
+    return path.slice(0, separator)
+}
+
+fn last_segment_end(path str) int {
+    var end int = path.len()
+    while end > 0 {
+        let item str = path.slice(end - 1, end)
+        if item != "/" && item != "\\" {
+            return end
+        }
+        end = end - 1
+    }
+    return 0
+}
+
+fn separator_before(path str, end int) int {
+    var index int = end - 1
+    while index >= 0 {
+        let item str = path.slice(index, index + 1)
+        if item == "/" || item == "\\" {
+            return index
+        }
+        index = index - 1
+    }
+    return -1
+}
+
+fn segment_name(path str) str {
+    let end int = last_segment_end(path)
+    if end == 0 || (end == 2 && path.slice(1, 2) == ":") {
+        return path
+    }
+    return path.slice(separator_before(path, end) + 1, end)
+}
+
+// The full chain is retained so the collapsed view can expand in place.
+pub fn build_crumbs(path str) List<FileManagerBreadcrumb> {
+    var parents List<str> = []
+    var current str = path
+    while current != "" && parents.len() < 40 {
+        parents.push(current.to(Str))
+        current = parent_of(current)
+    }
+    var crumbs List<FileManagerBreadcrumb> = []
+    var index int = parents.len() - 1
+    while index >= 0 {
+        let segment = "" + parents[index]
+        let segment_path str = segment.to(str)
+        let label str = segment_name(segment_path)
+        let is_last bool = index == 0
+        var separator str = "›"
+        if is_last {
+            separator = ""
+        }
+        crumbs.push(FileManagerBreadcrumb {
+            name: label.to(Str), path: segment_path.to(Str),
+            is_last: is_last, separator: separator.to(str).to(Str)
+        })
+        index = index - 1
+    }
+    return crumbs
+}
+
+pub fn slice_crumbs(segments List<FileManagerBreadcrumb>, start int, end int) List<FileManagerBreadcrumb> {
+    var result List<FileManagerBreadcrumb> = []
+    var index int = start
+    while index < end {
+        let name = "" + segments[index].name
+        let path = "" + segments[index].path
+        let separator = "" + segments[index].separator
+        result.push(FileManagerBreadcrumb {
+            name: name.to(str).to(Str),
+            path: path.to(str).to(Str),
+            is_last: segments[index].is_last,
+            separator: separator.to(str).to(Str)
+        })
+        index = index + 1
+    }
+    return result
+}

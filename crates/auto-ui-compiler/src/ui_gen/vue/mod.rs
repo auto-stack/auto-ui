@@ -1809,6 +1809,11 @@ impl VueGenerator {
             let mut entries: Vec<(&String, &String)> = widget.key_bindings.iter().collect();
             entries.sort();
             for (key, handler) in entries {
+                if matches!(key.trim_matches('"'), "file:list" | "file:root" | "file:mutate")
+                    || auto_ui_dialect::preferences::is_preference_binding(key)
+                {
+                    continue;
+                }
                 let handler_fn = handler.strip_prefix('.').unwrap_or(handler).to_string();
                 self.bind_key_bindings.push((key.clone(), handler_fn));
             }
@@ -15458,6 +15463,33 @@ pub fn unused_helper(x int) int {
     }
 
     #[test]
+    fn use_fn_called_from_a_record_field_is_emitted() {
+        let sfc = gen_sfc_with_use_fns(
+            r#"
+widget EntryView {
+    model { var n int = 3 }
+    computed { entry => make_entry(.n) }
+    view { text .entry.value }
+}
+"#,
+            r#"
+type Entry { value int }
+
+pub fn make_entry(x int) Entry {
+    return Entry { value: double(x) }
+}
+
+pub fn double(x int) int {
+    return x * 2
+}
+"#,
+            &["make_entry"],
+        );
+        assert!(sfc.contains("value: double(x)"), "{sfc}");
+        assert!(sfc.contains("function double("), "{sfc}");
+    }
+
+    #[test]
     fn test_plan522_use_fn_closure_deps_pulled_to_fixpoint() {
         let sfc = gen_sfc_with_use_fns(
             r#"
@@ -15914,6 +15946,12 @@ pub(crate) fn collect_called_bare_names_expr(
             for p in pairs {
                 collect_called_bare_names_expr(&p.value, out);
             }
+        }
+        Expr::Node(node) => {
+            for arg in &node.args.args {
+                collect_called_bare_names_expr(&arg.get_expr(), out);
+            }
+            collect_called_bare_names_stmts(&node.body.stmts, out);
         }
         Expr::Block(body) => collect_called_bare_names_stmts(&body.stmts, out),
         Expr::Index(a, i) => {

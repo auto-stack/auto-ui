@@ -1,35 +1,37 @@
+use collection_view.collection_schema: CollectionItem, CollectionCell, CollectionAction
+use file_manager_model: FileManagerRow
 use fs_util: is_image_ext
 
-pub fn fm_path_index(files List, target str) int {
-    if target == "" { return -1 }
-    var i int = 0
-    while i < files.len() {
-        if files[i].path == target { return i }
-        i = i + 1
-    }
-    return -1
+fn collection_kind(is_dir bool, extension str) str {
+    if is_dir { return "folder" }
+    if is_image_ext(extension) { return "image" }
+    return "file"
 }
 
-pub fn fm_collection_items(files List, item_revision str) List {
-    var result List = []
+pub fn fm_collection_items(files List<FileManagerRow>, item_revision str) List<CollectionItem> {
+    var result List<CollectionItem> = []
     var i int = 0
     while i < files.len() {
         let file = files[i]
         if file.path != "" {
-            let kind = if file.is_dir { "folder" } else if is_image_ext(file.file_ext) { "image" } else { "file" }
-            result.push({
-                id: file.path, itemRevision: item_revision, label: file.name,
-                kind: kind, icon: kind, thumbnailUri: file.thumb_src,
-                thumbnailState: if file.thumb_src == "" { "missing" } else { "ready" },
-                cells: [
-                    {key: "size", text: file.size_str},
-                    {key: "type", text: file.type_name},
-                    {key: "date", text: file.date}
-                ],
-                actions: [
-                    {id: "open", label: "打开", enabled: true},
-                    {id: "menu", label: "菜单", enabled: true}
-                ],
+            let kind = collection_kind(file.is_dir, file.file_ext)
+            var thumbnail_state str = "missing"
+            if file.thumb_src != "" {
+                thumbnail_state = "ready"
+            }
+            let cells List<CollectionCell> = [
+                CollectionCell { key: "size", text: file.size_str.to(str).to(Str) },
+                CollectionCell { key: "type", text: file.type_name.to(str).to(Str) },
+                CollectionCell { key: "date", text: file.date.to(str).to(Str) }
+            ]
+            let actions List<CollectionAction> = [
+                CollectionAction { id: "open", label: "打开", enabled: true },
+                CollectionAction { id: "menu", label: "菜单", enabled: true }
+            ]
+            result.push(CollectionItem {
+                id: file.path.to(str).to(Str), itemRevision: item_revision.to(Str), label: file.name.to(str).to(Str),
+                kind: kind.to(Str), icon: kind.to(Str), thumbnailUri: file.thumb_src.to(str).to(Str),
+                thumbnailState: thumbnail_state.to(str).to(Str), cells: cells, actions: actions,
                 defaultActionId: "open", disabled: false
             })
         }

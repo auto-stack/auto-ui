@@ -3,6 +3,9 @@ use ace_av::age_package::{WidgetElement, WidgetViewItem};
 use crate::ui::ace_svg;
 use crate::ui::aura_view_builder::parse_coords_extent;
 use crate::ui::view::PointerMoveHandler;
+use crate::ui::aura_view_builder::{rederive_layout, RederivedLayout};
+use crate::ui::style::{SizeValue, StyleClass};
+use crate::ui::view::{PopoverAnchor, PopoverPlacement};
 use crate::ui::{Style, View};
 
 use super::{NodeDesktopMsg, PackageFrame};
@@ -13,17 +16,50 @@ pub(super) fn view(
     frame: &PackageFrame,
     outlet: Option<&View<NodeDesktopMsg>>,
     routed: bool,
+    dialogs: &mut Vec<View<NodeDesktopMsg>>,
 ) -> View<NodeDesktopMsg> {
-    let context = FrameView {
+    let mut context = FrameView {
         session,
         instance,
         frame,
         routed,
+        dialogs,
     };
-    View::col()
+    let mut builder = View::col()
         .children(context.items(&frame.view, &mut Vec::new(), outlet))
-        .spacing(4)
-        .build()
+        .spacing(4);
+    if owns_viewport(frame) {
+        let style = if routed && outlet.is_some() {
+            "w-full h-full bg-background text-foreground"
+        } else {
+            "w-full h-full"
+        };
+        builder = builder.style(style);
+    }
+    builder.build()
+}
+
+/// A fullscreen package provides its own scroll regions.
+pub(super) fn owns_viewport(frame: &PackageFrame) -> bool {
+    let mut roots = frame.view.iter().filter(|item| !matches!(item, WidgetViewItem::Timer(_)));
+    let (Some(WidgetViewItem::Element(root)), None) = (roots.next(), roots.next()) else {
+        return false;
+    };
+    style(root).is_some_and(|style| {
+        style
+            .classes
+            .iter()
+            .rev()
+            .find_map(|class| match class {
+                StyleClass::Height(size) => Some(matches!(size, SizeValue::Full | SizeValue::Screen)),
+                _ => None,
+            })
+            .unwrap_or(false)
+    })
+}
+
+pub(super) fn focus_id(session: i32, instance: usize, target: &str) -> String {
+    format!("ace-package-focus/{session}/{instance}/{target}")
 }
 
 struct FrameView<'a> {
@@ -31,11 +67,12 @@ struct FrameView<'a> {
     instance: usize,
     frame: &'a PackageFrame,
     routed: bool,
+    dialogs: &'a mut Vec<View<NodeDesktopMsg>>,
 }
 
 impl FrameView<'_> {
     fn items(
-        &self,
+        &mut self,
         items: &[WidgetViewItem],
         path: &mut Vec<usize>,
         outlet: Option<&View<NodeDesktopMsg>>,
@@ -57,7 +94,7 @@ impl FrameView<'_> {
     }
 
     fn element(
-        &self,
+        &mut self,
         element: &WidgetElement,
         path: &mut Vec<usize>,
         outlet: Option<&View<NodeDesktopMsg>>,
@@ -81,20 +118,32 @@ impl FrameView<'_> {
                 Err(error) => View::text(error),
             };
         }
-        if element.tag == "drawer" && prop(element, "open") != Some("true") {
+        if matches!(element.tag.as_str(), "drawer" | "alert-dialog")
+            && prop(element, "open") != Some("true")
+        {
             return View::empty();
         }
+        if element.tag == "input" {
+            return self.input(element, path);
+        }
         let mut children = self.items(&element.children, path, outlet);
+        if element.tag == "alert-dialog" {
+            // A modal's viewport is the window, even when its owner scrolls.
+            self.dialogs.push(View::Popover {
+                anchor: PopoverAnchor::Widget(Box::new(View::empty())),
+                content: Box::new(View::col().children(children).build()),
+                placement: PopoverPlacement::Modal,
+                open: true,
+                on_dismiss: None,
+            });
+            return View::empty();
+        }
         let label = element.label.as_deref().or_else(|| prop(element, "text"));
         let link = self.routed.then(|| self.frame.link(path)).flatten();
-        let (session, instance, revision) = (self.session, self.instance, self.frame.revision);
-        let action = |target| NodeDesktopMsg::PackageClick {
-                session,
-                instance,
-                revision,
-                target,
-            };
-        let click = link.or_else(|| self.frame.click(path)).map(action);
+        let click = link.or_else(|| self.frame.click(path)).map(|target| self.action(target));
+        let control = self.frame.control(path);
+        let context_menu = control.and_then(|control| control.context_menu).map(|target| self.action(target));
+        let double_click = control.and_then(|control| control.double_click).map(|target| self.action(target));
         if element.tag == "checkbox" {
             return View::Checkbox {
                 is_checked: prop(element, "checked") == Some("true"),
@@ -103,7 +152,9 @@ impl FrameView<'_> {
                 style,
             };
         }
-        if element.tag == "button" || link.is_some() {
+        if matches!(element.tag.as_str(), "button" | "alert-dialog-action" | "alert-dialog-cancel")
+            || link.is_some()
+        {
             if let Some(onclick) = click {
                 let icon = prop(element, "icon");
                 let label = label.or_else(|| first_text(&element.children))
@@ -115,23 +166,31 @@ impl FrameView<'_> {
                         style: Style::parse("w-4 h-4").ok(),
                     });
                 }
-                return View::Button {
+                let content = (!children.is_empty()).then(|| {
+                    let builder = match rederive_layout(style.as_ref()) {
+                        Some(RederivedLayout::Column) => View::col(),
+                        _ => View::row(),
+                    };
+                    Box::new(builder.spacing(6).children(children).build())
+                });
+                let button = View::Button {
                     label: label.to_owned(),
-                    onclick,
+                    onclick: onclick.clone(),
                     style,
-                    on_right_click: None,
-                    content: (!children.is_empty())
-                        .then(|| Box::new(View::row().spacing(6).children(children).build())),
-                    disabled: false,
+                    on_right_click: context_menu,
+                    content,
+                    disabled: prop(element, "disabled") == Some("true"),
                     keyboard: None,
                 };
+                let button = pointer_events(button, None, double_click, None);
+                return self.focusable(button, path, Some(onclick));
             }
         }
         if element.tag == "drawer" {
             if let Some(onclick) = click {
                 children.push(View::button_styled("Close drawer", onclick, "px-2 py-1"));
             }
-            return View::col().children(children).build();
+            return self.focusable(View::col().children(children).build(), path, None);
         }
         if let Some(pointer) = self.frame.pointer(path) {
             let logical_extent = prop(element, "coords").and_then(parse_coords_extent)
@@ -139,13 +198,14 @@ impl FrameView<'_> {
             if pointer.motion.is_some() && logical_extent.is_none() && prop(element, "coords").is_some() {
                 return View::text("ace.desktop.pointer: coords must have a finite WxH extent");
             }
+            let (session, instance, revision) = (self.session, self.instance, self.frame.revision);
             return View::MouseArea {
                 content: Box::new(View::col().children(children).build()),
                 on_click: click,
-                on_enter: pointer.enter.map(action),
-                on_exit: pointer.leave.map(action),
-                on_double_click: None,
-                on_context_menu: None,
+                on_enter: pointer.enter.map(|target| self.action(target)),
+                on_exit: pointer.leave.map(|target| self.action(target)),
+                on_double_click: double_click,
+                on_context_menu: context_menu,
                 on_release: None,
                 on_move: pointer.motion.map(|target| {
                     PointerMoveHandler::new(move |x, y| NodeDesktopMsg::PackagePointer {
@@ -162,6 +222,7 @@ impl FrameView<'_> {
                 style,
             },
             "text" | "span" | "h1" | "h2" | "h3" | "th" | "td" | "codeblock"
+            | "alert-dialog-title" | "alert-dialog-description"
                 if children.is_empty() =>
             {
                 View::Text {
@@ -185,38 +246,141 @@ impl FrameView<'_> {
                 if let Some(label) = label {
                     children.insert(0, View::text(label.to_owned()));
                 }
-                let mut builder = if matches!(tag, "row" | "tr" | "mouse-area") {
-                    View::row()
-                } else {
-                    View::col()
-                };
-                if let Some(style) = style {
-                    builder = builder.with_style(style);
-                }
-                let content = builder.children(children).build();
-                if tag == "scroll" {
-                    View::scrollable(content).build()
-                } else {
-                    content
-                }
+                let layout = rederive_layout(style.as_ref()).unwrap_or(match tag {
+                    "row" | "tr" | "mouse-area" | "alert-dialog-footer" => RederivedLayout::Row,
+                    "grid" => RederivedLayout::Grid { cols: 1, gap: 0 },
+                    _ => RederivedLayout::Column,
+                });
+                layout_view(tag, layout, style, children)
             }
         };
-        if let Some(on_click) = click {
-            View::MouseArea {
-                content: Box::new(content),
-                on_click: Some(on_click),
-                on_enter: None,
-                on_exit: None,
-                on_double_click: None,
-                on_context_menu: None,
-                on_release: None,
-                on_move: None,
-                logical_extent: None,
-                style: None,
-            }
-        } else {
-            content
+        let content = pointer_events(content, click.clone(), double_click, context_menu);
+        self.focusable(content, path, click)
+    }
+
+    fn input(&self, element: &WidgetElement, path: &[usize]) -> View<NodeDesktopMsg> {
+        let mut input = View::input(prop(element, "placeholder").unwrap_or_default())
+            .value(prop(element, "value").unwrap_or_default())
+            .disabled(prop(element, "disabled") == Some("true"));
+        if let Some(style) = style(element) {
+            input = input.with_style(style);
         }
+        if prop(element, "type") == Some("password") {
+            input = input.password();
+        }
+        if let Some(control) = self.frame.control(path) {
+            if let Some(target) = control.input {
+                let (session, instance, revision) = (self.session, self.instance, self.frame.revision);
+                input = input.on_text(move |text| NodeDesktopMsg::PackageText {
+                    session, instance, revision, target, text,
+                });
+            }
+            if let Some(target) = control.submit {
+                input = input.on_submit(self.action(target));
+            }
+        }
+        self.focusable(input.build(), path, None)
+    }
+
+    fn action(&self, target: usize) -> NodeDesktopMsg {
+        NodeDesktopMsg::PackageClick {
+            session: self.session,
+            instance: self.instance,
+            revision: self.frame.revision,
+            target,
+        }
+    }
+
+    fn focusable(&self, child: View<NodeDesktopMsg>, path: &[usize], activation: Option<NodeDesktopMsg>) -> View<NodeDesktopMsg> {
+        let Some(control) = self.frame.control(path) else { return child };
+        let Some(id) = &control.focus else { return child };
+        View::FocusTarget {
+            id: focus_id(self.session, self.instance, id),
+            activation,
+            keys: control.keys.iter().map(|(key, target)| (key.clone(), self.action(*target))).collect(),
+            on_focus: control.on_focus.then(|| self.notice(id, true)),
+            on_blur: control.on_blur.then(|| self.notice(id, false)),
+            child: Box::new(child),
+        }
+    }
+
+    fn notice(&self, id: &str, gained: bool) -> NodeDesktopMsg {
+        NodeDesktopMsg::PackageFocus {
+            session: self.session,
+            instance: self.instance,
+            revision: self.frame.revision,
+            control: id.to_owned(),
+            gained,
+        }
+    }
+}
+
+fn layout_view(
+    tag: &str,
+    layout: RederivedLayout,
+    style: Option<Style>,
+    children: Vec<View<NodeDesktopMsg>>,
+) -> View<NodeDesktopMsg> {
+    let explicit_scroll = matches!(tag, "scroll" | "sidebar_content");
+    let style = style.map(|mut style| {
+        if explicit_scroll
+            && !style
+                .classes
+                .iter()
+                .any(|class| matches!(class, StyleClass::OverflowAuto | StyleClass::OverflowYAuto))
+        {
+            style.classes.push(StyleClass::OverflowYAuto);
+        }
+        style
+    });
+    let unstyled_scroll = explicit_scroll && style.is_none();
+    let content = match layout {
+        RederivedLayout::Grid { cols, gap } => View::Grid {
+            cols,
+            gap,
+            cells: children,
+            style,
+        },
+        RederivedLayout::Row | RederivedLayout::Column => {
+            let builder = match layout {
+                RederivedLayout::Row => View::row(),
+                _ => View::col(),
+            };
+            let builder = if let Some(style) = style {
+                builder.with_style(style)
+            } else {
+                builder
+            };
+            builder.children(children).build()
+        }
+    };
+    if unstyled_scroll {
+        View::scrollable(content).build()
+    } else {
+        content.with_overflow_scroll()
+    }
+}
+
+fn pointer_events(
+    content: View<NodeDesktopMsg>,
+    on_click: Option<NodeDesktopMsg>,
+    on_double_click: Option<NodeDesktopMsg>,
+    on_context_menu: Option<NodeDesktopMsg>,
+) -> View<NodeDesktopMsg> {
+    if on_click.is_none() && on_double_click.is_none() && on_context_menu.is_none() {
+        return content;
+    }
+    View::MouseArea {
+        content: Box::new(content),
+        on_click,
+        on_enter: None,
+        on_exit: None,
+        on_double_click,
+        on_context_menu,
+        on_release: None,
+        on_move: None,
+        logical_extent: None,
+        style: None,
     }
 }
 
@@ -253,6 +417,15 @@ fn style(element: &WidgetElement) -> Option<Style> {
                 "h2" => "text-lg font-semibold",
                 "preview-card" => "rounded-md border p-4",
                 "codeblock" => "font-mono bg-muted p-2",
+                "alert-dialog-content" => {
+                    "w-96 bg-background border border-border rounded-lg shadow-lg p-6 gap-4"
+                }
+                "alert-dialog-title" => "text-lg font-semibold",
+                "alert-dialog-description" => "text-sm text-muted-foreground",
+                "alert-dialog-header" => "gap-2",
+                "alert-dialog-footer" => "justify-end gap-2",
+                "alert-dialog-cancel" => "border bg-background text-foreground rounded-md px-4 py-2",
+                "alert-dialog-action" => "bg-primary text-primary-foreground rounded-md px-4 py-2",
                 _ => return None,
             };
             Style::parse(default).ok()

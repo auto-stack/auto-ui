@@ -1,4 +1,7 @@
 //! A container for capturing mouse events.
+use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
+
 use crate::core::layout;
 use crate::core::mouse;
 use crate::core::overlay;
@@ -30,6 +33,26 @@ pub struct MouseArea<
     on_move: Option<Box<dyn Fn(Point) -> Message + 'a>>,
     on_exit: Option<Message>,
     interaction: Option<mouse::Interaction>,
+    left_press_time: Option<PressClock>,
+}
+
+type PressTime = (u32, u32);
+type PressClock = fn() -> Option<PressTime>;
+
+thread_local! {
+    static LEFT_PRESS_TIME: Cell<Option<PressTime>> = const { Cell::new(None) };
+}
+
+struct PressTimeScope(Option<PressTime>);
+
+impl Drop for PressTimeScope {
+    fn drop(&mut self) {
+        LEFT_PRESS_TIME.set(self.0);
+    }
+}
+
+fn is_left_press(event: &Event) -> bool {
+    matches!(event, Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)))
 }
 
 impl<'a, Message, Theme, Renderer> MouseArea<'a, Message, Theme, Renderer> {
@@ -60,6 +83,14 @@ impl<'a, Message, Theme, Renderer> MouseArea<'a, Message, Theme, Renderer> {
     #[must_use]
     pub fn on_double_click(mut self, message: Message) -> Self {
         self.on_double_click = Some(message);
+        self
+    }
+
+    /// Supply the native press time and double-click interval in milliseconds
+    /// to the mouse areas inside this window's root.
+    #[must_use]
+    pub fn with_left_press_time(mut self, next: PressClock) -> Self {
+        self.left_press_time = Some(next);
         self
     }
 
@@ -137,6 +168,8 @@ struct State {
     bounds: Rectangle,
     cursor_position: Option<Point>,
     previous_click: Option<mouse::Click>,
+    previous_native_click: Option<(Point, u32)>,
+    overlay_presses: VecDeque<Option<PressTime>>,
 }
 
 impl<'a, Message, Theme, Renderer> MouseArea<'a, Message, Theme, Renderer> {
@@ -158,6 +191,7 @@ impl<'a, Message, Theme, Renderer> MouseArea<'a, Message, Theme, Renderer> {
             on_move: None,
             on_exit: None,
             interaction: None,
+            left_press_time: None,
         }
     }
 }
@@ -227,6 +261,11 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        let _press_time = self.left_press_time.filter(|_| is_left_press(event)).map(|next| {
+            let state = tree.state.downcast_mut::<State>();
+            let time = state.overlay_presses.pop_front().unwrap_or_else(next);
+            PressTimeScope(LEFT_PRESS_TIME.replace(time))
+        });
         self.content.as_widget_mut().update(
             &mut tree.children[0],
             event,
@@ -238,11 +277,37 @@ where
             viewport,
         );
 
-        if shell.is_event_captured() {
-            return;
+        if !shell.is_event_captured() {
+            update(self, tree, event, layout, cursor, shell);
         }
 
-        update(self, tree, event, layout, cursor, shell);
+        // The child can own a single press while its area owns the double-click.
+        if matches!(
+            event,
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+                | Event::Touch(touch::Event::FingerPressed { .. })
+        ) && let Some(position) = cursor.position_over(layout.bounds())
+            && let Some(message) = self.on_double_click.as_ref()
+        {
+            let state = tree.state.downcast_mut::<State>();
+            let double_click = if let Some((time, interval)) = LEFT_PRESS_TIME.get() {
+                state.previous_click = None;
+                let double_click = state.previous_native_click.is_some_and(|(previous, at)| {
+                    previous.distance(position) < 6.0 && time.wrapping_sub(at) <= interval
+                });
+                state.previous_native_click = (!double_click).then_some((position, time));
+                double_click
+            } else {
+                state.previous_native_click = None;
+                let click = mouse::Click::new(position, mouse::Button::Left, state.previous_click);
+                state.previous_click = Some(click);
+                click.kind() == mouse::click::Kind::Double
+            };
+            if double_click {
+                shell.publish(message.clone());
+            }
+            shell.capture_event();
+        }
     }
 
     fn mouse_interaction(
@@ -300,13 +365,74 @@ where
         viewport: &Rectangle,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        self.content.as_widget_mut().overlay(
+        let content = self.content.as_widget_mut().overlay(
             &mut tree.children[0],
             layout,
             renderer,
             viewport,
             translation,
-        )
+        )?;
+        let Some(next) = self.left_press_time else { return Some(content) };
+        let state = tree.state.downcast_mut::<State>();
+        Some(overlay::Element::new(Box::new(PressTimeOverlay {
+            content: RefCell::new(overlay::Nested::new(content)),
+            next,
+            forwarded: &mut state.overlay_presses,
+        })))
+    }
+}
+
+struct PressTimeOverlay<'a, Message, Theme, Renderer> {
+    content: RefCell<overlay::Nested<'a, Message, Theme, Renderer>>,
+    next: PressClock,
+    forwarded: &'a mut VecDeque<Option<PressTime>>,
+}
+
+impl<Message, Theme, Renderer: renderer::Renderer> overlay::Overlay<Message, Theme, Renderer>
+    for PressTimeOverlay<'_, Message, Theme, Renderer>
+{
+    fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
+        self.content.get_mut().layout(renderer, bounds)
+    }
+
+    fn operate(&mut self, layout: Layout<'_>, renderer: &Renderer, operation: &mut dyn Operation) {
+        self.content.get_mut().operate(layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+    ) {
+        let press = is_left_press(event).then(self.next);
+        let _scope = press.map(|time| PressTimeScope(LEFT_PRESS_TIME.replace(time)));
+        self.content.get_mut().update(event, layout, cursor, renderer, clipboard, shell);
+        // Iced processes the overlay's batch before dispatching its ignored
+        // events to the base. Keep only those timestamps in that same order.
+        if let Some(time) = press.filter(|_| !shell.is_event_captured()) {
+            self.forwarded.push_back(time);
+        }
+    }
+
+    fn mouse_interaction(
+        &self, layout: Layout<'_>, cursor: mouse::Cursor, renderer: &Renderer,
+    ) -> mouse::Interaction {
+        self.content.borrow_mut().mouse_interaction(layout, cursor, renderer)
+    }
+
+    fn draw(
+        &self,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+    ) {
+        self.content.borrow_mut().draw(renderer, theme, style, layout, cursor);
     }
 }
 
@@ -375,26 +501,6 @@ fn update<Message: Clone, Theme, Renderer>(
         | Event::Touch(touch::Event::FingerPressed { .. }) => {
             if let Some(message) = widget.on_press.as_ref() {
                 shell.publish(message.clone());
-                shell.capture_event();
-            }
-
-            if let Some(position) = cursor_position
-                && let Some(message) = widget.on_double_click.as_ref()
-            {
-                let new_click = mouse::Click::new(
-                    position,
-                    mouse::Button::Left,
-                    state.previous_click,
-                );
-
-                if new_click.kind() == mouse::click::Kind::Double {
-                    shell.publish(message.clone());
-                }
-
-                state.previous_click = Some(new_click);
-
-                // Even if this is not a double click, but the press is nevertheless
-                // processed by us and should not be popup to parent widgets.
                 shell.capture_event();
             }
         }

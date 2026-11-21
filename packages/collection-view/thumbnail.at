@@ -5,7 +5,7 @@ widget Thumbnail (src: str = "", alt: str = "", kind: str = "", icon: str = "", 
         // Recreate the image and its renderer callbacks together whenever the
         // resource changes, even when the two resources use the same URI.
         ThumbnailContent (
-            key: "" + .resourceId.len() + ":" + .resourceId + .resourceRevision.len() + ":" + .resourceRevision + .src.len() + ":" + .src + .state.len() + ":" + .state + .fit,
+            key: f"${.resourceId.len()}:${.resourceId}${.resourceRevision.len()}:${.resourceRevision}${.src.len()}:${.src}${.state.len()}:${.state}${.fit}",
             src: .src, alt: .alt, kind: .kind,
             iconName: .icon, state: .state, fit: .fit,
             resourceId: .resourceId, resourceRevision: .resourceRevision

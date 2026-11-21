@@ -52,12 +52,12 @@ fn flow_step(result: AutoResult<()>) -> Result<FlowEnd, AutoError> {
 }
 
 /// Steps (progress oracle):
-/// 1. Incrementally compile changed .at files (see `incremental_compile_changed`)
-/// 2. Generate project structure if not exists
-/// 3. Generate API client code (if api.at exists)
-/// 4. Materialize bundled shadcn-vue components (PLAN-457, before install)
-/// 5. npm install (+ registry fallback for non-bundled components)
-/// 6. Copy public assets, start backend, start dev server
+/// 1. Generate the API client and its import manifest (if api.at exists)
+/// 2. Compile changed .at files and generate missing project structure
+/// 3. Materialize bundled shadcn-vue components (PLAN-457, before install)
+/// 4. npm install (+ registry fallback for non-bundled components)
+/// 5. Copy public assets and start the backend
+/// 6. Start the dev server
 pub fn run_vue_flow(
     root_dir: &Path,
     args: Vec<String>,
@@ -107,12 +107,20 @@ pub fn run_vue_flow(
         }
     }
 
-    step(1, "incremental compile");
+    step(1, "generate API client");
+    println!("\n▶ Step 1/{total_steps}: Generating API client...");
+    // Incremental compilation validates `use back.api` against this manifest.
+    auto_web::generate_api(root_dir, "vue")?;
+    if proc_host::cancelled() {
+        return finish_cancelled();
+    }
+
+    step(2, "incremental compile");
     let changed_count = incremental_compile_changed(root_dir, req)?;
     if proc_host::cancelled() {
         return finish_cancelled();
     }
-    step(1, "project context");
+    step(2, "project context");
 
     // Load project context（R1-F02：请求在场则经合同读取，不再回读 pac.at）
     let mut project = match req {
@@ -130,9 +138,9 @@ pub fn run_vue_flow(
         project.set_frozen_theme_identity(frozen);
     }
 
-    let mut current_step = 0u64;
+    let mut current_step = 1u64;
 
-    // Step 1: Generate project structure if not exists, or regenerate source files
+    // Step 2: Generate project structure if not exists, or regenerate source files
     current_step += 1;
     step(current_step, "generate project structure");
     println!();
@@ -325,34 +333,6 @@ pub fn run_vue_flow(
         }
     }
 
-    // Step 2: Generate API client code (if api.at exists)
-    current_step += 1;
-    step(current_step, "generate API client");
-    println!();
-    println!(
-        "▶ Step {}/{}: Generating API client...",
-        current_step, total_steps
-    );
-    // PLAN-734 T-06：Err 传播（错误不能只 warn 后继续启动旧产物）。
-    auto_web::generate_api(root_dir, "vue")?;
-    if proc_host::cancelled() {
-        return finish_cancelled();
-    }
-
-    // Load API function names for Vue generator (dynamic detection)
-    let api_fns_path = root_dir.join("dist").join(".api_functions");
-    if api_fns_path.exists() {
-        if let Ok(content) = fs::read_to_string(&api_fns_path) {
-            let fns: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
-            if !fns.is_empty() {
-                // SAFETY: Setting a process-wide env var before spawning Vue generation
-                unsafe {
-                    std::env::set_var("AUTO_API_FUNCTIONS", fns.join(","));
-                }
-            }
-        }
-    }
-
     // Step 3: Materialize bundled shadcn-vue ui components (PLAN-457).
     // Offline copies land BEFORE the dependency install so package.json is
     // complete when pnpm resolves — no post-install dependency surgery.
@@ -399,8 +379,18 @@ pub fn run_vue_flow(
     let _desktop_backends = if desktop_mode() {
         Some(crate::desktop_backends::DesktopBackends::start(&project.output_dir)?)
     } else { None };
+    let file_root = std::env::var_os("AUTO_FILE_MANAGER_ROOT");
+    let file_browser = if project.name == "file-manager" {
+        file_root.as_deref().map(Path::new).map(|root| {
+            start_file_browser(root_dir, &project.output_dir, root)
+        }).transpose()?
+    } else {
+        None
+    };
     let backend_impl = std::env::var("AUTO_BACKEND_IMPL").unwrap_or_else(|_| "rust".to_string());
-    if backend_impl == "vm" {
+    if file_browser.is_some() {
+        println!("  ✓ File Manager scoped browser backend started");
+    } else if backend_impl == "vm" {
         // Vue+VM: AutoVM HTTP server as backend.
         crate::run_vm::start_vm_server(
             root_dir,
@@ -431,13 +421,18 @@ pub fn run_vue_flow(
         "▶ Step {}/{}: Starting dev server...",
         current_step, total_steps
     );
-    let dev_result = project.npm_run_dev(args);
+    let file_target = file_browser.as_ref().map(|server| format!("http://127.0.0.1:{}", server.port));
+    let file_credential = file_browser.as_ref().map(|server| server.proxy_authorization());
+    let dev_result = project.npm_run_dev_with_env(args, &[
+        ("AUTO_FILE_BROWSER_TARGET", file_target.as_deref().unwrap_or("")),
+        ("AUTO_FILE_BROWSER_CREDENTIAL", file_credential.unwrap_or("")),
+    ]);
 
     // Cleanup: stop API backend server when dev server exits
     if let Some(mut child) = _api_child {
         let _ = child.kill();
         println!("  ✓ API server (Rust) stopped");
-    } else if backend_impl == "vm" {
+    } else if file_browser.is_none() && backend_impl == "vm" {
         // VM server runs on a background thread — process exit cleans it up.
         println!("  ✓ API server (VM) stopped");
     }
@@ -446,6 +441,34 @@ pub fn run_vue_flow(
         return finish_cancelled();
     }
     flow_step(dev_result)
+}
+
+fn start_file_browser(
+    project: &Path, output: &Path, directory: &Path,
+) -> AutoResult<auto_ui_runtime::back_proxy::BrowserFileServer> {
+    use auto_ui_runtime::back_proxy::{start_file_browser_with_writes, SessionSpec};
+
+    let back_entry = auto_lang_core::config::resolve_back_api(project)
+        .ok_or_else(|| AutoError::from("File Manager requires its back/api.at"))?;
+    let writes = crate::util::file_manager_write_permissions()?;
+    let server = start_file_browser_with_writes(
+        SessionSpec { app_id: "file-manager".into(), back_entry }, directory, writes,
+    ).map_err(|error| format!("File Manager grant: {error}"))?;
+    let lib = output.join("src/lib");
+    let api_path = lib.join("api.ts");
+    let generated = fs::read_to_string(&api_path)?;
+    write_file_browser_client(output)?;
+    fs::write(api_path, format!("import {{ fileBrowserFetch as fetch }} from './file-browser'\n{generated}"))?;
+    Ok(server)
+}
+
+pub(crate) fn write_file_browser_client(output: &Path) -> AutoResult<()> {
+    let lib = output.join("src/lib");
+    fs::create_dir_all(&lib)?;
+    auto_api_gen::generated_build::write_if_changed(
+        &lib.join("file-browser.ts"), include_bytes!("file_browser_client.ts"),
+    )?;
+    Ok(())
 }
 
 /// PLAN-658 T-03: 画廊多后端 proxy 启动编排（rust_ui 画廊钩子在

@@ -15,6 +15,8 @@
 // folders schema（r2：沿 085 嵌套形状，薄适配为 TreeView 全键节点）：
 // { id: str, label: str, children: List }
 
+use collection_view.collection_schema: CollectionAction, CollectionItem
+
 /// 记录结构校验："" = 合法；"<empty-id>" = 存在空 id；"<no-revision>" =
 /// 存在空 revision；其余返回值 = 首个重复 id（子串 token 法，PLAN-085 同款：
 /// 起始 ""、`!`→`!0` 先于 `|`→`!1` 的单射转义、空 id 不入 token 流）。
@@ -98,16 +100,16 @@ pub fn ab_kind_icon(kind str) str {
 
 /// 将授权记录投影成 CollectionView 条目。可预览性由 091 的授权 URI 决定，
 /// 与缩略图是否成功渲染分开。
-pub fn ab_collection_items(records List) List {
-    var result List = []
+pub fn ab_collection_items(records List) List<CollectionItem> {
+    var result List<CollectionItem> = []
     var i int = 0
     while i < records.len() {
         let record = records[i]
-        var actions List = []
+        var actions List<CollectionAction> = []
         if record.kind == "image" && record.thumbnailUri != "" {
-            actions.push({id: "preview", label: "预览", enabled: true})
+            actions.push(CollectionAction { id: "preview", label: "预览", enabled: true })
         }
-        result.push({
+        result.push(CollectionItem {
             id: record.id, itemRevision: record.revision, label: record.label,
             kind: record.kind, icon: ab_kind_icon(record.kind), thumbnailUri: record.thumbnailUri,
             thumbnailState: if record.thumbnailUri != "" { "ready" } else { "missing" },

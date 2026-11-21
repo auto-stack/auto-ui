@@ -1,0 +1,27 @@
+use std.json: json_str
+
+fn cv_request_prefix(serial int, mount_token str, request_scope str, base_revision int) Str {
+    let envelope = f"{\"seq\":${serial},\"instanceToken\":" + json_str(mount_token.to(Str))
+    let scoped = envelope + ",\"scopeId\":" + json_str(request_scope.to(Str))
+    return scoped + f",\"baseRevision\":${base_revision}"
+}
+
+pub fn cv_view_request(serial int, mount_token str, request_scope str, base_revision int, requested_mode str) Str {
+    let envelope = cv_request_prefix(serial, mount_token, request_scope, base_revision)
+    return envelope + ",\"viewMode\":" + json_str(requested_mode.to(Str)) + "}"
+}
+
+pub fn cv_sort_request(serial int, mount_token str, request_scope str, base_revision int, requested_key str) Str {
+    let envelope = cv_request_prefix(serial, mount_token, request_scope, base_revision)
+    return envelope + ",\"sortKey\":" + json_str(requested_key.to(Str)) + "}"
+}
+
+pub fn cv_item_request(serial int, mount_token str, request_scope str, base_revision int, item_id str, content_revision str, requested_action str) Str {
+    let envelope = cv_request_prefix(serial, mount_token, request_scope, base_revision)
+    let with_id = envelope + ",\"id\":" + json_str(item_id.to(Str))
+    let with_item = with_id + ",\"itemRevision\":" + json_str(content_revision.to(Str))
+    if requested_action != "" {
+        return with_item + ",\"actionId\":" + json_str(requested_action.to(Str)) + "}"
+    }
+    return with_item + "}"
+}

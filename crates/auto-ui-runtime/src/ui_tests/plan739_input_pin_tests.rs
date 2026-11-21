@@ -148,6 +148,7 @@ mod plan739_input_pin_tests {
             value: "模板求值值".to_string(),
             is_final: true,
             on_change: Some(DynamicMessage::String(".Edit".to_string())),
+            on_text: None,
             on_focus: None,
             on_link: None,
             placeholder: None,

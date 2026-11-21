@@ -1042,7 +1042,7 @@ pub fn generate_vite_config(npm_deps: &[(String, String)]) -> String {
         }
         format!("  optimizeDeps: {{\n    include: [\n{entries}    ],\n  }},\n")
     };
-    r#"import { defineConfig } from 'vite'
+    r#"import { defineConfig, type ProxyOptions } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import { existsSync, readFileSync } from 'fs'
@@ -1058,6 +1058,26 @@ const desktopProxy = Object.fromEntries(desktopRoutes.map((route: {id: string, t
     rewrite: route.strip ? (path: string) => path.slice(prefix.length) : (path: string) => path,
   }]
 }))
+
+const fileTarget = process.env.AUTO_FILE_BROWSER_TARGET
+const fileCredential = process.env.AUTO_FILE_BROWSER_CREDENTIAL
+const fileBrowserProxy: ProxyOptions | undefined = fileTarget && fileCredential ? {
+  target: fileTarget,
+  changeOrigin: true,
+  configure(proxy) {
+    proxy.on('proxyReq', (outgoing, request) => {
+      outgoing.removeHeader('x-auto-file-browser')
+      const local = request.socket.remoteAddress === '127.0.0.1' || request.socket.remoteAddress === '::1'
+        || request.socket.remoteAddress === '::ffff:127.0.0.1'
+      if (local && /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(request.headers.host || '')) {
+        outgoing.setHeader('x-auto-file-browser', fileCredential)
+      }
+    })
+    proxy.on('proxyRes', (upstream, _, downstream) => {
+      downstream.once('close', () => upstream.destroy())
+    })
+  },
+} : undefined
 
 export default defineConfig({
 __OPTIMIZE_DEPS__  base: './',
@@ -1095,6 +1115,9 @@ __OPTIMIZE_DEPS__  base: './',
     // Read the backend port at RUNTIME from AUTO_HTTP_PORT (set by `auto run -B`),
     // so the proxy target updates without regenerating vite.config.ts.
     proxy: {
+      ...(fileBrowserProxy ? {
+        '^/(?:__auto/file-browser/|apps/file-session-)': fileBrowserProxy,
+      } : {}),
       ...desktopProxy,
       '/api': {
         target: process.env.AUTO_HTTP_PROXY || `http://127.0.0.1:${process.env.AUTO_HTTP_PORT || __PROXY_PORT__}`,
@@ -1140,7 +1163,59 @@ pub fn refresh_vite_config(output_dir: &std::path::Path, npm_deps: &[(String, St
     }
 }
 
-fn generate_tsconfig(ace_routed: bool) -> String {
+const CHECKED_PACKAGE_VIEW_START: &str = "const AcePackageView = (() => {";
+
+fn checked_package_sfc(code: &str) -> bool {
+    code.lines().any(|line| line == CHECKED_PACKAGE_VIEW_START)
+}
+
+fn oversized_checked_package_sfc(code: &str) -> bool {
+    // Volar resolves extra file extensions such as .vue only below 4 MiB.
+    code.len() >= 4 * 1024 * 1024 && checked_package_sfc(code)
+}
+
+fn write_vue_sfc(path: &Path, code: &str) -> Result<bool, String> {
+    if !oversized_checked_package_sfc(code) {
+        fs::write(path, code)
+            .map_err(|error| format!("Failed to write {}: {error}", path.display()))?;
+        return Ok(true);
+    }
+
+    let (template, script) = code
+        .split_once("<script setup>\n")
+        .ok_or_else(|| format!("Checked Vue component {} has no setup script", path.display()))?;
+    let (imports, body) = script
+        .split_once(CHECKED_PACKAGE_VIEW_START)
+        .and_then(|(imports, body)| {
+            body.strip_suffix("\n})();\n</script>\n").map(|body| (imports, body))
+        })
+        .ok_or_else(|| format!("Checked Vue component {} has no complete factory", path.display()))?;
+    let stem = path.file_stem().and_then(|stem| stem.to_str())
+        .ok_or_else(|| format!("Invalid Vue component path {}", path.display()))?;
+    let module = serde_json::to_string(&format!("./{stem}.ace.js")).expect("serialize module path");
+    let sfc = format!(
+        "{template}<script setup lang=\"ts\">\nimport {{ createAcePackageView }} from {module}\n\
+         const AcePackageView = createAcePackageView()\n</script>\n"
+    );
+    // Invoke the factory from setup each time so package state and host
+    // resources retain the lifetime of their own component instance.
+    let script = format!("{imports}export function createAcePackageView() {{{body}\n}}\n");
+    let declaration = b"import type { Component } from 'vue'\nexport function createAcePackageView(): Component\n";
+    let write = |path: &Path, bytes: &[u8]| {
+        auto_api_gen::generated_build::write_if_changed(path, bytes)
+            .map_err(|error| format!("Failed to write {}: {error}", path.display()))
+    };
+    let module_changed = write(&path.with_extension("ace.js"), script.as_bytes())?;
+    let declaration_changed = write(&path.with_extension("ace.d.ts"), declaration)?;
+    let sfc_changed = write(path, sfc.as_bytes())?;
+    Ok(module_changed || declaration_changed || sfc_changed)
+}
+
+fn imports_file_client(code: &str) -> bool {
+    code.lines().any(|line| line.starts_with("import {") && line.ends_with("from '@/lib/file-browser'"))
+}
+
+fn generate_tsconfig(checked_package: bool) -> String {
     // Plan 053 M4: ES2020 → ES2021 — the codegen maps `.at` `replace` to
     // JS `replaceAll` (Rust str::replace is full-replace), which needs the
     // es2021 lib for vue-tsc. WebView2/Chromium supports it (Chrome 85+).
@@ -1148,7 +1223,7 @@ fn generate_tsconfig(ace_routed: bool) -> String {
   "compilerOptions": {
 "#);
     // Checked ACE packages emit JavaScript in script setup and runtime modules.
-    if ace_routed || (cfg!(feature = "ace-vue") && std::env::var("AUTO_UI_ACE_VUE").ok().as_deref() == Some("1")) {
+    if checked_package || (cfg!(feature = "ace-vue") && std::env::var("AUTO_UI_ACE_VUE").ok().as_deref() == Some("1")) {
         config.push_str("    \"allowJs\": true,\n");
     }
     config.push_str(r#"    "target": "ES2021",
@@ -1178,7 +1253,11 @@ fn generate_tsconfig(ace_routed: bool) -> String {
   "references": [{ "path": "./tsconfig.node.json" }]
 }
 "#);
-    config
+    if checked_package {
+        config.replace(", \"src/**/*.vue\"", "")
+    } else {
+        config
+    }
 }
 
 fn generate_tsconfig_node() -> String {
@@ -1203,6 +1282,7 @@ module.exports = {
   content: [
     './index.html',
     './src/**/*.{ts,tsx,vue}',
+    './src/**/*.ace.js',
   ],
   theme: {
     container: {
@@ -2280,10 +2360,6 @@ fn ensure_natives_layer(output_dir: &Path) {
     }
 }
 
-fn generate_app_vue(vue_code: &str) -> String {
-    vue_code.to_string()
-}
-
 /// PLAN-593 V1：色变量块取自 auto-ui-compiler registry（scaffold）单一事实源，
 /// 本函数零手写色值（--radius 为非色 token，留脚手架；dark 块无 --radius 沿
 /// 原 CSS 继承语义）。sidebar 族块经 extra 槽拼接。
@@ -2659,7 +2735,7 @@ fn write_project_files(
         .map_err(|e| format!("Failed to write vite.config.ts: {}", e))?;
 
     // tsconfig.json
-    let tsconfig = generate_tsconfig(ace_routed);
+    let tsconfig = generate_tsconfig(ace_routed || checked_package_sfc(vue_code));
     fs::write(output_path.join("tsconfig.json"), tsconfig)
         .map_err(|e| format!("Failed to write tsconfig.json: {}", e))?;
 
@@ -2702,9 +2778,7 @@ fn write_project_files(
         .map_err(|e| format!("Failed to write src/main.ts: {}", e))?;
 
     // src/App.vue
-    let app_vue = generate_app_vue(vue_code);
-    fs::write(output_path.join("src/App.vue"), app_vue)
-        .map_err(|e| format!("Failed to write src/App.vue: {}", e))?;
+    write_vue_sfc(&output_path.join("src/App.vue"), vue_code)?;
 
     // src/assets/index.css
     let index_css = generate_index_css_with_tree(composed_theme, tree_index_css);
@@ -3877,6 +3951,11 @@ export default router
         if let Some(rt) = &self.ace_vue_rt {
             write_ace_vue_runtime(&self.output_dir, rt)?;
         }
+        if imports_file_client(&self.app_vue_code)
+            || self.components.iter().any(|(_, _, code, _)| imports_file_client(code))
+        {
+            crate::run_vue::write_file_browser_client(&self.output_dir)?;
+        }
         Ok(())
     }
 
@@ -4737,7 +4816,7 @@ export default router
         }
 
         // Plan 475: Compile widgets from deps/*/src/front into components/
-        for (dep_name, dep_front, library_dep) in &dep_front_dirs {
+        for (dep_name, dep_front, library_dep) in dep_front_dirs.iter().filter(|_| !ace_packaged) {
             let mut dep_at_files: Vec<PathBuf> = Vec::new();
             Self::collect_at_files_recursive(dep_front, &mut dep_at_files);
             dep_at_files.sort();
@@ -5412,8 +5491,7 @@ export default router
                 };
 
                 let component_file = output_subdir.join(format!("{}.vue", vue_file_name));
-                fs::write(&component_file, code)
-                    .map_err(|e| format!("Failed to write {}: {}", component_file.display(), e))?;
+                write_vue_sfc(&component_file, code)?;
             }
         }
 
@@ -5564,9 +5642,6 @@ export default router
         )?;
 
         // Write App.vue (the root component)
-        let app_vue_path = src_dir.join("App.vue");
-        fs::write(&app_vue_path, &self.app_vue_code)
-            .map_err(|e| format!("Failed to write App.vue: {}", e))?;
         self.write_ace_vue_rt()?;
 
         // Write main.ts
@@ -5599,7 +5674,7 @@ export default router
         self.write_theme_inputs_receipt()?;
 
         // Write tsconfig.json
-        let tsconfig = generate_tsconfig(self.ace_routed);
+        let tsconfig = generate_tsconfig(self.ace_routed || checked_package_sfc(&self.app_vue_code));
         fs::write(output_path.join("tsconfig.json"), &tsconfig)
             .map_err(|e| format!("Failed to write tsconfig.json: {}", e))?;
 
@@ -5754,8 +5829,7 @@ export default router
 
         // Regenerate App.vue
         let app_vue_path = src_dir.join("App.vue");
-        fs::write(&app_vue_path, &self.app_vue_code)
-            .map_err(|e| format!("Failed to write App.vue: {}", e))?;
+        write_vue_sfc(&app_vue_path, &self.app_vue_code)?;
         self.write_ace_vue_rt()?;
         println!("{}", "  ✓ Regenerated App.vue".bright_green());
 
@@ -5838,7 +5912,7 @@ export default router
 
         // Regenerate tsconfig.json
         let tsconfig_path = self.output_dir.join("tsconfig.json");
-        let tsconfig = generate_tsconfig(self.ace_routed);
+        let tsconfig = generate_tsconfig(self.ace_routed || checked_package_sfc(&self.app_vue_code));
         fs::write(&tsconfig_path, &tsconfig)
             .map_err(|e| format!("Failed to write tsconfig.json: {}", e))?;
         println!("{}", "  ✓ Regenerated tsconfig.json".bright_green());
@@ -5961,8 +6035,7 @@ export default router
                 };
 
                 let component_file = output_subdir.join(format!("{}.vue", vue_file_name));
-                fs::write(&component_file, code)
-                    .map_err(|e| format!("Failed to write {}: {}", component_file.display(), e))?;
+                write_vue_sfc(&component_file, code)?;
             }
         }
 
@@ -6164,8 +6237,7 @@ export default router
                 }
                 fs::create_dir_all(&components_dir)?;
                 let file = components_dir.join(format!("{}.vue", widget_name));
-                fs::write(&file, rewrite(code))
-                        .map_err(|e| format!("Failed to write {}: {}", file.display(), e))?;
+                write_vue_sfc(&file, &rewrite(code))?;
                 for comp in detect_shadcn_components(code) {
                     if !shadcn_needed.contains(&comp) {
                         shadcn_needed.push(comp);
@@ -6194,8 +6266,7 @@ export default router
             let app_dir = apps_src.join(&e.id);
             fs::create_dir_all(&app_dir)
                 .map_err(|e| format!("Failed to create {}: {}", app_dir.display(), e))?;
-            fs::write(app_dir.join("App.vue"), desktop_window_root(&rewrite(&vp.app_vue_code)))
-                .map_err(|e| format!("Failed to write {}/App.vue: {}", app_dir.display(), e))?;
+            write_vue_sfc(&app_dir.join("App.vue"), &desktop_window_root(&rewrite(&vp.app_vue_code)))?;
             // PLAN-015：注册表行展示名走 locale 链（zh=title_zh→title…）。
             // PLAN-024：mini 面旗标 + Mini.vue 落盘（根 widget 的 view mini）。
             if let Some((_, mcode)) = &vp.mini_face {
@@ -6456,10 +6527,10 @@ export default router
                         let _ = fs::create_dir_all(&components_dir);
                         let file = components_dir.join(format!("{}.vue", widget_name));
                         if claimed_components.insert(widget_name.clone()) {
-                            let _ = fs::write(
+                            write_vue_sfc(
                                 &file,
-                                gallery_scope_theme_runtime(&rewrite_api_import(code.clone())),
-                            );
+                                &gallery_scope_theme_runtime(&rewrite_api_import(code.clone())),
+                            )?;
                         }
                         for comp in detect_shadcn_components(code) {
                             if !shadcn_needed.contains(&comp) {
@@ -6481,7 +6552,7 @@ export default router
 
                     let app_dir = apps_src.join(&e.id);
                     if fs::create_dir_all(&app_dir).is_ok() {
-                        let _ = fs::write(app_dir.join("App.vue"), &rewritten_app_vue);
+                        write_vue_sfc(&app_dir.join("App.vue"), &rewritten_app_vue)?;
                         if let Some(api_ts) = &fullstack_api_ts {
                             let _ = fs::write(app_dir.join("lib_api.ts"), api_ts);
                         }
@@ -6848,6 +6919,10 @@ export default router
 
     /// Run package manager dev server
     pub fn npm_run_dev(&self, args: Vec<String>) -> AutoResult<()> {
+        self.npm_run_dev_with_env(args, &[])
+    }
+
+    pub(crate) fn npm_run_dev_with_env(&self, args: Vec<String>, env: &[(&str, &str)]) -> AutoResult<()> {
         let pm = crate::pkg::display_name();
         println!();
         println!(
@@ -6863,7 +6938,7 @@ export default router
 
         let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
-        match crate::pkg::run_script("dev", &args_str, &self.output_dir) {
+        match crate::pkg::run_script_with_env("dev", &args_str, &self.output_dir, env) {
             Ok(_) => Ok(()),
             Err(e) => Err(format!("{} run dev failed: {}", pm, e).into()),
         }
@@ -7612,6 +7687,8 @@ pub fn incremental_compile_changed(
     };
     for (dep_name, dep_front, library_dep) in
         VueProject::collect_dep_front_dirs_with_roots(root_dir, &roots)
+            .into_iter()
+            .filter(|_| ace_route_product.is_none())
     {
         let mut dep_at_files: Vec<PathBuf> = Vec::new();
         VueProject::collect_at_files_recursive(&dep_front, &mut dep_at_files);
@@ -7845,8 +7922,20 @@ pub fn incremental_compile_changed(
             write_ace_vue_runtime(&output_dir, runtime)?;
         }
         let router = src.join("router/index.ts");
+        if output_dir.join("package.json").is_file()
+            && (!product.routes.is_empty() || checked_package_sfc(&product.app))
+        {
+            auto_api_gen::generated_build::write_if_changed(
+                &output_dir.join("tsconfig.json"), generate_tsconfig(true).as_bytes(),
+            )?;
+        }
+        if imports_file_client(&product.app) || product.pages.values().any(|code| imports_file_client(code)) {
+            crate::run_vue::write_file_browser_client(&output_dir)?;
+        }
         let mut queue = |path: PathBuf, code: String, name: String| {
-            if fs::read_to_string(&path).ok().as_deref() != Some(&code) {
+            if oversized_checked_package_sfc(&code)
+                || fs::read_to_string(&path).ok().as_deref() != Some(&code)
+            {
                 changed_files.push((path, code, name));
             }
         };
@@ -7976,25 +8065,22 @@ pub fn incremental_compile_changed(
     cache.save(root_dir).ok();
 
     // Write changed files
-    let changed_count = changed_files.len();
-    if changed_count > 0 {
-        println!(
-            "{} files changed, writing...",
-            changed_count.to_string().bright_yellow()
-        );
-        for (output_path, vue_code, _widget_name) in changed_files {
-            if let Some(parent) = output_path.parent() {
-                fs::create_dir_all(parent).ok();
-            }
-            fs::write(&output_path, &vue_code)
-                .map_err(|e| format!("Failed to write {}: {}", output_path.display(), e))?;
-            // Extract file name from output path for logging
+    let mut changed_count = 0;
+    for (output_path, vue_code, _widget_name) in changed_files {
+        if let Some(parent) = output_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        if write_vue_sfc(&output_path, &vue_code)? {
+            changed_count += 1;
             let file_name = output_path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown");
             println!("  ✓ Wrote {}.vue", file_name.bright_green());
         }
+    }
+    if changed_count > 0 {
+        println!("{} source files updated", changed_count.to_string().bright_yellow());
     } else {
         println!(
             "{}",
@@ -8185,22 +8271,31 @@ fn ace_front(front_dir: &Path) -> AutoResult<Option<AceFront>> {
         let source = fs::read_to_string(&app_at)?;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(&source).with_session(session);
-        let Some(ast) = parser
+        let syntax = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .ok()
-            .map(auto_ui_dialect::UiCode)
-        else {
-            return Ok(None);
+            .map(auto_ui_dialect::UiCode);
+        let Some(syntax) = syntax else { return Ok(None) };
+        let mut widgets = syntax.domain_stmts().filter_map(|statement| match statement {
+            auto_ui_dialect::UiStmt::WidgetDecl(widget) => Some(widget),
+            _ => None,
+        });
+        let Some(root) = widgets.next() else { return Ok(None) };
+        let has_routes = |widget: &auto_ui_dialect::ast::WidgetDecl| {
+            widget.routes.as_ref().is_some_and(|routes| !routes.routes.is_empty())
         };
-        let is_routed = ast.domain_stmts().any(|stmt| {
-            matches!(stmt, auto_ui_dialect::UiStmt::WidgetDecl(widget)
-                if widget.routes.as_ref().is_some_and(|routes| !routes.routes.is_empty()))
+        let is_routed = has_routes(root) || widgets.any(|widget| has_routes(widget));
+        let imports_package = root.ext_imports.iter().any(|import| {
+            matches!(import.kind, auto_ui_dialect::ast::ExtImportKind::Package)
         });
-        let is_linked = ast.domain_stmts().any(|stmt| {
-            matches!(stmt, auto_ui_dialect::UiStmt::WidgetDecl(widget)
-                if widget.ext_imports.iter().any(|item| matches!(item.kind, auto_ui_dialect::ast::ExtImportKind::Package)))
+        let has_timers = root.timer.as_ref().is_some_and(|timer| !timer.entries.is_empty());
+        let has_host_bindings = root.bind.as_ref().is_some_and(|bind| {
+            bind.bindings.iter().any(|item| {
+                matches!(item.key.trim_matches('"'), "file:list" | "file:mutate" | "file:open" | "widget:context")
+                    || auto_ui_dialect::preferences::is_preference_binding(&item.key)
+            })
         });
-        if !is_routed && !is_linked {
+        if !is_routed && !imports_package && !has_timers && !has_host_bindings {
             return Ok(None);
         }
         let mut modules = Vec::new();
@@ -8221,7 +8316,8 @@ fn ace_front(front_dir: &Path) -> AutoResult<Option<AceFront>> {
             Some(generate_routed_front_sfc(&app_at, &source, &modules)?
                 .ok_or_else(|| format!("ace.route.admission: {} routes were not projected", app_at.display()))?)
         } else {
-            generate_linked_front_sfc(&app_at, &source, &modules)?
+            generate_linked_front_sfc(&app_at, &source, &modules)
+                .map_err(|error| format!("ace.package.app: {}: {error}", app_at.display()))?
         };
         Ok(product.map(|product| AceFront {
             app: product.app,
@@ -10750,7 +10846,7 @@ fn emit_demo_route_face(
         };
         let _ = fs::create_dir_all(&page_dir);
         let page_vue = gallery_scope_theme_runtime(&rewrite(code.clone()));
-        let _ = fs::write(page_dir.join(format!("{stem}.vue")), page_vue);
+        let _ = write_vue_sfc(&page_dir.join(format!("{stem}.vue")), &page_vue);
     }
 
     let mut page_paths: HashMap<String, String> = HashMap::new();
@@ -11606,6 +11702,36 @@ onMounted(() => {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn oversized_checked_sfc_publishes_and_repairs_its_factory() {
+        let output = tempfile::tempdir().unwrap();
+        let app = output.path().join("App.vue");
+        let factory = output.path().join("App.ace.js");
+        let declaration = output.path().join("App.ace.d.ts");
+        let prefix = "<template><AcePackageView /></template>\n<script setup>\nimport { h } from 'vue'\n";
+        let tail = "\nreturn { setup: () => () => h('p', 'ready') };\n})();\n</script>\n";
+        let small = format!("{prefix}{CHECKED_PACKAGE_VIEW_START}{tail}");
+        write_vue_sfc(&app, &small).unwrap();
+        assert_eq!(fs::read_to_string(&app).unwrap(), small);
+        assert!(!factory.exists());
+
+        let padding = " ".repeat(4 * 1024 * 1024);
+        let large = format!("{prefix}{CHECKED_PACKAGE_VIEW_START}\n//{padding}{tail}");
+        assert!(write_vue_sfc(&app, &large).unwrap());
+        let sfc = fs::read_to_string(&app).unwrap();
+        assert!(sfc.contains("const AcePackageView = createAcePackageView()"));
+        assert!(sfc.contains("from \"./App.ace.js\""));
+        let module = fs::read_to_string(&factory).unwrap();
+        assert!(module.starts_with("import { h } from 'vue'\nexport function createAcePackageView() {"));
+        assert!(module.ends_with("return { setup: () => () => h('p', 'ready') };\n}\n"));
+        assert!(fs::read_to_string(&declaration).unwrap().contains("createAcePackageView(): Component"));
+        assert!(!write_vue_sfc(&app, &large).unwrap());
+
+        fs::remove_file(&factory).unwrap();
+        assert!(write_vue_sfc(&app, &large).unwrap());
+        assert_eq!(fs::read_to_string(factory).unwrap(), module);
+    }
 
     /// PLAN-051 B-03（①）: four-combination main.ts — adjacent import
     /// statements must stay newline-separated (regression: cold scaffold

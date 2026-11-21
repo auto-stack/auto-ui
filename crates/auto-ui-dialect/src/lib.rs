@@ -33,6 +33,7 @@ pub mod declarations;
 pub mod grammar;
 pub mod model;
 pub mod node2d;
+pub mod preferences;
 pub mod route;
 // PLAN-980（IF-980-FIELDS）：WidgetDecl 完整字段分母的可执行清单 + 穷尽出现集抽取。
 pub mod p980_fields;

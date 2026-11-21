@@ -199,6 +199,7 @@ pub struct VmBridge {
 
     /// State field names (ordered, matching GenericInstanceData field order)
     state_field_names: Vec<String>,
+    preferences: Vec<auto_ui_dialect::preferences::PreferenceBinding>,
 
     // Declared parent channels, excluding legacy copies of child model defaults.
     root_parent_fields: std::collections::HashSet<String>,
@@ -843,6 +844,13 @@ impl VmBridge {
         crate::ui::dnd_host_provider::install_process_default();
 
         let widget_name = widget.name.clone();
+        let preferences = auto_ui_dialect::preferences::preference_bindings(
+            widget
+                .key_bindings
+                .iter()
+                .map(|(key, handler)| (key.as_str(), handler.as_str())),
+        )
+        .map_err(VmBridgeError::InvalidState)?;
 
         // 1. Synthesize imports + ALL widgets' state types + handlers into ONE
         //    Module via the genuine VM Codegen. Plan 320: single VM.
@@ -940,6 +948,7 @@ impl VmBridge {
             state_obj_id,
             root_parent_fields: widget.state_vars.iter().map(|v| v.name.clone()).collect(),
             state_field_names: field_names,
+            preferences,
             widget_name,
             child_state_map: std::cell::RefCell::new(std::collections::HashMap::new()),
             child_instances: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -1013,6 +1022,13 @@ impl VmBridge {
         crate::ui::dnd_host_provider::install_process_default();
 
         let widget_name = decl.name.to_string();
+        let preferences = auto_ui_dialect::preferences::preference_bindings(
+            decl.bind
+                .iter()
+                .flat_map(|bind| &bind.bindings)
+                .map(|row| (row.key.as_str(), row.handler.as_str())),
+        )
+        .map_err(VmBridgeError::InvalidState)?;
 
         // 1. Synthesize imports + ALL widgets' state types + handlers into ONE
         //    Module via the genuine VM Codegen, reading directly from WidgetDecl.
@@ -1209,6 +1225,7 @@ impl VmBridge {
             state_obj_id,
             root_parent_fields,
             state_field_names: field_names,
+            preferences,
             widget_name,
             child_state_map: std::cell::RefCell::new(std::collections::HashMap::new()),
             child_instances: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -4266,6 +4283,55 @@ impl VmBridge {
         Ok(out)
     }
 
+    pub(crate) fn restore_preferences(&self) -> Result<()> {
+        use auto_lang_core::vm::ffi::stdlib::storage_host_read_fresh;
+
+        for binding in &self.preferences {
+            if let Some(value) = storage_host_read_fresh(&binding.key) {
+                self.call_handler_for(
+                    &self.widget_name,
+                    &binding.restore,
+                    self.state_obj_id,
+                    &[Value::Str(value.into())],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    fn preference_values(&self, widget: &str, event: &str, state: u64) -> Vec<Option<Value>> {
+        if widget != self.widget_name
+            || state != self.state_obj_id
+            || event == "Init"
+            || self.preferences.iter().any(|binding| binding.restore == event)
+        {
+            return Vec::new();
+        }
+        self.preferences
+            .iter()
+            .map(|binding| self.read_state(&binding.field).ok())
+            .collect()
+    }
+
+    fn persist_preferences(&self, before: Vec<Option<Value>>) {
+        use auto_lang_core::vm::ffi::stdlib::storage_host_publish;
+
+        for (binding, before) in self.preferences.iter().zip(before) {
+            let Ok(after) = self.read_state(&binding.field) else {
+                continue;
+            };
+            if before.as_ref() == Some(&after) {
+                continue;
+            }
+            let text = match after {
+                Value::Str(text) => text.to_string(),
+                Value::Bool(value) => value.to_string(),
+                _ => continue,
+            };
+            storage_host_publish(&binding.key, text);
+        }
+    }
+
     pub fn call_handler_for(
         &self,
         widget_name: &str,
@@ -4280,6 +4346,8 @@ impl VmBridge {
             return Ok(());
         };
 
+        let preferences = self.preference_values(widget_name, event_name, state_obj_id);
+
         // Plan 446 批一 (F1): 失败时带上崩点 ip + handler 名 —— VMError 本身
         // 无位置信息,task.ip 在 Err 返回后指向失败指令附近。
         // PLAN-702 T-02: 段派发——Yield+等待即 park（task 入注册表、零忙等，
@@ -4290,6 +4358,9 @@ impl VmBridge {
             .call_fn_by_name_segment(&mut task, &fn_name, 1 + args.len())
         {
             SegmentOutcome::Completed(res) => {
+                if res.is_ok() {
+                    self.persist_preferences(preferences);
+                }
                 // PLAN-062 F2 配套: 主任务边界 RET 无帧清扫(见 call_vm_fn 注)——
                 // 任务弃前整栈清账。Err 路径同样清(局部/临时槽可能已持 stake,
                 // 不清则崩掉的 handler 额外漏一份)。
@@ -4337,11 +4408,15 @@ impl VmBridge {
             // parked 段在途重入——702 T-04 契约：静默忽略（Ok）。
             return Ok(());
         };
+        let preferences = self.preference_values(widget_name, event_name, state_obj_id);
         match self
             .vm
             .call_fn_by_name_cpu_slice(&mut task, &fn_name, 1 + args.len(), budget)
         {
             SegmentOutcome::Completed(res) => {
+                if res.is_ok() {
+                    self.persist_preferences(preferences);
+                }
                 self.vm.rc_release_task_stack(&mut task);
                 res.map_err(|e| {
                     VmBridgeError::VmError(format!(
@@ -4593,6 +4668,7 @@ impl VmBridge {
     /// Legacy call_handler — calls handler on the ROOT widget (widget_name
     /// defaults to this bridge's widget name). Uses self.state_obj_id.
     pub fn call_handler(&mut self, event_name: &str, args: &[Value]) -> Result<()> {
+        let preferences = self.preference_values(&self.widget_name, event_name, self.state_obj_id);
         let fn_name = format!("handler_{}", extract_handler_name(event_name));
 
         // Plan 320: try namespaced first (handler_<WidgetName>_<Event>),
@@ -4657,25 +4733,30 @@ impl VmBridge {
             .vm
             .call_fn_by_name_segment(&mut task, &fn_name, 1 + args.len())
         {
-            SegmentOutcome::Completed(res) => res.map_err(|e| {
-                eprintln!(
-                    "[CALL_HANDLER_ERR] {} error: {:?} at ip=0x{:x}",
-                    fn_name, e, task.ip
-                );
-                eprintln!(
-                    "[CALL_HANDLER_ERR] exports: {:?}",
-                    self.vm.flash.exports_by_name.keys().collect::<Vec<_>>()
-                );
-                let start = task.ip.saturating_sub(40);
-                let end = (task.ip + 40).min(self.vm.flash.memory.len());
-                eprintln!(
-                    "[CALL_HANDLER_ERR] code around ip (0x{:x}..0x{:x}): {:?}",
-                    start,
-                    end,
-                    &self.vm.flash.memory[start..end]
-                );
-                VmBridgeError::VmError(format!("{:?} (crash ip=0x{:x} in {})", e, task.ip, fn_name))
-            }),
+            SegmentOutcome::Completed(res) => {
+                if res.is_ok() {
+                    self.persist_preferences(preferences);
+                }
+                res.map_err(|e| {
+                    eprintln!(
+                        "[CALL_HANDLER_ERR] {} error: {:?} at ip=0x{:x}",
+                        fn_name, e, task.ip
+                    );
+                    eprintln!(
+                        "[CALL_HANDLER_ERR] exports: {:?}",
+                        self.vm.flash.exports_by_name.keys().collect::<Vec<_>>()
+                    );
+                    let start = task.ip.saturating_sub(40);
+                    let end = (task.ip + 40).min(self.vm.flash.memory.len());
+                    eprintln!(
+                        "[CALL_HANDLER_ERR] code around ip (0x{:x}..0x{:x}): {:?}",
+                        start,
+                        end,
+                        &self.vm.flash.memory[start..end]
+                    );
+                    VmBridgeError::VmError(format!("{:?} (crash ip=0x{:x} in {})", e, task.ip, fn_name))
+                })
+            }
             SegmentOutcome::Parked { wait, seg } => {
                 self.register_parked(
                     task,

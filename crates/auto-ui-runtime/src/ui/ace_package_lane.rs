@@ -6,9 +6,8 @@
 //! 发射器产出 TS 文本。跨模块 helper 的调用名由同一 `SemanticView` 决定；本模块
 //! 另提供 helper 函数体发射，供 SFC `<script>` 把**被调方**一并落进产物。
 //!
-//! 边界（具名）：本片只发射"handler 体 + 被引用的包内 helper 函数体"，不产出
-//! 完整 SFC（template/样式归既有方言道）；只支持 int/str/bool 标量体（与 976
-//! fragment 域的既有拒绝面一致）。
+//! Handler expressions use A2TS fragments. Package helpers use its whole-function
+//! lowerer so their local declarations and cleanup share one scope.
 use ace_a2x_core::{SemanticView, Ty};
 use ace_core::source::packages::PackageModuleInput;
 use std::collections::BTreeSet;

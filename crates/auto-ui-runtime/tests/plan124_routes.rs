@@ -119,7 +119,7 @@ fn route_sfc_publishes_pages_and_local_diagnostics() {
 fn native_front_routes_mount_the_checked_page_in_the_authored_outlet() {
     use auto_ui_runtime::ui::{
         ace_node_desktop::{host_session_stats, install_bridge, with_bridge, AceNodeDesktopWindow, NodeDesktopMsg},
-        iced::IntoIcedElement,
+        iced::ComponentIced,
         Component, View,
     };
 
@@ -214,8 +214,9 @@ fn native_front_routes_mount_the_checked_page_in_the_authored_outlet() {
         with_bridge(|bridge| bridge.step()).unwrap()
     };
     assert!(render(&window).contains("Original intro"));
-    let mut layout = iced_test::simulator(window.view().into_iced());
+    let mut layout = iced_test::simulator(window.view_iced());
     assert!(layout.find("Mobile only").is_err());
+    assert!(layout.find("Before outlet").unwrap().visible_bounds().is_some());
     layout.click("Open tree").expect("authored desktop sidebar link is visible");
     for message in layout.into_messages() {
         window.on(message);
@@ -228,10 +229,11 @@ fn native_front_routes_mount_the_checked_page_in_the_authored_outlet() {
     let leaf = rendered.find("Authored tree leaf").unwrap();
     let after = rendered.find("After outlet").unwrap();
     assert!(before < leaf && leaf < after);
-    let mut layout = iced_test::simulator(window.view().into_iced());
+    let mut layout = iced_test::simulator(window.view_iced());
     let target = layout.find("Authored tree leaf").expect("routed leaf in Iced layout");
     let bounds = target.visible_bounds().expect("routed leaf inside the viewport");
     assert!(bounds.width > 0.0 && bounds.height > 0.0);
+    assert!(layout.find("Go back").unwrap().visible_bounds().is_some());
     let back = button(&window.view(), "Go back").unwrap();
     let NodeDesktopMsg::PackageClick { session: page, .. } = back else {
         panic!("expected a checked page click");

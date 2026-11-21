@@ -12,6 +12,7 @@ use ace_core::source::{
     packages::{parse_package_source_age, PackageModuleInput, PACKAGES_CAPABILITY},
 };
 use auto_lang_core::{pac_declares_dep, pac_workspace_member_dir, resolve_module_path};
+use auto_lang_core::use_scanner::{scan_use_statements, UseStatement};
 use auto_ui_compiler::{
     aura::AuraNode,
     ui_gen::widget::{ComponentRegistry, LoadedPackage},
@@ -19,10 +20,12 @@ use auto_ui_compiler::{
 
 pub(super) fn append_widget_packages(
     source_path: &Path,
+    source: &str,
     candidates: &[ComponentNode],
     units: &mut Vec<PackageModuleInput>,
 ) -> Result<BTreeMap<String, PathBuf>, String> {
     let parent = source_path.parent().unwrap_or_else(|| Path::new("."));
+    let imports = active_uses(source)?;
     let mut registry = ComponentRegistry::new();
     let mut source_paths = BTreeMap::new();
     for node in candidates {
@@ -39,13 +42,13 @@ pub(super) fn append_widget_packages(
             let package = registry
                 .load_package(Path::new(&import.directory), parent)
                 .map_err(|error| format!("ace.widget.package: {name}: {error}"))?;
-            if package.manifest.name != *name {
+            if package.manifest.name != *name && package.manifest.name.replace('-', "_") != *name {
                 return Err(format!(
                     "ace.widget.package-identity: requested `{name}` from {:?}, found `{}`",
                     package.dir, package.manifest.name
                 ));
             }
-            append_package_sources(package, &tags, units, &mut source_paths)?;
+            append_package_sources(package, name, &tags, &imports, units, &mut source_paths)?;
         }
     }
     if !source_paths.is_empty() {
@@ -180,12 +183,15 @@ fn collect_aura_tags(view: &AuraNode, tags: &mut BTreeSet<String>) {
 
 fn append_package_sources(
     package: &LoadedPackage,
+    import_name: &str,
     tags: &BTreeSet<String>,
+    imports: &[UseStatement],
     units: &mut Vec<PackageModuleInput>,
     source_paths: &mut BTreeMap<String, PathBuf>,
 ) -> Result<(), String> {
     let mut pending = BTreeSet::new();
     enqueue_widgets(package, tags, &mut pending)?;
+    enqueue_modules(package, import_name, imports, false, &mut pending);
     let mut resolved = BTreeSet::new();
     let mut source_units = Vec::new();
     while let Some(path) = pending.pop_first() {
@@ -207,7 +213,7 @@ fn append_package_sources(
             .ok_or_else(|| format!("ace.widget.module: invalid module path {}", path.display()))?;
         let source = std::fs::read_to_string(&canonical)
             .map_err(|error| format!("ace.widget.module: {}: {error}", path.display()))?;
-        source_paths.entry(format!("{}::{id}", package.manifest.name)).or_insert(canonical);
+        source_paths.entry(format!("{import_name}::{id}")).or_insert(canonical);
         let mut child_tags = BTreeSet::new();
         for (_, widget) in &package.full_widgets {
             if package.widget_sources[&widget.name].contains(&path) {
@@ -218,32 +224,9 @@ fn append_package_sources(
             }
         }
         enqueue_widgets(package, &child_tags, &mut pending)?;
-        for import in auto_lang_core::use_scanner::scan_use_statements(&source) {
-            // The gallery uses both `use tree_util` and `use components.tree_util`.
-            // Keep local helpers by source identity. External imports belong to
-            // the project's ordinary dependency resolver.
-            let qualifier = package
-                .dir
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("");
-            let (prefix, module) = import
-                .module
-                .split_once('.')
-                .unwrap_or(("", &import.module));
-            if (prefix.is_empty() || prefix == qualifier || prefix == package.manifest.name)
-                && module
-                    .bytes()
-                    .all(|c| c.is_ascii_alphanumeric() || c == b'_')
-            {
-                let dependency = package.dir.join(format!("{module}.at"));
-                if dependency.is_file() {
-                    pending.insert(dependency);
-                }
-            }
-        }
+        enqueue_modules(package, import_name, &active_uses(&source)?, true, &mut pending);
         source_units.push(PackageModuleInput {
-            package: package.manifest.name.clone(),
+            package: import_name.to_owned(),
             version: package.manifest.version.clone(),
             id: id.to_string(),
             source,
@@ -266,6 +249,50 @@ fn append_package_sources(
         }
     }
     Ok(())
+}
+
+fn active_uses(source: &str) -> Result<Vec<UseStatement>, String> {
+    let mut imports = scan_use_statements(source);
+    if source.contains("Env") && source.contains("track") {
+        let syntax = super::ace_route::package_syntax(source)?;
+        // Use the checked compiler's reachability after host guards have been
+        // specialized. Leave namespace and wildcard imports to bind normally.
+        imports.retain(|import| {
+            import.is_pub || import.is_wildcard || import.items.is_empty()
+                || import.items.iter().any(|item| {
+                    !item.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+                        || syntax.referenced.contains(item)
+                })
+        });
+    }
+    Ok(imports)
+}
+
+fn enqueue_modules(
+    package: &LoadedPackage,
+    import_name: &str,
+    imports: &[UseStatement],
+    from_inside_package: bool,
+    pending: &mut BTreeSet<PathBuf>,
+) {
+    let directory_name = package.dir.file_name().and_then(|name| name.to_str());
+    for import in imports {
+        let module = match import.module.split_once('.') {
+            Some((prefix, module)) if prefix == import_name
+                || prefix == package.manifest.name
+                || Some(prefix) == directory_name
+                || (from_inside_package && prefix.is_empty()) => module,
+            None if from_inside_package => &import.module,
+            _ => continue,
+        };
+        if module.is_empty() || !module.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_') {
+            continue;
+        }
+        let dependency = package.dir.join(format!("{module}.at"));
+        if dependency.is_file() {
+            pending.insert(dependency);
+        }
+    }
 }
 
 fn enqueue_widgets(

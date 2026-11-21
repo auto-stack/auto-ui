@@ -9,8 +9,9 @@
 //! `proc_host::vm_main_hook` 交回宿主的 OS 主线程（iced 约束）；步骤
 //! 边界取消收口。未安装时行为与迁移前一致（CLI 主线程直接执行）。
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use auto_lang_core::file_session::FileWritePermissions;
 use colored::Colorize;
 
 use auto_val::{AutoError, AutoResult};
@@ -56,22 +57,50 @@ pub fn run_entry_file(path: &str) -> auto_lang_core::AutoResult<String> {
 /// 执行动态 UI 入口：托管时交宿主主线程，未托管在当前线程（= CLI 的
 /// OS 主线程，迁移前行为）。
 fn execute_vm_entry(code: &str, path: Option<&str>) -> auto_lang_core::AutoResult<String> {
+    if let Some(hook) = proc_host::vm_main_hook() {
+        return hook(code, path);
+    }
     // PLAN-980 NATIVE r13：`AUTO_UI_ENGINE=ace` → MIN-A-UI 通用 Node 桌面通道
     // （真实源经组件面编译 + AV→ui980 受检 FFI 实际 UI 更新 + typed 事件回
     // AV + run_app 真窗）；出面外源由 ACE 面**具名拒绝**（不静默回退旧 VM）。
     // 旧 vm 通道（含托管 hook）与 r11 快照面（`run_ace_native_entry`，保留给
     // 自己的测试/exe）不受影响。
-    if std::env::var("AUTO_UI_ENGINE").ok().as_deref() == Some("ace") {
+    if ace_desktop_selected() {
         let path = path.unwrap_or("ui.at");
-        return auto_ui_runtime::run_ace_node_desktop_entry(code, path).map_err(|e| {
-            let err: auto_lang_core::AutoError = format!("ace node desktop lane: {e}").into();
-            err
-        });
+        let access = desktop_file_manager_access(Path::new(path))?;
+        return auto_ui_runtime::run_ace_node_desktop_entry_with_access(
+            code,
+            path,
+            access.as_ref().map(|(root, writes)| (root.as_path(), *writes)),
+        )
+        .map_err(|error| format!("ace node desktop lane: {error}").into());
     }
-    match proc_host::vm_main_hook() {
-        Some(hook) => hook(code, path),
-        None => auto_ui_runtime::run_file_dynamic_ui(code, path),
+    auto_ui_runtime::run_file_dynamic_ui(code, path)
+}
+
+fn ace_desktop_selected() -> bool {
+    std::env::var("AUTO_UI_ENGINE").as_deref() == Ok("ace")
+}
+
+fn desktop_file_manager_access(
+    entry: &Path,
+) -> auto_lang_core::AutoResult<Option<(PathBuf, FileWritePermissions)>> {
+    let Some(root) = std::env::var_os("AUTO_FILE_MANAGER_ROOT") else {
+        return Ok(None);
+    };
+    let entry = entry.canonicalize().map_err(|error| {
+        format!("resolve desktop entry {}: {error}", entry.display())
+    })?;
+    let Some(project) = entry.ancestors().skip(1).find(|dir| dir.join("pac.at").is_file()) else {
+        return Ok(None);
+    };
+    if PacSource::legacy().name(&project.join("pac.at")) != "file-manager" {
+        return Ok(None);
     }
+    if root.is_empty() {
+        return Err("AUTO_FILE_MANAGER_ROOT must name a directory".into());
+    }
+    Ok(Some((project.join(root), crate::util::file_manager_write_permissions()?)))
 }
 
 /// Plan 340 fix: Start the AutoVM HTTP server (not the a2r Rust backend) for
@@ -340,9 +369,11 @@ pub fn run_vm_ui_flow(
             "vm".to_string()
         }
     });
-    let split_mode = std::env::var("AUTO_VM_MERGE").as_deref() == Ok("0")
-        || std::env::var("AUTO_VM_WITH_HTTP").as_deref() == Ok("1")
-        || backend_impl == "rust";
+    let scoped_file_manager = ace_desktop_selected() && source.name(&pac_path) == "file-manager";
+    let split_mode = !scoped_file_manager
+        && (std::env::var("AUTO_VM_MERGE").as_deref() == Ok("0")
+            || std::env::var("AUTO_VM_WITH_HTTP").as_deref() == Ok("1")
+            || backend_impl == "rust");
     let mut _api_child = if split_mode {
         if backend_impl == "rust" {
             // VM+Rust split: ensure the Rust axum server is generated, then
@@ -384,11 +415,13 @@ pub fn run_vm_ui_flow(
             None
         }
     } else {
-        println!();
-        println!(
-            "  {} vm+vm merged mode: backend runs in-process (no HTTP server)",
-            "✓".bright_green()
-        );
+        if !scoped_file_manager {
+            println!();
+            println!(
+                "  {} vm+vm merged mode: backend runs in-process (no HTTP server)",
+                "✓".bright_green()
+            );
+        }
         None
     };
     if proc_host::cancelled() {
@@ -409,7 +442,7 @@ pub fn run_vm_ui_flow(
     // 上下文；装载本身仍在执行进程（internal-vm-exec 子进程）进行。
     if proc_host::current().is_some() {
         let mut session_env: Vec<(String, String)> = Vec::new();
-        if !split_mode {
+        if !split_mode && !scoped_file_manager {
             match source.external_backend(project_dir) {
                 Ok(Some(backend_rel)) => {
                     let backend_dir = project_dir
@@ -446,7 +479,7 @@ pub fn run_vm_ui_flow(
             session_env.push(("WGPU_BACKEND".to_string(), "dx12".to_string()));
         }
         proc_host::set_vm_session_env(session_env);
-    } else if !split_mode {
+    } else if !split_mode && !scoped_file_manager {
         match source.external_backend(project_dir) {
             Ok(Some(backend_rel)) => {
                 let backend_dir = project_dir
@@ -527,7 +560,9 @@ pub fn run_vm_ui_flow(
 
     println!(
         "{}",
-        if split_mode {
+        if scoped_file_manager {
+            "Running AV/Iced File Manager with host-scoped file access".bright_cyan()
+        } else if split_mode {
             format!(
                 "Running VM interpreter UI (backend: {}, split over HTTP)",
                 backend_impl
