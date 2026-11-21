@@ -447,12 +447,44 @@ pub(super) fn prepare_page(
         .first()
         .ok_or_else(|| "page widget is missing".to_string())?;
     let mut replacements = Vec::new();
+    // PLAN-105 W111：文本定位游标——resolver 对重复 `router.param` 调用的
+    // expr.span 可能重复（实测两处同 span），按“上次命中之后”递进定位。
+    let mut param_search_from = 0usize;
     let mut commands = BTreeMap::new();
     let mut web_params = BTreeMap::new();
     let mut initialize = false;
     for handler in &widget.handlers {
         initialize |= handler.msg == "Init";
-        let span = handler.span.start as usize..handler.span.end as usize;
+        // PLAN-105 W111（落地适配）：AGE 投影的 span 属解析期坐标（脱糖后与
+        // 原源**必然可能偏移**）——handler 体一律按 `.msg ->` 文本定位
+        // （花括号配平），不信任解析 span。
+        let mut span = handler.span.start as usize..handler.span.end as usize;
+        {
+            let needle = format!(".{} ->", handler.msg);
+            if let Some(pos) = source.find(&needle) {
+                if let Some(brace_rel) = source[pos..].find('{') {
+                    let open = pos + brace_rel;
+                    let bytes = source.as_bytes();
+                    let mut depth = 0i32;
+                    let mut k = open;
+                    while k < bytes.len() {
+                        match bytes[k] {
+                            b'{' => depth += 1,
+                            b'}' => {
+                                depth -= 1;
+                                if depth == 0 {
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                        k += 1;
+                    }
+                    // 从 `.msg` 起（含 `->`）——下游 split_once("->") 依赖它。
+                    span = pos..(k + 1).min(source.len());
+                }
+            }
+        }
         if handler.body_foreign {
             let body = source[span.clone()]
                 .split_once("->")
@@ -464,7 +496,46 @@ pub(super) fn prepare_page(
                 commands.insert(handler.msg.clone(), command);
                 replacements.push((span, format!(".{} -> {{}}", handler.msg)));
             } else {
-                return Err(format!("ace.route.handler: handler {:?} contains a call outside the checked route commands", handler.msg));
+                return Err(format!("ace.route.handler: handler {:?} contains a call outside the checked route commands (body: {body:?})", handler.msg));
+            }
+        }
+        // PLAN-105 W111（落地适配）：router 交互调用在落地后的解析器里是
+        // ComponentStmt::Call（不再是 body_foreign）——语句 span 属解析期
+        // 坐标（脱糖后与原源可能有偏移），故按**结构渲染回原文**再定位替换，
+        // 语义与 124/125 期的 body_foreign 剥离一致。
+        for stmt in &handler.stmts {
+            let ace_core::source::age_component::ComponentStmt::Call { call, .. } = stmt
+            else {
+                continue;
+            };
+            let ExprKind::MethodCall { recv, name, args, .. } = &call.kind else {
+                continue;
+            };
+            let ExprKind::Var(owner) = &recv.kind else {
+                continue;
+            };
+            if owner.name != "router" {
+                continue;
+            }
+            let rendered_args = args
+                .iter()
+                .map(|a| match a {
+                    Arg::Pos(e) | Arg::MovePos(e) => render_router_arg(e),
+                    Arg::Named { value, .. } => render_router_arg(value),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let text = format!("router.{}({})", name.name, rendered_args);
+            if let Some(command) = route_command(&text, widget)? {
+                commands.insert(handler.msg.clone(), command);
+                if let Some(pos) = source.find(&text) {
+                    replacements.push((pos..pos + text.len(), String::new()));
+                }
+            } else {
+                return Err(format!(
+                    "ace.route.handler: handler {:?} contains a call outside the checked route commands (call: {text:?})",
+                    handler.msg
+                ));
             }
         }
         for assign in &handler.assigns {
@@ -477,7 +548,7 @@ pub(super) fn prepare_page(
             while let Some(expr) = expressions.pop() {
                 match &expr.kind {
                     ExprKind::Method { recv, name, args }
-                    | ExprKind::MethodCall { recv, name, args }
+                    | ExprKind::MethodCall { recv, name, args, .. }
                         if matches!(&recv.kind, ExprKind::Var(owner) if owner.name == "router")
                             && name.name == "param" =>
                     {
@@ -521,8 +592,22 @@ pub(super) fn prepare_page(
                             web_params.insert(name.clone(), (key.clone(), kind.to_string()));
                             format!(".{name}")
                         };
-                        replacements
-                            .push((expr.span.start as usize..expr.span.end as usize, literal));
+                        // PLAN-105 W111：解析期坐标（脱糖后）与原源可能偏移——
+                        // 按 `router.param(<key>)` 文本定位替换（找不到才回退 span）。
+                        let param_text = format!("router.param({key:?})");
+                        let range = match source[param_search_from..].find(&param_text) {
+                            Some(rel) => {
+                                let pos = param_search_from + rel;
+                                param_search_from = pos + param_text.len();
+                                pos..pos + param_text.len()
+                            }
+                            None => {
+                                let a = expr.span.start as usize;
+                                let b = expr.span.end as usize;
+                                if b <= source.len() { a..b } else { a..a }
+                            }
+                        };
+                        replacements.push((range, literal));
                     }
                     ExprKind::Binary { lhs, rhs, .. } => {
                         expressions.extend([lhs.as_ref(), rhs.as_ref()])
@@ -545,7 +630,11 @@ pub(super) fn prepare_page(
             .fields
             .first()
             .ok_or_else(|| "ace.route.param: missing model".to_string())?;
-        let start = first_field.span.start as usize;
+        // PLAN-105 W111：解析期坐标可能越原源界——插到 model 块文本处（原源）。
+        let mut start = first_field.span.start as usize;
+        if start > source.len() {
+            start = source.find("var ").unwrap_or(source.len());
+        }
         let mut declarations = String::new();
         for (field, (_, kind)) in &web_params {
             let initial = if kind == "int" { "0" } else { "\"\"" };
@@ -554,9 +643,20 @@ pub(super) fn prepare_page(
         replacements.push((start..start, declarations));
     }
     let mut rewritten = source.to_string();
+    // PLAN-105 W111（落地适配）：解析期坐标与原源可能偏移（AGE 脱糖）——
+    // 越界替换直接丢弃（文本定位路径已在产替换前锚定原源坐标）。
+    replacements.retain(|(range, _)| range.end <= rewritten.len());
     replacements.sort_by_key(|(range, _)| std::cmp::Reverse(range.start));
+    // 重叠防护：按 start 降序应用，新 range 的 end 不得超过上一个已应用
+    // range 的 start（Call-strip 与 body_foreign 剥离同指一个 handler 时，
+    // 内层已替换、外层整段跳过）。
+    let mut applied_floor = rewritten.len();
     for (range, replacement) in replacements {
-        rewritten.replace_range(range, &replacement);
+        if range.end > applied_floor {
+            continue;
+        }
+        rewritten.replace_range(range.clone(), &replacement);
+        applied_floor = applied_floor.min(range.start);
     }
     Ok(RouteSource {
         source: rewritten,
@@ -564,6 +664,35 @@ pub(super) fn prepare_page(
         has_init: initialize,
         web_params,
     })
+}
+
+
+/// PLAN-105 W111：router 交互实参的结构渲染（喂回 `route_command` 的文本
+/// 解析器：字符串字面量 / `+` 拼接 / `self.<int 字段>.to_string()`）。
+fn render_router_arg(expr: &ace_core::source::ast::Expr) -> String {
+    match &expr.kind {
+        ace_core::source::ast::ExprKind::StrLit(v) => format!("{v:?}"),
+        ace_core::source::ast::ExprKind::Binary {
+            op: ace_core::source::ast::BinOp::Add,
+            lhs,
+            rhs,
+        } => format!("{} + {}", render_router_arg(lhs), render_router_arg(rhs)),
+        ace_core::source::ast::ExprKind::MethodCall {
+            recv,
+            name,
+            args,
+            ..
+        } if name.name == "to_string" && args.is_empty() =>
+        {
+            if let ace_core::source::ast::ExprKind::Field { base, name } = &recv.kind {
+                // AutoLang 源形态是 `.field`（点前缀字段引用）。
+                let _ = base;
+                return format!(".{}.to_string()", name.name);
+            }
+            format!("{}.to_string()", render_router_arg(recv))
+        }
+        _ => String::new(),
+    }
 }
 
 fn route_command(body: &str, widget: &ComponentNode) -> Result<Option<RouteAction>, String> {
@@ -619,7 +748,7 @@ fn push_parts(
             } => {
                 items.extend([rhs.as_ref(), lhs.as_ref()]);
             }
-            ExprKind::Method { recv, name, args } | ExprKind::MethodCall { recv, name, args }
+            ExprKind::Method { recv, name, args } | ExprKind::MethodCall { recv, name, args, .. }
                 if name.name == "to_string" && args.is_empty() =>
             {
                 let ExprKind::Field { base, name } = &recv.kind else {

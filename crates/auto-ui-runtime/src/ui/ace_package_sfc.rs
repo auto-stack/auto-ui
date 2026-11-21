@@ -19,9 +19,290 @@ mod widgets;
 
 /// 生成一份可直接挂载的 Vue SFC（template + script setup）。
 pub fn generate_package_sfc(units: &[PackageModuleInput], entry: &str) -> Result<String, String> {
-    generate_package_sfc_with_root(units, entry, None)
+    // PLAN-124/125：routes 声明优先走 routed lane；非路由包回落 PLAN-105
+    // 的 prep/desugar 管线（leaf 兜底）。
+    if let Some(product) = generate_routed_package_sfcs(units, entry)? {
+        return Ok(product.app);
+    }
+    generate_package_sfc_with_root(units, entry, None, None, false)
 }
 
+/// Publish the app and page SFCs together. The project supplies the Vue Router
+/// instance with the same module aliases as the declared routes.
+pub struct RoutedPackageSfc {
+    pub app: String,
+    pub app_name: String,
+    pub pages: std::collections::BTreeMap<String, String>,
+    pub paths: Vec<(String, String)>,
+}
+
+/// Resolve a routed app from the standard front/app.at and front/pages layout.
+pub fn generate_routed_front_sfc(
+    app_at: &std::path::Path,
+    source: &str,
+    modules: &[std::path::PathBuf],
+) -> Result<Option<RoutedPackageSfc>, String> {
+    let unit = |id: String, source: String| PackageModuleInput {
+        package: "app".into(),
+        version: "1.0.0".into(),
+        id,
+        source,
+        provider: None,
+    };
+    let mut units = vec![unit("app".into(), source.into())];
+    for module in modules {
+        if let Some(id) = module.file_stem().and_then(|name| name.to_str()) {
+            let source = std::fs::read_to_string(module)
+                .map_err(|error| format!("ace.route.module: {}: {error}", module.display()))?;
+            units.push(unit(id.into(), source));
+        }
+    }
+    generate_routed_package_sfcs(&units, "app::app")
+        .map_err(|error| format!("{}: {error}", app_at.display()))
+}
+
+pub fn generate_routed_package_sfcs(
+    units: &[PackageModuleInput],
+    entry: &str,
+) -> Result<Option<RoutedPackageSfc>, String> {
+    let shell = units.iter().find(|unit| format!("{}::{}", unit.package, unit.id) == entry)
+        .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
+    let candidates = package_candidates(&shell.source)?;
+    let root = candidates.first().ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
+    let Some(table) = RouteTable::from_root(root, units, shell)? else {
+        return Ok(None);
+    };
+
+    let app = generate_route_file(&table, units, entry, true)?;
+    let mut pages = std::collections::BTreeMap::new();
+    let mut paths = Vec::new();
+    for route in table.routes() {
+        // A failed page component is per declaration so its diagnostic keeps
+        // the originating pattern when multiple routes use the same alias.
+        let result = route.page.as_ref().map_err(Clone::clone).and_then(|page| {
+            generate_route_file(&table, units, page, false).map_err(|error| {
+                format!("ace.route.page: pattern {:?} module {:?}: {error}", route.pattern, route.module)
+            })
+        });
+        let name = match result {
+            Ok(sfc) => {
+                pages.insert(route.module.clone(), sfc);
+                route.module.clone()
+            }
+            Err(diagnostic) => {
+                let name = format!("ace-route-error-{}", paths.len());
+                pages.insert(name.clone(), format!("<template><pre>{}</pre></template>\n", escape_html(&diagnostic)));
+                name
+            }
+        };
+        paths.push((route.pattern.clone(), name));
+    }
+    Ok(Some(RoutedPackageSfc { app, app_name: root.name.name.clone(), pages, paths }))
+}
+
+fn generate_route_file(
+    table: &RouteTable,
+    units: &[PackageModuleInput],
+    entry: &str,
+    shell: bool,
+) -> Result<String, String> {
+    let mut scoped = table.entry_units(units, entry);
+    let unit = scoped.first_mut().ok_or_else(|| format!("route entry `{entry}` is missing"))?;
+    let context = prepare_page(&unit.source, None)?;
+    unit.source = context.source.clone();
+    generate_package_sfc_leaf(&scoped, entry, Some(context), shell)
+}
+
+fn generate_package_sfc_leaf(
+    units: &[PackageModuleInput],
+    entry: &str,
+    route: Option<RouteSource>,
+    shell: bool,
+) -> Result<String, String> {
+    let entry_src = units
+        .iter()
+        .find(|u| format!("{}::{}", u.package, u.id) == entry)
+        .map(|u| u.source.clone())
+        .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
+    let node = package_candidates(&entry_src)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
+    // 受检描述：字段/初值/处理器赋值（同名一次编译）。
+    let caps = [ace_core::source::packages::PACKAGES_CAPABILITY.to_string()];
+    let compiled = ace_core::source::age_package::compile_age_package_with_scenario(
+        units,
+        entry,
+        ace_av::age_component::LegacyWidgetAlias::Accept,
+        &caps,
+        &ace_av::age_component::ComponentScenario {
+            instances: 1,
+            ops: Vec::new(),
+        },
+    )
+    .map_err(|ds| {
+        ds.iter()
+            .map(|d| format!("{}: {}", d.code, d.message))
+            .collect::<Vec<_>>()
+            .join("; ")
+    })?;
+    let component = compiled
+        .description
+        .components
+        .first()
+        .ok_or_else(|| "package declares no component".to_string())?;
+
+    // F-R21-2（PLAN-981 r21 复审指派，owner 980/UI）：`handler_stmts` 契约
+    // 的消费门——本车道只复放平铺赋值（`handler_assigns`）；体含 if/let
+    //（age-package 作者面文法可达）时**具名拒**，不双支裸喷/部分复放
+    //（lang 侧 `age_component.rs` `handler_stmts` 契约：部分复放=错状态
+    // 值，禁止）。
+    fn control_flow_kind(
+        stmts: &[ace_core::source::age_component::ComponentStmt],
+    ) -> Option<&'static str> {
+        for st in stmts {
+            match st {
+                ace_core::source::age_component::ComponentStmt::Assign(_) => {}
+                ace_core::source::age_component::ComponentStmt::Let { .. } => {
+                    return Some("let");
+                }
+                // If 本身即控制流（then/els 内嵌套同拒）。
+                ace_core::source::age_component::ComponentStmt::If { .. } => {
+                    return Some("if");
+                }
+                // PLAN-105/1090 落地后枚举新增的 For/While/Call：routed lane
+                // 保持 master 原语义——非平铺赋值句不在此拒（router 交互经
+                // route.commands 承载）；具名拒纪律在包片段 lane 的同款检查
+                // （本文件另一份 control_flow_kind）维持。
+                ace_core::source::age_component::ComponentStmt::For { .. }
+                | ace_core::source::age_component::ComponentStmt::While { .. }
+                | ace_core::source::age_component::ComponentStmt::Call { .. } => {}
+            }
+        }
+        None
+    }
+    for (msg, stmts) in &component.handler_stmts {
+        if let Some(kind) = control_flow_kind(stmts) {
+            return Err(format!(
+                "source.age.sfc-handler-stmt: handler `{msg}` contains a `{kind}` statement — \
+                 this lane replays flat assigns only; partial replay is forbidden"
+            ));
+        }
+    }
+
+    // handler 消息（on-block 声明序）——lane 用它重放状态函数。
+    let msgs: Vec<String> = component
+        .handler_assigns
+        .iter()
+        .map(|(m, _)| m.clone())
+        .collect();
+    let msgs_ref: Vec<&str> = msgs.iter().map(|m| m.as_str()).collect();
+    let lane = PackageFragmentLane::compile(units, entry, &msgs_ref)?;
+
+    // ---- script：helper 定义 + refs + handlers ----
+    let mut helper_fns: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut inits: Vec<(String, String)> = Vec::new();
+    for (name, _ty) in &component.fields {
+        let (js, helpers) = field_init_js(component, name, &lane)?;
+        helper_fns.extend(helpers);
+        inits.push((name.clone(), js));
+    }
+    let mut script = String::new();
+    script.push_str("import { ref } from 'vue'\n");
+    if let Some(route) = &route {
+        script.push_str("import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'\n");
+        script.push_str("const aceRoute = useRoute()\nconst aceRouter = useRouter()\n");
+        if !route.commands.is_empty() {
+            script.push_str("import { onBeforeUnmount } from 'vue'\nlet aceRouteActive = true\nonBeforeUnmount(() => { aceRouteActive = false })\n");
+        }
+        if route.has_init {
+            script.push_str("import { onMounted } from 'vue'\n");
+        }
+        if !route.web_params.is_empty() {
+            script.push_str("function aceParam(key, kind) {\n  const value = aceRoute.params[key];\n  if (typeof value !== 'string') throw new Error('ace.route.param: missing ' + key);\n  if (kind === 'str') return value;\n  const number = Number(value);\n  if (!/^[+-]?\\d+$/.test(value) || !Number.isInteger(number) || number < -2147483648 || number > 2147483647) throw new Error('ace.route.param: invalid int for ' + key);\n  return number;\n}\n");
+        }
+    }
+    for (name, js) in &inits {
+        if let Some((key, kind)) = route.as_ref().and_then(|route| route.web_params.get(name)) {
+            script.push_str(&format!("const {name} = ref(aceParam({key:?}, {kind:?}))\n"));
+        } else {
+            script.push_str(&format!("const {name} = ref({js})\n"));
+        }
+    }
+    for (msg, assigns) in &component.handler_assigns {
+        if route.as_ref().is_some_and(|route| route.commands.contains_key(msg)) {
+            continue;
+        }
+        let fn_name = handler_fn_name(msg);
+        script.push_str(&format!("function {fn_name}() {{\n"));
+        for (field, rhs) in assigns {
+            let state_fn = format!("__age_state_0_{field}");
+            let span = rhs.span.start..rhs.span.end;
+            let frag = lane.emit_expr_at_span(&state_fn, span).map_err(|e| {
+                format!("source.age.sfc-expr: handler `{msg}` field `{field}`: {e}")
+            })?;
+            if frag.text.is_empty() {
+                // Keep the existing scalar representation for inline constants and fields.
+                script.push_str(&format!("  {field}.value = {};\n", expr_to_js(rhs)?));
+            } else {
+                // A fragment may emit several temporaries. Use the value returned by
+                // the lane, and give its temporaries their own assignment scope.
+                script.push_str("  {\n");
+                for line in &frag.text {
+                    script.push_str("    ");
+                    script.push_str(&rewrite_lane_locals(line));
+                    script.push('\n');
+                }
+                helper_fns.extend(frag.helpers.iter().cloned());
+                script.push_str(&format!("    {field}.value = {};\n  }}\n", rewrite_lane_locals(&frag.expr)));
+            }
+        }
+        script.push_str("}\n");
+    }
+    if let Some(route) = &route {
+        for (message, action) in &route.commands {
+            let handler = handler_fn_name(message);
+            let operation = action.vue();
+            script.push_str(&format!("function {handler}() {{ if (aceRouteActive) {operation}; }}\n"));
+        }
+        if route.has_init {
+            script.push_str("onMounted(onInit)\n");
+        }
+    }
+    // helper 定义在 handler 之后统一发射（函数声明提升；遍历 helper_fns 已是全集）。
+    for helper in &helper_fns {
+        // a2x_fn_* = 包内函数（lane 发射定义）；其余 a2x_* 是 runtime helper，
+        // 由 runtime_helpers 内联，不能当包函数发射。
+        if !helper.starts_with("a2x_fn_") {
+            continue;
+        }
+        emit_helper(&lane, helper, &mut script)?;
+    }
+    script.push_str(&runtime_helpers(&helper_fns)?);
+    // 组件公开状态（defineExpose：宿主/测试经组件实例可读；不是测试专用钩子）。
+    let state_entries: Vec<String> = component
+        .fields
+        .iter()
+        .filter(|(name, _)| !route.as_ref().is_some_and(|route| route.web_params.contains_key(name)))
+        .map(|(name, _)| format!("{name}: {name}.value"))
+        .collect();
+    script.push_str(&format!(
+        "defineExpose({{ __state: () => ({{ {} }}) }})\n",
+        state_entries.join(", ")
+    ));
+
+    // ---- template ----
+    let mut template = String::new();
+    let mut ctx = TmplCtx::new(&mut template, route.is_some(), shell);
+    ctx.push_str("<div class=\"age-sfc\">");
+    render_items(&node.view.tree, &mut ctx)?;
+    ctx.push_str("</div>");
+    script.push_str(&ctx.widget_state);
+
+    Ok(format!(
+        "<template>\n{template}\n</template>\n\n<script setup>\n{script}</script>\n"
+    ))
+}
 /// PLAN-105 T-02（U03 真语料）：带工程根的 SFC 生成——entry 源先过组件面源准备
 /// （`use` 行空白化 + 依赖样式内联 + 类型化列表数据字段改写），再走组件投影；
 /// 其余单元已由 `desugar_units` 统一 f-string 脱糖。
@@ -29,6 +310,8 @@ pub fn generate_package_sfc_with_root(
     units: &[PackageModuleInput],
     entry: &str,
     project_root: Option<&std::path::Path>,
+    route: Option<RouteSource>,
+    shell: bool,
 ) -> Result<String, String> {
     // PLAN-105 T-02：单元统一 f-string 脱糖（与组件面/包桥同一入口）。
     let units = &crate::ui::ace_package_units::desugar_units(units.to_vec())?[..];
@@ -43,7 +326,7 @@ pub fn generate_package_sfc_with_root(
             .unwrap_or_else(|_| entry_src.clone()),
         None => entry_src.clone(),
     };
-    let node = age_component_candidates(&prepared_entry)?
+    let node = package_candidates(&prepared_entry)?
         .into_iter()
         .next()
         .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
@@ -151,19 +434,6 @@ pub fn generate_package_sfc_with_root(
     }
     let mut script = String::new();
     script.push_str("import { ref } from 'vue'\n");
-    if let Some(route) = &route {
-        script.push_str("import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'\n");
-        script.push_str("const aceRoute = useRoute()\nconst aceRouter = useRouter()\n");
-        if !route.commands.is_empty() {
-            script.push_str("import { onBeforeUnmount } from 'vue'\nlet aceRouteActive = true\nonBeforeUnmount(() => { aceRouteActive = false })\n");
-        }
-        if route.has_init {
-            script.push_str("import { onMounted } from 'vue'\n");
-        }
-        if !route.web_params.is_empty() {
-            script.push_str("function aceParam(key, kind) {\n  const value = aceRoute.params[key];\n  if (typeof value !== 'string') throw new Error('ace.route.param: missing ' + key);\n  if (kind === 'str') return value;\n  const number = Number(value);\n  if (!/^[+-]?\\d+$/.test(value) || !Number.isInteger(number) || number < -2147483648 || number > 2147483647) throw new Error('ace.route.param: invalid int for ' + key);\n  return number;\n}\n");
-        }
-    }
     for (name, js) in &inits {
         if let Some((key, kind)) = route.as_ref().and_then(|route| route.web_params.get(name)) {
             script.push_str(&format!("const {name} = ref(aceParam({key:?}, {kind:?}))\n"));
