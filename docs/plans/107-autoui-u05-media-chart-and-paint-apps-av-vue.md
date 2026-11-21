@@ -703,6 +703,14 @@ Iced 真窗经原侧栏进入相同页。AV 的视图闭包在同一 `lv` 上报
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 50 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 42908603, lang e172e837c | evidence: original Donut chart Iced and production Chrome pointer, legend, route lifecycle | next: work`
 
+### 第 51 轮｜项目声明依赖接到两端，Donut 空数据通过
+
+无路由的组件包应用接到受检包入口。原 `024-charts` 的样式模块按项目 manifest 和已用导入解析，两端均越过缺 `stylekit.styles` 或旧产品处理器缺席的入口诊断。Vue 冷生成推进到 A2TS 的受检函数闭包，失败日志 SHA256 为 `745a285b6cb2f70c9c6fd53d7e185c95402c5406f7ef90d344e1ad7ae756f35b`。Iced 进入原 LineChart，所有权验证报告其状态函数需要约 61 MB，超过既有 16 MiB 上限。窗口日志 SHA256 为 `6844217570723b2733a041eb6d878f2a43a634b48447ef7615a831afa80ad906`。定向依赖材料已修正成与原项目一致的多行 manifest 声明，继续复验。
+
+空数据对照沿实际产品入口挂载固定原 `donut_chart.at`，由单独调用页提供类型一致的空记录列表。Chrome 与 Iced 都观察到 1 个底环、0 个扇区，逻辑指针输入后保持该状态，没有图例。Chrome 卸载无异常，Iced 关闭后拒绝 1 次迟到指针回调。Chrome 日志和 Iced JSON SHA256 分别为 `2e0f4048fd56fdf79f78b78c1a3d6f3a13e1241047bdf7f07f1808372743777d`、`6b45d97398c0cc58279293afe82d89d645a47fe2f292f13a7d5e271b6e664e02`。与第 49、50 轮固定原页回放合看，覆盖 Donut 的数据、指针、图例、空数据及会话关闭。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 51 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 5528a2bd, lang e172e837c | evidence: original Donut empty-input control on two hosts, exact 024 linked entry reaches named downstream checks | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
