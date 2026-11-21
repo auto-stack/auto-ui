@@ -1039,6 +1039,27 @@ stage: work（013 点击验收 + shim 修复）| plan_id: PLAN-105 | plan_revisi
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 112 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 5f50d31f | next: work
 
+stage: work（012 concat 链四墙解除）| plan_id: PLAN-105 | plan_revision: r1 | round: 113 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | code_commit: auto-lang `ddbeecaa2` | task_ids: T-02（W108）| evidence: av plan105 13/13 + 桥真跑墙链记录 | next: work
+
+2026-11-21 stage: work（T-02 W108：整 owned 文本元素的视图用域——012 concat 链四墙）| outcome: pass（T-02 未整体完成）
+
+**交付（auto-lang `ddbeecaa2`，012 世界时钟的墙链逐一解除）**：
+- verify：TextConcat 操作数记账——AGE 组件面放行整 owned 文本元素入 concat（视图安全用域；`list_elem_type_is_text` 判载体）；
+- lowering `text_view_operand`：整 owned 文本元素操作数走 **LIST_FIELD_VIEW 空路径**（空路径=元素本体的非破坏视图；执行器补空路径取元素臂）；
+- 类型映射：列表**元素位** plain str 落 owned Str（owned 容器；借视图不可作元素——`mir.type.list-elem`）；
+- ListGet 臂：owned-Str 元素列表的整元素读改发 LIST_FIELD_VIEW 空路径（元素类型取**列表 MIR 实际元素**而非 elem_vt_of 的表达式位映射）；owned 位再 StrToOwned；
+- ListPush：StrView 积（concat）在 owned-Str 元素位 StrToOwned 收敛；Call：文本实参按被调签名位 Str/StrView 双向调和。
+
+**桥真跑墙链（每步实证）**：`verify.view-escape` → `mir.type.list-elem`（List<StrView>）→ `list-push` 失配 → `call-arg-type` 失配 → **当前余墙 = ownership 分析 bound ~29.5MB 超冻结 16MB 预算**（`d___age_hv_0_7`，Tick 是全组最大 handler；root 矩阵二次项主导）。**该余墙是冻结验证契约的预算/公式决策**（V-11 家族与预算测试需重基线），属独立刀，已具名移交——非本计划装配面的静默放宽对象。
+
+**回归**：av plan105 13/13、core plan105 26/26、census 4/4、plan980_state_face 8/8、av-core 133、p013_sfc 4/4 全绿。
+
+**016 现状**：`ace.desktop.view-for-unsupported`（computed 列表的循环叶展开）未动——桥的动态叶展开是下一刀（runtime 展开按 refresh_texts 机制）。
+
+`next_responsible_role: work（W109：016 view-for 动态叶展开 或 012 ownership 预算决策（需 V-11 重基线）；随后 T-06 冻结回归）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 113 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: ddbeecaa2 | next: work
+
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
