@@ -13,7 +13,7 @@
 | 104 | [U02 页面与表单（归档）](archived/104-autoui-u02-pages-and-forms-av-vue.md) | 已交付：AV 真窗 7/7（005 三 oracle、010 Submit+FAQ、004/006/007 文本/label/状态）+ A2Vue 7/7（005/010 引 1072 正式收据、余例真浏览器档）；复审 pass；合入 ui `5a862d46` / lang `2fb094483`；T-01..T-08 全勾，8/8 |
 | 105 | [U03 本地应用与编辑](105-autoui-u03-local-interactive-apps-av-vue.md) | executing r1，1/8（T-02 W1–W24 已交：entry 边界/msg 尾逗号/单行视图数据/f-string/int 文本/link/源准备/类型化列表改写/连字符键/属性元素开包面/单变量 for/handler var+包面脱糖/hook 局部再赋值/形状回归/AGE 索引后缀/连字符标签/依赖样式内联修复/裸名复合赋值/handler for 结构/顶层裸名赋值/AV 源准备接线/样式空白化/原源优先装载/循环体叶计数/.store 具名拒/store 声明入语法；auto-lang 19 提交至 `d8c75a7d8`、auto-ui 10 提交至 `50a8e527`；**015/018/022 已进 AV 桥并真开 Iced 窗**（T-04 部分）；SFC 生成接源准备；余 S1 store 语义（013/016）、012 局部列表、AV 真开窗），6 个原应用及关联 Widgets |
 | 106 | [U04 服务与数据应用](106-autoui-u04-service-and-data-apps-av-vue.md) | drafting r1，0/8，6 个原应用及关联 Widgets |
-| 107 | [U05 媒体、图表与绘制](107-autoui-u05-media-chart-and-paint-apps-av-vue.md) | drafting r1，0/8，7 个原应用及关联 Widgets |
+| 107 | [U05 024 Charts 与五个图表原页（归档）](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) | r2 已交付，Windows AV/Iced 与 A2Vue/Chrome 各 6/6；图表接面供 123 接续 |
 | 108 | [U06 复杂交互应用](108-autoui-u06-complex-interactive-apps-av-vue.md) | drafting r1，0/8，5 个原应用及关联 Widgets |
 
 U02 可先用 005-login 验证表单与主题。各组按实际接口并行，共享功能在 T-01 定唯一写面，原有组件计划与 AutoLang 1072 按实际版本复用。AV 证据供完整 W1 签发，A2Vue 证据供 1072 及 CLI 联验消费。各组分别复审、合入和归档。

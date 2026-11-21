@@ -1,6 +1,7 @@
 ---
 plan_id: PLAN-107
-status: reviewed
+status: archived
+completion_kind: delivered
 feature_name: AutoUI 024 Charts 与图表 Widgets AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
@@ -28,11 +29,11 @@ touched_goals: [auto-lang/GOAL-002]
 
 | AutoUI 原例 | 两端项目级检查重点 |
 |---|---|
-| [024-charts](../../examples/ui/024-charts/pac.at) | 可见图形、数据更新、指针/图例交互及空数据 |
+| [024-charts](../../../examples/ui/024-charts/pac.at) | 可见图形、数据更新、指针/图例交互及空数据 |
 
-关联 Widgets 使用 [AutoOS 规范来源](../../../auto-os/widgets-gallery/src/front/) 的 pages 与实际 components 闭包。area-chart、bar-chart、donut-chart、line-chart、flow-diagram。T-01 把 1071 标识逐项对应到实际页、组件与原测试，给复用页记录版本和各组消费结果。
+关联 Widgets 使用 [AutoOS 规范来源](../../../../auto-os/widgets-gallery/src/front/) 的 pages 与实际 components 闭包。area-chart、bar-chart、donut-chart、line-chart、flow-diagram。T-01 把 1071 标识逐项对应到实际页、组件与原测试，给复用页记录版本和各组消费结果。
 
-其余 U05 应用由 [115](115-autoui-video-app-av-vue.md)、[116](116-autoui-media-players-av-vue.md)、[117](117-autoui-image-apps-av-vue.md)、[118](118-autoui-paint-av-vue.md) 承接。Carousel 归 117，CodeEditor 原页归 [120](120-autoui-auto-edit-av-vue.md) 并仍计 U05。原 T-01 首轮对照及已录证据见 §9，接手计划按原路径、预期及证据身份复用。
+其余 U05 应用由 PLAN-115、PLAN-116、PLAN-117、PLAN-118 承接。Carousel 归 117，CodeEditor 原页归 PLAN-120 并仍计 U05。原 T-01 首轮对照及已录证据见 §9，接手计划按原路径、预期及证据身份复用。
 
 ## 2. 架构与跨仓职责
 
@@ -47,8 +48,8 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 
 ## 4. 来源与前置
 
-- [980 原 W1 和 ④-A 设计](../../../auto-lang/docs/plans/archive/980-ace-m2-autoui.md)、[981 基础](../../../auto-lang/docs/plans/archive/981-ace-m2-age.md) 和 [1071 示例/Widgets 冻结](../../../auto-lang/docs/plans/archive/1071-autoui-w1-av.md)。已有运行收据按实际输入、范围和版本复用。
-- [AV 宿主及 W1 收据](../../../auto-lang/docs/specs/ace-migration/m2-autoui.md)、[1072 Vue 生产计划](../../../auto-lang/docs/plans/archive/1072-autoui-vue-web.md)、[976 TS/JS 交付](../../../auto-lang/docs/plans/archive/976-ace-m2-typescript.md)、[978 构建交付](../../../auto-lang/docs/plans/archive/978-ace-m2-build.md)。
+- [980 原 W1 和 ④-A 设计](../../../../auto-lang/docs/plans/archive/980-ace-m2-autoui.md)、[981 基础](../../../../auto-lang/docs/plans/archive/981-ace-m2-age.md) 和 [1071 示例/Widgets 冻结](../../../../auto-lang/docs/plans/archive/1071-autoui-w1-av.md)。已有运行收据按实际输入、范围和版本复用。
+- [AV 宿主及 W1 收据](../../../../auto-lang/docs/specs/ace-migration/m2-autoui.md)、[1072 Vue 生产计划](../../../../auto-lang/docs/plans/archive/1072-autoui-vue-web.md)、[976 TS/JS 交付](../../../../auto-lang/docs/plans/archive/976-ace-m2-typescript.md)、[978 构建交付](../../../../auto-lang/docs/plans/archive/978-ace-m2-build.md)。
 - U02–U06 按用例所需接口推进。遇到共享的 ④-A、事件、集合、外部服务接面或组件缺口，记录具体接口、实现负责人、交付版本与消费测试，已具备前置的样例继续验收。1072 的 982 联合 CLI 验收可消费本计划的 A2Vue 证据。
 - 2026-11-20 用户以 `/goal 完成计划107` 授权 r1 原范围的实施、独立复审、限定修复和落地归档清理。
 - 2026-11-21 用户确认当前 goal 按 r2 收口，并授权最小 AutoOS 源修。原版和修正版各有可核对输入，最终验收用修正版。
@@ -975,7 +976,7 @@ AutoUI 第 91 轮新增 37 条中 36 条有有效运行计时，最长 5.482443 
 
 AutoLang `9bae90dcd2d058da3c20bce64e81a660c08eda71` 合并 `TextDisplay` 到唯一验证臂，保留既有 closures 宽整型准入和相同的具名拒绝，支持图表所需 F32。走普通 Auto 前端、共享 lowering、MIR 验证、二进制载入及 AV 控制台，实际字符为 `-2147483649/4294967296`。新增测试执行 0.040053 秒，外层直跑 0.062078 秒。窄 closures 前端探针给出已知的后缀字面量限制，保留 `round96-lang-text-display.log`，正式回放采用支持宽整数的普通 Auto 前端。
 
-先以 `cargo test --locked --offline -j 1 -p ace-av --test conformance --no-run --message-format=json` 准备 debug/test，校正 R97 准备耗时 7.358 秒。直接串行执行同一 conformance 的 981、105 列表、资源、指令契约和新宽整数用例，132 通过、1291 过滤，墙钟 1.726 秒。原图表 F32 插值用例仍通过，0.008046 秒。原子输出 `round97-lang-affected-av.jsonl` SHA256 `0510c1f978c6a5f4e587271bd33003cb3bc479da921a521140e2608cbc14bf21`。Lang §17 专化说明增加直接可追溯模型字段、单组件模块与非循环调用点的适用条件，规范 SHA256 `f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fe7af85d`。
+先以 `cargo test --locked --offline -j 1 -p ace-av --test conformance --no-run --message-format=json` 准备 debug/test，校正 R97 准备耗时 7.358 秒。直接串行执行同一 conformance 的 981、105 列表、资源、指令契约和新宽整数用例，132 通过、1291 过滤，墙钟 1.726 秒。原图表 F32 插值用例仍通过，0.008046 秒。原子输出 `round97-lang-affected-av.jsonl` SHA256 `0510c1f978c6a5f4e587271bd33003cb3bc479da921a521140e2608cbc14bf21`。Lang §17 专化说明增加直接可追溯模型字段、单组件模块与非循环调用点的适用条件，规范 SHA256 `f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fef7af85d`。
 
 本轮只选择了终审指定的八个固定组，实际固定门待复审通过。选择记录 `round97-fixed-groups-select.log` SHA256 `98983675525befcf93644361b03b83e54137de49f11867a3c4a75898e0e48b2a`，组配置 SHA256 沿用第 89–91 轮。构建排队 214.2 秒，未计入测试。
 
@@ -1012,7 +1013,7 @@ AutoUI `a4e90b1bc40e893a0ba0656e0839c16cef069ba5` 的 checked Iced 外壳以窗�
 
 每个目标色门槛为 75 像素。Flow 首探针以三种细描边颜色作完全相同 RGB 匹配，1.25 像素倍率下精确匹配 17、8、9，保留失败。改用作者定义的三种节点填充色，沿用相同门槛和窗口，复跑通过。
 
-修复交接固定 AutoUI `a4e90b1bc40e893a0ba0656e0839c16cef069ba5`、AutoLang `9bae90dcd2d058da3c20bce64e81a660c08eda71`、AutoOS `680a6ae344f89cbf4dcf5efd25a118889fe611c7`。工作树、分支、对比基线、兄弟仓和第 89 轮相同。规范候选为 AutoUI `docs/specs/runtime/ace-package-widgets.md`（SHA256 `98c9a6c3322bb4fe6784eceafa30fae1b603277ecc523445a32c84b59bb916b7`）、AutoLang `docs/specs/ace-migration/m2-autoui.md` §17（`f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fe7af85d`），AutoOS README 仍为 `a8d4859c3a23447d6fe1005624e1e9f95ddfbdfd2344123a716b1a783b1fd168`。AutoUI 规定窗口视口、响应可见性和等比命中矩形，AutoLang 规范收紧静态专化的适用条件。R107-01..05 的执行验证见第 96–105 轮，下一步同一独立审阅者复核。R107-06 的八组已固定，运行结果由合入阶段记录。
+修复交接固定 AutoUI `a4e90b1bc40e893a0ba0656e0839c16cef069ba5`、AutoLang `9bae90dcd2d058da3c20bce64e81a660c08eda71`、AutoOS `680a6ae344f89cbf4dcf5efd25a118889fe611c7`。工作树、分支、对比基线、兄弟仓和第 89 轮相同。规范候选为 AutoUI `docs/specs/runtime/ace-package-widgets.md`（SHA256 `98c9a6c3322bb4fe6784eceafa30fae1b603277ecc523445a32c84b59bb916b7`）、AutoLang `docs/specs/ace-migration/m2-autoui.md` §17（`f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fef7af85d`），AutoOS README 仍为 `a8d4859c3a23447d6fe1005624e1e9f95ddfbdfd2344123a716b1a783b1fd168`。AutoUI 规定窗口视口、响应可见性和等比命中矩形，AutoLang 规范收紧静态专化的适用条件。R107-01..05 的执行验证见第 96–105 轮，下一步同一独立审阅者复核。R107-06 的八组已固定，运行结果由合入阶段记录。
 
 `stage: work | plan_id: PLAN-107 | plan_revision: r2 | round: 105 | status: execution_done | outcome: pass | commit: ui a4e90b1b, lang 9bae90dcd, os 680a6ae3 | evidence: R107-01..05 repair controls, final windows and Chrome replays and changed Spec hashes | next: T-07 independent repair re-review`
 
@@ -1038,7 +1039,7 @@ AutoUI `a4e90b1bc40e893a0ba0656e0839c16cef069ba5` 的 checked Iced 外壳以窗�
 
 AutoLang 定向 test 准备 153.133 秒，exit 0。Core 编译及冻结语法选择 82 PASS、809 未选，执行 0.6677914 秒、外层 0.682 秒，SHA256 `224d59d7040bb7f4c90eb5bb1da693bbc975985dfe2d9b554fb8585d550ac0f1`。同版 `language_source_worker::compile_time_tests::plan1093_c_header_spelling_parses` 1 PASS、28 未选，执行 0.0332968 秒，SHA256 `67bf605c7295855af3fa76dc1298dda5c7c482138baa3c7a53efce2210eeeab7`。合流后、仅重冻结断言之前的 AV conformance 图表邻域 132 PASS、1291 未选，执行 1.1903081 秒，SHA256 `4397e13d654fb1c89e6583f1a67cd520b1a1e0369ac44a5c29638ba3c6627d86`，该断言更新不改变 AV 执行件。38 项 AutoUI 与 54 项 AutoLang 的定时收据继续使用第 104 轮，其中后者的合流触面再由上述定向项和 T-08 固定组核验。
 
-显式用 `cargo build --locked --offline -j 1 -p auto-ui-tools --features ace-vue --bin auto-ui-tool` 准备 debug 工具。禁用 `RUSTC_WRAPPER`，规避第 1093 轮记录的旧 grammar rlib 缓存。准备 782.180 秒、exit 0，工具 SHA256 `8b69eef1fe7c2f24d4d076e8a1abcc31e45e109bbddd28219ee2f87db2b57f34`。保留先前生成目录，在第 89 轮冻结原源上重走正式 `auto build --render vue --gen-only`、pnpm 离线安装、`vue-tsc` 与 Vite，再用 Chrome 157.0.8103.80 访问生产构建。024 全链 70.083 秒、exit 0，日志 SHA256 `507041a86698a3f5e57c31bd943e3e1ae82779d3091fa6a91476ca94a453226e`。与第 104 轮逐一比较 JSON 字段，仅端口变化，几何轨迹、命中、离开、淡出、`6→8→8`、网络和错误字段完全相同。画廊全链 147.944 秒、exit 0，70 路由、90 文件。Bar/Line、Area、Donut、Flow 的四份 Chrome 日志与第 104 轮及第 89 轮逐字相同。两个 pnpm 锁 SHA256 均与第 104 轮一致。
+显式用 `cargo build --locked --offline -j 1 -p auto-ui-tools --features ace-vue --bin auto-ui-tool` 准备 debug 工具。禁用 `RUSTC_WRAPPER`，规避 PLAN-1093 记录的旧 grammar rlib 缓存。准备 782.180 秒、exit 0，工具 SHA256 `8b69eef1fe7c2f24d4d076e8a1abcc31e45e109bbddd28219ee2f87db2b57f34`。保留先前生成目录，在第 89 轮冻结原源上重走正式 `auto build --render vue --gen-only`、pnpm 离线安装、`vue-tsc` 与 Vite，再用 Chrome 157.0.8103.80 访问生产构建。024 全链 70.083 秒、exit 0，日志 SHA256 `507041a86698a3f5e57c31bd943e3e1ae82779d3091fa6a91476ca94a453226e`。与第 104 轮逐一比较 JSON 字段，仅端口变化，几何轨迹、命中、离开、淡出、`6→8→8`、网络和错误字段完全相同。画廊全链 147.944 秒、exit 0，70 路由、90 文件。Bar/Line、Area、Donut、Flow 的四份 Chrome 日志与第 104 轮及第 89 轮逐字相同。两个 pnpm 锁 SHA256 均与第 104 轮一致。
 
 从本轮 debug 工具的 Cargo 构件显式重链真实 Windows Iced 绘制验证器，SHA256 `d2c3d37e9450bf3568f5eba4429431ced2f76d82bb059ed115a28334f498aa5e`。从相同原源串行打开六个 1438×1000 窗口，逐个核主体图形像素并关窗。各窗口 `painted=true`，宿主顶层错误 0，全部会话已关闭。六个像素签名与第 105 轮一致。第 103 轮保留 Iced 渲染器模拟指针进入和离开的证据，第 107 轮收据使用窗口自身截图验证实际绘制。
 
@@ -1057,7 +1058,7 @@ AutoLang 定向 test 准备 153.133 秒，exit 0。Core 编译及冻结语法选
 
 ### 第 108 轮｜同实施树独立终审
 
-独立审阅者 `/root/review107` 只读审阅 Plan r2 `6793d5ba871bb0e3fd104654d012d4f6f7d8d49b`，在第 107 轮列明的三树、`plan-107-dev`、完整候选和基线上给出 `pass`。生产合流差异逐行与 PLAN-1093 匹配，额外差异为冻结语法测试合流注释与两条 AGE golden。依赖为当前 AutoLang 基线与 AutoUI 锁中的两个既有传递包。第 89 轮固定的同组 AutoDown `45b642dadcbd4fb71a8c7f2e6f09435faf7a65f5`、AutoWeb `26d085f7e54ea20c6997edf2dc23eef0cb57faf6`、AutoMan `4a30483a590d81d5724cb453a0fd1fbc98d9aaf2` 继续适用。两个 canonical Spec 和 AutoOS README 分别冻结于第 105 轮 SHA256 `98c9a6c3322bb4fe6784eceafa30fae1b603277ecc523445a32c84b59bb916b7`、`f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fe7af85d`、`a8d4859c3a23447d6fe1005624e1e9f95ddfbdfd2344123a716b1a783b1fd168`。
+独立审阅者 `/root/review107` 只读审阅 Plan r2 `6793d5ba871bb0e3fd104654d012d4f6f7d8d49b`，在第 107 轮列明的三树、`plan-107-dev`、完整候选和基线上给出 `pass`。生产合流差异逐行与 PLAN-1093 匹配，额外差异为冻结语法测试合流注释与两条 AGE golden。依赖为当前 AutoLang 基线与 AutoUI 锁中的两个既有传递包。第 89 轮固定的同组 AutoDown `45b642dadcbd4fb71a8c7f2e6f09435faf7a65f5`、AutoWeb `26d085f7e54ea20c6997edf2dc23eef0cb57faf6`、AutoMan `4a30483a590d81d5724cb453a0fd1fbc98d9aaf2` 继续适用。两个 canonical Spec 和 AutoOS README 分别冻结于第 105 轮 SHA256 `98c9a6c3322bb4fe6784eceafa30fae1b603277ecc523445a32c84b59bb916b7`、`f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fef7af85d`、`a8d4859c3a23447d6fe1005624e1e9f95ddfbdfd2344123a716b1a783b1fd168`。
 
 | 验收项 | 终审结果 | 证据 |
 |---|---|---|
@@ -1067,6 +1068,34 @@ AutoLang 定向 test 准备 153.133 秒，exit 0。Core 编译及冻结语法选
 | AC-04 | T-07 pass | 两处规范增量及源码 README 通过。R107-06 八组固定门、三仓合入、规范验证、归档和清理由 T-08 完成。 |
 
 `stage: review | review_scope: final | reviewer_identity: /root/review107 | plan_id: PLAN-107 | plan_revision: r2 | round: 108 | status: reviewed | outcome: pass | reviewed_commit: ui 63a09efaf0df1ba2137e66d0e749012bf5c241ef, lang dd5f3eff56176b00cae2c5c8ce916cfed8c2f9f6, os 680a6ae344f89cbf4dcf5efd25a118889fe611c7 | next: T-08 affected fixed-group execution and consolidation`
+
+### 第 109 轮｜固定组回归与合入准备
+
+R107-06 的八个冻结组全部执行。2026-11-21 16:40 +08:00 启动前检查机器无在跑的构建/测试，AutoLang 实施树固定组租约由驱动获取并释放。组调用为 `cargo t ace-source ace-av ace-a2x ace-syntax ace-native ace-a2c-abi ace-lowering ace-stdlib`，分两段使用 `--prepare-only --debug-tools --out …/round108-prepared` 和 `--run-prepared …/round108-prepared/prepared.json --out …/round108-fixed-run`。准备采用普通 test/debug 与 runtime-dev、离线 Cargo、3 作业、`RUST_MIN_STACK=67108864`，使用第 107 轮相同的 wrapper 处理。外层准备 655.620 秒、exit 0，运行 230.785 秒、exit 1；驱动内运行 229.010 秒。没有新增测试。归档准备、发现和运行的原生进程墙钟分列如下，工具及整体清理时间以相应阶段记录为准。
+
+| 固定组 | PASS | FAIL | 条件排除 | NOT_RUN | 测试归档准备 s | 发现 s | 运行 s |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `ace-source` | 972 | 5 | 1 | 0 | 41.545 | 2.205 | 10.775 |
+| `ace-av` | 1554 | 13 | 0 | 0 | 59.167 | 4.652 | 49.584 |
+| `ace-a2x` | 303 | 0 | 2 | 0 | 22.357 | 9.169 | 78.477 |
+| `ace-syntax` | 159 | 0 | 0 | 0 | 21.624 | 2.261 | 5.274 |
+| `ace-native` | 325 | 5 | 0 | 0 | 38.000 | 6.563 | 49.640 |
+| `ace-a2c-abi` | 8 | 1 | 0 | 0 | 17.979 | 0.380 | 0.464 |
+| `ace-lowering` | 9 | 0 | 0 | 0 | 10.543 | 1.429 | 1.457 |
+| `ace-stdlib` | 2 | 0 | 0 | 0 | 189.817 | 1.986 | 4.430 |
+
+共 3356 项执行，3332 PASS、24 FAIL、3 条原条件排除、0 NOT_RUN。24 个失败逐 ID 对账，归属原基线，新增失败为 0。保留父驱动原 `gate_passed=false`、exit 1 和原用例。`ace-source` 五例 `text_record_source` 与 PLAN-1092 §9 及本计划的基线回放一致，均为 `verify.double-move`、span `1444..1454`。`ace-av` 十二例在 PLAN-1092 的 D-1055-BASE-01 清单，另有 `layout::tests::layout_rejects_non_record_and_empty` 归 D-1088-LAYOUT-01。`ace-native` 的 `collections_original_owned_first_cases`、`mn_owned_mut_writethrough_wrapper_three_paths`、`gap_hp01_text_record_hir_entry_runs`、`mn_method_token_microprogram`、`shadow871_text_record` 与 PLAN-1055 的基线逐 ID 对比一致。`ace-a2c-abi` 的 `runtime_admission_preserves_bytes_and_the_certification_pin` 复现既有签入值 `bd260a8b…` 与实际 `0a4f68e3…` 不同，沿 AutoLang 债务登记 PLAN-972 原归属。
+
+回归身份 AutoLang `dd5f3eff56176b00cae2c5c8ce916cfed8c2f9f6`、源码状态 `bebf601a1ed0bb5a9df61746274f56d2820d8febaa12d7df678f52c3b498eccf`、配置 `69165441f188d5dde0a17a1291a0a5e2b0748f778104a7e2b027632a76611fbf`、工具链 `1fb10dcd2dd67ff767f95bad0b2d205e34c03d0a346f60593f2cbc35abf4bf52`。准备清单 SHA256 `5696f837b1ca8f63f315e9ecc55898ce2ef09590f71aadd562139e137f4f972e`，原始 `results.json` `408cae744d269c91228c6146906f8ab60fdae149a40c8db49fe5d8dcf602676d`，已知失败对照 `7b77553413741db8abab6524d88a1dd3f08e7ddc8c26dbf9db5f992c7c450c0c`。依赖、逐项用例计时和各宿主限制见第 104、107、108 轮。R107-06 关闭，固定组判定 `known-reds-only`。
+
+#### 合入收据 `PLAN-107:r2`
+
+- `prepared`。AutoLang 交付 `dd5f3eff56176b00cae2c5c8ce916cfed8c2f9f6`，AutoOS 交付 `680a6ae344f89cbf4dcf5efd25a118889fe611c7`。AutoUI 已审 `63a09efaf0df1ba2137e66d0e749012bf5c241ef` 线性重放到仅有 Plan 文档进展的 `6ef5b9d6611aea90a3bf03cac15277e2e59ce48a`，交付 `fb343c48a86476e9b2e6536035dbadb902a50991`。`git range-diff` 九项均相等，SHA256 `8165fab5458a3416fdf9696afdee58d52717ea518f671428f794b396453a22a6`，两版产品文件逐字一致。六个具名工作树的 reparse 预检 exit 0，收据 `e462d4f4883b844967a27048dccc4b45e7e7b16ada6c780bf1e48a6f7d5d8922`。规范冻结哈希见第 108 轮。
+- 交付环境 AutoWeb 当前 `0cfc7c78446650631d244a9ea442d28635072958` 相对回放固定的 `26d085f7e54ea20c6997edf2dc23eef0cb57faf6` 仅改 HTTP 服务执行器 `src/av_service.rs` 和其测试。`AutoWeb::generate_api`、清单、图表实际调用面不变。两个原项目只有 `src/front`，均无后端合同。回放沿第 107 轮冻结工具。
+- `landed`。按 AutoLang `master`、AutoUI `master`、AutoOS `main` 执行 `git merge --ff-only plan-107-dev` 并逐个核分支头等于 `prepared` 的完整交付提交。三个快进及规范核对共 0.523 秒，主检出已有修改与本计划落地改动交集为 0。落地主检出 `cargo tree --locked --offline -p auto-ui-tools --features ace-vue --depth 1` exit 0，0.779 秒，SHA256 `f657420e06d5541d8c9eab846b8fb2f1b8090ae0652eebf414f7995ad27bd2e1`。
+- 落地主检出两份 `pac.at` 和 `src/front` 中 024 的 7 个 `.at`、画廊的 89 个 `.at` 与 R107 相同。初次整目录比较发现主检出多 49 个既有 `tests/screenshots` 和 `tmp` 下 PNG。逐项确认此类历史输出为目录比较的全部差异，源、其它随页资源和清单一致。AutoOS 子模块环境预检和合入前日志逐字相同，24 个未初始化、27 项清单、0 `missing_pac_at`，exit 1；检查和对照墙钟 1.230 秒。第 107 轮冻结 Windows 验证器读落地原路径，024 20.791 秒、FlowDiagram 16.671 秒，均 exit 0、目标像素重现且关窗。相应 JSON SHA256 `34c28f64d3e620417f171f6db1032ac27f0b05df4e67252a85c73ced9fbbb16b` 和 `35e376cfcdd1187484c1cac4feced7c04e97d23c5c4c0b728b72f6cbd7f8faaf`。A2Vue 正式六入口沿第 107 轮的同源产物和相同调用面复用。
+- `canonical_verified`。AutoUI `docs/specs/runtime/ace-package-widgets.md`、AutoLang `docs/specs/ace-migration/m2-autoui.md` §17、AutoOS `widgets-gallery/README.md` 在三个实际默认分支均匹配第 108 轮 SHA256。AutoOS 新 README 链接到 AutoUI 计划索引。事实源随代码一起落地，索引由应用读取。
+- `archived`。移入 `docs/plans/archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md`，`status: archived`、`completion_kind: delivered`。按真实归档路径核 9 条相对链接、8 个唯一任务及清理前 7/8。AutoUI 跟踪的计划索引更新至本归档。115–118 的本地草稿仅更新反链，原计划内容和草稿状态保留。T-08 尚待完成清理。
 
 ## 10. 下游交接
 
