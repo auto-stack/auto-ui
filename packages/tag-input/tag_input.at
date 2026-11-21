@@ -391,11 +391,12 @@ widget TagInput (tags: List = [], contextId: str = "", revision: int = 0, sugges
             if .phase != "pending" && !.disabled && !.readOnly && .config_code == "" {
                 if v != .draft {
                     .draft = v
-                    .candidates_hidden = false
                     .input_err = ""
                     .rejection = ""
                     .feedback_err = ""
                 }
+                // 任何输入事件都重开候选（含 Escape 后重输相同文本）。
+                .candidates_hidden = false
             }
         }
 
