@@ -1189,3 +1189,31 @@ stage: merge（归档检查点）| plan_id: PLAN-105:r1 | round: 125 | archived 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
 
 2026-11-19 停放与恢复：按用户裁定暂停过本计划开发；104 已交付并合入 master（ui `5a862d46` / lang `2fb094483`）后，已按裁定从 master 重建工作树（不共享 104 分支）并完成 T-02 W1。恢复/续做时先读 §9 的 W1 收据与 `plan-artifacts/plan-105/t02-gap-map.md`（S1–S10 缺口与顺序在案）。
+
+
+## 附录：T-06 冻结回归与两端可复跑交付矩阵（2026-11-21 收口折叠）
+
+冻结提交：auto-ui `5c3be6b7` 系（含落地集成）/ auto-lang `ddbeecaa2` 系（含落地收尾）；
+最终交付提交：auto-lang master `0b754af59` / auto-ui master `fe2dd4f1`。
+
+| 组 | 结果 |
+|---|---|
+| av plan105 list handlers | 13/13 |
+| core plan105 component entries | 26/26 |
+| grammar census（981 scope） | 4/4 |
+| plan981 全组 | 248/248 |
+| plan980（core）/ plan979 家族 / plan104 / plan1072 | 40 / 57 / 3 / 19 全绿 |
+| plan980_state_face（av）/ av-core | 8/8 / 135 绿 |
+| auto-ui prep / sfc_status / p013_sfc / p013_store_lane / sites | 8 / 4 / 1 / 3 / 1 全绿 |
+| 浏览器门（五 app） | failures=0 ×5 |
+| plan124_routes（routed lane 集成） | 2/2（AV 导航带 ACE_NODE_DESKTOP_PREPARED_RUSTC 准备） |
+
+两端矩阵（AV 桥 × 浏览器）：012 装载+ADnH×2 点击（a_h 7→6→5）✓ / 013 装载+ToggleAll ✓ /
+015 装载 ✓（AV 腿 KNOWN-DEBT 见 §10）/ 016 装载+PrevMonth ✓ / 018 装载 ✓ / 022 装载 ✓；
+浏览器五 app failures=0。
+
+AV 桥复跑命令：`ace_node_desktop_window.exe --source <app>/src/front/app.at --evidence <out>
+--instances 1 --hold-ms 2000 --min-frames 1 [--script "5:click:0:0"]`（012/013/016 带
+`P105_MEM_BACKEND=1`）。既有红（非本计划）：av_collections 内存门（需显式 prepare）、
+ace-native `allocation_controls`、auto-ui-compiler `theme_widget_projects_vars_to_container_root`、
+ace-core `layout_rejects_non_record_and_empty`（均 stash/主检出对照在案）。
