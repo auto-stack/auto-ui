@@ -71,6 +71,36 @@ def wait_text(native, port, text, seconds=8):
     raise AssertionError(f"no {text!r} within {seconds}s; last tree:\n{last[-4000:]}")
 
 
+def port_bindable(port, retries=20, delay=0.5):
+    # Windows 上 MCP 高频连接会让服务端口残留 TIME_WAIT，进程退出后立即 bind
+    # 偶发 WSAEADDRINUSE；有界重试等残留排空，不能无限等待（见 plan §6）。
+    for _ in range(retries):
+        try:
+            with socket.socket() as listener:
+                listener.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            time.sleep(delay)
+    return False
+
+
+def wait_notes_add(session, seconds=6):
+    """After an add press, poll for the PlanTag chip or the empty-input reject.
+    Windows MCP keyboard delivery can silently miss a type; the reject signals
+    that the press landed on an empty input, so the caller can retype at once
+    instead of burning the full wait."""
+    deadline = time.monotonic() + seconds
+    last = ""
+    while time.monotonic() < deadline:
+        last = session.snapshot()
+        if "删除标签 PlanTag" in last:
+            return "chip"
+        if "标签不能为空" in last:
+            return "reject"
+        time.sleep(0.25)
+    raise AssertionError(f"no chip/reject within {seconds}s; last:\n{last[-2000:]}")
+
+
 class NativeSession:
     def __init__(self, auto_bin, ui_tool_bin, app_dir, out_dir, port, log, startup_timeout=120):
         self.port = port
@@ -153,12 +183,7 @@ class NativeSession:
             pass
 
     def port_free(self):
-        try:
-            with socket.socket() as listener:
-                listener.bind(("127.0.0.1", self.port))
-            return True
-        except OSError:
-            return False
+        return port_bindable(self.port)
 
     def reopen_probe(self):
         # Port rebinding after process exit proves a subsequent session can
@@ -701,12 +726,7 @@ class VueSession:
         stop_tree(self.process)
 
     def port_free(self):
-        try:
-            with socket.socket() as listener:
-                listener.bind(("127.0.0.1", self.port))
-            return True
-        except OSError:
-            return False
+        return port_bindable(self.port)
 
 
 def case_vue_core(session):
@@ -868,28 +888,33 @@ def case_notes_native(session):
     i = snap.find(tag_input)
     add_btn = node_id(snap[i:i + 2500], r'button #(vnode_\d+) "[^"]*添加标签"')
     body_before = re.search(r'textarea #[^}]*?value: "([^"]*)"', snap)
-    snap2 = None
-    for attempt in range(2):
+    session.call("autoui_type", element_id=tag_input, text="PlanTag")
+    time.sleep(0.8)
+    session.press(add_btn)
+    if wait_notes_add(session) != "chip":
+        # type 未落地（空输入拒绝）：重打一次再提交
         session.call("autoui_type", element_id=tag_input, text="PlanTag")
         time.sleep(0.8)
         session.press(add_btn)
-        time.sleep(2.5)
-        snap2 = session.snapshot()
-        if "删除标签 PlanTag" in snap2:
-            break
-        time.sleep(1.0)
-    assert snap2 is not None and "删除标签 PlanTag" in snap2, snap2[-1500:] if snap2 else "no snapshot"
+        wait_notes_add(session)
+    snap2 = session.snapshot()
+    assert "删除标签 PlanTag" in snap2, snap2[-2000:]
     m = re.search(r'button #(vnode_\d+) "([^"]*Quick Ideas[^"]*)"', snap2)
     assert m, "no Quick Ideas button"
     session.press(m.group(1))
-    time.sleep(1.5)
-    snap3 = session.snapshot()
+    deadline = time.monotonic() + 8
+    gone = False
+    while time.monotonic() < deadline:
+        snap3 = session.snapshot()
+        if "删除标签 PlanTag" not in snap3:
+            gone = True
+            break
+        time.sleep(0.25)
+    assert gone, "tag chip did not leave after switching note"
     m2 = re.search(r'button #(vnode_\d+) "([^"]*Welcome[^"]*)"', snap3)
     if m2:
         session.press(m2.group(1))
-        time.sleep(1.5)
-    snap4 = session.snapshot()
-    assert "删除标签 PlanTag" in snap4, snap4[-1500:]
+    snap4 = wait_text(session.snapshot, session.port, "删除标签 PlanTag", seconds=8)
     body_after = re.search(r'textarea #[^}]*?value: "([^"]*)"', snap4)
     if body_before and body_after:
         assert body_before.group(1) == body_after.group(1), "note body changed"
@@ -982,10 +1007,20 @@ def main():
             try:
                 session.close(failed=report["result"] != "pass")
                 port_free = session.port_free()
+                reopen = session.reopen_probe()
                 report["cleanup"] = {"owned_exited": True, "port_free": port_free,
-                                     "reopen": session.reopen_probe()}
+                                     "reopen": reopen}
+                if not port_free or not reopen.get("ok"):
+                    report["result"] = "fail"
+                    report["cases"].append({
+                        "id": "cleanup-reopen", "status": "fail",
+                        "error": f"port not rebindable: port_free={port_free} reopen={reopen}",
+                    })
             except AssertionError as exc:
                 report["cleanup"] = {"error": str(exc)}
+                if report["result"] == "pass":
+                    report["result"] = "fail"
+                    report["cases"].append({"id": "cleanup", "status": "fail", "error": str(exc)[:1200]})
             log.close()
     else:
         if not args.browser_mcp_config:
@@ -1022,9 +1057,19 @@ def main():
             finally:
                 try:
                     session.close(failed=report["result"] != "pass")
-                    report["cleanup"] = {"owned_exited": True, "port_free": session.port_free()}
+                    port_free = session.port_free()
+                    report["cleanup"] = {"owned_exited": True, "port_free": port_free}
+                    if not port_free:
+                        report["result"] = "fail"
+                        report["cases"].append({
+                            "id": "cleanup", "status": "fail",
+                            "error": f"port not rebindable: port_free={port_free}",
+                        })
                 except AssertionError as exc:
                     report["cleanup"] = {"error": str(exc)}
+                    if report["result"] == "pass":
+                        report["result"] = "fail"
+                        report["cases"].append({"id": "cleanup", "status": "fail", "error": str(exc)[:1200]})
                 log.close()
 
     (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
