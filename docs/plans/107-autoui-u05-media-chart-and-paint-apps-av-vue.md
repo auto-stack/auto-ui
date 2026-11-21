@@ -711,6 +711,16 @@ Iced 真窗经原侧栏进入相同页。AV 的视图闭包在同一 `lv` 上报
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 51 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 5528a2bd, lang e172e837c | evidence: original Donut empty-input control on two hosts, exact 024 linked entry reaches named downstream checks | next: work`
 
+### 第 52 轮｜原 024 图表在生产 Chrome 完成四类切换
+
+受检 Vue 出盘从组件初始化、视图、事件和属性取值的实际函数开始，沿调用、闭包与回调引用遍历完整依赖。共享检查仍覆盖全包。旧包样式字面量在检查生成函数之前通过原导入绑定进入函数体，同时保留局部遮蔽规则。AutoLang Core 完整 conformance 867、AV PLAN-981 78、AutoUI 组件包 18、路由 4、SFC 20 通过。
+
+固定原 `024-charts` 项目从新目录经生产 CLI 冷生成，锁定依赖后通过 `vue-tsc` 和 Vite。Chrome `157.0.8103.80` 通过原按钮依次切换 Line、Bar、Area、Donut 和 Line，绘图区路径数为 `4 → 19 → 7 → 4 → 4`。分组柱以 SVG 路径绘制，Desktop 对应 6 根柱。折线图 Desktop 图例开关使路径数 `4 → 3 → 4`。窗口选为 8，播放、暂停、重置按钮可操作，等待 1.3 秒后的几何未变化，流式更新尚未通过。页面请求失败及 JS 异常均为 0，卸载后根节点清空。独立回放日志 SHA256 为 `b78220cd76f5ab96d35322f69d752e51552c8134a44b7572ade87c85ce3a77aa`。
+
+Iced 仍在第 51 轮的所有权分析内存门。原折线图初始化有 977 槽、123 个借用令牌槽和 214 块，视图函数有 2,590 槽、374 个令牌槽和 139 块，其令牌均无返回借用令牌的调用。用实际来源压缩分析表后继续复跑同一原入口。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 52 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 09ed6d02, lang 51d8325d8 | evidence: original 024 production Chrome renders all four charts, legend and reset, stream unchanged, native memory analysis measured | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
