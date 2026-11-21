@@ -721,6 +721,14 @@ Iced 仍在第 51 轮的所有权分析内存门。原折线图初始化有 977 
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 52 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 09ed6d02, lang 51d8325d8 | evidence: original 024 production Chrome renders all four charts, legend and reset, stream unchanged, native memory analysis measured | next: work`
 
+### 第 53 轮｜原 024 Iced 越过所有权分析内存门
+
+AV 只为携带令牌来源的位置和实际执行字段转移的根分配分析表。单根来源内联保存。静态来源预分析覆盖直接借用、来源别名、带借用参数的调用及分支汇合，为可能增长到多根的集合计入完整容量。活借用和保留型 Place 的汇合及逃逸规则保持。内存上限仍为 16 MiB。AV Core 库测试 71、conformance 51 通过，日志 SHA256 为 `3a21d2e7b0cff26eb624deb2870bdefb523ec9a76e4c0aa46f80874178c5ef75`。
+
+同一原 `024-charts` Iced 入口越过 LineChart 初始化与视图的内存门。挂窗下一项检查定位到原 `ptsOut` 列表在相邻 `k == 0/1/2/3` 分支中的转移。窗口诊断为 `mir.use-after-move`，日志 SHA256 为 `4e4396b95e702f47df90611e05400910de2aa623dfe97fe77fcc05279c53eee3`。本轮未获得原 024 的 Iced 几何。组件包 18、路由 4、SFC 20 串行通过。先前直接运行组件包时缺 provider 环境，再以并发运行触及共享 provider 状态，按准备参数和单线程重跑通过。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 53 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 09ed6d02, lang 60aaede97 | evidence: original Iced chart passes frozen verifier memory gate and reaches authored branch ownership diagnostic | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
