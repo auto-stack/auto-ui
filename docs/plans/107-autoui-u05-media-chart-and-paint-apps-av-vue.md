@@ -729,6 +729,16 @@ AV 只为携带令牌来源的位置和实际执行字段转移的根分配分�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 53 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 09ed6d02, lang 60aaede97 | evidence: original Iced chart passes frozen verifier memory gate and reaches authored branch ownership diagnostic | next: work`
 
+### 第 54 轮｜原 AreaChart 在生产 Chrome 回放
+
+将旧 widget 中连续的局部标量等值分支在证明互斥时降为共享分支链。要求各比较常量不同、可精确表示，分支体只从简单值写入 model，因而不会更改被比较的局部。AV 核对原形态的列表转移两条路径，分别显示 `0/2`、`2/0`，比较常量重叠的负例仍拒绝。旧 `memo` 只接受文字依赖提示并透传受检子树，未知提示具名拒绝。AV PLAN-981 79 通过，日志 SHA256 为 `46363ee16f65e3a9b2b9614fe06a427a5b8278f9fd8c8672e333ae4d3fdf9f93`。
+
+原画廊 manifest、外壳、AreaChart 页与组件逐字核对。生产 CLI 冷生成路由，经固定依赖的 `vue-tsc` 与 Vite 构建。Chrome `157.0.8103.80` 实测两层填充及对应描边、首个命中带显示 `desktop 186`、指针离开后清除、图例开关和离页重进。绘图区路径数 `5 → 3 → 5 → 5`，卸载无异常。源散列清单和浏览器日志 SHA256 分别为 `61f0e942f1a6cb80eedf98827867d90a75bd2c74ed045034cb775f552f74047d`、`3cd2e9a4e1e2efc7d42e015ed54e1a2556acd774a9238fbb18de2df825656dfb`。空数据和数据变更仍待验。
+
+Iced 原 `024-charts` 的首报从 `ptsOut` 推进到只读属性列表 `labels` 的重复转移，日志 SHA256 为 `b19549c0a3f842c29982bf2c541703b1a7247b40fa74f5bc6417b73df437cbb6`。原 AreaChart 的 Iced 路由进入 `/area-chart`，首次几何断言未找到 SVG，正在提取实际视图诊断。初次窗口日志 SHA256 为 `7b0da4b0e646d72a0bd700f3faacb5615c78dbabd0fffedfa2b2f5f68d1359a3`。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 54 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 09ed6d02, lang efb0b4287 | evidence: original AreaChart geometry, hover, legend and route lifecycle in Chrome; AV branches verified; named 024 list input diagnosis | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
