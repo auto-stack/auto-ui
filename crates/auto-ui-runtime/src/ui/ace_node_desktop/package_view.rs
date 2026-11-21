@@ -65,6 +65,10 @@ impl FrameView<'_> {
         if self.frame.is_widget(path) {
             return View::col().children(self.items(&element.children, path, None)).build();
         }
+        let style = style(element);
+        if style.as_ref().is_some_and(Style::is_hidden) {
+            return View::empty();
+        }
         if element.tag == "outlet" {
             return outlet.cloned().unwrap_or_else(View::empty);
         }
@@ -72,7 +76,7 @@ impl FrameView<'_> {
             return match ace_svg::checked_document(element) {
                 Ok(document) => View::Image {
                     src: format!("svgdoc:{document}"),
-                    style: style(element),
+                    style,
                 },
                 Err(error) => View::text(error),
             };
@@ -82,7 +86,6 @@ impl FrameView<'_> {
         }
         let mut children = self.items(&element.children, path, outlet);
         let label = element.label.as_deref().or_else(|| prop(element, "text"));
-        let style = style(element);
         let link = self.routed.then(|| self.frame.link(path)).flatten();
         let (session, instance, revision) = (self.session, self.instance, self.frame.revision);
         let action = |target| NodeDesktopMsg::PackageClick {
@@ -170,6 +173,14 @@ impl FrameView<'_> {
                     selectable: element.tag == "codeblock",
                 }
             }
+            "sidebar_content" => {
+                let content = View::col().children(children).build();
+                let mut viewport = View::scrollable(content);
+                if let Some(style) = style {
+                    viewport = viewport.with_style(style);
+                }
+                viewport.build()
+            }
             tag => {
                 if let Some(label) = label {
                     children.insert(0, View::text(label.to_owned()));
@@ -183,7 +194,7 @@ impl FrameView<'_> {
                     builder = builder.with_style(style);
                 }
                 let content = builder.children(children).build();
-                if matches!(tag, "scroll" | "sidebar_content") {
+                if tag == "scroll" {
                     View::scrollable(content).build()
                 } else {
                     content

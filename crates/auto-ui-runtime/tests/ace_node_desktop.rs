@@ -15,8 +15,13 @@
 //! 准备（e2e 档）：`cargo build -p auto-ui-runtime --features ace-bridge
 //! --example ace_node_desktop_window` + `ace_node_desktop_window.exe --prep-only
 //! --evidence <any>`（provider 预构建/缓存）——不在 case 计时内。
+//! F0 对照使用 `ace_hello_window.exe --prep-only --provider p980_nd_bytelen`
+//! 的产物。设 `ACE_NODE_DESKTOP_PREPARED_RUSTC` 为准备阶段的工具链身份。
 
 #![cfg(all(windows, feature = "ace-bridge"))]
+
+#[path = "support/ui980.rs"]
+mod ui980;
 
 use auto_ui_runtime::ui::ace_hello::stable_f0_root;
 use auto_ui_runtime::ui::ace_node_desktop::{
@@ -43,14 +48,9 @@ fn counter_fixture() -> (String, String) {
 }
 
 #[test]
+#[ignore = "opens a real Iced window and requires the prepared desktop example"]
 fn p107_window_deadline_fails_with_partial_evidence() {
-    if std::env::var("AUTO_UI_ACE_NODE_E2E").ok().as_deref() != Some("1") {
-        eprintln!("p107_window_deadline_fails_with_partial_evidence: window lane not scheduled");
-        return;
-    }
-
-    std::env::var("ACE_NODE_DESKTOP_PREPARED_RUSTC")
-        .expect("prepare the ui980 provider and set ACE_NODE_DESKTOP_PREPARED_RUSTC");
+    ui980::require_prepared();
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let executable = manifest.join("../../target/debug/examples/ace_node_desktop_window.exe");
     let (_, source) = counter_fixture();
@@ -112,6 +112,7 @@ fn displayed_count(session: i32, instance: usize) -> String {
 /// 提交（applies 计数与显示模型同源核对）。
 #[test]
 fn p980_node_desktop_counter_trajectory_and_two_instance_ratio() {
+    ui980::require_prepared();
     let (src, path) = counter_fixture();
     let mut bridge = NodeDesktopBridge::load(&src, &path, 2).expect("counter loads");
     let session = bridge.open().expect("open");
@@ -167,6 +168,7 @@ fn p980_node_desktop_counter_trajectory_and_two_instance_ratio() {
 /// session（字节级一致），无事件目标时步进 Idle。
 #[test]
 fn p980_node_desktop_hello_sources_av_texts_through_ffi() {
+    ui980::require_prepared();
     for (name, expect) in [("app.at", "Hello"), ("app-body.at", "你好 Auto")] {
         let (src, path) = hello_fixture(name);
         let mut bridge = NodeDesktopBridge::load(&src, &path, 1).expect("loads");
@@ -192,6 +194,7 @@ fn p980_node_desktop_hello_sources_av_texts_through_ffi() {
 /// 零 UI 效果，且失败后同入口恢复。
 #[test]
 fn p980_node_desktop_bad_schema_and_abi_refuse_before_ui_effects() {
+    ui980::require_prepared();
     // —— 坏 Schema 近邻 ①：无按钮绑定的 target（队列注入越界设备事件）。
     let (src, path) = counter_fixture();
     let mut bridge = NodeDesktopBridge::load(&src, &path, 1).expect("loads");
@@ -245,6 +248,7 @@ fn p980_node_desktop_bad_schema_and_abi_refuse_before_ui_effects() {
 /// 计数（不复活）；重开=新世代新 session，业务状态延续、显示恢复提交。
 #[test]
 fn p980_node_desktop_close_reopen_late_events() {
+    ui980::require_prepared();
     let (src, path) = counter_fixture();
     let mut bridge = NodeDesktopBridge::load(&src, &path, 1).expect("loads");
     let s1 = bridge.open().expect("open");
@@ -301,6 +305,7 @@ fn p980_node_desktop_close_reopen_late_events() {
 /// 车道必然红；本 case 把该判别力固化为永久断言。
 #[test]
 fn p980_node_desktop_byte_len_lane_is_not_ui_dispatch() {
+    let rustc = ui980::require_prepared();
     let (src, path) = counter_fixture();
     let mut bridge = NodeDesktopBridge::load(&src, &path, 1).expect("loads");
     let session = bridge.open().expect("open");
@@ -313,9 +318,13 @@ fn p980_node_desktop_byte_len_lane_is_not_ui_dispatch() {
     // 伪车道：以 F0 text_byte_len 携带同样的值字节（走另一 provider）。
     auto_lang_ace_host::install().expect("host");
     let root = stable_f0_root();
-    if let Err(e) = auto_lang_ace_host::build_f0_text_provider("p980_nd_bytelen", &root) {
-        assert!(e.contains("already registered"), "{e}");
-    }
+    auto_lang_ace_host::register_prepared_source_provider(
+        "p980_nd_bytelen",
+        &root,
+        ace_abi::rust_provider::f0_provider_source(),
+        &rustc,
+    )
+    .expect("PREPARATION_REQUIRED: run ace_hello_window --prep-only --provider p980_nd_bytelen");
     let av = "use.rs f0_text\nfn main() int { return text_byte_len(\"1\") }";
     let mut request = auto_lang_core::AceRequest::simple(av);
     request.provider = Some("p980_nd_bytelen");
@@ -349,6 +358,7 @@ fn p980_node_desktop_byte_len_lane_is_not_ui_dispatch() {
 ///    session 的事件）；③ 双重 close 同句柄 → stale 具名拒（不复活）。
 #[test]
 fn p980_node_desktop_lane_tag_queue_isolation_and_double_close() {
+    ui980::require_prepared();
     let (src, path) = counter_fixture();
     let mut bridge = NodeDesktopBridge::load(&src, &path, 1).expect("loads");
     let s1 = bridge.open().expect("open s1");
@@ -394,6 +404,7 @@ fn p980_node_desktop_lane_tag_queue_isolation_and_double_close() {
 
 #[test]
 fn p980_node_desktop_permission_revocation_refuses_before_dispatch() {
+    ui980::require_prepared();
     ensure_ui980_provider().expect("provider ready");
     let (src, path) = counter_fixture();
     let mut bridge = NodeDesktopBridge::load(&src, &path, 1).expect("loads");
@@ -438,6 +449,7 @@ fn p980_node_desktop_window_e2e_counter_full_script() {
         );
         return;
     }
+    ui980::require_prepared();
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let exe = manifest
         .join("../../target/debug/examples/ace_node_desktop_window.exe")
@@ -646,6 +658,7 @@ fn int_state(bridge: &NodeDesktopBridge, instance: usize, field: &str) -> i32 {
 /// 效果——count 不动、无 apply）、两实例隔离。
 #[test]
 fn p980_u01_input_text_numeric_reject_and_two_instance_isolation() {
+    ui980::require_prepared();
     let (src, path) = input_fixture();
     let mut bridge = NodeDesktopBridge::load(&src, &path, 2).expect("input fixture loads");
     assert_eq!(bridge.buttons().len(), 0, "no buttons in fixture");
@@ -797,6 +810,7 @@ fn p980_u01_window_input_e2e() {
         );
         return;
     }
+    ui980::require_prepared();
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let exe = manifest
         .join("../../target/debug/examples/ace_node_desktop_window.exe")

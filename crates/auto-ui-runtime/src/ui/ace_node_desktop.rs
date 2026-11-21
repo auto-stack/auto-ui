@@ -3424,7 +3424,14 @@ fn render_host_frame(
                 let page = if index == 0 { outlet.take().map(|(_, page)| page) } else { None };
                 package_view::view(id, index, frame, page.as_ref(), routed)
             });
-        return View::scrollable(View::col().children(views).build()).build();
+        let content = View::col().children(views).build();
+        // A routed shell owns its viewport and scroll surfaces. Wrapping it
+        // in another vertical scroll removes the height bound used by h-screen.
+        return if routed {
+            content
+        } else {
+            View::scrollable(content).build()
+        };
     }
     if let Some(tree) = widget_tree {
         let children = widget_instances

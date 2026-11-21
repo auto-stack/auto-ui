@@ -1,5 +1,8 @@
 #![cfg(feature = "ace-bridge")]
 
+#[path = "support/ui980.rs"]
+mod ui980;
+
 use ace_av::age_component::LegacyWidgetAlias;
 use ace_core::source::packages::PackageModuleInput;
 use auto_ui_runtime::ui::{
@@ -360,9 +363,7 @@ fn p107_checked_child_svg_updates_the_native_document() {
     assert!(vue.contains("return checkedSvgNode(element)"));
     assert!(vue.contains("a2x_str_display_f32"));
     let mut native = NodeDesktopBridge::load_package(units, "app::main", 1).unwrap();
-    if std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_none() {
-        return;
-    }
+    ui980::require_prepared();
 
     fn svg(view: &View<NodeDesktopMsg>) -> Option<&str> {
         match view {
@@ -429,9 +430,7 @@ fn p107_checked_chart_pointer_dispatches_native_coordinates_and_rejects_stale_ev
     let vue = generate_package_sfc(&units, "app::main").expect("checked pointer frame");
     assert!(vue.contains("acePointerSample(domEvent, pointerSamples"));
     let mut native = NodeDesktopBridge::load_package(units, "app::main", 1).unwrap();
-    if std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_none() {
-        return;
-    }
+    ui980::require_prepared();
     fn area(view: &View<NodeDesktopMsg>) -> Option<(NodeDesktopMsg, NodeDesktopMsg)> {
         match view {
             View::MouseArea { on_move: Some(sample), on_exit: Some(exit), logical_extent, .. } => {
@@ -505,9 +504,7 @@ fn p107_checked_chart_checkbox_tracks_the_routed_message() {
     assert!(error.contains("source.type-mismatch"), "{error}");
 
     let mut native = NodeDesktopBridge::load_package(units(root), "app::main", 1).unwrap();
-    if std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_none() {
-        return;
-    }
+    ui980::require_prepared();
     fn checkbox(view: &View<NodeDesktopMsg>) -> Option<(bool, NodeDesktopMsg)> {
         match view {
             View::Checkbox { is_checked, label, on_toggle: Some(on_toggle), .. } => {
@@ -615,7 +612,7 @@ fn stateless_widget_forwards_each_site_to_its_authored_channel() {
     assert!(sfc.contains("[\"Accept\"]: \"ChooseRight\""));
 
     let mut bridge = NodeDesktopBridge::load_package(units(page).to_vec(), entry, 1).unwrap();
-    assert!(std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_some());
+    ui980::require_prepared();
     let session = bridge.open().unwrap();
     assert_eq!(current_session(|session| session.package_frame(0).unwrap().actions().len()), Some(2));
     let mut window = AceNodeDesktopWindow::default();
@@ -729,9 +726,7 @@ fn desktop_package_button_delivers_the_authored_id_from_current_instance_state()
         vec![unit("gallery", "actions", source)], "gallery::actions", 2,
     ).expect("desktop loads the checked typed button");
     assert_eq!(bridge.buttons()[1].msg, "Select");
-    if std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_none() {
-        return;
-    }
+    ui980::require_prepared();
 
     let session = bridge.open().expect("open prepared UI host");
     push_session_event(session, 1, 0);
@@ -800,15 +795,14 @@ fn authored_source_paths_supply_only_the_referenced_package_modules() {
     };
     let mut native = NodeDesktopBridge::load(page, page_path.to_str().unwrap(), 1)
         .expect("load the authored project closure");
-    if std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_some() {
-        use auto_ui_runtime::ui::{ace_node_desktop::AceNodeDesktopWindow, Component};
-        native.open().expect("publish the checked entry and both widgets");
-        let window = AceNodeDesktopWindow::default();
-        let view = format!("{:?}", window.view());
-        assert!(view.contains("Leaf"), "{view}");
-        assert!(!view.contains("Other"), "{view}");
-        native.close_session().expect("close the package");
-    }
+    ui980::require_prepared();
+    use auto_ui_runtime::ui::{ace_node_desktop::AceNodeDesktopWindow, Component};
+    native.open().expect("publish the checked entry and both widgets");
+    let window = AceNodeDesktopWindow::default();
+    let view = format!("{:?}", window.view());
+    assert!(view.contains("Leaf"), "{view}");
+    assert!(!view.contains("Other"), "{view}");
+    native.close_session().expect("close the package");
     let product = vue_product();
     let vue = &product.pages[&product.paths[0].1];
     assert!(vue.contains("<AcePackageView />"));
@@ -923,9 +917,7 @@ fn bound_component_callbacks_route_in_current_native_view_revision() {
     assert!(vue.contains("<AcePackageView />"));
     assert!(vue.contains("[\"Pick\"]: \"Picked\""));
     let mut native = NodeDesktopBridge::load_package(units, entry, 2).unwrap();
-    if std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_none() {
-        return;
-    }
+    ui980::require_prepared();
     let session = native.open().unwrap();
     let mut window = AceNodeDesktopWindow::default();
     let click = |instance, message| {
@@ -1021,9 +1013,7 @@ fn declared_child_event_passes_the_authored_payload_to_its_parent() {
 
     let mut native =
         NodeDesktopBridge::load_package(units(&alias_parent, &alias_child), entry, 1).unwrap();
-    if std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_none() {
-        return;
-    }
+    ui980::require_prepared();
     native.open().unwrap();
     let mut window = AceNodeDesktopWindow::default();
     let click = current_session(|session| {

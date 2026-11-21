@@ -2059,15 +2059,25 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 // 拖拽死的断点)。内容侧镜像一个仅承载宽高的透明容器,使命
                 // 中区=可视区;外层树形与样式归属不动(absolute 抬升/z-order
                 // /绘制均不感知本改动)。
-                let sized_content = match style.as_ref() {
-                    Some(s) => {
-                        let is = IcedStyle::from_style(s);
+                let pointer_style = style.as_ref().map(IcedStyle::from_style);
+                let fills_bounds = pointer_style.as_ref().is_some_and(|is| {
+                    is.position == Some(crate::ui::style_iced_adapter::IcedPosition::Absolute)
+                        && [is.top_offset, is.right_offset, is.bottom_offset, is.left_offset]
+                            .into_iter()
+                            .all(|offset| offset == Some(0.0))
+                });
+                let sized_content = match &pointer_style {
+                    Some(is) => {
                         let mut c = iced::widget::container(content.into_iced());
                         if let Some(ref ws) = is.width {
                             c = c.width(iced_length(ws));
+                        } else if fills_bounds {
+                            c = c.width(iced::Length::Fill);
                         }
                         if let Some(ref hs) = is.height {
                             c = c.height(iced_length(hs));
+                        } else if fills_bounds {
+                            c = c.height(iced::Length::Fill);
                         }
                         c.into()
                     }
@@ -2107,7 +2117,14 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     if let Some(handler) = on_move.filter(|_| !inspect_capture_active()) {
                         let mut pa = crate::ui::iced::pointer_area::PointerArea::new(inner);
                         if let Some((w, h)) = logical_extent {
-                            pa = pa.extent(w, h);
+                            let sized = pointer_style
+                                .as_ref()
+                                .is_some_and(|is| is.width.is_some() || is.height.is_some());
+                            pa = if fills_bounds && !sized {
+                                pa.contained_extent(w, h)
+                            } else {
+                                pa.extent(w, h)
+                            };
                         }
                         let f = std::sync::Arc::new(move |x: f32, y: f32| handler.call(x, y));
                         pa.on_move(f).into()
@@ -4686,4 +4703,42 @@ fn plan087_rich_drag_emits_utf16_selection() {
     assert_eq!(ranges.len(), 1);
     assert_eq!(ranges[0].0, 0);
     assert!(ranges[0].1 > 6, "drag must cross both rich spans: {ranges:?}");
+}
+
+#[cfg(test)]
+#[test]
+fn plan107_empty_absolute_mouse_area_tracks_the_plot_bounds() {
+    use crate::ui::view::PointerMoveHandler;
+
+    #[derive(Clone, Debug, PartialEq)]
+    enum Message {
+        Moved(f32, f32),
+        Left,
+    }
+
+    let view = AbstractView::col()
+        .style("relative")
+        .child(AbstractView::col().style("w-[200px] h-[80px]").build())
+        .child(AbstractView::MouseArea {
+            content: Box::new(AbstractView::empty()),
+            on_enter: None,
+            on_exit: Some(Message::Left),
+            on_double_click: None,
+            on_click: None,
+            on_context_menu: None,
+            on_release: None,
+            on_move: Some(PointerMoveHandler::new(Message::Moved)),
+            logical_extent: Some((240.0, 160.0)),
+            style: Style::parse("absolute inset-0").ok(),
+        })
+        .build();
+    let mut sim = iced_test::simulator(view.into_iced());
+    for position in [iced::Point::new(70.0, 20.0), iced::Point::new(10.0, 20.0)] {
+        sim.point_at(position);
+        sim.simulate([iced::Event::Mouse(iced::mouse::Event::CursorMoved { position })]);
+    }
+    assert_eq!(
+        sim.into_messages().collect::<Vec<_>>(),
+        vec![Message::Moved(60.0, 40.0), Message::Left],
+    );
 }

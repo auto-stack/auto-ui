@@ -38,8 +38,13 @@ their parent instance. Pointer leave clears the transient hit and keeps the
 legend selection. A disconnected view discards late input.
 
 A `mouse-area` with a finite, positive `coords: WxH` uses that logical extent
-for pointer coordinates. The Vue projection scales the pointer from its DOM
-box to the declared extent. In an absolutely positioned element with `coords`,
+for pointer coordinates. Each host scales pointer coordinates from its hit
+box to the declared extent. In Iced, an absolute mouse area pinned to every
+edge at zero fills its enclosing stack along any axis without an explicit
+size. For a moving pointer with logical coordinates and no explicit size,
+the hit rectangle uses the SVG's centered aspect-preserving fit. Moving into
+the surrounding margin leaves that hit rectangle. In an absolutely positioned
+Vue element with `coords`,
 arbitrary pixel width, height and edge-offset utilities are resolved against
 the declared extent. This keeps the FlowDiagram hit boxes and tooltip aligned
 with its SVG view box when the browser resizes the widget.
@@ -47,3 +52,8 @@ with its SVG view box when the browser resizes the widget.
 An AreaChart or BarChart with no rows produces no data geometry. A subsequent
 nonempty input regenerates the paths or bars. The DonutChart empty state keeps
 its neutral ring, and LineChart draws no series for an empty input.
+
+A checked Iced route shell receives a bounded window viewport. Its authored
+scroll surfaces, including `sidebar_content`, constrain the viewport and
+let their contents scroll. The shell's responsive visibility controls apply
+to the sidebar and mobile navigation.

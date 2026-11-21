@@ -76,6 +76,7 @@ where
 {
     content: Element<'a, Message>,
     extent: Option<(f32, f32)>,
+    contain: bool,
     on_move: Option<Arc<dyn Fn(f32, f32) -> Message + Send + Sync>>,
 }
 
@@ -87,6 +88,7 @@ where
         Self {
             content: content.into(),
             extent: None,
+            contain: false,
             on_move: None,
         }
     }
@@ -95,6 +97,21 @@ where
     pub fn extent(mut self, w: f32, h: f32) -> Self {
         self.extent = Some((w, h));
         self
+    }
+
+    /// Match the centered, aspect-preserving drawing rectangle of an SVG.
+    pub(crate) fn contained_extent(mut self, w: f32, h: f32) -> Self {
+        self.extent = Some((w, h));
+        self.contain = true;
+        self
+    }
+
+    fn content_layout<'b>(&self, layout: Layout<'b>) -> Layout<'b> {
+        if self.contain {
+            layout.children().next().expect("contained pointer child")
+        } else {
+            layout
+        }
     }
 
     pub fn on_move(mut self, f: Arc<dyn Fn(f32, f32) -> Message + Send + Sync>) -> Self {
@@ -137,6 +154,21 @@ where
         renderer: &iced::Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
+        if let Some((width, height)) = self.extent.filter(|_| self.contain) {
+            let logical = Size::new(width, height);
+            let viewport = limits.resolve(iced::Length::Fill, iced::Length::Fill, logical);
+            let fitted = iced::ContentFit::Contain.fit(logical, viewport);
+            let child = self.content.as_widget_mut().layout(
+                &mut tree.children[0],
+                renderer,
+                &layout::Limits::new(fitted, fitted),
+            );
+            let position = Point::new(
+                (viewport.width - fitted.width) / 2.0,
+                (viewport.height - fitted.height) / 2.0,
+            );
+            return layout::Node::with_children(viewport, vec![child.move_to(position)]);
+        }
         self.content
             .as_widget_mut()
             .layout(&mut tree.children[0], renderer, limits)
@@ -153,6 +185,7 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        let layout = self.content_layout(layout);
         // 限频发布叠加在事件转发之上(不捕获,不改变内层语义)。
         if let (Some(on_move), Event::Mouse(iced::mouse::Event::CursorMoved { .. })) =
             (&self.on_move, event)
@@ -191,7 +224,7 @@ where
     ) -> mouse::Interaction {
         self.content.as_widget().mouse_interaction(
             &tree.children[0],
-            layout,
+            self.content_layout(layout),
             cursor,
             viewport,
             renderer,
@@ -213,7 +246,7 @@ where
             renderer,
             theme,
             inherited_style,
-            layout,
+            self.content_layout(layout),
             cursor,
             viewport,
         );
@@ -228,7 +261,7 @@ where
         translation: Vector,
     ) -> Option<iced::advanced::overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
         let child = tree.children.iter_mut().next();
-        let child_layout = layout;
+        let child_layout = self.content_layout(layout);
         self.content.as_widget_mut().overlay(
             child.unwrap(),
             child_layout,

@@ -10,6 +10,9 @@ use auto_ui_runtime::ui::ace_node_desktop::{
     ensure_ui980_provider, push_event, NodeDesktopBridge, StepOutcome,
 };
 
+#[path = "support/ui980.rs"]
+mod ui980;
+
 fn unit(pkg: &str, id: &str, src: &str) -> PackageModuleInput {
     PackageModuleInput {
         package: pkg.into(),
@@ -57,6 +60,7 @@ const HELPER_EDITED: &str = "pub fn step(n int) int {\n    return n + 10\n}\n";
 const TARGET_INC: usize = 1;
 
 fn load(helper: &str) -> NodeDesktopBridge {
+    ui980::require_prepared();
     ensure_ui980_provider().expect("ui980 provider");
     NodeDesktopBridge::load_package(
         vec![
@@ -124,6 +128,7 @@ fn p980_closure_package_bridge_states_follow_the_helper() {
 /// 负控：包面场景无 props/initials 面——非空种子具名拒（不静默丢种子）。
 #[test]
 fn p980_closure_package_bridge_refuses_initials() {
+    ui980::require_prepared();
     ensure_ui980_provider().expect("ui980 provider");
     let err = NodeDesktopBridge::load_package(
         vec![
@@ -216,6 +221,7 @@ fn p980_closure_window_package_e2e() {
         );
         return;
     }
+    ui980::require_prepared();
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let exe = manifest
         .join("../../target/debug/examples/ace_node_desktop_window.exe")

@@ -119,6 +119,7 @@ fn route_sfc_publishes_pages_and_local_diagnostics() {
 fn native_front_routes_mount_the_checked_page_in_the_authored_outlet() {
     use auto_ui_runtime::ui::{
         ace_node_desktop::{host_session_stats, install_bridge, with_bridge, AceNodeDesktopWindow, NodeDesktopMsg},
+        iced::IntoIcedElement,
         Component, View,
     };
 
@@ -148,15 +149,28 @@ fn native_front_routes_mount_the_checked_page_in_the_authored_outlet() {
     }
     model { showNavigation bool = true }
     view {
-        col {
+        col (style: "h-screen overflow-hidden") {
             TopBanner {}
-            if .showNavigation {
-                sidebar_menu_button (to: "/tree-page") { text "Open tree" }
+            col (style: "md:hidden") {
+                text "Mobile only"
             }
-            col {
-                text "Before outlet"
-                outlet (memo: true)
-                text "After outlet"
+            row (style: "flex-1 overflow-hidden") {
+                aside (style: "hidden md:flex w-64 flex-col shrink-0") {
+                    if .showNavigation {
+                        sidebar_menu_button (to: "/tree-page") { text "Open tree" }
+                    }
+                }
+                main (style: "flex-1 overflow-hidden flex flex-col") {
+                    sidebar_provider (class: "w-full min-h-0 flex-1 flex-col") {
+                        sidebar_content (style: "h-full") {
+                            col {
+                                text "Before outlet"
+                                outlet (memo: true)
+                                text "After outlet"
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -200,7 +214,13 @@ fn native_front_routes_mount_the_checked_page_in_the_authored_outlet() {
         with_bridge(|bridge| bridge.step()).unwrap()
     };
     assert!(render(&window).contains("Original intro"));
-    click(&mut window, "Open tree");
+    let mut layout = iced_test::simulator(window.view().into_iced());
+    assert!(layout.find("Mobile only").is_err());
+    layout.click("Open tree").expect("authored desktop sidebar link is visible");
+    for message in layout.into_messages() {
+        window.on(message);
+    }
+    with_bridge(|bridge| bridge.step()).unwrap();
     let rendered = render(&window);
     assert!(rendered.contains("Gallery banner"));
     assert!(rendered.contains("Mounts: 1"));
@@ -208,6 +228,10 @@ fn native_front_routes_mount_the_checked_page_in_the_authored_outlet() {
     let leaf = rendered.find("Authored tree leaf").unwrap();
     let after = rendered.find("After outlet").unwrap();
     assert!(before < leaf && leaf < after);
+    let mut layout = iced_test::simulator(window.view().into_iced());
+    let target = layout.find("Authored tree leaf").expect("routed leaf in Iced layout");
+    let bounds = target.visible_bounds().expect("routed leaf inside the viewport");
+    assert!(bounds.width > 0.0 && bounds.height > 0.0);
     let back = button(&window.view(), "Go back").unwrap();
     let NodeDesktopMsg::PackageClick { session: page, .. } = back else {
         panic!("expected a checked page click");
