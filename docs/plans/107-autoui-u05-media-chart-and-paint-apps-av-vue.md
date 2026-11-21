@@ -1,15 +1,15 @@
 ---
 plan_id: PLAN-107
-status: executing
+status: execution_done
 feature_name: AutoUI 024 Charts 与图表 Widgets AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-21
 plan_revision: 2
-current_step: 2
+current_step: 6
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
-supersedes_spec_components: [docs/specs/runtime/ace-package-widgets.md]
+supersedes_spec_components: [docs/specs/runtime/ace-package-widgets.md, auto-lang:docs/specs/ace-migration/m2-autoui.md]
 new_spec_components: []
 touched_goals: [auto-lang/GOAL-002]
 ---
@@ -107,11 +107,11 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 ## 8. 执行步骤
 
 - [x] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。见 §5 矩阵及 §9 基线与首轮回放。
-- [ ] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
-- [ ] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
-- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
+- [x] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
+- [x] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
+- [x] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
 - [x] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
-- [ ] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
+- [x] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
 - [ ] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
 - [ ] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
 
@@ -986,6 +986,35 @@ AutoUI 先用 debug/test 准备受影响套件 333.432 秒，两个窗口示例�
 原 FlowDiagram 双布局分别使用实窗挂载的 LR、TD 命中和离开回调。每侧高亮 1、弱化 4，提示分别为 start、check，另一侧几何不变，离开复原。修正版 304 帧、目标提交 4、迟到丢弃 1、关闭、exit 0。新文件 `round99-flow-fixed.json` SHA256 `d68e5489a584daace0f71bdc408bc3e9e2779fa0746bbcf64905e564ad8a783c`。冻结版驱动发出 `source.type-mismatch: expected i32, found f32`，退出 6，新文件 SHA256 `754921d098b8fa7b75ed66a297cf2426886c627719ef14acc01860dfa6d6b7c3`。024 实窗点击原 8 点按钮后从 6 增至 8，并在保持 8 点时继续替换首点。暂停、重置恢复 6 点。首次实窗指针探针将合法命中钉死在一月坐标而失败，保留 `round99-024-physical.log`。
 
 空绝对命中区的 Iced 布局永久回归用同一 renderer，从 120×80 的 plot 区接收实际 `CursorMoved`，逻辑 240×160，点 (30,20) 产生 (60,40)，移到区外产生 leave。成功耗时 2.09 秒，外层 2.891 秒。SHA256 `fb3db27892a1b5aadaee43ba02acc5fcd290cbad1c019dd36f8329c28edecdf6`。原 Donut 的实窗已挂载路由而画廊主体不可见，针对原项目的 Iced renderer 对照复现目标标题 `visible_bounds=None`。布局诊断中外壳内层高度仅 57 px，侧栏及主视口高度均为 0。发现 routed checked frame 被额外纵向 Scrollable 包裹，解除 `h-screen` 的高度约束；画廊 `sidebar_content` 的高度也曾下发到滚动内容。诊断 SHA256 `2bf17072a173018766cc6591ac10eed9c39434af929fcb505b82698cabfd8e54`。本轮复修保留原 AutoOS 外壳，从 AutoUI 调整 viewport 接线，之后逐个原页验绘制与事件。
+
+### 第 102–104 轮｜有界 Iced 绘制与正式 A2Vue 构建
+
+AutoUI `a4e90b1bc40e893a0ba0656e0839c16cef069ba5` 的 checked Iced 外壳以窗口有限尺寸布局，展开原声明的滚动视口并消费响应可见性。第 102 轮原 Donut 标题从不可见恢复到 41.19×23.40 可见区域。Iced 的 SVG 采用居中等比绘制。第一条指针探针在实际蓝色扇区内得到被拉伸的逻辑点 (157.63,136)，落在内孔。修复后同一像素通过真实布局和 `CursorMoved` 得到 (204.5,136)，显示 Desktop 55 (55%) 与白色选中描边，移到绘区外恢复逐字相同的初始 SVG。024 同法得到 (63.538464,149.69229)，显示当月原数据与准线，移出恢复。此对照由 Iced 渲染器的事件模拟器完成，使用正式字体和实际项目 View。桌面捕获未能始终锁定测试窗口，未对其他窗口输入。原 Donut 的错点对照 SHA256 `cc9e3ac0cc299ca2902eae11130f4f588ca7a2832e36e15fb52633715e05b3df`。最后 024 日志 SHA256 `55f2f4fa9085af0d35b8a39c581b7be3b7d8a7e0de900e24fc2f5ad2ed2c87ac`、Donut `8c435d3c07bf98beca912d60c30e096e948c6f3d01b8359933e1f58b24564507`。
+
+1150×800 逻辑 Iced 区对原项目渲染 2300×1600 的 WGPU 像素。五个原画廊页均从原侧栏经实际滚轮和点击事件进入，断言目标内容的可见边界。Area 首探针的 Overlay 与隐藏侧栏组重名，改用主区原作者描述后通过。逐页在绘图区取有代表性的像素并剔除导航，`round103-native-pixels.json` SHA256 `cce248bcbfc83968218635da51a6d5db865e51697ac991dd9d8c605938088185`。代表样本为 024 的三条抗锯齿色分别 2919、2779、2680，Area 蓝/绿 2886、3411，Bar 蓝 68547，Donut 四色 42573、19611、9658、6650，Line 蓝 1728，Flow 节点三色 3333、1734、1067。之前的窗口回调、关闭、两布局与定时状态收据按受影响边界复用。
+
+最终 AutoUI debug/test 准备 199.543 秒，排队 8.529 秒。真正经过居中拟合和进入留白后离开的永久回归 1.045531 秒。路由 4/4（2.224 秒），画廊型 shell 用实际 Iced 点击从可见侧栏进入，挂载可见的作者页，复开和迟到拒绝用例 1.210592 秒。包组件 20/20（10.210 秒）。历史 1.290163 秒真窗期限单测及第 103 轮新版覆盖合并进逐项计时。新增 AutoUI 38 项，最长 4.073283 秒，`round104-timing-auto-ui.json` SHA256 `b9a3a1ae2df95e21fe57ec0ad3ea79488d8e1f428838a9514148a0eb9bdf26ae`。AutoLang 新增 54 项，最长 0.269503 秒，`round104-timing-auto-lang.json` SHA256 `1ab69ede1f354bbfe17bda2b329335a8420a7b6cdf2b640fd27d48264dd3e2ab`。
+
+最终工具从相同三仓源以 `cargo build --locked --offline -j 1 -p auto-ui-tools --features ace-vue --bin auto-ui-tool` 显式准备 117.243 秒，固定 debug 工具 SHA256 `fb7dc9f349ab657aedb3a8656e98137ee39d2b79a72e2d072fed56d2fadb1c71`。用第 89 轮原始输入和版本环境重跑正式 `auto build --render vue --gen-only`、离线安装及 `vue-tsc` / Vite。024 全链 71.039 秒、exit 0，实际 Chrome 鼠标、图例、流式及卸载通过，输出日志 SHA256 `ce042d7c97d1c898b20726a283c49809a339df87f526f7b7632c548d506212bf`。完整画廊 144.133 秒、exit 0，生成 70 路由、90 文件，五个目标页的四份 Chrome 日志逐字重现第 89 轮哈希。024 和画廊最终锁 SHA256 为 `6384bcdd30aff1fbe1a9e618414615f5ca9b7093c2e333f25cded610e2259110` 与 `1dc15503c6694d73e00d4f2f5a1263e173747ec6b449cd6401077e9a5924ed3a`。
+
+### 第 105 轮｜真实 Windows Iced 绘制与复审交接
+
+固定第 103 轮 Cargo 构件重链窗口验证器，SHA256 `0d1d7d6d40231a2c8e9f0244c85911ad578602fde5d501106c634c155c15b375`。已准备的 Iced UI980 provider 与原应用 `src/front/app.at` 启动六次独立 Windows 窗口，窗口内用原侧栏回调切换画廊页。通过程序自己的 `iced::window::screenshot` 读取实际窗口绘制缓冲区，采样主体绘图区，排除侧栏和头部。各窗口输出为 1438×1000，断言后各自正常关闭且 exit 0，顶层宿主错误均为 0。画廊已有的首页错误按第 93–94 轮保留。下表记录形状像素。原 024 和 Donut 的指针进出同时有第 103 轮经过实际 Iced 布局的事件证据。
+
+| 原入口 | 实窗图形像素取样 | 第 105 轮 JSON 文件后缀及 SHA256 |
+|---|---|---|
+| 024 | 两条绘制折线色 887、853 | `024` `11f6550e7e47b263650cfea4cabdf5fadba8e2a9694b9148722213e5c349e3a5` |
+| Area | 两组色 931、1099 | `area` `c3c777ef961ce499b2fa3dd347e361d02d07fc223ae48fe3dc3491767b119c7f` |
+| Bar | 柱形蓝色 27600 | `bar` `8b0323058a1e967ad6502f2789ab56d8acea39508e65ebbc415b0e339a49808e` |
+| Donut | 四段色 16419、7545、3724、2550 | `donut` `3294a927dabde0c2ddc3cf07f0c6891ef6b36fa16990373f81adbf220eeda890` |
+| Line | 折线蓝色 675 | `line` `df06b830509ae85f0c34f1d59f6d2f343b4c9e59ff4a04b2037fabf4bfabfd9a` |
+| FlowDiagram | 三类作者节点填充色 31515、12842、12778 | `flow-fill` `19aedb5be7e65c643c3314570889023a9ae7b7fcb8f653b6add2bb3ba0f9433d` |
+
+每个目标色门槛为 75 像素。Flow 首探针以三种细描边颜色作完全相同 RGB 匹配，1.25 像素倍率下精确匹配 17、8、9，保留失败。改用作者定义的三种节点填充色，沿用相同门槛和窗口，复跑通过。
+
+修复交接固定 AutoUI `a4e90b1bc40e893a0ba0656e0839c16cef069ba5`、AutoLang `9bae90dcd2d058da3c20bce64e81a660c08eda71`、AutoOS `680a6ae344f89cbf4dcf5efd25a118889fe611c7`。工作树、分支、对比基线、兄弟仓和第 89 轮相同。规范候选为 AutoUI `docs/specs/runtime/ace-package-widgets.md`（SHA256 `98c9a6c3322bb4fe6784eceafa30fae1b603277ecc523445a32c84b59bb916b7`）、AutoLang `docs/specs/ace-migration/m2-autoui.md` §17（`f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fe7af85d`），AutoOS README 仍为 `a8d4859c3a23447d6fe1005624e1e9f95ddfbdfd2344123a716b1a783b1fd168`。AutoUI 规定窗口视口、响应可见性和等比命中矩形，AutoLang 规范收紧静态专化的适用条件。R107-01..05 的执行验证见第 96–105 轮，下一步同一独立审阅者复核。R107-06 的八组已固定，运行结果由合入阶段记录。
+
+`stage: work | plan_id: PLAN-107 | plan_revision: r2 | round: 105 | status: execution_done | outcome: pass | commit: ui a4e90b1b, lang 9bae90dcd, os 680a6ae3 | evidence: R107-01..05 repair controls, final windows and Chrome replays and changed Spec hashes | next: T-07 independent repair re-review`
 
 ## 10. 下游交接
 
