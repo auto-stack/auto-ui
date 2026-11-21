@@ -971,6 +971,14 @@ AutoUI 第 91 轮新增 37 条中 36 条有有效运行计时，最长 5.482443 
 
 `stage: review | review_scope: final | reviewer_identity: /root/review107, independent context on same worktrees, read-only | plan_id: PLAN-107 | plan_revision: r2 | round: 95 | outcome: needs_fix | reviewed_commit: ui 9b130370, lang 50e63ec9c, os 680a6ae3 (exact identities in round 89–91) | acceptance_results: AC-01 pass, AC-02 fail, AC-03 partial, AC-04 review failed / closeout pending | findings: R107-01..06 | next: reopen T-02/T-03/T-04/T-06, bounded repair, re-review`
 
+### 第 96–97 轮｜AV 共享验证修复
+
+AutoLang `9bae90dcd2d058da3c20bce64e81a660c08eda71` 合并 `TextDisplay` 到唯一验证臂，保留既有 closures 宽整型准入和相同的具名拒绝，支持图表所需 F32。走普通 Auto 前端、共享 lowering、MIR 验证、二进制载入及 AV 控制台，实际字符为 `-2147483649/4294967296`。新增测试执行 0.040053 秒，外层直跑 0.062078 秒。窄 closures 前端探针给出已知的后缀字面量限制，保留 `round96-lang-text-display.log`，正式回放采用支持宽整数的普通 Auto 前端。
+
+先以 `cargo test --locked --offline -j 1 -p ace-av --test conformance --no-run --message-format=json` 准备 debug/test，校正 R97 准备耗时 7.358 秒。直接串行执行同一 conformance 的 981、105 列表、资源、指令契约和新宽整数用例，132 通过、1291 过滤，墙钟 1.726 秒。原图表 F32 插值用例仍通过，0.008046 秒。原子输出 `round97-lang-affected-av.jsonl` SHA256 `0510c1f978c6a5f4e587271bd33003cb3bc479da921a521140e2608cbc14bf21`。Lang §17 专化说明增加直接可追溯模型字段、单组件模块与非循环调用点的适用条件，规范 SHA256 `f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fe7af85d`。
+
+本轮只选择了终审指定的八个固定组，实际固定门待复审通过。选择记录 `round97-fixed-groups-select.log` SHA256 `98983675525befcf93644361b03b83e54137de49f11867a3c4a75898e0e48b2a`，组配置 SHA256 沿用第 89–91 轮。构建排队 214.2 秒，未计入测试。
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
