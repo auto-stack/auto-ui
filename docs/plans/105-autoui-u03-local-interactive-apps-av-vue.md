@@ -1023,6 +1023,22 @@ stage: work（013 经 AV 桥装载）| plan_id: PLAN-105 | plan_revision: r1 | r
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 111 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 21d1dfdd8 | next: work
 
+stage: work（013 点击验收 + shim 修复）| plan_id: PLAN-105 | plan_revision: r1 | round: 112 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | code_commit: auto-ui `5f50d31f` | task_ids: T-04（013 交互片）| evidence: `plan-artifacts/plan-105/av-013-click2.json`（sha256 前 16 `711475F8C5E1242A`）| next: work
+
+2026-11-21 stage: work（T-04 W107：013 点击脚本验收——ToggleAll 经桥真派发）| outcome: pass（T-04 未整体完成）
+
+**交付（auto-ui `5f50d31f`，三项）**：①桥面 `checkbox { onclick: .Msg }` 收为可点击事件目标（与 button 同类）——此前 checkbox 事件在脚本面不可达；②`update_todo` shim 的实参里 `.todos[<任意下标>].field` 读**先于 remove 捕获**（改写为已移除记录的读取；if 条件位保持原实参）——原样内联在 remove 后重读会下标左移读错行/末位越界（ToggleAll 首次真跑即触发 `ListIndex` trap 的实证）；③装载测与 diagw82 的 `P105_MEM_BACKEND` env 开关加共享互斥锁（并行 set/remove 竞态让装载测吃到污染环境；装载测语义保持 env 关闭——015/018/022 不走 mem-backend 装载）。
+
+**验收（013 真点击）**：`--script "3:click:0:0,6:click:0:0"` → **ToggleAll 两次真派发**、frames=1、errors=0、store 状态稳定（`st_active_count=0` 两次一致——seeds 全未完成时 `all_done=true` 语义正确）；完整 store handler 链（嵌套 for + remove/insert + LIST_FIELD_VIEW 读 + 字段写 + Recompute）在真窗执行无 trap。**打字路径记账**：桥的 type 语义是「msg+文本实参」派发，013 的 `onenter: .AddTodo` 是无参读字段形 → `AddTodo` 具名拒（arity 域）——`value:` 绑定输入的两段语义（写字段→无参派发）是桥的下一片（KNOWN-DEBT）。
+
+**边界与同律墙（定位）**：012 = `verify.view-escape`（Tick handler 里 `rows.push(c + "…")` 的整 owned 元素 concat 用——resolver 的 ElemView 污点把 concat 判为 materializing use；需视图安全用域裁定，W108 刀）；016 = `ace.desktop.view-for-unsupported`（computed 列表的循环叶展开，W37 已记账）；013 打字如上。
+
+**affected（全绿）**：prep 8/8（并行+串行双跑）、u03_sfc_status 3/3、u03_sites 1/1、p013_sfc 4/4、p013_store_lane 1/1、浏览器门五 app `failures=0`。**新增用例时长**：无新增持久用例（shim 修复由 013 真点击与门组覆盖）。
+
+`next_responsible_role: work（W108：012 整元素 concat 视图用域（resolver ElemView）→ 016 view-for computed；随后 T-06 冻结回归）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 112 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 5f50d31f | next: work
+
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
