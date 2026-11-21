@@ -5,11 +5,16 @@
 | 提交 | 内容 |
 | --- | --- |
 | 基线 `ad62e154` | master HEAD（工作树创建点） |
-| 首提交 | TagInput 包 + demo 消费者 + native verify 脚本 |
-| 二提交 | native+vue 门通过；Escape 重开与跨实例定位修复 |
-| 三提交 | 015-notes 迁移（真实 noteId 绑定）+ notes 门 |
-| 四提交 | 工具模型测试 + 过期候选守卫 |
-| 五提交 | notes 门重试（运行时交付时序） |
+| `f48363ea` | TagInput 包 + demo 消费者 + native verify 脚本 |
+| `029b54a0` | native+vue 门通过；Escape 重开与跨实例定位修复 |
+| `28d9d253` | 015-notes 迁移（真实 noteId 绑定）+ notes 门 |
+| `05e6a878` | 工具模型测试 + 过期候选守卫 |
+| `8bc668b0` | notes 门重试（运行时交付时序） |
+| `83467ad8` | 包/demo README、decisions/evidence 记录 |
+| `1d45063f` | F-01..F-07 修复（backspace oracle、IME 守卫、X-07 UIA、text 语义、清理检查） |
+| `771100ea` | 修复轮证据 |
+| `30805dd3` | F-08 修复（candidates 有界快照，case ≤10s） |
+| `734519ce` | F-09 修复（notes 有界轮询）+ F-10 修复（清理并入 result/exit） |
 
 ## 门矩阵（Windows）
 
@@ -52,6 +57,27 @@ reopen、last-tree/last-dom 与截图）。
   （运行时行为，decisions.md 记录），测试层选择见 §6 分层。
 - 清理检查：port_free（进程退出后端口可重绑）与 reopen 为真实检查；连续门
   运行即重开证据。
+
+## 修复轮二（2026-11-21，复审 needs_fix F-08 后）
+
+- F-08：`candidates-escape-enter` 原 15.08–15.12s 超 10s 门；改有界快照模式
+  （type→sleep→单次快照→单次重打），本轮独立复测 7.470s、随后 7.203s，关闭。
+
+## 修复轮三（2026-11-21，复审 needs_fix F-09/F-10 后，HEAD `734519ce`）
+
+| 门 | 入口 | 结果（fresh out-dir `plan-artifacts/plan-097/fix-f09-f10/`） |
+| --- | --- | --- |
+| Win native notes | `timing_wrap.py --backend native --case notes` | pass；case 墙时 **1.391s**（修复前 8.829–12.210s） |
+| Win native demo | `timing_wrap.py --backend native --case demo` | 9/9 pass；逐 case 0.234–8.328s 全 ≤10s |
+| Win vue demo | `timing_wrap.py --backend vue --case demo` | 9/9 pass；逐 case 0.531–6.234s 全 ≤10s |
+| tools 模型门 | `cargo test -p auto-ui-tools --test tag_input_component` | 10/10 pass（1.04s） |
+
+- F-09：notes case 固定 sleep（0.8/2.5/1.5/1.5）换有界轮询；chip 出现/空输入
+  拒绝双目标快速判定，切笔记以「chip 随 active 笔记消失再重读」验证后端读回。
+- F-10：`port_free` 有界重试（20×0.5s，TIME_WAIT 残留）并供 `reopen_probe`
+  复用；`main()` 将清理/重开失败并入 result 与退出码（§6 契约：退出码 0 仅当
+  全部必需 case 通过且清理重开成功）。
+- 本轮全部清理 `port_free=true`、native `reopen.ok=true`。
 
 ## 待沉淀（merge 阶段落 docs/specs/ui/tag-input.md）
 
