@@ -833,6 +833,23 @@ AutoLang `c9232953427843e0362b0e917e7ca8749ac9e001` 检查稀疏的旧式匿名�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 70 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang}; D:/autostack/.wt/os-107/auto-os | commit: ui b58c7ebb, lang c92329534 | evidence: original line empty data, exact 024 empty-data repairs and Chrome project, original FlowDiagram Iced layout and hover diagnostic, A2TS record text lifetime failure isolated | next: authorized AutoOS source repairs and final replay`
 
+### 第 71–72 轮｜经授权修复原图表、双端回放
+
+AutoOS 源修 680a6ae344f89cbf4dcf5efd25a118889fe611c7。Area 和 Bar 跳过零分母，Area 空输入不生成错误闭合路径。FlowDiagram 从实时命中的节点 ID 派生高亮，在声明的图例坐标内放置不截取鼠标的提示。AutoUI 083bb61e 将 Vue 命中框和绝对定位偏移映射到同一逻辑尺寸。AutoLang 95d9d69e9 复制从记录字段读取并独立持有的文本局部。保留冻结源、源文件哈希及其失败原始记录。
+
+| 原入口或负控 | AV/Iced | A2Vue/Chrome |
+|---|---|---|
+| 024 原项目 | 真实窗口 834 帧，播放 6→7、暂停与重置，折线指针、图例 4→3→4，四图切换 4→19→7→4→4，关闭后旧回调拒绝，错误 0。round72-024-project-iced.json SHA256 5ef291401ff5a3aa6d49267d68a2430cb931f93e2f2ad5bbb0b2ba8231d45633 | 生产构建，鼠标、播放 6→8、暂停及重置，并卸载。SHA256 3b55e70995388157210ad36d57655766bf9f7378457788b5fa01ae425e4dd663 |
+| Area、Bar 空数据恢复 | 用修正版组件，空→填→清空→再填，面积及柱几何分别 (0,0)→(2,6)→(0,0)→(2,6)，301 帧，成功提交 3 次，关闭，错误 0。round71-gallery-data-controls-iced.json SHA256 b72acbae5eb06fc3fabac564dda0e45a5e6b32096845468ec1218c03939d076c | 同样两个组件，四个阶段的几何与 Iced 一致，卸载，错误 0。round71-gallery-data-controls-browser.log SHA256 8b848d4e2009919795a3bb24dd905ed4576681440ff0bd300b1f9c6d67f60b56 |
+| Area、Bar、Donut、Line 原页 | 原画廊正向与各空数据测值见 §9 第 50–72 轮。Iced 使用实际挂载 View 的回调，并经窗口类型化消息队列送入 | 修正版画廊原页通过实际鼠标、数据、图例、重开及卸载。round72-gallery-area-browser.log SHA256 3cd2e9a4e1e2efc7d42e015ed54e1a2556acd774a9238fbb18de2df825656dfb，Donut 84b4c74b9bef660d482fce04a6b3eeb0ddf2029b2112822a3709492a520bac0e，Bar/Line 454b9fde7fdf69c0f7a4577eaa7cb11c4b6d980afab5827ba3334c229d0d0249 |
+| FlowDiagram 原页 | LR、TD 各 5 节点、5 边、5 箭头。命中第一卡后 1 高亮、4 降透明、第二卡独立，离开复原。304 帧，迟到事件丢弃 1，错误 0。round71-fixed-flow-iced.json SHA256 638a8dc985b71f7e0b3654140f456f7f67ce5195e4a2b7186a9365ea9f8858c8 | 两种布局的坐标与 PLAN-502 独立期望一致，实际鼠标分别触发 1 高亮、4 降透明，提示锚点误差 ≤1.5 CSS px，离开、重开、卸载。round71-gallery-fixed-browser-final.log SHA256 6508bf451cb73366c992e9db8e1f1b9a54b922aff860e325d9e7ba65e42ab822 |
+
+同一套修复后运行时重播冻结版 FlowDiagram，两个布局命中均为 0 高亮、5 降透明。原始日志 round71-gallery-frozen-browser-final.log SHA256 f798a689a6f84eeacffa0cc965bd3aa5fa58a5a5a9b0e86e1e94fb30c11e7a3c。范围内永久 024 空数据用例 p107_024_area_and_bar_accept_an_empty_input 直走 AV，用时 8.11 秒。原项目窗口及数据回填在集成回放验。
+
+AutoOS 主检出子模块预检退出 1，日志列出未初始化的既有应用入口，27 个清单项，缺失 pac.at 0。AutoOS 源修没有 gitlink 改动，从固定原源及依赖生成的图表项目通过真实回放。审阅前须合入各自已落主的共享语义，再冻结最终版本验收。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 72 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang}; D:/autostack/.wt/os-107/auto-os | commit: ui 083bb61e, lang 95d9d69e9, os 680a6ae3 | evidence: six two-host entries, empty/refill exact components, case 8.11 s, AutoOS fixed and original comparison | next: integrated gate`
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
