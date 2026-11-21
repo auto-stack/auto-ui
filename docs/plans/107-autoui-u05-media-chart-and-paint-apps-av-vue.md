@@ -653,6 +653,16 @@ Iced 受检组件帧验证组合结果 837、参数列表的顺序，以及未�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 45 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ce24d8e0, lang 06fa116ad | evidence: legacy chart numeric casts, AV execution and production Vue replay, exact mixed-width diagnostics cleared | next: work`
 
+### 第 46 轮｜从实际记录列推导图表临时列表
+
+组件从调用端取得名义列表类型后，重投影阶段按真实字段声明推导 handler 中追加的值。记录字段选择须满足分支类型一致，并由共享绑定及验证链复核。受检 AV 帧按作者的字段顺序输出 `13/7.5`，同材料生成受检 Vue 组件。Core PLAN-981 251、AV PLAN-981 76、组件包 16、路由 4、SFC 20 通过。
+
+默认运行时构建发现合并成分的 ACE 包发现模块缺少 feature 门。恢复相邻 ACE 模块使用的 `ace-bridge` 条件后，默认 `cargo check` 与启用 ACE 的组件测试均通过。
+
+原 `024-charts`、原 Area 与原 Donut 的空列表诊断分别由 7、2、1 降到 0。闭包日志 SHA256 依次为 `de19450bfa67076979910bc985d465666f2c3860f39e8ff325aa76cbb1e2431b`、`87aee3c422c439618bbacdc910ea1df52172fdb7fa486f6823ddae4080c0c8e5`、`4f75a1ccfc5cd25e5c9143a1aecc5a8649b59735399c1004ed482e4b02491276`。定向 Vue 材料已生成，浏览器和原始页面交互仍待复验。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 46 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui e31b1e04, lang 5324a3368 | evidence: typed builders for caller records, same AV frame and generated Vue, exact empty-list diagnostics cleared | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
