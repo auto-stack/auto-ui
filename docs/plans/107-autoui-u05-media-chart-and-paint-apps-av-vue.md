@@ -930,6 +930,14 @@ AutoOS 预检 `pwsh -NoProfile -File scripts/check-app-submodules.ps1 -OsRoot D:
 
 `stage: work | plan_id: PLAN-107 | plan_revision: r2 | round: 91 | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang}; D:/autostack/.wt/os-107/auto-os | commit: ui 9b130370, lang 50e63ec9c, os 680a6ae3 | evidence: six original entries, actual two-host replay, frozen comparison, negative controls, new case timings and canonical Spec candidate hashes | next: T-07 final review`
 
+### 第 92 轮｜同版 Donut Iced 空数据复跑
+
+从第 89 轮准备好的 Iced 构件重链空输入验证器，使用第 91 轮浏览器对照的同一 Donut 作者组件和空列表调用页，设置 `PLAN107_EMPTY_DONUT=1`，参数 `--instances 1 --hold-ms 60000 --min-frames 42 --script '28:close'`。第 5、13 tick 均见 1 个中性环、0 数据弧，期间由实际挂载的命中区回调提交指针。窗口关闭后拒绝同一回调的再次提交，42 帧、目标提交 1、迟到丢弃 1、错误 0、退出 0。证据 `round92-donut-empty-iced.json` SHA256 `537751ed9591e1036a892da5c7d5b61264f2183f9028b15b556234c154c0ec96`。首条运行为正向验证后漏传关闭脚本，回调仍在活跃会话，失败原记录 `round92-donut-empty-iced-missing-close.log`。仅复跑参数有调整。
+
+交接校验重新核对三个候选 HEAD 与差异基线，工作树均干净，`git diff --check` 通过。样例、画廊 Iced JSON 和 Chrome 日志的 SHA256、规范候选 SHA256、37 与 53 条逐项计时均与交接一致。六个计划工作树经 `wt-guard.ps1` 检查均无 reparse point。独立审阅上下文待用户确认，T-07 保持待办。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 92 | from: work | to: review | status: execution_done | outcome: waiting | commit: ui 9b130370, lang 50e63ec9c, os 680a6ae3 | evidence: latest Donut empty on both hosts, artifact and source hashes rechecked | next: confirm final review context`
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
