@@ -749,6 +749,14 @@ Iced 原 `024-charts` 的首报从 `ptsOut` 推进到只读属性列表 `labels`
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 55 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bc4e854a, lang f8e1cf511 | evidence: exact AreaChart on both hosts; original 024 Chrome streaming, pause and reset; named BarChart ownership gate on native | next: work`
 
+### 第 56 轮｜原 BarChart 分支推进及 AreaChart 空数据实测
+
+旧 widget 的互斥分支证明覆盖向其他局部列表追加由简单值构成的记录。选择键在分支内保持不变，未能证明互斥的记录转移仍交给所有权检查。AV PLAN-981 80 通过。原 `024-charts` 在 Iced 越过 BarChart 的 `rcol` 所有权诊断，根件标量投影 `theme_name` 推进到 `VerifySteps`，尚未挂窗。窗口诊断日志 SHA256 为 `9dae9d8d510b0087d7a322e52c7a4cf53ac719a1aa80ec09b1d448d6adba9aec`。继续核对标量投影的实际调用闭包。
+
+独立调用页保留原 `area_chart.at` 的 SHA256 `44bcd6700457eed38cfd47be6f8bbb63e7615ed20ec4b3c8296e38eb7f08643a`，初始为空，通过原组件属性提供三条记录再清除。首次对照的列表赋值未类型化，在两端均具名拒绝；改用显式类型的列表局部后成功进入原组件。Iced 对空输入在原 `slot` 除数上报告 `DivByZero`，旧 VM 的浮点除法同样对零拒绝。Chrome 在空态和清除态生成两条无起点的填充路径，可见长度均为 0，浏览器记录 4 条 SVG 路径错误。填入后两条可见路径长度约为 1286.85、1154.45，卸载完成。Iced 诊断和 Chrome 观测日志 SHA256 分别为 `65021a6f7e9b9ecf67d226aa3d370cfdcc08c4d5428f25dab8fcbf5011c4db52`、`260e53e974d90458126dd6718277ec92160b2f26410e1f6beb6ace78a9097287`。空数据在两端表现未统一。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 56 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bc4e854a, lang ffdee7676 | evidence: original BarChart ownership gate cleared, native snapshot verifier work gate and empty Area behavior recorded | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
