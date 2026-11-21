@@ -623,6 +623,16 @@ AV 定向实例栈计算结果为 `0 → 8`。生产 Vue CLI 冷生成两个路�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 42 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 46b78613, lang 4a808bbac | evidence: original FlowDiagram component parses, checked stack effects replay in AV and Chrome | next: work`
 
+### 第 43 轮｜受检浮点插值更新两端 SVG 几何
+
+AGE 包面浮点插值经受检 `TextDisplay` 进入 AV 和 A2TS。AV 使用 f32 十进制表示，JS 选择能还原同一 f32 的最短十进制候选并展开为定点文本。差分比较覆盖 1,008,491 个有限值，含二进制指数边界和次正规数，输出差异为 0。差分日志 SHA256 为 `04ee2ad069c755416b84e453c93090f11786c97ca9629098d248a4c3b29c4d9e`。AV MIR 验证操作数和结果槽类型。A2C、A2R 与 native 编译器对该新增浮点格式给出具名拒绝。
+
+首次 Chrome 生成验证定位到受检子组件渲染器缺 SVG `path`。接入后，Iced 和 Vue 从同一个受检树消费共享的 SVG 标签与属性规则。Iced 测试解析实际 `svgdoc`，点击后 `d` 从 `M 0 0 L 1.2 4` 更新到 `M 0 0 L -0 4`，并检查标签中的 XML 转义。新目录生产 Vue CLI 冷生成，经 `vue-tsc` 与 Vite 构建，Chrome `157.0.8103.80` 观测到相同的 DOM `d` 更新，卸载无异常。浏览器最终日志 SHA256 为 `f98ac9c3446a3c56839072bdce1a981fa8476533735017df7f14e15060f30962`。Core 完整 conformance 867、AV PLAN-981 75、A2TS Node 4、组件包 14、路由 4、SFC 20 通过。
+
+原 `024-charts` 闭包的 f32 插值诊断由 58 降至 0，四个原画廊图表页的同类诊断也均清除。原应用日志 SHA256 为 `47a55142b80fc5e055bea1c27219652a6a865817e7a094ad0ece6fa2649a47ff`。动态记录键仍是原图表闭包首项诊断，真实原图表交互仍待验收。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 43 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 52f003a3, lang d34746351 | evidence: exact chart f32 diagnostics cleared, numeric differential and real SVG state updates in Iced and production Chrome | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
