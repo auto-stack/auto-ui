@@ -673,6 +673,16 @@ Iced 受检组件帧验证组合结果 837、参数列表的顺序，以及未�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 47 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui e31b1e04, lang a0df95710 | evidence: checked text snapshots in AV and production Chrome, exact chart ownership diagnostics cleared | next: work`
 
+### 第 48 轮｜原 DonutChart 闭包编译与原外壳挂载诊断
+
+生成的列表签名采用组件自身参数的源码位置，继续使用调用端记录的名义身份。多字节注释负控由越过 UTF-8 边界的内部错误推进到编译通过，受检组件帧仍输出 `13/7.5`。Core PLAN-981 251、AV PLAN-981 77 和组件包定向回归通过。原 Donut 页和组件编译为 2 个受检组件，原闭包日志 SHA256 为 `95419ec7262dc3347944eac967c6aabffa4e7352a25fd79d887db5c88f9c6cff`。
+
+保留原画廊 manifest、外壳、索引、Donut、Carousel 和声明依赖的源字节。隔离工程复用固定 AutoDown 源和产物，校验同一本地依赖的新路径后沿用此前锁定的依赖版本。生产 CLI 冷生成 `donut-chart.vue`，`vue-tsc` 和 Vite 构建通过。Chrome 由实际侧栏进入 `/donut-chart`，初始化遇到 `Str` 重复释放，未显示圆环。未压缩对照定位到 `Init` 的字段文本 `lv` 与局部 `name` 共用同一所有权。浏览器失败日志 SHA256 为 `991dc4c39c3e90f997e77cc4d201a0f87b605c5f4667a7b24a63077c9ef031b9`。
+
+Iced 真窗经原侧栏进入相同页。AV 的视图闭包在同一 `lv` 上报 `mir.use-after-move`，尚未建立页面实例。窗口记录 SHA256 为 `cf8ee1107396254492e21c9ceef2585ad23a8fec0a1a37138e17ca0f26699eb7`。标签快照、图形、指针、图例和卸载继续沿原输入复验。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 48 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 93b037e0, lang 5aa02dc94 | evidence: original Donut compiles, cold production route and real Iced navigation reveal matching ownership error | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
