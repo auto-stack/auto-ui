@@ -803,10 +803,18 @@ Chrome 指针已实际命中原折线图覆盖层。原 `.PointerMove` 把 `0.64
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 60 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 173993a7, lang 4fb2a2714 | evidence: exact 024 Iced stream, pause, reset and close; media first syntax shapes isolated | next: work`
 
+### 第 61–63 轮｜图表调用点隔离及原 024 Iced 指针
+
+首次命中原折线图的 Iced 指针回调，模型字段的重复重放达到 AV `VerifySteps` 上限，状态提交 0 次。现由每次 widget view 调用执行一次受检模型重放并读取同一份记录。仍使用冻结的内存和验证步数。第二次真窗回放实际显示 Jan 提示及十字准线，离开后清除，图例路径 `4 → 3 → 4`。从挂载的 Iced View 取得回调并送入真实窗口消息队列。会话关闭，304 帧、4 次消息轮询及成功提交、1 次关闭后的输入丢弃、0 错误。窗口 JSON SHA256 为 `8ab2a72757035a1c859d665a0268af6a34e0ae029a5d2a53d2d49654b8c82d05`。
+
+AutoLang `ef7faf610ebad390a9e687ca1fbc6d70c3938b7a` 将静态 widget 实例绑定到各自调用点的原记录类型和键集合。AV 回归验证两个记录签名的初值和独立状态，另一个实例的键不能用于当前实例。原画廊镜像核对 18 个输入文件，生产工具冷生成 Bar、Line 的实际受检页面。带 CodeEditor 诊断页的整包从固定依赖构建时，诊断中的原生函数名被误识别为可执行调用，`vue-tsc` 因而报告缺编辑器桥。Bar 和 Line 的 Chrome 行为在本轮尚未验收。FlowDiagram 的稀疏匿名记录仍待处理。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 63 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 173993a7, lang 9d17e7b4f | evidence: Core PLAN-981 251 and AV PLAN-981 82 pass, original 024 Iced pointer and legend and late event rejection, real Bar/Line generation with gallery build diagnostic | next: work`
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
 
-- 独立推进 024 原 Iced 滑窗、真实指针与空数据，以及画廊 Line/Bar 多调用点记录形状和 FlowDiagram 的节点类型。第 58 轮的四图切换/关闭及原 Chrome 结果保部分证据。
+- 024 的四图切换、滑窗、指针、图例和关闭已有回放。继续验空数据、画廊 Line/Bar 双端交互及数据边界、FlowDiagram 节点类型与双布局。
 - 向 123 提供原全画廊需要的图表 handler/组件及证据绑定的版本。涉及 123 在途的桌面入口时，接已审路由/入口切片与 114 实际包、列表、事件接口，再跑 107 的整合行。
 - CodeEditor 的光标宿主缺口及原用例收据移交 120。媒体、图片和画布的旧观测按 §9 各归属接续。
