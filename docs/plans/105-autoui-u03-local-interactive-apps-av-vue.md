@@ -10,7 +10,7 @@ current_step: 6
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
-new_spec_components: []
+new_spec_components: [auto-lang docs/specs/ace-migration/m2-autoui.md §16（U03 语义批：store S1/LIST_FIELD_VIEW/元素位 owned Str/预算分档）]
 touched_goals: []
 ---
 
@@ -1155,6 +1155,24 @@ stage: review | review_scope: final | reviewer_identity: 本会话终审（实�
 **findings（不阻断）**：F-105-R1 打字两段语义（桥宿主增片）；F-105-R2 016 逐 dispatch 动态叶数漂移；F-105-R3 载荷点击实参（SelectTab 族）；F-105-N1 frontmatter `new_spec_components` 空表——merge 沉淀 canonical Spec 增量时补写说明（AGE store/列表语义、LIST_FIELD_VIEW、元素位 owned Str、预算分档均应入 canonical docs/specs）。
 
 **verdict：final pass → `reviewed` → merge（T-08）**。
+
+stage: merge | plan_id: PLAN-105:r1 | round: 121 | from: reviewed | to: merge（进行中）| status: reviewed | outcome: pending（落地完成；归档/清理因落地检查发现 015 回归而暂缓）| worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | delivery_commit: auto-lang master `0b754af59`（含 spec §16 `91cc77e6c`）/ auto-ui master `fe2dd4f1`（落地 rebase 集成 `af2b28a0` + caller 收口）| canonical_verified: docs/specs/ace-migration/m2-autoui.md §16 在 auto-lang master（`91cc77e6c`）| archived: 未（见 blockers）| cleaned: 未 | next: work
+
+2026-11-21 stage: merge（T-08 落地执行）| outcome: pending（一项回归待修）
+
+**prepared/landed**：auto-lang rebase master（75 落后并集：文法 profile 并集、resolve 双入口/instance_probe 线程、age_component instance/proto 适配、W57/W70 语义并集；census 4/4 无需重算——master 文法变更已在本支同步线内）→ ff-only 落 master `0b754af59`（35 files，+4774/−443，无合并提交）。auto-ui rebase master 两轮（-X theirs 批量 + 手工并集：generate_package_sfc 族 routed/PLAN-105 管线并集、ace_route 落地适配、plan124 caller）→ ff-only 落 master `fe2dd4f1`。
+
+**canonical_verified**：docs/specs/ace-migration/m2-autoui.md §16（U03 语义批）随 `91cc77e6c` 在 auto-lang master 在案；auto-ui 计划 frontmatter `new_spec_components` 补写（F-105-N1 收口）。
+
+**落地检查发现的回归（pending fix-forward）**：015-notes 桥装载在落地树上失败——`event program compile failed: handler Init carries a body outside the checked script domain`。根因链：prep 的跨单元 store 内联**探测解析失败被跳过**（store 块 `.draft_title = .notes[.active_id].title` 在落地语法管线下解析拒绝 @4558；等价组件面最小复现**通过**——失败面为 store 块语句解析路径）。该回归由 auto-lang 落地的 syntax 管线增量（lexer/parse/project 约 1071 行：PLAN-1090 系）与 store 块语句解析的交互引入；012/013/016/018/022 桥装载与浏览器门五 app 在落地树上复验**全绿**（landed-*.json）。
+
+**blockers**：① 015 桥装载回归修复（auto-lang store 块语句面 × 落地语法管线；最小复现 = `p015-storeblock-prep.at` 经 project_component_candidates @4558）；② 归档 + 工作树清理 + 落地核对（等 ①）。
+
+**复验状态（落地树）**：plan124_routes 2/2（AV 导航带 ACE_NODE_DESKTOP_PREPARED_RUSTC 准备）、u03_sfc_status 4/4、p013_sfc 1/1、p013_store_lane 3/3、sites 1/1、浏览器门五 app failures=0、六 app 桥装载交互全绿（012 ADnH/013 ToggleAll/016 PrevMonth；015 见 blockers）。auto-lang 组：av plan105 13/13、core plan105 26/26、census 4/4、980 40、979 57、104 3、1072 19、state_face 8、av-core 134（layout 一红为 master 预存，stash 对照在案）。
+
+`next_responsible_role: work（fix-forward：015 store 块语句面解析回归修复于落地上进行，复验 015 全链后补归档/清理）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 121 | from: merge | to: work | status: reviewed | outcome: pending | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 0b754af59 / fe2dd4f1 | next: work
 
 ## 10. 下游交接
 
