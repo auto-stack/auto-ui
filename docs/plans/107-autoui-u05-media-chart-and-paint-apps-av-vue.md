@@ -739,6 +739,16 @@ Iced 原 `024-charts` 的首报从 `ptsOut` 推进到只读属性列表 `labels`
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 54 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 09ed6d02, lang efb0b4287 | evidence: original AreaChart geometry, hover, legend and route lifecycle in Chrome; AV branches verified; named 024 list input diagnosis | next: work`
 
+### 第 55 轮｜两端原 AreaChart 正例与 Chrome 原图表滑窗
+
+旧组件绑定列表属性作局部值时，通过共享受检列表操作逐项建立快照。定向 AV 测试修改第一份列表后，第一份、第二份与原属性长度为 `3/2/2`。显式计时器和原 widget `interval`/ `.Tick` 的启停条件进入受检视图，宿主按挂载实例派发并在停止或卸载时清除。Vue 按属性实际值变化在既有模型上重跑原 Init。Core 完整 conformance 867、AV PLAN-981 80、AutoUI 生产工具构建通过。
+
+固定原 `024-charts` 冷生成、构建后，Chrome `157.0.8103.80` 实测初始折线 6 点，选择 8 点滑窗后出现 `t3`，折线达到 8 点。暂停后再等 500 ms 几何保持一致，重置恢复原 6 点几何。重开播放后卸载，页面根清空，页面异常和请求失败均为 0。日志 SHA256 为 `36b5801c9f08690310bd0745c6bb8a55b188b7722fea9fb9334379e22c195341`。Iced 越过 `labels` 读属性门，原 BarChart 的并列分支构造记录时报告 `rcol` 所有权诊断，日志 SHA256 为 `c243d1d62ba927ccbd2629e20a4eee4185c0d4872c71b15a66fe4fa9b6e96e3e`。原 024 的 Iced 流式回放仍待验。
+
+原画廊 Iced 真窗经原侧栏进入 AreaChart，显示两层填充与对应顶边，用挂载视图回调命中首带显示 `desktop 186`，离开后清除，再用原图例使路径数 `5 → 3 → 5`。关闭后迟到回调拒绝 1 次。窗口 JSON SHA256 为 `ec67e206d3623afb4849be01d8ddd1e5907d5af4257729786726066edea7ba9c`。同源 Chrome 冷复验路径数 `5 → 3 → 5 → 5`，指针与卸载通过，日志 SHA256 为 `3cd2e9a4e1e2efc7d42e015ed54e1a2556acd774a9238fbb18de2df825656dfb`。空数据和更换数据仍待验。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 55 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bc4e854a, lang f8e1cf511 | evidence: exact AreaChart on both hosts; original 024 Chrome streaming, pause and reset; named BarChart ownership gate on native | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
