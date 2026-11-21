@@ -1005,6 +1005,24 @@ stage: work（AV collections 元素文本视图）| plan_id: PLAN-105 | plan_rev
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 110 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: fd7f5831a | next: work
 
+stage: work（013 经 AV 桥装载）| plan_id: PLAN-105 | plan_revision: r1 | round: 111 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | code_commit: auto-lang `21d1dfdd8` | task_ids: T-02（W106）/T-04 首破 | evidence: `plan-artifacts/plan-105/av-013-w106.json`（sha256 前 16 `F96E8AA4E5F4B083`）+ av plan105 组 13/13 | next: work
+
+2026-11-21 stage: work（T-02 W106：013 经 AV 桥装载——首个动态列表应用）| outcome: pass（T-02 未整体完成）
+
+**定位（dump 驱动）**：prepared 源（`p013-prepped-app.at`）在 auto-lang 侧同入口复现——compile OK、observe 墙在 `d___age_state_0_input`；lowered MIR dump 实证 place-get 位点的真实形状是 **owned 位文本字段读**四连（`ListPlace+PlaceGet+FieldGet+Clone`）：`.preview1 = .todos[i].text` 向 owned Str 字段赋值，表达式被推断为 owned Str（W105 的视图位条件 `ty == StrView` 不命中）。
+
+**交付（`21d1dfdd8`，两墙一并）**：①owned 位文本字段读改发 **LIST_FIELD_VIEW + StrToOwned**（视图→owned 拷贝；place/LIST_REMOVE 路径退役）；②**循环体内 ctor 反复消费 owned-Str 局部**——`Todo { text: current_text }` 的字段位是**拷贝语义**（语言无隐式 move，显式 `.move` 走 Move 臂），位置实参 Clone 后进 Aggregate，回边重读不再触发 `mir.use-after-move`。
+
+**验收（013 桥真开窗）**：`ace_node_desktop_window --source 013 app.at`（mem backend）→ **frames=1、errors=0**，store 内联状态在位（`st_next_id=4`/`st_active_count=0`/`st_editing_id=-1`），文本叶真实渲染（`h1: todos` 等 6 叶）；证据 `av-013-w106.json`。**首个动态列表应用进入 AV 桥**——013 从 2026-11-19 停放时的「AV collections 缺 owned 元素文本」到今日全链贯通。
+
+**回归**：av plan105 组 **13/13**（+2：owned 位读 / 循环 ctor 拷贝，单例 ≤0.01s）；core plan105 26/26、plan980_state_face 8/8、census 4/4 保持。
+
+**边界（诚实）**：013 的 T-04 完整验收（点击脚本 add/toggle/filter、关闭与资源终态）未做；012 同律露出 `verify.view-escape`（整元素读，世界时钟 `text .cities[...]` 形）、016 露出 `ace.desktop.view-for-unsupported`（computed 列表循环展开）——两者是各自下一刀的具名墙。
+
+`next_responsible_role: work（T-04：013 点击脚本验收 → 012 view-escape 墙 → 016 view-for computed 墙；随后 T-06 冻结回归）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 111 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 21d1dfdd8 | next: work
+
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
