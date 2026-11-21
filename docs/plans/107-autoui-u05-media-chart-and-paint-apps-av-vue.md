@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-107
-status: execution_done
+status: executing
 feature_name: AutoUI 024 Charts 与图表 Widgets AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-21
 plan_revision: 2
-current_step: 6
+current_step: 2
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: [docs/specs/runtime/ace-package-widgets.md]
@@ -52,6 +52,7 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 - U02–U06 按用例所需接口推进。遇到共享的 ④-A、事件、集合、外部服务接面或组件缺口，记录具体接口、实现负责人、交付版本与消费测试，已具备前置的样例继续验收。1072 的 982 联合 CLI 验收可消费本计划的 A2Vue 证据。
 - 2026-11-20 用户以 `/goal 完成计划107` 授权 r1 原范围的实施、独立复审、限定修复和落地归档清理。
 - 2026-11-21 用户确认当前 goal 按 r2 收口，并授权最小 AutoOS 源修。原版和修正版各有可核对输入，最终验收用修正版。
+- 2026-11-21 用户授权一名只读子代理在实施工作树独立终审。
 
 ## 5. 实施与交付边界
 
@@ -106,11 +107,11 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 ## 8. 执行步骤
 
 - [x] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。见 §5 矩阵及 §9 基线与首轮回放。
-- [x] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
-- [x] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
-- [x] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
+- [ ] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
+- [ ] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
+- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
 - [x] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
-- [x] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
+- [ ] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
 - [ ] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
 - [ ] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
 
@@ -945,6 +946,30 @@ AutoOS 预检 `pwsh -NoProfile -File scripts/check-app-submodules.ps1 -OsRoot D:
 从冻结版外壳连续两次打开原 FlowDiagram，均给出 `ace.route.page` 的 `source.type-mismatch: expected i32, found f32`；各次从原侧栏进入 Area 后，错误提示消失，图表正常挂载。冻结版及修正版两轮 Area 都通过键盘 Enter 隐藏首组、Space 恢复，路径数 5→3→5，有正长度的填充路径 2→1→2。最终卸载根容器为空、浏览器异常 0、退出 0。冻结版日志 `round94-frozen-flow-route-recovery.log` SHA256 `d76c282cc0add6b2dd18f276fcc4d9fbb8d4727e4bc3f69d3673a2202480c658`，修正版 `round94-fixed-area-keyboard.log` SHA256 `f29a37f1c8a6fea0017cc8758d3035d86ec2c2af0fa490557cf86de2a953d0a4`。早期探针记录分别保留多个 SVG 的选择器歧义和把五条总路径计成五条填充的断言，最终用原图表 viewBox 和填充/总路径各自计数。
 
 Iced 第 89 轮四份画廊记录分别保留默认 `/` 的 ``source.syntax: expected `fn`, found `widget` ``。后续通过原外壳路径成功创建五条图表会话，最终路由错误为 null，会话关闭、顶层错误 0。回放矩阵记录了默认首页与五个目标图表页各自的状态。T-07 的独立审核仍待确认。
+
+### 第 95 轮｜同树独立终审
+
+经用户授权，只读 reviewer `/root/review107` 在同一组工作树核对 Plan `ad62e15430ccb717fe6f7e06b2b26970f7811d45`，结果 `needs_fix`。基线、候选、分支和依赖见第 89–91 轮。末次检查三棵实施树干净，`git diff --check` 通过。Reviewer 核查 024 的 8 项及两份画廊各 91 项源与资产，全部匹配对应 Git blob。复核依赖版本、原始日志、测试断言和规范哈希。本轮复用执行记录，reviewer 未另启动产品测试。
+
+| 验收 | 审核结果 | 覆盖及限制 |
+|---|---|---|
+| AC-01 | pass | 024、五原页输入、依赖、核对哈希与 r1 余项移交完整。 |
+| AC-02 | fail | 已验证调用点记录、稀疏行、受检载荷、文本所有权及模型物化控制。发现通用宽整数插值回归和日常测试 provider 冷编译路径。 |
+| AC-03 | partial | 保留第 89、91–94 轮几何、空数据、复开和迟到回调等有效证据。Iced 的 FlowDiagram TD、负控退出、实际坐标命中以及现版窗口期限需要补测。 |
+| AC-04 | fail，合入操作待办 | 独立审核返回修复。固定组回归、三仓落主、规范验证、归档和清理由 T-08 负责。 |
+
+| 发现 | 路由、最小复放与关闭条件 |
+|---|---|
+| R107-01，AC-02 / T-02 | 候选 `av-core/src/mir_verify/mod.rs` 的首个 `TextDisplay` 验证臂遮蔽原宽整数规则。原 closures 支持宽整数，候选从前端发射到 AV 验证可达 `mir.text-display-type`。恢复单一验证臂，运行 I64/U64 超 32 位输入、图表 F32 和 bool 负控。 |
+| R107-02，AC-03 / T-04、T-06 | Iced Flow 只向 `regions[0]` 投递 LR 事件，且目标路由不可挂载时也设置成功完成标记。用原修正版 LR 与 TD 各作命中、提示、离开，检查对侧和迟到回调，再用不可挂载的冻结源验证具名诊断与非零退出，结果使用独立新文件。 |
+| R107-03，AC-02 / T-03、T-06 | 旧版 runtime 已有 provider 冷编译。修改后的入口在测试缺准备环境时仍可到达它，预热计时掩盖该路径。用同一测试和实际 `open` 分别验准备齐备与缺失，缺失需具名失败且无编译副作用。保留正式环境的旧入口行为。 |
+| R107-04，AC-03 / T-04、T-06 | 第 91 轮窗口期限 0.0000172 秒来自未调度的提前退出，旧版 1.1561032 秒不绑定候选。显式安排实际窗口，测当前 test 和 debug example，重核 exit 6、截止诊断、部分 JSON 与帧数。 |
+| R107-05，AC-03 / T-04 | Iced 的空 `absolute inset-0` 覆盖层可能没有命中面积，直接回调不能证明布局。核原 Line/Donut 进入、指针派发、提示和离开，包括实际投影与事件。024 同次复核滑窗滚动。 |
+| R107-06，T-08 | 在四个已选组外补 `ace-native ace-a2c-abi ace-lowering ace-stdlib`。固定组准备明确区分 debug/test 与既有工具 release 路径。落地前执行并对账原子结果。 |
+
+AutoUI 第 91 轮新增 37 条中 36 条有有效运行计时，最长 5.482443 秒；既有路由、工具和浮点 provider 的扩充断言各为 1.271066、3.783601、0.146560 秒。AutoLang 53 条新增最长 0.2695033 秒，历史定向 AV 131、A2TS 5+5、AV Core 集成 51 通过。Core 五个文本基线失败 span 相同为 1444..1454，AV Core 空记录布局基线同为 size 0、align 1。独立 reviewer 无新增产品执行时间。合格的已绑定证据随限定修复复用。两个 canonical Spec 目标已确认，Lang §17 补明专化适用输入，随后核最后的规范哈希。
+
+`stage: review | review_scope: final | reviewer_identity: /root/review107, independent context on same worktrees, read-only | plan_id: PLAN-107 | plan_revision: r2 | round: 95 | outcome: needs_fix | reviewed_commit: ui 9b130370, lang 50e63ec9c, os 680a6ae3 (exact identities in round 89–91) | acceptance_results: AC-01 pass, AC-02 fail, AC-03 partial, AC-04 review failed / closeout pending | findings: R107-01..06 | next: reopen T-02/T-03/T-04/T-06, bounded repair, re-review`
 
 ## 10. 下游交接
 
