@@ -1176,6 +1176,8 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 121 | from: merge |
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 122 | from: work | to: user | status: reviewed | outcome: blocked | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: auto-lang master `0b754af59` / auto-ui master `fe2dd4f1`+`46724757`（收据）| next: user
 
+stage: merge（归档检查点）| plan_id: PLAN-105:r1 | round: 125 | archived | delivery_commit: auto-lang `0b754af59` / auto-ui `fe2dd4f1`（均 ff 线性落地）| archive_path: docs/plans/archived/105-autoui-u03-local-interactive-apps-av-vue.md（git mv 已提交 `5ea4e182`，status: archived）| completion_kind: delivered（KNOWN-DEBT hold 在案：015 AV 腿回放车道 handler 调用特性，owner=后继 U03/回放车道计划，closure=该特性交付后复验 015 六 handler 链）| pending: wt-guard 清理两工作树与分支 + plan-artifacts 收口 + 落地核对
+
 2026-11-21 stage: blocked（015 回归的语法引擎修复超出本轮深度；精确诊断与两条路线在案）| **待用户裁定**：(i) 语法引擎专门刀修复 `.X()` 带点调用解析（独立会话，配 RUST_BACKTRACE 调 parse machine）；(ii) 015 AV 腿按已知缺口归档（其余五 app AV 腿 + 五 app 浏览器腿全绿 = 净能力增益，015 记 KNOWN-DEBT 随后继计划）。两仓落地保持（线性历史）；归档/清理等裁定后执行。
 
 ## 10. 下游交接
