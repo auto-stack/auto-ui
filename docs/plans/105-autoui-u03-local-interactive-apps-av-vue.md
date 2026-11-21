@@ -1166,7 +1166,7 @@ stage: merge | plan_id: PLAN-105:r1 | round: 121 | from: reviewed | to: merge（
 
 **落地检查发现的回归（pending fix-forward）**：015-notes 桥装载在落地树上失败——`event program compile failed: handler Init carries a body outside the checked script domain`。根因链：prep 的跨单元 store 内联**探测解析失败被跳过**（store 块 `.draft_title = .notes[.active_id].title` 在落地语法管线下解析拒绝 @4558；等价组件面最小复现**通过**——失败面为 store 块语句解析路径）。该回归由 auto-lang 落地的 syntax 管线增量（lexer/parse/project 约 1071 行：PLAN-1090 系）与 store 块语句解析的交互引入；012/013/016/018/022 桥装载与浏览器门五 app 在落地树上复验**全绿**（landed-*.json）。
 
-**blockers**：① 015 桥装载回归修复（auto-lang store 块语句面 × 落地语法管线；最小复现 = `p015-storeblock-prep.at` 经 project_component_candidates @4558）；② 归档 + 工作树清理 + 落地核对（等 ①）。
+**blockers（最终诊断 v2，2026-11-21，8809bccc9 对照实验后修正）**：① 015 桥装载失败**不是落地回归**——决定性对照：prep 精确形状探针（store 块 + __StoreProbe widget）在受审 tip `8809bccc9` 与落地树**同样失败**（`expected fn, found store @0`；stores_nonempty=false）。**真因**：`parse_whole_module`（AGE-component whole-module 入口）的 item 分派**不接受 store 声明**（W24 的文法 alt 在案但该入口的扫描器不分派 store item——预存条件）；prep 的内联探测因此一直失败跳过（fail-closed），015 的 W111 通过走的是当时的脆弱路径（现树态不再满足）。附带确认：`.X()` 带点调用语句在两版同样失败（同为预存）。**修复方向**：whole-module 入口的 store item 分派接线（或 prep 探针换用接受 store 的解析入口）——独立专门刀。② 归档/清理：两仓落地为**净能力增益**（五 app AV 腿 + 五 app 浏览器腿全新交付）；015 AV 腿按已知缺口记 KNOWN-DEBT（随后继计划修 whole-module store 分派后复验），经用户确认后收口归档。
 
 **复验状态（落地树）**：plan124_routes 2/2（AV 导航带 ACE_NODE_DESKTOP_PREPARED_RUSTC 准备）、u03_sfc_status 4/4、p013_sfc 1/1、p013_store_lane 3/3、sites 1/1、浏览器门五 app failures=0、六 app 桥装载交互全绿（012 ADnH/013 ToggleAll/016 PrevMonth；015 见 blockers）。auto-lang 组：av plan105 13/13、core plan105 26/26、census 4/4、980 40、979 57、104 3、1072 19、state_face 8、av-core 134（layout 一红为 master 预存，stash 对照在案）。
 
