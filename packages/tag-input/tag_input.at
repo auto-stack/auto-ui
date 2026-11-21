@@ -1,0 +1,588 @@
+// tag_input.at — TagInput 受控标签输入（PLAN-097）。
+//
+// 合同要点（与 docs/plans/097-tag-input.md §5 一致）：
+// * 调用方持有 tags/contextId/revision/suggestions/maxTags 与业务确认
+//   （response）。组件持有局部草稿、候选、选中与防重复请求状态。
+// * 每次合法手势最多一条 changed(str)：{instanceToken, seq, contextId,
+//   baseRevision, action: add|remove, tag, tags:[完整候选数组]}。
+// * response 必须完整身份匹配（instanceToken+seq+contextId）才生效；
+//   accepted 还要求当前 props tags 等于本次候选数组且 revision 已上升，
+//   否则视为 invalid_feedback（显示诊断、保持外部值、不二次写）。
+// * 具名配置错误（maxTags<0、tags 含空/重复）经 error(str) 恰好一次通知，
+//   由正常 Tick 派发（native 子组件 Init 内 emit 不派发，见 pagination/
+//   numeric-fields 既有记录），并阻止相关修改。
+// * readOnly 允许查看，禁止增删；disabled 禁用全部修改；pending 保留
+//   已接受 chips 与计数，输入/增删/候选提交均禁用，不乐观删除。
+// * 标签按实际规范文本作稳定 chip 身份（去重保证唯一），删除按钮按
+//   文本寻址，不按重排索引。
+
+use auto.json
+use tag_text: tag_trim, ascii_lower, tag_contains
+
+widget TagInput (tags: List = [], contextId: str = "", revision: int = 0, suggestions: List = [], maxTags: int = 0, disabled: bool = false, readOnly: bool = false, label: str = "", placeholder: str = "", errorMessage: str = "", response: str = "") {
+    msg { Tick, Edit(str), Commit, Pick(str), Remove(str), Move(str), Dismiss, BackspaceDelete, "changed"(str), "error"(str) }
+
+    model {
+        var interval int = 50
+        var instance_token str = ""
+        var seq int = 0
+        var target str = ""
+        var base_revision int = 0
+        var base_tags List = []
+        var draft str = ""
+        var phase str = "idle"
+        var pending_action str = ""
+        var pending_tag str = ""
+        var last_tags List = []
+        var confirm_seen bool = false
+        var seen_response str = ""
+        var rejection str = ""
+        var feedback_err str = ""
+        var input_err str = ""
+        var config_code str = ""
+        var config_message str = ""
+        var seen_config str = ""
+        var candidates List = []
+        var has_candidates bool = false
+        var candidates_hidden bool = false
+        var active_tag str = ""
+        var count int = 0
+        var over_limit bool = false
+        var prev_draft str = ""
+    }
+
+    computed {
+        candidates_visible => .draft != "" && !.candidates_hidden && .has_candidates
+        input_disabled => .phase == "pending" || .disabled || .readOnly || .config_code != ""
+        add_disabled => .phase == "pending" || .disabled || .readOnly || .config_code != ""
+        remove_disabled => .phase == "pending" || .disabled || .readOnly || .config_code != ""
+        field_caption => if .label == "" { "标签" } else { .label }
+        field_placeholder => if .placeholder == "" { "添加标签" } else { .placeholder }
+        count_label => if .maxTags > 0 { "" + .count + "/" + .maxTags } else { "" + .count }
+    }
+
+    view {
+        col (style: "w-full gap-1.5") {
+            if .label != "" {
+                text .label { style: "text-sm font-medium" }
+            }
+            if .config_code != "" {
+                text .config_message { style: "text-xs font-medium text-destructive" }
+            }
+            row (style: "flex-wrap items-center gap-1.5") {
+                for t in .tags key: t {
+                    row (style: "h-6 items-center gap-1 rounded-full bg-primary/10 pl-2 pr-1") {
+                        text t { style: "text-xs text-primary font-medium" }
+                        button (icon: "x", title: f"删除标签 ${t}", onclick: .Remove(t), disabled: .remove_disabled, style: "h-4 w-4 shrink-0 rounded-full bg-transparent p-0 hover:bg-destructive/10") {}
+                    }
+                }
+                if .phase == "pending" {
+                    text "保存中…" { style: "text-xs text-muted-foreground" }
+                } else if .count == 0 {
+                    text "暂无标签" { style: "text-xs text-muted-foreground" }
+                }
+            }
+            row (style: "items-center gap-1.5") {
+                input (value: .draft, placeholder: .field_placeholder, label: .field_caption, validationMessage: .input_err,
+                    oninput: .Edit, onenter: .Commit,
+                    onkeydown.up.prevent: .Move("up"), onkeydown.down.prevent: .Move("down"),
+                    onkeydown.escape.prevent: .Dismiss, onkeydown.backspace.prevent: .BackspaceDelete,
+                    disabled: .input_disabled, style: "h-8 min-w-0 flex-1 rounded-md bg-muted/40 px-2 text-sm") {}
+                button (icon: "plus", title: "添加标签", onclick: .Commit, disabled: .add_disabled, style: "h-8 w-8 shrink-0 rounded-md bg-primary text-primary-foreground hover:bg-primary/90") {}
+            }
+            if .candidates_visible {
+                col (style: "rounded-md border border-border bg-card p-1 gap-0.5") {
+                    for c in .candidates key: c {
+                        button (text: c, onclick: .Pick(c), disabled: .input_disabled,
+                            style: if c == .active_tag { "h-8 w-full justify-start rounded-md bg-accent px-2 text-sm" } else { "h-8 w-full justify-start rounded-md bg-transparent px-2 text-sm hover:bg-muted" }) {}
+                    }
+                }
+            }
+            row (style: "items-center justify-between gap-2") {
+                text .count_label { style: "text-xs text-muted-foreground" }
+                if .over_limit {
+                    text "标签数量超过上限，删除后恢复" { style: "text-xs text-destructive" }
+                }
+            }
+
+
+            if .input_err != "" {
+                text .input_err { style: "text-xs text-destructive" }
+            }
+            if .rejection != "" {
+                text .rejection { style: "text-xs text-destructive" }
+            }
+            if .feedback_err != "" {
+                text .feedback_err { style: "text-xs text-destructive" }
+            }
+            if .errorMessage != "" {
+                text .errorMessage { style: "text-xs text-destructive" }
+            }
+        }
+    }
+
+    on {
+        // ── 定时器：实例身份、配置校验、响应确认、候选与目标绑定 ──────
+        .Tick -> {
+            if .instance_token == "" {
+                .instance_token = str.uuid()
+            }
+            var tag_n int = 0
+            for tx in .tags { tag_n = tag_n + 1 }
+            .count = tag_n
+            var draft_changed bool = .draft != .prev_draft
+            .prev_draft = .draft
+            if draft_changed && .draft != "" {
+                .candidates_hidden = false
+            }
+
+            // 具名配置错误：maxTags<0、tags 含空值/重复。恰好一次通知，
+            // 只在配置签名变化时派发；修正后不再派发。
+            var code str = ""
+            var message str = ""
+            if .maxTags < 0 {
+                code = "invalid-max-tags"
+                message = "maxTags 不能为负"
+            } else {
+                var bad bool = false
+                var i int = 0
+                for t in .tags {
+                    if t == "" {
+                        bad = true
+                    }
+                    var j int = 0
+                    for u in .tags {
+                        if j < i && u == t {
+                            bad = true
+                        }
+                        j = j + 1
+                    }
+                    i = i + 1
+                }
+                if bad {
+                    code = "invalid-tags"
+                    message = "tags 含空值或重复"
+                }
+            }
+            if code != .config_code || message != .config_message {
+                .config_code = code
+                .config_message = message
+                if code != "" && (code + "|" + message + "|" + .maxTags) != .seen_config {
+                    ."error"(json.stringify({code: code, message: message}))
+                }
+            }
+            .seen_config = code + "|" + message + "|" + .maxTags
+
+            var dc int = 0
+            for dx in .tags { dc = dc + 1 }
+            var sc int = 0
+            for sx in .suggestions { sc = sc + 1 }
+            // 响应处理：先核对完整身份，再判断 accepted 快照是否与当前
+            // props 同快照发布。
+            if .response != "" && .response != .seen_response {
+                .seen_response = .response
+                try {
+                    let fb = json.parse(.response)
+                    if fb.instanceToken == .instance_token && fb.contextId == .target && fb.seq == .seq {
+                        if fb.status == "accepted" && .phase == "pending" {
+                            var arr_match bool = true
+                            var base_same bool = true
+                            var l1 int = 0
+                            var l2 int = 0
+                            var l3 int = 0
+                            for x in .tags { l1 = l1 + 1 }
+                            for y in .last_tags { l2 = l2 + 1 }
+                            for z in .base_tags { l3 = l3 + 1 }
+                            if l1 != l2 { arr_match = false }
+                            if l1 != l3 { base_same = false }
+                            var f_a bool = false
+                            for x in .tags {
+                                f_a = false
+                                for y in .last_tags {
+                                    if y == x { f_a = true }
+                                }
+                                if f_a == false { arr_match = false }
+                            }
+                            var f_b bool = false
+                            for x in .tags {
+                                f_b = false
+                                for z in .base_tags {
+                                    if z == x { f_b = true }
+                                }
+                                if f_b == false { base_same = false }
+                            }
+                            if arr_match && .revision > .base_revision {
+                                // 同快照确认：应用已把 tags/revision 推进到本次候选数组。
+                                .phase = "idle"
+                                .draft = ""
+                                .input_err = ""
+                                .rejection = ""
+                                .feedback_err = ""
+                                .confirm_seen = false
+                                .base_revision = .revision
+                                .base_tags = .tags
+                                .pending_action = ""
+                                .pending_tag = ""
+                                .active_tag = ""
+                                .candidates_hidden = true
+                            } else if base_same && .revision == .base_revision {
+                                // 应用尚未重发 props；保持 pending，等待同快照推进。
+                                .confirm_seen = true
+                            } else {
+                                // accepted 与当前 tags 不符：invalid_feedback，
+                                // 保持外部值，不二次写。
+                                .phase = "idle"
+                                .confirm_seen = false
+                                .feedback_err = "确认与当前标签不一致"
+                            }
+                        } else if fb.status == "rejected" && .phase == "pending" {
+                            var base_same bool = true
+                            var n1 int = 0
+                            var n2 int = 0
+                            for x in .tags { n1 = n1 + 1 }
+                            for z in .base_tags { n2 = n2 + 1 }
+                            if n1 != n2 {
+                                base_same = false
+                            } else {
+                                var f_r bool = false
+                                for x in .tags {
+                                    f_r = false
+                                    for z in .base_tags {
+                                        if z == x { f_r = true }
+                                    }
+                                    if f_r == false { base_same = false }
+                                }
+                            }
+                            if base_same && .revision == .base_revision && .target == .contextId {
+                                .phase = "idle"
+                                .confirm_seen = false
+                                .rejection = fb.message
+                            }
+                        }
+                    }
+                } catch {
+                    // 畸形响应不结算当前请求。
+                }
+            }
+
+            // 目标/修订/标签变化：外部替换、迟到反馈或同快照推进的检测。
+            var same_target bool = .target == .contextId
+            var same_rev bool = .revision == .base_revision
+            var same_tags bool = true
+            var m1 int = 0
+            var m2 int = 0
+            for x in .tags { m1 = m1 + 1 }
+            for z in .base_tags { m2 = m2 + 1 }
+            if m1 != m2 {
+                same_tags = false
+            } else {
+                var f_s bool = false
+                for x in .tags {
+                    f_s = false
+                    for z in .base_tags {
+                        if z == x { f_s = true }
+                    }
+                    if f_s == false { same_tags = false }
+                }
+            }
+            if !same_target || !same_rev || !same_tags {
+                var confirmed bool = false
+                if .phase == "pending" && .confirm_seen {
+                    var last_match bool = true
+                    var p1 int = 0
+                    var p2 int = 0
+                    for x in .tags { p1 = p1 + 1 }
+                    for y in .last_tags { p2 = p2 + 1 }
+                    if p1 != p2 {
+                        last_match = false
+                    } else {
+                        var f_l bool = false
+                        for x in .tags {
+                            f_l = false
+                            for y in .last_tags {
+                                if y == x { f_l = true }
+                            }
+                            if f_l == false { last_match = false }
+                        }
+                    }
+                    if last_match && .revision > .base_revision {
+                        confirmed = true
+                    }
+                }
+                if confirmed {
+                    .phase = "idle"
+                    .draft = ""
+                    .input_err = ""
+                    .rejection = ""
+                    .feedback_err = ""
+                    .confirm_seen = false
+                } else {
+                    // 非本次确认的目标/修订/标签变化：中止旧请求；目标或
+                    // 修订变化也中止草稿，标签内容变化保留草稿。
+                    if .phase == "pending" {
+                        .phase = "idle"
+                        .confirm_seen = false
+                    }
+                    if !same_target || !same_rev {
+                        .draft = ""
+                    }
+                }
+                .target = .contextId
+                .base_revision = .revision
+                .base_tags = .tags
+                .seen_response = .response
+                .rejection = ""
+                .feedback_err = ""
+                .input_err = ""
+                .pending_action = ""
+                .pending_tag = ""
+                .active_tag = ""
+                .candidates_hidden = true
+            }
+
+            // 候选重建：静态 suggestions 去重、排除已接受标签、ASCII
+            // 小写子串查询、保留提供顺序。
+            var cand List = []
+            var skip bool = false
+            for s in .suggestions {
+                skip = false
+                if s == "" { skip = true }
+                for t in .tags {
+                    if t == s { skip = true }
+                }
+                if skip == false && tag_contains(s, .draft) {
+                    cand.push(s)
+                }
+            }
+            .candidates = cand
+            var hc bool = false
+            for c in .candidates {
+                hc = true
+            }
+            .has_candidates = hc
+
+            // 候选重建后校正活动项。
+            if .candidates.len() > 0 {
+                var found bool = false
+                for c in .candidates {
+                    if c == .active_tag { found = true }
+                }
+                if found == false {
+                    var first str = ""
+                    var got_first bool = false
+                    for c in .candidates {
+                        if got_first == false {
+                            first = c
+                            got_first = true
+                        }
+                    }
+                    .active_tag = first
+                }
+            } else {
+                .active_tag = ""
+            }
+
+            // 超上限提示（运行态，不是配置错误）：保留删除，阻止新增。
+            .over_limit = .maxTags > 0 && .count > .maxTags
+        }
+
+        // ── 输入：更新草稿并展开候选 ───────────────────────────────
+        .Edit(v) -> {
+            if .phase != "pending" && !.disabled && !.readOnly && .config_code == "" {
+                if v != .draft {
+                    .draft = v
+                    .candidates_hidden = false
+                    .input_err = ""
+                    .rejection = ""
+                    .feedback_err = ""
+                }
+            }
+        }
+
+        // ── Enter/添加按钮：活动候选优先，否则当前草稿 ───────────────
+        .Commit -> {
+            if .phase == "pending" || .disabled || .readOnly || .config_code != "" { return }
+            var t str = ""
+            if .candidates_visible && .active_tag != "" {
+                t = .active_tag
+            } else {
+                t = .draft
+            }
+            let clean str = tag_trim(t)
+            if clean == "" {
+                .input_err = "标签不能为空"
+                return
+            }
+            var cur_count int = 0
+            for tg in .tags { cur_count = cur_count + 1 }
+            if .maxTags > 0 && cur_count >= .maxTags {
+                .input_err = "已达标签上限"
+                return
+            }
+            var dup bool = false
+            for tg in .tags {
+                if tg == clean { dup = true }
+            }
+            if dup {
+                .input_err = "标签已存在"
+                return
+            }
+            var arr List = []
+            for tg in .tags {
+                arr.push(tg)
+            }
+            arr.push(clean)
+            .phase = "pending"
+            .pending_action = "add"
+            .pending_tag = clean
+            .confirm_seen = false
+            .seq = .seq + 1
+            .last_tags = arr
+            .input_err = ""
+            .rejection = ""
+            .feedback_err = ""
+            .candidates_hidden = true
+            ."changed"(json.stringify({
+                instanceToken: .instance_token, seq: .seq, contextId: .target,
+                baseRevision: .base_revision, action: "add", tag: clean, tags: arr
+            }))
+        }
+
+        // ── 候选点击：与 Enter 同一添加规则 ─────────────────────────
+        .Pick(c) -> {
+            if .phase == "pending" || .disabled || .readOnly || .config_code != "" { return }
+            let clean str = tag_trim(c)
+            if clean == "" { return }
+            var cur_count int = 0
+            for tg in .tags { cur_count = cur_count + 1 }
+            if .maxTags > 0 && cur_count >= .maxTags {
+                .input_err = "已达标签上限"
+                return
+            }
+            var dup bool = false
+            for tg in .tags {
+                if tg == clean { dup = true }
+            }
+            if dup {
+                .input_err = "标签已存在"
+                return
+            }
+            var arr List = []
+            for tg in .tags {
+                arr.push(tg)
+            }
+            arr.push(clean)
+            .phase = "pending"
+            .pending_action = "add"
+            .pending_tag = clean
+            .confirm_seen = false
+            .seq = .seq + 1
+            .last_tags = arr
+            .input_err = ""
+            .rejection = ""
+            .feedback_err = ""
+            .candidates_hidden = true
+            ."changed"(json.stringify({
+                instanceToken: .instance_token, seq: .seq, contextId: .target,
+                baseRevision: .base_revision, action: "add", tag: clean, tags: arr
+            }))
+        }
+
+        // ── chip 删除：按文本寻址，拒绝保留标签 ─────────────────────
+        .Remove(t) -> {
+            if .phase == "pending" || .disabled || .readOnly || .config_code != "" { return }
+            var exists bool = false
+            for tg in .tags {
+                if tg == t { exists = true }
+            }
+            if exists == false { return }
+            var arr List = []
+            for tg in .tags {
+                if tg != t {
+                    arr.push(tg)
+                }
+            }
+            .phase = "pending"
+            .pending_action = "remove"
+            .pending_tag = t
+            .confirm_seen = false
+            .seq = .seq + 1
+            .last_tags = arr
+            .input_err = ""
+            .rejection = ""
+            .feedback_err = ""
+            .candidates_hidden = true
+            ."changed"(json.stringify({
+                instanceToken: .instance_token, seq: .seq, contextId: .target,
+                baseRevision: .base_revision, action: "remove", tag: t, tags: arr
+            }))
+        }
+
+        // ── Up/Down：移动活动候选，不提交 ──────────────────────────
+        .Move(dir) -> {
+            if .phase == "pending" || .disabled || .readOnly { return }
+            if .candidates.len() == 0 { return }
+            var found int = -1
+            var cur int = 0
+            for c in .candidates {
+                if c == .active_tag { found = cur }
+                cur = cur + 1
+            }
+            if found == -1 { found = 0 }
+            var idx int = found
+            if dir == "down" {
+                idx = found + 1
+                if idx >= .candidates.len() { idx = .candidates.len() - 1 }
+            } else if dir == "up" {
+                idx = found - 1
+                if idx < 0 { idx = 0 }
+            }
+            var i int = 0
+            for c in .candidates {
+                if i == idx { .active_tag = c }
+                i = i + 1
+            }
+        }
+
+        // ── Escape：只收起候选，不清空草稿 ──────────────────────────
+        .Dismiss -> {
+            .candidates_hidden = true
+        }
+
+        // ── 空草稿 Backspace：一次移除最后标签（长按重复受请求锁保护）─
+        .BackspaceDelete -> {
+            if .phase == "pending" || .disabled || .readOnly || .config_code != "" { return }
+            if .draft != "" { return }
+            var cur_count int = 0
+            for tg in .tags { cur_count = cur_count + 1 }
+            if cur_count == 0 { return }
+            var last str = ""
+            var got bool = false
+            for tg in .tags {
+                last = tg
+                got = true
+            }
+            if got == false { return }
+            var arr List = []
+            for tg in .tags {
+                if tg != last {
+                    arr.push(tg)
+                }
+            }
+            .phase = "pending"
+            .pending_action = "remove"
+            .pending_tag = last
+            .confirm_seen = false
+            .seq = .seq + 1
+            .last_tags = arr
+            .input_err = ""
+            .rejection = ""
+            .feedback_err = ""
+            .candidates_hidden = true
+            ."changed"(json.stringify({
+                instanceToken: .instance_token, seq: .seq, contextId: .target,
+                baseRevision: .base_revision, action: "remove", tag: last, tags: arr
+            }))
+        }
+    }
+}

@@ -1,0 +1,14 @@
+name: "tag-input-demo"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "TagInput 标签输入"
+window: "420x560"
+
+dep tag_input {
+    path: "../../packages/tag-input"
+}
+
+dep themes {
+    path: "../../packages/themes"
+}

@@ -1,0 +1,64 @@
+// tag_text.at — TagInput 文本工具（PLAN-097）。
+//
+// tag_trim：只裁剪首尾空格/Tab/CR/LF（与 prompt-dialog 的 prompt_trim
+// 同合同），其他字符原文保留。
+// ascii_lower：仅 ASCII A-Z 小写化（候选查询按 ASCII 小写子串匹配，
+// 其他 Unicode 原文匹配，不做 Unicode 归一化）。
+// tag_contains：ASCII 小写化后的子串包含判定，供候选查询使用。
+
+pub fn tag_trim(text str) str {
+    var start int = 0
+    var end int = text.len()
+    while start < end {
+        let ch str = text.substr(start, 1)
+        if ch != " " && ch != "\t" && ch != "\r" && ch != "\n" { break }
+        start = start + 1
+    }
+    while end > start {
+        let ch str = text.substr(end - 1, 1)
+        if ch != " " && ch != "\t" && ch != "\r" && ch != "\n" { break }
+        end = end - 1
+    }
+    return text.substr(start, end - start)
+}
+
+pub fn ascii_lower(s str) str {
+    var out str = ""
+    var i int = 0
+    while i < s.len() {
+        let ch str = s.substr(i, 1)
+        if ch == "A" { out = out + "a" }
+        else if ch == "B" { out = out + "b" }
+        else if ch == "C" { out = out + "c" }
+        else if ch == "D" { out = out + "d" }
+        else if ch == "E" { out = out + "e" }
+        else if ch == "F" { out = out + "f" }
+        else if ch == "G" { out = out + "g" }
+        else if ch == "H" { out = out + "h" }
+        else if ch == "I" { out = out + "i" }
+        else if ch == "J" { out = out + "j" }
+        else if ch == "K" { out = out + "k" }
+        else if ch == "L" { out = out + "l" }
+        else if ch == "M" { out = out + "m" }
+        else if ch == "N" { out = out + "n" }
+        else if ch == "O" { out = out + "o" }
+        else if ch == "P" { out = out + "p" }
+        else if ch == "Q" { out = out + "q" }
+        else if ch == "R" { out = out + "r" }
+        else if ch == "S" { out = out + "s" }
+        else if ch == "T" { out = out + "t" }
+        else if ch == "U" { out = out + "u" }
+        else if ch == "V" { out = out + "v" }
+        else if ch == "W" { out = out + "w" }
+        else if ch == "X" { out = out + "x" }
+        else if ch == "Y" { out = out + "y" }
+        else if ch == "Z" { out = out + "z" }
+        else { out = out + ch }
+        i = i + 1
+    }
+    return out
+}
+
+pub fn tag_contains(text str, query str) bool {
+    return ascii_lower(text).contains(ascii_lower(query))
+}

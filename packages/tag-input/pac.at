@@ -1,0 +1,5 @@
+name: "tag_input"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "TagInput"

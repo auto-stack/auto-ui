@@ -1,0 +1,4 @@
+name: "tag-input"
+version: "0.1.0"
+namespace: "auto"
+description: "AutoUI controlled tag input component (PLAN-097)"

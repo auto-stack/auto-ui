@@ -1,0 +1,240 @@
+// app.at — examples/tag-input 普通设置消费者（PLAN-097 T-04）。
+//
+// 三个实例覆盖合同主路径：
+// * demo-a：普通接受流（suggestions=[Design,Development,Work]、maxTags=5、
+//   初值 [Reading, Work]），另有只读/禁用切换与外部错误提示。
+// * demo-b：上限演示（maxTags=2、初值 [Reading, Work]）——达上限阻止新增、
+//   仍可删除；业务拒绝标签 Design。
+// * demo-c：配置错误演示——按钮把 tags 换成重复值触发 error(str)，
+//   再恢复证明修正后正常可用。
+//
+// 应用持有业务数据与确认（response），组件持有草稿/候选/请求锁。
+// 接受后应用把 payload 的 tags 数组写回并递增 revision，同快照发布
+// accepted，组件据此结算请求。
+
+use auto.json
+use themes.themes: Auto
+
+widget App {
+    use { package: tag_input from "../../../../packages/tag-input" }
+
+    msg { Init, ToggleTheme, Exit, RequestA(str), RequestB(str), SetDupC, FixC, ToggleReadOnlyA, ToggleDisabledA, ShowErrA, ClearErrA, ResetA, ResetB, ResetC }
+
+    model {
+        var dark_mode bool = false
+        var theme_name str = "Auto"
+        var runtime_track str = ""
+
+        // 实例 A：普通接受流
+        var tags_a List = ["Reading", "Work"]
+        var revision_a int = 0
+        var reply_a str = ""
+        var status_a str = ""
+        var read_only_a bool = false
+        var disabled_a bool = false
+        var external_err_a str = ""
+
+        // 实例 B：上限 + 业务拒绝
+        var tags_b List = ["Reading", "Work"]
+        var revision_b int = 0
+        var reply_b str = ""
+        var status_b str = ""
+
+        // 实例 C：配置错误演示
+        var tags_c List = ["Reading"]
+        var revision_c int = 0
+        var reply_c str = ""
+        var status_c str = ""
+    }
+
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
+    }
+
+    view {
+        col (style: "w-full h-full gap-3 p-4 bg-background text-foreground overflow-y-auto") {
+            row (style: "items-center justify-between gap-2") {
+                text "TagInput 标签输入" { style: "text-lg font-semibold" }
+                button "切换明暗" { onclick: .ToggleTheme }
+            }
+
+            col (style: "rounded-md border border-border p-3 gap-2") {
+                text "实例 A（接受流，maxTags=5）" { style: "text-sm font-semibold" }
+                TagInput (tags: .tags_a, contextId: "demo-a", revision: .revision_a,
+                    suggestions: ["Design", "Development", "Work"], maxTags: 5,
+                    label: "标签", placeholder: "A 标签：回车添加",
+                    disabled: .disabled_a, readOnly: .read_only_a, errorMessage: .external_err_a,
+                    response: .reply_a, onchanged: .RequestA, onerror: .SinkA) {}
+                if .status_a != "" {
+                    text .status_a { style: "text-xs text-muted-foreground" }
+                }
+                row (style: "items-center gap-2") {
+                    button "重置 A" { onclick: .ResetA }
+                    button "只读切换" { onclick: .ToggleReadOnlyA }
+                    button "禁用切换" { onclick: .ToggleDisabledA }
+                    button "外部错误" { onclick: .ShowErrA }
+                    button "清除错误" { onclick: .ClearErrA }
+                }
+            }
+
+            col (style: "rounded-md border border-border p-3 gap-2") {
+                text "实例 B（上限 maxTags=2 + 业务拒绝 Design）" { style: "text-sm font-semibold" }
+                TagInput (tags: .tags_b, contextId: "demo-b", revision: .revision_b,
+                    suggestions: ["Design", "Development", "Work"], maxTags: 2,
+                    label: "标签", placeholder: "B 标签：回车添加",
+                    response: .reply_b, onchanged: .RequestB, onerror: .SinkB) {}
+                if .status_b != "" {
+                    text .status_b { style: "text-xs text-muted-foreground" }
+                }
+                row (style: "items-center gap-2") {
+                    button "重置 B" { onclick: .ResetB }
+                }
+            }
+
+            col (style: "rounded-md border border-border p-3 gap-2") {
+                text "实例 C（配置错误演示）" { style: "text-sm font-semibold" }
+                TagInput (tags: .tags_c, contextId: "demo-c", revision: .revision_c,
+                    suggestions: ["Design", "Development", "Work"], maxTags: 5,
+                    label: "标签", placeholder: "C 标签：回车添加",
+                    response: .reply_c, onchanged: .RequestC, onerror: .SinkC) {}
+                if .status_c != "" {
+                    text .status_c { style: "text-xs text-muted-foreground" }
+                }
+                row (style: "items-center gap-2") {
+                    button "传入重复标签" { onclick: .SetDupC }
+                    button "恢复" { onclick: .FixC }
+                    button "重置 C" { onclick: .ResetC }
+                }
+            }
+
+            if .runtime_track == "vm" { button "退出示例" { onclick: .Exit } }
+        }
+    }
+
+    on {
+        .Init -> { .runtime_track = Env.track() }
+        .ToggleTheme -> { .dark_mode = !.dark_mode }
+        .SinkA(payload) -> { }
+        .SinkB(payload) -> { }
+        .SinkC(payload) -> { }
+        .Exit -> { if .runtime_track == "vm" { Process.exit(0) } }
+
+        // ── 实例 A：接受（应用把 payload tags 数组写回并递增 revision）──
+        .RequestA(payload) -> {
+            let req = json.parse(payload)
+            if req.contextId == "demo-a" && req.baseRevision == .revision_a {
+                var arr List = []
+                if req.action == "add" {
+                    for t in .tags_a { arr.push(t) }
+                    arr.push(req["tag"])
+                } else {
+                    for t in .tags_a {
+                        if t != req["tag"] { arr.push(t) }
+                    }
+                }
+                .tags_a = arr
+                .revision_a = .revision_a + 1
+                .reply_a = json.stringify({
+                    instanceToken: req.instanceToken, seq: req.seq, contextId: req.contextId,
+                    status: "accepted", message: ""
+                })
+                .status_a = if req.action == "add" { "已添加：" + req["tag"] } else { "已移除：" + req["tag"] }
+            }
+        }
+
+        // ── 实例 B：上限由组件执行；应用业务拒绝 Design ──────────────
+        .RequestB(payload) -> {
+            let req = json.parse(payload)
+            if req.contextId == "demo-b" && req.baseRevision == .revision_b {
+                if req.action == "add" && req["tag"] == "Design" {
+                    .reply_b = json.stringify({
+                        instanceToken: req.instanceToken, seq: req.seq, contextId: req.contextId,
+                        status: "rejected", message: "Design 不允许添加"
+                    })
+                    .status_b = "已拒绝：" + req["tag"]
+                } else {
+                    var arr List = []
+                    if req.action == "add" {
+                        for t in .tags_b { arr.push(t) }
+                        arr.push(req["tag"])
+                    } else {
+                        for t in .tags_b {
+                            if t != req["tag"] { arr.push(t) }
+                        }
+                    }
+                    .tags_b = arr
+                    .revision_b = .revision_b + 1
+                    .reply_b = json.stringify({
+                        instanceToken: req.instanceToken, seq: req.seq, contextId: req.contextId,
+                        status: "accepted", message: ""
+                    })
+                    .status_b = if req.action == "add" { "已添加：" + req["tag"] } else { "已移除：" + req["tag"] }
+                }
+            }
+        }
+
+        .RequestC(payload) -> {
+            let req = json.parse(payload)
+            if req.contextId == "demo-c" && req.baseRevision == .revision_c {
+                var arr List = []
+                if req.action == "add" {
+                    for t in .tags_c { arr.push(t) }
+                    arr.push(req["tag"])
+                } else {
+                    for t in .tags_c {
+                        if t != req["tag"] { arr.push(t) }
+                    }
+                }
+                .tags_c = arr
+                .revision_c = .revision_c + 1
+                .reply_c = json.stringify({
+                    instanceToken: req.instanceToken, seq: req.seq, contextId: req.contextId,
+                    status: "accepted", message: ""
+                })
+                .status_c = if req.action == "add" { "已添加：" + req["tag"] } else { "已移除：" + req["tag"] }
+            }
+        }
+
+        .ResetA -> {
+            var ra List = ["Reading", "Work"]
+            .tags_a = ra
+            .revision_a = .revision_a + 1
+            .reply_a = ""
+            .status_a = "已重置"
+            .read_only_a = false
+            .disabled_a = false
+            .external_err_a = ""
+        }
+        .ResetB -> {
+            var rb List = ["Reading", "Work"]
+            .tags_b = rb
+            .revision_b = .revision_b + 1
+            .reply_b = ""
+            .status_b = "已重置"
+        }
+        .ResetC -> {
+            var rc List = ["Reading"]
+            .tags_c = rc
+            .revision_c = .revision_c + 1
+            .reply_c = ""
+            .status_c = "已重置"
+        }
+        .ToggleReadOnlyA -> { .read_only_a = !.read_only_a }
+        .ToggleDisabledA -> { .disabled_a = !.disabled_a }
+        .ShowErrA -> { .external_err_a = "外部错误示例：保存失败" }
+        .ClearErrA -> { .external_err_a = "" }
+        .SetDupC -> {
+            var dup List = ["Reading", "Reading"]
+            .tags_c = dup
+            .revision_c = .revision_c + 1
+            .status_c = "已传入重复 tags（应出现配置错误）"
+        }
+        .FixC -> {
+            var ok List = ["Reading"]
+            .tags_c = ok
+            .revision_c = .revision_c + 1
+            .status_c = "已恢复为合法 tags"
+        }
+    }
+}
