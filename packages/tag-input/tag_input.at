@@ -332,7 +332,6 @@ widget TagInput (tags: List = [], contextId: str = "", revision: int = 0, sugges
                 .base_tags = .tags
                 .seen_response = .response
                 .rejection = ""
-                .feedback_err = ""
                 .input_err = ""
                 .pending_action = ""
                 .pending_tag = ""
@@ -553,21 +552,21 @@ widget TagInput (tags: List = [], contextId: str = "", revision: int = 0, sugges
         }
 
         // ── 空草稿 Backspace：一次移除最后标签（长按重复受请求锁保护）─
+        // 计数与末位标签取自 Tick 维护的镜像（handler 内直读 List prop 存在
+        // 交付时序抖动，见 decisions.md）。
         .BackspaceDelete -> {
             if .phase == "pending" || .disabled || .readOnly || .config_code != "" { return }
             if .draft != "" { return }
-            var cur_count int = 0
-            for tg in .tags { cur_count = cur_count + 1 }
-            if cur_count == 0 { return }
+            if .count == 0 { return }
             var last str = ""
             var got bool = false
-            for tg in .tags {
+            for tg in .base_tags {
                 last = tg
                 got = true
             }
             if got == false { return }
             var arr List = []
-            for tg in .tags {
+            for tg in .base_tags {
                 if tg != last {
                     arr.push(tg)
                 }

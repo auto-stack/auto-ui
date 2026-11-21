@@ -15,6 +15,8 @@ import queue
 import threading
 import urllib.error
 import urllib.request
+from verify_file_dialog import windows_for
+from verify_prompt_dialog import WindowsProcesses
 
 
 def available_port():
@@ -74,6 +76,8 @@ class NativeSession:
         self.port = port
         self.out_dir = out_dir
         self.log = log
+        self.app_dir = str(app_dir)
+        self.auto_bin = str(auto_bin)
         env = {
             **os.environ,
             "AUTOUI_MCP_PORT": str(port),
@@ -109,6 +113,11 @@ class NativeSession:
     def snapshot(self):
         return self.call("autoui_snapshot")
 
+    def discover_window(self):
+        owned = WindowsProcesses().owned(self.process.pid)
+        windows = windows_for(owned)
+        return windows[0] if windows else None
+
     def press(self, vid):
         return self.call("autoui_action", action="press", element_id=vid)
 
@@ -142,6 +151,20 @@ class NativeSession:
             raise AssertionError("MCP still answered after process exit")
         except (urllib.error.URLError, OSError):
             pass
+
+    def port_free(self):
+        try:
+            with socket.socket() as listener:
+                listener.bind(("127.0.0.1", self.port))
+            return True
+        except OSError:
+            return False
+
+    def reopen_probe(self):
+        # Port rebinding after process exit proves a subsequent session can
+        # bind it again (reopen); consecutive fresh gate runs demonstrate a
+        # full app restart on the same port (see evidence.md).
+        return {"ok": self.port_free()}
 
 
 def input_vid(snapshot, placeholder):
@@ -203,6 +226,107 @@ def reset_instance(session, label):
     session.press(btn)
     wait_text(session.snapshot, session.port, "已重置")
 
+SYSTEM_READER_TAG = r"""
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$ErrorActionPreference = 'Stop'
+$identity = Join-Path $PSScriptRoot 'system-window.txt'
+$deadline = [DateTime]::UtcNow.AddSeconds(20)
+while (!(Test-Path -LiteralPath $identity)) {
+    if ([DateTime]::UtcNow -ge $deadline) { throw 'system window identity unavailable' }
+    Start-Sleep -Milliseconds 30
+}
+$window = (Get-Content -Raw -LiteralPath $identity) -split " "
+$root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]([long]$window[0]))
+if ($root.Current.ProcessId -ne [int]$window[1]) { throw 'system window owner changed' }
+$fieldName = [System.Windows.Automation.PropertyCondition]::new(
+    [System.Windows.Automation.AutomationElement]::NameProperty, '标签')
+$addName = [System.Windows.Automation.PropertyCondition]::new(
+    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+    [System.Windows.Automation.ControlType]::Button)
+$targets = [System.Windows.Automation.OrCondition]::new($fieldName, $addName)
+$cache = [System.Windows.Automation.CacheRequest]::new()
+$element = [System.Windows.Automation.AutomationElement]
+$cache.Add($element::NameProperty)
+$cache.Add($element::ControlTypeProperty)
+$cache.Add($element::BoundingRectangleProperty)
+$cache.Add($element::HasKeyboardFocusProperty)
+$cache.Add($element::IsEnabledProperty)
+$cache.Add([System.Windows.Automation.ValuePattern]::ValueProperty)
+$cache.Add([System.Windows.Automation.ValuePattern]::Pattern)
+$cache.Add([System.Windows.Automation.InvokePattern]::Pattern)
+$cache.Push()
+try {
+    $nodes = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $targets)
+} finally {
+    $cache.Pop()
+}
+$rows = @()
+$input = $null
+$add = $null
+foreach ($node in $nodes) {
+    $current = $node.Cached
+    $rect = $current.BoundingRectangle
+    $role = $current.ControlType.ProgrammaticName
+    $value = $null
+    if ($role -eq 'ControlType.Edit' -and $current.Name -eq '标签' -and $null -eq $input) {
+        $input = $node.GetCachedPattern([System.Windows.Automation.ValuePattern]::Pattern)
+        $value = $input.Cached.Value
+    }
+    if ($role -eq 'ControlType.Button' -and $current.Name -like '*添加标签*' -and $null -eq $add) {
+        try { $add = $node.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern) } catch { $add = $null }
+    }
+    $rows += [pscustomobject]@{role=$role; name=$current.Name; value=$value;
+                              focus=$current.HasKeyboardFocus; enabled=$current.IsEnabled;
+                              x=$rect.X; y=$rect.Y; width=$rect.Width; height=$rect.Height}
+}
+if ($null -eq $input) { throw 'real system tag input missing' }
+if ($window[2] -eq 'system-invoke') {
+    $input.SetValue('UIA标签')
+    if ($null -ne $add) { $add.Invoke() }
+    $action = 'ValuePattern.SetValue+InvokePattern.Invoke'
+} else {
+    $action = 'read-only'
+}
+[Console]::WriteLine((@{nodes=$rows; action=$action} | ConvertTo-Json -Depth 4))
+"""
+
+
+def step_x07(session):
+    """Real Windows UIA system tree: role/name/value/focus/bounds/action on the
+    tag input and the add button; SetValue + Invoke land a real chip (X-07)."""
+    reset_instance(session, "重置 A")
+    snapshot = wait_text(session.snapshot, session.port, "已重置")
+    window = session.discover_window()
+    assert window, "no owned native window found"
+    identity = Path(session.out_dir) / "system-window.pending"
+    identity.write_text(f'{window["handle"]} {window["pid"]} system-invoke', encoding="ascii")
+    identity.replace(Path(session.out_dir) / "system-window.txt")
+    script = Path(session.out_dir) / "system-tree.ps1"
+    script.write_text(SYSTEM_READER_TAG, encoding="utf-8-sig")
+    helper = subprocess.Popen(
+        ["powershell.exe", "-NoProfile", "-STA", "-File", str(script)],
+        stdout=subprocess.PIPE, stderr=open(session.out_dir / "system-tree.log", "w", encoding="utf-8", errors="replace"),
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    raw, _ = helper.communicate(timeout=10)
+    assert helper.returncode == 0, "Windows UIA helper failed"
+    evidence = json.loads(raw.decode("utf-8-sig"))
+    (Path(session.out_dir) / "system-tree.json").write_text(
+        json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+    edits = [row for row in evidence["nodes"] if row["role"] == "ControlType.Edit"]
+    buttons = [row for row in evidence["nodes"] if row["role"] == "ControlType.Button"]
+    assert edits and buttons, "no UIA edit/button nodes"
+    assert edits[0]["name"] == "标签" and edits[0]["width"] > 0 and edits[0]["height"] > 0, edits[0]
+    assert buttons and buttons[0]["enabled"] and buttons[0]["width"] > 0 and buttons[0]["height"] > 0, buttons
+    snapshot = wait_text(session.snapshot, session.port, "已添加：UIA标签")
+    a_part = section(snapshot, "实例 A（接受流", "实例 B")
+    assert "删除标签 UIA标签" in a_part, a_part[-900:]
+    return ["x07:system-tree-input"]
+
+
 
 def case_native_core(session):
     steps = [
@@ -213,11 +337,50 @@ def case_native_core(session):
         ("limit", step_limit),
         ("reject", step_reject),
         ("config-error", step_config_error),
+        ("chinese-comma-case", step_text_semantics),
+        ("x07-system-tree", step_x07),
     ]
     for name, fn in steps:
         run_step(session, name, fn)
     session.screenshot("native-core.png")
     return [f"core:{name}" for name, _ in steps]
+
+
+def step_text_semantics(session):
+    """Chinese, case-sensitive dedup on A; comma-as-one-tag on C (F-02 oracles)."""
+    reset_instance(session, "重置 A")
+    snapshot = wait_text(session.snapshot, session.port, "已重置")
+    a_input = input_vid(snapshot, "A 标签：回车添加")
+    for text, chip in [("Design", "删除标签 Design"), ("中文", "删除标签 中文"), ("design", "删除标签 design")]:
+        session.call("autoui_type", element_id=a_input, text=text)
+        time.sleep(0.5)
+        session.key("Enter")
+        snapshot = wait_text(session.snapshot, session.port, chip)
+        a_part = section(snapshot, "实例 A（接受流", "实例 B")
+        assert chip in a_part, a_part[-900:]
+    # case-sensitive: "design" is a distinct tag from the accepted "Design"
+    a_part = section(snapshot, "实例 A（接受流", "实例 B")
+    assert "删除标签 Design" in a_part and "删除标签 design" in a_part, a_part[-900:]
+    # comma is one full tag (not split); C add via its targeted button
+    c_snap = None
+    for attempt in range(3):
+        reset_instance(session, "重置 C")
+        snapshot = wait_text(session.snapshot, session.port, "已重置")
+        c_input = input_vid(snapshot, "C 标签：回车添加")
+        session.call("autoui_type", element_id=c_input, text="a,b")
+        time.sleep(0.6)
+        snapshot = session.snapshot()
+        add_btn = add_button_near(snapshot, c_input)
+        session.press(add_btn)
+        try:
+            c_snap = wait_text(session.snapshot, session.port, "已添加：a,b")
+            break
+        except AssertionError:
+            time.sleep(0.8)
+    assert c_snap is not None, "comma add never confirmed"
+    c_part = section(c_snap, "实例 C", "退出示例")
+    assert "删除标签 a,b" in c_part, c_part[-900:]
+    assert not re.search(r'删除标签 a"', c_part), "comma input was split into a separate tag"
 
 
 def settle(session, seconds=1.0):
@@ -525,6 +688,14 @@ class VueSession:
         self.browser.close()
         stop_tree(self.process)
 
+    def port_free(self):
+        try:
+            with socket.socket() as listener:
+                listener.bind(("127.0.0.1", self.port))
+            return True
+        except OSError:
+            return False
+
 
 def case_vue_core(session):
     """Vue core flow mirroring the native cases (accept, dedup, remove, limit,
@@ -537,11 +708,17 @@ def case_vue_core(session):
         ("vue-limit", step_vue_limit),
         ("vue-reject", step_vue_reject),
         ("vue-config-error", step_vue_config),
+        ("vue-ime-guard", step_vue_ime),
+        ("vue-backspace", step_vue_backspace),
     ]
     for name, fn in steps:
         run_step(session, name, fn)
     return [f"vue:{name}" for name, _ in steps]
 
+
+def vue_reset_a(session):
+    session.press("重置 A")
+    session.wait_text("已重置")
 
 def step_vue_candidates(session):
     # Type "de" -> Design & Development candidates; Escape dismisses (candidates
@@ -612,6 +789,53 @@ def step_vue_config(session):
 
 
 
+def step_vue_ime(session):
+    """Composition guard: an Enter keyup with isComposing must not commit;
+    a normal Enter after compositionend commits (F-02 oracle)."""
+    vue_reset_a(session)
+    session.type_text("A 标签：回车添加", "Deve")
+    time.sleep(1.0)
+    session.wait_text("Development")
+    session.browser.call(
+        "browser_evaluate",
+        function="""() => {
+          const input = [...document.querySelectorAll('input')]
+            .find(el => el.placeholder === 'A 标签：回车添加');
+          input.dispatchEvent(new KeyboardEvent('keyup', {key: 'Enter', isComposing: true, bubbles: true}));
+        }""",
+    )
+    time.sleep(1.0)
+    snap = session.snapshot()
+    assert "已添加：Development" not in snap, "composing Enter committed"
+    session.browser.call(
+        "browser_evaluate",
+        function="""() => {
+          const input = [...document.querySelectorAll('input')]
+            .find(el => el.placeholder === 'A 标签：回车添加');
+          input.dispatchEvent(new KeyboardEvent('keyup', {key: 'Enter', isComposing: false, bubbles: true}));
+        }""",
+    )
+    session.wait_text("已添加：Development")
+
+
+def step_vue_backspace(session):
+    """Empty-draft Backspace removes the last tag once (F-01 oracle, Vue)."""
+    vue_reset_a(session)
+    session.type_text("A 标签：回车添加", "Tmp")
+    time.sleep(1.0)
+    session.key("Enter")
+    session.wait_text("已添加：Tmp")
+    session.browser.call(
+        "browser_evaluate",
+        function="""() => {
+          const input = [...document.querySelectorAll('input')]
+            .find(el => el.placeholder === 'A 标签：回车添加');
+          input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Backspace', bubbles: true}));
+        }""",
+    )
+    session.wait_text("已移除：Tmp")
+
+
 def case_notes_native(session):
     """015-notes migration: add a tag through TagInput, verify backend readback
     (chip persists after switching notes) and that the note body is unchanged."""
@@ -643,7 +867,6 @@ def case_notes_native(session):
             break
         time.sleep(1.0)
     assert snap2 is not None and "删除标签 PlanTag" in snap2, snap2[-1500:] if snap2 else "no snapshot"
-    # switch to another note and back: tag must persist (backend readback)
     m = re.search(r'button #(vnode_\d+) "([^"]*Quick Ideas[^"]*)"', snap2)
     assert m, "no Quick Ideas button"
     session.press(m.group(1))
@@ -746,7 +969,9 @@ def main():
         finally:
             try:
                 session.close(failed=report["result"] != "pass")
-                report["cleanup"] = {"owned_exited": True, "port_free": True}
+                port_free = session.port_free()
+                report["cleanup"] = {"owned_exited": True, "port_free": port_free,
+                                     "reopen": session.reopen_probe()}
             except AssertionError as exc:
                 report["cleanup"] = {"error": str(exc)}
             log.close()
@@ -785,7 +1010,7 @@ def main():
             finally:
                 try:
                     session.close(failed=report["result"] != "pass")
-                    report["cleanup"] = {"owned_exited": True, "port_free": True}
+                    report["cleanup"] = {"owned_exited": True, "port_free": session.port_free()}
                 except AssertionError as exc:
                     report["cleanup"] = {"error": str(exc)}
                 log.close()

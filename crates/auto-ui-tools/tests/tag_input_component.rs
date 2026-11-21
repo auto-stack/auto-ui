@@ -355,6 +355,100 @@ widget App {
     assert_eq!(model.bridge().read_instance_state(&b, "seq").unwrap(), Value::Int(0));
 }
 
+
+#[test]
+fn backspace_on_empty_draft_removes_the_last_tag_once() {
+    let mut model = mount_tag_input(consumer_base());
+    tick(&mut model);
+    // empty draft backspace -> remove the last tag (Work) with one request
+    act(&mut model, "BackspaceDelete", &[]);
+    assert_eq!(read(&model, "seq"), Value::Int(1));
+    assert_eq!(read(&model, "phase"), Value::str("pending"));
+    let payload = read_root(&model, "last_changed");
+    let parsed: serde_json::Value = serde_json::from_str(payload.as_str()).unwrap();
+    assert_eq!(parsed["action"], "remove");
+    assert_eq!(parsed["tag"], "Work");
+    assert_eq!(parsed["tags"].as_array().unwrap().len(), 1);
+    // a non-empty draft must not trigger the removal
+    act(&mut model, "Edit", &[Value::str("de")]);
+    act(&mut model, "BackspaceDelete", &[]);
+    assert_eq!(read(&model, "seq"), Value::Int(1));
+}
+
+#[test]
+fn stale_target_aborts_the_pending_request_and_rejects_old_replies() {
+    let mut model = mount_tag_input(consumer_base());
+    tick(&mut model);
+    act(&mut model, "Edit", &[Value::str("Design")]);
+    act(&mut model, "Commit", &[]);
+    assert_eq!(read(&model, "phase"), Value::str("pending"));
+    // the parent switches the target before confirming
+    model.write_state("contextId", Value::str("demo-b")).unwrap();
+    let _ = model.view();
+    tick(&mut model);
+    assert_eq!(read(&model, "phase"), Value::str("idle"));
+    assert_eq!(read(&model, "draft"), Value::str(""));
+    assert_eq!(read(&model, "target"), Value::str("demo-b"));
+    // a late accepted reply for the OLD target must not settle anything
+    let old_token = read(&model, "instance_token");
+    let late = serde_json::json!({
+        "instanceToken": old_token.as_str(), "seq": 1, "contextId": "demo-a",
+        "status": "accepted", "message": "",
+    });
+    model.write_state("response", Value::str(&late.to_string())).unwrap();
+    let _ = model.view();
+    tick(&mut model);
+    assert_eq!(read(&model, "phase"), Value::str("idle"));
+    assert_eq!(read(&model, "seq"), Value::Int(1));
+}
+
+#[test]
+fn accepted_with_mismatched_tags_is_invalid_feedback_and_external_replacement_wins() {
+    let mut model = mount_tag_input(consumer_base());
+    tick(&mut model);
+    act(&mut model, "Edit", &[Value::str("Design")]);
+    act(&mut model, "Commit", &[]);
+    let token = read(&model, "instance_token");
+    // accepted reply, but the parent advanced tags to something else
+    let mismatch = serde_json::json!({
+        "instanceToken": token.as_str(), "seq": 1, "contextId": "demo-a",
+        "status": "accepted", "message": "",
+    });
+    model.write_state("response", Value::str(&mismatch.to_string())).unwrap();
+    let mut ext = vec![Value::str("Reading"), Value::str("Design"), Value::str("Other")];
+    model
+        .write_state("tags", Value::Array(auto_val::Array { values: ext.clone() }))
+        .unwrap();
+    ext.clear();
+    model.write_state("revision", Value::Int(1)).unwrap();
+    let _ = model.view();
+    tick(&mut model);
+    eprintln!("dbg phase={:?} fb={:?} seen={:?} base={:?} rev={:?} seq={:?}",
+        read(&model, "phase"), read(&model, "feedback_err"),
+        read(&model, "seen_response"), read(&model, "base_revision"), read(&model, "revision"), read(&model, "seq"));
+    assert_eq!(read(&model, "phase"), Value::str("idle"));
+    assert_eq!(read(&model, "feedback_err"), Value::str("确认与当前标签不一致"));
+}
+
+#[test]
+fn same_revision_external_replacement_invalidates_the_old_request() {
+    let mut model = mount_tag_input(consumer_base());
+    tick(&mut model);
+    act(&mut model, "Edit", &[Value::str("Design")]);
+    act(&mut model, "Commit", &[]);
+    assert_eq!(read(&model, "phase"), Value::str("pending"));
+    // tags replaced at the SAME revision (external replacement, no reply)
+    let replaced = vec![Value::str("Reading"), Value::str("Work"), Value::str("New")];
+    model
+        .write_state("tags", Value::Array(auto_val::Array { values: replaced }))
+        .unwrap();
+    let _ = model.view();
+    tick(&mut model);
+    // old request aborted; no false success claim; tags-only change keeps draft
+    assert_eq!(read(&model, "phase"), Value::str("idle"));
+    assert_eq!(read(&model, "confirm_seen"), Value::Bool(false));
+}
+
 #[test]
 fn relocated_tag_input_generates_the_consumer_and_shared_text_logic() {
     let root = std::env::var_os("PLAN097_ARTIFACT_ROOT")
