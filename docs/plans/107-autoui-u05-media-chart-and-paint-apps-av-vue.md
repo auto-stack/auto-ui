@@ -897,12 +897,12 @@ AutoLang 定向 AV 131/131（1.23 秒），含 105 列表、981 包、普通集�
 
 A2Vue 从隔离的原项目根执行 `auto build --render vue --gen-only`，设置 `AUTO_UI_ACE_VUE=1`、`AUTO_UI_TOOL_BIN` 指向已固定工具、`RUST_MIN_STACK=67108864`。在 `gen/front/vue` 用 `pnpm install --offline` 和 `pnpm run build` 运行正式 `vue-tsc`、Vite。锁文件优先冻结，画廊按实际本地依赖路径重映射并核实只删移交组件的依赖，存量依赖版本均相同。最终画廊锁 SHA256 `1dc15503c6694d73e00d4f2f5a1263e173747ec6b449cd6401077e9a5924ed3a`。画廊两份输入各 91 个作者源，SHA256 比对仅三处获批组件有差异；产物覆盖 70 路由、90 生成文件。冻结版也通过生成和构建，原 FlowDiagram 在最终工具下给出 `source.type-mismatch: expected i32, found f32`，较早运行时的实际命中对照仍为高亮 0、降透明 5。最终合格判定使用修正版。
 
-原 Iced 测试以 `pac.at` 的 `src/front/app.at` 为源，从 Cargo 工件记录选择原宿主 rlib，显式使用准备好的 `ACE_NODE_DESKTOP_ROOT` 和与 `rustc --version` 一致的 `ACE_NODE_DESKTOP_PREPARED_RUSTC`。每条串行打开实际窗口，`--instances 1 --hold-ms 420000 --evidence <json>`，把挂载 View 的类型化回调提交到窗口消息队列。Chrome 指针由真实浏览器鼠标执行。下表各窗口关闭完成、目标晚到回调各丢弃 1，所有宿主错误和浏览器异常均为 0。
+原 Iced 测试以 `pac.at` 的 `src/front/app.at` 为源，从 Cargo 工件记录选择原宿主 rlib，显式使用准备好的 `ACE_NODE_DESKTOP_ROOT` 和与 `rustc --version` 一致的 `ACE_NODE_DESKTOP_PREPARED_RUSTC`。每条串行打开实际窗口，`--instances 1 --hold-ms 420000 --evidence <json>`，把挂载 View 的类型化回调提交到窗口消息队列。Chrome 指针由真实浏览器鼠标执行。下表各窗口关闭完成、最后一个目标会话的晚到回调各丢弃 1，顶层 Iced `errors` 与 Chrome 异常均为 0。Iced 原画廊默认 `/` 路由仍返回此前记录的 `app::index` 语法诊断，随后五条图表目标路由均成功创建会话，各自的路由错误为 null。
 
 | 原入口 | AV/Iced 最终回放 | A2Vue/Chrome 最终回放 |
 |---|---|---|
 | 024 | 770 帧，12 次提交。路径 4→19→7→4→4、Jan Desktop 186 与准线、图例 4→3→4；播放 6→7 后暂停、重置。 | 四图切换、指针命中/离开，播放 6→8、暂停重置，卸载完成，异常请求 0。 |
-| Area | 65 帧，4 次提交。提示跟随命中区，填充 5→3→5。 | 五条可量测面积填充，指针、图例 5→3→5、重开和卸载。 |
+| Area | 65 帧，4 次提交。提示跟随命中区，路径 5→3→5。 | 两组面积填充及轮廓，指针、图例路径 5→3→5、重开和卸载。 |
 | Bar | 与 Line 共 275 帧，Bar 提交 4 次。单组 5 柱、分组 8 柱，命中与复原。 | 单组/分组 5/8，命中 sales 155 且 6 根非目标柱降透明，离开复原，图例 8→4→8。 |
 | Donut | 65 帧，8 次提交。四段弧、层序、指针与图例状态。 | 弧 4→3→4，提示层级与鼠标离开复原，卸载。 |
 | Line | 与 Bar 共 275 帧，Line 提交 4 次。单/多列与相互独立的状态。 | 单/多列 1/2 条路径，分别 5/6 点，命中 desktop 186 与双准线，图例 2→1→2，重开卸载。 |
@@ -937,6 +937,14 @@ AutoOS 预检 `pwsh -NoProfile -File scripts/check-app-submodules.ps1 -OsRoot D:
 交接校验重新核对三个候选 HEAD 与差异基线，工作树均干净，`git diff --check` 通过。样例、画廊 Iced JSON 和 Chrome 日志的 SHA256、规范候选 SHA256、37 与 53 条逐项计时均与交接一致。六个计划工作树经 `wt-guard.ps1` 检查均无 reparse point。独立审阅上下文待用户确认，T-07 保持待办。
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 92 | from: work | to: review | status: execution_done | outcome: waiting | commit: ui 9b130370, lang 50e63ec9c, os 680a6ae3 | evidence: latest Donut empty on both hosts, artifact and source hashes rechecked | next: confirm final review context`
+
+### 第 93–94 轮｜补核缩放、故障恢复与键盘
+
+复用冻结的正式画廊构建及 Chrome 157.0.8103.80。修正版 FlowDiagram 在 1550、880、430 CSS px 宽的窗口分别显示为 576、526、364 CSS px 宽。用真实鼠标操作，两种布局各自高亮 1、降透明 4，另一布局保持原始几何，水平提示误差小于 1.5 CSS px，离开复原、路由重开、卸载，三轮错误 0、退出 0。宽屏走原侧栏。源外壳在窄屏隐藏桌面侧栏，手机抽屉没有菜单项，探针改用原 hash 路由，并把纵向节点滚到可见区中央。首次 760、640 的侧栏探针未进入目标路由，首次 760 的直达探针在实测纵向命中前调整了滚动位置。修正后 760、640 也通过，未改产品源。日志 `round93-flow-1550.log` SHA256 `e9641f6696d42734a51711dcd29582618c83ec1aa47d4ddad6bb9dd289276817`、`round93-flow-880.log` `8700ce11b6eb7d21026514d1a54f6aa992e03a8693e8851693c0905d1a7e2e2a`、`round93-flow-direct-centered-430.log` `f047895d588ddd4d36c215e34eb0867f509498074c3761c7b901048fabe81150`。
+
+从冻结版外壳连续两次打开原 FlowDiagram，均给出 `ace.route.page` 的 `source.type-mismatch: expected i32, found f32`；各次从原侧栏进入 Area 后，错误提示消失，图表正常挂载。冻结版及修正版两轮 Area 都通过键盘 Enter 隐藏首组、Space 恢复，路径数 5→3→5，有正长度的填充路径 2→1→2。最终卸载根容器为空、浏览器异常 0、退出 0。冻结版日志 `round94-frozen-flow-route-recovery.log` SHA256 `d76c282cc0add6b2dd18f276fcc4d9fbb8d4727e4bc3f69d3673a2202480c658`，修正版 `round94-fixed-area-keyboard.log` SHA256 `f29a37f1c8a6fea0017cc8758d3035d86ec2c2af0fa490557cf86de2a953d0a4`。早期探针记录分别保留多个 SVG 的选择器歧义和把五条总路径计成五条填充的断言，最终用原图表 viewBox 和填充/总路径各自计数。
+
+Iced 第 89 轮四份画廊记录分别保留默认 `/` 的 ``source.syntax: expected `fn`, found `widget` ``。后续通过原外壳路径成功创建五条图表会话，最终路由错误为 null，会话关闭、顶层错误 0。回放矩阵记录了默认首页与五个目标图表页各自的状态。T-07 的独立审核仍待确认。
 
 ## 10. 下游交接
 
