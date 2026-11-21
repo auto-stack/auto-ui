@@ -643,6 +643,16 @@ Iced 受检组件帧验证组合结果 837、参数列表的顺序，以及未�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 44 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ce24d8e0, lang eaaee4973 | evidence: call-site chart key domains, named mutation controls, Iced frame and production Chrome selection replay | next: work`
 
+### 第 45 轮｜图表坐标在共享验证链中完成数值转换
+
+原始 widget 布局的整数偏移量在浮点目的地及混合算术、比较中转为受检 f32。只有实际生成转换的标量包才切换到已有数值能力的集合验证器。AV 两实例结果为 `x=0`、`x=6.5`，普通 node 和模块函数仍具名拒绝混合宽度。Core PLAN-981 251、AV PLAN-981 76 通过。
+
+生产 CLI 的独立页面在旧 SFC 表达式边界给出 `source.age.sfc-expr`。随后按原图表的父子闭包组织材料并声明实际依赖包身份，冷生成经 `vue-tsc` 和 Vite 构建。Chrome `157.0.8103.80` 实测 `x=0 → x=6.5 → x=0`，卸载无异常。最终日志 SHA256 为 `4ada3aec0613a7859979e944ed8545a63a6ee15fc97bab01fd3086ebca45c2bc`。
+
+原 `024-charts` 混合宽度诊断由 18 降到 0，原 Area 由 6 降到 0。两处首项均推进到原样文本列表的借用值读取。原应用闭包日志 SHA256 为 `04c326122033ec8941e7da2e62d9b381865125c2472b5db6134cc814b38d6fb4`，原 Area 为 `6bc69f70621c8c9e95d1c97b07d78f934d50a1ba660c785b2ddea45ffbb78768`。原页挂载仍待验收。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 45 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ce24d8e0, lang 06fa116ad | evidence: legacy chart numeric casts, AV execution and production Vue replay, exact mixed-width diagnostics cleared | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
