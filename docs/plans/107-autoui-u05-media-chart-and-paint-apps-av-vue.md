@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-107
-status: executing
+status: execution_done
 feature_name: AutoUI 024 Charts 与图表 Widgets AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-21
 plan_revision: 2
-current_step: 2
+current_step: 6
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: [docs/specs/runtime/ace-package-widgets.md, auto-lang:docs/specs/ace-migration/m2-autoui.md]
@@ -107,11 +107,11 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 ## 8. 执行步骤
 
 - [x] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。见 §5 矩阵及 §9 基线与首轮回放。
-- [ ] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
+- [x] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
 - [x] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
-- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
-- [ ] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
-- [ ] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
+- [x] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
+- [x] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
+- [x] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
 - [ ] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
 - [ ] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
 
@@ -1026,10 +1026,39 @@ AutoUI `a4e90b1bc40e893a0ba0656e0839c16cef069ba5` 的 checked Iced 外壳以窗�
 
 `stage: review | review_scope: repair on historical candidate | reviewer_identity: /root/review107 | plan_id: PLAN-107 | plan_revision: r2 | round: 106 | outcome: historical pass for R107-01..05, integrated review pending | reviewed_commit: ui a4e90b1b, lang 9bae90dcd, os 680a6ae3 | next: inspect updated fixed baseline after PLAN-1093`
 
+### 第 107 轮｜在合流版重验定向回归和六个原入口
+
+| 仓 | 冻结候选 | 产品基线 |
+|---|---|---|
+| AutoUI | `63a09efaf0df1ba2137e66d0e749012bf5c241ef` | `80cc1874ce411f019537cb16af6545ca3b852fbb` |
+| AutoLang | `dd5f3eff56176b00cae2c5c8ce916cfed8c2f9f6` | `a2249c6859b8324ecc41487809138cf8f39c1b28` |
+| AutoOS | `680a6ae344f89cbf4dcf5efd25a118889fe611c7` | `efcfced51b58a1174f0b4fd3c0288c589495f70e` |
+
+上述三仓使用 §5 的同一实施树与 `plan-107-dev`。三树的受控文件干净，`git diff --check` 通过。AutoUI 在产品基线之后的主线改动均为 Plan 文档。`a4e90b1b..63a09efa` 仅刷新合流所需的 AV 传递依赖，锁 SHA256 `3a2e068c17fcecb0898a990d4d0c72d414baf2f88f9b62e716ca0c01d31a0f50`。AutoLang `46fb7afb..dd5f3eff` 仅重冻结两条 AGE 测试预期。两处规范与 AutoOS 调用说明的内容及 SHA256 与第 105 轮一致。图表原始输入和针对此范围的行为收据继续从第 89–105 轮追溯。
+
+AutoLang 定向 test 准备 153.133 秒，exit 0。Core 编译及冻结语法选择 82 PASS、809 未选，执行 0.6677914 秒、外层 0.682 秒，SHA256 `224d59d7040bb7f4c90eb5bb1da693bbc975985dfe2d9b554fb8585d550ac0f1`。同版 `language_source_worker::compile_time_tests::plan1093_c_header_spelling_parses` 1 PASS、28 未选，执行 0.0332968 秒，SHA256 `67bf605c7295855af3fa76dc1298dda5c7c482138baa3c7a53efce2210eeeab7`。合流后、仅重冻结断言之前的 AV conformance 图表邻域 132 PASS、1291 未选，执行 1.1903081 秒，SHA256 `4397e13d654fb1c89e6583f1a67cd520b1a1e0369ac44a5c29638ba3c6627d86`，该断言更新不改变 AV 执行件。38 项 AutoUI 与 54 项 AutoLang 的定时收据继续使用第 104 轮，其中后者的合流触面再由上述定向项和 T-08 固定组核验。
+
+显式用 `cargo build --locked --offline -j 1 -p auto-ui-tools --features ace-vue --bin auto-ui-tool` 准备 debug 工具。禁用 `RUSTC_WRAPPER`，规避第 1093 轮记录的旧 grammar rlib 缓存。准备 782.180 秒、exit 0，工具 SHA256 `8b69eef1fe7c2f24d4d076e8a1abcc31e45e109bbddd28219ee2f87db2b57f34`。保留先前生成目录，在第 89 轮冻结原源上重走正式 `auto build --render vue --gen-only`、pnpm 离线安装、`vue-tsc` 与 Vite，再用 Chrome 157.0.8103.80 访问生产构建。024 全链 70.083 秒、exit 0，日志 SHA256 `507041a86698a3f5e57c31bd943e3e1ae82779d3091fa6a91476ca94a453226e`。与第 104 轮逐一比较 JSON 字段，仅端口变化，几何轨迹、命中、离开、淡出、`6→8→8`、网络和错误字段完全相同。画廊全链 147.944 秒、exit 0，70 路由、90 文件。Bar/Line、Area、Donut、Flow 的四份 Chrome 日志与第 104 轮及第 89 轮逐字相同。两个 pnpm 锁 SHA256 均与第 104 轮一致。
+
+从本轮 debug 工具的 Cargo 构件显式重链真实 Windows Iced 绘制验证器，SHA256 `d2c3d37e9450bf3568f5eba4429431ced2f76d82bb059ed115a28334f498aa5e`。从相同原源串行打开六个 1438×1000 窗口，逐个核主体图形像素并关窗。各窗口 `painted=true`，宿主顶层错误 0，全部会话已关闭。六个像素签名与第 105 轮一致。第 103 轮保留 Iced 渲染器模拟指针进入和离开的证据，第 107 轮收据使用窗口自身截图验证实际绘制。
+
+| 原入口 | 目标色像素 | Windows 绘制壁钟 s / 退出 | `round107-window-<入口>.json` SHA256 |
+|---|---|---|---|
+| 024 | 887、853 | 19.429 / 0 | `4fe543c7473ae53dbe3dac71cec5afe959b7ab70b1c84788eb2e0fe352d41f26` |
+| Area | 931、1099 | 8.652 / 0 | `6f9eeb02f0ed334cd1c1beae46907333403601f15e35d9aa19bbcfa8a50e58f0` |
+| Bar | 27600 | 12.494 / 0 | `02bd8d3c62cc34bd13a69345c22a08ad0ec366e2d27d0a48003fa1cf5da0dcbd` |
+| Donut | 16419、7545、3724、2550 | 5.007 / 0 | `9be77426920b0f854c52f0a21e1fbfcb4744be760a80f075717803b4d0c6fc69` |
+| Line | 675 | 14.102 / 0 | `d2c8d299540026357a2ba810a6f0728176eecd5051ed897b567861ff027b7507` |
+| FlowDiagram | 31515、12842、12778 | 7.181 / 0 | `01f537e2c1507ecfc7494f56300523c3a1f3b4acfe48cd7f6f08d4c6f66192b4` |
+
+合入预检中 AutoOS 主检出的 27 项清单完整（`missing_pac_at=0`），其中 24 个工作树子模块未初始化，脚本 exit 1，SHA256 `326eb214cdd803a2ed20d72b0635bc1c83310db4c9235a1709992e8429028025`。`git diff --exit-code efcfced 680a6ae -- .gitmodules apps` exit 0，保持原仓环境记录。三个默认检出的现存修改与本计划变更路径交集为 0。
+
+`stage: work | plan_id: PLAN-107 | plan_revision: r2 | round: 107 | status: execution_done | outcome: pass | commit: ui 63a09efa, lang dd5f3eff, os 680a6ae3 | next: T-07 same-worktree integrated final review`
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
 
-- 024 和五个原页的最终双端回放、空数据和恢复对照已在 §9 第 89–91 轮绑定提交，供 W1 和 1072 消费。FlowDiagram 双布局与冻结版的失败证据一并保留。
+- 024 和五个原页的双端回放收据见 §9 第 107 轮。各页空数据、恢复、Iced 命中及 FlowDiagram 冻结版负控来自第 89–105 轮，和最终回放一起供 W1 和 1072 消费。
 - 向 123 提供原全画廊需要的图表 handler/组件及证据绑定的版本。涉及 123 在途的桌面入口时，接已审路由/入口切片与 114 实际包、列表、事件接口，再跑 107 的整合行。
 - CodeEditor 的光标宿主缺口及原用例收据移交 120。媒体、图片和画布的旧观测按 §9 各归属接续。
