@@ -51,7 +51,7 @@ fn p105_u03_apps_sfc_status() {
             ("todo_store", "src/front/todo_store.at"),
             ("todo_list", "src/front/todo_list.at"),
         ],
-        "store semantics are not wired yet (S1)|cross-unit store loading is not wired yet (S1)|source.syntax|model has no field `store`",
+        "store semantics are not wired yet (S1)|cross-unit store loading is not wired yet (S1)|source.syntax|model has no field `store`|package view cannot observe bracket list model field",
     );
     // 016：同一条 S1 闸（CalendarStore）。
     expect_gap(
