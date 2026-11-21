@@ -108,6 +108,8 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 2026-11-21 stage: work（T-06 A2Vue 浏览器证据）| PLAN-106 r2 | outcome: pass | worktree: auto-ui `b18572c7`（plan-106-dev）| task_ids: T-06 | evidence: `plan106_014_vue_browser` **14/14**（真实 Chromium，4.86s，`AUTO_UI_ACE_WEB_E2E=1`）+ 站点 `plan-artifacts/plan-106/sites/014-weather/`（App.vue/a2x_rt.mjs/vite 脚手架/verify.mjs）**判据（V-04）**：①lane 产品 SFC 含 北京/上海/24小时/5日/刷新/`v-for`/`:class`/SelectCity + 条件样式三元；②vite 冷构建成功；③真浏览器初始 marker 8/8（北京/24小时/5日/刷新/当前详情/湿度/体感/演示样本）；④城市切换按**原样本合同**（SelectCity 首段按 ASCII id 更新 city_zh→上海；第二段数据分支比较中文 id 故英雄保持 beijing 默认 23°——原 pac.at 冻结行为，vm_smoke.py 同口径只断言 city_id/city_zh）；⑤Tab 5日 切 今天/周二；⑥主题按钮在位；⑦零 page error。`next_responsible_role: review（T-04 AV 仍 B2 阻；T-07 终审待 A2Vue 落主）`
 
+2026-11-21 stage: goal | plan_id: PLAN-106 | plan_revision: r2 | round: 1 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-106/{auto-ui,auto-lang} | commit: auto-lang `010a14d35` / auto-ui `92054337`+`b18572c7` | next: user（B2 unblock 三选一见 §10）
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
