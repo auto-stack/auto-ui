@@ -217,8 +217,11 @@ fn p107_chart_child_uses_the_parent_record_list_type() {
     let conflicting = root.replace("v: 13", "v: true");
     let incompatible = [unit("app", "main", &conflicting), unit("official", "chart_label", child)];
     let error = generate_package_sfc(&incompatible, "app::main")
-        .expect_err("different record shapes at the same input must fail checking");
-    assert!(error.contains("source.type-mismatch"), "{error}");
+        .expect_err("the chart label cannot interpolate a Boolean field");
+    assert!(
+        error.contains("source.fstr-arg") && error.contains("found `bool`"),
+        "{error}"
+    );
 }
 
 #[test]
