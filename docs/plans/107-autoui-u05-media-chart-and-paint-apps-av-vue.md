@@ -693,6 +693,16 @@ Iced 真窗经原侧栏进入相同页。AV 的视图闭包在同一 `lv` 上报
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 49 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 93b037e0, lang e172e837c | evidence: exact 024 closure verifies, original Donut AV geometry, legend click and teardown, named production entry gaps | next: work`
 
+### 第 50 轮｜原 Donut 在两端执行指针、图例与卸载
+
+受检组件的鼠标移动将宿主坐标换算为作者声明的逻辑幅面，按两个有限 f32 交给当前页面、实例与视图代次的原消息。浏览器沿用已有坐标采样和限频。Iced 测试显示 `1.5/2.25`，拒绝旧视图的离开回调，再从当前视图离开。组件包 17、路由 4、SFC 20 通过。SFC 原断言同步检查抽取后的采样返回值和转发调用。
+
+原画廊 Iced 真窗实测 Desktop 扇区命中、高亮几何和提示文本，移出后复原，图例开关使扇区数 `4 → 3 → 4`。页面共收到 4 次动作，两个会话均关闭，页面拒绝 1 次关闭后指针回调。Chrome `157.0.8103.80` 经生产 CLI 冷生成和构建，同一页实测命中、移入内孔后的清除、图例悬停和开关，进入 Carousel 后重进原页，扇区数为 `4 → 3 → 4 → 4`，卸载无异常。几何起点以 f32 容差核对，原弧 y 为 `50.000008`。Iced JSON 和 Chrome 日志 SHA256 分别为 `0a41ab5ad486220674e2bc78decab75e5c6c14a8dadc540015e76ea84025b6cf`、`84b4c74b9bef660d482fce04a6b3eeb0ddf2029b2112822a3709492a520bac0e`。
+
+原页的实际数据通过上述动作，空数据负控仍待执行。原画廊首页仍保留 `index.at` 的独立语法诊断。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 50 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 42908603, lang e172e837c | evidence: original Donut chart Iced and production Chrome pointer, legend, route lifecycle | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
