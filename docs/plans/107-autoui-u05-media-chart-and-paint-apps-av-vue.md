@@ -850,6 +850,18 @@ AutoOS 主检出子模块预检退出 1，日志列出未初始化的既有应�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 72 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang}; D:/autostack/.wt/os-107/auto-os | commit: ui 083bb61e, lang 95d9d69e9, os 680a6ae3 | evidence: six two-host entries, empty/refill exact components, case 8.11 s, AutoOS fixed and original comparison | next: integrated gate`
 
+### 第 73–84 轮｜合流回归及交付范围
+
+以 AutoLang 主基线 `5e5121dac6d6034a7eeb28cf4ed8d71686d21cd9` 和 AutoUI 主基线 `80cc1874ce411f019537cb16af6545ca3b852fbb` 整合。工作分支先核对合流后的 Git 树，再在各自基线创建同内容的线性提交。中间提交保留为本地 `codex/plan-107-r1-ui-handoff` 与 `codex/plan-107-r1-language-handoff`，便于后继计划读取。合入候选移除了 MPV、Carousel 及配套内联文本专用改动。原图表闭包所需的共享 SVG、包绑定、路由、所有权和事件改动仍由本计划验收。AutoLang r1 媒体工作保留在原 stash。
+
+合流回归修复了四处行为。AGE 原列表构造保留内联及多行记录，语言仍检查局部可写性和消息实际类型。普通集合的 12,000 处保留引用仍以 `VerifyMemory` 拒绝。包视图的括号列表边界改成定位作者字段的具名诊断。AutoUI 保留来源准备入口，统一交受检 SFC 发射。独立对照发现核心文本记录组的五个用例在主基线及合流版均报相同 `verify.double-move`，AV Core 空记录布局断言也在主基线同样失败。全 AV 探测进入旧用例 `av_owned_r1_new_process_restore_executes` 的内嵌构建，已结束该轮并改用预构建的定向组，保留原失败日志。
+
+AutoLang 定向 AV 131/131（1.23 秒），含 105 列表、981 包、普通集合资源负控和指令表。A2TS 两组各 5/5（0.51、0.57 秒）。较早合流 AutoUI 的 desktop 12/12、provider 27/27（0.95、4.52 秒）。U03 的 013 诊断已补精确命名，准备重跑 AutoUI。采用当前工作树 `e2b9fcf8`、`6265e5757`、`680a6ae3` 的生产工具重放六条入口，固定输入及依赖均已复制、逐文件比对 SHA256。
+
+拟沉淀 Canonical Specs：AutoUI `docs/specs/runtime/ace-package-widgets.md` 增加 SVG、逻辑坐标与空数据行为。AutoLang `docs/specs/ace-migration/m2-autoui.md` 增加调用点 List/名义记录、受检事件、文本所有权及一次模型物化合同。AutoOS 源项目 README 提供所有者与计划索引入口。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 84 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang}; D:/autostack/.wt/os-107/auto-os | commit: ui e2b9fcf8, lang 6265e5757, os 680a6ae3 | evidence: 131 focused AV passes, main text-record/layout controls, typed package diagnostics, r2 scope isolated, production replay inputs ready | next: run frozen tools and independent review`
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
