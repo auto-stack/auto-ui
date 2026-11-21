@@ -1166,7 +1166,7 @@ stage: merge | plan_id: PLAN-105:r1 | round: 121 | from: reviewed | to: merge（
 
 **落地检查发现的回归（pending fix-forward）**：015-notes 桥装载在落地树上失败——`event program compile failed: handler Init carries a body outside the checked script domain`。根因链：prep 的跨单元 store 内联**探测解析失败被跳过**（store 块 `.draft_title = .notes[.active_id].title` 在落地语法管线下解析拒绝 @4558；等价组件面最小复现**通过**——失败面为 store 块语句解析路径）。该回归由 auto-lang 落地的 syntax 管线增量（lexer/parse/project 约 1071 行：PLAN-1090 系）与 store 块语句解析的交互引入；012/013/016/018/022 桥装载与浏览器门五 app 在落地树上复验**全绿**（landed-*.json）。
 
-**blockers**：① 015 桥装载回归修复（auto-lang store 块语句面 × 落地语法管线；最小复现 = `p015-storeblock-prep.at` 经 project_component_candidates @4558）；② 归档 + 工作树清理 + 落地核对（等 ①）。
+**blockers**：① 015 桥装载回归修复（根因已确认：prep 的跨单元 store 内联探测解析失败被跳过 → prepared 源**无 store 声明**（`store NotesStore {` 缺席，fail-closed 设计）→ 事件程序编译拒 `store.Init()` 为 body_foreign。失败构造 = store 块 on 体的 `.field = .list[.idx].sub` 链（最小复现 `p015-storeblock-prep.at` 经 project_component_candidates @4558；同形 widget handler/store 块合成**均通过**——失败依赖全块组合的 PEG cut/TokAdjacent 交互，落地 syntax 管线增量（lexer TokAdjacent/starts_postfix_method、parse/mod TokAdjacent、project.rs 1041 行）为触发面）。修复方向 = 语法引擎的 TokAdjacent/trivia 交互或 store 块语句面 profile；② 归档 + 工作树清理 + 落地核对（等 ①）。
 
 **复验状态（落地树）**：plan124_routes 2/2（AV 导航带 ACE_NODE_DESKTOP_PREPARED_RUSTC 准备）、u03_sfc_status 4/4、p013_sfc 1/1、p013_store_lane 3/3、sites 1/1、浏览器门五 app failures=0、六 app 桥装载交互全绿（012 ADnH/013 ToggleAll/016 PrevMonth；015 见 blockers）。auto-lang 组：av plan105 13/13、core plan105 26/26、census 4/4、980 40、979 57、104 3、1072 19、state_face 8、av-core 134（layout 一红为 master 预存，stash 对照在案）。
 
