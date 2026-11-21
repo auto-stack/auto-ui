@@ -663,6 +663,16 @@ Iced 受检组件帧验证组合结果 837、参数列表的顺序，以及未�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 46 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui e31b1e04, lang 5324a3368 | evidence: typed builders for caller records, same AV frame and generated Vue, exact empty-list diagnostics cleared | next: work`
 
+### 第 47 轮｜旧图表文本读取按值保存
+
+旧 widget 的局部绑定和赋值从列表视图复制文本。推导所得文本列表复用旧文本追加的受检复制语义，已拥有的插值结果可以转移。原始列表保持可读。AV 两实例分别显示 `none` 和 `after/x=after/before`，普通 node 中保存整个借用元素的负例仍具名拒绝。Core PLAN-981 251、AV PLAN-981 77 通过。
+
+同材料作为受检子组件经生产 CLI 冷生成，`vue-tsc` 与 Vite 通过。Chrome `157.0.8103.80` 两次触发后都读取到 `after/x=after/before`，卸载无异常。浏览器日志 SHA256 为 `5f339c4a6d707913fcbe67fdbe51176530f12a02f0b3a9309452e6602c7d36bb`。
+
+原 `024-charts`、原 Area、原 Donut 的 `source.view-escape` 和 `source.move-required` 分别由 `88/11`、`27/3`、`6/2` 降到 `0/0`。原 024 先报 `to_int`，原 Area 先报 `memo` 的列表属性表达式，原 Donut 推进到生成位置的 UTF-8 边界校验。三个闭包日志 SHA256 依次为 `c2f66bdfb4d93dadc05b38b16a54dc27a94066274e5c7a0fe154419f056e5784`、`7bbff2722966f5bcfb464f1a98712e97caf905e08c4fad5ecd3fd5ab66c14f2a`、`a0130df84b668d57a71c3b12bbfe02df4b684c46518fb5f22ecc850d5d8c52ee`。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 47 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui e31b1e04, lang a0df95710 | evidence: checked text snapshots in AV and production Chrome, exact chart ownership diagnostics cleared | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
