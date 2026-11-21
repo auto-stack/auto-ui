@@ -1166,13 +1166,17 @@ stage: merge | plan_id: PLAN-105:r1 | round: 121 | from: reviewed | to: merge（
 
 **落地检查发现的回归（pending fix-forward）**：015-notes 桥装载在落地树上失败——`event program compile failed: handler Init carries a body outside the checked script domain`。根因链：prep 的跨单元 store 内联**探测解析失败被跳过**（store 块 `.draft_title = .notes[.active_id].title` 在落地语法管线下解析拒绝 @4558；等价组件面最小复现**通过**——失败面为 store 块语句解析路径）。该回归由 auto-lang 落地的 syntax 管线增量（lexer/parse/project 约 1071 行：PLAN-1090 系）与 store 块语句解析的交互引入；012/013/016/018/022 桥装载与浏览器门五 app 在落地树上复验**全绿**（landed-*.json）。
 
-**blockers（最终诊断，2026-11-21）**：① 015 桥装载回归——**最小复现已缩至单语句**：widget on 体里的**带点调用语句 `.X()`**（任意名字、零参/带参、孤立形均失败；裸 `X()` 无点调用通过、链式赋值通过）。根因 = 落地 syntax 管线的 TokAdjacent 机制（parse/mod 的 `Atom::TokAdjacent` + `adjacent_to_previous` 的 `pending.is_empty()` 前提）与 age-view-call-stmt 的 leading-dot 原子交互；文法与我受审 tip **零差异**（0 行 diff 实证）。修复 = 语法引擎 parse machine 对 leading-dot call 的 TokAdjacent 调试（独立专门刀，配 RUST_BACKTRACE 逐帧）。② 015 桥装载回归修复后：归档 + 工作树清理 + 落地核对。**替代方案（若语法刀延后）**：015 AV 腿按已知缺口交付（其余五 app AV 腿 + 五 app 浏览器腿全绿 = 净能力增益；015 AV 腿记 KNOWN-DEBT 随后继计划），经用户确认后转归档。
+**blockers**：① 015 桥装载回归修复（auto-lang store 块语句面 × 落地语法管线；最小复现 = `p015-storeblock-prep.at` 经 project_component_candidates @4558）；② 归档 + 工作树清理 + 落地核对（等 ①）。
 
 **复验状态（落地树）**：plan124_routes 2/2（AV 导航带 ACE_NODE_DESKTOP_PREPARED_RUSTC 准备）、u03_sfc_status 4/4、p013_sfc 1/1、p013_store_lane 3/3、sites 1/1、浏览器门五 app failures=0、六 app 桥装载交互全绿（012 ADnH/013 ToggleAll/016 PrevMonth；015 见 blockers）。auto-lang 组：av plan105 13/13、core plan105 26/26、census 4/4、980 40、979 57、104 3、1072 19、state_face 8、av-core 134（layout 一红为 master 预存，stash 对照在案）。
 
 `next_responsible_role: work（fix-forward：015 store 块语句面解析回归修复于落地上进行，复验 015 全链后补归档/清理）`
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 121 | from: merge | to: work | status: reviewed | outcome: pending | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 0b754af59 / fe2dd4f1 | next: work
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 122 | from: work | to: user | status: reviewed | outcome: blocked | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: auto-lang master `0b754af59` / auto-ui master `fe2dd4f1`+`46724757`（收据）| next: user
+
+2026-11-21 stage: blocked（015 回归的语法引擎修复超出本轮深度；精确诊断与两条路线在案）| **待用户裁定**：(i) 语法引擎专门刀修复 `.X()` 带点调用解析（独立会话，配 RUST_BACKTRACE 调 parse machine）；(ii) 015 AV 腿按已知缺口归档（其余五 app AV 腿 + 五 app 浏览器腿全绿 = 净能力增益，015 记 KNOWN-DEBT 随后继计划）。两仓落地保持（线性历史）；归档/清理等裁定后执行。
 
 ## 10. 下游交接
 
