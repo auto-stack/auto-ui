@@ -633,6 +633,16 @@ AGE 包面浮点插值经受检 `TextDisplay` 进入 AV 和 A2TS。AV 使用 f32
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 43 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 52f003a3, lang d34746351 | evidence: exact chart f32 diagnostics cleared, numeric differential and real SVG state updates in Iced and production Chrome | next: work`
 
+### 第 44 轮｜按调用端声明的选择键读取图表记录
+
+必填裸 `List` 参数绑定后，从全部可见调用点收集已知标量键和键列表。受检处理器按作者的列表顺序选择对应记录字段。实际组件参数和循环仍参与运行时求值。参数值不明、列表可被修改或逃逸、局部别名被重写时保留原诊断，未知字段由共享类型检查拒绝。
+
+Iced 受检组件帧验证组合结果 837、参数列表的顺序，以及未知字段和别名重写负例。生产 Vue CLI 冷生成，经 `vue-tsc` 和 Vite 构建。Chrome `157.0.8103.80` 实测替换父数据后结果为 `837 → 525 → 837`，卸载完成且页面异常为 0。日志 `round44-chart-keys-browser.log` SHA256 为 `30720b702ca38ec353805d0e5f9f0f01656c6047c046c1b50c6ea93397157dfd`。Core PLAN-981 251、AV PLAN-981 75、组件包 15、路由 4、SFC 20 通过。
+
+原 `024-charts` 和原 Area 闭包首项推进到混合宽度的数值运算。原 Donut 推进到局部裸列表推导。原 Bar 的两个实例使用不同记录形状，首报缺 `cost`，原 Line 对应缺 `desktop`。五个源入口保持原字节，原 `024-charts` 闭包日志 SHA256 为 `4efb1dfbbe98fa9a1fc5ba07fd17a0cbd78712fcaa012428c578ffe3d602e572`。实测的两端选择键回放使用本轮定向材料，四个原页的挂载和交互仍待验收。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 44 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui ce24d8e0, lang eaaee4973 | evidence: call-site chart key domains, named mutation controls, Iced frame and production Chrome selection replay | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
