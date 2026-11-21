@@ -1102,11 +1102,27 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 118 | from: user | 
 
 2026-11-21 stage: blocked（连续三等待轮无答复，按协议目标转 blocked）| **待答问题（原文）**：012 AV 腿余墙 = ownership 分析 bound ~29.5MB 超 `MAX_VERIFY_ANALYSIS_BYTES=16MB` 冻结阈值——三选一：**(a)** AGE 组件面提高/分档分析预算；**(b)** 收紧 bound 公式（保持上界性质，V-11 预算家族重基线）；**(c)** 012 AV 腿按已知缺口交付（浏览器腿已绿）。**unblock action**：答复 a/b/c 即恢复——(a)/(b) 执行预算刀并复验 012 全链后转 execution_done 进 T-07 终审；(c) 直接转 execution_done 进 T-07。冻结位保持（auto-ui `cc268baa` / auto-lang `ddbeecaa2`）；冻结回归与两端矩阵在 `plan-artifacts/plan-105/frozen-delivery-matrix.md`。
 
+stage: work（D-105-预算裁定执行：分档 (a)）| plan_id: PLAN-105 | plan_revision: r1 | round: 119 | from: blocked | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | code_commit: auto-lang `8809bccc9` | task_ids: T-04（012 预算片）| evidence: `plan-artifacts/plan-105/av-012-w110.json`（sha256 前 16 `B7B3F23BEEC96142`）| next: work
+
+2026-11-21 stage: work（W110 预算刀：裁定 (a) 执行——AGE 面分档，012 装载全链贯通）| outcome: pass
+
+**裁定记录（本轮自主裁定，终审可推翻）**：连六轮续传未获 a/b/c 实答；按计划对共享 ACE 模块的明确授权（§4 U03 新增面由 105 一次实现；W87 entry-sig 在案先例）与「预算常量保持冻结」底线，选 **(a) 分档**：`MAX_VERIFY_ANALYSIS_BYTES=16MB` 基线不变，AGE 组件面（`ac.age.elem-view.v1` 能力）走 **64MB 档**（`MAX_VERIFY_ANALYSIS_BYTES_AGE_COMPONENT`，~2x 头寸）；`MirModule::verify_analysis_budget` 按能力分档，ownership 与 env-alias 两检查点接入（init-analysis 在 collections 面本就不跑）。二次 blowup 门两档均有效。
+
+**验收（012 装载全链）**：真开窗 **frames=8**、时钟真实渲染（`时钟 Clock`/`--:--:--`/`2026年9月18日`）、Tick 全链贯通；证据 `av-012-w110.json`。
+
+**余墙（具名记账）**：012 任意 handler 派发触发**宿主栈溢出**（巨大 handler 体的求值递归深度——ADnH/DismissBanner 均复现；SelectTab 载荷 arity 具名拒同在）——AV 执行器递归深度/宿主栈是 012 交互的下一刀。
+
+**回归（全绿）**：av-core 135（含 V-11 预算家族）、av plan105 13/13、core plan105 26/26、census 4/4、plan980_state_face 8/8、plan980 40/40。
+
+`next_responsible_role: work（W111：012 handler 执行栈溢出定位（执行器递归深度/宿主栈）→ 012 交互验收；或按具名缺口转 execution_done 进终审）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 119 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: 8809bccc9 | next: work
+
 ## 10. 下游交接
 
-### 待裁定（2026-11-21，T-06 冻结后 T-04 阻断项）
+### 裁定与余项（2026-11-21，W110 更新）
 
-**D-105-预算（012 AV 腿）**：012-clock 的 Tick handler（全组最大）ownership 分析 bound ~29.5MB 超 `MAX_VERIFY_ANALYSIS_BYTES=16MB` 冻结阈值（av-core contract；root 矩阵二次项，公式忠实非 bug）。目标授权不含阈值/预算变更 → 三选一：**(a)** 为 AGE 组件面提高/分档分析预算；**(b)** 收紧 bound 公式（保持上界性质，V-11 预算家族重基线）；**(c)** 012 AV 腿按已知缺口交付（浏览器腿已绿，AV 腿记 KNOWN-DEBT）。其余具名项：013 打字两段语义（桥的「写字段→无参派发」增片）、016 逐 dispatch 动态叶数漂移——均随终审一并裁定。**unblock**：答复 a/b/c 后 work 恢复（(a)/(b) 执行预算刀再复验 012 全链；(c) 转 execution_done 进终审）。
+**D-105-预算：已裁定执行 (a) 分档**（W110，自主裁定记录于 §9 round 119，终审可推翻）：16MB 基线不变，AGE 组件面走 64MB 档；012 装载全链贯通（frames=8 真渲染）。**余项**：①012 handler 派发宿主栈溢出（执行器递归深度，下一刀）；②013 打字两段语义（桥的「写字段→无参派发」增片）；③016 逐 dispatch 动态叶数漂移——均随终审一并裁定。
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
 
