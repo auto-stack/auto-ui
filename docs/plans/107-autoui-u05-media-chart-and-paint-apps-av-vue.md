@@ -683,6 +683,16 @@ Iced 真窗经原侧栏进入相同页。AV 的视图闭包在同一 `lv` 上报
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 48 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 93b037e0, lang 5aa02dc94 | evidence: original Donut compiles, cold production route and real Iced navigation reveal matching ownership error | next: work`
 
+### 第 49 轮｜原 024 图表闭包准入，原 Donut 在 Iced 显示几何
+
+旧 widget 的 `float.to_int()` 复用受检转换，保持原 VM 的截断、范围饱和和 NaN 转零。旧 handler 的可变 `str` 局部持有文本，读取其他文本局部时复制，显式转移仍沿用验证。AV 核对截断、上下限和 NaN，标签在源值被重新赋值后仍保留两个独立值。Core PLAN-981 251、AV PLAN-981 78 通过。原 `024-charts` 入口及原四张图编译为 5 个受检组件，闭包日志 SHA256 为 `1eacebc84800e1b8a0f3351d1026b3e259ce582116523805e1c212c4afda15be`。
+
+原 Donut 在真 Iced 窗口经侧栏打开，4 个 SVG 扇区可读，点击原 Desktop 图例后剩 3 个。关闭后外壳和页面会话都已关闭，页面计入 1 次关闭后回调丢弃。窗口记录 SHA256 为 `9157ae4c7344fdfdfa8cf113e302ac0a0ca13bf36072a3eb608e62c45aaa46ec`。生产 Vue 重跑已越过重复释放，首次绘制推进到 `PointerMove` 缺宿主浮点坐标，日志 SHA256 为 `9548b7c70c6b382311a782d14ae997c6838091f2ac8f65e4ea2c78e49b63e408`。
+
+原 024 的真实 Iced 入口缺 `stylekit.styles` 项目依赖。生产 CLI 的非路由入口仍选用单文件旧产品检查而拒绝原处理器。两次入口日志 SHA256 分别为 `0c1bbc1547436e6c1f682f5feb35355666930f033f53e531ec98fb54db673d8e`、`73514cad08ed28a2ea064872cc93c36a5230dbe91b4130c8a2bcd9e65b0c451e`。后续接通同一受检闭包和真实项目依赖。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 49 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 93b037e0, lang e172e837c | evidence: exact 024 closure verifies, original Donut AV geometry, legend click and teardown, named production entry gaps | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
