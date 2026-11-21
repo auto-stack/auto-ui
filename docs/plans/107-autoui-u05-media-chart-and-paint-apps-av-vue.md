@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-107
-status: execution_done
+status: reviewed
 feature_name: AutoUI 024 Charts 与图表 Widgets AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-21
 plan_revision: 2
-current_step: 6
+current_step: 7
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: [docs/specs/runtime/ace-package-widgets.md, auto-lang:docs/specs/ace-migration/m2-autoui.md]
@@ -112,7 +112,7 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 - [x] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
 - [x] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
 - [x] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
-- [ ] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
+- [x] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
 - [ ] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
 
 ## 9. 复审记录
@@ -1054,6 +1054,19 @@ AutoLang 定向 test 准备 153.133 秒，exit 0。Core 编译及冻结语法选
 合入预检中 AutoOS 主检出的 27 项清单完整（`missing_pac_at=0`），其中 24 个工作树子模块未初始化，脚本 exit 1，SHA256 `326eb214cdd803a2ed20d72b0635bc1c83310db4c9235a1709992e8429028025`。`git diff --exit-code efcfced 680a6ae -- .gitmodules apps` exit 0，保持原仓环境记录。三个默认检出的现存修改与本计划变更路径交集为 0。
 
 `stage: work | plan_id: PLAN-107 | plan_revision: r2 | round: 107 | status: execution_done | outcome: pass | commit: ui 63a09efa, lang dd5f3eff, os 680a6ae3 | next: T-07 same-worktree integrated final review`
+
+### 第 108 轮｜同实施树独立终审
+
+独立审阅者 `/root/review107` 只读审阅 Plan r2 `6793d5ba871bb0e3fd104654d012d4f6f7d8d49b`，在第 107 轮列明的三树、`plan-107-dev`、完整候选和基线上给出 `pass`。生产合流差异逐行与 PLAN-1093 匹配，额外差异为冻结语法测试合流注释与两条 AGE golden。依赖为当前 AutoLang 基线与 AutoUI 锁中的两个既有传递包。第 89 轮固定的同组 AutoDown `45b642dadcbd4fb71a8c7f2e6f09435faf7a65f5`、AutoWeb `26d085f7e54ea20c6997edf2dc23eef0cb57faf6`、AutoMan `4a30483a590d81d5724cb453a0fd1fbc98d9aaf2` 继续适用。两个 canonical Spec 和 AutoOS README 分别冻结于第 105 轮 SHA256 `98c9a6c3322bb4fe6784eceafa30fae1b603277ecc523445a32c84b59bb916b7`、`f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fe7af85d`、`a8d4859c3a23447d6fe1005624e1e9f95ddfbdfd2344123a716b1a783b1fd168`。
+
+| 验收项 | 终审结果 | 证据 |
+|---|---|---|
+| AC-01 | pass | 六个原入口、原所有者和冻结版本逐项对账，r1 其余用例有具名交接。 |
+| AC-02 | pass | 历史 R107-01..05 保持关闭。合流 Core 82 项、1093 实际头文件拼写 1 项、AV 132 项及锁变化均核原始记录。 |
+| AC-03 | pass | 正式 A2Vue 产物的 024 仅日志端口变化，画廊四日志逐字重现。六个 Windows Iced 真窗像素签名一致且关闭。第 103 轮保留渲染器布局指针对照及其输入限制。 |
+| AC-04 | T-07 pass | 两处规范增量及源码 README 通过。R107-06 八组固定门、三仓合入、规范验证、归档和清理由 T-08 完成。 |
+
+`stage: review | review_scope: final | reviewer_identity: /root/review107 | plan_id: PLAN-107 | plan_revision: r2 | round: 108 | status: reviewed | outcome: pass | reviewed_commit: ui 63a09efaf0df1ba2137e66d0e749012bf5c241ef, lang dd5f3eff56176b00cae2c5c8ce916cfed8c2f9f6, os 680a6ae344f89cbf4dcf5efd25a118889fe611c7 | next: T-08 affected fixed-group execution and consolidation`
 
 ## 10. 下游交接
 
