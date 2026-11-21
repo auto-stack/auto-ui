@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-21
 plan_revision: 2
-current_step: 7
+current_step: 8
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: [docs/specs/runtime/ace-package-widgets.md, auto-lang:docs/specs/ace-migration/m2-autoui.md]
@@ -114,7 +114,7 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 - [x] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
 - [x] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
 - [x] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
-- [ ] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
+- [x] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
 
 ## 9. 复审记录
 
@@ -1096,6 +1096,11 @@ R107-06 的八个冻结组全部执行。2026-11-21 16:40 +08:00 启动前检查
 - 落地主检出两份 `pac.at` 和 `src/front` 中 024 的 7 个 `.at`、画廊的 89 个 `.at` 与 R107 相同。初次整目录比较发现主检出多 49 个既有 `tests/screenshots` 和 `tmp` 下 PNG。逐项确认此类历史输出为目录比较的全部差异，源、其它随页资源和清单一致。AutoOS 子模块环境预检和合入前日志逐字相同，24 个未初始化、27 项清单、0 `missing_pac_at`，exit 1；检查和对照墙钟 1.230 秒。第 107 轮冻结 Windows 验证器读落地原路径，024 20.791 秒、FlowDiagram 16.671 秒，均 exit 0、目标像素重现且关窗。相应 JSON SHA256 `34c28f64d3e620417f171f6db1032ac27f0b05df4e67252a85c73ced9fbbb16b` 和 `35e376cfcdd1187484c1cac4feced7c04e97d23c5c4c0b728b72f6cbd7f8faaf`。A2Vue 正式六入口沿第 107 轮的同源产物和相同调用面复用。
 - `canonical_verified`。AutoUI `docs/specs/runtime/ace-package-widgets.md`、AutoLang `docs/specs/ace-migration/m2-autoui.md` §17、AutoOS `widgets-gallery/README.md` 在三个实际默认分支均匹配第 108 轮 SHA256。AutoOS 新 README 链接到 AutoUI 计划索引。事实源随代码一起落地，索引由应用读取。
 - `archived`。移入 `docs/plans/archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md`，`status: archived`、`completion_kind: delivered`。按真实归档路径核 9 条相对链接、8 个唯一任务及清理前 7/8。AutoUI 跟踪的计划索引更新至本归档。115–118 的本地草稿仅更新反链，原计划内容和草稿状态保留。T-08 尚待完成清理。
+- `cleaned`。归档和导航首次入库 `ec2be380bb873156087c452c69445f0afa39f926`。逐个核六个工作树的绝对组路径、Git 注册、内容身份和最新 `wt-guard.ps1` clean 后移除。三个已合入的 `plan-107-dev` 分支、两个空组和旧 AutoLang 合流临时 ref 均已移除，耗时 61.913 秒，清理收据 SHA256 `a7da05be1a8843aeb7e6167ab98d30e387f1e23ab1cd0b8248d158e101de3240`。r1 两个交接 ref 和语言 stash 已复核存在。
+- 折叠压测及回放收据后删除 `D:/autostack/plan-artifacts/plan-107/`，未跟随其中链接。移除 784935 个普通文件、21930845559 逻辑字节，摘除 28576 个链接，230.921 秒。另移除两个本计划暂存 PDB 目录的 16 个生成文件，scratch 和 PDB 清理共 230.981 秒。核对全部目标目录不存在。`.retention/policy.json` 的 `auto-ui/PLAN-107` 登记已刷新为 `deleted-at-merge (no holds)`、`remaining_bytes: 0`，指向入库归档、交付提交和清理计数。
+- 批量回归到期检查使用 AutoLang 主线 `.last-batch-regression.json`，最后覆盖 1109，`2026-11-21T04:20:52Z`，检查时约 4.784 小时。之后的合入没有编号高于 1109 且为 5 的倍数的计划，未触发批跑。默认检出的现有 `target/debug/auto-ui-tool.exe` 文件日期为 2026-11-19 00:50 +08:00，早于交付。六入口正式验证使用第 107 轮冻结 debug 工具与随后有界的落地实窗复跑。
+
+`stage: merge | plan_id: PLAN-107 | plan_revision: r2 | outcome: pass | gate: known-reds-only | delivery_commits: lang dd5f3eff56176b00cae2c5c8ce916cfed8c2f9f6, ui fb343c48a86476e9b2e6536035dbadb902a50991, os 680a6ae344f89cbf4dcf5efd25a118889fe611c7 | archive: ec2be380bb873156087c452c69445f0afa39f926 | AC-04: pass | tasks: 8/8 | next: done`
 
 ## 10. 下游交接
 
