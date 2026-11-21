@@ -114,7 +114,26 @@ fn p107_checked_child_class_tracks_its_parent_property() {
 }
 
 #[test]
-fn p107_024_area_and_bar_accept_an_empty_input() {
+fn p107_024_area_accepts_an_empty_input() {
+    assert_empty_024_chart(
+        "area-chart",
+        "area_chart",
+        include_str!("../../../examples/ui/024-charts/src/front/components/area_chart.at"),
+        r#", curve: "monotone""#,
+    );
+}
+
+#[test]
+fn p107_024_bar_accepts_an_empty_input() {
+    assert_empty_024_chart(
+        "bar-chart",
+        "bar_chart",
+        include_str!("../../../examples/ui/024-charts/src/front/components/bar_chart.at"),
+        "",
+    );
+}
+
+fn assert_empty_024_chart(tag: &str, module: &str, component: &str, extra_props: &str) {
     use ace_av::{
         age_component::{ComponentScenario, ScenarioOp},
         age_package::{evaluate_package_view, WidgetViewItem},
@@ -123,32 +142,28 @@ fn p107_024_area_and_bar_accept_an_empty_input() {
         age_package::compile_age_package_with_scenario, packages::PACKAGES_CAPABILITY,
     };
 
-    let source = r#"type Month {
+    let source = format!(r#"type Month {{
         m Str
         desktop int
-    }
-    widget ChartData {
-        use { package: official from "components" }
-        model { var monthly List<Month> = [] }
-        view {
-            area-chart (data: .monthly, index: "m", fields: ["desktop"], curve: "monotone") {}
-            bar-chart (data: .monthly, index: "m", fields: ["desktop"]) {}
-        }
-    }"#;
+    }}
+    widget ChartData {{
+        use {{ package: official from "components" }}
+        model {{ var monthly List<Month> = [] }}
+        view {{ {tag} (data: .monthly, index: "m", fields: ["desktop"]{extra_props}) {{}} }}
+    }}"#);
     let units = vec![
-        unit("app", "main", source),
-        unit("official", "area_chart", include_str!("../../../examples/ui/024-charts/src/front/components/area_chart.at")),
-        unit("official", "bar_chart", include_str!("../../../examples/ui/024-charts/src/front/components/bar_chart.at")),
+        unit("app", "main", &source),
+        unit("official", module, component),
         unit("stylekit", "styles", include_str!("../../../examples/ui/stylekit/src/front/styles.at")),
     ];
-    let ops = [1, 2].into_iter().map(|node| ScenarioOp::ForNode {
-        node,
+    let ops = vec![ScenarioOp::ForNode {
+        node: 1,
         op: Box::new(ScenarioOp::Send { instance: 0, msg: "Init".into() }),
-    }).collect();
+    }];
     let checked = compile_age_package_with_scenario(
         &units, "app::main", LegacyWidgetAlias::Accept, &[PACKAGES_CAPABILITY.into()],
         &ComponentScenario { instances: 1, ops },
-    ).expect("the original chart components admit an empty typed list");
+    ).expect("the original chart component admits an empty typed list");
 
     fn filled_paths(items: &[WidgetViewItem], paths: &mut Vec<String>) {
         for item in items {
@@ -164,7 +179,7 @@ fn p107_024_area_and_bar_accept_an_empty_input() {
     }
 
     let view = evaluate_package_view(&checked, 0, &Default::default())
-        .expect("empty Area and Bar view without a division trap");
+        .expect("empty chart view without a division trap");
     let mut paths = Vec::new();
     filled_paths(&view, &mut paths);
     assert!(paths.is_empty(), "{paths:?}");
