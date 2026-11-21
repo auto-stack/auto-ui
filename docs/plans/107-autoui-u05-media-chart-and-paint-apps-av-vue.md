@@ -979,6 +979,14 @@ AutoLang `9bae90dcd2d058da3c20bce64e81a660c08eda71` 合并 `TextDisplay` 到唯�
 
 本轮只选择了终审指定的八个固定组，实际固定门待复审通过。选择记录 `round97-fixed-groups-select.log` SHA256 `98983675525befcf93644361b03b83e54137de49f11867a3c4a75898e0e48b2a`，组配置 SHA256 沿用第 89–91 轮。构建排队 214.2 秒，未计入测试。
 
+### 第 98–101 轮｜Iced 关闭、事件与可见视口对照
+
+AutoUI 先用 debug/test 准备受影响套件 333.432 秒，两个窗口示例的 debug/dev 准备 100.538 秒。通过示例的 `--prep-only` 显式准备 UI980 和 F0。将 `AC741_RUSTC` 指到不存在的路径，分别在全新子进程运行普通打开与权限撤销用例。缺 `ACE_NODE_DESKTOP_PREPARED_RUSTC` 时二者均 exit 101、含 `PREPARATION_REQUIRED`，冷目录不产生；正确准备后同组 11 通过、1 真窗用例待另行运行，0.713 秒。包组件 20/20（12.847 秒）、路由 4/4（1.397 秒）、闭包 4/4（0.878 秒），此处保留各组原未排窗分支的限制。显式串行执行 `ace_node_desktop --ignored --exact p107_window_deadline_fails_with_partial_evidence`，用例执行 1.290163 秒、墙钟 1.353 秒。断言验证窗口子进程退出 6、截止诊断、Counter 部分 JSON 和帧数短缺。SHA256 `dbac0f269306e721c9bc787ca865ca48ecdabdfd279e8781839ac6d24eb330ba`。
+
+原 FlowDiagram 双布局分别使用实窗挂载的 LR、TD 命中和离开回调。每侧高亮 1、弱化 4，提示分别为 start、check，另一侧几何不变，离开复原。修正版 304 帧、目标提交 4、迟到丢弃 1、关闭、exit 0。新文件 `round99-flow-fixed.json` SHA256 `d68e5489a584daace0f71bdc408bc3e9e2779fa0746bbcf64905e564ad8a783c`。冻结版驱动发出 `source.type-mismatch: expected i32, found f32`，退出 6，新文件 SHA256 `754921d098b8fa7b75ed66a297cf2426886c627719ef14acc01860dfa6d6b7c3`。024 实窗点击原 8 点按钮后从 6 增至 8，并在保持 8 点时继续替换首点。暂停、重置恢复 6 点。首次实窗指针探针将合法命中钉死在一月坐标而失败，保留 `round99-024-physical.log`。
+
+空绝对命中区的 Iced 布局永久回归用同一 renderer，从 120×80 的 plot 区接收实际 `CursorMoved`，逻辑 240×160，点 (30,20) 产生 (60,40)，移到区外产生 leave。成功耗时 2.09 秒，外层 2.891 秒。SHA256 `fb3db27892a1b5aadaee43ba02acc5fcd290cbad1c019dd36f8329c28edecdf6`。原 Donut 的实窗已挂载路由而画廊主体不可见，针对原项目的 Iced renderer 对照复现目标标题 `visible_bounds=None`。布局诊断中外壳内层高度仅 57 px，侧栏及主视口高度均为 0。发现 routed checked frame 被额外纵向 Scrollable 包裹，解除 `h-screen` 的高度约束；画廊 `sidebar_content` 的高度也曾下发到滚动内容。诊断 SHA256 `2bf17072a173018766cc6591ac10eed9c39434af929fcb505b82698cabfd8e54`。本轮复修保留原 AutoOS 外壳，从 AutoUI 调整 viewport 接线，之后逐个原页验绘制与事件。
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
