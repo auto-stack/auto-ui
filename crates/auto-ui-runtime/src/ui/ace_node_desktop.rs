@@ -1712,13 +1712,29 @@ impl NodeDesktopBridge {
                     // 模板叶**按视图数据展开，而 shape 只数模块作用域叶——两者
                     // 差恰为可展开的循环叶数时以编译值真值为准（不静默丢项：
                     // 展开不支持的形状仍由 expand_view_for_leaves 具名拒）。
-                    let expanded = expand_view_for_leaves(node)?;
-                    let expected = node.view.texts.len() + expanded.len();
-                    if observed_leaves != expected {
-                        return Err(format!(
-                            "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
-                            shape.text_leaf_count
-                        ));
+                    // PLAN-105 W109（U03 016）：循环源是 **computed/动态列表**
+                    // （非视图数据字面量）时静态展开不可行——以编译观察值为
+                    // 真值接受，前提是观察数 ≥ 模块作用域叶数（动态展开只会
+                    // 增叶；字面量源的静默失配仍具名拒）。
+                    let expanded = match expand_view_for_leaves(node) {
+                        Ok(expanded) => Some(expanded),
+                        Err(e) if e.contains("view-for-unsupported") => None,
+                        Err(e) => return Err(e),
+                    };
+                    match expanded {
+                        Some(expanded) => {
+                            let expected = node.view.texts.len() + expanded.len();
+                            if observed_leaves != expected {
+                                return Err(format!(
+                                    "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
+                                    shape.text_leaf_count
+                                ));
+                            }
+                        }
+                        None => {
+                            // 动态源：shape 计入条件两支的叶（PLAN-104），初始态
+                            // 只走一支——观察数可小于静态数，以编译观察为真值。
+                        }
                     }
                     shape.text_leaf_count = observed_leaves;
                 }

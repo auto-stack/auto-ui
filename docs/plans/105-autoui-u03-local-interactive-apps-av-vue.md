@@ -1060,6 +1060,22 @@ stage: work（012 concat 链四墙解除）| plan_id: PLAN-105 | plan_revision: 
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 113 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: ddbeecaa2 | next: work
 
+stage: work（016 经 AV 桥 + PrevMonth 真点击）| plan_id: PLAN-105 | plan_revision: r1 | round: 114 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | code_commit: auto-ui `07459760` | task_ids: T-04（016）| evidence: `plan-artifacts/plan-105/av-016-w109.json`（sha256 前 16 `32C1EEE046C0ADCF`）| next: work
+
+2026-11-21 stage: work（T-04 W109：016-calendar 经 AV 桥装载 + PrevMonth 真点击）| outcome: pass（T-04 未整体完成）
+
+**交付（auto-ui `07459760`）**：装载点文本叶失配核验对 **computed/动态列表循环源**（016 日历网格）以编译观察值为真值接受——`expand_view_for_leaves` 的静态展开只吃视图数据字面量，动态源按「观察值与产生 texts 的同一编译自洽」采信；shape 计入条件两支的叶（PLAN-104），初始态只走一支，观察数可小于静态数。字面量源的静默失配仍具名拒。
+
+**验收（016 真开窗 + 真点击）**：frames=2、errors=0；日历真实内容渲染（June/2026/Settings/Selected: 2026-06-17）；store 内联状态在位（st_year=2026/st_month=6/st_today=2026-06-17）；**PrevMonth 真点击派发**，按钮面 15 目标齐备（PrevMonth/Today/NextMonth/SelectDay/ToggleSettings/SetTheme/SetAccent）。**同跑回归**：013（mem-backend）frames=1 errors=0；015/018/022（env 关，既定语义）frames=1 errors=0——五 app 全部经桥真装载。**口径记账**：015 带 mem-backend 装载是未定义组合（`List<..>` 具名拒），桥跑按各自既定 env 语义执行。
+
+**边界（诚实）**：012 的 ownership 预算墙未动（冻结契约决策，独立刀）；013 打字两段语义 KNOWN-DEBT 未动；016 的逐 dispatch 动态叶数变化（列表增删后叶数漂移）超出装载点口径，记后续。
+
+**回归（全绿）**：prep 8/8（串行）、u03_sfc_status 4/4、p013_sfc 1/1、p013_store_lane 3/3、u03_sites 1/1、浏览器门五 app failures=0。
+
+`next_responsible_role: work（W110：T-06 冻结回归（两仓受影响组全量收口 + 两端可复跑交付矩阵）；012 预算决策与打字语义随 T-07 终审裁定）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 114 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 07459760 | next: work
+
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
