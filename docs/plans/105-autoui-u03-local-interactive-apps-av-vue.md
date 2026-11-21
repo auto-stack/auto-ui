@@ -1094,6 +1094,10 @@ stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 116 | from: user | 
 
 2026-11-21 stage: waiting（等待轮 1；无新指令，不做事不跑检查）| D-105-预算三选一（a/b/c）仍未答复——本轮续传仅复述选项与恢复语义，无选择。冻结位保持（auto-ui `cc268baa` / auto-lang `ddbeecaa2`，两树 clean）。恢复方式：答复 a/b/c（(a)/(b) 预算刀→复验 012→终审；(c) 直接转 execution_done→终审）。
 
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 117 | from: user | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: cc268baa / ddbeecaa2 | next: user
+
+2026-11-21 stage: waiting（等待轮 2；裁定问题已直接向用户提出仍未获答，不做事不跑检查）| D-105-预算 a/b/c 无选择。冻结位保持。下一轮仍无答复则按协议目标转 blocked（连续三等待轮）。恢复方式不变：答复 a/b/c。
+
 ## 10. 下游交接
 
 ### 待裁定（2026-11-21，T-06 冻结后 T-04 阻断项）
