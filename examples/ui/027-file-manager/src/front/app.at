@@ -432,7 +432,7 @@ widget App {
                                 // 片段（多根迭代纵向堆叠，chevron 掉行实证）
                                 row {
                                     style: col_tight
-                                    button (text: c.name, variant: "ghost", title: c.path.clone()) {
+                                    button (text: c.name, variant: "ghost", title: "" + c.path) {
                                         onclick: .NavTo(c.path)
                                         style: if c.is_last { "h-7 shrink-0 max-w-[10rem] truncate text-xs font-medium text-foreground px-1.5" } else { "h-7 shrink-0 max-w-[10rem] truncate text-xs text-muted-foreground px-1.5" }
                                     }
@@ -452,7 +452,7 @@ widget App {
                             for c in .crumbs_tail {
                                 row {
                                     style: col_tight
-                                    button (text: c.name, variant: "ghost", title: c.path.clone()) {
+                                    button (text: c.name, variant: "ghost", title: "" + c.path) {
                                         onclick: .NavTo(c.path)
                                         style: if c.is_last { "h-7 shrink-0 max-w-[10rem] truncate text-xs font-medium text-foreground px-1.5" } else { "h-7 shrink-0 max-w-[10rem] truncate text-xs text-muted-foreground px-1.5" }
                                     }

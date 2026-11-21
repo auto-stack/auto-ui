@@ -1050,13 +1050,30 @@ const vAutoVersionedImage = {
             script.push_str("}>()\n\n");
         }
 
-        // Import custom types from api.ts (type-only import) — after both
-        // defineProps and defineEmits so prop types and emit payload types
-        // are collected.
-        if !custom_types.is_empty() {
+        // Local record types share their Auto declaration. Types from back.api
+        // still come from the generated API client.
+        let mut seen_types = std::collections::BTreeSet::new();
+        let mut api_types = Vec::new();
+        while let Some(name) = custom_types.pop() {
+            if !seen_types.insert(name.clone()) {
+                continue;
+            }
+            let Some(record) = self.use_module_records.get(&name) else {
+                api_types.push(name);
+                continue;
+            };
+            script.push_str(&format!("interface {name} {{\n"));
+            for member in &record.members {
+                Self::collect_custom_types(&member.ty, &mut custom_types);
+                script.push_str(&format!("  {}: {}\n", member.name, Self::auto_type_to_ts_type(&member.ty)));
+            }
+            script.push_str("}\n\n");
+        }
+        if !api_types.is_empty() {
+            api_types.reverse();
             script.push_str(&format!(
                 "import type {{ {} }} from '@/lib/api'\n\n",
-                custom_types.join(", ")
+                api_types.join(", ")
             ));
         }
 

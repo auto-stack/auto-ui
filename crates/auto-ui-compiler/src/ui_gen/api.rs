@@ -613,6 +613,38 @@ pub fn collect_use_module_fns(
     (fns, imported_names)
 }
 
+/// Resolve the record declarations used by Vue component props and events.
+/// Include their same-module dependencies so nested record fields stay typed.
+pub fn collect_use_module_records(
+    at_path: &Path,
+    code: &str,
+) -> std::collections::BTreeMap<String, auto_lang_core::ast::TypeDecl> {
+    let base_dir = at_path.parent().unwrap_or(Path::new("."));
+    let mut records = std::collections::BTreeMap::new();
+    for import in auto_lang_core::use_scanner::scan_use_statements(code) {
+        if import.items.is_empty() || import.module.starts_with("back.") {
+            continue;
+        }
+        let crate::UseModuleResolution::Module(path) = crate::resolve_use_module(base_dir, &import)
+        else {
+            continue;
+        };
+        let Ok(source) = std::fs::read_to_string(path) else { continue };
+        let Ok(ast) = crate::parse_validated_ui(&source) else { continue };
+        let declarations: Vec<_> = ast.core_stmts().filter_map(|stmt| match stmt {
+            auto_lang_core::ast::Stmt::TypeDecl(record) if record.generic_params.is_empty()
+                && record.parent.is_none() && record.has.is_empty() && !record.members.is_empty() => Some(record),
+            _ => None,
+        }).collect();
+        if declarations.iter().any(|record| record.is_pub && import.items.iter().any(|name| name == record.name.as_str())) {
+            for record in declarations {
+                records.entry(record.name.to_string()).or_insert_with(|| record.clone());
+            }
+        }
+    }
+    records
+}
+
 pub fn validate_ui_file_with_modules(at_path: &Path) -> Result<(), String> {
     let code = std::fs::read_to_string(at_path)
         .map_err(|error| format!("Failed to read {}: {error}", at_path.display()))?;
@@ -763,6 +795,7 @@ pub fn generate_component_from_file(
     // Plan 522: use 导入模块的 fn 池 + 显式导入裸名 —— vue 生成器按需把
     // computed/handler 体引用的 helper fn 转译进消费方 SFC。
     let (use_module_fns, use_imported_names) = collect_use_module_fns(at_path, &code);
+    let use_module_records = collect_use_module_records(at_path, &code);
     // PLAN-671 ③：store 路径用集合形态（widget 路径 :998/:1037 保持 Vec 传参）。
     let use_imported_set: std::collections::HashSet<String> =
         use_imported_names.iter().cloned().collect();
@@ -1161,6 +1194,7 @@ export function installAutoStoreContext(app: { provide(key: string, value: unkno
                 .with_store_surface(opts.store_surface.clone().unwrap_or_default())
                 .with_module_fns(module_fns.clone())
                 .with_use_module_fns(use_module_fns.clone(), use_imported_names.clone())
+                .with_use_module_records(use_module_records.clone())
                 .with_sub_widgets(all_sub_widgets.clone())
                 .with_sub_widget_models(sub_widget_models.clone())
                 .with_sub_widget_msgs(sub_widget_msgs.clone());
@@ -1201,6 +1235,7 @@ export function installAutoStoreContext(app: { provide(key: string, value: unkno
             .with_store_surface(opts.store_surface.clone().unwrap_or_default())
             .with_module_fns(module_fns.clone())
             .with_use_module_fns(use_module_fns.clone(), use_imported_names.clone())
+            .with_use_module_records(use_module_records.clone())
             .with_sub_widgets(all_sub_widgets.clone())
             .with_sub_widget_models(sub_widget_models.clone())
             .with_sub_widget_msgs(sub_widget_msgs.clone())

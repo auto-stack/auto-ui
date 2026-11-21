@@ -76,12 +76,12 @@ widget CollectionView (items: List<CollectionItem> = [], columns: List<Collectio
                 col (class: "flex-1 min-h-0 min-w-0 w-full overflow-auto") {
                     grid (style: if .viewMode == "list" { "grid grid-cols-1 gap-1 w-full p-2" } else { "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 w-full p-2" }) {
                         for item in .rows {
-                            col (key: item.id, class: item.rowStyle.clone()) {
+                            col (key: item.id, class: "" + item.rowStyle) {
                                 row (style: if .viewMode == "list" { "w-full items-center gap-1 px-1" } else { "w-full flex-col gap-1 p-1" }) {
                                     mouse-area (ondblclick: .ItemInput(item.binding, "default", ""),
                                                 oncontextmenu.prevent: .ItemInput(item.binding, "action", "menu"),
                                                 style: "flex-1 min-w-0") {
-                                        button (id: item.focusKey.clone(), title: item.id.clone(), disabled: .disabled || item.disabled,
+                                        button (id: "" + item.focusKey, title: "" + item.id, disabled: .disabled || item.disabled,
                                                 onclick: .ItemInput(item.binding, "selection", ""),
                                                 onfocus: .FocusItem(item.binding),
                                                 onblur: .BlurItem(item.id),
@@ -205,7 +205,7 @@ widget CollectionView (items: List<CollectionItem> = [], columns: List<Collectio
             var id Str = ""
             if !.disabled && .status == "ready" && cv_invalid(.items, .columns, .viewMode) == "" {
                 let target = cv_move(.items, cv_scoped_focus(.focus_scope, .scopeId, .focus_id), 0)
-                if target >= 0 { id = .items[target].id.clone() }
+                if target >= 0 { id = "" + .items[target].id }
             }
             .focus_scope = .scopeId
             .focus_id = id

@@ -783,6 +783,7 @@ pub struct VueGenerator {
     /// computed/handler 体引用的合法入口门(与 vm import_aliases 同口径;
     /// 池内闭包拉取不受此门限)。
     pub use_imported_names: std::collections::HashSet<String>,
+    use_module_records: std::collections::BTreeMap<String, auto_lang_core::ast::TypeDecl>,
 }
 
 /// A Vue component declared in a widget-level `use { component: ... }` block.
@@ -1049,6 +1050,7 @@ impl VueGenerator {
             module_fns: Vec::new(),
             use_module_fns: Vec::new(),
             use_imported_names: std::collections::HashSet::new(),
+            use_module_records: std::collections::BTreeMap::new(),
         }
     }
 
@@ -1068,6 +1070,14 @@ impl VueGenerator {
     ) -> Self {
         self.use_module_fns = fns;
         self.use_imported_names = imported_names.into_iter().collect();
+        self
+    }
+
+    pub fn with_use_module_records(
+        mut self,
+        records: std::collections::BTreeMap<String, auto_lang_core::ast::TypeDecl>,
+    ) -> Self {
+        self.use_module_records = records;
         self
     }
 
@@ -1809,7 +1819,7 @@ impl VueGenerator {
             let mut entries: Vec<(&String, &String)> = widget.key_bindings.iter().collect();
             entries.sort();
             for (key, handler) in entries {
-                if matches!(key.trim_matches('"'), "file:list" | "file:root" | "file:mutate")
+                if matches!(key.trim_matches('"'), "file:list" | "file:root" | "file:mutate" | "file:open" | "widget:context")
                     || auto_ui_dialect::preferences::is_preference_binding(key)
                 {
                     continue;
@@ -15487,6 +15497,21 @@ pub fn double(x int) int {
         );
         assert!(sfc.contains("value: double(x)"), "{sfc}");
         assert!(sfc.contains("function double("), "{sfc}");
+    }
+
+    #[test]
+    fn named_record_in_model_list_keeps_its_fields() {
+        let sfc = gen_sfc_with_use_fns(
+            r#"
+widget EntryView {
+    model { var entries List<Entry> = [Entry { value: (0).to(u64) }] }
+    view { text "Entries" {} }
+}
+"#,
+            "type Entry { value u64 }",
+            &[],
+        );
+        assert!(sfc.contains("[{ value: Math.trunc(0) }]"), "{sfc}");
     }
 
     #[test]

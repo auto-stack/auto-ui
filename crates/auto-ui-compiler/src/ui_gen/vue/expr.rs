@@ -206,7 +206,16 @@ impl VueGenerator {
 
     pub(super) fn convert_condition(&mut self, condition: &str) -> String {
         // Convert .var to var, .len to .length, etc.
-        let mut result = condition.trim().to_string();
+        static TRACK_CALL: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+            regex::Regex::new(r#""(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(^|[\s(!])Env\s*\.\s*track\s*\(\s*\)"#)
+                .expect("valid Vue track expression")
+        });
+        let mut result = TRACK_CALL.replace_all(condition.trim(), |matched: &regex::Captures<'_>| {
+            match matched.get(1) {
+                Some(prefix) => format!("{}{}", prefix.as_str(), super::super::ts_adapter::VUE_TRACK_VALUE),
+                None => matched[0].to_owned(),
+            }
+        }).into_owned();
 
         // Replace .len() with .length (JavaScript property, not method)
         // Plan 028 T9 fix: placeholder .length first so the bare `.len`
@@ -810,6 +819,12 @@ impl VueGenerator {
                 }
             }
             Expr::Call(call) => {
+                if call.args.args.is_empty()
+                    && matches!(call.name.as_ref(), Expr::Dot(object, method)
+                        if method.as_str() == "track" && matches!(object.as_ref(), Expr::Ident(name) if name.as_str() == "Env"))
+                {
+                    return Ok(super::super::ts_adapter::VUE_TRACK_VALUE.to_owned());
+                }
                 // Plan 412 续(toast 参数化):toast()/toast.success() 等调用的
                 // named 参数转 vue-sonner options 对象 ——
                 // toast('msg', position: 'top-left', duration: 2000) →
@@ -1081,6 +1096,14 @@ impl VueGenerator {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(format!("{{{}}}", pairs_js.join(", ")))
+            }
+            Expr::Node(node) if node.name.as_str().starts_with(|letter: char| letter.is_ascii_uppercase())
+                && node.args.args.iter().all(|arg| matches!(arg, auto_lang_core::ast::Arg::Pair(..) | auto_lang_core::ast::Arg::Name(_))) => {
+                // Named data records have the same representation in model initializers and handlers.
+                use super::super::ts_adapter::{transpile_expr_pub, AuraTsContext};
+                let mut output = Vec::new();
+                transpile_expr_pub(expr, &AuraTsContext::new(Default::default()), &mut output);
+                Ok(String::from_utf8_lossy(&output).into_owned())
             }
             Expr::Closure(closure) => {
                 let params: Vec<String> =

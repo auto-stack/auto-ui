@@ -58,9 +58,12 @@ widget ThumbnailContent (src: str = "", alt: str = "", kind: str = "", iconName:
         .Init -> {
             if Env.track() == "vm" {
                 .native_track = true
-                let source = "native-http-image:{\"uri\":" + json_str(.src.to(Str))
-                let resource = source + ",\"resource_id\":" + json_str(.resourceId.to(Str))
-                .http_source = resource + ",\"revision\":" + json_str(.resourceRevision.to(Str)) + "}"
+                let uri Str = .src + ""
+                let resource_id Str = .resourceId + ""
+                let revision Str = .resourceRevision + ""
+                let source = "native-http-image:{\"uri\":" + json_str(uri)
+                let resource = source + ",\"resource_id\":" + json_str(resource_id)
+                .http_source = resource + ",\"revision\":" + json_str(revision) + "}"
             } else {
                 .native_track = false
             }

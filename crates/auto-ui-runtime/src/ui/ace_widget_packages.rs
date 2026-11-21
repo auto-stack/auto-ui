@@ -192,6 +192,13 @@ fn append_package_sources(
     let mut pending = BTreeSet::new();
     enqueue_widgets(package, tags, &mut pending)?;
     enqueue_modules(package, import_name, imports, false, &mut pending);
+    if pending.is_empty() && !units.iter().any(|unit| unit.package == import_name) {
+        // The manifest has been resolved and checked even when the selected
+        // view has no active references to this package's source modules.
+        units.push(PackageModuleInput::component_manifest(
+            import_name.to_owned(), package.manifest.version.clone(),
+        ));
+    }
     let mut resolved = BTreeSet::new();
     let mut source_units = Vec::new();
     while let Some(path) = pending.pop_first() {

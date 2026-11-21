@@ -4590,6 +4590,7 @@ export default router
                                     auto_ui_compiler::ui_gen::api::collect_use_module_fns(
                                         &path, &comp_code,
                                     );
+                                let use_records = auto_ui_compiler::ui_gen::api::collect_use_module_records(&path, &comp_code);
                                 // PLAN-075 (074-sink-mode G-6 未修面): 同文件模块 fn
                                 // (Plan 367 P2-4) 在本臂同病——逐 widget 裸重生成时
                                 // 文件顶层 fn 定义被丢弃,调用点有 emission 无定义
@@ -4641,6 +4642,7 @@ export default router
                                             use_fns.clone(),
                                             imported_names.clone(),
                                         )
+                                        .with_use_module_records(use_records.clone())
                                         .with_module_fns(comp_module_fns.clone());
                                     match gen.generate(widget) {
                                         Ok(widget_code) => {
@@ -4731,6 +4733,7 @@ export default router
                         let sib_code = fs::read_to_string(&path).unwrap_or_default();
                         let (sib_use_fns, sib_imported_names) =
                             auto_ui_compiler::ui_gen::api::collect_use_module_fns(&path, &sib_code);
+                        let sib_use_records = auto_ui_compiler::ui_gen::api::collect_use_module_records(&path, &sib_code);
                         let sib_module_fns = same_file_module_fns(&sib_code);
                         for widget in &widgets {
                             if let Some(ref routes) = widget.routes {
@@ -4751,6 +4754,7 @@ export default router
                                     sib_use_fns.clone(),
                                     sib_imported_names.clone(),
                                 )
+                                .with_use_module_records(sib_use_records.clone())
                                 .with_module_fns(sib_module_fns.clone())
                                 .with_bound_model_channels(
                                     bound_model_channels
@@ -4855,6 +4859,7 @@ export default router
                                 &path,
                                 &dep_comp_code,
                             );
+                        let dep_use_records = auto_ui_compiler::ui_gen::api::collect_use_module_records(&path, &dep_comp_code);
                         // PLAN-075 (074-sink-mode G-6 未修面): dep 文件自身的
                         // 同文件模块 fn（Plan 367 P2-4）在重生成臂同样被丢弃——
                         // bp reference 携带文件顶层 fn 时调用点 TS2304（048
@@ -4878,6 +4883,7 @@ export default router
                                     dep_use_fns.clone(),
                                     dep_imported_names.clone(),
                                 )
+                                .with_use_module_records(dep_use_records.clone())
                                 .with_module_fns(dep_module_fns.clone())
                                 .with_bound_model_channels(
                                     bound_model_channels

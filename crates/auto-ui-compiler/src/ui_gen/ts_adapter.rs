@@ -24,6 +24,9 @@
 pub const VM_ONLY_OBJECT_NATIVES: &[&str] =
     &["fs", "File", "image", "Env", "Process", "file", "process"];
 
+// Preserve the string return type when TypeScript checks cross-track guards.
+pub(super) const VUE_TRACK_VALUE: &str = "String('vue')";
+
 use auto_lang_core::ast::*;
 use auto_lang_core::trans::typescript::TypeScriptTrans;
 use auto_lang_core::trans::Sink;
@@ -1257,13 +1260,18 @@ fn transpile_expr(expr: &Expr, ctx: &AuraTsContext, out: &mut Vec<u8>) {
                     // PLAN-671 的诚实抛错裁定不变：非字面量键与其余
                     // Env.*/Process.* 仍走 __vmOnly。
                     if let auto_lang_core::ast::Expr::Ident(recv) = object.as_ref() {
-                        if VM_ONLY_OBJECT_NATIVES.contains(&recv.as_str()) {
+                        let native_extension = recv.as_str() == "path"
+                            && method.as_str() == "extension"
+                            && ctx.local_ident(recv.as_str()).is_none()
+                            && !ctx.is_state(recv.as_str())
+                            && !ctx.is_prop(recv.as_str());
+                        if VM_ONLY_OBJECT_NATIVES.contains(&recv.as_str()) || native_extension {
                             if recv.as_str() == "Env" {
                                 if method.as_str() == "track" && call.args.args.is_empty() {
                                     ctx.note_warning(
                                         "Env.track() folded to 'vue' (vue-track build)".to_string(),
                                     );
-                                    write!(out, "'vue'").ok();
+                                    write!(out, "{VUE_TRACK_VALUE}").ok();
                                     return;
                                 }
                                 if method.as_str() == "get" {
