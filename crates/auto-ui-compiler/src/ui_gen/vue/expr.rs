@@ -645,6 +645,7 @@ impl VueGenerator {
         use auto_val::Op;
         match expr {
             Expr::Str(s) | Expr::CStr(s) => Ok(format!("'{}'", Self::escape_js_string(s.as_str()))),
+            Expr::FStr(fstr) => Self::format_js_fstring(&fstr.parts, |part| self.expr_to_js(part)),
             Expr::Int(n) => Ok(n.to_string()),
             Expr::I8(n) => Ok((*n as i32).to_string()),
             Expr::U8(n) => Ok((*n as i32).to_string()),
@@ -1283,6 +1284,24 @@ impl VueGenerator {
             }
             _ => Ok("undefined".to_string()),
         }
+    }
+
+    pub(super) fn format_js_fstring(
+        parts: &[auto_lang_core::ast::Expr],
+        mut render: impl FnMut(&auto_lang_core::ast::Expr) -> GenResult<String>,
+    ) -> GenResult<String> {
+        use auto_lang_core::ast::Expr;
+        let mut output = String::from("`");
+        for part in parts {
+            match part {
+                Expr::Str(text) | Expr::CStr(text) => {
+                    output.push_str(&text.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${"));
+                }
+                other => output.push_str(&format!("${{{}}}", render(other)?)),
+            }
+        }
+        output.push('`');
+        Ok(output)
     }
 
     /// Convert binary operator (auto_val::Op) to JS

@@ -15515,6 +15515,22 @@ widget EntryView {
     }
 
     #[test]
+    fn formatted_argument_in_computed_call_reads_the_current_ref() {
+        let sfc = gen_sfc_with_use_fns(
+            r#"
+widget EntryView {
+    model { var revision int = 1 }
+    computed { label => make_label(f"rev-${.revision}") }
+    view { text .label }
+}
+"#,
+            "pub fn make_label(text str) str { return text }",
+            &["make_label"],
+        );
+        assert!(sfc.contains("make_label(`rev-${revision.value}`)"), "{sfc}");
+    }
+
+    #[test]
     fn test_plan522_use_fn_closure_deps_pulled_to_fixpoint() {
         let sfc = gen_sfc_with_use_fns(
             r#"

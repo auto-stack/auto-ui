@@ -15,6 +15,7 @@ impl VueGenerator {
         let directory_reply = bound_handler("file:list");
         let directory_root = bound_handler("file:root");
         let mutation_reply = bound_handler("file:mutate");
+        let open_reply = bound_handler("file:open");
         let preferences = auto_ui_dialect::preferences::preference_bindings(
             widget.key_bindings.iter().map(|(key, handler)| (key.as_str(), handler.as_str())),
         ).map_err(GenError::UnsupportedStmt)?;
@@ -59,6 +60,11 @@ impl VueGenerator {
                     "file:mutate binding requires an explicit fs_mutate import from back.api".into(),
                 ));
             }
+        }
+        if open_reply.is_some() && !widget.state_vars.iter().any(|state| state.name == "file_open_pending") {
+            return Err(GenError::UnsupportedStmt(
+                "file:open binding requires model field `file_open_pending`".into(),
+            ));
         }
 
         // Determine needed imports
@@ -232,7 +238,7 @@ impl VueGenerator {
             }
         }
         // Widget-level `watch { ... }` block → Vue watch() calls
-        if (!widget.watchers.is_empty() || directory_reply.is_some() || mutation_reply.is_some()
+        if (!widget.watchers.is_empty() || directory_reply.is_some() || mutation_reply.is_some() || open_reply.is_some()
             || !preferences.is_empty())
             && !imports.contains(&"watch")
         {
@@ -1935,6 +1941,12 @@ if ((window as any).__AUTO_UI_THEME__ === 'light' || (window as any).__AUTO_UI_T
 }}, {{ immediate: true, flush: 'sync' }})
 
 "#
+            ));
+        }
+        if let Some(reply) = open_reply {
+            // The browser delivers the desktop-only reply without starting a file operation.
+            script.push_str(&format!(
+                "watch(file_open_pending, pending => {{ if (pending) {reply}(0) }}, {{ immediate: true, flush: 'sync' }})\n\n"
             ));
         }
 
@@ -3873,28 +3885,7 @@ impl VueGenerator {
                     _ => Ok(format!("!{}", expr_str)),
                 }
             }
-            Expr::FStr(fstr) => {
-                // f-string in a bound position → JS template literal:
-                // f"${.top}px" → `${top}px` (needed e.g. for style_obj values).
-                let mut out = String::from("`");
-                for part in &fstr.parts {
-                    match part {
-                        Expr::Str(s) | Expr::CStr(s) => {
-                            out.push_str(
-                                &s.replace("\\", "\\\\")
-                                    .replace("`", "\\`")
-                                    .replace("${", "\\${"),
-                            );
-                        }
-                        other => {
-                            let v = self.expr_to_vue_bound_value(other)?;
-                            out.push_str(&format!("${{{}}}", v));
-                        }
-                    }
-                }
-                out.push('`');
-                Ok(out)
-            }
+            Expr::FStr(fstr) => Self::format_js_fstring(&fstr.parts, |part| self.expr_to_vue_bound_value(part)),
             // Plan 022: fn 调用作为绑定值（如组件 props: Comp { items: getList(.msg) }）。
             // 复用 expr_to_vue_text_raw:5550-5559 的简单调用模板。此前 Expr::Call 落到
             // _ => "null"，导致 fn 调用 prop 被丢弃（getQuestions(.msg) → null）。
