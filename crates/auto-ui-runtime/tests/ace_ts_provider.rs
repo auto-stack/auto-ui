@@ -778,8 +778,7 @@ fn p980_web_unified_entry_census_v2() {
             "widget R {\n    msg Msg { Query(str) }\n\n    model {\n        var last str = \"\"\n    }\n\n    view {\n        col { text \"R\" }\n    }\n\n    on {\n        .Query(q) -> { .last = q }\n    }\n}\n",
         ),
         (
-            // 切片#6j 负控行：float 载荷不可承载（981 派发守卫同族
-            // fail-closed）→ 具名缺席（旧道承载），不造假数值。
+            // PLAN-107: pointer coordinates use the checked float payload.
             "float-payload",
             "widget F2 {\n    msg Msg { Resize(float) }\n\n    model {\n        var size int = 0\n    }\n\n    view {\n        col { text \"F\" }\n    }\n\n    on {\n        .Resize(w) -> { .size = 1 }\n    }\n}\n",
         ),
@@ -827,7 +826,7 @@ fn p980_web_unified_entry_census_v2() {
         ("watch-only", 0, false),
         ("param-handler", 1, false),
         ("param-read", 1, false),
-        ("float-payload", 0, true),
+        ("float-payload", 1, false),
         ("inline-lambda-only", 1, false),
         ("lambda-if", 1, false),
     ];
@@ -945,10 +944,12 @@ fn p980_web_full_dual_track_census() {
     // absent-1（逐项 A/B 实证：本刀 ui 侧模块 fn 重挂对计数零影响——
     // stash 对照逐项同值；翻转全部来自 lang 侧 lane 派生面（[60] 族进入
     // 拼接、[18] 族移出））。本修订在 lang `010e26f08` 基线上实测。
+    // PLAN-107 admits the checked float payload, moving one absent handler
+    // to the spliced column. The other census rows retain their outcomes.
     assert_eq!(corpus.len(), 83, "corpus size frozen");
     assert_eq!(
         (ok, err, spliced, absent),
-        (75, 8, 8, 22),
+        (75, 8, 9, 21),
         "dual-track aggregates frozen"
     );
 }
@@ -1140,8 +1141,7 @@ fn p980_web_lane_browser_mount() {
 
 /// WEB 切片#6j（PLAN-981 B-W1 消费，V-EVT-WEB-CONSUME CPU 面）：**param
 /// handler 的 lane 参数环境**——声明级检查函数发射（`__age_hv_*` 真形参）
-/// + 按位宿主映射。分列：typed/fragment/splice/node + 负控（float 具名缺
-/// 席、无参数环境=拒绝拼接常量体）。
+/// + 按位宿主映射。分列 typed/fragment/splice/node，另验无参数环境具名拒。
 #[test]
 fn p980_web_param_environment() {
     use auto_ui_runtime::ui::ace_ts_provider::ComponentFragmentLane;
@@ -1153,7 +1153,7 @@ fn p980_web_param_environment() {
     let q_src = "widget Q {\n    msg Msg { Query(str) }\n\n    model {\n        var last str = \"\"\n    }\n\n    view {\n        col { text \"Q\" }\n    }\n\n    on {\n        .Query(q) -> { .last = q }\n    }\n}\n";
     let m_src = "widget M {\n    msg Msg { Move(int, int) }\n\n    model {\n        var x int = 0\n    }\n\n    view {\n        col { text \"M\" }\n    }\n\n    on {\n        .Move(dx, dy) -> { .x = dx + dy }\n    }\n}\n";
     let b_src = "widget B {\n    msg Msg { SetDark(bool) }\n\n    model {\n        var dark bool = false\n    }\n\n    view {\n        col { text \"B\" }\n    }\n\n    on {\n        .SetDark(on) -> { .dark = on }\n    }\n}\n";
-    let f_src = "widget F {\n    msg Msg { Resize(float) }\n\n    model {\n        var size int = 0\n    }\n\n    view {\n        col { text \"F\" }\n    }\n\n    on {\n        .Resize(w) -> { .size = 1 }\n    }\n}\n";
+    let f_src = "widget F {\n    msg Msg { Resize(float) }\n\n    model {\n        var size float = 0.0\n    }\n\n    view {\n        col { text \"F\" }\n    }\n\n    on {\n        .Resize(w) -> { .size = w * 1.5 }\n    }\n}\n";
     let q = vec!["q".to_string()];
     let m = vec!["dx".to_string(), "dy".to_string()];
     let b = vec!["on".to_string()];
@@ -1225,10 +1225,22 @@ fn p980_web_param_environment() {
         "bool param read directly"
     );
 
-    // ④ node：宿主绑定实读参（多载荷 3+4=7；真 a2x_rt helper 就位）。
+    let specs = [LaneHandlerSpec {
+        pattern: ".Resize",
+        params: &f,
+        lambda_region: None,
+    }];
+    let (f_bodies, f_absent) =
+        lane_handler_bodies_spec(f_src, "p107-float-payload.at", &specs).expect("float fragment");
+    assert!(f_absent.is_empty(), "{f_absent:?}");
+    let [float_fragment] = f_bodies.as_slice() else { panic!("{f_bodies:?}") };
+    assert_eq!(float_fragment.params, f);
+    let f_body = float_fragment.lines.join("\n");
+
+    // Execute both fragments with non-constant host arguments in Node.
     let m_body = bodies.first().expect("m body").lines.join("\n");
     let driver = format!(
-        "import {{ a2x_add }} from \"./a2x_rt.mjs\";\nconst x = {{ value: 0 }};\nfunction Move(dx, dy) {{\n{m_body}\nreturn x.value;\n}}\nconst r = Move(3, 4);\nif (!(r === 7 && x.value === 7)) {{ throw new Error(\"FRAG_ASSERT_FAILED\"); }}\nconsole.log(\"FRAG_OK\");\n"
+        "import {{ a2x_add, a2x_f32_bits, a2x_f32_round }} from \"./a2x_rt.mjs\";\nconst x = {{ value: 0 }}, size = {{ value: 0 }};\nfunction Move(dx, dy) {{\n{m_body}\nreturn x.value;\n}}\nfunction Resize(w) {{\n{f_body}\nreturn size.value;\n}}\nif (Move(3, 4) !== 7 || Resize(1.25) !== 1.875 || Resize(-0.5) !== -0.75) {{ throw new Error(\"FRAG_ASSERT_FAILED\"); }}\nconsole.log(\"FRAG_OK\");\n"
     );
     let dir = std::env::temp_dir().join(format!("p980-6j-node-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1252,23 +1264,6 @@ fn p980_web_param_environment() {
         "node param env: {stdout} / {}",
         String::from_utf8_lossy(&out.stderr)
     );
-
-    // ⑤ 负控——float 载荷：无检查函数（981 派发守卫同族 fail-closed），
-    // 具名缺席（旧道承载），不造假数值。
-    {
-        let specs = [LaneHandlerSpec {
-            pattern: ".Resize",
-            params: &f,
-            lambda_region: None,
-        }];
-        let (f_bodies, f_absent) =
-            lane_handler_bodies_spec(f_src, "p980-6j.at", &specs).expect("f derives");
-        assert!(
-            f_bodies.is_empty(),
-            "float payload must not fabricate a body"
-        );
-        assert_eq!(f_absent, vec![".Resize".to_string()], "named absence");
-    }
 
     // ⑥ 负控——无参数环境：param handler 以 unit spec（无形参）求导=**编
     // 译期具名拒**（981 arity 域错误，零效果——不再像 981 前拼接常量体，

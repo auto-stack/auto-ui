@@ -149,7 +149,7 @@ widget AreaChart (data: List, index: str = "m", fields: List<str> = ["v"], color
                     ys.push(yv)
                 }
                 var lstr = ""
-                if .curve == "monotone" {
+                if n > 0 && .curve == "monotone" {
                     // 割线表 delta[i] = (y[i+1]-y[i])/h
                     var deltas List = []
                     var di = 0
@@ -213,7 +213,10 @@ widget AreaChart (data: List, index: str = "m", fields: List<str> = ["v"], color
                 // 面积闭合:描边路径 + 末点下探底边 → 回首点 x 的底边 → Z
                 var nf2 float = n - 1
                 var xlast float = left + nf2 * stepf
-                var astr = lstr + f" L${xlast} 260 L40 260 Z"
+                var astr = ""
+                if n > 0 {
+                    astr = lstr + f" L${xlast} 260 L40 260 Z"
+                }
                 var ci int = k
                 if ci >= ccount {
                     ci = ccount - 1
@@ -355,7 +358,10 @@ widget AreaChart (data: List, index: str = "m", fields: List<str> = ["v"], color
 
             // ---- 命中竖带 + tooltip 内容(逐索引预计算) ----
             var nf3 float = n
-            var slot float = (right - left) / nf3
+            var slot float = 0.0
+            if n > 0 {
+                slot = (right - left) / nf3
+            }
             var outBands List = []
             var outTipTitle List = []
             var outTipBody List = []

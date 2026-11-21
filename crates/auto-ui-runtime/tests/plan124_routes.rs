@@ -31,6 +31,46 @@ fn reader() -> Vec<PackageModuleInput> {
 }
 
 #[test]
+fn route_sfc_keeps_hyphenated_and_underscored_page_files_distinct() {
+    let app = r#"widget App {
+    routes {
+        "/code-editor" -> use code-editor
+        "/code_editor" -> use code_editor
+    }
+    view {
+        col { outlet }
+    }
+}
+"#;
+    let page = |label: &str| format!(r#"fn seed() int {{ return 1 }}
+widget Page {{
+    model {{ count int = seed() }}
+    view {{ text "{label}" {{}} }}
+}}
+"#);
+    let units = [
+        unit("app", app),
+        unit("code-editor", &page("Dash page")),
+        unit("code_editor", &page("Underscore page")),
+    ];
+    let product = generate_routed_package_sfcs(&units, "fixture::app").unwrap().unwrap();
+    assert_eq!(product.paths, [
+        ("/code-editor".into(), "code-editor".into()),
+        ("/code_editor".into(), "code_editor".into()),
+    ]);
+    assert!(product.pages["code-editor"].contains("Dash page"));
+    assert!(product.pages["code_editor"].contains("Underscore page"));
+    let compiled = ace_core::source::age_package::compile_age_package(
+        &units, "fixture::app", ace_av::age_component::LegacyWidgetAlias::Accept,
+        &[ace_core::source::packages::PACKAGES_CAPABILITY.into()],
+    ).unwrap();
+    assert_ne!(
+        compiled.symbol_of_in("fixture::code-editor", "seed").unwrap(),
+        compiled.symbol_of_in("fixture::code_editor", "seed").unwrap(),
+    );
+}
+
+#[test]
 fn route_sfc_publishes_pages_and_local_diagnostics() {
     let product = generate_routed_package_sfcs(&reader(), "fixture::app")
         .expect("routed product")
@@ -72,6 +112,113 @@ fn route_sfc_publishes_pages_and_local_diagnostics() {
         chapter.contains("aceParam(\"id\"") && chapter.contains("aceParam(\"ch\""),
         "{chapter}"
     );
+}
+
+#[test]
+fn native_front_routes_mount_the_checked_page_in_the_authored_outlet() {
+    use auto_ui_runtime::ui::{
+        ace_node_desktop::{host_session_stats, install_bridge, with_bridge, AceNodeDesktopWindow, NodeDesktopMsg},
+        Component, View,
+    };
+
+    fn button(view: &View<NodeDesktopMsg>, name: &str) -> Option<NodeDesktopMsg> {
+        match view {
+            View::Button { label, onclick, .. } if label == name => Some(onclick.clone()),
+            View::Column { children, .. } | View::Row { children, .. } => {
+                children.iter().find_map(|child| button(child, name))
+            }
+            View::Scrollable { child, .. } => button(child, name),
+            _ => None,
+        }
+    }
+
+    assert!(std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_some());
+    let dir = tempfile::tempdir().unwrap();
+    let front = dir.path();
+    let pages = front.join("pages/nested");
+    let components = front.join("components");
+    std::fs::create_dir_all(&pages).unwrap();
+    std::fs::create_dir_all(&components).unwrap();
+    let app = r#"widget Gallery {
+    use { package: official from "./components" }
+    routes {
+        "/" -> use intro
+        "/tree-page" -> use tree-page
+    }
+    model { showNavigation bool = true }
+    view {
+        col {
+            TopBanner {}
+            if .showNavigation {
+                sidebar_menu_button (to: "/tree-page") { text "Open tree" }
+            }
+            col {
+                text "Before outlet"
+                outlet (memo: true)
+                text "After outlet"
+            }
+        }
+    }
+}
+"#;
+    let app_path = front.join("app.at");
+    std::fs::write(&app_path, app).unwrap();
+    std::fs::write(
+        components.join("package.at"), "name: \"official\"\nversion: \"0.1.0\"\n",
+    ).unwrap();
+    std::fs::write(
+        components.join("banner.at"), "widget TopBanner { view { text \"Gallery banner\" {} } }\n",
+    ).unwrap();
+    std::fs::write(
+        components.join("leaf.at"), "widget TreeLeaf { view { text \"Authored tree leaf\" {} } }\n",
+    ).unwrap();
+    std::fs::write(pages.join("intro.at"), "widget Intro { view { text \"Original intro\" {} } }\n").unwrap();
+    std::fs::write(pages.join("tree-page.at"), r#"widget TreePage {
+    use { package: official from "../../components" }
+    msg { Init, Back }
+    model { count int = 0 }
+    on {
+        .Init -> { .count = .count + 1 }
+        .Back -> { router.back() }
+    }
+    view {
+        TreeLeaf {}
+        text f"Mounts: ${.count}" {}
+        button "Go back" { onClick: .Back }
+    }
+}
+"#).unwrap();
+
+    let mut bridge = NodeDesktopBridge::load(app, app_path.to_str().unwrap(), 1).unwrap();
+    let shell = bridge.open().unwrap();
+    install_bridge(bridge);
+    let mut window = AceNodeDesktopWindow::default();
+    let render = |window: &AceNodeDesktopWindow| format!("{:?}", window.view());
+    let click = |window: &mut AceNodeDesktopWindow, name| {
+        window.on(button(&window.view(), name).unwrap());
+        with_bridge(|bridge| bridge.step()).unwrap()
+    };
+    assert!(render(&window).contains("Original intro"));
+    click(&mut window, "Open tree");
+    let rendered = render(&window);
+    assert!(rendered.contains("Gallery banner"));
+    assert!(rendered.contains("Mounts: 1"));
+    let before = rendered.find("Before outlet").unwrap();
+    let leaf = rendered.find("Authored tree leaf").unwrap();
+    let after = rendered.find("After outlet").unwrap();
+    assert!(before < leaf && leaf < after);
+    let back = button(&window.view(), "Go back").unwrap();
+    let NodeDesktopMsg::PackageClick { session: page, .. } = back else {
+        panic!("expected a checked page click");
+    };
+    assert_ne!(page, shell);
+    click(&mut window, "Go back");
+    assert!(render(&window).contains("Original intro"));
+    window.on(back);
+    assert_eq!(host_session_stats(page).unwrap().late_dropped, 1);
+    click(&mut window, "Open tree");
+    assert!(render(&window).contains("Mounts: 1"));
+    with_bridge(|bridge| bridge.close_session()).unwrap().unwrap();
 }
 
 #[test]

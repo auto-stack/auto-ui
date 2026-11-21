@@ -770,7 +770,7 @@ impl AceStateEngine {
 }
 
 /// 桥值 → 场景初值域（负控车道沿用；同一 int/bool/str 值域的拷贝映射）。
-fn initial_of(v: &AceStateValue) -> InitialValue {
+pub(super) fn initial_of(v: &AceStateValue) -> InitialValue {
     match v {
         AceStateValue::Int(i) => InitialValue::Int(*i as i64),
         AceStateValue::Bool(b) => InitialValue::Bool(*b),

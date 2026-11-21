@@ -4,8 +4,7 @@
 //! + 惰性 `use themes.themes: Auto, Solarized`）；两实例场景 + 实例 0 的 `Inc`。
 //! 判据：状态行的 AV 值随 helper 源从 `[4, 2]` 变为 `[20, 10]`（CPU 与真窗同源）。
 //!
-//! 边界（诚实）：包场景桥首版只观察 int 字段、无 props/initials 面、带载荷 dispatch
-//! 未接线（均具名拒）；真窗键入/输入面仍走组件面 U01 切片。
+//! 包场景桥观察标量状态和文本，非空 props/initials 具名拒绝。
 use ace_core::source::packages::PackageModuleInput;
 use auto_ui_runtime::ui::ace_node_desktop::{
     ensure_ui980_provider, push_event, NodeDesktopBridge, StepOutcome,
@@ -36,7 +35,7 @@ node Counter {\n\
 \n\
     view {\n\
         col {\n\
-            text \"Counter\"\n\
+            text f\"Counter ${.count}\"\n\
             row {\n\
                 button \"Reset\" { onclick: .Reset }\n\
                 button \"+\" { onclick: .Inc }\n\
@@ -103,6 +102,16 @@ fn p980_closure_package_bridge_states_follow_the_helper() {
         2,
         "instance 1 keeps the initial step(0)"
     );
+    let assert_texts = |bridge: &NodeDesktopBridge| {
+        let evidence = bridge.evidence();
+        let session = evidence["sessions"].as_array().unwrap().last().unwrap();
+        assert_eq!(session["texts"], serde_json::json!([["Counter 4"], ["Counter 2"]]));
+    };
+    assert_texts(&base);
+    base.close_session().expect("close");
+    base.reopen().expect("reopen");
+    assert_texts(&base);
+    base.close_session().expect("close after reopen");
 
     let mut edited = load(HELPER_EDITED);
     edited.open().expect("open");
@@ -143,6 +152,57 @@ fn p980_closure_package_bridge_refuses_initials() {
         )
         .expect_err("package initials are a named pending surface");
     assert!(err.contains("no props/initials surface"), "{err}");
+}
+
+#[test]
+fn p107_package_bridge_replays_pointer_floats_in_the_entry_instance() {
+    use auto_ui_runtime::ui::ace_package_bridge::PackageStateEngine;
+    use auto_ui_runtime::ui::ace_state_bridge::AceStateValue::{F32, Int};
+
+    let source = r#"
+node Plot {
+    msg { PointerMove(float, f32), Clear }
+    model { var side int = 0 }
+    view { text "Plot" }
+    on {
+        .PointerMove(x, y) -> {
+            if x > y {
+                .side = 1
+            } else {
+                .side = 2
+            }
+        }
+        .Clear -> { .side = 0 }
+    }
+}
+"#;
+    let mut engine = PackageStateEngine::new(
+        vec![
+            unit("aux", "first", r#"node Notice { view { text "Other component" } }"#),
+            unit("app", "main", source),
+        ],
+        "app::main",
+        ace_av::age_component::LegacyWidgetAlias::Reject,
+    )
+    .expect("checked pointer message");
+    engine.mount("a", vec![]).unwrap();
+    engine.mount("b", vec![]).unwrap();
+    let read = |engine: &PackageStateEngine, identity: &str| {
+        engine.read_all(identity).expect("live entry state")
+    };
+    let side = |value| vec![("side".to_owned(), Int(value))];
+    assert!(engine.dispatch("a", "PointerMove").is_err());
+    assert!(engine.dispatch_with_args("a", "PointerMove", &[Int(2), F32(2.25)]).is_err());
+    assert!(engine.dispatch_with_args("a", "PointerMove", &[F32(f32::NAN), F32(2.25)]).is_err());
+    assert_eq!(read(&engine, "a"), side(0));
+    engine.dispatch_with_args("a", "PointerMove", &[F32(2.5), F32(2.25)]).unwrap();
+    engine.dispatch_with_args("b", "PointerMove", &[F32(2.25), F32(2.5)]).unwrap();
+    assert_eq!(read(&engine, "a"), side(1));
+    assert_eq!(read(&engine, "b"), side(2));
+    assert_eq!(engine.texts("a").unwrap(), ["Plot"]);
+    engine.dispatch("a", "Clear").unwrap();
+    assert_eq!(read(&engine, "a"), side(0));
+    assert_eq!(read(&engine, "b"), side(2));
 }
 
 /// 真窗面（`AUTO_UI_ACE_NODE_E2E=1`）：同一包闭包跑真实窗口两次——helper 原值

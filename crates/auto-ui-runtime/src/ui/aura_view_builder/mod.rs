@@ -1068,7 +1068,7 @@ fn fold_floats(
 
 /// Plan 499 M2: coords 逻辑幅面解析("WxH",如 "560x300")。
 /// 解析失败返回 None(= raw px 模式),不致命中错误坐标语义。
-fn parse_coords_extent(s: &str) -> Option<(f32, f32)> {
+pub(super) fn parse_coords_extent(s: &str) -> Option<(f32, f32)> {
     let s = s.trim();
     let (w, h) = s.split_once(['x', 'X'])?;
     let w: f32 = w.trim().parse().ok()?;
@@ -8491,27 +8491,13 @@ fn popover_node_children(n: &AuraNode) -> &[AuraNode] {
 /// 根元素 svg 由 convert_svg_image 显式发起)。与 ui_gen/vue.rs map_tag 的
 /// SVG 直通臂同表。Plan 502 M1: 增 `text`(diagram 标签机制——位置参数
 /// 文本经 props["text"] 进元素内容,见 serialize_svg_element)。
-fn is_svg_shape_tag(tag: &str) -> bool {
-    matches!(
-        tag,
-        "svg"
-            | "path"
-            | "circle"
-            | "rect"
-            | "line"
-            | "polyline"
-            | "polygon"
-            | "ellipse"
-            | "g"
-            | "defs"
-            | "use"
-            | "stop"
-            | "linearGradient"
-            | "radialGradient"
-            | "clipPath"
-            | "mask"
-            | "text"
-    )
+pub(super) const SVG_SHAPE_TAGS: &[&str] = &[
+    "svg", "path", "circle", "rect", "line", "polyline", "polygon", "ellipse", "g", "defs",
+    "use", "stop", "linearGradient", "radialGradient", "clipPath", "mask", "text",
+];
+
+pub(super) fn is_svg_shape_tag(tag: &str) -> bool {
+    SVG_SHAPE_TAGS.contains(&tag)
 }
 
 /// Plan 442 A4: 字面量 expr → SVG attribute 值(字符串原文,数值/布尔

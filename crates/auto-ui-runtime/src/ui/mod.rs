@@ -182,6 +182,10 @@ pub mod ace_source_prep;
 #[cfg(feature = "ace-bridge")]
 mod ace_widget_props;
 #[cfg(feature = "ace-bridge")]
+mod ace_svg;
+#[cfg(feature = "ace-bridge")]
+mod ace_widget_packages;
+#[cfg(feature = "ace-bridge")]
 mod ace_route;
 #[cfg(feature = "ace-bridge")]
 mod ace_route_desktop;

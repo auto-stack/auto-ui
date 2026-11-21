@@ -1,5 +1,5 @@
 use ace_core::source::age_component::{
-    ComponentEntryValue, ComponentViewElement, ComponentViewItem,
+    ComponentClassPart, ComponentEntryValue, ComponentViewElement, ComponentViewItem,
 };
 use ace_core::source::ast::{Expr, ExprKind};
 
@@ -52,6 +52,19 @@ pub(super) fn style(element: &ComponentViewElement) -> String {
         .flatten()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+pub(super) fn conditional_classes(
+    element: &ComponentViewElement,
+) -> impl Iterator<Item = &ComponentClassPart> {
+    element.items.iter().filter_map(|item| {
+        if let ComponentViewItem::Entry(entry) = item {
+            if let ComponentEntryValue::ClassList(parts) = &entry.value {
+                return Some(parts.as_slice());
+            }
+        }
+        None
+    }).flatten()
 }
 
 pub(super) fn square_style(element: &ComponentViewElement) -> String {

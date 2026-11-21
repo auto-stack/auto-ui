@@ -9,12 +9,13 @@
 //! 边界（具名）：本片只发射"handler 体 + 被引用的包内 helper 函数体"，不产出
 //! 完整 SFC（template/样式归既有方言道）；只支持 int/str/bool 标量体（与 976
 //! fragment 域的既有拒绝面一致）。
-use ace_a2x_core::SemanticView;
+use ace_a2x_core::{SemanticView, Ty};
 use ace_core::source::packages::PackageModuleInput;
+use std::collections::BTreeSet;
 
 /// 包片段 lane：受检模块 + 脱糖源（span 基准）。
 pub struct PackageFragmentLane {
-    ds_src: String,
+    entry_src: String,
     entry_offset: usize,
     checked: ace_core::verify::CheckedModule,
 }
@@ -34,6 +35,13 @@ pub struct PackageFragment {
 pub struct PackageFunctionBody {
     pub text: Vec<String>,
     pub locals: Vec<ace_a2x_ts::FragmentLocal>,
+    pub helpers: Vec<String>,
+}
+
+pub(super) struct CheckedHandlerBody {
+    pub params: Vec<String>,
+    pub lines: Vec<String>,
+    pub helpers: BTreeSet<String>,
 }
 
 impl PackageFragmentLane {
@@ -50,8 +58,6 @@ impl PackageFragmentLane {
             .find(|u| format!("{}::{}", u.package, u.id) == entry)
             .map(|u| u.source.clone())
             .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
-        let ds_src = ace_core::source::fstr::desugar_fstrings_widget(&entry_src)
-            .map_err(|e| format!("fstr desugar: {e}"))?;
         let caps = [ace_core::source::packages::PACKAGES_CAPABILITY.to_string()];
         let ops = handler_msgs
             .iter()
@@ -82,15 +88,15 @@ impl PackageFragmentLane {
             .ok_or_else(|| format!("compiled package has no entry module {entry:?}"))?
             .flat_start;
         Ok(Self {
-            ds_src,
+            entry_src,
             entry_offset,
             checked: compiled.checked,
         })
     }
 
-    /// 脱糖源长度（span 上界校验用）。
+    /// Authored source length used to validate spans.
     pub fn source_len(&self) -> usize {
-        self.ds_src.len()
+        self.entry_src.len()
     }
 
     /// 受检模块（view 构建用）。
@@ -100,7 +106,7 @@ impl PackageFragmentLane {
 
     /// 受检视图里的函数源名（调用方定位状态函数/helper 用）。
     pub fn function_names(&self) -> Result<Vec<String>, String> {
-        let view = SemanticView::from_checked(&self.checked)
+        let view = SemanticView::from_checked_age_package(&self.checked)
             .map_err(|e| format!("semantic view: {e:?}"))?;
         Ok(view
             .functions()
@@ -111,10 +117,10 @@ impl PackageFragmentLane {
 
     /// 源里第一次出现 `needle` 的 span（测试/调用方定位 handler 表达式用）。
     pub fn find_span(&self, needle: &str) -> Result<std::ops::Range<usize>, String> {
-        self.ds_src
+        self.entry_src
             .find(needle)
             .map(|start| start..start + needle.len())
-            .ok_or_else(|| format!("`{needle}` not found in the desugared source"))
+            .ok_or_else(|| format!("`{needle}` not found in the entry source"))
     }
 
     /// 在指定函数的体内、按**精确 span** 发射表达式（同 span 取索引最大者）。
@@ -123,7 +129,7 @@ impl PackageFragmentLane {
         fn_suffix: &str,
         span: std::ops::Range<usize>,
     ) -> Result<PackageFragment, String> {
-        let view = SemanticView::from_checked(&self.checked)
+        let view = SemanticView::from_checked_age_package(&self.checked)
             .map_err(|e| format!("semantic view: {e:?}"))?;
         let facts = view
             .functions()
@@ -162,36 +168,111 @@ impl PackageFragmentLane {
 
     /// 发射一个函数的**全部语句**（helper 定义落产物用；返回逐语句文本）。
     pub fn emit_function_body(&self, fn_suffix: &str) -> Result<PackageFunctionBody, String> {
-        let view = SemanticView::from_checked(&self.checked)
+        let view = SemanticView::from_checked_age_package(&self.checked)
             .map_err(|e| format!("semantic view: {e:?}"))?;
         let facts = view
             .functions()
             .iter()
-            .find(|f| f.source_name.ends_with(fn_suffix))
+            .find(|f| f.source_name == fn_suffix)
+            .or_else(|| {
+                view.functions()
+                    .iter()
+                    .find(|f| f.source_name.ends_with(fn_suffix))
+            })
             .ok_or_else(|| format!("no function ending with `{fn_suffix}` in the package view"))?;
         let ctx = ace_a2x_ts::FragmentProgramContext::from_view(&view);
-        let body = facts
-            .body
-            .blocks
-            .first()
-            .ok_or_else(|| format!("function `{}` has no body block", facts.source_name))?;
-        let mut out = Vec::new();
-        let mut locals = Vec::new();
-        for stmt in 0..body.stmts.len() {
-            let raw = ace_a2x_ts::emit_stmt_fragment(
-                ace_a2x_ts::ScriptLang::TypeScript,
-                &view,
-                facts,
-                0,
-                stmt,
-                &ctx,
+        let body = ace_a2x_ts::emit_function_body_fragment(
+            ace_a2x_ts::ScriptLang::JavaScript,
+            &view,
+            facts,
+            &ctx,
+        )
+        .map_err(|err| format!("function body: {err:?}"))?;
+        Ok(PackageFunctionBody {
+            text: body.text,
+            locals: body.locals,
+            helpers: body.helpers,
+        })
+    }
+
+    /// The check function has model seeds, the handler statements, and a model
+    /// probe return. Emit the middle section and bind its locals to live refs.
+    pub(super) fn emit_checked_handler_body(
+        &self,
+        symbol: &str,
+        fields: &[(String, String)],
+    ) -> Result<CheckedHandlerBody, String> {
+        use ace_core::hir::Stmt;
+
+        let view = SemanticView::from_checked(&self.checked)
+            .map_err(|err| format!("semantic view: {err:?}"))?;
+        let facts = view
+            .functions()
+            .iter()
+            .find(|f| f.source_name == symbol)
+            .ok_or_else(|| format!("checked handler `{symbol}` is missing"))?;
+        let entry = facts.body.entry.0;
+        let stmts = &facts.body.blocks[entry as usize].stmts;
+        let (Stmt::Return { .. }, before_return) = stmts
+            .split_last()
+            .ok_or_else(|| "checked handler has no result".to_owned())?
+        else {
+            return Err("checked handler must end in a model probe".into());
+        };
+        let (seeds, _) = before_return
+            .split_at_checked(fields.len())
+            .ok_or_else(|| "checked handler is missing model bindings".to_owned())?;
+
+        let ctx = ace_a2x_ts::FragmentProgramContext::from_view(&view);
+        let emit = |i| {
+            ace_a2x_ts::emit_stmt_fragment(
+                ace_a2x_ts::ScriptLang::JavaScript, &view, facts, entry, i, &ctx,
             )
-            .map_err(|e| format!("stmt fragment ({stmt}): {e:?}"))?;
-            out.extend(raw.text);
-            if locals.is_empty() {
-                locals = raw.locals;
+            .map_err(|err| format!("handler statement {i}: {err:?}"))
+        };
+        let locals = emit(stmts.len() - 1)?.locals;
+        if locals.iter().any(|local| {
+            local.role == "capture" || !matches!(local.ty, Ty::I32 | Ty::Bool | Ty::F32)
+        }) {
+            return Err("checked handlers require copyable int, bool or f32 bindings".into());
+        }
+        let params = locals
+            .iter()
+            .filter(|local| local.role == "param")
+            .map(|local| local.emitted_name.clone())
+            .collect();
+        let mut lines = Vec::new();
+        let mut state = Vec::new();
+        for (seed, (field, _)) in seeds.iter().zip(fields) {
+            let Stmt::Let { local, .. } = seed else {
+                return Err(format!("expected a model binding for `{field}`"));
+            };
+            let binding = locals
+                .iter()
+                .find(|binding| binding.index == local.0 && binding.source_name == format!("__age_s_0_{field}"))
+                .ok_or_else(|| format!("checked model binding does not match `{field}`"))?;
+            let name = &binding.emitted_name;
+            lines.push(format!("let {name} = {field}.value;"));
+            state.push((binding.index, format!("{field}.value = {name};")));
+        }
+        for binding in locals.iter().filter(|local| local.role == "binding") {
+            if !state.iter().any(|(index, _)| *index == binding.index) {
+                lines.push(format!("let {};", binding.emitted_name));
             }
         }
-        Ok(PackageFunctionBody { text: out, locals })
+        let mut helpers = BTreeSet::new();
+        for i in fields.len()..stmts.len() - 1 {
+            let fragment = emit(i)?;
+            helpers.extend(fragment.helpers);
+            lines.push("{".into());
+            lines.extend(fragment.text);
+            lines.push("}".into());
+        }
+        lines.extend(state.into_iter().map(|(_, write)| write));
+        Ok(CheckedHandlerBody {
+            params,
+            lines,
+            helpers,
+        })
     }
 }

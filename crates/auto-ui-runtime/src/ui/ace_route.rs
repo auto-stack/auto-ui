@@ -1,6 +1,7 @@
 //! Shared route admission for the ACE package consumers.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
 use ace_av::age_component::project_component_candidates;
 use ace_core::source::age_component::ComponentNode;
@@ -9,6 +10,33 @@ use ace_core::source::cst::FrontBudget;
 use ace_core::source::packages::{
     parse_package_source_age, PackageModuleInput, PACKAGES_CAPABILITY,
 };
+
+pub(super) type RouteModulePaths = BTreeMap<String, PathBuf>;
+
+pub(super) fn front_package_units(
+    app: &Path,
+    source: &str,
+    modules: &[PathBuf],
+) -> Result<(Vec<PackageModuleInput>, RouteModulePaths), String> {
+    let unit = |id: String, source: String| PackageModuleInput {
+        package: "app".into(),
+        version: "1.0.0".into(),
+        id,
+        source,
+        provider: None,
+    };
+    let mut paths = BTreeMap::from([("app::app".to_string(), app.to_path_buf())]);
+    let mut units = vec![unit("app".into(), source.into())];
+    for module in modules {
+        if let Some(id) = module.file_stem().and_then(|name| name.to_str()) {
+            let source = std::fs::read_to_string(module)
+                .map_err(|error| format!("ace.route.module: {}: {error}", module.display()))?;
+            units.push(unit(id.into(), source));
+            paths.insert(format!("app::{id}"), module.clone());
+        }
+    }
+    Ok((units, paths))
+}
 
 pub(super) fn package_candidates(source: &str) -> Result<Vec<ComponentNode>, String> {
     parse_package_source_age(
@@ -63,6 +91,7 @@ impl RouteTable {
         root: &ComponentNode,
         units: &[PackageModuleInput],
         entry: &PackageModuleInput,
+        validate_pages: bool,
     ) -> Result<Option<Self>, String> {
         let mut patterns = BTreeSet::new();
         let routes = root
@@ -89,7 +118,7 @@ impl RouteTable {
                 let module = row.text.clone().ok_or_else(|| {
                     format!("ace.route.module: {context}: path {pattern:?} has no module")
                 })?;
-                let page = resolve_page(units, entry, &module).map_err(|reason| {
+                let page = resolve_page(units, entry, &module, validate_pages).map_err(|reason| {
                     format!("ace.route.page: path {pattern:?} module {module:?}: {reason}")
                 });
                 Ok(Route {
@@ -231,6 +260,7 @@ fn resolve_page(
     units: &[PackageModuleInput],
     entry: &PackageModuleInput,
     alias: &str,
+    validate_page: bool,
 ) -> Result<String, String> {
     let id = format!("{}::{alias}", entry.package);
     let mut targets = units
@@ -245,15 +275,18 @@ fn resolve_page(
     if target.id == entry.id {
         return Err(format!("{id}: page refers to the app entry"));
     }
-    let components = package_candidates(&target.source)
-        .map_err(|reason| format!("{id}: projection failed: {reason}"))?;
-    if !components
-        .first()
-        .is_some_and(|component| component.view.exits.iter().any(|exit| exit.kind == "view"))
-    {
-        return Err(format!("{id}: module has no page widget with a view"));
+    if validate_page {
+        let components = package_candidates(&target.source)
+            .map_err(|reason| format!("{id}: projection failed: {reason}"))?;
+        if page_widget(&components).is_none() {
+            return Err(format!("{id}: module has no page widget with a view"));
+        }
     }
     Ok(id)
+}
+
+fn page_widget(candidates: &[ComponentNode]) -> Option<&ComponentNode> {
+    candidates.first().filter(|node| node.view.exits.iter().any(|exit| exit.kind == "view"))
 }
 
 #[cfg(test)]
@@ -277,7 +310,7 @@ mod tests {
     fn routes(units: &[PackageModuleInput]) -> RouteTable {
         let shell = &units[0];
         let candidates = package_candidates(&shell.source).unwrap();
-        RouteTable::from_root(&candidates[0], units, shell)
+        RouteTable::from_root(&candidates[0], units, shell, true)
             .unwrap()
             .expect("route rows")
     }
@@ -352,7 +385,7 @@ mod tests {
 
         let page = &units[1];
         let candidates = package_candidates(&page.source).unwrap();
-        assert!(RouteTable::from_root(&candidates[0], &units, page)
+        assert!(RouteTable::from_root(&candidates[0], &units, page, true)
             .unwrap()
             .is_none());
     }
@@ -443,9 +476,8 @@ pub(super) fn prepare_page(
     use ace_core::source::ast::{Arg, ExprKind};
 
     let candidates = package_candidates(source)?;
-    let widget = candidates
-        .first()
-        .ok_or_else(|| "page widget is missing".to_string())?;
+    let widget = page_widget(&candidates)
+        .ok_or_else(|| "module has no page widget with a view".to_string())?;
     let mut replacements = Vec::new();
     // PLAN-105 W111：文本定位游标——resolver 对重复 `router.param` 调用的
     // expr.span 可能重复（实测两处同 span），按“上次命中之后”递进定位。

@@ -42,6 +42,40 @@ fn counter_fixture() -> (String, String) {
     (src, path)
 }
 
+#[test]
+fn p107_window_deadline_fails_with_partial_evidence() {
+    if std::env::var("AUTO_UI_ACE_NODE_E2E").ok().as_deref() != Some("1") {
+        eprintln!("p107_window_deadline_fails_with_partial_evidence: window lane not scheduled");
+        return;
+    }
+
+    std::env::var("ACE_NODE_DESKTOP_PREPARED_RUSTC")
+        .expect("prepare the ui980 provider and set ACE_NODE_DESKTOP_PREPARED_RUSTC");
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let executable = manifest.join("../../target/debug/examples/ace_node_desktop_window.exe");
+    let (_, source) = counter_fixture();
+    let directory = tempfile::tempdir().expect("evidence directory");
+    let evidence = directory.path().join("partial.json");
+    let min_frames = 1_000_000_u64;
+    let output = std::process::Command::new(executable)
+        .args(["--source", &source, "--instances", "1", "--hold-ms", "1000"])
+        .arg("--min-frames")
+        .arg(min_frames.to_string())
+        .arg("--evidence")
+        .arg(&evidence)
+        .output()
+        .expect("run the prepared desktop window example");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(6), "{stderr}");
+    assert!(stderr.contains("deadline reached"), "{stderr}");
+    let partial: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(evidence).expect("partial window evidence"))
+            .expect("valid window evidence JSON");
+    assert_eq!(partial["node"], "Counter");
+    assert!(partial["frames_rendered"].as_u64().unwrap() < min_frames);
+}
+
 /// 按钮声明序（fixture 冻结）：0=`-`(Dec)、1=Reset、2=`+`(Inc)。
 const TARGET_DEC: usize = 0;
 const TARGET_RESET: usize = 1;

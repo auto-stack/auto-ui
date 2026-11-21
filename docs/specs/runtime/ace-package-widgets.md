@@ -28,3 +28,22 @@ ARIA and the native HTML range and progress properties.
 The VM [PaginationControl](../ui/pagination.md) is a separate higher-level
 package. [ACE route-page loading](ace-route-page-loading.md) defines the
 package page lifetime.
+
+## Chart geometry and interaction
+
+Checked package views can render SVG chart geometry built from the current
+widget model. Each mounted chart keeps its pointer and legend state within its
+own widget instance. Child event bindings deliver the declared payload to
+their parent instance. Pointer leave clears the transient hit and keeps the
+legend selection. A disconnected view discards late input.
+
+A `mouse-area` with a finite, positive `coords: WxH` uses that logical extent
+for pointer coordinates. The Vue projection scales the pointer from its DOM
+box to the declared extent. In an absolutely positioned element with `coords`,
+arbitrary pixel width, height and edge-offset utilities are resolved against
+the declared extent. This keeps the FlowDiagram hit boxes and tooltip aligned
+with its SVG view box when the browser resizes the widget.
+
+An AreaChart or BarChart with no rows produces no data geometry. A subsequent
+nonempty input regenerates the paths or bars. The DonutChart empty state keeps
+its neutral ring, and LineChart draws no series for an empty input.

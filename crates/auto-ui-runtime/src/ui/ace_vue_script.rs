@@ -12,7 +12,7 @@
 //! 切片#6j（PLAN-981 B-W1 消费）：**param handler 走声明级检查函数**
 //! （`__age_hv_*`，形参=真 handler 形参，载荷类型来自声明拼写）——不做
 //! 场景重放、不造代表值；ops 只含 unit handler（`Send` 对载荷变体=arity
-//! 域错误，981 IF-981-EVENT-PAYLOAD-B）。不可承载载荷（float 等）不铸检
+//! 域错误，981 IF-981-EVENT-PAYLOAD-B）。不可承载载荷（未识别的类型等）不铸检
 //! 查函数=具名缺席（fail-closed，旧道承载），不造假数值。
 //!
 //! 边界（具名）：本模块是路线 B 的**体级发射核心**，不含 SFC 拼接/默认
@@ -20,6 +20,7 @@
 //! 局部 var/控制流体的区间-最宽启发式不适用者具名拒绝（旧道承载）。
 
 use crate::ui::ace_ts_provider::ComponentFragmentLane;
+pub use ace_a2x_ts::script_runtime_declaration;
 
 /// 一个 handler 的 lane 派生函数体（已做 reactive 宿主映射）。
 #[derive(Clone, Debug)]
@@ -380,7 +381,7 @@ pub fn lane_handler_bodies(
 /// 不进 ops：`Send` 对载荷变体=arity 域错误；检查函数形参=真 handler 形
 /// 参，发射后按位映射到 SFC 形参名）。切片#6k：`lambda_region` 形走
 /// `__age_vl_*` 值函数道（view 内联 lambda——真实 body/origin）。未命中
-/// （无检查/值函数=不可承载载荷如 float；或无区间表达式）具名缺席——调
+/// （无检查/值函数=不可承载载荷；或无区间表达式）具名缺席——调
 /// 用方按合同决定旧道或拒绝。
 pub fn lane_handler_bodies_spec(
     src: &str,
@@ -476,7 +477,7 @@ pub fn lane_handler_bodies_spec_at(
         } else {
             match lane.check_fn_covering(region.clone()) {
                 Some(f) => Some(f),
-                // 无检查函数=载荷不可承载（float/ident 等，981 派发守卫同
+                // 无检查函数=载荷不可承载（981 派发守卫同
                 // 族 fail-closed）——不造假数值，具名缺席（旧道承载）。
                 None => {
                     absent.push((*pat).to_string());
@@ -626,7 +627,7 @@ pub fn lane_handler_bodies_spec_at(
 
 /// PLAN-980 WEB #6p：`on_<snake>` → Pascal 事件名（`on_select` → `Select`；
 /// 老道 `VueGenerator::snake_to_pascal` 同规则——emit 契约事件判定用）。
-fn channel_pascal(channel: &str) -> String {
+pub(super) fn channel_pascal(channel: &str) -> String {
     channel
         .strip_prefix("on_")
         .unwrap_or(channel)

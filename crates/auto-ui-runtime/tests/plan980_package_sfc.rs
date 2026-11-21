@@ -4,7 +4,7 @@
 //! `defineExpose` 状态）；②真实 Vue 挂载后点击 `+`/`Reset` 得 `0 → 1 → 0`（2 次 `+`
 //! 得 2）；③未改写 `002-counter` 的**首个实际阻断**被具名记录（不静默）。
 use ace_core::source::packages::PackageModuleInput;
-use auto_ui_runtime::ui::ace_package_sfc::generate_package_sfc;
+use auto_ui_runtime::ui::ace_package_sfc::{generate_package_sfc, generate_routed_package_sfcs};
 
 fn unit(pkg: &str, id: &str, src: &str) -> PackageModuleInput {
     PackageModuleInput {
@@ -23,7 +23,7 @@ fn counter_src() -> String {
         .to_string()
 }
 
-const HELPER: &str = "pub fn inc1(n int) int {\n    return n + 1\n}\n";
+const HELPER: &str = "pub fn inc1(n int) int {\n    var next int = n + 1\n    return finish(next)\n}\n\nfn finish(n int) int {\n    return n\n}\n";
 
 fn gen() -> String {
     generate_package_sfc(
@@ -34,6 +34,125 @@ fn gen() -> String {
         "app::main",
     )
     .expect("derived counter SFC generates")
+}
+
+#[test]
+fn p107_package_sfc_uses_the_checked_public_stylekit_literal() {
+    let source = r#"
+use stylekit.styles: caption_text
+widget ChartLegend {
+    view { text "Series 1" { style: caption_text } }
+}
+"#;
+    let styles = include_str!("../../../examples/ui/stylekit/src/front/styles.at");
+    let sfc = generate_package_sfc(
+        &[unit("app", "main", source), unit("stylekit", "styles", styles)],
+        "app::main",
+    ).expect("the official stylekit provides its public literal");
+    assert!(sfc.contains(r#"<text class="text-xs text-muted-foreground">Series 1</text>"#), "{sfc}");
+}
+
+#[test]
+fn p107_package_sfc_scopes_chart_css_and_binds_class_branches() {
+    let source = r#"
+widget ChartLegend {
+    model { var active bool = true }
+    style {
+        /* Authored SVG transition. */
+        path { transition: stroke-width 0.15s ease, fill-opacity 0.15s ease; }
+    }
+    view {
+        row (style: ["items-center gap-1", if .active { "" } else { "opacity-40" }, "legend-end"]) {
+            svg (viewBox: "0 0 10 10") {
+                path (d: "M0 0L10 10") {}
+            }
+        }
+    }
+}
+"#;
+    let sfc = generate_package_sfc(&[unit("app", "main", source)], "app::main")
+        .expect("checked chart legend generates a scoped SFC");
+    assert!(sfc.contains(concat!(
+        "class=\"flex flex-row items-center gap-1 legend-end\" ",
+        ":class=\"[(active ? '' : 'opacity-40')]\""
+    )), "{sfc}");
+    let authored_css = source.split_once("style {").unwrap().1
+        .split_once("\n    }").unwrap().0;
+    assert!(sfc.contains(&format!("<style scoped>{authored_css}\n    </style>")), "{sfc}");
+
+    let wrong_condition = source.replace("if .active", "if 2");
+    let error = generate_package_sfc(&[unit("app", "main", &wrong_condition)], "app::main")
+        .expect_err("conditional class list condition must be bool");
+    assert!(error.contains("source.type-mismatch"), "{error}");
+    let wrong_property = source.replace("row (style:", "row (value:");
+    let error = generate_package_sfc(&[unit("app", "main", &wrong_property)], "app::main")
+        .expect_err("conditional class lists are checked in class properties");
+    assert!(error.contains("source.age.class-list"), "{error}");
+}
+
+#[test]
+fn p107_package_sfc_emits_quoted_accessibility_attributes() {
+    let source = r#"
+widget ChartPreview {
+    model { var pressed bool = false }
+    view {
+        div {
+            role: "region"
+            "aria-roledescription": "carousel"
+            "aria-label": "Cards & \"photos\""
+            "aria-pressed": .pressed
+            text | Slide 1
+        }
+    }
+}
+"#;
+    let sfc = generate_package_sfc(&[unit("app", "main", source)], "app::main")
+        .expect("quoted accessibility attributes generate");
+    for attribute in [
+        r#"role="region""#,
+        r#"aria-roledescription="carousel""#,
+        r#"aria-label="Cards &amp; &quot;photos&quot;""#,
+        r#":aria-pressed="pressed""#,
+    ] {
+        assert!(sfc.contains(attribute), "missing {attribute}: {sfc}");
+    }
+    assert!(sfc.contains(">Slide 1</div>"), "{sfc}");
+}
+
+#[test]
+fn p107_package_sfc_keeps_svg_geometry_and_labels() {
+    let source = r##"
+node SvgPreview {
+    model {
+        var extent int = 4
+        gridPath str = "M40 200 H550 M40 140 H550 M40 80 H550 M40 20 H550"
+    }
+    view {
+        svg (viewBox: "0 0 20 20", style: "w-full") {
+            g {
+                path (d: .gridPath, fill: "none") {}
+                line (x1: 1, y1: 4, x2: .extent, y2: 4, stroke: "#ff0000", stroke-width: 2) {}
+                text "A < B & C" { x: 2, y: 14, text-anchor: "middle" }
+            }
+        }
+    }
+}
+"##;
+    let sfc = generate_package_sfc(&[unit("app", "main", source)], "app::main")
+        .expect("render checked SVG");
+    for expected in [
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="w-full">"#,
+        r#"<path :d="gridPath" fill="none"></path>"#,
+        r#"const gridPath = ref("M40 200 H550 M40 140 H550 M40 80 H550 M40 20 H550")"#,
+        r##"<line stroke="#ff0000" stroke-width="2" x1="1" :x2="extent" y1="4" y2="4"></line>"##,
+        r#"<text text-anchor="middle" x="2" y="14">A &lt; B &amp; C</text>"#,
+    ] {
+        assert!(sfc.contains(expected), "missing {expected}: {sfc}");
+    }
+    let unsupported = source.replace("stroke-width: 2", "unsupported: 2");
+    let diagnostic = generate_package_sfc(&[unit("app", "main", &unsupported)], "app::main")
+        .expect_err("unsupported SVG binding is named");
+    assert!(diagnostic.contains("source.age.sfc-svg: unsupported `unsupported` on SVG `line`"), "{diagnostic}");
 }
 
 #[test]
@@ -163,6 +282,10 @@ fn p980_package_sfc_has_template_script_and_state() {
         sfc.contains("a2x_fn_") && sfc.contains("inc1"),
         "helper definition is emitted with its mapped name"
     );
+    assert!(sfc.contains("let l1_next"), "helper locals are declared");
+    assert!(sfc.lines().any(|line| {
+        line.starts_with("function a2x_fn_") && line.contains("_finish(")
+    }), "the helper's own callee is emitted");
     assert!(
         sfc.contains("defineExpose({ __state:"),
         "component publishes its state"
@@ -353,42 +476,197 @@ fn p980_package_sfc_cond_branches_switch_in_real_vue() {
     }
 }
 
-/// F-R21-2（PLAN-981 r21 复审指派，owner 980/UI）：`handler_stmts` 消费门
-/// 负例——包面 widget 形 on 体控制流（if，`age-view-if-stmt` 包面文法可
-/// 达）在本车道**具名拒**（`source.age.sfc-handler-stmt`），不双支裸喷/
-/// 部分复放（lang 侧 `handler_stmts` 契约：部分复放=错状态值，禁止）。
 #[test]
-fn p980_package_sfc_if_handler_named_reject() {
+fn p107_package_sfc_unit_handler_emits_both_checked_branches() {
     let src = "node T {\n    msg { Go }\n\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"T\" }\n    }\n\n    on {\n        .Go -> { if .n == 1 { .n = 2 } else { .n = 3 } }\n    }\n}\n";
-    let err = generate_package_sfc(&[unit("app", "main", src)], "app::main")
-        .expect_err("if-body handler must named-reject on this lane");
-    assert!(
-        err.contains("source.age.sfc-handler-stmt"),
-        "named rejection code: {err}"
-    );
-    assert!(
-        err.contains('`') && err.contains("Go") && err.contains("if"),
-        "names the handler and the statement kind: {err}"
+    let generate = |src: &str| generate_package_sfc(&[unit("app", "main", src)], "app::main");
+    let sfc = generate(src).expect("checked unit handler emits");
+    assert!(sfc.contains("function onGo()"), "{sfc}");
+    assert!(sfc.contains("l0___age_s_0_n = 2;") && sfc.contains("l0___age_s_0_n = 3;"), "{sfc}");
+    assert!(sfc.contains("n.value = l0___age_s_0_n;"), "{sfc}");
+
+    let owned = src.replace("var n int = 0", "var n int = 0\n        var running str = \"true\"");
+    let rejection = generate(&owned).expect_err("unsupported owned bindings have a diagnostic");
+    assert!(rejection.contains("source.age.sfc-handler") && rejection.contains("copyable"), "{rejection}");
+}
+
+#[test]
+fn p107_package_sfc_unit_handler_preserves_let_and_mutable_locals() {
+    let src = r#"
+widget T {
+    msg { Go }
+    model { var n int = 0 }
+    view { button "Grow" { onclick: .Go } }
+    on {
+        .Go -> {
+            let next = .n + 1
+            var first = true
+            if first {
+                first = false
+            }
+            if !first {
+                .n = next
+            }
+        }
+    }
+}
+"#;
+    let sfc = generate_package_sfc(&[unit("app", "main", src)], "app::main")
+        .expect("checked let and mutable local emit");
+    assert!(sfc.contains("__age_hl_0_0_0_next"), "{sfc}");
+    assert_eq!(sfc.matches("__age_hl_0_0_1_first = ").count(), 2, "{sfc}");
+    assert!(sfc.contains("n.value = l0___age_s_0_n;"), "{sfc}");
+}
+
+#[test]
+fn p107_package_sfc_mouse_area_uses_checked_coordinate_handler() {
+    let source = r#"
+widget T {
+    msg { Move(float, f32), Leave }
+    model {
+        var n int = 0
+        var moved bool = false
+    }
+    view {
+        mouse-area (coords: "120x44", onmousemove: .Move, onmouseleave: .Leave) {
+            span { if .moved { text "Moved" {} } }
+        }
+    }
+    on {
+        .Move(x, y) -> {
+            let passed = x > y
+            if passed {
+                .n = 1
+                .moved = true
+            } else {
+                .n = 2
+                .moved = false
+            }
+        }
+        .Leave -> { .moved = false }
+    }
+}
+"#;
+    let generate = |source: &str| generate_package_sfc(&[unit("app", "main", source)], "app::main");
+    let sfc = generate(source).expect("checked mouse movement generates");
+    assert!(sfc.contains(r#"@mousemove="acePointerMove($event, onMove, onLeave, 120, 44)""#));
+    assert!(sfc.contains(r#"@mouseleave="acePointerLeave($event.currentTarget)""#));
+    assert!(sfc.contains("function onMove(p0_"));
+    assert!(sfc.contains("n.value = l2___age_s_0_n;"), "{sfc}");
+    assert!(sfc.contains("moved.value = l3___age_s_0_moved;"), "{sfc}");
+    assert!(sfc.contains("return [x, y]"));
+    assert!(sfc.contains("send(...sample)"));
+
+    let bad_extent = generate(&source.replace("120x44", "120xInfinity")).unwrap_err();
+    assert!(bad_extent.contains("source.age.sfc-pointer: coords"), "{bad_extent}");
+    let wrong_event = generate(&source.replace("onmousemove: .Move", "onmouseenter: .Move")).unwrap_err();
+    assert!(wrong_event.contains("source.age.sfc-payload: `mouseenter`"), "{wrong_event}");
+}
+
+#[test]
+fn p107_routed_package_publishes_the_checked_pointer_runtime() {
+    let shell = r#"
+widget App {
+    routes { "/" -> use chart }
+    view { col { outlet } }
+}
+"#;
+    let chart = r#"
+widget Chart {
+    msg { Move(float, f32), Reset }
+    model { var n int = 0 }
+    view {
+        mouse-area (coords: "120x44", onmousemove: .Move) { span { text "Chart" {} } }
+        button "Reset" { onclick: .Reset }
+    }
+    on {
+        .Move(x, y) -> {
+            let offsetX = x + 150.0
+            let offsetY = y + 160.0
+            if offsetX > offsetY { .n = .n + 1 }
+        }
+        .Reset -> { .n = .n + 1 }
+    }
+}
+"#;
+    let product = generate_routed_package_sfcs(
+        &[unit("app", "app", shell), unit("app", "chart", chart)],
+        "app::app",
+    )
+    .expect("route shell generates")
+    .expect("a routed product");
+    let page = &product.pages["chart"];
+    assert!(page.contains("from '@/a2x_rt.mjs'"), "{page}");
+    assert!(page.contains("a2x_f32_round("), "{page}");
+    assert!(page.contains("a2x_add("), "{page}");
+    assert!(!page.contains("function a2x_add("), "{page}");
+    assert_eq!(
+        product.runtime_mjs.as_deref(),
+        Some(ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]).as_str())
     );
 }
 
-/// F-R21-2 门 Let 臂永久例（r21 附带「UI 侧 Let 永久例」收口）：981 r21
-/// fold 落主（lang `33895d91c`——`age-on-widget-stmt` 并集规则两面同开
-/// let/if）后，widget 形 on 块 `let` 在主线**可解析并到达消费门**——本车
-/// 道具名拒 `…contains a \`let\` statement…`（fold 前同源在文法层被拒=
-/// `source.age.structure`，门 Let 臂主线不可达的历史归档由此收口；并集
-/// 树验收探针已先行证实命中，本例为其永久化）。
 #[test]
-fn p980_package_sfc_let_handler_named_reject() {
-    let src = "node T {\n    msg { Go }\n\n    model {\n        var n int = 0\n    }\n\n    view {\n        col { text \"T\" }\n    }\n\n    on {\n        .Go -> {\n            let q = .n + 1\n            .n = q\n        }\n    }\n}\n";
-    let err = generate_package_sfc(&[unit("app", "main", src)], "app::main")
-        .expect_err("let-body handler must named-reject on this lane");
-    assert!(
-        err.contains("source.age.sfc-handler-stmt") && err.contains("let"),
-        "named rejection with the let kind: {err}"
-    );
-    assert!(
-        !err.contains("source.age.structure"),
-        "post-fold mainline parses the let body (grammar no longer rejects first): {err}"
-    );
+fn p107_routed_chart_pointer_includes_transitive_math_helpers() {
+    let shell = r#"
+widget App {
+    routes { "/" -> use chart }
+    view { col { outlet } }
+}
+"#;
+    let chart = r#"
+use geometry: dc, ds
+widget Chart {
+    msg { Move(float, float) }
+    model { var hit bool = false }
+    view { mouse-area (onmousemove: .Move) { text "Chart" {} } }
+    on {
+        .Move(x, y) -> {
+            let angle = math.atan2(y, x)
+            let radius = math.sqrt(x * x + y * y)
+            .hit = dc(angle) * radius > ds(angle) * radius
+        }
+    }
+}
+"#;
+    let geometry = "pub fn dc(x float) float { math.cos(x) }\npub fn ds(x float) float { math.sin(x) }";
+    let product = generate_routed_package_sfcs(
+        &[
+            unit("app", "app", shell),
+            unit("app", "chart", chart),
+            unit("app", "geometry", geometry),
+        ],
+        "app::app",
+    )
+    .expect("route shell generates")
+    .expect("a routed product");
+    let page = &product.pages["chart"];
+    for name in ["trig_series", "sqrt_newton", "atan_series"] {
+        assert_eq!(
+            page.lines().filter(|line| line.starts_with("function a2x_fn_")
+                && line.contains(&format!("_{name}("))).count(),
+            1,
+            "one definition of {name}: {page}"
+        );
+    }
+    assert!(page.contains("from '@/a2x_rt.mjs'"), "{page}");
+    assert!(product.runtime_mjs.is_some());
+}
+
+#[test]
+fn p107_checked_chart_package_site_cannot_fall_back_to_an_html_tag() {
+    let app = r#"
+widget Charts {
+    use { package: official from "components" }
+    view { line-chart {} }
+}
+"#;
+    let chart = "widget LineChart { view { text \"Curve\" {} } }";
+    let sfc = generate_package_sfc(
+        &[unit("app", "main", app), unit("official", "line_chart", chart)],
+        "app::main",
+    )
+    .expect("the checked child widget uses the package renderer");
+    assert!(sfc.contains("<AcePackageView />"));
+    assert!(!sfc.contains("<line-chart"));
 }

@@ -1,19 +1,27 @@
-use super::NodeDesktopMsg;
+use super::{state_display, AceStateValue, NodeDesktopMsg};
 use crate::ui::ace_widget_props::{
-    element_children, expression, flag, literal, self_field, square_style, style,
+    conditional_classes, element_children, expression, flag, literal, self_field, square_style,
+    style,
 };
 use crate::ui::scroll::ScrollAxes;
 use crate::ui::view::{AccordionItem, ScrollMetrics};
 use crate::ui::{Style, View};
-use ace_core::source::age_component::{ComponentField, ComponentViewElement, ComponentViewItem};
+use ace_core::source::age_component::{
+    ComponentClassPart, ComponentField, ComponentViewElement, ComponentViewItem,
+};
 use ace_core::source::ast::{Expr, ExprKind};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
+
+mod pointer;
+mod svg;
 
 type WidgetView = View<NodeDesktopMsg>;
 
 #[derive(Clone, Debug)]
 pub enum Action {
     Focus(usize),
+    DispatchButton(usize),
     Accordion {
         key: usize,
         item: usize,
@@ -49,6 +57,7 @@ pub(super) struct State {
     pages: BTreeMap<usize, u32>,
     slider: BTreeMap<usize, f32>,
     scroll: BTreeMap<usize, ScrollMetrics>,
+    button_targets: Arc<BTreeMap<usize, usize>>,
 }
 
 impl State {
@@ -61,11 +70,22 @@ impl State {
             pages: BTreeMap::new(),
             slider: BTreeMap::new(),
             scroll: BTreeMap::new(),
+            button_targets: Arc::default(),
         }
+    }
+
+    pub(super) fn bind_buttons(mut self, targets: Arc<BTreeMap<usize, usize>>) -> Self {
+        self.button_targets = targets;
+        self
+    }
+
+    pub(super) fn source_button_count(&self) -> usize {
+        self.button_targets.len()
     }
 
     pub fn apply(&mut self, action: Action) {
         match action {
+            Action::DispatchButton(_) => {} // Forwarded to the AV event queue by the window.
             Action::Focus(key) => {
                 self.focus = Some(key);
             }
@@ -141,12 +161,19 @@ pub(super) fn contains_preview(items: &[ComponentViewItem]) -> bool {
     })
 }
 
+pub(super) fn contains_svg(items: &[ComponentViewItem]) -> bool {
+    items.iter().any(|item| match item {
+        ComponentViewItem::Element(element) => element.tag == "svg" || contains_svg(&element.items),
+        _ => false,
+    })
+}
+
 fn contains_control(items: &[ComponentViewItem]) -> bool {
     items.iter().any(|item| match item {
         ComponentViewItem::Element(element) => {
             matches!(
                 element.tag.as_str(),
-                "accordion" | "collapsible" | "pagination" | "progress" | "slider"
+                "accordion" | "collapsible" | "pagination" | "progress" | "slider" | "svg"
             ) || scroll_axes(element, &style(element)).is_some()
                 || contains_control(&element.items)
         }
@@ -159,7 +186,7 @@ pub(super) fn view(
     instance: usize,
     tree: &[ComponentViewItem],
     texts: &[String],
-    values: &[(String, String)],
+    values: &[(String, AceStateValue)],
     state: &State,
 ) -> WidgetView {
     let mut renderer = Renderer {
@@ -193,6 +220,7 @@ struct Control {
     key: usize,
     label: String,
     target: Target,
+    parent: Option<usize>,
 }
 
 enum Target {
@@ -228,7 +256,7 @@ impl Target {
 pub(super) fn keyboard_action(
     tree: &[ComponentViewItem],
     texts: &[String],
-    values: &[(String, String)],
+    values: &[(String, AceStateValue)],
     state: &State,
     key: &str,
 ) -> Option<Action> {
@@ -281,7 +309,7 @@ pub(super) fn keyboard_action(
 fn controls(
     tree: &[ComponentViewItem],
     texts: &[String],
-    values: &[(String, String)],
+    values: &[(String, AceStateValue)],
     state: &State,
 ) -> Vec<Control> {
     let mut renderer = Renderer {
@@ -301,7 +329,7 @@ pub(super) fn accessibility_tree(
     session: i32,
     tree: &[ComponentViewItem],
     texts: &[String],
-    values: &[(String, String)],
+    values: &[(String, AceStateValue)],
     state: &State,
 ) -> accesskit::TreeUpdate {
     use accesskit::{Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate};
@@ -309,19 +337,28 @@ pub(super) fn accessibility_tree(
     let root = NodeId(1);
     let mut window = Node::new(Role::Window);
     window.set_label("AutoUI Widgets");
-    let mut children = Vec::new();
+    let mut nodes = Vec::new();
+    let mut children: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
     let mut focus = root;
     for control in controls(tree, texts, values, state) {
         let id = NodeId((session as u64) << 32 | control.key as u64);
         if state.focus == Some(control.key) && control.target.takes_focus() {
             focus = id;
         }
-        children.push((id, control.accesskit_node()));
+        let parent = control
+            .parent
+            .map_or(root, |key| NodeId((session as u64) << 32 | key as u64));
+        children.entry(parent).or_default().push(id);
+        nodes.push((id, control.accesskit_node()));
     }
-    window.set_children(children.iter().map(|(id, _)| *id).collect::<Vec<_>>());
-    children.push((root, window));
+    nodes.push((root, window));
+    for (id, node) in &mut nodes {
+        if let Some(group) = children.remove(id) {
+            node.set_children(group);
+        }
+    }
     TreeUpdate {
-        nodes: children,
+        nodes,
         tree: Some(TreeInfo::new(root)),
         tree_id: TreeId::ROOT,
         focus,
@@ -333,7 +370,7 @@ pub(super) fn accessibility_action(
     session: i32,
     tree: &[ComponentViewItem],
     texts: &[String],
-    values: &[(String, String)],
+    values: &[(String, AceStateValue)],
     state: &State,
     request: accesskit::ActionRequest,
 ) -> Option<Action> {
@@ -456,7 +493,7 @@ struct Renderer<'a> {
     session: i32,
     instance: usize,
     texts: std::slice::Iter<'a, String>,
-    values: &'a [(String, String)],
+    values: &'a [(String, AceStateValue)],
     state: &'a State,
     targets: Vec<Control>,
 }
@@ -482,6 +519,7 @@ impl Renderer<'_> {
         self.targets.push(Control {
             key,
             label: label.clone(),
+            parent: None,
             target: Target::Button {
                 action: action.clone(),
                 expanded,
@@ -513,7 +551,7 @@ impl Renderer<'_> {
             ExprKind::BoolLit(value) => Some(value.to_string()),
             _ => self_field(expr)
                 .and_then(|field| self.values.iter().find(|(name, _)| name == field))
-                .map(|(_, value)| value.clone()),
+                .map(|(_, value)| state_display(value)),
         }
     }
 
@@ -523,6 +561,31 @@ impl Renderer<'_> {
             .and_then(|value| value.parse::<f32>().ok())
             .filter(|value| value.is_finite())
             .unwrap_or(default)
+    }
+
+    fn append_conditional_classes(
+        &self,
+        el: &ComponentViewElement,
+        classes: &mut String,
+    ) -> Result<(), String> {
+        for part in conditional_classes(el) {
+            let value = match part {
+                ComponentClassPart::Value(value) => value,
+                ComponentClassPart::If { cond, then_value, else_value } => {
+                    if super::eval_view_cond(cond, self.values)? {
+                        then_value
+                    } else {
+                        else_value
+                    }
+                }
+            };
+            let ExprKind::StrLit(value) = &value.kind else {
+                return Err("ace.desktop.style: class list item is not text".into());
+            };
+            classes.push(' ');
+            classes.push_str(value);
+        }
+        Ok(())
     }
 
     fn items(&mut self, items: &[ComponentViewItem]) -> Vec<WidgetView> {
@@ -546,10 +609,21 @@ impl Renderer<'_> {
 
     fn element(&mut self, el: &ComponentViewElement) -> WidgetView {
         let key = el.span.start;
-        let classes = style(el);
+        let mut classes = style(el);
+        if let Err(error) = self.append_conditional_classes(el, &mut classes) {
+            return View::text(error);
+        }
         let parsed = native_style(&classes);
         match el.tag.as_str() {
             "accordion" => self.accordion(el, key),
+            "svg" => self.svg(el),
+            "mouse-area" | "mouse_area" => self.mouse_area(el),
+            "button" if self.state.button_targets.contains_key(&key) => {
+                let target = self.state.button_targets[&key];
+                let label = el.label.as_ref().or_else(|| expression(el, "text"))
+                    .and_then(|label| self.display(label)).unwrap_or_default();
+                self.button(key, label, &classes, Some(Action::DispatchButton(target)), None, None)
+            }
             "collapsible" => self.collapsible(el, key),
             "pagination" => self.pagination(el, key),
             "progress" => {
@@ -558,6 +632,7 @@ impl Renderer<'_> {
                 self.targets.push(Control {
                     key,
                     label: "Progress".into(),
+                    parent: None,
                     target: Target::Progress { max, value },
                 });
                 View::col()
@@ -584,6 +659,7 @@ impl Renderer<'_> {
                 self.targets.push(Control {
                     key,
                     label: "Slider".into(),
+                    parent: None,
                     target: Target::Slider {
                         min,
                         max,
@@ -648,7 +724,12 @@ impl Renderer<'_> {
                 .build(),
             _ => {
                 let mut children = self.items(&el.items);
-                if let Some(label) = el.label.as_ref().and_then(|expr| self.display(expr)) {
+                let label = el.label.as_ref().or_else(|| {
+                    matches!(el.tag.as_str(), "span" | "td")
+                        .then(|| expression(el, "text"))
+                        .flatten()
+                });
+                if let Some(label) = label.and_then(|expr| self.display(expr)) {
                     let heading = match el.tag.as_str() {
                         "h1" => "text-2xl font-bold text-slate-900",
                         "h2" => "text-lg font-semibold text-slate-900",
@@ -767,6 +848,7 @@ impl Renderer<'_> {
                     Control {
                         key: key_for_header,
                         label: title.clone(),
+                        parent: None,
                         target: Target::Button {
                             action: Some(Action::Accordion {
                                 key,

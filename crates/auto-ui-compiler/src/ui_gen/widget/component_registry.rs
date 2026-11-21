@@ -69,6 +69,9 @@ pub struct LoadedPackage {
     pub dir: PathBuf,
     /// 包内全部 widget(fold-name → widget 名)
     pub widgets: HashMap<String, String>,
+    /// Widget declaration name to the files that define it. Checked consumers
+    /// use this to select source modules and detect duplicate definitions.
+    pub widget_sources: HashMap<String, Vec<PathBuf>>,
     /// Plan 435 P7-3(D7):逐文件 try-parse 的失败记录(路径 + 错误)。
     /// 单文件解析失败不丢弃整个包 —— 合法组件照常注册,失败文件由此暴露。
     pub parse_warnings: Vec<String>,
@@ -156,6 +159,7 @@ impl ComponentRegistry {
 
         let manifest = Self::parse_manifest(&canonical)?;
         let mut widgets = HashMap::new();
+        let mut widget_sources: HashMap<String, Vec<PathBuf>> = HashMap::new();
         let mut full_widgets: Vec<(auto_ui_dialect::ast::WidgetDecl, AuraWidget)> = Vec::new();
         let mut parse_warnings: Vec<String> = Vec::new();
         let entries = std::fs::read_dir(&canonical)
@@ -176,6 +180,7 @@ impl ComponentRegistry {
                 Ok(parsed) => {
                     for (d, w) in parsed {
                         widgets.insert(fold(&w.name), w.name.clone());
+                        widget_sources.entry(w.name.clone()).or_default().push(path.clone());
                         full_widgets.push((d, w));
                     }
                 }
@@ -207,6 +212,7 @@ impl ComponentRegistry {
             manifest,
             dir: canonical,
             widgets,
+            widget_sources,
             parse_warnings,
             families,
             full_widgets,

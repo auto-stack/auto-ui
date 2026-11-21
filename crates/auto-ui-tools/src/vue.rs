@@ -1140,13 +1140,18 @@ pub fn refresh_vite_config(output_dir: &std::path::Path, npm_deps: &[(String, St
     }
 }
 
-fn generate_tsconfig() -> String {
+fn generate_tsconfig(ace_routed: bool) -> String {
     // Plan 053 M4: ES2020 → ES2021 — the codegen maps `.at` `replace` to
     // JS `replaceAll` (Rust str::replace is full-replace), which needs the
     // es2021 lib for vue-tsc. WebView2/Chromium supports it (Chrome 85+).
-    r#"{
+    let mut config = String::from(r#"{
   "compilerOptions": {
-    "target": "ES2021",
+"#);
+    // Checked ACE packages emit JavaScript in script setup and runtime modules.
+    if ace_routed || (cfg!(feature = "ace-vue") && std::env::var("AUTO_UI_ACE_VUE").ok().as_deref() == Some("1")) {
+        config.push_str("    \"allowJs\": true,\n");
+    }
+    config.push_str(r#"    "target": "ES2021",
     "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": ["ES2021", "DOM", "DOM.Iterable"],
@@ -1172,8 +1177,8 @@ fn generate_tsconfig() -> String {
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
-"#
-    .to_string()
+"#);
+    config
 }
 
 fn generate_tsconfig_node() -> String {
@@ -2047,6 +2052,10 @@ fn ensure_natives_layer(output_dir: &Path) {
         let Ok(content) = fs::read_to_string(path) else {
             continue;
         };
+        #[cfg(feature = "ace-vue")]
+        if content.starts_with(auto_ui_runtime::ui::ace_package_sfc::ROUTE_DIAGNOSTIC_SFC_PREFIX) {
+            continue;
+        }
         for tok in content.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')) {
             // 插入注册表的 &'static 名（而非文件内容 token）——used 不借
             // 每文件 content。
@@ -2570,6 +2579,7 @@ fn write_project_files(
     vue_code: &str,
     usage: &VueDependencyUsage,
     has_routes: bool,
+    ace_routed: bool,
     extra_deps: &[(String, String)],
     style_files: &[String],
     i18n: &I18nConfig,
@@ -2649,7 +2659,7 @@ fn write_project_files(
         .map_err(|e| format!("Failed to write vite.config.ts: {}", e))?;
 
     // tsconfig.json
-    let tsconfig = generate_tsconfig();
+    let tsconfig = generate_tsconfig(ace_routed);
     fs::write(output_path.join("tsconfig.json"), tsconfig)
         .map_err(|e| format!("Failed to write tsconfig.json: {}", e))?;
 
@@ -2981,17 +2991,11 @@ fn npm_deps_from_value(v: Option<&auto_val::Value>) -> Vec<(String, String)> {
     match v {
         Some(auto_val::Value::Array(arr)) => {
             for item in &arr.values {
-                let s = item.to_astr().trim().to_string();
-                if s.is_empty() {
-                    continue;
+                let text = item.to_astr();
+                let spec = text.trim();
+                if !spec.is_empty() {
+                    deps.push(split_pkg_version(spec));
                 }
-                if let Some((pkg, ver)) = s.split_once('@') {
-                    if !pkg.is_empty() && !ver.is_empty() {
-                        deps.push((pkg.to_string(), ver.to_string()));
-                        continue;
-                    }
-                }
-                deps.push((s, "latest".to_string()));
             }
         }
         Some(auto_val::Value::Obj(obj)) => {
@@ -3545,6 +3549,16 @@ fn split_pkg_version(dep: &str) -> (String, String) {
     }
 }
 
+fn project_npm_file_path(root: &Path, mut dep: (String, String)) -> (String, String) {
+    if let Some(path) = dep.1.strip_prefix("file:").map(Path::new) {
+        if path.is_relative() {
+            let path = root.join(path);
+            dep.1 = format!("file:{}", path.to_string_lossy().replace('\\', "/"));
+        }
+    }
+    dep
+}
+
 /// Find the end index of a quoted string at the start of `s`.
 fn find_quoted_string_end(s: &str) -> Option<usize> {
     let bytes = s.as_bytes();
@@ -3857,20 +3871,17 @@ export default router
         .find(|p| p.is_dir())
     }
 
-    /// Create a new Vue project context from a workspace directory
-    /// （legacy 自扫路径——测试/旧调用；生产走 from_workspace_with_request。）
     /// PLAN-980 ④-A #7：产品 lane 产物的官方 a2x 运行时落盘（App.vue 同目
     /// 录——SFC 内 `./a2x_rt.mjs` 相对 import 的解析位；None=键未设，零写）。
     pub fn write_ace_vue_rt(&self) -> AutoResult<()> {
         if let Some(rt) = &self.ace_vue_rt {
-            let p = self.output_dir.join("src").join("a2x_rt.mjs");
-            fs::create_dir_all(p.parent().unwrap_or(&self.output_dir)).ok();
-            fs::write(&p, rt)
-                .map_err(|e| format!("Failed to write {}: {}", p.display(), e))?;
+            write_ace_vue_runtime(&self.output_dir, rt)?;
         }
         Ok(())
     }
 
+    /// Create a new Vue project context from a workspace directory
+    /// （legacy 自扫路径——测试/旧调用；生产走 from_workspace_with_request。）
     pub fn from_workspace(root_dir: &Path) -> AutoResult<Self> {
         let pac_path = root_dir.join("pac.at");
         if !pac_path.exists() {
@@ -4137,7 +4148,7 @@ export default router
         // PLAN-980 ④-A #7：ACE 键在场时根 widget SFC 换产品 lane 产物；
         // 官方 rt 随 Self 携带（generate/regenerate 写盘点落 src/a2x_rt.mjs）。
         let mut ace_vue_rt: Option<String> = None;
-        let ace_route_product = ace_routed_front(&front_dir)?;
+        let ace_route_product = ace_front(&front_dir)?;
         if app_at.exists() && ace_route_product.is_none() {
             match crate::shadcn_build::ui_build_shadcn_with_sub_widgets_and_stores_full(
                 app_at.to_str().unwrap(),
@@ -4162,10 +4173,6 @@ export default router
                                 root_widget_name_minis = Some((vname, mcode));
                             }
                         }
-                    }
-                    let components = detect_shadcn_components(&vue_code);
-                    for comp in &components {
-                        all_shadcn_components.insert(comp.clone());
                     }
                     all_store_files.extend(stores);
                     // PLAN-980 ④-A #7/#8：ACE 键在场时整文件**逐 widget**产品
@@ -4432,8 +4439,12 @@ export default router
         }
 
         let pages_dir = front_dir.join("pages");
-        let ace_routed = ace_route_product.is_some();
+        let ace_packaged = ace_route_product.is_some();
+        let ace_routed = ace_route_product.as_ref().is_some_and(|product| !product.routes.is_empty());
+        let mut embedded_widget_sources = std::collections::BTreeSet::new();
         if let Some(product) = ace_route_product {
+            ace_vue_rt = product.runtime_mjs;
+            embedded_widget_sources = product.embedded_widget_sources;
             let root = ("".into(), "app".into(), product.app, product.name);
             all_components.push(root);
             all_routes.extend(product.routes);
@@ -4466,7 +4477,10 @@ export default router
         // PLAN-639 T-06: `bps/` 目录与 components/ 同构扫描——L1 绑定工件
         // （`auto bp add --bind` 产出的 GENERATED *.at）落盘于此，构建期
         // 与 components/ 一样编译为独立组件 SFC（文件名 = widget 名）。
-        for sub_dir in ["components", "bps"] {
+        // Routed ACE SFCs already bind their source package closures. Only the
+        // standalone generators consume these directory-wide component products.
+        let component_dirs: &[&str] = if ace_packaged { &[] } else { &["components", "bps"] };
+        for sub_dir in component_dirs {
             let components_at_dir = front_dir.join(sub_dir);
             if components_at_dir.exists() {
                 let mut comp_entries: Vec<std::path::PathBuf> = fs::read_dir(&components_at_dir)
@@ -4477,7 +4491,7 @@ export default router
                 for path in comp_entries {
                     if path.extension().map(|e| e == "at").unwrap_or(false) {
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-                        if file_name == "package.at" {
+                        if file_name == "package.at" || route_embeds_widget_source(&embedded_widget_sources, &path) {
                             continue;
                         }
                         match crate::shadcn_build::ui_build_shadcn_with_widgets_and_stores(
@@ -4868,7 +4882,9 @@ export default router
         // Plan 475: Merge npm_deps and styles from deps/*/pac.at
         // （PLAN-809 T-06c：本工程声明来自 VueReads；dep 自身 pac.at 的
         // 合并是跨文件读取，两路径共用。）
-        let mut npm_deps = reads.npm_deps;
+        let mut npm_deps: Vec<_> = reads.npm_deps.into_iter()
+            .map(|dep| project_npm_file_path(root_dir, dep))
+            .collect();
         let mut style_files = reads.style_files;
         for (_dep_name, dep_front, _library_dep) in &dep_front_dirs {
             let dep_pac = dep_front
@@ -4880,7 +4896,7 @@ export default router
                 if let Ok(content) = fs::read_to_string(&p) {
                     for dep in parse_npm_deps(&content) {
                         if !npm_deps.iter().any(|(name, _)| name == &dep.0) {
-                            npm_deps.push(dep);
+                            npm_deps.push(project_npm_file_path(p.parent().unwrap_or(root_dir), dep));
                         }
                     }
                     for style in parse_style_files(&content) {
@@ -5339,6 +5355,7 @@ export default router
             &self.app_vue_code,
             &self.dependency_usage(),
             self.has_routes,
+            self.ace_routed,
             &self.npm_deps,
             &style_copies,
             &self.i18n,
@@ -5536,6 +5553,7 @@ export default router
             &self.app_vue_code,
             &self.dependency_usage(),
             self.has_routes,
+            self.ace_routed,
             &self.npm_deps,
             &style_copies,
             &self.i18n,
@@ -5581,7 +5599,7 @@ export default router
         self.write_theme_inputs_receipt()?;
 
         // Write tsconfig.json
-        let tsconfig = generate_tsconfig();
+        let tsconfig = generate_tsconfig(self.ace_routed);
         fs::write(output_path.join("tsconfig.json"), &tsconfig)
             .map_err(|e| format!("Failed to write tsconfig.json: {}", e))?;
 
@@ -5820,7 +5838,7 @@ export default router
 
         // Regenerate tsconfig.json
         let tsconfig_path = self.output_dir.join("tsconfig.json");
-        let tsconfig = generate_tsconfig();
+        let tsconfig = generate_tsconfig(self.ace_routed);
         fs::write(&tsconfig_path, &tsconfig)
             .map_err(|e| format!("Failed to write tsconfig.json: {}", e))?;
         println!("{}", "  ✓ Regenerated tsconfig.json".bright_green());
@@ -7297,6 +7315,7 @@ pub fn incremental_compile_changed(
     // Resolve front directory using same logic as VueProject::from_workspace
     let front_dir = resolve_front_dir(root_dir);
     crate::util::validate_ui_tree(&front_dir)?;
+    let ace_route_product = ace_front(&front_dir)?;
     let output_dir = root_dir.join("gen").join("front").join("vue");
 
     // Plan 013: shadcn-vue mapping toggle from pac.at (`shadcn: off`).
@@ -7483,7 +7502,7 @@ pub fn incremental_compile_changed(
     // `auto run` incremental path silently skipped the dir, leaving the dev
     // server with unresolved imports (Plan 484 charts-gallery 现场暴露).
     let components_pkg_dir = front_dir.join("components");
-    if components_pkg_dir.exists() {
+    if ace_route_product.is_none() && components_pkg_dir.exists() {
         if let Ok(entries) = fs::read_dir(&components_pkg_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -7500,6 +7519,12 @@ pub fn incremental_compile_changed(
                 }
                 if let Ok(content) = fs::read_to_string(&path) {
                     let hash = hash_string(&content);
+                    if ace_route_product.as_ref().is_some_and(|product| {
+                        route_embeds_widget_source(&product.embedded_widget_sources, &path)
+                    }) {
+                        cache.update(path, hash, Vec::new());
+                        continue;
+                    }
                     let source_changed = cache.is_dirty(&path, hash);
                     match compile_at_to_vue(
                             &path,
@@ -7535,12 +7560,7 @@ pub fn incremental_compile_changed(
                                     println!("  {} (changed)", file_name.bright_yellow());
                                 }
                                 if let Some(products) = &ace_products {
-                                    let rt_path = output_dir.join("src").join("a2x_rt.mjs");
-                                    fs::create_dir_all(rt_path.parent().unwrap_or(&output_dir))
-                                        .ok();
-                                    fs::write(&rt_path, &products.rt).map_err(|e| {
-                                        format!("Failed to write {}: {}", rt_path.display(), e)
-                                    })?;
+                                    write_ace_vue_runtime(&output_dir, &products.rt)?;
                                     for (wname, wsfc) in &products.widgets {
                                         let out = output_dir
                                             .join("src")
@@ -7668,7 +7688,6 @@ pub fn incremental_compile_changed(
     // Phase 2: Check app.at for changes (with sub-widget names known)
     let app_at = front_dir.join("app.at");
     let app_output_path = output_dir.join("src").join("App.vue");
-    let ace_route_product = ace_routed_front(&front_dir)?;
     if app_at.exists() && ace_route_product.is_none() {
         if let Ok(content) = fs::read_to_string(&app_at) {
             let hash = hash_string(&content);
@@ -7714,11 +7733,7 @@ pub fn incremental_compile_changed(
                             None => (vue_code, None),
                         };
                         if let Some((rest, rt)) = ace_rest {
-                            let rt_path = output_dir.join("src").join("a2x_rt.mjs");
-                            fs::create_dir_all(rt_path.parent().unwrap_or(&output_dir)).ok();
-                            fs::write(&rt_path, rt).map_err(|e| {
-                                format!("Failed to write {}: {}", rt_path.display(), e)
-                            })?;
+                            write_ace_vue_runtime(&output_dir, &rt)?;
                             for (wname, wsfc) in rest {
                                 let comp_dir = output_dir.join("src").join("components");
                                 let comp_path = comp_dir.join(format!("{}.vue", wname));
@@ -7826,6 +7841,9 @@ pub fn incremental_compile_changed(
     let pages_dir = front_dir.join("pages");
     if let Some(product) = ace_route_product {
         let src = output_dir.join("src");
+        if let Some(runtime) = &product.runtime_mjs {
+            write_ace_vue_runtime(&output_dir, runtime)?;
+        }
         let router = src.join("router/index.ts");
         let mut queue = |path: PathBuf, code: String, name: String| {
             if fs::read_to_string(&path).ok().as_deref() != Some(&code) {
@@ -7833,7 +7851,9 @@ pub fn incremental_compile_changed(
             }
         };
         queue(src.join("App.vue"), product.app, product.name);
-        queue(router, ace_router_file(&product.routes), "router".into());
+        if !product.routes.is_empty() {
+            queue(router, ace_router_file(&product.routes), "router".into());
+        }
         for (module, sfc) in product.pages {
             queue(src.join("pages").join(format!("{module}.vue")), sfc, module);
         }
@@ -8121,20 +8141,38 @@ fn handle_compile_error_with_dep_shape(
 /// bare VueGenerator. Mirrors the in-file collection in
 /// ui_gen::api::generate_component_from_file — parse failures yield an
 /// empty pool (the first pass already reported the real error).
+fn write_ace_vue_runtime(output_dir: &Path, runtime: &str) -> AutoResult<()> {
+    let src = output_dir.join("src");
+    fs::create_dir_all(&src)?;
+    fs::write(src.join("a2x_rt.mjs"), runtime)?;
+    #[cfg(feature = "ace-vue")]
+    fs::write(
+        src.join("a2x_rt.d.mts"),
+        auto_ui_runtime::ui::ace_vue_script::script_runtime_declaration(),
+    )?;
+    Ok(())
+}
+
 /// PLAN-980 ④-A #7（982 round-184 合同）：`AUTO_UI_ACE_VUE=1` 时 app.at 的
 /// SFC 走产品 lane 入口（`generate_sfc_with_lane_product`——lane 体 + 显式
 /// `./a2x_rt.mjs` import + 官方 rt 随产物）。
 /// 返回 `Ok(None)`=键未设（legacy 生成道逐字不变）；`Ok(Some((sfc, rt)))`
 /// =产品产物。lane 缺席/生成失败=**具名拒绝**（run 键下双轨收紧——不静默
 /// 落 legacy）；工具未按 `--features ace-vue` 构建同样具名拒绝。
-struct AceRoutedFront {
+struct AceFront {
     app: String,
     name: String,
     pages: std::collections::BTreeMap<String, String>,
     routes: Vec<AuraRoute>,
+    runtime_mjs: Option<String>,
+    embedded_widget_sources: std::collections::BTreeSet<PathBuf>,
 }
 
-fn ace_routed_front(front_dir: &Path) -> AutoResult<Option<AceRoutedFront>> {
+fn route_embeds_widget_source(sources: &std::collections::BTreeSet<PathBuf>, path: &Path) -> bool {
+    !sources.is_empty() && path.canonicalize().is_ok_and(|path| sources.contains(&path))
+}
+
+fn ace_front(front_dir: &Path) -> AutoResult<Option<AceFront>> {
     #[cfg(feature = "ace-vue")]
     {
         if std::env::var("AUTO_UI_ACE_VUE").ok().as_deref() != Some("1") {
@@ -8147,21 +8185,28 @@ fn ace_routed_front(front_dir: &Path) -> AutoResult<Option<AceRoutedFront>> {
         let source = fs::read_to_string(&app_at)?;
         let session = auto_lang_core::session::CompilerSession::ui();
         let mut parser = auto_lang_core::parser::Parser::from(&source).with_session(session);
-        let is_routed = parser
+        let Some(ast) = parser
             .parse_domain(&auto_ui_dialect::UiDialect)
             .ok()
             .map(auto_ui_dialect::UiCode)
-            .is_some_and(|ast| {
-                ast.domain_stmts().any(|stmt| {
-                    matches!(stmt, auto_ui_dialect::UiStmt::WidgetDecl(widget)
-                        if widget.routes.as_ref().is_some_and(|routes| !routes.routes.is_empty()))
-                })
-            });
-        if !is_routed {
+        else {
+            return Ok(None);
+        };
+        let is_routed = ast.domain_stmts().any(|stmt| {
+            matches!(stmt, auto_ui_dialect::UiStmt::WidgetDecl(widget)
+                if widget.routes.as_ref().is_some_and(|routes| !routes.routes.is_empty()))
+        });
+        let is_linked = ast.domain_stmts().any(|stmt| {
+            matches!(stmt, auto_ui_dialect::UiStmt::WidgetDecl(widget)
+                if widget.ext_imports.iter().any(|item| matches!(item.kind, auto_ui_dialect::ast::ExtImportKind::Package)))
+        });
+        if !is_routed && !is_linked {
             return Ok(None);
         }
         let mut modules = Vec::new();
-        VueProject::collect_at_files_recursive(&front_dir.join("pages"), &mut modules);
+        if is_routed {
+            VueProject::collect_at_files_recursive(&front_dir.join("pages"), &mut modules);
+        }
         for entry in fs::read_dir(front_dir)? {
             let path = entry?.path();
             if path != app_at && path.file_name().is_some_and(|name| name != "pac.at")
@@ -8171,14 +8216,19 @@ fn ace_routed_front(front_dir: &Path) -> AutoResult<Option<AceRoutedFront>> {
             }
         }
         modules.sort();
-        let product = auto_ui_runtime::ui::ace_package_sfc::generate_routed_front_sfc(
-            &app_at, &source, &modules,
-        )?
-        .ok_or_else(|| format!("ace.route.admission: {} routes were not projected", app_at.display()))?;
-        Ok(Some(AceRoutedFront {
+        use auto_ui_runtime::ui::ace_package_sfc::{generate_linked_front_sfc, generate_routed_front_sfc};
+        let product = if is_routed {
+            Some(generate_routed_front_sfc(&app_at, &source, &modules)?
+                .ok_or_else(|| format!("ace.route.admission: {} routes were not projected", app_at.display()))?)
+        } else {
+            generate_linked_front_sfc(&app_at, &source, &modules)?
+        };
+        Ok(product.map(|product| AceFront {
             app: product.app,
             name: product.app_name,
             pages: product.pages,
+            runtime_mjs: product.runtime_mjs,
+            embedded_widget_sources: product.embedded_widget_sources,
             routes: product.paths.into_iter().map(|(path, module)| AuraRoute {
                 widget_name: module.clone(),
                 path,
@@ -12461,6 +12511,7 @@ render: \"vm\"
         assert!(!pkg.contains("\"reka-ui\""), "{pkg}");
         assert!(!pkg.contains("\"vaul-vue\""), "{pkg}");
         assert!(!pkg.contains("\"embla-carousel-vue\""), "{pkg}");
+
     }
 
     /// Plan 442 P0-1: marker detection over the generated corpus — the
@@ -12817,6 +12868,25 @@ export default {{ }}
             component.contains("unregisterEditor(props.editorKey, view.value)"),
             "{component}"
         );
+    }
+
+    #[cfg(feature = "ace-vue")]
+    #[test]
+    fn p107_route_diagnostics_do_not_import_vm_natives() {
+        use auto_ui_runtime::ui::ace_package_sfc::ROUTE_DIAGNOSTIC_SFC_PREFIX;
+        let dir = std::env::temp_dir().join(format!("p107_route_native_{}", std::process::id()));
+        let src = dir.join("src");
+        std::fs::create_dir_all(src.join("pages")).unwrap();
+        std::fs::write(src.join("main.ts"), "import { createApp } from 'vue'\n").unwrap();
+        std::fs::write(
+            src.join("pages").join("ace-route-error-0.vue"),
+            format!("{ROUTE_DIAGNOSTIC_SFC_PREFIX}unknown function code_editor_cursor_line</pre></template>\n"),
+        ).unwrap();
+        ensure_natives_layer(&dir);
+        assert!(!src.join("lib").join("natives.ts").exists());
+        assert!(!src.join("natives.d.ts").exists());
+        assert!(!std::fs::read_to_string(src.join("main.ts")).unwrap().contains("/natives"));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// PLAN-677 T-04: natives 三层发射——R 层名（file_basename/console_*）

@@ -130,11 +130,17 @@ widget BarChart (data: List, index: str = "q", fields: List<str> = ["v"], colors
             var span float = 240.0
             var n int = .data.len()
             var nf float = n
-            var slot float = 510.0 / nf
+            var slot float = 0.0
+            if n > 0 {
+                slot = 510.0 / nf
+            }
             var ks int = .fields.len()
             var kf float = ks
             var inner float = slot * 0.6
-            var barw float = inner / kf
+            var barw float = 0.0
+            if ks > 0 {
+                barw = inner / kf
+            }
             var cs = .colors
             var ccount int = cs.len()
             var iname = .index

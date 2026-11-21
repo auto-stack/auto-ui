@@ -118,49 +118,47 @@ fn main() {
     if let Some(spec) = &script_spec {
         bridge.install_script(parse_script(spec));
     }
-    let expected_dispatches = count_clicks(&script_spec);
     if let Err(e) = bridge.open() {
         eprintln!("ace_node_desktop_window: open failed: {e}");
         std::process::exit(5);
     }
     install_bridge(bridge);
 
-    // 收口线程（只观察不驱动——桥步进只在窗口 tick 主线程）：脚本注完 +
-    // dispatch 齐或 hold 超时 + 帧数达标 → 证据退出。
+    // Observe the window thread's progress and preserve the snapshot on timeout.
     std::thread::spawn(move || {
         let deadline = Instant::now() + Duration::from_millis(hold_ms.max(1000));
-        loop {
-            let settled = auto_ui_runtime::ui::ace_node_desktop::with_bridge(|b| {
-                b.script_done() && b.dispatch_log.len() >= expected_dispatches
+        let completed = loop {
+            let settled = auto_ui_runtime::ui::ace_node_desktop::with_bridge(|bridge| {
+                bridge.script_settled()
             })
             .unwrap_or(false);
             let frames =
                 auto_ui_runtime::ui::ace_node_desktop::NODE_DESKTOP_FRAMES.load(Ordering::Relaxed);
-            if (settled && frames >= min_frames) || Instant::now() > deadline {
-                break;
+            if settled && frames >= min_frames {
+                break true;
+            }
+            if Instant::now() >= deadline {
+                eprintln!(
+                    "ace_node_desktop_window: deadline reached (frames={frames}/{min_frames}, script_settled={settled})"
+                );
+                break false;
             }
             std::thread::sleep(Duration::from_millis(40));
-        }
+        };
         let json = auto_ui_runtime::ui::ace_node_desktop::with_bridge(|b| b.evidence())
             .unwrap_or_else(|| serde_json::json!({"error": "bridge gone"}));
-        let _ = std::fs::write(&evidence_path, serde_json::to_string_pretty(&json).unwrap());
-        std::process::exit(0);
+        if let Err(error) = std::fs::write(&evidence_path, serde_json::to_string_pretty(&json).unwrap()) {
+            eprintln!("ace_node_desktop_window: writing evidence `{evidence_path}` failed: {error}");
+            std::process::exit(8);
+        }
+        std::process::exit(if completed { 0 } else { 6 });
     });
 
-    if let Err(e) = auto_ui_runtime::ui::iced::run_app::<AceNodeDesktopWindow>() {
-        eprintln!("ace_node_desktop_window: window run failed: {e:?}");
-        std::process::exit(7);
+    match auto_ui_runtime::ui::iced::run_app::<AceNodeDesktopWindow>() {
+        Ok(()) => eprintln!("ace_node_desktop_window: window closed before verification completed"),
+        Err(e) => eprintln!("ace_node_desktop_window: window run failed: {e:?}"),
     }
-}
-
-fn count_clicks(spec: &Option<String>) -> usize {
-    spec.as_ref()
-        .map(|s| {
-            s.split(',')
-                .filter(|p| matches!(p.split(':').nth(1), Some("click") | Some("type")))
-                .count()
-        })
-        .unwrap_or(0)
+    std::process::exit(7);
 }
 
 fn parse_script(spec: &str) -> Vec<(usize, ScriptStep)> {

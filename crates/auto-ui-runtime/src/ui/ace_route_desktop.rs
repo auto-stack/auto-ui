@@ -1,15 +1,18 @@
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use ace_core::source::age_component::{ComponentEntryValue, ComponentNode, ComponentViewItem};
 use ace_core::source::ast::{Expr, ExprKind};
 use ace_core::source::packages::PackageModuleInput;
 
 use super::ace_node_desktop::NodeDesktopBridge;
-use super::ace_route::{RouteAction, RouteNavigation, RouteTable};
+use super::ace_route::{RouteAction, RouteModulePaths, RouteNavigation, RouteTable};
+use super::ace_widget_packages::append_widget_packages;
 
 pub(super) struct DesktopRoutes {
     table: RouteTable,
     units: Vec<PackageModuleInput>,
+    paths: RouteModulePaths,
     history: Vec<String>,
     current: Option<ActivePage>,
     transitions: Vec<serde_json::Value>,
@@ -21,10 +24,11 @@ struct ActivePage {
 }
 
 impl DesktopRoutes {
-    pub fn new(table: RouteTable, units: Vec<PackageModuleInput>) -> Self {
+    pub fn new(table: RouteTable, units: Vec<PackageModuleInput>, paths: RouteModulePaths) -> Self {
         Self {
             table,
             units,
+            paths,
             history: Vec::new(),
             current: None,
             transitions: Vec::new(),
@@ -74,11 +78,15 @@ impl DesktopRoutes {
             let prepared = super::ace_route::prepare_page(&unit.source, Some(&params))?;
             unit.source = prepared.source;
             let nodes = super::ace_route::package_candidates(&unit.source)?;
-            let links = route_links(&nodes[0])?;
+            let root = nodes.first().ok_or("prepared page widget is missing")?;
+            let links = route_links(root)?;
+            if let Some(source_path) = self.paths.get(entry) {
+                append_widget_packages(source_path, &nodes, &mut units)?;
+            }
             let mut bridge = NodeDesktopBridge::load_package_leaf(units, entry, instances)?;
             bridge.set_route_controls(prepared.commands, links);
             bridge.open()?;
-            if prepared.has_init {
+            if prepared.has_init && !bridge.has_checked_package_view() {
                 if let Err(err) = bridge.initialize_route_page() {
                     let _ = bridge.close_for_shutdown();
                     return Err(err);
@@ -140,6 +148,33 @@ impl DesktopRoutes {
             "error": self.error(),
         })
     }
+}
+
+pub(super) fn front_route_modules(app: &Path) -> Result<Vec<PathBuf>, String> {
+    let front = app.parent().filter(|path| !path.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let pages = front.join("pages");
+    let mut pending = vec![(front.to_path_buf(), false)];
+    if pages.is_dir() {
+        pending.push((pages, true));
+    }
+    let mut modules = Vec::new();
+    while let Some((dir, recursive)) = pending.pop() {
+        let error = |err| format!("ace.route.module: {}: {err}", dir.display());
+        for entry in std::fs::read_dir(&dir).map_err(error)? {
+            let entry = entry.map_err(error)?;
+            let path = entry.path();
+            if recursive && entry.file_type().map_err(error)?.is_dir() {
+                pending.push((path, true));
+            } else if path != app
+                && path.extension().is_some_and(|ext| ext == "at")
+                && path.file_name().is_some_and(|name| name != "pac.at" && (recursive || name != "app.at"))
+            {
+                modules.push(path);
+            }
+        }
+    }
+    modules.sort();
+    Ok(modules)
 }
 
 pub(super) fn route_links(node: &ComponentNode) -> Result<Vec<(String, String)>, String> {
