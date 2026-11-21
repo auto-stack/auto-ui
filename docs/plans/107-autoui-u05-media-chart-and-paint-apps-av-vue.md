@@ -757,6 +757,14 @@ Iced 原 `024-charts` 的首报从 `ptsOut` 推进到只读属性列表 `labels`
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 56 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bc4e854a, lang ffdee7676 | evidence: original BarChart ownership gate cleared, native snapshot verifier work gate and empty Area behavior recorded | next: work`
 
+### 第 57 轮｜原 024 Iced 真窗与 Chrome 指针取整诊断
+
+受检组件包的标量观察沿视图已有的 MIR 调用闭包切片执行。原 Iced 入口越过全包 `VerifySteps`，在真窗显示 Line、Bar、Area，路径为 `4 → 19 → 7`。120 秒观察窗口截止时已有 4 帧，关闭脚本未完成，Donut 的最后一条路径记录被截断。本轮保留原应用的部分证据，窗口日志和部分 JSON SHA256 分别为 `8df94ea0e76bfd00ebdcf90e621286e77de7567d5a6d6d565239283c35130759`、`3a6456e25e27b82d71d86d7ec693966651c64865fbb70f29efaa65aabe25d6f9`。继续减少标量观察的重复降层。
+
+Chrome 指针已实际命中原折线图覆盖层。原 `.PointerMove` 把 `0.6463046669960022` 的浮点值转换为整数，脚本目标先检查整数而抛错。A2TS 当前在整数范围检查前截断，并把负零规范为整数零。真实 Node 测试覆盖 `-3.75 → -3`、`-0.125 → 0` 和原 widget 的饱和上限，A2TS 5 项通过。初次浏览器失败日志和 Node 测试日志 SHA256 分别为 `a1fdecd51be6ea23bf45fa7737804579dec1507cbdc2b644961ef3852b063c0c`、`799901d8780ca09681ef9efb20fddd0e7ebf1ddb3bf36cc3c77965e5f5b5714b`。生产 CLI 冷重建及原浏览器指针复验待执行。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 57 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui bc4e854a, lang e428ecc05 (cast change), AV closure projection under replay | evidence: three original Iced chart shapes, deadline receipt, checked JavaScript float cast regression | next: work`
+
 ## 10. 下游交接
 
 本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
