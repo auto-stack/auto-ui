@@ -987,6 +987,24 @@ stage: work（012 入浏览器门·五 app 全绿）| plan_id: PLAN-105 | plan_r
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 109 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: ed3b3cfd | next: work
 
+stage: work（AV collections 元素文本视图）| plan_id: PLAN-105 | plan_revision: r1 | round: 110 | from: work | to: work | status: executing | outcome: pass（本刀三提交；013 余 store 内联上下文一墙）| worktree: D:/autostack/.wt/ui-105/auto-lang | code_commit: auto-lang `859b8ae39`/`83c41a561`/`fd7f5831a` | task_ids: T-02（W105）| evidence: av plan105 组 11/11 + `plan-artifacts/plan-105/p013-prepped-*.at` | next: work
+
+2026-11-21 stage: work（T-02 W105：元素文本视图三刀）| outcome: pass（T-02 未整体完成）
+
+**W105a（`859b8ae39`，文法）**：`generic-atom`（`List<T>.member` 原子）规则 + condition-atom/atom-expr 两处 alt 的 age-component profile 回归——W38 首开、W85 手工重建文法时只回补了 generic-call/const-args，本形整类丢失（诊断落 view 位置 `unexpected token in a bare element tag`）。av plan105 组既有红 `p105_list_handler_executes_end_to_end` 随此翻转；census 重基线 age-component `2dfb9edf…`→`ac48cc92…`（age-package 不变）。
+
+**W105b（`83c41a561`，元素文本视图）**：①record **字段位** plain `str` 落 owned `Str`（`collections_record_field_type_idx`；表达式位 str→StrView 不变）——此前 view-kind 记录字段触发 `mir.field-borrow`；②record ctor 的 StrView 文本实参经 `StrToOwned` 收敛进 Aggregate；③新指令 **LIST_FIELD_VIEW**（opcode `0x37`，av.collections/1）：owned-Str 元素字段的非破坏借读（`StrViewSrc::Share`，列表不动、无 epoch bump），配 verify（dst StrView + 终字段 owned Str + 越界 trap）/execute/ABC 编解码/ownership walk/fingerprint/instr_spec 三份冻结名单；④lowering：`xs.get(i).path` 与 `.todos[i].path` 的文本字段值读（表达式位 StrView）改发 LIST_FIELD_VIEW——place 不读 owned 元素（`mir.list-type`）的墙由此解除。回归 av plan105 组 +3（视图循环 text 叶 / `.get(i)` 值读 / ctor 字面量收敛）。
+
+**W105c（`fd7f5831a`）**：bracket 索引形 `.todos[i].text` 值读回归（013 Recompute 真形），组 **11/11**。
+
+**013 桥实测推进**：`--source`（mem backend）此前墙链 `create_todo not wired` → `lower.type-use Str` → `mir.entry-sig` → `mir.field-borrow` 全部解除；**当前余墙**：store 内联合并上下文里的 `.todos[i].text`（def `d___age_state_0_input`，span 5378–5392 实证）仍走 place-get——**纯组件面同形已解**（bracket 探针 OK），差异在 store 合并后的 HIR 形（W106 首查点：dump 该 def 的 HIR/降级）。prepared 源存 `p013-prepped-*.at`。
+
+**affected（全绿）**：av plan105 11/11、av-core 133（70+51+11+2）、core plan105 26/26、census 4/4、979 24/24、981 248/248、980 40/40、104 3/3、1072 19/19、plan980_state_face 8/8、ace-native 17/17。**既有红记账（stash 对照，与本刀无关）**：av_collections 内存门（需显式 prepare）、ace-native `allocation_controls`。**新增用例时长**：组文件 11 例共 0.06s（单例 ≤0.01s）。
+
+`next_responsible_role: work（T-02 W106：store 内联上下文的 `.todos[i].text` place-get 墙（def d___age_state_0_input 的 HIR 形定位）→ 013 桥全链 → 012/016 同律）`
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 110 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-lang | commit: fd7f5831a | next: work
+
 ## 10. 下游交接
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
