@@ -1222,7 +1222,14 @@ fn render_items(
                         _ => None,
                     });
                     if let Some(target) = target {
-                        ctx.push_str(&format!("<RouterLink :to=\"{}\">", escape_attr(&expr_to_template_js(target)?)));
+                        match &target.kind {
+                            ace_core::source::ast::ExprKind::StrLit(path) => {
+                                ctx.push_str(&format!("<RouterLink to=\"{}\">", escape_attr(path)));
+                            }
+                            _ => {
+                                ctx.push_str(&format!("<RouterLink :to=\"{}\">", escape_attr(&expr_to_template_js(target)?)));
+                            }
+                        }
                         if let Some(label) = &el.label {
                             ctx.push_str(&format!("{{{{ {} }}}}", expr_to_template_js(label)?));
                         }

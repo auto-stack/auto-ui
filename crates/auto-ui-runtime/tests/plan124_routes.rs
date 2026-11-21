@@ -76,7 +76,8 @@ fn route_sfc_publishes_pages_and_local_diagnostics() {
         .expect("routed product")
         .expect("routes were projected");
     assert!(product.app.contains("<RouterView"), "{}", product.app);
-    assert!(product.app.contains("<RouterLink"), "{}", product.app);
+    assert!(product.app.contains(r#"<RouterLink to="/book/17">"#), "{}", product.app);
+    assert!(product.app.contains(r#"<RouterLink to="/settings">"#), "{}", product.app);
     let path = |name: &str| {
         product
             .paths
