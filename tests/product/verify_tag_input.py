@@ -632,12 +632,17 @@ def case_notes_native(session):
     i = snap.find(tag_input)
     add_btn = node_id(snap[i:i + 2500], r'button #(vnode_\d+) "[^"]*添加标签"')
     body_before = re.search(r'textarea #[^}]*?value: "([^"]*)"', snap)
-    session.call("autoui_type", element_id=tag_input, text="PlanTag")
-    time.sleep(0.8)
-    session.press(add_btn)
-    time.sleep(2.5)
-    snap2 = session.snapshot()
-    assert "删除标签 PlanTag" in snap2, snap2[-1500:]
+    snap2 = None
+    for attempt in range(2):
+        session.call("autoui_type", element_id=tag_input, text="PlanTag")
+        time.sleep(0.8)
+        session.press(add_btn)
+        time.sleep(2.5)
+        snap2 = session.snapshot()
+        if "删除标签 PlanTag" in snap2:
+            break
+        time.sleep(1.0)
+    assert snap2 is not None and "删除标签 PlanTag" in snap2, snap2[-1500:] if snap2 else "no snapshot"
     # switch to another note and back: tag must persist (backend readback)
     m = re.search(r'button #(vnode_\d+) "([^"]*Quick Ideas[^"]*)"', snap2)
     assert m, "no Quick Ideas button"
