@@ -22,3 +22,9 @@ tn = "test -p auto-ui-runtime --features native-dnd --test native_dnd_e2e"
 # =coverage examples_001_005_all_covered）——仓库级抬高测试线程栈。
 [env]
 RUST_MIN_STACK = "16777216"
+
+# PLAN-105 W111（U03 012）：巨型组件 handler（Tick 形）的 AV 求值递归深度
+# 超出 Windows 主线程默认栈——桥进程的线程栈默认抬到 512MB（虚拟预留、
+# 按需提交；64 位地址空间无压力；测试线程另有 RUST_MIN_STACK 档）。
+[target.'cfg(windows)']
+rustflags = ["-C", "link-args=/STACK:536870912"]
