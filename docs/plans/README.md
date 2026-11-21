@@ -4,23 +4,66 @@
 
 [PLAN-109 CollectionView / Thumbnail（归档）](archived/109-collection-view-and-thumbnail.md) 已交付 r2。交付提交为 `a6b16627`。AssetBrowser 与 027 FileManager 已迁移共用包，Windows 原生 VM 和 Vue 已验收。Linux 两轨随统一 Linux 开发补验，见 [DEBT-011](debts.md#debt-011-collectionview-的-linux-平台验收)。见[组件扩展路线](../design/autoui/component-library-extension-strategy.md#33-共用资源视图接续)。
 
-## U02–U06 示例与 Widgets 双端交付（2026-11-19）
+## U02–U06 交付状态（2026-11-21）
 
-五组独立承接 980/1071 的原应用和 Widgets 验收。AutoUI 持合同，各计划承担所需 AutoLang 实现与用例、AutoUI 缺失组件和现有组件缺口，逐组交付 AV/Iced 和 A2Vue/浏览器。A2R、AC 后续沿同源验收另立计划。
+按 AutoLang 980/1071 的原应用和 Widget 页逐项收 AV/Iced 与 A2Vue 证据。AutoUI 104 交 U02，105 汇总 U03，106–108 与 110–123 按下方归属交 U04–U06。共享代码按实际接口确定唯一修改方，后续消费者复用通过复审的版本。
 
-| 本仓号 | 计划 | 状态与范围 |
-|---|---|---|
-| 104 | [U02 页面与表单（归档）](archived/104-autoui-u02-pages-and-forms-av-vue.md) | 已交付：AV 真窗 7/7（005 三 oracle、010 Submit+FAQ、004/006/007 文本/label/状态）+ A2Vue 7/7（005/010 引 1072 正式收据、余例真浏览器档）；复审 pass；合入 ui `5a862d46` / lang `2fb094483`；T-01..T-08 全勾，8/8 |
-| 105 | [U03 本地应用与编辑](105-autoui-u03-local-interactive-apps-av-vue.md) | executing r1，1/8（T-02 W1–W24 已交：entry 边界/msg 尾逗号/单行视图数据/f-string/int 文本/link/源准备/类型化列表改写/连字符键/属性元素开包面/单变量 for/handler var+包面脱糖/hook 局部再赋值/形状回归/AGE 索引后缀/连字符标签/依赖样式内联修复/裸名复合赋值/handler for 结构/顶层裸名赋值/AV 源准备接线/样式空白化/原源优先装载/循环体叶计数/.store 具名拒/store 声明入语法；auto-lang 19 提交至 `d8c75a7d8`、auto-ui 10 提交至 `50a8e527`；**015/018/022 已进 AV 桥并真开 Iced 窗**（T-04 部分）；SFC 生成接源准备；余 S1 store 语义（013/016）、012 局部列表、AV 真开窗），6 个原应用及关联 Widgets |
-| 106 | [U04 服务与数据应用](106-autoui-u04-service-and-data-apps-av-vue.md) | drafting r1，0/8，6 个原应用及关联 Widgets |
-| 107 | [U05 024 Charts 与五个图表原页（归档）](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) | r2 已交付，Windows AV/Iced 与 A2Vue/Chrome 各 6/6；图表接面供 123 接续 |
-| 108 | [U06 复杂交互应用](108-autoui-u06-complex-interactive-apps-av-vue.md) | drafting r1，0/8，5 个原应用及关联 Widgets |
+| 计划 | 当前状态与下一交付 |
+|---|---|
+| 104 · 页面与表单 | 已归档，AV/Iced 与 A2Vue 各 7/7。 [交付收据](archived/104-autoui-u02-pages-and-forms-av-vue.md) |
+| 109 · CollectionView / Thumbnail | 已归档，027 和 AssetBrowser 共用包已交付，供 114 接续。 [交付收据](archived/109-collection-view-and-thumbnail.md) |
+| 124 · U03 路由与页面挂载 | 已归档，双端 routes/outlet 已交，由 105 接回 018/022。 [交付收据](archived/124-autoui-u03-routes-and-outlet.md) |
+| 125 · U03 独立交互 Widgets | 已归档，七个原页两端各 7/7，由 105 纳入原十四页矩阵。 [交付收据](archived/125-autoui-u03-interactive-widgets.md) |
+| 105 · U03 本地应用与编辑 | 已落主归档，AutoUI / AutoLang 交付分别为 fe2dd4f1 / 0b754af59。124/125 的已交来源纳入 U03，015 Notes 的原样 AV handler 回放仍为具名债务，按原条件补证。 [归档收据](archived/105-autoui-u03-local-interactive-apps-av-vue.md) |
+| 107 · 024 Charts | r2 已归档。024 和五个图表原页的 Windows AV/Iced 与 A2Vue/Chrome 各 6/6。 [交付收据](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) |
+| 114 · 027 FileManager | executing r2，1/8，进行 T-02。树页已有双端回放，受检子组件事件与属性已有定向双端证据。原 027 仍需 watch、FocusCurrent 与正式宿主回放；继续核实际文件写操作。 [计划](114-autoui-file-manager-av-vue.md) |
+| 123 · 布局 Widgets | 执行中。已有独立布局页和桌面路由入口证据；整包沿 107 图表与 114 树/包/事件的通过复审版本接续。 [计划](123-autoui-layout-widgets-av-vue.md) |
+| 106 · 014 Weather | executing r2，T-01 完成，T-02 部分交付（AutoLang 010a14d35）。条件样式 else-if 和包面文本比较已接通；原 hourly/daily 的可变记录列表接共享写面，真实 HTTP 与浏览器实跑仍待验。 [计划](106-autoui-u04-service-and-data-apps-av-vue.md) |
 
-U02 可先用 005-login 验证表单与主题。各组按实际接口并行，共享功能在 T-01 定唯一写面，原有组件计划与 AutoLang 1072 按实际版本复用。AV 证据供完整 W1 签发，A2Vue 证据供 1072 及 CLI 联验消费。各组分别复审、合入和归档。
+## 当前执行顺序
 
-[PLAN-124 U03 路由与页面挂载（归档）](archived/124-autoui-u03-routes-and-outlet.md) 已交付 AV/Iced 与 A2Vue 的 routes/outlet，由 PLAN-105 接入 018 和 022 的原应用。
+1. **107 进入 T-08，114 并行继续 T-02。** 107 完成固定组与三仓落地核对，交正式收据、向 123 登记图表组件版本。114 继续原 027 的属性观察、焦点、真实文件效果和双端回放，按实际消费点向 123 与 106 交共享接口。
+2. **106 同步推进 014 Weather。** 先实跑已可推进的样本行为、A2Vue 浏览器和本地真实 HTTP 合同。AV 的预报列表更新按 114/共享 typed-list owner 的交付接续，再核原城市切换、错误与重试。新增并行容量时，可开 108 的异步探针或准备 113 的 SQLite 回放。
+3. **123 逐项接入 107/114 的已审版本。** 路由宿主和独立布局页已有证据可先核验。拿到图表与树/包接点后跑原画廊和 kitchen-sink；若消费者先需要 123 的桌面入口，先按现有独立页证据交可用版本。
+4. **按原矩阵汇齐 W1。** 使用 104/105 已正式交付的适用行，保留 015 的具名 AV 缺口，其余逐例计划按下表前置推进。完整 W1 后交 1097 W2/AC，再交 1074 W3/A2R。可用的 A2Vue 结果独立交给 1072 路线与 982 的实际 CLI 联验。
 
-[PLAN-125 U03 独立交互 Widgets（归档）](archived/125-autoui-u03-interactive-widgets.md) 的七个原页 AV/Iced 与 A2Vue 各通过 7/7，正式收据供 PLAN-105 汇总。
+## U04–U06 逐例交付
+
+| 原组 | 计划 | 原 demo | 独立 Widget 页 | 状态与先手 |
+|---|---|---|---|---|
+| U04 | [106](106-autoui-u04-service-and-data-apps-av-vue.md) | 014-weather | 依实际消费组件 | 执行中。T-02 已有语法修复，AV 列表接共享写面，HTTP 与真实浏览器可并行验。 |
+| U04 | [110](110-autoui-chat-av-vue.md) | 017-chat | 依实际消费组件 | drafting。接实际 SSE/HTTP 与已交 Store。 |
+| U04 | [111](111-autoui-realworld-av-vue.md) | 023-realworld | 依实际消费组件 | drafting。接 HTTP、路由、认证和数据端口。 |
+| U04 | [112](112-autoui-sys-monitor-av-vue.md) | 025-sys-monitor | 依实际消费组件 | drafting。核系统采集与授权进程端口。 |
+| U04 | [113](113-autoui-database-av-vue.md) | 026-database | datatable、table | drafting。界面和真实 SQLite 各自出证据。 |
+| U04 | [114](114-autoui-file-manager-av-vue.md) | 027-file-manager | filetree、treeview | 执行中。继续原 027 的 watch、焦点和实际文件操作，向 123 交所用树/包接面。 |
+| U05 | [107](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) | 024-charts | area-chart、bar-chart、donut-chart、line-chart、flow-diagram | 已交付两端验收与图表接面，供 123 接续。 |
+| U05 | [115](115-autoui-video-app-av-vue.md) | 019-video-app | 依实际消费组件 | drafting。门户可先验，播放接实际 116/090 接口。 |
+| U05 | [116](116-autoui-media-players-av-vue.md) | 020-music-player、030-video-player | 依实际消费组件 | drafting。先核原播放，公共控件按所用 090 版本接续。 |
+| U05 | [117](117-autoui-image-apps-av-vue.md) | 029-photo-gallery、031-image-viewer | carousel | drafting。接已交 089，沿原页回放坏图与关闭。 |
+| U05 | [118](118-autoui-paint-av-vue.md) | 031-paint | 依实际消费组件 | drafting。接实际 ColorPicker、指针和画布输入。 |
+| U06 | [108](108-autoui-u06-complex-interactive-apps-av-vue.md) | 032-handler-async-probe | 依实际消费组件 | drafting。独立冻结挂起、取消和迟到回调。 |
+| U06 | [119](119-autoui-minesweeper-av-vue.md) | 038-minesweeper | 依实际消费组件 | drafting。接实际所用的 Store、集合或输入。 |
+| U06 | [120](120-autoui-auto-edit-av-vue.md) | 041-auto-edit | code-editor | drafting。接 085、文件对话框和所用 Store。复用 107 的原页探针，继续查光标宿主能力。 |
+| U06 | [121](121-autoui-blog-viewer-av-vue.md) | 021-blog-viewer | navigationmenu | drafting。可用 124 路由来源准备原服务与焦点验收。 |
+| U06 | [122](122-autoui-launcher-av-vue.md) | 028-launcher | command | drafting。先验原启动场景，用到 Command Palette 时接 096。 |
+| U06 | [123](123-autoui-layout-widgets-av-vue.md) | 布局和组合页 | absolute、alignment、center、col、flex、grid、grid-span、position、responsive、row、sizing、spacing、kitchen-sink | 执行中。原画廊整包接 107 图表与 114 树/包接面。 |
+
+17 份计划覆盖原 18 个 demo 和 26 个独立 Widget 页。120 的 code-editor 页仍计 U05。相同原页证据按同一输入、组件版本及目标复用，实际应用保各自行为验收。
+
+完整 UI-W1-AV 汇齐 AutoLang 1071 的 U01、104 的 U02、105 汇总的 U03，以及本表 U04–U06 的逐项 AV/Iced 收据。各计划 AV 可先独立复审与交付，A2Vue 独立收口。[AutoLang 1097](../../../auto-lang/docs/plans/1097-ace-ac-autoui-w2-and-age-host.md) 取完整 W1 交 W2/AC，[AutoLang 1074](../../../auto-lang/docs/plans/1074-autoui-w3-a2r.md) 取正式 W2 交 W3/A2R。截至本次核对，1097 和 1074 均为 drafting，0/5。
+
+## Web 与 983 交接
+
+| 顺序 | 生产接口与消费 |
+|---|---|
+| 1 · Web 基础 | 967/968/969/974 的运行时与 HTTP 端口进入 983 PORT，975/978 补 PROOF 的执行与构建来源。 |
+| 2 · 实际消费者前置 | 982 的已交 EXEC 接线与 980/WEB 的适用产物供 983 CONSUMERS。Vue U0 使用 980×982 的 002-counter 真 CLI 与浏览器收据 2c9c5f228；1072 沿同一产物身份接收。 |
+| 3 · 983 正式结果 | r28 已落主归档。C0/C1/U0 与四仓消费者收据按 r28 裁定接收。982 可继续使用 983 的 AV Web 服务公开面；983 来源供 984 的生态交付与 985/B 按实际消费者验收。 |
+
+107、114、106、123 与 983 的关系按实际接口消费。106 的真实 HTTP 可复用适用的 983 服务端口，仍用 014 自己的输入、错误与重试结果验收。UI 完整 W1、W2、W3 各走其收据链，982 图形 CLI 在所用宿主与工程接口正式交付后联合验收。
+
+[983 归档与 r28 裁定](../../../auto-lang/docs/plans/archive/983-ace-m2-web.md) · [982 CLI/SDK 计划](../../../auto-lang/docs/plans/982-ace-m2-man-gen.md) · [1072 Vue Web 归档](../../../auto-lang/docs/plans/archive/1072-autoui-vue-web.md)
 
 ## AGE三路线执行合同更新（2026-11-17，仅规划）
 
@@ -44,7 +87,7 @@ PromptDialog、TaskProgressDialog、CommandPalette、TagInput已分别补为094�
 | 094 | [PromptDialog（归档）](archived/094-prompt-dialog.md) | r3 已交付，Windows Native VM 与 Vue 已验收； 027重命名/新建与普通名称管理；失败留窗，应用持文件写入，Vue权限边界保留 |
 | 095 | [TaskProgressDialog](095-task-progress-dialog.md) | 普通实际记录校验任务；参考Reader导入/批处理，取消请求须由任务owner确认 |
 | 096 | [CommandPalette](096-command-palette.md) | 028 Launcher及普通设置；复用原排序/recent/环绕，组件不持启动总线 |
-| 097 | [TagInput](097-tag-input.md) | 015 Notes与普通设置；复用update_tags/vocab，稳定noteId防迟到错写 |
+| 097 | [TagInput（归档）](archived/097-tag-input.md) | 015 Notes与普通设置；复用update_tags/vocab，稳定noteId防迟到错写 |
 
 四项直接引用[已有四组件图与视觉指南](../design/autoui/file-navigation-and-interaction-visual-guide.md)，无需重新生图。互相没有硬依赖，可各自进入T-01；本批内部建议094、097先行，再按需求选096/095；全路线下一项优先第一批剩余085 TreeView。Windows/Linux native VM与Vue四门分别留证，未运行不算通过；本轮未建实施树或运行产品测试。094–097在独占分配锁下扫描当前/archived最大号后创建，保留其他任务的`.next-id`改动。
 

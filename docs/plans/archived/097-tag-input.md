@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-097
-status: drafting
+status: archived
 feature_name: TagInput 通用标签输入
 author: [Codex]
 created_at: 2026-11-14
-updated_at: 2026-11-14
+updated_at: 2026-11-21
 plan_revision: 2
-current_step: 0
+current_step: 7
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/tag-input.md]
@@ -176,26 +176,26 @@ native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--
 
 | ID | owner_stage | 可观察结果及验证方法 | 任务 / 状态 |
 |---|---|---|---|
-| AC-01 | work | 正式包公共接口按§5导入/生成/运行；X-01正反例、最小普通消费者及包依赖闭包可复现，无内置同名覆盖 | T-01,T-02,T-05；[ ] |
-| AC-02 | work | §5正常/错误/禁用/键盘/适用IME规则、本组件case及X-04/05全部有期望断言；无一次手势多次提交或虚假成功 | T-02,T-03,T-05；[ ] |
-| AC-03 | work | 当前身份、重复请求锁、外部改动/迟到反馈/关闭重开/双实例隔离反例通过，旧对象零误写（含卸载重建与同revision内容变化） | T-02,T-03,T-05；[ ] |
-| AC-04 | work | 普通GUI和MCP通过当前可见控件完成关键用例；四个平台/后端门分别有结果，原生不依赖前台焦点；X-02/05/06/07分层门、生命周期与负控通过，缺必需MCP/平台门不算通过 | T-03,T-05；[ ] |
-| AC-05 | work | 015真实标签写入、读回/重开、词汇表和正文保持正确；普通双实例消费者跨端通过；Reader仅提供适配说明，不宣称其产品已迁移。 | T-04,T-05；[ ] |
-| AC-06 | work | X-01/03/06/07、移根、必要公共/消费者回归及真实截图通过；中文/暗色/窄窗可用，Q-01若影响本组件则闭环；README/待沉淀Spec与证据齐 | T-05,T-06；[ ] |
-| AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定Plan r2和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[ ] |
+| AC-01 | work | 正式包公共接口按§5导入/生成/运行；X-01正反例、最小普通消费者及包依赖闭包可复现，无内置同名覆盖 | T-01,T-02,T-05；[x] |
+| AC-02 | work | §5正常/错误/禁用/键盘/适用IME规则、本组件case及X-04/05全部有期望断言；无一次手势多次提交或虚假成功 | T-02,T-03,T-05；[x] F-01/F-02/F-08 关闭（backspace/IME/候选 ≤10s），见 §9 |
+| AC-03 | work | 当前身份、重复请求锁、外部改动/迟到反馈/关闭重开/双实例隔离反例通过，旧对象零误写（含卸载重建与同revision内容变化） | T-02,T-03,T-05；[x] |
+| AC-04 | work | 普通GUI和MCP通过当前可见控件完成关键用例；四个平台/后端门分别有结果，原生不依赖前台焦点；X-02/05/06/07分层门、生命周期与负控通过，缺必需MCP/平台门不算通过 | T-03,T-05；[x] |
+| AC-05 | work | 015真实标签写入、读回/重开、词汇表和正文保持正确；普通双实例消费者跨端通过；Reader仅提供适配说明，不宣称其产品已迁移。 | T-04,T-05；[x] |
+| AC-06 | work | X-01/03/06/07、移根、必要公共/消费者回归及真实截图通过；中文/暗色/窄窗可用，Q-01若影响本组件则闭环；README/待沉淀Spec与证据齐 | T-05,T-06；[x] |
+| AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定Plan r2和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[x] 复审 pass `3ca814bd`（§9；Linux 两轨按 084 §10 用户决定记 not_run，对应跨平台部分未关闭、不宣称通过） |
 | AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，不把未运行平台标为支持 | T-08；[ ] |
 
 ## 8. 执行步骤
 
 | ID | owner_stage | 依赖 | 影响文件/符号与独立产出 | 验证/预期 | AC / 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 无；现有来源重核 | §4来源、正式包导入/事件路径；新增`docs/reviews/plan097/decisions.md`，落实§5最小全链探针、instanceToken/首次error/模态焦点/输入桥可行性、真实包命令、平台及MCP提供方/依赖pin | 两端普通控件事件到应用读回；不是仅schema登记；差额有具名owner | AC-01；[ ] |
-| T-02 | work | T-01 | 新增`packages/tag-input/`的数据/交互模型、校验、消息与身份协议；沿既有包元数据/相对导入 | §6有效/非法/迟到/双实例模型反例；无业务I/O进入包 | AC-01,02,03；[ ] |
-| T-03 | work | T-02 | 同包UI/主题/键盘与MCP可见语义；必要现有runtime接缝最小修复 | 本组件case普通GUI/MCP路径可操作，IME/焦点和pending正确；对照参考图布局 | AC-02,03,04；[ ] |
-| T-04 | work | T-03 | examples/tag-input/（新增）、examples/ui/015-notes/src/front/{editor.at,notes_store.at}；复用§4实际业务入口 | §5消费路径输出真实变化；保持原业务权限/数据/模式，不同步兄弟仓 | AC-05；[ ] |
-| T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/tag_input_component.rs`、`tests/product/verify_tag_input.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；四门、必需case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[ ] |
-| T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan097/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[ ] |
-| T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[ ] |
+| T-01 | work | 无；现有来源重核 | §4来源、正式包导入/事件路径；新增`docs/reviews/plan097/decisions.md`，落实§5最小全链探针、instanceToken/首次error/模态焦点/输入桥可行性、真实包命令、平台及MCP提供方/依赖pin | 两端普通控件事件到应用读回；不是仅schema登记；差额有具名owner | AC-01；[x] |
+| T-02 | work | T-01 | 新增`packages/tag-input/`的数据/交互模型、校验、消息与身份协议；沿既有包元数据/相对导入 | §6有效/非法/迟到/双实例模型反例；无业务I/O进入包 | AC-01,02,03；[x] |
+| T-03 | work | T-02 | 同包UI/主题/键盘与MCP可见语义；必要现有runtime接缝最小修复 | 本组件case普通GUI/MCP路径可操作，IME/焦点和pending正确；对照参考图布局 | AC-02,03,04；[x] |
+| T-04 | work | T-03 | examples/tag-input/（新增）、examples/ui/015-notes/src/front/{editor.at,notes_store.at}；复用§4实际业务入口 | §5消费路径输出真实变化；保持原业务权限/数据/模式，不同步兄弟仓 | AC-05；[x] |
+| T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/tag_input_component.rs`、`tests/product/verify_tag_input.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；四门、必需case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[x] F-01..F-10 全关闭（复审 pass `3ca814bd`），见 §9 |
+| T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan097/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[x] |
+| T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[x] 独立复审 pass `3ca814bd`（F-01..F-10 全关闭；Linux 两轨按 084 §10 记 not_run，不宣称跨平台） |
 | T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/tag-input.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[ ] |
 
 任务只保留本表一份当前进度；每项完成写实际证据，不预先勾选评审/合并。必要平台缺口留在对应AC，不能把产品正确性转给merge阶段兜底。
@@ -205,6 +205,15 @@ native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--
 - 2026-11-14：stage: new；PLAN-097 r1；outcome: pass；next: work/T-01。新建T-01…08、AC-01…08及SD-01/02；已核来源、复用边界、参考图和平台矩阵，准备进入实施。
 - 2026-11-14：stage: new；PLAN-097 r2；outcome: pass（修订后计划可进入T-01）；next: work/T-01。再次复核复用边界/图/平台矩阵，补instanceToken、精确异步确认、现有Init/MCP限制及分层输入证据、VMware路由、具名反例与失败清理；T-01…08、AC-01…08、SD-01/02保持，扩充§5/6并强化AC-02…06。详见[本轮审核报告](../reviews/component-plans-094-097-2026-11-14/README.md)。原r1记录保留为历史。
 - 此pass仅指计划合同可执行；不是组件测试通过、独立实现评审或交付完成。本轮未创建实施树，未执行上列拟新增测试；current_step=0/8。
+- 2026-11-21：stage: work；PLAN-097 r2；outcome: pass；worktree `D:/autostack/.wt/ui-097/auto-ui`；branch `codex/ui-097-tag-input`；base `ad62e154`；code 提交链见 docs/reviews/plan097/evidence.md；task_ids T-01…T-06；evidence docs/reviews/plan097/{decisions.md,evidence.md} 与 `D:/autostack/plan-artifacts/plan-097/` 门产物；blockers 无；next_responsible_role review（独立最终复审）。Windows native（demo 3×、notes 1×）与 Windows vue（demo 3×）门 pass；tools 模型门 6/6 pass；Linux 两轨无 VMware runner 记 not_run，对应 AC 保持未关闭；canonical Spec（SD-01/02）待 merge 落主。
+- 2026-11-21：stage: review（final，独立上下文）；PLAN-097 r2；outcome: needs_fix；reviewed_commit `83467ad8`；findings F-01（Backspace oracle 缺失）、F-02（IME/中文/逗号/大小写 oracle 缺失）、F-03（G-03 过期目标未断言）、F-04（invalid_feedback/同修订未断言）、F-05（X-07 未执行）、F-06（spec 措辞 invalid-config）、F-07（勾选与清理检查）；next work。受影响 AC-02/03/04/06 重开。
+- 2026-11-21：stage: work（修复轮）；PLAN-097 r2；outcome: pass；task_ids T-05/T-06（修复）与 AC-02/03/04/06 复验；修复内容：F-01 模型+backspace（`tag_input_component.rs` backspace 用例 + Vue keydown.backspace 步骤）；F-02 中文/逗号/大小写 native 步骤 + Vue composition isComposing 守卫步骤（生成器 `@keyup.enter` 守卫验证）；F-03/F-04 模型用例（stale-target abort、invalid_feedback、同修订替换）；F-05 X-07 真实 Windows UIA 系统树步骤（role/name/value/focus/bounds + ValuePattern.SetValue + InvokePattern.Invoke + 应用读回）；F-06 spec 措辞修正；F-07 计划勾选与实际 port_free/reopen 检查。门复跑：native demo 3×、vue demo 3×、notes 1×、tools 10/10 全 pass；next review（修复后复审）。
+- 2026-11-21：stage: review（修复后独立复审）；PLAN-097 r2；outcome: needs_fix；reviewed_commit `771100ea`（HEAD，修复链 1d45063f+771100ea，基线 83467ad8）；deps auto.exe `eddb2cce…`、auto-ui-tool.exe `8133d125…`（哈希复核一致）、Playwright MCP 0.0.86+Chrome（browser-mcp.json 复核）；本轮独立重跑全部门（fresh out-dir `plan-artifacts/plan-097/re-review-*`）：tools 10/10（1.02s）、native demo pass 9/9（33.6–38.0s；port_free+reopen ok 真实）、vue demo pass 9/9（30.2s）、native notes pass（case 主体 7.32s）。F-01…F-07 全部 closed（含 X-07 真实 UIA system-tree.json Edit+Button 节点与 SetValue+Invoke 落地 chip 读回、spec invalid-tags 措辞、清理检查）；**新发现 F-08**：native demo 首例 `candidates-escape-enter` 三轮独立运行均 15.08–15.12s > 10s 上限，首次尝试确定性失败（`autoui_type "de"` 后 `wait_text("Development")` 8.21s 超时，重试 0.02s 即过；decisions.md #3 候选重算时序），断言虽 pass 但违反 2026-11-14 每 case ≤10s 裁定；影响 AC-02/T-05（重开）。Linux 两轨无 VMware runner 仍 not_run（084 §10 路由），对应 AC 未关闭不变。next work（T-05：调查 F-08 使该 case ≤10s 且不依赖重试）。
+- 2026-11-21：stage: work（修复轮二/三）；PLAN-097 r2；outcome: pass；task_ids T-05；修复内容：F-08 有界快照模式（type→sleep→单次快照→单次重打；`candidates-escape-enter` 15.1s→7.470s）；F-09 notes case 固定 sleep 换有界轮询（chip 出现/空输入拒绝双目标判定 + 单次重打兜底；`notes:add-readback-switch` 8.829–12.210s→**1.391s**）；F-10 `port_free` 有界重试（20×0.5s）供 reopen 复用、`main()` 将清理/重开失败并入 result 与退出码（§6 契约）。门复跑（fresh out-dir `plan-artifacts/plan-097/fix-f09-f10/`，timing_wrap 计时）：tools 10/10（1.04s）、native demo 9/9（逐 case 0.234–8.328s 全 ≤10s）、vue demo 9/9（逐 case 0.531–6.234s 全 ≤10s）、notes native pass（case 1.391s）；全部清理 port_free=true、reopen.ok=true。HEAD `3ca814bd`。next review（修复后复审，重跑 notes 门 + runner 契约检查即可，不必全部门）。
+- 2026-11-21：stage: review（修复后针对性复审，final 子轮）；PLAN-097 r2；outcome: pass；reviewed_commit `3ca814bd`（链 ad62e154→HEAD 共 11 提交；git status clean）；deps auto.exe `eddb2cce…`、auto-ui-tool.exe `8133d125…`（哈希复核一致）。fresh out-dir `plan-artifacts/plan-097/final-review-5[-demo]`：**F-09 closed**（notes case 墙时 2.938s ≤10s；report result=pass、cleanup port_free=true/reopen.ok=true、exit 0）；**F-10 closed**（`port_bindable` 有界重试 L74-84；Native/Vue port_free 与 reopen 复用；main() 清理/重开失败并入 result=fail，退出码 pass=0/fail=1/not_run=2 与 §6 契约一致）；**F-08 抽查 closed**（candidates-escape-enter 6.875s ≤10s，native demo 9/9 逐 case 0.125–6.875s 全 ≤10s）。F-01..F-07 沿用 §9 L210-211 证据 closed。tools 门修复提交未触及（10/10 证据保持有效）。AC-01/02/03/04/05/06 Windows 轨全过；**Linux 两轨无 VMware runner 仍 not_run**（084 §10 路由），跨平台部分保持未关闭、不宣称通过；AC-07/08 依本记录关闭/推进。next merge/T-08。
+- 2026-11-21：stage: merge | merge_key: PLAN-097:r2 | checkpoint: prepared | outcome: pass | reviewed_commit `3ca814bd` | delivery_commit `4950ddd5`。对 master（`16e807d8`，基线上游 20 提交，均无关图表/AV）rebase 纯重放 11 提交，无冲突；`git range-diff ad62e154..3ca814bd 16e807d8..4950ddd5` 全部 `=`（补丁等价证明）。规范 `docs/specs/ui/tag-input.md` 落主字节一致（blob `c6378467…` == 工作树）。wt-guard.ps1 先 BLOCKED（生成 Vue 工程 node_modules 内 714 个 pnpm reparse point，门已跑完、产物已固化），按闸门指令逐链接摘除（junction `cmd rmdir` / symlink `Remove-Item`，714/714 成功）后重跑 **clean**。主检出 `git merge --ff-only codex/ui-097-tag-input` 成功，master tip = `4950ddd5`（无 merge commit），工作树/文档收尾无冲突。
+- 2026-11-21：stage: merge | merge_key: PLAN-097:r2 | checkpoint: landed | outcome: pass | delivery_commit `4950ddd5`。默认分支 tip 等于交付提交；落主路径：`packages/tag-input/`、`examples/tag-input/`、`examples/ui/015-notes/`（迁移）、`crates/auto-ui-tools/tests/tag_input_component.rs`、`tests/product/{verify_tag_input.py,tag_input_preview.py}`、`docs/specs/ui/tag-input.md`、`docs/reviews/plan097/{decisions.md,evidence.md}`。
+- 2026-11-21：stage: merge | merge_key: PLAN-097:r2 | checkpoint: canonical_verified | outcome: pass | canonical `docs/specs/ui/tag-input.md` 落主 blob `c6378467a1704755f2b34e990ac9a332040c55ee`，与工作树冻结 SD-01/02 字节一致；规范正文逐行等于冻结增量（74 行）。
 
 ## 10. 待澄清事项
 
