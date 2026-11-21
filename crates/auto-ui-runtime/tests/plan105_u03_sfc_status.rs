@@ -98,3 +98,45 @@ fn p105_u03_apps_lane_sfc_generate() {
         "013 todo_list v-for"
     );
 }
+
+/// PLAN-105 W104：prep 的空列表初值改写形 `List<T>.new()`（`ace_source_prep::
+/// rewrite_empty_list_inits`，AGE 面语义）在 **lane 面**的发射——GenName 接收器
+/// 此前落 catch-all → `undefined.new()`（setup 期 TypeError，组件空白且无
+/// pageerror，012 实测）。回归：零实参 → `[]`、种子实参转发、真实 012 源
+/// 经 prep 生成无 `undefined` 泄漏。
+#[test]
+fn p105_u03_lane_list_new_init_projects() {
+    std::env::set_var("P105_MEM_BACKEND", "1");
+    let src = r#"
+widget App {
+    model {
+        var w_rows []str = List<Str>.new()
+        var seeded []int = List<Int>.new([1, 2])
+    }
+    view {
+        text "hello"
+    }
+}
+"#;
+    let (sfc, _b, _a) = generate_sfc_with_lane(src, "app.at").expect("合成源生成");
+    assert!(
+        sfc.contains("const w_rows = ref<any[]>([])"),
+        "空 List.new → []，实际:\n{}",
+        sfc.lines()
+            .filter(|l| l.contains("const w_rows"))
+            .next()
+            .unwrap_or("")
+    );
+    assert!(
+        sfc.contains("const seeded = ref<any[]>([1, 2])"),
+        "种子 List.new → 实参数组"
+    );
+    assert!(!sfc.contains("undefined"), "不得泄漏 undefined");
+    // 真实 012 源（w_rows 是 handler 写入的列表 state → prep 改写为
+    // `List<Str>.new()`）——lane 生成不再产 `undefined.new()`。
+    let clock = lane_sfc("012-clock", "src/front/app.at");
+    assert!(
+        !clock.contains("undefined.new"),
+        "012 真实源不得再有 undefined.new()"
+    );
+}

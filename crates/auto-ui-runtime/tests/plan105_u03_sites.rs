@@ -377,6 +377,7 @@ fn main_js_for(root: &Path, merged: &str) -> String {
 
 fn u03_apps() -> Vec<(&'static str, Vec<&'static str>)> {
     vec![
+        ("012-clock", vec!["src/front/app.at"]),
         ("013-todo", vec!["src/front/app.at", "src/front/todo_list.at"]),
         ("015-notes", vec!["src/front/app.at", "src/front/editor.at", "src/front/sidebar.at"]),
         ("016-calendar", vec!["src/front/app.at"]),
@@ -443,27 +444,33 @@ fn scaffold_site(out: &std::path::Path, app: &str) -> Result<(), String> {
     std::fs::write(out.join("verify.mjs"), VERIFY_MJS).map_err(|e| e.to_string())?;
     let nm = out.join("node_modules");
     if !nm.exists() {
-        let status = std::process::Command::new("cmd")
-            .args(["/c", "mklink", "/J"])
-            .arg(&nm)
-            .arg(node_modules_dir())
-            .status()
-            .map_err(|e| e.to_string())?;
-        if !status.success() {
-            return Err(format!("{app}: node_modules junction 创建失败"));
-        }
+        mklink_junction(&nm, Path::new(node_modules_dir()))
+            .map_err(|e| format!("{app}: node_modules junction 创建失败: {e}"))?;
     }
     for (name, target) in extra_deps(app) {
         let link = nm.join(name);
         if !link.exists() {
-            let _ = std::process::Command::new("cmd")
-                .args(["/c", "mklink", "/J"])
-                .arg(&link)
-                .arg(target)
-                .status();
+            mklink_junction(&link, Path::new(target)).map_err(|e| {
+                format!("{app}: {name} junction 创建失败: {e}")
+            })?;
         }
     }
     Ok(())
+}
+
+/// `mklink /J <link> <target>`。cmd 的 mklink 不认 `/` 分隔路径
+/// （`Parameter format not correct`），两个实参都转成 `\` 形再传。
+fn mklink_junction(link: &Path, target: &Path) -> Result<(), String> {
+    let link = link.to_string_lossy().replace('/', "\\");
+    let target = target.to_string_lossy().replace('/', "\\");
+    let output = std::process::Command::new("cmd")
+        .args(["/c", "mklink", "/J", &link, &target])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
 }
 
 /// 浏览器腿的**可跑门**：构建四 app 站点 → `vite build` → `node verify.mjs`。

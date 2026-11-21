@@ -72,7 +72,10 @@ fn p105_p013_package_lane_reports_store_gap() {
         }
         Err(e) => assert!(
             e.contains("package-level store semantics are not wired yet (S1)")
-                || e.contains("source.syntax"),
+                || e.contains("source.syntax")
+                // W104：S1 首片（包面 store 内联）落地后，墙前移到 store 状态
+                // 函数的符号面——`__age_state_0_st_*` 是 S1 家族的具名拒绝。
+                || e.contains("__age_state_0_st_"),
             "包片段 lane 当前应停在 S1/语法面（已知缺口），实际: {e}"
         ),
     }

@@ -427,6 +427,20 @@ impl VueGenerator {
                 }
             }
             Expr::Array(_) => "any[]".to_string(),
+            // PLAN-105 W104：`List<T>.new()` 与空/种子数组同型 → `any[]`
+            // （此前落 `any`，`ref<any>` 让 v-for/push 失去元素类型）。
+            Expr::Call(call) => {
+                if let Expr::Dot(object, method) = call.name.as_ref() {
+                    if method.as_str() == "new" {
+                        if let Expr::GenName(n) = object.as_ref() {
+                            if n.as_str().starts_with("List") {
+                                return "any[]".to_string();
+                            }
+                        }
+                    }
+                }
+                "any".to_string()
+            }
             // Plan 028 F1: uniform dict literals infer `Record<K, V>` —
             // mixed-value dicts stay `any` (no union inference yet).
             Expr::Object(pairs) => {
@@ -827,6 +841,26 @@ impl VueGenerator {
                         call_args.push(format!("{{ {} }}", obj_fields.join(", ")));
                     }
                     return Ok(format!("{}({})", name_js, call_args.join(", ")));
+                }
+                // PLAN-105 W104：`List<T>.new()` —— prep 空列表初值改写形
+                // （ace_source_prep `rewrite_empty_list_inits`）。GenName 接收器
+                // 此前落 catch-all → `undefined.new()`（setup 期 TypeError，组件
+                // 空白且无 pageerror——012 实测）。零实参 → `[]`；单数组实参
+                // （`List<T>.new([种子…])`）→ 转发实参。
+                if let Expr::Dot(object, method) = call.name.as_ref() {
+                    if method.as_str() == "new" {
+                        if let Expr::GenName(n) = object.as_ref() {
+                            if n.as_str().starts_with("List") {
+                                return match call.args.args.first() {
+                                    None => Ok("[]".to_string()),
+                                    Some(auto_lang_core::ast::Arg::Pos(e)) => {
+                                        self.expr_to_js(e)
+                                    }
+                                    Some(_) => Ok("[]".to_string()),
+                                };
+                            }
+                        }
+                    }
                 }
                 // The call's name may be a Dot(object, method) — a method call.
                 if let Expr::Dot(object, method) = call.name.as_ref() {
