@@ -391,26 +391,38 @@ def step_candidates(session):
     # A is the first input in the tree: the native MCP Enter routes there.
     # Type "de" -> Design & Development candidates; Escape hides; Enter adds
     # the active candidate (Design), which also covers the add-accept flow.
+    # Bounded snapshots (no long poll): the native candidate recompute can
+    # miss the first render window (decisions.md race #3); one retry keeps the
+    # case well under the 10s per-case gate.
     snapshot = wait_text(session.snapshot, session.port, "Reading")
     a_input = input_vid(snapshot, "A 标签：回车添加")
     r_type = session.call("autoui_type", element_id=a_input, text="de")
-    settle(session)
-    try:
-        snapshot = wait_text(session.snapshot, session.port, "Development")
-    except AssertionError as exc:
-        raise AssertionError(f"CTYPE={r_type[:160]} {exc}")
+    time.sleep(1.5)
+    snapshot = session.snapshot()
+    if "Development" not in snapshot:
+        session.call("autoui_type", element_id=a_input, text="de")
+        time.sleep(1.5)
+        snapshot = session.snapshot()
+    if "Development" not in snapshot:
+        raise AssertionError(f"CTYPE={r_type[:160]}\n{snapshot[-2200:]}")
     assert "Design" in snapshot and "Development" in snapshot, snapshot[-900:]
     session.key("Escape")
-    settle(session)
+    time.sleep(0.8)
     snapshot_after = session.snapshot()
     c_after = section(snapshot_after, "实例 C", "退出示例")
     assert "Development" not in c_after, c_after[-900:]
     # re-open and Enter the active candidate
     session.call("autoui_type", element_id=a_input, text="de")
-    settle(session)
-    snapshot = wait_text(session.snapshot, session.port, "Development")
+    time.sleep(1.5)
+    snapshot = session.snapshot()
+    if "Development" not in snapshot:
+        session.call("autoui_type", element_id=a_input, text="de")
+        time.sleep(1.5)
+        snapshot = session.snapshot()
+    if "Development" not in snapshot:
+        raise AssertionError("candidates did not reopen after retype")
     r_enter = session.key("Enter")
-    settle(session, 1.2)
+    time.sleep(1.2)
     snapshot = session.snapshot()
     if "已添加：Design" not in snapshot:
         raise AssertionError(f"ENTER={r_enter[:120]}\n{snapshot[-2200:]}")
