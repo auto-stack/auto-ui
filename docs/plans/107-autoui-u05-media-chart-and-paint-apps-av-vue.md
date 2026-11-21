@@ -1,11 +1,11 @@
 ---
 plan_id: PLAN-107
 status: executing
-feature_name: AutoUI U05 媒体、图表与绘制 AV 与 A2Vue 交付
+feature_name: AutoUI 024 Charts 与图表 Widgets AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-21
-plan_revision: 1
+plan_revision: 2
 current_step: 1
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
@@ -14,32 +14,30 @@ new_spec_components: []
 touched_goals: []
 ---
 
-# PLAN-107 AutoUI U05 媒体、图表与绘制 AV 与 A2Vue 交付
+# PLAN-107 AutoUI 024 Charts 与图表 Widgets AV 与 A2Vue 交付
 
 ## 0. 变更摘要
+
+2026-11-21 r2。恢复用户已批准的 U04–U06 拆分口径。107 持有 024 Charts 和五个图表 Widgets 原页；U05 其余行按下列归属交付。现有实施树、T-01 已完成状态、原样回放和不通过证据继续沿用，整组原验收由路线索引逐行对账。
 
 2026-11-19 按用户裁定建立独立交付计划。承接语言 980 B-AV、1071 冻结清单中 U05 的原示例和关联 Widgets，验收 ACE AV 桌面和 A2Vue 浏览器。由本计划负责 AutoUI 和所需 AutoLang 改动，并补齐这些应用实际用到的缺失组件。A2R、AC 由后续独立计划接同源验收。本次为规划，进度 0/8。
 
 ## 1. 目标
 
-以下 7 个原项目及关联 Widgets 各有两端可复跑结果。复用原 `pac.at`、作者源、依赖及独立预期。交付可从干净目录构建和运行的项目、固定工具与 SDK 版本、每端操作记录及独立复审结论。
+交付原 024 Charts 和五个独立图表 Widget 页的两端可复跑结果。复用原 `pac.at`、作者源、依赖及独立预期。交付可从干净目录构建和运行的项目、固定工具与 SDK 版本、每端操作记录及独立复审结论。
 
 | AutoUI 原例 | 两端项目级检查重点 |
 |---|---|
-| [019-video-app](../../examples/ui/019-video-app/pac.at) | 真实媒体载入、切换、播放与坏源恢复 |
-| [020-music-player](../../examples/ui/020-music-player/pac.at) | 音频播放暂停、曲目切换与结束状态 |
 | [024-charts](../../examples/ui/024-charts/pac.at) | 可见图形、数据更新、指针/图例交互及空数据 |
-| [029-photo-gallery](../../examples/ui/029-photo-gallery/pac.at) | 图片浏览与查看、组件嵌入、缺图后恢复 |
-| [030-video-player](../../examples/ui/030-video-player/pac.at) | 播放/暂停/seek、进度一致、关闭回收 |
-| [031-image-viewer](../../examples/ui/031-image-viewer/pac.at) | 图像载入、缩放/平移、可见区域和坏图像恢复 |
-| [031-paint](../../examples/ui/031-paint/pac.at) | 实际指针绘制、像素或区域变化、原编辑操作和卸载 |
 
-关联 Widgets 使用 [AutoOS 规范来源](../../../auto-os/widgets-gallery/src/front/) 的 pages 与实际 components 闭包。area-chart、bar-chart、donut-chart、line-chart、flow-diagram、carousel、code-editor。T-01 把 1071 标识逐项对应到实际页、组件与原测试，给复用页记录版本和各组消费结果。
+关联 Widgets 使用 [AutoOS 规范来源](../../../auto-os/widgets-gallery/src/front/) 的 pages 与实际 components 闭包。area-chart、bar-chart、donut-chart、line-chart、flow-diagram。T-01 把 1071 标识逐项对应到实际页、组件与原测试，给复用页记录版本和各组消费结果。
+
+其余 U05 应用由 [115](115-autoui-video-app-av-vue.md)、[116](116-autoui-media-players-av-vue.md)、[117](117-autoui-image-apps-av-vue.md)、[118](118-autoui-paint-av-vue.md) 承接。Carousel 归 117，CodeEditor 原页归 [120](120-autoui-auto-edit-av-vue.md) 并仍计 U05。原 T-01 首轮对照及已录证据见 §9，接手计划按原路径、预期及证据身份复用。
 
 ## 2. 架构与跨仓职责
 
-- **AutoUI 主责。** 负责示例、组件契约、Iced 宿主消费、Vue 生成产物及真实交互。复用已有 media provider、相关图表和画布模块，核 089/090 等现有组件合同。媒体用固定可验证的实际资产，GPU/画布用固定视口及可重放输入验关键区域和状态。真实播放、实际 seek 和画布像素/输出各留可复查证据，资源回收采用实际宿主和浏览器观测。
-- **AutoLang 为同一计划的实施仓。** 核资源内容身份、媒体状态和事件载荷、时序/取消、指针数据与画布相关跨端类型。补实际缺失的 AutoLang 检查、AV 宿主调用或 A2TS 运行时映射，保留媒体结束、失败和资源释放语义。通过同一原源与资产对比两端可观测状态。 相关改动在组内 AutoLang 树完成，沿原模块 owner 审查与合入。
+- **AutoUI 主责。** 负责示例、组件契约、Iced 宿主消费、Vue 生成产物及真实交互。复用图表组件，验真实几何、数据更新、指针/图例交互、空数据、模式切换和关闭。资源回收采用实际宿主和浏览器观测。
+- **AutoLang 为同一计划的实施仓。** 核图表输入记录、几何计算、时序、指针数据与事件载荷的跨端类型。补实际缺失的 AutoLang 检查、AV 宿主调用及 A2TS 运行时映射，验证卸载和资源释放。通过同一原源与资产对比两端可观测状态。 相关改动在组内 AutoLang 树完成，沿原模块 owner 审查与合入。
 - **真实组件。** 对本组使用的每个缺失组件或缺失行为，优先补已有组件，再补所需新组件。交付适用属性、事件、绑定、生命周期和无障碍行为，两端实现、永久回归及原项目调用都计入本计划的完成条件。已有其他计划在写同一组件时，先对账实际界面与写面，固定单一实施负责人，当前计划持有本消费者验证及关闭条件。
 
 ## 3. 技术与实现入口
@@ -55,32 +53,24 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 
 ## 5. 实施与交付边界
 
-先冻结 U05 矩阵，逐行绑定项目原源、Widget 页和组件、预期、失败反例、权限、资源、版本和 AV/A2Vue 状态。从原项目的第一个失败处建立可复跑入口，修所用能力或组件，回同一项目完成两端验收。公共语义走原 owner 的统一接口，源级修复覆盖 AV 和 A2TS 的实际消费者。
+沿已冻结的 024 与五个图表页矩阵，逐行绑定项目原源、Widget 页和组件、预期、失败反例、权限、资源、版本和 AV/A2Vue 状态。从原项目的第一个失败处建立可复跑入口，修所用能力或组件，回同一项目完成两端验收。公共语义走原 owner 的统一接口，源级修复覆盖 AV 和 A2TS 的实际消费者。
 
 实施使用 `D:/autostack/.wt/ui-107/{auto-ui,auto-lang}` 的关联工作树。用到其他仓版本时明确固定提交，按组内路径或既有显式覆盖解析。合同、进度和归档在 AutoUI 主检出管理，实施和构建在工作树。跨仓落地顺序以实际生产者和消费者验证为准。
 
 ### T-01 原样回放矩阵
 
-应用入口均为 `examples/ui/<行名>/pac.at`、`src/front/app.at` 及其原始模块。画廊入口为 AutoOS `widgets-gallery/pac.at`、`src/front/app.at` 与 `src/front/pages/<行名>.at`，组件从原 `components/package.at` 解析。下表基于 §9 的 Git 来源。两端保留原有适用性，CodeEditor 的 vi 模式和系统 IME 按原 native 条件检查。首轮顺序为 002 对照、031-paint、024-charts、其余应用、画廊；同一 Iced 工具串行排窗。
+应用入口均为 `examples/ui/<行名>/pac.at`、`src/front/app.at` 及其原始模块。画廊入口为 AutoOS `widgets-gallery/pac.at`、`src/front/app.at` 与 `src/front/pages/<行名>.at`，组件从原 `components/package.at` 解析。下表基于 §9 的 Git 来源。两端保留原有适用性。按 002 对照、024、四图原页及 FlowDiagram 推进；真实 Iced 窗口串行排程。
 
 | 原样输入 | 实际闭包及独立预期来源 | AV 与 A2Vue 必验状态及负控 |
 |---|---|---|
-| `031-paint` | `paint_color.at`、ColorPicker、NumericFields、Canvas；`SPEC.md`、`tests/desktop_mcp.py` | 真实指针落笔，像素 42 按选色变化，Undo/Redo 回放，取消选色保正式色，存储往返后卸载 |
 | `024-charts` | `components/{line_chart,bar_chart,area_chart,donut_chart,chart_geom}.at`；`SPEC.md`、`tests/desktop_mcp.py`、`tests/test_024_vue.mjs` | 四类图有实际几何，更新数据后几何变化，指针命中、图例操作及空数据 |
-| `019-video-app` | `pages/{home,watch}.at`、`video_store.at`、`settings.at`、`back/{api,db}.at`；`tests/{acceptance.atd,smoke.spec.ts,vm-smoke.mjs}` | 卡片进入 `/watch/:id`，真实解码与时间推进，切换相关视频，坏 URL 后恢复；仅向已选用例开放媒体请求 |
-| `020-music-player` | `player_store.at`、`viewport.at`、`controls.at`、队列/导航与 `back/api.at`；`README.md`、`tests/test_020_vm.py` | 固定两首 1.5 秒 WAV，播放/暂停、换曲、到尾策略与设备释放；扫描根仅指向样本目录 |
-| `029-photo-gallery` | `back/api.at`、ImageViewer、AssetBrowser、TreeView、Pagination、CollectionView；`SPEC.md` 的 scan/thumb/full 与 UI 行为 | 缩略图与原图身份、相册和查看器切换，坏图失效后可打开同目录好图；`AUTO_PHOTO_ROOT` 指向固定图片目录，撤根或未授权路径不能被读取 |
-| `030-video-player` | `player_store.at`、`viewport.at`、`controls.at`、`playlist.at`、`file_picker.vue` 与 `back/api.at`；`tests/{smoke.spec.ts,vm-smoke.mjs}` | 真实帧与时间、暂停、seek 至 50%（时长 ±5%）、坏媒体后恢复及关闭；保留原用例媒体目录与真实 Chrome 编码支持条件 |
-| `031-image-viewer` | `back/{api,directory_index,image_service,types}.at`、ImageViewer；`tests/{vm_matrix.py,vue-actions.json,fixtures/manifest.json}` | JPEG/PNG/WebP、Alpha/EXIF、缩放/平移和可见区，坏图具名失败后恢复，关闭会话不残留图像请求 |
 | `area-chart` | `components/area_chart.at`；原页 `area-chart-overlay`、图表 `plan484` 与 `plan499` 回归族 | 叠加区填充和顶边几何、数据与指针回放、空数据 |
 | `bar-chart` | `components/bar_chart.at`；原页 `bar-chart-basic`、`bar-chart-grouped` 与 `plan484`/`plan499` | 单组/分组柱几何，命中与更新，空数据 |
 | `donut-chart` | `components/donut_chart.at`；原页 `donut-chart-basic` 与 `plan484`/`plan499` | 各段弧、指针/图例状态，空数据 |
 | `line-chart` | `components/line_chart.at`；原页 `line-chart-basic`、`line-chart-multi` 与 `plan484`/`plan499` | 单/多列路径、指针提示、更新与空数据 |
 | `flow-diagram` | `components/flow_diagram.at`；原页 `flow-diagram-lr`、`flow-diagram-basic` 与 `plan502_diagram_tests.rs` | 左右、上下两方向独立布局；节点命中，高亮/提示及指针离开复原 |
-| `carousel` | 外壳 `official` → `components/carousel.at` 五个同族组件；原页 `carousel-{basic,sizes,spacing,orientation,options}`，`component_registry_test.rs` | 指针与键盘改变滑页；横/竖、多个可见项、边界与循环可观察；关闭后无遗留事件 |
-| `code-editor` | 原页 `code-editor-{basic,auto}`、本仓 `ui/code_editor` 和 Vue CodeMirror；`plan413_code_editor_natives.rs`、原页 Props 表 | 编辑/撤销、光标、搜索、换行、内容回写与关闭，native vi/IME 按原条件 |
 
-单写面从实际代码分工。PLAN-105 继续负责通用 Store、组件面源准备及其 collections 接线；PLAN-114 负责正被其原树页消费的 AGE 包闭包、可变类型列表、计算值和事件参数；PLAN-123 负责在途桌面项目入口和路由源发现。PLAN-107 持有这些提交的 U05 消费复验、媒体/绘制/图表/编辑器实际使用的受检能力与该组原项目端到端证据。ImageViewer 沿 PLAN-089 已交包，PLAN-090 的通用 MediaPlayer/TransportControls 为独立草拟抽取；本组沿现有受控 `video` 契约验证原播放器。Gallery 源与闭包固定为 AutoOS 只读输入。
+单写面从实际代码分工。105 的 AGE Store/列表语义使用有效落主版本。114 持有源包、组件属性、列表及事件的共享接点；123 持有其在途的生产桌面入口及路由源发现。107 持有图表原源、消费回归及图表所需的共享能力增量。无路由的 024 与独立原页推进时，路由接缝按正式可消费提交接入；画廊整包在 114 树/包接缝和 107 图表接缝具备后复验。
 
 ## 6. 测试设计
 
@@ -114,6 +104,19 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 - [ ] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
 
 ## 9. 复审记录
+
+2026-11-21 stage: new | PLAN-107 r2 | outcome: pass（恢复原拆分、保留在途证据） | next: work/T-02。T-01 仍计完成；T-02..T-08 及 AC-01..04 按 §1、§5 的当前范围执行。下表保留 r1 已冻结并移交的行。
+
+| 原样输入 | 实际闭包及独立预期来源 | AV 与 A2Vue 必验状态及负控 |
+|---|---|---|
+| `031-paint` | `paint_color.at`、ColorPicker、NumericFields、Canvas；`SPEC.md`、`tests/desktop_mcp.py` | 真实指针落笔，像素 42 按选色变化，Undo/Redo 回放，取消选色保正式色，存储往返后卸载 |
+| `019-video-app` | `pages/{home,watch}.at`、`video_store.at`、`settings.at`、`back/{api,db}.at`；`tests/{acceptance.atd,smoke.spec.ts,vm-smoke.mjs}` | 卡片进入 `/watch/:id`，真实解码与时间推进，切换相关视频，坏 URL 后恢复；仅向已选用例开放媒体请求 |
+| `020-music-player` | `player_store.at`、`viewport.at`、`controls.at`、队列/导航与 `back/api.at`；`README.md`、`tests/test_020_vm.py` | 固定两首 1.5 秒 WAV，播放/暂停、换曲、到尾策略与设备释放；扫描根仅指向样本目录 |
+| `029-photo-gallery` | `back/api.at`、ImageViewer、AssetBrowser、TreeView、Pagination、CollectionView；`SPEC.md` 的 scan/thumb/full 与 UI 行为 | 缩略图与原图身份、相册和查看器切换，坏图失效后可打开同目录好图；`AUTO_PHOTO_ROOT` 指向固定图片目录，撤根或未授权路径不能被读取 |
+| `030-video-player` | `player_store.at`、`viewport.at`、`controls.at`、`playlist.at`、`file_picker.vue` 与 `back/api.at`；`tests/{smoke.spec.ts,vm-smoke.mjs}` | 真实帧与时间、暂停、seek 至 50%（时长 ±5%）、坏媒体后恢复及关闭；保留原用例媒体目录与真实 Chrome 编码支持条件 |
+| `031-image-viewer` | `back/{api,directory_index,image_service,types}.at`、ImageViewer；`tests/{vm_matrix.py,vue-actions.json,fixtures/manifest.json}` | JPEG/PNG/WebP、Alpha/EXIF、缩放/平移和可见区，坏图具名失败后恢复，关闭会话不残留图像请求 |
+| `carousel` | 外壳 `official` → `components/carousel.at` 五个同族组件；原页 `carousel-{basic,sizes,spacing,orientation,options}`，`component_registry_test.rs` | 指针与键盘改变滑页；横/竖、多个可见项、边界与循环可观察；关闭后无遗留事件 |
+| `code-editor` | 原页 `code-editor-{basic,auto}`、本仓 `ui/code_editor` 和 Vue CodeMirror；`plan413_code_editor_natives.rs`、原页 Props 表 | 编辑/撤销、光标、搜索、换行、内容回写与关闭，native vi/IME 按原条件 |
 
 2026-11-19 stage: new，drafting 0/8。U05 的原样示例、Widgets、AutoLang 支持和组件补齐均处于待实施状态。
 
@@ -777,9 +780,33 @@ Chrome 指针已实际命中原折线图覆盖层。原 `.PointerMove` 把 `0.64
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 58 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui df6a1b59, lang 8e3e91c6f | evidence: original 024 four-chart and close in Iced, original Chrome line pointer + streaming, exact remaining gallery diagnostics | next: work`
 
-## 10. 下游交接
-
-本计划按 U05 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
+### r1 移交前的历史下游记录
 
 - **B-107-01｜共享生产基线。** 019/020/030 的原 Store、页面模块与前端绑定依赖 PLAN-105 的共有实现；029/031/031-paint 的 `$event`、图表和原画廊的类型列表与包闭包依赖 PLAN-114 的受检实现；原桌面树形挂载需要 PLAN-123 的生产入口与路由源发现。对应在途提交分别为 AutoLang `b987e2c23`、`7d6eabe4c` 与 AutoUI `ffbb488c`/`9d5ea5b3`，它们未形成 107 所需的稳定发布基面。恢复条件是相应 owner 提供可消费并且包含原形态正反例的固定提交，随后在 107 两树接入并重放 §5 矩阵。030 的第一个条件读取 `.store.has_current`，需要共享受检状态与真实控件树共同实现。
 - **B-107-02｜原 CodeEditor 受检宿主能力。** 第 30 轮重跑固定原页，`QueryChanged` 已通过旧式单位消息的受检接线，当前首报缺 `code_editor_cursor_line`。继续按 §9 固定 AutoOS 源，由 107 接入编辑器光标的 AV/A2TS 能力并核编辑、搜索与卸载。
+
+### 第 59 轮｜受检同组件消息调用
+
+接入 PLAN-114 `633849248`，合并时保留本组循环、列表读写及旧图表分支。参数先在调用方求值，再进入目标 handler 的独立局部作用域，沿原对象模型提交。已声明载荷核对、未知目标和调用循环均由共享验证具名拒绝。AgePackage 语法标识为 `3adef60bc30e0092525585df6be020361209b815d3a2f04f8aa64c27794660b8`，相邻冻结通过，Core PLAN-981 251、AV PLAN-981 81 通过。
+
+定向媒体形状在 AV 的第二实例显示 `image:图像/图像`，第一实例仍为初值。生产 CLI 冷生成、固定依赖构建后，Chrome 两次点击均显示 `image-details 图像/图像`，卸载无页面异常。首次定位器把直接文本节点和按钮文字当成一个节点，改按应用可见文本结尾断言后通过。AV/Core 和 Chrome 日志 SHA256 分别为 `df015c2bf365f91bfc5ee689016f3a658c70082cd46316869d917f9ea380019a`、`a5fa3a89334d2dc20092c107f80465922f01d26e329270d03276a32ce828b108`。
+
+原 029、031 图片查看、031 绘制及所声明依赖在隔离目录核对 73 个文件。三份原应用整体仍在 AGE 语法及生产入口检查失败。源清单 SHA256 为 `9e8ac89ff7a4c8fff5e87b19df470badf8cd7118c9911da8896d266a64d23fee`。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 59 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 173993a7, lang 4fb2a2714 | evidence: same-widget typed messages in AV and production Chrome; exact media inputs still rejected at project admission | next: work`
+
+### 第 60 轮｜原 024 Iced 计时数据及原媒体语法定位
+
+原 `024-charts` 真窗按实际计时器完成 `Play → Tick → Pause → Reset`。Desktop 折线点数 `6 → 7`，暂停 500 ms 保持几何，重置逐字恢复原 6 点 SVG。观察使用实际墙钟等待计时器，早先按固定界面拍数关闭的脚本只记录了 Play。完成回放发布 889 帧，错误 0，会话关闭。窗口 JSON SHA256 为 `abc68721bf4f951c4703ca3c4133ca8f2f49407034e0043d03ad5f440a5ce0f3`。Chrome 复验从提示层下方命中，计时拟合状态到达 `opacity-100`，计算样式仍为 1，未计入视觉淡入。
+
+对固定原媒体入口逐成员和处理器缩减探针。原 031 图片查看的 `ApplyView` 已越过语法门，仍定位到 `SelectImage` 分支中的 `request_view(...)` 及 `SettleTick` 的 `for j < names_list.len()`。原 029 另涉及 `try/catch` 和未类型化的宿主 JSON；原 031 绘制另有 model 声明及 `.substr(...).to(int)`。探针日志 SHA256 为 `2b87b9a72f5783374f6e4d2b3c14915a668e9dc1c903b1637e5fa190809a7ab1`。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r1 | round: 60 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui 173993a7, lang 4fb2a2714 | evidence: exact 024 Iced stream, pause, reset and close; media first syntax shapes isolated | next: work`
+
+## 10. 下游交接
+
+107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
+
+- 独立推进 024 原 Iced 滑窗、真实指针与空数据，以及画廊 Line/Bar 多调用点记录形状和 FlowDiagram 的节点类型。第 58 轮的四图切换/关闭及原 Chrome 结果保部分证据。
+- 向 123 提供原全画廊需要的图表 handler/组件及证据绑定的版本。涉及 123 在途的桌面入口时，接已审路由/入口切片与 114 实际包、列表、事件接口，再跑 107 的整合行。
+- CodeEditor 的光标宿主缺口及原用例收据移交 120。媒体、图片和画布的旧观测按 §9 各归属接续。
