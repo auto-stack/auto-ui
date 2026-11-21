@@ -20,7 +20,7 @@
 - [094 PromptDialog](../../plans/archived/094-prompt-dialog.md)：027重命名/新建和普通名称集合；fs操作/权限/验证归应用，Vue不增加磁盘写权限。
 - [095 TaskProgressDialog](../../plans/095-task-progress-dialog.md)：组件只显示应用任务状态并请求取消；普通记录校验是首个真实消费者，Reader仅只读参考，不宣称产品已迁移。
 - [096 CommandPalette](../../plans/096-command-palette.md)：028保留排序/分类/recent/宿主总线，组件持交互；另有跨端普通设置消费者。
-- [097 TagInput](../../plans/097-tag-input.md)：015保留update_tags/vocab/正文，组件持草稿/候选；异步回包绑定真实noteId，不以active_id重定位写入。
+- [097 TagInput](../../plans/archived/097-tag-input.md)：015保留update_tags/vocab/正文，组件持草稿/候选；异步回包绑定真实noteId，不以active_id重定位写入。
 
 参考图保持单一仓库源：[PNG](../../design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1.png)、[提示](../../design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1-prompt.md)、[指南](../../design/autoui/file-navigation-and-interaction-visual-guide.md)。1586×992 RGB，SHA256 `EF667ABE23CFDC6377DDCF9E38005D118DD55D9CDCAFFD92D449CF02A440DD13`。四Plan分别引用左上/右上/左下/右下，字节未变，未重新生图；真实视觉仍需浅深色、中文/长文案、420×560和适用错误/pending截图，不能以图/MCP文本替代。
 
