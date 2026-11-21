@@ -1002,6 +1002,34 @@ fn project_view_shape(
                     if let Some(msg) = msg {
                         shape.buttons.push(ButtonSpec { label, msg });
                     }
+                } else if el.tag == "checkbox" {
+                    // PLAN-105 W107：`checkbox { onclick: .Msg }` 与 button 同为
+                    // 可点击事件目标（013 的 ToggleAll 全选框）——此前落入通用
+                    // 递归，checkbox 事件在脚本面不可达。
+                    let mut msg = None;
+                    for sub in &el.items {
+                        if let ComponentViewItem::Entry(entry) = sub {
+                            if entry.is_event && entry.key == "onclick" {
+                                if let ace_core::source::age_component::ComponentEntryValue::Expr(
+                                    expr,
+                                ) = &entry.value
+                                {
+                                    if let ExprKind::Field { base, name } = &expr.kind {
+                                        if matches!(&base.kind, ExprKind::Var(v) if v.name == "self")
+                                        {
+                                            msg = Some(name.name.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if let Some(msg) = msg {
+                        shape.buttons.push(ButtonSpec {
+                            label: "checkbox".to_string(),
+                            msg,
+                        });
+                    }
                 } else {
                     project_view_shape(&el.items, shape);
                 }

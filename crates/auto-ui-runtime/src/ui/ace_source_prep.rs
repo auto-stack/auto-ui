@@ -1262,11 +1262,36 @@ fn inline_memory_backend(app_root: &Path, store_src: &str) -> Option<String> {
                 // 整条替换走 `remove` + `insert`（下标赋值带记录字面量在 store 块
                 // 语法里不可解析；remove 返回物化元素、insert 收新值）。
                 let old = format!("__mb_o{tmp}");
+                // PLAN-105 W107：实参里的 `.{list_field}[<任意下标>].field` 读
+                // **先于 remove 捕获**——改写为对已移除记录 `{old}.field` 的
+                // 读取（命中元素即被移除的那个）。原样内联会在 remove 之后
+                // 重读：后续下标左移，命中靠前元素时读错行、外层 `i` 为末位时
+                // 越界 trap（ToggleAll 实测）。
+                let rewrite = |s: &str| {
+                    let needle = format!(".{list_field}[");
+                    let mut out = String::with_capacity(s.len());
+                    let mut rest = s;
+                    while let Some(pos) = rest.find(&needle) {
+                        let after = &rest[pos + needle.len()..];
+                        match after.find("].") {
+                            Some(close) => {
+                                out.push_str(&rest[..pos]);
+                                out.push_str(&old);
+                                out.push('.');
+                                rest = &after[close + 2..];
+                            }
+                            None => break,
+                        }
+                    }
+                    out.push_str(rest);
+                    out
+                };
                 out.push_str(&format!(
-                    "{indent}var {i} int = 0{nl}{indent}for {i} < .{list_field}.len() {{{nl}{indent}    if .{list_field}[{i}].id == {id} {{{nl}{indent}        var {old} {elem} = .{list_field}.remove({i}){nl}{indent}        .{list_field}.insert({i}, {elem} {{ id: {id}, text: {text}, done: {done} }}){nl}{indent}    }}{nl}{indent}    {i} = {i} + 1{nl}{indent}}}{nl}",
+                    "{indent}var {i} int = 0{nl}{indent}for {i} < .{list_field}.len() {{{nl}{indent}    if .{list_field}[{i}].id == {id} {{{nl}{indent}        var {old} {elem} = .{list_field}.remove({i}){nl}{indent}        .{list_field}.insert({i}, {elem} {{ id: {id2}, text: {text}, done: {done} }}){nl}{indent}    }}{nl}{indent}    {i} = {i} + 1{nl}{indent}}}{nl}",
                     id = args[0],
-                    text = args[1],
-                    done = args[2]
+                    id2 = rewrite(args[0]),
+                    text = rewrite(args[1]),
+                    done = rewrite(args[2])
                 ));
                 continue;
             }
@@ -1507,6 +1532,13 @@ fn inject_model_fields(src: &str, fields: &[(String, String)]) -> String {
 mod tests {
     use super::*;
 
+    /// `P105_MEM_BACKEND` 是进程级 env 开关：并行测试里 set/remove 会竞态
+    /// （bridge 装载测在开关关闭态跑 store 源 = 必红）。触碰开关的测试都持锁。
+    fn mem_backend_env_lock() -> &'static std::sync::Mutex<()> {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        &LOCK
+    }
+
     fn temp_project() -> PathBuf {
         let root = std::env::temp_dir().join(format!(
             "p105-prep-{}-{:?}",
@@ -1666,6 +1698,11 @@ mod tests {
     /// （`leaf-expr: no local named self`），按缺口表跟踪，不在本测断言内。
     #[test]
     fn real_u03_apps_load_through_desktop_bridge() {
+        // 与 `diagw82_span_013` 的 env 开关互斥（并行测试下 set/remove 竞态
+        // 会污染本测的装载环境）。本测保持 env 关闭语义（015/018/022 不走
+        // mem-backend 内联装载）。
+        let _env_guard = mem_backend_env_lock().lock().unwrap();
+        std::env::remove_var("P105_MEM_BACKEND");
         let ui_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
         for app in ["015-notes", "018-book-reader", "022-kanban"] {
             let app_root = ui_root.join(app);
@@ -1685,6 +1722,7 @@ mod tests {
     /// 组件投影才拿得到可吃进的单源（真语料形态的最小复现）。
     #[test]
     fn diagw82_span_013() {
+        let _env_guard = mem_backend_env_lock().lock().unwrap();
         std::env::set_var("P105_MEM_BACKEND", "1");
         let ui_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui");
         let app_root = ui_root.join("013-todo");
