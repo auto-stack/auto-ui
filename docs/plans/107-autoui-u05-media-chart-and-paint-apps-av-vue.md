@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-107
-status: execution_done
+status: executing
 feature_name: AutoUI 024 Charts 与图表 Widgets AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-21
 plan_revision: 2
-current_step: 6
+current_step: 2
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: [docs/specs/runtime/ace-package-widgets.md, auto-lang:docs/specs/ace-migration/m2-autoui.md]
@@ -107,11 +107,11 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 ## 8. 执行步骤
 
 - [x] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。见 §5 矩阵及 §9 基线与首轮回放。
-- [x] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
+- [ ] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
 - [x] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
-- [x] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
-- [x] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
-- [x] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
+- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。
+- [ ] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
+- [ ] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
 - [ ] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
 - [ ] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
 
@@ -1015,6 +1015,16 @@ AutoUI `a4e90b1bc40e893a0ba0656e0839c16cef069ba5` 的 checked Iced 外壳以窗�
 修复交接固定 AutoUI `a4e90b1bc40e893a0ba0656e0839c16cef069ba5`、AutoLang `9bae90dcd2d058da3c20bce64e81a660c08eda71`、AutoOS `680a6ae344f89cbf4dcf5efd25a118889fe611c7`。工作树、分支、对比基线、兄弟仓和第 89 轮相同。规范候选为 AutoUI `docs/specs/runtime/ace-package-widgets.md`（SHA256 `98c9a6c3322bb4fe6784eceafa30fae1b603277ecc523445a32c84b59bb916b7`）、AutoLang `docs/specs/ace-migration/m2-autoui.md` §17（`f35774bfd64c13b6b3994014b4c7982372d63f6203ece49c6da6146fe7af85d`），AutoOS README 仍为 `a8d4859c3a23447d6fe1005624e1e9f95ddfbdfd2344123a716b1a783b1fd168`。AutoUI 规定窗口视口、响应可见性和等比命中矩形，AutoLang 规范收紧静态专化的适用条件。R107-01..05 的执行验证见第 96–105 轮，下一步同一独立审阅者复核。R107-06 的八组已固定，运行结果由合入阶段记录。
 
 `stage: work | plan_id: PLAN-107 | plan_revision: r2 | round: 105 | status: execution_done | outcome: pass | commit: ui a4e90b1b, lang 9bae90dcd, os 680a6ae3 | evidence: R107-01..05 repair controls, final windows and Chrome replays and changed Spec hashes | next: T-07 independent repair re-review`
+
+### 第 106 轮｜修复复核与主线同步
+
+独立审阅者 `/root/review107` 在原工作树复核了第 105 轮候选和 Plan `cc81c537fd31f898a1c339cbcbe90d9cab81a524`。R107-01..05 关闭，历史候选的 AC-01..03 通过，规范哈希、两端原始收据和 38/54 个用例计时匹配。R103 的 Iced 输入证据经由真实布局和模拟 `CursorMoved`，R105 的六个真实 Windows Iced 窗口独立证明绘制与关闭。复核过程只读，复用原执行。R107-06 八组门由 T-08 执行。
+
+复核期间 AutoLang master 从 `5e5121dac6d6034a7eeb28cf4ed8d71686d21cd9` 前移到 `a2249c6859b8324ecc41487809138cf8f39c1b28`，带入 PLAN-1093 的 C 头文件拼写、源码投影与绑定准备。与本计划重叠的生产文件为 `core/src/source/cst/project.rs`、`grammars/auto-source.at`，冻结语法测试也重叠。该历史复核未授权落地，T-02、T-04、T-05、T-06 重开进行主线兼容验证。
+
+同树保留旧提交 `refs/plan-recovery/107/lang-before-1093` 后 rebase 6 个原工作提交。第一个提交只在冻结语法测试有一处文本冲突，两套注释均保留，后续 5 个补丁 `git range-diff` 相等。生产语法和投影自动合流，旧到新在两处各为 PLAN-1093 原有 18 增、1 删。整合版先跑定向 AV 132/132（1.190 秒）。Core 核查 80 通过、2 条 AGE 身份改变。按实际编译表，AgeComponent 从 `22c9e801…` 移到 `8f3a66cd…`，AgePackage 从 `c581fdc8…` 移到 `74cf9a93…`；保留其余行的独立预期，待复跑全选择并验证 PLAN-1093 的尖括号头文件。AutoUI `63a09efaf0df1ba2137e66d0e749012bf5c241ef` 离线更新 `Cargo.lock` 中 AV 已存在依赖项 `ace-foreign-contract` 与 `auto-bindgen`，`cargo tree --locked --offline -p auto-ui-tools --features ace-vue --depth 1` 复跑通过。
+
+`stage: review | review_scope: repair on historical candidate | reviewer_identity: /root/review107 | plan_id: PLAN-107 | plan_revision: r2 | round: 106 | outcome: historical pass for R107-01..05, integrated review pending | reviewed_commit: ui a4e90b1b, lang 9bae90dcd, os 680a6ae3 | next: inspect updated fixed baseline after PLAN-1093`
 
 ## 10. 下游交接
 
