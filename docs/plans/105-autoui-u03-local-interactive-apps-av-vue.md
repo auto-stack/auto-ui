@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-19
 updated_at: 2026-11-19
 plan_revision: 1
-current_step: 1
+current_step: 5
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -83,11 +83,11 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 ## 8. 执行步骤
 
 - [x] **T-01｜work** 冻结原项目、Widgets 与两端覆盖矩阵，确认首批运行顺序及共享接口和组件的唯一写面。收据见 §9（2026-11-19 T-01）：六例原源事实、组件面/包面首阻断、缺口台账 G1–G11、共享实现线与唯一写面已冻结；矩阵与原始日志在 `D:/autostack/plan-artifacts/plan-105/t01-matrix.md` + `t01-probe.log`。
-- [ ] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。
-- [ ] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。
-- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。（**部分**：015/018/022 已真开 Iced 窗——frames 2/2/3、errors 0；**018/022 已真点击交互**：`ToggleTheme`/`ToggleDarkMode` 两次点击状态翻转、dispatch 2、errors 0（收据 §9 W25/W29/W34）；015 事件体含 store/API 调用仍具名拒；013/016 待列表语义；012 待局部列表。）
-- [ ] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。
-- [ ] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。
+- [x] **T-02｜work** 补本组所需 AutoLang 源码、AV/A2TS 语义与宿主接口，交正反例及来源。（W105–W108：文法回归、S1 包面 store、LIST_FIELD_VIEW、元素位/字段位 owned Str、concat/调用点调和；正反例 = av plan105 13 例 + core plan105 26 例，收据见 §9。）
+- [x] **T-03｜work** 完成缺失组件及行为、双端接线和实际消费者回归。（组件页由 125 七页双端交付；本计划的组件行为（store/列表/view-for/checkbox/动态叶）双端接线完成，消费者回归 = prep 8/8 + 五 app 浏览器门 + 桥装载五例，收据见 §9。）
+- [ ] **T-04｜work** 从真实入口逐例验 AV/Iced、权限、错误恢复、关闭与资源。（**受阻**：013/016 真点击 + 015/018/022 装载已验；**012 余墙 = ownership 分析 bound ~29.5MB 超冻结 16MB 预算**——目标授权不含阈值/预算变更，待裁定；打字两段语义记 KNOWN-DEBT。详见 §10 与冻结矩阵。）
+- [x] **T-05｜work** 从真实入口逐例验 A2Vue 生成、构建、浏览器行为、关闭与错误恢复。（W102–W109：五 app 浏览器门 failures=0（构建+挂载+渲染+无异常，上游同口径）；站点自包含可复跑（`plan-artifacts/plan-105/sites/` + `p105_u03_browser_gate`）。）
+- [x] **T-06｜work** 冻结各仓提交，完成受影响回归及两端可复跑交付，补齐矩阵和规范增量。（冻结 auto-ui `cc268baa` / auto-lang `ddbeecaa2`；受影响回归组全绿（矩阵见 `plan-artifacts/plan-105/frozen-delivery-matrix.md`，V-01..V-06 索引在案）；规范增量随 T-08 merge 沉淀 canonical docs/specs。）
 - [ ] **T-07｜review** 同树独立终审 AC-01..04，核缺失行、错误路径、共享归属和收据，修复发现后复验。
 - [ ] **T-08｜merge** 按 owner 顺序正式落地，记录 AutoUI/AutoLang 来源，通知证据消费方的交接在计划记录中登记。归档并按仓规清理。
 
@@ -1076,7 +1076,25 @@ stage: work（016 经 AV 桥 + PrevMonth 真点击）| plan_id: PLAN-105 | plan_
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 114 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-105/auto-ui | commit: 07459760 | next: work
 
+stage: work（T-06 冻结回归完成；T-04 受阻待裁定）| plan_id: PLAN-105 | plan_revision: r1 | round: 115 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | code_commit: auto-ui `cc268baa` / auto-lang `ddbeecaa2`（两树 clean，零未提交代码）| task_ids: T-06（完成）/T-04（受阻）| evidence: `plan-artifacts/plan-105/frozen-delivery-matrix.md`（回归组全绿 + 两端矩阵 + V-01..V-06 索引 + 五 app 冻结桥证据）| blockers: 012 ownership 预算阈值决策 | next: user
+
+2026-11-21 stage: work（T-06 冻结回归 + 两端可复跑交付矩阵）| outcome: pass（T-06 完成）；T-04 outcome: blocked（裁定项移交）
+
+**冻结回归（两仓受影响组全量收口，冻结位全绿）**：av plan105 13/13、core plan105 26/26、census 4/4、plan981 248/248、plan980 40/40、plan979 家族 57/57、plan104 3/3、plan1072 19/19、plan980_state_face 8/8、av-core 135、prep 8/8（串行）、sfc_status 4/4、p013_sfc 1/1、p013_store_lane 3/3、sites 1/1、浏览器门五 app failures=0。既有红三条（stash 对照在案，与本计划无关）：av_collections 内存门（需显式 prepare）、ace-native `allocation_controls`、auto-ui-compiler `theme_widget_projects_vars_to_container_root`。
+
+**两端可复跑矩阵（冻结证据重取，sha16 绑定冻结位）**：013 ToggleAll 真点击（FA26DC15EFF53EC9）、016 PrevMonth 真点击（C134243A2F0D2BE2）、015/018/022 装载（D03BE1D33DD76F5B / 5F5DF444411FDBBF / 48F8D3DD213532FA），全部 frames≥1 errors=0；浏览器腿五 app 门绿。完整矩阵与 V-01..V-06 索引：`plan-artifacts/plan-105/frozen-delivery-matrix.md`。
+
+**§8 进度**：T-01/T-02/T-03/T-05/T-06 完成（5/8）；T-04 受阻（012 AV 腿）；T-07/T-08 review/merge 所有。
+
+**BLOCKER（精确裁定项，目标授权不含阈值/预算变更）**：012 AV 腿余墙 = `MAX_VERIFY_ANALYSIS_BYTES=16MB`（av-core contract 冻结阈值）vs 012 Tick 的 ownership 分析 bound ~29.5MB（root 矩阵二次项；公式按文档意图忠实产出，非 bug）。三选一：(a) 为 AGE 组件面提高分析预算（或按面分档）；(b) 收紧 bound 公式（保持上界性质，V-11 预算家族重基线）；(c) 012 AV 腿按已知缺口交付（浏览器腿已绿，AV 腿记 KNOWN-DEBT）。**unblock action**：用户三选一后，work 按(a)/(b)执行预算刀再复验 012 全链，或按(c)转 execution_done 进终审（012 AV 腿作为具名缺口随复审确认）。
+
+stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 115 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: cc268baa / ddbeecaa2 | next: user
+
 ## 10. 下游交接
+
+### 待裁定（2026-11-21，T-06 冻结后 T-04 阻断项）
+
+**D-105-预算（012 AV 腿）**：012-clock 的 Tick handler（全组最大）ownership 分析 bound ~29.5MB 超 `MAX_VERIFY_ANALYSIS_BYTES=16MB` 冻结阈值（av-core contract；root 矩阵二次项，公式忠实非 bug）。目标授权不含阈值/预算变更 → 三选一：**(a)** 为 AGE 组件面提高/分档分析预算；**(b)** 收紧 bound 公式（保持上界性质，V-11 预算家族重基线）；**(c)** 012 AV 腿按已知缺口交付（浏览器腿已绿，AV 腿记 KNOWN-DEBT）。其余具名项：013 打字两段语义（桥的「写字段→无参派发」增片）、016 逐 dispatch 动态叶数漂移——均随终审一并裁定。**unblock**：答复 a/b/c 后 work 恢复（(a)/(b) 执行预算刀再复验 012 全链；(c) 转 execution_done 进终审）。
 
 本计划按 U03 独立完成。AV 收据与 1071 已交范围及其他 U 组结果汇合后供 W1 签发、1068/T-04 和 985/B 接收。A2Vue 收据供 1072 与产品 CLI 消费。A2R/AC 后续计划沿同一源码、Widgets 和独立预期补验。跨仓 golden 基线维护按已有 PARITY 路线归档。
 
