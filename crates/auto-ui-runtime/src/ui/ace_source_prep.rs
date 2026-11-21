@@ -1781,6 +1781,8 @@ mod tests {
             &units,
             "app::app",
             Some(&root),
+            None,
+            false,
         )
         .expect("prepared entry generates an SFC");
         assert!(sfc.contains("<template>"), "SFC template emitted");
