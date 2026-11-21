@@ -33,6 +33,26 @@ reopen、last-tree/last-dom 与截图）。
 - 参考图区域（右下 Reading/Work 标签、de 候选、2/5 计数、重复错误态）与实现
   布局一致；图不冻结为像素金标准，以真实 GUI 可读可操作为准。
 
+## 修复轮（2026-11-21，复审 needs_fix F-01..F-07 后）
+
+| 门 | 入口 | 结果 |
+| --- | --- | --- |
+| Win native demo（含 X-07 + 中文/逗号/大小写） | erify_tag_input.py --backend native --case demo | pass ×3 |
+| Win vue demo（含 IME 守卫 + backspace） | --backend vue --case demo | pass ×3 |
+| Win native notes | --backend native --case notes | pass |
+| tools 模型门 | cargo test -p auto-ui-tools --test tag_input_component | 10/10 pass |
+
+- X-07：真实 Windows UIA 系统树（system-tree.json：role/name/value/focus/
+  bounds），ValuePattern.SetValue + InvokePattern.Invoke 真实系统输入落地 chip，
+  经普通 MCP 快照读回确认。
+- IME：Vue 生成器 @keyup.enter 的 isComposing||keyCode===229 守卫经浏览器
+  composition 事件序列验证（composing Enter 不提交、结束后提交）。
+- F-01 backspace：模型层（BackspaceDelete 单次移除末位标签）+ Vue
+  keydown.backspace 浏览器派发；native MCP 键盘对 input 键的绑定派发不可靠
+  （运行时行为，decisions.md 记录），测试层选择见 §6 分层。
+- 清理检查：port_free（进程退出后端口可重绑）与 reopen 为真实检查；连续门
+  运行即重开证据。
+
 ## 待沉淀（merge 阶段落 docs/specs/ui/tag-input.md）
 
 - SD-01：受控参数、消息、校验与身份/异步状态规则（§5 合同）。
