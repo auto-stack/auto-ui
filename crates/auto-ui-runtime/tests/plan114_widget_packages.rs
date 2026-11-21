@@ -126,14 +126,13 @@ fn p107_024_area_and_bar_accept_an_empty_input() {
     let source = r#"type Month {
         m Str
         desktop int
-        mobile int
     }
     widget ChartData {
         use { package: official from "components" }
         model { var monthly List<Month> = [] }
         view {
-            area-chart (data: .monthly, index: "m", fields: ["desktop", "mobile"], curve: "monotone") {}
-            bar-chart (data: .monthly, index: "m", fields: ["desktop", "mobile"]) {}
+            area-chart (data: .monthly, index: "m", fields: ["desktop"], curve: "monotone") {}
+            bar-chart (data: .monthly, index: "m", fields: ["desktop"]) {}
         }
     }"#;
     let units = vec![
