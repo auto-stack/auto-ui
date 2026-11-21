@@ -862,6 +862,18 @@ AutoLang 定向 AV 131/131（1.23 秒），含 105 列表、981 包、普通集�
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 84 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang}; D:/autostack/.wt/os-107/auto-os | commit: ui e2b9fcf8, lang 6265e5757, os 680a6ae3 | evidence: 131 focused AV passes, main text-record/layout controls, typed package diagnostics, r2 scope isolated, production replay inputs ready | next: run frozen tools and independent review`
 
+### 第 85–88 轮｜完整画廊复跑和边界回归
+
+以 AutoOS 冻结提交和修正版各复制完整画廊。两份源清单均为 91 文件，只在获批的 AreaChart、BarChart、FlowDiagram 三个组件有差异。生产生成覆盖 70 个路由、90 个输出文件。首次完整包构建在原 Sidebar 的静态路由目的地报 `vue-tsc` 表达式错误，AutoUI `d4f1ed03` 发射静态 `to` 属性并固定两个路由断言。重新冷生成后 `vue-tsc`、Vite 均退出 0。Chrome 在完全相同的修正版画廊闭包实测五个请求页，Bar/Line、Area、Donut、Flow 的原日志重现第 71–72 轮哈希。冻结版同样完成生成和构建，原 Flow 路由给出 `source.type-mismatch: expected i32, found f32`，保留日志和此前冻结运行时两张图均 0 高亮的对照。
+
+最终整合候选前一版本的 024 生产 Chrome 真实鼠标、流 6→8、暂停、重置、卸载，错误及异常请求均为 0。SHA256 `748863a75b068eca449fac728b31c5d567435ab0ada162b9017ba1607c52dd9c`。在完整原外壳中，Iced 024 661 帧、Area 65、Bar/Line 270、Donut 65、Flow 268。所有五份窗口证据的宿主错误数为 0。逐份 SHA256 为 `a5106f742cf8b6a61f8d7f4356731c6e7c7b515b533beddf5463d35a11682f8b`、`51fbe7051e6f5f065e959090da697b9fd0d0a96b33eb420c237e889104a66434`、`4d22493795f7b7eb45278ced8f35869d4821166f4d8aca3c53aebe3311c8de11`、`642050a5bc86672e143999647aea1ffdf7cc9379175a6e468f2aac785e237280`、`7abefa40708c37b8f018259bb8aa47e2f0f961b58ae6709a15e7ddf6df039d33`。
+
+追加回归识别出专化组件名透出、已重赋值的 selector 局部仍被静态推定、同进程准备过的 Iced provider 再注册，以及已移交内联文本的测试语料残留。AutoLang `50e63ec9c` 将作者标签和调用点内部身份分开，并让已赋值的裸名进入共享 lexical 检查。AutoUI `1a8bdc0f` 两端按相同作者标签核对 view 记录，使用调用点 ID 找正确实例，复用已准备的 Iced provider。024 空数据测试在整合工具的两次尝试用时 25.313 和 12.215 秒。以一个真实 series 触发两个原组件的空数据路径，仍执行两次 Init、渲染并断言无有色数据路径。独立计时探针 6.261 秒检查加 0.962 秒执行，正式用例待复验。完整双端两组数据回填证据保留。
+
+最新版 AutoLang `50e63ec9c` 的定向 AV 131/131（1.322 秒），A2TS 5/5 和 5/5（0.635、0.638 秒），AV Core conformance 51/51（0.246 秒），Core 886 通过及 5 个已经对照的基线失败（16.865 秒），AV Core unit 70 通过及 1 个已经对照的基线失败（0.241 秒）。目前仍在验证 AutoUI `81b063dd`，随后进入 T-07。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 88 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang}; D:/autostack/.wt/os-107/auto-os | commit: ui 81b063dd, lang 50e63ec9c, os 680a6ae3 | evidence: full 91-source gallery, production Chrome repaired and frozen diagnostic, native 6-entry replay on prior candidate, final language affected groups | next: verify bounded repairs and new-case timings`
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
