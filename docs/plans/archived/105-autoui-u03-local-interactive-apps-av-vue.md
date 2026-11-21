@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-105
-status: reviewed
+status: archived
 feature_name: AutoUI U03 本地应用与编辑 AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
