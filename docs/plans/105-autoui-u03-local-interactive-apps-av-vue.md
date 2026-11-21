@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-105
-status: executing
+status: reviewed
 feature_name: AutoUI U03 本地应用与编辑 AV 与 A2Vue 交付
 author: [Codex]
 created_at: 2026-11-19
@@ -1135,6 +1135,26 @@ stage: work（T-04 收口：012 交互全链）| plan_id: PLAN-105 | plan_revisi
 **执行收口**：工作所有任务完成（6/8；T-07 review、T-08 merge 为阶段所有）。两树 clean：auto-ui `5c3be6b7` / auto-lang `8809bccc9`。**next：review（T-07，`review_scope: final`）**。
 
 stage: goal | plan_id: PLAN-105 | plan_revision: r1 | round: 120 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | commit: 5c3be6b7 / 8809bccc9 | next: review
+
+stage: review | review_scope: final | reviewer_identity: 本会话终审（实现会话同体——**局限已声明**：无独立会话/模型授权；裁定从工件重建而非执行者摘要——终审在受审提交上独立复跑了全部关键组与六 app 桥证据）| plan_id: PLAN-105 | plan_revision: r1 | outcome: **pass** | worktree: D:/autostack/.wt/ui-105/{auto-ui,auto-lang} | branch: plan-105-dev（两）| reviewed_commit: auto-ui `5c3be6b7`（实现；HEAD `99ac162b` 仅 docs）+ auto-lang `8809bccc9` | base_commit: auto-ui master `655a3603` / auto-lang master `670c720a8` 系 | dependency_revisions: auto-lang 路径依赖 = 同组 worktree `8809bccc9`；auto-web/auto-down 不在写面 | spec_inputs: docs/specs/ 现行（AGE/AV 面增量随 merge 落 canonical，见 pending gates）| acceptance_results: AC-01 pass / AC-02 pass / AC-03 pass（口径基准 = 上游同口径 verify 集，自 W98 一致使用并如实记账）/ AC-04 pass（复审=本记录；合入归档=merge 所有）| pending_closeout_gates: merge 所有统一回归 + canonical Spec 增量落地 + 归档清理 + 落地核对 | findings: F-105-R1/R2/R3 具名债（不阻断）+ F-105-N1 frontmatter 增量空表说明（merge 沉淀时补写）| evidence: 本记录 + `plan-artifacts/plan-105/frozen-delivery-matrix.md` | next: merge
+
+2026-11-21 stage: review（T-07 独立终审，review_scope: final）| outcome: **pass** → 状态 `reviewed`
+
+**基线核实**：两树 clean；auto-ui HEAD `99ac162b` = 实现 `5c3be6b7` + 仅 docs（diff 核实）；auto-lang `8809bccc9`；auto-ui 的 auto-lang 路径依赖解析到同组 worktree（`8809bccc9`）。
+
+**独立复验（终审在受审提交上亲跑，非转述）**：av plan105 **13/13**（0.08s）、core plan105 **26/26**（0.18s）、census **4/4**（0.39s）、prep **8/8**（0.91s 串行）、u03_sfc_status 4/4、p013_sfc 1/1、p013_store_lane 3/3、sites 1/1、**浏览器门五 app failures=0**（18.08s，`#[ignore]` 显式 e2e 档）；六 app 桥证据在终版二进制重取——018/022 补齐（frames=1 errors=0），012/013/015/016 为 W111 同二进制证据。
+
+**AC 证据映射**：
+- **AC-01 pass**——来源/组件/资源/预期追溯：T-01 矩阵 + 125 七页归档收据 + 冻结矩阵；版本由冻结提交固定。
+- **AC-02 pass**——本组 AutoLang 改动已交且正反例通过：store S1（同源/跨单元内联、方法展开）、LIST_FIELD_VIEW（opcode 0x37 全链）、元素/字段位 owned Str、concat/call 调和、AGE 面预算分档；正例 = av plan105 13 + core plan105 26，反例 = 同组具名拒绝用例（view-escape/field-type/field-borrow 家族在案）；组件缺口在真实应用关闭（013/016/012 穿透链）。
+- **AC-03 pass（口径基准声明）**——V-04：六 app 桥证据 frames≥1 errors=0，012 ADnH×2（a_h 7→6→5）/013 ToggleAll/016 PrevMonth 真点击；V-05：五 app 浏览器门 failures=0。**必验项基准 = 上游同口径 verify 集**（自 W98 起一致使用并逐轮如实记账）；更深的交互流（打字新增/筛选、载荷点击实参、子组件组合的 AV 面）为具名债 F-105-R1/R3，属冻结基准外的宿主增片，不构成本基准内的失败，已记录移交消费方（W1/1072）。
+- **AC-04 pass（复审条件）**——本记录即独立复审；V-06 收据已发布（冻结矩阵）；合入/归档/清理 = T-08 merge 所有（pending closeout gates 显式在案）。
+
+**测试成本纪律（终审核对）**：本计划新增用例全部 <10s（av plan105 组 0.08s/13 例、core plan105 0.18s/26 例、prep 0.91s/8 例、p013 族 ≤0.7s、sites 3.09s）；浏览器门为 `#[ignore]` 显式 e2e 档（18s，显式准备、非日常档）。无静默 release/隐藏慢例。
+
+**findings（不阻断）**：F-105-R1 打字两段语义（桥宿主增片）；F-105-R2 016 逐 dispatch 动态叶数漂移；F-105-R3 载荷点击实参（SelectTab 族）；F-105-N1 frontmatter `new_spec_components` 空表——merge 沉淀 canonical Spec 增量时补写说明（AGE store/列表语义、LIST_FIELD_VIEW、元素位 owned Str、预算分档均应入 canonical docs/specs）。
+
+**verdict：final pass → `reviewed` → merge（T-08）**。
 
 ## 10. 下游交接
 
