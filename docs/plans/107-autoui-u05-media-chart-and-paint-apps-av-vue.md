@@ -38,6 +38,7 @@ touched_goals: []
 
 - **AutoUI 主责。** 负责示例、组件契约、Iced 宿主消费、Vue 生成产物及真实交互。复用图表组件，验真实几何、数据更新、指针/图例交互、空数据、模式切换和关闭。资源回收采用实际宿主和浏览器观测。
 - **AutoLang 为同一计划的实施仓。** 核图表输入记录、几何计算、时序、指针数据与事件载荷的跨端类型。补实际缺失的 AutoLang 检查、AV 宿主调用及 A2TS 运行时映射，验证卸载和资源释放。通过同一原源与资产对比两端可观测状态。 相关改动在组内 AutoLang 树完成，沿原模块 owner 审查与合入。
+- **AutoOS 承担已批准的最小源修。** 修复原 Area/Bar 的空数据处理与原 FlowDiagram 的节点高亮、提示锚点。冻结版保留复跑证据，修正版在同一画廊外壳和原页验证 AV 与 A2Vue。
 - **真实组件。** 对本组使用的每个缺失组件或缺失行为，优先补已有组件，再补所需新组件。交付适用属性、事件、绑定、生命周期和无障碍行为，两端实现、永久回归及原项目调用都计入本计划的完成条件。已有其他计划在写同一组件时，先对账实际界面与写面，固定单一实施负责人，当前计划持有本消费者验证及关闭条件。
 
 ## 3. 技术与实现入口
@@ -50,12 +51,13 @@ AV 沿 `crates/auto-ui-runtime/src/ui/ace_node_desktop.rs` 的公开宿主路径
 - [AV 宿主及 W1 收据](../../../auto-lang/docs/specs/ace-migration/m2-autoui.md)、[1072 Vue 生产计划](../../../auto-lang/docs/plans/archive/1072-autoui-vue-web.md)、[976 TS/JS 交付](../../../auto-lang/docs/plans/archive/976-ace-m2-typescript.md)、[978 构建交付](../../../auto-lang/docs/plans/archive/978-ace-m2-build.md)。
 - U02–U06 按用例所需接口推进。遇到共享的 ④-A、事件、集合、外部服务接面或组件缺口，记录具体接口、实现负责人、交付版本与消费测试，已具备前置的样例继续验收。1072 的 982 联合 CLI 验收可消费本计划的 A2Vue 证据。
 - 2026-11-20 用户以 `/goal 完成计划107` 授权 r1 原范围的实施、独立复审、限定修复和落地归档清理。
+- 2026-11-21 用户确认当前 goal 按 r2 收口，并授权最小 AutoOS 源修。原版和修正版各有可核对输入，最终验收用修正版。
 
 ## 5. 实施与交付边界
 
 沿已冻结的 024 与五个图表页矩阵，逐行绑定项目原源、Widget 页和组件、预期、失败反例、权限、资源、版本和 AV/A2Vue 状态。从原项目的第一个失败处建立可复跑入口，修所用能力或组件，回同一项目完成两端验收。公共语义走原 owner 的统一接口，源级修复覆盖 AV 和 A2TS 的实际消费者。
 
-实施使用 `D:/autostack/.wt/ui-107/{auto-ui,auto-lang}` 的关联工作树。用到其他仓版本时明确固定提交，按组内路径或既有显式覆盖解析。合同、进度和归档在 AutoUI 主检出管理，实施和构建在工作树。跨仓落地顺序以实际生产者和消费者验证为准。
+实施使用 `D:/autostack/.wt/ui-107/{auto-ui,auto-lang}` 的关联工作树和 `D:/autostack/.wt/os-107/auto-os` 的源修工作树。用到其他仓版本时明确固定提交，按组内路径或既有显式覆盖解析。合同、进度和归档在 AutoUI 主检出管理，实施和构建在工作树。跨仓落地顺序以实际生产者和消费者验证为准。
 
 ### T-01 原样回放矩阵
 
@@ -820,6 +822,16 @@ Iced 从同一原外壳经两个侧栏链接进入对应路由。实测图形、
 原 LineChart 组件 SHA256 `930e812e3cf52b435f2cec6a3cd5a43830ca2f29c6454b37e99bd9f0e2c47740`。额外的类型化数据夹具在真实 Chrome 执行空 → 三条记录 → 清空 → 再填，实际可绘制折线数 `0 → 2 → 0 → 2`，第二次填入几何逐字相同，卸载和错误计数通过。Chrome 日志 SHA256 为 `ad0d022ceafbb41af934b2bbdc3d6a8960ea8dadcbe1c9fe4e6655024b720c33`。Iced 数据变化控制和 Bar 空数据待复核。
 
 `stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 65 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang} | commit: ui a002e7fc, lang 9d17e7b4f plus uncommitted sparse FlowDiagram projection | evidence: original Bar/Line pages in Chrome and Iced, independent geometry and events, LineChart Chrome empty data and refill control | next: work`
+
+### 第 66–70 轮｜空数据根因与 FlowDiagram 冻结版
+
+原 LineChart 空、填入三条、清空、再填在 Iced 发布 304 帧，折线数 `0 → 2 → 0 → 2`，几何与浏览器逐字相同，关闭、错误 0。窗口 JSON SHA256 为 `70e6283db586b509028b06c261540ed933ebad9f5f75377cc0c412ffedca157a`。AutoOS 冻结版 Bar 在空列表的首帧 Iced 报 `DivByZero`，Chrome 如常完成 `0 → 6 → 0 → 6`。两个日志 SHA256 为 `551f31eb8a6243b7a3cab966925f0531ae68d67ca082a014f36a62b1cb845722`、`308a377bd5baa6086b7fefc73b593f6cced65594e08a9290246695239a551912`。
+
+AutoUI `b58c7ebbd8613035c3f9eba210cade5d0927e27b` 在 024 自带组件防护零分母，Area 的空状态不生成错误闭合路径。带两种实际组件的类型化夹具，生产 Chrome 与 Iced 的可绘制路径同为 `(0,0) → (2,6) → (0,0) → (2,6)`，二次填充相同，均关闭且无异常。Chrome、Iced 收据 SHA256 分别为 `8b848d4e2009919795a3bb24dd905ed4576681440ff0bd300b1f9c6d67f60b56`、`9f968b21144d914f2b023a9a3da093efaa0c03530b0faf264174fa4c55e95618`。用原 024 入口复验 Chrome 四图、点击、指针、滑窗和卸载，异常 0。日志 SHA256 为 `3b55e70995388157210ad36d57655766bf9f7378457788b5fa01ae425e4dd663`。实际淡入仍未确认。
+
+AutoLang `c9232953427843e0362b0e917e7ca8749ac9e001` 检查稀疏的旧式匿名行，保留具名记录的未知键诊断，并将被记录构造消费的行文本复制为独立值。AV 83、Core 251 项通过。冻结版 FlowDiagram 在 Iced 两卡显示 `672×200` 和 `336×416`，各有五节点、五边、五箭头。悬停第一卡显示 `id: start`，实际高亮 0、降透明 5，第二卡不变，离开复原且关闭后拒绝迟到输入。窗口 JSON SHA256 为 `dae99fdc9b1b8a49527759a8b8dbc986750f468a927c7c478df3bf0c5eb6ce0a`。Chrome 冷构建识别出该原页，执行 Init 在记录字段与局部变量清理阶段重复释放同一 `Str`，未挂载。带符号的浏览器日志 SHA256 为 `ccc6a6e483d86cc97390c91665ac16c2950fe95e2610a577e4918bda86ba6d55`。直接记录字段赋给旧式文本局部时复制，定向 A2TS 真 Node 回归已通过，整页待复验。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 70 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-107/{auto-ui,auto-lang}; D:/autostack/.wt/os-107/auto-os | commit: ui b58c7ebb, lang c92329534 | evidence: original line empty data, exact 024 empty-data repairs and Chrome project, original FlowDiagram Iced layout and hover diagnostic, A2TS record text lifetime failure isolated | next: authorized AutoOS source repairs and final replay`
 
 ## 10. 下游交接
 
