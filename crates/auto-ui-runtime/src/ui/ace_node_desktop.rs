@@ -1063,7 +1063,7 @@ fn project_view_shape(
             }
             ComponentViewItem::Element(el) => {
                 if el.tag == "text" {
-                    shape.text_leaf_count += 1;
+                    shape.text_leaf_count += usize::from(el.label.is_some());
                 } else if el.tag == "input" {
                     // PLAN-980 B-AV U01：`input (value: .field)
                     // { oninput: .Msg }`——值绑定（Entry key="value"，Expr
@@ -1803,7 +1803,9 @@ fn mark_leaf_visibility(
             }
             ComponentViewItem::Element(el) => {
                 if el.tag == "text" {
-                    out.push(active);
+                    if el.label.is_some() {
+                        out.push(active);
+                    }
                 } else if el.tag == "input" || el.tag == "button" {
                     // input/button 自身 label 不计文本叶（与 shape 一致）。
                 } else {

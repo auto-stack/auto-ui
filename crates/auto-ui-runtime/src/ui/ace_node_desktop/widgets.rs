@@ -716,19 +716,11 @@ impl Renderer<'_> {
                     .child(View::text(format!("{value}")))
                     .build()
             }
-            "text" => {
-                let value = self
-                    .texts
-                    .next()
-                    .cloned()
-                    .or_else(|| el.label.as_ref().and_then(|label| self.display(label)))
-                    .unwrap_or_default();
-                View::Text {
-                    content: value,
-                    style: Some(parsed),
-                    selectable: false,
-                }
-            }
+            "text" => View::Text {
+                content: self.text(el).unwrap_or_default(),
+                style: Some(parsed),
+                selectable: flag(el, "selectable"),
+            },
             "button" => {
                 let label = self.label(el);
                 self.button(key, label, classes, None, None, None)
@@ -869,6 +861,13 @@ impl Renderer<'_> {
         }
     }
 
+    fn text(&mut self, element: &ComponentViewElement) -> Option<String> {
+        match &element.label {
+            Some(label) => self.texts.next().cloned().or_else(|| self.display(label)),
+            None => expression(element, "text").and_then(|value| self.display(value)),
+        }
+    }
+
     fn label(&mut self, element: &ComponentViewElement) -> String {
         let mut parts = Vec::new();
         if let Some(value) = element.label.as_ref().and_then(|expr| self.display(expr)) {
@@ -887,12 +886,7 @@ impl Renderer<'_> {
                     }
                 }
                 ComponentViewItem::Element(text) if text.tag == "text" => {
-                    if let Some(value) = self
-                        .texts
-                        .next()
-                        .cloned()
-                        .or_else(|| text.label.as_ref().and_then(|label| self.display(label)))
-                    {
+                    if let Some(value) = self.text(text) {
                         parts.push(value);
                     }
                 }
@@ -1174,6 +1168,44 @@ widget Layout {
             panic!("expected authored column");
         };
         assert!(matches!(&children[..], [View::Text { content, .. }] if content == "AV visible"));
+    }
+
+    #[test]
+    fn empty_text_keeps_the_following_av_observation() {
+        use crate::ui::ace_node_desktop::{mark_leaf_visibility, project_view_shape, ViewShape};
+
+        let source = r#"widget Preview {
+    view {
+        row {
+            text (selectable: true) {}
+            text "Following" {}
+        }
+    }
+}"#;
+        let nodes = project_component_candidates(source).expect("checked text view");
+        let tree = &nodes[0].view.tree;
+        let mut shape = ViewShape::default();
+        project_view_shape(tree, &mut shape, false).unwrap();
+        assert_eq!(shape.text_leaf_count, 1);
+        let mut visible = Vec::new();
+        mark_leaf_visibility(tree, &[], true, &mut visible).unwrap();
+        assert_eq!(visible, [true]);
+
+        let state = State::new(BTreeMap::new());
+        let texts = ["AV observation".into()];
+        let View::Column { children, .. } = view(1, 0, tree, &texts, &[], &state) else {
+            panic!("expected a frame column");
+        };
+        let [View::Row { children, .. }] = children.as_slice() else {
+            panic!("expected the authored row");
+        };
+        assert!(matches!(
+            children.as_slice(),
+            [
+                View::Text { content: empty, selectable: true, .. },
+                View::Text { content: following, .. },
+            ] if empty.is_empty() && following == "AV observation"
+        ));
     }
 
     const WIDGETS: &str = r#"

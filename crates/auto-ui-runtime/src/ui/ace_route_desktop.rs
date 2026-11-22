@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
 
 use ace_core::source::age_component::{ComponentEntryValue, ComponentNode, ComponentViewItem};
 use ace_core::source::ast::{Expr, ExprKind};
