@@ -2061,6 +2061,11 @@ impl NodeDesktopBridge {
                         }
                     }
                 }
+                // PLAN-108（T-03c M2）：宿主 HTTP provider 注入（含 Http 效应
+                // 的程序派发整体路由 worker 线程；UI 线程不等待）。
+                e.set_http_provider(std::sync::Arc::new(std::sync::Mutex::new(
+                    super::ace_state_bridge::UiHttpProvider::new(),
+                )));
                 engine = Some(BridgeEngine::Component(e));
             }
             Err(e) if e.contains("requires at least one") => {
@@ -2643,6 +2648,31 @@ impl NodeDesktopBridge {
     pub fn step(&mut self) -> StepOutcome {
         self.tick_no += 1;
         self.run_due_script();
+        // PLAN-108（T-03c M2）：收取在途 Http 派发（不阻塞）；完成/迟到
+        // 落账或丢弃（世代核对——卸载后迟到结果隔离）。
+        if let Some(BridgeEngine::Component(engine)) = self.engine.as_mut() {
+            for completion in engine.poll_http_completions() {
+                let Some(instance) = self.identities.iter().position(|id| id == &completion.identity) else {
+                    continue;
+                };
+                match completion.result {
+                    Ok(states) => {
+                        let snapshot: Vec<(String, String)> = states
+                            .iter()
+                            .map(|(n, v)| (n.clone(), state_display(v)))
+                            .collect();
+                        self.dispatch_log
+                            .push((instance, completion.msg.clone(), snapshot));
+                        let _ = self.diff_and_apply(instance, &states);
+                    }
+                    Err(reason) => {
+                        // 迟到丢弃 / worker 失败：具名记录（取消与迟到隔离面）。
+                        self.dispatch_log.push((instance, completion.msg.clone(), Vec::new()));
+                        self.errors.push(format!("http completion dropped: {reason}"));
+                    }
+                }
+            }
+        }
         let shell_outcome = self.step_lane();
         let Some(routes) = self.routes.as_mut() else {
             return shell_outcome;
@@ -2842,6 +2872,7 @@ impl NodeDesktopBridge {
             Ok((message, DispatchOutcome::Delivered(states))) => {
                 self.publish_package_frame(instance, &message, states)
             }
+            Ok((_, DispatchOutcome::InFlight)) => StepOutcome::Idle,
             Ok((_, DispatchOutcome::Dropped(reason))) => StepOutcome::DispatchRefused(format!("{reason:?}")),
             Err(error) => {
                 self.errors.push(error.clone());
@@ -2859,6 +2890,7 @@ impl NodeDesktopBridge {
         };
         match outcome {
             Ok(DispatchOutcome::Delivered(states)) => self.publish_package_frame(instance, &message, states),
+            Ok(DispatchOutcome::InFlight) => StepOutcome::Idle,
             Ok(DispatchOutcome::Dropped(reason)) => StepOutcome::DispatchRefused(format!("{reason:?}")),
             Err(error) => {
                 self.errors.push(error.clone());
@@ -2984,6 +3016,12 @@ impl NodeDesktopBridge {
                     msg: msg_name.to_owned(),
                     states,
                 }
+            }
+            Ok((DispatchOutcome::InFlight, _)) => {
+                // PLAN-108：Http 效应派发已上 worker 线程在途——本拍不阻塞；
+                // 完成经 step() 的 poll_http_completions 回写（dispatch_log
+                // 与状态发布在 completion 臂统一发生，证据不提前）。
+                StepOutcome::Idle
             }
             Ok((DispatchOutcome::Dropped(reason), _)) => {
                 let msg = format!("event dropped: {reason:?}");

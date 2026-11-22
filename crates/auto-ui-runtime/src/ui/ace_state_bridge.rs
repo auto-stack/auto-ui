@@ -94,6 +94,8 @@ pub enum DropReason {
     UnknownIdentity,
     InstanceReleased,
     StaleGeneration,
+    /// PLAN-108：同实例已有 Http 派发worker在途（重入拒绝；完成后再派）。
+    HttpBusy,
 }
 
 /// 定向事件结果。
@@ -101,6 +103,37 @@ pub enum DropReason {
 pub enum DispatchOutcome {
     Delivered(Vec<(String, AceStateValue)>),
     Dropped(DropReason),
+    /// PLAN-108（T-03c M2）：Http 效应派发已上 worker 线程在途；完成经
+    /// [`AceStateEngine::poll_http_completions`] 回写（世代/存活核对，
+    /// 迟到完成丢弃=卸载后迟到结果隔离）。本返回值不含状态。
+    InFlight,
+}
+
+/// PLAN-108：在途 Http worker 派发。`SyncReceiver` 的 unsafe Sync 与
+/// `SyncSession`（176 行）同纪律：一切访问经桥 RwLock 串行化，worker 侧
+/// 只持 Sender。
+struct SyncReceiver(std::sync::mpsc::Receiver<HttpWorkerResult>);
+unsafe impl Sync for SyncReceiver {}
+
+struct HttpPending {
+    identity: String,
+    generation: u64,
+    msg: String,
+    rx: SyncReceiver,
+}
+
+struct HttpWorkerResult {
+    session: SyncSession,
+    outcome: Result<Vec<(String, ComponentFieldValue)>, String>,
+}
+
+/// PLAN-108：Http 派发完成（桥逐步循环消费回写）。
+#[derive(Debug)]
+pub struct HttpCompletion {
+    pub identity: String,
+    pub generation: u64,
+    pub msg: String,
+    pub result: Result<Vec<(String, AceStateValue)>, String>,
 }
 
 /// 卸载结果（返回被释放实例的世代）。
@@ -210,6 +243,14 @@ pub struct AceStateEngine {
     replay_history: Vec<(String, Vec<(String, Option<Vec<AceStateValue>>)>)>,
     /// 观察口计数。
     audit: EngineExecutionAudit,
+    /// PLAN-108（T-03c M2）：宿主 HTTP provider（UI 桥注入；None=HttpCall
+    /// 具名 fail-closed）。`SyncSession` 已 Send/Sync，派发可上 worker。
+    http_provider:
+        Option<std::sync::Arc<std::sync::Mutex<dyn ace_av::component_event_sessions::HttpProvider>>>,
+    /// PLAN-108：本程序含 Http 效应（派发整体路由 worker 线程）。
+    program_has_http: bool,
+    /// PLAN-108：在途 Http 派发（每 identity 至多一个）。
+    http_pending: Vec<HttpPending>,
 }
 
 /// 组件面单场景实例上限（256^i 打包编码的可区分域；面级常量）。
@@ -221,11 +262,15 @@ impl AceStateEngine {
     pub fn new(src: &str, module_path: &str, alias: LegacyWidgetAlias) -> Result<Self, String> {
         let program = ComponentEventSessionProgram::compile(src, module_path, alias)?;
         let compile_count = program.compile_count;
+        let program_has_http = program.has_http_effects();
         Ok(Self {
             src: src.to_string(),
             module_path: module_path.to_string(),
             alias,
             program,
+            program_has_http,
+            http_provider: None,
+            http_pending: Vec::new(),
             slots: Vec::new(),
             force_replay: false,
             replay_baseline: Vec::new(),
@@ -295,7 +340,11 @@ impl AceStateEngine {
             seeds.push((name.clone(), fv));
         }
         // 开会话（link + init + 可选 seed）：失败即不挂载（干净回滚）。
-        let session = self.program.open_session(&seeds)?;
+        let mut session = self.program.open_session(&seeds)?;
+        // PLAN-108：Http provider 随会话（worker 派发时随会话上 worker 线程）。
+        if let Some(provider) = self.http_provider.clone() {
+            session.set_http_provider(provider);
+        }
         let generation = session.generation();
         self.audit.init_runs += session.audit().init_runs;
         let states = session
@@ -373,6 +422,89 @@ impl AceStateEngine {
         self.dispatch_impl(identity, msg.to_string(), Some(args.to_vec()))
     }
 
+    /// PLAN-108（T-03c M2）：注入宿主 HTTP provider（UI 桥开窗时调用）；
+    /// 已挂载的存活会话即时补注（worker 派发随会话携带）。
+    pub fn set_http_provider(
+        &mut self,
+        provider: std::sync::Arc<std::sync::Mutex<dyn ace_av::component_event_sessions::HttpProvider>>,
+    ) {
+        self.http_provider = Some(provider.clone());
+        for slot in self.slots.iter_mut() {
+            if slot.live {
+                if let Some(session) = slot.session.as_mut() {
+                    session.0.set_http_provider(provider.clone());
+                }
+            }
+        }
+    }
+
+    /// PLAN-108（T-03c M2）：收取在途 Http 派发结果。世代/存活核对后回写
+    /// 会话与状态；已释放/重挂实例的结果**丢弃**（worker 会话随之释放——
+    /// 卸载后的迟到结果隔离面）。每步可调（try_recv 不阻塞）。
+    pub fn poll_http_completions(&mut self) -> Vec<HttpCompletion> {
+        let pending = std::mem::take(&mut self.http_pending);
+        let mut out = Vec::new();
+        let mut still = Vec::new();
+        for p in pending {
+            match p.rx.0.try_recv() {
+                Ok(res) => {
+                    let accepted = matches!(
+                        self.slot(&p.identity),
+                        Some(slot)
+                            if slot.live && slot.generation == p.generation && slot.session.is_none()
+                    );
+                    if accepted {
+                        let slot = self.slot_mut(&p.identity).expect("checked above");
+                        let states: Vec<(String, AceStateValue)> = match &res.outcome {
+                            Ok(states) => states
+                                .iter()
+                                .map(|(n, v)| (n.clone(), AceStateValue::from(v)))
+                                .collect(),
+                            Err(_) => slot.states.clone(),
+                        };
+                        if res.outcome.is_ok() {
+                            slot.states = states.clone();
+                            slot.session = Some(res.session);
+                        } else {
+                            // 执行失败（含 http 错误）：事务回滚，会话仍存活。
+                            slot.session = Some(res.session);
+                        }
+                        out.push(HttpCompletion {
+                            identity: p.identity,
+                            generation: p.generation,
+                            msg: p.msg,
+                            result: res.outcome.map(|_| states),
+                        });
+                    } else {
+                        // 迟到完成：实例已释放或重挂——worker 会话整体丢弃，
+                        // 结果不得落账（取消/迟到隔离见证面）。
+                        self.audit.events_delivered += 0;
+                        out.push(HttpCompletion {
+                            identity: p.identity,
+                            generation: p.generation,
+                            msg: p.msg,
+                            result: Err(
+                                "dropped: instance released or remounted before http completion (late result isolated)"
+                                    .to_string(),
+                            ),
+                        });
+                    }
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => still.push(p),
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    out.push(HttpCompletion {
+                        identity: p.identity,
+                        generation: p.generation,
+                        msg: p.msg,
+                        result: Err("http worker terminated without a result".to_string()),
+                    });
+                }
+            }
+        }
+        self.http_pending = still;
+        out
+    }
+
     fn dispatch_impl(
         &mut self,
         identity: &str,
@@ -401,6 +533,36 @@ impl AceStateEngine {
             None => Vec::new(),
             Some(values) => values.iter().map(|v| v.to_field_value()).collect(),
         };
+        // PLAN-108（T-03c M2）：含 Http 效应的程序——派发上 worker 线程
+        // （provider 阻塞等待不冻结 UI；完成经 poll_http_completions 回写）。
+        // 同实例重入拒绝（HttpBusy）。
+        if self.program_has_http {
+            if self.http_provider.is_none() {
+                // 无 provider：落到同步道，HttpCall 具名 fail-closed（M1）。
+            } else if self.http_pending.iter().any(|p| p.identity == identity) {
+                return Ok(DispatchOutcome::Dropped(DropReason::HttpBusy));
+            } else {
+                let slot = self.slot_mut(identity).expect("live checked above");
+                let Some(sync) = slot.session.take() else {
+                    return Ok(DispatchOutcome::Dropped(DropReason::InstanceReleased));
+                };
+                let generation = slot.generation;
+                let msg_for_worker = msg.clone();
+                let payload_for_worker = payload.clone();
+                let provider = self.http_provider.clone().expect("checked above");
+                let (tx, rx) = std::sync::mpsc::channel();
+                std::thread::spawn(move || {
+                    http_dispatch_worker(sync, msg_for_worker, payload_for_worker, provider, tx)
+                });
+                self.http_pending.push(HttpPending {
+                    identity: identity.to_string(),
+                    generation,
+                    msg,
+                    rx: SyncReceiver(rx),
+                });
+                return Ok(DispatchOutcome::InFlight);
+            }
+        }
         let result = {
             let slot = self.slot_mut(identity).expect("live checked above");
             let session = slot.session.as_mut().expect("live slot holds a session");
@@ -547,7 +709,10 @@ impl AceStateEngine {
         let program =
             ComponentEventSessionProgram::compile(&self.src, &self.module_path, self.alias)?;
         self.audit.rebuild_compiles += 1;
-        let rebuilt = program.open_session(&target)?;
+        let mut rebuilt = program.open_session(&target)?;
+        if let Some(provider) = self.http_provider.clone() {
+            rebuilt.set_http_provider(provider);
+        }
         self.audit.links += 1;
         // 状态根替换（旧会话关闭——重建道的可观察事实就是身份更换）。
         let mut retired = 0u64;
@@ -764,6 +929,9 @@ impl AceStateEngine {
             match self.dispatch(&ticket.identity, &ticket.completion_msg)? {
                 DispatchOutcome::Delivered(states) => AsyncOutcome::Completed(states),
                 DispatchOutcome::Dropped(reason) => AsyncOutcome::Dropped(reason),
+                // PLAN-108：http 程序的完成消息落入 worker 车道——ticket 语义
+                // 为同步回写，InFlight 视为 busy 丢弃（完成经逐步 poll 落账）。
+                DispatchOutcome::InFlight => AsyncOutcome::Dropped(DropReason::HttpBusy),
             },
         )
     }
@@ -777,4 +945,88 @@ pub(super) fn initial_of(v: &AceStateValue) -> InitialValue {
         AceStateValue::Str(s) => InitialValue::Str(s.clone()),
         AceStateValue::F32(f) => InitialValue::Float(*f),
     }
+}
+
+/// PLAN-108（T-03c M2）：宿主 HTTP provider（reqwest blocking）。**阻塞语义**：
+/// 只在 worker 线程上调用（含 Http 效应的程序派发整体路由 worker——
+/// `AceStateEngine` 的 http_pending 车道）；UI 线程不等待。
+pub struct UiHttpProvider {
+    client: reqwest::blocking::Client,
+}
+
+impl UiHttpProvider {
+    pub fn new() -> Self {
+        Self {
+            client: reqwest::blocking::Client::builder()
+                .no_proxy()
+                .build()
+                .unwrap_or_default(),
+        }
+    }
+}
+
+impl ace_av::component_event_sessions::HttpProvider for UiHttpProvider {
+    fn execute(&mut self, verb: &str, url: &str, body: Option<&str>) -> Result<String, String> {
+        let method = match verb {
+            "auto.http.get.v1" | "auto.http.get-json.v1" => reqwest::Method::GET,
+            "auto.http.delete.v1" => reqwest::Method::DELETE,
+            "auto.http.put.v1" | "auto.http.put-json.v1" => reqwest::Method::PUT,
+            "auto.http.patch.v1" | "auto.http.patch-json.v1" => reqwest::Method::PATCH,
+            _ => reqwest::Method::POST,
+        };
+        let mut req = self.client.request(method, url);
+        if let Some(body) = body {
+            let json_verb = verb.ends_with("-json.v1");
+            req = req.header(
+                reqwest::header::CONTENT_TYPE,
+                if json_verb {
+                    "application/json"
+                } else {
+                    "text/plain; charset=utf-8"
+                },
+            );
+            req = req.body(body.to_string());
+        }
+        let resp = req
+            .send()
+            .map_err(|e| format!("request failed: {e}"))?;
+        let status = resp.status();
+        let text = resp.text().map_err(|e| format!("body read failed: {e}"))?;
+        if status.is_success() {
+            Ok(text)
+        } else {
+            Err(format!("HTTP {status}: {text}"))
+        }
+    }
+}
+
+/// PLAN-108：Http worker 线程体（独立 fn——2021 disjoint capture 会经
+/// tuple-struct 解构按字段捕获，独立 fn 保证 `SyncSession` 整体按值跨线程；
+/// `SyncSession` 的 Send/Sync 与 176 行 unsafe 纪律同约：访问经桥 RwLock
+/// 串行化）。
+#[allow(clippy::type_complexity)]
+fn http_dispatch_worker(
+    sync: SyncSession,
+    msg: String,
+    payload: Vec<ComponentFieldValue>,
+    provider: std::sync::Arc<
+        std::sync::Mutex<dyn ace_av::component_event_sessions::HttpProvider>,
+    >,
+    tx: std::sync::mpsc::Sender<HttpWorkerResult>,
+) {
+    let SyncSession(mut session) = sync;
+    session.set_http_provider(provider);
+    let outcome = session
+        .dispatch(&msg, &payload)
+        .map(|_| {
+            session
+                .last_committed_states()
+                .iter()
+                .map(|(n, v)| (n.clone(), v.clone()))
+                .collect::<Vec<(String, ComponentFieldValue)>>()
+        });
+    let _ = tx.send(HttpWorkerResult {
+        session: SyncSession(session),
+        outcome,
+    });
 }
