@@ -1187,7 +1187,8 @@ fn p1119_v04_stop_invalidates_and_releases_request() {
         host.active_tab().committed_address(),
         Some("app://auto.gallery/")
     );
-    // 真实请求释放：worker 在取消后 ≤2s 回到 0；服务器侧连接中止。
+    // 真实请求释放：worker 在取消后 ≤2s 回到 0；服务器侧连接中止记录
+    // 落账（NF-1：终止事件延迟落账——断言前必须等它出现）后判定。
     let released = step_until(&mut host, Duration::from_secs(2), |h| {
         h.web_in_flight() == 0
     });
@@ -1196,7 +1197,14 @@ fn p1119_v04_stop_invalidates_and_releases_request() {
         "worker released after stop (in_flight={})",
         host.web_in_flight()
     );
+    assert!(
+        wait_for_log(&site, |log| log
+            .iter()
+            .any(|r| r.path == "/slowdoc/" && r.outcome == "aborted")),
+        "stop abort lands in the server log"
+    );
     let slow_hits = site.requests_to("/slowdoc/");
+    assert_eq!(slow_hits.len(), 1, "{:?}", slow_hits);
     assert!(
         slow_hits.iter().all(|r| r.outcome == "aborted"),
         "慢体连接被中止: {:?}",
