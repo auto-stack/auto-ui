@@ -212,6 +212,32 @@ impl Renderer<'_> {
         }
     }
 
+    pub(super) fn native_textarea(
+        &self,
+        element: &ComponentViewElement,
+        mut style: Style,
+    ) -> WidgetView {
+        let key = element.span.start;
+        let value = self
+            .state
+            .inputs
+            .get(&key)
+            .map(String::as_str)
+            .or_else(|| literal(element, "value"))
+            .unwrap_or_default();
+        if style.classes.is_empty() {
+            style = Style::parse("w-48").unwrap_or_default();
+        }
+        let rows = self.number(element, "rows", 3.0).max(1.0) as u16;
+        View::textarea(literal(element, "placeholder").unwrap_or_default())
+            .value(value)
+            .height(rows.saturating_mul(24).saturating_add(16))
+            .with_style(style)
+            .disabled(super::flag(element, "disabled"))
+            .on_change(self.action(Action::Textarea { key }))
+            .build()
+    }
+
     pub(super) fn native_input(&self, el: &ComponentViewElement, mut parsed: Style) -> WidgetView {
         let key = el.span.start;
         let (session, instance) = (self.session, self.instance);

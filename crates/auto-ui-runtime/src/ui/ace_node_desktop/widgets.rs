@@ -19,6 +19,8 @@ use std::sync::Arc;
 
 mod composite;
 mod pointer;
+mod resources;
+pub(super) use resources::public_assets;
 mod svg;
 
 type WidgetView = View<NodeDesktopMsg>;
@@ -28,6 +30,7 @@ pub enum Action {
     Focus(usize),
     DispatchButton(usize),
     Input { key: usize, text: String },
+    Textarea { key: usize },
     Select { key: usize, index: usize },
     Accordion {
         key: usize,
@@ -58,6 +61,7 @@ pub enum Action {
 #[derive(Clone, Debug)]
 pub(super) struct State {
     focus: Option<usize>,
+    public_assets: Option<Arc<std::path::PathBuf>>,
     expanded: BTreeMap<usize, BTreeSet<usize>>,
     disclosure: BTreeMap<usize, bool>,
     inputs: BTreeMap<usize, String>,
@@ -73,6 +77,7 @@ impl State {
     pub fn new(bindings: BTreeMap<String, bool>) -> Self {
         Self {
             focus: None,
+            public_assets: None,
             expanded: BTreeMap::new(),
             disclosure: BTreeMap::new(),
             inputs: BTreeMap::new(),
@@ -90,6 +95,22 @@ impl State {
         self
     }
 
+    pub(super) fn with_public_assets(mut self, root: Option<Arc<std::path::PathBuf>>) -> Self {
+        self.public_assets = root;
+        self
+    }
+
+    pub(super) fn release_session(
+        session: i32,
+        tree: &[ComponentViewItem],
+        states: &mut [Self],
+    ) {
+        resources::release_editors(session, states.len(), tree);
+        for state in states {
+            state.inputs.clear();
+        }
+    }
+
     pub(super) fn source_button_count(&self) -> usize {
         self.button_targets.len()
     }
@@ -99,6 +120,9 @@ impl State {
             Action::DispatchButton(_) => {} // Forwarded to the AV event queue by the window.
             Action::Input { key, text } => {
                 self.inputs.insert(key, text);
+            }
+            Action::Textarea { key } => {
+                self.inputs.insert(key, crate::ui::iced::renderer::last_input_text());
             }
             Action::Select { key, index } => {
                 self.selected.insert(key, index);
@@ -662,10 +686,58 @@ impl Renderer<'_> {
         }
         match el.tag.as_str() {
             "input" => self.native_input(el, parsed),
+            "textarea" => self.native_textarea(el, parsed),
+            "icon" => self.native_icon(el, parsed),
+            "avatar" if literal(el, "src").is_some() => self.native_image(
+                el,
+                native_style(&format!("rounded-full w-10 h-10 {classes}")),
+            ),
+            "divider" | "separator" | "sep" => {
+                let vertical = literal(el, "direction").or_else(|| literal(el, "orientation"))
+                    == Some("vertical");
+                let line = if vertical { "w-px h-6" } else { "w-full h-px" };
+                let separator = View::container(View::empty())
+                    .with_style(native_style(&format!("{line} bg-border {classes}")))
+                    .build();
+                if let Some(label) = literal(el, "label") {
+                    View::col().child(View::text(label)).child(separator).build()
+                } else {
+                    separator
+                }
+            }
+            "native_button" => {
+                let label = self.label(el);
+                let action = (!flag(el, "disabled")).then_some(Action::Focus(key));
+                self.button(key, label, classes, action, None, None)
+            }
             "select" => self.native_select(el, parsed),
+            "image" | "imagesurface" | "image-surface" | "image_surface" => self.native_image(el, parsed),
+            "autodown_editor" | "autodown-editor" | "code_editor" | "code-editor" => {
+                self.native_editor(el, parsed)
+            }
+            "workspace_preview" | "workspace-preview" => View::WorkspacePreview {
+                ws: literal(el, "ws").unwrap_or_default().into(),
+                fallback_icon: literal(el, "fallback").unwrap_or("app-window").into(),
+                style: Some(parsed),
+            },
+            "remote-frame" => View::RemoteFrame {
+                url: literal(el, "url").unwrap_or_default().into(),
+                style: Some(parsed),
+            },
             "accordion" => self.accordion(el, key),
             "svg" => self.svg(el),
             "mouse-area" | "mouse_area" => self.mouse_area(el),
+            "link" | "sidebar_menu_button" | "sidebar_menu_sub_button" | "nav-item"
+                if self.state.button_targets.contains_key(&key) =>
+            {
+                let target = self.state.button_targets[&key];
+                let children = self.label(el);
+                let label = literal(el, "text").or_else(|| literal(el, "label"))
+                    .or_else(|| (!children.is_empty()).then_some(children.as_str()))
+                    .or_else(|| literal(el, "to")).or_else(|| literal(el, "href"))
+                    .unwrap_or_default().to_owned();
+                self.button(key, label, classes, Some(Action::DispatchButton(target)), None, None)
+            }
             "button" if self.state.button_targets.contains_key(&key) => {
                 let target = self.state.button_targets[&key];
                 let label = el.label.as_ref().or_else(|| expression(el, "text"))
@@ -685,6 +757,7 @@ impl Renderer<'_> {
                 });
                 View::col()
                     .spacing(5)
+                    .children(self.items(&el.items))
                     .child(View::ProgressBar {
                         progress: value / max,
                         style: Some(parsed),
@@ -773,13 +846,16 @@ impl Renderer<'_> {
                     .with_style(native_style(&format!("w-full h-full {classes}")))
                     .build()
             }
-            "spacer" => View::container(View::empty())
-                .with_style(if classes.is_empty() {
-                    native_style("flex-1")
-                } else {
-                    parsed
-                })
-                .build(),
+            "spacer" => {
+                let style = match expression(el, "size").and_then(|expr| self.display(expr))
+                    .and_then(|value| value.parse::<u16>().ok())
+                {
+                    Some(size) => native_style(&format!("w-[{size}px] h-[{size}px] {classes}")),
+                    None if classes.is_empty() => native_style("flex-1"),
+                    None => parsed,
+                };
+                View::container(View::empty()).with_style(style).build()
+            }
             "codeblock" => {
                 View::text_styled(literal(el, "code").unwrap_or_default(), "text-sm font-mono")
             }
@@ -1228,6 +1304,26 @@ widget Layout {
                 View::Text { content: following, .. },
             ] if empty.is_empty() && following == "AV observation"
         ));
+    }
+
+    #[test]
+    fn progress_caption_preserves_following_av_text() {
+        let source = r#"widget Preview {
+    view {
+        col {
+            progress { text "Caption" {} }
+            text "Sibling" {}
+        }
+    }
+}"#;
+        let nodes = project_component_candidates(source).expect("checked progress view");
+        let state = State::new(BTreeMap::new());
+        let texts = ["AV caption".into(), "AV sibling".into()];
+        let view = view(1, 0, &nodes[0].view.tree, &texts, &[], &state);
+        let rendered = format!("{view:?}");
+        let caption = rendered.find("AV caption").expect("progress caption rendered");
+        let sibling = rendered.find("AV sibling").expect("sibling text rendered");
+        assert!(caption < sibling, "{rendered}");
     }
 
     const WIDGETS: &str = r#"

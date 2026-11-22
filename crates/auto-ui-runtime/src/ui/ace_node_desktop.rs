@@ -28,7 +28,7 @@
 
 use crate::ui::ace_package_bridge::{PackageFocusNotice, PackageFrame, PackageQueuedAction, PackageStateEngine};
 use super::ace_route::{front_package_units, front_route_modules, package_candidates, RouteAction, RouteModulePaths, RouteNavigation, RouteTable};
-use super::ace_route_desktop::{DesktopRoutes, RouteHandlers, route_links};
+use super::ace_route_desktop::{DesktopRoutes, RouteHandlers, RouteLink, route_links};
 use crate::ui::ace_state_bridge::{
     AceStateEngine, AceStateValue, DispatchOutcome, EngineExecutionAudit,
 };
@@ -830,7 +830,9 @@ fn close_host_session(session: i32) -> i32 {
     }
     s.closed = true;
     s.queue.clear();
-    s.widget_tree = None;
+    if let Some(tree) = s.widget_tree.take() {
+        widgets::State::release_session(session, &tree, &mut s.widget_instances);
+    }
     s.widget_values.clear();
     s.package_frames.clear();
     s.publish_focus(None);
@@ -1021,12 +1023,14 @@ pub struct NodeDesktopBridge {
     /// PLAN-104：装载时的 view 树（条件可见性求值用；叶序与 texts 一致）。
     view_items: Vec<ace_core::source::age_component::ComponentViewItem>,
     widget_initial_bools: std::collections::BTreeMap<String, bool>,
+    public_assets: Option<Arc<std::path::PathBuf>>,
     /// PLAN-104：文本叶来自循环体模板展开（视图数据，非状态派生）——不参与
     /// 状态驱动的叶刷新。（PLAN-1106 T-05：源串与场景 op 历史随增量会话
     /// 接线退役——文本叶改由会话纯读 `AceStateEngine::read_texts`。）
     expanded_static: bool,
     routes: Option<Box<DesktopRoutes>>,
     route_actions: std::collections::BTreeMap<usize, RouteAction>,
+    route_button_spans: Vec<usize>,
     package_route_handlers: Option<RouteHandlers>,
     route_request: Option<RouteNavigation>,
 }
@@ -2165,9 +2169,11 @@ impl NodeDesktopBridge {
             tick_no: 0,
             view_items: node.view.tree.clone(),
             widget_initial_bools: widgets::initial_bools(&node.fields),
+            public_assets: widgets::public_assets(std::path::Path::new(path)).map(Arc::new),
             expanded_static,
             routes: None,
             route_actions: Default::default(),
+            route_button_spans: Vec::new(),
             package_route_handlers: None,
             route_request: None,
         })
@@ -2317,15 +2323,21 @@ impl NodeDesktopBridge {
             tick_no: 0,
             view_items: node.view.tree.clone(),
             widget_initial_bools: widgets::initial_bools(&node.fields),
+            public_assets: None,
             expanded_static: false,
             routes: None,
             route_actions: Default::default(),
+            route_button_spans: Vec::new(),
             package_route_handlers: None,
             route_request: None,
         })
     }
 
-    pub(super) fn set_route_controls(&mut self, handlers: RouteHandlers, links: Vec<(String, String)>) {
+    pub(super) fn set_source_assets(&mut self, source: &std::path::Path) {
+        self.public_assets = widgets::public_assets(source).map(Arc::new);
+    }
+
+    pub(super) fn set_route_controls(&mut self, handlers: RouteHandlers, links: Vec<RouteLink>) {
         if self.has_checked_package_view() {
             self.package_route_handlers = Some(handlers);
             return;
@@ -2335,9 +2347,10 @@ impl NodeDesktopBridge {
                 self.route_actions.insert(index, action.clone());
             }
         }
-        for (label, path) in links {
-            self.route_actions.insert(self.buttons.len(), RouteAction::literal(path));
-            self.buttons.push(ButtonSpec { label, msg: "navigate".into(), payload: None });
+        for link in links {
+            self.route_actions.insert(self.buttons.len(), RouteAction::literal(link.destination));
+            self.buttons.push(ButtonSpec { label: link.label, msg: "navigate".into(), payload: None });
+            self.route_button_spans.push(link.span_start);
         }
     }
 
@@ -2485,10 +2498,11 @@ impl NodeDesktopBridge {
                 });
                 s.package_frames = frames;
                 s.publish_focus(focus);
+                let has_authored_buttons = self.buttons.len() > self.route_button_spans.len();
                 if s.package_frames.is_empty() && self.routes.is_none()
                     && self.inputs.is_empty()
                     && unsupported_widget_condition(&self.view_items, false).is_none()
-                    && (widgets::contains_svg(&self.view_items) || (self.buttons.is_empty()
+                    && (widgets::contains_svg(&self.view_items) || (!has_authored_buttons
                         && widgets::contains_preview(&self.view_items)))
                 {
                     let mut shape = ViewShape::default();
@@ -2497,13 +2511,16 @@ impl NodeDesktopBridge {
                         shape
                             .button_spans
                             .into_iter()
+                            .chain(self.route_button_spans.iter().copied())
                             .enumerate()
                             .map(|(target, span)| (span, target))
                             .collect(),
                     );
                     s.widget_tree = Some(self.view_items.clone().into());
                     s.widget_instances = vec![
-                        widgets::State::new(self.widget_initial_bools.clone()).bind_buttons(bindings);
+                        widgets::State::new(self.widget_initial_bools.clone())
+                            .bind_buttons(bindings)
+                            .with_public_assets(self.public_assets.clone());
                         instances
                     ];
                     s.widget_values = self

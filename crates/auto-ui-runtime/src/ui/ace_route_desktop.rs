@@ -83,6 +83,9 @@ impl DesktopRoutes {
                 append_widget_packages(source_path, &prepared.source, &nodes, &mut units)?;
             }
             let mut bridge = NodeDesktopBridge::load_package_leaf(units, entry, instances)?;
+            if let Some(source_path) = self.paths.get(entry) {
+                bridge.set_source_assets(source_path);
+            }
             bridge.set_route_controls(prepared.commands, links);
             bridge.open()?;
             if prepared.has_init && !bridge.has_checked_package_view() {
@@ -149,17 +152,30 @@ impl DesktopRoutes {
     }
 }
 
-pub(super) fn route_links(node: &ComponentNode) -> Result<Vec<(String, String)>, String> {
+pub(super) struct RouteLink {
+    pub span_start: usize,
+    pub label: String,
+    pub destination: String,
+}
+
+pub(super) fn route_links(node: &ComponentNode) -> Result<Vec<RouteLink>, String> {
     let mut links = Vec::new();
     let mut items: Vec<&ComponentViewItem> = node.view.tree.iter().rev().collect();
     while let Some(item) = items.pop() {
         match item {
             ComponentViewItem::Element(element) => {
-                if matches!(element.tag.as_str(), "link" | "sidebar_menu_button") {
-                    if let Some(to) = element.items.iter().find_map(|item| match item {
-                        ComponentViewItem::Entry(entry) if entry.key == "to" => Some(&entry.value),
+                if matches!(element.tag.as_str(), "link" | "sidebar_menu_button" | "sidebar_menu_sub_button" | "nav-item") {
+                    let property = |name: &str| element.items.iter().find_map(|item| match item {
+                        ComponentViewItem::Entry(entry) if entry.key == name => Some(&entry.value),
                         _ => None,
-                    }) {
+                    });
+                    let local_href = || match property("href") {
+                        Some(value @ ComponentEntryValue::Expr(Expr {
+                            kind: ExprKind::StrLit(path), ..
+                        })) if path.starts_with('/') && !path.starts_with("//") => Some(value),
+                        _ => None,
+                    };
+                    if let Some(to) = property("to").or_else(local_href) {
                         let ComponentEntryValue::Expr(Expr {
                             kind: ExprKind::StrLit(path),
                             ..
@@ -175,6 +191,14 @@ pub(super) fn route_links(node: &ComponentNode) -> Result<Vec<(String, String)>,
                             .as_ref()
                             .or_else(|| {
                                 element.items.iter().find_map(|item| match item {
+                                    ComponentViewItem::Entry(entry)
+                                        if matches!(entry.key.as_str(), "text" | "label") =>
+                                    {
+                                        match &entry.value {
+                                            ComponentEntryValue::Expr(expr) => Some(expr),
+                                            _ => None,
+                                        }
+                                    }
                                     ComponentViewItem::Text(leaf) => Some(&leaf.expr),
                                     ComponentViewItem::Element(child) if child.tag == "text" => {
                                         child.label.as_ref()
@@ -187,7 +211,11 @@ pub(super) fn route_links(node: &ComponentNode) -> Result<Vec<(String, String)>,
                                 _ => None,
                             })
                             .unwrap_or(path);
-                        links.push((label.to_string(), path.clone()));
+                        links.push(RouteLink {
+                            span_start: element.span.start,
+                            label: label.to_owned(),
+                            destination: path.clone(),
+                        });
                     }
                 }
                 items.extend(element.items.iter().rev());
