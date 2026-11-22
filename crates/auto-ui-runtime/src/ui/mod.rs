@@ -164,6 +164,10 @@ pub mod ase_m0_frame;
 // PLAN-1023 ASE M0：交互会话宿主（两活会话/引擎常驻/选中车道/关闭代次；
 // 纯 980/981 公共面消费，观察口在真实调用边界计量）。
 pub mod ase_m0_sessions;
+#[cfg(feature = "ace-bridge")]
+// PLAN-1118 AutoScape：本地浏览器七区外壳（导航/历史/收藏元数据层 +
+// 复用 ase_m0_sessions 会话层；严格地址解析复用 ase-m0 crate 单一语法源）。
+pub mod ase_browser_shell;
 // PLAN-980 ④-A：包感知桥与包片段 lane 同样只在 ce-bridge 面存在——
 // ce-av/ce-core/ce-a2x-ts 都是 optional 依赖，不加门会让默认构建
 // （auto-ui 自身、man 的 ace-candidate 链）拿到 E0433。

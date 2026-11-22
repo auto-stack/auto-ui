@@ -360,8 +360,11 @@ fn p1023_v10_min_unit_trajectory_and_payload_refusal() {
     let refused = eng.dispatch_with_args("i0", "Inc", &[AceStateValue::Int(1)]);
     match &refused {
         Err(_) | Ok(DispatchOutcome::Dropped(_)) => {}
-        Ok(DispatchOutcome::Delivered(states)) => {
-            panic!("payload dispatch on unit msg must refuse, got {states:?}")
+        // PLAN-1118 门禁修复（预存红）：PLAN-108 给 DispatchOutcome 增设
+        // InFlight 后本 match 不再穷尽（测试面未随枚举更新）。语义不变：
+        // 单元消息上的带参派发不允许任何 Ok 结果（含在途）。
+        Ok(other) => {
+            panic!("payload dispatch on unit msg must refuse, got {other:?}")
         }
     }
     assert_eq!(

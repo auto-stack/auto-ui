@@ -5222,12 +5222,31 @@ where
             if status == iced::event::Status::Captured {
                 return None;
             }
-            let iced::Event::Keyboard(Event::KeyPressed { key: Key::Named(key), modifiers, .. }) = event else {
+            let iced::Event::Keyboard(Event::KeyPressed { key, modifiers, .. }) = event else {
                 return None;
             };
+            // PLAN-1118：Ctrl 组合快捷键（如外壳 Ctrl+T/W/D/L）投递为
+            // `Ctrl+<字母>` 名；组件 `key_message` 未声明者自然忽略（与
+            // 既有命名键同过滤面——listen_with 只收无捕获闭包，绑定过滤
+            // 在 update 的 key_message 分派处）。
+            if modifiers.control() && !modifiers.alt() && !modifiers.logo() {
+                if let Key::Character(character) = &key {
+                    let mut chars = character.chars();
+                    if let (Some(first), None) = (chars.next(), chars.next()) {
+                        if first.is_ascii_alphabetic() {
+                            let name = format!("Ctrl+{}", first.to_ascii_uppercase());
+                            return Some(TickWrapMsg::Key(name));
+                        }
+                    }
+                }
+                return None;
+            }
             if modifiers.control() || modifiers.alt() || modifiers.logo() {
                 return None;
             }
+            let Key::Named(key) = key else {
+                return None;
+            };
             let name = match key {
                 Named::Tab if modifiers.shift() => "Shift+Tab",
                 Named::Tab => "Tab",

@@ -82,6 +82,13 @@ pub struct AseApp {
     pub path: String,
 }
 
+/// 分段打开票据（PLAN-1118）：一次已完成的 `NodeDesktopBridge::load`，等待
+/// 挂载。未挂载即 drop → 引擎 owner 释放，零 session/零 UI 效果。
+pub struct AseOpenTicket {
+    pub(crate) app_key: String,
+    pub(crate) bridge: NodeDesktopBridge,
+}
+
 /// 保留性观察口（T-01 冻结）：真实调用边界上的计量。真实路径与负控共用
 /// 同一结构/语义；`dispatches*` 经 [`AseSessionHost::dispatches_of`] 从引擎
 /// `dispatch_log` 派生（真实 handler 执行，不另行自增）。
@@ -213,6 +220,15 @@ impl AseSessionHost {
     /// `session.limit` 拒（现有会话不变）；未知 app 具名拒（零装载）。
     /// 同 app 重复打开 = 双会话（两次独立装载，双 engine，模型不合并）。
     pub fn open_session(&mut self, app_key: &str) -> Result<usize, String> {
+        let ticket = self.begin_open(app_key)?;
+        self.mount_open(ticket)
+    }
+
+    /// 分段打开第一步（PLAN-1118）：容量速检 + 真实装载（编译+引擎挂载，
+    /// 计 `loads`）→ 返回待挂载票据。票据未挂载即 drop 时引擎 owner 随之
+    /// 释放、零 session/零 UI 效果。容量在挂载点还有一次权威复检（分段间
+    /// 可能有并发 open 落位）。
+    pub fn begin_open(&mut self, app_key: &str) -> Result<AseOpenTicket, String> {
         if self.live.len() >= ASE_M0_SESSION_LIMIT {
             let msg = format!(
                 "session.limit: {} live sessions held ({}); refuse new open for {app_key:?} \
@@ -231,14 +247,44 @@ impl AseSessionHost {
         let src = std::fs::read_to_string(&path)
             .map_err(|e| format!("read app {app_key} source {}: {e}", path.display()))?;
         self.metrics.loads += 1;
-        let mut bridge = NodeDesktopBridge::load(&src, &path.to_string_lossy(), 1)
+        let bridge = NodeDesktopBridge::load(&src, &path.to_string_lossy(), 1)
             .map_err(|e| format!("load refused for {app_key}: {e}"))?;
-        let clock = self.clock_app.as_deref() == Some(app_key);
-        if clock && !bridge.accepts_clock_tick() {
+        if self.clock_app.as_deref() == Some(app_key) && !bridge.accepts_clock_tick() {
             return Err(format!(
                 "clock app {app_key:?} must declare a Tick(int) handler"
             ));
         }
+        Ok(AseOpenTicket {
+            app_key: app_key.to_string(),
+            bridge,
+        })
+    }
+
+    /// 分段打开第二步（PLAN-1118）：权威容量复检 → 出向车道撤（引擎常驻）
+    /// → 开车道 → 记录/选中。容量不足 → 具名 `session.limit` 拒，票据
+    /// drop（零 session、零 UI 效果）。
+    pub fn mount_open(&mut self, ticket: AseOpenTicket) -> Result<usize, String> {
+        if self.live.len() >= ASE_M0_SESSION_LIMIT {
+            let msg = format!(
+                "session.limit: {} live sessions held ({}); refuse mount of {:?} \
+                 — ticket dropped, existing sessions unchanged",
+                self.live.len(),
+                self.live
+                    .iter()
+                    .map(|s| format!("{}#{}", s.record.app_key, s.record.id))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                ticket.app_key
+            );
+            drop(ticket);
+            self.errors.push(msg.clone());
+            return Err(msg);
+        }
+        let AseOpenTicket {
+            app_key,
+            mut bridge,
+        } = ticket;
+        let clock = self.clock_app.as_deref() == Some(app_key.as_str());
         // 新会话成为选中：出向车道先撤（引擎常驻，只撤显示副本）。
         self.close_outgoing_lane("open-session")?;
         self.metrics.ui_lane_opens += 1;
@@ -248,7 +294,7 @@ impl AseSessionHost {
             bridge.open()
         }
         .map_err(|e| format!("open refused for {app_key}: {e}"))?;
-        let generation = self.next_generation_of(app_key);
+        let generation = self.next_generation_of(&app_key);
         let id = self.next_id;
         self.next_id += 1;
         self.log.push(format!(
@@ -259,7 +305,7 @@ impl AseSessionHost {
         self.live.push(LiveSession {
             record: SessionRecord {
                 id,
-                app_key: app_key.to_string(),
+                app_key: app_key.clone(),
                 generation,
                 closed: false,
                 last_ui_session: Some(ui_session),
@@ -317,6 +363,17 @@ impl AseSessionHost {
             self.live[idx].bridge.close_session()?;
         }
         self.retire_session(idx);
+        Ok(())
+    }
+
+    /// 撤销选中而不关闭会话（PLAN-1118 外壳：切到无 guest 的页签——关出向
+    /// 显示车道并停时钟资格，**引擎常驻**；已无选中 → no-op）。后台页签
+    /// 由此获得"隐藏零业务/零呈现"语义（Clock 隐藏期零派发）。
+    pub fn deselect(&mut self) -> Result<(), String> {
+        if self.selected.is_none() && self.clock.is_none() {
+            return Ok(());
+        }
+        self.close_outgoing_lane("deselect")?;
         Ok(())
     }
 

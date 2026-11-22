@@ -655,6 +655,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ase-m0"
+version = "0.1.0"
+dependencies = [
+ "ace-av",
+ "ace-av-core",
+ "ace-core",
+ "ace-source-query",
+ "serde",
+ "sha2 0.10.9",
+ "toml",
+]
+
+[[package]]
 name = "ash"
 version = "0.38.0+1.3.281"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1024,6 +1037,7 @@ dependencies = [
  "ace-core",
  "ace-foreign-contract",
  "ace-lowering",
+ "ace-source-cte",
  "ace-source-query",
  "auto-lang-core",
  "base64 0.22.1",
@@ -1268,6 +1282,7 @@ dependencies = [
  "ace-foreign-contract",
  "ace-source-query",
  "arboard",
+ "ase-m0",
  "auto-lang-ace-host",
  "auto-lang-core",
  "auto-media-core",

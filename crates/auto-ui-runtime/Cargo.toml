@@ -15,7 +15,7 @@ default = ["ui-iced"]
 # PLAN-980（STATE/HELLO/RUST）：ACE 桥接线（组件面状态执行/首窗/A2R AXR0）。
 # 默认关闭——交付闭包（792 受管 bundle）不含 experimental/ace 树；交付投影
 # 剥除这些 optional path 行并把本 feature 改写为空（autodown-core 同型先例）。
-ace-bridge = ["dep:ace-av", "dep:auto-lang-ace-host", "dep:ace-abi", "dep:ace-a2x-core", "dep:ace-a2x-rust", "dep:ace-source-query", "dep:ace-foreign-contract", "dep:ace-core", "dep:ace-a2x-ts"]
+ace-bridge = ["dep:ace-av", "dep:auto-lang-ace-host", "dep:ace-abi", "dep:ace-a2x-core", "dep:ace-a2x-rust", "dep:ace-source-query", "dep:ace-foreign-contract", "dep:ace-core", "dep:ace-a2x-ts", "dep:ase-m0"]
 ui = ["auto-ui-compiler/ui"]
 # PLAN-018（Design52 D）：稳定UI基线（解释器/image-pipeline/code-editor/
 # 剪贴板/对话框/native-dock/clipboard + iced后端依赖）恒在——deps非optional、
@@ -92,6 +92,9 @@ auto-lang-core = { path = "../../../auto-lang/crates/auto-lang-core" }
 # PLAN-980 B-STATE：ACE 状态执行桥消费组件面（场景脱糖→共享 verify→AV）与
 # scheduler 一次性执行入口（异步宿主）。经组内兄弟树解析（../auto-lang）。
 ace-av = { path = "../../../auto-lang/experimental/ace/crates/av", optional = true }
+# PLAN-1118 AutoScape 外壳：严格 `app://` 地址解析单一语法源（ase-m0 crate
+# 经组内兄弟树解析；仅解析面消费，不触碰其 headless run 面）。
+ase-m0 = { path = "../../../auto-lang/experimental/ase-m0", optional = true }
 # PLAN-980 NATIVE：view 树（元素/属性行）类型消费（经 ace-av 的面亦可，此处
 # 直用核心类型以走完整 Expr 事实）。
 ace-core = { path = "../../../auto-lang/experimental/ace/crates/core", optional = true }

@@ -84,3 +84,32 @@ auto-lang `docs/specs/ace-migration/component-event-sessions.md`。
 `ase_m0_sessions_window` 接收 `--app clock=<Clock 源路径> --app counter-a=<Counter 源路径> --clock-app clock`。在需要验证原生关窗清理时使用 `--await-window-close`，证据包括关窗前的会话和自然退出后的释放状态。现有 `--prep-only` 准备 UI980 provider。运行验证时将 `ACE_NODE_DESKTOP_ROOT` 指向准备目录，并将 `ACE_NODE_DESKTOP_PREPARED_RUSTC` 设为准备阶段的 `rustc --version` 输出。缺失或过期的 provider 会具名拒绝。
 
 Clock 使用现有 20 毫秒宿主循环消费单个已到期唤醒。宿主负责选中、单调截止点与 UTC 日内秒采样，`NodeDesktopBridge::dispatch_typed` 复用受检 AV 派发和文本差量提交。Clock 显示车道在重新选中时等待首个新样本。会话卸载用实际 AV close 记录已释放状态根。 Provider 拒绝关闭时，旧车道进入待关闭状态并失去定时资格。窗体退出继续回收宿主显示车道和所有会话根，证据保留关闭错误。CPU 生命周期入口为 `cargo test -p auto-ui-runtime --features ace-bridge --test ase_clock_lifecycle -- --test-threads=1`。适用范围和验收来源见 auto-lang `docs/specs/ase/visible-tab-timers.md` 与 PLAN-1109 归档。
+
+## AutoScape 浏览器外壳消费（PLAN-1118）
+
+`crates/auto-ui-runtime/src/ui/ase_browser_shell.rs` 是本地浏览器七区外壳的
+宿主适配：导航/页签/历史/收藏是外壳自有元数据层，guest 会话经
+`AseSessionHost` 的**分段打开面**（`begin_open` 装载成票据 → `mount_open`
+容量复检 + 车道落位；票据未挂载即 drop = 引擎释放、零 session/零 UI 效果）
+与 `deselect`（切到无 guest 页签撤出向车道、停时钟资格）驱动，复用
+1023/1106/1109 的全部会话语义。严格 `app://` 地址解析消费 ase-m0 crate
+（`parse_app_uri` 单一语法源，经组内兄弟树 path dep；不复制语法）。已验
+范围/冻结身份/导航与收藏语义见 auto-lang
+`docs/specs/ase/local-browser-shell.md`（单源权威）。
+
+- 窗口：`AutoscapeWindow`（七区：菜单栏/地址栏/右侧工具/页签/收藏栏/
+  内容视口/状态栏；`Ctrl+T/W/D/L` 快捷键经共享 keyboard_subscription 的
+  声明式扩展——组件 `key_bindings` 声明 `Ctrl+<Key>` 才投递，未声明组件
+  零影响）。原生入口 `examples/autoscape_window`（`--evidence
+  <json> --config-home <dir> [--script tick:动作] [--prep-only]`；窄窗档
+  `AUTO_VM_WINDOW=520x700`）。
+- 收藏/配置：`BookmarkStore` 落宿主用户配置目录
+  `~/.config/autoos/apps/autoscape/bookmarks.json`（env `AUTOSCAPE_HOME`
+  覆盖），原子写经 `auto_lang_core::state_file::atomic_write`。
+- 完整目标 `tests/autoscape_shell_navigation.rs`（`--test-threads=1`；排窗
+  档 `AUTO_UI_ASE_M0_E2E=1` 单实例覆盖常用+窄窗）。新增 case 全部 ≤10s
+  （预备档=构建示例+`--prep-only`，日常档零 rustc）。
+- 给 1119 的公共接缝：导航请求/代次/取消（`PendingNav`/`nav_generation`/
+  `stop`）、已验证目标提交（`CommittedPage`/`mount_open`）、视口/状态
+  （内容视口二态 + 状态栏阶段）与配置接口（`BookmarkStore` 同型根 +
+  原子写入口）。
