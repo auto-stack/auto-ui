@@ -66,6 +66,11 @@ fn run_bridge_window(tag: &str, db: &Path, script: &str) -> serde_json::Value {
         .arg("2")
         .arg("--script")
         .arg(script)
+        // PLAN-113 r2（2026-11-23 环境破案）：ACE 装载道对 ambient Python
+        // env 非 hermetic（PyO3 惰性嵌入改变受理行为——昨夜绿今夜红根因）。
+        // 测试自净：子进程 env 剔除 PYTHONPATH/PYO3_PYTHON，证据可复跑。
+        .env_remove("PYTHONPATH")
+        .env_remove("PYO3_PYTHON")
         .output()
         .expect("spawn window exe");
     let stdout = String::from_utf8_lossy(&out.stdout);
