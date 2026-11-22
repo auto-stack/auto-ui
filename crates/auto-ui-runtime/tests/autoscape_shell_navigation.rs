@@ -16,8 +16,9 @@
 
 use auto_ui_runtime::ui::ace_state_bridge::AceStateValue;
 use auto_ui_runtime::ui::ase_browser_shell::{
-    resolve_address, AutoscapeHost, AutoscapeWindow, Bookmark, BookmarkLoad, BookmarkStore,
-    ShellAppKind, SHELL_IDENTITY_CLOCK, SHELL_IDENTITY_COUNTER, SHELL_IDENTITY_GALLERY,
+    resolve_address, with_shell_host, AutoscapeHost, AutoscapeWindow, Bookmark, BookmarkLoad,
+    BookmarkStore, ShellAppKind, ShellMenu, ShellMsg, SHELL_IDENTITY_CLOCK,
+    SHELL_IDENTITY_COUNTER, SHELL_IDENTITY_GALLERY,
 };
 use auto_ui_runtime::ui::Component;
 use std::path::PathBuf;
@@ -832,6 +833,206 @@ fn p1118_v01_component_bindings_and_address_focus() {
     );
     eprintln!(
         "p1118_v01_component_bindings_and_address_focus elapsed: {:?}",
+        started.elapsed()
+    );
+}
+
+/// V-01（RF-1 修复）：七区动作的**组件消息面**全覆盖——`AutoscapeWindow::on`
+/// 各动作臂（地址栏编辑/回车、菜单、右侧工具、页签、收藏栏/面板、悬停、
+/// 重试、刷新-停止、frame 点击）逐一接线到宿主真实状态。脚本与 host 级
+/// case 直达宿主方法，本 case 钉住消息→方法的绑定不被静默破坏。
+#[test]
+fn p1118_v01_component_message_wiring_all_regions() {
+    let started = Instant::now();
+    let (_guard, host) = shell_host("wiring");
+    auto_ui_runtime::ui::ase_browser_shell::install_shell_host(host);
+    let mut window = AutoscapeWindow;
+    let committed = || {
+        with_shell_host(|h| {
+            h.tabs()
+                .get(h.active_index())
+                .and_then(|tab| tab.committed_address().map(|s| s.to_string()))
+        })
+        .flatten()
+    };
+
+    // ── 区域 2 地址栏：编辑（on_text→AddressEdited）→ 回车（AddressSubmit）
+    //    → 提交在 tick。真实 Counter 经组件面到达。
+    window.on(ShellMsg::AddressEdited("Counter".into()));
+    assert_eq!(committed(), Some("app://auto.gallery/".into()), "编辑不动已提交");
+    window.on(ShellMsg::AddressSubmit);
+    window.on(ShellMsg::ShellTick);
+    assert_eq!(committed(), Some("app://auto.demo.counter/".into()));
+
+    // frame 业务按钮（区域 6 内容区）经组件面入真实 typed 队列。
+    window.on(ShellMsg::FrameClick(TARGET_INC));
+    window.on(ShellMsg::ShellTick);
+    let count = with_shell_host(|h| {
+        let session = h.tabs()[h.active_index()]
+            .committed
+            .as_ref()
+            .and_then(|p| p.session)
+            .expect("counter session");
+        engine_count(h, session)
+    })
+    .expect("host");
+    assert_eq!(count, 1, "frame click dispatched the real handler");
+
+    // ── 区域 1 菜单：导航菜单展开 → 后退/前进/刷新/停止全臂。
+    window.on(ShellMsg::MenuToggle(ShellMenu::Nav));
+    assert_eq!(
+        with_shell_host(|h| h.open_menu()).flatten(),
+        Some(ShellMenu::Nav)
+    );
+    window.on(ShellMsg::MenuNavBack);
+    window.on(ShellMsg::ShellTick);
+    assert_eq!(committed(), Some("app://auto.gallery/".into()));
+    window.on(ShellMsg::MenuNavForward);
+    window.on(ShellMsg::ShellTick);
+    assert_eq!(committed(), Some("app://auto.demo.counter/".into()));
+    window.on(ShellMsg::MenuNavRefresh);
+    window.on(ShellMsg::ShellTick);
+    assert_eq!(committed(), Some("app://auto.demo.counter/".into()), "refresh stays");
+    window.on(ShellMsg::MenuNavStop);
+    window.on(ShellMsg::ShellTick);
+
+    // 刷新-停止共用键：有进行中请求 → 停止（不提交）；无 → 刷新。
+    window.on(ShellMsg::AddressEdited("Clock".into()));
+    window.on(ShellMsg::AddressSubmit); // staged（未 tick）
+    window.on(ShellMsg::AddressRefreshStop); // 停止臂
+    window.on(ShellMsg::ShellTick);
+    assert_eq!(
+        committed(),
+        Some("app://auto.demo.counter/".into()),
+        "stopped request never commits"
+    );
+    window.on(ShellMsg::AddressRefreshStop); // 刷新臂
+    window.on(ShellMsg::ShellTick);
+    assert_eq!(committed(), Some("app://auto.demo.counter/".into()));
+
+    // ── 区域 1 查看/收藏菜单 + 区域 3 右侧工具 + 区域 5 收藏栏/面板。
+    window.on(ShellMsg::MenuViewFavoritesBar); // off
+    assert_eq!(
+        with_shell_host(|h| h.favorites_bar_visible()),
+        Some(false)
+    );
+    window.on(ShellMsg::MenuViewFavoritesBar); // on
+    window.on(ShellMsg::ToolbarFavorite); // ☆ 收藏当前页
+    assert_eq!(
+        with_shell_host(|h| h.bookmarks().len()),
+        Some(1),
+        "toolbar favorite wired"
+    );
+    window.on(ShellMsg::ToolbarPanel); // 收藏面板开
+    assert_eq!(
+        with_shell_host(|h| h.favorites_panel_open()),
+        Some(true)
+    );
+    window.on(ShellMsg::MenuFavoritesPanel); // 面板关
+    assert_eq!(
+        with_shell_host(|h| h.favorites_panel_open()),
+        Some(false)
+    );
+    // 收藏打开/删除（收藏栏与面板共用消息）。
+    window.on(ShellMsg::FavoriteOpen(0)); // 同地址 → 刷新语义
+    window.on(ShellMsg::ShellTick);
+    assert_eq!(committed(), Some("app://auto.demo.counter/".into()));
+    window.on(ShellMsg::FavoriteDelete(0));
+    assert_eq!(
+        with_shell_host(|h| h.bookmarks().len()),
+        Some(0),
+        "favorite delete wired"
+    );
+
+    // ── 区域 4 页签：新建/切换/关闭。
+    window.on(ShellMsg::TabNew);
+    assert_eq!(
+        with_shell_host(|h| h.tabs().len()),
+        Some(2),
+        "Ctrl+T/menu new-tab wired"
+    );
+    window.on(ShellMsg::TabSelect(0));
+    assert_eq!(
+        with_shell_host(|h| h.active_index()),
+        Some(0),
+        "tab select wired"
+    );
+    window.on(ShellMsg::TabClose(1));
+    assert_eq!(with_shell_host(|h| h.tabs().len()), Some(1));
+
+    // ── 区域 7 状态栏：悬停目标/退出恢复。
+    window.on(ShellMsg::HoverIn("app://auto.demo.clock/".into()));
+    let hinting = with_shell_host(|h| h.status_line()).unwrap_or_default();
+    assert!(hinting.contains("app://auto.demo.clock/"), "hover hint: {hinting}");
+    window.on(ShellMsg::HoverOut);
+    let restored = with_shell_host(|h| h.status_line()).unwrap_or_default();
+    assert!(restored.contains("app://auto.demo.counter/"), "hover-out restores: {restored}");
+
+    // 失败行重试（区域 6）经组件面。
+    window.on(ShellMsg::AddressEdited("app://no.such.app/".into()));
+    window.on(ShellMsg::AddressSubmit);
+    assert_eq!(committed(), Some("app://auto.demo.counter/".into()), "拒绝不动已提交");
+    window.on(ShellMsg::RetryFailed);
+    assert_eq!(
+        committed(),
+        Some("app://auto.demo.counter/".into()),
+        "failed retry keeps the committed page"
+    );
+    eprintln!(
+        "p1118_v01_component_message_wiring_all_regions elapsed: {:?}",
+        started.elapsed()
+    );
+}
+
+/// V-03/V-04（RF-3 修复）：`mount_open` 权威容量复检——两页签各持 staged
+/// 票据（begin 时 live=1<2 通过），先提交者落位（live→2），后提交者 mount
+/// 具名 `session.limit` 拒、其已提交页保留（合同"准备中的挂载同样计入
+/// 上限"）。
+#[test]
+fn p1118_v03_mount_capacity_refusal_keeps_committed() {
+    let started = Instant::now();
+    let (_guard, mut host) = shell_host("mount-capacity");
+    navigate_and_commit(&mut host, "Counter").expect("tab0 counter (live=1)");
+    // tab1 与 tab2 先后 stage Clock（begin 时 live=1，均通过装载）。
+    host.new_tab(); // tab1（活动）
+    host.navigate("Clock").expect("tab1 stage clock");
+    host.new_tab(); // tab2（活动；tab1 pending 保留）
+    assert_eq!(host.tabs().len(), 3);
+    host.navigate("Clock").expect("tab2 stage clock");
+    assert_eq!(host.session_host().metrics.loads, 3, "两份票据都已真实装载");
+
+    // tab1 先提交：mount live=1<2 通过 → live=2。
+    host.select_tab(1).expect("activate tab1");
+    host.step();
+    assert_eq!(
+        host.tabs()[1].committed_address(),
+        Some("app://auto.demo.clock/"),
+        "the first staged commit mounts"
+    );
+    assert_eq!(host.session_host().live_ids().len(), 2);
+
+    // tab2 后提交：mount 权威复检 live=2 → 具名拒，已提交 Gallery 保留。
+    host.select_tab(2).expect("activate tab2");
+    host.step();
+    assert_eq!(
+        host.tabs()[2].committed_address(),
+        Some("app://auto.gallery/"),
+        "the second staged commit is refused; committed page retained"
+    );
+    let failure = host.tabs()[2].failure.as_ref().expect("mount refusal recorded");
+    assert!(failure.message.contains("session.limit"), "named refusal: {}", failure.message);
+    assert_eq!(host.session_host().live_ids().len(), 2, "counter+clock stay live");
+    // 释放后重试可达（既有 RF 前证据的同一语义在 mount 面成立）。
+    host.close_tab(1).expect("release the clock tab");
+    host.retry_failed().expect("retry after release");
+    host.step();
+    assert_eq!(
+        host.tabs()[1].committed_address(),
+        Some("app://auto.demo.clock/"),
+        "retry reaches the target after release"
+    );
+    eprintln!(
+        "p1118_v03_mount_capacity_refusal_keeps_committed elapsed: {:?}",
         started.elapsed()
     );
 }

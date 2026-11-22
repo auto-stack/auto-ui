@@ -98,9 +98,10 @@ Clock 使用现有 20 毫秒宿主循环消费单个已到期唤醒。宿主负�
 `docs/specs/ase/local-browser-shell.md`（单源权威）。
 
 - 窗口：`AutoscapeWindow`（七区：菜单栏/地址栏/右侧工具/页签/收藏栏/
-  内容视口/状态栏；`Ctrl+T/W/D/L` 快捷键经共享 keyboard_subscription 的
-  声明式扩展——组件 `key_bindings` 声明 `Ctrl+<Key>` 才投递，未声明组件
-  零影响）。原生入口 `examples/autoscape_window`（`--evidence
+  内容视口/状态栏；`Ctrl+T/W/D/L` 快捷键经共享 keyboard_subscription 扩展
+  ——对声明了 `key_bindings` 的组件投递 `Ctrl+<字母>` 组合名，由组件
+  `key_message` 分派过滤，未映射组合零效果）。原生入口
+  `examples/autoscape_window`（`--evidence
   <json> --config-home <dir> [--script tick:动作] [--prep-only]`；窄窗档
   `AUTO_VM_WINDOW=520x700`）。
 - 收藏/配置：`BookmarkStore` 落宿主用户配置目录
