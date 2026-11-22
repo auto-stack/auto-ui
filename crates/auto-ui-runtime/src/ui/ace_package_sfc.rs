@@ -31,6 +31,7 @@ fn checked_host_members(members: &[ace_core::source::age_component::ComponentMem
     })
 }
 
+mod builtin_widgets;
 mod checked_widgets;
 mod widgets;
 
@@ -243,6 +244,13 @@ fn generate_package_sfc_leaf(
             return Err("source.age.sfc-widget-route: checked widget views do not support route commands or parameters".into());
         }
         return checked_widgets::generate(units, entry, &caps, route.is_some(), shell);
+    }
+    if !shell && route.as_ref().is_some_and(|page| {
+        page.commands.is_empty() && page.web_params.is_empty()
+    }) {
+        if let Some(sfc) = builtin_widgets::generate(node)? {
+            return Ok(sfc);
+        }
     }
     if node.members.iter().any(|member| member.role == "computed") {
         use ace_core::{

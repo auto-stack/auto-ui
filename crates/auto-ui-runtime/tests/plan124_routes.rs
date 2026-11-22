@@ -116,6 +116,61 @@ fn route_sfc_publishes_pages_and_local_diagnostics() {
 }
 
 #[test]
+fn p123_literal_route_uses_registered_vue_widgets() {
+    let units = [
+        unit("app", r#"widget App {
+    routes {
+        "/" -> use gallery
+        "/live" -> use live
+    }
+    view { col { outlet } }
+}"#),
+        unit("gallery", r#"widget Gallery {
+    model { unused int = 0 }
+    view {
+        col {
+            hover_card {
+                hover-card-trigger { button "Hover" {} }
+                hover_card_content { text "Details" {} }
+            }
+            alert_dialog {
+                alert_dialog_trigger { button "Open" {} }
+                alert_dialog_content { alert_dialog_action "Continue" }
+            }
+            link (text: "Next", href: "/live") {}
+        }
+    }
+}"#),
+        unit("live", r#"widget Live {
+    msg { Increment }
+    model { count int = 0 }
+    on { .Increment -> { .count = .count + 1 } }
+    view {
+        col {
+            button "Add" { onclick: .Increment }
+            text .count {}
+        }
+    }
+}"#),
+    ];
+    let product = generate_routed_package_sfcs(&units, "fixture::app").unwrap().unwrap();
+    let gallery = &product.pages["gallery"];
+    for expected in [
+        "from '@/components/ui/hover-card'",
+        "from '@/components/ui/alert-dialog'",
+        "<HoverCardTrigger",
+        "<HoverCardContent",
+        "<AlertDialogAction",
+        r#"<NavLink to="/live""#,
+    ] {
+        assert!(gallery.contains(expected), "missing {expected}: {gallery}");
+    }
+    assert!(!gallery.contains("<hover_card"), "{gallery}");
+    let live = &product.pages["live"];
+    assert!(live.contains("onIncrement") && live.contains("count.value"), "{live}");
+}
+
+#[test]
 fn native_front_routes_mount_the_checked_page_in_the_authored_outlet() {
     use auto_ui_runtime::ui::{
         ace_node_desktop::{host_session_stats, install_bridge, with_bridge, AceNodeDesktopWindow, NodeDesktopMsg},
