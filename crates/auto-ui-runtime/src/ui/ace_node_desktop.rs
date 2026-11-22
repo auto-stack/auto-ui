@@ -2724,6 +2724,22 @@ impl NodeDesktopBridge {
             _ => return,
         };
         for instance in live {
+            // 宿主会话须已挂该实例的 widget 面（close 后/reopen 重发布前的
+            // 窗口跳过——对新会话发 apply 会 SESSION_CLOSED/-2 噪音）。
+            // close→reopen 窗口跳过（宿主会话已关；对新会话的 apply 会
+            // SESSION_CLOSED 噪音）。post-reopen 的 provider 侧重绑缺口
+            // 见 PLAN-108 §9 已知项（显示层，模型语义不受影响）。
+            let mounted = self.session.is_some_and(|session| {
+                host().read().is_ok_and(|host| {
+                    host.sessions
+                        .iter()
+                        .find(|s| s.id == session)
+                        .is_some_and(|s| !s.closed)
+                })
+            });
+            if !mounted {
+                continue;
+            }
             while self.tick_accum_ms.len() <= instance {
                 self.tick_accum_ms.push(0);
             }
