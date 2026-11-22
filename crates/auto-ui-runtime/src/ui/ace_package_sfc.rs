@@ -1419,12 +1419,6 @@ fn escape_attr(s: &str) -> String {
     escape_html(s).replace('"', "&quot;")
 }
 
-fn text_directive(value: &str) -> String {
-    // Keep the double quotes of JavaScript string literals visible to vue-tsc.
-    let attr = escape_html(value).replace('\'', "&#39;");
-    format!("<span v-text='{attr}'></span>")
-}
-
 #[cfg(test)]
 mod p980_cond_render_tests {
     //! PLAN-980 view-if 边界（静态核对两缺陷）的单元级判据：转义（含双引号
