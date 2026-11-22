@@ -1102,6 +1102,10 @@ R107-06 的八个冻结组全部执行。2026-11-21 16:40 +08:00 启动前检查
 
 `stage: merge | plan_id: PLAN-107 | plan_revision: r2 | outcome: pass | gate: known-reds-only | delivery_commits: lang dd5f3eff56176b00cae2c5c8ce916cfed8c2f9f6, ui fb343c48a86476e9b2e6536035dbadb902a50991, os 680a6ae344f89cbf4dcf5efd25a118889fe611c7 | archive: ec2be380bb873156087c452c69445f0afa39f926 | AC-04: pass | tasks: 8/8 | next: done`
 
+2026-11-21 交付验证轮（goal）：三仓交付提交均已在默认分支历史（`git merge-base --is-ancestor` 通过，AutoOS main HEAD 即交付提交），归档提交 `ec2be380` 在 AutoUI master。规范文件在位：AutoUI `docs/specs/runtime/ace-package-widgets.md`、AutoLang `docs/specs/ace-migration/m2-autoui.md`、AutoOS `widgets-gallery/README.md`。归档文件在 `docs/plans/archived/` 且 `status: archived`、`completion_kind: delivered`。清理核验：`D:/autostack/plan-artifacts/plan-107/`、`D:/autostack/.wt/ui-107`、`D:/autostack/.wt/os-107` 均不存在，三仓 `plan-107-dev` 分支已删除，仅 §9 注明刻意保留的 r1 交接 ref。主检出无代码路径 WIP，未提交改动均为其他计划的 docs 文档。
+
+`stage: goal | plan_id: PLAN-107 | plan_revision: r2 | round: 93 | from: merge | to: done | status: archived | outcome: pass | commit: ui fb343c48a86476e9b2e6536035dbadb902a50991, lang dd5f3eff56176b00cae2c5c8ce916cfed8c2f9f6, os 680a6ae344f89cbf4dcf5efd25a118889fe611c7 | evidence: delivery on default branches, archive and canonical Specs on disk, worktrees/branches/artifacts removed | next: done`
+
 ## 10. 下游交接
 
 107 按原 024 与五个图表页给 W1 和 1072/产品 CLI 提交各端证据。U05 剩余行由各 owner 按路线索引汇入，保留本计划此前探针及用例映射。
