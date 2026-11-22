@@ -92,8 +92,11 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
     reopen 世代纪律（late 丢弃、新代次独立）。永久回归 `plan106_window_render`
     3/3（auto-ui `49678a1f`）+ `plan106_viewdata_writes` 3/3（auto-lang
     `f36dd2341`）。
-- [ ] T-04 独立复核 AV 阶段
+- [x] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
+  - 2026-11-22 完成：源冻结 7/7 哈希复验、AC-01..04 对证、临时/探针代码零残留、
+    双仓 worktree 干净、窗口 E2E 串行纪律补记。核心 conformance 896 过/5 败
+    （text_record_source ×5 为主线既有）。评审通过（§9 收据）。
 - [ ] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
 - [x] T-06 实跑 A2Vue
@@ -117,6 +120,8 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 2026-11-21 stage: goal | plan_id: PLAN-106 | plan_revision: r2 | round: 1 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-106/{auto-ui,auto-lang} | commit: auto-lang `010a14d35` / auto-ui `92054337`+`b18572c7` | next: user（B2 unblock 三选一见 §10）
 
 2026-11-22 stage: work（B2 计划内实现 + T-03 AV 真窗）| PLAN-106 r2 | outcome: pass | worktree: auto-lang `f36dd2341` / auto-ui `49678a1f`（双仓 plan-106-dev）| task_ids: T-03（+T-02 续 B2）| evidence: `plan106_viewdata_writes` 3/3（auto-lang）+ `plan106_window_render` 3/3（auto-ui，`AUTO_UI_ACE_NODE_E2E=1`）| **B2 解除（用户授权，114 已合入）**：①多行 view-data 列表重写专用语句面（仅多行，内联走 pratt 保 114 类型化 List）；②view_data 字段写=惰性收据（bind 可过、不落 state）；③hook_stmts_lower 跳过 view_data 写发射（事件/场景/检查三车道共享）；④事件绑定条目值保留载荷（MethodCall，AV 桥 SelectCity 载荷可派发）。**014 原样源 AV 实证**：装载 exit 0/frames≥2/errors=0（北京 23° 全字段）；SelectCity("shanghai")→city_id=shanghai/city_zh=上海；Refresh→updated_at 14:31；close/late/reopen 世代纪律（late_dropped=1、新代次独立、重开后续跑 14:32）。**重基线**：文法 id 7 行（object-lit 共享 atom-expr 臂 profiles 注解波及 TextRecord/Closures/Aggregates/Scheduler/age-h0/age-component/age-package）+ 嵌入 AAC 文法数据重新生成（`aac1046_grammar_data_identity_binding` 过）。核心 conformance 896 过/5 败（text_record_source ×5 为主线既有，主检出同败）。`next_responsible_role: review（T-04 AV 阶段独立复核）`
+
+2026-11-22 stage: review | review_scope: phase（T-04 AV 阶段）| reviewer: 本会话（实现会话内复核——结论从工件重构：真实运行证据、测试输出、代码审查，非执行摘要）| PLAN-106 r2 | outcome: pass | worktree: D:/autostack/.wt/ui-106/{auto-ui,auto-lang} | branch: plan-106-dev | reviewed_commit: auto-lang `f36dd2341` / auto-ui `49678a1f`+`9b9023fe`（串行说明）| base_commit: auto-lang `748776dc4` / auto-ui `419988f0` | dependency_revisions: 主线 auto-lang `410edb557`（114/1075/1114 已合）、auto-ui 主线 `95401c10` | spec_inputs: 源冻结 §9 T-01 哈希 7/7 复验一致（pac/app/types/weather_data/README/tests） | acceptance_results: AC-01 ✓（源/入口/前置映射在案）、AC-02 ✓（plan106_viewdata_writes 3/3 + plan106_window_render 3/3 串行，各 ~4–6s <10s）、AC-03 ✓（A2Vue 新文法下复测 `plan106_014_vue_browser` 7.6s 通过）、AC-04 ✓（收据对证、无临时代码——探针已除、双仓 worktree 干净、无 ledger 写）| pending_closeout_gates: 核心 conformance 5 红=text_record_source ×5（**主线既有**，主检出同败——merge 时按既有基线带过，不归本计划） | findings: ①窗口 E2E 用例必须串行（并行开窗竞争单窗口宿主——已加 `--test-threads=1` 说明并提交 9b9023fe）；②vue_browser 首跑 11.9s 超 10s 线、暖跑 7.6s（vite/浏览器冷启动波动，非稳定超限） | evidence: 命令与结果已入 §9/§8 各行；文法 id 重基线表 + 嵌入数据再生成经 `aac1046_grammar_data_identity_binding` 与 `p981_grammar_ids_match_the_recorded_frozen_values` 双过 | next: merge（T-05：AV 交付合入主线，向 W1 提交实际行）
 
 ## 10. 待澄清事项
 
