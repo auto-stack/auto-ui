@@ -8418,6 +8418,23 @@ fn ace_vue_sfcs(
             )
             .into());
         }
+        // PLAN-108 具名承载放行：缺席集中属 Http 效应族（闭合 VM 原生
+        // Http.<verb> 集）的 handler 由旧道受检体承载（ts_adapter 的
+        // await fetch 受检映射），此处逐名打印诊断行——不静默回落，
+        // 名字/文件在案可审；非 Http 的缺席仍在上臂硬拒。
+        let carried_detail: Vec<String> = multi
+            .widgets
+            .iter()
+            .filter(|w| !w.carried.is_empty())
+            .map(|w| format!("{}[{}]", w.name, w.carried.join("/")))
+            .collect();
+        if !carried_detail.is_empty() {
+            eprintln!(
+                "ace.vue-lane-carried: {} 的 Http 效应 handler 由受检旧道体承载：{}",
+                at_path.display(),
+                carried_detail.join(", ")
+            );
+        }
         Ok(Some(AceVueProducts {
             widgets: multi.widgets.into_iter().map(|w| (w.name, w.sfc)).collect(),
             rt: multi.runtime_mjs,

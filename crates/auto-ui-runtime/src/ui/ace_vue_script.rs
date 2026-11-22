@@ -761,7 +761,8 @@ pub fn generate_sfc_with_lane(
         (Vec::new(), Vec::new());
     let mut first_sfc: Option<String> = None;
     for (wi, decl) in decls.iter().enumerate() {
-        let (_name_w, sfc_w, bodies_w, absent_w) = generate_widget_with_lane(decl, src, path, wi)?;
+        let (_name_w, sfc_w, bodies_w, absent_w, _carried_w) =
+            generate_widget_with_lane(decl, src, path, wi)?;
         if first_sfc.is_none() {
             first_sfc = Some(sfc_w);
         }
@@ -786,7 +787,7 @@ fn generate_widget_with_lane(
     src: &str,
     path: &str,
     node_index: usize,
-) -> Result<(String, String, Vec<LaneHandlerBody>, Vec<String>), String> {
+) -> Result<(String, String, Vec<LaneHandlerBody>, Vec<String>, Vec<String>), String> {
     generate_widget_with_lane_stores(decl, src, path, node_index, &[], &Default::default())
 }
 
@@ -801,7 +802,7 @@ fn generate_widget_with_lane_stores(
     node_index: usize,
     store_deps: &[String],
     store_surface: &std::collections::HashMap<String, Vec<String>>,
-) -> Result<(String, String, Vec<LaneHandlerBody>, Vec<String>), String> {
+) -> Result<(String, String, Vec<LaneHandlerBody>, Vec<String>, Vec<String>), String> {
     use auto_ui_dialect::UiStmt;
     let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl)
         .map_err(|e| format!("extract: {e:?}"))?;
@@ -862,6 +863,229 @@ fn generate_widget_with_lane_stores(
     // 区间、跳过=旧道）。计数失配（区间数 ≠ 带体 handler 数）=全体缺席
     //（fail-closed，不猜测配对）。
     let specs = pair_lambda_regions(src, &widget, specs);
+/// PLAN-108：expr 树内调用点递归检测——op_exempt 预扫描的完整形。旧扫描
+/// 只认 `Stmt::Expr(Expr::Call(_))`（裸调用表达式语句），`var x = f(...)`
+///（`Stmt::Store` 初始化子）与 `return f(...)` 漏检：域外调用进 ops 会把
+/// 整个 lane 编译打成 Err，兄弟 handler 全体缺席——#6p 的裁定意图是「豁免
+/// 含调用 handler、保全兄弟」。覆盖主 composite 变体递归；未列出的叶/罕见
+/// 变体默认无调用（欠豁免=旧行为，不过度豁免）。
+fn expr_contains_call(e: &auto_lang_core::ast::Expr) -> bool {
+    use auto_lang_core::ast::Expr;
+    match e {
+        Expr::Call(_) => true,
+        Expr::View(inner)
+        | Expr::Mut(inner)
+        | Expr::Move(inner)
+        | Expr::Take(inner)
+        | Expr::Unary(_, inner)
+        | Expr::Dot(inner, _)
+        | Expr::Some(inner)
+        | Expr::Ok(inner)
+        | Expr::Err(inner)
+        | Expr::BoxExpr(inner)
+        | Expr::ArcExpr(inner)
+        | Expr::Yield(inner)
+        | Expr::ErrorPropagate(inner)
+        | Expr::Await { expr: inner }
+        | Expr::Cast { expr: inner, .. }
+        | Expr::To { expr: inner, .. } => expr_contains_call(inner),
+        Expr::Index(a, i) => expr_contains_call(a) || expr_contains_call(i),
+        Expr::Bina(l, _, r) | Expr::NullCoalesce(l, r) => {
+            expr_contains_call(l) || expr_contains_call(r)
+        }
+        Expr::Array(items) => items.iter().any(expr_contains_call),
+        Expr::Object(pairs) => pairs.iter().any(|p| expr_contains_call(&p.value)),
+        Expr::Block(body) => body.stmts.iter().any(stmt_contains_call),
+        Expr::If(if_expr) => {
+            if_expr.branches.iter().any(|b| {
+                expr_contains_call(&b.cond) || b.body.stmts.iter().any(stmt_contains_call)
+            }) || if_expr
+                .else_
+                .as_ref()
+                .is_some_and(|body| body.stmts.iter().any(stmt_contains_call))
+        }
+        _ => false,
+    }
+}
+
+fn stmt_contains_call(s: &auto_lang_core::ast::Stmt) -> bool {
+    use auto_lang_core::ast::Stmt;
+    match s {
+        Stmt::Expr(e) => expr_contains_call(e),
+        Stmt::Store(st) => expr_contains_call(&st.expr),
+        Stmt::Return(e) | Stmt::Reply(e) => expr_contains_call(e),
+        Stmt::Block(body) => body.stmts.iter().any(stmt_contains_call),
+        Stmt::If(if_stmt) => {
+            if_stmt.branches.iter().any(|b| {
+                expr_contains_call(&b.cond) || b.body.stmts.iter().any(stmt_contains_call)
+            }) || if_stmt
+                .else_
+                .as_ref()
+                .is_some_and(|body| body.stmts.iter().any(stmt_contains_call))
+        }
+        _ => false,
+    }
+}
+
+/// PLAN-108：expr 树内 **Http 效应族**调用检测（`Http.<verb>` 限定调用，
+/// verb ∈ ts_adapter 受检映射的闭合集——get/get_msg/get/post/post_json/
+/// put/put_json/patch/patch_json/delete）。具名承载（carried）判定的唯一
+/// 有效原因；其它域外调用仍=具名缺席硬拒。
+fn expr_contains_http_effect(e: &auto_lang_core::ast::Expr) -> bool {
+    use auto_lang_core::ast::Expr;
+    const HTTP_VERBS: &[&str] = &[
+        "get", "get_json", "get_msg", "post", "post_json", "put", "put_json", "patch",
+        "patch_json", "delete",
+    ];
+    match e {
+        Expr::Call(call) => {
+            matches!(
+                call.name.as_ref(),
+                Expr::Dot(obj, verb)
+                    if matches!(obj.as_ref(), Expr::Ident(n) if n.as_str() == "Http")
+                        && HTTP_VERBS.contains(&verb.as_str())
+            ) || call
+                .args
+                .args
+                .iter()
+                .any(|a| expr_contains_http_effect(&a.get_expr().clone()))
+        }
+        Expr::View(inner)
+        | Expr::Mut(inner)
+        | Expr::Move(inner)
+        | Expr::Take(inner)
+        | Expr::Unary(_, inner)
+        | Expr::Dot(inner, _)
+        | Expr::Some(inner)
+        | Expr::Ok(inner)
+        | Expr::Err(inner)
+        | Expr::BoxExpr(inner)
+        | Expr::ArcExpr(inner)
+        | Expr::Yield(inner)
+        | Expr::ErrorPropagate(inner)
+        | Expr::Await { expr: inner }
+        | Expr::Cast { expr: inner, .. }
+        | Expr::To { expr: inner, .. } => expr_contains_http_effect(inner),
+        Expr::Index(a, i) => expr_contains_http_effect(a) || expr_contains_http_effect(i),
+        Expr::Bina(l, _, r) | Expr::NullCoalesce(l, r) => {
+            expr_contains_http_effect(l) || expr_contains_http_effect(r)
+        }
+        Expr::Array(items) => items.iter().any(expr_contains_http_effect),
+        Expr::Object(pairs) => pairs.iter().any(|p| expr_contains_http_effect(&p.value)),
+        Expr::Block(body) => body.stmts.iter().any(stmt_contains_http_effect),
+        Expr::If(if_expr) => {
+            if_expr.branches.iter().any(|b| {
+                expr_contains_http_effect(&b.cond)
+                    || b.body.stmts.iter().any(stmt_contains_http_effect)
+            }) || if_expr
+                .else_
+                .as_ref()
+                .is_some_and(|body| body.stmts.iter().any(stmt_contains_http_effect))
+        }
+        _ => false,
+    }
+}
+
+
+/// PLAN-108：expr 树内 **非 Http 效应族**调用检测——承载判定的闭合集：
+/// 体里存在 Http 族之外的任何调用即不可承载（保持具名缺席硬拒）。
+fn expr_contains_non_http_call(e: &auto_lang_core::ast::Expr) -> bool {
+    use auto_lang_core::ast::Expr;
+    const HTTP_VERBS: &[&str] = &[
+        "get", "get_json", "get_msg", "post", "post_json", "put", "put_json", "patch",
+        "patch_json", "delete",
+    ];
+    match e {
+        Expr::Call(call) => {
+            let http_here = matches!(
+                call.name.as_ref(),
+                Expr::Dot(obj, verb)
+                    if matches!(obj.as_ref(), Expr::Ident(n) if n.as_str() == "Http")
+                        && HTTP_VERBS.contains(&verb.as_str())
+            );
+            !http_here
+                || call
+                    .args
+                    .args
+                    .iter()
+                    .any(|a| expr_contains_non_http_call(&a.get_expr().clone()))
+        }
+        Expr::View(inner)
+        | Expr::Mut(inner)
+        | Expr::Move(inner)
+        | Expr::Take(inner)
+        | Expr::Unary(_, inner)
+        | Expr::Dot(inner, _)
+        | Expr::Some(inner)
+        | Expr::Ok(inner)
+        | Expr::Err(inner)
+        | Expr::BoxExpr(inner)
+        | Expr::ArcExpr(inner)
+        | Expr::Yield(inner)
+        | Expr::ErrorPropagate(inner)
+        | Expr::Await { expr: inner }
+        | Expr::Cast { expr: inner, .. }
+        | Expr::To { expr: inner, .. } => expr_contains_non_http_call(inner),
+        Expr::Index(a, i) => expr_contains_non_http_call(a) || expr_contains_non_http_call(i),
+        Expr::Bina(l, _, r) | Expr::NullCoalesce(l, r) => {
+            expr_contains_non_http_call(l) || expr_contains_non_http_call(r)
+        }
+        Expr::Array(items) => items.iter().any(expr_contains_non_http_call),
+        Expr::Object(pairs) => pairs.iter().any(|p| expr_contains_non_http_call(&p.value)),
+        Expr::Block(body) => body.stmts.iter().any(stmt_contains_non_http_call),
+        Expr::If(if_expr) => {
+            if_expr.branches.iter().any(|b| {
+                expr_contains_non_http_call(&b.cond)
+                    || b.body.stmts.iter().any(stmt_contains_non_http_call)
+            }) || if_expr
+                .else_
+                .as_ref()
+                .is_some_and(|body| body.stmts.iter().any(stmt_contains_non_http_call))
+        }
+        _ => false,
+    }
+}
+
+fn stmt_contains_non_http_call(s: &auto_lang_core::ast::Stmt) -> bool {
+    use auto_lang_core::ast::Stmt;
+    match s {
+        Stmt::Expr(e) => expr_contains_non_http_call(e),
+        Stmt::Store(st) => expr_contains_non_http_call(&st.expr),
+        Stmt::Return(e) | Stmt::Reply(e) => expr_contains_non_http_call(e),
+        Stmt::Block(body) => body.stmts.iter().any(stmt_contains_non_http_call),
+        Stmt::If(if_stmt) => {
+            if_stmt.branches.iter().any(|b| {
+                expr_contains_non_http_call(&b.cond)
+                    || b.body.stmts.iter().any(stmt_contains_non_http_call)
+            }) || if_stmt
+                .else_
+                .as_ref()
+                .is_some_and(|body| body.stmts.iter().any(stmt_contains_non_http_call))
+        }
+        _ => false,
+    }
+}
+
+fn stmt_contains_http_effect(s: &auto_lang_core::ast::Stmt) -> bool {
+    use auto_lang_core::ast::Stmt;
+    match s {
+        Stmt::Expr(e) => expr_contains_http_effect(e),
+        Stmt::Store(st) => expr_contains_http_effect(&st.expr),
+        Stmt::Return(e) | Stmt::Reply(e) => expr_contains_http_effect(e),
+        Stmt::Block(body) => body.stmts.iter().any(stmt_contains_http_effect),
+        Stmt::If(if_stmt) => {
+            if_stmt.branches.iter().any(|b| {
+                expr_contains_http_effect(&b.cond)
+                    || b.body.stmts.iter().any(stmt_contains_http_effect)
+            }) || if_stmt
+                .else_
+                .as_ref()
+                .is_some_and(|body| body.stmts.iter().any(stmt_contains_http_effect))
+        }
+        _ => false,
+    }
+}
+
     // PLAN-980 WEB #6p：通道上下文（方言侧预扫描）——
     // - `op_exempt`：handler 体含**调用语句**（裸 `f(...)` 表达式语句）的
     //   msg（去点）。通道 handler（callee ∈ 头参数）走检查函数道；域外
@@ -872,10 +1096,10 @@ fn generate_widget_with_lane_stores(
     let mut op_exempt: Vec<String> = Vec::new();
     for (pattern, payload) in &widget.handlers {
         if let auto_ui_compiler::aura::LogicPayload::AstStmts(stmts) = payload {
-            let has_call = stmts.iter().any(|s| {
-                use auto_lang_core::ast::{Expr, Stmt};
-                matches!(s, Stmt::Expr(Expr::Call(_)))
-            });
+            // PLAN-108：调用检测从「裸调用表达式语句」扩到任意语句位
+            // （Store 初始化子/return/if 分支——`var x = f(...)` 旧扫描漏检，
+            // 域外调用进 ops 把整 lane 编译打成 Err、兄弟全体缺席）。
+            let has_call = stmts.iter().any(stmt_contains_call);
             if has_call {
                 let base = pattern.split('(').next().unwrap_or(pattern);
                 op_exempt.push(base.trim_start_matches('.').to_string());
@@ -893,18 +1117,66 @@ fn generate_widget_with_lane_stores(
     };
     // 切片#6n：node 选择器——lane 编译选本 widget（多 widget 源非本节点
     // handler 的 ops/区间自然落空=缺席）。
-    let (bodies, absent) =
+    // PLAN-108：lane 编译整体失败须与逐 handler 缺席区分——失败时携带
+    // 标记，承载判定的覆盖面随之收紧（见下）。
+    let ((bodies, absent), compile_failed) =
         match lane_handler_bodies_spec_at(src, path, &specs, node_index, &channel_ctx) {
-            Ok(v) => v,
-            Err(_) => (Vec::new(), patterns.clone()),
+            Ok(v) => (v, false),
+            Err(_) => ((Vec::new(), patterns.clone()), true),
         };
+    // PLAN-108 具名承载：缺席 handler 满足下列条件时由旧道受检体承载并
+    // 记入 carried——工具键门逐名放行并打印诊断行（不静默回落）：
+    // - 逐 handler 缺席（编译成功）：体含 Http 效应族调用（闭合 VM 原生
+    //   族；ts_adapter 有受检 await fetch 映射）；
+    // - 编译整体失败：体除 Http 效应族外**无任何调用**（纯状态/Http 混合
+    //   体——失败只可能由 Http 族符号引起；AST 可验证的闭合判定）。含其它
+    //   域外调用的体保持 absent 硬拒。
+    let handler_bodies_call_clean = |base: &str| {
+        widget.handlers.iter().any(|(pattern, payload)| {
+            let pb = pattern.split('(').next().unwrap_or(pattern).trim_start_matches('.');
+            pb == base
+                && matches!(
+                    payload,
+                    auto_ui_compiler::aura::LogicPayload::AstStmts(stmts)
+                        if !stmts.iter().any(stmt_contains_non_http_call)
+                )
+        })
+    };
+    let (carried, absent): (Vec<String>, Vec<String>) =
+        absent.into_iter().partition(|pat| {
+            let base = pat.trim_start_matches('.');
+            if !handler_bodies_call_clean(base) {
+                return false;
+            }
+            if compile_failed {
+                // 整体失败承载须以 widget 确有 Http 效应为前提——否则
+                // 失败另有原因（非 Http 符号），不得掩盖，保持硬拒。
+                widget.handlers.values().any(|payload| {
+                    matches!(
+                        payload,
+                        auto_ui_compiler::aura::LogicPayload::AstStmts(stmts)
+                            if stmts.iter().any(stmt_contains_http_effect)
+                    )
+                })
+            } else {
+                widget.handlers.iter().any(|(pattern, payload)| {
+                    let pb = pattern.split('(').next().unwrap_or(pattern).trim_start_matches('.');
+                    pb == base
+                        && matches!(
+                            payload,
+                            auto_ui_compiler::aura::LogicPayload::AstStmts(stmts)
+                                if stmts.iter().any(stmt_contains_http_effect)
+                        )
+                })
+            }
+        });
     let spliced = if bodies.is_empty() {
         sfc
     } else {
         splice_lane_handler_bodies(&sfc, &bodies)?
     };
     // ④-A #8：名字随件返回（多 widget 产品道按名对位产物）。
-    Ok((widget.name.clone(), spliced, bodies, absent))
+    Ok((widget.name.clone(), spliced, bodies, absent, carried))
 }
 
 /// 切片#6k：脱糖源里的 view 内联 lambda 体区间清单（`=> {` …配对 `}`，
@@ -1091,6 +1363,9 @@ pub struct WidgetLaneSfc {
     pub bodies: Vec<LaneHandlerBody>,
     /// 该 widget 的具名缺席（工具键门聚合拒绝；产品侧不裁决）。
     pub absent: Vec<String>,
+    /// PLAN-108 具名承载：缺席中由旧道受检体承载的 Http 效应 handler
+    /// （闭合 VM 原生族；名字逐条在案，工具键门放行并打印诊断行）。
+    pub carried: Vec<String>,
 }
 
 /// 多 widget 产品集合（`generate_sfcs_with_lane_product` 返回）。
@@ -1183,7 +1458,7 @@ pub fn generate_sfcs_with_lane_product_stores(
     let runtime_mjs = ace_a2x_ts::script_runtime_body(ace_a2x_ts::ScriptLang::JavaScript, &[]);
     let mut widgets = Vec::with_capacity(decls.len());
     for (wi, decl) in decls.iter().enumerate() {
-        let (name, sfc, bodies, absent) = generate_widget_with_lane_stores(
+        let (name, sfc, bodies, absent, carried) = generate_widget_with_lane_stores(
             decl,
             src,
             path,
@@ -1202,6 +1477,7 @@ pub fn generate_sfcs_with_lane_product_stores(
             sfc,
             bodies,
             absent,
+            carried,
         });
     }
     Ok((
