@@ -1036,6 +1036,9 @@ pub struct NodeDesktopBridge {
     route_button_spans: Vec<usize>,
     package_route_handlers: Option<RouteHandlers>,
     route_request: Option<RouteNavigation>,
+    /// PLAN-113 T-03：真实 SQLite 宿主桥（V-03 冻结合同；opt-in，测试入口
+    /// `--sqlite-db` 安装；默认 None 零行为变化）。
+    sqlite_bridge: Option<crate::ui::ace_sqlite_bridge::SqliteHostBridge>,
 }
 
 /// view 树投影：文本叶计数 + 按钮目标（label=StrLit、onclick=.Msg）+
@@ -2196,6 +2199,7 @@ impl NodeDesktopBridge {
             route_button_spans: Vec::new(),
             package_route_handlers: None,
             route_request: None,
+            sqlite_bridge: None,
         })
     }
 
@@ -2351,6 +2355,7 @@ impl NodeDesktopBridge {
             route_button_spans: Vec::new(),
             package_route_handlers: None,
             route_request: None,
+            sqlite_bridge: None,
         })
     }
 
@@ -3055,6 +3060,13 @@ impl NodeDesktopBridge {
         let Some(identity) = self.identities.get(instance) else {
             return StepOutcome::DispatchRefused(format!("unknown instance {instance}"));
         };
+        // PLAN-113 T-03：宿主桥在引擎派发**之前**镜像消息（app 面惰性
+        // handler 跳过不阻塞真实执行；样本语义与真实 SQL 结果两层独立）。
+        let states_snapshot = self.last_states.get(instance).cloned();
+        if let (Some(bridge), Some(states)) = (self.sqlite_bridge.as_mut(), states_snapshot.as_ref())
+        {
+            bridge.notify(msg_name, states);
+        }
         let dispatch_result = engine.dispatch(identity, msg_name, args);
         match dispatch_result {
             Ok((DispatchOutcome::Delivered(states), _))
@@ -3240,6 +3252,14 @@ impl NodeDesktopBridge {
         self.script = script;
     }
 
+    /// PLAN-113 T-03：安装真实 SQLite 宿主桥（V-03 opt-in 入口）。
+    pub fn install_sqlite_bridge(
+        &mut self,
+        bridge: crate::ui::ace_sqlite_bridge::SqliteHostBridge,
+    ) {
+        self.sqlite_bridge = Some(bridge);
+    }
+
     fn run_due_script(&mut self) {
         let due: Vec<ScriptStep> = self
             .script
@@ -3373,6 +3393,7 @@ impl NodeDesktopBridge {
             "sessions": sessions,
             "frames_rendered": NODE_DESKTOP_FRAMES.load(Ordering::Relaxed),
             "routes": self.routes.as_ref().map(|routes| routes.evidence()),
+            "sqlite_bridge": self.sqlite_bridge.as_ref().map(|b| b.evidence()),
         })
     }
 }

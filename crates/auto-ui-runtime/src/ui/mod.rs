@@ -157,6 +157,11 @@ pub mod ace_native;
 // 事件回 AV）。r11 `ace_native`（宿主直读 AV 快照）保留自己的面。
 pub mod ace_node_desktop;
 #[cfg(feature = "ace-bridge")]
+// PLAN-113 T-03：真实 SQLite 宿主桥（V-03 冻结合同；opt-in，仅测试入口安装）。
+pub mod ace_sqlite_bridge;
+#[cfg(feature = "ace-bridge")]
+pub mod ace_sqlite_bridge_seed;
+#[cfg(feature = "ace-bridge")]
 // PLAN-1022 ASE M0：同宿主 frame 轮换薄适配（页面注册/导航代次/陈旧拒绝；
 // 纯 980 公共面消费，不复制 FFI/解析/窗口）。
 pub mod ase_m0_frame;

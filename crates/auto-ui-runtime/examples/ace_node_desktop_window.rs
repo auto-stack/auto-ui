@@ -5,6 +5,7 @@
 //! 用法：ace_node_desktop_window.exe --source <app.at> --evidence <out.json>
 //!   [--instances 2] [--hold-ms 8000] [--min-frames 4]
 //!   [--file-root <directory>] [--file-writes <create,copy,rename,delete>]
+//!   [--sqlite-db <path>]（PLAN-113 T-03：安装真实 SQLite 宿主桥）
 //!   [--script "3:click:0:2,5:click:0:2,7:click:1:2,9:close,11:late,13:reopen"]
 //!   （脚本语法 tick:动作[:实例:目标]；动作 click/close/late/reopen。）
 
@@ -30,6 +31,8 @@ fn main() {
     let mut package_entry: Option<String> = None;
     let mut file_root: Option<String> = None;
     let mut file_writes = FileWritePermissions::default();
+    // PLAN-113 T-03：真实 SQLite 宿主桥（V-03 opt-in；证据入 bridge evidence）。
+    let mut sqlite_db: Option<String> = None;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -42,6 +45,7 @@ fn main() {
             "--package" => package_spec = args.next(),
             "--entry" => package_entry = args.next(),
             "--file-root" => file_root = Some(args.next().expect("--file-root <directory>")),
+            "--sqlite-db" => sqlite_db = Some(args.next().expect("--sqlite-db <path>")),
             "--file-writes" => {
                 let value = args.next().expect("--file-writes <create,copy,rename,delete>");
                 file_writes = value.parse().unwrap_or_else(|error| {
@@ -129,6 +133,16 @@ fn main() {
     };
     if let Some(spec) = &script_spec {
         bridge.install_script(parse_script(spec));
+    }
+    if let Some(db) = &sqlite_db {
+        let bridge_sqlite = auto_ui_runtime::ui::ace_sqlite_bridge::SqliteHostBridge::open(
+            std::path::Path::new(db),
+        )
+        .unwrap_or_else(|e| {
+            eprintln!("ace_node_desktop_window: sqlite bridge install failed: {e}");
+            std::process::exit(9);
+        });
+        bridge.install_sqlite_bridge(bridge_sqlite);
     }
     let opened = match &file_root {
         Some(root) => bridge.open_with_file_access(std::path::Path::new(root), file_writes),
