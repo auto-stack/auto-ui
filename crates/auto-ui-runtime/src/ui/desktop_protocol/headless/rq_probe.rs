@@ -504,7 +504,7 @@ fn corpus() -> Vec<Case> {
             keys: Vec::new(),
             on_focus: None,
             on_blur: None,
-            child: Box::new(View::button(("Focus", ()))),
+            child: Box::new(View::button(("Focus".into(), ()))),
         },
         note: "ready",
     });
