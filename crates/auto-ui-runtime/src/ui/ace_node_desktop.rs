@@ -1018,6 +1018,8 @@ pub struct NodeDesktopBridge {
     field_names: Vec<String>,
     /// 证据：dispatch 轨迹（instance, msg, 状态快照）与错误。
     pub dispatch_log: Vec<(usize, String, Vec<(String, String)>)>,
+    /// PLAN-108：组件 Tick 合成的每实例毫秒累积（BridgeTick 20ms 拍）。
+    tick_accum_ms: Vec<u32>,
     pub errors: Vec<String>,
     script: Vec<(usize, ScriptStep)>,
     tick_no: usize,
@@ -2170,6 +2172,7 @@ impl NodeDesktopBridge {
             last_states,
             field_names,
             dispatch_log: Vec::new(),
+            tick_accum_ms: Vec::new(),
             errors: Vec::new(),
             script: Vec::new(),
             tick_no: 0,
@@ -2324,6 +2327,7 @@ impl NodeDesktopBridge {
             last_states,
             field_names,
             dispatch_log: Vec::new(),
+            tick_accum_ms: Vec::new(),
             errors: Vec::new(),
             script: Vec::new(),
             tick_no: 0,
@@ -2674,6 +2678,7 @@ impl NodeDesktopBridge {
                 }
             }
         }
+        self.step_component_ticks();
         let shell_outcome = self.step_lane();
         let Some(routes) = self.routes.as_mut() else {
             return shell_outcome;
@@ -2699,6 +2704,36 @@ impl NodeDesktopBridge {
             return StepOutcome::LaneError(error);
         }
         outcome
+    }
+
+    /// PLAN-108：组件面 Tick 合成——程序含 `.Tick`+`interval` 时按间隔
+    /// （250ms 语义）派发 Tick；挂起期照常（M3 park/resume：非 http 派发
+    /// 同步提交）——032 探针的挂起期可交互见证面。
+    fn step_component_ticks(&mut self) {
+        let interval = match self.engine.as_ref() {
+            Some(BridgeEngine::Component(e)) => e.tick_interval_ms(),
+            _ => None,
+        };
+        let Some(interval) = interval else { return };
+        let live: Vec<usize> = match self.engine.as_ref() {
+            Some(BridgeEngine::Component(e)) => e
+                .live_identities()
+                .iter()
+                .filter_map(|id| self.identities.iter().position(|x| x == id))
+                .collect(),
+            _ => return,
+        };
+        for instance in live {
+            while self.tick_accum_ms.len() <= instance {
+                self.tick_accum_ms.push(0);
+            }
+            let acc = &mut self.tick_accum_ms[instance];
+            *acc += 20;
+            if *acc >= interval {
+                *acc = 0;
+                self.dispatch_event(instance, "Tick", None);
+            }
+        }
     }
 
     fn step_lane(&mut self) -> StepOutcome {
