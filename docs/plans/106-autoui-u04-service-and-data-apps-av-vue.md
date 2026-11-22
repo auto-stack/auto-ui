@@ -83,9 +83,15 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - [x] T-02 接通本计划的具体运行接口
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
   - 2026-11-21 完成（B1/B3 已修、HTTP 合同已冻结、B2 具名记录见 §10）：**B1 else-if 链文法/投影/verify**（auto-lang `010a14d35`）、**B3 包面 Str==str**、**object-lit 开 AGE 两面**、永久回归 `plan106_entry_if_chain` 5/5、文法 id 重基线；**本地真实 HTTP 服务合同**（auto-ui `92054337`，`plan106_weather_service` 2/2）。
-- [ ] T-03 实跑 AV/Iced
+- [x] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
-  - **BLOCKED（B2，owner 见 §10）**：014 原样源在 AV 事件会话引擎被列表状态标量门拒（`compile_component_event_program` 5085 门）。已交替代证据：全原样 view 真窗 exit 0/frames=2/applies=81/errors=0（北京 23° 全字段文本在位）。B2 解除后补原样装载与 SelectCity/Refresh 交互。
+  - 2026-11-22 完成（B2 已按用户授权在计划内实现，见 §10）：**014 原样源**经
+    `ace_node_desktop_window --source` 完整装载（exit 0/frames≥2/errors=0，
+    北京 23° 全字段文本在案），SelectCity("shanghai") 点击 → city_id/city_zh
+    按原样本合同更新（上海），Refresh → updated_at 14:30→14:31，close/late/
+    reopen 世代纪律（late 丢弃、新代次独立）。永久回归 `plan106_window_render`
+    3/3（auto-ui `49678a1f`）+ `plan106_viewdata_writes` 3/3（auto-lang
+    `f36dd2341`）。
 - [ ] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
 - [ ] T-05 交付 AV 收据
@@ -110,8 +116,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 2026-11-21 stage: goal | plan_id: PLAN-106 | plan_revision: r2 | round: 1 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-106/{auto-ui,auto-lang} | commit: auto-lang `010a14d35` / auto-ui `92054337`+`b18572c7` | next: user（B2 unblock 三选一见 §10）
 
+2026-11-22 stage: work（B2 计划内实现 + T-03 AV 真窗）| PLAN-106 r2 | outcome: pass | worktree: auto-lang `f36dd2341` / auto-ui `49678a1f`（双仓 plan-106-dev）| task_ids: T-03（+T-02 续 B2）| evidence: `plan106_viewdata_writes` 3/3（auto-lang）+ `plan106_window_render` 3/3（auto-ui，`AUTO_UI_ACE_NODE_E2E=1`）| **B2 解除（用户授权，114 已合入）**：①多行 view-data 列表重写专用语句面（仅多行，内联走 pratt 保 114 类型化 List）；②view_data 字段写=惰性收据（bind 可过、不落 state）；③hook_stmts_lower 跳过 view_data 写发射（事件/场景/检查三车道共享）；④事件绑定条目值保留载荷（MethodCall，AV 桥 SelectCity 载荷可派发）。**014 原样源 AV 实证**：装载 exit 0/frames≥2/errors=0（北京 23° 全字段）；SelectCity("shanghai")→city_id=shanghai/city_zh=上海；Refresh→updated_at 14:31；close/late/reopen 世代纪律（late_dropped=1、新代次独立、重开后续跑 14:32）。**重基线**：文法 id 7 行（object-lit 共享 atom-expr 臂 profiles 注解波及 TextRecord/Closures/Aggregates/Scheduler/age-h0/age-component/age-package）+ 嵌入 AAC 文法数据重新生成（`aac1046_grammar_data_identity_binding` 过）。核心 conformance 896 过/5 败（text_record_source ×5 为主线既有，主检出同败）。`next_responsible_role: review（T-04 AV 阶段独立复核）`
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
 
 **B2（2026-11-21，AV 腿原样装载阻断，owner=共享 typed-list 写面/114 在途）**：014 原 SelectCity/Init 在 handler 重写无类型 Obj 记录列表（`var hourly = [...]`、`var daily = [...]`）。AV 事件会话引擎（`ComponentEventSessionProgram::compile` → `compile_component_event_program`）当前按 **5085 标量门**拒绝**任何**列表 model 字段（`[]str`/`[]Todo`/`[]HourPoint` 均拒；场景车道 2325 门放行 `[]T` 但 AV 桥不用该入口）——014 原样源无法在 AV `--source` 装载。三个层次均已核实：①语法（对象/数组字面量在 AGE 表达式面）已由本计划开（B1 同批）；②bind（无类型列表=只读 view-data，handler 写=设计拒 `undeclared model field`）；③AV 事件会话标量门。105 已交 `[]T` 内建元素写（012，场景车道）+ store/宿主 API 记录写（013）；114 在途（age-package object-lit，可变列表未接通）；组件面事件会话的列表状态字段写面两仓均未交。按 §4「核对 105 已交语义及 114 同一写面」+ §5「缺具体能力时明确负责计划、版本和最小复现」，本计划记录不重复实现。**unblock**：114 或共享 typed-list owner 交付组件面事件会话的列表状态写面后，014 原样源可在 AV 装载并复验；届时本计划 T-03/T-04 续跑。**已交替代证据**：固定负载显示（全原样 view 真窗 exit 0/applies=81/北京 23° 全字段）+ 本地真实 HTTP 服务合同（fail-once→retry-200 + 未知城市回落，2 测试通过）。
+
+**B2 解除（2026-11-22，用户授权 106 在计划内实现共享写面）**：114 已合入主线（auto-lang/auto-ui 均含），用户选择「Authorize PLAN-106 to implement that shared surface in-plan」。本计划实现：①handler 多行 view-data 列表重写（`.hourly = [\n {…},\n …]`）经专用语句面（age-view-assign-viewdata-stmt，仅多行——内联列表仍走 pratt 保 114 类型化 List 写）解析；②bind 层把 view_data 字段写定为**惰性收据**（可 bind、可编译、不落 state cell；展示读 view_data 初值）；③hook_stmts_lower（事件/场景/检查三车道共享脱糖）对 view_data 写跳过发射；④事件绑定条目值保留作者载荷实参（`.SelectCity("beijing")` 投影为 MethodCall，AV 桥按钮载荷可派发）。014 原样源 AV 装载 + SelectCity/Refresh 交互 + close/late/reopen 世代纪律全部实证（`plan106_window_render` 3/3）。文法 id 重基线 7 行（object-lit 共享臂 profiles 注解波及邻居）+ 嵌入 AAC 文法数据重新生成。空列表 `[]` 投影为真实空数组（类型化 List reset 合法）。
