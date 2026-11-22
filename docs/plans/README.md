@@ -18,7 +18,7 @@
 | 107 · 024 Charts | r2 已归档。024 和五个图表原页的 Windows AV/Iced 与 A2Vue/Chrome 各 6/6。 [交付收据](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) |
 | 114 · 027 FileManager | r2 已交付，原 027、FileTree 与 TreeView 的 Windows AV/Iced 和 A2Vue 收据已归档。 [交付收据](archived/114-autoui-file-manager-av-vue.md) |
 | 123 · 布局 Widgets | r1 已交付。原 12 个布局页与 Kitchen Sink 的 Windows AV/Iced、A2Vue 各 13/13，供 W1 与 Vue/CLI 接续。 [交付收据](archived/123-autoui-layout-widgets-av-vue.md) |
-| 106 · 014 Weather | executing r2，T-01 完成，T-02 部分交付（AutoLang 010a14d35）。条件样式 else-if 和包面文本比较已接通；原 hourly/daily 的可变记录列表接共享写面，真实 HTTP 与浏览器实跑仍待验。 [计划](106-autoui-u04-service-and-data-apps-av-vue.md) |
+| 106 · 014 Weather | **已交付归档**（2026-11-22）：AV 原样装载+交互+关闭、A2Vue 浏览器、本地真实 HTTP 合同、规范增量（m2-autoui view-data 惰性收据+事件绑定载荷）。AutoLang 292575164 / AutoUI f9542a9d。 [计划](archived/106-autoui-u04-service-and-data-apps-av-vue.md) |
 
 ## 当前执行顺序
 
@@ -31,7 +31,7 @@
 
 | 原组 | 计划 | 原 demo | 独立 Widget 页 | 状态与先手 |
 |---|---|---|---|---|
-| U04 | [106](106-autoui-u04-service-and-data-apps-av-vue.md) | 014-weather | 依实际消费组件 | 执行中。T-02 已有语法修复，AV 列表接共享写面，HTTP 与真实浏览器可并行验。 |
+| U04 | [106](archived/106-autoui-u04-service-and-data-apps-av-vue.md) | 014-weather | 依实际消费组件 | **已交付归档**（2026-11-22）：AV/A2Vue 双端落主 + HTTP 合同。 |
 | U04 | [110](110-autoui-chat-av-vue.md) | 017-chat | 依实际消费组件 | drafting。接实际 SSE/HTTP 与已交 Store。 |
 | U04 | [111](111-autoui-realworld-av-vue.md) | 023-realworld | 依实际消费组件 | drafting。接 HTTP、路由、认证和数据端口。 |
 | U04 | [112](112-autoui-sys-monitor-av-vue.md) | 025-sys-monitor | 依实际消费组件 | drafting。核系统采集与授权进程端口。 |
