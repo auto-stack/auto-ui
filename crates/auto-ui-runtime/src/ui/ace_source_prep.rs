@@ -860,7 +860,7 @@ pub fn prepare_component_source(
 }
 
 /// prep 注入的文本谓词实现（`contains` 的等价展开）。
-const STR_CONTAINS_HELPER: &str = "fn __p105_str_contains(hay str, needle str) bool {\n    if needle.len() == 0 {\n        return true\n    }\n    if needle.len() > hay.len() {\n        return false\n    }\n    var i int = 0\n    for i + needle.len() <= hay.len() {\n        if hay.slice(i, i + needle.len()) == needle {\n            return true\n        }\n        i = i + 1\n    }\n    return false\n}\n";
+const STR_CONTAINS_HELPER: &str = "fn __p105_str_contains(hay Str, needle Str) bool {\n    if needle.len() == 0 {\n        return true\n    }\n    if needle.len() > hay.len() {\n        return false\n    }\n    var i int = 0\n    for i + needle.len() <= hay.len() {\n        if hay.slice(i, i + needle.len()) == needle {\n            return true\n        }\n        i = i + 1\n    }\n    return false\n}\n";
 
 /// `<recv>.contains(<arg>)` → `__p105_str_contains(<recv>, <arg>)`；`need` 置真
 /// 时调用方需注入 [`STR_CONTAINS_HELPER`]。

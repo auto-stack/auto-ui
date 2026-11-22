@@ -1118,11 +1118,13 @@ fn project_view_shape(
                         if let ComponentViewItem::Entry(entry) = sub {
                             if entry.is_event && entry.key == "onclick" {
                                 if let Some((name, args)) = entry.message_call() {
+                                    // PLAN-113（026 真语料）：循环体内带载荷的
+                                    // 按钮/复选框（表格删除行 `.DeleteRow(i)`）——
+                                    // 载荷是逐行动态值，桥面平铺形状无法静态承载。
+                                    // 跳过该目标（不整体拒绝装载）：渲染不受影响，
+                                    // 仅该交互不可脚本化；行为证据经场景派发/A2Vue。
                                     if in_loop && !args.is_empty() {
-                                        return Err(format!(
-                                            "ace.desktop.event-payload: `{}` requires the current view-loop row",
-                                            name.name,
-                                        ));
+                                        continue;
                                     }
                                     msg = Some(name.name.clone());
                                     payload = Some(args.iter().map(ButtonPayload::from_arg)
@@ -1158,11 +1160,13 @@ fn project_view_shape(
                         if let ComponentViewItem::Entry(entry) = sub {
                             if entry.is_event && entry.key == "onclick" {
                                 if let Some((name, args)) = entry.message_call() {
+                                    // PLAN-113（026 真语料）：循环体内带载荷的
+                                    // 按钮/复选框（表格删除行 `.DeleteRow(i)`）——
+                                    // 载荷是逐行动态值，桥面平铺形状无法静态承载。
+                                    // 跳过该目标（不整体拒绝装载）：渲染不受影响，
+                                    // 仅该交互不可脚本化；行为证据经场景派发/A2Vue。
                                     if in_loop && !args.is_empty() {
-                                        return Err(format!(
-                                            "ace.desktop.event-payload: `{}` requires the current view-loop row",
-                                            name.name,
-                                        ));
+                                        continue;
                                     }
                                     msg = Some(name.name.clone());
                                     payload = Some(args.iter().map(ButtonPayload::from_arg)
