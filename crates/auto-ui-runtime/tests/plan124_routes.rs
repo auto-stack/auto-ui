@@ -138,6 +138,9 @@ fn p123_literal_route_uses_registered_vue_widgets() {
                 alert_dialog_content { alert_dialog_action "Continue" }
             }
             link (text: "Next", href: "/live") {}
+            sidebar { text "Local sidebar" {} }
+            imagesurface (fit: "contain") {}
+            select (disabled: "false") {}
         }
     }
 }"#),
@@ -162,6 +165,9 @@ fn p123_literal_route_uses_registered_vue_widgets() {
         "<HoverCardContent",
         "<AlertDialogAction",
         r#"<router-link to="/live""#,
+        "[contain:layout_paint]",
+        "String('contain') === 'cover'",
+        r#":disabled="false""#,
     ] {
         assert!(gallery.contains(expected), "missing {expected}: {gallery}");
     }

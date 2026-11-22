@@ -170,6 +170,16 @@ fn view(item: &ComponentViewItem, uses_composite: &mut bool) -> Option<AuraNode>
                     node = node.with_child(view(item, uses_composite)?);
                 }
             }
+            if tag == "sidebar" {
+                // A sidebar inside a routed page has its own preview viewport.
+                // Fixed positioning remains relative to that viewport.
+                node = AuraNode::element("div")
+                    .with_prop(
+                        "style",
+                        Expr::Str("relative w-64 h-28 overflow-hidden [contain:layout_paint]".into()),
+                    )
+                    .with_child(node);
+            }
             Some(node)
         }
         _ => None,
