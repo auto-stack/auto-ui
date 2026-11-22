@@ -12,7 +12,9 @@
 //!   - 关闭语义：close 后 late 事件被丢弃（不改旧实例），reopen 起新代次。
 //!
 //! 单窗口纪律：env `AUTO_UI_ACE_NODE_E2E=1` 才跑；前置 `cargo build
-//! --example ace_node_desktop_window --features ace-bridge`。
+//! --example ace_node_desktop_window --features ace-bridge`。用例各自开真窗，
+//! **必须串行**（`-- --test-threads=1`）——并行开窗会竞争单窗口宿主。
+//! 各用例 ~4–6s（脚本 settle 后早退，低于 10s 测试成本线）。
 
 #![allow(dead_code)]
 
