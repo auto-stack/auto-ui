@@ -43,7 +43,7 @@ const logs = []
 page.on('pageerror', e => errors.push(e.message))
 page.on('console', m => logs.push(`${m.type()}: ${m.text()}`))
 await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' })
-await page.waitForTimeout(900)
+await page.waitForTimeout(400)
 if (logs.length) { console.log('CONSOLE:', logs.slice(0, 20).join('\n')) }
 await page.screenshot({ path: 'shot.png' })
 let failures = 0
@@ -60,7 +60,7 @@ for (const marker of ['Database Studio', 'northwind.db', 'Tables', 'Views', 'Ind
 const schemaTab = page.getByRole('button', { name: 'Schema', exact: true })
 if (await schemaTab.count()) {
   await schemaTab.click()
-  await page.waitForTimeout(500)
+  await page.waitForTimeout(250)
   b = await body()
   check('Schema Tab：列定义可见', b.includes('Column') || b.includes('column'))
   check('Schema Tab：DDL 可见', b.includes('CREATE TABLE'))
@@ -72,13 +72,13 @@ if (await schemaTab.count()) {
 const sqlTab = page.getByRole('button', { name: 'SQL', exact: true })
 if (await sqlTab.count()) {
   await sqlTab.click()
-  await page.waitForTimeout(500)
+  await page.waitForTimeout(250)
   b = await body()
   check('SQL Tab 激活', b.includes('SQL') || b.includes('Run'))
   const runBtn = page.getByRole('button', { name: /Run/i })
   if (await runBtn.count()) {
     await runBtn.first().click()
-    await page.waitForTimeout(600)
+    await page.waitForTimeout(300)
     b = await body()
     check('SQL 执行成功路径（结果/耗时）', b.includes('Success') || b.includes('rows') || b.includes('耗时'))
   } else {
@@ -88,11 +88,11 @@ if (await sqlTab.count()) {
   const errPreset = page.getByRole('button', { name: /Error|Syntax/i })
   if (await errPreset.count()) {
     await errPreset.first().click()
-    await page.waitForTimeout(300)
+    await page.waitForTimeout(150)
     const run2 = page.getByRole('button', { name: /Run/i })
     if (await run2.count()) {
       await run2.first().click()
-      await page.waitForTimeout(600)
+      await page.waitForTimeout(300)
       b = await body()
       check('SQL 错误路径反馈', b.includes('Error') || b.includes('error') || b.includes('not found'))
     }
@@ -105,22 +105,22 @@ if (await sqlTab.count()) {
 
 // Commit / Rollback 按钮：新增行后事务控制台可见（dirtyCount > 0 条件内）。
 const dataTab = page.getByRole('button', { name: 'Data', exact: true })
-if (await dataTab.count()) { await dataTab.click(); await page.waitForTimeout(400) }
+if (await dataTab.count()) { await dataTab.click(); await page.waitForTimeout(200) }
 const addRow = page.getByRole('button', { name: /Add Row/i })
 if (await addRow.count()) {
   await addRow.first().click()
-  await page.waitForTimeout(300)
+  await page.waitForTimeout(150)
   const save = page.getByRole('button', { name: /Save Record/i })
   if (await save.count()) {
     await save.click()
-    await page.waitForTimeout(500)
+    await page.waitForTimeout(250)
     b = await body()
     check('Commit 按钮在位', b.includes('Commit'))
     check('Rollback 按钮在位', b.includes('Rollback'))
     const commit = page.getByRole('button', { name: /Commit/i })
     if (await commit.count()) {
       await commit.first().click()
-      await page.waitForTimeout(400)
+      await page.waitForTimeout(200)
       b = await body()
       check('Commit 事务反馈', b.includes('COMMITTED') || b.includes('committed'))
     } else {
