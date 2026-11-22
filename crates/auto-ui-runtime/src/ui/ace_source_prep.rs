@@ -785,7 +785,17 @@ pub fn prepare_component_source(
                 }
             }
         }
-        // `use` 行等长空白化（保 span）。
+        // `use` 行等长空白化（保 span）——**widget 级组件包导入
+        // `use { package: <name> from "<path>" }` 除外**：该声明是 AGE 包
+        // 面的解析依据（包子组件/`$event` 绑定/组件 props 都要按它解析真实
+        // 包），空白化会让包面把包子组件当未声明（PLAN-117 T-01 实证：
+        // 031 的 ImageViewport `$event` 与 029 的 AssetBrowser props 均因
+        // 导入被空白而 child-event-site / 记录字面量拒绝）。
+        if t.starts_with("use { package:") {
+            out.push_str(body);
+            out.push_str(nl);
+            continue;
+        }
         out.push_str(&" ".repeat(body.len()));
         out.push_str(nl);
         let _ = handled;
@@ -1509,11 +1519,55 @@ fn rewrite_host_storage(src: &str, fields: &mut Vec<(String, String)>) -> String
 }
 
 /// 把宿主仿真字段插进 `model {` 块尾（无 model 块则不插）。
+/// 块尾 `}` 按词法扫描定位：跳过行注释（`//`）与字符串字面量——model 注释
+/// 或字符串里的 `}`（如 `[{name,rel_path}]`、CSS 类）不再误当块尾
+/// （PLAN-117 T-01 实证：029 的 dirs 注释含 `}]`，字段被插进注释内）。
 fn inject_model_fields(src: &str, fields: &[(String, String)]) -> String {
     let Some(model_at) = src.find("model {") else {
         return src.to_string();
     };
-    let Some(close) = src[model_at..].find('}').map(|i| model_at + i) else {
+    let bytes = src.as_bytes();
+    let mut i = model_at + "model {".len();
+    let mut depth = 1i32;
+    let mut close = None;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b'/' && bytes.get(i + 1) == Some(&b'/') {
+            // 行注释：跳到行尾（含换行前，`\n` 由下一轮处理）。
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            continue;
+        }
+        if b == b'"' {
+            // 字符串字面量：跳转义与闭合引号。
+            i += 1;
+            while i < bytes.len() {
+                if bytes[i] == b'\\' {
+                    i += 2;
+                } else if bytes[i] == b'"' {
+                    i += 1;
+                    break;
+                } else {
+                    i += 1;
+                }
+            }
+            continue;
+        }
+        match b {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    let Some(close) = close else {
         return src.to_string();
     };
     let indent_at = src[..model_at].rfind('\n').map(|i| model_at - i - 1).unwrap_or(0);
