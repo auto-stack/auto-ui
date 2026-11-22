@@ -17,14 +17,14 @@
 | 105 · U03 本地应用与编辑 | 已落主归档，AutoUI / AutoLang 交付分别为 fe2dd4f1 / 0b754af59。124/125 的已交来源纳入 U03，015 Notes 的原样 AV handler 回放仍为具名债务，按原条件补证。 [归档收据](archived/105-autoui-u03-local-interactive-apps-av-vue.md) |
 | 107 · 024 Charts | r2 已归档。024 和五个图表原页的 Windows AV/Iced 与 A2Vue/Chrome 各 6/6。 [交付收据](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) |
 | 114 · 027 FileManager | r2 已交付，原 027、FileTree 与 TreeView 的 Windows AV/Iced 和 A2Vue 收据已归档。 [交付收据](archived/114-autoui-file-manager-av-vue.md) |
-| 123 · 布局 Widgets | 执行中。已有独立布局页和桌面路由入口证据；整包沿 107 图表与 114 树/包/事件的通过复审版本接续。 [计划](123-autoui-layout-widgets-av-vue.md) |
+| 123 · 布局 Widgets | r1 已交付。原 12 个布局页与 Kitchen Sink 的 Windows AV/Iced、A2Vue 各 13/13，供 W1 与 Vue/CLI 接续。 [交付收据](archived/123-autoui-layout-widgets-av-vue.md) |
 | 106 · 014 Weather | executing r2，T-01 完成，T-02 部分交付（AutoLang 010a14d35）。条件样式 else-if 和包面文本比较已接通；原 hourly/daily 的可变记录列表接共享写面，真实 HTTP 与浏览器实跑仍待验。 [计划](106-autoui-u04-service-and-data-apps-av-vue.md) |
 
 ## 当前执行顺序
 
 1. **接续 107 和 114 的交付。** 123 可接 107 的图表组件及 114 的树组件和受检包。106 可按实际调用点接续 114 的共享接口。
 2. **106 同步推进 014 Weather。** 先实跑已可推进的样本行为、A2Vue 浏览器和本地真实 HTTP 合同。AV 的预报列表更新按 114/共享 typed-list owner 的交付接续，再核原城市切换、错误与重试。新增并行容量时，可开 108 的异步探针或准备 113 的 SQLite 回放。
-3. **123 逐项接入 107/114 的已审版本。** 路由宿主和独立布局页已有证据可先核验。拿到图表与树/包接点后跑原画廊和 kitchen-sink；若消费者先需要 123 的桌面入口，先按现有独立页证据交可用版本。
+3. **接收 123 的原画廊交付。** W1 复用 13 个原路由的 AV/Iced 收据，A2Vue 消费者沿同一冻结原项目的严格构建与 Chrome 证据接续。 [PLAN-123](archived/123-autoui-layout-widgets-av-vue.md)
 4. **按原矩阵汇齐 W1。** 使用 104/105 已正式交付的适用行，保留 015 的具名 AV 缺口，其余逐例计划按下表前置推进。完整 W1 后交 1097 W2/AC，再交 1074 W3/A2R。可用的 A2Vue 结果独立交给 1072 路线与 982 的实际 CLI 联验。
 
 ## U04–U06 逐例交付
@@ -47,7 +47,7 @@
 | U06 | [120](120-autoui-auto-edit-av-vue.md) | 041-auto-edit | code-editor | drafting。接 085、文件对话框和所用 Store。复用 107 的原页探针，继续查光标宿主能力。 |
 | U06 | [121](121-autoui-blog-viewer-av-vue.md) | 021-blog-viewer | navigationmenu | drafting。可用 124 路由来源准备原服务与焦点验收。 |
 | U06 | [122](122-autoui-launcher-av-vue.md) | 028-launcher | command | drafting。先验原启动场景，用到 Command Palette 时接 096。 |
-| U06 | [123](123-autoui-layout-widgets-av-vue.md) | 布局和组合页 | absolute、alignment、center、col、flex、grid、grid-span、position、responsive、row、sizing、spacing、kitchen-sink | 执行中。原画廊整包接 107 图表与 114 树/包接面。 |
+| U06 | [123](archived/123-autoui-layout-widgets-av-vue.md) | 布局和组合页 | absolute、alignment、center、col、flex、grid、grid-span、position、responsive、row、sizing、spacing、kitchen-sink | Windows AV/Iced 与 A2Vue 各 13/13。 |
 
 17 份计划覆盖原 18 个 demo 和 26 个独立 Widget 页。120 的 code-editor 页仍计 U05。相同原页证据按同一输入、组件版本及目标复用，实际应用保各自行为验收。
 
