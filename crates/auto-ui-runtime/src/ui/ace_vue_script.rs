@@ -819,6 +819,16 @@ fn generate_widget_with_lane_stores(
     if let Some(module_fns) = same_file_module_fns(src) {
         gen = gen.with_module_fns(module_fns);
     }
+    // PLAN-113（026 真语料）：lane 产品道补 **use 导入模块 fn 池**（官方链
+    // `with_use_module_fns` 同款——026 `use components.tree_util: filter_tree,
+    // collect_ids, toggle_id` 的兄弟模块 helper；缺失时调用点有 emission 无
+    // 定义，浏览器装载即 `ReferenceError`）。收集器对解析/读取失败返回空池
+    // （无导入时零挂，不阻断 lane 产品）。
+    let (use_fns, use_names) =
+        auto_ui_compiler::ui_gen::api::collect_use_module_fns(std::path::Path::new(path), src);
+    if !use_fns.is_empty() {
+        gen = gen.with_use_module_fns(use_fns, use_names);
+    }
     let sfc = gen
         .generate_sfc(&widget)
         .map_err(|e| format!("SFC: {e:?}"))?;

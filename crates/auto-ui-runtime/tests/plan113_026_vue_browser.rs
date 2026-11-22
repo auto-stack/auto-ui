@@ -39,9 +39,13 @@ const m = await import(pathToFileURL(pw).href)
 const browser = await m.chromium.launch({ headless: true })
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 960 } })).newPage()
 const errors = []
+const logs = []
 page.on('pageerror', e => errors.push(e.message))
+page.on('console', m => logs.push(`${m.type()}: ${m.text()}`))
 await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' })
 await page.waitForTimeout(900)
+if (logs.length) { console.log('CONSOLE:', logs.slice(0, 20).join('\n')) }
+await page.screenshot({ path: 'shot.png' })
 let failures = 0
 const check = (name, ok) => { console.log(`${ok ? '[+] OK' : '[-] FAIL'}: ${name}`); if (!ok) failures++ }
 const body = async () => (await page.textContent('body')) || ''
@@ -99,10 +103,35 @@ if (await sqlTab.count()) {
   check('找到 SQL Tab', false)
 }
 
-// Commit / Rollback 按钮在位（事务控制台）。
-b = await body()
-check('Commit 按钮在位', b.includes('Commit'))
-check('Rollback 按钮在位', b.includes('Rollback'))
+// Commit / Rollback 按钮：新增行后事务控制台可见（dirtyCount > 0 条件内）。
+const dataTab = page.getByRole('button', { name: 'Data', exact: true })
+if (await dataTab.count()) { await dataTab.click(); await page.waitForTimeout(400) }
+const addRow = page.getByRole('button', { name: /Add Row/i })
+if (await addRow.count()) {
+  await addRow.first().click()
+  await page.waitForTimeout(300)
+  const save = page.getByRole('button', { name: /Save Record/i })
+  if (await save.count()) {
+    await save.click()
+    await page.waitForTimeout(500)
+    b = await body()
+    check('Commit 按钮在位', b.includes('Commit'))
+    check('Rollback 按钮在位', b.includes('Rollback'))
+    const commit = page.getByRole('button', { name: /Commit/i })
+    if (await commit.count()) {
+      await commit.first().click()
+      await page.waitForTimeout(400)
+      b = await body()
+      check('Commit 事务反馈', b.includes('COMMITTED') || b.includes('committed'))
+    } else {
+      check('找到 Commit 按钮', false)
+    }
+  } else {
+    check('找到 Save Record 按钮', false)
+  }
+} else {
+  check('找到 Add Row 按钮', false)
+}
 
 check('无页面异常', errors.length === 0)
 if (errors.length) console.log('ERRORS:', errors.slice(0, 5))
@@ -135,20 +164,20 @@ fn p113_026_vue_browser_evidence() {
         eprintln!("not scheduled (set AUTO_UI_ACE_WEB_E2E=1; browser tier)");
         return;
     }
-    use auto_ui_runtime::ui::ace_source_prep::prepare_component_source;
+    use auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product;
     use auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product_stores;
 
     let root = repo_root();
     let app_dir = root.join("examples/ui/026-database");
     let src = std::fs::read_to_string(app_dir.join("src/front/app.at")).expect("read 026 app.at");
-    let prepped = prepare_component_source(&app_dir, &src)
-        .map(|p| p.source)
-        .unwrap_or(src.clone());
+    // A2Vue lane 用**原始源**（use 导入行必须保留——lane 侧解析导入池；
+    // `prepare_component_source` 会把 use 行空白化，那是 AV 组件面单源投影
+    // 的职责，A2Vue 官方链同样传原始内容）。
     let (multi, stores) = generate_sfcs_with_lane_product_stores(
-        &prepped,
-        "src/front/app.at",
+        &src,
+        app_dir.join("src/front/app.at").to_string_lossy().as_ref(),
         "./a2x_rt.mjs",
-        "./a2x_rt.mjs",
+        "../a2x_rt.mjs",
     )
     .expect("026 lane product derives");
 
@@ -167,8 +196,42 @@ fn p113_026_vue_browser_evidence() {
     let _ = std::fs::remove_dir_all(&out);
     std::fs::create_dir_all(out.join("components")).expect("mkdir components");
     std::fs::write(out.join("a2x_rt.mjs"), &multi.runtime_mjs).expect("write runtime");
-    std::fs::write(out.join("App.vue"), sfc.sfc.replace("@/components/", "./components/"))
-        .expect("write App.vue");
+    for w in &multi.widgets {
+        let body = w.sfc.replace("@/components/", "./components/");
+        if w.name == "App" {
+            std::fs::write(out.join("App.vue"), body).expect("write App.vue");
+        } else {
+            std::fs::write(out.join("components").join(format!("{}.vue", w.name)), body)
+                .unwrap_or_else(|e| panic!("write components/{}.vue: {e}", w.name));
+        }
+    }
+    // 包组件 SFC（PaginationControl/TreeView/TreeIcon）走与 App 同一条 lane
+    // 产品道（`generate_sfcs_with_lane_product`——官方 ACE-VUE 组件腿同入口），
+    // 落 src/components/{W}.vue 位；rt href=`../a2x_rt.mjs`（组件位相对引用）。
+    for (rel, widget) in [
+        ("packages/pagination/pagination_control.at", "PaginationControl"),
+        ("packages/tree-view/tree_view.at", "TreeView"),
+        ("packages/tree-view/tree_icon.at", "TreeIcon"),
+    ] {
+        let path = root.join(rel);
+        let source = std::fs::read_to_string(&path).expect("read package widget source");
+        let multi = generate_sfcs_with_lane_product(
+            &source,
+            &path.to_string_lossy(),
+            "../a2x_rt.mjs",
+            "../a2x_rt.mjs",
+        )
+        .unwrap_or_else(|e| panic!("lane product for {rel}: {e}"));
+        let sfc = multi
+            .widgets
+            .iter()
+            .find(|w| w.name == widget)
+            .unwrap_or_else(|| panic!("{rel} declares no {widget} widget: {:?}", multi.widgets.iter().map(|w| w.name.clone()).collect::<Vec<_>>()))
+            .sfc
+            .clone();
+        std::fs::write(out.join("components").join(format!("{widget}.vue")), sfc)
+            .unwrap_or_else(|e| panic!("write components/{widget}.vue: {e}"));
+    }
     std::fs::write(
         out.join("index.html"),
         "<!doctype html>\n<html lang=\"en\">\n  <head><meta charset=\"utf-8\" /><title>database</title></head>\n  <body><div id=\"app\"></div><script type=\"module\" src=\"/main.js\"></script></body>\n</html>\n",

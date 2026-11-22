@@ -28,7 +28,10 @@ pub fn front_route_modules(app: &Path) -> Result<Vec<PathBuf>, String> {
                 pending.push((path, true));
             } else if path != app
                 && path.extension().is_some_and(|ext| ext == "at")
-                && path.file_name().is_some_and(|name| name != "pac.at" && (recursive || name != "app.at"))
+                && path.file_name().is_some_and(|name| {
+                    // pac.at/package.at 是包声明/元数据文件，不是模块源。
+                    name != "pac.at" && name != "package.at" && (recursive || name != "app.at")
+                })
             {
                 modules.push(path);
             }
