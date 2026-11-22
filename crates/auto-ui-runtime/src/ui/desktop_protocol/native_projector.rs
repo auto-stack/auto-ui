@@ -2173,6 +2173,7 @@ fn layout_view_node<M: Clone + std::fmt::Debug>(
         View::Select {
             options,
             selected_index,
+            placeholder,
             on_select,
             ..
         } => {
@@ -2195,7 +2196,7 @@ fn layout_view_node<M: Clone + std::fmt::Debug>(
             );
             let size = style.font_size.unwrap_or(14.0);
             let line_h = size * LINE_H_FACTOR;
-            if let Some(label) = selected_index.and_then(|i| options.get(i)) {
+            if let Some(label) = selected_index.and_then(|i| options.get(i)).or(placeholder.as_ref()) {
                 ctx.ops.push(DrawOp::Text {
                     x: x + INPUT_PAD,
                     y: y + (h - line_h) / 2.0,
@@ -5238,6 +5239,7 @@ mod tests {
                 .child(View::Select {
                     options,
                     selected_index,
+                    placeholder: None,
                     on_select: Some(SelectCallback::new(|i, s| SbMsg::Pick(i, s.to_string()))),
                     style: None,
                 })
@@ -5560,6 +5562,7 @@ mod tests {
                     .child(View::Select {
                         options: vec!["o".into()],
                         selected_index: Some(0),
+                        placeholder: None,
                         on_select: None,
                         style: None,
                     })

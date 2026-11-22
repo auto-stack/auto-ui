@@ -1053,6 +1053,7 @@ pub enum View<M: Clone + Debug> {
     Select {
         options: Vec<String>,
         selected_index: Option<usize>,
+        placeholder: Option<String>,
         on_select: Option<SelectCallback<M>>,
         style: Option<Style>, // ✅ NEW: Unified styling support
     },
@@ -2330,6 +2331,7 @@ impl<M: Clone + Debug> View<M> {
         View::Select {
             options,
             selected_index: None,
+            placeholder: None,
             on_select: None,
             style: None, // ✅ NEW: style field
         }
@@ -3178,11 +3180,13 @@ impl<M: Clone + Debug> View<M> {
             View::Select {
                 options,
                 selected_index,
+                placeholder,
                 on_select,
                 style,
             } => View::Select {
                 options,
                 selected_index,
+                placeholder,
                 on_select: on_select.map(|cb| {
                     let f = std::sync::Arc::clone(f);
                     SelectCallback::new(move |idx, val| f(cb.call(idx, val)))

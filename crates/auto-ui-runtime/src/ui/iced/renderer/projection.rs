@@ -2335,6 +2335,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
             AbstractView::Select {
                 options,
                 selected_index,
+                placeholder,
                 on_select,
                 style: _,
             } => project_widget(|| {
@@ -2350,7 +2351,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 match on_select {
                     Some(callback) => {
                         let options_clone = options.clone();
-                        let picklist_widget =
+                        let mut picklist_widget =
                             pick_list(options, selected_value, move |selected_string| {
                                 let index = options_clone
                                     .iter()
@@ -2358,10 +2359,14 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                                     .unwrap_or(0);
                                 callback.call(index, selected_string.as_str())
                             });
+                        if let Some(placeholder) = placeholder {
+                            picklist_widget = picklist_widget.placeholder(placeholder);
+                        }
                         picklist_widget.into()
                     }
                     None => {
                         let display_text = selected_value
+                            .or(placeholder)
                             .unwrap_or_else(|| options.first().cloned().unwrap_or_default());
                         text(display_text).into()
                     }

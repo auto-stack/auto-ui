@@ -7,7 +7,8 @@ use crate::ui::aura_view_builder::{
     extract_absolute_position, fold_floats, rederive_layout, RederivedLayout,
 };
 use crate::ui::scroll::ScrollAxes;
-use crate::ui::style::StyleClass;
+use crate::ui::style::{SizeValue, StyleClass};
+use crate::ui::style_iced_adapter::{IcedSize, IcedStyle};
 use crate::ui::view::{AccordionItem, ScrollMetrics};
 use crate::ui::{Style, View};
 use ace_core::source::age_component::{
@@ -61,7 +62,7 @@ pub enum Action {
 #[derive(Clone, Debug)]
 pub(super) struct State {
     focus: Option<usize>,
-    public_assets: Option<Arc<std::path::PathBuf>>,
+    public_assets: Option<Arc<resources::PublicImages>>,
     expanded: BTreeMap<usize, BTreeSet<usize>>,
     disclosure: BTreeMap<usize, bool>,
     inputs: BTreeMap<usize, String>,
@@ -96,7 +97,7 @@ impl State {
     }
 
     pub(super) fn with_public_assets(mut self, root: Option<Arc<std::path::PathBuf>>) -> Self {
-        self.public_assets = root;
+        self.public_assets = root.map(resources::PublicImages::new).map(Arc::new);
         self
     }
 
@@ -108,6 +109,7 @@ impl State {
         resources::release_editors(session, states.len(), tree);
         for state in states {
             state.inputs.clear();
+            state.public_assets = None;
         }
     }
 
@@ -859,9 +861,6 @@ impl Renderer<'_> {
             "codeblock" => {
                 View::text_styled(literal(el, "code").unwrap_or_default(), "text-sm font-mono")
             }
-            "separator" => View::container(View::empty())
-                .style("w-full h-1 bg-gray-200")
-                .build(),
             _ => {
                 let mut children = self.items(&el.items);
                 let label = el.label.as_ref().or_else(|| {
@@ -1174,7 +1173,30 @@ fn native_style(classes: &str) -> Style {
         })
         .collect::<Vec<_>>()
         .join(" ");
-    Style::parse(&normalized).unwrap_or_default()
+    let mut style = Style::parse(&normalized).unwrap_or_default();
+    if !style
+        .classes
+        .iter()
+        .any(|class| matches!(class, StyleClass::MinWidth(_) | StyleClass::MinHeight(_)))
+    {
+        return style;
+    }
+    let dimensions = IcedStyle::from_style(&style);
+    if let Some(width) = fixed_minimum(dimensions.width.as_ref(), dimensions.min_width) {
+        style.classes.push(StyleClass::Width(width));
+    }
+    if let Some(height) = fixed_minimum(dimensions.height.as_ref(), dimensions.min_height) {
+        style.classes.push(StyleClass::Height(height));
+    }
+    style
+}
+
+fn fixed_minimum(size: Option<&IcedSize>, minimum: Option<f32>) -> Option<SizeValue> {
+    let minimum = minimum.filter(|value| *value > 0.0 && *value < 9999.0)?;
+    match size {
+        Some(IcedSize::Fixed(size)) if *size < minimum => Some(SizeValue::Pixels(minimum)),
+        _ => None,
+    }
 }
 
 fn scroll_axes(element: &ComponentViewElement, classes: &str) -> Option<ScrollAxes> {
@@ -1324,6 +1346,55 @@ widget Layout {
         let caption = rendered.find("AV caption").expect("progress caption rendered");
         let sibling = rendered.find("AV sibling").expect("sibling text rendered");
         assert!(caption < sibling, "{rendered}");
+    }
+
+    #[test]
+    fn native_select_keeps_the_authored_prompt_across_page_mounts() {
+        let source = r#"widget Preview {
+    view {
+        select {
+            select-trigger { select-value (placeholder: "Choose an option") {} }
+            select-content { select-item (text: "Sample option", value: "sample") {} }
+        }
+    }
+}"#;
+        let nodes = project_component_candidates(source).expect("checked select view");
+        let tree = &nodes[0].view.tree;
+        let mut state = State::new(BTreeMap::new());
+        let View::Column { children, .. } = view(1, 0, tree, &[], &[], &state) else {
+            panic!("expected a frame column");
+        };
+        let [View::Select {
+            options,
+            placeholder,
+            selected_index,
+            on_select,
+            ..
+        }] = children.as_slice() else {
+            panic!("expected a select");
+        };
+        assert_eq!(placeholder.as_deref(), Some("Choose an option"));
+        assert_eq!(*selected_index, None);
+        assert_eq!(options, &["Sample option"]);
+        let callback = on_select.as_ref().expect("enabled original select");
+        let NodeDesktopMsg::Widget { session: 1, action, .. } = callback.call(0, "Sample option")
+        else {
+            panic!("expected a page-owned choice");
+        };
+        state.apply(action);
+        let View::Column { children, .. } = view(1, 0, tree, &[], &[], &state) else {
+            panic!("expected a frame column");
+        };
+        assert!(matches!(&children[0], View::Select { selected_index: Some(0), .. }));
+        let state = State::new(BTreeMap::new());
+        let View::Column { children, .. } = view(2, 0, tree, &[], &[], &state) else {
+            panic!("expected a remounted frame");
+        };
+        assert!(matches!(
+            &children[0],
+            View::Select { placeholder: Some(prompt), selected_index: None, .. }
+                if prompt == "Choose an option"
+        ));
     }
 
     const WIDGETS: &str = r#"

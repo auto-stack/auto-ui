@@ -187,6 +187,14 @@ impl Renderer<'_> {
 
     pub(super) fn native_select(&self, el: &ComponentViewElement, style: Style) -> WidgetView {
         let key = el.span.start;
+        let placeholder = element_children(el)
+            .find(|child| matches!(child.tag.as_str(), "select-trigger" | "select_trigger"))
+            .into_iter()
+            .flat_map(element_children)
+            .find(|child| matches!(child.tag.as_str(), "select-value" | "select_value"))
+            .and_then(|child| literal(child, "placeholder"))
+            .or_else(|| literal(el, "placeholder"))
+            .map(str::to_owned);
         let options = element_children(el)
             .find(|child| matches!(child.tag.as_str(), "select-content" | "select_content"))
             .into_iter()
@@ -201,6 +209,7 @@ impl Renderer<'_> {
         View::Select {
             options,
             selected_index: self.state.selected.get(&key).copied(),
+            placeholder,
             on_select: enabled.then(|| {
                 SelectCallback::new(move |index, _| NodeDesktopMsg::Widget {
                     session,

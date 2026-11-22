@@ -865,6 +865,7 @@ impl<'a> AuraViewBuilder<'a> {
         View::Select {
             options: labels,
             selected_index,
+            placeholder: None,
             on_select,
             style,
         }

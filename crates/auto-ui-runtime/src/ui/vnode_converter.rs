@@ -1157,6 +1157,7 @@ mod tests {
         let view: View<TestMsg> = View::Select {
             options: vec!["Option 1".to_string(), "Option 2".to_string()],
             selected_index: Some(0),
+            placeholder: None,
             on_select: None,
             style: None,
         };

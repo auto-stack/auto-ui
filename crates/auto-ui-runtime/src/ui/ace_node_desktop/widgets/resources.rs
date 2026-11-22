@@ -1,19 +1,64 @@
+use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use ace_core::source::age_component::{ComponentViewElement, ComponentViewItem};
+use auto_media_core::image_pipeline::{
+    global_media_registry, media_uri, queue_media_path, MediaAssetTicket, MediaPriority,
+};
 
 use super::{literal, Renderer, WidgetView};
 use crate::ui::style::{SizeValue, StyleClass};
 use crate::ui::{Style, View};
 
 pub(in crate::ui) fn public_assets(source: &Path) -> Option<PathBuf> {
-    let root = source
+    let front = source
         .ancestors()
         .find(|path| path.file_name().is_some_and(|name| name == "front"))?
-        .join("public")
         .canonicalize()
         .ok()?;
-    root.is_dir().then_some(root)
+    let root = front.join("public").canonicalize().ok()?;
+    (root.starts_with(front) && root.is_dir()).then_some(root)
+}
+
+#[derive(Debug)]
+pub(super) struct PublicImages {
+    root: Arc<PathBuf>,
+    surfaces: Mutex<BTreeMap<PathBuf, MediaAssetTicket>>,
+}
+
+impl PublicImages {
+    pub(super) fn new(root: Arc<PathBuf>) -> Self {
+        Self {
+            root,
+            surfaces: Mutex::default(),
+        }
+    }
+
+    fn resolve(&self, source: &str) -> Option<PathBuf> {
+        let path = Path::new(source.strip_prefix('/').unwrap_or(source));
+        if !path.components().all(|part| matches!(part, Component::Normal(_))) {
+            return None;
+        }
+        let file = self.root.join(path).canonicalize().ok()?;
+        (file.starts_with(self.root.as_path()) && file.is_file()).then_some(file)
+    }
+
+    fn surface(&self, file: PathBuf) -> String {
+        let mut surfaces = self.surfaces.lock().unwrap();
+        let ticket = *surfaces
+            .entry(file.clone())
+            .or_insert_with(|| queue_media_path(file, MediaPriority::Current));
+        media_uri(ticket)
+    }
+}
+
+impl Drop for PublicImages {
+    fn drop(&mut self) {
+        for ticket in self.surfaces.get_mut().unwrap().values() {
+            global_media_registry().release(ticket.id);
+        }
+    }
 }
 
 fn widget_key(session: i32, instance: usize, element: &ComponentViewElement) -> String {
@@ -49,26 +94,24 @@ pub(super) fn release_editors(session: i32, instances: usize, items: &[Component
 }
 
 impl Renderer<'_> {
-    fn image_source(&self, rendered: &str) -> String {
-        if let Some((root, relative)) = self
-            .state
-            .public_assets
-            .as_deref()
-            .zip(rendered.strip_prefix('/'))
+    fn image_source(&self, rendered: &str, surface: bool) -> String {
+        if ["http://", "https://", "data:", "builtin:", "/api/__auto/media/"]
+            .iter()
+            .any(|&prefix| rendered.starts_with(prefix))
         {
-            let relative = Path::new(relative);
-            if relative
-                .components()
-                .all(|component| matches!(component, Component::Normal(_)))
-            {
-                if let Ok(file) = root.join(relative).canonicalize() {
-                    if file.starts_with(root) && file.is_file() {
-                        return file.to_string_lossy().into_owned();
-                    }
-                }
-            }
+            return rendered.to_owned();
         }
-        rendered.to_owned()
+        let Some(assets) = self.state.public_assets.as_deref() else {
+            return String::new();
+        };
+        let Some(file) = assets.resolve(rendered) else {
+            return String::new();
+        };
+        if surface {
+            assets.surface(file)
+        } else {
+            file.to_string_lossy().into_owned()
+        }
     }
 
     pub(super) fn native_icon(
@@ -108,12 +151,13 @@ impl Renderer<'_> {
     }
 
     pub(super) fn native_image(&self, element: &ComponentViewElement, style: Style) -> WidgetView {
-        let source = self.image_source(literal(element, "src").unwrap_or_default());
-        let fit = literal(element, "fit").unwrap_or("contain");
-        if matches!(
+        let surface = matches!(
             element.tag.as_str(),
             "imagesurface" | "image-surface" | "image_surface"
-        ) {
+        );
+        let source = self.image_source(literal(element, "src").unwrap_or_default(), surface);
+        let fit = literal(element, "fit").unwrap_or("contain");
+        if surface {
             let mut surface = View::image_surface(source);
             if let View::ImageSurface {
                 alt,
@@ -180,5 +224,47 @@ impl Renderer<'_> {
             placeholder: literal(element, "placeholder").map(str::to_owned),
             style: Some(style),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checked_image_sources_stay_inside_the_front_public_directory() {
+        let fixture = tempfile::tempdir().unwrap();
+        let public = fixture.path().join("front/public");
+        std::fs::create_dir_all(&public).unwrap();
+        std::fs::write(public.join("icon.png"), b"public fixture").unwrap();
+        let private = fixture.path().join("front/private.png");
+        std::fs::write(&private, b"outside public fixture").unwrap();
+        let root = public_assets(&fixture.path().join("front/pages/gallery.at")).unwrap();
+        let state = super::super::State::new(BTreeMap::new()).with_public_assets(Some(Arc::new(root)));
+        let mut renderer = Renderer {
+            session: 1,
+            instance: 0,
+            texts: [].iter(),
+            values: &[],
+            state: &state,
+            targets: Vec::new(),
+            panel_close: None,
+        };
+        assert_eq!(
+            renderer.image_source("/icon.png", false),
+            public.join("icon.png").canonicalize().unwrap().to_string_lossy()
+        );
+        assert_eq!(renderer.image_source("../private.png", false), "");
+        assert_eq!(renderer.image_source("/../private.png", false), "");
+        assert_eq!(renderer.image_source(&private.to_string_lossy(), false), "");
+        assert_eq!(renderer.image_source("/missing.png", false), "");
+        assert_eq!(renderer.image_source("/../private.png", true), "");
+        assert_eq!(
+            renderer.image_source("https://example.test/icon.png", false),
+            "https://example.test/icon.png"
+        );
+        let no_public = super::super::State::new(BTreeMap::new());
+        renderer.state = &no_public;
+        assert_eq!(renderer.image_source(&private.to_string_lossy(), false), "");
     }
 }

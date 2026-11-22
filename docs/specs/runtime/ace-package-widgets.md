@@ -35,17 +35,23 @@ The layout previews use the authored view tree. Grid columns, gaps and spans
 resolve against the current viewport. Responsive visibility applies before
 native controls enter the focus list. A hidden native subtree and a display
 element with no text value preserve the alignment of following AV observations.
+Fixed native preview sizes respect an authored minimum size. Native containers
+apply negative margins before sibling painting in source order.
 
 Literal composite pages use the registered controls of the destination
 renderer after AGE checks the view. The Iced page keeps disclosure and input
-state with its own session. The Vue page keeps those states in its mounted
-controls. A sidebar used as a preview occupies a viewport inside its page,
-so it does not capture the shell's navigation.
+state with its own session. Select displays the authored placeholder before
+a choice and after a new page mount. The Vue page keeps those states in its
+mounted controls. A sidebar used as a preview occupies a viewport inside its
+page, so it does not capture the shell's navigation.
 
 Native editors have distinct keys per page session, widget instance and
-source element. Closing a page releases those native editors. Native image
-references served by the original front's public directory resolve against
-that directory. The Vue product copies those public files into its build.
+source element. Closing a page releases those native editors and its public
+ImageSurface tickets. Checked local image references resolve within the
+canonical front public directory. An unresolved or out-of-root reference
+shows the missing-image state. ImageSurface consumes a media ticket for a
+public raster. The Vue product copies public files into its build.
+
 ## Chart geometry and interaction
 
 Checked package views can render SVG chart geometry built from the current

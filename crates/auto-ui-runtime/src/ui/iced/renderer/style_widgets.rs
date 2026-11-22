@@ -1052,6 +1052,16 @@ fn apply_column_style<M: Clone + Debug + 'static>(
                 }
             }
         }
+        if (justify_center || justify_end)
+            && iced_style.as_ref().is_some_and(|style| {
+                matches!(
+                    style.align_items,
+                    Some(crate::ui::style_iced_adapter::IcedAlign::Center)
+                )
+            })
+        {
+            cont = cont.align_x(iced::alignment::Horizontal::Center);
+        }
         // Apply visual styles (background, border, rounded, shadow)
         if let Some(ref is) = iced_style {
             if has_visual {
@@ -1375,7 +1385,8 @@ fn apply_container_style<M: Clone + Debug + 'static>(
     widget_id: Option<String>,
     hover: Option<crate::ui::iced::hover_area::HoverFlag>,
 ) -> iced::Element<'static, M> {
-    let max_width_pct = style.and_then(|s| IcedStyle::from_style(s).max_width_pct);
+    let iced_style = style.map(IcedStyle::from_style);
+    let max_width_pct = iced_style.as_ref().and_then(|style| style.max_width_pct);
     cont = cont.padding(iced_padding(padding, style));
     // PLAN-002 B：hover 变体类 → 第二套已构建样式（同 apply_column_style）。
     let hover_cs = style
@@ -1387,9 +1398,7 @@ fn apply_container_style<M: Clone + Debug + 'static>(
             ))
         });
 
-    if let Some(ref s) = style {
-        let is = IcedStyle::from_style(s);
-
+    if let Some(ref is) = iced_style {
         if center_x || center_y {
             // When centering, the container must fill its parent so it has room
             // to center the content. We apply width/height from style to this
@@ -1531,12 +1540,19 @@ fn apply_container_style<M: Clone + Debug + 'static>(
     } else {
         cont.into()
     };
-    match max_width_pct {
+    let el = match max_width_pct {
         // PLAN-077: max-w-[N%] 百分比上限（同 col/row 臂尾部）——居中臂的
         // width(Fill) 先行吃满父宽，收窄由本委托 widget 在 layout 期完成。
         Some(pct) => crate::ui::iced::max_width::MaxWidthPct::new(el, pct / 100.0).into(),
         None => el,
+    };
+    if let Some(style) = iced_style {
+        let (top, right, bottom, left) = style.effective_margin();
+        if top.min(right).min(bottom).min(left) < 0.0 {
+            return wrap_with_margin(el, &style);
+        }
     }
+    el
 }
 
 // ─────────────────────────────────────────────────────────────────────────
