@@ -11,6 +11,89 @@ fn main() {
     let path = args.next().expect("usage: p118_diag <app.at> [module_path]");
     let module_path = args.next().unwrap_or_else(|| "app::main".to_string());
     let src = std::fs::read_to_string(&path).expect("read source");
+    // 包面模式：跳过 prep，直接以 app::app 单元走宿主包面装载（手工组包探针）。
+    if std::env::var("P118_PKG").ok().as_deref() == Some("1") {
+        let units = vec![ace_core::source::packages::PackageModuleInput {
+            package: "app".into(),
+            version: "1.0.0".into(),
+            id: "app".into(),
+            source: src.into(),
+            provider: None,
+        }];
+        match auto_ui_runtime::ui::ace_node_desktop::NodeDesktopBridge::load_package(
+            units, "app::app", 1,
+        ) {
+            Ok(bridge) => {
+                let ev = bridge.evidence();
+                println!(
+                    "PACKAGE LOAD OK: buttons={} fields={} dispatch_errors={}",
+                    ev["buttons"].as_array().map(|a| a.len()).unwrap_or(0),
+                    ev["field_names"].as_array().map(|a| a.len()).unwrap_or(0),
+                    ev["errors"].as_array().map(|a| a.len()).unwrap_or(0),
+                );
+            }
+            Err(e) => {
+                println!("PACKAGE LOAD FAILED: {e}");
+                std::process::exit(2);
+            }
+        }
+        return;
+    }
+    // 包面帧转储：直连 PackageStateEngine，打印画布元素的 properties/events。
+    if std::env::var("P118_PKG_DUMP").ok().as_deref() == Some("1") {
+        use auto_ui_runtime::ui::ace_package_bridge::PackageStateEngine;
+        let units = vec![ace_core::source::packages::PackageModuleInput {
+            package: "app".into(),
+            version: "1.0.0".into(),
+            id: "app".into(),
+            source: src.into(),
+            provider: None,
+        }];
+        let mut engine = PackageStateEngine::new(
+            units,
+            "app::app",
+            ace_av::age_component::LegacyWidgetAlias::Accept,
+        )
+        .map_err(|e| e.to_string())
+        .unwrap_or_else(|e| {
+            println!("ENGINE NEW FAILED: {e}");
+            std::process::exit(2);
+        });
+        engine.mount("i0", Vec::new()).unwrap_or_else(|e| {
+            println!("MOUNT FAILED: {e}");
+            std::process::exit(2);
+        });
+        let frame = engine.package_frame("i0").unwrap_or_else(|| {
+            println!("NO FRAME");
+            std::process::exit(2);
+        });
+        fn walk(items: &[ace_av::age_package::WidgetViewItem], depth: usize, out: &mut String) {
+            for item in items {
+                match item {
+                    ace_av::age_package::WidgetViewItem::Text(t) => {
+                        println!("{}text {:?}", "  ".repeat(depth), &t[..t.len().min(60)]);
+                    }
+                    ace_av::age_package::WidgetViewItem::Timer(t) => {
+                        println!("{}timer {} {}ms", "  ".repeat(depth), t.message, t.every_ms);
+                    }
+                    ace_av::age_package::WidgetViewItem::Element(el) => {
+                        println!(
+                            "{}<{}> site={} label={:?} props={:?} events={:?}",
+                            "  ".repeat(depth),
+                            el.tag,
+                            el.site,
+                            el.label,
+                            el.properties,
+                            el.events.iter().map(|e| (&e.key, &e.message, &e.args)).collect::<Vec<_>>()
+                        );
+                        walk(&el.children, depth + 1, out);
+                    }
+                }
+            }
+        }
+        walk(&frame.view, 0, &mut String::new());
+        return;
+    }
     // 与宿主一致：有 pac.at 祖先时先过组件面源准备。
     let prepared = std::path::Path::new(&path)
         .ancestors()
