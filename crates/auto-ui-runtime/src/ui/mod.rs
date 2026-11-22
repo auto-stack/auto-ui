@@ -168,6 +168,10 @@ pub mod ase_m0_sessions;
 // PLAN-1118 AutoScape：本地浏览器七区外壳（导航/历史/收藏元数据层 +
 // 复用 ase_m0_sessions 会话层；严格地址解析复用 ase-m0 crate 单一语法源）。
 pub mod ase_browser_shell;
+// PLAN-1119 AutoWeb：只读网络导航 worker（协议/缓存在 ase-m0 autoweb 层；
+// 本模块为 reqwest rustls 网络执行 + 事件回投，复用 ase-m0 语法源）。
+#[cfg(feature = "ace-bridge")]
+pub mod autoweb_nav;
 // PLAN-980 ④-A：包感知桥与包片段 lane 同样只在 ce-bridge 面存在——
 // ce-av/ce-core/ce-a2x-ts 都是 optional 依赖，不加门会让默认构建
 // （auto-ui 自身、man 的 ace-candidate 链）拿到 E0433。

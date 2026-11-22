@@ -34,8 +34,10 @@
 
 use crate::ui::ace_node_desktop::{current_session, StepOutcome};
 use crate::ui::ase_m0_sessions::{AseApp, AseOpenTicket, AseSessionHost};
+use crate::ui::autoweb_nav::{AutowebNavOptions, WebNavWorker};
 use crate::ui::component::FocusRequest;
 use crate::ui::{Component, View};
+use ase_m0::autoweb::WebAddress;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock, RwLock};
@@ -70,6 +72,8 @@ pub enum ShellAppKind {
     Node { path: String },
     /// 内建目录页（元数据渲染，零装载）。
     Gallery,
+    /// AutoWeb 只读网络文档（PLAN-1119；HTTPS/`autoweb://` 同一导航入口）。
+    WebDoc,
 }
 
 impl ShellApp {
@@ -85,6 +89,8 @@ pub struct ResolvedTarget {
     pub display: String,
     pub canonical: String,
     pub kind: ShellAppKind,
+    /// 网络目标的已解析地址（`WebDoc` 恒有；本地目标为 None）。
+    pub web: Option<WebAddress>,
 }
 
 /// 解析失败（具名；不改变已提交状态）。
@@ -94,6 +100,9 @@ pub struct ResolveRefusal(pub String);
 /// 输入归一化 + 严格解析 + 冻结表 lookup（T-01 冻结规则）。
 ///
 /// - trim 后为空 → 具名拒。
+/// - 网络写法（`https://`/`autoweb://`/`http://`）→ ase-m0
+///   `parse_web_address` 单一语法源（别名映射/降级拒/userinfo 拒/片段
+///   剥离），不走 app 表（PLAN-1119）。
 /// - 含 `://` → 原样交严格解析（scheme 非 `app` 具名拒）。
 /// - 不含 scheme → 先试显示名（大小写不敏感），再按裸 identity 补
 ///   `app://<input>/`（输入尾部 `/` 保留），随后严格解析。
@@ -104,6 +113,23 @@ pub fn resolve_address(input: &str, apps: &[ShellApp]) -> Result<ResolvedTarget,
     let input = input.trim();
     if input.is_empty() {
         return Err(ResolveRefusal("empty address".to_string()));
+    }
+    // PLAN-1119：网络写法先行——协议层具名拒绝（含 http 降级拒）。
+    if let Some((scheme, _)) = input.split_once("://") {
+        if matches!(
+            scheme.to_ascii_lowercase().as_str(),
+            "https" | "autoweb" | "http"
+        ) {
+            let address = ase_m0::autoweb::parse_web_address(input)
+                .map_err(|e| ResolveRefusal(format!("resolve: {e}")))?;
+            return Ok(ResolvedTarget {
+                identity: format!("web:{}", address.host),
+                display: address.host.clone(),
+                canonical: address.display_address(),
+                kind: ShellAppKind::WebDoc,
+                web: Some(address),
+            });
+        }
     }
     let candidate = if input.contains("://") {
         // 根路由缺省补全：`app://identity` → `app://identity/`（地址栏友好
@@ -136,6 +162,7 @@ pub fn resolve_address(input: &str, apps: &[ShellApp]) -> Result<ResolvedTarget,
         display: app.display.clone(),
         canonical: app.canonical(),
         kind: app.kind.clone(),
+        web: None,
     })
 }
 
@@ -269,12 +296,30 @@ pub struct HistoryEntry {
     pub title: String,
 }
 
+/// 已提交的网络只读文档页（PLAN-1119；一次可呈现时与地址/历史/视口
+/// 一起提交——已下载描述不构成已打开文档）。
+#[derive(Clone, Debug)]
+pub struct WebDocPage {
+    /// 保留写法的地址（历史/收藏形态）。
+    pub address: String,
+    /// 规范 https URL。
+    pub canonical: String,
+    pub title: String,
+    pub release: String,
+    pub app_id: String,
+    /// 已验证的 AutoDown 源（sha256 与描述声明一致 + 只读准入通过）。
+    pub body: String,
+    pub sha256_hex: String,
+}
+
 /// 已提交页面（导航在新目标可呈现时一次提交）。
 #[derive(Clone, Debug)]
 pub struct CommittedPage {
     pub target: ResolvedTarget,
-    /// 该页签持有的 guest 会话（Gallery/新页签为 None）。
+    /// 该页签持有的 guest 会话（Gallery/新页签/网络文档为 None）。
     pub session: Option<usize>,
+    /// 网络只读文档内容（`WebDoc` 提交时恒有；本地目标为 None）。
+    pub web: Option<WebDocPage>,
 }
 
 /// 导航受理模式（决定成功提交时的历史语义）。
@@ -293,8 +338,10 @@ pub struct PendingNav {
     pub generation: u64,
     pub target: ResolvedTarget,
     pub mode: NavMode,
-    /// guest 目标的已装载票据（Gallery 为 None）。
+    /// guest 目标的已装载票据（Gallery/WebDoc 为 None）。
     pub ticket: Option<AseOpenTicket>,
+    /// 网络目标的取消旗标（PLAN-1119；置位后 worker 在下一 chunk/跳中止）。
+    pub web: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 /// 最近一次失败请求（独立展示 + 重试入口；不动已提交页面）。
@@ -403,6 +450,10 @@ pub struct AutoscapeHost {
     address_editing: Option<String>,
     /// 状态栏悬停目标（MouseArea enter/exit 驱动）。
     hover_hint: Option<String>,
+    /// PLAN-1119：网络导航选项（信任根/限额；测试注入隔离 CA）。
+    web_options: AutowebNavOptions,
+    /// PLAN-1119：网络导航 worker（首次网络导航时惰性启动）。
+    web_worker: Option<WebNavWorker>,
     /// 待执行的地址栏聚焦（take_focus_request 消费一次）。
     focus_epoch: Arc<AtomicU64>,
     focus_address: bool,
@@ -423,7 +474,7 @@ impl AutoscapeHost {
                     key: app.identity.clone(),
                     path: path.clone(),
                 }),
-                ShellAppKind::Gallery => None,
+                ShellAppKind::Gallery | ShellAppKind::WebDoc => None,
             })
             .collect();
         let mut errors = Vec::new();
@@ -474,6 +525,8 @@ impl AutoscapeHost {
             open_menu: None,
             address_editing: None,
             hover_hint: None,
+            web_options: AutowebNavOptions::default(),
+            web_worker: None,
             focus_epoch: Arc::new(AtomicU64::new(0)),
             focus_address: false,
             nav_log: Vec::new(),
@@ -494,6 +547,18 @@ impl AutoscapeHost {
         let config_root = autoscape_config_root()
             .ok_or_else(|| "preparation failure: home directory unavailable".to_string())?;
         Ok(Self::with_roots(fixture_root, config_root))
+    }
+
+    /// PLAN-1119：网络导航选项注入（测试注入隔离测试 CA 与更小限额；
+    /// 生产缺省=系统可信根 + 冻结限额）。
+    pub fn with_autoweb_options(mut self, options: AutowebNavOptions) -> Self {
+        self.web_options = options;
+        self
+    }
+
+    /// PLAN-1119：网络导航 worker 观察口（在途计数/事件 drain 由 step 承担）。
+    pub fn web_in_flight(&self) -> usize {
+        self.web_worker.as_ref().map_or(0, |w| w.in_flight())
     }
 
     // ----- 观察面 -----
@@ -571,6 +636,7 @@ impl AutoscapeHost {
                     format!("本地应用 {}", page.target.canonical)
                 }
                 ShellAppKind::Gallery => format!("本地目录 {}", page.target.canonical),
+                ShellAppKind::WebDoc => format!("网络文档 {}", page.target.canonical),
             })
             .unwrap_or_else(|| "就绪".to_string())
     }
@@ -606,8 +672,10 @@ impl AutoscapeHost {
                     display: app.display.clone(),
                     canonical: app.canonical(),
                     kind: app.kind.clone(),
+                    web: None,
                 },
                 session: None,
+                web: None,
             });
             tab.history.push(HistoryEntry {
                 address: app.canonical(),
@@ -669,9 +737,13 @@ impl AutoscapeHost {
                 self.tabs.len()
             ));
         }
-        // 进行中导航整票失效（票据 drop → 引擎释放）。
+        // 进行中导航整票失效（票据 drop → 引擎释放；网络旗标置位 →
+        // worker 中止并释放连接）。
         let tab = self.tabs.remove(index);
         if let Some(pending) = tab.pending {
+            if let Some(cancel) = &pending.web {
+                cancel.store(true, Ordering::Relaxed);
+            }
             drop(pending.ticket);
             self.nav_log.push(NavEvent {
                 tick: self.tick_no,
@@ -734,10 +806,14 @@ impl AutoscapeHost {
         } else {
             mode
         };
-        // 旧进行中请求整票失效（同页新请求使旧完成失效）。
+        // 旧进行中请求整票失效（同页新请求使旧完成失效）；网络目标同时
+        // 置位取消旗标（worker 在下一 chunk/跳中止并释放连接）。
         self.tabs[self.active].nav_generation += 1;
         let generation = self.tabs[self.active].nav_generation;
         if let Some(stale) = self.tabs[self.active].pending.take() {
+            if let Some(cancel) = &stale.web {
+                cancel.store(true, Ordering::Relaxed);
+            }
             drop(stale.ticket);
             self.nav_log.push(NavEvent {
                 tick: self.tick_no,
@@ -752,10 +828,11 @@ impl AutoscapeHost {
             });
         }
         self.tabs[self.active].failure = None;
-        // 分段装载：guest 真实编译成票据；Gallery 仅元数据。
-        let ticket = match &target.kind {
+        // 分段装载：guest 真实编译成票据；Gallery 仅元数据；网络目标交
+        // worker（事件驱动完成——可更新所属后台页签）。
+        let (ticket, web_cancel) = match &target.kind {
             ShellAppKind::Node { .. } => match self.sessions.begin_open(&target.identity) {
-                Ok(ticket) => Some(ticket),
+                Ok(ticket) => (Some(ticket), None),
                 Err(error) => {
                     self.tabs[self.active].failure = Some(NavFailure {
                         address: target.canonical.clone(),
@@ -768,7 +845,18 @@ impl AutoscapeHost {
                     return Err(error);
                 }
             },
-            ShellAppKind::Gallery => None,
+            ShellAppKind::Gallery => (None, None),
+            ShellAppKind::WebDoc => {
+                let address = target
+                    .web
+                    .clone()
+                    .expect("web target carries a parsed address");
+                let worker = self
+                    .web_worker
+                    .get_or_insert_with(|| WebNavWorker::spawn(self.web_options.clone()));
+                let cancel = worker.start(self.tabs[self.active].id, generation, address);
+                (None, Some(cancel))
+            }
         };
         self.log(
             "navigate",
@@ -780,13 +868,23 @@ impl AutoscapeHost {
             target,
             mode,
             ticket,
+            web: web_cancel,
         });
         self.address_editing = None;
         Ok(())
     }
 
-    /// 挂载点提交（step 内调用；仅活动页签的进行中请求提交）。
+    /// 挂载点提交（step 内调用；仅活动页签的进行中**本地**请求提交）。
+    /// 网络请求不经此路径：由事件驱动完成（[`Self::drain_web_events`]，
+    /// 可更新所属后台页签——PLAN-1119 §5）。
     fn commit_active_pending(&mut self) {
+        if self.tabs[self.active]
+            .pending
+            .as_ref()
+            .is_some_and(|p| p.web.is_some())
+        {
+            return;
+        }
         let tab = &mut self.tabs[self.active];
         let Some(pending) = tab.pending.take() else {
             return;
@@ -844,6 +942,7 @@ impl AutoscapeHost {
         self.tabs[self.active].committed = Some(CommittedPage {
             target: target.clone(),
             session: mounted_session,
+            web: None,
         });
         // 历史语义：New 且地址与游标记录不同 → 截断前进并追加；
         // Refresh/Reopen 不动历史。
@@ -940,8 +1039,8 @@ impl AutoscapeHost {
         self.navigate_with_mode(&address, NavMode::Refresh)
     }
 
-    /// 停止：使活动页签的进行中请求失效（票据 drop → 引擎释放），保留
-    /// 已提交页面与原历史记录。
+    /// 停止：使活动页签的进行中请求失效（票据 drop → 引擎释放；网络旗
+    /// 标置位 → worker 中止），保留已提交页面与原历史记录。
     pub fn stop(&mut self) -> Result<(), String> {
         let committed_address = self.tabs[self.active]
             .committed_address()
@@ -957,6 +1056,9 @@ impl AutoscapeHost {
         };
         let address = pending.target.canonical.clone();
         let generation = pending.generation;
+        if let Some(cancel) = &pending.web {
+            cancel.store(true, Ordering::Relaxed);
+        }
         drop(pending.ticket);
         let tab = &mut self.tabs[self.active];
         tab.nav_generation += 1;
@@ -1157,19 +1259,152 @@ impl AutoscapeHost {
         }
     }
 
-    /// 受控步进：到期脚本 → 活动页签进行中导航的挂载提交 → 会话层步进
-    /// （AV poll → 真实 handler → 差量 apply；Clock 到期校时）。
+    /// 网络完成事件裁决（step 内 drain）：按 `tab_id` 找页签、按代次判
+    /// 新鲜度；成功在内容可呈现时一次提交（地址/标题/历史/视口/状态），
+    /// 失败具名记录且已提交页面不动。切页签后有效结果仅更新所属页签。
+    fn drain_web_events(&mut self) {
+        while let Some(crate::ui::autoweb_nav::WebNavEvent::Outcome {
+            tab_id,
+            generation,
+            address,
+            result,
+        }) = self.web_worker.as_mut().and_then(|w| w.try_recv_event())
+        {
+            let Some(index) = self.tabs.iter().position(|tab| tab.id == tab_id) else {
+                self.nav_log.push(NavEvent {
+                    tick: self.tick_no,
+                    tab: tab_id,
+                    generation,
+                    action: "web-commit",
+                    address,
+                    outcome: "late completion dropped (tab already closed)".to_string(),
+                });
+                continue;
+            };
+            let (current_generation, has_web) = {
+                let tab = &self.tabs[index];
+                (
+                    tab.nav_generation,
+                    tab.pending.as_ref().is_some_and(|p| p.web.is_some()),
+                )
+            };
+            // pending 缺席（停止/关页后）或代次不匹配（已被更新请求抢占，
+            // pending 属于新请求须保留）→ 迟到完成整票丢弃。
+            let fresh = has_web
+                && self.tabs[index]
+                    .pending
+                    .as_ref()
+                    .is_some_and(|p| p.generation == generation);
+            if !fresh {
+                self.nav_log.push(NavEvent {
+                    tick: self.tick_no,
+                    tab: tab_id,
+                    generation,
+                    action: "web-commit",
+                    address: address.clone(),
+                    outcome: format!(
+                        "stale completion dropped (generation {generation} vs current \
+                         {current_generation}); committed page unchanged"
+                    ),
+                });
+                continue;
+            }
+            let pending = self.tabs[index]
+                .pending
+                .take()
+                .expect("fresh implies pending");
+            let mode = pending.mode;
+            let target = pending.target.clone();
+            match result {
+                Ok(outcome) => {
+                    // 网络文档替换任何旧 guest（先释放旧会话再落位）。
+                    let old_session = self.tabs[index]
+                        .committed
+                        .take()
+                        .and_then(|page| page.session);
+                    if let Some(old) = old_session {
+                        if let Err(error) = self.sessions.close_session(old) {
+                            self.errors.push(format!("web-commit rotate: {error}"));
+                        }
+                    }
+                    let title = outcome.title.clone();
+                    let page = crate::ui::ase_browser_shell::WebDocPage {
+                        address: pending.target.canonical.clone(),
+                        canonical: outcome.canonical_url.clone(),
+                        title: outcome.title,
+                        release: outcome.release,
+                        app_id: outcome.app_id,
+                        body: outcome.document,
+                        sha256_hex: outcome.document_sha256_hex,
+                    };
+                    self.tabs[index].committed = Some(CommittedPage {
+                        target: target.clone(),
+                        session: None,
+                        web: Some(page),
+                    });
+                    let tab = &mut self.tabs[index];
+                    if mode == NavMode::New {
+                        let current = tab.history.get(tab.cursor);
+                        if current.map(|e| e.address.as_str()) != Some(target.canonical.as_str()) {
+                            tab.history.truncate(tab.cursor + 1);
+                            tab.history.push(HistoryEntry {
+                                address: target.canonical.clone(),
+                                title,
+                            });
+                            tab.cursor = tab.history.len() - 1;
+                        }
+                    }
+                    tab.failure = None;
+                    self.nav_log.push(NavEvent {
+                        tick: self.tick_no,
+                        tab: tab_id,
+                        generation,
+                        action: "web-commit",
+                        address: address.clone(),
+                        outcome: format!(
+                            "committed (web document, {} request(s), cache_reused={})",
+                            outcome.request_count, outcome.cache_reused
+                        ),
+                    });
+                }
+                Err(message) => {
+                    self.tabs[index].failure = Some(NavFailure {
+                        address: address.clone(),
+                        message: message.clone(),
+                        generation,
+                    });
+                    self.nav_log.push(NavEvent {
+                        tick: self.tick_no,
+                        tab: tab_id,
+                        generation,
+                        action: "web-commit",
+                        address: address.clone(),
+                        outcome: format!("refused: {message}"),
+                    });
+                }
+            }
+        }
+    }
+
+    /// 受控步进：到期脚本 → 网络完成事件裁决 → 活动页签进行中本地导航的
+    /// 挂载提交 → 会话层步进（AV poll → 真实 handler → 差量 apply；
+    /// Clock 到期校时）。
     pub fn step(&mut self) -> StepOutcome {
         self.tick_no += 1;
         self.run_due_script();
+        self.drain_web_events();
         self.commit_active_pending();
         self.sessions.step_selected()
     }
 
-    /// 关窗收口：释放全部 guest 会话（引擎 owner + 状态根）。
+    /// 关窗收口：释放全部 guest 会话（引擎 owner + 状态根）；网络请求
+    /// 全部置位取消（worker 在通道关闭后随宿主退出）。
     pub fn close_all(&mut self) -> Result<(), String> {
         for tab in &mut self.tabs {
             if let Some(pending) = tab.pending.take() {
+                if let Some(cancel) = &pending.web {
+                    cancel.store(true, Ordering::Relaxed);
+                }
                 drop(pending.ticket);
             }
         }
@@ -1199,10 +1434,18 @@ impl AutoscapeHost {
                         "generation": p.generation,
                         "address": p.target.canonical,
                         "mode": format!("{:?}", p.mode),
+                        "web": p.web.is_some(),
                     })),
                     "failure": tab.failure.as_ref().map(|f| serde_json::json!({
                         "address": f.address, "message": f.message,
                     })),
+                    "committed_web": tab.committed.as_ref().and_then(|page| page.web.as_ref())
+                        .map(|web| serde_json::json!({
+                            "address": web.address, "canonical": web.canonical,
+                            "title": web.title, "release": web.release,
+                            "app_id": web.app_id, "sha256": web.sha256_hex,
+                            "body_bytes": web.body.len(),
+                        })),
                     "nav_generation": tab.nav_generation,
                     "history": tab.history.iter().map(|e| serde_json::json!({
                         "address": e.address, "title": e.title,
@@ -1217,8 +1460,10 @@ impl AutoscapeHost {
                 "kind": match &a.kind {
                     ShellAppKind::Node { path } => serde_json::json!({"node": path}),
                     ShellAppKind::Gallery => serde_json::json!("gallery"),
+                    ShellAppKind::WebDoc => serde_json::json!("webdoc"),
                 },
             })).collect::<Vec<_>>(),
+            "web_in_flight": self.web_in_flight(),
             "fixture_root": self.fixture_root.to_string_lossy(),
             "config_root": self.store.root().to_string_lossy(),
             "tabs": tabs,
@@ -1472,6 +1717,10 @@ impl Component for AutoscapeWindow {
                 h.active_index(),
                 h.address_editing().map(|s| s.to_string()),
                 h.active_tab().committed_address().map(|s| s.to_string()),
+                h.active_tab()
+                    .committed
+                    .as_ref()
+                    .and_then(|page| page.web.clone()),
                 h.bookmarks().to_vec(),
                 h.favorites_bar_visible(),
                 h.favorites_panel_open(),
@@ -1486,6 +1735,7 @@ impl Component for AutoscapeWindow {
             active,
             editing,
             committed_address,
+            web_doc,
             bookmarks,
             show_bar,
             panel_open,
@@ -1706,7 +1956,24 @@ impl Component for AutoscapeWindow {
                 app.canonical() == address && matches!(app.kind, ShellAppKind::Node { .. })
             })
         });
-        if committed_is_guest {
+        if let Some(web) = web_doc {
+            // 网络只读文档（PLAN-1119）：来源行 + 已验证 AutoDown 只读视图
+            // （渲染前准入已拒图片/HTML/组件指令/越域链接——零隐式资源）。
+            let mut doc = View::col().spacing(6).padding(12);
+            doc = doc
+                .child(View::text_styled(
+                    format!("{} — {}（release {}）", web.title, web.address, web.release),
+                    "text-sm",
+                ))
+                .child(View::text_styled(
+                    format!("sha256 {}", web.sha256_hex),
+                    "text-xs",
+                ));
+            doc = doc.child(crate::ui::autodown_render::render_document::<ShellMsg>(
+                &web.body, true,
+            ));
+            content = content.child(doc.build());
+        } else if committed_is_guest {
             if let Some((texts, states, buttons, generation)) = current_session(|s| {
                 (
                     s.texts.clone(),

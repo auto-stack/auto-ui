@@ -114,3 +114,22 @@ Clock 使用现有 20 毫秒宿主循环消费单个已到期唤醒。宿主负�
   `stop`）、已验证目标提交（`CommittedPage`/`mount_open`）、视口/状态
   （内容视口二态 + 状态栏阶段）与配置接口（`BookmarkStore` 同型根 +
   原子写入口）。
+
+## AutoWeb 只读网络文档消费（PLAN-1119）
+
+`src/ui/autoweb_nav.rs` 是 AutoWeb HTTPS 只读导航的网络执行面：协议/
+缓存/准入全在 auto-lang ase-m0 `autoweb` 模块（单一语义源，经组内兄弟
+path dep），本仓只做 reqwest blocking 执行（native-tls/schannel，redirect
+禁用——跳转策略归协议层；附加根 PEM 仅注入本客户端，OS 信任库不动）、
+单 worker 单飞行与事件回投。外壳接入（`ase_browser_shell.rs`）：网络写法
+与 `app://` 同一 `navigate` 入口；`PendingNav.web` 携带取消旗标（停止/
+抢占/关页/关窗置位，传输在下一读取块前中止并释放连接）；完成事件驱动
+（`drain_web_events` 可更新所属**后台**页签，与本地请求的活动页签提交不
+同路径）；成功在文档完整验证（sha256+只读准入）后与地址/历史/视口/状态
+一次提交，失败具名保留已提交页面。内容视口三态：guest AutoFrame / Gallery
+目录 / 网络只读文档（`autodown_render::render_document` 复用；渲染前准入
+已拒图片/HTML/`$` 组件指令/越域链接——零隐式资源、零执行面）。冻结的
+协议/来源/缓存/限额语义见 auto-lang `docs/specs/ase/autoweb-https-readonly.md`
+（单源权威）。完整目标 `tests/autoscape_autoweb_readonly.rs`
+（`--test-threads=1`；真窗档 `AUTO_UI_ASE_M0_E2E=1` 单实例，
+`examples/autoscape_window --autoweb-root-ca <pem>` 注入测试 CA）。

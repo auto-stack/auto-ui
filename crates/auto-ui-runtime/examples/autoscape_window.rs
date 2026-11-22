@@ -32,6 +32,7 @@ fn main() {
     let mut evidence_path: Option<String> = None;
     let mut config_home: Option<PathBuf> = None;
     let mut fixture_root: Option<PathBuf> = None;
+    let mut autoweb_root_ca: Option<Vec<u8>> = None;
     let mut hold_ms: u64 = 8000;
     let mut min_frames: usize = 8;
     let mut script_spec: Option<String> = None;
@@ -41,6 +42,18 @@ fn main() {
         match a.as_str() {
             "--config-home" => config_home = args.next().map(PathBuf::from),
             "--fixture-root" => fixture_root = args.next().map(PathBuf::from),
+            // PLAN-1119：网络导航附加信任根（真窗档 e2e 注入测试 CA；
+            // 信任仅作用于 AutoWeb 导航客户端，不碰 OS 信任库）。
+            "--autoweb-root-ca" => {
+                let pem_path = args
+                    .next()
+                    .map(PathBuf::from)
+                    .expect("--autoweb-root-ca <pem>");
+                autoweb_root_ca = Some(std::fs::read(&pem_path).unwrap_or_else(|e| {
+                    eprintln!("autoscape_window: read {}: {e}", pem_path.display());
+                    std::process::exit(2);
+                }));
+            }
             "--evidence" => evidence_path = args.next(),
             "--hold-ms" => hold_ms = args.next().and_then(|v| v.parse().ok()).unwrap_or(8000),
             "--min-frames" => min_frames = args.next().and_then(|v| v.parse().ok()).unwrap_or(8),
@@ -80,6 +93,11 @@ fn main() {
             }
         }
     };
+    if let Some(pem) = autoweb_root_ca {
+        let mut options = auto_ui_runtime::ui::autoweb_nav::AutowebNavOptions::default();
+        options.extra_root_pem = Some(pem);
+        host = host.with_autoweb_options(options);
+    }
     if let Some(spec) = &script_spec {
         host.install_script(parse_script(spec));
     }

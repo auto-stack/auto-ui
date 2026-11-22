@@ -15,7 +15,9 @@ default = ["ui-iced"]
 # PLAN-980（STATE/HELLO/RUST）：ACE 桥接线（组件面状态执行/首窗/A2R AXR0）。
 # 默认关闭——交付闭包（792 受管 bundle）不含 experimental/ace 树；交付投影
 # 剥除这些 optional path 行并把本 feature 改写为空（autodown-core 同型先例）。
-ace-bridge = ["dep:ace-av", "dep:auto-lang-ace-host", "dep:ace-abi", "dep:ace-a2x-core", "dep:ace-a2x-rust", "dep:ace-source-query", "dep:ace-foreign-contract", "dep:ace-core", "dep:ace-a2x-ts", "dep:ase-m0"]
+# PLAN-1119：+autodown——外壳网络文档只读视图复用既有 autodown 渲染面
+# （V-05 冻结命令 `--features ace-bridge` 单 feature 即含文档渲染）。
+ace-bridge = ["dep:ace-av", "dep:auto-lang-ace-host", "dep:ace-abi", "dep:ace-a2x-core", "dep:ace-a2x-rust", "dep:ace-source-query", "dep:ace-foreign-contract", "dep:ace-core", "dep:ace-a2x-ts", "dep:ase-m0", "autodown"]
 ui = ["auto-ui-compiler/ui"]
 # PLAN-018（Design52 D）：稳定UI基线（解释器/image-pipeline/code-editor/
 # 剪贴板/对话框/native-dock/clipboard + iced后端依赖）恒在——deps非optional、
@@ -379,6 +381,10 @@ iced_test = { version = "0.14" }
 insta = { version = "1", features = ["filters"] }
 # PLAN-814 T-07：plan804_os_e2e（随 owner 迁入）的消费面。
 fastrand = "2.4.1"
+# PLAN-1119：autoscape_autoweb_readonly 的受控 TLS 测试站（运行期生成
+# 隔离测试 CA + `localhost` 服务器证书；rustls 同步服务端）。
+rcgen = { version = "0.13", default-features = false, features = ["pem", "ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 resvg = "0.45"
 tiny-skia = "0.11"
 tempfile = "3"
