@@ -1,0 +1,17 @@
+// PLAN-011 G02/main author source: the original PLAN-877 two-part GLB entry
+// rebuilt through the view-3d author chain (auto-ui PLAN-027 delivery,
+// components-3d-runtime profile). Pure static scene: no model/msg/on
+// anywhere, so the generated product embeds behavior=null and plays without
+// a user VM, character or camera (fixed editor framing, unchanged).
+// The generated product is generated/main/ (scene/6 + identity.json +
+// closure/ + hash-named asset copy); this module is the living source.
+use resources: g02_glb
+
+node Main {
+    view-3d {
+        model3d badge {
+            model: resources.g02_glb
+            position: (0.0, 0.6, 0.0)
+        }
+    }
+}

@@ -1,0 +1,74 @@
+{
+ "origin": "age-examples @ ea0fc59 (worktree D:/autostack/.wt/lang-1075/age-examples)",
+ "note": "PLAN-1075 frozen gallery closures that pass the ACE front door (T-02 census 2026-11-22); vendored verbatim; entry module id sanitized (hyphen->underscore) by the loader, not in files.",
+ "files": {
+  "g01-main/main/main.at": {
+   "source": "g01-shapes/g01-main/generated/main/closure/main.at",
+   "sha256": "9b809a1c6d99985bcf96f3d8975caa2305f80e97d3876546d510e863bfd19067"
+  },
+  "g01-main/main/resources.at": {
+   "source": "g01-shapes/g01-main/generated/main/closure/resources.at",
+   "sha256": "6f993775477ebc395702905ce6f2f9de14010064bc602257a4a49af93ea08cad"
+  },
+  "g01-main/main/shapes.at": {
+   "source": "g01-shapes/g01-main/generated/main/closure/shapes.at",
+   "sha256": "dbdc5243ec590dab4fdd3dd7349860297a5dfd90962442b34d5e3ea1c6284d96"
+  },
+  "g01-main/v-color/resources.at": {
+   "source": "g01-shapes/g01-main/generated/v-color/closure/resources.at",
+   "sha256": "6f993775477ebc395702905ce6f2f9de14010064bc602257a4a49af93ea08cad"
+  },
+  "g01-main/v-color/shapes.at": {
+   "source": "g01-shapes/g01-main/generated/v-color/closure/shapes.at",
+   "sha256": "dbdc5243ec590dab4fdd3dd7349860297a5dfd90962442b34d5e3ea1c6284d96"
+  },
+  "g01-main/v-color/v-color.at": {
+   "source": "g01-shapes/g01-main/generated/v-color/closure/v-color.at",
+   "sha256": "4cc489e7e00a4f24861f226b580f7ef80f8b0ba62bcb8f3cdb6ee6ec850ad630"
+  },
+  "g01-main/v-order/resources.at": {
+   "source": "g01-shapes/g01-main/generated/v-order/closure/resources.at",
+   "sha256": "6f993775477ebc395702905ce6f2f9de14010064bc602257a4a49af93ea08cad"
+  },
+  "g01-main/v-order/shapes.at": {
+   "source": "g01-shapes/g01-main/generated/v-order/closure/shapes.at",
+   "sha256": "dbdc5243ec590dab4fdd3dd7349860297a5dfd90962442b34d5e3ea1c6284d96"
+  },
+  "g01-main/v-order/v-order.at": {
+   "source": "g01-shapes/g01-main/generated/v-order/closure/v-order.at",
+   "sha256": "d871100de8ad385e246cc758e52de8d549705b566aacaeb8eefadc914f95b32a"
+  },
+  "g01-main/v-position/resources.at": {
+   "source": "g01-shapes/g01-main/generated/v-position/closure/resources.at",
+   "sha256": "6f993775477ebc395702905ce6f2f9de14010064bc602257a4a49af93ea08cad"
+  },
+  "g01-main/v-position/shapes.at": {
+   "source": "g01-shapes/g01-main/generated/v-position/closure/shapes.at",
+   "sha256": "dbdc5243ec590dab4fdd3dd7349860297a5dfd90962442b34d5e3ea1c6284d96"
+  },
+  "g01-main/v-position/v-position.at": {
+   "source": "g01-shapes/g01-main/generated/v-position/closure/v-position.at",
+   "sha256": "4301c5b111ca911efcf99e0a987ade66fdc3aa9c366040c8cc6ae6642cf7f1a6"
+  },
+  "g01-main/v-visible/resources.at": {
+   "source": "g01-shapes/g01-main/generated/v-visible/closure/resources.at",
+   "sha256": "6f993775477ebc395702905ce6f2f9de14010064bc602257a4a49af93ea08cad"
+  },
+  "g01-main/v-visible/shapes.at": {
+   "source": "g01-shapes/g01-main/generated/v-visible/closure/shapes.at",
+   "sha256": "dbdc5243ec590dab4fdd3dd7349860297a5dfd90962442b34d5e3ea1c6284d96"
+  },
+  "g01-main/v-visible/v-visible.at": {
+   "source": "g01-shapes/g01-main/generated/v-visible/closure/v-visible.at",
+   "sha256": "ce899eeae7c77779e4db5934ff3982bbbbd05c088e6a31652f6ec42c4a03e0c1"
+  },
+  "g02-main/main/main.at": {
+   "source": "g02-glb/g02-main/generated/main/closure/main.at",
+   "sha256": "7ace9687fa243ce81218eac2d6e67e0b8fc01559cbfd3135675c0186dc6a2477"
+  },
+  "g02-main/main/resources.at": {
+   "source": "g02-glb/g02-main/generated/main/closure/resources.at",
+   "sha256": "d64a6f66088b862922d3f5592e30fff97e69c2f94db2812a118bbc22cecd20d3"
+  }
+ }
+}

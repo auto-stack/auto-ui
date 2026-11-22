@@ -20,6 +20,13 @@ pub struct AgeSession {
     ops: Vec<ace_core::source::age_component::ScenarioOp>,
     /// R63-1：Session 保存最近一次受检源，供 restart 与增量调度复用。
     source: String,
+    /// PLAN-1075（公共 AV 会话接线）：多模块作者闭包。Gallery 来源是
+    /// `use <id>: …` 的模块集（如 g01 的 resources/shapes/main）；单模块会话
+    /// 恒为 `[("main", source)]`。`source` 对闭包会话是各模块按序拼接
+    /// （仅供 send_args 诊断 anchor；模块真身在本表，按 id 编辑）。
+    modules: Vec<(String, String)>,
+    /// PLAN-1075：出口模块 id（编译出口 `app::<entry>`；单模块会话恒 "main"）。
+    entry: String,
     /// R63-1：stop 后的最后观察值（停止期间不受编辑/调度影响）。
     last_observed: Option<ObservedAgePackage>,
     stopped: bool,
@@ -74,6 +81,8 @@ impl AgeSession {
             instances,
             ops,
             source: src.to_string(),
+            modules: vec![("main".into(), src.to_string())],
+            entry: "main".into(),
             last_observed: None,
             stopped: false,
             pid: NEXT_PID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
@@ -87,19 +96,109 @@ impl AgeSession {
         })
     }
 
-    /// 同 PID 的 body 更新：成功替换并递增 generation；失败保留旧代。
-    pub fn update_body(&mut self, src: &str) -> Result<u64, Vec<String>> {
+    /// PLAN-1075（公共 AV 会话接线）：按**多模块作者闭包**打开 Gallery 来源。
+    /// `modules` = `(模块 id, 源文本)`（Gallery 各变体闭包见
+    /// `<project>/generated/<variant>/closure/`，id = 文件名去扩展）；
+    /// `entry` = 出口模块 id（编译出口 `app::<entry>`；基础变体通常是
+    /// `main`，变体闭包以其变体名入口，如 g01 的 `v-color`）。模块 id 不得
+    /// 重复、entry 必须在闭包内；诊断路径与单模块会话一致（共享 verify）。
+    pub fn open_modules(
+        modules: &[(String, String)],
+        entry: &str,
+        instances: usize,
+        ops: Vec<ace_core::source::age_component::ScenarioOp>,
+    ) -> Result<Self, Vec<String>> {
+        Self::validate_modules(modules, entry)?;
+        let compiled = Self::compile_modules(modules, entry, instances, ops.clone())?;
+        let source = modules
+            .iter()
+            .map(|(_, src)| src.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        Ok(Self {
+            compiled,
+            instances,
+            ops,
+            source,
+            modules: modules.to_vec(),
+            entry: entry.to_string(),
+            last_observed: None,
+            stopped: false,
+            pid: NEXT_PID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            dispatches: 0,
+            body_generation: 0,
+            runs: 1,
+            stops: 0,
+            async_spawned: 0,
+            async_settled: 0,
+            active: true,
+        })
+    }
+
+    /// PLAN-1075：闭包会话的**单模块**热更新（同 PID，坏编辑保旧）。
+    /// 未知名具名拒；编译失败保留上一好代与全部账面（generation 不动）。
+    pub fn update_module(&mut self, id: &str, src: &str) -> Result<u64, Vec<String>> {
         if self.stopped {
             return Err(vec![
                 "source.session.stopped: restart the session before editing".into(),
             ]);
         }
+        let Some(index) = self.modules.iter().position(|(mid, _)| mid == id) else {
+            return Err(vec![format!(
+                "source.session.module-unknown: {id} (declared: {})",
+                self.modules
+                    .iter()
+                    .map(|(mid, _)| mid.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )]);
+        };
         // R63-3: reuse the open-time scenario ops (not an empty schedule).
-        let next = Self::compile(src, self.instances, self.ops.clone())?;
+        let mut next_modules = self.modules.clone();
+        next_modules[index].1 = src.to_string();
+        let next =
+            Self::compile_modules(&next_modules, &self.entry, self.instances, self.ops.clone())?;
         self.compiled = next;
-        self.source = src.to_string();
+        self.modules = next_modules;
+        self.source = self
+            .modules
+            .iter()
+            .map(|(_, src)| src.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n");
         self.body_generation += 1;
         Ok(self.body_generation)
+    }
+
+    /// PLAN-1075：闭包会话的模块表（id 序，供宿主对账来源身份）。
+    pub fn module_ids(&self) -> Vec<String> {
+        self.modules.iter().map(|(id, _)| id.clone()).collect()
+    }
+
+    fn validate_modules(modules: &[(String, String)], entry: &str) -> Result<(), Vec<String>> {
+        if modules.is_empty() {
+            return Err(vec!["source.session.modules-empty".into()]);
+        }
+        let mut seen: Vec<&str> = Vec::new();
+        for (id, _) in modules {
+            if seen.contains(&id.as_str()) {
+                return Err(vec![format!("source.session.module-duplicate: {id}")]);
+            }
+            seen.push(id);
+        }
+        if !seen.contains(&entry) {
+            return Err(vec![format!(
+                "source.session.module-entry-missing: closure has no `{entry}` module (declared: {})",
+                seen.join(", ")
+            )]);
+        }
+        Ok(())
+    }
+
+    /// 同 PID 的 body 更新：成功替换并递增 generation；失败保留旧代。
+    /// （闭包会话等价于 `update_module("main", src)`——只换入口模块。）
+    pub fn update_body(&mut self, src: &str) -> Result<u64, Vec<String>> {
+        self.update_module("main", src)
     }
 
     // ---- R63-1：SESSION I 的调度/回调/资源/停止恢复/布局义务 ----
@@ -268,7 +367,8 @@ impl AgeSession {
         // the session's schedule (compile the tentative ops first, commit after).
         let mut next_ops = self.ops.clone();
         next_ops.extend(extra);
-        let next = Self::compile(&self.source, self.instances, next_ops.clone())?;
+        let next =
+            Self::compile_modules(&self.modules, &self.entry, self.instances, next_ops.clone())?;
         self.ops = next_ops;
         self.compiled = next;
         self.dispatches += 1;
@@ -331,7 +431,7 @@ impl AgeSession {
 
     /// 恢复：同一 PID 重新启动（Start 再次为 1），generation 递增。
     pub fn restart(&mut self) -> Result<u64, Vec<String>> {
-        let next = Self::compile(&self.source, self.instances, Vec::new())?;
+        let next = Self::compile_modules(&self.modules, &self.entry, self.instances, Vec::new())?;
         self.compiled = next;
         self.ops.clear();
         self.stopped = false;
@@ -372,17 +472,36 @@ impl AgeSession {
         instances: usize,
         ops: Vec<ace_core::source::age_component::ScenarioOp>,
     ) -> Result<AgePackageCompilation, Vec<String>> {
+        Self::compile_modules(
+            &[("main".to_string(), src.to_string())],
+            "main",
+            instances,
+            ops,
+        )
+    }
+
+    /// PLAN-1075：多模块闭包编译（与单模块同一受检前门与 verify；模块集即
+    /// `PackageModuleInput` 列表，出口 `app::<entry>`）。
+    fn compile_modules(
+        modules: &[(String, String)],
+        entry: &str,
+        instances: usize,
+        ops: Vec<ace_core::source::age_component::ScenarioOp>,
+    ) -> Result<AgePackageCompilation, Vec<String>> {
         let scenario = ComponentScenario { instances, ops };
-        let inputs = [PackageModuleInput {
-            package: "app".into(),
-            version: "1.0.0".into(),
-            id: "main".into(),
-            source: src.into(),
-            provider: None,
-        }];
+        let inputs: Vec<PackageModuleInput> = modules
+            .iter()
+            .map(|(id, src)| PackageModuleInput {
+                package: "app".into(),
+                version: "1.0.0".into(),
+                id: id.clone(),
+                source: src.clone(),
+                provider: None,
+            })
+            .collect();
         compile_age_package_with_scenario(
             &inputs,
-            "app::main",
+            &format!("app::{entry}"),
             LegacyWidgetAlias::Reject,
             &[PACKAGES_CAPABILITY.to_string()],
             &scenario,

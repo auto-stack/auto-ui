@@ -1,0 +1,7 @@
+// PLAN-011 G02 resource declaration: the original two-parts GLB (sha256
+// 42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671, 1528
+// bytes, MIT, PLAN-838 self-authored; license record at
+// licenses/42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671.LICENSE)
+// read in place as a typed Model3D resource. The compiler maps the symbol to
+// the resource identity - authors never hand-write hashes or numeric IDs.
+let g02_glb = model3d.glb("../assets/42c9da673fc67ccb0c65d4b337608834efd28a499f7e460866dcfc5ff2a0c671.glb")
