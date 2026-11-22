@@ -31,6 +31,7 @@ use super::ace_route::{front_package_units, front_route_modules, package_candida
 use super::ace_route_desktop::{DesktopRoutes, RouteHandlers, RouteLink, route_links};
 use crate::ui::ace_state_bridge::{
     AceStateEngine, AceStateValue, DispatchOutcome, EngineExecutionAudit,
+    DropReason,
 };
 use crate::ui::{Component, View};
 use std::collections::VecDeque;
@@ -3023,6 +3024,9 @@ impl NodeDesktopBridge {
                 // 与状态发布在 completion 臂统一发生，证据不提前）。
                 StepOutcome::Idle
             }
+            // PLAN-108：HttpBusy=同实例派发worker在途的正常背压（Tick 拍
+            // 期间恒见）——静默，不记错误。
+            Ok((DispatchOutcome::Dropped(DropReason::HttpBusy), _)) => StepOutcome::Idle,
             Ok((DispatchOutcome::Dropped(reason), _)) => {
                 let msg = format!("event dropped: {reason:?}");
                 self.errors.push(msg.clone());

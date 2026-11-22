@@ -950,53 +950,92 @@ pub(super) fn initial_of(v: &AceStateValue) -> InitialValue {
 /// PLAN-108（T-03c M2）：宿主 HTTP provider（reqwest blocking）。**阻塞语义**：
 /// 只在 worker 线程上调用（含 Http 效应的程序派发整体路由 worker——
 /// `AceStateEngine` 的 http_pending 车道）；UI 线程不等待。
-pub struct UiHttpProvider {
-    client: reqwest::blocking::Client,
-}
+pub struct UiHttpProvider;
 
 impl UiHttpProvider {
     pub fn new() -> Self {
-        Self {
-            client: reqwest::blocking::Client::builder()
-                .no_proxy()
-                .build()
-                .unwrap_or_default(),
-        }
+        Self
     }
 }
 
 impl ace_av::component_event_sessions::HttpProvider for UiHttpProvider {
     fn execute(&mut self, verb: &str, url: &str, body: Option<&str>) -> Result<String, String> {
-        let method = match verb {
-            "auto.http.get.v1" | "auto.http.get-json.v1" => reqwest::Method::GET,
-            "auto.http.delete.v1" => reqwest::Method::DELETE,
-            "auto.http.put.v1" | "auto.http.put-json.v1" => reqwest::Method::PUT,
-            "auto.http.patch.v1" | "auto.http.patch-json.v1" => reqwest::Method::PATCH,
-            _ => reqwest::Method::POST,
-        };
-        let mut req = self.client.request(method, url);
-        if let Some(body) = body {
-            let json_verb = verb.ends_with("-json.v1");
-            req = req.header(
-                reqwest::header::CONTENT_TYPE,
-                if json_verb {
-                    "application/json"
-                } else {
-                    "text/plain; charset=utf-8"
-                },
-            );
-            req = req.body(body.to_string());
-        }
-        let resp = req
-            .send()
-            .map_err(|e| format!("request failed: {e}"))?;
-        let status = resp.status();
-        let text = resp.text().map_err(|e| format!("body read failed: {e}"))?;
-        if status.is_success() {
-            Ok(text)
-        } else {
-            Err(format!("HTTP {status}: {text}"))
-        }
+        plain_http_request(verb, url, body)
+    }
+}
+
+/// PLAN-108：极简 HTTP/1.1 客户端（std::net::TcpStream；无代理/TLS——
+/// M2 闭合域=组件面探针的明文 http 慢端点；生产广度客户端另行立项）。
+/// 阻塞语义：只在 worker 线程调用。
+fn plain_http_request(
+    verb: &str,
+    url: &str,
+    body: Option<&str>,
+) -> Result<String, String> {
+    let method = match verb {
+        "auto.http.get.v1" | "auto.http.get-json.v1" => "GET",
+        "auto.http.delete.v1" => "DELETE",
+        "auto.http.put.v1" | "auto.http.put-json.v1" => "PUT",
+        "auto.http.patch.v1" | "auto.http.patch-json.v1" => "PATCH",
+        _ => "POST",
+    };
+    let rest = url
+        .strip_prefix("http://")
+        .ok_or_else(|| format!("unsupported url scheme (plain http only): {url}"))?;
+    let (authority, path) = match rest.find('/') {
+        Some(i) => (&rest[..i], &rest[i..]),
+        None => (rest, "/"),
+    };
+    let (host, port) = match authority.rfind(':') {
+        Some(i) => (&authority[..i], authority[i + 1..].parse::<u16>().map_err(|e| format!("bad port: {e}"))?),
+        None => (authority, 80u16),
+    };
+    let body = body.unwrap_or("");
+    let content_type = if verb.ends_with("-json.v1") {
+        "application/json"
+    } else {
+        "text/plain; charset=utf-8"
+    };
+    let mut stream = std::net::TcpStream::connect((host, port))
+        .map_err(|e| format!("connect {host}:{port} failed: {e}"))?;
+    std::net::TcpStream::set_read_timeout(
+        &stream,
+        Some(std::time::Duration::from_secs(120)),
+    )
+    .map_err(|e| format!("set_read_timeout failed: {e}"))?;
+    let request = format!(
+        "{method} {path} HTTP/1.1
+Host: {authority}
+Connection: close
+Content-Type: {content_type}
+Content-Length: {}
+
+{body}",
+        body.len()
+    );
+    use std::io::{Read, Write};
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|e| format!("request write failed: {e}"))?;
+    let mut raw = Vec::new();
+    stream
+        .read_to_end(&mut raw)
+        .map_err(|e| format!("response read failed: {e}"))?;
+    let text = String::from_utf8_lossy(&raw).into_owned();
+    let Some(header_end) = text.find("\r\n\r\n") else {
+        return Err(format!("malformed response (no header terminator): {text:.120}"));
+    };
+    let header = &text[..header_end];
+    let status: u32 = header
+        .split_whitespace()
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| format!("malformed status line: {header}"))?;
+    let body_out = text[header_end + 4..].to_string();
+    if (200..300).contains(&status) {
+        Ok(body_out)
+    } else {
+        Err(format!("HTTP {status}: {body_out:.200}"))
     }
 }
 
