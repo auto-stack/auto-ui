@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-22
 plan_revision: 1
-current_step: 7
+current_step: 8
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: [docs/specs/runtime/ace-route-page-loading.md, docs/specs/runtime/ace-package-widgets.md, docs/specs/ace-migration/m2-age.md]
@@ -112,7 +112,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。 2026-11-22 原 PAC 冷构建与 Chrome 走查完成，具体见 §9。
 - [x] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
-- [ ] T-08 正式交付与归档
+- [x] T-08 正式交付与归档
   - merge，AC-05，发布 A2Vue 和最终主线收据，沉淀适用规范，归档和校验组清理。
 
 ## 9. 复审记录
@@ -267,6 +267,19 @@ AutoLang 默认在回归期间更新至 `5c968b701e439523051277908914a6afd3e9de2
 
 - W1 接收本计划 §5 原画廊 13 行的 Windows AV/Iced 收据，生产入口使用原 PAC；运行验证和各原行预期见 R14/R15。目标 13/13，含经授权修复的 `/responsive` 窄/中/宽/窄回放。
 - Vue/CLI 接收同一冻结原项目的 A2Vue 13/13 行，含正式 TS/Vite 构建、实际浏览器与原资源。现行交付表登记以上两项。T-05 完成，T-08 待档案入库和清理回读。
+
+2026-11-22 stage: merge | plan_id: PLAN-123 | plan_revision: r1 | checkpoint: archived | outcome: pass。
+
+归档及下游登记提交 `75ebfbc3a71d6de179a8cc8d925d675d03501afd`，含本档案和 AutoUI 计划导航。归档实态校验 22 条链接、3 个导航入口及 8 个唯一任务，结果为 `archived / delivered`。归档时任务 7/8。原 PLAN-108 在途文稿仅随归档调整指向 PLAN-123 的一个链接，该文稿的其它编辑保持原样并留在工作区。
+
+2026-11-22 stage: merge | plan_id: PLAN-123 | plan_revision: r1 | checkpoint: cleaned | outcome: pass。
+
+- 三个落主工作树及两个固定只读工作树均通过最新绝对路径、Git 版本、干净状态和 reparse 守卫检查。五个工作树、三个已合并分支及空组目录已移除，39.126 s、退出 0。逐仓读回无 `ui-123` 工作树注册或 `plan-123-dev` 分支。
+- 证据折入本档案后仅移除已登记的 `D:/autostack/plan-artifacts/plan-123`。移除 138734 个文件、15085 个目录及 5036 个链接条目，未沿链接访问目标，回收独占文件数据 18358605075 字节，182.080 s。目录不存在，登记表已核 `deleted-at-merge (no holds)`、`remaining_bytes=0` 和归档引用。
+- 批回归读回 `last_covered_plan_id=1109`，收据年龄 24.357 h，覆盖版本之后无高于该编号且可被 5 整除的交付，本次未触发批回归。验收使用 R15 冻结 debug 工具，AutoUI 默认检出已有的 debug 工具最后写入为 2026-11-19 00:50（UTC+8）。本次交付状态为本地三仓源码快进。
+- AC-05 完成。三仓版本、三份规范、双端下游收据、归档和清理均已读回，8/8 完成。
+
+stage: goal | plan_id: PLAN-123 | plan_revision: r1 | round: 8 | from: merge | to: done | status: archived | outcome: pass | commit: 8f1ebe7d60a338acc6dd05c0fbb21d17879f5493 | archive: 75ebfbc3a71d6de179a8cc8d925d675d03501afd | next: done
 
 ## 10. 待澄清事项
 
