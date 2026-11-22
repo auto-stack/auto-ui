@@ -253,3 +253,5 @@ M4 回归：ace-av conformance 全量 1414 过 / 29 红（`m3-conformance.log`�
 
 2026-11-22 stage: merge | plan_id: PLAN-108:r2 | outcome: pass | delivery_commit: auto-lang 541623c42 / auto-ui 011a1b11 | landed: 双主线 ff-only（auto-lang rebase 9 提交 range-diff 全等；auto-ui 7 提交、一提交 import 行随主干 PLAN-123 适配、重基后编译复核）；canonical_verified: `docs/specs/ace-migration/component-event-sessions.md`（http.client/1 节）SHA256 `fc468de3…`、`docs/specs/runtime/component-http-async.md` SHA256 `41a443ef…`（均落主干提交）；测试面：新用例 11 例 0.09–0.41s（≤10s），ace-av conformance 全量 1414/29（29=master 对证既有/环境，清单 m3-conformance.log），浏览器/实窗证据哈希绑定 §9；archived: 本文件（git mv + status archived + completion_kind delivered）；cleaned: 见下行收据。
 
+
+2026-11-22 stage: merge | checkpoint cleaned | outcome: pass | guard: wt-guard 双树 clean（pwsh，reparse point 扫描）；worktree/branch: .wt/ui-108/{auto-ui,auto-lang,auto-web,auto-down} 与双仓 plan-108-dev 已删，组目录已删（worktree list 复核 0）；plan-artifacts/plan-108 整域已删（证据先折入本文件 §9；哈希绑定行保留）；registry 已刷新（merge_closeouts 记录，无 holds）；批回归门：`.last-batch-regression.json`（2026-11-22T15:10Z，covered=1114）——108<1114 且收据 <48h → 不到期，观察记录在案；部署面：无 release/部署授权范围，debug 产物随 worktree 删除（landing≠deployment，无运行中制品受本计划影响）。
