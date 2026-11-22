@@ -17,8 +17,9 @@ pub(in crate::ui) fn public_assets(source: &Path) -> Option<PathBuf> {
         .find(|path| path.file_name().is_some_and(|name| name == "front"))?
         .canonicalize()
         .ok()?;
-    let root = front.join("public").canonicalize().ok()?;
-    (root.starts_with(front) && root.is_dir()).then_some(root)
+    let declared = front.join("public");
+    let root = declared.canonicalize().ok()?;
+    (root == declared && root.is_dir()).then_some(root)
 }
 
 #[derive(Debug)]
