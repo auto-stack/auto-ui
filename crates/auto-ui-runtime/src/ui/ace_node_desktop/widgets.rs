@@ -17,6 +17,7 @@ use ace_core::source::ast::{Expr, ExprKind};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+mod composite;
 mod pointer;
 mod svg;
 
@@ -26,6 +27,8 @@ type WidgetView = View<NodeDesktopMsg>;
 pub enum Action {
     Focus(usize),
     DispatchButton(usize),
+    Input { key: usize, text: String },
+    Select { key: usize, index: usize },
     Accordion {
         key: usize,
         item: usize,
@@ -57,6 +60,8 @@ pub(super) struct State {
     focus: Option<usize>,
     expanded: BTreeMap<usize, BTreeSet<usize>>,
     disclosure: BTreeMap<usize, bool>,
+    inputs: BTreeMap<usize, String>,
+    selected: BTreeMap<usize, usize>,
     bindings: BTreeMap<String, bool>,
     pages: BTreeMap<usize, u32>,
     slider: BTreeMap<usize, f32>,
@@ -70,6 +75,8 @@ impl State {
             focus: None,
             expanded: BTreeMap::new(),
             disclosure: BTreeMap::new(),
+            inputs: BTreeMap::new(),
+            selected: BTreeMap::new(),
             bindings,
             pages: BTreeMap::new(),
             slider: BTreeMap::new(),
@@ -90,6 +97,12 @@ impl State {
     pub fn apply(&mut self, action: Action) {
         match action {
             Action::DispatchButton(_) => {} // Forwarded to the AV event queue by the window.
+            Action::Input { key, text } => {
+                self.inputs.insert(key, text);
+            }
+            Action::Select { key, index } => {
+                self.selected.insert(key, index);
+            }
             Action::Focus(key) => {
                 self.focus = Some(key);
             }
@@ -165,7 +178,8 @@ pub(super) fn contains_preview(items: &[ComponentViewItem]) -> bool {
             _ => false,
         })
     }
-    find_preview(items, static_layout(items))
+    let static_view = static_layout(items);
+    find_preview(items, static_view) || (static_view && composite::contains_panel(items))
 }
 
 fn static_layout(items: &[ComponentViewItem]) -> bool {
@@ -211,6 +225,7 @@ pub(super) fn view(
         values,
         state,
         targets: Vec::new(),
+        panel_close: None,
     };
     View::col()
         .spacing(10)
@@ -334,6 +349,7 @@ fn controls(
         values,
         state,
         targets: Vec::new(),
+        panel_close: None,
     };
     renderer.items(tree);
     renderer.targets
@@ -511,6 +527,7 @@ struct Renderer<'a> {
     values: &'a [(String, AceStateValue)],
     state: &'a State,
     targets: Vec<Control>,
+    panel_close: Option<usize>,
 }
 
 impl Renderer<'_> {
@@ -640,7 +657,12 @@ impl Renderer<'_> {
 
     fn element(&mut self, el: &ComponentViewElement, classes: &str, parsed: Style) -> WidgetView {
         let key = el.span.start;
+        if let Some(view) = self.render_panel(el).or_else(|| self.panel_close_button(el, classes)) {
+            return view;
+        }
         match el.tag.as_str() {
+            "input" => self.native_input(el, parsed),
+            "select" => self.native_select(el, parsed),
             "accordion" => self.accordion(el, key),
             "svg" => self.svg(el),
             "mouse-area" | "mouse_area" => self.mouse_area(el),
