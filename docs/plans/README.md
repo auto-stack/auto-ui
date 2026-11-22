@@ -16,13 +16,13 @@
 | 125 · U03 独立交互 Widgets | 已归档，七个原页两端各 7/7，由 105 纳入原十四页矩阵。 [交付收据](archived/125-autoui-u03-interactive-widgets.md) |
 | 105 · U03 本地应用与编辑 | 已落主归档，AutoUI / AutoLang 交付分别为 fe2dd4f1 / 0b754af59。124/125 的已交来源纳入 U03，015 Notes 的原样 AV handler 回放仍为具名债务，按原条件补证。 [归档收据](archived/105-autoui-u03-local-interactive-apps-av-vue.md) |
 | 107 · 024 Charts | r2 已归档。024 和五个图表原页的 Windows AV/Iced 与 A2Vue/Chrome 各 6/6。 [交付收据](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) |
-| 114 · 027 FileManager | executing r2，1/8，进行 T-02。树页已有双端回放，受检子组件事件与属性已有定向双端证据。原 027 仍需 watch、FocusCurrent 与正式宿主回放；继续核实际文件写操作。 [计划](114-autoui-file-manager-av-vue.md) |
+| 114 · 027 FileManager | r2 已交付，原 027、FileTree 与 TreeView 的 Windows AV/Iced 和 A2Vue 收据已归档。 [交付收据](archived/114-autoui-file-manager-av-vue.md) |
 | 123 · 布局 Widgets | 执行中。已有独立布局页和桌面路由入口证据；整包沿 107 图表与 114 树/包/事件的通过复审版本接续。 [计划](123-autoui-layout-widgets-av-vue.md) |
 | 106 · 014 Weather | executing r2，T-01 完成，T-02 部分交付（AutoLang 010a14d35）。条件样式 else-if 和包面文本比较已接通；原 hourly/daily 的可变记录列表接共享写面，真实 HTTP 与浏览器实跑仍待验。 [计划](106-autoui-u04-service-and-data-apps-av-vue.md) |
 
 ## 当前执行顺序
 
-1. **107 进入 T-08，114 并行继续 T-02。** 107 完成固定组与三仓落地核对，交正式收据、向 123 登记图表组件版本。114 继续原 027 的属性观察、焦点、真实文件效果和双端回放，按实际消费点向 123 与 106 交共享接口。
+1. **接续 107 和 114 的交付。** 123 可接 107 的图表组件及 114 的树组件和受检包。106 可按实际调用点接续 114 的共享接口。
 2. **106 同步推进 014 Weather。** 先实跑已可推进的样本行为、A2Vue 浏览器和本地真实 HTTP 合同。AV 的预报列表更新按 114/共享 typed-list owner 的交付接续，再核原城市切换、错误与重试。新增并行容量时，可开 108 的异步探针或准备 113 的 SQLite 回放。
 3. **123 逐项接入 107/114 的已审版本。** 路由宿主和独立布局页已有证据可先核验。拿到图表与树/包接点后跑原画廊和 kitchen-sink；若消费者先需要 123 的桌面入口，先按现有独立页证据交可用版本。
 4. **按原矩阵汇齐 W1。** 使用 104/105 已正式交付的适用行，保留 015 的具名 AV 缺口，其余逐例计划按下表前置推进。完整 W1 后交 1097 W2/AC，再交 1074 W3/A2R。可用的 A2Vue 结果独立交给 1072 路线与 982 的实际 CLI 联验。
@@ -36,7 +36,7 @@
 | U04 | [111](111-autoui-realworld-av-vue.md) | 023-realworld | 依实际消费组件 | drafting。接 HTTP、路由、认证和数据端口。 |
 | U04 | [112](112-autoui-sys-monitor-av-vue.md) | 025-sys-monitor | 依实际消费组件 | drafting。核系统采集与授权进程端口。 |
 | U04 | [113](113-autoui-database-av-vue.md) | 026-database | datatable、table | drafting。界面和真实 SQLite 各自出证据。 |
-| U04 | [114](114-autoui-file-manager-av-vue.md) | 027-file-manager | filetree、treeview | 执行中。继续原 027 的 watch、焦点和实际文件操作，向 123 交所用树/包接面。 |
+| U04 | [114](archived/114-autoui-file-manager-av-vue.md) | 027-file-manager | filetree、treeview | 已交付。原 027 与两棵树各有 AV/Iced 与 A2Vue 收据，向 123 交所用树与受检包接口。 |
 | U05 | [107](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) | 024-charts | area-chart、bar-chart、donut-chart、line-chart、flow-diagram | 已交付两端验收与图表接面，供 123 接续。 |
 | U05 | [115](115-autoui-video-app-av-vue.md) | 019-video-app | 依实际消费组件 | drafting。门户可先验，播放接实际 116/090 接口。 |
 | U05 | [116](116-autoui-media-players-av-vue.md) | 020-music-player、030-video-player | 依实际消费组件 | drafting。先核原播放，公共控件按所用 090 版本接续。 |

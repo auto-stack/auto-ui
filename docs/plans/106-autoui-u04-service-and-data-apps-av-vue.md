@@ -18,7 +18,7 @@ touched_goals: [GOAL-002]
 
 ## 0. 变更摘要
 
-2026-11-20 用户批准按 demo 和共用接口拆分 AutoUI 106–108。本号继续承担本页范围，原组其余 demo 迁至 [110](110-autoui-chat-av-vue.md)、[111](111-autoui-realworld-av-vue.md)、[112](112-autoui-sys-monitor-av-vue.md)、[113](113-autoui-database-av-vue.md)、[114](114-autoui-file-manager-av-vue.md)。 [原分母与交付映射](README.md)。
+2026-11-20 用户批准按 demo 和共用接口拆分 AutoUI 106–108。本号继续承担本页范围，原组其余 demo 迁至 [110](110-autoui-chat-av-vue.md)、[111](111-autoui-realworld-av-vue.md)、[112](112-autoui-sys-monitor-av-vue.md)、[113](113-autoui-database-av-vue.md)、[114](archived/114-autoui-file-manager-av-vue.md)。 [原分母与交付映射](README.md)。
 
 ## 1. 目标
 
