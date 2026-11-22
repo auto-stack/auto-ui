@@ -1148,27 +1148,20 @@ fn stmt_contains_http_effect(s: &auto_lang_core::ast::Stmt) -> bool {
             if !handler_bodies_call_clean(base) {
                 return false;
             }
-            if compile_failed {
-                // 整体失败承载须以 widget 确有 Http 效应为前提——否则
-                // 失败另有原因（非 Http 符号），不得掩盖，保持硬拒。
-                widget.handlers.values().any(|payload| {
-                    matches!(
-                        payload,
-                        auto_ui_compiler::aura::LogicPayload::AstStmts(stmts)
-                            if stmts.iter().any(stmt_contains_http_effect)
-                    )
-                })
-            } else {
-                widget.handlers.iter().any(|(pattern, payload)| {
-                    let pb = pattern.split('(').next().unwrap_or(pattern).trim_start_matches('.');
-                    pb == base
-                        && matches!(
-                            payload,
-                            auto_ui_compiler::aura::LogicPayload::AstStmts(stmts)
-                                if stmts.iter().any(stmt_contains_http_effect)
-                        )
-                })
-            }
+            // PLAN-108 F-1（review needs_fix 修复）：承载谓词对称化——
+            // 组件面 Http 准入（M1）后 lane 编译对 Http widget 整体成功，
+            // 纯状态兄弟（.Bump/.Tick 等）经「逐 handler 缺席」到达本判定；
+            // 两臂统一为「体 call-clean 且 widget 确有 Http 效应」（call-clean
+            // 已由外层 filter 保证）。无 Http 效应的 widget 的派生缺席保持
+            // 硬拒（失败另有原因，不得掩盖）。
+            let _ = compile_failed;
+            widget.handlers.values().any(|payload| {
+                matches!(
+                    payload,
+                    auto_ui_compiler::aura::LogicPayload::AstStmts(stmts)
+                        if stmts.iter().any(stmt_contains_http_effect)
+                )
+            })
         });
     let spliced = if bodies.is_empty() {
         sfc
