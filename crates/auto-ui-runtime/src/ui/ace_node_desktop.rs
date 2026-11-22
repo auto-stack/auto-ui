@@ -1879,6 +1879,13 @@ impl NodeDesktopBridge {
     fn load_source(src: &str, path: &str, instances: usize) -> Result<Self, String> {
         use ace_core::source::age_package::{FILE_LIST_BINDING, FILE_MUTATE_BINDING, FILE_OPEN_BINDING};
 
+        // PLAN-113（026 真语料）：AV 桌面装载与 TS/WEB lane 同律——`$event`
+        // 宿主事件占位按**同长归一化**（`$event`→`nevent`，5→5 字节，span
+        // 零位移）后进 CST；方言事件绑定实参位（`onchanged: .PageChanged($event)`）
+        // 投影层丢弃实参（宿主通道，§13.14）。
+        let src = src.replace("$event", "nevent");
+        let src: &str = &src;
+
         if let Ok(candidates) = package_candidates(src) {
             if candidates.first().is_some_and(|node| node.members.iter().any(|row| row.role == "route")) {
                 let app = std::path::Path::new(path);
