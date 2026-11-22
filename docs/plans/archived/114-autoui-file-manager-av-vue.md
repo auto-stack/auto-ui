@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-22
 plan_revision: 2
-current_step: 7
+current_step: 8
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-085]
 supersedes_spec_components: [docs/specs/runtime/ace-package-widgets.md, docs/specs/ui/collection-view.md]
@@ -124,7 +124,7 @@ T-02 的永久回归优先使用 AutoLang 已登记 `ace-source`、`ace-av`、`a
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
 - [x] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
-- [ ] T-08 正式交付与归档
+- [x] T-08 正式交付与归档
   - merge，AC-05，发布 A2Vue 和最终主线收据，沉淀适用规范，归档和校验组清理。
 
 ## 9. 复审记录
@@ -2284,6 +2284,15 @@ stage: goal | plan_id: PLAN-114 | plan_revision: r2 | round: 131 | from: review 
 - `canonical_verified` 核三份规范在实际默认检出的 SHA-256 等于 R127。落地主检出与通过浏览器的验证目录逐文件核对，原 027 及三依赖包共 44 个跟踪文件，原画廊 91 个源/入口文件，全部相同。主检出 `cargo tree --locked --offline -p auto-ui-tools --features ace-vue --depth 1` 退出 0，1.321 s，SHA-256 `F657420E06D5541D8C9EAB846B8FB2F1B8090AE0652EEBF414F7995AD27BD2E1`。
 - 当次测试使用冻结的 debug 工具。主检出已有的 debug `auto-ui-tool.exe` 日期为 2026-11-19 00:50（北京时间），早于交付。此次交付为源代码合并与归档。批回归核对 `last_covered_plan_id=1109`，当次收据约 21.41 小时，未达编号或 48 小时触发条件。
 - `archived` 归档及 U04 导航登记为 AV 与 A2Vue 下游接收点。实际路径验证 11 条链接、3 条导向、8 个唯一任务。归档时 7/8 完成，T-08 尚待入库后的工作树与专属产物清理回读。
+
+2026-11-22 stage: merge | plan_id: PLAN-114 | plan_revision: r2 | round: 133 | checkpoint: cleaned | outcome: pass。
+
+- `archived` 归档与下游导航入库提交 `63df40282091825e639b83121d52b2cd623a50ba`，包含本档案、U04 索引及 PLAN-106 反链。复验后其他计划的 64 个未提交路径的状态、索引与字节保持，AutoUI 16、AutoLang 26、AutoOS 22。
+- `cleaned` 各专属工作树在移除前复核绝对路径、提交、干净状态和 `wt-guard`。已移除 AutoUI、AutoLang、AutoOS 交付树及 AutoDown、AutoWeb 两个只读依赖树，三个已快进的 `plan-114-dev` 分支已删除，`D:/autostack/.wt/ui-114` 不再存在。R98–99 原实窗源码的 `refs/plan-recovery/114/{ui-t04,lang-t04,os-t04}` 已读回，供重现冻结证据。
+- 折叠回放、固定组与收尾证据后仅移除已登记的 `D:/autostack/plan-artifacts/plan-114`。共 818336 个普通文件、98578 个目录、28009 个链接条目，回收独占文件逻辑数据 76808366712 字节，399.456 s。路径不再存在，`.retention/policy.json` 中对应条目记录 `deleted-at-merge (no holds)`、`remaining_bytes=0`、归档路径和归档提交。
+- AC-05 完成。三仓交付、规范读回、AV 与 A2Vue 下游收据及清理回读均成立，计划 8/8 完成。
+
+stage: goal | plan_id: PLAN-114 | plan_revision: r2 | round: 133 | from: merge | to: done | status: archived | outcome: pass | commit: 3dbdc756d5ed4414a36b49336aa2dcf602ffef5c | archive: 63df40282091825e639b83121d52b2cd623a50ba | next: done
 
 ## 10. 待澄清事项
 
