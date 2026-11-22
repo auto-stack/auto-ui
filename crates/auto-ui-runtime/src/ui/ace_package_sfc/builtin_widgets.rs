@@ -21,7 +21,10 @@ pub(super) fn generate(node: &ComponentNode) -> Result<Option<PackageSfc>, Strin
         || !node.view.named_trees.is_empty()
         || !node.view.node_refs.is_empty()
         || node.messages.iter().any(|message| message.outbound)
-        || node.fields.iter().any(|field| literal(&field.init).is_none())
+        || node
+            .fields
+            .iter()
+            .any(|field| literal(&field.init).is_none())
         || node.handlers.iter().any(|handler| {
             handler.body_foreign || !handler.stmts.is_empty() || !handler.channel_calls.is_empty()
         })
@@ -29,7 +32,9 @@ pub(super) fn generate(node: &ComponentNode) -> Result<Option<PackageSfc>, Strin
         return Ok(None);
     }
 
-    let [root] = node.view.tree.as_slice() else { return Ok(None) };
+    let [root] = node.view.tree.as_slice() else {
+        return Ok(None);
+    };
     let mut uses_composite = false;
     let Some(view_tree) = view(root, &mut uses_composite).filter(|_| uses_composite) else {
         return Ok(None);
@@ -83,34 +88,84 @@ fn view(item: &ComponentViewItem, uses_composite: &mut bool) -> Option<AuraNode>
 
     match item {
         ComponentViewItem::Text(leaf) => {
-            let ExprKind::StrLit(value) = &leaf.expr.kind else { return None };
+            let ExprKind::StrLit(value) = &leaf.expr.kind else {
+                return None;
+            };
             Some(AuraNode::text(value))
         }
         ComponentViewItem::Element(element) => {
             let tag = element.tag.as_str();
             *uses_composite |= matches!(
                 tag,
-                "alert-dialog" | "alert_dialog" | "drawer" | "dropdown-menu"
-                    | "hover-card" | "hover_card" | "popover" | "select" | "sheet"
+                "alert-dialog"
+                    | "alert_dialog"
+                    | "drawer"
+                    | "dropdown-menu"
+                    | "hover-card"
+                    | "hover_card"
+                    | "popover"
+                    | "select"
+                    | "sheet"
             );
-            let local_href = tag == "link"
-                && prop(element, "href").is_some_and(|value| {
-                    value.starts_with('/') && !value.starts_with("//")
+            if tag == "link" {
+                for item in &element.items {
+                    if let ComponentViewItem::Entry(entry) = item {
+                        if !matches!(entry.key.as_str(), "text" | "href" | "to")
+                            || entry.is_event
+                            || !matches!(&entry.value, ComponentEntryValue::Expr(expr) if matches!(expr.kind, ExprKind::StrLit(_)))
+                        {
+                            return None;
+                        }
+                    }
+                }
+                let href = prop(element, "href").unwrap_or_default();
+                let to = prop(element, "to")
+                    .or_else(|| (href.starts_with('/') && !href.starts_with("//")).then_some(href));
+                let label = match &element.label {
+                    Some(label) => match &label.kind {
+                        ExprKind::StrLit(value) => value.as_str(),
+                        _ => return None,
+                    },
+                    None => prop(element, "text").unwrap_or_default(),
+                };
+                let mut children = element
+                    .items
+                    .iter()
+                    .filter(|item| !matches!(item, ComponentViewItem::Entry(_)))
+                    .map(|item| view(item, uses_composite))
+                    .collect::<Option<Vec<_>>>()?;
+                if !label.is_empty() {
+                    children = vec![AuraNode::text(label)];
+                }
+                return Some(AuraNode::Link {
+                    to: to.unwrap_or_default().into(),
+                    href: if to.is_none() {
+                        href.into()
+                    } else {
+                        String::new()
+                    },
+                    text: String::new(),
+                    children,
+                    span: None,
+                    debug_id: None,
                 });
-            let internal_link = local_href || (tag == "link" && prop(element, "to").is_some());
-            let mut node = AuraNode::element(if internal_link { "nav_link" } else { tag });
+            }
+            let mut node = AuraNode::element(tag);
             if let Some(label) = &element.label {
-                let ExprKind::StrLit(value) = &label.kind else { return None };
+                let ExprKind::StrLit(value) = &label.kind else {
+                    return None;
+                };
                 node = node.with_child(AuraNode::text(value));
             }
             for item in &element.items {
                 if let ComponentViewItem::Entry(entry) = item {
-                    let ComponentEntryValue::Expr(expr) = &entry.value else { return None };
+                    let ComponentEntryValue::Expr(expr) = &entry.value else {
+                        return None;
+                    };
                     if entry.is_event {
                         return None;
                     }
-                    let key = if local_href && entry.key == "href" { "to" } else { &entry.key };
-                    node = node.with_prop(key, literal(expr)?);
+                    node = node.with_prop(&entry.key, literal(expr)?);
                 } else {
                     node = node.with_child(view(item, uses_composite)?);
                 }

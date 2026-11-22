@@ -161,7 +161,7 @@ fn p123_literal_route_uses_registered_vue_widgets() {
         "<HoverCardTrigger",
         "<HoverCardContent",
         "<AlertDialogAction",
-        r#"<NavLink to="/live""#,
+        r#"<router-link to="/live""#,
     ] {
         assert!(gallery.contains(expected), "missing {expected}: {gallery}");
     }

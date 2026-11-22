@@ -1231,6 +1231,8 @@ impl VueGenerator {
                 if let Some(value) = props.get("disabled") {
                     if self.extract_bool_value(value) {
                         attrs.push("disabled".to_string());
+                    } else if self.extract_string_value(value).as_deref() == Some("false") {
+                        attrs.push(":disabled=\"false\"".to_string());
                     } else if let AuraPropValue::Expr(e) = value {
                         match self.expr_to_vue_bound_value(e) {
                             Ok(expr_vue) => attrs.push(format!(":disabled=\"{}\"", expr_vue)),

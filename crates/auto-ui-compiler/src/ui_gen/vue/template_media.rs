@@ -1999,7 +1999,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
         // 表达式)在 vue-tsc 的模板检查下类型收窄失败(StyleValue 被解析
         // 为 undefined,TS2345 实证);CSS 声明串语义等价且类型稳定。
         image_attrs.push(format!(
-            ":style=\"'transform:' + ({}) + ';object-fit:' + ({}) + ';filter:' + ({}) + ';' + (({}) === 'cover' ? 'width:100%;height:100%;' : '')\"",
+            ":style=\"'transform:' + ({}) + ';object-fit:' + ({}) + ';filter:' + ({}) + ';' + (String({}) === 'cover' ? 'width:100%;height:100%;' : '')\"",
             transform, fit, filter, fit
         ));
 
@@ -4077,7 +4077,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                     Ok(format!(
                         "{}<a href=\"{}\">{}</a>\n",
                         ind,
-                        href,
+                        Self::escape_html_attr(href),
                         text_content.trim()
                     ))
                 } else {
@@ -4094,7 +4094,7 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                     };
                     // Vue Router link. Plan 409 §8: links use the theme color
                     // (text-primary) — matches the VM link rendering.
-                    Ok(format!("{}<router-link to=\"{}\" class=\"group block text-primary\" active-class=\"\" exact-active-class=\"router-link-exact-active\">\n{}{}</router-link>\n", ind, to, children_html, ind))
+                    Ok(format!("{}<router-link to=\"{}\" class=\"group block text-primary\" active-class=\"\" exact-active-class=\"router-link-exact-active\">\n{}{}</router-link>\n", ind, Self::escape_html_attr(to), children_html, ind))
                 }
             }
         }
