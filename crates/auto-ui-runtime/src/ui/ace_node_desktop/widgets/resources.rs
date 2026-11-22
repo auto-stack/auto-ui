@@ -139,13 +139,9 @@ impl Renderer<'_> {
                 .push(StyleClass::Height(SizeValue::Pixels(size)));
         }
         let name = literal(element, "name").unwrap_or("circle");
-        let src = if name.contains(':') {
-            name.to_owned()
-        } else {
-            format!("lucide:{name}")
-        };
+        let name = name.strip_prefix("lucide:").unwrap_or(name);
         View::Image {
-            src,
+            src: format!("lucide:{name}"),
             style: Some(style),
         }
     }
@@ -266,5 +262,23 @@ mod tests {
         let no_public = super::super::State::new(BTreeMap::new());
         renderer.state = &no_public;
         assert_eq!(renderer.image_source(&private.to_string_lossy(), false), "");
+
+        let file_name = serde_json::to_string(&private.to_string_lossy()).unwrap();
+        let source = format!(r#"widget Preview {{
+    view {{
+        icon (name: {file_name}) {{}}
+        icon (name: "lucide:circle") {{}}
+    }}
+}}"#);
+        let nodes = ace_core::source::age_component::project_component_candidates(&source).unwrap();
+        let tree = &nodes[0].view.tree;
+        let View::Column { children, .. } = super::super::view(1, 0, tree, &[], &[], &state) else {
+            panic!("expected a frame for the icons");
+        };
+        assert!(matches!(
+            children.as_slice(),
+            [View::Image { src: invalid, .. }, View::Image { src: valid, .. }]
+                if invalid == &format!("lucide:{}", private.display()) && valid == "lucide:circle"
+        ));
     }
 }
