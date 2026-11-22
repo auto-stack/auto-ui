@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-106
-status: executing
+status: archived
 feature_name: U04 Weather 双端交付
 author: [Codex]
 created_at: 2026-11-19
-updated_at: 2026-11-21
+updated_at: 2026-11-22
 plan_revision: 2
-current_step: 3
+current_step: 8
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -111,6 +111,8 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
     投影分流修复）、A2Vue 新文法复测通过（5.96s）、两端差额与可复跑输入在案。
 - [ ] T-08 正式交付与归档
   - merge，AC-05，发布 A2Vue 和最终主线收据，沉淀适用规范，归档和校验组清理。
+  - 2026-11-22 完成：双仓交付落主（auto-lang `292575164`、auto-ui `f9542a9d`）、
+    规范增量沉淀（m2-autoui.md）、归档本计划、工作树清理。详见 §9 T-08 收据。
 
 ## 9. 复审记录
 
@@ -139,3 +141,5 @@ T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台
 **B2（2026-11-21，AV 腿原样装载阻断，owner=共享 typed-list 写面/114 在途）**：014 原 SelectCity/Init 在 handler 重写无类型 Obj 记录列表（`var hourly = [...]`、`var daily = [...]`）。AV 事件会话引擎（`ComponentEventSessionProgram::compile` → `compile_component_event_program`）当前按 **5085 标量门**拒绝**任何**列表 model 字段（`[]str`/`[]Todo`/`[]HourPoint` 均拒；场景车道 2325 门放行 `[]T` 但 AV 桥不用该入口）——014 原样源无法在 AV `--source` 装载。三个层次均已核实：①语法（对象/数组字面量在 AGE 表达式面）已由本计划开（B1 同批）；②bind（无类型列表=只读 view-data，handler 写=设计拒 `undeclared model field`）；③AV 事件会话标量门。105 已交 `[]T` 内建元素写（012，场景车道）+ store/宿主 API 记录写（013）；114 在途（age-package object-lit，可变列表未接通）；组件面事件会话的列表状态字段写面两仓均未交。按 §4「核对 105 已交语义及 114 同一写面」+ §5「缺具体能力时明确负责计划、版本和最小复现」，本计划记录不重复实现。**unblock**：114 或共享 typed-list owner 交付组件面事件会话的列表状态写面后，014 原样源可在 AV 装载并复验；届时本计划 T-03/T-04 续跑。**已交替代证据**：固定负载显示（全原样 view 真窗 exit 0/applies=81/北京 23° 全字段）+ 本地真实 HTTP 服务合同（fail-once→retry-200 + 未知城市回落，2 测试通过）。
 
 **B2 解除（2026-11-22，用户授权 106 在计划内实现共享写面）**：114 已合入主线（auto-lang/auto-ui 均含），用户选择「Authorize PLAN-106 to implement that shared surface in-plan」。本计划实现：①handler 多行 view-data 列表重写（`.hourly = [\n {…},\n …]`）经专用语句面（age-view-assign-viewdata-stmt，仅多行——内联列表仍走 pratt 保 114 类型化 List 写）解析；②bind 层把 view_data 字段写定为**惰性收据**（可 bind、可编译、不落 state cell；展示读 view_data 初值）；③hook_stmts_lower（事件/场景/检查三车道共享脱糖）对 view_data 写跳过发射；④事件绑定条目值保留作者载荷实参（`.SelectCity("beijing")` 投影为 MethodCall，AV 桥按钮载荷可派发）。014 原样源 AV 装载 + SelectCity/Refresh 交互 + close/late/reopen 世代纪律全部实证（`plan106_window_render` 3/3）。文法 id 重基线 7 行（object-lit 共享臂 profiles 注解波及邻居）+ 嵌入 AAC 文法数据重新生成。空列表 `[]` 投影为真实空数组（类型化 List reset 合法）。
+
+2026-11-22 stage: merge（T-08 正式交付与归档）| PLAN-106 r2 | outcome: pass | landed: auto-lang `292575164` / auto-ui `f9542a9d`（ff-only，均=默认分支 tip）| canonical_verified: docs/specs/ace-migration/m2-autoui.md 两段增量（`投影保留实参`/`惰性收据`）在落主提交 | archived: 本计划移至 docs/plans/archived/（status: archived，docs 提交随归档提交落主）| cleaned: wt-guard 干净后移除 .wt/ui-106/{auto-ui,auto-lang} 工作树 + 删除 plan-106-dev 分支；plan-artifacts/plan-106/ 整体删除（证据已折入 §9/§8），registry 刷新 | 交付核对: AC-01..05 全过、双端结果落主（AV 窗口/服务 + A2Vue 浏览器）、下游交接（W1 实际行）随 §9 各收据登记 | batch-regression: 本计划 id=106 非 5 的倍数；收据检查按 auto-lang 既有批次门（.last-batch-regression.json）执行
