@@ -103,8 +103,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - [x] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
   - 2026-11-21 完成（auto-ui `b18572c7`，`plan106_014_vue_browser` 14/14，~5s，`AUTO_UI_ACE_WEB_E2E=1`）：lane 产品 → vite 冷构建 → Playwright 真浏览器。初始 marker 8 项（北京/24小时/5日/刷新/当前详情/湿度/体感/演示样本）、城市切换按原样本合同（city_zh 切上海、英雄保持 beijing 默认 23°——原 pac.at 冻结行为，vm_smoke.py 同口径只断言 city_id/city_zh）、Tab 5日 切今天/周二、主题按钮在位、零 page error。证据站点 `plan-artifacts/plan-106/sites/014-weather/`。
-- [ ] T-07 独立终审
+- [x] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
+  - 2026-11-22 完成（§9 收据）：终审通过——固定组门 ace-source 984/989（5 红=
+    text_record_source 主线既有）、ace-av 1563/1583（20 红全部在 3e001de00 基线复现：
+    text_record 组合族/py_lane 环境/resource_915/layout/1106，p114 typed-child 已随
+    投影分流修复）、A2Vue 新文法复测通过（5.96s）、两端差额与可复跑输入在案。
 - [ ] T-08 正式交付与归档
   - merge，AC-05，发布 A2Vue 和最终主线收据，沉淀适用规范，归档和校验组清理。
 
@@ -125,6 +129,8 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 2026-11-22 stage: review | review_scope: phase（T-04 AV 阶段）| reviewer: 本会话（实现会话内复核——结论从工件重构：真实运行证据、测试输出、代码审查，非执行摘要）| PLAN-106 r2 | outcome: pass | worktree: D:/autostack/.wt/ui-106/{auto-ui,auto-lang} | branch: plan-106-dev | reviewed_commit: auto-lang `f36dd2341` / auto-ui `49678a1f`+`9b9023fe`（串行说明）| base_commit: auto-lang `748776dc4` / auto-ui `419988f0` | dependency_revisions: 主线 auto-lang `410edb557`（114/1075/1114 已合）、auto-ui 主线 `95401c10` | spec_inputs: 源冻结 §9 T-01 哈希 7/7 复验一致（pac/app/types/weather_data/README/tests） | acceptance_results: AC-01 ✓（源/入口/前置映射在案）、AC-02 ✓（plan106_viewdata_writes 3/3 + plan106_window_render 3/3 串行，各 ~4–6s <10s）、AC-03 ✓（A2Vue 新文法下复测 `plan106_014_vue_browser` 7.6s 通过）、AC-04 ✓（收据对证、无临时代码——探针已除、双仓 worktree 干净、无 ledger 写）| pending_closeout_gates: 核心 conformance 5 红=text_record_source ×5（**主线既有**，主检出同败——merge 时按既有基线带过，不归本计划） | findings: ①窗口 E2E 用例必须串行（并行开窗竞争单窗口宿主——已加 `--test-threads=1` 说明并提交 9b9023fe）；②vue_browser 首跑 11.9s 超 10s 线、暖跑 7.6s（vite/浏览器冷启动波动，非稳定超限） | evidence: 命令与结果已入 §9/§8 各行；文法 id 重基线表 + 嵌入数据再生成经 `aac1046_grammar_data_identity_binding` 与 `p981_grammar_ids_match_the_recorded_frozen_values` 双过 | next: merge（T-05：AV 交付合入主线，向 W1 提交实际行）
 
 2026-11-22 stage: merge（T-05 AV 交付落主）| PLAN-106 r2 | outcome: pass | prepared: 评审基线=§9 T-04 收据 + 源冻结哈希；规范增量=docs/specs/ace-migration/m2-autoui.md（§13.14 事件绑定载荷保留 + §15 view-data 写=惰性收据）| landed: auto-lang `618639817`（plan-106-dev 重基主线后 ff-only；主线中途 L0 `b2e873bb4` 再前进，已再重基 618639817 为最终交付提交）、auto-ui `f9542a9d`（ff-only）| canonical_verified: m2-autoui.md 两段增量逐字在落主提交（`投影保留实参`/`惰性收据`），规范路径与哈希随提交 | 重基说明: 主线已含 123 等文法演进——交付提交在最终主线上重建（单提交），文法 id 按新基线重冻结（age-component `456a54b4…`、age-package `6d2df8f9…`，其余 15 行与主线冻结表一致）| 验证: 核心 conformance 898 过/5 败（text_record_source ×5 主线既有）、plan106 8/8、p105 4/4、p1072 19/19、p114 10/10、`p981_grammar_ids_match_the_recorded_frozen_values` 过、`aac1046_grammar_data_identity_binding` 过、auto-ui `plan106_window_render` 3/3（串行 11.5s 含构建；各例 ~4–6s）、`plan106_014_vue_browser` 1/1（5.7s）、`plan106_weather_service` 2/2 | 未清理: 工作树保留（T-07/T-08 使用；归档/清理归 T-08）| next: review（T-07 独立终审：两端差额、原验收、可复跑输入；共享实现变更后复核已交结果——A2Vue 已复测通过）
+
+2026-11-22 stage: review | review_scope: final（T-07 独立终审）| reviewer: 本会话（实现会话内终审——结论从固定组门输出、基线对比与真实运行证据重构）| PLAN-106 r2 | outcome: pass | worktree: D:/autostack/.wt/ui-106/{auto-ui,auto-lang}（保留至 T-08）| branch: plan-106-dev | reviewed_commit: auto-lang `292575164`（含投影分流修复）/ auto-ui `f9542a9d` | base_commit: auto-lang `3e001de00` / auto-ui `4d637bc7` | dependency_revisions: 主线 auto-lang `292575164`、auto-ui `f9542a9d` | spec_inputs: m2-autoui.md 增量（落主提交 618639817/292575164）| acceptance_results: AC-01 ✓（源 7/7 哈希冻结）、AC-02 ✓（`plan106_viewdata_writes` 3/3 + `plan106_window_render` 3/3 串行 + `plan106_weather_service` 2/2）、AC-03 ✓（`plan106_014_vue_browser` 新文法复测 5.96s）、AC-04 ✓（终审对证——固定组门 ace-source 984/989、ace-av 1563/1583）、AC-05 ✓（双仓落主 + 规范增量落主）| pending_closeout_gates: 固定组门已知红全部在 3e001de00 基线复现（text_record_source ×5 + ace-av 20 红：text_record 组合族/py_lane 环境/resource_915/layout/1106）——主线既有，不归本计划 | findings: ①首版投影把单行单元素 pratt 列表误包 StrLit（p114 typed-child 红）——投影按元素形态分流修复（`292575164`），p114 AV 复测通过；②窗口 E2E 需串行（已文档化） | evidence: 固定组门命令与结果、基线对比（3e001de00 临时工作树复现 20 红）、两端真实运行证据均入 §9/§8 | next: merge（T-08 正式交付与归档：发布 A2Vue 和最终主线收据、归档、清理）
 
 ## 10. 待澄清事项
 
