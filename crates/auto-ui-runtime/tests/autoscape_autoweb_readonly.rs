@@ -78,6 +78,9 @@ mod tls_site {
     pub struct TestSite {
         pub port: u16,
         pub requests: Arc<Mutex<Vec<ServedRequest>>>,
+        /// 请求头解析即记（路径）——"请求已到达"信号；带结果的记录仍在
+        /// 连接终止时落账（RF-1：两阶段观察面）。
+        pub seen: Arc<Mutex<Vec<String>>>,
         pub routes: Arc<Mutex<HashMap<String, Endpoint>>>,
     }
 
@@ -136,9 +139,11 @@ mod tls_site {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let requests = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::new(Mutex::new(Vec::new()));
         let routes = Arc::new(Mutex::new(HashMap::new()));
         let config = Arc::new(config);
         let accept_requests = Arc::clone(&requests);
+        let accept_seen = Arc::clone(&seen);
         let accept_routes = Arc::clone(&routes);
         let accept_config = Arc::clone(&config);
         std::thread::spawn(move || {
@@ -146,14 +151,18 @@ mod tls_site {
                 let Ok(stream) = stream else { break };
                 let config = Arc::clone(&accept_config);
                 let requests = Arc::clone(&accept_requests);
+                let seen = Arc::clone(&accept_seen);
                 let routes = Arc::clone(&accept_routes);
-                std::thread::spawn(move || serve_connection(stream, config, requests, routes));
+                std::thread::spawn(move || {
+                    serve_connection(stream, config, requests, seen, routes)
+                });
             }
         });
         (
             TestSite {
                 port,
                 requests,
+                seen,
                 routes,
             },
             ca_pem,
@@ -189,6 +198,7 @@ mod tls_site {
         stream: std::net::TcpStream,
         config: Arc<rustls::ServerConfig>,
         requests: Arc<Mutex<Vec<ServedRequest>>>,
+        seen: Arc<Mutex<Vec<String>>>,
         routes: Arc<Mutex<HashMap<String, Endpoint>>>,
     ) {
         let stream = stream;
@@ -216,6 +226,9 @@ mod tls_site {
         let head = String::from_utf8_lossy(&head).to_string();
         let request_line = head.lines().next().unwrap_or_default().to_string();
         let path = request_line.split(' ').nth(1).unwrap_or("/").to_string();
+        seen.lock()
+            .unwrap()
+            .push(path.split('?').next().unwrap_or("/").to_string());
         let header = |name: &str| -> Option<String> {
             head.lines().skip(1).find_map(|line| {
                 let (key, value) = line.split_once(':')?;
@@ -320,6 +333,16 @@ mod tls_site {
 
         pub fn log(&self) -> Vec<ServedRequest> {
             self.requests.lock().unwrap().clone()
+        }
+
+        /// 已见请求数（路径前缀；头解析即计）。
+        pub fn seen_count(&self, path: &str) -> usize {
+            self.seen
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|p| *p == path)
+                .count()
         }
 
         pub fn requests_to(&self, path: &str) -> Vec<ServedRequest> {
@@ -446,6 +469,35 @@ fn step_until(
     predicate(host)
 }
 
+/// 轮询站点日志直到谓词命中（RF-1：请求记录仅在连接终止事件落账——
+/// aborted 条目在取消后延迟出现，断言前必须等它落账；预算 3s）。
+fn wait_for_log(
+    site: &TestSite,
+    mut predicate: impl FnMut(&[tls_site::ServedRequest]) -> bool,
+) -> bool {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < deadline {
+        if predicate(&site.log()) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    predicate(&site.log())
+}
+
+/// 轮询直到服务器**已见**（头解析即记）指定路径的请求数达标——取消类
+/// 用例须先确认请求在途，再触发停止/关页（RF-1 两阶段观察面）。
+fn wait_for_seen(site: &TestSite, path: &str, at_least: usize) -> bool {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < deadline {
+        if site.seen_count(path) >= at_least {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    site.seen_count(path) >= at_least
+}
+
 fn committed_web<'a>(
     host: &'a AutoscapeHost,
     tab: usize,
@@ -548,7 +600,8 @@ fn p1119_v01_alias_spellings_share_origin_history_and_cache() {
     let doc_hits = site.requests_to("/guide/guide.ad");
     assert_eq!(doc_hits.len(), 2);
     assert_eq!(doc_hits[1].if_none_match.as_deref(), Some("\"b1\""));
-    // 收藏保留打开方式，重开仍走该入口（再复验一次 → 304 面已证）。
+    // 收藏保留打开方式，重开仍走该入口（RF-7：真实断言——服务器侧
+    // 观察第三次复验请求 + 提交地址/历史不动 + 回退/前进换页语义）。
     host.add_favorite().unwrap();
     let bookmark_address = host.bookmarks()[0].address.clone();
     assert_eq!(bookmark_address, alias);
@@ -556,6 +609,49 @@ fn p1119_v01_alias_spellings_share_origin_history_and_cache() {
     assert!(step_until(&mut host, Duration::from_secs(5), |h| {
         h.active_tab().pending.is_none()
     }));
+    assert_eq!(host.active_tab().committed_address(), Some(alias.as_str()));
+    assert!(
+        wait_for_log(&site, |log| log
+            .iter()
+            .filter(|r| r.path == "/guide/")
+            .count()
+            >= 3),
+        "favorite reopen revalidates again"
+    );
+    let reopen_hits = site.requests_to("/guide/");
+    assert_eq!(reopen_hits.len(), 3);
+    assert!(
+        reopen_hits[2].if_none_match.is_some(),
+        "重开走条件复验: {:?}",
+        reopen_hits[2]
+    );
+    assert_eq!(
+        host.active_tab().history.len(),
+        2,
+        "同地址刷新/重开不加历史"
+    );
+    // 回退 → Gallery；前进 → 回到网络文档（未驻留历史页显式重开语义）。
+    host.back().unwrap();
+    assert!(step_until(&mut host, Duration::from_secs(5), |h| h
+        .active_tab()
+        .pending
+        .is_none()));
+    assert_eq!(
+        host.active_tab().committed_address(),
+        Some("app://auto.gallery/"),
+        "回退到 Gallery"
+    );
+    host.forward().unwrap();
+    assert!(step_until(&mut host, Duration::from_secs(5), |h| h
+        .active_tab()
+        .pending
+        .is_none()));
+    assert_eq!(
+        host.active_tab().committed_address(),
+        Some(alias.as_str()),
+        "前进回到网络文档（复验打开）"
+    );
+    assert!(site.requests_to("/guide/").len() >= 4);
 }
 
 // ---------------------------------------------------------------------------
@@ -1080,6 +1176,10 @@ fn p1119_v04_stop_invalidates_and_releases_request() {
     host.navigate(&site.url("/slowdoc/")).unwrap();
     assert!(host.active_tab().pending.is_some());
     host.step();
+    assert!(
+        wait_for_seen(&site, "/slowdoc/", 1),
+        "slow descriptor reaches the server before stop"
+    );
     // 停止：pending 立即清空，已提交页面不变。
     host.stop().unwrap();
     assert!(host.active_tab().pending.is_none());
@@ -1282,34 +1382,68 @@ fn p1119_v04_close_tab_and_close_all_release_pending_navigation() {
     let config = tempdir::new("v04-close");
     let mut host = web_host(&ca_pem, &config);
 
-    // 关页释放：页签 0 慢导航在途 → 关闭该页签。
+    // 关页释放：先确认服务器已见到慢导航请求（消除接取竞态）→ 关闭该
+    // 页签 → 中止记录落账后断言（RF-1：站点记录仅在终止事件落账）。
     host.navigate(&site.url("/slow/")).unwrap();
     host.step();
+    assert!(
+        wait_for_seen(&site, "/slow/", 1),
+        "slow request reaches the server before close"
+    );
     host.close_tab(0).unwrap();
     assert!(host.web_in_flight() <= 1);
     assert!(step_until(&mut host, Duration::from_secs(2), |h| h
         .web_in_flight()
         == 0));
+    assert!(
+        wait_for_log(&site, |log| log
+            .iter()
+            .any(|r| r.path == "/slow/" && r.outcome == "aborted")),
+        "close-tab abort lands in the server log"
+    );
     let slow_hits = site.requests_to("/slow/");
+    assert_eq!(slow_hits.len(), 1, "{:?}", slow_hits);
     assert!(
         slow_hits.iter().all(|r| r.outcome == "aborted"),
         "{:?}",
         slow_hits
     );
 
-    // 关窗收口：两页签各起慢导航 → close_all 全部释放。
-    host.navigate(&site.url("/slow/")).unwrap();
-    host.new_tab();
+    // 关窗收口：页签 A 慢导航（确认触网后）+ 页签 B 排队命令 → close_all。
+    // B 的取消旗标在 worker 接取前已置——永不触网（单飞行语义），服务
+    // 器只见到飞行中的 A；A 中止落账后总账恰 2 条且全 aborted。
     host.navigate(&site.url("/slow/")).unwrap();
     host.step();
+    assert!(
+        wait_for_seen(&site, "/slow/", 2),
+        "second slow request reaches the server before close_all"
+    );
+    host.new_tab();
+    host.navigate(&site.url("/slow/")).unwrap(); // 排队（worker 单飞行）
     host.close_all().unwrap();
     assert!(step_until(&mut host, Duration::from_secs(2), |h| h
         .web_in_flight()
         == 0));
-    assert!(site
-        .requests_to("/slow/")
-        .iter()
-        .all(|r| r.outcome == "aborted"));
+    assert!(
+        wait_for_log(&site, |log| log
+            .iter()
+            .filter(|r| r.path == "/slow/")
+            .all(|r| r.outcome == "aborted")
+            && log.iter().filter(|r| r.path == "/slow/").count() >= 2),
+        "close-all abort lands for the in-flight request"
+    );
+    let aborted_all = site.requests_to("/slow/");
+    assert_eq!(
+        aborted_all.len(),
+        2,
+        "关页 1 条 + 关窗飞行中 1 条；排队命令零触网: {:?}",
+        aborted_all
+    );
+    assert!(
+        aborted_all.iter().all(|r| r.outcome == "aborted"),
+        "{:?}",
+        aborted_all
+    );
 }
 
 // ---------------------------------------------------------------------------

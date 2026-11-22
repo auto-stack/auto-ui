@@ -169,7 +169,7 @@ pub mod ase_m0_sessions;
 // 复用 ase_m0_sessions 会话层；严格地址解析复用 ase-m0 crate 单一语法源）。
 pub mod ase_browser_shell;
 // PLAN-1119 AutoWeb：只读网络导航 worker（协议/缓存在 ase-m0 autoweb 层；
-// 本模块为 reqwest rustls 网络执行 + 事件回投，复用 ase-m0 语法源）。
+// 本模块为 reqwest native-tls 网络执行 + 事件回投，复用 ase-m0 语法源）。
 #[cfg(feature = "ace-bridge")]
 pub mod autoweb_nav;
 // PLAN-980 ④-A：包感知桥与包片段 lane 同样只在 ce-bridge 面存在——
