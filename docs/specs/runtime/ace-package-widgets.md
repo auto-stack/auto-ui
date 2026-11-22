@@ -29,6 +29,23 @@ The VM [PaginationControl](../ui/pagination.md) is a separate higher-level
 package. [ACE route-page loading](ace-route-page-loading.md) defines the
 package page lifetime.
 
+## Routed layout previews and built-in controls
+
+The layout previews use the authored view tree. Grid columns, gaps and spans
+resolve against the current viewport. Responsive visibility applies before
+native controls enter the focus list. A hidden native subtree and a display
+element with no text value preserve the alignment of following AV observations.
+
+Literal composite pages use the registered controls of the destination
+renderer after AGE checks the view. The Iced page keeps disclosure and input
+state with its own session. The Vue page keeps those states in its mounted
+controls. A sidebar used as a preview occupies a viewport inside its page,
+so it does not capture the shell's navigation.
+
+Native editors have distinct keys per page session, widget instance and
+source element. Closing a page releases those native editors. Native image
+references served by the original front's public directory resolve against
+that directory. The Vue product copies those public files into its build.
 ## Chart geometry and interaction
 
 Checked package views can render SVG chart geometry built from the current
