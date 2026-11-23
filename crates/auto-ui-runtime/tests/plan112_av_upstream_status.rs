@@ -4,13 +4,15 @@
 //! back.api` 调用、`fmt.at` helper、`.as(float)`/`nil`、滑窗与排序循环。AV
 //! （受检 AGE）两端——组件面 `prepare_component_source` →
 //! `NodeDesktopBridge::load`，与包面 `load_package`（A2Vue 包面
-//! `generate_package_sfc` 同一 AGE 包编译）——在 auto-lang `8a52d7364` 上均
-//! 无法装载原样 025。
+//! `generate_package_sfc` 同一 AGE 包编译）——在 PLAN-117 合入后的 master 上
+//! 仍无法装载原样 025。
 //!
 //! 本文件是**状态钉点**而非功能用例（先例：`plan105_u03_sfc_status`）：
 //! - `p112_av_control_*`：今天就被接受的对照——缺口是具体构造，不是「store
 //!   语义整体不存在」。原样真实 `SysStore`（21 个 handler 臂）在包面解析通过
-//!   （PLAN-112 为 AGE **包面**开放 `nil` 字面量与 `.as(T)` 之后；组件面仍拒）。
+//!   （nil 字面量由 PLAN-117 开到两面；`.as(T)` 由 PLAN-112 开到包面，组件面仍拒）。
+//!   PLAN-117 还关掉了旧的 handler 调用词汇门，并在组件面放行了 nil 比较与
+//!   记录字面量局部量——这些原是缺口，现为对照。
 //! - `p112_av_gap_*`：每个缺口一个最小源 + 首阻断诊断；包面的门序见
 //!   `p112_av_gap_package_store_gates_in_order`（钉的是**裸 AGE 包编译**）。过语法
 //!   不等于可消费：包面的 `.as(T)` / `.to(int)` 停在 Atom bind（TextRecord 描述符
@@ -250,11 +252,11 @@ fn p112_av_gap_component_slice_rejects_list_of_record_model_field() {
     );
 }
 
-/// `.as(float)` 转换与 `nil` 比较被**组件面**的 store handler 文法拒绝（025
-/// `.Refresh` 的 `totalG_int.as(float)`、`snap == nil`）；包面已收，见
+/// `.as(float)` 转换被**组件面**的 store handler 文法拒绝（025 `.Refresh` 的
+/// `totalG_int.as(float)`）；包面已收，见
 /// `p112_av_control_package_grammar_admits_nil_and_float_cast`。
 #[test]
-fn p112_av_gap_float_cast_and_nil_compare_are_rejected_grammar() {
+fn p112_av_gap_float_cast_is_rejected_grammar() {
     let root = synthetic_root();
     let cast = store_probe(
         "",
@@ -268,19 +270,22 @@ fn p112_av_gap_float_cast_and_nil_compare_are_rejected_grammar() {
         &component_face(&root, &cast),
         &["source.syntax", "expected `fn`, found `store`"],
     );
+}
+
+/// 对照：`nil` 比较在组件面经 prep → load 可装载（PLAN-117 把 nil 字面量开到
+/// AGE 两面，含 `if` 条件位）。025 `.Refresh` 的守卫 `snap == nil` 不再是语法红。
+#[test]
+fn p112_av_control_component_face_admits_nil_compare() {
+    let root = synthetic_root();
     let nil_cmp = store_probe(
         "",
         "",
         "",
-        "            var snap str = \"\"\n            if snap == nil {\n                .label = \"nil\"\n            \
-         } else {\n                .label = \"ok\"\n            }\n",
+        "            var snap str = \"\"\n            if snap == nil {\n                .label = \"nil\"\n            } \
+             else {\n                .label = \"ok\"\n            }\n",
         "",
     );
-    expect_gap(
-        "nil 比较",
-        &component_face(&root, &nil_cmp),
-        &["source.syntax", "expected `fn`, found `store`"],
-    );
+    expect_accepted("组件面 nil 比较", &component_face(&root, &nil_cmp));
 }
 
 /// store handler 调后端 API（`use back.api`）无解析面——S1 宿主 API 面缺席
@@ -302,9 +307,10 @@ fn p112_av_gap_store_cannot_call_backend_api() {
     );
 }
 
-/// 局部字符串重赋值 `str`↔owned `Str` 类型不匹配；带计算初值的局部 `var` 不在
-/// profile 内（025 `.Refresh`/`.ApplySort` 的路径拼串与 `var xf float = 36.0 +
-/// ic * stepf`）。
+/// 局部字符串重赋值：handler 进到验证器后停在 `verify.borrow-escape`——重赋值
+/// 存了一个临时量的视图（025 `.Refresh`/`.ApplySort` 的路径拼串）。带计算初值的
+/// 局部 `var`：改写后 float 局部落进 int 槽的 type-mismatch（`var xf float =
+/// 36.0 + ic * stepf`）。
 #[test]
 fn p112_av_gap_local_string_reassign_and_computed_var_initializers() {
     let root = synthetic_root();
@@ -318,7 +324,7 @@ fn p112_av_gap_local_string_reassign_and_computed_var_initializers() {
     expect_gap(
         "局部字符串重赋值",
         &component_face(&root, &concat),
-        &["source.type-mismatch: expected str, found Str"],
+        &["verify.borrow-escape: assignment to `l2` stores a view of a temporary"],
     );
     let computed = store_probe(
         "",
@@ -338,10 +344,10 @@ fn p112_av_gap_local_string_reassign_and_computed_var_initializers() {
     );
 }
 
-/// 记录字面量局部量（025 `filled.push(ProcInfo { pid: raw.pid, … })`）：同单元
-/// 声明的记录类型在 handler 内不可见。
+/// 对照：记录字面量局部量（025 `filled.push(ProcInfo { pid: raw.pid, … })`）在组件
+/// 面可装载——PLAN-117 给受检 AGE 组件表达式加了命名字段记录构造。
 #[test]
-fn p112_av_gap_record_literal_local_has_no_record_type() {
+fn p112_av_control_record_literal_local_loads() {
     let root = synthetic_root();
     let src = store_probe(
         "",
@@ -350,11 +356,7 @@ fn p112_av_gap_record_literal_local_has_no_record_type() {
         "            var r = Rec { pid: 2 }\n            .n = r.pid\n",
         "",
     );
-    expect_gap(
-        "记录字面量局部量",
-        &component_face(&root, &src),
-        &["no record type named `Rec` in this module"],
-    );
+    expect_accepted("记录字面量局部量", &component_face(&root, &src));
 }
 
 // ── 缺口钉点（AGE 包编译）─────────────────────────────────────────────────
@@ -504,6 +506,26 @@ const SYS_STORE_ALL_ARMS: &[&str] = &[
     "SortDisk", "SortNet", "SortPid", "Sort", "ApplySort", "Refresh",
 ];
 
+/// 探针中和（只为揭示后面的门，**不是实现**）：无类型空列表字段 `cpu_segs` /
+/// `mem_segs` 改成 `List<int>`——受检 AGE 不把 `var x = []` 当状态。
+fn typed_segments(store_src: &str) -> String {
+    store_src
+        .replace("var cpu_segs = []", "var cpu_segs List<int> = []")
+        .replace("var mem_segs = []", "var mem_segs List<int> = []")
+}
+
+/// 探针中和：删掉往段字段 push 记录字面量的语句（字段已改成 `List<int>`）。
+fn neutralize_segments(body: &str) -> String {
+    let mut out = String::new();
+    for line in body.split_inclusive('\n') {
+        if line.contains(".cpu_segs.push(") || line.contains(".mem_segs.push(") {
+            continue;
+        }
+        out.push_str(line);
+    }
+    out
+}
+
 /// 带最小消费者的包编译首诊断（store 单元 id `sys_store`）。
 fn package_store_diag(store_src: &str) -> String {
     let consumer = "use sys_store: SysStore\n\nwidget Main {\n    view {\n        text .store.cpu {}\n        \
@@ -555,18 +577,15 @@ fn p112_av_control_package_grammar_admits_nil_and_float_cast() {
             "{label}: 应通过包面语法，实际: {diag}"
         );
     }
-    // `nil` 到共享 resolve 才被裁定：与非可空字段比较是类型红（`source.nil-op`），
-    // 不再是语法红。真实 `SysStore` 的 nil 比较落在后端调用返回值与可选记录字段上
-    // （门②/③之后）；本例只证字面量已入表达式原子。
+    // `nil` 与非可空字段比较在包面 store handler 这条路径上编译通过（PLAN-117
+    // 之后不再报 `source.nil-op`；运行期真值不在本例断言）。真实 `SysStore` 的
+    // nil 比较落在后端调用返回值与可选记录字段上。
     let store = store_with_arm("if .cpu == nil {\n                .cpu = 0.0\n            }");
     let diag = package_diag(
         &[unit("main", &go_consumer("        text .store.n { }\n")), unit("s", &store)],
         "app::main",
     );
-    assert!(
-        !diag.contains("source.syntax") && diag.contains("source.nil-op"),
-        "nil 比较应过语法、停在 resolve 的可空性裁定，实际: {diag}"
-    );
+    assert!(diag.is_empty(), "nil 比较应随消费者整体编译通过，实际: {diag}");
 }
 
 /// 缺口：包面数值转换（`.as(T)` 与既有拼写 `.to(int)`）过语法、过 resolve，停在
@@ -633,44 +652,40 @@ fn p112_av_control_real_store_parses_on_package_face() {
     );
 }
 
-/// 包面的门序（入口 = 最小消费者；每道门只报首错，逐层中和只为露出下一道）：
-/// ① `storage.*` 需所属宿主（`.Init`）→ ② handler 调用词汇：后端 API 调用
-/// （`ConfirmKill` 的 `kill_process`）不在允许集内 → ③ store model 引用的记录类型
-/// （`ProcInfo`）不是可见的模块符号（在 `types.at`，而 `sys_store.at` 未导入）。
+/// 包面的门序（入口 = 最小消费者；每道门只报首错，逐层中和只为露出下一道）。
+/// PLAN-117 合入后重测：
+/// - ⓪ model 形态：无类型空列表字段（`var cpu_segs = []`）不再是状态，handler
+///   一写就报 `assigns undeclared model field`。
+/// - ① `storage.*` 需所属宿主（`.SetSpeed` / `.SelectTab` / `.Sort`）。
+/// - ③ store model 引用的记录类型（`ProcInfo`，声明在 `types.at`，`sys_store.at`
+///   既未导入、类型也非 `pub`）对内联后的消费者不可见。
+///
+/// 旧门②（handler 调用词汇）已由 PLAN-117 关掉：`ConfirmKill` 的
+/// `kill_process(.kill_target)` 语句不再在这一层被拒。
 #[test]
 fn p112_av_gap_package_store_gates_in_order() {
     let (head, store) = real_store_source();
     let identity = |body: &str| body.to_string();
-    let without = |excluded: &[&str], neutral: fn(&str) -> String| {
-        let kept: Vec<&str> = SYS_STORE_ALL_ARMS
-            .iter()
-            .copied()
-            .filter(|arm| !excluded.contains(arm))
-            .collect();
-        format!(
-            "{head}\n{}",
-            assemble_store(&store, &kept, neutral)
-        )
+    let all = SYS_STORE_ALL_ARMS;
+    // ⓪ 全部真实臂，零中和：先撞 model 形态。
+    expect_gap(
+        "门⓪ 无类型空列表字段",
+        &package_store_diag(&format!("{head}\n{}", assemble_store(&store, all, identity))),
+        &["assigns undeclared model field `cpu_segs`"],
+    );
+    // 之后各门都以「段字段已带类型」为底：字段改成 `List<int>`，段 push 语句删掉
+    // （只为露出后面的门，不是实现）。
+    let typed = |neutral: fn(&str) -> String| {
+        typed_segments(&assemble_store(&store, all, |body| neutralize_segments(&neutral(body))))
     };
-    // ① 全部真实臂，零中和。
     expect_gap(
         "门① storage",
-        &package_store_diag(&without(&[], identity)),
+        &package_store_diag(&format!("{head}\n{}", typed(identity))),
         &["storage calls require the owning host"],
     );
-    // ② 再中和 storage。
-    expect_gap(
-        "门② handler 调用词汇",
-        &package_store_diag(&without(&[], neutralize_storage)),
-        &[
-            "handler calls require a declared widget message, same-unit store method, or \
-             checked list operation",
-        ],
-    );
-    // ③ 去掉含后端 API 调用的两个臂（`ConfirmKill`、`Refresh`）。
     expect_gap(
         "门③ 记录类型可见性",
-        &package_store_diag(&without(&["ConfirmKill", "Refresh"], neutralize_storage)),
+        &package_store_diag(&format!("{head}\n{}", typed(neutralize_storage))),
         &["source.module-symbol", "unknown type `ProcInfo`"],
     );
 }
@@ -737,11 +752,11 @@ fn p112_av_control_av_package_path_simulates_store_storage() {
 /// AV 包面（生产路径 `NodeDesktopBridge::load_package`）：`SysStore` 过语法之后，
 /// 纯 store 单元里的 `storage.get/set` 由宿主服务仿真改写为 store 的模型字段
 /// （PLAN-112，与组件面 prep 同一映射——AGE 的门① 在这条路径上不再出现，见
-/// `p112_av_gap_package_store_gates_in_order` 对裸 AGE 的钉点），首阻断落在门②
-/// handler 调用词汇。A2Vue 包面（`generate_package_sfc`）不做仿真，且先走 routed
-/// 车道，车道对入口单元**单独**做组件面解析（`package_candidates`）——`app.at`
-/// 单独解析时 `use sys_store: SysStore` 不可见，首阻断是
-/// `model has no field \`store\``，轮不到包编译。
+/// `p112_av_gap_package_store_gates_in_order` 对裸 AGE 的钉点），首阻断落在门⓪
+/// model 形态：无类型空列表字段不是状态。A2Vue 包面（`generate_package_sfc`）
+/// 不做仿真，且先走 routed 车道，车道对入口单元**单独**做组件面解析
+/// （`package_candidates`）——`app.at` 单独解析时 `use sys_store: SysStore` 不可见，
+/// 首阻断是 `model has no field \`store\``，轮不到包编译。
 #[test]
 fn p112_av_real_app_first_blocker_on_package_faces() {
     let units: Vec<PackageModuleInput> = [
@@ -760,10 +775,7 @@ fn p112_av_real_app_first_blocker_on_package_faces() {
         &NodeDesktopBridge::load_package(units.clone(), "app::main", 1)
             .err()
             .unwrap_or_default(),
-        &[
-            "handler calls require a declared widget message, same-unit store method, or \
-             checked list operation",
-        ],
+        &["assigns undeclared model field `cpu_segs`"],
     );
     let a2vue = generate_package_sfc(&units, "app::main")
         .err()
