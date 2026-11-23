@@ -336,6 +336,22 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 029 生产窗口 Debug 准备 54.911 s。原入口越过 `OnWheel` 内的 `.c_ok` 绑定，仍在 admission 阶段退出 4（2.509 s）。首拒在 `image_viewer::image_viewport:140:47`，对应 `onwheel: .OnWheel($event.deltaY)` 被归一为找不到的 `nevent`。现有 Iced 适配器已定义 wheel 的单 f32 和 pan 的 f32/f32/phase。029 的 checked 包视图由 `ace_node_desktop/package_view.rs` 投影，该路径尚无 `image_surface` 分支，队列目前承载点击、文本和指针坐标。恢复点为沿现有输入协议和媒体授权接入包视图、图像变换与事件回调。`av/r68-029-window.log` SHA256 `5A71F6BF5E532BA3484E2F15EDC0D9E03C2F1EA6E2116DB3000F2362E1E9A510`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 68 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `b936120d6` / auto-ui `1521f47a` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work round 69 — 图像滚轮与拖拽的受检事件载荷
+
+- AutoLang `b086dd621` 按 `image_surface` 的元素和事件键识别加载器规范化后的 `$event.deltaY`、`$0, $1, $2`。验证目标消息分别接受 f32 与 f32/f32/str。AV 视图记录保留宿主载荷种类，普通双击和静态消息参数仍经现有值路径。
+- 定向用例核滚轮、拖拽、无参双击及错误滚轮消息类型。Debug 准备 31.739 s / 11.385 s，首次用例揭示独立的消息实参检查仍在求值占位符（0.170 s），修正后定向 1/1（0.170 s），981 包 AV 43/43（0.808 s），dynamic AV 21/21（0.107 s），发现和清理未单计。`av/r69-image-event-case-r2.log` SHA256 `87DCE40E3834DF716CB8FDC875790159ECF247303DB6D2F72AC34F85C1C72C42`。
+- 029 生产窗口 Debug 准备 86.603 s。原入口越过 `$event.deltaY` 及 `$0, $1, $2` 绑定后仍在 admission 阶段退出 4（2.512 s），首拒为 `pagination::pagination_control:102:38` 的 `size_candidates.push(size)`。原公开候选是整数列表，内部裸 List 将整数按动态所有权元素转移。`av/r69-029-window.log` SHA256 `68B4A89E1DDD0CA56778CD80D7912653DBD07CF1FC1967009CE271F2E8EF6379`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 69 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `b086dd621` / auto-ui `1521f47a` | next: work/T-02–T-03。
+
+### 2026-11-23 goal work rounds 70–71 — Iced 图像事件与分页计算成员
+
+- AutoUI `ee933de0` 给受检包视图接入现有 Iced ImageSurface，投影 zoom、offset、rotation、load/error 和输入回调。事件队列按绑定种类带入 f32 或 f32/f32/phase，检查视图版本。同一帧已入队的拖拽消息只在视图仍提供同一个资源绑定时重定位。图像来源走已有媒体 URI，或只读入口 `front/public` 内的文件并在关闭时释放其媒体票据。
+- Iced 投影视图用例调用实际挂载的回调，验证缩放 1.5→2.0、旋转 -90→270、同帧入队的 start/move、偏移 (7, -3)、无参双击、异种载荷和旧帧拒绝。UI980 头部准备 0.262 s，最终 Debug 准备 12.635 s，定向 1/1（0.351 s），已有 pointer 与 SVG 分别 1/1（0.370 s、0.350 s）。首次用例因缺测试进程准备标记退出 101，重新以已准备的提供器执行。日志 `av/r70-image-desktop-case-final.log` SHA256 `DE82492E1A801630234CEA854436902360F7A5A15661E30443C7D4A76F8909E4`。用例验证投影回调及 AV 计算，未作为设备操作或远程媒体解码收据。
+- AutoUI `25aeb019` 将内部分页候选改为 `List<int>`。029 用同一生产二进制读取更新源，越过 `.push(size)`，仍在 admission 阶段退出 4（2.529 s）。首拒对上分页 `changed` 的对象字段读取 `.current`。`av/r70-029-window.log`。同批 031 原入口仍在 `close_session` 符号解析退出 4（0.746 s），`av/r70-031-window.log` SHA256 `950350C76BA5F189E6F166B067D8812E0ED51518939CE43D2DF4BF2CE9A92853`。
+- AutoLang `2d2ffbd8a` 在对象字面量的字段值中展开现有计算成员。回归以动态集合验证嵌套对象读取，Debug 最终准备 4.338 s，定向 1/1（0.190 s），包 AV 43/43（0.825 s）。`av/r71-computed-object-case-r2.log` SHA256 `2F52B985ACDFEDE18476C1F6CF6DC2A3E64AC556C59DE0606F73046E05F76EA2`。
+- 029 最终生产 Debug 准备 30.782 s，越过分页，仍在 admission 阶段退出 4（2.482 s）。`tree_view::tree_view:110:62` 对上 `.WantToggle(r.id)`，受检消息实参在动态 ID 上生成了 `.len()` 验证。`av/r71-029-window.log` SHA256 `3A71ADA9A8518D586839D4040DC2EEC7AF1DA893CA047275FCDABBB550673248`。原 029 后端相对图像 URI 待接既有 HTTP 来源，真窗浏览、嵌入和缺图恢复仍未验收。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 71 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `2d2ffbd8a` / auto-ui `25aeb019` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
