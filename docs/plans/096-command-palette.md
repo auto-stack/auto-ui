@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-096
-status: execution_done
+status: reviewed
 feature_name: CommandPalette 通用命令面板
 author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-23
 plan_revision: 3
-current_step: 6
+current_step: 7
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/command-palette.md]
@@ -185,7 +185,7 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 | AC-04 | work | 普通GUI和MCP通过当前可见控件完成关键用例；Windows Native VM 和 Windows Vue 两轨分别有结果，原生不依赖前台焦点；X-02/05/06/07分层门、生命周期与负控通过，缺必需MCP/平台门不算通过 | T-03,T-05；[x] |
 | AC-05 | work | 028保留recent/分类/评分/grid并正确转发一次宿主动作；无宿主明确报不可用；普通设置示例在两端读回真实模型修改，源码匹配或高亮不算执行成功。 | T-04,T-05；[x] Windows 宿主单次启动、双轨独立消费及排序对照见 §9 |
 | AC-06 | work | X-01/03/06/07、移根、必要公共/消费者回归及真实截图通过；中文/暗色/窄窗可用，Q-01若影响本组件则闭环；README/待沉淀Spec与证据齐 | T-05,T-06；[x] |
-| AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定 Plan r3和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[ ] |
+| AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定 Plan r3和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[x] 绑定 `19eb448a` 与候选 Spec `c1216683`，R096-F01…05 闭合 |
 | AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，发布说明限定为已验收的 Windows Native VM 和 Windows Vue | T-08；[ ] |
 
 ## 8. 执行步骤
@@ -198,7 +198,7 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 | T-04 | work | T-03 | examples/command-palette/（新增）、examples/ui/028-launcher/src/front/app.at；复用§4实际业务入口 | §5消费路径输出真实变化；保持原业务权限/数据/模式，不同步兄弟仓 | AC-05；[x] 两轨设置、028 排序/独立负控与当前完整包宿主单次启动通过，真实 Calculator 窗口截图见 §9。 |
 | T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/command_palette_component.rs`、`tests/product/verify_command_palette.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；Windows 双轨、必需 case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[x] 单案执行 Native VM 16/16、Vue 15/15，或缺准备明确退出 2，所有正式通过用例低于 10 秒。 |
 | T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan096/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[x] 两轨错误、窄窗和长中文截图，冷加载与依赖摘要、待发布 SD 已更新。 |
-| T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[ ] |
+| T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[x] 独立复审通过，合并权限由本次精确收据闭合 |
 | T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/command-palette.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[ ] |
 
 任务只保留本表一份当前进度；每项完成写实际证据，不预先勾选评审/合并。必要平台缺口留在对应AC，不能把产品正确性转给merge阶段兜底。
@@ -237,6 +237,9 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
   - R096-F05：两轨业务拒绝与配置错误实图、当前完整包的真实 AutoOS 接入均已复验。手动宿主命令 `python hosted_operator_repair.py hosted-repair-window-capture tiny-skia` 退出 0，用户搜索 `cal` 后点击一次，单条 `launch_app(inproc) 011-calculator`、应用树及真实 Windows 窗口相互对照，原 PID/端口回收。报告 SHA256 `c0a260148a7607e373d371cefda62784be17ecc03cafd6e445e982138de4b653`，原始窗口图 `calculator-window.jpg` SHA256 `cebc6a5b1cf3a87871d475e04c142c22f1b2e6ecb8cd7eb0a73d3f2d469811a3`。人工操作/快照/退出总耗时 100.939 秒。早期宿主报告旧包和壳截图仅作为历史观察。
   - 原始失败保留于独立证据目录。磁盘空间耗尽期间不计未执行、残缺或进程回收失败为通过。Native Launcher 一次量到启动及清理延迟 10.535 秒，资源恢复后同用例 5.904 秒。Windows UIA Invoke 全部控件及应用读回通过，一次直接关闭遇到 AccessKit 过期句柄，使用正常应用 Exit 控件重放 5.249 秒，整应用重开仍走真实窗口关闭。复用未改变的原生输入桥、共用嵌套模态、旧 Command 浏览器和 Launcher 前后排序对照证据。
 - stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 8 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 19eb448a2c7a4b931631ba90d24f6ec64b5bc6b3 | next: review/T-07 re-review R096-F01…05
+- 2026-11-23：stage: review | review_scope: final | reviewer: /root/plan096_review（独立、用户授权及同树只读） | plan_id: PLAN-096 | plan_revision: r3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-096/auto-ui | branch: codex/ui-096-command-palette | reviewed_commit: 19eb448a2c7a4b931631ba90d24f6ec64b5bc6b3 | base_commit: 4dd9696da6a6289795ba9d6f57e603c24d99114a | dependency_revisions: auto-lang 8384ea064、auto-web 0cfc7c784、auto-down 456c86ac、AutoOS cdb4883 | spec_inputs: SD-01/02 为新增，冻结候选 blob c12166834e85f699ec8132b94cdada5d414cdb79 | acceptance_results: AC-01…07 pass，R096-F01…05 闭合 | pending_closeout_gates: scoped AutoUI regression、canonical 发布校验、线性落主、归档及清理 | next: merge。
+  - 独立核验了 31/31 产品报告、实际工具/源码/准备收据、当前窗口 Calculator 画面及明确拒绝和配置错误的四张实图。较早 runner 与当前版本的唯一变动由反向重建 SHA 证明为 Native `system-invoke` 的退出策略，受影响 case 已独立重放。debug/test 模型复跑（执行，不含构建）首次 provided 配置 0.120775 秒、过期 pending 0.111873 秒、重排移除 0.105181 秒、反馈及 accepted 0.107170 秒，全部退出 0。预检 `--case all`、`AUTO_VM_WITH_HTTP=1`、`AUTO_VM_MERGE=0` 均在启动前退出 2，分别 0.178、0.329、0.323 秒。本轮无新测试构建；未重复整套通过证据。
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 9 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 19eb448a2c7a4b931631ba90d24f6ec64b5bc6b3 | next: merge/T-08
 
 ## 10. 待澄清事项
 
