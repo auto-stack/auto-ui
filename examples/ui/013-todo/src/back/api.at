@@ -53,3 +53,7 @@ pub fn delete_todo(id int) bool {
 pub fn remove_completed(done bool) bool {
     return db.remove_completed(done)
 }
+
+pub fn set_all_todos(done bool) bool {
+    return db.set_all_todos(done)
+}

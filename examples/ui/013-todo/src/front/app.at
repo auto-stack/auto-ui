@@ -5,6 +5,7 @@
 
 use todo_store: TodoStore
 use todo_list: TodoList
+use types: TodoCompletion
 
 // PLAN-637 Phase B token 化映射（2026-09-17，B1）：页面底 bg-gray-100→bg-background；
 // 标题 text-red-400→text-primary（TodoMVC 传承红按设计退休，角色=品牌强调）；卡面
@@ -18,11 +19,12 @@ use themes.themes: Auto, Solarized
 
 widget App {
     msg {
-        Init, AddTodo, ToggleAll
+        Init, Refresh, AddTodo, SetInput(str), ToggleAll, TodoFinished(TodoCompletion)
     }
 
+    bind { "service:todo" -> .TodoFinished }
+
     model {
-        var input str = ""
         // PLAN-037：主题族/模式选择态（主题选择，非业务状态）
         var theme_name str = "Auto"
         var dark_mode bool = false
@@ -56,10 +58,18 @@ widget App {
                         style: "w-10 h-12 ml-2"
                     }
                     input {
-                        value: .input
+                        value: .store.input
+                        oninput: .SetInput
                         onenter: .AddTodo
                         placeholder: "What needs to be done?"
                         style: "flex-1 text-xl px-2 py-3 outline-none"
+                    }
+                }
+
+                if .store.todo_error > 0 {
+                    row {
+                        text "Todo request needs attention" {}
+                        button "Refresh" { onclick: .Refresh }
                     }
                 }
 
@@ -123,6 +133,18 @@ widget App {
 
         .AddTodo -> {
             store.AddTodo()
+        }
+
+        .SetInput(text) -> {
+            store.SetInput(text)
+        }
+
+        .Refresh -> {
+            store.Refresh()
+        }
+
+        .TodoFinished(result TodoCompletion) -> {
+            store.CompleteTodo(result)
         }
 
         .ToggleAll -> {

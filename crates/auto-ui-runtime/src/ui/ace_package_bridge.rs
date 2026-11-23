@@ -13,7 +13,7 @@ use ace_core::atom_text::Span;
 use ace_core::source::age_component::ComponentNode;
 use ace_core::source::age_package::{
     compile_age_package_with_scenario, widget_timer_interval_ms, widget_view_fn_name_at,
-    AgePackageCompilation,
+    AgePackageCompilation, TODO_SERVICE_BINDING,
 };
 use ace_core::source::packages::{PackageModuleInput, PACKAGES_CAPABILITY};
 
@@ -27,6 +27,7 @@ pub(crate) mod file_directory;
 pub(crate) mod file_mutation;
 pub(crate) mod file_open;
 pub(crate) mod preferences;
+mod todo_service;
 pub use frame::{PackageAction, PackageFrame};
 pub(crate) use frame::{PackageFocusNotice, PackageQueuedAction};
 use auto_lang_core::file_session::{FileSession, FileWritePermissions};
@@ -35,6 +36,8 @@ use file_mutation::{FileMutationBinding, MutationRequest};
 use file_open::FileOpenBinding;
 use live::{LiveEvent, LivePackage, MountedWidget};
 use std::path::Path;
+use ase_m0::todo_service::{RealmId, ServiceBinding};
+use todo_service::TodoTab;
 
 fn frame_limits() -> ExecLimits {
     // A checked frame can replay and materialize a full file listing or tree.
@@ -90,6 +93,9 @@ pub struct PackageStateEngine {
     file_mutation: Option<FileMutationBinding>,
     file_open: Option<FileOpenBinding>,
     preferences: Vec<auto_ui_dialect::preferences::PreferenceBinding>,
+    todo_reply: Option<String>,
+    todo_service: Option<(ServiceBinding, RealmId)>,
+    todo_tabs: BTreeMap<String, TodoTab>,
 }
 
 impl PackageStateEngine {
@@ -132,6 +138,9 @@ impl PackageStateEngine {
         let file_mutation = FileMutationBinding::from_component(component)?;
         let file_open = FileOpenBinding::from_component(component)?;
         let preferences = preferences::checked_bindings(component)?;
+        let todo_reply = component.members.iter()
+            .find(|row| row.role == "bind" && row.name == TODO_SERVICE_BINDING)
+            .and_then(|row| row.text.clone());
         if !preferences.is_empty() && !has_entry_view {
             return Err("ace.desktop.storage-binding: storage requires a checked entry view".into());
         }
@@ -143,6 +152,9 @@ impl PackageStateEngine {
         } else {
             None
         };
+        if todo_reply.is_some() && live_package.is_none() {
+            return Err("ace.desktop.todo-binding: a checked live entry view is required".into());
+        }
         if live_package.is_some() {
             for widget in compiled.widget_refs.values().flatten() {
                 if let Some(child) = compiled.description.components.iter().find(|candidate| {
@@ -176,6 +188,9 @@ impl PackageStateEngine {
             file_mutation,
             file_open,
             preferences,
+            todo_reply,
+            todo_service: None,
+            todo_tabs: BTreeMap::new(),
         };
         // Verify that both reply constructors match the package before a host can
         // authorize any access. This compilation never runs the filesystem.
@@ -188,6 +203,50 @@ impl PackageStateEngine {
 
     pub(crate) fn has_checked_view(&self) -> bool {
         self.checked_views
+    }
+
+    pub(crate) fn install_todo_service(&mut self, binding: ServiceBinding, realm: RealmId) -> Result<(), String> {
+        if self.todo_reply.is_none() || self.slots.iter().any(|slot| slot.live) {
+            return Err("ace.desktop.todo-binding: install a service on a checked, unmounted Todo package".into());
+        }
+        self.todo_service = Some((binding, realm));
+        Ok(())
+    }
+
+    pub(crate) fn poll_todo_service(&mut self, identity: &str) -> Result<Option<(String, Vec<(String, AceStateValue)>)>, String> {
+        let Some(index) = self.slot(identity).filter(|&index| self.slots[index].live) else {
+            return Ok(None);
+        };
+        let Some(tab) = self.todo_tabs.get_mut(identity) else {
+            return Ok(None);
+        };
+        let slot = &mut self.slots[index];
+        let frame = slot.frame.as_ref().ok_or("Todo service has no checked frame")?;
+        let payload = match tab.poll() {
+            Some(payload) => Some(payload),
+            None => {
+                use todo_service::{DONE_FIELD, ID_FIELD, OPERATION_FIELD, REQUEST_FIELD, TEXT_FIELD};
+                let state = |name| frame.states.iter().find(|(field, _)| {
+                    field.strip_prefix("st_").unwrap_or(field) == name
+                }).map(|(_, value)| value);
+                let (Some(AceStateValue::Int(sequence)), Some(AceStateValue::Str(operation)),
+                    Some(AceStateValue::Int(id)), Some(AceStateValue::Str(text)),
+                    Some(AceStateValue::Bool(done))) =
+                    (state(REQUEST_FIELD), state(OPERATION_FIELD), state(ID_FIELD), state(TEXT_FIELD), state(DONE_FIELD))
+                else {
+                    return Err("ace.desktop.todo-binding: invalid checked Todo request fields".into());
+                };
+                tab.observe(*sequence, operation, *id, text, *done)
+            }
+        };
+        let Some(payload) = payload else { return Ok(None) };
+        let live = self.live_package.as_ref().ok_or("Todo service has no live package")?;
+        let mount = slot.widget.as_deref().ok_or("Todo service mount was released")?;
+        let message = self.todo_reply.as_deref().ok_or("Todo service has no checked reply")?;
+        let next = live.todo_reply(mount, frame.revision + 1, message, payload)?;
+        let states = next.states.clone();
+        slot.frame = Some(Arc::new(next));
+        Ok(Some((message.to_owned(), states)))
     }
 
     /// 试验/重放共用：按场景编译一次包闭包。
@@ -223,6 +282,13 @@ impl PackageStateEngine {
             }
         }
         let generation = self.next_generation;
+        let todo = if self.todo_reply.is_some() {
+            let (binding, realm) = self.todo_service.as_ref()
+                .ok_or("ace.desktop.todo-binding: host has not granted the local Todo service")?;
+            Some(TodoTab::open(binding, *realm).map_err(|error| format!("Todo lease: {error:?}"))?)
+        } else {
+            None
+        };
         let mut slot = Slot {
             identity: identity.to_string(), live: true, generation,
             ops: Vec::new(), frame: None, initialized: BTreeSet::new(), timer_due: Vec::new(),
@@ -258,10 +324,14 @@ impl PackageStateEngine {
         } else {
             self.slots.push(slot);
         }
+        if let Some(tab) = todo {
+            self.todo_tabs.insert(identity.to_owned(), tab);
+        }
         Ok(generation)
     }
 
     pub(crate) fn unmount(&mut self, identity: &str) {
+        self.todo_tabs.remove(identity);
         if let Some(i) = self.slot(identity) {
             let slot = &mut self.slots[i];
             slot.live = false;

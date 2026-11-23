@@ -2,10 +2,11 @@
 // Client-side cache backed by the Todo API. Mirrors 015-notes notes_store.at.
 
 use back.api: list_todos, create_todo, update_todo, delete_todo, remove_completed
+use types: Todo, TodoCompletion
 
 store TodoStore {
     model {
-        var todos []Todo = []
+        var todos List<Todo> = []
         var next_id int = 0
         var active_count int = 0
         // PLAN-035 T-06：未完成前三预览（mini 右列；标量槽位形态——.at
@@ -18,30 +19,49 @@ store TodoStore {
         // 编辑态由 store 集中管理（与 VM 单一状态堆语义一致）。
         var editing_id int = -1
         var edit_text str = ""
+        var todo_request int = 0
+        var todo_operation str = ""
+        var todo_id int = 0
+        var todo_text str = ""
+        var todo_done bool = false
+        var todo_pending bool = false
+        var todo_error int = 0
     }
 
     msg { Init, Refresh, AddTodo, SetInput(str), ToggleTodo(int), DeleteTodo(int),
               ToggleAll, ClearCompleted,
               StartEdit(int), SetEditText(str), CommitEdit, CancelEdit,
-              Recompute }
+              Recompute, RequestTodo(str, int, str, bool), CompleteTodo(TodoCompletion) }
 
     on {
         .Init -> {
-            .todos = list_todos()
-            .Recompute()
+            if Env.track() == "vm" || Env.track() == "vue" {
+                .todos = list_todos()
+                .Recompute()
+            } else {
+                .RequestTodo("list_todos", 0, "", false)
+            }
         }
 
         .Refresh -> {
-            .todos = list_todos()
-            .Recompute()
+            if Env.track() == "vm" || Env.track() == "vue" {
+                .todos = list_todos()
+                .Recompute()
+            } else {
+                .RequestTodo("list_todos", 0, "", false)
+            }
         }
 
         .AddTodo -> {
             if .input != "" {
-                create_todo(.input)
-                .todos = list_todos()
-                .Recompute()
-                .input = ""
+                if Env.track() == "vm" || Env.track() == "vue" {
+                    create_todo(.input)
+                    .todos = list_todos()
+                    .Recompute()
+                    .input = ""
+                } else {
+                    .RequestTodo("create_todo", 0, .input, false)
+                }
             }
         }
 
@@ -56,36 +76,52 @@ store TodoStore {
             for idx < .todos.len() {
                 if .todos[idx].id == id {
                     current_done = .todos[idx].done
-                    current_text = .todos[idx].text
+                    current_text = "" + .todos[idx].text
                 }
                 idx = idx + 1
             }
-            update_todo(id, current_text, !current_done)
-            .todos = list_todos()
-            .Recompute()
+            if Env.track() == "vm" || Env.track() == "vue" {
+                update_todo(id, current_text, !current_done)
+                .todos = list_todos()
+                .Recompute()
+            } else {
+                .RequestTodo("update_todo", id, current_text, !current_done)
+            }
         }
 
         .DeleteTodo(id) -> {
-            delete_todo(id)
-            .todos = list_todos()
-            .Recompute()
+            if Env.track() == "vm" || Env.track() == "vue" {
+                delete_todo(id)
+                .todos = list_todos()
+                .Recompute()
+            } else {
+                .RequestTodo("delete_todo", id, "", false)
+            }
         }
 
         .ToggleAll -> {
             var all_done bool = .active_count == 0
-            var i int = 0
-            for i < .todos.len() {
-                update_todo(.todos[i].id, .todos[i].text, !all_done)
-                i = i + 1
+            if Env.track() == "vm" || Env.track() == "vue" {
+                var i int = 0
+                for i < .todos.len() {
+                    update_todo(.todos[i].id, .todos[i].text, !all_done)
+                    i = i + 1
+                }
+                .todos = list_todos()
+                .Recompute()
+            } else {
+                .RequestTodo("set_all_todos", 0, "", !all_done)
             }
-            .todos = list_todos()
-            .Recompute()
         }
 
         .ClearCompleted -> {
-            remove_completed(true)
-            .todos = list_todos()
-            .Recompute()
+            if Env.track() == "vm" || Env.track() == "vue" {
+                remove_completed(true)
+                .todos = list_todos()
+                .Recompute()
+            } else {
+                .RequestTodo("remove_completed", 0, "", true)
+            }
         }
 
         // PLAN-035 T-06：active_count + preview（未完成前三）单一重算臂
@@ -100,13 +136,13 @@ store TodoStore {
                 if .todos[i].done == false {
                     .active_count = .active_count + 1
                     if .preview1 == "" {
-                        .preview1 = .todos[i].text
+                        .preview1 = "" + .todos[i].text
                     } else {
                         if .preview2 == "" {
-                            .preview2 = .todos[i].text
+                            .preview2 = "" + .todos[i].text
                         } else {
                             if .preview3 == "" {
-                                .preview3 = .todos[i].text
+                                .preview3 = "" + .todos[i].text
                             }
                         }
                     }
@@ -121,7 +157,7 @@ store TodoStore {
             var idx int = 0
             for idx < .todos.len() {
                 if .todos[idx].id == id {
-                    .edit_text = .todos[idx].text
+                    .edit_text = "" + .todos[idx].text
                 }
                 idx = idx + 1
             }
@@ -133,27 +169,70 @@ store TodoStore {
 
         .CommitEdit -> {
             if .editing_id >= 0 {
-                if .edit_text == "" {
-                    delete_todo(.editing_id)
+                if Env.track() == "vm" || Env.track() == "vue" {
+                    if .edit_text == "" {
+                        delete_todo(.editing_id)
+                    } else {
+                        var idx int = 0
+                        for idx < .todos.len() {
+                            if .todos[idx].id == .editing_id {
+                                update_todo(.editing_id, .edit_text, .todos[idx].done)
+                            }
+                            idx = idx + 1
+                        }
+                    }
+                    .todos = list_todos()
+                    .Recompute()
+                    .editing_id = -1
+                    .edit_text = ""
+                } else if .edit_text == "" {
+                    .RequestTodo("delete_todo", .editing_id, "", false)
                 } else {
                     var idx int = 0
                     for idx < .todos.len() {
                         if .todos[idx].id == .editing_id {
-                            update_todo(.editing_id, .edit_text, .todos[idx].done)
+                            .RequestTodo("update_todo", .editing_id, .edit_text, .todos[idx].done)
                         }
                         idx = idx + 1
                     }
                 }
-                .todos = list_todos()
-                .Recompute()
-                .editing_id = -1
-                .edit_text = ""
             }
         }
 
         .CancelEdit -> {
             .editing_id = -1
             .edit_text = ""
+        }
+
+        .RequestTodo(operation, id, text, done) -> {
+            if !.todo_pending {
+                .todo_request += 1
+                .todo_operation = operation
+                .todo_id = id
+                .todo_text = text
+                .todo_done = done
+                .todo_pending = true
+                .todo_error = 0
+            }
+        }
+
+        .CompleteTodo(result TodoCompletion) -> {
+            if .todo_pending && result.request == .todo_request {
+                .todo_pending = false
+                .todo_error = result.status
+                if result.ok {
+                    let succeeded = result.status == 0
+                    .todos = result.rows
+                    .Recompute()
+                    if succeeded && .todo_operation == "create_todo" && .input == .todo_text {
+                        .input = ""
+                    }
+                    if succeeded && .editing_id == .todo_id && (.todo_operation == "update_todo" || .todo_operation == "delete_todo") {
+                        .editing_id = -1
+                        .edit_text = ""
+                    }
+                }
+            }
         }
     }
 }

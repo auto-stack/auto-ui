@@ -3,7 +3,8 @@ use std::sync::{Arc, Mutex};
 use ace_av::age_package::live_session::{WidgetProgram, WidgetSession};
 use ace_core::source::age_package::{
     compile_age_package_widget_runtime, AgePackageCompilation, AgePackageComponent,
-    AgePackageDescription, AgeWidgetProperty, AgeWidgetRefs, WIDGET_CONTEXT_BINDING,
+    AgePackageDescription, AgeWidgetProperty, AgeWidgetRefs, TODO_SERVICE_BINDING,
+    WIDGET_CONTEXT_BINDING,
 };
 use ace_core::source::packages::PACKAGES_CAPABILITY;
 use auto_lang_core::file_session::FileSession;
@@ -49,7 +50,10 @@ impl LivePackage {
         let uses_context = |node: &AgePackageComponent| {
             node.members.iter().any(|row| row.role == "bind" && row.name == WIDGET_CONTEXT_BINDING)
         };
-        let mut needs_current_models =
+        let has_todo_service = component.members.iter()
+            .any(|row| row.role == "bind" && row.name == TODO_SERVICE_BINDING);
+        let has_shared_store = component.imported_store.is_some();
+        let mut needs_current_models = has_todo_service || has_shared_store ||
             component.emits_outbound || component.has_watches || component.requests_focus || uses_context(component);
         for site in ordinary.widget_refs.values().flatten() {
             let child = ordinary
@@ -91,7 +95,7 @@ impl LivePackage {
             .iter()
             .position(|node| node.module == entry)
             .ok_or("missing checked widget root")?;
-        let live_children = compiled.widget_runtime.iter().any(|runtime| {
+        let live_children = has_todo_service || has_shared_store || compiled.widget_runtime.iter().any(|runtime| {
             runtime.outbound || runtime.focus || runtime.context_handler.is_some() || !runtime.watches.is_empty()
         });
         if requires_child_state && !live_children {
@@ -147,6 +151,21 @@ impl LivePackage {
         )?;
         frame.focus_requests = session.take_focus_requests();
         Ok(frame)
+    }
+
+    pub(super) fn todo_reply(
+        &self,
+        mount: &Mutex<MountedWidget>,
+        revision: u64,
+        message: &str,
+        value: ace_av::age_package::live_session::HostInput,
+    ) -> Result<PackageFrame, String> {
+        let mounted = mount.lock().map_err(|_| "checked widget mount is unavailable")?;
+        let session = &mounted.0;
+        session.transaction(|| {
+            session.todo_service_reply(message, value, &frame_limits())?;
+            self.frame(session, revision)
+        })
     }
 
     pub(super) fn update(

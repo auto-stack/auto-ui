@@ -28,11 +28,12 @@
 //! `dispatches*`（真实 handler 执行计数，`dispatch_log` 同源）。
 
 use crate::ui::ace_node_desktop::{
-    current_session, host_session_text_applies, push_event, NodeDesktopBridge, StepOutcome,
+    current_session, host_session_text_applies, push_event, queue_package_message,
+    selected_package_view, NodeDesktopBridge, NodeDesktopMsg, StepOutcome,
 };
 use crate::ui::ace_state_bridge::{AceStateValue, EngineExecutionAudit};
 use crate::ui::{Component, View};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{OnceLock, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -114,6 +115,7 @@ pub enum AseSessionAction {
     Close(usize),
     /// frame 按钮（声明序 target；与窗口点击同一 typed 队列）。
     Click(usize),
+    PackageInput { message: String, occurrence: usize, text: Option<String> },
 }
 
 /// 一条会话生命周期记录（证据面；关闭后保留记录、释放 owner）。
@@ -136,6 +138,41 @@ struct LiveSession {
     clock: bool,
 }
 
+struct TodoProject {
+    units: Vec<ace_core::source::packages::PackageModuleInput>,
+    service: ase_m0::todo_service::ServiceBinding,
+    started: Instant,
+    timings: Vec<SessionTiming>,
+}
+
+#[derive(serde::Serialize)]
+struct SessionTiming {
+    phase: &'static str,
+    app: String,
+    session: Option<usize>,
+    at_us: u128,
+    elapsed_us: u128,
+}
+
+impl TodoProject {
+    fn record(&mut self, phase: &'static str, app: &str, session: Option<usize>, start: Instant) {
+        if self.timings.len() >= 4096 {
+            return;
+        }
+        let now = Instant::now();
+        self.timings.push(SessionTiming {
+            phase,
+            app: app.to_owned(),
+            session,
+            at_us: now.saturating_duration_since(self.started).as_micros(),
+            elapsed_us: now.saturating_duration_since(start).as_micros(),
+        });
+    }
+}
+
+const TODO_APP_KEY: &str = "todo";
+const TODO_REALM: ase_m0::todo_service::RealmId = ase_m0::todo_service::RealmId(1);
+
 /// ASE 交互会话宿主：app 注册表 + 会话表（活≤2）+ 选中态 + 观察口。
 pub struct AseSessionHost {
     apps: Vec<AseApp>,
@@ -144,6 +181,7 @@ pub struct AseSessionHost {
     selected: Option<usize>,
     next_id: usize,
     clock_app: Option<String>,
+    todo_project: Option<TodoProject>,
     visibility: u64,
     clock: Option<VisibleClock>,
     clock_metrics: ClockMetrics,
@@ -166,6 +204,7 @@ impl AseSessionHost {
             selected: None,
             next_id: 1,
             clock_app: None,
+            todo_project: None,
             visibility: 0,
             clock: None,
             clock_metrics: ClockMetrics::default(),
@@ -183,6 +222,54 @@ impl AseSessionHost {
     pub fn with_clock_app(mut self, app_key: String) -> Result<Self, String> {
         self.app_path(&app_key)?;
         self.clock_app = Some(app_key);
+        Ok(self)
+    }
+
+    /// Register the actual Gallery 013 project's native frontend and local backend.
+    pub fn with_todo_project(
+        mut self,
+        project: &Path,
+        code_root: PathBuf,
+        data_root: Option<&Path>,
+    ) -> Result<Self, String> {
+        use ase_m0::todo_service::{ServiceBinding, TODO_APP, TODO_VERSION};
+        use ase_m0::{Registry, RegistryApp};
+
+        let started = Instant::now();
+        if self.apps.iter().any(|app| app.key == TODO_APP_KEY) {
+            return Err("ASE Todo key is already registered".into());
+        }
+        let project = project.canonicalize().map_err(|error| error.to_string())?;
+        let manifest = project.join("pac.at");
+        if !manifest.is_file() {
+            return Err(format!("013 manifest is missing: {}", manifest.display()));
+        }
+        let path = project.join("src/front/app.at");
+        let source = std::fs::read_to_string(&path)
+            .map_err(|error| format!("read {}: {error}", path.display()))?;
+        let modules = super::ace_route::front_route_modules(&path)?;
+        let (units, _) = super::ace_route::front_package_units(&path, &source, &modules)?;
+        let registry = Registry {
+            dir: project,
+            apps: vec![RegistryApp {
+                identity: TODO_APP.into(),
+                version: TODO_VERSION.into(),
+                package: "todo".into(),
+                root: "src/back".into(),
+                entry: "api".into(),
+                sources: vec!["api.at".into(), "db.at".into()],
+                capabilities: Vec::new(),
+            }],
+        };
+        let service = match data_root {
+            Some(root) => ServiceBinding::with_persistence(registry, code_root, TODO_REALM, root)
+                .map_err(|error| format!("Todo data grant: {error:?}"))?,
+            None => ServiceBinding::new(registry, code_root),
+        };
+        self.apps.push(AseApp { key: TODO_APP_KEY.into(), path: path.to_string_lossy().into_owned() });
+        let mut todo = TodoProject { units, service, started, timings: Vec::new() };
+        todo.record("host_prepare", TODO_APP_KEY, None, started);
+        self.todo_project = Some(todo);
         Ok(self)
     }
 
@@ -244,15 +331,26 @@ impl AseSessionHost {
             return Err(msg);
         }
         let path = self.app_path(app_key)?;
-        let src = std::fs::read_to_string(&path)
-            .map_err(|e| format!("read app {app_key} source {}: {e}", path.display()))?;
         self.metrics.loads += 1;
-        let bridge = NodeDesktopBridge::load(&src, &path.to_string_lossy(), 1)
-            .map_err(|e| format!("load refused for {app_key}: {e}"))?;
+        let started = Instant::now();
+        let bridge = if let Some(todo) = self.todo_project.as_ref().filter(|_| app_key == TODO_APP_KEY) {
+            let mut bridge = NodeDesktopBridge::load_package(todo.units.clone(), "app::app", 1)
+                .map_err(|error| format!("load refused for {app_key}: {error}"))?;
+            bridge.install_todo_service(todo.service.clone(), TODO_REALM)?;
+            bridge
+        } else {
+            let src = std::fs::read_to_string(&path)
+                .map_err(|e| format!("read app {app_key} source {}: {e}", path.display()))?;
+            NodeDesktopBridge::load(&src, &path.to_string_lossy(), 1)
+                .map_err(|e| format!("load refused for {app_key}: {e}"))?
+        };
         if self.clock_app.as_deref() == Some(app_key) && !bridge.accepts_clock_tick() {
             return Err(format!(
                 "clock app {app_key:?} must declare a Tick(int) handler"
             ));
+        }
+        if let Some(todo) = &mut self.todo_project {
+            todo.record("load", app_key, None, started);
         }
         Ok(AseOpenTicket {
             app_key: app_key.to_string(),
@@ -284,6 +382,7 @@ impl AseSessionHost {
             app_key,
             mut bridge,
         } = ticket;
+        let started = Instant::now();
         let clock = self.clock_app.as_deref() == Some(app_key.as_str());
         // 新会话成为选中：出向车道先撤（引擎常驻，只撤显示副本）。
         self.close_outgoing_lane("open-session")?;
@@ -297,6 +396,9 @@ impl AseSessionHost {
         let generation = self.next_generation_of(&app_key);
         let id = self.next_id;
         self.next_id += 1;
+        if let Some(todo) = &mut self.todo_project {
+            todo.record("mount", &app_key, Some(id), started);
+        }
         self.log.push(format!(
             "open session {id} app {app_key} gen {generation} ui {ui_session} \
              (loads={}, lane_opens={})",
@@ -329,6 +431,7 @@ impl AseSessionHost {
         let idx = self
             .live_idx(id)
             .ok_or_else(|| format!("select refused: session {id} is not a live session"))?;
+        let started = Instant::now();
         self.close_outgoing_lane("select")?;
         self.metrics.ui_lane_opens += 1;
         let session = &mut self.live[idx];
@@ -340,8 +443,18 @@ impl AseSessionHost {
         .map_err(|e| format!("select refused: reopening lane for {id}: {e}"))?;
         session.ui_session = Some(ui_session);
         session.record.last_ui_session = Some(ui_session);
+        if self.todo_project.is_some() && session.record.app_key == TODO_APP_KEY {
+            if let StepOutcome::DispatchRefused(error) | StepOutcome::LaneError(error) =
+                session.bridge.dispatch_typed(0, "Refresh", &[])
+            {
+                self.errors.push(error);
+            }
+        }
         let generation = session.record.generation;
         let clock = session.clock;
+        if let Some(todo) = &mut self.todo_project {
+            todo.record("select", &session.record.app_key, Some(id), started);
+        }
         self.switches += 1;
         self.activate(id, generation, clock);
         self.log.push(format!(
@@ -357,12 +470,17 @@ impl AseSessionHost {
         let idx = self
             .live_idx(id)
             .ok_or_else(|| format!("close refused: session {id} is not a live session"))?;
+        let started = Instant::now();
+        let app = self.live[idx].record.app_key.clone();
         if self.selected == Some(id) {
             self.close_outgoing_lane("close-session")?;
         } else {
             self.live[idx].bridge.close_session()?;
         }
         self.retire_session(idx);
+        if let Some(todo) = &mut self.todo_project {
+            todo.record("close", &app, Some(id), started);
+        }
         Ok(())
     }
 
@@ -401,7 +519,7 @@ impl AseSessionHost {
             let id = session.record.id;
             session
                 .bridge
-                .close_session()
+                .hide_ase_session()
                 .map_err(|error| format!("{reason}: closing lane of session {id}: {error}"))?;
             session.ui_session = None;
             self.log.push(format!(
@@ -445,6 +563,13 @@ impl AseSessionHost {
                 failure.get_or_insert(error);
             }
             self.retire_session(0);
+        }
+        if let Some(todo) = &self.todo_project {
+            if let Err(error) = todo.service.wait_released(Duration::from_secs(5)) {
+                let error = format!("close Todo service: {error:?}");
+                self.errors.push(error.clone());
+                failure.get_or_insert(error);
+            }
         }
         failure.map_or(Ok(()), Err)
     }
@@ -560,6 +685,37 @@ impl AseSessionHost {
         Ok(())
     }
 
+    pub fn package_input(
+        &mut self,
+        message: &str,
+        occurrence: usize,
+        text: Option<String>,
+    ) -> Result<(), String> {
+        let (session, revision, target) = current_session(|session| {
+            let frame = session.package_frame(0)?;
+            let target = (0..frame.actions().len())
+                .filter(|&target| {
+                    frame.action_message(target) == Some(message)
+                        && frame.accepts_target(target, text.is_some())
+                })
+                .nth(occurrence)?;
+            Some((session.id, frame.revision, target))
+        }).flatten().ok_or_else(|| format!("package input {message}[{occurrence}] is unavailable"))?;
+        let input = match text {
+            Some(text) => NodeDesktopMsg::PackageText { session, instance: 0, revision, target, text },
+            None => NodeDesktopMsg::PackageClick { session, instance: 0, revision, target },
+        };
+        self.package_message(input);
+        Ok(())
+    }
+
+    fn package_message(&mut self, message: NodeDesktopMsg) {
+        let click = matches!(message, NodeDesktopMsg::PackageClick { .. });
+        if queue_package_message(message) && click {
+            self.metrics.clicks_offered += 1;
+        }
+    }
+
     /// 受控步进选中会话（AV poll → 真实 handler 执行 → 差量 apply 到当前
     /// 车道）。无选中 → Idle。`Dispatched` 在 step 边界计入累计
     /// `metrics.dispatches`（真实 handler 执行走势）。到期脚本先注入（tick
@@ -567,6 +723,21 @@ impl AseSessionHost {
     pub fn step_selected(&mut self) -> StepOutcome {
         self.tick_no += 1;
         self.run_due_script();
+        for session in &mut self.live {
+            if Some(session.record.id) != self.selected {
+                let started = Instant::now();
+                match session.bridge.step_todo_service() {
+                    StepOutcome::DispatchRefused(error) => self.errors.push(error),
+                    StepOutcome::Dispatched { .. } => {
+                        self.metrics.dispatches += 1;
+                        if let Some(todo) = &mut self.todo_project {
+                            todo.record("hidden_reply", &session.record.app_key, Some(session.record.id), started);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
         let now = Instant::now();
         if let Some(wake) = self.clock_wake() {
             self.queue_clock_wake(wake, now);
@@ -581,9 +752,14 @@ impl AseSessionHost {
         let Some(idx) = self.live_idx(id) else {
             return StepOutcome::Idle;
         };
+        let started = Instant::now();
         let outcome = self.live[idx].bridge.step();
-        if matches!(outcome, StepOutcome::Dispatched { .. }) {
+        if let StepOutcome::Dispatched { msg, .. } = &outcome {
             self.metrics.dispatches += 1;
+            if let Some(todo) = &mut self.todo_project {
+                let phase = if msg == "TodoFinished" { "visible_reply" } else { "visible_input" };
+                todo.record(phase, &self.live[idx].record.app_key, Some(id), started);
+            }
         }
         outcome
     }
@@ -611,6 +787,9 @@ impl AseSessionHost {
                 AseSessionAction::Select(id) => self.select(*id),
                 AseSessionAction::Close(id) => self.close_session(*id),
                 AseSessionAction::Click(target) => self.click(*target),
+                AseSessionAction::PackageInput { message, occurrence, text } => {
+                    self.package_input(message, *occurrence, text.clone())
+                }
             };
             if let Err(e) = result {
                 self.errors.push(format!("script {action:?}: {e}"));
@@ -623,6 +802,10 @@ impl AseSessionHost {
     pub fn engine_states(&self, id: usize) -> Option<Vec<(String, AceStateValue)>> {
         self.live_idx(id)
             .and_then(|idx| self.live[idx].bridge.states(0))
+    }
+
+    pub fn todo_inventory(&self) -> Option<ase_m0::todo_service::Inventory> {
+        self.todo_project.as_ref().map(|todo| todo.service.inventory())
     }
 
     /// 该会话真实 handler 执行计数（引擎 `dispatch_log` 同源）。
@@ -707,6 +890,23 @@ impl AseSessionHost {
             "live": live,
             "closed": closed,
             "selected": self.selected,
+            "todo": self.todo_inventory().map(|todo| serde_json::json!({
+                "leases": todo.leases,
+                "workers": todo.workers,
+                "owners": todo.owners,
+                "queued": todo.queued,
+                "active": todo.active,
+                "links": todo.links,
+                "initializations": todo.initializations,
+                "executions": todo.executions,
+                "durable_writes": todo.durable_writes,
+                "suppressed": todo.suppressed,
+                "package_hash": todo.last_package_hash,
+                "timings": self.todo_project.as_ref().map(|project| &project.timings),
+                "visible_frame": current_session(|session| {
+                    session.package_frame(0).map(|frame| format!("{:?}", frame.view))
+                }).flatten(),
+            })),
             "switches": self.switches,
             "clock": {
                 "registrations": usize::from(self.clock.is_some()),
@@ -765,6 +965,7 @@ pub enum AseSessionsMsg {
     CloseSession(usize),
     /// frame 内业务按钮（声明序 target；真实 980 队列注入）。
     FrameClick(usize),
+    Package(NodeDesktopMsg),
     SessionTick,
 }
 
@@ -796,6 +997,9 @@ impl Component for AseM0SessionsWindow {
             }
             AseSessionsMsg::FrameClick(target) => {
                 let _ = with_ase_sessions_host(|h| h.click(target));
+            }
+            AseSessionsMsg::Package(message) => {
+                with_ase_sessions_host(|h| h.package_message(message));
             }
             AseSessionsMsg::SessionTick => {
                 with_ase_sessions_host(|h| h.step_selected());
@@ -871,6 +1075,9 @@ impl Component for AseM0SessionsWindow {
         }
         if selected.is_none() {
             return root.build();
+        }
+        if let Some(content) = selected_package_view() {
+            return root.child(content.map_msg(AseSessionsMsg::Package)).build();
         }
         if let Some((texts, states, buttons, generation)) = current_session(|s| {
             (

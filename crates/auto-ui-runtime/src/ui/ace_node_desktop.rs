@@ -485,6 +485,35 @@ fn push_package_focus(id: i32, instance: usize, revision: u64, control: String, 
     }
 }
 
+/// Admit package input through the same revisioned queue in both desktop hosts.
+pub(crate) fn queue_package_message(message: NodeDesktopMsg) -> bool {
+    match message {
+        NodeDesktopMsg::PackageClick { session, instance, revision, target } => {
+            push_package_event(session, instance, revision, target, None, None);
+        }
+        NodeDesktopMsg::PackagePointer { session, instance, revision, target, x, y } => {
+            push_package_event(session, instance, revision, target, None, Some((x, y)));
+        }
+        NodeDesktopMsg::PackageText { session, instance, revision, target, text } => {
+            push_package_event(session, instance, revision, target, Some(text), None);
+        }
+        NodeDesktopMsg::PackageFocus { session, instance, revision, control, gained } => {
+            push_package_focus(session, instance, revision, control, gained);
+        }
+        _ => return false,
+    }
+    true
+}
+
+pub(crate) fn selected_package_view() -> Option<View<NodeDesktopMsg>> {
+    let frame = current_session(|session| {
+        (!session.package_frames.is_empty()).then(|| host_frame(session))
+    }).flatten()?;
+    let mut dialogs = Vec::new();
+    let content = render_host_frame(frame, None, false, &mut dialogs);
+    Some(View::col().child(content).children(dialogs).build())
+}
+
 /// 向当前 session 推入 typed 事件（窗口点击/脚本注入的同一队列边界）。
 /// 无活动 session 或已关闭 → 丢弃并计数（不复活、不静默成功）。
 pub fn push_event(instance: usize, target: usize) {
@@ -2228,7 +2257,15 @@ impl NodeDesktopBridge {
     ) -> Result<Self, String> {
         let unit = units.iter().find(|unit| format!("{}::{}", unit.package, unit.id) == entry)
             .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
-        let candidates = package_candidates(&unit.source)?;
+        let candidates = match package_candidates(&unit.source) {
+            Ok(candidates) => candidates,
+            // The single-unit inspection cannot resolve a Store imported
+            // from another package unit. The complete package remains checked.
+            Err(error) if error.contains("Declare the store in the same package unit") => {
+                return Self::load_package_leaf(units, entry, instances);
+            }
+            Err(error) => return Err(error),
+        };
         let node = candidates.first()
             .ok_or_else(|| "no AGE node candidate in the entry module".to_string())?;
         // A desktop session admits only the page it is about to mount.
@@ -2384,6 +2421,37 @@ impl NodeDesktopBridge {
         matches!(&self.engine, Some(BridgeEngine::Package(engine)) if engine.has_checked_view())
     }
 
+    /// Bind a checked package to a local service before its first mount.
+    pub fn install_todo_service(
+        &mut self,
+        binding: ase_m0::todo_service::ServiceBinding,
+        realm: ase_m0::todo_service::RealmId,
+    ) -> Result<(), String> {
+        let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() else {
+            return Err("ace.desktop.todo-binding: expected a checked package".into());
+        };
+        engine.install_todo_service(binding, realm)
+    }
+
+    pub(crate) fn step_todo_service(&mut self) -> StepOutcome {
+        let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() else {
+            return StepOutcome::Idle;
+        };
+        for (instance, identity) in self.identities.iter().enumerate() {
+            match engine.poll_todo_service(identity) {
+                Ok(Some((message, states))) => {
+                    return self.publish_package_frame(instance, &message, states);
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    self.errors.push(error.clone());
+                    return StepOutcome::DispatchRefused(error);
+                }
+            }
+        }
+        StepOutcome::Idle
+    }
+
     pub(super) fn initialize_route_page(&mut self) -> Result<(), String> {
         for instance in 0..self.instances {
             match self.dispatch_event(instance, "Init", None) {
@@ -2453,16 +2521,20 @@ impl NodeDesktopBridge {
 
     fn open_lane(&mut self, deferred_snapshot: bool) -> Result<i32, String> {
         install_ui980_lane()?;
-        let frames = self.mount_package_views()?;
+        let (frames, mounted_here) = self.mount_package_views()?;
         let session = match av_call(&format!("ui_open(\"open\", {}, 0)", self.instances)) {
             Ok(session) => session,
             Err(error) => {
-                self.release_package_views();
+                if mounted_here {
+                    self.release_package_views();
+                }
                 return Err(error);
             }
         };
         if session < 1 {
-            self.release_package_views();
+            if mounted_here {
+                self.release_package_views();
+            }
             return Err(format!("ui_open refused: {session}"));
         }
         self.session = Some(session);
@@ -2559,7 +2631,7 @@ impl NodeDesktopBridge {
         }
         if !deferred_snapshot {
             if let Err(error) = self.apply_initial_snapshot() {
-                let _ = self.close_session();
+                let _ = self.close_lane(mounted_here);
                 return Err(error);
             }
         }
@@ -2569,12 +2641,21 @@ impl NodeDesktopBridge {
         Ok(session)
     }
 
-    fn mount_package_views(&mut self) -> Result<Vec<Arc<PackageFrame>>, String> {
+    fn mount_package_views(&mut self) -> Result<(Vec<Arc<PackageFrame>>, bool), String> {
         let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), false));
         };
         if !engine.has_checked_view() {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), false));
+        }
+        let retained = self.identities.iter()
+            .filter_map(|id| engine.package_frame(id))
+            .collect::<Vec<_>>();
+        if !retained.is_empty() {
+            if retained.len() != self.identities.len() {
+                return Err("checked package has an incomplete retained mount".into());
+            }
+            return Ok((retained, false));
         }
         let mut frames = Vec::new();
         for id in &self.identities {
@@ -2586,7 +2667,7 @@ impl NodeDesktopBridge {
             }
             frames.push(engine.package_frame(id).expect("mounted package frame"));
         }
-        Ok(frames)
+        Ok((frames, true))
     }
 
     fn release_package_views(&mut self) {
@@ -2950,6 +3031,10 @@ impl NodeDesktopBridge {
     }
 
     fn step_package_timers(&mut self) -> StepOutcome {
+        let service = self.step_todo_service();
+        if !matches!(service, StepOutcome::Idle) {
+            return service;
+        }
         let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() else {
             unreachable!("package timers require a package engine");
         };
@@ -3212,7 +3297,19 @@ impl NodeDesktopBridge {
 
     /// 关闭当前 session（AV `ui_close`）；后续 apply/poll 具名拒、late 事件丢弃。
     pub fn close_session(&mut self) -> Result<(), String> {
+        self.close_lane(true)
+    }
+
+    /// ASE switches withdraw the output lane while the checked mount stays live.
+    pub(crate) fn hide_ase_session(&mut self) -> Result<(), String> {
+        self.close_lane(false)
+    }
+
+    fn close_lane(&mut self, release_mount: bool) -> Result<(), String> {
         let Some(session) = self.session else {
+            if release_mount {
+                self.release_package_views();
+            }
             return Ok(());
         };
         let route_result = self.routes.as_mut().map_or(Ok(()), |routes| routes.close());
@@ -3222,7 +3319,9 @@ impl NodeDesktopBridge {
             return Err(format!("ui_close refused: {rc}"));
         }
         self.session = None;
-        self.release_package_views();
+        if release_mount {
+            self.release_package_views();
+        }
         // B-AV U01：键入配对随 session 关闭一并丢弃（provider 队列已清，
         // 残留文本会成为无码孤儿）。
         self.pending_texts.clear();
@@ -3554,17 +3653,11 @@ impl Component for AceNodeDesktopWindow {
             NodeDesktopMsg::BridgeTick => {
                 with_bridge(|b| b.step());
             }
-            NodeDesktopMsg::PackageClick { session, instance, revision, target } => {
-                push_package_event(session, instance, revision, target, None, None);
-            }
-            NodeDesktopMsg::PackagePointer { session, instance, revision, target, x, y } => {
-                push_package_event(session, instance, revision, target, None, Some((x, y)));
-            }
-            NodeDesktopMsg::PackageText { session, instance, revision, target, text } => {
-                push_package_event(session, instance, revision, target, Some(text), None);
-            }
-            NodeDesktopMsg::PackageFocus { session, instance, revision, control, gained } => {
-                push_package_focus(session, instance, revision, control, gained);
+            message @ (NodeDesktopMsg::PackageClick { .. }
+            | NodeDesktopMsg::PackagePointer { .. }
+            | NodeDesktopMsg::PackageText { .. }
+            | NodeDesktopMsg::PackageFocus { .. }) => {
+                queue_package_message(message);
             }
             NodeDesktopMsg::Widget { session, instance, action } => {
                 if let WidgetAction::DispatchButton(target) = action {

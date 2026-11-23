@@ -1,8 +1,15 @@
 // front/types.at — Frontend type definitions (mirror of back/api.at)
 // Duplicated to avoid circular import issues (same pattern as 015-notes).
 
-type Todo {
+pub type Todo {
     id int
     text str
     done bool
+}
+
+pub type TodoCompletion {
+    request int
+    ok bool
+    status int
+    rows List<Todo>
 }

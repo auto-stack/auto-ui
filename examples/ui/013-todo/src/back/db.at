@@ -84,6 +84,17 @@ pub fn remove_completed(done bool) bool {
     return true
 }
 
+// The native Store sends ToggleAll as one checked request and one commit.
+pub fn set_all_todos(done bool) bool {
+    var updated = List<Todo>.new()
+    let current = all_todos()
+    for todo in current {
+        updated.push(Todo { id: todo.id, text: todo.text.clone(), done: done })
+    }
+    todos = updated
+    return true
+}
+
 // Internal to the checked ASE backend package. The HTTP API does not export
 // these entries. Its process still starts with the seed data above.
 pub fn restore_todo_snapshot(next_id int) bool {

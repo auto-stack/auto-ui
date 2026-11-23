@@ -10,7 +10,10 @@
 //!   [--script "3:open:counter-a,5:click:2,11:open:counter-b,25:select:1,31:close:1"]
 //!   （脚本语法 tick:动作[:arg]；动作 open:<app>/select:<sid>/close:<sid>/
 //!   click:<target>。click 的 target=按钮声明序：0=Dec、1=Reset、2=Inc。）
+//!   Checked package actions use press:<message>:<occurrence> or
+//!   type:<message>:<occurrence>:<text>, with zero-based occurrences.
 //!   --prep-only：预构建 ui980 provider 后即退出（排窗前准备，不开窗）。
+//!   --todo-project <013 root> --todo-code-root <directory> [--todo-data <directory>]
 
 use auto_ui_runtime::ui::ase_m0_sessions::{
     install_ase_sessions_host, with_ase_sessions_host, AseApp, AseM0SessionsWindow,
@@ -30,6 +33,9 @@ fn main() {
     let mut script_spec: Option<String> = None;
     let mut clock_app = None;
     let mut await_window_close = false;
+    let mut todo_project = None;
+    let mut todo_code_root = None;
+    let mut todo_data = None;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -61,6 +67,9 @@ fn main() {
                 );
             }
             "--await-window-close" => await_window_close = true,
+            "--todo-project" => todo_project = args.next().map(std::path::PathBuf::from),
+            "--todo-code-root" => todo_code_root = args.next().map(std::path::PathBuf::from),
+            "--todo-data" => todo_data = args.next().map(std::path::PathBuf::from),
             "--evidence" => evidence_path = args.next(),
             "--hold-ms" => hold_ms = args.next().and_then(|v| v.parse().ok()).unwrap_or(8000),
             "--min-frames" => min_frames = args.next().and_then(|v| v.parse().ok()).unwrap_or(8),
@@ -76,13 +85,24 @@ fn main() {
             }
         }
     }
-    if apps.is_empty() {
+    if apps.is_empty() && todo_project.is_none() {
         eprintln!("ase_m0_sessions_window: at least one --app <key>=<path> is required");
         std::process::exit(2);
     }
     let evidence_path = evidence_path.expect("--evidence <out.json> is required");
     await_window_close |= clock_app.is_some() && script_spec.is_none();
     let mut host = AseSessionHost::new(apps);
+    if let Some(project) = todo_project {
+        let code = todo_code_root.expect("--todo-code-root is required with --todo-project");
+        host = host.with_todo_project(&project, code, todo_data.as_deref())
+            .unwrap_or_else(|error| {
+                eprintln!("ase_m0_sessions_window: {error}");
+                std::process::exit(2);
+            });
+    } else if todo_code_root.is_some() || todo_data.is_some() {
+        eprintln!("ase_m0_sessions_window: --todo-project is required for Todo options");
+        std::process::exit(2);
+    }
     if let Some(key) = clock_app {
         host = match host.with_clock_app(key) {
             Ok(host) => host,
@@ -150,7 +170,7 @@ fn parse_script(spec: &str) -> Vec<(usize, AseSessionAction)> {
         if part.is_empty() {
             continue;
         }
-        let mut fields = part.split(':');
+        let mut fields = part.splitn(5, ':');
         let Some(tick) = fields.next().and_then(|t| t.parse::<usize>().ok()) else {
             eprintln!("ase_m0_sessions_window: bad script entry `{part}`");
             std::process::exit(2);
@@ -181,6 +201,14 @@ fn parse_script(spec: &str) -> Vec<(usize, AseSessionAction)> {
                     std::process::exit(2);
                 };
                 AseSessionAction::Click(target)
+            }
+            "press" | "type" => {
+                let message = fields.next().expect("package action needs a handler name");
+                let occurrence = fields.next().and_then(|value| value.parse().ok())
+                    .expect("package action needs a zero-based occurrence");
+                let text = (action == "type")
+                    .then(|| fields.next().expect("type action needs text").to_owned());
+                AseSessionAction::PackageInput { message: message.into(), occurrence, text }
             }
             other => {
                 eprintln!("ase_m0_sessions_window: unknown script action `{other}`");
