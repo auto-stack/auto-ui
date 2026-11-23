@@ -498,6 +498,15 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 在同一代码上重放原图缺失与恢复，依次观察 320×240 正常解码、真实 404、换回正常图、64×48 恢复解码、返回图库及关闭会话。夹具已复原，零运行时错误（40.346 s，退出 0）。`media-regression.json` SHA256 `6D3D53B0B4392093F33D124B063524D36B114827E48E2732D64B02FC67176360`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 95 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `1e9e8cd9` | next: work/T-02–T-03 / T-06。
 
+### 2026-11-23 goal work round 96 — Carousel 真窗渲染与鼠标拖动
+
+- 原 AutoOS `cdb4883` 画廊经受检 Iced 宿主启动，Win32 鼠标可以从侧栏进入 `/carousel`。基线观察到 Basic、Sizes、Spacing 和 Options 的位置状态随按钮变化，幻灯片内容空白。真窗收据 `scratch/r95-carousel-physical/observed.json` SHA256 `9EB8700DB063C86DD72FF4C9DE5F2BF272C2BB84E806544FE8BD0DB195C41CB0`。画廊首页的 `expected fn, found widget` 本轮仍可见，Carousel 独立路由成功挂载。
+- AutoUI `5026fdff` 使横向轮播项按内容取高，纵向固定轨道给可见项分配明确高度。仅 Carousel 启用 Iced 按下与释放位置的采样，保留鼠标移动限频。该选项在视图转换时随事件回调传递。仅修高度的真窗已看见五组幻灯片，并验证了按钮、方向键和首尾循环。完整补丁的 Release 位置跟踪也经真实鼠标拖动复验。
+- 最终真窗观察到 Basic 横向左右拖动与方向键往返、Sizes 和 Spacing 按钮往返、Orientation 向上及向下拖动和方向键往返，Orientation 忽略右方向键。Options 从 `1,2,3` 循环至 `5,1,2`，经 `/avatar` 离页后重进恢复 `1,2,3`。两次向下拖动未翻页，第三次长距离拖动成功，纵向输入稳定性继续保留为复核项。退出时 6,725 帧、四个会话均关闭、零运行时错误、退出 0。受检库准备 45.646 s，观察程序链接 15.878 s。 `drag-final.json` SHA256 `C87B328FD562E7E66F5F8AB16A7DBA8BAFE4F66ED9561BCC20A28BE21353D938`。
+- Debug 定向回归覆盖滑项高度及回调映射、可见项与导航，2/2 通过（编译和执行共 169.364 s）。既有指针区坐标、限频与去重测试 6/6 通过（1.700 s）。`carousel-tests-final-r2.log` SHA256 `DFF5389306F7498EEF15907561AB69E3AA7CE511E48B44C89EED4A74585FECCC`，`pointer-tests-final-r2.log` SHA256 `3E536FEFE1C7F41319D09336D92CD9EA45E2BE8175E97CCEE2BAFBA5747AC3E1`。
+- 核对 PLAN-118 移交的最小 prep 补丁 `7c7ef158`（等同 `299ac88d`）已进入 AutoUI master，落主提交 `3f4f9b3f` 给 T-01 探针增加 `ace-bridge` feature 条件。独立验证探针 `0cc47f5d` 留在 `fix-prep-118`。补丁使用现有 style 声明处理。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 96 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `5026fdff` | next: work/T-02–T-03 / T-06。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
