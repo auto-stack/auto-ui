@@ -360,6 +360,33 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 029 使用 round 72 生产二进制加载当前依赖，越过 `.pop()` 后仍在 admission 阶段退出 4（2.493 s）。首拒在 `tree_view::tree_view_util:99:23` 对动态 ID 调 `.replace()`。恢复点为沿现有文本合同接入去重键转义，保留 TreeView 的 Unicode 和大树性能约束。`av/r73-029-window.log` SHA256 `7E7705B16C63980956FB4E58ADD3BFD4B27AD18067D9868E4BB0E78E30DD8F09`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 73 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `b509a6d95` / auto-ui `9c4dcae7` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work rounds 74–76 — TreeView 文本语义与目录列表接续
+
+- AutoUI `579892e9` 保留 TreeView 的 `|id|` 去重标记和原生子串查询，通过受检文本操作转义 `!` 和 `|`。输出拼接原 ID 的完整片段。目录与焦点比较使用声明的文本值，诊断与图标等派生结果按拥有文本返回。
+- 显式旧 VM 入口对照核中文、表情、分隔符与其转义拼写、空 ID、遍历和父节点、1,000 个非重复键，结果逐行一致（基线 0.307 s，变更后 0.750 s）。`scratch/r74-tree-escape-vm-base.log`、`scratch/r74-tree-escape-vm-final.log`。完整作者工具模块的 AV 用例同时核重复 ID、可达行数、中文行焦点及两个父节点查询。最终 Debug 准备 71.088 s，定向 1/1（0.459 s），发现和清理未单计。`av/r74-tree-escape-case-final.log` SHA256 `B992707E0986EE4E0191641BC88B23CEC80E5F81AE8FDFA55AD63B8963E1E090`。AssetBrowser 原 ID 和 029 包发现定向用例也分别通过（0.272 s、1.317 s）。
+- 029 原入口 round 74 越过 TreeView 文本转义，停在 `GalApply` 向 `.gal_folders` 赋值（2.509 s，退出 4）。AutoUI `bd885aa3` 在同一个动态列表中追加“全部”“收藏”和实际目录项。round 75 单加 List 注解仍在同一处拒绝（2.512 s），改为在空列表追加后越过该处，下一拒为 AssetBrowser 将计算出的 `.folder_nodes` 传给 TreeView（2.525 s，退出 4）。`av/r74-029-window.log`、`av/r75-029-window-r2.log`。
+- AutoLang `956141c3b` 以计算成员所调用函数的裸 List 返回声明为子组件列表参数提供检查上下文，导入仍由原包绑定器解析。Debug 准备 15.602 s，定向用例从实际导入函数收到“照片”并经 AV 子组件显示，通过 1/1（0.170 s），包 AV 45/45（0.850 s）。`av/r76-computed-list-case.log` SHA256 `71663E1FA2D582F73689A0FB3D1F426F0A948608C3A3D7A1A326238E42D8953A`。
+- 029 生产 Debug 准备 59.621 s，越过 AssetBrowser 的目录列表传参，仍在 admission 阶段退出 4（2.554 s）。首拒为 `tree_view::tree_view:63:62`，对上未传入的空 `.disabledIds` 在 `tv_derive_rows` 调用中的元素类型。`av/r76-029-window.log` SHA256 `47FC474D515A452FC4EB68D9EF4C73FA2D5BE106C1F129FB193726762C53AE97`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 76 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `956141c3b` / auto-ui `bd885aa3` | next: work/T-02–T-03。
+
+### 2026-11-23 goal work round 77 — TreeView 空列表默认值
+
+- AutoLang `5972d904f` 对未在任何使用点传入的空 List 默认值，沿已声明的计算函数形参确定列表类型。回归同时核导入函数产生的目录记录和子组件省略的禁用列表，Debug 准备 17.308 s，定向 1/1（0.186 s），包 AV 45/45（0.897 s），发现和清理未单计。`av/r77-computed-default-case.log` SHA256 `E49EB7521E64F4420F69AF60D58705E625FE40BE0ED1D7A419012367DBFBFD40`。
+- 029 生产 Debug 准备 71.805 s。原入口越过列表绑定和类型检查，仍在 admission 阶段退出 4（5.157 s）。生成的 Atom 文档有 8 处 `expr.if` 遭现有描述符具名拒绝，恢复点为将值位置的条件表达式按原分支顺序降低到已支持的控制流。`av/r77-029-window.log` SHA256 `DC285EFC4BD3A41218664AC81BE8E1428D59309065B21AB21262020ED11D175F`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 77 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `5972d904f` / auto-ui `bd885aa3` | next: work/T-02–T-03。
+
+### 2026-11-23 goal work round 78 — 条件表达式接入受检控制流
+
+- AutoLang `223997797` 将 AGE 包的值位置 `if` 降为现有条件块和结果槽，条件及分支值的预备语句保留在各自路径。定向用例核对象里的 `if/else if/else` 分别得到 `first` 和 `second`，未选中的非法 JSON 分支无效果。Debug 准备 18.658 s，定向 1/1（0.186 s），包 AV 46/46（1.128 s），HTTP 13/13（0.258 s），动态值 21/21（0.180 s），发现和清理未单计。`av/r78-if-value-case.log` SHA256 `2EFA7B8101385A372B3BEEF73262BFB96980161D236BFF77905F42D58768E8A8`。
+- 029 生产 Debug 准备 77.079 s。原入口越过 Atom 的 8 处 `expr.if` 拒绝，仍在装载阶段退出 4（4.969 s），首拒 `source.age.widget-view-output: the entry component has no checked view`。`av/r78-029-window.log` SHA256 `AB76E238B086241D54CDE77AA4CDBB8A3FD3A5C602A75B0E8D53F106CDD72C4A`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 78 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `223997797` / auto-ui `bd885aa3` | next: work/T-02–T-03。
+
+### 2026-11-23 goal work round 79 — 029 进入运行时组件挂载
+
+- AutoUI `e6b56d9b` 在同一个动态列表中收集过滤排序结果，业务总数从发布的 `.view_list` 读取。列表进入受检模型，入口视图得以发射。直接给空模型列表加裸 List 注解的对照按文本列表解析，先后触发元素转移（2.499 s）和列表类型拒绝（2.512 s）。`av/r79-029-window.log`、`av/r79-029-window-r2.log`。
+- 029 使用 round 78 生产二进制加载当前原入口，越过入口视图和编译检查。进程终态为 19.497 s、退出 4，首拒 `ace.desktop.widget-timer: child timers are unavailable for AssetBrowser`，无成功窗口收据。该定时器驱动查询镜像，既有场景调度按子组件路径调度，当前实时挂载明确拒绝子组件计时器。恢复点为在子组件当前模型上评估计时器条件，接现有调度并核挂载、卸载和代次。`av/r79-029-window-r3.log` SHA256 `A9210411A65C743B123C1EC597ED5F376E411A5134CF63AA3F079697A6B63B94`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 79 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `223997797` / auto-ui `e6b56d9b` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
