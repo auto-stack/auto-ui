@@ -595,6 +595,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 同一用户状态切到含同相对路径的第二个照片根，使用先前令牌的原图查询先后得到 404、仅扫根目录仍 404、明确扫描所属目录后 200，返回字节等于第二根的原图（1.844 s）。`browser-root.log` SHA256 `9F879B569E43ED7E082D93E6DD01768D02E5104398A1FCEE7FD0CD5FEF3B87A1`。原 029 Iced 真窗使用同一新 Rust 后端复验两张缩略图解码、Unicode 过滤与会话关闭（29.166 s，退出 0）；复用 round 102 窗口探针，未重编桌面内嵌代理。`iced/desktop.json` SHA256 `4B3A1502B384984CD6B7E9E50656742F4CCDC0FF5A3A437453CE3CD478DD2A14`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 107 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `2982178d8b` / auto-ui `9ed57639` | next: work/T-02–T-06 核 031 带授权媒体绑定、029 桌面内嵌代理复验及剩余原验收。
 
+2026-11-23 T-02 续（round 108）：031 后台媒体读取沿用宿主文件授权。
+
+- 定位当前边界：031 `back.api` 的 `auto.image.open_session` 接收路径，旧图片生产者在后台按路径打开；私有 `FileBackendSession` 已向请求线程传入宿主目录授权，但旧图片读取没有消费它。主线方案继续由宿主发放文件凭证，再在后台读取时复查该授权。031 前端、原后端及公用媒体 HTTP 路由本轮未更改。
+- AutoLang `5d7fe0329d` 增加和发放它的目录授权绑定的 `FileReadTicket`。读取在已有目录句柄内完成，复用普通文件和禁止跟随目录链接的打开规则，应用字节上限。撤销、重新授予同一目录及关闭均不能复活旧凭证。媒体会话可将宿主读取器送入现有有界解码与缩放队列，原图和后续尺寸请求使用同一读取器。
+- `cargo test --locked -p auto-lang-core --lib file_session::tests::` 6/6 通过（执行 0.190 s，整命令 19.547 s）。使用仓内实际 320×240 PNG，HTTP 层对拍原始编码字节，解码缓存核实后续 64×48 尺寸，撤销后新尺寸请求 422 且无媒体字节。独立文件验证覆盖后台线程读取、授权前拒绝、字节上限、目录链接替换、重授权与会话关闭。`scratch/r108-031-read-ticket/authorized-final.log` SHA256 `3DE1C592513D1775B9EF2B700CEA529D9C2D4B266570B3F6FEA55531C32E0A32`。
+- 首次媒体全库的并发关闭测试长时间未退出，终止已确认的本次测试进程。恢复队列写入和会话表更新的原有锁顺序及 legacy 的关闭入口检查后，独立并发关闭 1/1 通过，`cargo test --locked -p auto-media-core --lib` 56/56 通过（执行 49.820 s）。`media-shutdown.log` SHA256 `CF09E236438AC273EBF25493A414D2F606DAE460CDA30E1A7B823BD2DF1BACC3`，`media-regression.log` SHA256 `970EE616333CBF86A3898E5B8A96C4CDDE419348A2E8BF8A7BA89CC2EE4C2ABA`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 108 | from: work/T-02 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `5d7fe0329d` / auto-ui `9ed57639` | next: work/T-02 将 031 原 `back.api` 接到私有宿主会话，绑定媒体 URI 所有权，核撤销和关闭后已发 URI 不可读，再接双端原入口。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
