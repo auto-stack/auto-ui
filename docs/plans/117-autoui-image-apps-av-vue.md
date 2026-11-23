@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-117
-status: executing
+status: execution_done
 feature_name: U05 Photo Gallery 与 Image Viewer 双端交付
 author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-24
 plan_revision: 1
-current_step: 3
+current_step: 4
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -79,7 +79,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 - [x] T-01 固定原项目、依赖与验收矩阵
   - work，AC-01，核 §1 现有源和 §6 原运行入口，输出逐行的源、权限、预期和实际阻断。
-- [ ] T-02 接通本计划的具体运行接口
+- [x] T-02 接通本计划的具体运行接口
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
 - [x] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
@@ -948,6 +948,16 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 
 - stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | code_commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | task_ids: T-02 | evidence: round 131 | next: 收齐短路修复定向结果并提交
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 131 | from: work/T-02 | to: work/T-02 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | next: 核查在途修复验证，补当前实现的阶段复审
+
+### 2026-11-24 goal work round 132 — 短路修复复验与阶段复审交接
+
+- round 131 的队列退出 0，Windows 测试机等待 196.487 s。A2X Worker Debug 准备 35.304 s，定向 4/4，执行外层 1.216 s，269 条过滤。包括 PLAN-931 的左侧临时值寿命、未执行右侧零分配、语句根 clone 消费，以及 PLAN-979 的 AGE 拒绝及恢复。AV Debug 准备 29.826 s，定向 6/6，执行外层 0.405 s，1496 条过滤。覆盖 Aggregates 短路和合并、数值陷阱与参考行为、文本 HOF 短路、受检 JSON 正常和错误。两个准备及执行均退出 0，无新增用例，发现、清理未单计。`scratch/r123-phase-gate/r131-short-circuit-repair/results.json` SHA256 `2972F46242DC9C311CAECD0CDC47B0CD253A0BEC9E96DEB795BEB3255461BA64`。
+- 问题用例的修复后 `generated.rs`、`main.rs`、`manifest.json` 与 round 131 的实际合流基面产物各自逐字节相同。暂存 `repaired-output/` 下 `generated.rs` SHA256 `86DFE8B454FEC702A151DB0F1C04BA81C238C55C10100DCA21CA273CB5005B30`，`manifest.json` SHA256 `EA57EAE5F22FDE77743CD42D2DB7E9CD890A90FF0969616D6B4D81502187AE15`。确认 RHS 临时值释放后才释放 LHS，保留原断言与惰性。
+- AutoLang 提交 `30780612c8733be45c196d68b67f4ed4946ce3e4`、parent `c3593fe12`，仅 `core/src/source/resolve.rs` 一处变化。已提交 blob `8940783357ff08cae18468055a0bf8337d72988c` 与测试源一致，`git diff --check` 通过，AutoLang 树 clean。AutoUI `8894c9ef` 及原产品输入未变，保留此前 `.am/` 本地文件。最后范围核对显示受检 AGE 包与组件入口继续走原分派，修复恢复普通源既有语义。原产品真窗和浏览器收据仍标明实跑的 c359，提交等效性和收据复用交 T-04/T-07 复核。
+- T-02 实施和定向验证收齐，T-03/T-06 原产品收据见 round 128/130。AutoLang master `717ae5c17` 相对本计划合流基面 `048698155` 仅更新 PLAN-1054 文档。合流时保留该主线历史。规范候选沿用 round 128 归档输入，本补丁恢复既有短路作用域，未提出新规范。阶段固定组、正式 W1 和最终交付仍待各自复核和门禁。
+
+- stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | base: AutoUI `848d883c` / AutoLang `048698155` | code_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | dependency_revisions: AutoOS `cdb4883` / AutoDown `45b642d` / AutoWeb `26d085f` | task_ids: T-02,T-03,T-06 | evidence: round 128–132 | next: review/T-04
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 132 | from: work/T-02 | to: review/T-04 | status: execution_done | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: review/T-04
 
 ## 10. 待澄清事项
 
