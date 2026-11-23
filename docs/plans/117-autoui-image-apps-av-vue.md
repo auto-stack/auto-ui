@@ -482,6 +482,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 当前源码重放生产 A2Vue 包前门（Debug 准备 4.859 s）。029 原源遇到 `lower`、`split`、`replace` 链接拒绝，031 仍拒 `back.api`（原源合计 3.534 s）。029 诊断额外经过桌面文本准备后，依然在 `auto.http.get-json.v1` 的计算面准入处拒绝（16.741 s）。两个探针退出 0 只表示完成诊断，尚无可构建 SFC。 `scratch/r93-linked-vue-original.log` SHA256 `F1915589F7FEC6F7C101A5D76A0FA4368EA8E590FCAFBD587AC61424CCF8E1B6`，`scratch/r93-linked-vue-prepared.log` SHA256 `0561F33C52D252F5EF284ECC8595CC0CA890E831D97C1FAC36C34489D84F00B0`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 93 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `17e6de20` | next: work/T-02–T-03 / T-06。真实窗口的回放使用宿主回调。031 带授权的媒体会话、Carousel 的物理输入和 Vue 原项目验收仍待完成。
 
+### 2026-11-23 goal work round 94 — 029 目录导航与搜索提交
+
+- 真窗基线的 `WantSelect("dir:trip-2024")` 已抵达原相册，合法查询被误判为“代次过期”，目录仍在根，结果 2 项（22.332 s，退出 6）。AutoUI `38210f00` 在查询比较前将代次、序列和筛选字段读为声明类型。导航按前缀和目录分隔符处理路径，替换 `split` 和 `replace`，返回上级时刷新查询 ID 和版本，并重置页码与选中状态。两次测试基于相同 029 生产宿主与原 Rust 后端。
+- 真窗以现有控件回调进入 `trip-2024` 得到 1 项，返回根目录生成新查询并恢复 2 项，搜索 `SCENIC` 得到 1 项（Debug 探针准备 15.558 s，执行 29.213 s，退出 0）。独立目录夹具验证名为 `root` 的普通目录、其子目录 `root/相册`、逐级返回与拒绝旧查询版本（准备 5.973 s，执行 41.871 s，退出 0）。 `scratch/r94-gallery-query-r1.json` SHA256 `A032C01C88588C3E4EA4EE5B08FB1DBD5D958C58E1F03E2814B3764DA6AED918`，`scratch/r94-gallery-hierarchy.json` SHA256 `17849351BCD59D9C6C0FC1D5CD199EF627A0C03B2FA0869E09EED247EDB282EB`。
+- 层级回放记录一条切换目录时的缩略图 404。独立调用原后端验证同一令牌在父目录扫描后返回 200，改扫子目录后返回 404，重新扫描父目录后恢复 200，原文件始终存在（0.200 s）。`auto-media-core/src/photo_service.rs` 按根整体替换令牌表。待由 PhotoService 写面核对跨目录浏览和跨目录收藏的令牌生命周期。 `scratch/r94-gallery-token-lifetime.log` SHA256 `742E513F09C3EB67B581A258043CCB0B2FF7F002AE2BB5A937CB93A2F50AACC0`。
+- 原 029 源直调 A2Vue 生产包入口，`split` 和 `replace` 的拒绝消失，剩余文本拒绝对上 `lower` 及其连带类型诊断（2.647 s）。对照经过现有桌面文本准备后仍在 `auto.http.get-json.v1` 的计算面准入处拒绝（15.871 s）。两次执行均完成诊断，尚无 SFC。 `scratch/r94-linked-vue-path.log` SHA256 `4959005AB355869A69DC2F31D84DE2C866F7475B227D041C885101D0EC8AAF2E`，`scratch/r94-linked-vue-prepared.log` SHA256 `0561F33C52D252F5EF284ECC8595CC0CA890E831D97C1FAC36C34489D84F00B0`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 94 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `38210f00` | next: work/T-02–T-03 / T-06。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
