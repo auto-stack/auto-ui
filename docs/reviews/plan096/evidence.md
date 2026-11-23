@@ -79,3 +79,26 @@
 Windows Native VM 12 个产品用例通过，Windows Vue 11 个产品用例通过。模型目标构建为 debug/test，最后一轮准备 41.54 秒。耗时表按独立入口记录实测墙钟，包括产品启动、动作和清理。Windows 桌面宿主单独通过 C-04。
 
 内置 Command 与正式 CommandPalette 同页用例通过。现有 CommandGroup 在真实 Vue 页面保留旧搜索过滤，墙钟 1.992 秒，报告 SHA256 `32f5e479aa5b8a96bcf5e3d9df1d88b43d7f24c48da7bf56e79c73d3ef7199d7`。
+
+## 完整套件复跑与覆盖
+
+将 `examples/command-palette`、`examples/ui/028-launcher`、`tests/product/fixtures/command-palette-provided` 和声明的包复制到隔离根，保留清单和源码的相对路径。使用同一工具为各 Vue 项目生成前端、安装依赖及预构建。`verify_command_palette.py` 默认执行相应后端的完整套件，`--suite-root` 可指定该隔离根。`--case` 可单独执行用例，`--app-dir` 可覆盖该用例的项目目录。每次使用新的 `--out-dir`。
+
+| 门 | 结果 | 墙钟秒 | 报告 SHA256 |
+|---|---:|---:|---|
+| `native-suite-r3` | 14/14 | 68.962 | `774c20481a265ef1ccbc38dbb40ac4518c0281e233bbb09fd1e43568bc1f7f69` |
+| `vue-suite-r3` | 13/13 | 49.472 | `0739178703637170a84b7a551fe592f72f0a76029ec2301bce9103140307e4f6` |
+| `vue-missing-provider-suite-r3` | 退出 2（预期 `not_run`） | 0.031 | `52282531a388a32d687463b050bd72e6b42b107da6d32794ab027493ecd93569` |
+| `native-nested-r3`，共用嵌套模态用例 | pass | 4.961 | `e19b04fb398dd63896d4544ac4539efeb38d5b6c83515e1a60257ff5c43a7368` |
+| `vue-nested-preview-r3`，共用嵌套模态用例 | pass | 4.022 | `603e6244b0385f6a72b692ebe9a8465782b637964372d6ba9665898f894a2a6c` |
+
+套件在独立进程逐项执行，逐案上限 10 秒。全套墙钟合计包含所有启动、操作及清理。最长原生用例为整应用退出重开（8.417 秒），最长 Vue 用例为设置写回（5.553 秒）。同名命令正例通过搜索 `重置` 并选择两个结果，分别读回 General 与 Layout 设置回执，Native VM/Vue 耗时 4.875/3.620 秒。受控失败用例在真实查询后中断，分别在 3.839/2.075 秒留下最后树、释放本轮进程并验证同一入口连接拒绝。Vue 嵌套模态第一次缺已声明的预览收据，补跑既有 `prompt_dialog_preview.py` 后成功；两个平台核对上下层焦点范围及关闭后下层控件可操作。`visual/narrow-dark-cjk.png` 的两轨实图中，输入及长中文禁用行可读、取消按钮可用，本组件用例未复现 Q-01 字形缺失。
+
+| 验收 | 证据 |
+|---|---|
+| AC-01 | 两轨正常包导入、移根生成及缺依赖具名错误，内置 Command 同页共存 |
+| AC-02 | C-01/02/05 和 X-04/05，设置双轨、同名行、禁用空结果、方向键、原生 IME 输入桥、Vue composition 和共享嵌套模态 |
+| AC-03 | C-03/06 与 X-04，提供方 A→B→A、同修订旧动作、双挂载、待确认防重和确认后外部修订保护 |
+| AC-04 | X-02/05/06/07，两轨当前工具节点及读回、系统树 ValuePattern/InvokePattern、正常重开、缺提供方与动作失败清理 |
+| AC-05 | C-04，真实 AutoOS 搜索后启动 Calculator 一次、028 排序对照及无宿主反馈，普通设置两轨归属验证 |
+| AC-06 | X-01/03/06/07，移根、视觉、滚动、必要公共模态及旧消费者回归，README 与 SD-01/02 候选 |

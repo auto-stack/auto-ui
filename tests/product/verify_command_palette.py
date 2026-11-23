@@ -112,6 +112,18 @@ def empty_disabled_and_reopen(session):
     session.wait_text("Layout settings reset", "Applied commands: 1")
 
 
+def duplicate_labels(session):
+    session.open_palette()
+    session.search("重置", "Reset settings", absent=("Open file", "Dark theme"))
+    session.key("Enter")
+    session.wait_text("General settings reset", "Applied commands: 1", absent=("Search commands",))
+    session.open_palette()
+    session.search("重置", "Reset settings", absent=("Open file", "Dark theme"))
+    session.key("ArrowDown")
+    session.key("Enter")
+    session.wait_text("Layout settings reset", "Applied commands: 2", absent=("Search commands",))
+
+
 def rejection(session):
     session.open_palette()
     session.search("file", "Open file", absent=("Theme settings",))
@@ -251,9 +263,21 @@ def launcher_no_host(session):
     session.wait_text("Calculator", "Weather", "Tab palette")
 
 
+class ExpectedActionFailure(Exception):
+    pass
+
+
+def interrupt_active_session(session):
+    session.open_palette()
+    session.search("night", "Dark theme", absent=("Light theme",))
+    raise ExpectedActionFailure("controlled interruption after the live query")
+
+
 CASES = {
     "settings": (local_settings, "C-01/C-02/C-04", "MCP and application model"),
     "reopen-dialog": (empty_disabled_and_reopen, "C-01/C-02/C-05", "MCP and application model"),
+    "duplicate-labels": (duplicate_labels, "C-01", "MCP selection identity and application model"),
+    "failure-cleanup": (interrupt_active_session, "X-06", "forced interruption after a live action"),
     "rejected": (rejection, "C-04/C-06", "MCP and application model"),
     "visual": (visual, "X-03", "rendered screenshots"),
     "scroll": (scroll_results, "X-03", "native scroll and browser wheel"),
@@ -265,6 +289,14 @@ CASES = {
     "provided": (provided_results, "C-03/C-06", "provided query and current command model"),
     "launcher": (launcher_no_host, "C-04", "standalone Launcher no-host and grid"),
 }
+
+PROJECTS = {
+    "provided": "tests/product/fixtures/command-palette-provided",
+    "launcher": "examples/ui/028-launcher",
+    "demo": "examples/command-palette",
+}
+
+EXIT_STATUS = {"pass": 0, "fail": 1, "not_run": 2}
 
 
 def run_session(args, output, check):
@@ -282,6 +314,8 @@ def run_session(args, output, check):
             result.update(result="pass", action_seconds=time.monotonic() - check_started)
         except Exception as error:
             result.update(result="fail", error=repr(error))
+            if isinstance(error, ExpectedActionFailure):
+                result["expected_interruption"] = True
         finally:
             (output / "last-tree.txt").write_text(session.last_snapshot, encoding="utf-8")
             cleanup_started = time.monotonic()
@@ -312,33 +346,11 @@ def source_hashes(path, backend):
     return hashes
 
 
-def main():
+def run_case(args):
     started = time.monotonic()
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--auto-bin", required=True, type=Path)
-    parser.add_argument("--ui-tool-bin", required=True, type=Path)
-    parser.add_argument("--out-dir", required=True, type=Path)
-    parser.add_argument("--backend", required=True, choices=["native", "vue"])
-    parser.add_argument("--app-dir", type=Path,
-                        help="isolated native project or prepared Vue project")
-    parser.add_argument("--browser-mcp-config", type=Path)
-    parser.add_argument("--case", choices=[*CASES, "reopen-app"], default="settings")
-    parser.add_argument("--startup-timeout", type=float, default=20)
-    args = parser.parse_args()
-    if not 0 < args.startup_timeout <= 300:
-        parser.error("--startup-timeout must be within (0, 300]")
-    for option in ("auto_bin", "ui_tool_bin", "out_dir", "app_dir", "browser_mcp_config"):
-        path = getattr(args, option)
-        if path is not None:
-            setattr(args, option, path.resolve())
     args.consumer = "provided" if args.case.startswith("provided") else "launcher" if args.case == "launcher" else "demo"
     if args.app_dir is None:
-        projects = {
-            "provided": "tests/product/fixtures/command-palette-provided",
-            "launcher": "examples/ui/028-launcher",
-            "demo": "examples/command-palette",
-        }
-        args.app_dir = args.out_dir.parent / "windows" / projects[args.consumer]
+        args.app_dir = args.suite_root / PROJECTS[args.consumer]
         if args.backend == "vue":
             args.app_dir /= "gen/front/vue"
     args.out_dir.mkdir(parents=True)
@@ -374,6 +386,9 @@ def main():
             check, coverage, layer = CASES[args.case]
             report.update(coverage=coverage, layer=layer)
             report.update(run_session(args, args.out_dir, check))
+            if args.case == "failure-cleanup" and report.get("expected_interruption") and report.get("cleanup") == "pass":
+                report["interruption"] = report.pop("error")
+                report["result"] = "pass"
         report["artifacts"] = {
             file.relative_to(args.out_dir).as_posix(): digest(file)
             for file in args.out_dir.rglob("*")
@@ -383,9 +398,61 @@ def main():
     report["wall_seconds"] = time.monotonic() - started
     if report["result"] == "pass" and report["wall_seconds"] > 10:
         report.update(result="fail", error="Product case exceeded the 10-second wall-time limit")
-    (args.out_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_report(args.out_dir, report)
+    return report
+
+
+def write_report(output, report):
+    (output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def run_suite(args):
+    started = time.monotonic()
+    args.out_dir.mkdir(parents=True)
+    incompatible = {"ime"} if args.backend == "native" else {"system-input", "system-invoke"}
+    cases = {}
+    for case in (*CASES, "reopen-app"):
+        if case in incompatible:
+            continue
+        output = args.out_dir / case
+        completed = run_case(argparse.Namespace(**(vars(args) | {"case": case, "out_dir": output})))
+        cases[case] = {"result": completed["result"], "wall_seconds": completed["wall_seconds"],
+                       "report": f"{case}/report.json", "sha256": digest(output / "report.json")}
+        print(f"{args.backend} {case}: {completed['result']} ({completed['wall_seconds']:.3f}s)", flush=True)
+    outcomes = {run["result"] for run in cases.values()}
+    result = "fail" if "fail" in outcomes else "not_run" if "not_run" in outcomes else "pass"
+    report = {"plan": "PLAN-096", "revision": 3, "platform": platform.system(),
+              "backend": args.backend, "case": "all", "runner": digest(__file__),
+              "cases": cases, "wall_seconds": time.monotonic() - started, "result": result}
+    write_report(args.out_dir, report)
+    return report
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--auto-bin", required=True, type=Path)
+    parser.add_argument("--ui-tool-bin", required=True, type=Path)
+    parser.add_argument("--out-dir", required=True, type=Path)
+    parser.add_argument("--backend", required=True, choices=["native", "vue"])
+    parser.add_argument("--app-dir", type=Path, help="project override for an individual case")
+    parser.add_argument("--suite-root", type=Path, help="root of the three isolated projects")
+    parser.add_argument("--browser-mcp-config", type=Path)
+    parser.add_argument("--case", choices=["all", *CASES, "reopen-app"])
+    parser.add_argument("--startup-timeout", type=float, default=20)
+    args = parser.parse_args()
+    if not 0 < args.startup_timeout <= 300:
+        parser.error("--startup-timeout must be within (0, 300]")
+    args.case = args.case or ("settings" if args.app_dir else "all")
+    if args.app_dir is not None and args.case == "all":
+        parser.error("--app-dir applies to an individual case. Use --suite-root for all cases")
+    for option in ("auto_bin", "ui_tool_bin", "out_dir", "app_dir", "suite_root", "browser_mcp_config"):
+        path = getattr(args, option)
+        if path is not None:
+            setattr(args, option, path.resolve())
+    args.suite_root = args.suite_root or args.out_dir.parent / "windows"
+    report = run_suite(args) if args.case == "all" else run_case(args)
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return {"pass": 0, "fail": 1, "not_run": 2}[report["result"]]
+    return EXIT_STATUS[report["result"]]
 
 
 if __name__ == "__main__":
