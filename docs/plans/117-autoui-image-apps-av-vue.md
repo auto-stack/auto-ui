@@ -989,6 +989,16 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: language preparation active, UI queued | evidence: round 134 | next: 核查在途阶段门
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 134 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 核查语言准备及执行，再收 AutoUI 阶段结果和 W1
 
+### 2026-11-24 goal merge round 135 — 全部语言归档与 AAC1046 准备完成
+
+- 当前 AutoLang `30780612c` 的固定组 Debug 准备 152.521 s、退出 0。11 个归档各自退出 0，总 468,461,759 B，逐件 SHA256 与准备清单一致。`scratch/r123-phase-gate/r134-reviewed-phase-gate/language-prepare/prepared.json` SHA256 `F90E4FE45B54A9C1D719829911F453CC869951DBE8E652AEF4462041567EEFC6`，源状态 `5dea688cdce3bc54d58747953e0955dcf10dccf038730491d631bfbd04d73f5e`。归档检查 `prepared-archive-hashes.json` SHA256 `8CC358687E7A814ED91A95DD2EDBEE8CCD45D36ED25262AA7AD1CC286B8BCCA6`。该阶段为准备，原固定组发现、测试与清理待执行。
+- AAC1046 原生驱动准备 113.609 s、退出 0，`t134-gate/aac1046/aac1046-driver.exe` SHA256 `C779322293FA940EE49D3CC3B1A624190C821668C5DDE4BDA07D4D1A4D79A928`。00:46:40 见原控制器 `387676` 子进程 `618816` 开始 AAC1047 的 `prepare-native ... semantic`。后续 AV Python provider、固定组执行和 AutoUI 阶段仍在原控制器排队。
+- 当前阶段准备期间，D 盘余量最低观测约 10.1 GiB。用 NTFS `compact` 无损压缩本计划 AutoUI 专属树中 5 个上一版 PDB。逐件前后 SHA256 相同、压缩属性已实查、命令均退出 0，文件占用合计减少 4,462,018,560 B。00:46:12 余量 15,074,086,912 B。`ui-symbol-compression.log` SHA256 `95B689A1B79CB08CD1A5F8D8ED80017429D473E465437C9AD912E9F345771F04`。未更改被测源码或现有二进制。
+- 用 `git merge-tree --write-tree` 在不更新分支的情况下求得两个当前主线与已审提交的合成树，作线性化后核验基准。AutoUI 主线 `d8d74d6a` 的合成树 `35afeab27c98052736047c0936ad778e38b171e7`，相对受检提交仅多本计划记录。AutoLang 主线 `1cfc47106` 的合成树 `3fe3c19e75f4898225f5266d111b0b1c7a5f0870`，差异仅为 PLAN-1054 计划文档。`landing-tree-preflight.json` SHA256 `0F5B4FF67136A25D5BA0CAAD4FBFD571B5EBE32D4A2F67DBF548BB0883909624`。落主前须以届时实际主线复算并核对真实结果。两开发树实施提交保持不变。
+
+- stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: 11 archives ready, AAC1046 ready, AAC1047 active | evidence: round 135 | next: 收齐原生准备及实际阶段测试
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 135 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 核查 AAC1047、Python provider 和固定组终态
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
