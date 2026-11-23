@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-22
 plan_revision: 1
-current_step: 2
+current_step: 1
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -42,6 +42,8 @@ AutoUI 持原项目、Widget、Iced 宿主与 Vue 消费端。AutoLang 的公共
 用户本轮批准拆分计划。规划基面 auto-ui master 448ed614f388c1ee16c68d2ac7cd0da46c73d4bd。原合同、正负例与 Widgets 归属依据 [1071 W1 冻结](../../../auto-lang/docs/plans/archive/1071-autoui-w1-av.md)、[980 基础](../../../auto-lang/docs/plans/archive/980-ace-m2-autoui.md)、[981 基础](../../../auto-lang/docs/plans/archive/981-ace-m2-age.md) 与 [示例归属](../specs/ui/examples-ownership.md)。Vue 接 [1072 正式交付](../../../auto-lang/docs/plans/archive/1072-autoui-vue-web.md)，按原 SDK、Schema 和源身份复用。
 
 接 089 已交视口与预览来源，缺图和资源释放按实际接口验。 前置按实际能力、原项目和目标逐项记录。共享写面正在由其他计划维护时，消费交付版本并在本计划复验。
+
+2026-11-23 用户通过 `/goal 继续完成计划117` 授权接续 r1 的实施、复审、合同内修复和交付。
 
 ## 5. 实施与交付边界
 
@@ -228,7 +230,36 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 43 | from: work | t
 
 stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 44 | from: work | to: work | status: executing | outcome: partial | worktree: D:/autostack/.wt/ui-117/auto-lang | commit: auto-lang c2dcd2668 | next: work/T-03 续（模块级 host_imports 的入口隔离 → 029 状态观察全通 → V-03 事件道）
 
+2026-11-23 stage: work | plan_id: PLAN-117 | plan_revision: r1 | checkpoint: T-03 续（round 45） | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-lang,auto-ui}` | branch: `plan-117-dev` | code_commit: auto-lang `d5a78732e` / auto-ui `63b2e299` | next: work/T-03。
+
+- AV 将进程内 JSON 原语与 console provider 分类分开。029 原入口观察到 `dark_mode` 等初值，继续进入事件程序编译。console 声明的前置授权和缺 HTTP provider 的具名拒绝均通过原负控。事件程序保留场景前门已经解析的模块声明，消除搜索、筛选等处理器的 `source.undefined`。
+- Debug 准备 `cargo test -p ace-av --test conformance --locked --no-run` 退出 0（32.667 s）。定向实测 9/9。新增 `p117_initial_state_with_json_imports_needs_no_provider` 0.112 s（初始 flag 与 label 真值），`p117_component_event_calls_module_function` 0.049 s（派发后计数为 3）。原例 `p117_get_json` 2/2（0.055 s）、`p108_http_post_json_admitted_and_fail_closed` 1/1（0.056 s）、`av_console_unreachable_host_declarations_still_need_authority` 1/1（0.073 s）、`plan1106` 3/3（0.052 s）。时间为单过滤命令墙钟，发现与清理合并计时。
+- `cargo build -p auto-ui-runtime --features ace-bridge --example ace_node_desktop_window --locked` 退出 0（42.47 s）。该 exe 对两个原 `src/front/app.at` 顺序复跑。029 退出 4（16.717 s），进入集合事件函数的借用文本校验 `verify.local-type`。031 退出 4（0.280 s），单组件入口的 `SelectImage` 需要当前缩略图行。均在装载阶段失败，无窗口交互证据。原始日志在 `D:/autostack/plan-artifacts/plan-117/av/`，`r45-029-replay.log` SHA256 `CAA3A5D702CF4A991A539A2DA55544A28991F254098912C7CB6885415368C70E`，`r45-031-replay.log` SHA256 `972AA184638B070445EABC255E3B2F40DB4667D796198990301EE51440987481`。
+
+2026-11-23 stage: work | plan_id: PLAN-117 | plan_revision: r1 | checkpoint: T-03 续（round 46） | outcome: partial | code_commit: auto-lang `3e0eff185` / auto-ui `63b2e299` | next: work/T-03。
+
+- AGE 包面的普通函数 `for <condition>` 原先在同一规则中连续消费两个条件；处理器 `for` 则误用允许记录构造抢占花括号的普通表达式。分别保留单一条件并复用处理器 `if` 的条件入口。029 的七个文本函数及 `GalApply`、`OpenPhoto` 单项探针均通过；完整准备源投影为 1 个组件。031 原源包面还将后端函数 `request_view` 归为未知 widget 消息。
+- `cargo test -p ace-core --lib --locked --no-run` 退出 0（6.062 s）。`source::packages::tests` 4/4（0.075 s）；新增 `age_package_function_accepts_a_single_for_condition` 0.104 s 核普通函数循环 AST，`age_package_handler_for_condition_ends_before_the_body` 0.045 s 核处理器循环和体内赋值。独立源探针执行 0.238 s，`scratch/r46-package-final.log` SHA256 `4F18039C960E128813EFFD58F95F39365059BDFC77C5F7B3825493094AED1EBF`。
+- 原 029 窗口工具重建成功（45.50 s），重新进入 AGE 包装载并具名拒绝 `asset_browser::asset_browser` 缺 `tree_view` 传递包。`av/r46-029-window.log` SHA256 `AB0CA24AD918A683BA415D7D9B9950F9F69114CB533BA41D561F9B51130BBAB1`。
+
+2026-11-23 stage: work | plan_id: PLAN-117 | plan_revision: r1 | checkpoint: T-03 续（rounds 47–48） | outcome: partial | code_commit: auto-ui `085c0a72` / auto-lang `42fea1599` | next: work/T-03。
+
+- 组件包装载按引用继续装入所选包模块的传递组件，保留源身份并去重。`auto-ui-runtime --features ace-bridge --lib` Debug 准备 92.950 s；新增 `photo_gallery_loads_asset_browser_dependencies` 1.839 s，核原 029 的 AssetBrowser、TreeView、PaginationControl、CollectionView、ImageViewport 各一个实际源单元。兄弟 `ui::ace_source_prep::tests` 7/8（0.921 s），`real_u03_apps_load_through_desktop_bridge` 的 015 Notes 报普通函数 `update_note` 被误判为 widget 消息。
+- 把前缀点保留为投影事实。带点的调用按声明消息核对，未接线的普通调用保留为域外调用。ACE core Debug 准备 12.71 s，`source::packages::tests` 5/5（0.073 s）；新增 `age_package_dotted_calls_are_messages_and_free_calls_are_foreign` 0.169 s。029 和 031 的作者源包投影均通过（定向 0.304 s）。
+- Debug 窗口工具重建 63.719 s，029 装载失败转移到 PaginationControl 的整数列表默认值（退出 4，2.288 s），031 转移到后端 `close_session` 未绑定（退出 4，0.766 s）。015 的 `update_note` 不再被识别为消息，仍受 store 内联后错误清掉嵌套域外标记影响。日志 `av/r48-029-window.log` SHA256 `176AD9DEB2EC00E3390E2AA84335D4700ED7EF7A7A1ED42797027CDDEF0F645B`，`av/r48-031-window.log` SHA256 `9636769AFCA65D4E8648A72121CF30D830FB2DA597678ECF19D8165D290DE3D1`。
+
+2026-11-23 stage: work | plan_id: PLAN-117 | plan_revision: r1 | checkpoint: T-03 续（rounds 49–51） | outcome: partial | code_commit: auto-lang `1495e443d` / auto-ui `cd4d8260` | next: work/T-03。
+
+- 兼容包属性以同质整数或文本默认值建立列表元素类型，空默认值继续沿用文本元素，混合序列具名拒绝。AGE 包解析保留 `$event`，历史 `on_<name>` 属性在存在同名带载荷出站事件且未作为独立通道使用时按该事件绑定。核父子载荷与重复绑定。包绑定器沿现有 try/catch AST 走完作用域校验。store 内联保留分支里的域外调用标记。
+- Debug `ace-core --lib` 准备 7.878 s。`source::packages::tests` 7/7（0.123 s）。新增 `age_package_legacy_list_default_types_match_their_elements` 独跑 0.103 s（整数、文本、空、混合四形），`age_package_legacy_event_prop_forwards_declared_child_payload` 独跑 0.152 s（真实包绑定命名与重复负控）。时间为过滤命令墙钟，发现与清理合并计时。
+- 029 原入口越过分页、TreeView 事件和 try 块，当前包绑定停在 `asset_browser::asset_browser` 无法绑定 `std::json.parse`。最近 Debug 构建 42.218 s，执行退出 4（2.361 s），无窗口证据。`av/r51-029-window.log` SHA256 `44B23299BE6801B1803932438F4C06D3EA0A1F4C3DED2799E20F5B9FCF044498`。031 原入口重复报 `close_session` 缺符号（退出 4，0.729 s），`av/r50-031-window.log` 同 round 48 哈希。015 原入口越过域外标记错误后仍失败，首错为 `Note` 类型没有绑定（退出 4，0.476 s）。`av/r49-015-window.log` SHA256 `5B7BE39CAD8206CFABCD15DF4F5947FC6D177B86247ED545CE53A5CEEA2D0B2F`。015 后续类型错误在 PLAN-117 基线上的归因待复验。
+- 独立 A2Vue 生成复验（`cargo test -p auto-ui-runtime --features ace-bridge --test plan117_t01_probe --locked --no-run` 17.943 s，随后 `_lane_probe --nocapture --test-threads=1` 2.630 s，2 条探针退出 0）。029 有 42,789 B SFC、18 个未生成的处理器，031 有 33,702 B SFC、13 个未生成的处理器。两个探针的可执行处理器数均为 0，浏览器验收尚未开始。`av/r51-lane-probes.log` SHA256 `EEC90BB2738785C354D7C3DEEF3AC456148F450E1BA25B1B4172B9E10808FD3B`。
+
+stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-117/{auto-lang,auto-ui} | commit: auto-lang 1495e443d / auto-ui cd4d8260 | next: user
+
 ## 10. 待澄清事项
+
+2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
 
 2026-11-23 T-03 续（round 26，§10）：**事件道 view-data 集合物化端到端落地；发现 round-22 物化从未发射**（auto-lang `ca90d847a`）。**假绿通道（round-5 同族）**：round-22 的物化铸壳 `fn __age_vd_cast()` 无返回注解——AGE 组件 profile parse 期具名拒（`function return type annotation is required`），全部字面量静默走 PARSE-FAIL 臂（None 无声跳过）；「no local named `__age_s_*`/self」拒类（round-24 墙 289 undefined 的主体）根因即此。**修复链（探针二分逐层退拒）**：① 铸壳补 `-> int`（Auto 语法无箭头）+ 尾部 return（仅取 Let 值）；② 物化改**按 handler 按需**（`handler_reads_view_data` 判读——纯写/零读 handler 不携带集合初值，文档保持文本域；get_json 探针的 `var photos = []` 零读不受扰）；③ collections 升域门**按发射形状**（`event_stmt_collections` 跳过 PLAN-106 收据 vd 写的 RHS——needs_collections_face 无此 awareness）；④ adapter 类型表：List/Object 带 Dyn elem 时补 `t_dyn` 行（t_list_dyn 的 elem 引用悬空）；⑤ lowering：collections 域事件文档同走 av.owned（domain 门 + HIR List 类型臂——plain str elem 落 owned Str + LIST_* 表达式臂按 **AGE_ELEM_VIEW_CAPABILITY** 面标记（lowering 入口按 HIR 域盖戳，复用 PLAN-105 既有标记）+ ListPush 的 Unit 效果位豁免）；⑥ wire：Owned 线族的 List 类型标签 + LIST_* 指令标签按面标记放行（encode+decode 对称）；⑦ mir_verify：`elem_view_surface` 开 Dyn 类型/List 类型/List(Dyn) 元素位/LIST_* 指令门。**执行可观测**：常备用例 `p117_view_data_list_read_in_for_cond_executes`——view-data `["a","b"]` 物化 + **for 条件里的 `.len()` 读**（029 `for fi2 < .fav_records.len()` 真形最小切片）+ 循环 + typed 字段落账 = `Int(2)` 端到端。**车道发现（重要）**：bridge_load（029 真窗路径）走**场景车道**（`compile_component_scenario_with_initials`）——round-22 的读改写/物化只在**事件道**（compile_component_event_program）；场景车道的 view-data 读仍走 `self.<field>` 形（`self` 未绑定 → 800 墙不变）。**下轮切面**：场景车道移植读改写+按需物化（场景道 collections 面已存在——needs_collections_face 先例）→ 029 真窗；其后 ② Dyn 值链方法面 ③ nil-on-missing（ObjectGetOpt）031 back 桥。回归全绿：ace-core lib 88 / p108 7 / p117 3 / json_975 4 / wire 3 / plan981 84 / collections 124 / event sessions 5（基线红 v02b、collections perf 门除外——均 stash 对照实证 base 即红）。
 
