@@ -979,6 +979,16 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - stage: review | review_scope: phase/T-04 | reviewer_identity/limitations: same implementation session, source-bound independent AV controls | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | reviewed_commit: AutoUI `8894c9ef3721b28669f859cbafc5722fe266b79f` / AutoLang `30780612c8733be45c196d68b67f4ed4946ce3e4` | base_commit: AutoUI `848d883c` / AutoLang `048698155` | dependency_revisions: AutoOS `cdb4883` / AutoDown `45b642d` / AutoWeb `26d085f` | spec_inputs: round 133 | acceptance_results: AC-01/02/04 pass for AV, AC-03 final pending, AC-05 pending | pending_closeout_gates: T-05 fixed groups and AV/W1, T-07, T-08 | findings: none open in AV phase | evidence: round 128,130,132,133 | next: merge/T-05
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 133 | from: review/T-04 | to: merge/T-05 | status: executing | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: merge/T-05 阶段固定组和 W1 收据
 
+### 2026-11-24 goal merge round 134 — T-05 阶段固定组开始准备
+
+- 核对 round 133 阶段复审、两树分支和依赖。AutoUI `8894c9ef3721b28669f859cbafc5722fe266b79f`、AutoLang `30780612c8733be45c196d68b67f4ed4946ce3e4`。自合流基面起各自主线相应差异仅为计划文档，尚未改动实施或正式规范。两树历史分别含两次主线合并，正式线性化时须检查那些冲突解决处和落主树与已审源码的等效性。
+- 测试机先见 PLAN-1054 的 AAC1047 语义驱动准备和 PLAN-1129 固定组实跑。00:40:08 起队列控制器 `387676` 等 PLAN-1129 PID `970324` 及关联 nextest 进程退出。00:42:12 核实空闲，等待 124.182 s，D 盘尚余 14,991,581,184 B。00:42:14 确认 Cargo PID `26048` 执行 `cargo t stdlib auto-media-core ace-source ace-syntax ace-semantics ace-av ace-comptime ace-lowering ace-native ace-a2x ace-aac-syntax --prepare-only --debug-tools`。当前实际阶段为准备，发现和执行结果待收。
+- 编排 `scratch/r123-phase-gate/run-reviewed-phase-gate.ps1` SHA256 `1988370371C144A1B1B34659A3D5A13BC0A852549DCEFCD46E870DFE45004B1B`。输出 `scratch/r123-phase-gate/r134-reviewed-phase-gate/`。已从绑定解释器实见 NumPy 2.5.1、PyTorch 2.14.0+cpu。语言组归档后，串行显式准备 AAC1046、AAC1047、AV Python provider，再按仓库 16 MiB 栈配置执行原组。随后复查占用，在同一 AutoUI 审查提交构建窗口并执行原 11 个目标。沿用原 AutoUI 目标、断言与环境开关，使用短路径存放各自临时输出。
+- 从已核归档收据提取 Core/AV 18 条和 Native 5 条原失败身份，AutoUI 保留原 Chart 用例及 `source.age.view-list` 诊断作比较。`prior-failure-identities.json` SHA256 `3E445E45763045B235099DFCC5DD484467E6042DC74E9B82144D688A4F803B0C`。阶段按原分母实跑，首轮结果与逐项归因需分别入账。按已审规范目标整理 AV 规范落点草稿 `av-spec-text-draft.md` SHA256 `AA3FC46AF303C34DF26C339D404AA2810674C144DEFC9E11ED28FE0C0D3BFE75`。T-05 落主及 W1 正式登记待门禁结果。
+
+- stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: language preparation active, UI queued | evidence: round 134 | next: 核查在途阶段门
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 134 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 核查语言准备及执行，再收 AutoUI 阶段结果和 W1
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
