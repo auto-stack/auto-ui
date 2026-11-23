@@ -39,9 +39,9 @@
 
 在此机上，首次使用默认渲染器、全屏、私有 rqhost 及恢复共享子组件默认值旧逻辑的对照构建均未绘制首帧。切换到现有 `ICED_BACKEND=tiny-skia` 后，正式 `ui-desktop` 二进制渲染了 `Auto - Desktop` 并发布实时 MCP 树。两轮直接 Windows 合成键盘探针未读回查询，最终用户路径通过已定位的真实窗口操作完成。
 
-启动命令 `python hosted_operator.py hosted-resume-07 tiny-skia` 退出 0。使用壳当前快照找到并按下召唤按钮。隔离宿主发布 Launcher `[4:028-launcher]`，`hosted = "1"`，此时没有 Calculator 应用面。通过真实 Windows 窗口点击搜索框、输入 `cal`，MCP 嵌入面同时读回 `q = "cal"` 和 `palette_ids = ["011-calculator"]`。点击一次可见的 Calculator 行后，宿主日志恰有一行 `[session] launch_app(inproc) 011-calculator`，同时出现 Calculator `[5:011-calculator]`、可见窗口和数字键盘。捕获后观察一秒，启动计数仍为一。宿主正常退出 0，确认原 PID 消失，使用同一 MCP 方法验证旧端口拒绝连接。38.373 秒为本轮人工交互、快照、单次结果稳定观察和清理的总墙钟。
+启动命令 `python hosted_operator_repair.py hosted-repair-window-capture tiny-skia` 退出 0。先逐文件核验隔离包闭包与实施树一致，再使用壳当前快照找到并按下召唤按钮。Launcher `[4:028-launcher]` 发布 `hosted = "1"`，此时尚无 Calculator 应用面。通过真实 Windows 窗口点击搜索框并输入 `cal`，MCP 嵌入面读回 `q = "cal"` 和 `palette_ids = ["011-calculator"]`。点击一次结果后，宿主日志恰有一行 `[session] launch_app(inproc) 011-calculator`，发布 Calculator `[5:011-calculator]`。同一拥有窗口的 Windows.Graphics.Capture 直接显示 Calculator 标题、模式标签、数字键和运算键。宿主正常退出 0，同一 MCP 方法确认旧端口拒绝连接。100.939 秒为人工操作、等待、窗口截图及清理的总墙钟，独立于 10 秒逐案自动化门。
 
-`hosted-resume-07/report.json` SHA256 `a72f63b1e8615235d568b70facf16ad38a4cfd929550e6975d01384300080e5b`。已过滤的 Launcher 树 SHA256 `3d5afad2635219250c1663f787cab98c472c029431b3fad2275a1a2ef0674290`。Calculator 树 SHA256 `206c034bcc7aef1f5d3adc43838dfe56d27002da02a76105af263ce8e429fffc`，截图 SHA256 `9175715593f01767c36d3096664b6701ac7fea237b31d4a70c3249c6007f8fe4`。宿主二进制 SHA256 `07da3fd756170f8b9bd72131eb34bd00571a8b6edf861aad71a8317c5e9ca4e1`，Launcher 源 SHA256 `756a438b7b388e1c842b435c464cfe01c1792f8420c92a2867316e245f6be722`。
+`hosted-repair-window-capture/report.json` SHA256 `c0a260148a7607e373d371cefda62784be17ecc03cafd6e445e982138de4b653`。过滤后的 Launcher 树 SHA256 `566b2cdcd0d2cd99b56471d605ba0f0ef62ddb1e49194d4847c51504ca426d85`。Calculator 树 SHA256 `98b40b51d71939acf7d2ae301d14f5652332e8e1152b15f08c533877c3804734`，原始窗口截图 `calculator-window.jpg` SHA256 `cebc6a5b1cf3a87871d475e04c142c22f1b2e6ecb8cd7eb0a73d3f2d469811a3`，同像素 PNG 见报告。宿主二进制 SHA256 `07da3fd756170f8b9bd72131eb34bd00571a8b6edf861aad71a8317c5e9ca4e1`，Launcher 源 SHA256 `756a438b7b388e1c842b435c464cfe01c1792f8420c92a2867316e245f6be722`。报告含完整包源码摘要。旧 `hosted-resume-07` 用于诊断对照，包含旧包文件且壳截图不含应用窗，正式验收采用本轮窗口截图。
 
 ## Windows 产品执行
 
@@ -80,9 +80,9 @@ Windows Native VM 12 个产品用例通过，Windows Vue 11 个产品用例通�
 
 内置 Command 与正式 CommandPalette 同页用例通过。现有 CommandGroup 在真实 Vue 页面保留旧搜索过滤，墙钟 1.992 秒，报告 SHA256 `32f5e479aa5b8a96bcf5e3d9df1d88b43d7f24c48da7bf56e79c73d3ef7199d7`。
 
-## 完整套件复跑与覆盖
+## 首轮产品套件与覆盖
 
-将 `examples/command-palette`、`examples/ui/028-launcher`、`tests/product/fixtures/command-palette-provided` 和声明的包复制到隔离根，保留清单和源码的相对路径。使用同一工具为各 Vue 项目生成前端、安装依赖及预构建。`verify_command_palette.py` 默认执行相应后端的完整套件，`--suite-root` 可指定该隔离根。`--case` 可单独执行用例，`--app-dir` 可覆盖该用例的项目目录。每次使用新的 `--out-dir`。
+将 `examples/command-palette`、`examples/ui/028-launcher`、`tests/product/fixtures/command-palette-provided` 和声明包的源码复制到隔离根，保留清单和源码的相对路径。为各 Vue 项目生成前端、安装依赖、做类型检查，并通过共享 `prompt_dialog_preview.py` 准备 development bundle。首轮聚合入口的结果保留用于诊断，其中新增可执行包装器超出 10 秒，独立复审退回。当前 `verify_command_palette.py` 每次执行一案，`--project-root` 指定隔离根。对 `settings`、`launcher`、`provided` 分别使用 `--prepare` 记录各轨准备指纹。单案可用 `--app-dir` 指定项目目录，运行使用新的 `--out-dir`。
 
 | 门 | 结果 | 墙钟秒 | 报告 SHA256 |
 |---|---:|---:|---|
@@ -102,3 +102,19 @@ Windows Native VM 12 个产品用例通过，Windows Vue 11 个产品用例通�
 | AC-04 | X-02/05/06/07，两轨当前工具节点及读回、系统树 ValuePattern/InvokePattern、正常重开、缺提供方与动作失败清理 |
 | AC-05 | C-04，真实 AutoOS 搜索后启动 Calculator 一次、028 排序对照及无宿主反馈，普通设置两轨归属验证 |
 | AC-06 | X-01/03/06/07，移根、视觉、滚动、必要公共模态及旧消费者回归，README 与 SD-01/02 候选 |
+
+## 独立复审退回后的复验
+
+| 发现 | 修复及关闭证据 |
+|---|---|
+| R096-F01 | 产品入口逐案独立执行，保留此前 68.962 / 49.472 秒聚合失败与 `native-provided-3` 11.614 秒原始报告。当前 Native VM 16/16，逐案 4.185–8.512 秒，逐案耗时和 88.094 秒。Vue 15/15，逐案 2.654–5.580 秒，耗时和 65.955 秒。首次复跑 `launcher` 行为和清理成功，但启动 4.168 秒、操作 1.873 秒、清理 3.885 秒，计入报告后 10.535 秒。退出高负荷阶段后按完全相同入口重放为 5.904 秒，原超时报告保留。 |
+| R096-F02 | 配置校验先于 provided 结果归属核验。原生一次组件派发只保存一条公开消息，首次查询与配置错误分开派发。两轨 `provided-config` 在重复 ID 尚无当前结果时显示错误，首次有且仅有一个错误通知，Enter 零调用，修正并提供当前结果后真实写回一次。Native VM 6.435 秒、Vue 4.862 秒。第一次原生修复复跑发现查询与 error 同帧造成初次查询丢失，11.122 秒退出失败，记录 `repair-native-provided-config/report.json`。 |
+| R096-F03 | 过期 provided 查询元组或低修订结果不解除当前请求锁。两轨 `provided-stale-pending` 在真实点击后发布旧结果，Escape/Enter 都不提前关闭或重复调用，随后正确读回一次应用。Native VM 5.820 秒、Vue 4.331 秒。模型覆盖真实当前命令变更可使旧动作失效和 accepted 同帧保持锁；原 A→B→A 双轨现行用例均通过。 |
+| R096-F04 | 启动前校验准备收据、工具指纹、当前消费源码与包闭包。Vue 校验已有 development preview 的源码与 dist 指纹。Native VM 拒绝会进入 split/Rust 构建的环境。缺收据、不匹配工具、缺浏览器 MCP、Rust 后端环境和替换单个 Vue 资产均在启动前退出 2，无 RPC 文件。分别耗时 0.068、0.255、0.052、0.272、0.223 秒。 |
+| R096-F05 | 模型 `provided_reorder_preserves_selection_and_removal_selects_an_enabled_result` 选中 `second`，重排保留 ID，移除后选 `third` 且公开提交正确 ID，0.447 秒。两轨 `rejected.png` 和 `invalid-config.png` 实图均显示具名反馈，拒绝行为可恢复。真实宿主的完整闭包和 Calculator 窗口截图见上节。 |
+
+当前模型用已准备的 debug/test 目标逐个 `--exact` 执行 12/12，0.117–2.730 秒，包含实际读取当前包源码的三个新增闭环。准备目标上一次增量 38.264 秒，另有测试线程栈探针，探针在较大测试栈证明加载成功，未纳入日常门。模型索引 `repair-sealed-model-results.json` SHA256 `a507a05105feeac264ff449bc2a4c3c66c11a44ab7d7ac0cf866218d50cb1b33`。两个正式反例的共享修复边界为配置通知一次、请求身份未被时序污染、修正或当前更新后仍可执行。
+
+`repair-verified-product-index.json` SHA256 `58669d10ebb63ada65dd57e95c6a382af27d026b54af226912bb58ec02be2ec9`，记录 31 个独立报告的耗时、runner 及摘要，核对每份报告的实际工具与 `command_palette.at` 摘要一致。最后 `system-invoke` 改用应用内 Exit 控件，避免紧接 UIA Invoke 的裸 `WM_CLOSE` 与 AccessKit 过期窗口句柄竞态。原失败可见 `0x80070578`，应用状态读回已通过；正向重放 5.249 秒，系统输入及整应用重开仍使用原窗口关闭路径。其余用例的执行语义不受该退出分支变化影响。
+
+磁盘临时耗尽的尝试保留 `repair-product-index.json`、`hosted-repair-old-control` 和相应日志。该轮多项未启动及浏览器退出失败，没有作为通过证据。已正常重放当前受影响产品门。为源码边界留可重放证据，原始 Windows 窗口截图和新旧报告均在单一 Plan scratch scope。

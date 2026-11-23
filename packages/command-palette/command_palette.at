@@ -4,7 +4,7 @@ use palette_search: palette_local
 
 widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", placeholder: str = "", commands: List<PaletteCommand> = [], filterMode: str = "local", query: str = "", wrapNavigation: bool = false, resultsSession: int = 0, resultsQuerySeq: int = 0, resultsQuery: str = "", response: str = "", errorMessage: str = "") {
     msg {
-        Tick, PublishQuery, RefreshResults, Edit(str, str), Move(str, int, str),
+        Tick, PublishQuery, RefreshResults, PublishConfigError, Edit(str, str), Move(str, int, str),
         Submit(str, int), Invoke(str, int, str), Close(str, str),
         "queryChanged"(str), "invokeRequested"(str), "closeRequested"(str), "error"(str)
     }
@@ -33,6 +33,7 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
         var config_code str = ""
         var config_signature str = ""
         var config_mode str = ""
+        var config_notice str = ""
         var source_commands List<PaletteCommand> = []
     }
 
@@ -139,6 +140,7 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
                 }
                 .seen_response = .response
                 .RefreshResults()
+                .PublishConfigError()
                 return
             }
 
@@ -155,10 +157,16 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
                 .rejection = ""
                 .seen_response = .response
                 .PublishQuery()
+                .RefreshResults()
+                return
             }
 
             let signature = palette_signature(.commands)
-            let same_commands = .revision == .result_revision && signature == .result_signature
+            // An out-of-order provider snapshot cannot supersede a live invocation.
+            let stale_result = .filterMode == "provided" && (.resultsSession != .session ||
+                .resultsQuerySeq != .query_seq || .resultsQuery != .draft || .revision < .result_revision)
+            let same_commands = stale_result ||
+                (.revision == .result_revision && signature == .result_signature)
             let same_query = .mode == .filterMode && (.external_query == .query || .draft == .query)
             if .phase == "pending" && same_query && .response != "" && .response != .seen_response {
                 .seen_response = .response
@@ -187,6 +195,8 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
                 .pending_id = ""
                 .rejection = ""
                 .PublishQuery()
+                .RefreshResults()
+                return
             } else {
                 .external_query = .query
             }
@@ -195,6 +205,7 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
                 .pending_id = ""
             }
             .RefreshResults()
+            .PublishConfigError()
         }
 
         .PublishQuery -> {
@@ -207,23 +218,17 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
 
         .RefreshResults -> {
             let signature = palette_signature(.commands)
-            if .open && .filterMode == "provided" && (.resultsSession != .session ||
-                .resultsQuerySeq != .query_seq || .resultsQuery != .draft ||
-                .revision < .result_revision ||
-                (.result_query_seq != .query_seq && .revision == .result_revision)) {
-                return
-            }
-
             if signature != .config_signature || .filterMode != .config_mode {
                 .source_commands = palette_commands(.commands)
                 .config_code = palette_error(.source_commands, .filterMode)
                 .config_signature = signature
                 .config_mode = .filterMode
-                if .config_code != "" {
-                    ."error"(json.stringify({code: .config_code, message: .config_message}))
-                }
+                .config_notice = if .config_code != "" { json.stringify({code: .config_code, message: .config_message}) } else { "" }
             }
             if !.open { return }
+            if .filterMode == "provided" && (.resultsSession != .session ||
+                .resultsQuerySeq != .query_seq || .resultsQuery != .draft || .revision < .result_revision ||
+                (.result_query_seq != .query_seq && .revision == .result_revision)) { return }
             if .result_query_seq == .query_seq && .result_revision == .revision && .result_signature == signature { return }
 
             .result_revision = .revision
@@ -238,6 +243,14 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
                 .rows = []
                 .active_id = ""
             }
+        }
+
+        .PublishConfigError -> {
+            if .config_notice == "" { return }
+            // A native widget dispatch has room for one emitted public message.
+            let notice = .config_notice
+            .config_notice = ""
+            ."error"(notice)
         }
 
         .Edit(mount, value) -> {

@@ -8,6 +8,7 @@ import re
 import time
 from pathlib import Path
 
+from prompt_dialog_preview import checked_preview
 from verify_collection_view import wait_for
 from verify_prompt_dialog import ProductSession, SYSTEM_READER, digest
 
@@ -16,7 +17,9 @@ class PaletteSession(ProductSession):
     demo_anchor = "Theme setting: light"
     demo_exit = "Exit example"
     browser_client_name = "verify-command-palette"
-    native_window_exit_cases = ProductSession.native_window_exit_cases | {"reopen-app"}
+    # After invoking the Windows provider, close through the application's
+    # normal Exit action so pending accessibility notifications can settle.
+    native_window_exit_cases = (ProductSession.native_window_exit_cases - {"system-invoke"}) | {"reopen-app"}
 
     def startup_anchor(self):
         return {"launcher": "Open launcher", "provided": "Open provided palette"}.get(
@@ -129,6 +132,7 @@ def rejection(session):
     session.search("file", "Open file", absent=("Theme settings",))
     session.key("Enter")
     session.wait_text("File access is unavailable in Settings.", "Applied commands: 0")
+    session.screenshot("rejected")
     session.search("night", "Dark theme", absent=("Open file",))
     session.key("Enter")
     session.wait_text("Theme setting: dark", "Applied commands: 1")
@@ -251,6 +255,31 @@ def provided_pending(session):
     session.wait_text("Provided commands applied: 1", "two", absent=("Search commands",))
 
 
+def provided_stale_pending(session):
+    session.open_palette()
+    session.search("A", "Middle result")
+    session.press("Middle result")
+    session.wait_text("Obsolete result published", "Executing…", "Provided invocation requests: 1")
+    session.key("Escape")
+    session.key("Enter")
+    session.wait_text("Provided commands applied: 1", "Provided invocation requests: 1", "two",
+                      absent=("Search commands",))
+
+
+def provided_configuration(session):
+    session.press("Open invalid provided palette")
+    session.wait_text("Command IDs must be unique.", "duplicate-command-id",
+                      "Configuration notifications: 1", absent=("Searching…",))
+    session.key("Enter")
+    session.wait_text("Configuration notifications: 1", "Provided invocation requests: 0")
+    session.screenshot("invalid-config")
+    session.press("Repair configuration")
+    session.wait_text("First result", absent=("Command IDs must be unique.", "Searching…"))
+    session.press("First result")
+    session.wait_text("Provided commands applied: 1", "Provided invocation requests: 1", "one",
+                      absent=("Search commands",))
+
+
 def launcher_no_host(session):
     session.open_palette()
     session.key("ArrowUp")
@@ -285,6 +314,8 @@ CASES = {
     "system-input": (system_accessibility, "X-07", "Windows UI Automation"),
     "system-invoke": (system_accessibility, "X-07", "Windows UI Automation"),
     "provided-pending": (provided_pending, "C-06/X-03", "pending close lock and appearance"),
+    "provided-stale-pending": (provided_stale_pending, "C-03/C-06", "obsolete results during a live invocation"),
+    "provided-config": (provided_configuration, "C-05/X-03/X-04", "first configuration error and recovery"),
     "provided-wrap": (provided_wrap, "C-02", "provided keyboard navigation"),
     "provided": (provided_results, "C-03/C-06", "provided query and current command model"),
     "launcher": (launcher_no_host, "C-04", "standalone Launcher no-host and grid"),
@@ -297,6 +328,8 @@ PROJECTS = {
 }
 
 EXIT_STATUS = {"pass": 0, "fail": 1, "not_run": 2}
+PREPARED = "command-palette-prepared.json"
+REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 def run_session(args, output, check):
@@ -329,47 +362,81 @@ def run_session(args, output, check):
     return result
 
 
-def source_hashes(path, backend):
-    files = ("pac.at", "src/front/app.at") if backend == "native" else (
-        "package.json", "pnpm-lock.yaml", "src/App.vue", "src/components/CommandPalette.vue",
-        "dist/index.html", "dist/assets/index.css", "dist/assets/index.js",
-    )
-    hashes = {name: digest(path / name) for name in files if (path / name).is_file()}
-    if backend == "native":
-        root = next((parent for parent in path.parents if
-                     (parent / "packages/command-palette/package.at").is_file()), None)
-        if root is not None:
-            for package in ("command-palette", "themes"):
-                for source in sorted((root / "packages" / package).glob("*")):
-                    if source.is_file() and source.suffix in {".at", ".json"}:
-                        hashes[source.relative_to(root).as_posix()] = digest(source)
+def source_hashes(path):
+    manifest = path / "pac.at"
+    if not manifest.is_file() or not (path / "src/front/app.at").is_file():
+        raise ValueError("prepared application manifest or frontend source is missing")
+    hashes = {"pac.at": digest(manifest)}
+    for source in sorted((path / "src/front").rglob("*.at")):
+        hashes[source.relative_to(path).as_posix()] = digest(source)
+    root = next((parent for parent in path.parents if
+                 (parent / "packages/command-palette/package.at").is_file()), None)
+    if root is None:
+        raise ValueError("prepared CommandPalette package closure is missing")
+    for package in ("command-palette", "themes"):
+        for source in sorted((root / "packages" / package).glob("*")):
+            if source.is_file() and source.suffix in {".at", ".json"}:
+                hashes[source.relative_to(root).as_posix()] = digest(source)
     return hashes
+
+
+def preparation_inputs(args):
+    if os.name != "nt" or not args.auto_bin.is_file() or not args.ui_tool_bin.is_file():
+        raise ValueError("Windows and prepared Auto/AutoUI executables are required")
+    inputs = {"backend": args.backend, "consumer": args.consumer,
+              "tools": {"auto": digest(args.auto_bin), "auto-ui-tool": digest(args.ui_tool_bin)}}
+    if args.backend == "vue":
+        if args.app_dir.parts[-3:] != ("gen", "front", "vue"):
+            raise ValueError("prepared Vue project must be the consumer's gen/front/vue directory")
+        preview = checked_preview(args.app_dir)
+        inputs["preview"] = {"source": preview["source"], "dist": preview["dist"]}
+        source_dir = args.app_dir.parents[2]
+    else:
+        source_dir = args.app_dir
+    inputs["source"] = source_hashes(source_dir)
+    if inputs["source"] != source_hashes(REPOSITORY / PROJECTS[args.consumer]):
+        raise ValueError("prepared sources differ from the checked-out consumer or package closure")
+    return inputs
+
+
+def checked_preparation(args):
+    receipt_path = args.app_dir / PREPARED
+    if not receipt_path.is_file():
+        raise ValueError(f"prepared input receipt {PREPARED} is missing")
+    expected = json.loads(receipt_path.read_text(encoding="utf-8"))
+    actual = preparation_inputs(args)
+    if expected != actual:
+        fields = [name for name, value in actual.items()
+                  if not isinstance(expected, dict) or expected.get(name) != value]
+        raise ValueError(f"prepared input receipt differs: {', '.join(fields)}")
+    if args.backend == "native":
+        if (os.getenv("AUTO_BACKEND_IMPL", "vm") != "vm" or os.getenv("AUTO_VM_MERGE") == "0"
+            or os.getenv("AUTO_VM_WITH_HTTP") == "1"):
+            raise ValueError("CommandPalette Native VM cases require the merged VM backend")
+    return actual
 
 
 def run_case(args):
     started = time.monotonic()
-    args.consumer = "provided" if args.case.startswith("provided") else "launcher" if args.case == "launcher" else "demo"
-    if args.app_dir is None:
-        args.app_dir = args.suite_root / PROJECTS[args.consumer]
-        if args.backend == "vue":
-            args.app_dir /= "gen/front/vue"
     args.out_dir.mkdir(parents=True)
     report = {"plan": "PLAN-096", "revision": 3, "platform": platform.system(),
               "backend": args.backend, "case": args.case, "app_dir": str(args.app_dir),
               "runner": digest(__file__), "startup_limit_seconds": args.startup_timeout}
-    if os.name != "nt" or not args.auto_bin.is_file() or not args.ui_tool_bin.is_file() or not args.app_dir.is_dir():
-        report.update(result="not_run", error="Windows and prepared source-bound tools and project required")
-    elif args.backend == "vue" and (not args.browser_mcp_config or not args.browser_mcp_config.is_file()
-                                    or not (args.app_dir / "dist/index.html").is_file()
-                                    or not (args.app_dir / "node_modules/vite/bin/vite.js").is_file()):
-        report.update(result="not_run", error="Prepared Vue frontend and browser MCP provider required")
-    elif (args.case.startswith("system-") and args.backend != "native") or (args.case == "ime" and args.backend != "vue"):
-        report.update(result="not_run", error="This check needs its declared input provider")
+    try:
+        if args.backend == "vue" and (not args.browser_mcp_config or not args.browser_mcp_config.is_file()
+                                      or not (args.app_dir / "node_modules/vite/bin/vite.js").is_file()):
+            raise ValueError("prepared Vue frontend and browser MCP provider are required")
+        if (args.case.startswith("system-") and args.backend != "native") or (args.case == "ime" and args.backend != "vue"):
+            raise ValueError("this case needs its declared input provider")
+        prepared = checked_preparation(args)
+    except (OSError, ValueError) as error:
+        report.update(result="not_run", error=str(error))
     else:
-        report["tools"] = {"auto": digest(args.auto_bin), "auto-ui-tool": digest(args.ui_tool_bin)}
+        report["tools"] = prepared["tools"]
+        report["preparation"] = digest(args.app_dir / PREPARED)
         if args.browser_mcp_config:
             report["tools"]["browser-mcp-config"] = digest(args.browser_mcp_config)
-        report["source"] = source_hashes(args.app_dir, args.backend)
+        report["source"] = prepared["source"]
         if args.case == "reopen-app":
             report.update(coverage="X-02/X-06", layer="MCP, app and lifecycle")
             first = run_session(args, args.out_dir / "first", lambda s: s.open_palette())
@@ -406,51 +473,45 @@ def write_report(output, report):
     (output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def run_suite(args):
-    started = time.monotonic()
-    args.out_dir.mkdir(parents=True)
-    incompatible = {"ime"} if args.backend == "native" else {"system-input", "system-invoke"}
-    cases = {}
-    for case in (*CASES, "reopen-app"):
-        if case in incompatible:
-            continue
-        output = args.out_dir / case
-        completed = run_case(argparse.Namespace(**(vars(args) | {"case": case, "out_dir": output})))
-        cases[case] = {"result": completed["result"], "wall_seconds": completed["wall_seconds"],
-                       "report": f"{case}/report.json", "sha256": digest(output / "report.json")}
-        print(f"{args.backend} {case}: {completed['result']} ({completed['wall_seconds']:.3f}s)", flush=True)
-    outcomes = {run["result"] for run in cases.values()}
-    result = "fail" if "fail" in outcomes else "not_run" if "not_run" in outcomes else "pass"
-    report = {"plan": "PLAN-096", "revision": 3, "platform": platform.system(),
-              "backend": args.backend, "case": "all", "runner": digest(__file__),
-              "cases": cases, "wall_seconds": time.monotonic() - started, "result": result}
-    write_report(args.out_dir, report)
-    return report
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--auto-bin", required=True, type=Path)
     parser.add_argument("--ui-tool-bin", required=True, type=Path)
-    parser.add_argument("--out-dir", required=True, type=Path)
+    parser.add_argument("--out-dir", type=Path)
     parser.add_argument("--backend", required=True, choices=["native", "vue"])
-    parser.add_argument("--app-dir", type=Path, help="project override for an individual case")
-    parser.add_argument("--suite-root", type=Path, help="root of the three isolated projects")
+    parser.add_argument("--app-dir", type=Path, help="prepared isolated project for this case")
+    parser.add_argument("--project-root", type=Path, help="root of the three isolated projects")
     parser.add_argument("--browser-mcp-config", type=Path)
-    parser.add_argument("--case", choices=["all", *CASES, "reopen-app"])
+    parser.add_argument("--case", choices=[*CASES, "reopen-app"], default="settings")
+    parser.add_argument("--prepare", action="store_true", help="record fingerprints for a prebuilt input set")
     parser.add_argument("--startup-timeout", type=float, default=20)
     args = parser.parse_args()
     if not 0 < args.startup_timeout <= 300:
         parser.error("--startup-timeout must be within (0, 300]")
-    args.case = args.case or ("settings" if args.app_dir else "all")
-    if args.app_dir is not None and args.case == "all":
-        parser.error("--app-dir applies to an individual case. Use --suite-root for all cases")
-    for option in ("auto_bin", "ui_tool_bin", "out_dir", "app_dir", "suite_root", "browser_mcp_config"):
+    if args.out_dir is None and not args.prepare:
+        parser.error("--out-dir is required to run a case")
+    for option in ("auto_bin", "ui_tool_bin", "out_dir", "app_dir", "project_root", "browser_mcp_config"):
         path = getattr(args, option)
         if path is not None:
             setattr(args, option, path.resolve())
-    args.suite_root = args.suite_root or args.out_dir.parent / "windows"
-    report = run_suite(args) if args.case == "all" else run_case(args)
+    args.consumer = "provided" if args.case.startswith("provided") else "launcher" if args.case == "launcher" else "demo"
+    if args.app_dir is None:
+        if args.out_dir is None and args.project_root is None:
+            parser.error("--prepare requires --app-dir or --project-root")
+        root = args.project_root or args.out_dir.parent / "windows"
+        args.app_dir = root / PROJECTS[args.consumer]
+        if args.backend == "vue":
+            args.app_dir /= "gen/front/vue"
+    if args.prepare:
+        try:
+            if args.app_dir.is_relative_to(REPOSITORY):
+                raise ValueError("prepare an isolated copy of the project outside the repository")
+            prepared = preparation_inputs(args)
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
+        (args.app_dir / PREPARED).write_text(json.dumps(prepared, ensure_ascii=False, indent=2), encoding="utf-8")
+        return 0
+    report = run_case(args)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return EXIT_STATUS[report["result"]]
 

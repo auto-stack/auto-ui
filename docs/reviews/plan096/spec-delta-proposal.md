@@ -17,7 +17,7 @@
 
 调用方拥有命令数据、过滤结果的业务来源、权限、执行、持久化和全局快捷键。组件管理查询草稿、焦点、活动命令和请求锁。应用通过 `open` 控制是否显示，通过 `query` 同步查询。`commands` 默认空列表，`filterMode` 默认 `local`，`revision` 默认 `0`，`wrapNavigation` 默认关闭。`title` 和 `placeholder` 为空时分别显示 “Command palette” 和 “Search commands”。`errorMessage` 用于应用错误提示，`response` 用于当前请求反馈。默认 slot 可在编辑阶段放置应用控件。
 
-每条命令提供非空唯一 `id` 和可见 `label`。同名命令可分别运行。可选字段为 `groupId`、`groupLabel`、`keywords`、`shortcut`、`disabled` 和 `icon`。空 `groupId` 表示无分组。同一组的非空标题须一致。`shortcut` 是文字提示，图标缺失不影响命令名称。无效过滤模式、空或重复 ID、组标题冲突都会显示具名错误并阻止调用。`error` 每次相应配置变化发布一次 JSON `{code,message}`，相同错误在重绘时不重复发布。
+每条命令提供非空唯一 `id` 和可见 `label`。同名命令可分别运行。可选字段为 `groupId`、`groupLabel`、`keywords`、`shortcut`、`disabled` 和 `icon`。空 `groupId` 表示无分组。同一组的非空标题须一致。`shortcut` 是文字提示，图标缺失不影响命令名称。无效过滤模式、空或重复 ID、组标题冲突都会显示具名错误并阻止调用。`error` 每次相应配置变化发布一次 JSON `{code,message}`，相同错误在重绘时不重复发布。Provided 模式首次收到结果前即可提示现有配置错误，应用仍会收到当前查询请求。
 
 ## 搜索与选择
 
@@ -37,7 +37,7 @@ Provided 模式由应用先过滤和排序。每次打开及查询变化均发 `
 | `invokeRequested` | `instanceToken`, `session`, `seq`, `commandId`, `baseRevision`, `querySeq`, `query` |
 | `closeRequested` | `instanceToken`, `session`, `reason`（`escape` 或 `cancel`） |
 
-应用核对当前请求、命令及权限再执行。同一修订的命令内容若已改变，旧绑定同样失效。等待反馈时，用户输入、移动、执行及关闭均受锁保护。应用可关闭面板，重新打开或重挂载后拒绝旧反馈。`response` 须包含本次 `instanceToken`、`session`、`seq`、`commandId`、`status` 和 `message`。`accepted` 保持锁直到应用关闭，`rejected` 显示消息并允许重试。普通 Escape 或取消仅发一次关闭请求。
+应用核对当前请求、命令及权限再执行。同一修订的命令内容若已改变，旧绑定同样失效。等待反馈时，用户输入、移动、执行及关闭均受锁保护。过期 provided 结果不能解除当前请求锁，当前结果发生有效变更时仍可使旧动作失效。应用可关闭面板，重新打开或重挂载后拒绝旧反馈。`response` 须包含本次 `instanceToken`、`session`、`seq`、`commandId`、`status` 和 `message`。`accepted` 保持锁直到应用关闭，`rejected` 显示消息并允许重试。普通 Escape 或取消仅发一次关闭请求。
 
 ## 消费与交付范围
 

@@ -3,7 +3,8 @@ use auto.json
 widget App {
     use { package: command_palette from "../../../../../../packages/command-palette" }
 
-    msg { Init, Open, Query(str), Publish(str, bool), Complete, Run(str), FinishRun, ApplyRun(str), Close(str), Exit }
+    msg { Init, Open, OpenInvalid, RepairConfig, ConfigError(str), Query(str), Publish(str, bool), Complete,
+        Run(str), FinishRun, ApplyRun(str), Commit(str), Close(str), Exit }
 
     model {
         var shown bool = false
@@ -13,14 +14,21 @@ widget App {
         var session int = 0
         var sequence int = 0
         var query str = ""
+        var latest str = ""
+        var previous str = ""
         var revision int = 0
+        var broken bool = false
+        var errors int = 0
+        var diagnostic str = ""
         var first_a str = ""
         var waiting str = ""
         var settling bool = false
         var result_ready_at int = 0
         var running bool = false
+        var stale_during_run bool = false
         var run_ready_at int = 0
         var run_request str = ""
+        var invocations int = 0
         var applied int = 0
         var command str = ""
         var offered List = []
@@ -42,23 +50,50 @@ widget App {
     view {
         col (style: "p-4 gap-2") {
             button "Open provided palette" { onclick: .Open }
+            button "Open invalid provided palette" { onclick: .OpenInvalid }
             text f"Provided commands applied: ${.applied}"
+            text f"Provided invocation requests: ${.invocations}"
+            text f"Configuration notifications: ${.errors}"
+            if .diagnostic != "" { text .diagnostic }
+            if .stale_during_run { text "Obsolete result published" }
             text .command
             if .runtime_track == "vm" { button "Exit example" { onclick: .Exit } }
             CommandPalette (open: .shown, title: "Provided commands", filterMode: "provided", wrapNavigation: true,
                 commands: .offered, revision: .revision, resultsSession: .session,
                 resultsQuerySeq: .sequence, resultsQuery: .query, response: .reply,
-                onqueryChanged: .Query, oninvokeRequested: .Run, oncloseRequested: .Close) {}
+                onqueryChanged: .Query, oninvokeRequested: .Run, oncloseRequested: .Close,
+                onerror: .ConfigError) {
+                button "Repair configuration" { onclick: .RepairConfig }
+            }
         }
     }
 
     on {
         .Init -> { .runtime_track = Env.track() }
         .Open -> { .shown = true }
+        .OpenInvalid -> {
+            .broken = true
+            .offered = [.fixed[0], .fixed[0]]
+            .shown = true
+        }
+        .RepairConfig -> {
+            if .broken {
+                .broken = false
+                .Publish(.latest, false)
+            }
+        }
+        .ConfigError(payload) -> {
+            let error = json.parse(payload)
+            .errors = .errors + 1
+            .diagnostic = error.code
+        }
         .Query(payload) -> {
             let request = json.parse(payload)
             .instance_token = request.instanceToken
+            .previous = .latest
+            .latest = payload
             .settling = false
+            if .broken { return }
             if request.query == "A" && .first_a != "" {
                 .waiting = payload
                 .Publish(.first_a, true)
@@ -85,28 +120,46 @@ widget App {
         }
         .Run(payload) -> {
             let request = json.parse(payload)
-            if request.commandId == "two" && !.running {
+            .invocations = .invocations + 1
+            if .running || !.shown || request.instanceToken != .instance_token || request.session != .session ||
+                request.querySeq != .sequence || request.query != .query || request.baseRevision != .revision { return }
+            if request.commandId == "two" {
                 .run_request = payload
                 .run_ready_at = Time.now_ms() + 1300
                 .running = true
-            } else if !.running {
+                if request.query == "A" && .previous != "" {
+                    .Publish(.previous, true)
+                    .stale_during_run = true
+                    .run_ready_at = Time.now_ms() + 1950
+                }
+            } else {
                 .ApplyRun(payload)
             }
         }
         .FinishRun -> {
             if .running && Time.now_ms() >= .run_ready_at {
                 .running = false
-                .ApplyRun(.run_request)
+                if .stale_during_run {
+                    let request = json.parse(.run_request)
+                    let current = json.parse(.latest)
+                    if .shown && request.instanceToken == current.instanceToken && request.session == current.session &&
+                        request.querySeq == current.querySeq && request.query == current.query { .Commit(request.commandId) }
+                } else {
+                    .ApplyRun(.run_request)
+                }
             }
         }
         .ApplyRun(payload) -> {
             let request = json.parse(payload)
             if .shown && request.instanceToken == .instance_token && request.session == .session &&
                 request.querySeq == .sequence && request.query == .query && request.baseRevision == .revision {
-                .applied = .applied + 1
-                .command = request.commandId
-                .shown = false
+                .Commit(request.commandId)
             }
+        }
+        .Commit(name) -> {
+            .applied = .applied + 1
+            .command = name
+            .shown = false
         }
         .Close(payload) -> {
             let request = json.parse(payload)

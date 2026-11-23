@@ -315,6 +315,107 @@ fn first_invalid_configuration_notifies_once_and_can_recover() {
 }
 
 #[test]
+fn provided_validates_configuration_before_results_arrive() {
+    let mut model = model();
+    set(&mut model, "mode", Value::str("provided"));
+    let good = model.read_state_as_vec("choices").unwrap();
+    model
+        .write_state_vec("choices", vec![good[0].clone(), good[0].clone()])
+        .unwrap();
+    tick(&mut model);
+    tick(&mut model);
+    assert_eq!(model.read_state("queries").unwrap(), Value::Int(1));
+    assert_eq!(emitted(&model, "diagnostic")["code"], "duplicate-command-id");
+    assert_eq!(model.read_state("errors").unwrap(), Value::Int(1));
+    invoke(&mut model, "first");
+    assert_eq!(child(&model, "seq"), Value::Int(0));
+
+    model.write_state_vec("choices", good).unwrap();
+    set(&mut model, "version", Value::Int(1));
+    set(&mut model, "result_session", Value::Int(1));
+    set(&mut model, "result_seq", Value::Int(1));
+    tick(&mut model);
+    assert_eq!(child(&model, "config_code"), Value::str(""));
+    invoke(&mut model, "first");
+    assert_eq!(child(&model, "seq"), Value::Int(1));
+    tick(&mut model);
+    assert_eq!(emitted(&model, "request")["commandId"], "first");
+}
+
+#[test]
+fn ignored_provider_snapshots_cannot_unlock_the_current_invocation() {
+    let mut model = model();
+    set(&mut model, "mode", Value::str("provided"));
+    set(&mut model, "selected_query", Value::str("A"));
+    tick(&mut model);
+    set(&mut model, "version", Value::Int(1));
+    set(&mut model, "result_session", Value::Int(1));
+    set(&mut model, "result_seq", Value::Int(1));
+    set(&mut model, "result_query", Value::str("A"));
+    tick(&mut model);
+    invoke(&mut model, "second");
+    let mut updated_commands = model.read_state_as_vec("choices").unwrap();
+    updated_commands.remove(0);
+    model.write_state_vec("choices", updated_commands).unwrap();
+    set(&mut model, "version", Value::Int(99));
+    set(&mut model, "result_seq", Value::Int(0));
+    tick(&mut model);
+    let binding = child(&model, "binding");
+    action(&mut model, "Close", &[binding, Value::str("escape")]);
+    edit(&mut model, "ignored");
+    invoke(&mut model, "third");
+    assert_eq!(child(&model, "phase"), Value::str("pending"));
+    assert_eq!(child(&model, "result_revision"), Value::Int(1));
+    assert_eq!(child(&model, "draft"), Value::str("A"));
+    assert_eq!(model.read_state("invocations").unwrap(), Value::Int(1));
+    assert_eq!(model.read_state("closures").unwrap(), Value::Int(0));
+
+    set(&mut model, "version", Value::Int(2));
+    set(&mut model, "result_seq", Value::Int(1));
+    tick(&mut model);
+    assert_eq!(child(&model, "phase"), Value::str("editing"));
+    invoke(&mut model, "third");
+    assert_eq!(child(&model, "seq"), Value::Int(2));
+    tick(&mut model);
+    assert_eq!(emitted(&model, "request")["commandId"], "third");
+    assert_eq!(model.read_state("invocations").unwrap(), Value::Int(2));
+}
+
+#[test]
+fn provided_reorder_preserves_selection_and_removal_selects_an_enabled_result() {
+    let mut model = model();
+    set(&mut model, "mode", Value::str("provided"));
+    tick(&mut model);
+    set(&mut model, "version", Value::Int(1));
+    set(&mut model, "result_session", Value::Int(1));
+    set(&mut model, "result_seq", Value::Int(1));
+    tick(&mut model);
+    let binding = child(&model, "binding");
+    let epoch = child(&model, "result_epoch");
+    action(&mut model, "Move", &[binding, epoch, Value::str("down")]);
+    assert_eq!(child(&model, "active_id"), Value::str("second"));
+
+    let mut reordered = model.read_state_as_vec("choices").unwrap();
+    reordered.swap(0, 3);
+    model.write_state_vec("choices", reordered.clone()).unwrap();
+    set(&mut model, "version", Value::Int(2));
+    tick(&mut model);
+    assert_eq!(child(&model, "active_id"), Value::str("second"));
+
+    reordered.remove(2);
+    model.write_state_vec("choices", reordered).unwrap();
+    set(&mut model, "version", Value::Int(3));
+    tick(&mut model);
+    assert_eq!(child(&model, "active_id"), Value::str("third"));
+    let binding = child(&model, "binding");
+    let epoch = child(&model, "result_epoch");
+    action(&mut model, "Submit", &[binding, epoch]);
+    assert_eq!(child(&model, "seq"), Value::Int(1));
+    tick(&mut model);
+    assert_eq!(emitted(&model, "request")["commandId"], "third");
+}
+
+#[test]
 fn invalid_records_report_missing_id_and_conflicting_group_labels() {
     for (source, expected) in [
         (APP.replace("id: \"first\", ", ""), "missing-command-id"),
@@ -324,6 +425,7 @@ fn invalid_records_report_missing_id_and_conflicting_group_labels() {
         ),
     ] {
         let mut model = mount(&source);
+        tick(&mut model);
         tick(&mut model);
         assert_eq!(emitted(&model, "diagnostic")["code"], expected);
         invoke(&mut model, "third");
