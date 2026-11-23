@@ -636,6 +636,17 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 取未经改写的原 031 前端和后端。生产 `generate_linked_front_sfc` 生成 734,863 字节（2.484 s，`Host.vue` SHA256 `7BE399F43F6AB2D273197DA3AC6C05741D7CB0DF7CA87FAE2B8C384BEC79A81E`）。Vite 构建通过（1.651 s）。Chrome 通过独立验证宿主挂载原前端，用户点击「Open File」创建真实 `BrowserFileServer` 私有租用。原 VM 后端收到私有 `POST /api/viewer/open-file` 与原样参数 `../../tests/fixtures/scenic-320x240.png`。守卫按已授权目录拒绝该相对路径并返回空会话（1.271 s）。`chrome.log` SHA256 `868100BF3B8396D63FAC9F11696C8D93A9ED0E841D2ACFA9B9B4C68875105FB9`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 112 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `34440f276e` / auto-ui `422cc6152a` | next: work/T-02–T-06 接通有授权的原例路径解析及正式运行入口，完成原版 031 的 Chrome 与 Iced 加载、恢复、视口交互和关闭。
 
+2026-11-23 T-02 / T-06 续（round 113）：正式 Vue 启动加载原 031 图像，验证视口、恢复和租用关闭。
+
+- AutoLang `e9f09cc87a` 为有宿主源码目录的图像会话解释原版 `../../tests/fixtures` 路径。规范化路径仍经过当前目录句柄授权，普通相对文件名沿用授权根。授权替换、撤销或普通文件会话不能借用该路径基准。AutoUI `5faec589da` 让正式 Vue 启动器为已选择受检前端的 Image Viewer 读取 `AUTO_IMAGE_VIEWER_ROOT`，通过浏览器文件租用启动原 VM 后端。
+- 真浏览器首次缩放暴露两个相邻语言问题。AutoLang `c9fdffc15e` 让动态修订号与整数走值比较，并保留显式 `null` 判空。AGE 受检的目标浮点绑定经签名受检的 JSON 原语接收整数及小数，在 AV 与 Vue 统一按有限 `f32` 物化。超出范围的请求失败并回滚。AutoUI `aa9a4b5279` 对同源媒体工作器票据的 503 限次等待重试，终态 422 和关闭后的 404 仍沿错误路径处理。
+- `cargo test --locked -p auto-lang-core --lib file_session::tests::` 7/7（执行 0.180 s，整命令 17.169 s）。`ace-av` 包面 51/51（执行 0.380 s，整命令 23.328 s），新增修订与浮点专例独立 0.230 s。`ace-a2x-core` / `ace-a2x-ts` 45/45（14.338 s），AutoUI `plan117_viewer_backend` / `plan114_file_session` 7/7（执行 5.970 s，整命令 70.971 s）。`scratch/r113-viewer-source/av-view-final.log` SHA256 `49E99C13C09138A43A18B3A00D4C4B0442BB645FDD562A0694C9171A1B9DA30A`，`consumer-retry.log` SHA256 `AE2A1A66ADE2DDCE025283B6150E3704B6D8F867743CDF34C5CA985618C92D1D`。
+- 同源副本保留原 031 `pac.at` 与前后端输入。将原坏图字节另存成具可枚举扩展名的 `bad-preview.png`，并在授权目录外放一张独立有效 PNG 作为权限反例。正式 `auto build --render vue --gen-only` 冷生成（19.974 s），生成目录 `pnpm run build`（`vue-tsc && vite build`，4.894 s）。`App.vue` SHA256 `1DEAA03CD05C84B33DEFAD86C07B6E3576B827B542D7F4FD6E4CC30625707459`。
+- 正式 `auto run --render vue` 加载原前端与私有 VM。Chrome 实证原示例 320×240 解码、1.25 倍缩放、−40 px 平移及视口 overflow 裁切，原目录枚举后点击坏图得 422，随后同一真实接口将好图的 503 过渡至 200 并恢复解码。首次恢复请求另固定注入一次 503，使该重试校验可复跑。替换会话后旧 URI 404，目录外有效 PNG 被拒绝，关闭浏览器页后最终 URI 404（总命令 30.139 s）。`chrome-retry.log` SHA256 `49067638079E8DFC22A5698FD3ECD53FC9503622A4B0620B7FE7C92801B57D48`。
+- 原版 029 用同一工具重生成，Vite 构建后接已有原生照片代理复跑 Chrome。Unicode 搜索、503 恢复、过时请求及卸载取消均通过（含探针重链接的总命令 49.422 s）。`gallery-chrome.log` SHA256 `D36DE434BF9E89F9A7E20A63407496BD60BFAB53D25557362CE2B49769ABE228`。
+- 原前端的 Escape 快捷键在真实 Chrome 的追加检查中无 close 请求（22.832 s，其余轨迹复过）。`chrome-escape.log` SHA256 `D636E6A78F1260A1E8F787B8FA58286C6BC4F69AD5AF7FDC65A4C3D9F625EF06`。Chrome 页面租用释放已证，应用级快捷键及原版 Iced 全链仍待实际验收。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 113 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `e9f09cc87a` / `c9fdffc15e`，auto-ui `5faec589da` / `aa9a4b5279` | next: work/T-02–T-06 接通原 031 Iced 的受检私有后端与键绑定，补齐双端关闭和实窗。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
