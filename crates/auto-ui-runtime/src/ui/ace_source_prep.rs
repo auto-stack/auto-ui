@@ -815,6 +815,12 @@ pub fn prepare_component_source(
     // PLAN-105 T-02（U03 真语料 012）：`<text>.contains(<sub>)`——语言无该内建
     // 方法，改写为 prep 注入的文本谓词 helper（`len`/`slice`/`==` 皆既有内建）。
     let mut need_str_contains = false;
+    // PLAN-118：包面目标（widget 级 `use { package: }` 导入存在）——AGE 包面
+    // 的 `str`/`Str` 是借用/owned 两个类型：VM 作者源（paint_color 内联 fn、
+    // handler 局部）把 Str 值赋给 `str` 局部/返回（`var t str = <Str>`、
+    // `fn f(…) str`），包面 bind 逐处具名拒。包面消费下 str 注解一律归一为
+    // owned `Str`（model 字段同款语义；`rewrite_model_text_fields` 已覆盖
+    // model 块，本 pass 覆盖 fn 形参/返回与块外 var 局部）。
     out = rewrite_model_text_fields(&out);
     out = rewrite_str_contains(&out, &mut need_str_contains);
     // PLAN-117（round-28 ②，029 真语料）：`<text>.lower()`/`.upper()`——组件
@@ -894,6 +900,11 @@ pub fn prepare_component_source(
     // 注入的依赖块（fn/type/const）同样做组件面语法归一：`while` → 条件 `for`，
     // 并去掉显式 `as int` 转换。
     out = rewrite_while_to_for(&out);
+    // PLAN-118：包面目标的 str→Str 注解归一（内联 fn 已前置，最后统一跑；
+    // model 块早被 rewrite_model_text_fields 覆盖，此处恒等）。
+    if src.lines().any(|l| l.trim_start().starts_with("use { package:")) {
+        out = rewrite_str_surface_for_package(&out);
+    }
     Ok(PreparedComponentSource {
         source: out,
         inlined,
@@ -1769,9 +1780,70 @@ fn rewrite_model_text_fields(src: &str) -> String {
     }
     out
 }
+/// PLAN-118：包面目标的 str→Str 注解归一——fn 形参（`x str`）、fn 返回
+/// （`) str {`）、以及 model 块之外的 `var <name> str` 局部（model 块已由
+/// rewrite_model_text_fields 覆盖，重复无害）。跳过注释行；字符串字面量内
+/// 的命中在本计划语料（paint）中不存在，属具名记录的改写边界。
+fn rewrite_str_surface_for_package(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    for line in src.split_inclusive('\n') {
+        let trimmed_end = line.trim_end_matches(['\n', '\r']);
+        let nl = &line[trimmed_end.len()..];
+        let t = trimmed_end.trim_start();
+        if t.starts_with("//") || t.starts_with("style ") {
+            out.push_str(line);
+            continue;
+        }
+        let mut body = trimmed_end.to_string();
+        if t.starts_with("fn ") {
+            // 形参表与返回注解：`) str {` → `) Str {`；形参内 ` str` 词 → ` Str`。
+            if let Some(open) = body.find('(') {
+                if let Some(close_rel) = body[open..].find(')') {
+                    let close = open + close_rel;
+                    let params = body[open + 1..close].to_string();
+                    let params = params
+                        .replace(" str,", " Str,")
+                        .replace(", str,", ", Str,")
+                        .replace("( str,", "( Str,");
+                    let params = if params.ends_with(" str") {
+                        let cut = params.len() - " str".len();
+                        format!("{} Str", &params[..cut])
+                    } else {
+                        params
+                    };
+                    body.replace_range(open + 1..close, &params);
+                }
+            }
+            if let Some(pos) = body.find(") str {") {
+                body.replace_range(pos..pos + ") str {".len(), ") Str {");
+            } else if let Some(pos) = body.find(") str\n") {
+                body.replace_range(pos..pos + ") str\n".len(), ") Str\n");
+            }
+        }
+        // `var <name> str …`（行内任意位；model 块行此前已处理，重复替换是恒等）。
+        if let Some(pos) = body.find("var ") {
+            let rest = &body[pos + 4..];
+            let mut parts = rest.splitn(3, char::is_whitespace);
+            let name = parts.next().unwrap_or("");
+            let ty = parts.next().unwrap_or("");
+            if ty == "str" && !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                let after = parts.next().unwrap_or("");
+                let indent = &body[..pos];
+                body = if after.is_empty() {
+                    format!("{indent}var {name} Str")
+                } else {
+                    format!("{indent}var {name} Str {after}")
+                };
+            }
+        }
+        out.push_str(&body);
+        out.push_str(nl);
+    }
+    out
+}
+
 /// 记录类型块里的文本字段类型改写成 owned `Str`（`<field> str` → `<field> Str`）。
-fn rewrite_record_text_fields(block: &str) -> String {
-    let mut out = String::with_capacity(block.len());
+fn rewrite_record_text_fields(block: &str) -> String {    let mut out = String::with_capacity(block.len());
     for line in block.split_inclusive('\n') {
         let trimmed_end = line.trim_end_matches(['\n', '\r']);
         let nl = &line[trimmed_end.len()..];

@@ -11,15 +11,41 @@ fn main() {
     let path = args.next().expect("usage: p118_diag <app.at> [module_path]");
     let module_path = args.next().unwrap_or_else(|| "app::main".to_string());
     let src = std::fs::read_to_string(&path).expect("read source");
-    // 包面模式：跳过 prep，直接以 app::app 单元走宿主包面装载（手工组包探针）。
+    // 包面模式：忠实复刻宿主路径——prep（pac.at 祖先根）+ `$event`→`nevent`
+    // 归一化 + color_picker 包单元，再走宿主包面装载。
     if std::env::var("P118_PKG").ok().as_deref() == Some("1") {
-        let units = vec![ace_core::source::packages::PackageModuleInput {
-            package: "app".into(),
-            version: "1.0.0".into(),
-            id: "app".into(),
-            source: src.into(),
-            provider: None,
-        }];
+        let root = std::path::Path::new(&path)
+            .ancestors()
+            .find(|p| p.join("pac.at").is_file())
+            .unwrap_or_else(|| std::path::Path::new(&path).parent().unwrap())
+            .to_path_buf();
+        let prepped = auto_ui_runtime::ui::ace_source_prep::prepare_component_source(&root, &src)
+            .map(|p| p.source)
+            .unwrap_or_else(|_| src.clone())
+            .replace("$event", "nevent");
+        let mut units: Vec<ace_core::source::packages::PackageModuleInput> =
+            vec![ace_core::source::packages::PackageModuleInput {
+                package: "app".into(),
+                version: "1.0.0".into(),
+                id: "app".into(),
+                source: prepped,
+                provider: None,
+            }];
+        let pkg_dir = root.join("../../../../../packages/color-picker");
+        let which = std::env::var("P118_PKG_SET")
+            .unwrap_or_else(|_| "color_picker,color_model,color_dialog".into());
+        for name in which.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            let f = pkg_dir.join(format!("{name}.at"));
+            if let Ok(s) = std::fs::read_to_string(&f) {
+                units.push(ace_core::source::packages::PackageModuleInput {
+                    package: "color_picker".into(),
+                    version: "0.1.0".into(),
+                    id: name.into(),
+                    source: s,
+                    provider: None,
+                });
+            }
+        }
         match auto_ui_runtime::ui::ace_node_desktop::NodeDesktopBridge::load_package(
             units, "app::app", 1,
         ) {
