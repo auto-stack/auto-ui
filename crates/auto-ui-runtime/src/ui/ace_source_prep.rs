@@ -2123,6 +2123,56 @@ fn rewrite_host_storage(src: &str, fields: &mut Vec<(String, String)>) -> String
     out
 }
 
+/// AV 包面：对**纯 store 单元**做同一套宿主服务仿真（PLAN-112，025 真语料）。
+///
+/// 组件面的 prep 只处理入口源；store 另成包单元时（`use sys_store: SysStore`），
+/// 其 handler 里的 `storage.get/set` 到了受检 AGE 停在
+/// `storage calls require the owning host`。宿主在此把它们改写成该 store 的模型
+/// 字段——与组件面同一映射（`.__st_<key>`；内存态、不落盘，是 AV 车道既有合同）。
+/// 只处理恰含一个 store、没有 widget/node 声明、带 `model {` 块、且每个
+/// `storage.` 调用的键都是字符串字面量的单元；其余原样返回，诊断仍由 AGE 给出。
+pub(crate) fn simulate_store_host_services(
+    units: Vec<ace_core::source::packages::PackageModuleInput>,
+) -> Vec<ace_core::source::packages::PackageModuleInput> {
+    units
+        .into_iter()
+        .map(|mut unit| {
+            if is_pure_storage_store(&unit.source) {
+                let mut fields = Vec::new();
+                let out = rewrite_host_storage(&unit.source, &mut fields);
+                if !fields.is_empty() {
+                    unit.source = inject_model_fields(&out, &fields);
+                }
+            }
+            unit
+        })
+        .collect()
+}
+
+/// 顶层声明行（去缩进后以 `store `/`widget `/`node ` 起头）里恰有一个 store、
+/// 没有 widget/node，且所有 `storage.` 调用形如 `storage.get("` / `storage.set("`。
+fn is_pure_storage_store(src: &str) -> bool {
+    let mut stores = 0;
+    for line in src.lines() {
+        let t = line.trim_start();
+        let is_decl = |kw: &str| {
+            t.strip_prefix(kw)
+                .is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_'))
+        };
+        if is_decl("store ") {
+            stores += 1;
+        } else if is_decl("widget ") || is_decl("node ") {
+            return false;
+        }
+    }
+    if stores != 1 || !src.contains("model {") {
+        return false;
+    }
+    let calls = src.matches("storage.").count();
+    let literal = src.matches("storage.get(\"").count() + src.matches("storage.set(\"").count();
+    calls > 0 && calls == literal
+}
+
 /// 把宿主仿真字段插进 `model {` 块尾（无 model 块则不插）。
 /// 块尾 `}` 按词法扫描定位：跳过行注释（`//`）与字符串字面量——model 注释
 /// 或字符串里的 `}`（如 `[{name,rel_path}]`、CSS 类）不再误当块尾
@@ -2516,5 +2566,84 @@ mod tests {
         assert!(sfc.contains("<template>"), "SFC template emitted");
         assert!(sfc.contains("text-xs text-muted-foreground"), "inlined style reaches the template");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn package_unit(id: &str, source: &str) -> ace_core::source::packages::PackageModuleInput {
+        ace_core::source::packages::PackageModuleInput {
+            package: "app".into(),
+            version: "1.0.0".into(),
+            id: id.into(),
+            source: source.into(),
+            provider: None,
+        }
+    }
+
+    /// 纯 store 单元：`storage.get/set("k", …)` → `.__st_k`，字段注入该 store 的 model。
+    #[test]
+    fn p112_simulates_host_storage_in_a_pure_store_unit() {
+        let src = "use fmt: n1\n\nstore S {\n    model {\n        var speed str = \"\"\n    }\n    \
+                   msg { Go }\n\n    on {\n        .Init -> {\n            var sp = storage.get(\"sysmon.speed\")\n            \
+                   if sp == \"\" { sp = storage.get(\"dash.speed\") }\n            .speed = sp\n        }\n        \
+                   .SetSpeed(speed) -> {\n            storage.set(\"sysmon.speed\", speed)\n        }\n    }\n}\n";
+        let out = simulate_store_host_services(vec![package_unit("s", src)]).remove(0).source;
+        assert!(!out.contains("storage."), "{out}");
+        assert!(out.contains("var sp = .__st_sysmon_speed"), "{out}");
+        assert!(out.contains("sp = .__st_dash_speed"), "{out}");
+        assert!(out.contains(".__st_sysmon_speed = speed"), "{out}");
+        // 字段落在 store 的 model 块尾（`model {` 之后、`msg {` 之前），初值为空串。
+        let (model, msg, field) = (
+            out.find("model {").unwrap(),
+            out.find("msg {").unwrap(),
+            out.find("var __st_sysmon_speed str = \"\"").unwrap(),
+        );
+        assert!(model < field && field < msg, "{out}");
+        assert!(out.contains("var __st_dash_speed str = \"\""), "{out}");
+        assert!(out.starts_with("use fmt: n1\n"), "use 行原样保留：{out}");
+    }
+
+    /// 不做仿真的形状一律逐字节不变：非 store 单元、store 与 widget 同单元、两个
+    /// store、无 model 块、键不是字符串字面量、只在注释里提到 `storage.`。
+    #[test]
+    fn p112_leaves_other_unit_shapes_untouched() {
+        let shapes = [
+            "widget Main {\n    model { var n int = 0 }\n    view { text .n { } }\n}\n",
+            "store S {\n    model { var a str = \"\" }\n    on { .Go -> { storage.set(\"k\", .a) } }\n}\nwidget Main {\n    view { text \"x\" { } }\n}\n",
+            "store A {\n    model { var a str = \"\" }\n}\nstore B {\n    model { var b str = \"\" }\n    on { .Go -> { storage.set(\"k\", .b) } }\n}\n",
+            "store S {\n    on { .Go -> { storage.set(\"k\", \"v\") } }\n}\n",
+            "store S {\n    model { var a str = \"\" }\n    on { .Go -> { storage.set(.a, \"v\") } }\n}\n",
+            "store S {\n    model { var a str = \"\" }\n    on { .Go -> { .a = \"v\" } }\n}\n// storage.get 的注释\n",
+        ];
+        let out = simulate_store_host_services(shapes.iter().enumerate().map(|(i, s)| package_unit(&format!("u{i}"), s)).collect());
+        for (before, unit) in shapes.iter().zip(out) {
+            assert_eq!(&unit.source, before);
+        }
+    }
+
+    /// 025 真实 `sys_store.at`：8 个键全部映射为 store 的模型字段，源里不再有 `storage.`。
+    #[test]
+    fn p112_simulates_host_storage_for_the_real_025_store() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/ui/025-sys-monitor/src/front/sys_store.at");
+        let src = std::fs::read_to_string(&path).unwrap();
+        // 13 处调用、8 个键（源变更时同步本钉点）。
+        assert_eq!(src.matches("storage.").count(), 13);
+        let out = simulate_store_host_services(vec![package_unit("sys_store", &src)]).remove(0).source;
+        assert!(!out.contains("storage."), "storage 调用应全部改写");
+        for key in [
+            "sysmon.speed",
+            "dash.speed",
+            "sysmon.sort_column",
+            "dash.sort_column",
+            "sysmon.sort_dir",
+            "dash.sort_dir",
+            "sysmon.active_tab",
+            "sysmon.perf_tab",
+        ] {
+            let field = host_field_name(key);
+            assert!(out.contains(&format!("var {field} str = \"\"")), "{key} 应有模型字段：{field}");
+        }
+        assert_eq!(out.matches("var __st_").count(), 8, "恰 8 个仿真字段");
+        assert!(out.contains("var sp = .__st_sysmon_speed"), "{out}");
+        assert!(out.contains(".__st_sysmon_speed = speed"), "{out}");
     }
 }

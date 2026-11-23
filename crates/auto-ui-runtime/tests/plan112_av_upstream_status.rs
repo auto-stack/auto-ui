@@ -12,8 +12,11 @@
 //!   语义整体不存在」。原样真实 `SysStore`（21 个 handler 臂）在包面解析通过
 //!   （PLAN-112 为 AGE **包面**开放 `nil` 字面量与 `.as(T)` 之后；组件面仍拒）。
 //! - `p112_av_gap_*`：每个缺口一个最小源 + 首阻断诊断；包面的门序见
-//!   `p112_av_gap_package_store_gates_in_order`。过语法不等于可消费：包面的
-//!   `.as(T)` / `.to(int)` 停在 Atom bind（TextRecord 描述符无 `expr.cast`）。
+//!   `p112_av_gap_package_store_gates_in_order`（钉的是**裸 AGE 包编译**）。过语法
+//!   不等于可消费：包面的 `.as(T)` / `.to(int)` 停在 Atom bind（TextRecord 描述符
+//!   无 `expr.cast`）。
+//! - 宿主行为与语言行为分开钉：AV 包面生产路径（`load_package`）对纯 store 单元做
+//!   `storage` 宿主服务仿真，门① 在该路径不再出现；门序用例里的门① 仍对裸 AGE 成立。
 //! - `p112_av_real_*`：真实 025 单元的首阻断。
 //!
 //! 某项缺口关闭后，对应 `expect_gap` 会因「编译通过」或「诊断改名」翻红——届时
@@ -700,12 +703,45 @@ fn p112_av_real_app_first_blocker_on_component_face() {
     );
 }
 
-/// AV 包面 / A2Vue 包面：025 六单元**原样**装配（零中和）。AV 包面上 `SysStore`
-/// 过语法之后，消费者经 `use sys_store: SysStore` 把 store 内联，首阻断落在内联后的
-/// 第一道语义门（见 `p112_av_gap_package_store_gates_in_order`）。A2Vue 包面
-/// （`generate_package_sfc`）先走 routed 车道，车道对入口单元**单独**做组件面解析
-/// （`package_candidates`）——`app.at` 单独解析时 `use sys_store: SysStore` 不可见，
-/// 首阻断是 `model has no field \`store\``，轮不到包编译。
+/// AV 包面生产路径上的正对照：纯 store 单元里的 `storage.get/set` 经宿主服务仿真
+/// （`ace_source_prep::simulate_store_host_services`）改写为 store 模型字段后，
+/// 装载不再停在 AGE 的门①。
+#[test]
+fn p112_av_control_av_package_path_simulates_store_storage() {
+    let store = store_with_arm(
+        "            .label = storage.get(\"sysmon.speed\")\n            \
+         storage.set(\"sysmon.speed\", .label)\n            .n = .n + 1",
+    );
+    let consumer = || unit("main", &go_consumer("        text .store.n { }\n"));
+    // 同一源直送 AGE 包编译：门① 仍在（仿真是宿主行为，不是语言行为）。
+    expect_gap(
+        "裸 AGE 包编译（store 用 storage）",
+        &package_diag(&[consumer(), unit("s", &store)], "app::main"),
+        &["storage calls require the owning host"],
+    );
+    let diag = NodeDesktopBridge::load_package(
+        vec![consumer(), unit("s", &store)],
+        "app::main",
+        1,
+    )
+    .err()
+    .unwrap_or_default();
+    assert!(
+        !diag.contains("storage calls require the owning host") && !diag.contains("source.syntax"),
+        "AV 包面装载不应再停在 storage 门，实际: {diag}"
+    );
+}
+
+/// AV 包面 / A2Vue 包面：025 六单元**原样**装配（零中和）。
+///
+/// AV 包面（生产路径 `NodeDesktopBridge::load_package`）：`SysStore` 过语法之后，
+/// 纯 store 单元里的 `storage.get/set` 由宿主服务仿真改写为 store 的模型字段
+/// （PLAN-112，与组件面 prep 同一映射——AGE 的门① 在这条路径上不再出现，见
+/// `p112_av_gap_package_store_gates_in_order` 对裸 AGE 的钉点），首阻断落在门②
+/// handler 调用词汇。A2Vue 包面（`generate_package_sfc`）不做仿真，且先走 routed
+/// 车道，车道对入口单元**单独**做组件面解析（`package_candidates`）——`app.at`
+/// 单独解析时 `use sys_store: SysStore` 不可见，首阻断是
+/// `model has no field \`store\``，轮不到包编译。
 #[test]
 fn p112_av_real_app_first_blocker_on_package_faces() {
     let units: Vec<PackageModuleInput> = [
@@ -724,7 +760,10 @@ fn p112_av_real_app_first_blocker_on_package_faces() {
         &NodeDesktopBridge::load_package(units.clone(), "app::main", 1)
             .err()
             .unwrap_or_default(),
-        &["storage calls require the owning host"],
+        &[
+            "handler calls require a declared widget message, same-unit store method, or \
+             checked list operation",
+        ],
     );
     let a2vue = generate_package_sfc(&units, "app::main")
         .err()

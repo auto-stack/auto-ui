@@ -2318,6 +2318,9 @@ impl NodeDesktopBridge {
         instances: usize,
         paths: RouteModulePaths,
     ) -> Result<Self, String> {
+        // PLAN-112：独立 store 单元里的 `storage.get/set` 走宿主服务仿真（与组件面
+        // prep 同一映射）——否则受检 AGE 停在 `storage calls require the owning host`。
+        let units = super::ace_source_prep::simulate_store_host_services(units);
         let unit = units.iter().find(|unit| format!("{}::{}", unit.package, unit.id) == entry)
             .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
         let candidates = match package_candidates(&unit.source) {
