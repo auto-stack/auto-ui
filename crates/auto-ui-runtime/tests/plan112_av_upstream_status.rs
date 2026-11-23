@@ -9,15 +9,15 @@
 //!
 //! 本文件是**状态钉点**而非功能用例（先例：`plan105_u03_sfc_status`）：
 //! - `p112_av_control_*`：今天就被接受的对照——缺口是具体构造，不是「store
-//!   语义整体不存在」。包面上真实 `SysStore` 的 21 个 handler 臂里有 20 个
-//!   语法通过；仅去掉 4 处（2 个 `nil` 比较、2 个 `.as(float)`）后整个 store
-//!   解析通过。
+//!   语义整体不存在」。原样真实 `SysStore`（21 个 handler 臂）在包面解析通过
+//!   （PLAN-112 为 AGE **包面**开放 `nil` 字面量与 `.as(T)` 之后；组件面仍拒）。
 //! - `p112_av_gap_*`：每个缺口一个最小源 + 首阻断诊断；包面的门序见
-//!   `p112_av_gap_package_store_gates_in_order`。
+//!   `p112_av_gap_package_store_gates_in_order`。过语法不等于可消费：包面的
+//!   `.as(T)` / `.to(int)` 停在 Atom bind（TextRecord 描述符无 `expr.cast`）。
 //! - `p112_av_real_*`：真实 025 单元的首阻断。
 //!
-//! 上游（auto-lang AGE）落地某项后，对应 `expect_gap` 会因「编译通过」或
-//! 「诊断改名」翻红——届时把该条改为结构断言，并恢复 PLAN-112 的 T-03。
+//! 某项缺口关闭后，对应 `expect_gap` 会因「编译通过」或「诊断改名」翻红——届时
+//! 把该条改为结构断言（`p112_av_control_*`）。全部关闭后恢复 PLAN-112 的 T-03。
 //! 构造级探针一律走生产路径（prep → load；prep 拒绝时退回裸源）——裸源直送
 //! 会把 prep 已仿真的构造（字段显示、`storage.set`、`while`）误报成缺口。
 //! 探针拼装务必从显式片段构造：把 `raw[..model_start]` 当「头部」会把
@@ -73,10 +73,15 @@ fn package_diag(units: &[PackageModuleInput], entry: &str) -> String {
 
 /// 组件面生产路径：prep → load。返回首阻断（装载成功 = `OK`）。
 fn component_face(root: &Path, src: &str) -> String {
+    component_face_at(root, src, "p112-probe.at")
+}
+
+/// 同上，`path` = 生产入口传入的源路径（`--source <app.at>` 的语义）。
+fn component_face_at(root: &Path, src: &str, path: &str) -> String {
     let prepped = prepare_component_source(root, src)
         .map(|p| p.source)
         .unwrap_or_else(|_| src.to_string());
-    NodeDesktopBridge::load(&prepped, "p112-probe.at", 1)
+    NodeDesktopBridge::load(&prepped, path, 1)
         .err()
         .unwrap_or_else(|| "OK".into())
 }
@@ -242,8 +247,9 @@ fn p112_av_gap_component_slice_rejects_list_of_record_model_field() {
     );
 }
 
-/// `.as(float)` 转换与 `nil` 比较被 store handler 文法拒绝（025 `.Refresh` 的
-/// `totalG_int.as(float)`、`snap == nil`）。
+/// `.as(float)` 转换与 `nil` 比较被**组件面**的 store handler 文法拒绝（025
+/// `.Refresh` 的 `totalG_int.as(float)`、`snap == nil`）；包面已收，见
+/// `p112_av_control_package_grammar_admits_nil_and_float_cast`。
 #[test]
 fn p112_av_gap_float_cast_and_nil_compare_are_rejected_grammar() {
     let root = synthetic_root();
@@ -457,16 +463,10 @@ fn assemble_store(store: &str, real: &[&str], neutral: impl Fn(&str) -> String) 
     format!("{pre}    on {{\n{arms}    }}\n}}\n")
 }
 
-/// 探针中和（只为揭示下一道门，**不是实现**）：`nil` 比较 → `false`；`.as(float)`
-/// 去掉；`storage.get(k)` → `""`；`storage.set(k, v)` → `.__noop = v`。
-fn neutralize_syntax(body: &str) -> String {
-    body.replace("snap == nil", "false")
-        .replace("snap.summary == nil", "false")
-        .replace(".as(float)", "")
-}
-
+/// 探针中和（只为揭示下一道门，**不是实现**）：`storage.get(k)` → `""`；
+/// `storage.set(k, v)` → `.__noop = v`。
 fn neutralize_storage(body: &str) -> String {
-    let mut out = neutralize_syntax(body);
+    let mut out = body.to_string();
     for key in [
         "sysmon.speed",
         "dash.speed",
@@ -511,53 +511,117 @@ fn package_store_diag(store_src: &str) -> String {
     )
 }
 
-/// 包面文法只被真实 `SysStore` 里的两类构造触发：`nil` 比较（`.Refresh` 守卫）与
-/// `.as(float)` 转换。`||`、比较、嵌套 if/else、`while`、列表索引、`storage.*`、
-/// 记录列表上的选择排序、f-string、记录字面量 push 都能解析——此前「handler 体被
-/// 文法拒」的归因过宽。
+/// 单独 store 单元（无消费者）的包编译诊断：语法通过的终点是「无消费者」。
+fn lone_store_diag(store_src: &str) -> String {
+    package_diag(&[unit("s", store_src)], "app::s")
+}
+
+/// `store S { model { cpu: float, label: str, n: int }, .Go -> <stmt> }`。
+fn store_with_arm(stmt: &str) -> String {
+    format!(
+        "store S {{\n    model {{\n        var cpu float = 0.0\n        var label str = \"\"\n        var n int = 0\n    }}\n\n    \
+         msg {{ Go }}\n\n    on {{\n        .Go -> {{\n            {stmt}\n        }}\n    }}\n}}\n"
+    )
+}
+
+/// `use s: S` 消费者：视图行 `view` + 按钮调 `store.Go()`。
+fn go_consumer(view: &str) -> String {
+    format!(
+        "use s: S\n\nwidget Main {{\n    msg {{ Go }}\n    view {{\n{view}        \
+         button \"go\" {{ onclick: .Go }}\n    }}\n    on {{\n        .Go -> {{ store.Go() }}\n    }}\n}}\n"
+    )
+}
+
+/// AGE **包面**文法已收 `nil` 字面量与 `.as(T)` 数值转换（PLAN-112，auto-lang
+/// `auto-source.at`）。此前这两类是真实 `SysStore` 仅有的语法红——`||`、比较、嵌套
+/// if/else、`while`、列表索引、`storage.*`、记录列表上的选择排序、f-string、记录
+/// 字面量 push 本就能解析。组件面两者仍拒（见 `…_float_cast_and_nil_compare_…`）。
 #[test]
-fn p112_av_gap_package_grammar_rejects_nil_and_float_cast() {
-    let probe = |stmt: &str| {
-        let src = format!(
-            "store S {{\n    model {{\n        var cpu float = 0.0\n        var label str = \"\"\n        var n int = 0\n    }}\n\n    \
-             msg {{ Go }}\n\n    on {{\n        .Go -> {{\n            {stmt}\n        }}\n    }}\n}}\n"
-        );
-        package_diag(&[unit("s", &src)], "app::s")
-    };
+fn p112_av_control_package_grammar_admits_nil_and_float_cast() {
     for (label, stmt) in [
         ("nil 比较", "if .cpu == nil { .cpu = 0.0 }"),
         ("成员 nil 比较", "if x.y == nil { .cpu = 0.0 }"),
+        ("nil || nil", "if x == nil || y == nil { .cpu = 0.0 }"),
         (".as(float)", "var f float = .n.as(float) / 10.0"),
+        (".as(int)", "var i int = .cpu.as(int)"),
+        (".as(f32)", "var f float = .n.as(f32) / 10.0"),
     ] {
-        expect_gap(label, &probe(stmt), &["source.syntax", "expected `fn`, found `store`"]);
-    }
-    // 对照：去掉这两个构造的同形语句可解析。
-    for (label, stmt) in [
-        ("bool 比较", "if .cpu < 0.0 || .label == \"\" { .cpu = 0.0 }"),
-        ("整型除以浮点", "var f float = .n / 10.0"),
-    ] {
-        // 单独的 store 单元没有消费者：语法通过的终点就是「无消费者」这条后续诊断。
-        let diag = probe(stmt);
+        let diag = lone_store_diag(&store_with_arm(stmt));
         assert!(
             !diag.contains("source.syntax") && diag.contains("no checked widget consumer"),
-            "{label}: 应通过语法，实际: {diag}"
+            "{label}: 应通过包面语法，实际: {diag}"
+        );
+    }
+    // `nil` 到共享 resolve 才被裁定：与非可空字段比较是类型红（`source.nil-op`），
+    // 不再是语法红。真实 `SysStore` 的 nil 比较落在后端调用返回值与可选记录字段上
+    // （门②/③之后）；本例只证字面量已入表达式原子。
+    let store = store_with_arm("if .cpu == nil {\n                .cpu = 0.0\n            }");
+    let diag = package_diag(
+        &[unit("main", &go_consumer("        text .store.n { }\n")), unit("s", &store)],
+        "app::main",
+    );
+    assert!(
+        !diag.contains("source.syntax") && diag.contains("source.nil-op"),
+        "nil 比较应过语法、停在 resolve 的可空性裁定，实际: {diag}"
+    );
+}
+
+/// 缺口：包面数值转换（`.as(T)` 与既有拼写 `.to(int)`）过语法、过 resolve，停在
+/// Atom bind——AGE 两面的 HIR 域是 TextRecord，其描述符没有 `expr.cast` 分支
+/// （numeric / aggregates / auto-language 描述符有）。用户书写的转换以内部错误
+/// （`source.internal`）浮出，而非类型化的 `source.unsupported`。
+#[test]
+fn p112_av_gap_package_numeric_cast_fails_at_atom_bind() {
+    for (label, stmt) in [
+        (".as(float)", "var t float = .n.as(float) / 10.0\n            .cpu = t"),
+        (".as(int)", "var i int = .cpu.as(int)"),
+        (".to(int)", "var i int = .cpu.to(int)"),
+    ] {
+        let diag = package_diag(
+            &[
+                unit("main", &go_consumer("        text .store.n { }\n")),
+                unit("s", &store_with_arm(stmt)),
+            ],
+            "app::main",
+        );
+        expect_gap(
+            label,
+            &diag,
+            &[
+                "generated Atom text failed to bind",
+                "no accepted case `expr.cast` in descriptor",
+            ],
         );
     }
 }
 
-/// 对照：真实 `SysStore` 只去掉 4 处（2 个 `nil` 比较、2 个 `.as(float)`）后，整个
-/// store（真实 model + 全部 21 个真实臂）在包面解析通过——停在「无消费者」。
+/// 缺口：包面视图显示 float 状态字段——字段读取处的隐式 `clone` 在本 profile 没有
+/// `f32` 实现。与 `.as(T)` 无关：同一消费者显示 int 字段通过（见上面的接受对照）。
 #[test]
-fn p112_av_control_real_store_parses_without_nil_and_float_cast() {
-    let (head, store) = real_store_source();
-    let src = format!(
-        "{head}\n{}",
-        assemble_store(&store, SYS_STORE_ALL_ARMS, neutralize_syntax)
+fn p112_av_gap_package_float_state_display_needs_clone() {
+    let diag = package_diag(
+        &[
+            unit("main", &go_consumer("        text .store.cpu { }\n")),
+            unit("s", &store_with_arm(".cpu = .cpu + 1.0")),
+        ],
+        "app::main",
     );
-    let diag = package_diag(&[unit("sys_store", &src)], "app::sys_store");
+    expect_gap(
+        "包面显示 float 状态字段",
+        &diag,
+        &["numeric receiver has no method `clone` in this profile"],
+    );
+}
+
+/// 对照：原样的真实 `SysStore`（真实 model + 全部 21 个真实臂，零中和）在包面解析
+/// 通过——停在「无消费者」。
+#[test]
+fn p112_av_control_real_store_parses_on_package_face() {
+    let (head, store) = real_store_source();
+    let diag = lone_store_diag(&format!("{head}\n{store}"));
     assert!(
         !diag.contains("source.syntax"),
-        "真实 SysStore 去掉 nil/.as(float) 后应解析通过，实际: {diag}"
+        "原样 SysStore 应通过包面语法，实际: {diag}"
     );
     assert_eq!(
         real_store_arms(&store).len(),
@@ -573,6 +637,7 @@ fn p112_av_control_real_store_parses_without_nil_and_float_cast() {
 #[test]
 fn p112_av_gap_package_store_gates_in_order() {
     let (head, store) = real_store_source();
+    let identity = |body: &str| body.to_string();
     let without = |excluded: &[&str], neutral: fn(&str) -> String| {
         let kept: Vec<&str> = SYS_STORE_ALL_ARMS
             .iter()
@@ -584,10 +649,10 @@ fn p112_av_gap_package_store_gates_in_order() {
             assemble_store(&store, &kept, neutral)
         )
     };
-    // ① 全部真实臂，仅中和语法。
+    // ① 全部真实臂，零中和。
     expect_gap(
         "门① storage",
-        &package_store_diag(&without(&[], neutralize_syntax)),
+        &package_store_diag(&without(&[], identity)),
         &["storage calls require the owning host"],
     );
     // ② 再中和 storage。
@@ -623,18 +688,24 @@ fn p112_av_gap_component_face_cross_unit_store_not_wired() {
 }
 
 /// 025 `app.at` 经 prep 投影后首阻断即 S1（prep 未把独立 store 单元内联进来）。
+/// 路径取真实 `app.at`（生产 `--source` 入口的语义）。
 #[test]
 fn p112_av_real_app_first_blocker_on_component_face() {
     let src = read("src/front/app.at");
+    let path = app_dir().join("src/front/app.at");
     expect_gap(
         "025 app.at（组件面）",
-        &component_face(&app_dir(), &src),
+        &component_face_at(&app_dir(), &src, &path.to_string_lossy()),
         &["cross-unit store loading is not wired yet (S1)"],
     );
 }
 
-/// AV 包面 / A2Vue 包面：025 六单元原样装配首阻断 = 消费者找不到 store 字段
-/// （store 单元因 `nil` 比较 / `.as(float)` 语法红而出不了 store，见上）。
+/// AV 包面 / A2Vue 包面：025 六单元**原样**装配（零中和）。AV 包面上 `SysStore`
+/// 过语法之后，消费者经 `use sys_store: SysStore` 把 store 内联，首阻断落在内联后的
+/// 第一道语义门（见 `p112_av_gap_package_store_gates_in_order`）。A2Vue 包面
+/// （`generate_package_sfc`）先走 routed 车道，车道对入口单元**单独**做组件面解析
+/// （`package_candidates`）——`app.at` 单独解析时 `use sys_store: SysStore` 不可见，
+/// 首阻断是 `model has no field \`store\``，轮不到包编译。
 #[test]
 fn p112_av_real_app_first_blocker_on_package_faces() {
     let units: Vec<PackageModuleInput> = [
@@ -653,11 +724,10 @@ fn p112_av_real_app_first_blocker_on_package_faces() {
         &NodeDesktopBridge::load_package(units.clone(), "app::main", 1)
             .err()
             .unwrap_or_default(),
-        &["model has no field `store`"],
+        &["storage calls require the owning host"],
     );
-    expect_gap(
-        "025 六单元（A2Vue 包面）",
-        &generate_package_sfc(&units, "app::main").err().unwrap_or_default(),
-        &["model has no field `store`"],
-    );
+    let a2vue = generate_package_sfc(&units, "app::main")
+        .err()
+            .unwrap_or_default();
+    expect_gap("025 六单元（A2Vue 包面）", &a2vue, &["model has no field `store`"]);
 }
