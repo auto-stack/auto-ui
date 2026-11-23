@@ -101,6 +101,8 @@ before the underlying view receives any unconsumed press. A queued double
 click can survive a selection redraw if it still identifies the same keyed
 item, instance and checked action.
 
-## Carousel in the Iced gallery
+## Carousel in the gallery
 
 A mounted Carousel keeps its own position. Previous and Next advance within its item range. A vertical track responds to vertical drags and keeps its position on a horizontal drag. Looping wraps at the bounds. Leaving the route releases the mounted state, and reopening the page restores its authored starting position.
+
+The generated Vue `/carousel` route uses the original gallery pages and authored item data. Dragging and arrow keys follow the declared axis. The loop option governs how the track moves at its bounds. At both wide and narrow widths, the viewport clips the track to its visible area. Leaving and reopening the route mounts a fresh Carousel at its authored starting position.
