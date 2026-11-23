@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-117
-status: execution_done
+status: executing
 feature_name: U05 Photo Gallery 与 Image Viewer 双端交付
 author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-23
 plan_revision: 1
-current_step: 4
+current_step: 1
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -79,15 +79,15 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 - [x] T-01 固定原项目、依赖与验收矩阵
   - work，AC-01，核 §1 现有源和 §6 原运行入口，输出逐行的源、权限、预期和实际阻断。
-- [x] T-02 接通本计划的具体运行接口
+- [ ] T-02 接通本计划的具体运行接口
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
-- [x] T-03 实跑 AV/Iced
+- [ ] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
 - [ ] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
 - [ ] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
-- [x] T-06 实跑 A2Vue
+- [ ] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
 - [ ] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
@@ -760,6 +760,32 @@ AutoUI `70021514f6fb1d7e3e42389b63383a8bf5bb6650`、AutoLang `1c15fdd4b9af765e3b
 - 规范待审稿 `scratch/r119-repair/spec-delta-candidate.md` SHA256 `549F9760F0784897BAA27E28937AB8507B22575B99C2B99EA04F6E3FD1CE2D95`，涵盖 HTTP 可恢复错误、029 目录和首扫重试以及 round 118 冻结的消费契约。AC-01 身份沿用原矩阵，AC-02/03 新反例已重放。T-04、T-05、T-07、T-08 待完成。
 - stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | base: AutoUI `c041fb6c` / AutoLang `f26245cc4` | code_commit: AutoUI `70021514` / AutoLang `1c15fdd4b` | task_ids: T-02,T-03,T-06 | evidence: round 119 | next: review/T-04
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 119 | from: work | to: review | status: execution_done | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `70021514` / AutoLang `1c15fdd4b` | next: review/T-04
+
+### 2026-11-23 goal review round 120 — T-04 目录切换失败复核
+
+在实施会话中重新从锁定提交、生产入口及原始收据建立判断。复核 AutoUI `70021514f6fb1d7e3e42389b63383a8bf5bb6650`、AutoLang `1c15fdd4b9af765e3bcd102e240c5aeb5c1f4277`，主线合流基面 `848d883c18d43b1ebcf61b9cbf3f389d18c9cd43` / `0486981556bd8d128c69ded9888319ac4a65fc02`，修复对照 `c041fb6c` / `f26245cc4`。两仓为 `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` 的 `plan-117-dev`，tracked 代码干净，既有 `.am/` 保留。AutoOS `cdb4883`、AutoWeb `26d085f`、AutoDown `45b642d`。本轮 029 原源 SHA256 `EDB66872F6001DDEFF85ADE757A73660B4597B820271A308EB58129A5F98D7B1`，Chrome 使用 round 119 的相同生成 App.vue 内容。
+
+**R117-AV-05（P2，T-02/T-03/T-06，AC-02/03）** 029 已展示目录 A 的照片后，如果目录 B 扫描失败，新目录错误和上一目录的数据一起提交。对照同一个原生照片后端的 `album & trips` 请求返回一张照片和 HTTP 200。复核只拦截原界面的首个目录 B 请求，正确编码的 `dir` 收到一次受控 HTTP 503。作者在 `.ReloadDir catch` 里明确清空 `.photos`、`.dirs` 后再运行 `.GalApply()`。
+
+- Iced 原窗口和受检侧栏动作 `WantSelect(Str("dir:album & trips"))` 提交 `dir=album & trips`，同时发布 `load_error`、`gal_error`，保留了根目录的 `total=2`、两项结果文案和根目录来源。原 `GoUp` 能恢复根目录及清除错误，窗口关闭、零宿主错误。探针 16.230 s，窗口退出 6，外层退出 1。 `gallery-iced.json` SHA256 `9028A625D2EB8F46538ED6B3CA519AFFD753C9D819CF4B2796740D9C42E6E49F`。
+- Chrome 正式产物先通过启动 503→200，再真实点击同一目录。失败响应之后仍能看到原来的两个图片标题、根目录树及两项结果，同时显示作者错误。等待空结果超时，外层 6.732 s、退出 1。 `browser-navigation.log` SHA256 `B42DF2B486212A99C31452785ABB27C512318A6D631AB782718E5AEAF628BE85`。
+- 根因定位在共享 CST 投影。`age-on-branch-stmt` 已准入 `age-view-assign-viewdata-stmt`，顶层 widget handler 也已有该节点的赋值投影。分支共用的 `project_on_stmt_inner` 缺同一 CST 臂，`project_on_stmts` 略过返回空的语句。独立最小输入从非空 typed list 开始。同一句 `.rows = []` 在顶层得到 `Assign(ArrayLit([]))`，在 `if` 和 `catch` 中只留下相邻的 marker 赋值。原 029 的投影中 `catch` 也只剩 `root_missing`、`load_error`、`gal_error`，生成 JS 中对应失败臂没有两个列表重置。探针 `branch-projection.at`、`branch-projection.rs` 及结果 `branch-projection.log` SHA256 `7CF3D85636722F7A679109737677C345D981A19F461CFC2205764B8D29363953`。
+- 关闭判据在两端原入口进入非空根目录、点击目录、一次合格 503 后核对目标目录只呈现作者错误和空结果，旧根图与旧目录项清除。使用原 `GoUp` 和再次点击检查 200 恢复与错误清除。保留首扫失败后恢复、特殊字符目录、无 provider、宿主拒绝和取消控制。共享投影检查覆盖顶层、分支、catch 以及采用同一投影的循环体，保留组件面既有惰性 view-data 合同及对应 SQLite 控制。新常备用例按原 10 秒门逐例计时。
+
+| 复核范围 | 本轮结果 |
+|---|---|
+| 029 Iced 首扫 503→200 | 1/1，13.751 s，退出 0。确认空结果、作者错误、两项恢复及关闭。收据 SHA256 `7AA93A1643D65A499C562D8B72B2B73E958436388982A6AEB265690FC7F1CF77`。 |
+| 029 已有列表后的目录 503 | Iced 16.230 s、Chrome 6.732 s，均重现 R117-AV-05。 |
+| 029 Vue 生成首项、语法 computed 条件块 | 1/1、1/1。Debug 执行 4.94 s、0.05 s，外层 5.028 s、0.163 s，原判据及成本门通过。 |
+| AutoLang HTTP、AGE 会话、错误传播 | 13/13、1/1、6/6。执行 0.26、0.10、0.07 s，外层 0.372、0.115、0.088 s。 |
+| CST 最小诊断与三份原 Iced 收据审计 | 诊断运行 0.128 s、链接 0.762 s，原始 029/031/Carousel 收据审计 3/3、0.132 s。 |
+
+本轮无新增常备测试。使用 round 119 的已准备 Debug 库、测试二进制和冷构建产物。独立探针做显式链接，发现、清理和资源等待未单计。复用上一轮的成功特殊字符、Unicode 和嵌套目录、031 授权/恢复、Carousel 物理交互及 Chart 已知基线记录。未执行阶段统一固定组回归。
+
+AC-01 通过。AC-02、AC-03 的旧反例已覆盖，R117-AV-05 的新状态控制失败。AC-04 返回修复，AC-05 待复核及交付。规范候选仍为 `scratch/r119-repair/spec-delta-candidate.md`（`549F9760…`），本轮核对 AutoUI viewport `A78467A7…`、widget `BFEF4DE2…`、029 SPEC `40C0C22C…`，AutoLang AGE `007E079A…`、event session `FC468DE3…`、media `F29678E8…`。候选中的首扫合同有运行证据，目录失败路径待修复后再核。完整复核原始记录位于 `D:/autostack/plan-artifacts/plan-117/scratch/r120-phase-review/`。
+
+- stage: review | review_scope: phase/T-04 | reviewer: current implementation-session context with independently selected post-load 503 and CST controls | plan_id: PLAN-117 | plan_revision: r1 | outcome: needs_fix | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | reviewed_commit: AutoUI `70021514` / AutoLang `1c15fdd4b` | findings: R117-AV-05 | pending_closeout_gates: T-04/T-05/T-07/T-08 and phase affected union | next: work/T-02、T-03、T-06
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 120 | from: review/T-04 | to: work | status: executing | outcome: needs_fix | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `70021514` / AutoLang `1c15fdd4b` | next: work/R117-AV-05
 
 ## 10. 待澄清事项
 
