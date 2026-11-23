@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-117
-status: execution_done
+status: executing
 feature_name: U05 Photo Gallery 与 Image Viewer 双端交付
 author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-24
 plan_revision: 1
-current_step: 4
+current_step: 5
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -83,7 +83,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
 - [x] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
-- [ ] T-04 独立复核 AV 阶段
+- [x] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
 - [ ] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
@@ -958,6 +958,26 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 
 - stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | base: AutoUI `848d883c` / AutoLang `048698155` | code_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | dependency_revisions: AutoOS `cdb4883` / AutoDown `45b642d` / AutoWeb `26d085f` | task_ids: T-02,T-03,T-06 | evidence: round 128–132 | next: review/T-04
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 132 | from: work/T-02 | to: review/T-04 | status: execution_done | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: review/T-04
+
+### 2026-11-24 goal review round 133 — T-04 AV 阶段复审通过
+
+在同一实施会话中，从当前代码、生产入口、原始收据和另选四个 AV 控制重建判断。AutoUI `8894c9ef3721b28669f859cbafc5722fe266b79f`，AutoLang `30780612c8733be45c196d68b67f4ed4946ce3e4`，基面分别为 `848d883c18d43b1ebcf61b9cbf3f389d18c9cd43`、`0486981556bd8d128c69ded9888319ac4a65fc02`。两仓 `plan-117-dev` 已提交，AutoUI 既有 `.am/` 仅本地留存。AutoOS `cdb4883812229576b1f21e6124cd900bfad7c630`、AutoDown `45b642dadcbd4fb71a8c7f2e6f09435faf7a65f5`、AutoWeb `26d085f7e54ea20c6997edf2dc23eef0cb57faf6`，实际 checkout 与收据一致。
+
+| 验收 | 阶段结论与证据 |
+|---|---|
+| AC-01 来源 | 通过。029、031 的 `app.at` 与 Carousel 原页 SHA256 分别为 `5E44166F…`、`D4F2340D…`、`F43F17C2…`，与 W1 候选及归档暂存相符。两份产品树的 65 个源文件、原画廊 148 个文件的逐项对照继续采用 round 130 的 `product-input-correspondence.json`。 |
+| AC-02 AV 产品与接口 | 通过。复核 029 的目录 503→200、首扫恢复、缺图第 486 帧 `OnError`、恢复第 701 帧 `OnLoaded`、回列表。031 原尺寸 320×240、1.25 倍缩放和 −40 px 平移、坏图格式控制及 Escape 和关闭撤销票据均有原入口证据。Carousel 原五组示例的翻页、轴向、循环、重入复位可从物理记录追到会话。五份产品记录合计八个会话正常关闭。首页的独立具名拒绝继续保留。 |
+| AC-03 A2Vue | 阶段保留。核对受检 SFC 入口和产品源对应，原冷建与 Chrome 收据仍见 round 128/130。完整 A2Vue 差额判断归 T-07。 |
+| AC-04 阶段复核 | 通过。同一会话复审。提交和修复代码与已验证字节相符，旧缺陷 R117-AV-01/02/05、R117-QA-03/04 的闭合凭据与当前变更范围核对，无阶段发现。 |
+| AC-05 落主与 W1 | 待 T-05。固定组门、可消费提交和正式 W1 行由合流阶段记录。 |
+
+- c359→30780612 仅收窄 `&&`/`||` 降级。由 AutoUI Iced `ace_package_bridge/live.rs`、Vue 的受检 SFC 入口追到 `resolve_age_package` 设置 `coll.age_package`，并核场景与事件入口设置 `elem_view_admission`。这些路径和原 Aggregates 路径保留原降级，`??` 未变。与原入口及运行输入的字节对照支持复用 c359 产品证据，其中执行提交仍标作 c359。A2X 问题用例的产物与合流基面逐字节一致，接受 round 132 的 4/4 与 AV 6/6 修复实测。Collections 的 HOST 段共享编解码条件及 AAC `LineText` 与 Rust tag 的对应也已核，测试门保留已经登记的基面失败及前置差异。
+- 独立选取 AV 模块函数调用、事件集合 `for` 读、场景内 try/for 投影和 `List<Note>` HOF 短路次数。从已准备、SHA256 `ACF1158C874F3B334904CCE550E6A9B58E2BE0EE453D90B81787EC33F089DA3F` 的 Debug conformance exe 执行精确选集，4/4，0.181 s 外层，退出 0，1,498 条过滤。准备复用 round 132，发现、清理及资源等待本次未单计。`scratch/r133-phase-review/av-focused.json` SHA256 `8668FA9B4C5CFB3D42FF8BCF8D4B4180C413F58B6A5BDE61B297C8A9340335D7`。本次未新增用例或重跑产品。复用 round 122 的逐例量测，原新增 AV、Core、A2X TS 的外层上限分别为 0.145、0.157、0.357 s，原 029 生产 SFC 测试 6.446 s，Carousel SFC 定向 0.244 s。语法/验收测试调用链及原准备边界未由本次修复新增。
+- 冻结规范增量 `scratch/r128-repaired-vue/spec-delta-candidate.md` SHA256 `9578F6DF5507453E7A97D02BBCA92191020CEE4A7002E9BDF46B79B32DECF26E`。AutoUI 现行 `docs/specs/ui/image-viewport.md` `840a77a7`、`docs/specs/runtime/ace-package-widgets.md` `772b8150`、029 项目 `SPEC.md` 基面 `8b610e1f`。AutoLang `docs/specs/ace-migration/m2-age.md` `5b2a8fd3`、`component-event-sessions.md` `fedf7256`、`docs/specs/auto-media-core/project.md` `550a4ed1`、W1 目标 `docs/specs/ace-migration/m2-autoui.md` `4977ffbd`。现有规范补齐受检语法、宿主与窗口资源合同，新增/退役集合为空，`GOAL-002` 保持。待合流将 AV 部分按实际执行结果落 Canonical Specs，A2Vue 部分待 T-07。
+- T-05 语言组冻结为 `stdlib auto-media-core ace-source ace-syntax ace-semantics ace-av ace-comptime ace-lowering ace-native ace-a2x ace-aac-syntax`，存档组配置 SHA256 `A560D21924CBEF243572962499FB7A0EFF661B1614767A469118EC3009DF8A5F`。AutoUI 冻结 round 123 的 11 目标，包括原 026 真窗及真实浏览器路径。已实跑归因的基面失败及 Python/AAC 准备条件见 round 126–132，阶段门须保留原用例身份和结果。核对时 PLAN-1054 准备 AAC1046、PLAN-1129 执行固定组，阶段并集尚未启动。
+
+- stage: review | review_scope: phase/T-04 | reviewer_identity/limitations: same implementation session, source-bound independent AV controls | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | reviewed_commit: AutoUI `8894c9ef3721b28669f859cbafc5722fe266b79f` / AutoLang `30780612c8733be45c196d68b67f4ed4946ce3e4` | base_commit: AutoUI `848d883c` / AutoLang `048698155` | dependency_revisions: AutoOS `cdb4883` / AutoDown `45b642d` / AutoWeb `26d085f` | spec_inputs: round 133 | acceptance_results: AC-01/02/04 pass for AV, AC-03 final pending, AC-05 pending | pending_closeout_gates: T-05 fixed groups and AV/W1, T-07, T-08 | findings: none open in AV phase | evidence: round 128,130,132,133 | next: merge/T-05
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 133 | from: review/T-04 | to: merge/T-05 | status: executing | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: merge/T-05 阶段固定组和 W1 收据
 
 ## 10. 待澄清事项
 
