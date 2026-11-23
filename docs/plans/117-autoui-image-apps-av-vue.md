@@ -436,6 +436,17 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 029 收藏试稿复用现有桌面文本准备做 A2Vue 诊断，越过文本方法校验，在 `auto.http.get-json.v1` 被计算面拒绝（10.696 s）。诊断副本用同型的 `json.parse("{}")` 替换 HTTP 表达式后，首拒改为 `auto.json.parse.v1`（16.982 s）。此对照确认 HTTP 之外，Vue 还需 JSON 值运算。两份均无 SFC 产物，也未替换原项目的扫描。 `scratch/r88-linked-vue-prepared.log`、`scratch/r88-linked-vue-compute.log`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 88 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `3ce49b876` / auto-ui `bcbd4be7` | next: work/T-02–T-03 / T-06。
 
+### 2026-11-23 goal work round 89 — 真实扫描到达 Iced 包会话
+
+- AutoLang `0f42de25c` 按保留的受检指令决定是否需要 HTTP 工作线程。AutoUI `999765a9` 接入按挂载代次提交的 Iced HTTP 工作线程。等待期间使用上次已发布帧，待处理视图事件按原有帧身份检查，再由当前代次接收结果。相对 URI 复用已有宿主基址解析。
+- Iced 定向回归以真实本地 TCP 请求核首次派发不阻塞、旧代关闭后响应不发布、新代中文响应提交一次。最终 Debug 准备 84.315 s，定向 1/1（0.296 s）。根及子组件计时器回归各 1/1（3.384 s、3.862 s）。初版用例未选中受检挂载入口，改用带禁用计时器的普通受检入口后通过。 `av/r89-http-case-r4.log` SHA256 `E58CE7E304B5C8230FCCCF1BA595D5C77D034C8FD84C43613D51A7D311FAC93C`。
+- 以原 029 后端 API 源和 pac 在隔离目录用 `auto service --server rust -B 34429` 启动原 Rust 服务，冷编译 8m32s。按原产品探针放入两张根图与一张子目录图。真实扫描返回 HTTP 200、两条目录直辖图片、一个子目录、`root_missing=false`。 `scratch/r89-photo-service/scan-root.json` SHA256 `30224323EA92CC4EF24990D57A77024CC1F6CE731226822424602B601847889B`。
+- 029 用原入口和 round 86 收藏试稿运行实际宿主（最终生产 Debug 准备 105.675 s），通过加载、绘制 35 帧并由宿主脚本关闭（30.312 s，退出 0）。首扫的受检事件仍因 `ObjectMissing` 拒绝，源跨度 177376–177383，相同错误 11 次、无派发提交。退出码只证明帧数与脚本结束。同入口宿主轮询探针在打开后 0.859 s 复现，帧版本仍为 1。 `av/r89-029-window-r3.json` SHA256 `B60BB5115AA14A3B8519350A848E03498BE3F6D5E882615299961C0E5C27D239`。
+- 保留真实 HTTP 和扫描转换，只将首扫的 `.GalApply()` 换成诊断性计数后，受检提交得到 `total=2`、`root_missing=false`、`load_error=""`，打开后 1.566 s 提交。这把拒绝定位在查询发布或其视图更新，首扫对照只作为定位证据。 `scratch/r89-029-scan-only.log` SHA256 `A91143B19094C0EAC527EE5C2A78149BDDEA82BB8D2F00DF3D7421CB2D303D85`。
+- 将扫描局部列表显式声明为 `List` 的对照仍在同一调用上触发 `ObjectMissing`，跨度随增加的十个源码字节平移。省略分类发布的对照更早触发 `no local named self`，未能判定分类视图。继续沿原入口解析运行时函数和字段访问的跨度。两个诊断变体均在 scratch，原收藏试稿仍需整条查询通过后复验。 `scratch/r89-029-typed-scan-lists.log` SHA256 `6BAF8BA7698FB3D9ADFDB28353F6D1E9E3974B477EE8F2DC089CC9A5741FF604`。
+- 收藏恢复独立 AV 探针通过现有 `std.json.json_is_valid` 与数组首标记核空值、损坏 JSON、非数组对象和有效中文记录（0.277 s）。直接使用 `json_kind_at(value, "")` 的对照没有恢复有效数组。此校验尚未进原项目。 `scratch/r90-preference-validation-r2.log` SHA256 `04D062019F4630B6C4B367BDE1A3D1F7AFB0666ABD23DCC296512661B13B3E81`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 89 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `999765a9` | next: work/T-02–T-03 / T-06。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
