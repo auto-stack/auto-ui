@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-24
 plan_revision: 1
-current_step: 1
+current_step: 3
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -81,13 +81,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - work，AC-01，核 §1 现有源和 §6 原运行入口，输出逐行的源、权限、预期和实际阻断。
 - [ ] T-02 接通本计划的具体运行接口
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
-- [ ] T-03 实跑 AV/Iced
+- [x] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
 - [ ] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
 - [ ] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
-- [ ] T-06 实跑 A2Vue
+- [x] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
 - [ ] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
@@ -924,6 +924,19 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - 00:01:50 复核 PLAN-1129 PID `1263020` 仍在固定组准备，子进程已从 ABI、语义工具切换至 `ace-a2x-worker`（Cargo PID `85960`）。原产品补验 PID `141580` 与定向回归 PID `168336` 均在等该测试时段。无新用例执行或终态，本轮未修改实施提交、验收或已冻结证据。
 
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 129 | from: work/T-02,T-03,T-06 | to: work/T-02,T-03,T-06 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | next: 核查原产品及定向复跑的在途结果
+
+### 2026-11-24 goal work round 130 — 原产品缺图与 Carousel 双端验收
+
+- 复查本轮和 round 128 的实际冷建输入。029、031 及六个消费包的 65 个源文件在两份暂存树均与 AutoUI `8894c9ef3721b28669f859cbafc5722fe266b79f` 的 Git blob 逐字节相同。031 的坏图与 EXIF 正例也逐件对齐。原 `widgets-gallery` 148 个归档文件与 AutoOS `cdb4883812229576b1f21e6124cd900bfad7c630` 一致。消费 AutoLang `c3593fe1248419acc3ac071204136e41776b40bb`、AutoDown `45b642dadcbd4fb71a8c7f2e6f09435faf7a65f5`、AutoWeb `26d085f7e54ea20c6997edf2dc23eef0cb57faf6`。逐项对照 `scratch/r123-phase-gate/r129-failure-replay/product-input-correspondence.json` SHA256 `30FDE369C396682C31425160F8492D1336440A831019678F8ADBBE2AE46A5826`。
+- Windows 等待时段 583.368 s，029 与 Carousel Iced 观察件 Debug 链接分别 17.952、5.578 s。029 同一原图移出获 `OnError`（第 486 帧），放回获 `OnLoaded`（第 701 帧），第 890 帧回列表。窗口和原生后端均退出 0，零宿主错误，四次解码、一次预期图像错误，fixture 已恢复，会话正常关闭。总用时 34.799 s，`scratch/r128-original-media/gallery-iced.json` SHA256 `7E96B0989F0713AD131B1BECBE9E6ABF4C763EFBB95D8EC874DAFE70C36A7A2F`。Chrome 同一原图 200→404→200，恢复后重新解码为 64×48，另核越界路径 400、返回根目录恢复、后端重启后照片和缩略图可取。2.970 s、退出 0，`gallery-missing-browser.log` SHA256 `7EA1B1696A30B17017502B1E678202D0DC20ACEC689AF494910296412A112DBA`。
+- 原 Iced 画廊从侧栏实际打开 `/carousel`。Basic 1→2、Sizes 1/2/3→2/3/4、Spacing 1/2→2/3，Options 首张向前循环再返回。Orientation 在轨道内向上拖动 1/2→2/3、向下恢复，横拖时仍为 1/2。经 `/card` 返回后重新挂载，Basic、Sizes、Spacing 恢复初始位置。197.065 s、9,669 帧、退出 0，四个会话均关闭，零宿主错误。原首页 `/` 仍报 `source.syntax: expected fn, found widget`，与 round 117 的已知页边界一致。目标页及 Card 对照的三条跳转均成功。`physical/carousel-iced.json`、`physical/carousel-iced.log` SHA256 分别为 `E1DDC3BAA2203BFA6E1F55D7CF48FC0C9C7705B578CC4089EC6E032873222081`、`5D84911CE4FC239C846C21C669841E5B03EAB006287DAF4D6BD2EE29F4CA1F36`。
+- 原 Carousel `auto build --render vue` 冷建 150.523 s，退出 0。Chrome 直接打开 `/carousel`，实点、拖动、宽及窄视口、间距、纵向键盘、循环和重入复位全部通过，5.881 s、退出 0，浏览器关闭。页脚本错误和测试记录的失败响应均为空，原控制台另有一条资源 404。`carousel-vue-browser.log` 及生成 `src/pages/carousel.vue` SHA256 分别为 `5F6D9EB5318EC0DB0B69A742881A8E738D6B6FEF07A2EEE09FA69D7292D939F9`、`532F99DF5A4E3347807294A226C28C8B30F36CC80D591887775BFD3388942952`。
+- 结合 round 128 的 029 目录与 031 几何、格式和资源行为，当前提交的 T-03、T-06 实跑收齐。发现和清理未在本产品回放单计。T-02 的能力兼容回归和绑定当前提交的阶段复审仍待完成。
+- Core/AV 精确复放等待 839.383 s，Debug 准备 23.719 s、退出 0。Core 6/11，余 5 条 `verify.double-move`。AV 列表发现无缺席。单进程直跑未继承 Cargo 的 16 MiB Rust 线程栈，在一条文件系统用例中止（42.470 s，`STATUS_STACK_OVERFLOW`），先得到 146 条通过与 12 条失败。读取现行仓库栈值，以同一 exe 隔离补跑 24 条，12 条通过含该文件系统用例。计入 AV 两个 lib 目标，AV 合计 161/174、Core/AV 合计 167/185。剩余 18 条的测试身份与 round 129 冻结的 PLAN-1092 登记集合完全相同。合流基面由归档验证提交线性继承，当前 AutoLang 主线 `ebfde0685` 比合流基面 `048698155` 仅多一份无代码变更的计划记录。阶段门继续保留全部 18 条原失败计数。原始 `r129-failure-replay/results.json` 和 `r130-av-isolated/results.json` SHA256 分别为 `EBD18595B61D9244DF7304328238EF0E2D961FBB577A333ED3165EFAF5790A94`、`A6FE9FCE3528A85F0D88C0FF46FD5F953FA353DF2FD1178365AF7763DECCBD96`，均位于 `scratch/r123-phase-gate/`。
+- `cargo t ace-native ace-a2x --prepare-only --debug-tools` 在测试机空闲后开始；使用本计划短临时路径，并确认 `A2PY_PYTHON` 能导入 NumPy 2.5.1、PyTorch 2.14.0+cpu。准备和执行分别记录在 `scratch/r123-phase-gate/r130-native-a2x/`。编排 `run-native-a2x-replay.ps1` SHA256 `F6632D11B25BB75F0DEED738297BBFC2CE60A4B78F89D6464E2C0B14341A5C8E`，实测终态待收。
+
+- stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | code_commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | task_ids: T-03,T-06 | evidence: round 128,130 | next: T-02 剩余兼容回归归因
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 130 | from: work/T-02,T-03,T-06 | to: work/T-02 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | next: 收齐 Core/AV 回放及 Native/A2X 差额，补当前提交的阶段复审
 
 ## 10. 待澄清事项
 
