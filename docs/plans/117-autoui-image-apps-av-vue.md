@@ -454,6 +454,13 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 用真正 Rust 后端复跑 029 原入口和收藏试稿。窗口绘制 12 帧，完整首扫提交 `total=2`，状态文案为“2 项内容 · 全部 · 第 1 页”，无运行时错误，宿主脚本关闭（23.131 s，退出 0）。同一后端的原图和缩略图均返回 HTTP 200，原图 SHA256 与冻结夹具一致。收藏恢复和查看器的交互证据待接续。 `av/r90-tree-shape-window.json` SHA256 `A6EA12D3F47A0D396D8582BF089C67F5D200DEC4D40F13FAAD4803B61B5DACC5`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 90 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `25f20411` | next: work/T-02–T-03 / T-06。
 
+### 2026-11-23 goal work round 91 — 原 029 恢复收藏后执行首扫
+
+- AutoUI `36c66449` 将原 `photo-gallery.favs` 键接入受检宿主偏好绑定。首个 Iced 计时事件在恢复偏好后启动原目录扫描。收藏恢复只解析语法有效的数组，保留已有收藏记录的序列化格式。受检包准备保留显式 `std.json` 导入，以复用现有校验。最终生产 Debug 准备 96.222 s。 `av/r91-gallery-window-build.log`。
+- 用原 029 后端和干净生产二进制打开实际 Iced 窗口，隔离偏好含损坏的 `[broken`。窗口在空收藏下完成原首扫，提交 `total=2`，绘制 42 帧，无运行时错误，脚本关闭（48.480 s，退出 0）。 `av/r91-restore-solo.json` SHA256 `664B2A8AAC786C97E1266136370455739CA160F03B4725722A196DCF9893AA83`。
+- 同一原入口的宿主探针也完成无偏好文件的首扫（24.682 s），以及含一条真实图片记录的偏好恢复和首扫（27.582 s）。有效收藏在首扫前后保持原记录。后一条探针随后调用当前帧的 `onclick` 照片选择回调，宿主提交了 `ItemInput`，当时根组件的 `selection` 仍为空，探针退出 101。查看器打开尚待验证。 `scratch/r91-gallery-fresh.log` SHA256 `0B45C339C9BA026CAC8A7AABC93950EA0DF9EA7E6F9A42585BB75A8FEAA05985`，`scratch/r91-gallery-callbacks-r3.log` SHA256 `8C3D303BD9E994155AAA2C824DD071101C00F0DDDDB2657081CCDB4230AEBCC0`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 91 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `36c66449` | next: work/T-02–T-03 / T-06。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
