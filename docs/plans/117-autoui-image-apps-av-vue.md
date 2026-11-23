@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-117
-status: executing
+status: execution_done
 feature_name: U05 Photo Gallery 与 Image Viewer 双端交付
 author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-23
 plan_revision: 1
-current_step: 1
+current_step: 4
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -79,15 +79,15 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 - [x] T-01 固定原项目、依赖与验收矩阵
   - work，AC-01，核 §1 现有源和 §6 原运行入口，输出逐行的源、权限、预期和实际阻断。
-- [ ] T-02 接通本计划的具体运行接口
+- [x] T-02 接通本计划的具体运行接口
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
-- [ ] T-03 实跑 AV/Iced
+- [x] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
 - [ ] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
 - [ ] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
-- [ ] T-06 实跑 A2Vue
+- [x] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
 - [ ] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
@@ -735,6 +735,31 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - Spec 候选冻结于 `scratch/r118-av-review/spec-delta-candidate.md`，SHA256 `BAFA74A15F38FCB36671E753ADE7FAD98EF1935CE8A0DB9B30BFCA8B4BCC929A`。AutoUI 比对 `docs/specs/ui/image-viewport.md`（`A78467A7…`）、`docs/specs/runtime/ace-package-widgets.md`（`BFEF4DE2…`），AutoLang 比对 `docs/specs/ace-migration/m2-age.md`（`007E079A…`）、`docs/specs/ace-migration/component-event-sessions.md`（`FC468DE3…`）、`docs/specs/auto-media-core/project.md`（`F29678E8…`）。029 目录和失败态改正后再验证并更新适用条文，规范文件本轮未写入。
 - stage: review | review_scope: phase/T-04 | reviewer: current implementation-session context, reviewed from frozen commits and raw controls | plan_id: PLAN-117 | plan_revision: r1 | reviewed_commit: AutoUI `c041fb6c` / AutoLang `f26245cc4` | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | outcome: needs_fix | findings: R117-AV-01, R117-AV-02, R117-QA-03, R117-QA-04 | pending_closeout_gates: T-04/T-05/T-07/T-08 and phase affected union | next: work/T-02、T-03、T-06
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 118 | from: review/T-04 | to: work | status: executing | outcome: needs_fix | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `c041fb6c` / AutoLang `f26245cc4` | next: work/T-02、T-03、T-06，按反例修复后重提受影响复核。
+
+### 2026-11-23 goal work round 119 — 029 目录与首扫恢复
+
+AutoUI `70021514f6fb1d7e3e42389b63383a8bf5bb6650`、AutoLang `1c15fdd4b9af765e3bcd102e240c5aeb5c1f4277`。沿用原 029、031、Carousel 入口和 round 117 输入身份。AutoOS `cdb4883`、AutoWeb `26d085f`、AutoDown `45b642d`。PLAN-118 拆出的 prep 补丁在 AutoUI 主线提交 `3f4f9b3f`，生产内容等同 `7c7ef158`。验证探针 `0cc47f5d` 仍在其验证分支。
+
+- **R117-AV-01** 029 将目录作为一个 UTF-8 百分号编码的查询值发送。Iced 真窗点击 `album & trips` 与 `旅行 é 😀 + #% &` 后，代理收到完整 `dir`、唯一查询键、HTTP 200，原组件各显示一项。Chrome 经正式冷构建验证同两目录、返回根目录和嵌套 `child +`，逐项核实际图片标题与完整相对路径。编码的越界请求返回 400。
+- **R117-AV-02** AutoLang 将已发起请求的失败投递至受检 `Invoke` 的失败边。缺 provider、宿主拒绝、取消、无效 JSON 保留各自的具名终态。029 每 250 ms 调度首扫，首次受控 503 发布空列表及 `load_error`、`gal_error`，恢复后提交两项并清空错误。最终 Iced 收据记录一次注入、零宿主派发错误和会话关闭。Chrome 看到了作者文案，随后检查同一个页面恢复为两项。
+- **R117-QA-03** Vue 的已识别受检入口直接编译 widget runtime，跳过场景编译和旧入口的 v-model 预扫。AutoLang 为同一个模块复用类型分类，并去掉结构校验的重复调用。保持原 gallery 项目入口、生成器函数、收藏持久化与路由断言。两次单例 Debug 运行分别为 6.36 s 与 6.44 s，外层 6.391 s 与 6.463 s。最终 exe SHA256 `F01731BA83C5AD15ED280DEDDBA34008E690CF54569A304784476EE0D6C4B9B3`。
+- **R117-QA-04** 三份探索模块移入 `scratch/r119-repair/syntax-diagnostics/`。常备语法增加条件 computed 块的自包含正反断言，包面自由调用用例同步检查受检效果和未声明调用的具名拒绝。现有 HTTP 会话用例补齐 503、成功重试、宿主拒绝与取消的提交顺序。
+
+| Debug 检查范围 | 结果与执行耗时 |
+|---|---|
+| AutoLang syntax conformance | 48/48，2.33 s。新增 computed 条件块用例 0.05 s。 |
+| AutoLang ace-core lib | 96 通过，1 条原有忽略，4.63 s。更新的包面发送/自由调用用例 0.08 s。 |
+| AutoLang HTTP、AGE 包面 conformance | 13/13 和 51/51，0.11 s 和 0.82 s。补齐失败控制的会话用例 0.09 s。 |
+| AutoUI Vue 项目入口 | 3/3，8.37 s。029 单例见 QA-03。 |
+| AutoUI 视口、查看器后端与包 SFC | 1/1、4/4、20/21，执行 1.39 s、3.53 s、0.52 s。唯一失败是 round 57 已登记的 Chart 条件样式列表 `source.age.view-list`。旧二进制和本轮均复现，且该分支在包解析时返回。 |
+| 029 原项目冷构建与真实操作 | Vue 冷构建 67.65 s，含依赖安装与构建。Chrome 回放 1.95 s。Iced 两个目录为 22.278/22.574 s，失败恢复为 23.021 s，含开窗和关闭。 |
+
+最终 Vue 测试二进制准备 54.12 s，AV 测试二进制准备 18.71 s，Iced 探针库准备 65 s 后链接 6.86 s。工作阶段使用编译后的 Debug 逐组及逐例断言。未单计资源等待，统一固定组回归归交付阶段。未受影响的 031 与 Carousel 原产品操作收据沿用 round 117–118，本轮复验其视口、私有授权与相关 SFC。
+
+- 收据目录为 `D:/autostack/plan-artifacts/plan-117/scratch/r119-repair/` 和 `scratch/r119-native-final/`。Chrome `029-browser-final-replay.log` SHA256 `EAF1E59193B72F0AD4379A8679EC1B21E66FD2F4FDB38FFE12BA2CAD4474A4B3`。Iced 普通、Unicode 和失败恢复 JSON 分别为 `D2111B47A9E3E092693381143E61496982BA0164176CA8FF46838266160E25BE`、`770271BE7A7B6CBF2FCEEA2DECAF571B66F88D2770503B4181077380D8E6B68D`、`E1464E93531FF0478A9A1B57122AACCDA0C9022280677D92372B912C11D954F4`。新旧当轮正式 Vue 生成 `App.vue` 字节一致，SHA256 `26EB41E09DEC9D2C30D00E368192F8A17E0F3761AEC6F6835B7DEB1FAED1BA76`。
+- 规范待审稿 `scratch/r119-repair/spec-delta-candidate.md` SHA256 `549F9760F0784897BAA27E28937AB8507B22575B99C2B99EA04F6E3FD1CE2D95`，涵盖 HTTP 可恢复错误、029 目录和首扫重试以及 round 118 冻结的消费契约。AC-01 身份沿用原矩阵，AC-02/03 新反例已重放。T-04、T-05、T-07、T-08 待完成。
+- stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | base: AutoUI `c041fb6c` / AutoLang `f26245cc4` | code_commit: AutoUI `70021514` / AutoLang `1c15fdd4b` | task_ids: T-02,T-03,T-06 | evidence: round 119 | next: review/T-04
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 119 | from: work | to: review | status: execution_done | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `70021514` / AutoLang `1c15fdd4b` | next: review/T-04
 
 ## 10. 待澄清事项
 
