@@ -352,6 +352,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 029 最终生产 Debug 准备 30.782 s，越过分页，仍在 admission 阶段退出 4（2.482 s）。`tree_view::tree_view:110:62` 对上 `.WantToggle(r.id)`，受检消息实参在动态 ID 上生成了 `.len()` 验证。`av/r71-029-window.log` SHA256 `3A71ADA9A8518D586839D4040DC2EEC7AF1DA893CA047275FCDABBB550673248`。原 029 后端相对图像 URI 待接既有 HTTP 来源，真窗浏览、嵌入和缺图恢复仍未验收。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 71 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `2d2ffbd8a` / auto-ui `25aeb019` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work rounds 72–73 — TreeView 事件与遍历
+
+- AutoLang `b509a6d95` 按受检消息签名在校验和视图求值时读取动态文本实参。AV 核从动态记录派出中文 ID `目录`，并拒绝以整数冒充的动态 ID。Debug 最终准备 6.048 s，定向 1/1（0.176 s），包 AV 44/44（0.828 s），发现和清理未单计。`av/r72-text-event-case-r3.log` SHA256 `4EFEFEBB4D3245799F124F67D645FC59B7DA3B61D5CB19196887F4720330D8DD`。
+- 029 生产 Debug 准备 40.517 s，越过 `.WantToggle(r.id)` 后在 admission 阶段退出 4（2.511 s）。首拒为 `tree_view::tree_view_util:50:9` 对动态列表调用 `.pop()` 落到仅收整数的标准库接口。`av/r72-029-window.log` SHA256 `5ACF457CA3B37A140B5E3B0E70BEED0233EB3976678C842EB10A7B0BC69D0777`。
+- AutoUI `9c4dcae7` 用现成的带索引移除取得遍历栈的栈顶。在显式旧 VM 入口以相同输入运行原包工具函数，对照核总节点 4、可达 3、行序、可见及结构父节点、重复 ID，前后输出一致（0.134 s / 0.384 s）。`scratch/r73-tree-stack-vm-base.log`、`scratch/r73-tree-stack-vm-r2.log`。Windows CLI 默认 ACE 脚本道先具名拒旧 `while`，该结果保留于 `scratch/r73-tree-stack-vm.log`。
+- 029 使用 round 72 生产二进制加载当前依赖，越过 `.pop()` 后仍在 admission 阶段退出 4（2.493 s）。首拒在 `tree_view::tree_view_util:99:23` 对动态 ID 调 `.replace()`。恢复点为沿现有文本合同接入去重键转义，保留 TreeView 的 Unicode 和大树性能约束。`av/r73-029-window.log` SHA256 `7E7705B16C63980956FB4E58ADD3BFD4B27AD18067D9868E4BB0E78E30DD8F09`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 73 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `b509a6d95` / auto-ui `9c4dcae7` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
