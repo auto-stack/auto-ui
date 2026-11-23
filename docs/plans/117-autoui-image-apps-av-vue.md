@@ -430,6 +430,12 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 已交 `std.json.json_is_valid` 可用于接续核收藏恢复。无效偏好需在解析之前验证，现有 JSON 宿主 I/O 错误不会进入客体 catch。恢复试稿仍在 scratch，结合 HTTP 接缝后复验。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 87 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `4bfd3b214` / auto-ui `bcbd4be7` | next: work/T-02–T-03 / T-06。
 
+### 2026-11-23 goal work round 88 — 受检组件 HTTP 挂起与 Vue 效应定位
+
+- AutoLang `3ce49b876` 让受检包会话的宿主工作线程复用 PLAN-108 挂起、轮询和恢复执行入口。提供器和取消标志随一次工作线程操作注入。定向回归核实际挂起两次后收到中文 JSON、只启动一次请求、取消回滚，以及退出注入作用域后仍具名拒绝无提供器请求。Debug 准备 19.120 s，定向用例 1/1（0.349 s），AGE 包 49/49（0.858 s），PLAN-108 HTTP 13/13（0.517 s）。`av/r88-worker-case.log` SHA256 `08C3811140C447ED7106039CE5D44A9E6DE701DE0C862D663223CF9DEB3B3F`。
+- 029 收藏试稿复用现有桌面文本准备做 A2Vue 诊断，越过文本方法校验，在 `auto.http.get-json.v1` 被计算面拒绝（10.696 s）。诊断副本用同型的 `json.parse("{}")` 替换 HTTP 表达式后，首拒改为 `auto.json.parse.v1`（16.982 s）。此对照确认 HTTP 之外，Vue 还需 JSON 值运算。两份均无 SFC 产物，也未替换原项目的扫描。 `scratch/r88-linked-vue-prepared.log`、`scratch/r88-linked-vue-compute.log`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 88 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `3ce49b876` / auto-ui `bcbd4be7` | next: work/T-02–T-03 / T-06。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
