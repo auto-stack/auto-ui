@@ -401,6 +401,13 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 029 生产 Debug 准备 61.387 s，原入口越过错误位置校验，10.999 s 退出 4。首拒为相同处理器内的 `mir.text-display`，跨度 21091–21105。恢复点为动态记录标量的文本显示准入，仍无成功窗口收据。`av/r81-029-window.log` SHA256 `B2695C46570A59F3F0B67D56393E3C85D624ECF291E911AB173F66A0730CBCF4`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 81 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `1739516ef` / auto-ui `10c6431a` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work rounds 82–83 — 动态标量显示与分页所有权
+
+- AutoLang `4bfd3b214` 让启用了受检普通语言值的实时 AGE 包复用现有动态标量文本指令。定向用例先复现 `mir.text-display`，修复后经实际挂载和事件派发显示 `20261123/未知`。Debug 准备 8.830 s，定向用例 1/1（0.104 s），包 AV 48/48（0.413 s），文本状态 8/8（0.305 s）。旧 `dynamic_objects_964` 组 7/14，七条失败与改动前 r81 广跑日志的同名失败一致，均在源码绑定阶段。 `av/r82-av-case.log` SHA256 `40909C026949FC6D88B85E35AFFFD56B3A352EAAB69DEEB3876FB7D9C6711A2C`。
+- 029 生产 Debug 准备 48.398 s，原入口越过动态显示校验，10.947 s 退出 4，`mir.use-after-move` 指向发布后继续用于分页的 `vlist`。 `av/r82-029-window.log` SHA256 `EB40173E073239169CA00234E0B6DEEBA3465F13380CAC411EC78CCC54D1DA0C`。
+- AutoUI `1ad8a8cd` 先从排序后的列表生成当前页，再把完整列表移入模型并公布总数。原入口使用同一生产二进制越过分页列表校验，11.414 s 退出 4。首拒为 `mir.use-after-move`，处理器返回模型时聚合读取已移出的 `__age_s_0_photos`。恢复点为保留原目录和收藏模型的所有权，完成列表来源切换的定向验证。 `av/r83-029-window.log` SHA256 `6BC99328E6C2A4CA46E1D16D6752F075BCD33D2F1BC3C1E4D797E68CAB9B90BB`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 83 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `4bfd3b214` / auto-ui `1ad8a8cd` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
