@@ -611,6 +611,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - `cargo test --locked -p auto-lang-core --lib file_session::tests::` 6/6 通过（38.888 s），`cargo test --locked -p auto-media-core --lib` 56/56 通过（32.940 s）。`core-tests.log` SHA256 `E9D8808A17E4D9736312A58B4ECBD034AA7835401C1165947A9F2938C58EC400`，`media-tests.log` SHA256 `72DA2705A44D383E9E5209423CD4B65F72BADE28AF9ECEDB249F0BEA20599AA3`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 109 | from: work/T-02 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `476005a925` / auto-ui `ce8f99d100` | next: work/T-02–T-06 接入 031 受检前端 `back.api` 调用及宿主授予路径，验证实际 Iced 与浏览器的图像、缩放、平移、坏图恢复和关闭。
 
+2026-11-23 T-02 / T-06 续（round 110）：受检 Vue 可调用 031 私有后端的 GET 与 JSON POST。
+
+- AutoLang `c3e3bc7624` 让已受检的 `Http.post_json` 参与组件包面处理器的挂起与恢复，保留其文本结果类型。AutoUI `de16576656` 在原同源、限长与取消路径上提交 JSON POST，保留既有 GET 及其动态 JSON 结果语义。
+- 真浏览器测试发现 round 109 媒体代理重复发送 `Content-Length`，Node HTTP 解析器报 `HPE_UNEXPECTED_CONTENT_LENGTH`（`scratch/r110-viewer-post/chrome-parser-baseline.log` SHA256 `11695E8A25EF0504B17F761E963110B683E162B9C086A9C4E6B921911A969ACA`）。本轮修正媒体响应组装，GET 只有一个实际长度，HEAD 保留声明长度和空体，私有响应只发 `Cache-Control: no-store`。
+- 生产 `generate_linked_front_sfc` 生成独立受检 `viewer_http.at` 夹具，用 Vite 和 Chrome 驱动原 031 `src/back/api.at` 与已授权的私有 VM 后端。实际验证未授权拒绝、中文文件名的 JSON POST、GET 读取原媒体 URI、解码 320×240、关闭后旧地址 404、503 可捕获及卸载取消挂起的 POST（Chrome 1.677 s）。重生成原 029 并复跑 Chrome 的 GET、旧请求取消、503 恢复和卸载（82.228 s）。`chrome.log` SHA256 `832418479EDE968887A775A5AE0203EB42CB5FEB9C65956D285583CDF4E665EC`，`gallery-chrome.log` SHA256 `D36DE434BF9E89F9A7E20A63407496BD60BFAB53D25557362CE2B49769ABE228`。
+- `cargo test -p ace-a2x-core -p ace-a2x-ts --locked` 45/45（27.972 s）。`cargo test --locked -p auto-ui-runtime --features ace-bridge --test plan117_viewer_backend --test plan114_file_session` 5/5（73.240 s）。031 原前端当前仍具名拒绝 `source.module-missing: unknown module back.api`（0.831 s，退出 101，无 SFC）。`script-tests.log` SHA256 `B1A8B6CDC8FA9EBD6B7E4A60E0AD92C54E1DD549D452D66ACC8D2773281DF13A`，`consumer.stdout` SHA256 `B6F2421823BB79229785848F3D9E1C1915A3A90744B5C2EEBEEF4D273B1D6`，`viewer-original-admission.log` SHA256 `85C2529E89A669FB480FD77B3472244434A8EC76CAD82149AFC10E90FE175050`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 110 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `c3e3bc7624` / auto-ui `de16576656` | next: work/T-02–T-06 按原端点声明接 031 的 `back.api` 受检模块和宿主授权上下文，再验原前端的 Iced 与 Chrome 交互。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
