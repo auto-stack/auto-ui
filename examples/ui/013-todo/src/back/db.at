@@ -83,3 +83,16 @@ pub fn remove_completed(done bool) bool {
     todos = new_todos
     return true
 }
+
+// Internal to the checked ASE backend package. The HTTP API does not export
+// these entries. Its process still starts with the seed data above.
+pub fn restore_todo_snapshot(next_id int) bool {
+    todos = List<Todo>.new()
+    nextid = next_id
+    return true
+}
+
+pub fn restore_todo_item(id int, text str, done bool) bool {
+    todos.push(Todo { id: id, text: text, done: done })
+    return true
+}
