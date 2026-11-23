@@ -136,12 +136,12 @@ path dep），本仓只做 reqwest blocking 执行（native-tls/schannel，redir
 
 ## 原生 Todo 包消费（PLAN-1112）
 
-`ase_m0_sessions_window --todo-project <013 根> --todo-code-root <目录>`
+`ase_m0_sessions_window --todo-project <013 根> --todo-code-root <目录> --evidence <JSON>`
 选择 AutoUI 原 013 的 checked AGE 包。可加 `--todo-data <目录>` 启用私有
 持久化。App 与 TodoList 通过同一挂载的共享 Store 执行业务。窗口复用包 renderer
 和带 revision 的队列，事件从当前可用帧携带实参进入 AV。
 
 切页关闭出向显示车道并保留受检包挂载。服务票据由挂载持有，完成必须符合
 checked record 并匹配租约/请求/代次。隐藏完成更新对应 AV 模型，切回提交该模型
-并读回服务列表。关页撤销挂载和租约。关窗等待服务终态。共享数据、草稿隔离和
+并读回服务列表。关页撤销挂载和租约。交互启动等待用户关窗并回收服务。共享数据、草稿隔离和
 业务/窗口证据见 `tests/ase_native_todo.rs` 与 AutoLang PLAN-1112。
