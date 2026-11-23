@@ -939,6 +939,16 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | code_commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | task_ids: T-03,T-06 | evidence: round 128,130 | next: T-02 剩余兼容回归归因
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 130 | from: work/T-02,T-03,T-06 | to: work/T-02 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | next: 读取 A2X 余项基面复放及分支恢复证明，补当前提交的阶段复审
 
+### 2026-11-24 goal work round 131 — 确认并修复 A2X 短路临时值回归
+
+- 在同一 AutoLang 专属树对合流基面 `0486981556bd8d128c69ded9888319ac4a65fc02` 用 `cargo test --locked --offline -p ace-a2x-worker --test conformance a2r_owned_temporaries_931::p931_short_circuit_outer_pending_survives -- --exact --nocapture`。等候 119.035 s，Debug 构建 38.89 s，单例 0.33 s，外层 39.455 s，1/1、退出 0、272 条过滤，清理未单计。执行后验明 `plan-117-dev` 回到 `c3593fe12` 且工作树干净。`scratch/r123-phase-gate/r130-a2x-baseline/` 的 `baseline.log` SHA256 `75BBE6E4048FB864C110FF7AA3869556073FB006578EDDC7C12CC1CB4D8C156A`，`result.json` SHA256 `9B2AD464BBB7EB113D9C632C5995EB845DD8B38D5285E51B2BE66D36164B040F`。
+- 基面 Rust 产物将 RHS 包在短路表达式，先释放 RHS 临时值，再在语句末释放 LHS。候选则物化 `__agg_sc_0` 布尔局部，提前释放 LHS。两个 `generated.rs` SHA256 分别为 `86DFE8B454FEC702A151DB0F1C04BA81C238C55C10100DCA21CA273CB5005B30`、`A84EB59A835FDF74C2D110EF6649F5371E50BBE6A4251101FCC38EC1CE3DE604`。暂存对照 `baseline-output/`、`candidate-output/`。确认 `2f7e8fe20` 将 `??` 分派扩到 text/collections 时同时扩大了共用分支中的 `&&`/`||` 降级范围。本项是本计划回归，继续保留原用例和事件判据。
+- 工作树修复仅收回普通非聚合 text/collections 的 `&&`/`||` 语句降级，让原逻辑表达式保持临时所有权。原 Aggregates/Scheduler/Auto、受检 AGE 包和元素视图维持现行降级，`??` 分派保持现行行为。逐入口追到包面设置 `coll.age_package`、场景和事件设置 `coll.elem_view_admission`。当前改动文件 SHA256 `479F2ECAB3E48A0850767112BCC27DE3FF9DFA1AF621B26BFB9CBAF218421CC8`，`git diff --check` 通过。10 条既有定向用例按 PLAN-931 生命周期和惰性、原 AGE 拒绝、AV 聚合/数值/文本惰性和受检 JSON 正反例编排。00:27:47 队列已启动，等待 PLAN-1054 Gen1 重现准备；编排 `scratch/r123-phase-gate/run-short-circuit-repair.ps1` SHA256 `A53C85EFC46451B76893ACBA732DA0B422260C3A5688CBFB165E1B96D5F4C7AC`。验证未结束，改动处于工作树，等待用例终态后提交。无新增常备用例。
+- 按三份原源和 round 128/130 实测刷新了 c359 的 W1 AV 候选收据。`scratch/r123-phase-gate/w1-u05-receipt-c359.md` SHA256 `0C293F6A08ADDA984A7096FB4CA3F426AA659ADDF45EC2082A98E7775974CDF6`。候选保留首页装载边界、历史原分母，签发仍待当前提交复核及落主。
+
+- stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | code_commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | task_ids: T-02 | evidence: round 131 | next: 收齐短路修复定向结果并提交
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 131 | from: work/T-02 | to: work/T-02 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | next: 核查在途修复验证，补当前实现的阶段复审
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
