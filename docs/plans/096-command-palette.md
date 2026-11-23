@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-096
-status: executing
+status: execution_done
 feature_name: CommandPalette 通用命令面板
 author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-23
 plan_revision: 3
-current_step: 1
+current_step: 6
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/command-palette.md]
@@ -145,13 +145,15 @@ Windows Native VM 与 Windows Vue 使用相同公共接口、状态语义和普�
 
 ### 运行入口与证据合同
 
-以下入口用于 T-05。程序通过隔离的准备目录运行，默认执行相应后端整套用例。`--suite-root` 指定隔离的三项目根（缺省为输出目录父目录下的 `windows`）。单案可用 `--case` 和 `--app-dir`。实际运行证据见 §9。
+以下入口用于 T-05。每次产品命令运行一个具名用例，输出目录各自独立。`--project-root` 指定隔离的三项目根（缺省为输出目录父目录下的 `windows`），`--app-dir` 可指定单案项目路径。实际运行证据见 §9。
 
 ```text
 cargo test -p auto-ui-tools --test command_palette_component
-python tests/product/verify_command_palette.py --auto-bin <绝对CLI路径> --ui-tool-bin <绝对MCP工具路径> --out-dir <本轮独立证据目录> --backend native
-python tests/product/verify_command_palette.py --auto-bin <绝对CLI路径> --ui-tool-bin <绝对MCP工具路径> --out-dir <另一独立证据目录> --backend vue --browser-mcp-config <绝对浏览器MCP配置路径>
+python tests/product/verify_command_palette.py --auto-bin <绝对CLI路径> --ui-tool-bin <绝对MCP工具路径> --out-dir <本轮独立证据目录> --backend native --case <用例>
+python tests/product/verify_command_palette.py --auto-bin <绝对CLI路径> --ui-tool-bin <绝对MCP工具路径> --out-dir <另一独立证据目录> --backend vue --case <用例> --browser-mcp-config <绝对浏览器MCP配置路径>
 ```
+
+两轨共同执行 `settings`、`reopen-dialog`、`duplicate-labels`、`failure-cleanup`、`rejected`、`visual`、`scroll`、`provided`、`provided-config`、`provided-stale-pending`、`provided-pending`、`provided-wrap`、`launcher`、`reopen-app`。Native VM 另执行 `system-input`、`system-invoke`，Vue 另执行 `ime`。依赖、调试工具与 Vue development bundle 在测试之前准备。对 `settings`、`launcher`、`provided` 分别带实际后端、`--project-root`、工具参数和 `--prepare` 写入输入指纹。Vue 复用 `tests/product/prompt_dialog_preview.py` 的源码和 bundle 收据。正常运行在进程启动前校验收据，Native VM 使用合并模式。
 
 native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--server vm`当原生前端）。Vue及MCP入口按下文分层合同验证。只跑本组件、被修改公共接缝和迁移消费者的必要回归，保留既有oracle，不叠加无关整仓测试。
 
@@ -191,11 +193,11 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 | ID | owner_stage | 依赖 | 影响文件/符号与独立产出 | 验证/预期 | AC / 进度 |
 |---|---|---|---|---|---|
 | T-01 | work | 无；现有来源重核 | §4来源、正式包导入/事件路径；新增`docs/reviews/plan096/decisions.md`，落实§5最小全链探针、instanceToken/首次error/模态焦点/输入桥可行性、真实包命令、平台及MCP提供方/依赖pin | 两端普通控件事件到应用读回；不是仅schema登记；差额有具名owner | AC-01；[x] Windows 普通设置与 Launcher provided 双轨探针见 §9；实际宿主启动由 T-04 验收 |
-| T-02 | work | T-01 | 新增`packages/command-palette/`的数据/交互模型、校验、消息与身份协议；沿既有包元数据/相对导入 | §6有效/非法/迟到/双实例模型反例；无业务I/O进入包 | AC-01,02,03；[x] 9 个模型及包边界用例通过，含缺失 ID、分组冲突、同修订数据变化及重挂载 | 独立复审退回，见 §9。
-| T-03 | work | T-02 | 同包UI/主题/键盘与MCP可见语义；必要现有runtime接缝最小修复 | 本组件case普通GUI/MCP路径可操作，IME/焦点和pending正确；对照参考图布局 | AC-02,03,04；[x] Windows 普通控件、模态焦点、IME、系统树、选择和请求锁双轨通过。宿主真实启动属 T-04 | 独立复审退回，见 §9。
-| T-04 | work | T-03 | examples/command-palette/（新增）、examples/ui/028-launcher/src/front/app.at；复用§4实际业务入口 | §5消费路径输出真实变化；保持原业务权限/数据/模式，不同步兄弟仓 | AC-05；[x] Windows 两轨设置写回与 028 独立模式通过，排序对照一致。真实 Windows AutoOS 桌面搜索 `cal` 后点击一次已打开一个 Calculator 窗口 | 独立复审退回，见 §9。
-| T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/command_palette_component.rs`、`tests/product/verify_command_palette.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；Windows 双轨、必需 case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[x] 9 个模型、Native VM 14/14、Vue 13/13，失败对照和共用嵌套模态回归符合预期 | 独立复审退回，见 §9。
-| T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan096/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[x] 窄窗两轨实图未见 Q-01 字形缺失，验收和待发布 SD 正文已准备 | 独立复审退回，见 §9。
+| T-02 | work | T-01 | 新增`packages/command-palette/`的数据/交互模型、校验、消息与身份协议；沿既有包元数据/相对导入 | §6有效/非法/迟到/双实例模型反例；无业务I/O进入包 | AC-01,02,03；[x] 12 个模型与移根用例通过，含首次 provided 校验、过期结果和重排移除。 |
+| T-03 | work | T-02 | 同包UI/主题/键盘与MCP可见语义；必要现有runtime接缝最小修复 | 本组件case普通GUI/MCP路径可操作，IME/焦点和pending正确；对照参考图布局 | AC-02,03,04；[x] 当前控件、输入桥、模态与首次错误/待确认硬门通过。 |
+| T-04 | work | T-03 | examples/command-palette/（新增）、examples/ui/028-launcher/src/front/app.at；复用§4实际业务入口 | §5消费路径输出真实变化；保持原业务权限/数据/模式，不同步兄弟仓 | AC-05；[x] 两轨设置、028 排序/独立负控与当前完整包宿主单次启动通过，真实 Calculator 窗口截图见 §9。 |
+| T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/command_palette_component.rs`、`tests/product/verify_command_palette.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；Windows 双轨、必需 case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[x] 单案执行 Native VM 16/16、Vue 15/15，或缺准备明确退出 2，所有正式通过用例低于 10 秒。 |
+| T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan096/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[x] 两轨错误、窄窗和长中文截图，冷加载与依赖摘要、待发布 SD 已更新。 |
 | T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[ ] |
 | T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/command-palette.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[ ] |
 
@@ -208,18 +210,18 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 - 此pass仅指计划合同可执行；不是组件测试通过、独立实现评审或交付完成。本轮未创建实施树，未执行上列拟新增测试；current_step=0/8。
 
 - 2026-11-23：stage: new | plan_id: PLAN-096 | plan_revision: r3 | outcome: pass | 用户明确授权仅 Windows。调整 AC-04/06/07/08、T-05/07/08、X-02 及 SD-02 的平台适用范围，保留其余验收入口与阈值。next: work/T-01。
-- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 1 | from: new | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 4dd9696da6a6289795ba9d6f57e603c24d99114a | next: work。继承 `/goal 完成计划096` 的全链路授权和用户确认的 Windows 交付范围。
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 1 | from: new | to: work | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 4dd9696da6a6289795ba9d6f57e603c24d99114a | next: work。继承 `/goal 完成计划096` 的全链路授权和用户确认的 Windows 交付范围。
 
 - 2026-11-23：T-01 机制探针完成。Windows Native VM 与 Vue 经相对包导入、MCP 普通搜索/键盘/点击和设置真实写回；Launcher 独立运行经原 `ApplyFilter` 发布 provided 结果且具名拒绝缺宿主启动。原生定向键接缝复用当前模态焦点，初次配置通知使用正常 Tick。证据 `plan-artifacts/plan-096/native-settings-2/report.json`、`vue-settings-2/report.json`、`native-launcher-2/report.json` 与 `vue-launcher-2/report.json`。T-02/T-03 仍在闭合本轮模型、输入桥和视觉回归；T-04 宿主真启动待验证。实施决策在实施树 `docs/reviews/plan096/decisions.md`。
 
 - 2026-11-23：stage: work | plan_id: PLAN-096 | plan_revision: r3 | outcome: blocked | worktree_path: D:/autostack/.wt/ui-096/auto-ui | branch: codex/ui-096-command-palette | base_commit: 4dd9696da6a6289795ba9d6f57e603c24d99114a | code_commit: a5929d9b8c4196e976a20580710182a4b64679a6 | dependency_revisions: auto-lang 8384ea064、auto-web 0cfc7c784、auto-down 456c86ac、AutoOS cdb4883 | task_ids: T-01…T-03 verified, T-04/T-05 open | evidence: 实施树 `docs/reviews/plan096/evidence.md` SHA256 `6880f4f2801039fbfa4964e4b3e347e56e2fc6185028ef6514fbe11cffd53c3a`。模型 9/9；Windows Native VM 12/12；Windows Vue 11/11；原生 IME、现有模态与提交定向回归和内置 Command 共存通过。028 空查询、`to` 和 tool 分类的排序结果与基线一致。 | blockers: AutoOS Windows `ui-desktop` 实际宿主未绘制。独立示例及 028 无宿主下的可用路径均已核验。真实操作和启动一次 Calculator 的宿主验收待补 | next_responsible_role: work after host prerequisite.
-- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 2 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a5929d9b8c4196e976a20580710182a4b64679a6 | next: user
-- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 3 | from: work | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a5929d9b8c4196e976a20580710182a4b64679a6 | next: user。AutoOS 仍为 `cdb4883`，当前没有可接续的 AutoOS 桌面进程，§10 无新决定；未重跑验收。
-- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 4 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a5929d9b8c4196e976a20580710182a4b64679a6 | next: user。连续第三个目标轮次遇到同一宿主前置条件；§10 尚无可用的 Windows AutoOS 会话或宿主启动修复授权。实施树干净，AC-05 及后续交付门保持待验。
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 2 | from: work | to: user | status: execution_done | outcome: blocked | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a5929d9b8c4196e976a20580710182a4b64679a6 | next: user
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 3 | from: work | to: user | status: execution_done | outcome: waiting | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a5929d9b8c4196e976a20580710182a4b64679a6 | next: user。AutoOS 仍为 `cdb4883`，当前没有可接续的 AutoOS 桌面进程，§10 无新决定；未重跑验收。
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 4 | from: work | to: user | status: execution_done | outcome: blocked | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a5929d9b8c4196e976a20580710182a4b64679a6 | next: user。连续第三个目标轮次遇到同一宿主前置条件；§10 尚无可用的 Windows AutoOS 会话或宿主启动修复授权。实施树干净，AC-05 及后续交付门保持待验。
 - 2026-11-23：用户恢复目标并确认 Windows 桌面已可测试。T-04 通过。现有 `ICED_BACKEND=tiny-skia` 使 AutoOS `cdb4883` 的 `ui-desktop` 渲染出真实窗口。打开壳 Launcher 后，MCP 读回 `q = "cal"`；通过可见结果点击一次，宿主输出一行 `launch_app(inproc) 011-calculator`，取得实际 Calculator 窗口、键盘和独立嵌入树，随后宿主正常退出，原 PID、MCP 端口均回收。`hosted-resume-07/report.json` SHA256 `a72f63b1e8615235d568b70facf16ad38a4cfd929550e6975d01384300080e5b`；实施树证据提交 `3c032f2e519362131d7e1819688c9e0f0ed154ff`，无行为代码变更。
-- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 3c032f2e519362131d7e1819688c9e0f0ed154ff | next: work/T-05
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 5 | from: work | to: work | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 3c032f2e519362131d7e1819688c9e0f0ed154ff | next: work/T-05
 - 2026-11-23：stage: work | plan_id: PLAN-096 | plan_revision: r3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-096/auto-ui | branch: codex/ui-096-command-palette | base_commit: 4dd9696da6a6289795ba9d6f57e603c24d99114a | code_commit: a2a31db67d588299f5b951bf6d3f34e1fb0c3a24 | dependency_revisions: auto-lang 8384ea064、auto-web 0cfc7c784、auto-down 456c86ac、AutoOS cdb4883 | task_ids: T-01…T-06 | evidence: 实施树 `docs/reviews/plan096/evidence.md` SHA256 `3e067f2aa813954d012daa94e138d14a8c6a4f973d177bf8b9c708085909fcaf`；完整 Native VM 套件 14/14（68.962 秒，单案 3.839–8.417 秒），Vue 13/13（49.472 秒，单案 2.075–5.553 秒），缺提供方按预期退出 2；既有嵌套模态用例 Native VM 4.961 秒、Vue 4.022 秒。新同名命令分别读回 General/Layout（4.875/3.620 秒），中途失败保存最后树和回收进程端口（3.839/2.075 秒）。复用未变行为的 9 项模型与公共输入桥证据，实际宿主门见上项。候选 Spec Git blob `36786f200914e3f822e085c5c0779f3159bc35e3`。 | blockers: none | next_responsible_role: independent final review, authorized by user.
-- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 6 | from: work | to: review | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a2a31db67d588299f5b951bf6d3f34e1fb0c3a24 | next: review/T-07
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 6 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a2a31db67d588299f5b951bf6d3f34e1fb0c3a24 | next: review/T-07
 
 - 2026-11-23：stage: review | review_scope: final | reviewer: /root/plan096_review（独立，用户授权） | plan_id: PLAN-096 | plan_revision: r3 | outcome: needs_fix | worktree_path: D:/autostack/.wt/ui-096/auto-ui | branch: codex/ui-096-command-palette | reviewed_commit: a2a31db67d588299f5b951bf6d3f34e1fb0c3a24 | base_commit: 4dd9696da6a6289795ba9d6f57e603c24d99114a | dependency_revisions: auto-lang 8384ea064、auto-web 0cfc7c784、auto-down 456c86ac、AutoOS cdb4883 | spec_inputs: 候选 blob 36786f200914e3f822e085c5c0779f3159bc35e3，目标 canonical 路径尚不存在 | acceptance_results: AC-01 pass，AC-02/03/06 fail，AC-04/05 partial | pending_closeout_gates: 受影响回归、落主等价、规范、归档和清理 | findings: R096-F01…05 | next: work。
   - R096-F01（AC-06/T-05）：新增聚合测试入口的 Native VM 68.961684400 秒、Vue 49.472130900 秒超过包装器 10 秒门。既往 `native-provided-3` 11.614346700 秒及动作失败保留。关闭条件为两轨逐案运行、全断言及结果传播保留。
@@ -227,7 +229,14 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
   - R096-F03（AC-02/03/T-02/03/05）：A 结果调用待确认时，旧查询序号的高修订结果使原生实窗放行 Escape。结果被拒绝前原始修订/命令属性已进入解锁条件。复现 `reviewer-stale-result-pending/report.json`（SHA256 `f16dca9ec13acf18ba9f09e6d80a290fdc8b7e5a390b83cfb9e63d24569b5cbb`，4.055839 秒，清理通过）。关闭条件为迟到结果不解锁、同会话当前变更仍失效、accepted 同帧继续保持。
   - R096-F04（AC-04/06/T-05）：runner 未核验准备收据，过期 Vue bundle 或不匹配工具可启动。Native 接受任意项目并继承分轨环境，可触发后端编译。关闭条件为绑定来源与正式预构建工具，缺失/过期/分轨构建配置明确拒绝。
   - R096-F05（AC-03/05/06/T-04/05/06）：补 provided 选中 ID 重排与移除断言、错误态实图、Calculator 稳定后的宿主截图。原始日志单次分派和应用身份有效，持久截图未显示计算器内容，另有实际操作窗口观察成功。
-- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 7 | from: review | to: work | status: executing | outcome: needs_fix | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a2a31db67d588299f5b951bf6d3f34e1fb0c3a24 | next: work/R096-F01…05
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 7 | from: review | to: work | status: execution_done | outcome: needs_fix | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a2a31db67d588299f5b951bf6d3f34e1fb0c3a24 | next: work/R096-F01…05
+
+- 2026-11-23：stage: work | plan_id: PLAN-096 | plan_revision: r3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-096/auto-ui | branch: codex/ui-096-command-palette | base_commit: 4dd9696da6a6289795ba9d6f57e603c24d99114a | code_commit: 19eb448a2c7a4b931631ba90d24f6ec64b5bc6b3 | dependency_revisions: auto-lang 8384ea064、auto-web 0cfc7c784、auto-down 456c86ac、AutoOS cdb4883 | task_ids: T-01…T-06 | evidence: 实施树 evidence.md SHA256 `c5114ed2b70dbf18def78d0ddb5920846fe4d69ef79f25d767d7771c94768f05`，候选 Spec blob `c12166834e85f699ec8132b94cdada5d414cdb79` | blockers: none | next_responsible_role: 用户授权的独立复审。
+  - R096-F01/04：单案入口取消超时聚合，准备期与执行期分离。31 个独立当前源码报告索引 `repair-verified-product-index.json` SHA256 `58669d10ebb63ada65dd57e95c6a382af27d026b54af226912bb58ec02be2ec9`。Native VM 16/16，逐案 4.185–8.512 秒、耗时和 88.094 秒。Vue 15/15，逐案 2.654–5.580 秒、耗时和 65.955 秒。缺准备、不匹配工具、缺浏览器 MCP、Rust 后端环境、Vue 资产失配均未启动进程并退出 2。
+  - R096-F02/03：首条查询和具名错误分开派发，作废的 provided 结果不清当前请求锁。真实界面两轨首次非法配置、修正后执行 6.435/4.862 秒，过期结果后的 Escape/Enter 仍只应用一次 5.820/4.331 秒。模型 12/12，0.117–2.730 秒；当前结果变更、accepted 同帧、重排保留与移除重选均有断言。
+  - R096-F05：两轨业务拒绝与配置错误实图、当前完整包的真实 AutoOS 接入均已复验。手动宿主命令 `python hosted_operator_repair.py hosted-repair-window-capture tiny-skia` 退出 0，用户搜索 `cal` 后点击一次，单条 `launch_app(inproc) 011-calculator`、应用树及真实 Windows 窗口相互对照，原 PID/端口回收。报告 SHA256 `c0a260148a7607e373d371cefda62784be17ecc03cafd6e445e982138de4b653`，原始窗口图 `calculator-window.jpg` SHA256 `cebc6a5b1cf3a87871d475e04c142c22f1b2e6ecb8cd7eb0a73d3f2d469811a3`。人工操作/快照/退出总耗时 100.939 秒。早期宿主报告旧包和壳截图仅作为历史观察。
+  - 原始失败保留于独立证据目录。磁盘空间耗尽期间不计未执行、残缺或进程回收失败为通过。Native Launcher 一次量到启动及清理延迟 10.535 秒，资源恢复后同用例 5.904 秒。Windows UIA Invoke 全部控件及应用读回通过，一次直接关闭遇到 AccessKit 过期句柄，使用正常应用 Exit 控件重放 5.249 秒，整应用重开仍走真实窗口关闭。复用未改变的原生输入桥、共用嵌套模态、旧 Command 浏览器和 Launcher 前后排序对照证据。
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 8 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 19eb448a2c7a4b931631ba90d24f6ec64b5bc6b3 | next: review/T-07 re-review R096-F01…05
 
 ## 10. 待澄清事项
 
