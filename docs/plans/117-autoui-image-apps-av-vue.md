@@ -394,6 +394,13 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 029 原入口用最终生产 Debug 二进制（准备 28.234 s）越过 AssetBrowser 定时器拒绝，10.800 s 退出 4。首拒为 `verify widget runtime MIR`，入口处理器 `d_p3_appm3_app___age_p_hidden_runtime_handler_0_0` 的 `mir.lang-fail-span`，MIR 报跨度 4996–5002。下一步以最小受检包复现并定位进入动态线族的失败位置与错误控制流。尚无成功窗口收据。`av/r80-029-window-final.log` SHA256 `ECB703430403EFD6D72FDAF270E0BBF4864DCDD113AFC267BC98CF8F8781E28F`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 80 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `010391873` / auto-ui `10c6431a` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work round 81 — 实时组件保留受检错误控制流
+
+- AutoLang `1739516ef` 在已有普通语言值准入的动态线族中校验调用错误边、本地抛出边和失败位置。保留消息类型、目标块和跨度顺序校验。用例通过实时组件链接、派发和渲染，核对受保护调用的列表越界进入恢复分支，以及未捕获错误回滚模型。
+- 最终 Debug 准备 5.594 s，定向用例 1/1（0.250 s），包 AV 47/47（0.397 s），PLAN-1087 错误控制流 6/6（0.160 s）。`av/r81-av-case-final.log` SHA256 `9BF7FAF5F152C2B99C6131B402AC1F983BCA98230792C829C95B6ACCE54CF833`。一次 PowerShell 筛选参数展开错误触发了未筛选的旧测试二进制，遇多处失败和栈溢出。上述定向结果来自修正后分别执行的筛选命令，全量回归未验收。
+- 029 生产 Debug 准备 61.387 s，原入口越过错误位置校验，10.999 s 退出 4。首拒为相同处理器内的 `mir.text-display`，跨度 21091–21105。恢复点为动态记录标量的文本显示准入，仍无成功窗口收据。`av/r81-029-window.log` SHA256 `B2695C46570A59F3F0B67D56393E3C85D624ECF291E911AB173F66A0730CBCF4`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 81 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `1739516ef` / auto-ui `10c6431a` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
