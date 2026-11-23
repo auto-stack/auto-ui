@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-24
 plan_revision: 1
-current_step: 7
+current_step: 8
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -92,7 +92,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
 - [x] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
-- [ ] T-08 正式交付与归档
+- [x] T-08 正式交付与归档
   - merge，AC-05，发布 A2Vue 和最终主线收据，沉淀适用规范，归档和校验组清理。
 
 ## 9. 复审记录
@@ -1108,6 +1108,16 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - `archived`。实际归档路径 `docs/plans/archived/117-autoui-image-apps-av-vue.md`，`completion_kind: delivered`，当前 7/8。T-08 所余为组清理、材料清理、保留登记和最终校验。
 
 - stage: merge | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | delivery: AutoUI `ca7197b1` / AutoLang `d13488b7e` | completed_checkpoints: prepared, landed, canonical_verified, archived | next: guarded cleanup and final verification
+
+### PLAN-117:r1 交付收尾（2026-11-24）
+
+- `archived`。AutoUI `4cf9e2548c5863bb09e0b74f48365da2b5c4c34f` 提交实际归档件和计划索引。归档时核实全部 11 个相对链接指向正确来源。最终任务为 8/8，AC-05 已完成。
+- `cleaned`。对组内 AutoUI、AutoLang、AutoDown、AutoWeb 分别执行原生 PowerShell `wt-guard.ps1`，均退出 0。按各自 Git 归属移除四份工作树、两条已落主开发分支和空组目录，验证临时复审快照引用已撤销。AutoUI 工作树中两份生成的 `.am` 文件先按 SHA256 转入本计划暂存区。
+- 暂存根 `D:/autostack/plan-artifacts/plan-117` 清理前含 291,900 个普通文件、33,418 个普通目录及 9,850 个依赖目录链接，普通文件逻辑大小 22,673,399,601 字节。逐个摘除链接且未遍历目标，再用同一守卫复核 clean，删除范围用时 93.285 s。暂存根及组目录均已核实不存在。保留登记 `D:/autostack/plan-artifacts/.retention/policy.json` 的 `scopes.plan-117` 与 `merge_closeouts` 已更新，剩余 0 字节，留存项为空。
+- 发布观察。PATH 中 `D:/autostack/auto-man/target/debug/auto.exe` 的现有产物时间为 2026-11-19 12:27:02 +08:00，早于本次交付。常规 release 路径未见 `auto.exe`、`auto-ui-tool.exe` 或 `ace_node_desktop_window.exe`，三处主线应用/画廊未见 `dist/index.html`。本次仅做本地主线交付，无发布构建或重启。AutoLang 批量门收据覆盖至 1126，距检查 17.52 小时，此后无满足五号刻度的已归档计划，本次批量门未到期。
+- 118 源准备移交：`3f4f9b3f` 已在 AutoUI 主线。运行时文件的 stable patch-id `6c716aa239e2c8d069eb11294c322fabfd43b37b` 与 `299ac88d` 一致。移植附带 `ace-bridge` 测试门。验证用 `0cc47f5d` 无主线祖先关系。
+
+- stage: merge | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | delivery: AutoUI `ca7197b11919809d80578f9b998e1540a831c0ac` / AutoLang `d13488b7eed6811b383a0bb2a3891298bf30271e` | archive_commit: `4cf9e2548c5863bb09e0b74f48365da2b5c4c34f` | completion_kind: delivered | checkpoints: prepared, landed, canonical_verified, archived, cleaned | task_count: 8/8
 
 ## 10. 待澄清事项
 
