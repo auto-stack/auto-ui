@@ -490,6 +490,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 原 029 源直调 A2Vue 生产包入口，`split` 和 `replace` 的拒绝消失，剩余文本拒绝对上 `lower` 及其连带类型诊断（2.647 s）。对照经过现有桌面文本准备后仍在 `auto.http.get-json.v1` 的计算面准入处拒绝（15.871 s）。两次执行均完成诊断，尚无 SFC。 `scratch/r94-linked-vue-path.log` SHA256 `4959005AB355869A69DC2F31D84DE2C866F7475B227D041C885101D0EC8AAF2E`，`scratch/r94-linked-vue-prepared.log` SHA256 `0561F33C52D252F5EF284ECC8595CC0CA890E831D97C1FAC36C34489D84F00B0`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 94 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `38210f00` | next: work/T-02–T-03 / T-06。
 
+### 2026-11-23 goal work round 95 — 029 收藏持久化与查看器选源
+
+- 同一原 029 入口、Iced 真窗和原 Rust 后端的基线收到 `ToggleFavSelected` 后，收藏仍为空（33.338 s，退出 6）。保留 `photos.fav` 并原位更新的尝试在接下来读取 `photo.title` 时触发 `DynTypeMismatch`。AutoUI `1e9e8cd9` 统一用 `fav_records` 保存收藏，以类型明确的照片 ID 比较成员关系，继续沿原 JSON 和宿主偏好路径读写。查看器按当前结果行选取照片的 ID、标题和资源，取消收藏可直接找到已存记录。
+- 三次独立进程依次提交收藏并核对磁盘（31.930 s）、重开并解码收藏原图后从查看器取消收藏（34.679 s）、再次重开验证收藏为空（23.940 s），均退出 0。使用实际窗口控件回调和同一隔离偏好文件。证据目录 `scratch/r95-gallery-favorites/`，`r2-add.json` SHA256 `44721F462B86D0E4DB1683C598C81F2F8CF0FA46FE62952DA6BDD546F37491D1`，`r2-remove.json` SHA256 `1FBE54A1C083F46BC7A55629DAD34F9652C026B8B294DF548A70251A782A0612`，`r2-empty.json` SHA256 `55F38B464E930FBA15AEC8FB83DF14440FCEC00FC4101E4AC2E964408F191A82`。
+- 从根目录打开仅存在于收藏中的子目录照片，实际查看器投影已保存的 ID、标题和原图 URI，宿主收到该 URI 的 404 并提交 `OnError`。该结果与 round 94 记录的令牌生命周期一致。查看器取消收藏成功，返回收藏列表为空（准备 8.956 s，执行 43.017 s，退出 0）。`detached-r2.json` SHA256 `2AD43F0CFCC542D009B0423F71A9F53A520E779CEF4EA56F039E6AD896939720`。
+- 在同一代码上重放原图缺失与恢复，依次观察 320×240 正常解码、真实 404、换回正常图、64×48 恢复解码、返回图库及关闭会话。夹具已复原，零运行时错误（40.346 s，退出 0）。`media-regression.json` SHA256 `6D3D53B0B4392093F33D124B063524D36B114827E48E2732D64B02FC67176360`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 95 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `1e9e8cd9` | next: work/T-02–T-03 / T-06。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
