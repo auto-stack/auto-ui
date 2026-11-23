@@ -22,7 +22,7 @@
 //! ——桌面宿主 launch 时按需装载、窗关卸载（生命周期翻转，路由/SSE/原生
 //! media 语义零变化；见 docs/specs/auto-lang/vm/back-proxy.md 增补节）。
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::io::{BufRead, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc;
@@ -87,6 +87,31 @@ pub struct NativePhotoApp {
     /// env `AUTO_PHOTO_ROOT` → 无（诚实空图库））。
     pub photo_root: Option<String>,
 }
+
+/// PLAN-112 T-02：结束进程路由（`POST /api/system/kill`，025 `src/back/api.at`
+/// 的 `#[api]` 声明）的宿主授权策略，按 app 登记。未登记即无门——既有
+/// `auto run` 行为逐字不变；一经登记即默认拒绝：
+/// - `AllowAll`：显式撤门（等价未登记）；
+/// - `Deny`：该 app 不持结束进程授权，请求一律具名拒；
+/// - `AllowedPids`：仅授权清单内的 pid 放行，其余具名拒。
+///
+/// 拒绝在会话派发**之前**应答（403 + `SYS_KILL_PERMISSION_DENIED`），VM 后端
+/// 与 OS 进程均不被触碰——破坏性操作的具名拒绝路径。
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum SysKillPolicy {
+    #[default]
+    AllowAll,
+    Deny {
+        reason: String,
+    },
+    AllowedPids(BTreeSet<i32>),
+}
+
+/// PLAN-112 T-02：受策略门约束的路由（app 前缀之后的子路径）。
+const SYS_KILL_ROUTE: &str = "/api/system/kill";
+
+/// PLAN-112 T-02：拒绝诊断的稳定码——两种拒绝形态同名，`error` 载具名原因。
+pub const SYS_KILL_PERMISSION_DENIED: &str = "sys.kill.permission_denied";
 
 /// proxy 启动配置。
 #[derive(Debug, Clone, Default)]
@@ -178,6 +203,8 @@ struct ProxyShared {
     /// PLAN-043 Part 1: 宿主原生 photo 路由状态（cfg image-pipeline；
     /// 生命周期语义同 native_media）。
     native_photos: std::sync::Mutex<HashMap<String, NativePhotoState>>,
+    /// PLAN-112 T-02：按 app 登记的结束进程授权策略（`SysKillPolicy`）；空表=无门。
+    sys_kill_policies: std::sync::Mutex<HashMap<String, SysKillPolicy>>,
 }
 
 /// PLAN-658 T-03: 一个 app 的原生 media 服务面（惰性索引 + 绝对 URL base）。
@@ -322,6 +349,10 @@ fn start_proxy(
             }
             map
         }),
+        // PLAN-112 T-02：策略表启动为空（无门）；宿主经
+        // `RunningProxy::set_sys_kill_policy` 登记。`BackProxyConfig` 字段面不变
+        // （既有穷举字面量构造点零改动）。
+        sys_kill_policies: std::sync::Mutex::new(HashMap::new()),
     });
     let listener_shared = shared.clone();
     std::thread::Builder::new()
@@ -498,6 +529,8 @@ impl RunningProxy {
         let join = remove_session(&self.shared, app_id);
         self.shared.native_media.lock().unwrap().remove(app_id);
         self.shared.native_photos.lock().unwrap().remove(app_id);
+        // PLAN-112 T-02：授权策略随 app 供给面一并卸下（重登记不继承旧策略）。
+        self.shared.sys_kill_policies.lock().unwrap().remove(app_id);
         join
     }
 
@@ -505,6 +538,15 @@ impl RunningProxy {
     /// apps/{id}`（桌面 launch 期对 spec.code 内存态改写的 base）。
     pub fn base_url_for(&self, app_id: &str) -> String {
         format!("http://127.0.0.1:{}/apps/{app_id}", self.port)
+    }
+
+    /// PLAN-112 T-02：运行期改写某 app 的结束进程授权策略（见 `SysKillPolicy`）。
+    pub fn set_sys_kill_policy(&self, app_id: &str, policy: SysKillPolicy) {
+        self.shared
+            .sys_kill_policies
+            .lock()
+            .unwrap()
+            .insert(app_id.to_string(), policy);
     }
 }
 
@@ -693,6 +735,9 @@ fn route_request(shared: &ProxyShared, req: &ParsedRequest) -> ProxyReply {
         if let Some(reply) = route_shared_resource(shared, req, &app_id, &sub_path) {
             return reply;
         }
+        if let Some(reply) = check_sys_kill_policy(shared, req, &app_id, &sub_path) {
+            return reply;
+        }
         // PLAN-675 T-08: lazy 档未命中时装载目录表中的普通应用。
         if shared.lazy && !shared.sessions.lock().unwrap().contains_key(&app_id) {
             ensure_session(shared, &app_id);
@@ -748,6 +793,53 @@ fn route_request(shared: &ProxyShared, req: &ParsedRequest) -> ProxyReply {
             error_json(&format!("back-proxy: session for `{app_id}` timed out")),
         ),
     }
+}
+
+/// PLAN-112 T-02：`SYS_KILL_ROUTE` 的宿主授权门——该 app 未登记策略、或登记
+/// 为 `AllowAll`，一律放行（`None`）。拒绝应答 403 JSON：
+/// `{ ok: false, code, error, pid }`；`pid` 取请求体 `pid`（缺失/非法为 null）。
+fn check_sys_kill_policy(
+    shared: &ProxyShared,
+    req: &ParsedRequest,
+    app_id: &str,
+    sub_path: &str,
+) -> Option<ProxyReply> {
+    if !req.method.eq_ignore_ascii_case("POST") || sub_path != SYS_KILL_ROUTE {
+        return None;
+    }
+    let policy = shared
+        .sys_kill_policies
+        .lock()
+        .unwrap()
+        .get(app_id)
+        .cloned()?;
+    let pid = serde_json::from_slice::<serde_json::Value>(&req.body)
+        .ok()
+        .and_then(|v| v.get("pid").and_then(|p| p.as_i64()))
+        .and_then(|p| i32::try_from(p).ok());
+    let reason = match policy {
+        SysKillPolicy::AllowAll => return None,
+        SysKillPolicy::Deny { reason } => reason,
+        SysKillPolicy::AllowedPids(allowed) => {
+            if matches!(pid, Some(p) if allowed.contains(&p)) {
+                return None;
+            }
+            format!(
+                "host policy denied process termination for ungranted pid {}",
+                pid.map_or_else(|| "<missing>".to_string(), |p| p.to_string())
+            )
+        }
+    };
+    Some(ProxyReply::json(
+        403,
+        serde_json::json!({
+            "ok": false,
+            "code": SYS_KILL_PERMISSION_DENIED,
+            "error": reason,
+            "pid": pid,
+        })
+        .to_string(),
+    ))
 }
 
 fn route_shared_resource(
@@ -856,6 +948,7 @@ fn write_response(stream: &mut TcpStream, reply: ProxyReply, no_store: bool) -> 
         200 => "OK",
         206 => "Partial Content",
         400 => "Bad Request",
+        403 => "Forbidden",
         404 => "Not Found",
         416 => "Range Not Satisfiable",
         500 => "Internal Server Error",
