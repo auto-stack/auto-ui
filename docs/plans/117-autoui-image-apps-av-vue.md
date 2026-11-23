@@ -845,6 +845,14 @@ AC-01 通过。AC-02、AC-03 的旧反例已覆盖，R117-AV-05 的新状态控�
 
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 123 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `65c473046` | next: 核查在途语言门，顺序运行 AutoUI 门并完成 AV/W1 交付
 
+### 2026-11-23 goal merge round 124 — 语言组归档就绪
+
+- 11 个 Debug 测试归档均完成，各 `archive-N.command.json` 退出 0。按 round 122 冻结组序，准备阶段各归档用时为 79.045、4.229、34.743、22.533、12.668、74.439、48.926、31.531、26.197、27.058、5.423 s。当前原始归档和命令记录在 `scratch/r123-phase-gate/language-prepare-final/`。语言运行控制器仍在准备受检工具，AAC 两个独立准备和执行段待后续记录。本轮完成的归档均为 build-only，发现、运行、清理及用例数未观测。
+- D 盘最低观测约 6.1 GiB。对本计划 AutoUI 专属工作树中 6 个已核对的旧增量缓存目录执行可逆 NTFS 压缩。`compact` 全部退出 0，累计减少实际占用 10,209,592,119 字节，文件内容保留。`scratch/r123-phase-gate/ui-incremental-compression.log` SHA256 `EBBFC6D373C83EF128CCAC55797182E7056C5F6D092E67D28FBF0A76624F635B`。23:05:33 观测 D 盘余量 54.11 GiB，其中包含同盘其它空间变化。
+- AutoUI 阶段队列 PID `1144992` 按本轮语言控制器 PID `550372` 及启动时间等候，待其退出并核对测试机空闲后执行已冻结的 11 个 AutoUI 目标。队列 `scratch/r123-phase-gate/queue-ui-gate.ps1` SHA256 `F68779D71B8BAA71FB14128C0828EFF9A52072C4935E0F274C7E35E9617A6061`。PLAN-1054 在本计划已启动后于 23:04:23 开始其 AAC1047 单体准备，与本计划工具准备有重叠，后续测试时间依据实际执行阶段。
+
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 124 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `65c473046` | next: 读取在途阶段回归结果，核对 AV/W1 落主前置
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
