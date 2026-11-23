@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-23
 plan_revision: 3
-current_step: 7
+current_step: 8
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/command-palette.md]
@@ -187,7 +187,7 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 | AC-05 | work | 028保留recent/分类/评分/grid并正确转发一次宿主动作；无宿主明确报不可用；普通设置示例在两端读回真实模型修改，源码匹配或高亮不算执行成功。 | T-04,T-05；[x] Windows 宿主单次启动、双轨独立消费及排序对照见 §9 |
 | AC-06 | work | X-01/03/06/07、移根、必要公共/消费者回归及真实截图通过；中文/暗色/窄窗可用，Q-01若影响本组件则闭环；README/待沉淀Spec与证据齐 | T-05,T-06；[x] |
 | AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定 Plan r3和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[x] 绑定 `19eb448a` 与候选 Spec `c1216683`，R096-F01…05 闭合 |
-| AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，发布说明限定为已验收的 Windows Native VM 和 Windows Vue | T-08；[ ] |
+| AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，发布说明限定为已验收的 Windows Native VM 和 Windows Vue | T-08；[x] `a227015e` 快进交付，规范、归档及清理见 §9 |
 
 ## 8. 执行步骤
 
@@ -200,7 +200,7 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 | T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/command_palette_component.rs`、`tests/product/verify_command_palette.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；Windows 双轨、必需 case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[x] 单案执行 Native VM 16/16、Vue 15/15，或缺准备明确退出 2，所有正式通过用例低于 10 秒。 |
 | T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan096/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[x] 两轨错误、窄窗和长中文截图，冷加载与依赖摘要、待发布 SD 已更新。 |
 | T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[x] 独立复审通过，合并权限由本次精确收据闭合 |
-| T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/command-palette.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[ ] |
+| T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/command-palette.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[x] 快进、规范及来源摘要核验、实际归档链接与全部计划路径清理通过 |
 
 任务只保留本表一份当前进度；每项完成写实际证据，不预先勾选评审/合并。必要平台缺口留在对应AC，不能把产品正确性转给merge阶段兜底。
 
@@ -245,6 +245,8 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
   - 合并前明确复跑 9 个 debug/test 定向用例。Native IME 1.901 秒、焦点 1.451 秒、背景动作隔离 0.136 秒、既有 Enter 0.124 秒、默认值 0.167 秒；配置 0.373 秒、过期锁 0.242 秒、重排移除 0.368 秒、移根 3.008 秒，均退出 0。复用符合条件的已准备测试目标，无额外测试编译。发现耗时 0.106/0.069 秒；清理未单独计时。`merge-scoped-checks.json` SHA256 `1ada22340d545aa695a8211de58e61ce25978264ad021ad718cc66e605afcba0`。
   - 第一次快进写 Git 索引遇 D 盘满，默认分支未前移。校验 35 个计划部分文件与预期交付对象一致，回收本计划无用的准备副本，移走 17 个临时新增文件并恢复 18 个既有计划路径后重试；他人三份未提交文档摘要不变。实际 `git merge --ff-only` 成功。初次落主烟测识别设置 `pac.at` 单处 CRLF 归一化并返回具名准备不匹配。逐字节对比之外的 DSL 正文等价，从落主字节重新准备后 Native VM 设置 5.139 秒退出 0，Vue 设置 3.973 秒退出 0。Vue 前置生成、类型检查及开发预览准备 25.053 秒。两份报告 SHA256 `3a35c87d8da0c7a38267e73d194047047aac327cbdcebf3a764390f610495cc2`、`9bbc6ce7a9dad170c07b6b98ea9a2d7d16241797eb907de072a9022c4aad27ca`。
 - 2026-11-23：stage: merge | checkpoint: archive_pending_cleanup | completion_kind: delivered | archive: `docs/plans/archived/096-command-palette.md` | 清理工作树、分支、scratch 及登记待核验。独立评审使用的文档型验收草稿在交付提交历史中可重查。最终方案以本归档及 canonical Spec 为准。
+- 2026-11-23：stage: merge | plan_id: PLAN-096 | plan_revision: r3 | outcome: pass | checkpoints: prepared, landed, canonical_verified, archived, cleaned | delivery_commit: a227015e2f2bea79be99e506f07cba3426471a45 | archive_commit: a6da052318301cfa5b6c2a64d1591aa37b5d14a4 | archive: `docs/plans/archived/096-command-palette.md` | 验证归档 9 处相对链接和 5 处回链，路线限定 Windows 两轨。五棵计划工作树经独立 `wt-guard` 检查并移除，无残留 `D:/autostack/.wt/ui-096` 或 `codex/ui-096-command-palette`。计划 scratch 删除 125300 个文件及 3960 个链接，实际回收 190671096 字节，剩余 0；登记 `plan-096` 为 `deleted-at-merge`。清理回执 `D:/autostack/plan-artifacts/.retention/receipts/plan-096-r3-scope-cleanup.json` SHA256 `ee97a04e46955ee081a62510aa09764753fac92dd609148548399186c4b915b6`。主检出本计划范围干净，其他计划的文档工作保留。
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 10 | from: merge | to: done | status: archived | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui（已移除） | commit: a227015e2f2bea79be99e506f07cba3426471a45 | next: done
 
 ## 10. 待澄清事项
 
@@ -257,7 +259,7 @@ r3 的 Windows Native VM 和 Vue 范围已确定。包语法/实例token/首次e
 
 ## 11. 交付证据索引
 
-Windows x64 MSVC，Rust/Cargo 1.98.0 debug/test、Node 25.2.1、pnpm 11.6.0、Python 3.14.2、Playwright MCP 0.0.86 与 Chrome 157.0.8103.80。`auto.exe` SHA256 `eddb2cce50fd8afe08cd26959c2fe52e090eb833b5c8b9a3f27538b28d947fcf`，`auto-ui-tool.exe` SHA256 `46a9d39d7a1b74da6bcc003dec7ba582dea86de35c5d5350c4e20a914bfea405`。宿主 `ui-desktop.exe` SHA256 `07da3fd756170f8b9bd72131eb34bd00571a8b6edf861aad71a8317c5e9ca4e1`。部署工件沿用原发布流程，本次完成源码交付及开发配置验证。
+Windows x64 MSVC，Rust/Cargo 1.98.0 debug/test、Node 25.2.1、pnpm 11.6.0、Python 3.14.2、Playwright MCP 0.0.86 与 Chrome 157.0.8103.80。`auto.exe` SHA256 `eddb2cce50fd8afe08cd26959c2fe52e090eb833b5c8b9a3f27538b28d947fcf`，`auto-ui-tool.exe` SHA256 `46a9d39d7a1b74da6bcc003dec7ba582dea86de35c5d5350c4e20a914bfea405`。宿主 `ui-desktop.exe` SHA256 `07da3fd756170f8b9bd72131eb34bd00571a8b6edf861aad71a8317c5e9ca4e1`。本次完成源码交付及开发配置验证。落主检查发现主检出 `target/debug/auto-ui-tool.exe` 为 2026-11-22 17:17（北京时间）构建，未见主检出 release 工具或设置示例发布 bundle。
 
 当前组件主源码 SHA256 `1bc4c89f4d4181a6cbce688c66b0d37d2a876cbfaeb773d9cc1036cc5f040945`，`palette_data.at` 为 `8fa1a2bac0d5e0f62ddf671567674c037db0545889997f69b4836aa617de7be5`，`palette_search.at` 为 `bcba8eb262407354870fdbcaccddd44af22aedbda820e5e065fc67df3f05724c`。Launcher 源为 `756a438b7b388e1c842b435c464cfe01c1792f8420c92a2867316e245f6be722`。正式包以普通 Dialog、Input 和 Button 保持 Native VM、Vue 一套 `.at` 行为，新增的原生方向键绑定走当前模态焦点。旧内置 Command 的实际 Vue 搜索仍可用。
 
