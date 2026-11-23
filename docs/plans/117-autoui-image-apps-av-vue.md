@@ -896,6 +896,16 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | code_commit: AutoUI `8894c9ef` / AutoLang `74caa718c` | task_ids: T-02,T-03,T-06 | evidence: round 126 | next: work/T-02 余项
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 126 | from: merge/T-05 | to: work/T-02 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `74caa718c` | next: 修复旧构造路径与剩余回归，复核原产品与阶段门
 
+### 2026-11-23 goal work round 127 — 恢复组件构造与 Python provider 复验
+
+- AutoLang `c3593fe1248419acc3ac071204136e41776b40bb` 复用要求命名字段且遇到非构造块可回退的 `condition-ctor`，恢复组件面普通表达式中的 record 值。条件主规则保持自身的块边界。投影层映射构造表达式时保留真实规则身份。AgeComponent 新身份 `5aed2a9d4d0292758baa5a1ceeb020acd1052c5a3fc68b9d15ce37277f7c53fb`，其余受检 profile 和 AgePackage 的历史冻结身份全通过。附带将数组右值的 U05 放行限定于实际受检 AGE 执行上下文，恢复 Aggregates 旧拒绝与已有普通 Auto 支持。
+- PLAN-1129 准备固定组期间等待 31.241 s。第一轮 Debug 准备 37.114 s，AV 14/14，Core 8/9，唯一差异为上述有意的冻结值更新。更新后再次等待 5.377 s，Debug 准备 12.548 s。Core 9/9（外层 0.508 s），AV 16/16（0.210 s），含 PLAN-105 列表构造、循环及投影、历史数组正反例和受检 HTTP。全部使用原有用例。 `scratch/r123-phase-gate/r127-component-ctor-final/` 下 `component-grammar.log`、`component-ctors.log` SHA256 分别为 `F90D13FCC497DCD3AAFE69B4E3454411D8B6161097A83EE55536279AA0748F67`、`C699E9DBFF0F272B8F76DCD016A01E1AC1A1E8918140F6597167485EE659D794`。发现与清理未单计。
+- `ace-abi` Debug `prepare-av-providers` 首轮等待 PLAN-1054 20.905 s，准备外层 36.337 s。程序外层退出 0，但嵌套临时构建的长路径使 MSVC `LNK1104`，缺 `py.descriptor.json`。将临时目录改到本计划暂存根短路径 `D:/autostack/plan-artifacts/plan-117/t127` 后，Debug 准备 18.347 s，描述符 SHA256 `90D7548DEA3F501E9E1668A0543757E9F3B1ECE1013C9139D3C0DEE4AFA8E1E3`。原 `py_lane_probe_1094` 7/7，外层 0.414 s。节点调用、异常、Unicode 和上下文管理正常。原日志 `scratch/r123-phase-gate/r127-av-provider-short/tests.log` SHA256 `56DD77D87ED21A24E3B2E143A17F86C38927F23117B66416DC6E8D79D4E8D569`。其它 C provider 的已知前置未配置，未计入此批。
+- 当前修复版 Iced 使用 AutoUI `8894c9ef3721b28669f859cbafc5722fe266b79f` 和 `c3593fe12`。23:44:47 启动 Windows 控制器 `1159196`，23:45:14 实见 Cargo PID `1160120` 构建正式 Debug 窗口。后续串行复放 029 原入口的目录失败与首扫恢复，以及 031 原入口的格式、几何与关闭。编排 `scratch/r123-phase-gate/run-repaired-iced.ps1` SHA256 `EC6CA0F5DCAA1F815F7E983019A29C3F5C510164F55F12B75683F3AC7AF032CF`，输出 `scratch/r127-repaired-iced/`。Iced 终态、A2Vue 原产品复验和固定组余差待收齐。上一阶段的原始证据继续保留。
+
+- stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | code_commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | task_ids: T-02,T-03,T-06 | evidence: round 127 | next: 收齐原产品与剩余回归结果
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 127 | from: work/T-02 | to: work/T-02,T-03,T-06 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | next: 核查当前 Iced 构建及回放，继续 A2Vue 复验和回归归因
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
