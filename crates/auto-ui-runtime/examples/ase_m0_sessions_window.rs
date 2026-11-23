@@ -90,7 +90,7 @@ fn main() {
         std::process::exit(2);
     }
     let evidence_path = evidence_path.expect("--evidence <out.json> is required");
-    await_window_close |= clock_app.is_some() && script_spec.is_none();
+    await_window_close |= (clock_app.is_some() || todo_project.is_some()) && script_spec.is_none();
     let mut host = AseSessionHost::new(apps);
     if let Some(project) = todo_project {
         let code = todo_code_root.expect("--todo-code-root is required with --todo-project");
