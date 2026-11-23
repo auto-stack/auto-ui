@@ -657,6 +657,15 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - `cargo test --locked -p auto-media-core --lib` 56/56（28.081 s），`cargo test --locked -p auto-lang-core --lib file_session::tests` 8/8（24.819 s）。AutoUI `plan114_widget_packages`、`plan117_viewer_backend`、`plan114_file_session` 合计 57/57（138.455 s），含调度停顿时子定时器仍可派发的回归。`ui-regression.log` SHA256 `EACA198DA302ED982BEBD4C766BAB8E6C3D60BFBE2F7B2C4ECAE6959CE7345BA`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 114 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `cd6c231216` / auto-ui `69eaa452` | next: work/T-03、T-06 复验 029 原生内嵌代理重开及 Carousel 纵向输入，再锁定两端复审与交付基线。
 
+### 2026-11-23 goal work round 115 — 029 原生代理重启与 Carousel 物理输入
+
+- 以原 029 的正式 Vue 冷构建连接当前工作树重编的原生照片代理。基线收到 `dir=album-slow` 仍返回根目录，两次扫描均为 200，真实浏览器等不到子目录照片。AutoUI `49790886` 从代理已分离的查询串解码 `dir` 和缩略图宽度。重放原页，收藏 `album-slow/slow-photo.png` 后浏览 `album-fast`，缩略图和原图均 200；原生代理进程结束并同端口重开，收藏记录保留，两路仍为 200，原图 64×48、宽度参数缩略图 32×24，目录越界返回 400。重新链接前的 Cargo 构建 74.216 s，真实 Chrome 1.731 s，退出 0。`scratch/r115-proxy-restart/gallery-proxy-restart.log` SHA256 `EEE9FC3CA8779A4AB2AF5538CB4C365A0372DA3AE4E9933ECB384F00A7419017`。
+- 从原 AutoOS `cdb4883` 画廊的真实侧栏进入 Carousel。Orientation 按钮置于第 2 张后，用 Win32 鼠标在可见轨道内拖动 175 px，向下三次和向上两次均翻一张，逐次核对 2→1→2→1→2→1。此前该次会话的 138 px 向上拖动及移出轨道的动作均未翻页。6,015 帧，两个宿主会话关闭。`scratch/r115-carousel/receipt.json` SHA256 `63B450B7669A3FE6A4D8575BCE505542F33B77C043A3F5EF9CFC0C17B94D14A2`。
+- 031 物理复验发现受检帧虽提交缩放，Iced 在自适应尺寸下仍以普通图像布局绘制，且标准窗口键表没有 Escape。AutoUI `c0d78b21` 用实际布局 bounds 计算图片矩形，在视口和父裁切区内绘制，并把普通键与 Escape 接入已声明的窗口绑定。鼠标点放大，画面宽从约 801 px 到 1,000 px、垂直内容在原视口截断。物理 Escape 调用原 close 路由，窗口显示 Closed 和空态。1,649 帧、零宿主错误、37.050 s、退出 0。`scratch/r114-viewer-iced/iced-paint-final.json` SHA256 `D87C83CDB60696C4937662CE0F691469CCD06279A71F0B16BD3747A85E9F222A`。同一二进制点开原平移控件，点左箭头，图像左右边缘同向左移约 40 px。
+- 平移窗口收据记录 `PanLeft` 提交 −40 和随后物理 Escape 的 `Close`。3,517 帧、零宿主错误、75.285 s（含窗口脚本守卫等待）、退出 0。`iced-toolbar-pan.json` SHA256 `6678CB7C17CDA6BEAB58BDE08085B2C84F027F689BA01E60B4B7666478946CDE`。
+- AutoUI `image_surface_contract` / `image_pipeline_parity` 合计 2/2（38.774 s，执行合计 0.370 s）。合并树预演覆盖 AutoUI master `8e613066` 和 AutoLang master `048698155`，分别有五个和八个路径需要与已落地的主线实现对齐。后续审查须使用解决冲突后的跨仓提交和回归证据。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 115 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `cd6c231216` / auto-ui `c0d78b21` | next: work 对齐两仓主线并复验受影响的原输入，再进入 T-04/T-07 复审。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
