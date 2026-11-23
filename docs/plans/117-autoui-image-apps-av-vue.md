@@ -333,7 +333,7 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 ### 2026-11-23 goal work round 68 — ImageViewport 处理器读计算成员
 
 - AutoLang `b936120d6` 在 AGE 包处理器复用组件的计算成员展开。定向 AV 用例先在错误态派发，再只修改第二个实例并重新派发，结果为 `0` 与 `1`。Debug 准备 14.406 s，定向 1/1（0.166 s），981 包 AV 42/42（0.870 s），发现和清理未单计。`av/r68-computed-handler-av-case.log` SHA256 `98D9307796749513631C507907EED676F222ECA9DD21D7D066945E278B709691`。
-- 029 生产窗口 Debug 准备 54.911 s。原入口越过 `OnWheel` 内的 `.c_ok` 绑定，仍在 admission 阶段退出 4（2.509 s）。首拒在 `image_viewer::image_viewport:140:47`，对应 `onwheel: .OnWheel($event.deltaY)` 被归一为找不到的 `nevent`。现有 Iced 适配器已定义 wheel 的单 f32 和 pan 的 f32/f32/phase，checked `native_image` 当前只投影 src/alt/尺寸/fit/style。恢复点为沿原协议接入宿主事件值、图像变换属性与真实回调。`av/r68-029-window.log` SHA256 `5A71F6BF5E532BA3484E2F15EDC0D9E03C2F1EA6E2116DB3000F2362E1E9A510`。
+- 029 生产窗口 Debug 准备 54.911 s。原入口越过 `OnWheel` 内的 `.c_ok` 绑定，仍在 admission 阶段退出 4（2.509 s）。首拒在 `image_viewer::image_viewport:140:47`，对应 `onwheel: .OnWheel($event.deltaY)` 被归一为找不到的 `nevent`。现有 Iced 适配器已定义 wheel 的单 f32 和 pan 的 f32/f32/phase。029 的 checked 包视图由 `ace_node_desktop/package_view.rs` 投影，该路径尚无 `image_surface` 分支，队列目前承载点击、文本和指针坐标。恢复点为沿现有输入协议和媒体授权接入包视图、图像变换与事件回调。`av/r68-029-window.log` SHA256 `5A71F6BF5E532BA3484E2F15EDC0D9E03C2F1EA6E2116DB3000F2362E1E9A510`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 68 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `b936120d6` / auto-ui `1521f47a` | next: work/T-02–T-03。
 
 ## 10. 待澄清事项
