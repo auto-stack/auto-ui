@@ -50,6 +50,10 @@ fn action(host: &mut AseSessionHost, message: &str, index: usize, text: Option<&
 
 #[test]
 fn gallery_todo_keeps_drafts_local_and_reopens_real_persisted_rows() {
+    assert!(
+        std::env::var_os("ACE_NODE_DESKTOP_PREPARED_RUSTC").is_some(),
+        "prepare ui980 with ase_m0_sessions_window --prep-only and set ACE_NODE_DESKTOP_PREPARED_RUSTC to rustc --version",
+    );
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let project = root.join("examples/ui/013-todo");
     let counter = root.join("../auto-lang/experimental/ase-m0/fixtures/counter-a/main.at");
