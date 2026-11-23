@@ -1304,8 +1304,12 @@ export function installAutoStoreContext(app: { provide(key: string, value: unkno
     })
 }
 
-// Re-export helper functions from super (used by generate_component_from_file)
-fn extract_api_imports_from_ast(
+/// `use back.api: f…` 导入的 API 函数名（模块形态 `use back.api` 自 api.at
+/// 契约枚举）。`generate_component_from_file` 的发射臂之外，PLAN-112 T-02 起
+/// A2Vue lane 的 store composable（`ace_vue_script::
+/// generate_sfcs_with_lane_product_stores`）同样消费——与 vue.rs 旧道的
+/// `store.api_imports` 同源。
+pub fn extract_api_imports_from_ast(
     ast: &auto_ui_dialect::UiCode,
     front_at: Option<&std::path::Path>,
 ) -> Vec<String> {

@@ -1429,15 +1429,60 @@ pub fn generate_sfcs_with_lane_product_stores(
         return Err("no widget decl".to_string());
     }
     // PLAN-105 T-02：`store X { … }` → Vue composable + widget 的 store 绑定。
+    // PLAN-112 T-02：实后端 store（025 `SysStore`）的 composable 与 `auto-ui-tools`
+    // 旧道同语义。此前 store 的 `api_imports` 与函数池皆空——composable 无
+    // `@/lib/api` 导入、API 调用不带 `await`、裸调 helper（运行期 ReferenceError）。
+    // ① `use back.api: f…` → `store.api_imports`（`@/lib/api` 导入 + 调用点
+    //    `await`）。合并源里多个单元可各自声明同一行（025：app.at 与
+    //    sys_store.at）——按首次出现去重，否则发射重复的导入说明符（JS 语法错误）。
+    // ② 同文件顶层 `fn` 与 `use <unit>: fn` 模块函数合并为一个池，经
+    //    `generate_store_composable_full` 的入口门控 + 闭包拉取内联
+    //    （PLAN-671 ③ 同机制：跨文件 helper 如 `fmt.at` 的 `n1`/`rate` 及其被调 `n2`）。
+    let mut api_imports: Vec<String> = Vec::new();
+    for name in auto_ui_compiler::ui_gen::api::extract_api_imports_from_ast(
+        &ast,
+        Some(std::path::Path::new(path)),
+    ) {
+        if !api_imports.contains(&name) {
+            api_imports.push(name);
+        }
+    }
+    let same_file_fns: Vec<auto_ui_compiler::aura::AuraModuleFn> = ast
+        .core_stmts()
+        .filter_map(|stmt| match stmt {
+            auto_lang_core::ast::Stmt::Fn(fn_decl) => {
+                auto_ui_compiler::aura::extract_module_fn(fn_decl)
+            }
+            _ => None,
+        })
+        .collect();
+    // 同文件 fn 名首到先得；use 导入名只做入口门控（非 fn 的导入名无池项，
+    // 天然无效）。`use back.api` 在 `collect_use_module_fns` 内被跳过。
+    let mut module_fns = same_file_fns;
+    let mut module_fn_names: std::collections::HashSet<String> =
+        module_fns.iter().map(|f| f.name.clone()).collect();
+    let (use_fns, use_names) =
+        auto_ui_compiler::ui_gen::api::collect_use_module_fns(std::path::Path::new(path), src);
+    for mfn in use_fns {
+        if !module_fns.iter().any(|f| f.name == mfn.name) {
+            module_fns.push(mfn);
+        }
+    }
+    module_fn_names.extend(use_names);
     let mut stores: Vec<LaneStoreComposable> = Vec::new();
     let mut store_deps: Vec<String> = Vec::new();
     let mut store_surface: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
     for stmt in ast.domain_stmts() {
         if let UiStmt::StoreDecl(d) = stmt {
-            let store = auto_ui_compiler::aura::extract_store_from_decl(d)
+            let mut store = auto_ui_compiler::aura::extract_store_from_decl(d)
                 .map_err(|e| format!("store extract: {e:?}"))?;
-            let code = auto_ui_compiler::ui_gen::VueGenerator::generate_store_composable(&store);
+            store.api_imports = api_imports.clone();
+            let (code, _) = auto_ui_compiler::ui_gen::VueGenerator::generate_store_composable_full(
+                &store,
+                &module_fns,
+                &module_fn_names,
+            );
             store_deps.push(store.name.clone());
             let methods: Vec<String> = store
                 .handlers
