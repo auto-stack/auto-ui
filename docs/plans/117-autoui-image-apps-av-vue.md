@@ -507,6 +507,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 核对 PLAN-118 移交的最小 prep 补丁 `7c7ef158`（等同 `299ac88d`）已进入 AutoUI master，落主提交 `3f4f9b3f` 给 T-01 探针增加 `ace-bridge` feature 条件。独立验证探针 `0cc47f5d` 留在 `fix-prep-118`。补丁使用现有 style 声明处理。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 96 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `5026fdff` | next: work/T-02–T-03 / T-06。
 
+### 2026-11-23 goal work round 97 — A2Vue 图片视口输入与原入口准入
+
+- 029 和 031 当前原源经生产 `generate_linked_front_sfc` 分别重现 `lower` 的类型拒绝和 `source.module-missing: unknown module back.api`（双例 3.261 s）。029 隔离源将标题读入明确的 `str` 局部并复用 AV 的大小写助手，保留原 `.contains` 即推进到 `auto.http.get-json.v1` 的计算面准入（16.890 s）。完整桌面 prep 重放得到相同拒绝（15.810 s）。仅为诊断替换单处 HTTP 调用后，下一项为 `auto.json.parse.v1`（16.045 s）。上述诊断退出 0 表示探针正常收集报错。证据目录 `scratch/r97-vue-admission/`，`original-baseline.log` SHA256 `9B7677FD34DFB4D4E590620D696C68EA8B2954981C39B6F44B5107B3D06173F2`，`text-typed.log` 和 `prepared-current.log` SHA256 `EB594550DE3C7F8BBD25894F641E335F7801D50553F9CB45D3B90FFB84D5A907`，`no-http-diagnostic.log` SHA256 `0179C3907816660163261AE73B58522EF487E6A2BEC0EF5F70C61C97A929B4BD`。PLAN-108 的 HTTP 承载规范覆盖组件面 call-clean 条件，029 当前调用的是带子组件的受检包面。
+- 同一受检 `image_surface` 夹具经生产生成器和 Vue SFC 编译器挂载，基线浏览器报 `ace.widget.view: unknown operation 'image-surface-event'`，图片节点缺席（生成和浏览器合计 1.571 s，退出 0 验证预期失败）。AutoUI `bb0b3708` 接收包面已有的 wheel/pan 记录，检查消息和载荷类型，用浏览器指针捕获投递 start/move/end。DOM 图像在裁切区应用 fit、缩放、偏移、旋转及 filter，按 URI 和资源身份更新节点，加载与错误沿当前投影回调投递。
+- 在最终生产库（49.949 s，退出 0）和生成器（链接 13.570 s，退出 0）上，同一夹具冷生成 154,439 字节 SFC，经 Vue 编译器和 Chrome 挂载，观察 64×48 图像解码、320×240 裁切区、真实滚轮放大至 1.25、拖动 30×20、双击复位、坏图错误和换图复原。迟到的坏图在卸载并重建视口后没有增加错误计数。终态加载 3 次、错误 1 次、拖动更新 1 次、页面异常 0、关闭浏览器和回环服务（生成与执行共 2.555 s，退出 0）。`browser-baseline-final.log` SHA256 `15B8854E52E826E868A13B49FC3EC39603AC65B472488E1CC46E34BA64195EE9`，`browser-current-r3.log` SHA256 `BDA3218ECD94E6F6D3660200CA443F5AED0875D7DD7D86EA0023121ED467BA2A`，`after.vue` SHA256 `9782439EE3C2C9F7424DCFBB2B3A4575F5608188211582548A29EEB86DB65238`。
+- 用正式 `packages/image-viewer` 导入未改写的 `ImageViewport`，当前生产包 SFC 入口明确拒绝其 `auto.json.stringify.v1`，尚不能生成原组件（1.686 s，探针因拒绝退出 101）。`official-current.log` SHA256 `2F2B3DC1B53421AF0380492C283A28D6C7697B41CB590630865025E570816FD2`。同 URI 换版本的重新读取仍待消费既有浏览器媒体重验证机制。029/031 的原项目浏览器验收继续保留。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 97 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `bb0b3708` | next: work/T-06 继续核对原包 JSON 值与 HTTP 承载；T-02–T-03 仍含 031 授权媒体绑定。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
