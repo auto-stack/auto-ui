@@ -415,6 +415,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 029 原入口使用 round 82 生产二进制越过全部加载检查，进入会话 `open` 后在 11.298 s 退出 5。首错误为收藏恢复 JSON 解析空文本（`json.parse: unexpected byte None at 0`）。现有桌面准备把源 `storage.get` 改写为初值为空的模型字段，Vue 原包入口又拒裸存储调用。恢复点为消费既有宿主偏好绑定，并处理两端恢复相对 `Init` 的顺序。尚无成功窗口收据。`av/r85-029-window-r5.log` SHA256 `8DEB6AB40C12693342C4C3715228E850461E0E36211DD176CB8BF1DDA091CF58`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 85 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `4bfd3b214` / auto-ui `3e3e4926` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work round 86 — 收藏绑定与 HTTP 接缝探查
+
+- 收藏绑定试稿将同一个 `photo-gallery.favs` 存储键交给既有宿主偏好绑定，以一次启动计时调度首扫。Iced 是 Init 后恢复，Vue 是 Init 前恢复，两端均在初帧之后启动计时。试稿在定向隔离存储路径下绕过空收藏解析并建立了原 029 Iced 会话，录得 2 帧，17.635 s 后因 4 帧门退出 6。
+- 窗口收据内 144 次同一首扫事件失败，未提交派发。首错误是 `http.client: no http provider installed in this session lane (plan108 M1 fail-closed)`。首扫错误回滚启动标志，试稿会反复重试，故将试稿从工作树收回并保存在 `scratch/r86-029-preference-prototype.at`（SHA256 `4CDACFB78584F6B91F7D5E69CFDAD960C12289FCC5CE47CAED3CC178C8F77586`）。`av/r86-029-window.json` SHA256 `C328FF3F610A910F82BE2779F2206204210E1ECEB119AF86CDA5A6A55F2A453B`。
+- 同一收藏试稿经现有 `generate_linked_front_sfc` 越过裸存储拒绝，029 与 031 现在均报 `source.module-missing: unknown module auto`。探查命令正常结束（2.685 s），两条生成结果均失败。`scratch/r86-linked-vue.log` SHA256 `27B29F56FF084F3703514D62E8BF79B128190482CCC3D9803106A2574C460271`。
+- 接续点为消费 PLAN-108 已有的 HTTP 挂起、轮询和恢复执行入口。现有注入仅覆盖桌面单组件会话，受检包应在自己的挂载代次接入宿主提供器及已配置的同源地址，并核关闭后的迟到结果。另需在 Vue 包链接上核 JSON 导入，及恢复空值、有效值和非法值的启动表现。本轮帧数只证明窗口建立，V-03 仍需实际原行为验收。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 86 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `4bfd3b214` / auto-ui `3e3e4926` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
