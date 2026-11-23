@@ -452,8 +452,10 @@ fn start_proxy() -> auto_ui_runtime::back_proxy::RunningProxy {
 }
 
 /// 真实浏览器腿（Playwright + 系统 Chrome）。判据见各 `check`：原 `tests/smoke.spec.ts`
-/// 的适用 oracle（T1/T2/T4/T5/T6，T3 按现 UI 的右键流）+ 本 Plan 的权限拒绝
-/// 具名可恢复 + 关闭释放刷新任务。失败与统计以末行 `RESULT {json}` 回传。
+/// 的适用 oracle（T1/T2/T4/T5/T6；T3 按现 UI 的右键流）+ 本 Plan 的权限拒绝
+/// 具名可恢复 + 关闭释放刷新任务。选择器即原 smoke 的结构口径——`table tbody tr`
+/// 行、真实 `<button>`、模态对话框（生成器 Plain 模式的原生表格 / 原生模态）。
+/// 失败与统计以末行 `RESULT {json}` 回传。
 const VERIFY_MJS: &str = r#"import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -527,31 +529,34 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++
 }
 const bodyText = async () => (await page.locator('body').innerText()) || ''
-const rows = () => page.locator('table > div').last().locator(':scope > div')
+// 结构选择器 = 原 tests/smoke.spec.ts 的口径：`table tbody tr` 行、真实 <button>、模态对话框
+// （生成器 Plain 模式的原生表格 / 原生模态）。
+const rows = () => page.locator('table tbody tr')
+const dialog = () => page.getByRole('alertdialog')
+const dialogText = async () => (await dialog().innerText()) || ''
 const dialogPid = async () => {
-  const t = await page.locator('text=/确定结束 .*\\(PID \\d+\\)/').first().innerText()
-  const m = t.match(/\(PID (\d+)\)/)
+  const m = (await dialogText()).match(/\(PID (\d+)\)/)
   return m ? Number(m[1]) : NaN
 }
 const ctxMenu = () => page.locator('div.fixed.inset-0')
+const cancelDialog = async () => {
+  await dialog().getByRole('button', { name: '取消', exact: true }).click()
+  await dialog().waitFor({ state: 'detached', timeout: 1500 })
+}
 const openKillDialogFor = async pid => {
   const n = await rows().count()
   for (let i = 0; i < n; i++) {
-    const name = (await rows().nth(i).locator(':scope > div').first().innerText()).trim()
+    const name = (await rows().nth(i).locator('td').first().innerText()).trim()
     if (name !== 'node.exe') continue
     await rows().nth(i).click({ button: 'right' })
     await ctxMenu().getByText('结束进程', { exact: true }).waitFor({ state: 'visible', timeout: 1500 })
     await ctxMenu().getByText('结束进程', { exact: true }).click()
-    await page.locator('text=/确定结束 .*\\(PID \\d+\\)/').first().waitFor({ state: 'visible', timeout: 1500 })
+    await dialog().waitFor({ state: 'visible', timeout: 1500 })
     const shown = await dialogPid()
     if (shown === pid) return true
-    await page.getByText('取消', { exact: true }).click()
+    await cancelDialog()
   }
   return false
-}
-const cancelDialog = async () => {
-  await page.getByText('取消', { exact: true }).click()
-  await page.waitForTimeout(80)
 }
 
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' })
@@ -565,27 +570,29 @@ check('T1 退役页负 pin', !body.includes('详细信息视图') && !body.inclu
 check('T2 KPI 四卡', ['CPU', '内存', '磁盘', '网络'].every(m => body.includes(m)))
 check('T2 真实 sysinfo 值（已用 N MB, N>0）', /已用 [1-9]\d* MB/.test(body))
 const initialRows = await rows().count()
-check('T2 真实进程列表 > 0 行', initialRows > 5, `rows=${initialRows}`)
+check('T2 真实进程列表 table tbody tr > 0 行', initialRows > 5, `rows=${initialRows}`)
 const snap0 = stats.snapshot
 await page.waitForTimeout(1300)
 check('真实采集随刷新出现（轮询在跑）', stats.snapshot > snap0, `snapshots=${snap0}->${stats.snapshot}`)
 
 // 表格静止后再定位行：暂停轮询。
-await page.getByText('内存', { exact: true }).last().click()
+await page.locator('table thead th', { hasText: '内存' }).click()
 await page.locator('button', { hasText: '⏸' }).click()
 await page.waitForTimeout(350)
-check('列排序：表头变为 内存 ↓', (await page.locator('table > div').first().innerText()).includes('内存 ↓'))
+check('列排序：表头变为 内存 ↓', (await page.locator('table thead').innerText()).includes('内存 ↓'))
 
 // ── T3（现 UI：右键结束 → 二次确认）：取消路径 ──
+check('初始无对话框', (await dialog().count()) === 0)
 check('在进程表里定位到授权子进程行', await openKillDialogFor(grantedPid), `pid=${grantedPid}`)
+check('T3 确认框可见（标题 + 目标）', (await dialogText()).includes('结束任务') && (await dialogText()).includes('确定结束'))
 await cancelDialog()
-check('T3 取消后确认框复位（PID 0）', (await dialogPid()) === 0)
+check('T3 取消后确认框关闭', (await dialog().count()) === 0)
 check('T3 取消后右键菜单关闭', (await ctxMenu().count()) === 0)
 
 // ── 权限受限：未授权 pid 具名拒 + UI 可恢复 ──
 check('在进程表里定位到未授权子进程行', await openKillDialogFor(ungrantedPid), `pid=${ungrantedPid}`)
 const errorsBefore = consoleErrors.length
-await page.getByText('结束进程', { exact: true }).click()
+await dialog().getByRole('button', { name: '结束进程', exact: true }).click()
 await page.waitForTimeout(250)
 const denial = stats.lastKill403 ? JSON.parse(stats.lastKill403.rsp) : null
 check('未授权结束请求被宿主策略拒绝（HTTP 403）', stats.kill403 === 1, JSON.stringify(stats.lastKill403))
@@ -594,17 +601,15 @@ const newErrors = consoleErrors.slice(errorsBefore)
 // 一次拒绝在 console 留两条：浏览器网络层的 403 资源日志 + 应用层抛出的 `Error: HTTP 403`。
 const appLayer403 = newErrors.filter(t => t.includes('Error: HTTP 403'))
 check('拒绝以生成客户端的既有错误路径浮出（应用层恰一次 Error: HTTP 403）', appLayer403.length === 1, JSON.stringify(newErrors))
-check('拒绝后确认框仍指目标（handler 在 await 处中止）', (await dialogPid()) === ungrantedPid)
-await cancelDialog()
-check('UI 可恢复：取消后确认框复位', (await dialogPid()) === 0)
+check('拒绝后确认框已关闭（取消/确认的关闭语义）', (await dialog().count()) === 0)
 check('UI 可恢复：拒绝后应用仍显示「后端正常」', (await bodyText()).includes('后端正常'))
 
 // ── 授权 pid：经后端真实结束 ──
 check('重新定位授权子进程行', await openKillDialogFor(grantedPid), `pid=${grantedPid}`)
-await page.getByText('结束进程', { exact: true }).click()
+await dialog().getByRole('button', { name: '结束进程', exact: true }).click()
 await page.waitForTimeout(250)
 check('授权结束请求到达后端（HTTP 200 true）', stats.kill200 === 1 && stats.lastKill200 === 'true', `kill200=${stats.kill200} body=${stats.lastKill200}`)
-check('结束后确认框复位（PID 0）', (await dialogPid()) === 0)
+check('结束后确认框关闭', (await dialog().count()) === 0)
 
 // ── 恢复轮询 + T4/T5/T6 ──
 await page.locator('button', { hasText: '▶' }).click()
@@ -644,8 +649,9 @@ await page.waitForTimeout(900)
 check('关闭后释放刷新任务（卸载后零快照请求）', stats.snapshot === atClose, `atClose=${atClose} now=${stats.snapshot}`)
 check('关闭后页面已卸载', (await page.locator('#app').innerText()).trim() === '')
 
-const unexpected = pageErrors.filter(m => !/(^|\W)HTTP 403$/.test(m))
-check('无非预期的未捕获页面异常', unexpected.length === 0, JSON.stringify(pageErrors))
+// 关闭语义用 `return handler()` 交还 promise：async handler 的拒绝经 Vue 的错误
+// 处理落 console（与纯方法处理器一致），**不得**成为未处理拒绝（pageerror）。
+check('无未处理拒绝/未捕获页面异常', pageErrors.length === 0, JSON.stringify(pageErrors))
 const otherConsole = consoleErrors.filter(t => !t.includes('403 (Forbidden)') && !t.includes('Error: HTTP 403'))
 check('除该次 403 外无其他 console error', otherConsole.length === 0, JSON.stringify(otherConsole))
 
@@ -736,5 +742,9 @@ fn p112_a2vue_sys_monitor_browser_e2e() {
     assert_eq!(
         app_layer_403, 1,
         "the denial surfaces exactly once through the generated client's error path: {result}"
+    );
+    assert!(
+        result["pageErrors"].as_array().is_some_and(Vec::is_empty),
+        "the denial must not surface as an unhandled rejection: {result}"
     );
 }
