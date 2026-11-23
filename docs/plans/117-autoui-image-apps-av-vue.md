@@ -628,6 +628,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 原 031 已越过 `back.api` 缺模块，生成仍在缩略图 view 循环具名拒绝（0.878 s，退出 101）。把按钮标签换成字面量的隔离探针只剩循环源 `.thumbnails` 的 `self` 作用域错误。去掉载荷的探针只剩 `item.name` 作用域错误。两者同时避开的探针推进到 `names_list[j]` 用作记录字段值的 `verify.view-escape`。原始诊断 `original-admission-final.log` SHA256 `49D8A608E5F39A003A4378BFC66438945B8FEC6D22EBB8D49BB09DF827E0CF78`，探针输入与收据保留在同一 scratch。原 031 的 AV/Chrome 整体验收、CLI 启动时的私有租用授权和原示例路径解析继续待验。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 111 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-ui `572912ada7` / auto-lang `c3e3bc7624` | next: work/T-02–T-06 修正 031 原缩略图作用域及列表读取，再接原启动授权和实窗、浏览器验收。
 
+2026-11-23 T-02 / T-06 续（round 112）：原版 031 可生成、打包并在 Chrome 发起私有后端调用。
+
+- AutoLang `34440f276e` 让 view 循环读取已被处理器替换的无类型记录列表时使用可写模型，通过既有记录推断检查初值、直接列表替换和从局部构建的列表。循环按钮的标签和点击载荷由当前行绑定。包面处理器条件体中的具名函数语句走既有共享绑定及结果释放，在原版 `.SelectImage` 中实际保留 `request_view`。
+- `cargo test --locked -p ace-av --test conformance plan981_age_package_av:: -- --nocapture` 50/50（执行 0.370 s，整命令 21.607 s）。新增 AV 用例独立执行 0.220 s，实证初始行、字面量替换、使用 `List<Str>` 下标读构建的替换、点击载荷，以及导入函数的失败回滚与成功派发。`scratch/r112-viewer-loop/av-package-checked-call.log` SHA256 `471394B7D8D9D4CEAAC8F3F8FD46FA2CCA69AA77E98C3C1D3DF39DC53AE8F18E`。
+- AutoUI `422cc6152a` 锁定原版 031 受检 SFC 生成。定向 `plan117_viewer_backend` 与 `plan114_file_session` 7/7（执行 4.240 s，整命令 15.694 s）。原前端专例独立执行 2.400 s。`consumer-final.log` SHA256 `CE79B6AFC249A8974654073F6461C5C2FF83BB40AF61E1CCBD1F8F7679E8A429`。原版 029 重生成的 SFC 与第 111 轮逐字节一致，SHA256 `AA73601E9EE621AAC09DC3C3EB167B5D811D77F6CDDC529451712090EC4A2423`。
+- 取未经改写的原 031 前端和后端。生产 `generate_linked_front_sfc` 生成 734,863 字节（2.484 s，`Host.vue` SHA256 `7BE399F43F6AB2D273197DA3AC6C05741D7CB0DF7CA87FAE2B8C384BEC79A81E`）。Vite 构建通过（1.651 s）。Chrome 通过独立验证宿主挂载原前端，用户点击「Open File」创建真实 `BrowserFileServer` 私有租用。原 VM 后端收到私有 `POST /api/viewer/open-file` 与原样参数 `../../tests/fixtures/scenic-320x240.png`。守卫按已授权目录拒绝该相对路径并返回空会话（1.271 s）。`chrome.log` SHA256 `868100BF3B8396D63FAC9F11696C8D93A9ED0E841D2ACFA9B9B4C68875105FB9`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 112 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `34440f276e` / auto-ui `422cc6152a` | next: work/T-02–T-06 接通有授权的原例路径解析及正式运行入口，完成原版 031 的 Chrome 与 Iced 加载、恢复、视口交互和关闭。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
