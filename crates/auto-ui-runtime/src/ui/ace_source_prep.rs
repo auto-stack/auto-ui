@@ -2130,6 +2130,48 @@ fn inject_model_fields(src: &str, fields: &[(String, String)]) -> String {
 }
 
 #[cfg(test)]
+mod plan118_tests {
+    use super::*;
+
+    /// 件④：合成场景名改写成串 prop；真实字段绑定不动；非组名不动。
+    #[test]
+    fn canvas_scene_bindings_rewrite() {
+        let src = "widget App {
+    msg { Init }
+    model {
+        var cells_pts List = []
+        var cells_nodes List = []
+        var plain str = \"x\"
+    }
+    view {
+        canvas (scene: .cells, coords: \"320x320\") {}
+        canvas (scene: .plain, coords: \"32x32\") {}
+        canvas (scene: .unknown, coords: \"8x8\") {}
+    }
+    on { .Init -> { } }
+}
+";
+        let out = rewrite_canvas_scene_bindings(src);
+        assert!(out.contains("scene: \"cells\""), "synthetic name -> string prop");
+        assert!(out.contains("scene: .plain"), "real field binding untouched");
+        assert!(out.contains("scene: .unknown"), "non-group name untouched");
+    }
+
+    /// str/Str 归一：fn 形参/返回与 var 局部；非目标行不动。
+    #[test]
+    fn str_surface_normalizes_fn_scope() {
+        let src = "fn f(ps str, n int) str {
+    var t str = ps.substr(1, 2)
+    return t
+}
+";
+        let out = rewrite_str_surface_for_package(src);
+        assert!(out.contains("fn f(ps Str, n int) Str {"));
+        assert!(out.contains("var t Str ="));
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
