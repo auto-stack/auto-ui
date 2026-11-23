@@ -447,6 +447,13 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 收藏恢复独立 AV 探针通过现有 `std.json.json_is_valid` 与数组首标记核空值、损坏 JSON、非数组对象和有效中文记录（0.277 s）。直接使用 `json_kind_at(value, "")` 的对照没有恢复有效数组。此校验尚未进原项目。 `scratch/r90-preference-validation-r2.log` SHA256 `04D062019F4630B6C4B367BDE1A3D1F7AFB0666ABD23DCC296512661B13B3E81`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 89 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `999765a9` | next: work/T-02–T-03 / T-06。
 
+### 2026-11-23 goal work round 90 — 真实目录与空态使用同一行结构
+
+- 临时 AV 诊断在原 029 上定位到 TreeView 的视图片段请求 `empty`，当前普通行的键包含 `depth`，缺少 `empty`。AutoUI `25f20411` 为普通行补 `empty: false`，给空树哨兵补 `depth: 0`。临时诊断已从工作树清除。 `av/r90-object-miss-window.log` SHA256 `AD3FAF007DC3DAF8E452CE1CE1906DD1F3CAA63B1089A03B697ADDD26F7C8C3A`。
+- TreeView 原作者工具经 AV 验证普通父子行的标记和深度、空树哨兵、Unicode ID 和层级导航。Debug 准备 166.337 s，定向 1/1（0.402 s），AssetBrowser 记录验证与 029 依赖发现各 1/1（0.201 s、1.287 s）。 `av/r90-tree-rows.log` SHA256 `D9FD29E2B72B772F35C27AEEB163C80A89D16177C13D5C121934697C37FFBEC3`。
+- 用真正 Rust 后端复跑 029 原入口和收藏试稿。窗口绘制 12 帧，完整首扫提交 `total=2`，状态文案为“2 项内容 · 全部 · 第 1 页”，无运行时错误，宿主脚本关闭（23.131 s，退出 0）。同一后端的原图和缩略图均返回 HTTP 200，原图 SHA256 与冻结夹具一致。收藏恢复和查看器的交互证据待接续。 `av/r90-tree-shape-window.json` SHA256 `A6EA12D3F47A0D396D8582BF089C67F5D200DEC4D40F13FAAD4803B61B5DACC5`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 90 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `25f20411` | next: work/T-02–T-03 / T-06。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
