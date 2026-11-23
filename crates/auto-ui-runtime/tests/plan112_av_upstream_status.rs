@@ -8,16 +8,20 @@
 //! 无法装载原样 025。
 //!
 //! 本文件是**状态钉点**而非功能用例（先例：`plan105_u03_sfc_status`）：
-//! - `p112_av_control_*`：今天就被接受的对照（最小跨单元 store、同单元 store
-//!   的 handler 调用/字段显示/`storage.set`/`while`）——缺口是具体构造，不是
-//!   「store 语义整体不存在」。
-//! - `p112_av_gap_*`：每个缺口一个最小源 + 首阻断诊断。
+//! - `p112_av_control_*`：今天就被接受的对照——缺口是具体构造，不是「store
+//!   语义整体不存在」。包面上真实 `SysStore` 的 21 个 handler 臂里有 20 个
+//!   语法通过；仅去掉 4 处（2 个 `nil` 比较、2 个 `.as(float)`）后整个 store
+//!   解析通过。
+//! - `p112_av_gap_*`：每个缺口一个最小源 + 首阻断诊断；包面的门序见
+//!   `p112_av_gap_package_store_gates_in_order`。
 //! - `p112_av_real_*`：真实 025 单元的首阻断。
 //!
 //! 上游（auto-lang AGE）落地某项后，对应 `expect_gap` 会因「编译通过」或
 //! 「诊断改名」翻红——届时把该条改为结构断言，并恢复 PLAN-112 的 T-03。
 //! 构造级探针一律走生产路径（prep → load；prep 拒绝时退回裸源）——裸源直送
 //! 会把 prep 已仿真的构造（字段显示、`storage.set`、`while`）误报成缺口。
+//! 探针拼装务必从显式片段构造：把 `raw[..model_start]` 当「头部」会把
+//! `store SysStore {` 行一并带入，拼出重复 store 头而得出「全红」的假象。
 
 #![cfg(feature = "ace-bridge")]
 
@@ -384,43 +388,222 @@ type Snapshot {
     );
 }
 
-/// 真实 `SysStore` 在包面：model 可解析（只差消费者），**handler 体**被文法
-/// 拒绝——缺口在 `on { … }` 的语言构造，不在 store 声明本身。
-#[test]
-fn p112_av_gap_real_store_handlers_rejected_by_package_grammar() {
+/// 真实 `SysStore` 的包面源：`(store 头之前的内容, store 声明本体)`。`use` 行等长
+/// 空白化——包面没有 `back.api` / `fmt` 模块，不让「未解析导入」抢在语法之前。
+fn real_store_source() -> (String, String) {
     let raw = read("src/front/sys_store.at");
-    let (head, rest) = raw.split_once("    model {").expect("model block");
-    let (model, rest) = rest.split_once("    msg {").expect("msg block");
-    let (_, on) = rest.split_once("    on {").expect("on block");
-    let head = format!("{head}    model {{");
-    let msg_trivial = "    msg {\n        Go\n    }\n\n";
+    let store_hdr = raw.find("store SysStore {").expect("store header");
+    let head: String = raw[..store_hdr]
+        .lines()
+        .map(|l| {
+            if l.trim_start().starts_with("use ") {
+                " ".repeat(l.len())
+            } else {
+                l.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    (head, raw[store_hdr..].to_string())
+}
 
-    // 真 model + 平凡 handler：只剩「无消费者」——model 被接受。
-    let mut trivial_arms = String::new();
-    for m in [
-        "Init", "Refresh", "Play", "Pause", "SetSpeed", "SelectTab", "SelectPerfTab", "SelectProc",
-        "RowCtx", "CloseCtx", "RequestKill", "CancelKill", "ConfirmKill", "Sort", "ApplySort",
-        "SortName", "SortCpu", "SortMem", "SortDisk", "SortNet", "SortPid",
-    ] {
-        trivial_arms.push_str(&format!("        .{m} -> {{ .cpu = 0.0 }}\n"));
+/// 把真实 store 的 `on { … }` 切成 `(臂名, 臂文本)`（声明序）。
+fn real_store_arms(store: &str) -> Vec<(String, String)> {
+    let on_open = store.find("    on {").expect("on");
+    let store_close = store.rfind('}').expect("store close");
+    let on_tail = &store[on_open + "    on {".len()..store_close];
+    let on_close = on_tail.rfind('}').expect("on close");
+    let mut arms = Vec::new();
+    let mut cur: Option<(String, String)> = None;
+    for line in on_tail[..on_close].split_inclusive('\n') {
+        let t = line.trim_start();
+        if t.starts_with('.') && t.contains("->") {
+            let name = t[1..].split("->").next().unwrap_or("").trim().to_string();
+            if let Some((n, b)) = cur.take() {
+                arms.push((n, b));
+            }
+            cur = Some((name, String::new()));
+        }
+        if let Some((_, body)) = cur.as_mut() {
+            body.push_str(line);
+        }
     }
-    let real_model = format!(
-        "{head}{model}{msg_trivial}    on {{\n{trivial_arms}    }}\n}}\n"
+    if let Some((n, b)) = cur.take() {
+        arms.push((n, b));
+    }
+    arms
+}
+
+/// 用给定臂重装 store：`real` 中的臂取真实体（经 `neutral`），其余打桩。
+fn assemble_store(store: &str, real: &[&str], neutral: impl Fn(&str) -> String) -> String {
+    let on_open = store.find("    on {").expect("on");
+    // 中和 `storage.set` 会写入 `.__noop`——在 model 里声明它，免得抢在目标门前报错。
+    let pre = store[..on_open].replacen(
+        "    model {\n",
+        "    model {\n        var __noop str = \"\"\n",
+        1,
     );
-    let diag = package_diag(&[unit("sys_store", &real_model)], "app::sys_store");
+    let arms: String = real_store_arms(store)
+        .iter()
+        .map(|(n, b)| {
+            let stem = n.split('(').next().unwrap_or(n);
+            if real.contains(&stem) {
+                neutral(b)
+            } else {
+                format!("        .{n} -> {{ .cpu = 0.0 }}\n")
+            }
+        })
+        .collect();
+    format!("{pre}    on {{\n{arms}    }}\n}}\n")
+}
+
+/// 探针中和（只为揭示下一道门，**不是实现**）：`nil` 比较 → `false`；`.as(float)`
+/// 去掉；`storage.get(k)` → `""`；`storage.set(k, v)` → `.__noop = v`。
+fn neutralize_syntax(body: &str) -> String {
+    body.replace("snap == nil", "false")
+        .replace("snap.summary == nil", "false")
+        .replace(".as(float)", "")
+}
+
+fn neutralize_storage(body: &str) -> String {
+    let mut out = neutralize_syntax(body);
+    for key in [
+        "sysmon.speed",
+        "dash.speed",
+        "sysmon.sort_column",
+        "dash.sort_column",
+        "sysmon.sort_dir",
+        "dash.sort_dir",
+        "sysmon.active_tab",
+        "sysmon.perf_tab",
+    ] {
+        out = out.replace(&format!("storage.get(\"{key}\")"), "\"\"");
+    }
+    while let Some(at) = out.find("storage.set(\"") {
+        let close = out[at..].find('\n').map(|n| at + n).unwrap_or(out.len());
+        let line = out[at..close].to_string();
+        let value = line
+            .trim_start_matches("storage.set(")
+            .trim_end_matches(')')
+            .splitn(2, ',')
+            .nth(1)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        out.replace_range(at..close, &format!(".__noop = {value}"));
+    }
+    out
+}
+
+const SYS_STORE_ALL_ARMS: &[&str] = &[
+    "Init", "Play", "Pause", "SetSpeed", "SelectTab", "SelectPerfTab", "SelectProc", "RowCtx",
+    "CloseCtx", "RequestKill", "CancelKill", "ConfirmKill", "SortName", "SortCpu", "SortMem",
+    "SortDisk", "SortNet", "SortPid", "Sort", "ApplySort", "Refresh",
+];
+
+/// 带最小消费者的包编译首诊断（store 单元 id `sys_store`）。
+fn package_store_diag(store_src: &str) -> String {
+    let consumer = "use sys_store: SysStore\n\nwidget Main {\n    view {\n        text .store.cpu {}\n        \
+                    button \"go\" { onclick: .Go }\n    }\n    on {\n        .Go -> { store.Init() }\n    }\n}\n";
+    package_diag(
+        &[unit("main", consumer), unit("sys_store", store_src)],
+        "app::main",
+    )
+}
+
+/// 包面文法只被真实 `SysStore` 里的两类构造触发：`nil` 比较（`.Refresh` 守卫）与
+/// `.as(float)` 转换。`||`、比较、嵌套 if/else、`while`、列表索引、`storage.*`、
+/// 记录列表上的选择排序、f-string、记录字面量 push 都能解析——此前「handler 体被
+/// 文法拒」的归因过宽。
+#[test]
+fn p112_av_gap_package_grammar_rejects_nil_and_float_cast() {
+    let probe = |stmt: &str| {
+        let src = format!(
+            "store S {{\n    model {{\n        var cpu float = 0.0\n        var label str = \"\"\n        var n int = 0\n    }}\n\n    \
+             msg {{ Go }}\n\n    on {{\n        .Go -> {{\n            {stmt}\n        }}\n    }}\n}}\n"
+        );
+        package_diag(&[unit("s", &src)], "app::s")
+    };
+    for (label, stmt) in [
+        ("nil 比较", "if .cpu == nil { .cpu = 0.0 }"),
+        ("成员 nil 比较", "if x.y == nil { .cpu = 0.0 }"),
+        (".as(float)", "var f float = .n.as(float) / 10.0"),
+    ] {
+        expect_gap(label, &probe(stmt), &["source.syntax", "expected `fn`, found `store`"]);
+    }
+    // 对照：去掉这两个构造的同形语句可解析。
+    for (label, stmt) in [
+        ("bool 比较", "if .cpu < 0.0 || .label == \"\" { .cpu = 0.0 }"),
+        ("整型除以浮点", "var f float = .n / 10.0"),
+    ] {
+        // 单独的 store 单元没有消费者：语法通过的终点就是「无消费者」这条后续诊断。
+        let diag = probe(stmt);
+        assert!(
+            !diag.contains("source.syntax") && diag.contains("no checked widget consumer"),
+            "{label}: 应通过语法，实际: {diag}"
+        );
+    }
+}
+
+/// 对照：真实 `SysStore` 只去掉 4 处（2 个 `nil` 比较、2 个 `.as(float)`）后，整个
+/// store（真实 model + 全部 21 个真实臂）在包面解析通过——停在「无消费者」。
+#[test]
+fn p112_av_control_real_store_parses_without_nil_and_float_cast() {
+    let (head, store) = real_store_source();
+    let src = format!(
+        "{head}\n{}",
+        assemble_store(&store, SYS_STORE_ALL_ARMS, neutralize_syntax)
+    );
+    let diag = package_diag(&[unit("sys_store", &src)], "app::sys_store");
     assert!(
         !diag.contains("source.syntax"),
-        "真实 model 应被包面接受（只差消费者），实际: {diag}"
+        "真实 SysStore 去掉 nil/.as(float) 后应解析通过，实际: {diag}"
     );
+    assert_eq!(
+        real_store_arms(&store).len(),
+        21,
+        "025 SysStore 的 handler 臂数（源变更时同步本钉点）"
+    );
+}
 
-    // 平凡 model + 真 handler：文法拒绝。
-    let real_on = format!(
-        "{head}\n        var cpu float = 0.0\n    }}\n\n{msg_trivial}    on {{{on}"
-    );
+/// 包面的门序（入口 = 最小消费者；每道门只报首错，逐层中和只为露出下一道）：
+/// ① `storage.*` 需所属宿主（`.Init`）→ ② handler 调用词汇：后端 API 调用
+/// （`ConfirmKill` 的 `kill_process`）不在允许集内 → ③ store model 引用的记录类型
+/// （`ProcInfo`）不是可见的模块符号（在 `types.at`，而 `sys_store.at` 未导入）。
+#[test]
+fn p112_av_gap_package_store_gates_in_order() {
+    let (head, store) = real_store_source();
+    let without = |excluded: &[&str], neutral: fn(&str) -> String| {
+        let kept: Vec<&str> = SYS_STORE_ALL_ARMS
+            .iter()
+            .copied()
+            .filter(|arm| !excluded.contains(arm))
+            .collect();
+        format!(
+            "{head}\n{}",
+            assemble_store(&store, &kept, neutral)
+        )
+    };
+    // ① 全部真实臂，仅中和语法。
     expect_gap(
-        "真实 SysStore handler（包面）",
-        &package_diag(&[unit("sys_store", &real_on)], "app::sys_store"),
-        &["source.syntax", "expected `fn`, found `store`"],
+        "门① storage",
+        &package_store_diag(&without(&[], neutralize_syntax)),
+        &["storage calls require the owning host"],
+    );
+    // ② 再中和 storage。
+    expect_gap(
+        "门② handler 调用词汇",
+        &package_store_diag(&without(&[], neutralize_storage)),
+        &[
+            "handler calls require a declared widget message, same-unit store method, or \
+             checked list operation",
+        ],
+    );
+    // ③ 去掉含后端 API 调用的两个臂（`ConfirmKill`、`Refresh`）。
+    expect_gap(
+        "门③ 记录类型可见性",
+        &package_store_diag(&without(&["ConfirmKill", "Refresh"], neutralize_storage)),
+        &["source.module-symbol", "unknown type `ProcInfo`"],
     );
 }
 
@@ -451,7 +634,7 @@ fn p112_av_real_app_first_blocker_on_component_face() {
 }
 
 /// AV 包面 / A2Vue 包面：025 六单元原样装配首阻断 = 消费者找不到 store 字段
-/// （store 单元自身的 handler 文法被拒，见上）。
+/// （store 单元因 `nil` 比较 / `.as(float)` 语法红而出不了 store，见上）。
 #[test]
 fn p112_av_real_app_first_blocker_on_package_faces() {
     let units: Vec<PackageModuleInput> = [
