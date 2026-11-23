@@ -14,6 +14,7 @@ const PENDING: &str = "file_request_pending";
 const PATH: &str = "file_request_path";
 pub(super) const REQUEST_FIELDS: &[&str] = &[PENDING, PATH];
 
+#[derive(Clone)]
 pub(crate) struct FileDirectoryBinding {
     reply: String,
     anchor: Span,

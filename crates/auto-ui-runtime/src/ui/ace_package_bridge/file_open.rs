@@ -11,6 +11,7 @@ const PENDING: &str = "file_open_pending";
 const PATH: &str = "file_open_path";
 pub(super) const REQUEST_FIELDS: &[&str] = &[PENDING, PATH];
 
+#[derive(Clone)]
 pub(crate) struct FileOpenBinding {
     reply: String,
     anchor: Span,

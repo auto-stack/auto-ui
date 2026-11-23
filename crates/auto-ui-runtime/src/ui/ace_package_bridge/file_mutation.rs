@@ -11,6 +11,7 @@ const PATH: &str = "file_mutation_path";
 const TARGET: &str = "file_mutation_target";
 pub(super) const REQUEST_FIELDS: &[&str] = &[PENDING, OPERATION, PATH, TARGET];
 
+#[derive(Clone)]
 pub(crate) struct FileMutationBinding {
     reply: String,
     anchor: Span,

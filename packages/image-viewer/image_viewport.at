@@ -1,4 +1,4 @@
-use auto.json
+use std.json: json_str
 
 // PLAN-089 ImageViewport — 通用受控图片视口（抽取自 031 局部 widget 的正式包）。
 //
@@ -27,6 +27,53 @@ use auto.json
 //   geometry clamp；越界夹取，非有限 zoom / 非法 fit → invalid_view 错误
 //   事件（同配置只报一次）。按钮与滚轮/拖拽共用同一变换算法（视口中心锚）。
 // - 校验/投影逻辑按 087 先例内联在 Init/Tick（widget 内不定义 fn）。
+fn image_viewport_resource_fields(resource_id str, resource_revision str) Str {
+    let id = json_str(resource_id.to(Str))
+    let revision = json_str(resource_revision.to(Str))
+    return "\"resourceId\":" + id + ",\"resourceRevision\":" + revision
+}
+
+fn image_viewport_request_fields(seq int, base_revision int, resource_id str, resource_revision str) Str {
+    let resource = image_viewport_resource_fields(resource_id, resource_revision)
+    return f"\"seq\":${seq},\"baseRevision\":${base_revision}," + resource
+}
+
+fn image_viewport_json_number(value float) Str {
+    if value * 0.0 != 0.0 { return "null" }
+    return f"${value}".to(Str)
+}
+
+fn image_viewport_view_request(seq int, base_revision int, resource_id str, resource_revision str, fit str, zoom float, offset_x float, offset_y float, rotation int, source str) Str {
+    let request = image_viewport_request_fields(seq, base_revision, resource_id, resource_revision)
+    let fit_json = json_str(fit.to(Str))
+    let zoom_json = image_viewport_json_number(zoom)
+    let x_json = image_viewport_json_number(offset_x)
+    let y_json = image_viewport_json_number(offset_y)
+    let source_json = json_str(source.to(Str))
+    // The flat aliases use the same encoded values as the nested view.
+    let view_fields = "\"fit\":" + fit_json + ",\"zoom\":" + zoom_json + ",\"offsetX\":" + x_json + ",\"offsetY\":" + y_json + f",\"rotation\":${rotation}"
+    return "{" + request + ",\"view\":{" + view_fields + "}," + view_fields + ",\"source\":" + source_json + "}"
+}
+
+fn image_viewport_navigation(seq int, base_revision int, resource_id str, resource_revision str, direction str) Str {
+    let request = image_viewport_request_fields(seq, base_revision, resource_id, resource_revision)
+    let direction_json = json_str(direction.to(Str))
+    return "{" + request + ",\"direction\":" + direction_json + "}"
+}
+
+fn image_viewport_loaded(resource_id str, resource_revision str) Str {
+    let resource = image_viewport_resource_fields(resource_id, resource_revision)
+    return "{" + resource + "}"
+}
+
+fn image_viewport_error(code str, message str, resource_id str, resource_revision str) Str {
+    let resource = image_viewport_resource_fields(resource_id, resource_revision)
+    let code_json = json_str(code.to(Str))
+    let message_json = json_str(message.to(Str))
+    return "{\"code\":" + code_json + ",\"message\":" + message_json + "," + resource + "}"
+}
+
+
 widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resourceRevision: str = "", revision: int = 0, fit: str = "contain", zoom: float = 1.0, offsetX: float = 0.0, offsetY: float = 0.0, rotation: int = 0, showToolbar: bool = true, canPrevious: bool = false, canNext: bool = false) {
     msg {
         Init, Tick,
@@ -40,6 +87,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
     }
     model {
         var interval int = 80
+        var view_initialized bool = false
         // 受控快照（Tick 重投影基准；seen_* 与 props 逐字段对齐）。
         var seen_rev int = 0
         var seen_src str = ""
@@ -82,6 +130,11 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
     }
     computed {
         c_ok => .cfg_err == ""
+        cache_identity => f"${.resourceId.len()}:${.resourceId}${.resourceRevision}"
+        needs_projection => !.view_initialized || .revision != .seen_rev || .src != .seen_src || .resourceId != .seen_rid || .resourceRevision != .seen_rrev || .fit != .seen_fit || .zoom != .seen_zoom || .offsetX != .seen_ox || .offsetY != .seen_oy || .rotation != .seen_rot || .canPrevious != .seen_can_prev || .canNext != .seen_can_next
+    }
+    timer {
+        Tick (every_ms: 80, when: .needs_projection)
     }
     view {
         col (style: "w-full h-full min-h-0 flex-col bg-background text-foreground") {
@@ -129,6 +182,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                     } else {
                         image_surface (
                             src: .src,
+                            cache_identity: .cache_identity,
                             alt: .alt,
                             fit: .cur_fit,
                             zoom: .cur_zoom,
@@ -149,57 +203,13 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
     }
     on {
         .Init -> {
-            .seen_rev = .revision
-            .seen_src = .src
-            .seen_rid = .resourceId
-            .seen_rrev = .resourceRevision
-            .seen_fit = .fit
-            .seen_zoom = .zoom
-            .seen_ox = .offsetX
-            .seen_oy = .offsetY
-            .seen_rot = .rotation
-            .seen_can_prev = .canPrevious
-            .seen_can_next = .canNext
-            // 初始基线捕获（换图时同款逻辑；Init 即首图基线）。
-            var ifit str = "contain"
-            if .fit == "contain" { ifit = "contain" }
-            if .fit == "width" { ifit = "width" }
-            if .fit == "one-to-one" { ifit = "one-to-one" }
-            if .fit == "free" { ifit = "free" }
-            .init_fit = ifit
-            .init_zoom = .zoom
-            .init_ox = .offsetX
-            .init_oy = .offsetY
-            .init_rot = ((.rotation % 360) + 360) % 360
-            // 受控重投影。
-            .cur_fit = ifit
-            .cur_zoom = .zoom
-            if .cur_zoom < 0.05 { .cur_zoom = 0.05 }
-            if .cur_zoom > 64.0 { .cur_zoom = 64.0 }
-            .cur_ox = .offsetX
-            .cur_oy = .offsetY
-            .cur_rot = ((.rotation % 360) + 360) % 360
-            // 配置校验（invalid_view 同配置只报一次）。
-            var bad str = ""
-            if .zoom * 0.0 != 0.0 {
-                bad = "image-viewer: zoom must be a finite number (invalid_view)"
-            }
-            if bad == "" {
-                if .fit != "contain" && .fit != "width" && .fit != "one-to-one" && .fit != "free" {
-                    bad = "image-viewer: fit must be contain|width|one-to-one|free (invalid_view)"
-                }
-            }
-            if bad != "" && bad != .prev_err {
-                .seq = .seq + 1
-                ."error"(json.stringify({code: "invalid_view", message: bad, resourceId: .resourceId, resourceRevision: .resourceRevision}))
-            }
-            .prev_err = bad
-            .cfg_err = bad
+            // The browser also initializes the widget when controlled props change.
+            .Tick()
         }
         .Tick -> {
-            if .revision != .seen_rev || .src != .seen_src || .resourceId != .seen_rid || .resourceRevision != .seen_rrev || .fit != .seen_fit || .zoom != .seen_zoom || .offsetX != .seen_ox || .offsetY != .seen_oy || .rotation != .seen_rot || .canPrevious != .seen_can_prev || .canNext != .seen_can_next {
+            if .needs_projection {
                 // 资源换代：手势/门清零，新图初始基线 = 调用方随图提供的视图。
-                if .src != .seen_src || .resourceId != .seen_rid || .resourceRevision != .seen_rrev {
+                if !.view_initialized || .src != .seen_src || .resourceId != .seen_rid || .resourceRevision != .seen_rrev {
                     .dragging = false
                     .g_dx = 0.0
                     .g_dy = 0.0
@@ -217,6 +227,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                     .init_oy = .offsetY
                     .init_rot = ((.rotation % 360) + 360) % 360
                 }
+                .view_initialized = true
                 .seen_rev = .revision
                 .seen_src = .src
                 .seen_rid = .resourceId
@@ -253,7 +264,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                 }
                 if bad != "" && bad != .prev_err {
                     .seq = .seq + 1
-                    ."error"(json.stringify({code: "invalid_view", message: bad, resourceId: .resourceId, resourceRevision: .resourceRevision}))
+                    ."error"(image_viewport_error("invalid_view", bad, .resourceId, .resourceRevision))
                 }
                 .prev_err = bad
                 .cfg_err = bad
@@ -273,7 +284,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                 if nz > 64.0 { nz = 64.0 }
                 if nz != .seen_zoom {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: nz, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, fit: .seen_fit, zoom: nz, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot, source: "zoom"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, nz, .seen_ox, .seen_oy, .seen_rot, "zoom"))
                 }
             }
         }
@@ -306,7 +317,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                                 .cur_oy = .seen_oy
                                 if nx != .seen_ox || ny != .seen_oy {
                                     .seq = .seq + 1
-                                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: nx, offsetY: ny, rotation: .seen_rot}, fit: .seen_fit, zoom: .seen_zoom, offsetX: nx, offsetY: ny, rotation: .seen_rot, source: "gesture"}))
+                                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, .seen_zoom, nx, ny, .seen_rot, "gesture"))
                                 }
                             }
                         }
@@ -319,10 +330,10 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
             if .c_ok && .src != "" {
                 if .seen_fit != "one-to-one" {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "one-to-one", zoom: 1.0, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, fit: "one-to-one", zoom: 1.0, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot, source: "fit"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, "one-to-one", 1.0, .seen_ox, .seen_oy, .seen_rot, "fit"))
                 } else {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "contain", zoom: 1.0, offsetX: 0.0, offsetY: 0.0, rotation: .seen_rot}, fit: "contain", zoom: 1.0, offsetX: 0.0, offsetY: 0.0, rotation: .seen_rot, source: "fit"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, "contain", 1.0, 0.0, 0.0, .seen_rot, "fit"))
                 }
             }
         }
@@ -332,7 +343,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                 if nz > 64.0 { nz = 64.0 }
                 if nz != .seen_zoom {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: nz, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, fit: .seen_fit, zoom: nz, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot, source: "zoom"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, nz, .seen_ox, .seen_oy, .seen_rot, "zoom"))
                 }
             }
         }
@@ -342,7 +353,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                 if nz < 0.05 { nz = 0.05 }
                 if nz != .seen_zoom {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: nz, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, fit: .seen_fit, zoom: nz, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot, source: "zoom"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, nz, .seen_ox, .seen_oy, .seen_rot, "zoom"))
                 }
             }
         }
@@ -350,7 +361,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
             if .c_ok && .src != "" {
                 if .seen_fit != "contain" || .seen_zoom != 1.0 || .seen_ox != 0.0 || .seen_oy != 0.0 {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "contain", zoom: 1.0, offsetX: 0.0, offsetY: 0.0, rotation: .seen_rot}, fit: "contain", zoom: 1.0, offsetX: 0.0, offsetY: 0.0, rotation: .seen_rot, source: "fit"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, "contain", 1.0, 0.0, 0.0, .seen_rot, "fit"))
                 }
             }
         }
@@ -358,7 +369,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
             if .c_ok && .src != "" {
                 if .seen_fit != "width" || .seen_zoom != 1.0 {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "width", zoom: 1.0, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, fit: "width", zoom: 1.0, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot, source: "fit"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, "width", 1.0, .seen_ox, .seen_oy, .seen_rot, "fit"))
                 }
             }
         }
@@ -366,7 +377,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
             if .c_ok && .src != "" {
                 if .seen_fit != "one-to-one" || .seen_zoom != 1.0 {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: "one-to-one", zoom: 1.0, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot}, fit: "one-to-one", zoom: 1.0, offsetX: .seen_ox, offsetY: .seen_oy, rotation: .seen_rot, source: "fit"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, "one-to-one", 1.0, .seen_ox, .seen_oy, .seen_rot, "fit"))
                 }
             }
         }
@@ -375,7 +386,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                 var nr int = (.seen_rot + 270) % 360
                 if nr != .seen_rot {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy, rotation: nr}, fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy, rotation: nr, source: "rotate"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, .seen_zoom, .seen_ox, .seen_oy, nr, "rotate"))
                 }
             }
         }
@@ -384,7 +395,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
                 var nr int = (.seen_rot + 90) % 360
                 if nr != .seen_rot {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy, rotation: nr}, fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy, rotation: nr, source: "rotate"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, .seen_zoom, .seen_ox, .seen_oy, nr, "rotate"))
                 }
             }
         }
@@ -392,32 +403,32 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
             if .c_ok && .src != "" {
                 if .seen_fit != .init_fit || .seen_zoom != .init_zoom || .seen_ox != .init_ox || .seen_oy != .init_oy || .seen_rot != .init_rot {
                     .seq = .seq + 1
-                    ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .init_fit, zoom: .init_zoom, offsetX: .init_ox, offsetY: .init_oy, rotation: .init_rot}, fit: .init_fit, zoom: .init_zoom, offsetX: .init_ox, offsetY: .init_oy, rotation: .init_rot, source: "reset"}))
+                    ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .init_fit, .init_zoom, .init_ox, .init_oy, .init_rot, "reset"))
                 }
             }
         }
         .PanLeft -> {
             if .c_ok && .src != "" {
                 .seq = .seq + 1
-                ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox - 40.0, offsetY: .seen_oy, rotation: .seen_rot}, fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox - 40.0, offsetY: .seen_oy, rotation: .seen_rot, source: "pan"}))
+                ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, .seen_zoom, .seen_ox - 40.0, .seen_oy, .seen_rot, "pan"))
             }
         }
         .PanRight -> {
             if .c_ok && .src != "" {
                 .seq = .seq + 1
-                ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox + 40.0, offsetY: .seen_oy, rotation: .seen_rot}, fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox + 40.0, offsetY: .seen_oy, rotation: .seen_rot, source: "pan"}))
+                ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, .seen_zoom, .seen_ox + 40.0, .seen_oy, .seen_rot, "pan"))
             }
         }
         .PanUp -> {
             if .c_ok && .src != "" {
                 .seq = .seq + 1
-                ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy - 40.0, rotation: .seen_rot}, fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy - 40.0, rotation: .seen_rot, source: "pan"}))
+                ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, .seen_zoom, .seen_ox, .seen_oy - 40.0, .seen_rot, "pan"))
             }
         }
         .PanDown -> {
             if .c_ok && .src != "" {
                 .seq = .seq + 1
-                ."viewRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, "view": {fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy + 40.0, rotation: .seen_rot}, fit: .seen_fit, zoom: .seen_zoom, offsetX: .seen_ox, offsetY: .seen_oy + 40.0, rotation: .seen_rot, source: "pan"}))
+                ."viewRequested"(image_viewport_view_request(.seq, .revision, .resourceId, .resourceRevision, .seen_fit, .seen_zoom, .seen_ox, .seen_oy + 40.0, .seen_rot, "pan"))
             }
         }
         .TogglePanPad -> {
@@ -429,13 +440,13 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
         .RequestPrevious -> {
             if .canPrevious {
                 .seq = .seq + 1
-                ."navigateRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, direction: "previous"}))
+                ."navigateRequested"(image_viewport_navigation(.seq, .revision, .resourceId, .resourceRevision, "previous"))
             }
         }
         .RequestNext -> {
             if .canNext {
                 .seq = .seq + 1
-                ."navigateRequested"(json.stringify({seq: .seq, baseRevision: .revision, resourceId: .resourceId, resourceRevision: .resourceRevision, direction: "next"}))
+                ."navigateRequested"(image_viewport_navigation(.seq, .revision, .resourceId, .resourceRevision, "next"))
             }
         }
         .OnLoaded -> {
@@ -443,7 +454,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
             if !.loaded_once {
                 .loaded_once = true
                 .err_reported = false
-                ."loaded"(json.stringify({resourceId: .resourceId, resourceRevision: .resourceRevision}))
+                ."loaded"(image_viewport_loaded(.resourceId, .resourceRevision))
             }
         }
         .OnError -> {
@@ -453,7 +464,7 @@ widget ImageViewport (src: str = "", alt: str = "", resourceId: str = "", resour
             if !.err_reported {
                 .err_reported = true
                 .loaded_once = false
-                ."error"(json.stringify({code: "load_failed", message: "image failed to load", resourceId: .resourceId, resourceRevision: .resourceRevision}))
+                ."error"(image_viewport_error("load_failed", "image failed to load", .resourceId, .resourceRevision))
             }
         }
     }

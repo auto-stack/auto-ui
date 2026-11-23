@@ -51,7 +51,11 @@ const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
 const FILE_SESSION_PREFIX: &str = "file-session-";
 
 mod browser_files;
-pub use browser_files::{start_file_browser, start_file_browser_with_writes, BrowserFileServer};
+pub use browser_files::{
+    start_file_browser, start_file_browser_with_writes, start_file_viewer, BrowserFileServer,
+};
+#[cfg(feature = "ace-bridge")]
+pub(crate) mod native_files;
 
 /// 一个 app 后端的装载描述。
 #[derive(Debug, Clone, PartialEq)]
@@ -155,6 +159,7 @@ struct SessionHandle {
     file_access: Option<Arc<FileSession>>,
 }
 
+#[derive(Default)]
 struct ProxyShared {
     browser_files: Option<Arc<browser_files::BrowserFiles>>,
     /// app_id → session 请求通道。PLAN-037 T-01: listener 连接线程与宿主
@@ -694,18 +699,26 @@ fn route_request(shared: &ProxyShared, req: &ParsedRequest) -> ProxyReply {
         }
     }
     // Clone the sender under the lock and release it before waiting on the VM.
-    let tx = shared
+    let session = shared
         .sessions
         .lock()
         .unwrap()
         .get(&app_id)
-        .map(|handle| handle.tx.clone());
-    let Some(tx) = tx else {
+        .map(|handle| (handle.tx.clone(), handle.file_access.clone()));
+    let Some((tx, file_access)) = session else {
         return ProxyReply::json(
             404,
             error_json(&format!("back-proxy: unknown app `{app_id}`")),
         );
     };
+    if let Some(access) = file_access {
+        if sub_path.starts_with("/api/__auto/media/") {
+            return access
+                .media_response(&req.method, &sub_path, media_validator(req))
+                .map(media_reply)
+                .unwrap_or_else(|| ProxyReply::json(404, error_json("media unavailable")));
+        }
+    }
     let (reply_tx, reply_rx) = mpsc::channel::<ProxyReply>();
     let sent = tx.send(ProxyRequest {
         method: req.method.clone(),
@@ -722,7 +735,14 @@ fn route_request(shared: &ProxyShared, req: &ParsedRequest) -> ProxyReply {
         );
     }
     match reply_rx.recv_timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS)) {
-        Ok(reply) => reply,
+        Ok(mut reply) => {
+            if app_id.starts_with(FILE_SESSION_PREFIX) {
+                if let Some(files) = &shared.browser_files {
+                    files.scope_media_uri(&app_id, &mut reply);
+                }
+            }
+            reply
+        }
         Err(_) => ProxyReply::json(
             502,
             error_json(&format!("back-proxy: session for `{app_id}` timed out")),
@@ -748,36 +768,42 @@ fn route_shared_resource(
     // 不透明 `/api/__auto/media/{id}/{rev}` URI，session 内 auto.image 原生
     // 创建的条目同进程可读——字节保真 + ETag/304 语义直答）。
     if sub_path.starts_with("/api/__auto/media/") {
-        let if_none = req
-            .headers
-            .iter()
-            .find(|(k, _)| k == "if-none-match")
-            .map(|(_, v)| v.clone());
-        if let Some(resp) = auto_lang_core::vm::ffi::stdlib::media_response_for_vm_request(
+        return auto_lang_core::vm::ffi::stdlib::media_response_for_vm_request(
             &req.method,
             sub_path,
-            if_none.as_deref(),
-        ) {
-            let mut content_type = "application/octet-stream".to_string();
-            let mut extra_headers = Vec::new();
-            for (k, v) in &resp.headers {
-                if k.eq_ignore_ascii_case("content-type") {
-                    content_type = v.clone();
-                } else {
-                    extra_headers.push((k.clone(), v.clone()));
-                }
-            }
-            let body = resp.body.unwrap_or_else(|| Arc::from(Vec::new()));
-            return Some(ProxyReply::Stream {
-                status: resp.status,
-                content_type,
-                extra_headers,
-                content_length: body.len() as u64,
-                reader: Box::new(std::io::Cursor::new(body)),
-            });
-        }
+            media_validator(req),
+        ).map(media_reply);
     }
     None
+}
+
+fn media_validator(req: &ParsedRequest) -> Option<&str> {
+    req.headers.iter().find(|(key, _)| key == "if-none-match").map(|(_, value)| value.as_str())
+}
+
+fn media_reply(response: auto_media_core::image_pipeline::MediaHttpResponse) -> ProxyReply {
+    let mut content_type = "application/octet-stream".to_owned();
+    let mut advertised_length = None;
+    let mut extra_headers = Vec::new();
+    for (key, value) in response.headers {
+        if key.eq_ignore_ascii_case("content-type") {
+            content_type = value;
+        } else if key.eq_ignore_ascii_case("content-length") {
+            advertised_length = value.parse::<u64>().ok();
+        } else {
+            extra_headers.push((key, value));
+        }
+    }
+    let content_length = response.body.as_ref().map(|body| body.len() as u64)
+        .or(advertised_length).unwrap_or_default();
+    let body = response.body.unwrap_or_else(|| Arc::from(Vec::new()));
+    ProxyReply::Stream {
+        status: response.status,
+        content_type,
+        extra_headers,
+        content_length,
+        reader: Box::new(std::io::Cursor::new(body)),
+    }
 }
 
 fn write_response(stream: &mut TcpStream, reply: ProxyReply, no_store: bool) -> std::io::Result<()> {
@@ -844,6 +870,9 @@ fn write_response(stream: &mut TcpStream, reply: ProxyReply, no_store: bool) -> 
         head.push_str("Cache-Control: no-store\r\n");
     }
     for (k, v) in &extra_headers {
+        if no_store && k.eq_ignore_ascii_case("cache-control") {
+            continue;
+        }
         head.push_str(&format!("{k}: {v}\r\n"));
     }
     match body_source {
@@ -1071,26 +1100,17 @@ impl ProxyShared {
     ) -> Option<ProxyReply> {
         let photos = self.native_photos.lock().unwrap();
         let state = photos.get(app_id)?;
-        if sub_path.starts_with("/api/photos/scan") && req.method == "GET" {
+        if sub_path == "/api/photos/scan" && req.method == "GET" {
             // 非递归浏览模型：`?dir=<相对路径>`（缺省根目录）。非法段由
             // list_directory 拒（400）。
-            let dir = sub_path
-                .split('?')
-                .nth(1)
-                .and_then(|q| q.split('&').find_map(|p| p.strip_prefix("dir=")))
-                .map(|v| v.to_string())
-                .unwrap_or_default();
-            return Some(Self::photo_scan(state, &dir));
+            let query = parse_query(&req.query);
+            let dir = query.get("dir").map(String::as_str).unwrap_or_default();
+            return Some(Self::photo_scan(state, dir));
         }
-        if let Some(rest) = sub_path.strip_prefix("/api/photos/thumb/") {
-            let id = rest.split(['?', '&']).next().unwrap_or("");
-            let width = rest
-                .split('?')
-                .nth(1)
-                .and_then(|q| q.split('&').find_map(|p| p.strip_prefix("w=")))
-                .and_then(|v| v.parse::<u32>().ok())
-                .unwrap_or(260);
-            if !id.is_empty() && (req.method == "GET" || req.method == "HEAD") {
+        if let Some(id) = sub_path.strip_prefix("/api/photos/thumb/") {
+            if !id.is_empty() && matches!(req.method.as_str(), "GET" | "HEAD") {
+                let width = parse_query(&req.query).get("w")
+                    .and_then(|value| value.parse().ok()).unwrap_or(260);
                 return Some(Self::photo_thumb(state, id, width, req.method == "HEAD"));
             }
         }

@@ -63,14 +63,7 @@ impl ImageSurfaceCarry {
             ImageSurfaceCarry::Pan { dx, dy, phase } => vec![
                 auto_val::Value::Double(*dx as f64),
                 auto_val::Value::Double(*dy as f64),
-                auto_val::Value::Str(
-                    match phase {
-                        ImageSurfacePanPhase::Start => "start",
-                        ImageSurfacePanPhase::Move => "move",
-                        ImageSurfacePanPhase::End => "end",
-                    }
-                    .into(),
-                ),
+                auto_val::Value::Str(phase.as_str().into()),
             ],
             ImageSurfaceCarry::DoubleClick { .. } => Vec::new(),
         }

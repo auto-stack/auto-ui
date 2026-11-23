@@ -22,7 +22,8 @@
 pub fn tv_member(list List, id str) bool {
     var i int = 0
     while i < list.len() {
-        if list[i] == id {
+        let item str = list[i]
+        if item == id {
             return true
         }
         i = i + 1
@@ -46,8 +47,7 @@ pub fn tv_total_nodes(nodes List) int {
     }
     while stack.len() > 0 {
         var top int = stack.len() - 1
-        var nd = stack[top]
-        stack.pop()
+        var nd = stack.remove(top)
         n = n + 1
         var kids List = nd.children
         var k int = kids.len()
@@ -59,6 +59,32 @@ pub fn tv_total_nodes(nodes List) int {
     return n
 }
 
+/// Escape only the two ASCII token characters. Append whole spans of the
+/// original ID so Unicode is preserved even when slice indices are UTF-8 bytes.
+fn tv_escape_id(id str) Str {
+    if !id.contains("!") && !id.contains("|") {
+        return id.to(Str)
+    }
+    var result Str = ""
+    var start int = 0
+    var cursor int = 0
+    let end int = id.len()
+    while cursor < end {
+        let mark str = id.slice(cursor, cursor + 1)
+        if mark == "!" || mark == "|" {
+            result = result + id.slice(start, cursor)
+            if mark == "!" {
+                result = result + "!0"
+            } else {
+                result = result + "!1"
+            }
+            start = cursor + 1
+        }
+        cursor = cursor + 1
+    }
+    return result + id.slice(start, end)
+}
+
 /// 首个重复节点 ID（空串 = 无重复）。深度优先，遇到即返回，用于具名结构错误。
 ///
 /// 用**拼接字符串 + 子串包含**实现，而不是 `tv_member` 的逐元素线性扫描：
@@ -66,7 +92,7 @@ pub fn tv_total_nodes(nodes List) int {
 /// 而非 VM 字节码迭代，因此 1000 节点也在毫秒级；旧的 `tv_member(seen, id)` 每结点
 /// 要跑 len(seen) 次 VM 迭代（实测 1000 节点约 14s，耗尽预算并渲染 0 行）。
 /// id 两端包 `|`，避免 `ab` 误命中 `b` 之类的子串误报。
-pub fn tv_duplicate_id(nodes List) str {
+pub fn tv_duplicate_id(nodes List) Str {
     // Token framing: escape `|` out of ids, then wrap each token as |id|. Two
     // earlier bugs are avoided by doing it this way (review N-02a/b):
     //   - dropping the `|`-fallback keeps every id on the native `contains` path,
@@ -86,9 +112,9 @@ pub fn tv_duplicate_id(nodes List) str {
     }
     while stack.len() > 0 {
         var top int = stack.len() - 1
-        var nd = stack[top]
-        stack.pop()
-        if nd.id == "" {
+        var nd = stack.remove(top)
+        let id str = nd.id
+        if id == "" {
             // Distinguishable from the "no duplicate" sentinel by construction:
             // the caller sees a named error, not an empty result.
             return "<empty-id>"
@@ -98,10 +124,9 @@ pub fn tv_duplicate_id(nodes List) str {
         // NOT injective — an id literally containing `!!` escapes to the same token
         // as an id containing `|`, which reported a false duplicate for a valid
         // tree (measured: `a|b` + `a!!b` -> 0 actionable rows).
-        var esc str = nd.id.replace("!", "!0").replace("|", "!1")
-        var token str = "|" + esc + "|"
+        var token str = "|" + tv_escape_id(id) + "|"
         if seen.contains(token) {
-            return nd.id
+            return id.to(Str)
         }
         seen = seen + token
         var kids List = nd.children
@@ -125,8 +150,7 @@ pub fn tv_count_rows(nodes List, expanded List, disabled List) int {
     }
     while stack.len() > 0 {
         var top int = stack.len() - 1
-        var nd = stack[top]
-        stack.pop()
+        var nd = stack.remove(top)
         if !tv_member(disabled, nd.id) {
             n = n + 1
         }
@@ -144,8 +168,8 @@ pub fn tv_count_rows(nodes List, expanded List, disabled List) int {
 
 /// 文件名 → 图标名（lucide 名）。纯展示映射：不探测文件系统、不判断真实
 /// 文件类型，只看显示文本后缀——与四示例既有 `ext_icon` 语义一致。
-pub fn tv_ext_icon(name str) str {
-    var ic str = "file"
+pub fn tv_ext_icon(name str) Str {
+    var ic Str = "file"
     if name.ends_with(".png") || name.ends_with(".jpg") || name.ends_with(".jpeg") || name.ends_with(".gif") || name.ends_with(".webp") || name.ends_with(".svg") {
         ic = "image"
     } else {
@@ -163,9 +187,9 @@ pub fn tv_ext_icon(name str) str {
 /// 行图标：`icon` 显式指定优先；`directory` 模式下按目录/文件派生
 /// （目录按展开态取 folder-open/folder，文件按后缀取 file 族）；
 /// 非 directory 模式且未显式指定 = 无图标。
-pub fn tv_row_icon(nd_icon str, label str, kind str, has_kids bool, open bool, directory bool) str {
+pub fn tv_row_icon(nd_icon str, label str, kind str, has_kids bool, open bool, directory bool) Str {
     if nd_icon != "" {
-        return nd_icon
+        return nd_icon.to(Str)
     }
     if !directory {
         return ""
@@ -216,19 +240,20 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
     }
     while seed.len() > 0 {
         var stop int = seed.len() - 1
-        var entry = seed[stop]
-        seed.pop()
+        var entry = seed.remove(stop)
         var nd = entry[0]
         var lvl int = entry[1]
         var kids List = nd.children
-        var leaf bool = nd.is_leaf == true
+        let id str = nd.id
+        let kind str = nd.kind
+        let leaf bool = nd.is_leaf
         // A directory with no children loaded YET is still expandable: it is
         // not a leaf, so the app must be able to request expansion (lazy
         // children arrive afterwards). Gating on kids.len() alone treated a
         // not-yet-loaded directory as a leaf, which made `images` in the demo
         // (kind "dir", children [], is_leaf false) un-expandable — Plan §5
         // requires those to raise a request rather than be treated as leaves.
-        var is_dir_node bool = nd.kind == "dir"
+        var is_dir_node bool = kind == "dir"
         var has_kids bool = !leaf && (kids.len() > 0 || is_dir_node)
         var dis bool = tv_member(disabled, nd.id)
         var op bool = false
@@ -248,11 +273,11 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
         var row_ix int = out.len()
         var sel bool = false
         if selected != "" {
-            if selected == nd.id {
+            if selected == id {
                 sel = true
             }
         }
-        var ic str = tv_row_icon(nd.icon, nd.label, nd.kind, has_kids, op, directory)
+        var ic Str = tv_row_icon(nd.icon, nd.label, kind, has_kids, op, directory)
         // With a duplicate id present the tree is structurally invalid: emit the
         // row as non-actionable metadata instead of publishing a second
         // ambiguous target for the same id. The named error is raised
@@ -262,7 +287,7 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
         if dup {
             dis_row = true
         }
-        out.push({ id: nd.id, label: nd.label, has_kids: has_kids, open: op, disabled: dis_row, selected: sel, focused: row_ix == focus, loading: tv_member(loading, nd.id), error: tv_member(error, nd.id), leaf: !has_kids, icon: ic, badge: nd.badge, depth: lvl })
+        out.push({ id: nd.id, label: nd.label, has_kids: has_kids, open: op, disabled: dis_row, selected: sel, focused: row_ix == focus, loading: tv_member(loading, nd.id), error: tv_member(error, nd.id), leaf: !has_kids, icon: ic, badge: nd.badge, depth: lvl, empty: false })
         if op {
             var j int = kids.len()
             while j > 0 {
@@ -283,13 +308,13 @@ pub fn tv_derive_rows(nodes List, expanded List, selected str, disabled List, lo
     // Emitting the sentinel from the same function that produces `rows` keeps
     // the empty state on the one derivation path that is proven live.
     if out.len() == 0 {
-        out.push({ id: "", label: "空树无可操作行", has_kids: false, open: false, disabled: true, selected: false, focused: false, loading: false, error: false, leaf: true, icon: "", badge: "", empty: true })
+        out.push({ id: "", label: "空树无可操作行", has_kids: false, open: false, disabled: true, selected: false, focused: false, loading: false, error: false, leaf: true, icon: "", badge: "", depth: 0, empty: true })
     }
     return out
 }
 
 /// 焦点序 → 节点 ID（越界/无行返回空串，调用方不得据此发空 ID 回调）。
-pub fn tv_focus_id(rows List, index int) str {
+pub fn tv_focus_id(rows List, index int) Str {
     if index < 0 {
         return ""
     }
@@ -301,8 +326,8 @@ pub fn tv_focus_id(rows List, index int) str {
 
 /// 展开状态下当前焦点节点的可见父节点 ID（无父/父不可见返回空串）。
 /// 左键折叠或上移到父行由调用方按自己语义选择，这里只给可见祖先。
-pub fn tv_visible_parent(nodes List, expanded List, target str) str {
-    var parent str = ""
+pub fn tv_visible_parent(nodes List, expanded List, target str) Str {
+    var parent Str = ""
     var found bool = false
     var stack List = []
     var parents List = []
@@ -314,11 +339,10 @@ pub fn tv_visible_parent(nodes List, expanded List, target str) str {
     }
     while stack.len() > 0 {
         var top int = stack.len() - 1
-        var nd = stack[top]
-        var par str = parents[top]
-        stack.pop()
-        parents.pop()
-        if nd.id == target {
+        var nd = stack.remove(top)
+        var par Str = parents.remove(top)
+        let id str = nd.id
+        if id == target {
             parent = par
             found = true
         }
@@ -345,8 +369,8 @@ pub fn tv_visible_parent(nodes List, expanded List, target str) str {
 /// 可见祖先」；本函数无条件下钻整棵树，用于**焦点修复**——父节点折叠后，被聚焦
 /// 的子节点已不在 expanded 集合里，若仍走可见祖先就会找不到 target 并返回空串，
 /// 使修复静默失效（re-review F-05 实测）。
-pub fn tv_struct_parent(nodes List, target str) str {
-    var parent str = ""
+pub fn tv_struct_parent(nodes List, target str) Str {
+    var parent Str = ""
     var found bool = false
     var stack List = []
     var parents List = []
@@ -358,11 +382,10 @@ pub fn tv_struct_parent(nodes List, target str) str {
     }
     while stack.len() > 0 {
         var top int = stack.len() - 1
-        var nd = stack[top]
-        var par str = parents[top]
-        stack.pop()
-        parents.pop()
-        if nd.id == target {
+        var nd = stack.remove(top)
+        var par Str = parents.remove(top)
+        let id str = nd.id
+        if id == target {
             parent = par
             found = true
         }
@@ -389,7 +412,8 @@ pub fn tv_repair_focus(rows List, nodes List, expanded List, focus_id str, fallb
     while i < rows.len() {
         var r = rows[i]
         if !r.disabled {
-            if r.id == focus_id {
+            let id str = r.id
+            if id == focus_id {
                 return i
             }
         }
@@ -401,13 +425,14 @@ pub fn tv_repair_focus(rows List, nodes List, expanded List, focus_id str, fallb
     // Structural parent, NOT `tv_visible_parent`: after a collapse the focused
     // child is gone from `expanded`, so the visibility-filtered walk cannot find
     // it and the repair would silently do nothing (re-review F-05).
-    var anc str = tv_struct_parent(nodes, focus_id)
+    var anc Str = tv_struct_parent(nodes, focus_id)
     if anc != "" {
         var j int = 0
         while j < rows.len() {
             var rj = rows[j]
             if !rj.disabled {
-                if rj.id == anc {
+                let id str = rj.id
+                if id == anc {
                     return j
                 }
             }

@@ -4,6 +4,20 @@ use auto_project_model::{descriptor::SourceInfo, generation_request::GenerationR
 use auto_ui_tools::vue::{incremental_compile_changed, VueProject};
 
 #[test]
+fn ace_project_uses_the_checked_package_for_the_original_photo_gallery() {
+    std::env::set_var("AUTO_UI_ACE_VUE", "1");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui/029-photo-gallery");
+    let mut request = GenerationRequest::dynamic(SourceInfo::from_path(root.join("pac.at")));
+    request.identity.name = Some("photo-gallery".into());
+    let project = VueProject::from_workspace_with_request(&root, &request)
+        .expect("the original gallery is admitted as a checked Vue package");
+    assert!(project.app_vue_code.contains("<AcePackageView"));
+    assert!(project.app_vue_code.contains("function*"));
+    assert!(project.app_vue_code.contains("photo-gallery.favs"));
+    assert!(!project.has_routes);
+}
+
+#[test]
 fn ace_route_project_emits_and_refreshes_the_full_page_set() {
     std::env::set_var("AUTO_UI_ACE_VUE", "1");
     let workspace = tempfile::tempdir().expect("temporary Vue project");

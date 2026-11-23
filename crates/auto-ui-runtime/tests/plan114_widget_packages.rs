@@ -357,6 +357,99 @@ fn p107_chart_builder_uses_types_of_selected_bound_record_fields() {
 }
 
 #[test]
+fn checked_image_surface_delivers_iced_gestures_with_the_current_media_binding() {
+    use auto_ui_runtime::ui::{
+        ace_node_desktop::{AceNodeDesktopWindow, NodeDesktopMsg, StepOutcome},
+        iced::{image_surface::ImageSurfacePanPhase, image_surface_input::ImageSurfaceCarry},
+        Component, View,
+    };
+
+    let page = r#"widget Gallery {
+        use { package: official from "components" }
+        view { Surface {} }
+    }"#;
+    let surface = r#"widget Surface {
+        msg { Wheel(float), Pan(float, float, str), Reset }
+        model {
+            var zoom float = 1.5
+            var ox float = 0.0
+            var oy float = 0.0
+            var last_phase str = ""
+        }
+        on {
+            .Wheel(delta float) -> { .zoom = .zoom + delta }
+            .Pan(dx float, dy float, phase str) -> {
+                .ox = dx
+                .oy = dy
+                .last_phase = phase
+            }
+            .Reset -> { .zoom = 1.5 }
+        }
+        view {
+            image_surface (
+                src: "/api/__auto/media/7/2", alt: .last_phase,
+                zoom: .zoom, offset_x: .ox, offset_y: .oy, rotation: -90,
+                onwheel: .Wheel(nevent.deltaY), onpan: .Pan(n0, n1, n2), ondblclick: .Reset
+            ) {}
+        }
+    }"#;
+    let mut bridge = NodeDesktopBridge::load_package(
+        vec![unit("app", "main", page), unit("official", "surface", surface)],
+        "app::main",
+        1,
+    ).expect("load the checked image surface package");
+    ui980::require_prepared();
+    bridge.open().unwrap();
+    let mut window = AceNodeDesktopWindow::default();
+
+    fn projected(view: &View<NodeDesktopMsg>) -> Option<&View<NodeDesktopMsg>> {
+        match view {
+            View::ImageSurface { .. } => Some(view),
+            View::Column { children, .. } | View::Row { children, .. } => {
+                children.iter().find_map(projected)
+            }
+            View::Container { child, .. } | View::Scrollable { child, .. } => projected(child),
+            _ => None,
+        }
+    }
+
+    let initial = window.view();
+    let Some(View::ImageSurface { src, zoom, rotation, on_wheel: Some(wheel), .. }) = projected(&initial) else {
+        panic!("expected a native surface and wheel callback in {initial:?}");
+    };
+    assert_eq!((src.as_str(), *zoom, *rotation), ("/api/__auto/media/7/2", 1.5, 270));
+    window.on(wheel.call(ImageSurfaceCarry::Pan { dx: 5.0, dy: 0.0, phase: ImageSurfacePanPhase::Move }));
+    assert!(matches!(bridge.step(), StepOutcome::Idle));
+    let old_wheel = wheel.call(ImageSurfaceCarry::Wheel { delta_y: 0.5, x: 3.0, y: 4.0 });
+    window.on(old_wheel.clone());
+    assert!(matches!(bridge.step(), StepOutcome::Dispatched { msg, .. } if msg == "Wheel"));
+    window.on(old_wheel);
+    assert!(matches!(bridge.step(), StepOutcome::Idle));
+
+    let zoomed = window.view();
+    let Some(View::ImageSurface { zoom, on_pan: Some(pan), .. }) = projected(&zoomed) else {
+        panic!("expected a pan callback in {zoomed:?}");
+    };
+    assert_eq!(*zoom, 2.0);
+    for (dx, dy, phase) in [(0.0, 0.0, ImageSurfacePanPhase::Start), (7.0, -3.0, ImageSurfacePanPhase::Move)] {
+        window.on(pan.call(ImageSurfaceCarry::Pan { dx, dy, phase }));
+    }
+    for expected in ["start", "move"] {
+        let outcome = bridge.step();
+        assert!(matches!(&outcome, StepOutcome::Dispatched { msg, .. } if msg == "Pan"), "{outcome:?}");
+        assert!(matches!(projected(&window.view()), Some(View::ImageSurface { alt, .. }) if alt == expected));
+    }
+    let panned = window.view();
+    let Some(View::ImageSurface { offset_x, offset_y, on_double_click: Some(reset), .. }) = projected(&panned) else {
+        panic!("expected a panned image surface in {panned:?}");
+    };
+    assert_eq!((*offset_x, *offset_y), (7.0, -3.0));
+    window.on(reset.call(ImageSurfaceCarry::DoubleClick { x: 3.0, y: 4.0 }));
+    assert!(matches!(bridge.step(), StepOutcome::Dispatched { msg, .. } if msg == "Reset"));
+    bridge.close_session().unwrap();
+}
+
+#[test]
 fn p107_checked_child_svg_updates_the_native_document() {
     use auto_ui_runtime::ui::{
         ace_node_desktop::{current_session, AceNodeDesktopWindow, NodeDesktopMsg, StepOutcome},
@@ -1213,6 +1306,7 @@ widget ChartCaption { view { text "Series 1" { style: caption_text } } }
 "#).unwrap();
     let app = front.join("app.at");
     let source = r#"
+use auto.json
 widget App {
     use { package: official from "components" }
     view { ChartCaption {} }
@@ -1462,6 +1556,230 @@ fn guarded_root_timer_follows_the_live_package_instance() {
     assert!(matches!(bridge.step(), StepOutcome::Dispatched { instance: 0, msg, states }
         if msg == "BootTick" && states.contains(&("ticks".into(), "1".into()))));
     bridge.close_session().unwrap();
+}
+
+#[test]
+fn guarded_child_timer_follows_keyed_mounts_and_restarts_after_remount() {
+    use auto_ui_runtime::ui::ace_node_desktop::{current_session, AceNodeDesktopWindow, StepOutcome};
+    use auto_ui_runtime::ui::Component;
+    use std::time::Duration;
+
+    let page = r#"widget App {
+    use { package: pulse from "./pulse" }
+    msg { Reverse, Toggle }
+    model {
+        var visible bool = true
+        var labels List<str> = ["first", "second"]
+    }
+    on {
+        .Reverse -> { .labels = ["second", "first"] }
+        .Toggle -> { .visible = !.visible }
+    }
+    view {
+        if .visible {
+            for label in .labels {
+                Pulse (key: label, label: label) {}
+            }
+        }
+    }
+}
+"#;
+    let child = r#"widget Pulse (label: str) {
+    msg { PulseTick }
+    timer { PulseTick (every_ms: 400, when: .label == "first" && .ticks == 0) }
+    model { var ticks int = 0 }
+    on { .PulseTick -> { .ticks += 1 } }
+    view { text f"${.label}: ${.ticks}" {} }
+}
+"#;
+    ui980::require_prepared();
+    let mut bridge = NodeDesktopBridge::load_package(
+        vec![unit("app", "app", page), unit("pulse", "panel", child)], "app::app", 1,
+    ).unwrap();
+    bridge.open().unwrap();
+    let window = AceNodeDesktopWindow::default();
+    let view = || format!("{:?}", window.view());
+    let revision = || current_session(|session| session.package_frame(0).unwrap().revision).unwrap();
+    assert!(view().contains("first: 0") && view().contains("second: 0"));
+
+    let wait = Duration::from_millis(420);
+    std::thread::sleep(wait);
+    assert!(matches!(bridge.dispatch_typed(0, "Reverse", &[]), StepOutcome::Dispatched { .. }));
+    let reordered = view();
+    assert!(reordered.find("second: 0").unwrap() < reordered.find("first: 0").unwrap());
+    assert!(matches!(bridge.step(), StepOutcome::Dispatched { instance: 0, msg, .. } if msg == "PulseTick"));
+    assert!(view().contains("first: 1") && view().contains("second: 0"));
+    let after_tick = revision();
+    std::thread::sleep(wait);
+    assert_eq!(bridge.step(), StepOutcome::Idle);
+    assert_eq!(revision(), after_tick);
+
+    assert!(matches!(bridge.dispatch_typed(0, "Toggle", &[]), StepOutcome::Dispatched { .. }));
+    assert!(!view().contains("first:"));
+    assert!(matches!(bridge.dispatch_typed(0, "Toggle", &[]), StepOutcome::Dispatched { .. }));
+    assert!(view().contains("first: 0"));
+    std::thread::sleep(wait);
+    assert!(matches!(bridge.dispatch_typed(0, "Toggle", &[]), StepOutcome::Dispatched { .. }));
+    assert_eq!(bridge.step(), StepOutcome::Idle);
+    assert!(matches!(bridge.dispatch_typed(0, "Toggle", &[]), StepOutcome::Dispatched { .. }));
+    assert_eq!(bridge.step(), StepOutcome::Idle);
+    assert!(view().contains("first: 0"));
+    std::thread::sleep(wait);
+    assert!(matches!(bridge.step(), StepOutcome::Dispatched { instance: 0, msg, .. } if msg == "PulseTick"));
+    assert!(view().contains("first: 1") && view().contains("second: 0"));
+    bridge.close_session().unwrap();
+}
+
+#[test]
+fn overdue_child_timer_runs_while_the_root_is_continuously_due() {
+    use auto_ui_runtime::ui::ace_node_desktop::StepOutcome;
+    use std::time::Duration;
+
+    let page = r#"widget App {
+    use { package: pulse from "./pulse" }
+    msg { RootTick }
+    timer { RootTick (every_ms: 10) }
+    model { var count int = 0 }
+    on { .RootTick -> { .count += 1 } }
+    view { Pulse {} }
+}
+"#;
+    let child = r#"widget Pulse {
+    msg { ChildTick }
+    timer { ChildTick (every_ms: 50, when: .count == 0) }
+    model { var count int = 0 }
+    on { .ChildTick -> { .count += 1 } }
+    view { text f"${.count}" {} }
+}
+"#;
+    ui980::require_prepared();
+    let mut bridge = NodeDesktopBridge::load_package(
+        vec![unit("app", "app", page), unit("pulse", "panel", child)], "app::app", 1,
+    ).unwrap();
+    bridge.open().unwrap();
+    let stall = Duration::from_millis(65);
+    std::thread::sleep(stall);
+    assert!(matches!(bridge.step(), StepOutcome::Dispatched { msg, .. } if msg == "RootTick"));
+    std::thread::sleep(stall);
+    assert!(matches!(bridge.step(), StepOutcome::Dispatched { msg, .. } if msg == "ChildTick"));
+    bridge.close_session().unwrap();
+}
+
+#[test]
+fn checked_package_http_completion_belongs_to_the_current_mount() {
+    use auto_ui_runtime::ui::{
+        ace_node_desktop::{
+            current_session, host_session_stats, AceNodeDesktopWindow, NodeDesktopMsg, StepOutcome,
+        },
+        Component,
+    };
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let (request_tx, request_rx) = mpsc::channel();
+    let (reply_tx, reply_rx) = mpsc::channel::<&'static str>();
+    let timeout = Duration::from_secs(2);
+    let server = std::thread::spawn(move || {
+        for _ in 0..2 {
+            let (stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(timeout)).unwrap();
+            let mut request = BufReader::new(stream);
+            let mut line = String::new();
+            request.read_line(&mut line).unwrap();
+            assert_eq!(line.trim_end(), "GET /api/photos/scan HTTP/1.1");
+            loop {
+                line.clear();
+                if request.read_line(&mut line).unwrap() == 0 || line.trim_end().is_empty() {
+                    break;
+                }
+            }
+            request_tx.send(()).unwrap();
+            let body = reply_rx.recv_timeout(timeout).unwrap();
+            write!(request.get_mut(),
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len(),
+            ).unwrap();
+        }
+    });
+
+    let source = r#"widget Gallery {
+    msg { Load, Pick, ExpiredChoice }
+    timer { Load (every_ms: 250, when: false) }
+    model {
+        var label Str = "waiting"
+        var chosen Str = ""
+    }
+    on {
+        .Load -> {
+            let row = Http.get_json("http://ADDRESS/api/photos/scan")
+            .label = row.label ?? "missing"
+        }
+        .Pick -> { .chosen = .label }
+        .ExpiredChoice -> { .chosen = "expired choice" }
+    }
+    view {
+        button "Load" { onclick: .Load }
+        button "Pick" { onclick: .Pick }
+        button (text: "Waiting choice", disabled: .label != "waiting", onclick: .ExpiredChoice) {}
+        text .label {}
+    }
+}
+"#.replace("ADDRESS", &address.to_string());
+    ui980::require_prepared();
+    let mut bridge = NodeDesktopBridge::load_package(vec![unit("app", "app", &source)], "app::app", 1).unwrap();
+    let first = bridge.open().unwrap();
+    let revision = || current_session(|host| host.package_frame(0).unwrap().revision).unwrap();
+    let initial_revision = revision();
+    assert_eq!(bridge.dispatch_typed(0, "Load", &[]), StepOutcome::Idle);
+    request_rx.recv_timeout(timeout).unwrap();
+    assert_eq!(bridge.step(), StepOutcome::Idle);
+    assert_eq!(revision(), initial_revision);
+
+    bridge.close_session().unwrap();
+    reply_tx.send(r#"{"label":"old mount"}"#).unwrap();
+    let session = bridge.open().unwrap();
+    assert_ne!(session, first);
+    assert_eq!(revision(), initial_revision);
+    assert_eq!(bridge.dispatch_typed(0, "Load", &[]), StepOutcome::Idle);
+    request_rx.recv_timeout(timeout).unwrap();
+    let mut window = AceNodeDesktopWindow::default();
+    for message in ["Pick", "ExpiredChoice"] {
+        let target = current_session(|host| {
+            host.package_frame(0).unwrap().actions().iter()
+                .position(|action| action.source.message == message).unwrap()
+        }).unwrap();
+        window.on(NodeDesktopMsg::PackageClick { session, instance: 0, revision: initial_revision, target });
+    }
+    reply_tx.send(r#"{"label":"新相册"}"#).unwrap();
+    let started = Instant::now();
+    let outcome = loop {
+        let outcome = bridge.step();
+        if outcome != StepOutcome::Idle || started.elapsed() >= timeout {
+            break outcome;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    };
+    assert!(matches!(&outcome, StepOutcome::Dispatched { instance: 0, msg, states }
+        if msg == "Load" && states.contains(&("label".into(), "新相册".into()))), "{outcome:?}");
+    assert_eq!(revision(), initial_revision + 1);
+    let started = Instant::now();
+    let outcome = loop {
+        let outcome = bridge.step();
+        if outcome != StepOutcome::Idle || started.elapsed() >= timeout {
+            break outcome;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    };
+    assert!(matches!(&outcome, StepOutcome::Dispatched { instance: 0, msg, states }
+        if msg == "Pick" && states.contains(&("chosen".into(), "新相册".into()))), "{outcome:?}");
+    assert_eq!(bridge.dispatch_log.len(), 2);
+    assert_eq!(host_session_stats(session).unwrap().stale_rejected, 1);
+    bridge.close_session().unwrap();
+    server.join().unwrap();
 }
 
 #[test]

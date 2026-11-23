@@ -721,62 +721,7 @@ impl VueGenerator {
         // Plan 547: ImageSurface onpan 合成包装(pointer 三绑定的函数体;
         // buttons&1 门控 + start/move/end 相位,handler 收 (dx, dy, phase))。
         if self.versioned_images {
-            script.push_str(r#"
-type VersionedImage = {
-  source: string
-  identity: string
-  request: AbortController
-  objectUrl?: string
-}
-const versionedImages = new WeakMap<HTMLImageElement, VersionedImage>()
-function releaseVersionedImage(element: HTMLImageElement) {
-  const previous = versionedImages.get(element)
-  if (!previous) return
-  previous.request.abort()
-  if (previous.objectUrl) URL.revokeObjectURL(previous.objectUrl)
-  versionedImages.delete(element)
-}
-async function updateVersionedImage(element: HTMLImageElement, binding: { value: [string, string] }) {
-  const [source, identity] = binding.value
-  const previous = versionedImages.get(element)
-  if (previous?.source === source && previous.identity === identity) return
-  releaseVersionedImage(element)
-  element.removeAttribute('src')
-  if (!source) return
-  const current: VersionedImage = { source, identity, request: new AbortController() }
-  versionedImages.set(element, current)
-  try {
-    const url = new URL(source, document.baseURI)
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      element.src = source
-      return
-    }
-    const response = await fetch(url, {
-      cache: 'reload', credentials: 'include', mode: 'no-cors', signal: current.request.signal,
-    })
-    if (versionedImages.get(element) !== current) return
-    if (response.type === 'opaque') {
-      // The reload refreshes the HTTP cache even for images without CORS.
-      // A fragment changes Blink's decoded-image key without changing the request URI.
-      if (!url.hash) url.hash = 'auto-ui-' + encodeURIComponent(identity)
-      element.src = url.href
-      return
-    }
-    if (!response.ok) throw Error('Image request failed')
-    const blob = await response.blob()
-    if (versionedImages.get(element) !== current) return
-    current.objectUrl = URL.createObjectURL(blob)
-    element.src = current.objectUrl + url.hash
-  } catch {
-    if (versionedImages.get(element) === current) element.dispatchEvent(new Event('error'))
-  }
-}
-const vAutoVersionedImage = {
-  mounted: updateVersionedImage,
-  updated: updateVersionedImage,
-  unmounted: releaseVersionedImage,
-}
-"#);
+            append_versioned_image_directive(&mut script, VueScriptLanguage::TypeScript);
         }
 
         if !self.surface_pans.is_empty() {

@@ -4,8 +4,7 @@ use std::fmt::Write;
 use ace_a2x_core::{RecordFacts, SemanticView, Ty};
 use ace_a2x_ts::seed::{decode_coll_seed, encode_coll_seed, render_coll_seed_helpers, SeedCollTy};
 use ace_a2x_ts::{
-    emit_function_body_fragment, script_widget_runtime_body, ts_fn_name, FragmentProgramContext,
-    ScriptLang,
+    emit_widget_function_body_fragment, script_widget_runtime_body, ts_fn_name, FragmentProgramContext,
 };
 use ace_core::source::age_component::ComponentViewItem;
 use ace_core::source::age_package::{
@@ -13,6 +12,7 @@ use ace_core::source::age_package::{
     WIDGET_FOCUS_FIELD, WIDGET_OUTBOUND_FIELD,
 };
 use ace_core::source::packages::PackageModuleInput;
+use auto_ui_compiler::ui_gen::vue::{append_versioned_image_directive, VueScriptLanguage};
 
 use crate::ui::ace_vue_script::channel_pascal;
 use crate::ui::ace_widget_props::literal;
@@ -61,13 +61,17 @@ pub(super) fn generate(
         &compiled.description.components[root_index],
     )?;
 
+    let scoped_backend = units.iter().any(|unit| {
+        unit.package == super::back_api::PACKAGE && unit.id == super::back_api::MODULE
+    });
     let icons = icon_imports(&compiled);
     let mut script = String::from("import { Fragment, h, nextTick, onBeforeUnmount, onMounted, shallowRef } from 'vue'\n");
-    if file_directory.is_some() || file_mutation.is_some() {
+    if file_directory.is_some() || file_mutation.is_some() || scoped_backend {
         let mut imports = Vec::new();
         if file_directory.is_some() { imports.push("readFileDirectory"); }
         if file_mutation.is_some() { imports.push("applyFileMutation"); }
-        imports.push("fileBrowserSignal");
+        if file_directory.is_some() || file_mutation.is_some() { imports.push("fileBrowserSignal"); }
+        if scoped_backend { imports.push("fetchFileBackend"); }
         writeln!(script, "import {{ {} }} from '@/lib/file-browser'", imports.join(", ")).unwrap();
     }
     if shell {
@@ -109,12 +113,26 @@ pub(super) fn generate(
     for line in render_coll_seed_helpers(&seed, false).lines() {
         writeln!(script, "{}", line.strip_prefix("export ").unwrap_or(line)).unwrap();
     }
-    let mut roots = write_components(&compiled, &mut script)?;
-    roots.extend(view.global_init_fns().into_iter().map(str::to_owned));
+    let suspending: BTreeSet<_> = view.functions().iter()
+        .filter(|function| view.age_http_suspends(function.def_index))
+        .map(|function| function.source_name)
+        .collect();
+    let root_sync_handlers: BTreeSet<&str> = preferences.iter().map(|entry| entry.restore.as_str())
+        .chain(file_directory.as_ref().map(|binding| binding.0.as_str()))
+        .chain(file_mutation.as_ref().map(FileMutationBinding::reply_name))
+        .chain(file_open.as_ref().map(FileOpenBinding::reply_name))
+        .collect();
+    let mut roots = write_components(&compiled, &mut script, &suspending, root_index, &root_sync_handlers)?;
+    for initializer in view.global_init_fns() {
+        if suspending.contains(initializer) {
+            return Err("source.age.sfc-widget-http: a module initializer cannot suspend".into());
+        }
+        roots.insert(initializer.to_owned());
+    }
     let reachable = widget_functions(&view, &roots)?;
     let context = FragmentProgramContext::from_view(&view);
     for function in view.functions().iter().filter(|function| reachable.contains(&function.def_index)) {
-        let code = emit_function_body_fragment(ScriptLang::JavaScript, &view, function, &context)
+        let code = emit_widget_function_body_fragment(&view, function, &context)
             .map_err(|err| {
             format!(
                 "source.age.sfc-widget-body: {}: {err:?}",
@@ -130,7 +148,8 @@ pub(super) fn generate(
             .join(", ");
         writeln!(
             script,
-            "function {}({params}) {{\n{}\n}}",
+            "function{} {}({params}) {{\n{}\n}}",
+            if suspending.contains(function.source_name) { "*" } else { "" },
             ts_fn_name(&function.source_name),
             code.text.join("\n")
         )
@@ -145,6 +164,7 @@ pub(super) fn generate(
     }
     script.push_str("};\n");
     script.push_str(super::POINTER_SAMPLE);
+    append_versioned_image_directive(&mut script, VueScriptLanguage::JavaScript);
     script.push_str(include_str!("checked_widget_view.js"));
     let file_directory = file_directory.map_or_else(|| "null".into(), |(reply, entry_tag, include_extension)| format!(
         "{{ read: readFileDirectory, lease: fileBrowserSignal, reply: {}, entryTag: {}, includeExtension: {include_extension} }}",
@@ -160,9 +180,13 @@ pub(super) fn generate(
     let preferences = preferences.iter().map(|entry| (&entry.key, &entry.field, &entry.restore))
         .collect::<Vec<_>>();
     let preferences = serde_json::to_string(&preferences).map_err(|error| error.to_string())?;
+    let file_backend = if scoped_backend { "fetchFileBackend" } else { "null" };
+    let component = compiled.entry_node().ok_or("missing shortcut owner")?;
+    let shortcuts = crate::ui::ace_shortcuts::widget_shortcuts(&component.members, &component.messages);
+    let shortcuts = serde_json::to_string(&shortcuts).map_err(|error| error.to_string())?;
     writeln!(
         script,
-        "\nreturn createCheckedWidgetView({root_index}, {file_directory}, {file_mutation}, {preferences}, {file_open});\n}})();"
+        "\nreturn createCheckedWidgetView({root_index}, {file_directory}, {file_mutation}, {preferences}, {file_open}, {file_backend}, {shortcuts});\n}})();"
     )
     .unwrap();
     let source = format!(
@@ -243,14 +267,21 @@ fn widget_functions(view: &SemanticView<'_>, roots: &BTreeSet<String>) -> Result
 fn write_components(
     compiled: &AgePackageCompilation,
     script: &mut String,
+    suspending: &BTreeSet<&str>,
+    root: usize,
+    root_sync_handlers: &BTreeSet<&str>,
 ) -> Result<BTreeSet<String>, String> {
     let mut roots = BTreeSet::new();
-    let mut symbol = |module: &str, name: &str| -> Result<String, String> {
+    let mut symbol = |module: &str, name: &str, can_suspend: bool| -> Result<(String, bool), String> {
         let symbol = compiled
             .symbol_of_in(module, name)
             .ok_or_else(|| format!("source.age.sfc-widget-symbol: {module}::{name}"))?;
+        let effect = suspending.contains(symbol.as_str());
+        if effect && !can_suspend {
+            return Err(format!("source.age.sfc-widget-http: `{module}::{name}` must be synchronous"));
+        }
         roots.insert(symbol.clone());
-        Ok(ts_fn_name(&symbol))
+        Ok((ts_fn_name(&symbol), effect))
     };
     writeln!(script, "const checkedOutboundField = {};", quoted(WIDGET_OUTBOUND_FIELD)).unwrap();
     writeln!(script, "const checkedFocusField = {};", quoted(WIDGET_FOCUS_FIELD)).unwrap();
@@ -261,7 +292,7 @@ fn write_components(
         let init = runtime
             .initialize
             .as_deref()
-            .map(|init| symbol(&owner.module, init))
+            .map(|init| symbol(&owner.module, init, false).map(|(symbol, _)| symbol))
             .transpose()?;
         writeln!(
             script,
@@ -269,7 +300,7 @@ fn write_components(
             runtime.node,
             quoted(&owner.name),
             init.as_deref().unwrap_or("null"),
-            symbol(&owner.module, &runtime.view)?,
+            symbol(&owner.module, &runtime.view, false)?.0,
             runtime.focus,
             runtime.context_handler.as_deref().map_or_else(|| "null".into(), quoted),
         )
@@ -280,11 +311,14 @@ fn write_components(
                 .iter()
                 .find(|item| item.name == handler.message)
                 .map_or(&[][..], |item| item.payload.as_slice());
+            let can_suspend = runtime.context_handler.as_deref() != Some(handler.message.as_str())
+                && (runtime.node != root || !root_sync_handlers.contains(handler.message.as_str()));
+            let (name, effect) = symbol(&owner.module, &handler.function, can_suspend)?;
+            let suspension = if effect { ", suspends: true" } else { "" };
             writeln!(
                 script,
-                "[{}]: {{ run: {}, types: {} }},",
+                "[{}]: {{ run: {name}, types: {}{suspension} }},",
                 quoted(&handler.message),
-                symbol(&owner.module, &handler.function)?,
                 serde_json::to_string(payload).unwrap()
             )
             .unwrap();
@@ -308,13 +342,13 @@ fn write_components(
                 "{{ sources: {}, immediate: {}, run: {} }},",
                 serde_json::to_string(&sources).unwrap(),
                 watch.immediate,
-                symbol(&owner.module, &watch.function)?,
+                symbol(&owner.module, &watch.function, false)?.0,
             ).unwrap();
         }
         script.push_str("], timers: [\n");
         for timer in &runtime.timers {
             let condition = timer.condition.as_deref()
-                .map(|name| symbol(&owner.module, name))
+                .map(|name| symbol(&owner.module, name, false).map(|(symbol, _)| symbol))
                 .transpose()?;
             writeln!(
                 script,
@@ -358,7 +392,7 @@ fn write_components(
                         writeln!(
                             script,
                             "{{ get: {}, defaulted: {authored_default} }},",
-                            symbol(module, getter)?
+                            symbol(module, getter, false)?.0
                         )
                         .unwrap();
                     }

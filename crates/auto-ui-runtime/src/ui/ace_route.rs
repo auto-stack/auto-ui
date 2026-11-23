@@ -52,7 +52,7 @@ pub(super) fn front_package_units(
         package: "app".into(),
         version: "1.0.0".into(),
         id,
-        source,
+        source: super::ace_widget_packages::normalize_legacy_json_import(source),
         provider: None,
     };
     let mut paths = BTreeMap::from([("app::app".to_string(), app.to_path_buf())]);

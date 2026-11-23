@@ -168,6 +168,16 @@ pub enum ImageSurfacePanPhase {
     End,
 }
 
+impl ImageSurfacePanPhase {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Start => "start",
+            Self::Move => "move",
+            Self::End => "end",
+        }
+    }
+}
+
 /// Raw pointer/media events received by the Iced surface.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ImageSurfaceInputEvent {

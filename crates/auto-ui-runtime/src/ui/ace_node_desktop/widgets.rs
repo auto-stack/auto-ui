@@ -21,8 +21,12 @@ use std::sync::Arc;
 mod composite;
 mod pointer;
 mod resources;
-pub(super) use resources::public_assets;
+pub(super) use resources::{public_assets, PublicImages};
 mod svg;
+
+mod carousel;
+pub use carousel::CarouselAction;
+use carousel::CarouselState;
 
 type WidgetView = View<NodeDesktopMsg>;
 
@@ -57,6 +61,7 @@ pub enum Action {
         key: usize,
         metrics: ScrollMetrics,
     },
+    Carousel(CarouselAction),
 }
 
 #[derive(Clone, Debug)]
@@ -72,6 +77,7 @@ pub(super) struct State {
     slider: BTreeMap<usize, f32>,
     scroll: BTreeMap<usize, ScrollMetrics>,
     button_targets: Arc<BTreeMap<usize, usize>>,
+    carousel: CarouselState,
 }
 
 impl State {
@@ -88,6 +94,7 @@ impl State {
             slider: BTreeMap::new(),
             scroll: BTreeMap::new(),
             button_targets: Arc::default(),
+            carousel: CarouselState::default(),
         }
     }
 
@@ -165,6 +172,12 @@ impl State {
             Action::Scroll { key, metrics } => {
                 self.scroll.insert(key, metrics);
             }
+            Action::Carousel(action) => {
+                if let CarouselAction::Press(key) = action {
+                    self.focus = Some(key);
+                }
+                self.carousel.apply(action);
+            }
         }
     }
 
@@ -176,6 +189,7 @@ impl State {
             "bindings": self.bindings,
             "pages": self.pages,
             "slider": self.slider,
+            "carousel": self.carousel.positions(),
             "scroll": self.scroll.iter().map(|(key, m)| serde_json::json!({
                 "key": key, "offset": [m.offset_x, m.offset_y],
                 "viewport": [m.viewport_w, m.viewport_h], "content": [m.content_w, m.content_h],
@@ -228,7 +242,7 @@ fn contains_control(items: &[ComponentViewItem]) -> bool {
         ComponentViewItem::Element(element) => {
             matches!(
                 element.tag.as_str(),
-                "accordion" | "collapsible" | "pagination" | "progress" | "slider" | "svg"
+                "accordion" | "carousel" | "collapsible" | "pagination" | "progress" | "slider" | "svg"
             ) || scroll_axes(element, &style(element)).is_some()
                 || contains_control(&element.items)
         }
@@ -295,6 +309,8 @@ enum Target {
         max: f32,
         value: f32,
     },
+    Carousel(carousel::Navigation),
+    CarouselSlide,
 }
 
 impl Target {
@@ -304,7 +320,7 @@ impl Target {
             Self::Button {
                 action: Some(_),
                 ..
-            } | Self::Slider { .. }
+            } | Self::Slider { .. } | Self::Carousel(_)
         )
     }
 }
@@ -337,6 +353,18 @@ pub(super) fn keyboard_action(
         return Some(Action::Focus(targets[next].key));
     }
     let control = targets[focus?];
+    let carousel = match &control.target {
+        Target::Carousel(nav) => Some(nav),
+        _ => control.parent.and_then(|parent| {
+            controls.iter().find_map(|control| match &control.target {
+                Target::Carousel(nav) if control.key == parent => Some(nav),
+                _ => None,
+            })
+        }),
+    };
+    if let Some(action) = carousel.and_then(|nav| nav.keyboard(key)) {
+        return Some(Action::Carousel(action));
+    }
     match &control.target {
         Target::Button { action, .. } if matches!(key, "Enter" | " ") => action.clone(),
         Target::Slider {
@@ -471,7 +499,7 @@ pub(super) fn accessibility_action(
             };
             Some(Action::Slide { key, value })
         }
-        Target::Progress { .. } => None,
+        Target::Progress { .. } | Target::Carousel(_) | Target::CarouselSlide => None,
     }
 }
 
@@ -538,6 +566,17 @@ impl Control {
                 node.set_min_numeric_value(0.0);
                 node.set_max_numeric_value(*max as f64);
                 node.set_numeric_value(*value as f64);
+                node
+            }
+            Target::Carousel(_) => {
+                let mut node = Node::new(Role::Region);
+                node.set_role_description("carousel");
+                node.add_action(Request::Focus);
+                node
+            }
+            Target::CarouselSlide => {
+                let mut node = Node::new(Role::Group);
+                node.set_role_description("slide");
                 node
             }
         };
@@ -746,6 +785,7 @@ impl Renderer<'_> {
                     .and_then(|label| self.display(label)).unwrap_or_default();
                 self.button(key, label, classes, Some(Action::DispatchButton(target)), None, None)
             }
+            "carousel" => self.carousel(el),
             "collapsible" => self.collapsible(el, key),
             "pagination" => self.pagination(el, key),
             "progress" => {

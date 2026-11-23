@@ -38,6 +38,13 @@ pub(super) fn render(
             let classes = if classes.is_empty() { "flex-1" } else { &classes };
             ctx.push_str(&format!("<div class=\"{}\"></div>", escape_attr(classes)));
         }
+        "carousel" => carousel(element, ctx, "AceCarousel")?,
+        "carousel-content" | "carousel_content" => carousel(element, ctx, "AceCarouselContent")?,
+        "carousel-item" | "carousel_item" => carousel(element, ctx, "AceCarouselItem")?,
+        "carousel-previous" | "carousel_previous" | "carousel-prev" | "carousel_prev" => {
+            carousel(element, ctx, "AceCarouselPrevious")?
+        }
+        "carousel-next" | "carousel_next" => carousel(element, ctx, "AceCarouselNext")?,
         "preview-card" => {
             ctx.push_str("<section");
             if let Some(id) = literal(element, "id") {
@@ -103,6 +110,58 @@ fn grid(element: &ComponentViewElement, ctx: &mut TmplCtx<'_>) -> Result<(), Str
     ctx.push_str(">");
     render_items(&element.items, ctx)?;
     ctx.push_str("</div>");
+    Ok(())
+}
+
+fn carousel(element: &ComponentViewElement, ctx: &mut TmplCtx<'_>, tag: &str) -> Result<(), String> {
+    ctx.carousel_used = true;
+    ctx.push_str(&format!("<{tag}"));
+    if element.tag == "carousel" {
+        if let Some(orientation) = expression(element, "orientation") {
+            match &orientation.kind {
+                ExprKind::StrLit(value) => {
+                    ctx.push_str(&format!(" orientation=\"{}\"", escape_attr(value)))
+                }
+                _ => ctx.push_str(&format!(
+                    " :orientation=\"{}\"",
+                    escape_attr(&expr_to_template_js(orientation)?)
+                )),
+            }
+        }
+        let mut options = Vec::new();
+        if let Some(opts) = expression(element, "opts") {
+            options.push(format!("...({})", expr_to_template_js(opts)?));
+        }
+        if let Some(align) = expression(element, "align") {
+            let value = match &align.kind {
+                ExprKind::StrLit(value) if matches!(value.as_str(), "start" | "center" | "end") => {
+                    format!("'{value}'")
+                }
+                ExprKind::StrLit(_) => {
+                    return Err("source.age.sfc-carousel: align must be start, center, or end".into());
+                }
+                _ => expr_to_template_js(align)?,
+            };
+            options.push(format!("align: {value}"));
+        }
+        if let Some(looping) = expression(element, "loop") {
+            let value = match &looping.kind {
+                ExprKind::StrLit(_) => flag(element, "loop").to_string(),
+                _ => expr_to_template_js(looping)?,
+            };
+            options.push(format!("loop: {value}"));
+        }
+        if !options.is_empty() {
+            ctx.push_str(&format!(" :opts=\"{{ {} }}\"", escape_attr(&options.join(", "))));
+        }
+    }
+    let classes = style(element);
+    if !classes.is_empty() {
+        ctx.push_str(&format!(" class=\"{}\"", escape_attr(&classes)));
+    }
+    ctx.push_str(">");
+    render_label(element, ctx)?;
+    ctx.push_str(&format!("</{tag}>"));
     Ok(())
 }
 

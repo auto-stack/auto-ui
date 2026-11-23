@@ -1,94 +1,43 @@
-//! PLAN-117 T-01 probe: A2Vue lane generation for the two original apps
-//! (029-photo-gallery, 031-image-viewer) plus minimal probes isolating
-//! record literals and multibyte strings. Sources are read from the repo
-//! example trees (same commit as the worktree base). Outcome is recorded
-//! by the caller from the printed status lines.
-
 #![cfg(feature = "ace-bridge")]
 
 use auto_ui_runtime::ui::ace_source_prep::prepare_component_source;
-use auto_ui_runtime::ui::ace_vue_script::generate_sfc_with_lane;
-
-fn lane_for(root: &str, rel: &str) -> Result<(usize, usize, Vec<String>), String> {
-    let path = format!("{root}/{rel}");
-    let src = std::fs::read_to_string(&path).map_err(|e| format!("read {path}: {e}"))?;
-    let prepared = prepare_component_source(std::path::Path::new(root), &src)
-        .map(|p| p.source)
-        .unwrap_or_else(|e| {
-            eprintln!("  prepare_component_source declined: {e}");
-            src
-        });
-    if std::env::var("PLAN117_DUMP_PREP").is_ok() {
-        let _ = std::fs::write(
-            "D:/autostack/plan-artifacts/plan-117/probes/029-prepared.at",
-            &prepared,
-        );
-    }
-    match generate_sfc_with_lane(&prepared, rel) {
-        Ok((sfc, bodies, absent)) => Ok((
-            sfc.len(),
-            bodies.len(),
-            absent.iter().map(|n| n.to_string()).collect(),
-        )),
-        Err(e) => Err(format!("{rel}: {e}")),
-    }
-}
-
-fn lane_raw(path: &str, label: &str) -> Result<(usize, usize, Vec<String>), String> {
-    let src = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
-    match generate_sfc_with_lane(&src, label) {
-        Ok((sfc, bodies, absent)) => Ok((
-            sfc.len(),
-            bodies.len(),
-            absent.iter().map(|n| n.to_string()).collect(),
-        )),
-        Err(e) => Err(format!("{label}: {e}")),
-    }
-}
+use std::path::Path;
 
 #[test]
-fn plan117_t01_029_lane_probe() {
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/029-photo-gallery");
-    match lane_for(root, "src/front/app.at") {
-        Ok((n, b, a)) => println!("PLAN117 PROBE 029 lane OK sfc_bytes={n} bodies={b} absent={a:?}"),
-        Err(e) => println!("PLAN117 PROBE 029 lane FAIL {e}"),
+fn preparation_keeps_package_imports_and_injects_fields_inside_the_model() {
+    let project = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/ui/029-photo-gallery"
+    ));
+    let source = r#"style panel = "p-2"
+widget App {
+    use { package: color_picker from "../../../../../packages/color-picker" }
+    msg { Restore }
+    model {
+        // Preserve punctuation in the comment } .
+        var title str = "quote: \" }"
+        var rows = [{ id: 1, label: "row" }]
+        var trailing int = 3
     }
+    on { .Restore -> { .title = storage.get("sample") } }
+    view { text .title { style: panel } }
 }
+"#;
 
-#[test]
-fn plan117_t01_029_lane_raw_probe() {
-    let p = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/029-photo-gallery/src/front/app.at");
-    match lane_raw(p, "029-raw") {
-        Ok((n, b, a)) => println!(
-            "PLAN117 PROBE 029 lane-RAW OK sfc_bytes={n} bodies={b} absent={a:?}"
-        ),
-        Err(e) => println!("PLAN117 PROBE 029 lane-RAW FAIL {e}"),
-    }
-}
+    let prepared = prepare_component_source(project, source).unwrap().source;
 
-#[test]
-fn plan117_t01_031_lane_probe() {
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/ui/031-image-viewer");
-    match lane_for(root, "src/front/app.at") {
-        Ok((n, b, a)) => println!("PLAN117 PROBE 031 lane OK sfc_bytes={n} bodies={b} absent={a:?}"),
-        Err(e) => println!("PLAN117 PROBE 031 lane FAIL {e}"),
-    }
-}
+    assert!(prepared.contains(
+        r#"use { package: color_picker from "../../../../../packages/color-picker" }"#
+    ));
+    assert!(prepared.contains(r#"style: "p-2""#));
+    assert!(!prepared.contains("style panel ="));
+    assert!(prepared.contains("// Preserve punctuation in the comment } ."));
+    assert!(prepared.contains(".title = .__st_sample"));
 
-#[test]
-fn plan117_t01_probes_lane() {
-    let base = "D:/autostack/plan-artifacts/plan-117/probes";
-    for (name, label) in [
-        ("p-record.at", "p-record"),
-        ("p-record2.at", "p-record2"),
-        ("p-record3.at", "p-record3"),
-        ("p-multibyte.at", "p-multibyte"),
-    ] {
-        match lane_raw(&format!("{base}/{name}"), label) {
-            Ok((n, b, a)) => println!(
-                "PLAN117 PROBE {label} lane OK sfc_bytes={n} bodies={b} absent={a:?}"
-            ),
-            Err(e) => println!("PLAN117 PROBE {label} lane FAIL {e}"),
-        }
-    }
+    let handler = prepared.find("\n    on {").expect("handler after the model");
+    let model_end = prepared[..handler].rfind('}').expect("model closing brace");
+    let last_field = prepared.find("var trailing int = 3").expect("last authored field");
+    let host_field = prepared.find("var __st_sample").expect("injected host field");
+    assert!(prepared[model_end + 1..handler].trim().is_empty(), "{prepared}");
+    assert!(last_field < host_field && host_field < model_end, "{prepared}");
 }

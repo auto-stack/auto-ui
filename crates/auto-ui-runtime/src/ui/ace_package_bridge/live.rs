@@ -1,4 +1,6 @@
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
+use std::time::Duration;
 
 use ace_av::age_package::live_session::{WidgetProgram, WidgetSession};
 use ace_core::source::age_package::{
@@ -36,6 +38,10 @@ pub(super) struct LiveEvent<'a> {
 unsafe impl Send for MountedWidget {}
 
 impl LivePackage {
+    pub(super) fn uses_http(&self) -> bool {
+        self.program.uses_http()
+    }
+
     pub(super) fn prepare(
         units: &[PackageModuleInput],
         entry: &str,
@@ -68,7 +74,11 @@ impl LivePackage {
                     .properties
                     .iter()
                     .any(|property| !matches!(property, AgeWidgetProperty::Message { .. }));
-            needs_current_models |= child.emits_outbound || child.has_watches || child.requests_focus || uses_context(child);
+            needs_current_models |= child.emits_outbound
+                || child.has_watches
+                || child.requests_focus
+                || uses_context(child)
+                || child.members.iter().any(|row| row.role == "timer");
         }
         if requires_child_state && !needs_current_models {
             return Ok(None);
@@ -95,12 +105,6 @@ impl LivePackage {
             .iter()
             .position(|node| node.module == entry)
             .ok_or("missing checked widget root")?;
-        let live_children = has_todo_service || has_shared_store || compiled.widget_runtime.iter().any(|runtime| {
-            runtime.outbound || runtime.focus || runtime.context_handler.is_some() || !runtime.watches.is_empty()
-        });
-        if requires_child_state && !live_children {
-            return Ok(None);
-        }
         let timers = compiled
             .widget_runtime
             .iter()
@@ -109,6 +113,10 @@ impl LivePackage {
             .timers
             .len();
         let program = WidgetProgram::prepare(&compiled, entry)?;
+        let live_children = program.has_live_children();
+        if requires_child_state && !live_children {
+            return Ok(None);
+        }
         Ok(Some(Self {
             description: compiled.description,
             widget_refs: compiled.widget_refs,
@@ -150,6 +158,18 @@ impl LivePackage {
             self.live_children,
         )?;
         frame.focus_requests = session.take_focus_requests();
+        if self.live_children {
+            frame.child_timers = session.child_timers().into_iter().map(|timer| frame::ChildTimer {
+                key: frame::ChildTimerKey {
+                    owner: frame::ChildTimerOwner::Live(timer.mount),
+                    message: timer.message,
+                    every_ms: timer.every_ms,
+                },
+                node: timer.node,
+                instance: timer.component,
+                anchor: self.description.components[timer.node].head_span.start,
+            }).collect();
+        }
         Ok(frame)
     }
 
@@ -177,13 +197,14 @@ impl LivePackage {
         directory: Option<&FileDirectoryBinding>,
         mutation: Option<&FileMutationBinding>,
         open: Option<&FileOpenBinding>,
+        http: Option<(Arc<AtomicBool>, Option<Arc<crate::back_proxy::FileBackendSession>>)>,
     ) -> Result<PackageFrame, String> {
         let mounted = mount
             .lock()
             .map_err(|_| "checked widget mount is unavailable")?;
         let session = &mounted.0;
         session.set_viewport_width(viewport_width());
-        session.transaction(|| {
+        let update = || session.transaction(|| {
             let limits = frame_limits();
             if let Some(event) = event {
                 let args = event.args.iter().map(AceStateValue::to_field_value).collect::<Vec<_>>();
@@ -251,7 +272,14 @@ impl LivePackage {
                 return Ok(frame);
             }
             self.frame(session, revision)
-        })
+        });
+        match http {
+            Some((cancel, backend)) => session.with_http_worker(
+                Arc::new(Mutex::new(crate::ui::ace_state_bridge::UiHttpProvider::with_backend(backend))),
+                cancel, Duration::from_secs(30), update,
+            ),
+            None => update(),
+        }
     }
 
     fn refresh_directory(

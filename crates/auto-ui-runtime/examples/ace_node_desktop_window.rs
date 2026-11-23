@@ -114,7 +114,14 @@ fn main() {
         // PLAN-105 T-02：真实工程源（带 `use`/依赖样式/类型化列表数据字段）先过
         // 组件面源准备（工程根=最近的 `pac.at` 祖先）；无 `pac.at` 的源原样装载
         // （104 的简单源行为不变）。
-        let prepared = std::path::Path::new(&source_path)
+        let prepared = if auto_lang_core::use_scanner::scan_use_statements(&src)
+            .iter().any(|import| import.module == "back.api")
+        {
+            // Checked backend imports bind to the authored contract in the
+            // package loader. Component preparation removes those imports.
+            src
+        } else {
+            std::path::Path::new(&source_path)
             .ancestors()
             .find(|p| p.join("pac.at").is_file())
             .map(|root| {
@@ -122,8 +129,14 @@ fn main() {
                     .map(|p| p.source)
                     .unwrap_or_else(|_| src.clone())
             })
-            .unwrap_or_else(|| src.clone());
-        match NodeDesktopBridge::load(&prepared, &source_path, instances) {
+            .unwrap_or(src)
+        };
+        let bridge = if sqlite_db.is_some() {
+            NodeDesktopBridge::load_sqlite_component(&prepared, &source_path, instances)
+        } else {
+            NodeDesktopBridge::load(&prepared, &source_path, instances)
+        };
+        match bridge {
             Ok(b) => b,
             Err(e) => {
                 eprintln!("ace_node_desktop_window: load failed: {e}");

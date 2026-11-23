@@ -45,16 +45,23 @@ async function openSession(): Promise<string> {
   return base
 }
 
-export const fileBrowserFetch: typeof fetch = async (input, init) => {
-  if (typeof input !== 'string' || !input.startsWith('/api/fs/')) {
-    return globalThis.fetch(input, init)
+export async function fetchFileBackend(input: string, init?: RequestInit): Promise<Response> {
+  if (!/^\/api(?:\/[a-zA-Z0-9_-]+)+(?:\?|$)/.test(input) || input.includes('#')) {
+    throw new Error('Invalid file backend route')
   }
   const signal = init?.signal ? AbortSignal.any([page.signal, init.signal]) : page.signal
   signal.throwIfAborted()
   session ??= openSession().catch(error => { close(); throw error })
   const base = await session
   signal.throwIfAborted()
-  return globalThis.fetch(`${base}${input}`, { ...init, cache: 'no-store', signal })
+  return globalThis.fetch(`${base}${input}`, { ...init, cache: 'no-store', redirect: 'error', signal })
+}
+
+export const fileBrowserFetch: typeof fetch = (input, init) => {
+  if (typeof input !== 'string' || !input.startsWith('/api/fs/')) {
+    return globalThis.fetch(input, init)
+  }
+  return fetchFileBackend(input, init)
 }
 
 type JsonReviver = (key: string, value: unknown, context?: { source?: string }) => unknown

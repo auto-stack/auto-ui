@@ -935,6 +935,8 @@ enum StyleBranch {
 // generate_sfc 编排与测试；家族方法分散于下列文件，全部仍 impl VueGenerator。
 mod nav_sidebar;
 mod script;
+mod versioned_image;
+pub use versioned_image::{append_versioned_image_directive, VueScriptLanguage};
 mod template_media;
 mod design_theme;
 mod expr;

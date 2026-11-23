@@ -205,6 +205,7 @@ fn detect_shadcn_components(vue_code: &str) -> Vec<String> {
     // 无进一步 @/components 依赖，闭包到此为止）。
     const SCAFFOLD_DEPS: &[(&str, &str)] = &[
         ("toggle-group", "toggle"),
+        ("carousel", "button"),
         ("sidebar", "button"),
         ("sidebar", "sheet"),
         ("sidebar", "input"),
@@ -409,10 +410,10 @@ impl VueDependencyUsage {
         if self.toast {
             pkgs.push("vue-sonner");
         }
-        if self.button || self.reka_scaffold {
+        if self.button || self.carousel || self.reka_scaffold {
             pkgs.push("reka-ui");
         }
-        if self.button || self.cva_scaffold {
+        if self.button || self.carousel || self.cva_scaffold {
             pkgs.push("class-variance-authority");
         }
         if self.drawer {
@@ -4049,6 +4050,7 @@ export default router
         // Output directory (Plan 129: vue/ instead of dist/)
         let output_dir = root_dir.join("gen").join("front").join("vue");
         let public_dir = front_dir.join("public");
+        let ace_route_product = ace_front(&front_dir)?;
 
         // Compile .at files
         let mut all_components: Vec<(String, String, String, String)> = Vec::new();
@@ -4193,6 +4195,11 @@ export default router
                 }
             }
             for path in &prescan_files {
+                // The checked entry emits its own widget bindings. Legacy
+                // v-model discovery is only used by the legacy generators.
+                if path == &app_at && ace_route_product.is_some() {
+                    continue;
+                }
                 // app.at + front siblings see the cross-file channel map;
                 // pages/ files are same-file only (T5 visibility parity).
                 let cross = !path.starts_with(&pages_dir);
@@ -4227,7 +4234,6 @@ export default router
         // PLAN-980 ④-A #7：ACE 键在场时根 widget SFC 换产品 lane 产物；
         // 官方 rt 随 Self 携带（generate/regenerate 写盘点落 src/a2x_rt.mjs）。
         let mut ace_vue_rt: Option<String> = None;
-        let ace_route_product = ace_front(&front_dir)?;
         if app_at.exists() && ace_route_product.is_none() {
             match crate::shadcn_build::ui_build_shadcn_with_sub_widgets_and_stores_full(
                 app_at.to_str().unwrap(),
@@ -8281,27 +8287,29 @@ fn ace_front(front_dir: &Path) -> AutoResult<Option<AceFront>> {
             .parse_domain(&auto_ui_dialect::UiDialect)
             .ok()
             .map(auto_ui_dialect::UiCode);
-        let Some(syntax) = syntax else { return Ok(None) };
-        let mut widgets = syntax.domain_stmts().filter_map(|statement| match statement {
+        let widgets = syntax.iter().flat_map(|code| code.domain_stmts()).filter_map(|statement| match statement {
             auto_ui_dialect::UiStmt::WidgetDecl(widget) => Some(widget),
             _ => None,
         });
-        let Some(root) = widgets.next() else { return Ok(None) };
+        let mut widgets = widgets.peekable();
+        let root = widgets.peek().copied();
         let has_routes = |widget: &auto_ui_dialect::ast::WidgetDecl| {
             widget.routes.as_ref().is_some_and(|routes| !routes.routes.is_empty())
         };
-        let is_routed = has_routes(root) || widgets.any(|widget| has_routes(widget));
-        let imports_package = root.ext_imports.iter().any(|import| {
+        let is_routed = widgets.any(has_routes);
+        let imports_package = root.is_some_and(|root| root.ext_imports.iter().any(|import| {
             matches!(import.kind, auto_ui_dialect::ast::ExtImportKind::Package)
-        });
-        let has_timers = root.timer.as_ref().is_some_and(|timer| !timer.entries.is_empty());
-        let has_host_bindings = root.bind.as_ref().is_some_and(|bind| {
+        }));
+        let has_timers = root.and_then(|root| root.timer.as_ref()).is_some_and(|timer| !timer.entries.is_empty());
+        let has_host_bindings = root.and_then(|root| root.bind.as_ref()).is_some_and(|bind| {
             bind.bindings.iter().any(|item| {
                 matches!(item.key.trim_matches('"'), "file:list" | "file:mutate" | "file:open" | "widget:context")
                     || auto_ui_dialect::preferences::is_preference_binding(&item.key)
             })
         });
-        if !is_routed && !imports_package && !has_timers && !has_host_bindings {
+        if !is_routed && !imports_package && !has_timers && !has_host_bindings
+            && !auto_ui_runtime::ui::ace_package_sfc::has_linked_front(&source)
+        {
             return Ok(None);
         }
         let modules = if is_routed {
@@ -12664,6 +12672,15 @@ render: \"vm\"
         assert!(!pkg.contains("\"vaul-vue\""), "{pkg}");
         assert!(!pkg.contains("\"embla-carousel-vue\""), "{pkg}");
 
+        let carousel_import = "import { Carousel } from '@/components/ui/carousel'\n";
+        let components = detect_shadcn_components(carousel_import);
+        assert!(components.contains(&"carousel".to_string()));
+        assert!(components.contains(&"button".to_string()));
+        let usage = VueDependencyUsage::detect(carousel_import);
+        let pkg = generate_package_json("demo", false, false, &[], &usage);
+        for package in ["embla-carousel-vue", "@vueuse/core", "reka-ui", "class-variance-authority"] {
+            assert!(pkg.contains(&format!("\"{package}\"")), "{pkg}");
+        }
     }
 
     /// Plan 442 P0-1: marker detection over the generated corpus — the

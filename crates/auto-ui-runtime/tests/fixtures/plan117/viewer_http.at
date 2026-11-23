@@ -1,0 +1,51 @@
+use auto.json
+
+widget ViewerHttp {
+    msg { Open, Read, Close }
+    timer { Read (every_ms: 250, when: false) }
+    model {
+        var session Str = ""
+        var photo_uri Str = ""
+        var status Str = "Waiting"
+    }
+    on {
+        .Open -> {
+            try {
+                let body = json.stringify({path: "风景.png"})
+                let response = Http.post_json("/api/viewer/open-file", body)
+                let session str = json.parse(response)
+                .session = session
+                if session == "" { .status = "Denied" } else { .status = "Opened" }
+            } catch { .status = "Open failed" }
+        }
+        .Read -> {
+            try {
+                let uri str = Http.get_json("/api/viewer/current-uri?session=" + .session)
+                .photo_uri = uri
+            } catch { .status = "Read failed" }
+        }
+        .Close -> {
+            try {
+                let body = json.stringify({session: .session})
+                let response = Http.post_json("/api/viewer/close", body)
+                let released bool = json.parse(response)
+                if released {
+                    .session = ""
+                    .photo_uri = ""
+                    .status = "Closed"
+                }
+            } catch { .status = "Close failed" }
+        }
+    }
+    view {
+        col {
+            button "Open fixture" { onclick: .Open }
+            button "Read source" { onclick: .Read }
+            button "Close fixture" { onclick: .Close }
+            text .status {}
+            if .photo_uri != "" {
+                image_surface (src: .photo_uri, alt: "Authorized image") {}
+            }
+        }
+    }
+}

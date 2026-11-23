@@ -10,7 +10,7 @@
 //! 平铺空载荷处理器沿赋值车道复放。结构化处理器使用完整受检语句。
 //! 鼠标绑定在浏览器换算为 f32 后按声明顺序传参。
 use ace_core::source::age_package::AgePackageComponent;
-use ace_core::source::age_component::{ComponentClassPart, ComponentViewElement};
+use ace_core::source::age_component::{ComponentClassPart, ComponentNode, ComponentViewElement};
 use ace_core::source::packages::PackageModuleInput;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -31,7 +31,12 @@ fn checked_host_members(members: &[ace_core::source::age_component::ComponentMem
     })
 }
 
+fn package_caps() -> [String; 1] {
+    [ace_core::source::packages::PACKAGES_CAPABILITY.to_string()]
+}
+
 mod builtin_widgets;
+use super::ace_back_api as back_api;
 mod checked_widgets;
 mod widgets;
 
@@ -53,6 +58,7 @@ pub fn generate_package_front_sfc(
 ) -> Result<(String, String), String> {
     let generate = || {
         let (mut units, _) = front_package_units(app_at, source, modules)?;
+        back_api::append_contract(app_at, &mut units)?;
         let candidates = package_candidates(source)?;
         let root = candidates.first().ok_or("no AGE node candidate in the entry module")?;
         append_widget_packages(app_at, source, &candidates, &mut units)?;
@@ -98,17 +104,22 @@ pub fn generate_linked_front_sfc(
     modules: &[PathBuf],
 ) -> Result<Option<RoutedPackageSfc>, String> {
     let candidates = package_candidates(source)?;
-    let [root] = candidates.as_slice() else { return Ok(None) };
-    if root.package_imports.is_empty() && !checked_host_members(&root.members) {
-        return Ok(None);
-    }
+    let Some(root) = linked_front_root(&candidates) else { return Ok(None) };
     let (mut units, _) = front_package_units(app_at, source, modules)?;
+    back_api::append_contract(app_at, &mut units)?;
     let widget_paths = append_widget_packages(app_at, source, &candidates, &mut units)?;
-    if widget_paths.is_empty() && !checked_host_members(&root.members) {
+    let checked_host = checked_host_members(&root.members);
+    if widget_paths.is_empty() && !checked_host {
         return Ok(None);
     }
-    let sfc = generate_package_sfc_leaf(&units, "app::app", None, false)
-        .map_err(|error| format!("{}: {error}", app_at.display()))?;
+    // The projected host declarations already select the checked widget
+    // runtime. Its compiler validates the full closure before emission.
+    let sfc = if checked_host {
+        checked_widgets::generate(&units, "app::app", &package_caps(), false, false)
+    } else {
+        generate_package_sfc_leaf(&units, "app::app", None, false)
+    }
+    .map_err(|error| format!("{}: {error}", app_at.display()))?;
     let embedded_widget_sources = widget_paths.into_iter()
         .filter_map(|(module, path)| sfc.embedded_widget_modules.contains(&module).then_some(path))
         .collect();
@@ -122,6 +133,18 @@ pub fn generate_linked_front_sfc(
         }),
         embedded_widget_sources,
     }))
+}
+
+/// Identify checked package fronts even when the legacy Vue parser cannot read the app.
+pub fn has_linked_front(source: &str) -> bool {
+    package_candidates(source).is_ok_and(|candidates| linked_front_root(&candidates).is_some())
+}
+
+fn linked_front_root(candidates: &[ComponentNode]) -> Option<&ComponentNode> {
+    match candidates {
+        [root] if !root.package_imports.is_empty() || checked_host_members(&root.members) => Some(root),
+        _ => None,
+    }
 }
 
 pub fn generate_routed_package_sfcs(
@@ -218,7 +241,7 @@ fn generate_package_sfc_leaf(
     shell: bool,
 ) -> Result<PackageSfc, String> {
     // 受检描述：字段/初值/处理器赋值（同名一次编译）。
-    let caps = [ace_core::source::packages::PACKAGES_CAPABILITY.to_string()];
+    let caps = package_caps();
     let compiled = ace_core::source::age_package::compile_age_package_with_scenario(
         units,
         entry,
@@ -326,6 +349,9 @@ fn generate_package_sfc_leaf(
                 ace_core::source::age_component::ComponentStmt::Call { .. } => {}
                 ace_core::source::age_component::ComponentStmt::Focus { .. } => {
                     return Some("focus request");
+                }
+                ace_core::source::age_component::ComponentStmt::Try { .. } => {
+                    return Some("try");
                 }
             }
         }
@@ -537,6 +563,13 @@ fn generate_package_sfc_leaf(
         script.push_str(POINTER_SAMPLE);
         script.push_str(POINTER_MOVE);
     }
+    if ctx.carousel_used {
+        script.push_str(concat!(
+            "import { Carousel as AceCarousel, CarouselContent as AceCarouselContent, ",
+            "CarouselItem as AceCarouselItem, CarouselPrevious as AceCarouselPrevious, ",
+            "CarouselNext as AceCarouselNext } from '@/components/ui/carousel'\n"
+        ));
+    }
 
 
     let runtime = if has_lists {
@@ -615,6 +648,7 @@ struct TmplCtx<'a> {
     svg_depth: usize,
     pointer_move_used: bool,
     component: Option<&'a AgePackageComponent>,
+    carousel_used: bool,
 }
 
 impl<'a> TmplCtx<'a> {
@@ -629,6 +663,7 @@ impl<'a> TmplCtx<'a> {
             svg_depth: 0,
             pointer_move_used: false,
             component: None,
+            carousel_used: false,
         }
     }
 
@@ -1400,6 +1435,10 @@ fn render_items(
                     } else if is_format_call(label) {
                         let value = class_binding_expr(label)?;
                         ctx.push_str(&format!("<span v-text=\"{value}\"></span>"));
+                    }
+                } else if matches!(el.tag.as_str(), "span" | "td") {
+                    if let Some(label) = crate::ui::ace_widget_props::literal(el, "text") {
+                        ctx.push_str(&escape_html(label));
                     }
                 } else if matches!(el.tag.as_str(), "span" | "td") {
                     if let Some(label) = crate::ui::ace_widget_props::literal(el, "text") {

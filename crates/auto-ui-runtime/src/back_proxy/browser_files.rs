@@ -49,7 +49,24 @@ pub fn start_file_browser_with_writes(
     root: &Path,
     writes: FileWritePermissions,
 ) -> io::Result<BrowserFileServer> {
-    let root_authority = FileSession::default();
+    start_scoped_browser(spec, root, writes, FileSession::default())
+}
+
+pub fn start_file_viewer(
+    spec: SessionSpec,
+    root: &Path,
+    source_dir: &Path,
+) -> io::Result<BrowserFileServer> {
+    let authority = FileSession::for_media_source(source_dir).map_err(io::Error::other)?;
+    start_scoped_browser(spec, root, FileWritePermissions::default(), authority)
+}
+
+fn start_scoped_browser(
+    spec: SessionSpec,
+    root: &Path,
+    writes: FileWritePermissions,
+    root_authority: FileSession,
+) -> io::Result<BrowserFileServer> {
     root_authority.grant(root, writes).map_err(io::Error::other)?;
     let files = Arc::new(BrowserFiles {
         authorization: file_nonce()?,
@@ -80,6 +97,22 @@ struct LaunchGrant {
 impl BrowserFiles {
     pub(super) fn is_active(&self) -> bool {
         self.grant.lock().unwrap().is_some()
+    }
+
+    pub(super) fn scope_media_uri(&self, session: &str, reply: &mut ProxyReply) {
+        if self.spec.app_id != "image-viewer" {
+            return;
+        }
+        let ProxyReply::Response { status: 200, content_type: "application/json", body } = reply else {
+            return;
+        };
+        let Ok(uri) = serde_json::from_slice::<&str>(body) else {
+            return;
+        };
+        if auto_media_core::image_pipeline::parse_media_path(uri).is_some() {
+            *body = serde_json::to_vec(&format!("/apps/{session}{uri}"))
+                .expect("a media URI serializes as JSON");
+        }
     }
 
     pub(super) fn permits(&self, req: &ParsedRequest) -> bool {

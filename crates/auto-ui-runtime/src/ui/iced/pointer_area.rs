@@ -77,6 +77,7 @@ where
     content: Element<'a, Message>,
     extent: Option<(f32, f32)>,
     contain: bool,
+    sample_button_positions: bool,
     on_move: Option<Arc<dyn Fn(f32, f32) -> Message + Send + Sync>>,
 }
 
@@ -89,6 +90,7 @@ where
             content: content.into(),
             extent: None,
             contain: false,
+            sample_button_positions: false,
             on_move: None,
         }
     }
@@ -116,6 +118,11 @@ where
 
     pub fn on_move(mut self, f: Arc<dyn Fn(f32, f32) -> Message + Send + Sync>) -> Self {
         self.on_move = Some(f);
+        self
+    }
+
+    pub(crate) fn with_button_positions(mut self) -> Self {
+        self.sample_button_positions = true;
         self
     }
 }
@@ -186,18 +193,24 @@ where
         viewport: &Rectangle,
     ) {
         let layout = self.content_layout(layout);
-        // 限频发布叠加在事件转发之上(不捕获,不改变内层语义)。
-        if let (Some(on_move), Event::Mouse(iced::mouse::Event::CursorMoved { .. })) =
-            (&self.on_move, event)
-        {
-            let bounds = layout.bounds();
-            if cursor.is_over(bounds) {
-                if let Some(local) = cursor.position_in(bounds) {
-                    let logical = to_logical(local, &bounds, self.extent);
-                    let state = tree.state.downcast_mut::<State>();
-                    if should_publish(state, logical, Instant::now()) {
-                        shell.publish((on_move)(logical.0, logical.1));
-                    }
+        let movement = matches!(event, Event::Mouse(iced::mouse::Event::CursorMoved { .. }));
+        let button_endpoint = self.sample_button_positions
+            && matches!(
+                event,
+                Event::Mouse(
+                    iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)
+                        | iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)
+                )
+            );
+        let bounds = layout.bounds();
+        if let Some(on_move) = self.on_move.as_ref().filter(|_| movement || button_endpoint) {
+            if let Some(local) = cursor.position_in(bounds) {
+                let logical = to_logical(local, &bounds, self.extent);
+                let state = tree.state.downcast_mut::<State>();
+                // The inner mouse area publishes the press or release next.
+                // Those coordinates must survive move throttling and coalescing.
+                if button_endpoint || should_publish(state, logical, Instant::now()) {
+                    shell.publish((on_move)(logical.0, logical.1));
                 }
             }
         }

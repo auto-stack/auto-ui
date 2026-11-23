@@ -3166,7 +3166,7 @@ pub(super) fn media_notify_sweep(
         for sf in &surfaces {
             eprintln!("[PLAN089SWEEP] src={} loaded={:?} error={:?} status={:?}",
                 sf.src, sf.on_loaded.is_some(), sf.on_error.is_some(),
-                auto_media_core::image_pipeline::media_surface_status(&sf.src));
+                surface_media_status(&sf.src));
         }
     }
     let has_handled_surface = surfaces
@@ -3225,7 +3225,7 @@ pub(super) fn media_notify_sweep(
                 Some(None) => auto_media_core::image_pipeline::MediaSurfaceStatus::Failed(
                     "HTTP image could not be read or decoded".into(),
                 ),
-                None => auto_media_core::image_pipeline::media_surface_status(&surf.src),
+                None => surface_media_status(&surf.src),
             };
             match status {
                 auto_media_core::image_pipeline::MediaSurfaceStatus::Ready => {
@@ -3238,7 +3238,7 @@ pub(super) fn media_notify_sweep(
                             let (w, h) = http
                                 .flatten()
                                 .map(|(w, h, _)| (w, h))
-                                .or_else(|| auto_media_core::image_pipeline::resolve_media_render(&surf.src)
+                                .or_else(|| surface_media_render(&surf.src)
                                     .map(|(_, w, h, _)| (w, h)))
                                 .unwrap_or((0, 0));
                             // URI 末段 = 入队时资产 revision（parse_media_path 同形）。
@@ -5251,13 +5251,18 @@ where
             if modifiers.control() || modifiers.alt() || modifiers.logo() {
                 return None;
             }
-            let Key::Named(key) = key else {
-                return None;
+            let key = match key {
+                Key::Named(key) => key,
+                Key::Character(character) if character.chars().count() == 1 => {
+                    return Some(TickWrapMsg::Key(character.to_string()));
+                }
+                _ => return None,
             };
             let name = match key {
                 Named::Tab if modifiers.shift() => "Shift+Tab",
                 Named::Tab => "Tab",
                 Named::Enter => "Enter",
+                Named::Escape => "Escape",
                 Named::Space => " ",
                 Named::ArrowLeft => "ArrowLeft",
                 Named::ArrowRight => "ArrowRight",
@@ -6030,7 +6035,7 @@ where
                 table.last_mut().expect("entry just pushed")
             }
         };
-        match auto_media_core::image_pipeline::media_surface_status(src) {
+        match surface_media_status(src) {
             auto_media_core::image_pipeline::MediaSurfaceStatus::Ready => {
                 if !entry.ready_seen {
                     entry.ready_seen = true; // 第一拍：下一拍（其间有渲染帧）单发

@@ -2,6 +2,9 @@
 //! 消息序/active判据/last-owner exit/纹理与external pin寿命零改——纯移动。
 use super::devtools::*;
 use super::*;
+use crate::ui::iced::image_surface::{image_surface_geometry, ImageSurfaceFit};
+
+pub(super) use crate::ui::image_pipeline::{media_surface_status as surface_media_status, resolve_media_render as surface_media_render};
 
 /// Per-asset iced image::Handle cache (P547 flicker fix).
 ///
@@ -62,8 +65,6 @@ pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
     _filter: String,
     style: Option<Style>,
 ) -> iced::Element<'static, M> {
-    use crate::ui::iced::image_surface::ImageSurfaceFit;
-
     let is = style.as_ref().map(IcedStyle::from_style);
     let width_hint = if width > 0 {
         Some(iced::Length::Fixed(width as f32))
@@ -75,14 +76,6 @@ pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
     } else {
         is.as_ref().and_then(|s| s.height.as_ref().map(iced_length))
     };
-    let fit = ImageSurfaceFit::parse(&fit);
-    let object_fit = match fit {
-        ImageSurfaceFit::Contain => iced::ContentFit::Contain,
-        ImageSurfaceFit::Cover => iced::ContentFit::Cover,
-        ImageSurfaceFit::Width => iced::ContentFit::Contain,
-        ImageSurfaceFit::OneToOne => iced::ContentFit::None,
-        ImageSurfaceFit::Free => iced::ContentFit::None,
-    };
     let filter_method = if quality < 80 {
         iced::widget::image::FilterMethod::Nearest
     } else {
@@ -91,62 +84,25 @@ pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
 
     // Tickets consume pixels already decoded by the media worker. The HTTP
     // marker is reserved for sources already supported by the Image loader.
-    let bitmap = if src.starts_with("/api/__auto/media/") {
-        auto_media_core::image_pipeline::resolve_media_render(&src)
-            .map(|(asset_id, w, h, rgba)| (w, h, cached_media_handle(asset_id, w, h, rgba)))
-    } else {
-        native_http_image_source(&src).and_then(native_http_image)
-    };
-    let mut inner: iced::Element<'static, M> =
+    let bitmap = surface_media_render(&src)
+        .map(|(asset_id, w, h, rgba)| (w, h, cached_media_handle(asset_id, w, h, rgba)))
+        .or_else(|| native_http_image_source(&src).and_then(native_http_image));
+    let inner: iced::Element<'static, M> =
         if let Some((source_width, source_height, handle)) = bitmap {
-            let zoom = zoom.clamp(0.05, 64.0);
-            let viewport = iced::Rectangle {
-                x: 0.0,
-                y: 0.0,
-                width: width.max(source_width) as f32,
-                height: height.max(source_height) as f32,
-            };
-            let geometry = crate::ui::iced::image_surface::image_surface_geometry(
-                viewport,
-                iced::Size::new(source_width as f32, source_height as f32),
-                fit,
+            iced::Element::new(ImageSurfaceBitmap {
+                image: iced::advanced::image::Image::new(handle)
+                    .filter_method(filter_method)
+                    .rotation(iced::Radians::from((rotation.rem_euclid(360) as f32).to_radians())),
+                source_size: iced::Size::new(source_width as f32, source_height as f32),
+                size: iced::Size {
+                    width: width_hint.unwrap_or(iced::Length::Shrink),
+                    height: height_hint.unwrap_or(iced::Length::Shrink),
+                },
+                fit: ImageSurfaceFit::parse(&fit),
                 zoom,
-                offset_x,
-                offset_y,
-                rotation as f32,
-            );
-            let display_width = geometry.rotated_bounds.width.max(1.0);
-            let display_height = geometry.rotated_bounds.height.max(1.0);
-            let radians = (rotation.rem_euclid(360) as f32).to_radians();
-            let mut image = iced::widget::image(handle)
-            .content_fit(object_fit)
-            .filter_method(filter_method)
-            .rotation(iced::Radians::from(radians));
-            if width > 0 && fit != ImageSurfaceFit::Cover {
-                image = image.width(iced::Length::Fixed(
-                    display_width.max(width as f32 + offset_x.abs()),
-                ));
-            } else if let Some(w) = width_hint {
-                image = image.width(w);
-            }
-            if height > 0 && fit != ImageSurfaceFit::Cover {
-                image = image.height(iced::Length::Fixed(
-                    display_height.max(height as f32 + offset_y.abs()),
-                ));
-            } else if let Some(h) = height_hint {
-                image = image.height(h);
-            }
-            // Keep the translation in the clipping layout as well as in the
-            // geometry calculation. This makes pan state observable without ever
-            // moving decode or filesystem work onto the render thread.
-            container(image)
-                .padding(iced::Padding {
-                    top: offset_y.max(0.0),
-                    right: (-offset_x).max(0.0),
-                    bottom: (-offset_y).max(0.0),
-                    left: offset_x.max(0.0),
-                })
-                .into()
+                offset: iced::Vector::new(offset_x, offset_y),
+                rotation,
+            })
         } else {
             let label = if alt.is_empty() {
                 "Image unavailable".to_string()
@@ -186,8 +142,58 @@ pub(super) fn render_image_surface<M: Clone + Debug + 'static>(
             ..Default::default()
         });
     }
-    inner = surface.into();
-    inner
+    surface.into()
+}
+
+struct ImageSurfaceBitmap {
+    image: iced::advanced::image::Image,
+    source_size: iced::Size,
+    size: iced::Size<iced::Length>,
+    fit: ImageSurfaceFit,
+    zoom: f32,
+    offset: iced::Vector,
+    rotation: i32,
+}
+
+impl<M> iced::advanced::Widget<M, iced::Theme, iced::Renderer> for ImageSurfaceBitmap {
+    fn size(&self) -> iced::Size<iced::Length> {
+        self.size
+    }
+
+    fn layout(
+        &mut self,
+        _tree: &mut iced::advanced::widget::Tree,
+        _renderer: &iced::Renderer,
+        limits: &iced::advanced::layout::Limits,
+    ) -> iced::advanced::layout::Node {
+        iced::advanced::layout::Node::new(
+            limits.resolve(self.size.width, self.size.height, self.source_size),
+        )
+    }
+
+    fn draw(
+        &self,
+        _tree: &iced::advanced::widget::Tree,
+        renderer: &mut iced::Renderer,
+        _theme: &iced::Theme,
+        _style: &iced::advanced::renderer::Style,
+        layout: iced::advanced::Layout<'_>,
+        _cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        use iced::advanced::image::Renderer as _;
+        use iced::advanced::Renderer as _;
+
+        let bounds = layout.bounds();
+        let Some(clip) = bounds.intersection(viewport) else { return };
+        let geometry = image_surface_geometry(
+            bounds, self.source_size, self.fit, self.zoom, self.offset.x,
+            self.offset.y, self.rotation as f32,
+        );
+        renderer.with_layer(clip, |renderer| {
+            renderer.draw_image(self.image.clone(), geometry.image, clip);
+        });
+    }
 }
 
 /// `video` 的渲染面（PLAN-617 T-19）。

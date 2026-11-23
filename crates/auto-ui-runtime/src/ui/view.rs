@@ -94,6 +94,7 @@ use crate::ui::interpreter::DynamicMessage;
 
 pub struct PointerMoveHandler<M> {
     callback: Arc<dyn Fn(f32, f32) -> M + Send + Sync>,
+    pub(crate) sample_button_positions: bool,
     /// PLAN-088 T-05：事件基座消息（Typed/TypedInst——实例身份与 handler
     /// 名的提取源；MCP 合成动作按它解析组件作用域派发）。None = 旧构造。
     /// 类型擦除存储（避免 M: Send+Sync 传染；提取点按 DynamicMessage 下转）。
@@ -104,6 +105,7 @@ impl<M: Clone> Clone for PointerMoveHandler<M> {
     fn clone(&self) -> Self {
         Self {
             callback: Arc::clone(&self.callback),
+            sample_button_positions: self.sample_button_positions,
             base: self.base.clone(),
         }
     }
@@ -122,6 +124,7 @@ impl<M> PointerMoveHandler<M> {
     {
         Self {
             callback: Arc::new(f),
+            sample_button_positions: false,
             base: None,
         }
     }
@@ -134,7 +137,28 @@ impl<M> PointerMoveHandler<M> {
     {
         Self {
             callback: Arc::new(f),
+            sample_button_positions: false,
             base: Some(Arc::new(base)),
+        }
+    }
+
+    pub(crate) fn with_button_positions(mut self) -> Self {
+        self.sample_button_positions = true;
+        self
+    }
+
+    pub(crate) fn map<N>(
+        self,
+        f: impl Fn(M) -> N + Send + Sync + 'static,
+    ) -> PointerMoveHandler<N>
+    where
+        M: 'static,
+    {
+        let callback = self.callback;
+        PointerMoveHandler {
+            callback: Arc::new(move |x, y| f(callback(x, y))),
+            sample_button_positions: self.sample_button_positions,
+            base: None,
         }
     }
 
@@ -2685,7 +2709,7 @@ impl<M: Clone + Debug> View<M> {
                 on_release: on_release.map(|m| f(m)),
                 on_move: on_move.map(|h| {
                     let f = std::sync::Arc::clone(f);
-                    PointerMoveHandler::new(move |x, y| f(h.call(x, y)))
+                    h.map(move |message| f(message))
                 }),
                 logical_extent,
                 style,

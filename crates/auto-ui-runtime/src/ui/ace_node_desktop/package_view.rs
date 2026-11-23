@@ -4,16 +4,19 @@ use crate::ui::ace_svg;
 use crate::ui::aura_view_builder::parse_coords_extent;
 use crate::ui::view::PointerMoveHandler;
 use crate::ui::aura_view_builder::{rederive_layout, RederivedLayout};
+use crate::ui::iced::image_surface_input::ImageSurfaceCallback;
 use crate::ui::style::{SizeValue, StyleClass};
 use crate::ui::view::{PopoverAnchor, PopoverPlacement};
 use crate::ui::{Style, View};
 
-use super::{NodeDesktopMsg, PackageFrame};
+use super::{package_images::{PackageImages, SurfaceCallbacks}, NodeDesktopMsg, PackageFrame};
+use std::sync::Arc;
 
 pub(super) fn view(
     session: i32,
     instance: usize,
     frame: &PackageFrame,
+    images: Option<&PackageImages>,
     outlet: Option<&View<NodeDesktopMsg>>,
     routed: bool,
     dialogs: &mut Vec<View<NodeDesktopMsg>>,
@@ -22,12 +25,16 @@ pub(super) fn view(
         session,
         instance,
         frame,
+        images,
         routed,
         dialogs,
     };
     let mut builder = View::col()
         .children(context.items(&frame.view, &mut Vec::new(), outlet))
         .spacing(4);
+    if let Some(images) = images {
+        images.finish_frame(instance, frame.revision);
+    }
     if owns_viewport(frame) {
         let style = if routed && outlet.is_some() {
             "w-full h-full bg-background text-foreground"
@@ -66,6 +73,7 @@ struct FrameView<'a> {
     session: i32,
     instance: usize,
     frame: &'a PackageFrame,
+    images: Option<&'a PackageImages>,
     routed: bool,
     dialogs: &'a mut Vec<View<NodeDesktopMsg>>,
 }
@@ -217,6 +225,7 @@ impl FrameView<'_> {
             };
         }
         let content = match element.tag.as_str() {
+            _ if self.frame.image_surface(path).is_some() => self.image_surface(element, path, style),
             "icon" => View::Image {
                 src: format!("lucide:{}", prop(element, "name").unwrap_or_default()),
                 style,
@@ -256,6 +265,77 @@ impl FrameView<'_> {
         };
         let content = pointer_events(content, click.clone(), double_click, context_menu);
         self.focusable(content, path, click)
+    }
+
+    fn image_surface(&self, element: &WidgetElement, path: &[usize], style: Option<Style>) -> View<NodeDesktopMsg> {
+        let bindings = self.frame.image_surface(path).expect("published image surface");
+        let source = prop(element, "src").unwrap_or_default();
+        let private = crate::back_proxy::native_files::is_media(source);
+        let callbacks = || SurfaceCallbacks {
+            revision: self.frame.revision,
+            loaded: bindings.loaded.and_then(|target| self.frame.queued_action(target)),
+            error: bindings.error.and_then(|target| self.frame.queued_action(target)),
+        };
+        let src = if private {
+            if let Some(images) = self.images {
+                images.project_private(self.instance, path, source, callbacks());
+            }
+            source.to_owned()
+        } else if source.starts_with("/api/__auto/media/") {
+            source.to_owned()
+        } else if let Some(images) = self.images {
+            if let Some(url) = images.http_url(source) {
+                images.project_http(
+                    self.instance,
+                    path,
+                    url,
+                    prop(element, "cache_identity").unwrap_or_default(),
+                    callbacks(),
+                )
+            } else {
+                images.public_source(source).unwrap_or_default()
+            }
+        } else {
+            String::new()
+        };
+        let number = |key, default| {
+            prop(element, key).and_then(|value| value.parse::<f32>().ok())
+                .filter(|value| value.is_finite()).unwrap_or(default)
+        };
+        let text = |key, default| {
+            prop(element, key).filter(|value| !value.is_empty()).unwrap_or(default).to_owned()
+        };
+        let zoom = number("zoom", 1.0);
+        let (session, instance, revision) = (self.session, self.instance, self.frame.revision);
+        let input = |target: usize| {
+            let has_payload = self.frame.actions()[target].source.image_surface_payload.is_some();
+            ImageSurfaceCallback::from_closure(Arc::new(move |carry| {
+                if has_payload {
+                    NodeDesktopMsg::PackageImageSurface { session, instance, revision, target, carry }
+                } else {
+                    NodeDesktopMsg::PackageClick { session, instance, revision, target }
+                }
+            }))
+        };
+        View::ImageSurface {
+            src,
+            alt: text("alt", ""),
+            width: number("width", 0.0) as u32,
+            height: number("height", 0.0) as u32,
+            quality: number("quality", 90.0).clamp(0.0, 100.0) as u8,
+            fit: text("fit", "contain"),
+            zoom: if zoom > 0.0 { zoom } else { 1.0 },
+            offset_x: number("offset_x", 0.0),
+            offset_y: number("offset_y", 0.0),
+            rotation: (number("rotation", 0.0) as i32).rem_euclid(360),
+            filter: text("filter", "high"),
+            on_error: (!private).then(|| bindings.error.map(|target| self.action(target))).flatten(),
+            on_loaded: (!private).then(|| bindings.loaded.map(|target| self.action(target))).flatten(),
+            on_wheel: bindings.wheel.map(input),
+            on_pan: bindings.pan.map(input),
+            on_double_click: bindings.double_click.map(input),
+            style,
+        }
     }
 
     fn input(&self, element: &WidgetElement, path: &[usize]) -> View<NodeDesktopMsg> {

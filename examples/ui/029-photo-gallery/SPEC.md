@@ -27,8 +27,8 @@
 > 主题：AutoOS Dark/indigo 默认；root 声明 `dark_mode` bool /
 > `accent_color` str 契约变量（变量名即双端契约），工具栏可运行时切换。
 >
-> 收藏：id 落 app Storage 键 `photo-gallery.favs`（CSV），ToggleFav 翻标 +
-> 重建 CSV + 重写盘，重开保留。
+> 收藏以整条照片记录的 JSON 数组持久化，沿用应用 Storage 键
+> `photo-gallery.favs`。宿主恢复后执行首次扫描，重开保留收藏。
 
 ## 形态
 
@@ -51,7 +51,6 @@
   album: str     // "photos"（根文件）| 子目录名（如 "Screenshots"）
   date: str      // "YYYY-MM-DD"（mtime）
   meta: str      // "宽×高 · 大小 · 日期"（尺寸解析失败时省宽高段）
-  fav: bool      // 收藏标（fav_ids 初始化时命中即真）
   thumb: str     // 绝对缩略图 URL
   full: str      // 绝对原图 URL
   sort_key: int  // mtime epoch 秒（排序键）
@@ -60,20 +59,20 @@
 
 ## 行为契约
 
-- **Init**：`Storage.get("photo-gallery.favs")` 恢复收藏 →
-  `Http.get_json("/api/photos/scan")` 建 `photos` → `ApplyFilter()`。
+- **Init**：宿主恢复 `photo-gallery.favs`，首扫
+  `Http.get_json("/api/photos/scan")` 建 `photos`，然后应用当前查询。
   scan 失败（后端未起）→ 空列表 + `load_error` 文案（空态三态之一）；
   `root_missing: true` → 空态「照片源目录不存在」。
 - **动态相册分组**：`ApplyFilter` 每次按 `photos` 首现序重建
   `album_tabs = [全部, <各 album>, 收藏]`（计数同重建）。"photos" 标签
   📷 图片、"Screenshots" 标签 📱 截图，其余 album 用目录原名。
-- **过滤**：相册键相等 || all || favorites(fav 标)；搜索子串命中
-  `title.lower()`。
+- **过滤**：普通相册使用当前目录扫描结果，收藏夹使用收藏记录。搜索按
+  `title.lower()` 的子串匹配。
 - **排序**：`sort_key`（mtime）选择序，desc 最新在前 / asc 最早在前。
 - **查看器**：`OpenPhoto(id)` 在 `view_ids`（当前过滤排序序）定位，前后
-  循环环绕；`cur_*` 字段从 `photos` 反查填充。
-- **收藏**：`ToggleFav(id)` 翻 `photos[i].fav` → 重建 `fav_ids` +
-  CSV → `Storage.set` → `ApplyFilter`；查看器态同步 `fav_label`。
+  循环环绕。原图地址和显示信息来自同一条当前结果。
+- **收藏**：`ToggleFav(id)` 按照片 ID 添加或移除 `fav_records` 中的完整记录，
+  更新宿主偏好绑定及当前查询。查看器同步 `fav_label`。
 
 ## 已知边界
 

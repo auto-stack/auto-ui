@@ -34,6 +34,14 @@ function checkedViewItems(tape) {
       current.properties.set(next(), next());
     } else if (operation === 'label') {
       current.children.push(next());
+    } else if (operation === 'image-surface-event') {
+      const kind = next();
+      const message = next();
+      if (!isCheckedImageSurface(current.tag) || (kind !== 'onwheel' && kind !== 'onpan')) {
+        throw new Error('ace.widget.view: invalid image surface event');
+      }
+      const types = kind === 'onwheel' ? ['f32'] : ['f32', 'f32', 'str'];
+      current.events.push({ kind, message, types, values: [], imageInput: true });
     } else if (operation === 'event') {
       const event = { kind: next(), message: next(), types: [], values: [] };
       const count = Number(next());
@@ -177,17 +185,40 @@ function checkedOutboundEvents(context, model) {
   return events;
 }
 
+function* outboundWidgetActions(context, model) {
+  for (const event of checkedOutboundEvents(context, model)) {
+    if (context.parent === null || !Object.hasOwn(context.channels, event.message)) continue;
+    const message = context.channels[event.message];
+    yield checkedWidgetAction(context.parent, { ...event, message });
+  }
+}
+
 function sameWidgetValue(left, right) {
   const pairs = [[left, right]];
+  let visited;
   while (pairs.length !== 0) {
     const [before, after] = pairs.pop();
     if (Object.is(before, after)) continue;
+    if (before === null || after === null || typeof before !== 'object' || typeof after !== 'object') return false;
+    let matches = (visited ??= new WeakMap()).get(before);
+    if (matches === undefined) visited.set(before, matches = new WeakSet());
+    if (matches.has(after)) continue;
+    matches.add(after);
     if (before instanceof A2xOwnedStr && after instanceof A2xOwnedStr) {
       if (a2x_str_utf8(before) !== a2x_str_utf8(after)) return false;
     } else if (before instanceof A2xList && after instanceof A2xList) {
       if (before.items.length !== after.items.length) return false;
       for (const [index, item] of before.items.entries()) pairs.push([item, after.items[index]]);
-    } else if (before && after && Object.getPrototypeOf(before) === Object.prototype &&
+    } else if (before instanceof A2xDyn && after instanceof A2xDyn) {
+      pairs.push([before.type, after.type], [before.value, after.value]);
+    } else if (before instanceof A2xObject && after instanceof A2xObject) {
+      pairs.push([before.entries, after.entries]);
+    } else if (before instanceof Uint8Array && after instanceof Uint8Array) {
+      if (before.length !== after.length || !before.every((byte, index) => byte === after[index])) return false;
+    } else if (Array.isArray(before) && Array.isArray(after)) {
+      if (before.length !== after.length) return false;
+      for (const [index, item] of before.entries()) pairs.push([item, after[index]]);
+    } else if (Object.getPrototypeOf(before) === Object.prototype &&
                Object.getPrototypeOf(after) === Object.prototype) {
       const fields = Object.keys(before);
       if (fields.length !== Object.keys(after).length) return false;
@@ -237,7 +268,9 @@ const checkedDomEvents = {
   onblur: 'onBlur',
   onkeydown: 'onKeydown',
   oninput: 'onInput',
+  onchange: 'onChange',
   onenter: 'onKeydown',
+  onload: 'onLoad',
   onerror: 'onError',
 };
 
@@ -265,7 +298,81 @@ function checkedDomBinding(binding) {
   return { property: checkedDomEvents[event], key: event === 'onenter' ? 'Enter' : checkedDomKeys[keys[0]], flags };
 }
 
-function nativeWidgetNode(element, children, click, close, listeners, focusMarker) {
+function isCheckedImageSurface(tag) {
+  return tag === 'image_surface' || tag === 'image-surface' || tag === 'imagesurface';
+}
+
+function checkedImageNode(properties, props, path) {
+  const source = properties.get('src');
+  const cacheIdentity = properties.get('cache_identity');
+  const fit = properties.get('fit') ?? 'contain';
+  const numeric = (key, fallback) => {
+    const value = Number(properties.get(key));
+    return Number.isFinite(value) ? value : fallback;
+  };
+  const zoom = Math.min(64, Math.max(0.05, numeric('zoom', 1)));
+  const width = fit === 'contain' || fit === 'cover' || fit === 'width' ? '100%' : 'auto';
+  const height = fit === 'contain' || fit === 'cover' ? '100%' : 'auto';
+  const { class: classes, style: viewportStyle, ...imageProps } = props;
+  if (cacheIdentity === undefined) {
+    imageProps.src = source || undefined;
+  } else {
+    const binding = { value: [source, cacheIdentity] };
+    const update = ({ el }) => vAutoVersionedImage.updated(el, binding);
+    imageProps.onVnodeMounted = update;
+    imageProps.onVnodeUpdated = update;
+    imageProps.onVnodeBeforeUnmount = ({ el }) => vAutoVersionedImage.unmounted(el);
+  }
+  return h('div', {
+    key: path,
+    class: ['relative overflow-hidden', classes],
+    style: { display: 'grid', placeItems: 'center', overflow: 'hidden', ...viewportStyle },
+  }, [h('img', {
+    ...imageProps,
+    key: JSON.stringify([source, cacheIdentity]),
+    alt: properties.get('alt') ?? '',
+    draggable: false,
+    style: {
+      width, height, maxWidth: 'none', maxHeight: 'none', userSelect: 'none',
+      touchAction: props.onPointerdown ? 'none' : undefined,
+      objectFit: fit === 'cover' ? 'cover' : 'contain',
+      filter: properties.get('filter'),
+      transform: `translate(${numeric('offset_x', 0)}px, ${numeric('offset_y', 0)}px) rotate(${numeric('rotation', 0)}deg) scale(${zoom})`,
+    },
+  })]);
+}
+
+function checkedPanListeners(samples, enabled, run) {
+  function end(event) {
+    const element = event.currentTarget;
+    const sample = samples.get(element);
+    if (sample?.id !== event.pointerId) return;
+    samples.delete(element);
+    if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
+    run([0, 0, 'end']);
+  }
+  return [
+    ['onPointerdown', event => {
+      const element = event.currentTarget;
+      if (!enabled() || event.button !== 0 || samples.has(element)) return;
+      element.setPointerCapture(event.pointerId);
+      samples.set(element, { id: event.pointerId, x: event.clientX, y: event.clientY });
+      run([0, 0, 'start']);
+    }],
+    ['onPointermove', event => {
+      const sample = samples.get(event.currentTarget);
+      if (sample?.id !== event.pointerId) return;
+      const dx = event.clientX - sample.x;
+      const dy = event.clientY - sample.y;
+      sample.x = event.clientX;
+      sample.y = event.clientY;
+      if (dx !== 0 || dy !== 0) run([dx, dy, 'move']);
+    }],
+    ['onPointerup', end], ['onPointercancel', end], ['onLostpointercapture', end],
+  ];
+}
+
+function nativeWidgetNode(element, children, click, close, listeners, focusMarker, path) {
   const { tag, properties } = element;
   const props = { key: properties.get('key') };
   if (focusMarker !== null) props['data-auto-checked-focus'] = focusMarker;
@@ -335,10 +442,7 @@ function nativeWidgetNode(element, children, click, close, listeners, focusMarke
     ...props, type: properties.get('type') ?? 'text', value: properties.get('value') ?? '',
     placeholder: properties.get('placeholder'), disabled: properties.get('disabled') === 'true',
   });
-  if (tag === 'image_surface') return h('img', {
-    ...props, key: properties.get('cache_identity') ?? props.key, src: properties.get('src'),
-    alt: properties.get('alt') ?? '', style: { objectFit: properties.get('fit') },
-  });
+  if (isCheckedImageSurface(tag)) return checkedImageNode(properties, props, path);
   if (tag === 'outlet' && aceRouting?.outlet) {
     return h(aceRouting.outlet, props, { default: ({ Component, route }) => Component
       ? h(Component, { key: route.path })
@@ -396,9 +500,105 @@ function nativeWidgetNode(element, children, click, close, listeners, focusMarke
   throw new Error(`ace.widget.view: unsupported element '${tag}'`);
 }
 
-function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences = [], fileOpen = null) {
+function fileBackendTarget(url, post) {
+  const pathAndQuery = url.slice('auto:back:'.length);
+  const separator = pathAndQuery.indexOf('?');
+  const path = separator === -1 ? pathAndQuery : pathAndQuery.slice(0, separator);
+  if (!/^\/api(?:\/[a-zA-Z0-9_-]+)+$/.test(path) || post !== (separator === -1)) {
+    throw new A2xTrap('Fail', 'http.client: invalid backend request');
+  }
+  if (post) return path;
+  const json = pathAndQuery.slice(separator + 1);
+  if (new TextEncoder().encode(json).length > _jsonMaxText) {
+    throw new A2xTrap('Budget', 'http.client: JSON request exceeds the text limit');
+  }
+  let params;
+  try {
+    params = JSON.parse(json);
+  } catch {
+    throw new A2xTrap('Fail', 'http.client: invalid backend query');
+  }
+  if (params === null || typeof params !== 'object' || Array.isArray(params)) {
+    throw new A2xTrap('Fail', 'http.client: invalid backend query');
+  }
+  const query = new URLSearchParams();
+  for (const [name, value] of Object.entries(params)) {
+    if (!['string', 'number', 'boolean'].includes(typeof value)) {
+      throw new A2xTrap('Fail', 'http.client: invalid backend query parameter');
+    }
+    query.append(name, String(value));
+  }
+  return query.size === 0 ? path : `${path}?${query}`;
+}
+
+async function requestWidgetJson(request, signal, fileBackend) {
+  const post = typeof request !== 'string';
+  const url = post ? request.url : request;
+  const scoped = url.startsWith('auto:back:');
+  let target;
+  if (scoped) {
+    if (fileBackend === null) throw new A2xTrap('Fail', 'http.client: backend session unavailable');
+    target = fileBackendTarget(url, post);
+  } else {
+    try {
+      target = new URL(url, globalThis.location.href);
+    } catch {
+      throw new A2xTrap('Fail', 'http.client: invalid URL');
+    }
+    if (target.origin !== globalThis.location.origin || !['http:', 'https:'].includes(target.protocol)) {
+      throw new A2xTrap('Fail', 'http.client: request must use the widget origin');
+    }
+  }
+  const options = { signal, mode: 'same-origin', credentials: 'same-origin' };
+  if (post) {
+    if (new TextEncoder().encode(request.json).length > _jsonMaxText) {
+      throw new A2xTrap('Budget', 'http.client: JSON request exceeds the text limit');
+    }
+    options.method = 'POST';
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = request.json;
+  }
+  try {
+    const response = await (scoped ? fileBackend(target, options) : fetch(target, options));
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new A2xTrap('Fail', 'http.client: response status ' + response.status);
+    }
+    const reader = response.body?.getReader();
+    if (!reader) return new Uint8Array(0);
+    const chunks = [];
+    let length = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        length += value.length;
+        if (length > _jsonMaxText) {
+          await reader.cancel();
+          throw new A2xTrap('Budget', 'http.client: JSON response exceeds the text limit');
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const bytes = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return bytes;
+  } catch (error) {
+    if (signal.aborted || error instanceof A2xTrap) throw error;
+    throw new A2xTrap('Fail', 'http.client: request failed');
+  }
+}
+
+function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences = [], fileOpen = null, fileBackend = null, shortcuts = {}) {
   const rendered = shallowRef(null);
   const pointerSamples = new WeakMap();
+  const panSamples = new WeakMap();
   let current = null;
   let savedPreferences = [];
   let active = true;
@@ -411,9 +611,15 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
   let nextMountToken = 0;
   let directoryRequest = null;
   let mutationRequest = null;
+  let initActionsScheduled = false;
+  let initActionBudget = null;
+  const pendingHttp = new Set();
+  const hasHttp = Object.values(aceComponents).some(component =>
+    Object.values(component.handlers).some(handler => handler.suspends));
+  let nextTransition = 0;
 
   function draw(changes = new Map(), focus = []) {
-    const frame = { models: new Map(), timerOwners: new Map(), focus, focusTargets: new Map() };
+    const frame = { models: new Map(), timerOwners: new Map(), initActions: new Map(), focus, focusTargets: new Map() };
     const building = new Set();
 
     function widget(node, inputs, path, parent, channels) {
@@ -445,16 +651,19 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
         }
         const inputsChanged = previous === undefined ||
           inputs.some((value, index) => !sameWidgetValue(value, previous.inputs[index]));
-        if (inputsChanged) {
-          if (Object.hasOwn(definition.handlers, 'Init')) {
-            const handler = definition.handlers.Init;
-            if (handler.types.length !== 0) throw new Error('ace.widget.init: Init must take no payload');
+        if (inputsChanged && Object.hasOwn(definition.handlers, 'Init')) {
+          const handler = definition.handlers.Init;
+          if (handler.types.length !== 0) throw new Error('ace.widget.init: Init must take no payload');
+          if (handler.suspends) {
+            frame.initActions.set(path, [{ path, handler, types: [], values: [] }]);
+          } else {
             context.model = handler.run(...widgetArguments(context));
             collectWidgetFocus(context, context.model, frame.focus);
-            if (checkedOutboundEvents(context, context.model).some(event => Object.hasOwn(channels, event.message))) {
-              throw new Error('ace.widget.init: outbound events require a mounted parent');
-            }
+            const actions = Array.from(outboundWidgetActions(context, context.model));
+            if (actions.length !== 0) frame.initActions.set(path, actions);
           }
+        } else if (!inputsChanged && current.initActions.has(path)) {
+          frame.initActions.set(path, current.initActions.get(path));
         }
         if (definition.watches.length !== 0) runWidgetWatches(previous, context, frame.focus);
         frame.models.set(path, context);
@@ -494,10 +703,29 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
           const kind = event.kind.toLowerCase();
           if (bindings.has(kind)) throw new Error(`ace.widget.event: duplicate binding '${event.kind}'`);
           bindings.add(kind);
-          const acceptsInputValue = element.tag === 'input' && kind === 'oninput' && event.types.length === 0;
+          const acceptsInputValue = element.tag === 'input' &&
+            (kind === 'oninput' || kind === 'onchange') && event.types.length === 0;
           const pointerMove = element.tag === 'mouse-area' && kind === 'onmousemove' && event.types.length === 0;
           const action = checkedWidgetAction(owner, event, acceptsInputValue,
             pointerMove ? ['f32', 'f32'] : event.types);
+          if (isCheckedImageSurface(element.tag) && (kind === 'onpan' || kind === 'onwheel')) {
+            const enabled = () => active && current === frame && element.properties.get('disabled') !== 'true';
+            const run = values => {
+              if (enabled()) dispatch(frame, event.imageInput ? { ...action, values } : action);
+            };
+            if (kind === 'onpan') {
+              for (const [property, listen] of checkedPanListeners(panSamples, enabled, run)) {
+                listeners.set(property, listen);
+              }
+            } else {
+              listeners.set('onWheel', domEvent => {
+                if (!enabled() || !Number.isFinite(domEvent.deltaY)) return;
+                domEvent.preventDefault();
+                run([domEvent.deltaY]);
+              });
+            }
+            continue;
+          }
           const extent = pointerMove ? element.properties.get('coords') : undefined;
           const dimensions = widgetExtent(extent);
           if (extent !== undefined && dimensions === null) {
@@ -540,7 +768,7 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
           listeners.set(property, callbacks);
         }
         return nativeWidgetNode(element, render(element.children, owner, path), click, close, listeners,
-          registerFocusTarget(frame, owner, element.properties.get('id')));
+          registerFocusTarget(frame, owner, element.properties.get('id')), path);
       });
     }
 
@@ -584,10 +812,17 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
   function keep(frame) {
     const models = frame === null ? [] : Array.from(frame.models.values(), instance => [instance.model, instance.inputs]);
     if (directoryRequest !== null) models.push(...directoryRequest.changes.values());
+    for (const transaction of pendingHttp) {
+      for (const instance of transaction.models.values()) models.push([instance.model, instance.inputs]);
+      models.push(Array.from(transaction.held));
+    }
     a2x_widget_keep_models(models);
   }
 
   function publish(frame) {
+    for (const transaction of pendingHttp) {
+      if (!httpOwnersCurrent(transaction, frame)) cancelWidgetHttp(transaction);
+    }
     keep(frame);
     const model = frame.models.get('root')?.model;
     const nextPreferences = preferences.map(([, field]) => {
@@ -602,6 +837,7 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
       }
       current.models.clear();
       current.timerOwners.clear();
+      current.initActions.clear();
       current.view = null;
     }
     savedPreferences = nextPreferences;
@@ -611,7 +847,29 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
     if (mounted) {
       reconcileTimers(frame.timerOwners);
       startPendingMutation();
+      scheduleInitActions();
     }
+  }
+
+  function scheduleInitActions() {
+    if (current.initActions.size === 0) initActionBudget = null;
+    if (current.initActions.size === 0 || initActionsScheduled || directoryRequest !== null) return;
+    initActionsScheduled = true;
+    // Mount and patch the VNodes before invoking any parent handlers.
+    void nextTick(() => {
+      initActionsScheduled = false;
+      if (!mounted || current.initActions.size === 0 || directoryRequest !== null) return;
+      const frame = current;
+      const actions = Array.from(frame.initActions.values()).flat();
+      frame.initActions.clear();
+      initActionBudget ??= { remaining: 4096 };
+      try {
+        dispatchActions(frame, actions, null, initActionBudget);
+      } catch (error) {
+        initActionBudget = null;
+        throw error;
+      }
+    });
   }
 
   function reconcileTimers(owners) {
@@ -630,6 +888,7 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
           const owner = frame?.timerOwners.get(path);
           if (!active || owner === undefined || scheduled.get(path) !== schedule) return;
           if (directoryRequest !== null && path === 'root') return;
+          if (Array.from(pendingHttp).some(transaction => transaction.touched.has(path))) return;
           const action = checkedWidgetAction(owner, { message: timer.message, types: [], values: [] });
           const enabled = timer.condition === null ? null : () => timer.condition(...widgetArguments(owner));
           dispatch(frame, action, enabled);
@@ -660,6 +919,7 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
     directoryRequest = null;
     if (fileDirectory.lease.aborted) {
       keep(current);
+      scheduleInitActions();
       return;
     }
     a2x_widget_begin_frame();
@@ -753,62 +1013,174 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
     }
   }
 
-  function applyWidgetAction(frame, action, changes, focus, budget) {
-    if (budget.remaining-- === 0) throw new Error('ace.widget.outbound: transition limit exceeded');
-    const instance = frame.models.get(action.path);
-    const previous = withWidgetContext(instance, changes.get(action.path) ?? instance.model);
+  function httpOwnersCurrent(transition, frame) {
+    if (!active || frame === null) return false;
+    for (const path of transition.touched) {
+      const before = transition.models.get(path);
+      const after = frame.models.get(path);
+      if (!before || !after || after.definition !== before.definition || after.model !== before.model ||
+          !sameWidgetValue(before.inputs, after.inputs)) return false;
+    }
+    return true;
+  }
+
+  function cancelWidgetHttp(transition) {
+    pendingHttp.delete(transition);
+    transition.controller?.abort();
+    transition.iterator.return();
+  }
+
+  function* applyWidgetAction(transition, action) {
+    if (transition.budget.remaining-- === 0) throw new Error('ace.widget.outbound: transition limit exceeded');
+    transition.touched.add(action.path);
+    if (transition.controller !== null && !httpOwnersCurrent(transition, current)) return;
+    const instance = transition.models.get(action.path);
+    let model = transition.changes.get(action.path) ?? instance.model;
+    let inputs = instance.inputs;
+    if (hasHttp) {
+      if (transition.inputs.has(action.path)) {
+        inputs = transition.inputs.get(action.path);
+      } else {
+        // Changes made before a yield belong to the transition's private state.
+        [model, inputs] = a2x_widget_copy_state([model, inputs]);
+        transition.inputs.set(action.path, inputs);
+      }
+    }
+    const previous = withWidgetContext({ ...instance, inputs }, model);
     const payload = action.values.map((value, index) => widgetScalar(action.types[index], value));
-    const model = action.handler.run(...widgetArguments({ ...instance, model: previous }), ...payload);
-    changes.set(action.path, model);
-    collectWidgetFocus(instance, model, focus);
-    for (const event of checkedOutboundEvents(instance, model)) {
-      if (instance.parent === null || !Object.hasOwn(instance.channels, event.message)) continue;
-      const message = instance.channels[event.message];
-      const target = checkedWidgetAction(instance.parent, { ...event, message });
-      applyWidgetAction(frame, target, changes, focus, budget);
+    const result = action.handler.run(...widgetArguments({ ...instance, inputs, model: previous }), ...payload);
+    model = action.handler.suspends ? yield* result : result;
+    transition.changes.set(action.path, model);
+    collectWidgetFocus(instance, model, transition.focus);
+    for (const target of outboundWidgetActions(instance, model)) {
+      yield* applyWidgetAction(transition, target);
     }
   }
 
+  function* applyWidgetActions(transition, actions) {
+    for (const action of actions) yield* applyWidgetAction(transition, action);
+  }
+
   function dispatch(frame, action, enabled = null) {
+    dispatchActions(frame, [action], enabled, { remaining: 4096 });
+  }
+
+  function dispatchActions(frame, actions, enabled, budget) {
     if (!active || current !== frame) return;
     a2x_widget_begin_frame();
-    try {
-      if (enabled !== null && !enabled()) {
-        keep(current);
-        return;
-      }
-      const changes = new Map();
-      const focus = [];
-      applyWidgetAction(frame, action, changes, focus, { remaining: 4096 });
-      let rootModel = changes.get('root');
-      if (fileOpen !== null && rootModel?.file_open_pending) {
-        const instance = frame.models.get('root');
-        const handler = instance.definition.handlers[fileOpen.reply];
-        rootModel = handler.run(...widgetArguments({ ...instance, model: rootModel }), fileOpen.unavailable);
-        if (rootModel.file_open_pending) {
-          throw new Error('ace.widget.file-reply: open reply must clear the pending request');
+    if (enabled !== null) {
+      try {
+        if (!enabled()) {
+          keep(current);
+          return;
         }
-        changes.set('root', rootModel);
-        collectWidgetFocus(instance, rootModel, focus);
+      } catch (error) {
+        keep(current);
+        throw error;
       }
-      const path = rootModel === undefined ? null : pendingDirectoryPath('root', rootModel);
-      if (path !== null) {
-        startDirectoryRequest(frame, changes, path, focus);
+    }
+    const transition = {
+      sequence: nextTransition++, models: frame.models, touched: new Set(), inputs: new Map(),
+      changes: new Map(), focus: [], budget, held: new Set(), controller: null,
+    };
+    transition.iterator = applyWidgetActions(transition, actions);
+    advanceWidgetActions(transition, 'next');
+  }
+
+  function advanceWidgetActions(transition, method, value) {
+    try {
+      const step = a2x_widget_step(transition.held, () => transition.iterator[method](value));
+      if (!httpOwnersCurrent(transition, current)) {
+        cancelWidgetHttp(transition);
+        keep(current);
+      } else if (step.done) {
+        pendingHttp.delete(transition);
+        commitWidgetChanges(current, transition.changes, transition.focus);
       } else {
-        const next = draw(changes, focus);
-        cancelDirectoryRequest();
-        publish(next);
-        deliverMutationReply();
+        parkWidgetHttp(transition, step.value);
       }
     } catch (error) {
+      cancelWidgetHttp(transition);
       keep(current);
       throw error;
     }
   }
 
+  function parkWidgetHttp(transition, request) {
+    if (typeof request !== 'string' && (typeof request?.url !== 'string' || typeof request?.json !== 'string')) {
+      throw new Error('ace.widget.http: invalid request');
+    }
+    if (transition.controller === null) {
+      transition.models = new Map(transition.models);
+      transition.controller = new AbortController();
+    }
+    const overlapping = Array.from(pendingHttp).filter(other => other !== transition &&
+      Array.from(transition.touched).some(path => other.touched.has(path)));
+    if (overlapping.some(other => other.sequence > transition.sequence)) {
+      cancelWidgetHttp(transition);
+      keep(current);
+      return;
+    }
+    for (const other of overlapping) cancelWidgetHttp(other);
+    transition.workBudget = a2x_widget_work_budget();
+    pendingHttp.add(transition);
+    keep(current);
+    void resumeWidgetHttp(transition, request);
+  }
+
+  async function resumeWidgetHttp(transition, request) {
+    let method = 'next';
+    let value;
+    try {
+      value = await requestWidgetJson(request, transition.controller.signal, fileBackend);
+    } catch (error) {
+      method = 'throw';
+      value = error;
+    }
+    if (!pendingHttp.has(transition)) return;
+    a2x_widget_begin_frame(transition.workBudget);
+    advanceWidgetActions(transition, method, value);
+  }
+
+  function commitWidgetChanges(frame, changes, focus) {
+    let rootModel = changes.get('root');
+    if (fileOpen !== null && rootModel?.file_open_pending) {
+      const instance = frame.models.get('root');
+      const handler = instance.definition.handlers[fileOpen.reply];
+      rootModel = handler.run(...widgetArguments({ ...instance, model: rootModel }), fileOpen.unavailable);
+      if (rootModel.file_open_pending) {
+        throw new Error('ace.widget.file-reply: open reply must clear the pending request');
+      }
+      changes.set('root', rootModel);
+      collectWidgetFocus(instance, rootModel, focus);
+    }
+    const path = rootModel === undefined ? null : pendingDirectoryPath('root', rootModel);
+    if (path !== null) {
+      startDirectoryRequest(frame, changes, path, focus);
+    } else {
+      const next = draw(changes, focus);
+      cancelDirectoryRequest();
+      publish(next);
+      deliverMutationReply();
+    }
+  }
+
+  function onShortcut(event) {
+    if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey ||
+        !Object.hasOwn(shortcuts, event.key) || current === null) return;
+    if (event.key !== 'Escape' && event.target instanceof Element &&
+        event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const owner = current.models.get('root');
+    const action = checkedWidgetAction(owner, { message: shortcuts[event.key], types: [], values: [] });
+    event.preventDefault();
+    dispatch(current, action);
+  }
+  const hasShortcuts = Object.keys(shortcuts).length !== 0;
+
   onMounted(() => {
     if (current === null) return;
     mounted = true;
+    if (hasShortcuts) window.addEventListener('keydown', onShortcut);
     reconcileTimers(current.timerOwners);
     if (fileDirectory !== null) {
       const model = current.models.get('root').model;
@@ -816,17 +1188,21 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
       if (path !== null) startDirectoryRequest(current, new Map([['root', model]]), path);
     }
     startPendingMutation();
+    scheduleInitActions();
   });
 
   onBeforeUnmount(() => {
+    if (hasShortcuts) window.removeEventListener('keydown', onShortcut);
     active = false;
     mounted = false;
+    for (const transition of pendingHttp) cancelWidgetHttp(transition);
     cancelDirectoryRequest();
     mutationRequest?.controller.abort();
     mutationRequest = null;
     reconcileTimers(new Map());
     current?.models.clear();
     current?.timerOwners.clear();
+    current?.initActions.clear();
     if (current !== null) current.view = null;
     current = null;
     rendered.value = null;

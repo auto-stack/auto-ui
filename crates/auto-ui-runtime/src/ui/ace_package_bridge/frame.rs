@@ -8,7 +8,7 @@ use ace_core::source::age_package::{
 
 use crate::ui::ace_vue_script::channel_pascal;
 
-use super::AceStateValue;
+use super::{AceStateValue, PackageEventInput};
 
 /// A rendered package and the events offered by that exact revision.
 #[derive(Debug)]
@@ -22,6 +22,7 @@ pub struct PackageFrame {
     pub(super) actions: Vec<PackageAction>,
     pub(super) child_timers: Vec<ChildTimer>,
     pointers: BTreeMap<Vec<usize>, PointerEvents>,
+    image_surfaces: BTreeMap<Vec<usize>, ImageSurfaceEvents>,
     clicks: BTreeMap<Vec<usize>, usize>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
@@ -75,12 +76,23 @@ pub struct PackageAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct ChildTimer {
-    pub owner_path: Vec<usize>,
-    pub node: usize,
-    pub instance: Vec<usize>,
+pub(super) enum ChildTimerOwner {
+    Scenario { path: Vec<usize>, node: usize, instance: Vec<usize> },
+    Live(u64),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct ChildTimerKey {
+    pub owner: ChildTimerOwner,
     pub message: String,
     pub every_ms: u32,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct ChildTimer {
+    pub key: ChildTimerKey,
+    pub node: usize,
+    pub instance: Vec<usize>,
     pub anchor: usize,
 }
 
@@ -89,6 +101,15 @@ pub(crate) struct PointerEvents {
     pub(crate) enter: Option<usize>,
     pub(crate) leave: Option<usize>,
     pub(crate) motion: Option<usize>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct ImageSurfaceEvents {
+    pub(crate) loaded: Option<usize>,
+    pub(crate) error: Option<usize>,
+    pub(crate) wheel: Option<usize>,
+    pub(crate) pan: Option<usize>,
+    pub(crate) double_click: Option<usize>,
 }
 
 impl PackageFrame {
@@ -108,6 +129,10 @@ impl PackageFrame {
         self.pointers.get(path)
     }
 
+    pub(crate) fn image_surface(&self, path: &[usize]) -> Option<&ImageSurfaceEvents> {
+        self.image_surfaces.get(path)
+    }
+
     pub(crate) fn link(&self, path: &[usize]) -> Option<usize> {
         self.links.get(path).map(|index| self.actions.len() + index)
     }
@@ -117,12 +142,13 @@ impl PackageFrame {
         self.destinations.get(index).map(String::as_str)
     }
 
-    pub(crate) fn accepts_target(&self, target: usize, has_text: bool) -> bool {
+    pub(crate) fn accepts_target(&self, target: usize, input: &PackageEventInput) -> bool {
         self.enabled_action(target).is_some_and(|action| {
             !action.source.key.eq_ignore_ascii_case("onfocus")
                 && !action.source.key.eq_ignore_ascii_case("onblur")
-                && action.source.key.eq_ignore_ascii_case("oninput") == has_text
-        }) || (!has_text && self.navigation_target(target).is_some())
+                && input.matches_surface(action)
+                && action.source.key.eq_ignore_ascii_case("oninput") == matches!(input, PackageEventInput::Text(_))
+        }) || (matches!(input, PackageEventInput::Activation) && self.navigation_target(target).is_some())
     }
 
     pub(super) fn enabled_action(&self, target: usize) -> Option<&PackageAction> {
@@ -253,6 +279,7 @@ pub(super) fn assemble(
         actions: Vec::new(),
         child_timers: Vec::new(),
         pointers: BTreeMap::new(),
+        image_surfaces: BTreeMap::new(),
         clicks: BTreeMap::new(),
         links: BTreeMap::new(),
         destinations: Vec::new(),
@@ -274,6 +301,7 @@ pub(super) fn assemble(
         actions: frame.actions,
         child_timers: frame.child_timers,
         pointers: frame.pointers,
+        image_surfaces: frame.image_surfaces,
         clicks: frame.clicks,
         links: frame.links,
         destinations: frame.destinations,
@@ -295,6 +323,7 @@ struct ViewBindings<'a> {
     actions: Vec<PackageAction>,
     child_timers: Vec<ChildTimer>,
     pointers: BTreeMap<Vec<usize>, PointerEvents>,
+    image_surfaces: BTreeMap<Vec<usize>, ImageSurfaceEvents>,
     clicks: BTreeMap<Vec<usize>, usize>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
@@ -329,15 +358,17 @@ impl ViewBindings<'_> {
                     return Err(format!("ace.desktop.widget-timer: '{message}' must take no payload"));
                 }
                 let timer = ChildTimer {
-                    owner_path: path.clone(),
+                    key: ChildTimerKey {
+                        owner: ChildTimerOwner::Scenario { path: path.clone(), node, instance: instance.clone() },
+                        message,
+                        every_ms: timer.every_ms,
+                    },
                     node,
                     instance,
-                    message,
-                    every_ms: timer.every_ms,
                     anchor: component.head_span.start,
                 };
-                if self.child_timers.contains(&timer) {
-                    return Err(format!("ace.desktop.widget-timer: duplicate '{}'", timer.message));
+                if self.child_timers.iter().any(|existing| existing.key == timer.key) {
+                    return Err(format!("ace.desktop.widget-timer: duplicate '{}'", timer.key.message));
                 }
                 self.child_timers.push(timer);
             }
@@ -385,7 +416,13 @@ impl ViewBindings<'_> {
         let disabled = property(element, "disabled") == Some("true");
         if let Some(event) = element.events.iter().find(|event| event.key.eq_ignore_ascii_case(event_key)) {
             let target = self.action(event, disabled)?;
+            if !disabled && event_key == "onclick" {
+                self.bind_queued_action(target, event_key, None);
+            }
             self.clicks.insert(path.clone(), target);
+        }
+        if matches!(element.tag.as_str(), "image_surface" | "image-surface" | "imagesurface") {
+            self.image_surface_bindings(element, path, disabled)?;
         }
         if !disabled {
             self.control(element, path)?;
@@ -422,6 +459,36 @@ impl ViewBindings<'_> {
         self.walk(&element.children, path)
     }
 
+    fn image_surface_bindings(
+        &mut self,
+        element: &WidgetElement,
+        path: &[usize],
+        disabled: bool,
+    ) -> Result<(), String> {
+        let mut bindings = ImageSurfaceEvents::default();
+        let source = property(element, "src").unwrap_or_default();
+        let identity = serde_json::to_string(&(source, property(element, "cache_identity"))).unwrap();
+        for event in &element.events {
+            let key = event.key.to_ascii_lowercase();
+            let slot = match key.as_str() {
+                "onload" | "onloaded" | "on_loaded" => &mut bindings.loaded,
+                "onerror" | "on_error" => &mut bindings.error,
+                "onwheel" if !disabled => &mut bindings.wheel,
+                "onpan" if !disabled => &mut bindings.pan,
+                "ondblclick" if !disabled => &mut bindings.double_click,
+                _ => continue,
+            };
+            if slot.is_some() {
+                return Err(format!("ace.desktop.image-surface: repeated binding for `{key}`"));
+            }
+            let target = self.action(event, false)?;
+            self.bind_queued_action(target, &key, Some(&identity));
+            *slot = Some(target);
+        }
+        self.image_surfaces.insert(path.to_vec(), bindings);
+        Ok(())
+    }
+
     fn action(&mut self, event: &WidgetEvent, disabled: bool) -> Result<usize, String> {
         let (node, message, instance) = self.route(&event.message)?;
         let target = self.actions.len();
@@ -451,10 +518,10 @@ impl ViewBindings<'_> {
                     control.submit = Some(self.editor_action(event, false)?);
                 }
                 Some("oncontextmenu") => control.context_menu = Some(self.action(event, false)?),
-                Some("ondblclick") => {
+                Some("ondblclick") if !self.image_surfaces.contains_key(path) => {
                     let target = self.action(event, false)?;
                     if self.outline.iter().any(|(_, key, _)| key.is_some()) {
-                        self.bind_queued_action(target, &event.key);
+                        self.bind_queued_action(target, &event.key, None);
                     }
                     control.double_click = Some(target);
                 }
@@ -520,12 +587,12 @@ impl ViewBindings<'_> {
                 }
             }
         }
-        self.bind_queued_action(target, &event.key);
+        self.bind_queued_action(target, &event.key, None);
         Ok(target)
     }
 
-    fn bind_queued_action(&mut self, target: usize, event: &str) {
-        let key = serde_json::to_string(&(&self.outline, event)).unwrap();
+    fn bind_queued_action(&mut self, target: usize, event: &str, source: Option<&str>) {
+        let key = serde_json::to_string(&(&self.outline, event, source)).unwrap();
         self.actions[target].queued_control = Some(key.clone());
         self.queued_actions.entry(key).and_modify(|previous| *previous = None).or_insert(Some(target));
     }

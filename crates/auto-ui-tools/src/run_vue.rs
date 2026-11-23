@@ -376,7 +376,11 @@ pub fn run_vue_flow(
     // Plan 346: --server=vm starts AutoVM HTTP server; --server=rust (default)
     // starts the a2r-generated Rust axum server.
     let mut _api_child: Option<std::process::Child> = None;
-    let _desktop_backends = if desktop_mode() {
+    let checked_viewer = project.name == "image-viewer"
+        && fs::read_to_string(project.output_dir.join("src/App.vue")).is_ok_and(|code| {
+            code.contains("import { fetchFileBackend } from '@/lib/file-browser'")
+        });
+    let _desktop_backends = if desktop_mode() && !checked_viewer {
         Some(crate::desktop_backends::DesktopBackends::start(&project.output_dir)?)
     } else { None };
     let file_root = std::env::var_os("AUTO_FILE_MANAGER_ROOT");
@@ -384,12 +388,23 @@ pub fn run_vue_flow(
         file_root.as_deref().map(Path::new).map(|root| {
             start_file_browser(root_dir, &project.output_dir, root)
         }).transpose()?
+    } else if checked_viewer {
+        std::env::var_os("AUTO_IMAGE_VIEWER_ROOT").as_deref().map(Path::new).map(|root| {
+            let back_entry = auto_lang_core::config::resolve_back_api(root_dir)
+                .ok_or_else(|| AutoError::from("Image Viewer requires its back/api.at"))?;
+            auto_ui_runtime::back_proxy::start_file_viewer(
+                auto_ui_runtime::back_proxy::SessionSpec { app_id: project.name.clone(), back_entry },
+                root, &project.front_dir,
+            ).map_err(|error| AutoError::from(format!("Image Viewer grant: {error}")))
+        }).transpose()?
     } else {
         None
     };
     let backend_impl = std::env::var("AUTO_BACKEND_IMPL").unwrap_or_else(|_| "rust".to_string());
     if file_browser.is_some() {
-        println!("  ✓ File Manager scoped browser backend started");
+        println!("  ✓ {} scoped browser backend started", project.name);
+    } else if checked_viewer {
+        println!("  Image Viewer is waiting for AUTO_IMAGE_VIEWER_ROOT");
     } else if backend_impl == "vm" {
         // Vue+VM: AutoVM HTTP server as backend.
         crate::run_vm::start_vm_server(
@@ -432,7 +447,7 @@ pub fn run_vue_flow(
     if let Some(mut child) = _api_child {
         let _ = child.kill();
         println!("  ✓ API server (Rust) stopped");
-    } else if file_browser.is_none() && backend_impl == "vm" {
+    } else if !checked_viewer && file_browser.is_none() && backend_impl == "vm" {
         // VM server runs on a background thread — process exit cleans it up.
         println!("  ✓ API server (VM) stopped");
     }

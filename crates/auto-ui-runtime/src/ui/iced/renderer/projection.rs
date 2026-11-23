@@ -2141,6 +2141,9 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 let wrapped: iced::Element<'static, M> =
                     if let Some(handler) = on_move.filter(|_| !inspect_capture_active()) {
                         let mut pa = crate::ui::iced::pointer_area::PointerArea::new(inner);
+                        if handler.sample_button_positions {
+                            pa = pa.with_button_positions();
+                        }
                         if let Some((w, h)) = logical_extent {
                             let sized = pointer_style
                                 .as_ref()

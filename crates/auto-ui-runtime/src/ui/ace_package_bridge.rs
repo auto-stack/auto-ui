@@ -13,12 +13,16 @@ use ace_core::atom_text::Span;
 use ace_core::source::age_component::ComponentNode;
 use ace_core::source::age_package::{
     compile_age_package_with_scenario, widget_timer_interval_ms, widget_view_fn_name_at,
-    AgePackageCompilation, TODO_SERVICE_BINDING,
+    AgePackageCompilation, ImageSurfaceEventPayload, TODO_SERVICE_BINDING,
 };
 use ace_core::source::packages::{PackageModuleInput, PACKAGES_CAPABILITY};
 
-use crate::ui::ace_state_bridge::{initial_of, AceStateValue, DispatchOutcome};
+use crate::ui::ace_state_bridge::{initial_of, AceStateValue, DispatchOutcome, DropReason};
+use crate::back_proxy::{FileBackendSession, SessionSpec};
+use crate::ui::iced::image_surface_input::ImageSurfaceCarry;
 use std::{collections::{BTreeMap, BTreeSet}, sync::{Arc, Mutex}};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 mod frame;
@@ -35,9 +39,59 @@ use file_directory::FileDirectoryBinding;
 use file_mutation::{FileMutationBinding, MutationRequest};
 use file_open::FileOpenBinding;
 use live::{LiveEvent, LivePackage, MountedWidget};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use ase_m0::todo_service::{RealmId, ServiceBinding};
 use todo_service::TodoTab;
+
+#[derive(Debug)]
+pub(crate) enum PackageEventInput {
+    Activation,
+    Text(String),
+    Pointer { x: f32, y: f32 },
+    ImageSurface(ImageSurfaceCarry),
+}
+
+impl PackageEventInput {
+    fn surface_payload(&self) -> Option<ImageSurfaceEventPayload> {
+        match self {
+            Self::ImageSurface(ImageSurfaceCarry::Wheel { .. }) => Some(ImageSurfaceEventPayload::Wheel),
+            Self::ImageSurface(ImageSurfaceCarry::Pan { .. }) => Some(ImageSurfaceEventPayload::Pan),
+            _ => None,
+        }
+    }
+
+    fn matches_surface(&self, action: &PackageAction) -> bool {
+        let required = action.source.image_surface_payload;
+        match self {
+            Self::ImageSurface(_) => required.is_some() && self.surface_payload() == required,
+            _ => required.is_none(),
+        }
+    }
+
+    fn arguments(self, action: &PackageAction) -> Result<Vec<AceStateValue>, String> {
+        let refused = || String::from("ace.desktop.widget-input: invalid host event payload");
+        if !self.matches_surface(action) {
+            return Err(refused());
+        }
+        let motion = action.source.key.eq_ignore_ascii_case("onmousemove");
+        Ok(match self {
+            Self::Pointer { x, y } if motion && x.is_finite() && y.is_finite() => {
+                vec![AceStateValue::F32(x), AceStateValue::F32(y)]
+            }
+            Self::Text(text) if action.input_value => vec![AceStateValue::Str(text)],
+            Self::Activation if !motion && !action.input_value => {
+                action.source.args.iter().map(AceStateValue::from).collect()
+            }
+            Self::ImageSurface(ImageSurfaceCarry::Wheel { delta_y, .. }) if delta_y.is_finite() => {
+                vec![AceStateValue::F32(delta_y)]
+            }
+            Self::ImageSurface(ImageSurfaceCarry::Pan { dx, dy, phase }) if dx.is_finite() && dy.is_finite() => {
+                vec![AceStateValue::F32(dx), AceStateValue::F32(dy), AceStateValue::Str(phase.as_str().into())]
+            }
+            _ => return Err(refused()),
+        })
+    }
+}
 
 fn frame_limits() -> ExecLimits {
     // A checked frame can replay and materialize a full file listing or tree.
@@ -60,13 +114,42 @@ struct Slot {
     widget: Option<Arc<Mutex<MountedWidget>>>,
     initialized: BTreeSet<usize>,
     timer_due: Vec<Instant>,
-    child_timer_due: BTreeMap<frame::ChildTimer, Instant>,
+    child_timer_due: BTreeMap<frame::ChildTimerKey, Instant>,
     file_session: Option<Arc<FileSession>>,
+    file_backend: Option<Arc<FileBackendSession>>,
+}
+
+impl Slot {
+    fn publish_frame(&mut self, frame: PackageFrame, now: Instant) {
+        let mut due = BTreeMap::new();
+        for timer in &frame.child_timers {
+            let key = &timer.key;
+            let deadline = self.child_timer_due.get(key).copied().unwrap_or_else(|| {
+                now + Duration::from_millis(u64::from(key.every_ms))
+            });
+            due.insert(key.clone(), deadline);
+        }
+        self.child_timer_due = due;
+        self.frame = Some(Arc::new(frame));
+    }
 }
 
 struct PackageTimer {
     interval: Duration,
     message: String,
+}
+
+struct PackageHttpWork {
+    generation: u64,
+    message: String,
+    cancel: Arc<AtomicBool>,
+    worker: Option<JoinHandle<Result<PackageFrame, String>>>,
+}
+
+impl Drop for PackageHttpWork {
+    fn drop(&mut self) {
+        self.cancel.store(true, Ordering::Relaxed);
+    }
 }
 
 #[derive(Default)]
@@ -87,11 +170,13 @@ pub struct PackageStateEngine {
     next_generation: u64,
     checked_views: bool,
     startup_handlers: BTreeSet<usize>,
-    live_package: Option<LivePackage>,
+    live_package: Option<Arc<LivePackage>>,
+    http_work: BTreeMap<usize, PackageHttpWork>,
     timers: Vec<PackageTimer>,
     file_directory: Option<FileDirectoryBinding>,
     file_mutation: Option<FileMutationBinding>,
     file_open: Option<FileOpenBinding>,
+    file_backend: Option<(SessionSpec, PathBuf)>,
     preferences: Vec<auto_ui_dialect::preferences::PreferenceBinding>,
     todo_reply: Option<String>,
     todo_service: Option<(ServiceBinding, RealmId)>,
@@ -148,22 +233,12 @@ impl PackageStateEngine {
             return Err("ace.desktop.file-binding: file requests require a checked entry view".into());
         }
         let live_package = if has_entry_view {
-            LivePackage::prepare(&units, entry, alias, &compiled, component)?
+            LivePackage::prepare(&units, entry, alias, &compiled, component)?.map(Arc::new)
         } else {
             None
         };
         if todo_reply.is_some() && live_package.is_none() {
             return Err("ace.desktop.todo-binding: a checked live entry view is required".into());
-        }
-        if live_package.is_some() {
-            for widget in compiled.widget_refs.values().flatten() {
-                if let Some(child) = compiled.description.components.iter().find(|candidate| {
-                    candidate.module == widget.module && candidate.name == widget.node
-                        && candidate.members.iter().any(|row| row.role == "timer")
-                }) {
-                    return Err(format!("ace.desktop.timer-owner: nested timer on `{}` requires a keyed child instance", child.name));
-                }
-            }
         }
         let startup_handlers = if checked_views && live_package.is_none() {
             Self::initial_widget_handlers(&compiled, entry_node)?
@@ -183,10 +258,12 @@ impl PackageStateEngine {
             checked_views,
             startup_handlers,
             live_package,
+            http_work: BTreeMap::new(),
             timers,
             file_directory,
             file_mutation,
             file_open,
+            file_backend: None,
             preferences,
             todo_reply,
             todo_service: None,
@@ -203,6 +280,10 @@ impl PackageStateEngine {
 
     pub(crate) fn has_checked_view(&self) -> bool {
         self.checked_views
+    }
+
+    pub(super) fn set_file_backend(&mut self, spec: SessionSpec, source_dir: &Path) {
+        self.file_backend = Some((spec, source_dir.to_path_buf()));
     }
 
     pub(crate) fn install_todo_service(&mut self, binding: ServiceBinding, realm: RealmId) -> Result<(), String> {
@@ -282,6 +363,14 @@ impl PackageStateEngine {
             }
         }
         let generation = self.next_generation;
+        let file_backend = self.file_backend.as_ref().map(|(spec, source)| {
+            crate::back_proxy::native_files::open(spec, source).map(Arc::new)
+        }).transpose()?;
+        let file_session = file_backend.as_ref().map(|backend| backend.file_access())
+            .or_else(|| {
+                (self.file_directory.is_some() || self.file_mutation.is_some() || self.file_open.is_some())
+                    .then(|| Arc::new(FileSession::default()))
+            });
         let todo = if self.todo_reply.is_some() {
             let (binding, realm) = self.todo_service.as_ref()
                 .ok_or("ace.desktop.todo-binding: host has not granted the local Todo service")?;
@@ -294,15 +383,16 @@ impl PackageStateEngine {
             ops: Vec::new(), frame: None, initialized: BTreeSet::new(), timer_due: Vec::new(),
                 child_timer_due: BTreeMap::new(),
             widget: None,
-            file_session: (self.file_directory.is_some() || self.file_mutation.is_some() || self.file_open.is_some())
-                .then(|| Arc::new(FileSession::default())),
+            file_session,
+            file_backend,
         };
         if let Some(live) = &self.live_package {
             let mount = live.mount(generation, &self.preferences)?;
-            slot.frame = Some(Arc::new(live.update(
+            let frame = live.update(
                 &mount, 1, None, slot.file_session.as_deref(), self.file_directory.as_ref(),
-                self.file_mutation.as_ref(), self.file_open.as_ref(),
-            )?));
+                self.file_mutation.as_ref(), self.file_open.as_ref(), None,
+            )?;
+            slot.publish_frame(frame, Instant::now());
             slot.widget = Some(mount);
         } else if self.checked_views {
             slot.initialized = self.startup_handlers.clone();
@@ -333,6 +423,7 @@ impl PackageStateEngine {
     pub(crate) fn unmount(&mut self, identity: &str) {
         self.todo_tabs.remove(identity);
         if let Some(i) = self.slot(identity) {
+            self.http_work.remove(&i);
             let slot = &mut self.slots[i];
             slot.live = false;
             slot.frame = None;
@@ -341,7 +432,10 @@ impl PackageStateEngine {
             slot.initialized.clear();
             slot.timer_due.clear();
             slot.child_timer_due.clear();
-            if let Some(session) = slot.file_session.take() {
+            let access = slot.file_session.take();
+            if let Some(backend) = slot.file_backend.take() {
+                backend.close();
+            } else if let Some(session) = access {
                 session.close();
             }
         }
@@ -371,6 +465,9 @@ impl PackageStateEngine {
     pub(crate) fn start_timers(&mut self, now: Instant) {
         for slot in self.slots.iter_mut().filter(|slot| slot.live) {
             slot.timer_due = self.timers.iter().map(|timer| now + timer.interval).collect();
+            for (key, due) in &mut slot.child_timer_due {
+                *due = now + Duration::from_millis(u64::from(key.every_ms));
+            }
         }
     }
 
@@ -380,6 +477,9 @@ impl PackageStateEngine {
     ) -> Option<(usize, String, Result<DispatchOutcome, String>)> {
         let mut due = None;
         for (instance, slot) in self.slots.iter_mut().enumerate() {
+            if self.http_work.contains_key(&instance) {
+                continue;
+            }
             let Some(frame) = &slot.frame else { continue };
             for (timer, time) in slot.timer_due.iter_mut().enumerate() {
                 if *time > now {
@@ -394,19 +494,32 @@ impl PackageStateEngine {
                 }
             }
         }
-        let Some((_, instance, index)) = due else {
-            let (index, timer) = self.slots.iter_mut().enumerate().find_map(|(index, slot)| {
-                if !slot.live { return None; }
-                let (timer, deadline) = slot.child_timer_due.iter_mut()
+        let child = self.slots.iter().enumerate()
+            .filter_map(|(index, slot)| {
+                if !slot.live || self.http_work.contains_key(&index) {
+                    return None;
+                }
+                let (key, deadline) = slot.child_timer_due.iter()
                     .filter(|(_, due)| **due <= now)
                     .min_by_key(|(_, due)| **due)?;
-                *deadline = now + Duration::from_millis(u64::from(timer.every_ms));
-                Some((index, timer.clone()))
-            })?;
+                let timer = slot.frame.as_ref()?.child_timers.iter().find(|timer| timer.key == *key)?;
+                Some((*deadline, index, timer))
+            })
+            .min_by_key(|(deadline, _, _)| *deadline);
+        if let Some((_, index, timer)) =
+            child.filter(|(deadline, _, _)| due.is_none_or(|(root, _, _)| *deadline < root))
+        {
+            let timer = timer.clone();
+            self.slots[index].child_timer_due.insert(
+                timer.key.clone(),
+                now + Duration::from_millis(u64::from(timer.key.every_ms)),
+            );
             let anchor = Span { start: timer.anchor, end: timer.anchor };
-            let result = self.dispatch_checked(index, timer.node, &timer.instance, &timer.message, &[], anchor);
-            return Some((index, timer.message, result));
-        };
+            let message = timer.key.message;
+            let result = self.dispatch_checked(index, timer.node, &timer.instance, &message, &[], anchor);
+            return Some((index, message, result));
+        }
+        let (_, instance, index) = due?;
         let timer = &self.timers[index];
         self.slots[instance].timer_due[index] = now + timer.interval;
         let message = timer.message.clone();
@@ -492,14 +605,7 @@ impl PackageStateEngine {
             };
             let frame = frame::render(&compiled, self.entry_node, revision)?;
             if !Self::init_visible(&compiled, frame.mounted.clone(), slot) {
-                let now = Instant::now();
-                slot.child_timer_due.retain(|timer, _| frame.child_timers.contains(timer));
-                for timer in &frame.child_timers {
-                    slot.child_timer_due.entry(timer.clone()).or_insert_with(|| {
-                        now + Duration::from_millis(u64::from(timer.every_ms))
-                    });
-                }
-                slot.frame = Some(Arc::new(frame));
+                slot.publish_frame(frame, Instant::now());
                 return Ok(());
             }
         }
@@ -692,25 +798,14 @@ impl PackageStateEngine {
         identity: &str,
         revision: u64,
         target: usize,
-        text: Option<String>,
-        coordinates: Option<(f32, f32)>,
+        input: PackageEventInput,
     ) -> Result<(String, DispatchOutcome), String> {
         let frame = self.package_frame(identity).ok_or("checked view is not mounted")?;
         if revision != frame.revision {
             return Err("ace.desktop.widget-event-stale: view revision has changed".into());
         }
         let action = frame.enabled_action(target).ok_or("unknown or disabled checked view event target")?;
-        let motion = action.source.key.eq_ignore_ascii_case("onmousemove");
-        let args: Vec<_> = match (coordinates, text) {
-            (Some((x, y)), None) if motion && x.is_finite() && y.is_finite() => {
-                vec![AceStateValue::F32(x), AceStateValue::F32(y)]
-            }
-            (None, Some(text)) if action.input_value => vec![AceStateValue::Str(text)],
-            (None, None) if !motion && !action.input_value => {
-                action.source.args.iter().map(AceStateValue::from).collect()
-            }
-            _ => return Err("ace.desktop.widget-input: invalid host event payload".into()),
-        };
+        let args = input.arguments(action)?;
         let index = self.slot(identity).expect("frame has a mounted slot");
         let outcome = self.dispatch_checked(index, action.node, &action.instance, &action.message, &args, action.anchor)?;
         Ok((action.message.clone(), outcome))
@@ -726,17 +821,20 @@ impl PackageStateEngine {
             return Err("ace.desktop.file-reply: only the file binding can deliver its reply".into());
         }
         if let Some(live) = &self.live_package {
+            if live.uses_http() {
+                return self.start_http_update(index, LiveEvent { instance, message, args });
+            }
             let slot = &mut self.slots[index];
             let mount = slot.widget.as_deref().ok_or("checked widget is not mounted")?;
             let previous = slot.frame.as_ref().ok_or("missing checked widget frame")?;
             let revision = previous.revision + 1;
             let frame = live.update(
                 mount, revision, Some(LiveEvent { instance, message, args }), slot.file_session.as_deref(),
-                self.file_directory.as_ref(), self.file_mutation.as_ref(), self.file_open.as_ref(),
+                self.file_directory.as_ref(), self.file_mutation.as_ref(), self.file_open.as_ref(), None,
             )?;
             let states = frame.states.clone();
             preferences::save_changes(&self.preferences, &previous.states, &states);
-            slot.frame = Some(Arc::new(frame));
+            slot.publish_frame(frame, Instant::now());
             return Ok(DispatchOutcome::Delivered(states));
         }
         let mut trial = self.slots[index].clone();
@@ -754,6 +852,73 @@ impl PackageStateEngine {
         }
         self.slots[index] = trial;
         Ok(DispatchOutcome::Delivered(states))
+    }
+
+    fn start_http_update(&mut self, index: usize, event: LiveEvent<'_>) -> Result<DispatchOutcome, String> {
+        if self.http_work.contains_key(&index) {
+            return Ok(DispatchOutcome::Dropped(DropReason::HttpBusy));
+        }
+        let live = Arc::clone(self.live_package.as_ref().expect("HTTP requires a live package"));
+        let slot = &self.slots[index];
+        let mount = slot.widget.clone().ok_or("checked widget is not mounted")?;
+        let revision = slot.frame.as_ref().ok_or("missing checked widget frame")?.revision + 1;
+        let file = slot.file_session.clone();
+        let backend = slot.file_backend.clone();
+        let directory = self.file_directory.clone();
+        let mutation = self.file_mutation.clone();
+        let open = self.file_open.clone();
+        let instance = event.instance.to_vec();
+        let args = event.args.to_vec();
+        let message = event.message.to_owned();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = Arc::clone(&cancel);
+        let worker_message = message.clone();
+        let worker = std::thread::Builder::new()
+            .name("ace-package-http".into())
+            .stack_size(16 * 1024 * 1024)
+            .spawn(move || {
+                live.update(
+                    &mount, revision,
+                    Some(LiveEvent { instance: &instance, message: &worker_message, args: &args }),
+                    file.as_deref(), directory.as_ref(), mutation.as_ref(), open.as_ref(), Some((worker_cancel, backend)),
+                )
+            })
+            .map_err(|error| format!("start checked package HTTP worker: {error}"))?;
+        self.http_work.insert(index, PackageHttpWork {
+            generation: slot.generation,
+            message,
+            cancel,
+            worker: Some(worker),
+        });
+        Ok(DispatchOutcome::InFlight)
+    }
+
+    pub(crate) fn http_pending(&self, identity: &str) -> bool {
+        self.slot(identity).is_some_and(|index| self.http_work.contains_key(&index))
+    }
+
+    pub(crate) fn poll_http_update(
+        &mut self,
+    ) -> Option<(usize, String, Result<Vec<(String, AceStateValue)>, String>)> {
+        let index = self.http_work.iter()
+            .find(|(_, work)| work.worker.as_ref().is_some_and(|worker| worker.is_finished()))
+            .map(|(&index, _)| index)?;
+        let mut work = self.http_work.remove(&index).expect("finished worker");
+        let slot = &mut self.slots[index];
+        if !slot.live || slot.generation != work.generation {
+            return None;
+        }
+        let result = work.worker.take().expect("finished worker").join()
+            .map_err(|_| "checked package HTTP worker panicked".to_string())
+            .and_then(|frame| frame)
+            .map(|frame| {
+                let previous = slot.frame.as_ref().expect("live HTTP worker has a published frame");
+                preferences::save_changes(&self.preferences, &previous.states, &frame.states);
+                let states = frame.states.clone();
+                slot.publish_frame(frame, Instant::now());
+                states
+            });
+        Some((index, std::mem::take(&mut work.message), result))
     }
 
     fn dispatch_event(
@@ -857,6 +1022,6 @@ fn compile_package(
 fn package_diagnostic(diagnostics: &[ace_core::atom_text::Diagnostic]) -> String {
     diagnostics
         .first()
-        .map(|diagnostic| format!("{}: {}", diagnostic.code, diagnostic.message))
+        .map(|diagnostic| format!("{}: {} @{:?}", diagnostic.code, diagnostic.message, diagnostic.span))
         .unwrap_or_else(|| "package scene refused".to_string())
 }

@@ -187,6 +187,38 @@ node SvgPreview {
 }
 
 #[test]
+fn p107_package_sfc_uses_the_carousel_widget_family() {
+    let source = r#"
+widget Gallery {
+    view {
+        preview-card (id: "carousel-options") {
+            carousel (orientation: "vertical", align: "start", loop: "true", style: "h-[200px]") {
+                carousel-content {
+                    carousel-item (style: "basis-1/3") { span (text: "1") {} }
+                    carousel-item { text | Slide 2 }
+                }
+                carousel-previous {}
+                carousel-next {}
+            }
+        }
+    }
+}
+"#;
+    let sfc = generate_package_sfc(&[unit("app", "main", source)], "app::main")
+        .expect("carousel gallery markup generates through the checked package route");
+    for markup in [
+        "from '@/components/ui/carousel'",
+        "id=\"carousel-options\"",
+        r#"<AceCarousel orientation="vertical" :opts="{ align: 'start', loop: true }" class="h-[200px]">"#,
+        r#"<AceCarouselItem class="basis-1/3"><span>1</span></AceCarouselItem>"#,
+        "<AceCarouselItem>Slide 2</AceCarouselItem>",
+        "<AceCarouselPrevious></AceCarouselPrevious><AceCarouselNext></AceCarouselNext>",
+    ] {
+        assert!(sfc.contains(markup), "missing {markup}: {sfc}");
+    }
+}
+
+#[test]
 fn p125_package_sfc_progress_preserves_percent_scale_and_bound_value() {
     let source = r#"
 widget ProgressView {

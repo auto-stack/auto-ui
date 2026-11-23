@@ -33,7 +33,9 @@ use ace_av::age_component::{
     self, ComponentFieldValue, ComponentInitials, ComponentScenario, InitialValue,
     LegacyWidgetAlias, ScenarioOp,
 };
-use ace_av::component_event_sessions::{ComponentEventSession, ComponentEventSessionProgram};
+use ace_av::component_event_sessions::{
+    ComponentEventSession, ComponentEventSessionProgram, HttpFailure,
+};
 
 // 消费者（含集成测试）经本模块取面配置类型，不必直接依赖 ace-av。
 pub use ace_av::age_component::{InitialValue as AceInitialValue, LegacyWidgetAlias as AceAlias};
@@ -980,14 +982,20 @@ pub(super) fn initial_of(v: &AceStateValue) -> InitialValue {
 /// `AceStateEngine` 的 http_pending 车道）；UI 线程不等待。
 pub struct UiHttpProvider {
     next_job: u64,
-    jobs: std::collections::HashMap<u64, std::thread::JoinHandle<Result<String, String>>>,
+    jobs: std::collections::HashMap<u64, std::thread::JoinHandle<Result<String, HttpFailure>>>,
+    backend: Option<std::sync::Arc<crate::back_proxy::FileBackendSession>>,
 }
 
 impl UiHttpProvider {
     pub fn new() -> Self {
+        Self::with_backend(None)
+    }
+
+    pub(super) fn with_backend(backend: Option<std::sync::Arc<crate::back_proxy::FileBackendSession>>) -> Self {
         Self {
             next_job: 1,
             jobs: std::collections::HashMap::new(),
+            backend,
         }
     }
 }
@@ -996,16 +1004,29 @@ impl ace_av::component_event_sessions::HttpProvider for UiHttpProvider {
     fn http_start(&mut self, verb: &str, url: &str, body: Option<&str>) -> u64 {
         // job 线程承载阻塞请求（执行器/会话不等待）；poll 收编。
         let verb = verb.to_string();
-        let url = url.to_string();
+        let scoped = url.starts_with(super::ace_back_api::SCOPED_URL);
+        let url = if scoped { url.to_owned() } else {
+            auto_lang_core::vm::ffi::stdlib::resolve_http_base_url(url)
+        };
         let body = body.map(str::to_string);
-        let handle = std::thread::spawn(move || plain_http_request(&verb, &url, body.as_deref()));
+        let backend = self.backend.clone();
+        let handle = std::thread::spawn(move || {
+            if let Some(target) = url.strip_prefix(super::ace_back_api::SCOPED_URL) {
+                let backend = backend.ok_or_else(|| {
+                    HttpFailure::Rejected("checked backend session unavailable".into())
+                })?;
+                return backend.native_json(&verb, target, body.as_deref())
+                    .map_err(HttpFailure::Rejected);
+            }
+            plain_http_request(&verb, &url, body.as_deref())
+        });
         let job = self.next_job;
         self.next_job += 1;
         self.jobs.insert(job, handle);
         job
     }
 
-    fn http_poll(&mut self, job: u64) -> Option<Result<String, String>> {
+    fn http_poll(&mut self, job: u64) -> Option<Result<String, HttpFailure>> {
         let handle = self.jobs.get(&job)?;
         if !handle.is_finished() {
             return None;
@@ -1014,7 +1035,7 @@ impl ace_av::component_event_sessions::HttpProvider for UiHttpProvider {
         Some(
             handle
                 .join()
-                .unwrap_or_else(|_| Err("http job thread panicked".to_string())),
+                .unwrap_or_else(|_| Err(HttpFailure::Rejected("http job thread panicked".into()))),
         )
     }
 }
@@ -1026,7 +1047,7 @@ fn plain_http_request(
     verb: &str,
     url: &str,
     body: Option<&str>,
-) -> Result<String, String> {
+) -> Result<String, HttpFailure> {
     let method = match verb {
         "auto.http.get.v1" | "auto.http.get-json.v1" => "GET",
         "auto.http.delete.v1" => "DELETE",
@@ -1036,13 +1057,17 @@ fn plain_http_request(
     };
     let rest = url
         .strip_prefix("http://")
-        .ok_or_else(|| format!("unsupported url scheme (plain http only): {url}"))?;
+        .ok_or_else(|| HttpFailure::Rejected(format!("unsupported url scheme (plain http only): {url}")))?;
     let (authority, path) = match rest.find('/') {
         Some(i) => (&rest[..i], &rest[i..]),
         None => (rest, "/"),
     };
     let (host, port) = match authority.rfind(':') {
-        Some(i) => (&authority[..i], authority[i + 1..].parse::<u16>().map_err(|e| format!("bad port: {e}"))?),
+        Some(i) => (
+            &authority[..i],
+            authority[i + 1..].parse::<u16>()
+                .map_err(|e| HttpFailure::Rejected(format!("bad port: {e}")))?,
+        ),
         None => (authority, 80u16),
     };
     let body = body.unwrap_or("");
@@ -1052,45 +1077,40 @@ fn plain_http_request(
         "text/plain; charset=utf-8"
     };
     let mut stream = std::net::TcpStream::connect((host, port))
-        .map_err(|e| format!("connect {host}:{port} failed: {e}"))?;
+        .map_err(|e| HttpFailure::Request(format!("connect {host}:{port} failed: {e}")))?;
     std::net::TcpStream::set_read_timeout(
         &stream,
         Some(std::time::Duration::from_secs(120)),
     )
-    .map_err(|e| format!("set_read_timeout failed: {e}"))?;
+    .map_err(|e| HttpFailure::Rejected(format!("set_read_timeout failed: {e}")))?;
     let request = format!(
-        "{method} {path} HTTP/1.1
-Host: {authority}
-Connection: close
-Content-Type: {content_type}
-Content-Length: {}
-
-{body}",
-        body.len()
+        "{method} {path} HTTP/1.1\r\nHost: {authority}\r\nConnection: close\r\n\
+         Content-Type: {content_type}\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len(),
     );
     use std::io::{Read, Write};
     stream
         .write_all(request.as_bytes())
-        .map_err(|e| format!("request write failed: {e}"))?;
+        .map_err(|e| HttpFailure::Request(format!("request write failed: {e}")))?;
     let mut raw = Vec::new();
     stream
         .read_to_end(&mut raw)
-        .map_err(|e| format!("response read failed: {e}"))?;
+        .map_err(|e| HttpFailure::Request(format!("response read failed: {e}")))?;
     let text = String::from_utf8_lossy(&raw).into_owned();
     let Some(header_end) = text.find("\r\n\r\n") else {
-        return Err(format!("malformed response (no header terminator): {text:.120}"));
+        return Err(HttpFailure::Request(format!("malformed response (no header terminator): {text:.120}")));
     };
     let header = &text[..header_end];
     let status: u32 = header
         .split_whitespace()
         .nth(1)
         .and_then(|s| s.parse().ok())
-        .ok_or_else(|| format!("malformed status line: {header}"))?;
+        .ok_or_else(|| HttpFailure::Request(format!("malformed status line: {header}")))?;
     let body_out = text[header_end + 4..].to_string();
     if (200..300).contains(&status) {
         Ok(body_out)
     } else {
-        Err(format!("HTTP {status}: {body_out:.200}"))
+        Err(HttpFailure::Request(format!("HTTP {status}: {body_out:.200}")))
     }
 }
 

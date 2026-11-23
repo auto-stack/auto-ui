@@ -23,13 +23,13 @@ pub(in crate::ui) fn public_assets(source: &Path) -> Option<PathBuf> {
 }
 
 #[derive(Debug)]
-pub(super) struct PublicImages {
+pub(in crate::ui::ace_node_desktop) struct PublicImages {
     root: Arc<PathBuf>,
     surfaces: Mutex<BTreeMap<PathBuf, MediaAssetTicket>>,
 }
 
 impl PublicImages {
-    pub(super) fn new(root: Arc<PathBuf>) -> Self {
+    pub(in crate::ui::ace_node_desktop) fn new(root: Arc<PathBuf>) -> Self {
         Self {
             root,
             surfaces: Mutex::default(),
@@ -51,6 +51,10 @@ impl PublicImages {
             .entry(file.clone())
             .or_insert_with(|| queue_media_path(file, MediaPriority::Current));
         media_uri(ticket)
+    }
+
+    pub(in crate::ui::ace_node_desktop) fn surface_source(&self, source: &str) -> Option<String> {
+        self.resolve(source).map(|file| self.surface(file))
     }
 }
 

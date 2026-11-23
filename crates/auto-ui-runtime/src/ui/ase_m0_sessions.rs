@@ -31,6 +31,7 @@ use crate::ui::ace_node_desktop::{
     current_session, host_session_text_applies, push_event, queue_package_message,
     selected_package_view, NodeDesktopBridge, NodeDesktopMsg, StepOutcome,
 };
+use crate::ui::ace_package_bridge::PackageEventInput;
 use crate::ui::ace_state_bridge::{AceStateValue, EngineExecutionAudit};
 use crate::ui::{Component, View};
 use std::path::{Path, PathBuf};
@@ -691,19 +692,21 @@ impl AseSessionHost {
         occurrence: usize,
         text: Option<String>,
     ) -> Result<(), String> {
+        let payload = text.map_or(PackageEventInput::Activation, PackageEventInput::Text);
         let (session, revision, target) = current_session(|session| {
             let frame = session.package_frame(0)?;
             let target = (0..frame.actions().len())
                 .filter(|&target| {
                     frame.action_message(target) == Some(message)
-                        && frame.accepts_target(target, text.is_some())
+                        && frame.accepts_target(target, &payload)
                 })
                 .nth(occurrence)?;
             Some((session.id, frame.revision, target))
         }).flatten().ok_or_else(|| format!("package input {message}[{occurrence}] is unavailable"))?;
-        let input = match text {
-            Some(text) => NodeDesktopMsg::PackageText { session, instance: 0, revision, target, text },
-            None => NodeDesktopMsg::PackageClick { session, instance: 0, revision, target },
+        let input = if let PackageEventInput::Text(text) = payload {
+            NodeDesktopMsg::PackageText { session, instance: 0, revision, target, text }
+        } else {
+            NodeDesktopMsg::PackageClick { session, instance: 0, revision, target }
         };
         self.package_message(input);
         Ok(())

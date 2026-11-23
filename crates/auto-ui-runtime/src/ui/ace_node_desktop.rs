@@ -26,7 +26,8 @@
 //! 自己的测试/exe）；本模块 = r13 新范围（通用项目入口 + 实际 UI-FFI 效果与
 //! typed 事件）。001/002 完整主题/选择/全部组件与 Widgets 归 W1 B-AV。
 
-use crate::ui::ace_package_bridge::{PackageFocusNotice, PackageFrame, PackageQueuedAction, PackageStateEngine};
+use crate::ui::ace_package_bridge::{PackageEventInput, PackageFocusNotice, PackageFrame, PackageQueuedAction, PackageStateEngine};
+use crate::ui::iced::image_surface_input::ImageSurfaceCarry;
 use super::ace_route::{front_package_units, front_route_modules, package_candidates, RouteAction, RouteModulePaths, RouteNavigation, RouteTable};
 use super::ace_route_desktop::{DesktopRoutes, RouteHandlers, RouteLink, route_links};
 use crate::ui::ace_state_bridge::{
@@ -48,6 +49,7 @@ use ace_av::age_component::{
 use ace_core::source::packages::PackageModuleInput;
 
 mod widgets;
+mod package_images;
 mod package_view;
 pub use widgets::Action as WidgetAction;
 
@@ -319,9 +321,11 @@ pub struct HostSession {
     widget_instances: Vec<widgets::State>,
     widget_values: Vec<Arc<[(String, AceStateValue)]>>,
     package_frames: Vec<Arc<PackageFrame>>,
+    package_images: Option<Arc<package_images::PackageImages>>,
     focus_epoch: Arc<AtomicU64>,
     focus_request: Option<crate::ui::component::FocusRequest>,
     package_events: VecDeque<QueuedPackageEvent>,
+    package_workers_pending: Vec<bool>,
     package_focus_notices: VecDeque<(usize, u64, PackageFocusNotice)>,
     queue: VecDeque<(usize, usize)>,
     closed: bool,
@@ -340,8 +344,7 @@ struct QueuedPackageEvent {
     revision: u64,
     target: usize,
     action: Option<PackageQueuedAction>,
-    text: Option<String>,
-    coordinates: Option<(f32, f32)>,
+    input: PackageEventInput,
 }
 
 impl HostSession {
@@ -360,9 +363,11 @@ impl HostSession {
             widget_instances: Vec::new(),
             widget_values: Vec::new(),
             package_frames: Vec::new(),
+            package_images: None,
             focus_epoch: Arc::new(AtomicU64::new(0)),
             focus_request: None,
             package_events: VecDeque::new(),
+            package_workers_pending: vec![false; instances],
             package_focus_notices: VecDeque::new(),
             queue: VecDeque::new(),
             closed: false,
@@ -450,17 +455,22 @@ pub fn push_session_event(id: i32, instance: usize, target: usize) {
     }
 }
 
-fn push_package_event(id: i32, instance: usize, revision: u64, target: usize, text: Option<String>, coordinates: Option<(f32, f32)>) {
+fn push_package_event(id: i32, instance: usize, revision: u64, target: usize, input: PackageEventInput) {
     let mut host = host().write().unwrap();
     if let Some(session) = host.get(id) {
         if session.closed {
             session.late_dropped += 1;
         } else if let Some(frame) = session.package_frame(instance).filter(|frame| {
-            frame.revision == revision && frame.accepts_target(target, text.is_some())
+            frame.revision == revision && frame.accepts_target(target, &input)
         }) {
-            let action = frame.queued_action(target);
+            // Ordinary clicks may wait for the worker already processing this
+            // frame. Clicks queued before a worker starts retain their frame-only semantics.
+            let action = frame.queued_action(target).filter(|_| {
+                session.package_workers_pending[instance]
+                    || !frame.actions()[target].source.key.eq_ignore_ascii_case("onclick")
+            });
             session.package_events.push_back(QueuedPackageEvent {
-                instance, revision, target, action, text, coordinates,
+                instance, revision, target, action, input,
             });
         } else {
             session.stale_rejected += 1;
@@ -485,17 +495,31 @@ fn push_package_focus(id: i32, instance: usize, revision: u64, control: String, 
     }
 }
 
+fn push_script_click(id: i32, instance: usize, target: usize) {
+    let revision = host().write().unwrap().get(id)
+        .and_then(|session| session.package_frame(instance))
+        .map(|frame| frame.revision);
+    if let Some(revision) = revision {
+        push_package_event(id, instance, revision, target, PackageEventInput::Activation);
+    } else {
+        push_session_event(id, instance, target);
+    }
+}
+
 /// Admit package input through the same revisioned queue in both desktop hosts.
 pub(crate) fn queue_package_message(message: NodeDesktopMsg) -> bool {
     match message {
         NodeDesktopMsg::PackageClick { session, instance, revision, target } => {
-            push_package_event(session, instance, revision, target, None, None);
+            push_package_event(session, instance, revision, target, PackageEventInput::Activation);
         }
         NodeDesktopMsg::PackagePointer { session, instance, revision, target, x, y } => {
-            push_package_event(session, instance, revision, target, None, Some((x, y)));
+            push_package_event(session, instance, revision, target, PackageEventInput::Pointer { x, y });
         }
         NodeDesktopMsg::PackageText { session, instance, revision, target, text } => {
-            push_package_event(session, instance, revision, target, Some(text), None);
+            push_package_event(session, instance, revision, target, PackageEventInput::Text(text));
+        }
+        NodeDesktopMsg::PackageImageSurface { session, instance, revision, target, carry } => {
+            push_package_event(session, instance, revision, target, PackageEventInput::ImageSurface(carry));
         }
         NodeDesktopMsg::PackageFocus { session, instance, revision, control, gained } => {
             push_package_focus(session, instance, revision, control, gained);
@@ -865,6 +889,7 @@ fn close_host_session(session: i32) -> i32 {
     }
     s.widget_values.clear();
     s.package_frames.clear();
+    s.package_images = None;
     s.publish_focus(None);
     s.package_events.clear();
     s.package_focus_notices.clear();
@@ -1064,6 +1089,8 @@ pub struct NodeDesktopBridge {
     route_actions: std::collections::BTreeMap<usize, RouteAction>,
     route_button_spans: Vec<usize>,
     package_route_handlers: Option<RouteHandlers>,
+    shortcuts: std::collections::BTreeMap<String, String>,
+    pending_shortcuts: VecDeque<String>,
     route_request: Option<RouteNavigation>,
     /// PLAN-113 T-03：真实 SQLite 宿主桥（V-03 冻结合同；opt-in，测试入口
     /// `--sqlite-db` 安装；默认 None 零行为变化）。
@@ -1882,7 +1909,7 @@ fn escape(s: &str) -> String {
 
 fn diags(ds: &[ace_core::atom_text::Diagnostic]) -> String {
     ds.iter()
-        .map(|d| format!("{}: {}", d.code, d.message))
+        .map(|d| format!("{}: {} @{:?}", d.code, d.message, d.span))
         .collect::<Vec<_>>()
         .join("; ")
 }
@@ -1909,23 +1936,27 @@ impl NodeDesktopBridge {
     /// + states-only 引擎挂载（keyed 实例、世代纪律；无 model/msg 的 Hello 类
     /// 源为静态面——事件面缺席具名可辨）。
     pub fn load(src: &str, path: &str, instances: usize) -> Result<Self, String> {
-        on_widget_stack("compile", || Self::load_source(src, path, instances))
+        let mut bridge = on_widget_stack("compile", || Self::load_source(src, path, instances))?;
+        bridge.set_source_assets(std::path::Path::new(path));
+        Ok(bridge)
+    }
+
+    /// Open the component lane used by the opt-in SQLite message mirror.
+    pub fn load_sqlite_component(src: &str, path: &str, instances: usize) -> Result<Self, String> {
+        let mut bridge = on_widget_stack("compile", || Self::load_component_source(src, path, instances))?;
+        bridge.set_source_assets(std::path::Path::new(path));
+        Ok(bridge)
     }
 
     fn load_source(src: &str, path: &str, instances: usize) -> Result<Self, String> {
         use ace_core::source::age_package::{FILE_LIST_BINDING, FILE_MUTATE_BINDING, FILE_OPEN_BINDING};
-
-        // PLAN-113（026 真语料）：AV 桌面装载与 TS/WEB lane 同律——`$event`
-        // 宿主事件占位按**同长归一化**（`$event`→`nevent`，5→5 字节，span
-        // 零位移）后进 CST；方言事件绑定实参位（`onchanged: .PageChanged($event)`）
-        // 投影层丢弃实参（宿主通道，§13.14）。
-        let src = src.replace("$event", "nevent");
-        let src: &str = &src;
-
-        if let Ok(candidates) = package_candidates(src) {
+        // Preserve typed child-event bindings on the package front door.
+        let package_source = super::ace_widget_packages::normalize_package_module_placeholders(src);
+        let package_src = package_source.as_str();
+        if let Ok(candidates) = package_candidates(package_src) {
             if candidates.first().is_some_and(|node| node.members.iter().any(|row| row.role == "route")) {
                 let app = std::path::Path::new(path);
-                let (units, paths) = front_package_units(app, src, &front_route_modules(app)?)?;
+                let (units, paths) = front_package_units(app, package_src, &front_route_modules(app)?)?;
                 return Self::load_package_paths(units, "app::app", instances, paths);
             }
             if candidates.iter().any(|node| !node.package_imports.is_empty())
@@ -1938,24 +1969,39 @@ impl NodeDesktopBridge {
                     package: "app".into(),
                     version: "1.0.0".into(),
                     id: "app".into(),
-                    source: src.into(),
+                    source: package_src.into(),
                     provider: None,
                 }];
                 super::ace_widget_packages::append_widget_packages(
                     std::path::Path::new(path),
-                    src,
+                    package_src,
                     &candidates,
                     &mut units,
                 )?;
-                return Self::load_package_paths(units, "app::app", instances, RouteModulePaths::new());
+                let source = std::path::Path::new(path);
+                let backend = super::ace_back_api::append_contract(source, &mut units)?;
+                let mut bridge = Self::load_package_paths(units, "app::app", instances, RouteModulePaths::new())?;
+                if let Some(back_entry) = backend {
+                    let Some(BridgeEngine::Package(engine)) = bridge.engine.as_mut() else {
+                        return Err("checked backend requires a live desktop package".into());
+                    };
+                    let spec = crate::back_proxy::SessionSpec { app_id: "checked-desktop".into(), back_entry };
+                    engine.set_file_backend(spec, source.parent().unwrap_or(std::path::Path::new(".")));
+                }
+                return Ok(bridge);
             }
         }
+        Self::load_component_source(src, path, instances)
+    }
+
+    fn load_component_source(src: &str, path: &str, instances: usize) -> Result<Self, String> {
+        let standalone_source = super::ace_widget_packages::normalize_event_placeholders(src, false);
+        let src = standalone_source.as_str();
         // PLAN-104：harness 不消费 style 面（A2Vue 覆盖样式）；空白化保字节长。
         // PLAN-105 T-02：**先用原源**投影（本地/内联样式可解析），仅当原源投影
         // 失败才退回空白化（104 既有语料语义不变；真实工程源不再因样式引用被
         // 误伤）。
-        let raw = src.to_string();
-        let candidates = match project_component_candidates(&raw) {
+        let candidates = match project_component_candidates(src) {
             Ok(c) => c,
             Err(ds) => {
                 // 只有样式解析类失败才退回空白化；其它具名拒（store/结构/语法）
@@ -1964,7 +2010,7 @@ impl NodeDesktopBridge {
                     .iter()
                     .all(|d| d.code == "source.age.style-call");
                 if style_only {
-                    project_component_candidates(&blank_style_surface(&raw))
+                    project_component_candidates(&blank_style_surface(src))
                         .map_err(|ds| diags(&ds))?
                 } else {
                     return Err(diags(&ds));
@@ -1994,84 +2040,6 @@ impl NodeDesktopBridge {
         let trial_initials = ComponentInitials {
             per_instance: vec![Vec::new()],
         };
-        let per_node_texts = if node.view.texts.is_empty() {
-            // PLAN-104：无模块作用域文本叶（循环体模板叶）——按视图数据把
-            // 循环体展开为具体叶值（010 的 FAQ 列表）；states-only 面照常。
-            let expanded = expand_view_for_leaves(node)?;
-            if expanded.is_empty() {
-                vec![vec![String::new(); 0]]
-            } else {
-                shape.text_leaf_count = expanded.len();
-                vec![expanded]
-            }
-        } else {
-            match compile_component_scenario_with_initials(
-            src,
-            path,
-            LegacyWidgetAlias::Accept,
-            &caps,
-            &trial,
-            None,
-            &trial_initials,
-        ) {
-            Ok(compiled) => {
-                // 状态真值经事件引擎（mount 后 read_all）取；此处只消费文本叶。
-                let (_states0, texts0) = observe_component_states_and_texts_flat(&compiled)?;
-                let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
-                if observed_leaves != shape.text_leaf_count {
-                    // PLAN-105 T-02（U03 真语料 015/018/022）：编译侧把**循环体
-                    // 模板叶**按视图数据展开，而 shape 只数模块作用域叶——两者
-                    // 差恰为可展开的循环叶数时以编译值真值为准（不静默丢项：
-                    // 展开不支持的形状仍由 expand_view_for_leaves 具名拒）。
-                    // PLAN-105 W109（U03 016）：循环源是 **computed/动态列表**
-                    // （非视图数据字面量）时静态展开不可行——以编译观察值为
-                    // 真值接受，前提是观察数 ≥ 模块作用域叶数（动态展开只会
-                    // 增叶；字面量源的静默失配仍具名拒）。
-                    let expanded = match expand_view_for_leaves(node) {
-                        Ok(expanded) => Some(expanded),
-                        Err(e) if e.contains("view-for-unsupported") => None,
-                        Err(e) => return Err(e),
-                    };
-                    match expanded {
-                        Some(expanded) => {
-                            let expected = node.view.texts.len() + expanded.len();
-                            if observed_leaves != expected {
-                                return Err(format!(
-                                    "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
-                                    shape.text_leaf_count
-                                ));
-                            }
-                        }
-                        None => {
-                            // 动态源：shape 计入条件两支的叶（PLAN-104），初始态
-                            // 只走一支——观察数可小于静态数，以编译观察为真值。
-                        }
-                    }
-                    shape.text_leaf_count = observed_leaves;
-                }
-                texts0
-            }
-            Err(ds)
-                if ds
-                    .iter()
-                    .any(|d| d.message.contains("requires at least one")) =>
-            {
-                // Hello 类（无 model 字段）：静态观察面（带 on 的源在此被
-                // 具名拒——`on` handler 属场景面，不属静态面）。
-                let texts0 = observe_component_texts(src, path, LegacyWidgetAlias::Accept)?;
-                let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
-                if observed_leaves != shape.text_leaf_count {
-                    return Err(format!(
-                        "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
-                        shape.text_leaf_count
-                    ));
-                }
-                texts0
-            }
-            Err(ds) => return Err(diags(&ds)),
-            }
-        };
-
         // 事件引擎：有 model 的源挂 N 实例；Hello 类（无 model 字段可观察）
         // 为静态面（engine=None——点击/键入无从产生，事件面缺席具名可辨）。
         let mut engine = None;
@@ -2127,20 +2095,14 @@ impl NodeDesktopBridge {
         let session_texts = match engine.as_mut() {
             Some(BridgeEngine::Component(engine)) if !node.view.texts.is_empty() => identities
                 .first()
-                .and_then(|id| engine.read_texts(id).ok().map(|texts| vec![texts])),
+                .and_then(|id| engine.read_texts(id).ok())
+                .filter(|texts| texts.len() == shape.text_leaf_count),
             _ => None,
         };
         // Reuse the live checked program and its initial state for text leaves.
         // Preserve the observation fallback for static and legacy sources.
         let per_node_texts = if let Some(texts) = session_texts {
-            let observed_leaves = texts[0].len();
-            if observed_leaves != shape.text_leaf_count {
-                return Err(format!(
-                    "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
-                    shape.text_leaf_count
-                ));
-            }
-            texts
+            vec![texts]
         } else {
             if node.view.texts.is_empty() {
                 // PLAN-104：无模块作用域文本叶（循环体模板叶）——按视图数据把
@@ -2168,10 +2130,20 @@ impl NodeDesktopBridge {
                             observe_component_states_and_texts_flat(&compiled)?;
                         let observed_leaves = texts0.first().map(|t| t.len()).unwrap_or(0);
                         if observed_leaves != shape.text_leaf_count {
-                            return Err(format!(
-                                "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
-                                shape.text_leaf_count
-                            ));
+                            // The scenario may expand loop leaves or observe
+                            // just the active branch of a dynamic list view.
+                            let expected = match expand_view_for_leaves(node) {
+                                Ok(expanded) => Some(node.view.texts.len() + expanded.len()),
+                                Err(error) if error.contains("view-for-unsupported") => None,
+                                Err(error) => return Err(error),
+                            };
+                            if expected.is_some_and(|count| count != observed_leaves) {
+                                return Err(format!(
+                                    "text leaf mismatch: view tree has {}, AV observed {observed_leaves}",
+                                    shape.text_leaf_count
+                                ));
+                            }
+                            shape.text_leaf_count = observed_leaves;
                         }
                         texts0
                     }
@@ -2221,12 +2193,14 @@ impl NodeDesktopBridge {
             tick_no: 0,
             view_items: node.view.tree.clone(),
             widget_initial_bools: widgets::initial_bools(&node.fields),
-            public_assets: widgets::public_assets(std::path::Path::new(path)).map(Arc::new),
+            public_assets: None,
             expanded_static,
             routes: None,
             route_actions: Default::default(),
             route_button_spans: Vec::new(),
             package_route_handlers: None,
+            shortcuts: Default::default(),
+            pending_shortcuts: VecDeque::new(),
             route_request: None,
             sqlite_bridge: None,
         })
@@ -2391,6 +2365,8 @@ impl NodeDesktopBridge {
             route_actions: Default::default(),
             route_button_spans: Vec::new(),
             package_route_handlers: None,
+            shortcuts: if checked { super::ace_shortcuts::widget_shortcuts(&node.members, &node.messages) } else { Default::default() },
+            pending_shortcuts: VecDeque::new(),
             route_request: None,
             sqlite_bridge: None,
         })
@@ -2595,6 +2571,9 @@ impl NodeDesktopBridge {
                     frame.focus_target().map(|target| package_view::focus_id(session, instance, target))
                 });
                 s.package_frames = frames;
+                if !s.package_frames.is_empty() {
+                    s.package_images = Some(Arc::new(package_images::PackageImages::new(self.public_assets.clone())));
+                }
                 s.publish_focus(focus);
                 let has_authored_buttons = self.buttons.len() > self.route_button_spans.len();
                 if s.package_frames.is_empty() && self.routes.is_none()
@@ -2958,11 +2937,33 @@ impl NodeDesktopBridge {
     }
 
     fn step_package_lane(&mut self, session: i32) -> StepOutcome {
-        let Some((instance, revision, target, text, coordinates)) = ({
+        let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() else {
+            unreachable!("package lane has a package engine");
+        };
+        if let Some((instance, message, result)) = engine.poll_http_update() {
+            self.set_package_worker_pending(instance, false);
+            return match result {
+                Ok(states) => self.publish_package_frame(instance, &message, states),
+                Err(error) => {
+                    self.errors.push(error.clone());
+                    StepOutcome::DispatchRefused(error)
+                }
+            };
+        }
+        let ready = |instance: usize| self.identities.get(instance)
+            .is_some_and(|identity| !engine.http_pending(identity));
+        if ready(0) {
+            if let Some(message) = self.pending_shortcuts.pop_front() {
+                return self.dispatch_typed(0, &message, &[]);
+            }
+        }
+        let Some((instance, revision, target, input)) = ({
             let mut host = host().write().unwrap();
             host.get(session).and_then(|front| {
-                if let Some(event) = front.package_events.pop_front() {
+                if let Some(position) = front.package_events.iter().position(|event| ready(event.instance)) {
+                    let event = front.package_events.remove(position).expect("ready package event");
                     front.polled += 1;
+                    front.consumed_events += 1;
                     let resolved = front.package_frame(event.instance).and_then(|frame| {
                         let target = if frame.revision == event.revision {
                             event.target
@@ -2972,19 +2973,33 @@ impl NodeDesktopBridge {
                         Some((frame.revision, target))
                     });
                     if let Some((revision, target)) = resolved {
-                        return Some((event.instance, revision, target, event.text, event.coordinates));
+                        return Some((event.instance, revision, target, event.input));
                     }
                     front.stale_rejected += 1;
                     return None;
                 }
-                let (instance, revision, _) = front.package_focus_notices.front()?;
+                let first = front.package_focus_notices.iter().position(|(instance, _, _)| ready(*instance));
+                let Some(first) = first else {
+                    let (instance, revision, target) = front.package_images.as_ref()?.next_event(|instance, notice| {
+                        if !ready(instance) {
+                            return None;
+                        }
+                        let frame = front.package_frame(instance)?;
+                        frame.queued_action_target(notice).map(|target| (frame.revision, target))
+                    })?;
+                    front.polled += 1;
+                    return Some((instance, revision, target, PackageEventInput::Activation));
+                };
+                let (instance, revision, _) = &front.package_focus_notices[first];
                 let position = front.package_focus_notices.iter()
+                    .skip(first)
                     .take_while(|(root, frame, _)| root == instance && frame == revision)
-                    .position(|(_, _, notice)| !notice.gained()).unwrap_or(0);
+                    .position(|(_, _, notice)| !notice.gained()).map_or(first, |offset| first + offset);
                 let (instance, _, notice) = front.package_focus_notices.remove(position)?;
                 front.polled += 1;
                 let target = front.package_frame(instance).and_then(|frame| {
-                    frame.focus_notice_target(&notice).map(|target| (instance, frame.revision, target, None, None))
+                    frame.focus_notice_target(&notice)
+                        .map(|target| (instance, frame.revision, target, PackageEventInput::Activation))
                 });
                 if target.is_none() {
                     front.stale_rejected += 1;
@@ -2993,9 +3008,6 @@ impl NodeDesktopBridge {
             })
         }) else {
             return self.step_package_timers();
-        };
-        let Some(BridgeEngine::Package(engine)) = self.engine.as_mut() else {
-            unreachable!("package lane has a package engine");
         };
         let id = &self.identities[instance];
         if let Some(frame) = engine.package_frame(id) {
@@ -3017,11 +3029,14 @@ impl NodeDesktopBridge {
                 };
             }
         }
-        match engine.dispatch_frame(id, revision, target, text, coordinates) {
+        match engine.dispatch_frame(id, revision, target, input) {
             Ok((message, DispatchOutcome::Delivered(states))) => {
                 self.publish_package_frame(instance, &message, states)
             }
-            Ok((_, DispatchOutcome::InFlight)) => StepOutcome::Idle,
+            Ok((_, DispatchOutcome::InFlight)) => {
+                self.set_package_worker_pending(instance, true);
+                StepOutcome::Idle
+            }
             Ok((_, DispatchOutcome::Dropped(reason))) => StepOutcome::DispatchRefused(format!("{reason:?}")),
             Err(error) => {
                 self.errors.push(error.clone());
@@ -3043,7 +3058,10 @@ impl NodeDesktopBridge {
         };
         match outcome {
             Ok(DispatchOutcome::Delivered(states)) => self.publish_package_frame(instance, &message, states),
-            Ok(DispatchOutcome::InFlight) => StepOutcome::Idle,
+            Ok(DispatchOutcome::InFlight) => {
+                self.set_package_worker_pending(instance, true);
+                StepOutcome::Idle
+            }
             Ok(DispatchOutcome::Dropped(reason)) => StepOutcome::DispatchRefused(format!("{reason:?}")),
             Err(error) => {
                 self.errors.push(error.clone());
@@ -3082,6 +3100,14 @@ impl NodeDesktopBridge {
         }
         self.dispatch_log.push((instance, message.to_owned(), states.clone()));
         StepOutcome::Dispatched { instance, msg: message.to_owned(), states }
+    }
+
+    fn set_package_worker_pending(&self, instance: usize, pending: bool) {
+        if let Some(session) = self.session {
+            if let Some(front) = host().write().unwrap().get(session) {
+                front.package_workers_pending[instance] = pending;
+            }
+        }
     }
 
     /// Dispatch a typed host event to its current lane using the normal AV and frame path.
@@ -3178,6 +3204,9 @@ impl NodeDesktopBridge {
                 }
             }
             Ok((DispatchOutcome::InFlight, _)) => {
+                if matches!(engine, BridgeEngine::Package(_)) {
+                    self.set_package_worker_pending(instance, true);
+                }
                 // PLAN-108：Http 效应派发已上 worker 线程在途——本拍不阻塞；
                 // 完成经 step() 的 poll_http_completions 回写（dispatch_log
                 // 与状态发布在 completion 臂统一发生，证据不提前）。
@@ -3325,6 +3354,7 @@ impl NodeDesktopBridge {
         // B-AV U01：键入配对随 session 关闭一并丢弃（provider 队列已清，
         // 残留文本会成为无码孤儿）。
         self.pending_texts.clear();
+        self.pending_shortcuts.clear();
         route_result
     }
 
@@ -3336,6 +3366,7 @@ impl NodeDesktopBridge {
                 close_host_session(session);
             }
             self.pending_texts.clear();
+            self.pending_shortcuts.clear();
             self.release_package_views();
         }
         result
@@ -3368,10 +3399,16 @@ impl NodeDesktopBridge {
             .collect();
         for step in due {
             match step {
-                ScriptStep::Click { instance, target } => push_event(instance, target),
+                ScriptStep::Click { instance, target } => {
+                    if let Some(session) = self.session {
+                        push_script_click(session, instance, target);
+                    } else {
+                        push_event(instance, target);
+                    }
+                }
                 ScriptStep::ClickPage { instance, target } => {
                     if let Some(session) = self.routes.as_ref().and_then(|routes| routes.page_session()) {
-                        push_session_event(session, instance, target);
+                        push_script_click(session, instance, target);
                     }
                 }
                 ScriptStep::TypeText {
@@ -3554,7 +3591,15 @@ pub enum NodeDesktopMsg {
         y: f32,
     },
     PackageText { session: i32, instance: usize, revision: u64, target: usize, text: String },
+    PackageImageSurface {
+        session: i32,
+        instance: usize,
+        revision: u64,
+        target: usize,
+        carry: ImageSurfaceCarry,
+    },
     PackageFocus { session: i32, instance: usize, revision: u64, control: String, gained: bool },
+    PackageShortcut { session: i32, message: String },
     Widget { session: i32, instance: usize, action: WidgetAction },
     BridgeTick,
 }
@@ -3579,13 +3624,14 @@ impl Component for AceNodeDesktopWindow {
     }
 
     fn key_bindings(&self) -> std::collections::HashMap<String, String> {
-        if widget_keyboard_session().is_none() {
-            return Default::default();
+        let mut bindings = with_bridge(|bridge| bridge.shortcuts.clone().into_iter().collect::<std::collections::HashMap<_, _>>())
+            .unwrap_or_default();
+        if widget_keyboard_session().is_some() {
+            for key in widgets::KEYS {
+                bindings.entry(key.to_string()).or_insert_with(|| key.to_string());
+            }
         }
-        widgets::KEYS
-            .iter()
-            .map(|key| (key.to_string(), key.to_string()))
-            .collect()
+        bindings
     }
 
     fn key_message(&self, key: &str) -> Option<Self::Msg> {
@@ -3598,6 +3644,10 @@ impl Component for AceNodeDesktopWindow {
             })
         })
         .flatten()
+        .or_else(|| with_bridge(|bridge| Some(NodeDesktopMsg::PackageShortcut {
+            session: bridge.session?,
+            message: bridge.shortcuts.get(key)?.clone(),
+        })).flatten())
     }
 
     #[cfg(windows)]
@@ -3656,8 +3706,19 @@ impl Component for AceNodeDesktopWindow {
             message @ (NodeDesktopMsg::PackageClick { .. }
             | NodeDesktopMsg::PackagePointer { .. }
             | NodeDesktopMsg::PackageText { .. }
+            | NodeDesktopMsg::PackageImageSurface { .. }
             | NodeDesktopMsg::PackageFocus { .. }) => {
                 queue_package_message(message);
+            }
+            NodeDesktopMsg::PackageShortcut { session, message } => {
+                with_bridge(|bridge| {
+                    if bridge.session == Some(session)
+                        && bridge.shortcuts.values().any(|handler| handler == &message)
+                        && !bridge.pending_shortcuts.contains(&message)
+                    {
+                        bridge.pending_shortcuts.push_back(message);
+                    }
+                });
             }
             NodeDesktopMsg::Widget { session, instance, action } => {
                 if let WidgetAction::DispatchButton(target) = action {
@@ -3813,6 +3874,7 @@ struct HostFrame {
     widget_instances: Vec<widgets::State>,
     widget_values: Vec<Arc<[(String, AceStateValue)]>>,
     package_frames: Vec<Arc<PackageFrame>>,
+    package_images: Option<Arc<package_images::PackageImages>>,
 }
 
 fn host_frame(session: &HostSession) -> HostFrame {
@@ -3829,6 +3891,7 @@ fn host_frame(session: &HostSession) -> HostFrame {
         widget_instances: session.widget_instances.clone(),
         widget_values: session.widget_values.clone(),
         package_frames: session.package_frames.clone(),
+        package_images: session.package_images.clone(),
     }
 }
 
@@ -3840,19 +3903,19 @@ fn render_host_frame(
 ) -> View<NodeDesktopMsg> {
     let HostFrame {
         id, generation, texts, states, buttons, inputs, visibility, labels, widget_tree,
-        widget_instances, widget_values, package_frames,
+        widget_instances, widget_values, package_frames, package_images,
     } = frame;
     if !package_frames.is_empty() {
         if let [frame] = package_frames.as_slice() {
             if (!routed || outlet.is_some()) && package_view::owns_viewport(frame) {
                 let page = outlet.as_ref().map(|(_, page)| page);
-                return package_view::view(id, 0, frame, page, routed, dialogs);
+                return package_view::view(id, 0, frame, package_images.as_deref(), page, routed, dialogs);
             }
         }
         let views = package_frames.iter().enumerate()
             .map(|(index, frame)| {
                 let page = if index == 0 { outlet.take().map(|(_, page)| page) } else { None };
-                package_view::view(id, index, frame, page.as_ref(), routed, dialogs)
+                package_view::view(id, index, frame, package_images.as_deref(), page.as_ref(), routed, dialogs)
             });
         let content = View::col().children(views).build();
         return if routed { content } else { View::scrollable(content).build() };

@@ -186,6 +186,10 @@ pub mod ace_package_bridge;
 pub mod ace_package_lane;
 #[cfg(feature = "ace-bridge")]
 pub mod ace_package_sfc;
+#[cfg(feature = "ace-bridge")]
+mod ace_back_api;
+#[cfg(feature = "ace-bridge")]
+mod ace_shortcuts;
 // PLAN-105 T-02：包闭包单元的 widget f-string 统一脱糖（单一入口）。
 #[cfg(feature = "ace-bridge")]
 pub mod ace_package_units;

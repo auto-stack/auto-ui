@@ -578,6 +578,7 @@ pub fn prepare_component_source(
         None
     };
     let src: &str = merged_routes.as_deref().unwrap_or(src);
+    let uses_widget_packages = src.lines().any(|line| line.trim_start().starts_with("use { package:"));
     let mut inlined: Vec<InlinedStyle> = Vec::new();
     // PLAN-105 T-02（U03 真语料 013/016）：跨单元 store 声明——组件面只能看见
     // 本源；`use <unit>: <StoreType>` 指向的单元里若有同名 `store` 声明，就把
@@ -791,7 +792,8 @@ pub fn prepare_component_source(
         // 包），空白化会让包面把包子组件当未声明（PLAN-117 T-01 实证：
         // 031 的 ImageViewport `$event` 与 029 的 AssetBrowser props 均因
         // 导入被空白而 child-event-site / 记录字面量拒绝）。
-        if t.starts_with("use { package:") {
+        // Retain the standard JSON module for the checked package linker.
+        if t.starts_with("use { package:") || (uses_widget_packages && module == "std.json") {
             out.push_str(body);
             out.push_str(nl);
             continue;
@@ -815,9 +817,38 @@ pub fn prepare_component_source(
     let mut need_str_contains = false;
     out = rewrite_model_text_fields(&out);
     out = rewrite_str_contains(&out, &mut need_str_contains);
+    // PLAN-117（round-28 ②，029 真语料）：`<text>.lower()`/`.upper()`——组件
+    // 面无该内建方法，改写为 prep 注入的大小写折叠 helper（`len`/`char_at`/
+    // `to_codepoint`/`from_codepoint`/`to(Str)` 皆既有内建；仅 ASCII 区间
+    // 折叠——029 语料的查询/标题匹配为 ASCII 路径，非 ASCII 原样保留）。
+    let mut need_str_case = false;
+    out = rewrite_str_case(&out, &mut need_str_case);
+    // PLAN-117（round-29 ②，029 GoUp）：`<text>.split(<sep>)` 消费成语
+    // 改写——自由 fn 不能返回/接 List（v1 面：lists are function-local），
+    // 拆为 `__p117_str_split_count(recv, mark)`（`parts.len()`）与
+    // `__p117_str_split_at(recv, mark, idx)`（`parts[i]`）两个标量 helper；
+    // 声明行 `var parts = X.split(Y)` 摘除，同源后续 `parts.len()`/`parts[i]`
+    // 整词改写（029 语料 parts 为 handler 内局部，无跨域泄漏）。
+    let mut need_str_split = false;
+    out = rewrite_str_split(&out, &mut need_str_split);
+    // PLAN-117（round-30）：`<text>.replace(<mark>, <repl>)` → 标量 helper。
+    let mut need_str_replace = false;
+    out = rewrite_str_replace(&out, &mut need_str_replace);
     out = rewrite_while_to_for(&out);
     if need_str_contains {
         fn_blocks.push(STR_CONTAINS_HELPER.to_string());
+    }
+    if need_str_case {
+        fn_blocks.push(STR_INDEX_IN_HELPER.to_string());
+        fn_blocks.push(STR_LOWER_HELPER.to_string());
+        fn_blocks.push(STR_UPPER_HELPER.to_string());
+    }
+    if need_str_split {
+        fn_blocks.push(STR_SPLIT_COUNT_HELPER.to_string());
+        fn_blocks.push(STR_SPLIT_AT_HELPER.to_string());
+    }
+    if need_str_replace {
+        fn_blocks.push(STR_REPLACE_HELPER.to_string());
     }    // PLAN-105 T-02（U03 真语料 012）：`var NAME []T = []` 的空列表初值改为
     // `List<T>.new()`（共享 resolver 要求空字面量带元素类型）。
     out = rewrite_empty_list_inits(&out);
@@ -878,12 +909,35 @@ fn rewrite_str_contains(src: &str, need: &mut bool) -> String {
     let mut out = src.to_string();
     loop {
         let Some(pos) = out.find(".contains(") else { break };
-        // 接收位：从 `.contains(` 前往回扫标识符/点链（允许前导空格中断）。
+        // 接收位：从 `.contains(` 前往回扫标识符/点链；`)`/`]` 跳回**配对**
+        // 开括号（`p.title.lower().contains(x)` 的接收者是整个调用链——
+        // PLAN-117（round-28）修：此前 `)` 只回退一格，链式调用的接收位
+        // 被截断成 `)`，改写出 0 参 helper 调用）。
         let bytes = out.as_bytes();
         let mut start = pos;
         while start > 0 {
             let c = bytes[start - 1] as char;
-            if c.is_alphanumeric() || c == '_' || c == '.' || c == ')' || c == ']' {
+            if c == ')' || c == ']' {
+                let (open, close) = if c == ')' { ('(', ')') } else { ('[', ']') };
+                let mut depth = 0i32;
+                let mut k = start - 1;
+                loop {
+                    if k == 0 {
+                        break;
+                    }
+                    let b = bytes[k] as char;
+                    if b == close {
+                        depth += 1;
+                    } else if b == open {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    k -= 1;
+                }
+                start = k;
+            } else if c.is_alphanumeric() || c == '_' || c == '.' {
                 start -= 1;
             } else {
                 break;
@@ -916,6 +970,342 @@ fn rewrite_str_contains(src: &str, need: &mut bool) -> String {
     }
     out
 }
+// 大小写折叠用**纯 str 词汇**实现（len/slice/==/拼接）——collections 面
+// descriptor 无 char 转换用例（char_to_codepoint 族缺失，PLAN-864 冻结）；
+// 字母表扫描：单字符在 UPPER/LOWER 表中定位（-1 = 非 ASCII 字母，原样保留）。
+const STR_INDEX_IN_HELPER: &str = "fn __p117_str_index_in(c Str, alphabet Str) int {
+    var i int = 0
+    for i < alphabet.len() {
+        if alphabet.slice(i, i + 1) == c {
+            return i
+        }
+        i = i + 1
+    }
+    return -1
+}
+";
+
+const STR_LOWER_HELPER: &str = "fn __p117_str_lower(hay Str) Str {
+    var out Str = \"\"
+    var i int = 0
+    for i < hay.len() {
+        var k int = __p117_str_index_in(hay.slice(i, i + 1), \"ABCDEFGHIJKLMNOPQRSTUVWXYZ\")
+        if k >= 0 {
+            out = out + \"abcdefghijklmnopqrstuvwxyz\".slice(k, k + 1)
+        } else {
+            out = out + hay.slice(i, i + 1)
+        }
+        i = i + 1
+    }
+    return out
+}
+";
+
+const STR_UPPER_HELPER: &str = "fn __p117_str_upper(hay Str) Str {
+    var out Str = \"\"
+    var i int = 0
+    for i < hay.len() {
+        var k int = __p117_str_index_in(hay.slice(i, i + 1), \"abcdefghijklmnopqrstuvwxyz\")
+        if k >= 0 {
+            out = out + \"ABCDEFGHIJKLMNOPQRSTUVWXYZ\".slice(k, k + 1)
+        } else {
+            out = out + hay.slice(i, i + 1)
+        }
+        i = i + 1
+    }
+    return out
+}
+";
+
+/// PLAN-117（round-30 ②）：`<text>.lower()`/`.upper()` → helper 调用
+/// （无参形；接收位回扫跳配对括号）。
+fn rewrite_str_case(src: &str, need: &mut bool) -> String {
+    let mut out = src.to_string();
+    for (method, helper) in [(".lower()", "__p117_str_lower"), (".upper()", "__p117_str_upper")] {
+        loop {
+            let Some(pos) = out.find(method) else { break };
+            let bytes = out.as_bytes();
+            let mut start = pos;
+            while start > 0 {
+                let c = bytes[start - 1] as char;
+                if c == ')' || c == ']' {
+                    let (open, close) = if c == ')' { ('(', ')') } else { ('[', ']') };
+                    let mut depth = 0i32;
+                    let mut k = start - 1;
+                    loop {
+                        if k == 0 {
+                            break;
+                        }
+                        let b = bytes[k] as char;
+                        if b == close {
+                            depth += 1;
+                        } else if b == open {
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                        k -= 1;
+                    }
+                    start = k;
+                } else if c.is_alphanumeric() || c == '_' || c == '.' {
+                    start -= 1;
+                } else {
+                    break;
+                }
+            }
+            if start == pos {
+                break;
+            }
+            let recv = out[start..pos].to_string();
+            let call = format!("{helper}({recv})");
+            out.replace_range(start..pos + method.len(), &call);
+            *need = true;
+        }
+    }
+    out
+}
+
+/// PLAN-117（round-29 ②）：`.split(sep)` 消费成语改写——声明行摘除 +
+/// `NAME.len()`/`NAME[i]` 用法改写为 count/at 标量 helper 调用。
+fn rewrite_str_split(src: &str, need: &mut bool) -> String {
+    let mut out = src.to_string();
+    let mut vars: Vec<(String, String, String)> = Vec::new();
+    loop {
+        let Some(dpos) = out.find(".split(") else { break };
+        let bytes = out.as_bytes();
+        let mut start = dpos;
+        while start > 0 {
+            let c = bytes[start - 1] as char;
+            if c == ')' || c == ']' {
+                let (open, close) = if c == ')' { ('(', ')') } else { ('[', ']') };
+                let mut depth = 0i32;
+                let mut k = start - 1;
+                loop {
+                    if k == 0 {
+                        break;
+                    }
+                    let b = bytes[k] as char;
+                    if b == close {
+                        depth += 1;
+                    } else if b == open {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    k -= 1;
+                }
+                start = k;
+            } else if c.is_alphanumeric() || c == '_' || c == '.' {
+                start -= 1;
+            } else {
+                break;
+            }
+        }
+        if start == dpos {
+            break;
+        }
+        let args_at = dpos + ".split(".len();
+        let mut depth = 0i32;
+        let mut dend = None;
+        for (i, ch) in out[args_at..].char_indices() {
+            match ch {
+                '(' | '[' | '{' => depth += 1,
+                ')' if depth == 0 => {
+                    dend = Some(args_at + i);
+                    break;
+                }
+                ')' | ']' | '}' => depth -= 1,
+                _ => {}
+            }
+        }
+        let Some(dend) = dend else { break };
+        let head = out[..start].trim_end();
+        let Some(eq) = head.rfind('=') else { break };
+        let head_l = head[..eq].trim_end();
+        let Some(var_at) = head_l.rfind("var ") else { break };
+        let name = head_l[var_at + 4..].trim().to_string();
+        if name.is_empty() || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            break;
+        }
+        let recv = out[start..dpos].to_string();
+        let arg = out[args_at..dend].trim().to_string();
+        let line_start = out[..var_at].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_end = out[dend..].find('\n').map(|i| dend + i + 1).unwrap_or(dend);
+        out.replace_range(line_start..line_end, "");
+        vars.push((name, recv, arg));
+        *need = true;
+    }
+    for (name, recv, arg) in &vars {
+        let len_pat = format!("{name}.len()");
+        let count_call = format!("__p117_str_split_count({recv}, {arg})");
+        while let Some(pp) = out.find(&len_pat) {
+            if pp > 0 {
+                let b = out.as_bytes()[pp - 1] as char;
+                if b.is_alphanumeric() || b == '_' {
+                    break;
+                }
+            }
+            out.replace_range(pp..pp + len_pat.len(), &count_call);
+        }
+        let idx_pat = format!("{name}[");
+        while let Some(pp) = out.find(&idx_pat) {
+            if pp > 0 {
+                let b = out.as_bytes()[pp - 1] as char;
+                if b.is_alphanumeric() || b == '_' {
+                    break;
+                }
+            }
+            let mut depth = 0i32;
+            let mut e = None;
+            for (i, ch) in out[pp + name.len()..].char_indices() {
+                match ch {
+                    '[' | '(' | '{' => depth += 1,
+                    ']' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            e = Some(pp + name.len() + i);
+                            break;
+                        }
+                    }
+                    ')' | '}' => depth -= 1,
+                    _ => {}
+                }
+            }
+            let Some(e) = e else { break };
+            let idx_expr = out[pp + name.len() + 1..e].to_string();
+            let call = format!("__p117_str_split_at({recv}, {arg}, {idx_expr})");
+            out.replace_range(pp..e + 1, &call);
+        }
+    }
+    out
+}
+
+const STR_SPLIT_COUNT_HELPER: &str = "fn __p117_str_split_count(hay Str, mark Str) int {
+    var n int = 1
+    var i int = 0
+    for i + mark.len() <= hay.len() {
+        if hay.slice(i, i + mark.len()) == mark {
+            n = n + 1
+        }
+        i = i + 1
+    }
+    return n
+}
+";
+
+// `.replace(mark, repl)` 全量替换（首个匹配起循环扫描；标量词汇）。
+const STR_REPLACE_HELPER: &str = "fn __p117_str_replace(hay Str, mark Str, repl Str) Str {
+    var out Str = \"\"
+    var i int = 0
+    for i < hay.len() {
+        if i + mark.len() <= hay.len() {
+            if hay.slice(i, i + mark.len()) == mark {
+                out = out + repl
+                i = i + mark.len()
+            } else {
+                out = out + hay.slice(i, i + 1)
+                i = i + 1
+            }
+        } else {
+            out = out + hay.slice(i, i + 1)
+            i = i + 1
+        }
+    }
+    return out
+}
+";
+
+const STR_SPLIT_AT_HELPER: &str = "fn __p117_str_split_at(hay Str, mark Str, want int) Str {
+    var piece Str = \"\"
+    var idx int = 0
+    var i int = 0
+    for i < hay.len() {
+        if i + mark.len() <= hay.len() {
+            if hay.slice(i, i + mark.len()) == mark {
+                if idx == want {
+                    return piece
+                }
+                idx = idx + 1
+                piece = \"\"
+                i = i + mark.len()
+            } else {
+                piece = piece + hay.slice(i, i + 1)
+                i = i + 1
+            }
+        } else {
+            piece = piece + hay.slice(i, i + 1)
+            i = i + 1
+        }
+    }
+    return piece
+}
+";
+
+/// PLAN-117（round-30 ②）：`<text>.replace(<mark>, <repl>)` →
+/// `__p117_str_replace(<recv>, <mark>, <repl>)`（双参配对 + 接收位回扫）。
+fn rewrite_str_replace(src: &str, need: &mut bool) -> String {
+    let mut out = src.to_string();
+    loop {
+        let Some(pos) = out.find(".replace(") else { break };
+        let bytes = out.as_bytes();
+        let mut start = pos;
+        while start > 0 {
+            let c = bytes[start - 1] as char;
+            if c == ')' || c == ']' {
+                let (open, close) = if c == ')' { ('(', ')') } else { ('[', ']') };
+                let mut depth = 0i32;
+                let mut k = start - 1;
+                loop {
+                    if k == 0 {
+                        break;
+                    }
+                    let b = bytes[k] as char;
+                    if b == close {
+                        depth += 1;
+                    } else if b == open {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    k -= 1;
+                }
+                start = k;
+            } else if c.is_alphanumeric() || c == '_' || c == '.' {
+                start -= 1;
+            } else {
+                break;
+            }
+        }
+        if start == pos {
+            break;
+        }
+        let recv = out[start..pos].to_string();
+        let args_at = pos + ".replace(".len();
+        let mut depth = 0i32;
+        let mut end = None;
+        for (i, ch) in out[args_at..].char_indices() {
+            match ch {
+                '(' | '[' | '{' => depth += 1,
+                ')' if depth == 0 => {
+                    end = Some(args_at + i);
+                    break;
+                }
+                ')' | ']' | '}' => depth -= 1,
+                _ => {}
+            }
+        }
+        let Some(end) = end else { break };
+        let args = out[args_at..end].trim().to_string();
+        let call = format!("__p117_str_replace({recv}, {args})");
+        out.replace_range(start..end + 1, &call);
+        *need = true;
+    }
+    out
+}
+
 /// 首个路由映射的页面单元源码（`routes { "/" -> use bookshelf }`）。
 fn first_route_page(app_root: &Path, src: &str) -> Option<String> {
     let mut in_routes = false;

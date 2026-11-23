@@ -2220,11 +2220,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             on_click: on_click.map(|m| IcedMessage::from_dynamic(&m)),
             on_context_menu: on_context_menu.map(|m| IcedMessage::from_dynamic(&m)),
             on_release: on_release.map(|m| IcedMessage::from_dynamic(&m)),
-            on_move: on_move.map(|h| {
-                crate::ui::view::PointerMoveHandler::new(move |x, y| {
-                    IcedMessage::from_dynamic(&h.call(x, y))
-                })
-            }),
+            on_move: on_move.map(|h| h.map(|message| IcedMessage::from_dynamic(&message))),
             logical_extent,
             style,
         },

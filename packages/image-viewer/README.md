@@ -125,7 +125,7 @@ widget Gallery {
 
 ## 依赖闭包
 
-- `use auto.json`（json.stringify/parse）
+- ImageViewport 使用 `std.json: json_str` 转义字符串字段，在组件内组装固定结构的事件 JSON。
 - 内建：`col/row/text/button/icon/image_surface/dialog/dialog-content`
 - 无第三方包依赖；包目录整体拷贝即脱离主源根可用（vendored 闭包）。
 

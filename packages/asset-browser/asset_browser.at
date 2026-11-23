@@ -36,6 +36,11 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
         SearchInput(str), DoSearch, SetKind(str), CollectionMode(str),
         FoldToggle(str), FoldSelect(str), PageChanged(str),
         CollectionSelect(str), CollectionAction(str), CardSelect(str), CardPreview(str),
+        // PLAN-117（AV 包面装载修订）：view 事件转发与 on 段 handler 引用的
+        // 内部消息补齐声明（PvEvent 转发 ImageViewport loaded/error；ClosePreview/
+        // KEscape 为预览面板 UI 消息）。声明不改行为，仅为 AGE 包面
+        //「view 事件/ handler 消息须已声明」规范所要求（image_viewport 同款）。
+        PvEvent(str), ClosePreview, KEscape,
         "queryRequested"(str), "selectionRequested"(str), "previewRequested"(str)
     }
     model {
@@ -365,10 +370,16 @@ widget AssetBrowser (records: List = [], folders: List = [], query: str = "", qu
         .CollectionSelect(payload str) -> {
             try {
                 let request = json.parse(payload)
-                if !.locked && !.loading && .q_id != "" && .q_id == .resultQueryId && .querySeq == .last_emitted_seq && .errorMessage == "" && request.scopeId == .q_id && request.baseRevision == .revision && request.instanceToken != "" && ab_check_records(.records) == "" {
-                    let index = ab_find_index(.records, request.id)
-                    if index >= 0 && .records[index].revision == request.itemRevision {
-                        .CardSelect(request.id)
+                let scope str = request.scopeId
+                let base_revision int = request.baseRevision
+                let token str = request.instanceToken
+                if !.locked && !.loading && .q_id != "" && .q_id == .resultQueryId && .querySeq == .last_emitted_seq && .errorMessage == "" && scope == .q_id && base_revision == .revision && token != "" && ab_check_records(.records) == "" {
+                    let requested_id str = request.id
+                    let index = ab_find_index(.records, requested_id)
+                    if index >= 0 {
+                        let revision str = .records[index].revision
+                        let requested_revision str = request.itemRevision
+                        if revision == requested_revision { .CardSelect(requested_id) }
                     }
                 }
             } catch {}

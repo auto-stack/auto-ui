@@ -1,0 +1,51 @@
+use back.api: open_file, current_uri, names, close_session
+
+widget ViewerContract {
+    msg { Open, Read, Special, Close }
+    timer { Read (every_ms: 250, when: false) }
+    model {
+        var session Str = ""
+        var photo_uri Str = ""
+        var status Str = "Waiting"
+        var entry_count int = 0
+    }
+    on {
+        .Open -> {
+            try {
+                .session = open_file("风景.png")
+                .status = "Opened"
+            } catch { .status = "Open failed" }
+        }
+        .Read -> {
+            try {
+                let values = names(.session)
+                .entry_count = values.len()
+                .photo_uri = current_uri(.session)
+            } catch { .status = "Read failed" }
+        }
+        .Special -> {
+            let values = names("空 & = ? # +")
+            .entry_count = values.len()
+        }
+        .Close -> {
+            if close_session(.session) {
+                .session = ""
+                .photo_uri = ""
+                .status = "Closed"
+            }
+        }
+    }
+    view {
+        col {
+            button "Open fixture" { onclick: .Open }
+            button "Read source" { onclick: .Read }
+            button "Special query" { onclick: .Special }
+            button "Close fixture" { onclick: .Close }
+            text .status {}
+            text .entry_count {}
+            if .photo_uri != "" {
+                image_surface (src: .photo_uri, alt: "Authorized image") {}
+            }
+        }
+    }
+}

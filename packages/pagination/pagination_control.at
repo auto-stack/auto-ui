@@ -32,7 +32,7 @@
 widget PaginationControl (page: int = 1, pageSize: int = 10, total: int = 0, hideWhenSingle: bool = true, compact: bool = false, disabled: bool = false, showPageSize: bool = false, pageSizes: List = [10, 25, 50]) {
     msg { Init, First, Prev, Next, Last, SetSize(int), "changed"(str) }
     model {
-        var size_candidates List = []
+        var size_candidates List<int> = []
         var sizes_error bool = false
     }
     computed {
