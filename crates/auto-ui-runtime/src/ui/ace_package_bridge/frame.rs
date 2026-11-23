@@ -24,6 +24,8 @@ pub struct PackageFrame {
     pointers: BTreeMap<Vec<usize>, PointerEvents>,
     image_surfaces: BTreeMap<Vec<usize>, ImageSurfaceEvents>,
     clicks: BTreeMap<Vec<usize>, usize>,
+    /// PLAN-118：canvas onhit 目标（tap 命中 id 经文本事件通道回程序）。
+    hits: BTreeMap<Vec<usize>, usize>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
     widgets: BTreeSet<Vec<usize>>,
@@ -119,6 +121,11 @@ impl PackageFrame {
 
     pub fn actions(&self) -> &[PackageAction] {
         &self.actions
+    }
+
+    /// PLAN-118：canvas onhit 事件目标（渲染层 tap 命中后按此派发）。
+    pub(crate) fn hit(&self, path: &[usize]) -> Option<usize> {
+        self.hits.get(path).copied()
     }
 
     pub(crate) fn click(&self, path: &[usize]) -> Option<usize> {
@@ -281,6 +288,7 @@ pub(super) fn assemble(
         pointers: BTreeMap::new(),
         image_surfaces: BTreeMap::new(),
         clicks: BTreeMap::new(),
+        hits: BTreeMap::new(),
         links: BTreeMap::new(),
         destinations: Vec::new(),
         widgets: BTreeSet::new(),
@@ -303,6 +311,7 @@ pub(super) fn assemble(
         pointers: frame.pointers,
         image_surfaces: frame.image_surfaces,
         clicks: frame.clicks,
+        hits: frame.hits,
         links: frame.links,
         destinations: frame.destinations,
         widgets: frame.widgets,
@@ -325,6 +334,8 @@ struct ViewBindings<'a> {
     pointers: BTreeMap<Vec<usize>, PointerEvents>,
     image_surfaces: BTreeMap<Vec<usize>, ImageSurfaceEvents>,
     clicks: BTreeMap<Vec<usize>, usize>,
+    /// PLAN-118：canvas onhit 目标（tap 命中 id 经文本事件通道回程序）。
+    hits: BTreeMap<Vec<usize>, usize>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
     widgets: BTreeSet<Vec<usize>>,
@@ -423,6 +434,14 @@ impl ViewBindings<'_> {
         }
         if matches!(element.tag.as_str(), "image_surface" | "image-surface" | "imagesurface") {
             self.image_surface_bindings(element, path, disabled)?;
+        }
+        // PLAN-118：canvas onhit —— tap 命中元素 id 经文本事件通道回事件程序
+        // （`.PaintHit(id)` 范式；命中判定在渲染层 canvas_hit_test）。
+        if element.tag == "canvas" {
+            if let Some(event) = element.events.iter().find(|e| e.key.eq_ignore_ascii_case("onhit")) {
+                let target = self.action(event, disabled)?;
+                self.hits.insert(path.clone(), target);
+            }
         }
         if !disabled {
             self.control(element, path)?;

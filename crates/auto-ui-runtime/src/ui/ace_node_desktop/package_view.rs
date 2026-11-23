@@ -226,6 +226,42 @@ impl FrameView<'_> {
         }
         let content = match element.tag.as_str() {
             _ if self.frame.image_surface(path).is_some() => self.image_surface(element, path, style),
+            // PLAN-118：canvas 场景件 —— 包面画布臂。场景数据通道（列表态读面）
+            // 随 PLAN-117 live_session 链落主后接通；当前渲染空场景，tap 命中
+            // 通路（onhit → PackageText 带命中 id）已完整接线。
+            "canvas" => {
+                let logical_extent =
+                    prop(element, "coords").and_then(parse_coords_extent);
+                let clear = prop(element, "clear").map(str::to_owned);
+                let on_hit = self.frame.hit(path).map(|target| {
+                    let (session, instance, revision) =
+                        (self.session, self.instance, self.frame.revision);
+                    crate::ui::view::ElementHitHandler::new(move |hit_id| {
+                        NodeDesktopMsg::PackageText {
+                            session,
+                            instance,
+                            revision,
+                            target,
+                            text: hit_id,
+                        }
+                    })
+                });
+                return View::Canvas {
+                    scene: crate::ui::view::CanvasScene {
+                        strokes: Vec::new(),
+                        nodes: Vec::new(),
+                        edges: Vec::new(),
+                        labels: Vec::new(),
+                    },
+                    logical_extent,
+                    clear,
+                    on_pen_start: None,
+                    on_pen_move: None,
+                    on_pen_end: None,
+                    on_hit,
+                    style,
+                };
+            }
             "icon" => View::Image {
                 src: format!("lucide:{}", prop(element, "name").unwrap_or_default()),
                 style,
