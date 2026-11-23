@@ -1,6 +1,7 @@
 ---
 plan_id: PLAN-096
-status: reviewed
+status: archived
+completion_kind: delivered
 feature_name: CommandPalette 通用命令面板
 author: [Codex]
 created_at: 2026-11-14
@@ -17,7 +18,7 @@ touched_goals: []
 
 ## 0. 变更摘要
 
-补齐组件库路线 CL-06 的实施合同；提供命令搜索、分组、稳定选中、禁用状态、上下选择/Enter执行/Escape关闭、快捷键提示。应用提供命令并持有执行权限、全局快捷键、历史记录和业务动作。见[持续跟踪 strategy](../design/autoui/component-library-extension-strategy.md)。r3 按用户确认将交付平台限定为 Windows Native VM 与 Windows Vue。
+交付组件库 CL-06 的命令面板。提供命令搜索、分组、稳定选中、禁用状态、方向键选择、Enter 执行和 Escape 关闭。应用提供命令并持有执行权限、全局快捷键、历史记录和业务动作。r3 交付 Windows Native VM 与 Windows Vue。见[正式规范](../../specs/ui/command-palette.md)与[组件扩展路线](../../design/autoui/component-library-extension-strategy.md)。
 
 ## 1. 目标
 
@@ -45,7 +46,7 @@ Windows Native VM 与 Windows Vue 使用相同公共接口、状态语义和普�
 
 2026-11-14本次复核HEAD `3cab09943079a1d1fca993fa5a4c4dd2a9fa8315`；084交付 `7ea71f0c`，086交付 `765251b9`。本次用户授权再次审查/补齐计划并推荐下一项，仍无实施、建树、跨仓写入授权。补读当前FileDialog/Pagination Spec及Windows系统语义合同；下列原始源文件摘要复核未变。
 
-初稿观察基线 auto-ui HEAD `a6f776c24a4ba98611849955edceb5a04edac969`；未提交来源采用下表摘要/路径，不当作已交付版本。已读 [Spec总览](../specs/README.md)、`ui/{examples-ownership,theme-scope-and-publication,structure-closure}.md`、[原生验证合同](../specs/runtime/native-vm-app-validation.md)、`build/ui-test-selection.md`。当前无本组件专门Spec，拟在交付时新增；当前Spec不能因草案而改成已支持。
+初稿观察基线 auto-ui HEAD `a6f776c24a4ba98611849955edceb5a04edac969`；未提交来源采用下表摘要/路径，不当作已交付版本。已读 [Spec总览](../../specs/README.md)、`ui/{examples-ownership,theme-scope-and-publication,structure-closure}.md`、[原生验证合同](../../specs/runtime/native-vm-app-validation.md)、`build/ui-test-selection.md`。本组件专门 Spec 在本次交付中新增。
 
 | 已核来源 | 复用边界与现存差额 |
 |---|---|
@@ -104,9 +105,9 @@ Windows Native VM 与 Windows Vue 使用相同公共接口、状态语义和普�
 
 固定普通消费命令：Appearance组theme.dark/“Dark theme”、theme.light/“Light theme”，Settings组theme.settings/“Theme settings”，另有files.open/“Open file”。查询theme只得前三项；theme.dark执行后真正更新页面受控theme=dark，重开读回，files.open不进入该查询结果。补两个相同label但不同ID与一个disabled项，验证ID/禁用；provided用A→B→A加不同querySeq模拟正常异步结果迟到，不能直调执行回调。Launcher迁移需对空查询recent、分类和既有评分准备前后相同输入的结果序列对照，首尾环绕也必须保留。数据与执行入口在T-04/05新增，当前未运行。
 
-直接复用[已生成的四组件参考图](../design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1.png)及[文件导航/轻量交互视觉指南](../design/autoui/file-navigation-and-interaction-visual-guide.md)，只实现**左下：theme 搜索、匹配结果分组、选中行、快捷键与键盘提示**。[生成提示](../design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1-prompt.md)和最终PNG均为仓库设计资产，不依赖attachments或个人缓存。PNG SHA256 `EF667ABE23CFDC6377DDCF9E38005D118DD55D9CDCAFFD92D449CF02A440DD13`，1586×992 RGB。
+直接复用[已生成的四组件参考图](../../design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1.png)及[文件导航/轻量交互视觉指南](../../design/autoui/file-navigation-and-interaction-visual-guide.md)，只实现**左下：theme 搜索、匹配结果分组、选中行、快捷键与键盘提示**。[生成提示](../../design/autoui/assets/everyday-interactions-cl04-cl07-reference-v1-prompt.md)和最终PNG均为仓库设计资产，不依赖attachments或个人缓存。PNG SHA256 `EF667ABE23CFDC6377DDCF9E38005D118DD55D9CDCAFFD92D449CF02A440DD13`，1586×992 RGB。
 
-样式沿[公共执行/视觉指南](../design/autoui/common-components-execution-and-visual-guide.md)：32px控件、8px间距、16px面板padding、16px outline图标、约6px圆角，语义主题色和focus ring。图不是界面纹理或尺寸像素金标准；中文/长标签/错误、浅深色及420×560小窗以真实GUI可读可操作为准。图中文字不覆盖上表状态/异步合同。
+样式沿[公共执行/视觉指南](../../design/autoui/common-components-execution-and-visual-guide.md)：32px控件、8px间距、16px面板padding、16px outline图标、约6px圆角，语义主题色和focus ring。中文、长标签、错误、浅深色及 420×560 小窗以真实界面可读可操作为准。
 
 ### 规范增量
 
@@ -206,7 +207,7 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 ## 9. 复审记录
 
 - 2026-11-14：stage: new；PLAN-096 r1；outcome: pass；next: work/T-01。新建T-01…08、AC-01…08及SD-01/02；已核来源、复用边界、参考图和平台矩阵，准备进入实施。
-- 2026-11-14：stage: new；PLAN-096 r2；outcome: pass（修订后计划可进入T-01）；next: work/T-01。再次复核复用边界/图/平台矩阵，补instanceToken、精确异步确认、现有Init/MCP限制及分层输入证据、VMware路由、具名反例与失败清理；T-01…08、AC-01…08、SD-01/02保持，扩充§5/6并强化AC-02…06。详见[本轮审核报告](../reviews/component-plans-094-097-2026-11-14/README.md)。原r1记录保留为历史。
+- 2026-11-14：stage: new；PLAN-096 r2；outcome: pass（修订后计划可进入T-01）；next: work/T-01。再次复核复用边界/图/平台矩阵，补instanceToken、精确异步确认、现有Init/MCP限制及分层输入证据、VMware路由、具名反例与失败清理；T-01…08、AC-01…08、SD-01/02保持，扩充§5/6并强化AC-02…06。详见[本轮审核报告](../../reviews/component-plans-094-097-2026-11-14/README.md)。原r1记录保留为历史。
 - 此pass仅指计划合同可执行；不是组件测试通过、独立实现评审或交付完成。本轮未创建实施树，未执行上列拟新增测试；current_step=0/8。
 
 - 2026-11-23：stage: new | plan_id: PLAN-096 | plan_revision: r3 | outcome: pass | 用户明确授权仅 Windows。调整 AC-04/06/07/08、T-05/07/08、X-02 及 SD-02 的平台适用范围，保留其余验收入口与阈值。next: work/T-01。
@@ -240,6 +241,10 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 - 2026-11-23：stage: review | review_scope: final | reviewer: /root/plan096_review（独立、用户授权及同树只读） | plan_id: PLAN-096 | plan_revision: r3 | outcome: pass | worktree_path: D:/autostack/.wt/ui-096/auto-ui | branch: codex/ui-096-command-palette | reviewed_commit: 19eb448a2c7a4b931631ba90d24f6ec64b5bc6b3 | base_commit: 4dd9696da6a6289795ba9d6f57e603c24d99114a | dependency_revisions: auto-lang 8384ea064、auto-web 0cfc7c784、auto-down 456c86ac、AutoOS cdb4883 | spec_inputs: SD-01/02 为新增，冻结候选 blob c12166834e85f699ec8132b94cdada5d414cdb79 | acceptance_results: AC-01…07 pass，R096-F01…05 闭合 | pending_closeout_gates: scoped AutoUI regression、canonical 发布校验、线性落主、归档及清理 | next: merge。
   - 独立核验了 31/31 产品报告、实际工具/源码/准备收据、当前窗口 Calculator 画面及明确拒绝和配置错误的四张实图。较早 runner 与当前版本的唯一变动由反向重建 SHA 证明为 Native `system-invoke` 的退出策略，受影响 case 已独立重放。debug/test 模型复跑（执行，不含构建）首次 provided 配置 0.120775 秒、过期 pending 0.111873 秒、重排移除 0.105181 秒、反馈及 accepted 0.107170 秒，全部退出 0。预检 `--case all`、`AUTO_VM_WITH_HTTP=1`、`AUTO_VM_MERGE=0` 均在启动前退出 2，分别 0.178、0.329、0.323 秒。本轮无新测试构建；未重复整套通过证据。
 - stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 9 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 19eb448a2c7a4b931631ba90d24f6ec64b5bc6b3 | next: merge/T-08
+- 2026-11-23：stage: merge | plan_id: PLAN-096 | plan_revision: r3 | checkpoint: prepared, landed, canonical_verified | reviewed_commit: 19eb448a2c7a4b931631ba90d24f6ec64b5bc6b3 | delivery_commit: a227015e2f2bea79be99e506f07cba3426471a45 | spec: `docs/specs/ui/command-palette.md` SHA256 `3e22ef0c4e2827da6f71e9ed8a85ec87be47dfc88c2ccd1a6e56a55b6652d2db`。待发布候选正文逐字相同。基于 `06ba8ef9` 重基并快进到 `a227015e`，`git range-diff` 六项相等（184344f1→e8603a06、a5929d9b→56f73b86、3c032f2e→94eec12f、a2a31db6→0f227ceb、19eb448a→7b10f71b、1b32a710→a227015e）。主分支同期代码变动限现有 ACE/ASE 入口，未重叠本计划的 VM/Vue 路径。落主准备期间发现一处计划生成的 pnpm reparse point 目录，已移入同一 scratch 后复跑 `wt-guard` 通过。
+  - 合并前明确复跑 9 个 debug/test 定向用例。Native IME 1.901 秒、焦点 1.451 秒、背景动作隔离 0.136 秒、既有 Enter 0.124 秒、默认值 0.167 秒；配置 0.373 秒、过期锁 0.242 秒、重排移除 0.368 秒、移根 3.008 秒，均退出 0。复用符合条件的已准备测试目标，无额外测试编译。发现耗时 0.106/0.069 秒；清理未单独计时。`merge-scoped-checks.json` SHA256 `1ada22340d545aa695a8211de58e61ce25978264ad021ad718cc66e605afcba0`。
+  - 第一次快进写 Git 索引遇 D 盘满，默认分支未前移。校验 35 个计划部分文件与预期交付对象一致，回收本计划无用的准备副本，移走 17 个临时新增文件并恢复 18 个既有计划路径后重试；他人三份未提交文档摘要不变。实际 `git merge --ff-only` 成功。初次落主烟测识别设置 `pac.at` 单处 CRLF 归一化并返回具名准备不匹配。逐字节对比之外的 DSL 正文等价，从落主字节重新准备后 Native VM 设置 5.139 秒退出 0，Vue 设置 3.973 秒退出 0。Vue 前置生成、类型检查及开发预览准备 25.053 秒。两份报告 SHA256 `3a35c87d8da0c7a38267e73d194047047aac327cbdcebf3a764390f610495cc2`、`9bbc6ce7a9dad170c07b6b98ea9a2d7d16241797eb907de072a9022c4aad27ca`。
+- 2026-11-23：stage: merge | checkpoint: archive_pending_cleanup | completion_kind: delivered | archive: `docs/plans/archived/096-command-palette.md` | 清理工作树、分支、scratch 及登记待核验。独立评审使用的文档型验收草稿在交付提交历史中可重查。最终方案以本归档及 canonical Spec 为准。
 
 ## 10. 待澄清事项
 
@@ -249,3 +254,13 @@ r3 的 Windows Native VM 和 Vue 范围已确定。包语法/实例token/首次e
 ### AutoOS 宿主首帧（已解决）
 
 默认渲染器启动时观察到隐藏窗口且无首帧，恢复后使用现有软件渲染后端 `ICED_BACKEND=tiny-skia` 完成真实宿主验收，证据见 §9。没有修改 AutoOS 宿主源码或默认渲染设置。
+
+## 11. 交付证据索引
+
+Windows x64 MSVC，Rust/Cargo 1.98.0 debug/test、Node 25.2.1、pnpm 11.6.0、Python 3.14.2、Playwright MCP 0.0.86 与 Chrome 157.0.8103.80。`auto.exe` SHA256 `eddb2cce50fd8afe08cd26959c2fe52e090eb833b5c8b9a3f27538b28d947fcf`，`auto-ui-tool.exe` SHA256 `46a9d39d7a1b74da6bcc003dec7ba582dea86de35c5d5350c4e20a914bfea405`。宿主 `ui-desktop.exe` SHA256 `07da3fd756170f8b9bd72131eb34bd00571a8b6edf861aad71a8317c5e9ca4e1`。部署工件沿用原发布流程，本次完成源码交付及开发配置验证。
+
+当前组件主源码 SHA256 `1bc4c89f4d4181a6cbce688c66b0d37d2a876cbfaeb773d9cc1036cc5f040945`，`palette_data.at` 为 `8fa1a2bac0d5e0f62ddf671567674c037db0545889997f69b4836aa617de7be5`，`palette_search.at` 为 `bcba8eb262407354870fdbcaccddd44af22aedbda820e5e065fc67df3f05724c`。Launcher 源为 `756a438b7b388e1c842b435c464cfe01c1792f8420c92a2867316e245f6be722`。正式包以普通 Dialog、Input 和 Button 保持 Native VM、Vue 一套 `.at` 行为，新增的原生方向键绑定走当前模态焦点。旧内置 Command 的实际 Vue 搜索仍可用。
+
+Launcher 对照的空查询 12 项，Notes 与 Calculator 按最近使用置顶。`to` 依序为 Todo、Calculator、Stopwatch、系统监视器、Auto Edit。`tool` 分类与 `to` 同时使用时依序为 Calculator、Stopwatch。三组与基线一致，对照 SHA256 `9befa344931d7f668c2677057697df054b686863f66ac24d8455bba189191765`。当前宿主的过滤 Launcher 树 SHA256 `566b2cdcd0d2cd99b56471d605ba0f0ef62ddb1e49194d4847c51504ca426d85`，Calculator 树 SHA256 `98b40b51d71939acf7d2ae301d14f5652332e8e1152b15f08c533877c3804734`，可辨读键盘的实际窗口截图摘要见 §9。
+
+两轨均通过浅深色、420×560 逻辑窄窗、中文、失败反馈、错误配置与分组滚动实图核对。当前组件实图未复现 Q-01 字形缺失。系统焦点、ValuePattern/InvokePattern、两条输入桥、相对包移根、真实消费及正常进程/端口生命周期的验收结果见 §9。安装准备、实际动作、验证报告与负对照通过 Plan scratch 独立记录，摘要已归入本文件。

@@ -90,7 +90,7 @@ PromptDialog、TaskProgressDialog、CommandPalette、TagInput已分别补为094�
 |---|---|---|
 | 094 | [PromptDialog（归档）](archived/094-prompt-dialog.md) | r3 已交付，Windows Native VM 与 Vue 已验收； 027重命名/新建与普通名称管理；失败留窗，应用持文件写入，Vue权限边界保留 |
 | 095 | [TaskProgressDialog](095-task-progress-dialog.md) | 普通实际记录校验任务；参考Reader导入/批处理，取消请求须由任务owner确认 |
-| 096 | [CommandPalette](096-command-palette.md) | 028 Launcher及普通设置；复用原排序/recent/环绕，组件不持启动总线 |
+| 096 | [CommandPalette](archived/096-command-palette.md) | 已交付 r3，Windows Native VM 与 Vue。028 搜索后真实启动 Calculator。[规范](../specs/ui/command-palette.md) |
 | 097 | [TagInput（归档）](archived/097-tag-input.md) | 015 Notes与普通设置；复用update_tags/vocab，稳定noteId防迟到错写 |
 
 四项直接引用[已有四组件图与视觉指南](../design/autoui/file-navigation-and-interaction-visual-guide.md)，无需重新生图。互相没有硬依赖，可各自进入T-01；本批内部建议094、097先行，再按需求选096/095；全路线下一项优先第一批剩余085 TreeView。Windows/Linux native VM与Vue四门分别留证，未运行不算通过；本轮未建实施树或运行产品测试。094–097在独占分配锁下扫描当前/archived最大号后创建，保留其他任务的`.next-id`改动。
