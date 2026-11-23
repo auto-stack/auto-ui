@@ -603,6 +603,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 首次媒体全库的并发关闭测试长时间未退出，终止已确认的本次测试进程。恢复队列写入和会话表更新的原有锁顺序及 legacy 的关闭入口检查后，独立并发关闭 1/1 通过，`cargo test --locked -p auto-media-core --lib` 56/56 通过（执行 49.820 s）。`media-shutdown.log` SHA256 `CF09E236438AC273EBF25493A414D2F606DAE460CDA30E1A7B823BD2DF1BACC3`，`media-regression.log` SHA256 `970EE616333CBF86A3898E5B8A96C4CDDE419348A2E8BF8A7BA89CC2EE4C2ABA`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 108 | from: work/T-02 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `5d7fe0329d` / auto-ui `9ed57639` | next: work/T-02 将 031 原 `back.api` 接到私有宿主会话，绑定媒体 URI 所有权，核撤销和关闭后已发 URI 不可读，再接双端原入口。
 
+2026-11-23 T-02 续（round 109）：031 原后端按宿主授权提供私有媒体。
+
+- AutoLang `476005a925` 让 `FileSession` 按当前授权按需持有独立媒体运行时。031 原 `auto.image` 会话调用在私有请求里使用该运行时，按原目录句柄打开并限制签发的文件；撤销、替换授权和关闭均摘除旧运行时。后台读取凭证只持有授权状态的弱引用。取图核对仍由该运行时的活跃查看会话持有的完整票据和修订号。
+- AutoUI `ce8f99d100` 将私有后端的媒体请求转给该文件会话，沿现有 `no-store` 规则发送响应。`plan117_viewer_backend` 在真回环 HTTP 装载原 `031-image-viewer/src/back/api.at`，验证未授权、越授权根拒绝，坏图 422 后导航到正常图并对拍原字节，其他私有会话及公开地址拒绝当前媒体。关闭查看会话、撤销授权、重授同根及关闭后端后旧 URI 全部 404；重授后可新开媒体。031 原 `.at` 源未改。
+- `cargo test --locked -p auto-ui-runtime --features ace-bridge --test plan117_viewer_backend --test plan114_file_session` 4/4 通过，031 真后端 1/1（2.920 s）与 027 文件会话 3/3（2.260 s），整命令 145.152 s。`scratch/r109-031-private-backend/private-backend.log` SHA256 `DBBFCAB4B422699D0079A5C98E3874AF16EDA35265072A67ED7E31CA5EA822A2`。
+- `cargo test --locked -p auto-lang-core --lib file_session::tests::` 6/6 通过（38.888 s），`cargo test --locked -p auto-media-core --lib` 56/56 通过（32.940 s）。`core-tests.log` SHA256 `E9D8808A17E4D9736312A58B4ECBD034AA7835401C1165947A9F2938C58EC400`，`media-tests.log` SHA256 `72DA2705A44D383E9E5209423CD4B65F72BADE28AF9ECEDB249F0BEA20599AA3`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 109 | from: work/T-02 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `476005a925` / auto-ui `ce8f99d100` | next: work/T-02–T-06 接入 031 受检前端 `back.api` 调用及宿主授予路径，验证实际 Iced 与浏览器的图像、缩放、平移、坏图恢复和关闭。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
