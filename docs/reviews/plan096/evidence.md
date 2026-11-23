@@ -37,9 +37,11 @@
 
 宿主以 `cdb4883` 的 `ui-desktop` 入口消费本实施树。使用同组固定依赖及 AutoUI 的两项 iced patch 完成 debug 构建。完整 OS 注册表声明的 017-chat 原生服务源码在隔离树缺席，因此使用只包含 028 Launcher 和 011 Calculator 的隔离注册表核验。
 
-真实宿主成功启动 MCP，但窗口没有绘制。普通窗口、全屏、标准私有 rqhost 的结果一致。系统句柄对照发现标题为 `Auto - Desktop` 的真实窗口处于隐藏态。当前二进制的 MCP snapshot 和 VTree 均未取得首帧。恢复共享子组件默认值旧逻辑的对照二进制也复现隐藏窗口。在对照上调用非激活显示、改用 DX12 均未产生可操作界面。探针停止了本轮拥有的进程并验证旧 MCP 端口拒绝连接。
+在此机上，首次使用默认渲染器、全屏、私有 rqhost 及恢复共享子组件默认值旧逻辑的对照构建均未绘制首帧。切换到现有 `ICED_BACKEND=tiny-skia` 后，正式 `ui-desktop` 二进制渲染了 `Auto - Desktop` 并发布实时 MCP 树。两轮直接 Windows 合成键盘探针未读回查询，最终用户路径通过已定位的真实窗口操作完成。
 
-关键原始产物位于 `hosted-8/`、`hosted-prior-props/` 和 `hosted-dx12/`。Windows 宿主动作分支仍需用可正常渲染的 AutoOS 会话验证，AC-05 保持开放。
+启动命令 `python hosted_operator.py hosted-resume-07 tiny-skia` 退出 0。使用壳当前快照找到并按下召唤按钮。隔离宿主发布 Launcher `[4:028-launcher]`，`hosted = "1"`，此时没有 Calculator 应用面。通过真实 Windows 窗口点击搜索框、输入 `cal`，MCP 嵌入面同时读回 `q = "cal"` 和 `palette_ids = ["011-calculator"]`。点击一次可见的 Calculator 行后，宿主日志恰有一行 `[session] launch_app(inproc) 011-calculator`，同时出现 Calculator `[5:011-calculator]`、可见窗口和数字键盘。捕获后观察一秒，启动计数仍为一。宿主正常退出 0，确认原 PID 消失，使用同一 MCP 方法验证旧端口拒绝连接。38.373 秒为本轮人工交互、快照、单次结果稳定观察和清理的总墙钟。
+
+`hosted-resume-07/report.json` SHA256 `a72f63b1e8615235d568b70facf16ad38a4cfd929550e6975d01384300080e5b`。已过滤的 Launcher 树 SHA256 `3d5afad2635219250c1663f787cab98c472c029431b3fad2275a1a2ef0674290`。Calculator 树 SHA256 `206c034bcc7aef1f5d3adc43838dfe56d27002da02a76105af263ce8e429fffc`，截图 SHA256 `9175715593f01767c36d3096664b6701ac7fea237b31d4a70c3249c6007f8fe4`。宿主二进制 SHA256 `07da3fd756170f8b9bd72131eb34bd00571a8b6edf861aad71a8317c5e9ca4e1`，Launcher 源 SHA256 `756a438b7b388e1c842b435c464cfe01c1792f8420c92a2867316e245f6be722`。
 
 ## Windows 产品执行
 
@@ -74,6 +76,6 @@
 
 产品脚本的缺提供方反例退出 2。退出重开分别启动两个 App 进程，前一进程退出及端口释放后再运行当前控件。浅色选中行和深色 420×560 截图人工核对通过，长中文命令在两轨可读。Native VM 保留逻辑窗口尺寸，截图像素受系统 DPI 缩放。
 
-Windows Native VM 12 个产品用例通过，Windows Vue 11 个产品用例通过。模型目标构建为 debug/test，最后一轮准备 41.54 秒。耗时表按独立入口记录实测墙钟，包括产品启动、动作和清理。实际桌面宿主启动门单独开放。
+Windows Native VM 12 个产品用例通过，Windows Vue 11 个产品用例通过。模型目标构建为 debug/test，最后一轮准备 41.54 秒。耗时表按独立入口记录实测墙钟，包括产品启动、动作和清理。Windows 桌面宿主单独通过 C-04。
 
 内置 Command 与正式 CommandPalette 同页用例通过。现有 CommandGroup 在真实 Vue 页面保留旧搜索过滤，墙钟 1.992 秒，报告 SHA256 `32f5e479aa5b8a96bcf5e3d9df1d88b43d7f24c48da7bf56e79c73d3ef7199d7`。
