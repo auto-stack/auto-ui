@@ -130,10 +130,33 @@ fn store_probe(top: &str, model_extra: &str, types: &str, handler: &str, view_ex
     )
 }
 
-fn synthetic_root() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("p112-age-probe-{}", std::process::id()));
-    let _ = std::fs::create_dir_all(&dir);
-    dir
+/// 探针根目录（空）。Drop 时删除——钉点翻红、断言失败时也不留临时目录。
+struct ProbeRoot(PathBuf);
+
+impl ProbeRoot {
+    fn new() -> Self {
+        let dir = std::env::temp_dir().join(format!("p112-age-probe-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        Self(dir)
+    }
+}
+
+impl std::ops::Deref for ProbeRoot {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for ProbeRoot {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn synthetic_root() -> ProbeRoot {
+    ProbeRoot::new()
 }
 
 // ── 接受对照 ────────────────────────────────────────────────────────────────
@@ -157,7 +180,6 @@ fn p112_av_control_store_call_and_field_display_load_on_component_face() {
     let root = synthetic_root();
     let src = store_probe("", "", "", "            .n = .n + 1\n", "        text .store.n { }\n");
     expect_accepted("同单元 store：调用 + 字段显示", &component_face(&root, &src));
-    let _ = std::fs::remove_dir_all(&root);
 }
 
 /// 组件面（经 prep）收 `storage.set` 与 `while`（prep 的宿主存储仿真与循环改写）。
@@ -173,7 +195,6 @@ fn p112_av_control_storage_set_and_while_load_through_prep() {
         "",
     );
     expect_accepted("同单元 store：storage.set + while", &component_face(&root, &src));
-    let _ = std::fs::remove_dir_all(&root);
 }
 
 // ── 缺口钉点（组件面，经 prep）────────────────────────────────────────────
@@ -195,7 +216,6 @@ fn p112_av_gap_storage_get_binding_needs_ownership_transfer() {
         &component_face(&root, &src),
         &["verify.ownership-required"],
     );
-    let _ = std::fs::remove_dir_all(&root);
 }
 
 /// 记录列表 model 字段（025 `var procs []ProcInfo = []`）不在组件切片内。
@@ -248,7 +268,6 @@ fn p112_av_gap_float_cast_and_nil_compare_are_rejected_grammar() {
         &component_face(&root, &nil_cmp),
         &["source.syntax", "expected `fn`, found `store`"],
     );
-    let _ = std::fs::remove_dir_all(&root);
 }
 
 /// store handler 调后端 API（`use back.api`）无解析面——S1 宿主 API 面缺席
@@ -268,7 +287,6 @@ fn p112_av_gap_store_cannot_call_backend_api() {
         &component_face(&root, &src),
         &["no function named `ping` in this module"],
     );
-    let _ = std::fs::remove_dir_all(&root);
 }
 
 /// 局部字符串重赋值 `str`↔owned `Str` 类型不匹配；带计算初值的局部 `var` 不在
@@ -305,7 +323,6 @@ fn p112_av_gap_local_string_reassign_and_computed_var_initializers() {
             || diag.contains("source.type-mismatch"),
         "计算初值局部 var: 首阻断应为 profile 拒或 type-mismatch，实际: {diag}"
     );
-    let _ = std::fs::remove_dir_all(&root);
 }
 
 /// 记录字面量局部量（025 `filled.push(ProcInfo { pid: raw.pid, … })`）：同单元
@@ -325,7 +342,6 @@ fn p112_av_gap_record_literal_local_has_no_record_type() {
         &component_face(&root, &src),
         &["no record type named `Rec` in this module"],
     );
-    let _ = std::fs::remove_dir_all(&root);
 }
 
 // ── 缺口钉点（AGE 包编译）─────────────────────────────────────────────────
