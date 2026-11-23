@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-117
-status: executing
+status: execution_done
 feature_name: U05 Photo Gallery 与 Image Viewer 双端交付
 author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-23
 plan_revision: 1
-current_step: 1
+current_step: 4
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -79,15 +79,15 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 - [x] T-01 固定原项目、依赖与验收矩阵
   - work，AC-01，核 §1 现有源和 §6 原运行入口，输出逐行的源、权限、预期和实际阻断。
-- [ ] T-02 接通本计划的具体运行接口
+- [x] T-02 接通本计划的具体运行接口
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
-- [ ] T-03 实跑 AV/Iced
+- [x] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
 - [ ] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
 - [ ] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
-- [ ] T-06 实跑 A2Vue
+- [x] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
 - [ ] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
@@ -679,7 +679,39 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 兼容修复后复用 AutoLang `conformance` 既有回归。HTTP / 组件事件 `plan108_http_component` 13/13（20.510 s，执行 0.12 s），惰性数据写 `plan106_viewdata_writes` 3/3（11.779 s，执行 0.05 s），组件入口 `plan105_component_entries` 26/26（0.451 s，执行 0.17 s）。固定列表的真实 handler 执行仍通过。无新增测试。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 116 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `5aa9bcfbb` / auto-ui `003b97ec` | next: work 清理生产诊断代码，复核当前提交的原 029 Iced、Carousel 及两端剩余验收差额，再交 T-04 独立复核。
 
+### 2026-11-23 goal work round 117 — 原入口验收矩阵与复核准备
+
+- AutoLang `f26245cc4aa01b139c632b81eea9f045712cf584` 清理六个生产文件中的 21 处临时诊断，正常具名诊断、span 与产物逻辑保留。AutoUI `c041fb6c4eeda0ba3790c02546c28d2216575547` 把已复审的 prep 断言写入仓内测试，覆盖包导入、样式字面化和跨注释、转义字符串与嵌套记录的字段插入。原探索探针迁入 `scratch/r117-review-prep/`，文件 SHA256 为 T-01 `839DC7F58BB418F0DC2629ABD3FAAA518A142CFF92C2D045B12A5093B4AC8C7C`、T-02 `CBAA08AA89AA6DC61AE1330A7C8A541A88E6D83BC8821897E7A3BBD4C4D0CC05`。仓内回归可在暂存目录清理后运行。
+- 原输入和工具身份。029 `app.at` SHA256 `C2664FD087B174B4095B72B6918459BD70DFA070264310C96A2D1FAB7729F574`，031 `app.at` `D4F2340DA7C1222941D9B2E662EF3A0E01B554688EFF746DCC2B520991FC12BD`，AutoOS `cdb4883` 原 `carousel.at` `F43F17C29A83924ABC3061494E873F54140982BA828367A4A33F820CAE891BF1`。依赖仍为 AutoWeb `26d085f`、AutoDown `45b642d` 和 round 116 冻结的两项 AGE 语法身份。Auto CLI 二进制 SHA256 `EDDB2CCE50FD8AFE08CD26959C2FE52E090EB833B5C8B9A3F27538B28D947FCF`，受检生成器 `9581DCE437ADF7AB6F949E1FAB61E8201FAC0B36DDAAAA62A85790918F5682FF`，标准 Iced 窗口 `1FC11F87AA62B32002ECAB56757BE82C1FEA68E118662F48697D538E017A1E03`。本轮 Node 25.2.1、pnpm 11.6.0。
+- 029 Iced 使用本轮生产库、原项目入口和实跑原生照片代理。真窗回调选择原照片，320×240 解码，移走第二张隔离图片触发 OnError，切回真图后恢复，放回原字节后解码 64×48，返回网格及关闭通过。39.537 s、856 帧、零宿主错误、代理退出 0。收据 `gallery-iced.json` SHA256 `0589C018CF0C63C45CD6C165CBDEDC3D7B1B852D4B395C3833DBF2534E54364B`。
+- 029 Vue 使用本轮生产工具和冻结原项目，空生成目录 `auto build --render vue` 77.489 s，构建日志 SHA256 `9F697C916C9F958200851460E172E21966F5E57B2769CA4DDB1B2EE3DD938F77`。在 Chrome 与实时照片代理中用同一原图 URI 实测 200→404→200，浏览器先报图像错误，放回原字节后解码 64×48。收藏跨目录及后端进程重启后，原图与缩略图均返回 200。移开配置照片根时 scan 返回 `root_missing`，已记录的旧图 URI 返回 404。恢复根后校验越界 400、宽度 32 返回 32×24。浏览器及后端关闭，执行 2.686 s，退出 0。 `gallery-vue-browser.log` SHA256 `7EA1B1696A30B17017502B1E678202D0DC20ACEC689AF494910296412A112DBA`。
+- Carousel Iced 从原画廊侧栏打开目标页，实点 Basic、Sizes、Spacing 观察内容变化。Orientation 在轨道内部向上及向下拖动逐次推进和返回，横向误动作保持同一页。两次从靠近上沿开始的拖动未翻页。Options 在首尾双向循环，进 Card 再返回重置。146.620 s、7,107 帧、四个会话关闭、零运行时错误。原画廊首页仍给出已有的 `expected fn, found widget`，侧栏及 Carousel 路由可正常挂载。物理输入收据 `carousel-iced.json` SHA256 `0F6B8BE79D22741B53D054A73E05B6BCF5DA9788458DF2F5FBE0D99476DE4864`。
+- Carousel Vue 从冻结源码及对应 AutoDown engine 产物在空目录执行 `auto build --render vue`（199.079 s），正式 `vue-tsc` 和 Vite 通过。生成 `carousel.vue` SHA256 `532F99DF5A4E3347807294A226C28C8B30F36CC80D591887775BFD3388942952`，与 round 56 同字节。Chrome 8.557 s，五组滑项 3/6/4/4/5，按钮、拖动、键盘、尺寸断点、间距、循环、离页重进和关闭通过。控制台出现一条资源 404，目的页面的响应和脚本记录无失败。 `carousel-vue-browser.log` SHA256 `5F6D9EB5318EC0DB0B69A742881A8E738D6B6FEF07A2EEE09FA69D7292D939F9`。
+- 031 原格式夹具保留。控制发现原 `orientation-6.jpg` 与 `rgb-1x1.jpg` SHA256 均为 `FAC32FE541B57DE6AE72DB4C62269A7E6DC7AEE8A9E81321FF8E897C1714AB11`，均无 EXIF 标签。隔离目录另加 36×24 JPEG（EXIF 6，源左红右绿）作正控，SHA256 `C4DCDF83679C6876124C778E67344802D91A4B16329A79E28A961FC397D40460`。Iced 和 Chrome 均从原应用加载 JPEG/PNG/WebP 与原名 EXIF 夹具，原 Alpha PNG 的两个像素均观察到 255/64。EXIF 正控 Iced 512×768、Chrome 24×36，顶部红、底部绿，红/绿取样一致。Iced 放大后的 Alpha 保留部分透明边缘，首轮把重采样边缘与原始像素直接比较导致探针断言失败，随后以原始 2×1 画面核对精确 Alpha。Chrome 首轮把图片的 `blob:` URI 当网络路径断言失败，重放读取同次实际受检媒体 GET，并对已经解码的同一图像取样。
+- 031 最新真窗同批验证原 PNG 320×240、1.25 倍缩放、−40 px 平移、坏图终态与恢复、Escape 和关闭撤销。Iced 重放 12.063 s、417 帧、零错误、会话关闭。 `viewer-iced-formats.json` SHA256 `3EEE88FCAE43D0BF7DA48CEB1FEDE88D5538297E9322196D4335BFA26B17D8AE`。Vue 正式生成 32.211 s、生产构建 5.330 s，Chrome 通过原启动器重放 23.484 s，核验缩放和平移、裁切、坏图 422、注入一次 503 后恢复、越权路径拒绝和 Escape 后 404。 `viewer-vue-formats-retry.log` SHA256 `9DAACB8891111598675ED8F1458CC5D2367350E6F07641556602F133E32A42EB`。
+
+| 本轮定向门 | 实际结果 | 构建及执行时间 |
+|---|---|---|
+| Iced 正式窗口、三个外置观察程序、A2Vue 正式工具 | 命令均退出 0 | 118.063 s，外置链接 20.798 / 16.280 / 16.967 s，工具 100.111 s |
+| AutoUI runtime 八目标（prep、viewer backend、官方 viewport SFC、surface、媒体 parity、包 Widget、文件会话、ASE Todo） | 62/62 | 215.296 s，ui980 独立准备 0.178 s |
+| AutoUI `plan113_026_sqlite_bridge`、工具 `plan124_ace_vue_routes` | 1/1、3/3 | 9.004 / 53.545 s，分别实际执行 4.67 / 28.29 s |
+| AutoLang `plan108_http_component`、`plan981`、`plan106_viewdata_writes`、`plan105_component_entries` | 13/13、98/98、3/3、26/26 | 32.366 / 1.815 / 16.345 / 0.401 s，实际执行 0.09 / 1.34 / 0.05 / 0.15 s |
+
+工具各目标的原始计时见 `scratch/r117-review-prep/scoped-gates-time.txt`，SHA256 `852A18CA64D5F25B894787FB718DBE9834502298345A07FCC8A4FC5B6FA45493`。AutoUI 八目标执行分别为 10.09、0.00、0.40、4.21、58.46、1.57、0.00、3.74 s，原始 `ui-scoped.log` SHA256 `527FC007C2E84227A73535D6F11D7D3C3D2D2E2DC6B4B4EE5D0A2E1B21778C77`。发现和清理时间未单拆。
+
+| 常备回归 | 输入与判据 | Profile | 执行 |
+|---|---|---|---|
+| `plan117_t01_probe::preparation_keeps_package_imports_and_injects_fields_inside_the_model` | 检查 package import 与样式字面量，确认宿主字段位于最后作者字段之后和 model 闭括号之前 | Debug，`ace-bridge` | 通过，libtest 0.00 s。本用例依赖仓内原项目目录 |
+
+**提交复核的 Spec 增量。** AutoUI `docs/specs/ui/image-viewport.md` 和 `docs/specs/runtime/ace-package-widgets.md` 增补受检宿主的图片手势、错误、换代、视口变换与 Carousel 的轴向输入及挂载生命周期。AutoLang `docs/specs/ace-migration/m2-age.md`、`docs/specs/ace-migration/component-event-sessions.md` 记 AGE 语法档、受检子组件载荷、计时器和 JSON/HTTP 结果类型。AutoLang `docs/specs/auto-media-core/project.md` 记照片令牌的根与目录边界、已扫描快照跨进程恢复和授权目录会话的票据检查。复核按提交核实各条契约后再沉淀。
+
+- AC-01 的来源、原判据和依赖见 T-01 及本轮身份表。AC-02 的 AV 三行使用现行宿主和原输入，本轮补齐 029 Iced 和 Carousel 物理操作，并复验 031 格式与授权关闭。AC-03 的 Vue 三行使用现行正式生成、冷构建与真实浏览器，旧回合中的取消、URI 换代和失败反例由对应受检回归及本轮播放续证。附带复核 PLAN-113 SQLite 和 ASE Todo 兼容。当前提交可开始 T-04 AV 复核，T-05 交付、T-07 终审及 T-08 归档仍是后续门。
+- stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | base: AutoUI `848d883c18d43b1ebcf61b9cbf3f389d18c9cd43` / AutoLang `0486981556bd8d128c69ded9888319ac4a65fc02` | code_commit: AutoUI `c041fb6c4eeda0ba3790c02546c28d2216575547` / AutoLang `f26245cc4aa01b139c632b81eea9f045712cf584` | dependency_revisions: AutoOS `cdb4883` / AutoDown `45b642d` / AutoWeb `26d085f` | task_ids: T-02,T-03,T-06 | evidence: round 116–117 | blockers: none for review | next: review/T-04
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 117 | from: work | to: review | status: execution_done | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `c041fb6c` / AutoLang `f26245cc4` | next: review/T-04
+
 ## 10. 待澄清事项
+
+2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
 
