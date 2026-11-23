@@ -4,7 +4,7 @@ status: executing
 feature_name: U05 Photo Gallery 与 Image Viewer 双端交付
 author: [Codex]
 created_at: 2026-11-20
-updated_at: 2026-11-22
+updated_at: 2026-11-23
 plan_revision: 1
 current_step: 1
 total_steps: 8
@@ -263,6 +263,15 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 诊断对照中只改材料副本的 `loop` 键即让原页通过包解析，改 `align` 不通过。复用 PLAN-107 r1 交接分支的 `d414aec0e` 中 `loop` 键切片和 `9f4a65ad3` 的 `text | …` 扫描、投影、编解码及回归；保留当前工作树的其他语法。组件 `Carousel` 剩余失败由换行分隔的 `Next` / `Previous` 消息触发，材料副本只加逗号即通过，改字面样式不通过。使用既有的换行列表规则，保留逗号、载荷、尾逗号和同行无分隔拒绝。最终原页及组件文件逐字不改，包解析分别产出 1 个与 6 个组件（0.149 s）。日志 `scratch/r54-carousel-package.log` SHA256 `A1CF4D2DBA2E20A4EB004277CD6D07DF02731C37564D734BA3A295976D3791E1`。
 - `ace-core` conformance 最后准备 1.742 s。PLAN-107 属性、行内文本等 5/5（0.136 s），AGE 包身份冻结 1/1（0.042 s），新增换行消息 `p117_carousel_messages_accept_newline_or_comma` 1/1（0.073 s）。复用的 `p107_carousel_loop_is_a_view_property` 单跑 0.164 s；`ace-syntax-runtime` 编解码往返通过。组件模块 29/30（0.159 s），`p979_component_vdetail02_named_refusals_keep_original_spans` 的非文本叶诊断失配在本轮起点 `1495e443d` 独立重建（9.244 s）后同码同 span 再现（0.055 s，退出 101）；Scalar 冻结身份在导入 inline-text 前已红并前后相同。新 AGE 两面身份按工作树实测更新。
 - 原画廊的 Iced 路由、可见项、键盘/指针、循环、卸载与 A2Vue 浏览器验收仍待。PLAN-107 保留 Iced `f5ea801f` 和 Vue `6e8f8d89` 的可复用实现；两项补丁与本工作树渲染器重构存在冲突，下一步按现行渲染入口迁入并以原页回放，旧计划的运行收据不计作本次通过。029/031 仍按 §10 等待共享运行时写面裁定。
+
+### 2026-11-23 goal work round 55–57 — Carousel 原页双端运行回放
+
+- 接续 r1 的 T-02/T-03，保留五个原 Carousel 示例。AutoUI `3e3421f5` 复用 PLAN-107 的 Iced 控件与状态，`96faac40` 复用 Carousel 组件族的 Vue 降低并补齐脚手架依赖闭包。两项保留现行路由、布局和指针接线。AutoLang 固定 `a50d5f6fd`，AutoOS 原页与组件的哈希同 round 54，AutoDown `45b642d` 的 engine 离线构建成功。Debug 生产工具和 Iced 窗口编译完成（1m51s），`av/r56-product-build.log` SHA256 `ED9D2090AA4BDDC466EC1A3B8D814BDB713C278DF7A0C152D829468303593848`。
+- Iced 定向测试 `native_carousel_keeps_visible_slides_and_inputs_in_sync` 1/1，覆盖可见项、分组状态、拖拽、垂直键、错误轴、循环及断点。原画廊真窗中以实际视图回调驱动侧栏及五组按钮，`/carousel` 挂载为页面会话 2，五组各从 0 前进到 1 并退回 0，Options 单独从 0 循环到 4，外壳和页面会话关闭，共 20 帧（6.859 s，退出 0）。真窗此轮依靠回调回放，物理输入仍缺独立观察。脚本 `scratch/r57-carousel-window.rs`，日志 `scratch/r57-carousel-window-five.log` SHA256 `120EE2FD104C9F30EF3FEC2A71BB43AF85F8C1EDA65A5DBB42C40946B69EBFC0`。画廊首页原有的 `expected fn, found widget` 仍可见，Carousel 路由正常挂载。
+- 从原仓 `cdb4883` 重新提取画廊，在空生成目录以 `AUTO_UI_ACE_VUE=1`、本次 `AUTO_UI_TOOL_BIN` 和离线包缓存执行 `auto build --dir <original-gallery> --render vue`，生成 70 条路由，正式流程自动复制源 public 资源并通过 Vue 类型检查和 Vite 构建（84.961 s，退出 0）。先前对 `--gen-only` 目录直接运行 pnpm build 缺 `/icon.png`，用同仓原资源复测通过，最终冷构建使用正式命令。生成的 `carousel.vue` SHA256 `532F99DF5A4E3347807294A226C28C8B30F36CC80D591887775BFD3388942952`。完整终态 `scratch/r56-vue/auto-build-cold.log` SHA256 `8FC339131F6EC40EAA2CED37E1C281484CC4F26D612268C6890B533F2AEE4993`。
+- Chrome + Playwright 从冷构建产物的原侧栏进入 `#/carousel`，确认 Basic/Sizes/Spacing/Orientation/Options 分别 3/6/4/4/5 项，按钮、拖动、水平及垂直方向键、错误轴、尺寸断点、间距、Options 尾首循环、离页卸载及重进归位通过，浏览器关闭，无页面异常（6.404 s，退出 0）。控制台有一条浏览器资源 404，页面响应记录无失败。脚本 `scratch/r56-vue/browser-check/carousel.mjs`，日志 `scratch/r56-vue/browser-cold.log` SHA256 `D7D2C45F525DABC5F8A5248DB88DB95F5757C8397BDE548A0619A1CB474EBA8F`。
+- 包 SFC 回归 20/21（0.764 s，退出 101），Carousel 用例通过。唯一 chart 条件样式列表拒绝，同一原测试输入在 round 52 轮前及当前 parser 均重现相同 `source.age.view-list` code 与 span。组日志 `scratch/r57-package-sfc-group.log` SHA256 `82579040C84E5AFD2BEB5DAC815C8833D6784AAAA20627D1EAB96A97AF4421D2`，轮前对照 `scratch/r57-chart-base.log` SHA256 `6A44CEB486D228423E3C69B28394FC39B556CDC90289F7662FC8DF70EA3DA527`。
+- 029/031 待完成项见 §10。完整 AV 阶段尚不能送独立复审，未落主代码或交接收据。恢复点 `work / T-02–T-03`。
 
 ## 10. 待澄清事项
 
