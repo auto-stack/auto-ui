@@ -523,6 +523,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 非法初始 fit 的对照 SFC 可以生成和构建。Chrome 负例两次导航超时（22.891 s、45.991 s，退出 1），未获得浏览器终态。独立执行同一生成的 setup，正常配置返回组件（0.555 s），非法配置触发 `ace.widget.init: outbound events require a mounted parent`（0.170 s），定位到初始化时上报 `invalid_view` 的宿主限制。`setup-invalid.log` SHA256 `2F7AB263EB0E4EB11BF3EB692F68E523AF5D8B3FA92FC3844BDB2B04B3A0BF7E`，`browser-invalid-r3.log` SHA256 `57E4D497500B48517DF28004497FE000560A12B2BF277D2D703262DBAC85E972`。同 URI 换版本重新读取、029 的受检文本及 HTTP/JSON、031 的带授权后端和两个原项目浏览器验收仍需交付。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 98 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `cbbc6bec` | next: work/T-06 核对初始化事件投递与版本化重读，继续原项目准入；T-02–T-03 仍含 031 授权媒体绑定。
 
+### 2026-11-23 goal work round 99 — 正式 ImageViewport 同 URI 换版重读
+
+- 直接导入原 ImageViewport 的生产 checked SFC 使用带缓存响应的回环夹具。基线在同 URL 从 `rev-1` 更新到 `rev-2` 后，上报新版本 loaded，Chrome 仍解码旧图 64×48，请求日志只有一次 `/marked.png`（生成 2.120 s，Vite 构建 6.704 s，Chrome 1.205 s，均退出 0，浏览器用例核对预期复现）。
+- AutoUI `eab845c3` 将既有 Vue 图片重验证指令的 JavaScript/TypeScript 发射收拢到同一实现。受检 `image_surface` 使用 VNode 挂载、更新和卸载回调，沿原 URI 重新读取有版本的图片。保留 URI 与版本都未变时的加载状态。旧版生成器的 TypeScript 指令与基线 2,116 字节逐字相同。
+- 以最终受检生产库和真实 Chrome 验证同 URL 重读得到 320×240，普通受控缩放保持同一对象 URL 且无额外请求。404 正确回传，过期或卸载的两次慢读取均在服务端观察到取消，三条旧对象 URL 均无法再读取，迟到响应未覆盖错误状态，浏览器和回环服务关闭。受检库准备 80.207 s，生成工具链接 10.804 s，测试 SFC 生成 1.865 s，Vite 构建 3.249 s，最终 Chrome 用例执行 1.331 s，均退出 0。日志 `scratch/r99-versioned-image/browser-before.log` SHA256 `81153B97E816CC519B9271706C49AFA874BABE35589607016973B3C3F38DC3BA`，`browser-final.log` SHA256 `1A1EED27F77CA4F64355ECA7CF9C8799A18D70866D2B4ACCED23891A9774195C`。
+- 正式组件的导航、缩放、拖动、复位、换图、坏图和卸载回归仍通过（SFC 生成 1.862 s，Vite 构建 1.613 s，Chrome 执行 1.226 s）。永久生成用例 `checked_vue_embeds_official_image_viewport` 1/1 通过（链接 10.871 s，执行 1.777 s）。`gesture-browser.log` SHA256 `0E574F23E79454103D32D4A09B02C6FF5E77FBB83C683CA3CAEC92C8D5B72E29`，`viewport-regression.log` SHA256 `BB104A8CC40412B3325E2DAC06A82D73867CAF20F2E608807B39CA3DA9261B47`，`emitter-compat.log` SHA256 `32CC8AFC950D7EAA9B8F1F90CC569AE05C75FF8F0BF0B39C8B06DBB9E84A8F84`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 99 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `eab845c3` | next: work/T-06 核对初始化错误投递及原项目准入；T-02–T-03 仍含 031 授权媒体绑定。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
