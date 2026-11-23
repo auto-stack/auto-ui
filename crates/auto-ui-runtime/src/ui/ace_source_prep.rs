@@ -912,6 +912,14 @@ pub fn prepare_component_source(
     if package_face_target {
         out = rewrite_str_surface_for_package(&out);
     }
+    // PLAN-118：canvas 场景合成名归一——`scene: .cells`（cells 非 model 字段，
+    // 五平行列表 `<名>_pts/_meta/_nodes/_edges/_labels` 是）改写成串 prop
+    // `scene: "cells"`：包面视图条目值不再按 self 字段解析（具名拒消失），
+    // 场景名串 prop 直达宿主（G6 按名读列表）与 A2Vue 道。
+    if package_face_target {
+        out = rewrite_canvas_scene_bindings(&out);
+    }
+
     Ok(PreparedComponentSource {
         source: out,
         inlined,
@@ -1787,6 +1795,76 @@ fn rewrite_model_text_fields(src: &str) -> String {
     }
     out
 }
+/// PLAN-118：`scene: .<名>` → `scene: "<名>"`（仅当 `<名>` 非 model 字段而
+/// `<名>_nodes` 是——canvas 五平行列表合成名约定）。字段名集取 model 块
+/// `var <名>` 行（含注入的 `.__st_` 字段）；view 行内逐处替换 `scene: .<ident>`。
+fn rewrite_canvas_scene_bindings(src: &str) -> String {
+    let mut fields: Vec<String> = Vec::new();
+    let mut in_model = false;
+    let mut depth = 0i32;
+    for line in src.lines() {
+        let t = line.trim_start();
+        if !in_model && t.starts_with("model") && t.contains('{') {
+            in_model = true;
+            depth = 1;
+        } else if in_model {
+            let opens = line.matches('{').count() as i32;
+            let closes = line.matches('}').count() as i32;
+            if depth == 1 && opens == 0 && closes == 0 {
+                if let Some(rest) = t.strip_prefix("var ") {
+                    let name: String = rest
+                        .chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_')
+                        .collect();
+                    if !name.is_empty() {
+                        fields.push(name);
+                    }
+                }
+            }
+            depth += opens - closes;
+            if depth <= 0 {
+                in_model = false;
+            }
+        }
+    }
+    let mut out = String::with_capacity(src.len());
+    for line in src.split_inclusive('\n') {
+        let t = line.trim_start();
+        if t.starts_with("//") {
+            out.push_str(line);
+            continue;
+        }
+        let mut body = line.to_string();
+        // 逐处 `scene: .<ident>`（ident 边界到非标识符字符）；游标前移，跳过
+        // 不改写处也继续扫行内后续命中。
+        let mut cursor = 0usize;
+        while let Some(rel) = body[cursor..].find("scene: .") {
+            let pos = cursor + rel;
+            let start = pos + "scene: .".len();
+            let name: String = body[start..]
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            if name.is_empty() {
+                cursor = start;
+                continue;
+            }
+            let is_field = fields.iter().any(|f| f == &name);
+            let has_group = fields.iter().any(|f| f == &format!("{name}_nodes"));
+            if !is_field && has_group {
+                let end = start + name.len();
+                body.replace_range(pos..end, &format!("scene: \"{name}\""));
+                // `scene: "<name>"` = 8 + name.len() + 1 字节。
+                cursor = pos + 8 + name.len() + 1;
+            } else {
+                cursor = start + name.len();
+            }
+        }
+        out.push_str(&body);
+    }
+    out
+}
+
 /// PLAN-118：包面目标的 str→Str 注解归一——fn 形参（`x str`）、fn 返回
 /// （`) str {`）、以及 model 块之外的 `var <name> str` 局部（model 块已由
 /// rewrite_model_text_fields 覆盖，重复无害）。跳过注释行；字符串字面量内
