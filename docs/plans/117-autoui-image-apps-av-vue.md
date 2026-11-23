@@ -1025,6 +1025,30 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: language first run exit 1, one Windows lock replay queued, UI preparation active | evidence: round 136 | next: 收齐 AutoUI 和 Native 定向复放，再判定阶段门
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 136 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 核查 AutoUI 阶段结果和同归档准备锁复放
 
+### 2026-11-24 goal merge round 137 — AutoUI 阶段终态及 Native 复放环境校正
+
+- AutoUI `8894c9ef`、AutoLang `30780612c` 的 11 个目标都完成，87 条实跑、86 通过、1 失败、零跳过。Debug runtime/tools 准备 107.161/58.066 s，provider 显式准备 0.618 s，均退出 0。11 目标执行外层之和 93.136 s，驱动外层 262.045 s、退出 1，发现和清理未单计。`scratch/r123-phase-gate/r134-reviewed-phase-gate/ui-gate/results.json` SHA256 `7D5730889DF1D83E2502DD0160F165BDAF59D3D9746B6BB47807CD4312AAAD97`。
+
+| AutoUI 目标 | 通过/实跑 | 执行外层 s |
+|---|---|---:|
+| `plan117_t01_probe` | 1/1 | 0.181 |
+| `plan117_viewer_backend` | 4/4 | 4.258 |
+| `plan117_image_viewport_sfc` | 1/1 | 1.720 |
+| `image_surface_contract` | 1/1 | 0.589 |
+| `image_pipeline_parity` | 1/1 | 0.141 |
+| `plan114_widget_packages` | 50/50 | 54.317 |
+| `plan114_file_session` | 3/3 | 4.046 |
+| `ase_native_todo` | 1/1 | 8.978 |
+| `plan980_package_sfc` | 20/21 | 4.934 |
+| `plan113_026_sqlite_bridge` | 1/1 | 4.675 |
+| `plan124_ace_vue_routes` | 3/3 | 9.297 |
+
+- 唯一失败 `p107_package_sfc_scopes_chart_css_and_binds_class_branches` 的 `source.age.view-list: a literal view property list requires homogeneous text (or integer) values` 与 round 126 同用例的原始日志逐字相符，保留其失败计数。原 026 SQLite 真窗及 `plan980_package_sfc` 的真实浏览器计数、条件分支均通过。
+- Native 原归档串行选中 1 条，经等待 305.517 s，外层 0.950 s、nextest 退出 100。首轮 `os error 5` 未重现，此次在同一用例前置报 `PREPARATION_REQUIRED: missing or stale runtime-dev runtime`，尚未得到产品断言。原 `native-lock-replay/result.json` SHA256 `3E7AF8C5A300C82EB1A9ECB6CFDE515C5EE558AB7395422BDA3E7825949C7248`。原 `cargo t` 准备和执行继承 Rustup 环境，直接运行 `cargo-nextest` 的会话未设置 `RUSTUP_TOOLCHAIN`。补齐当前 `stable-x86_64-pc-windows-msvc` 后先以 `run-debug` 核实原准备件能直接读取，再精确复放同归档。测试继续禁用按需构建。更新脚本 `replay-native-prep-lock.ps1` SHA256 `03E0557E6A7EF6222506D312E4443D43A971E8ED4F8FA2B405F8D46987685A1F`。首轮失败照录，01:02:20 启动复放控制器 `220636`，等待 PLAN-1129 当前固定组进程 `1287640`。
+
+- stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: AutoUI complete with recorded Chart failure, Native runtime-bound replay queued | evidence: round 137 | next: 核查同归档复放并确定阶段门归因
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 137 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 读取 Native 前置及复放结果，准备 W1 落主材料
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
