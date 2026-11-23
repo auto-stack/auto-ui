@@ -2,6 +2,8 @@
 // CRUD endpoints for the TodoMVC app.
 // In rust merged mode these are in-process direct calls (not HTTP).
 
+use db
+
 // ═══════════════════════════════════════════════════════════
 // Types (shared between frontend and backend)
 // ═══════════════════════════════════════════════════════════
@@ -16,8 +18,6 @@ pub type Todo = {
 // ═══════════════════════════════════════════════════════════
 // API Endpoints
 // ═══════════════════════════════════════════════════════════
-
-use db
 
 /// List all todos
 /// GET /api/todos

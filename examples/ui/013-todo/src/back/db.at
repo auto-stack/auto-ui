@@ -11,7 +11,7 @@ var todos List<Todo> = List<Todo>.new([
     Todo { id: 0, text: "Learn Auto Language", done: true },
     Todo { id: 1, text: "Build a TodoMVC app", done: false },
     Todo { id: 2, text: "Master the a2r transpiler", done: false },
-    Todo { id: 3, text: "Write integration tests", done: false },
+    Todo { id: 3, text: "Write integration tests", done: false }
 ])
 
 var nextid int = 4
@@ -29,25 +29,26 @@ pub fn all_todos() []Todo {
 pub fn create_todo(text str) Todo {
     let todo = Todo { id: nextid, text: text, done: false }
     nextid = nextid + 1
-    todos.push(todo)
+    todos.push(Todo { id: todo.id, text: todo.text.clone(), done: todo.done })
     return todo
 }
 
 /// Update a todo's text and done status, returns the updated todo
 pub fn update_todo(id int, text str, done bool) ?Todo {
-    var new_todos List<Todo> = List<Todo>.new([])
+    var new_todos = List<Todo>.new()
     var found ?Todo = None
-    for todo in todos {
+    let current = all_todos()
+    for todo in current {
         if todo.id == id {
             let updated = Todo {
                 id: todo.id,
                 text: text,
-                done: done,
+                done: done
             }
-            new_todos.push(updated)
+            new_todos.push(Todo { id: updated.id, text: updated.text.clone(), done: updated.done })
             found = Some(updated)
         } else {
-            new_todos.push(todo)
+            new_todos.push(Todo { id: todo.id, text: todo.text.clone(), done: todo.done })
         }
     }
     todos = new_todos
@@ -56,11 +57,12 @@ pub fn update_todo(id int, text str, done bool) ?Todo {
 
 /// Delete a todo by id, returns true if deleted
 pub fn delete_todo(id int) bool {
-    var new_todos List<Todo> = List<Todo>.new([])
+    var new_todos = List<Todo>.new()
     var found bool = false
-    for todo in todos {
+    let current = all_todos()
+    for todo in current {
         if todo.id != id {
-            new_todos.push(todo)
+            new_todos.push(Todo { id: todo.id, text: todo.text.clone(), done: todo.done })
         } else {
             found = true
         }
@@ -71,10 +73,11 @@ pub fn delete_todo(id int) bool {
 
 /// Remove all completed todos, returns true
 pub fn remove_completed(done bool) bool {
-    var new_todos List<Todo> = List<Todo>.new([])
-    for todo in todos {
+    var new_todos = List<Todo>.new()
+    let current = all_todos()
+    for todo in current {
         if !todo.done {
-            new_todos.push(todo)
+            new_todos.push(Todo { id: todo.id, text: todo.text.clone(), done: todo.done })
         }
     }
     todos = new_todos
