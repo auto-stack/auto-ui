@@ -131,16 +131,42 @@ fn p112_lane_widgets_bind_the_store_surface() {
     assert!(app.contains("@click=\"Pause\">⏸</button>") && app.contains("@click=\"Play\">▶</button>"));
     assert!(app.contains("<ProcessesView ") && app.contains("<PerformanceView "));
 
+    // 表格族：Plain（lane）模式落原生表格元素——原 smoke 的 `table tbody tr` 选择器成立。
     let processes = sfc("ProcessesView");
-    assert!(processes.contains("v-for=\"p in store.procsView\""), "process rows");
-    assert!(processes.contains("@contextmenu.prevent=\"RowCtx(p.pid)\""), "row context menu");
-    assert!(processes.contains("@click=\"ConfirmKill\""), "confirm action");
-    assert!(processes.contains("@click=\"CancelKill\""), "cancel action");
-    assert!(processes.contains("@click=\"SortMem\""), "column sort");
+    for needle in [
+        "<table class=\"w-full border-collapse\">",
+        "<thead>",
+        "<tbody>",
+        "<th class=\"text-right text-xs text-muted-foreground font-medium px-2 py-1.5 cursor-pointer select-none tabular-nums\" @click=\"SortMem\">",
+        "<td class=\"text-xs font-medium px-2 py-1 truncate max-w-[140px]\">{{ p.name }}</td>",
+        "@contextmenu.prevent=\"RowCtx(p.pid)\"",
+    ] {
+        assert!(processes.contains(needle), "ProcessesView lacks `{needle}`");
+    }
+    let row_at = processes.find("v-for=\"p in store.procsView\"").expect("row v-for");
+    let row_open = processes[..row_at].rfind('<').expect("row open tag");
     assert!(
-        processes.contains("(PID {{ store.kill_target }})"),
-        "confirmation names the target pid"
+        processes[row_open..].starts_with("<tr "),
+        "process rows must be native <tr>: {}",
+        &processes[row_open..row_open + 40]
     );
+    assert!(!processes.contains("<div :open="), "dialog `open` must not leak onto a div");
+
+    // alert-dialog 族：原生模态（v-if 门控的遮罩 + 关闭语义 + 面板/标题/按钮语义）。
+    for needle in [
+        "<div v-if=\"store.kill_dialog_open\" role=\"alertdialog\" aria-modal=\"true\" class=\"fixed inset-0 z-50 flex items-center justify-center bg-black/80\" @click.self=\"store.kill_dialog_open = false\">",
+        "class=\"bg-background text-foreground rounded-lg border shadow-lg p-6 w-full max-w-lg\"",
+        "<h2 class=\"text-lg font-semibold\">结束任务</h2>",
+        "<p class=\"text-sm text-muted-foreground\">确定结束 {{ store.kill_target_name }} (PID {{ store.kill_target }})",
+        "<button class=\"inline-flex items-center justify-center rounded-md border bg-background px-4 py-2 text-sm font-medium\" @click=\"($event) => { store.kill_dialog_open = false; return CancelKill() }\">",
+        "<button class=\"inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium\" @click=\"($event) => { store.kill_dialog_open = false; return ConfirmKill() }\">",
+    ] {
+        assert!(processes.contains(needle), "ProcessesView lacks `{needle}`");
+    }
+    // 按钮标签 = 位置参数文本（`alert-dialog-cancel "取消"`）——浏览器档靠 role+name 定位，
+    // 空按钮会让「取消」不可达。
+    assert_eq!(button_label(&processes, "($event) => { store.kill_dialog_open = false; return CancelKill() }"), "取消");
+    assert_eq!(button_label(&processes, "($event) => { store.kill_dialog_open = false; return ConfirmKill() }"), "结束进程");
 
     let performance = sfc("PerformanceView");
     assert!(performance.contains("CPU 使用率实时曲线"), "performance tab (smoke T4)");
@@ -148,6 +174,109 @@ fn p112_lane_widgets_bind_the_store_surface() {
         performance.contains("<path :d=\"store.cpuLine\"") && performance.contains("<path :d=\"store.cpuArea\""),
         "live SVG curve bound to store geometry"
     );
+}
+
+/// 以 `@click="<click>"` 定位按钮，取其开标签之后、`</button>` 之前的可见文本。
+fn button_label(sfc: &str, click: &str) -> String {
+    let at = sfc
+        .find(&format!("@click=\"{click}\""))
+        .unwrap_or_else(|| panic!("no button with `{click}`"));
+    let rest = &sfc[at..];
+    let end = rest.find("</button>").expect("button close");
+    rest[..end]
+        .rsplit('>')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+/// 用给定模式的生成器直接产单个 widget 的 SFC（对照 Plain 与 shadcn 两种模式）。
+fn widget_sfc(src: &str, shadcn: bool) -> String {
+    use auto_ui_dialect::UiStmt;
+    let session = auto_parser_api::session::CompilerSession::ui();
+    let mut parser = auto_lang_core::parser::Parser::from(src).with_session(session);
+    let ast = parser
+        .parse_domain(&auto_ui_dialect::UiDialect)
+        .map(auto_ui_dialect::UiCode)
+        .expect("parse");
+    let decl = ast
+        .domain_stmts()
+        .find_map(|s| match s {
+            UiStmt::WidgetDecl(d) => Some(d),
+            _ => None,
+        })
+        .expect("widget decl");
+    let widget = auto_ui_compiler::aura::extract_widget_from_decl(decl).expect("extract widget");
+    let mut gen = if shadcn {
+        auto_ui_compiler::ui_gen::VueGenerator::new_shadcn()
+    } else {
+        auto_ui_compiler::ui_gen::VueGenerator::new()
+    };
+    gen.generate_sfc(&widget).expect("sfc")
+}
+
+const TABLE_AND_DIALOG: &str = r#"
+widget W {
+    model {
+        var open bool = false
+        var name str = "x"
+    }
+    msg { Go, Stop }
+    view {
+        table {
+            table-header {
+                table-row {
+                    table-head (onclick: .Go) { text .name {} }
+                }
+            }
+            table-body {
+                table-row (key: .name) {
+                    table-cell (text: .name) {}
+                }
+            }
+        }
+        alert-dialog (open: .open) {
+            alert-dialog-content {
+                alert-dialog-header {
+                    alert-dialog-title "T" {}
+                    alert-dialog-description "D" {}
+                }
+                alert-dialog-footer {
+                    alert-dialog-cancel "取消" { onclick: .Stop }
+                    alert-dialog-action "结束" { onclick: .Go }
+                }
+            }
+        }
+    }
+    on {
+        .Go -> { .open = true }
+        .Stop -> { .open = false }
+    }
+}
+"#;
+
+/// 共享生成器语义变更的对照面（Plain ↔ shadcn）：同一份源，Plain 落原生表格 +
+/// 原生模态，shadcn 仍走 `TableRow`/`TableCell`/`AlertDialog*` 组件——新映射只在
+/// Plain 生效，产品默认（shadcn）道逐字不变。
+#[test]
+fn p112_generator_plain_native_table_and_modal_leave_shadcn_mode_untouched() {
+    let plain = widget_sfc(TABLE_AND_DIALOG, false);
+    for needle in ["<thead>", "<tbody>", "<th ", "<tr ", "<td"] {
+        assert!(plain.contains(needle), "plain: `{needle}` missing:\n{}", &plain[..plain.len().min(600)]);
+    }
+    assert!(plain.contains("v-if=\"open\" role=\"alertdialog\""), "plain modal is v-if gated");
+    assert!(plain.contains("@click=\"($event) => { open = false; return Stop() }\""), "cancel closes + explicit handler call");
+    assert!(plain.contains("@click=\"($event) => { open = false; return Go() }\""), "action closes + explicit handler call");
+    assert_eq!(button_label(&plain, "($event) => { open = false; return Stop() }"), "取消", "cancel keeps its label");
+    assert_eq!(button_label(&plain, "($event) => { open = false; return Go() }"), "结束", "action keeps its label");
+    assert!(plain.contains(">T</h2>") && plain.contains(">D</p>"), "title/description keep their labels");
+
+    let shadcn = widget_sfc(TABLE_AND_DIALOG, true);
+    for needle in ["<TableRow", "<TableHead", "<TableCell", "<AlertDialog", "<AlertDialogCancel", "<AlertDialogAction"] {
+        assert!(shadcn.contains(needle), "shadcn: `{needle}` missing:\n{}", &shadcn[..shadcn.len().min(600)]);
+    }
+    assert!(!shadcn.contains("role=\"alertdialog\""), "shadcn arm untouched by the native modal");
 }
 
 /// 合成正例：同文件 helper（PLAN-116 形态）与 `use back.api` 并存——两者都

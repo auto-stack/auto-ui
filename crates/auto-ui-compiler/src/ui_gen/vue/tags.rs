@@ -192,6 +192,16 @@ impl VueGenerator {
             "tr" | "Tr" => "tr".to_string(),
             "th" | "Th" => "th".to_string(),
             "td" | "Td" => "td".to_string(),
+            // PLAN-112 T-02：AutoUI 表格族组件名在 Plain 模式（lane 产品道 /
+            // `shadcn: off`）落原生表格元素。shadcn 模式经上面的
+            // `shadcn_component_name` 走 `<TableRow>`/`<TableCell>`…；Plain 此前
+            // 无臂，恒坍缩为 div——行不成行、单元格竖排。只收 kebab 组件名：
+            // PascalCase（用户自定义组件）仍走下方的组件引用臂。
+            "table-header" => "thead".to_string(),
+            "table-body" => "tbody".to_string(),
+            "table-row" => "tr".to_string(),
+            "table-head" => "th".to_string(),
+            "table-cell" => "td".to_string(),
             "tree" | "Tree" => "ul".to_string(),
             "tree_item" | "tree-item" | "TreeItem" => "li".to_string(),
 
@@ -202,6 +212,14 @@ impl VueGenerator {
             // Overlay
             "modal" | "Modal" => "div".to_string(),
             "tooltip" | "Tooltip" => "span".to_string(),
+            // PLAN-112 T-02：alert-dialog 族在 Plain 模式的原生语义标签
+            // （根的模态臂见 template_media；面板/头部/脚部的默认类见
+            // extract_classes）。
+            "alert-dialog" | "alert-dialog-content" | "alert-dialog-header"
+            | "alert-dialog-footer" => "div".to_string(),
+            "alert-dialog-title" => "h2".to_string(),
+            "alert-dialog-description" => "p".to_string(),
+            "alert-dialog-cancel" | "alert-dialog-action" => "button".to_string(),
 
             // Form
             "slider" | "Slider" => "input".to_string(),

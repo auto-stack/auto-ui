@@ -644,6 +644,11 @@ pub struct VueGenerator {
     /// 子树内 `text` 据此直通为 SVG `<text>`(子树外仍 DSL text→span)。
     in_svg_subtree: bool,
 
+    /// PLAN-112 T-02：Plain 模式 `alert-dialog` 原生模态臂的 open 表达式栈
+    /// （根臂进入时压入、退出时弹出）——模态内的 `alert-dialog-cancel` /
+    /// `alert-dialog-action` 按钮臂据此追加「关闭」语义。shadcn 模式恒空。
+    native_modal_open: Vec<String>,
+
     /// True when `current_loop_var` is the loop INDEX variable
     /// (`for i, note in .notes` → current_loop_var = "i", an int).
     /// Index vars are primitive ints, so the auto-:key must not emit `i?.id`.
@@ -1021,6 +1026,7 @@ impl VueGenerator {
             current_loop_var: None,
             current_loop_var_is_index: false,
             in_svg_subtree: false,
+            native_modal_open: Vec::new(),
             widget_key_counter: 0,
             mention_helper_needed: false,
             loop_param_handlers: HashMap::new(),

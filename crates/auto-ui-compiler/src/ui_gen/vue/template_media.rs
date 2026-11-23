@@ -2472,6 +2472,99 @@ onMounted(() => {{ nextTick(__canvasRedraw_{i}) }})
                     return Ok(out);
                 }
 
+                // PLAN-112 T-02：Plain 模式 `alert-dialog` 的原生模态臂。
+                // shadcn 模式经 map_tag 走 <AlertDialog v-model:open>（不变）；
+                // Plain（lane 产品道 / `shadcn: off`）此前无臂——`:open` 落在一个
+                // 常显的 div 上，对话框永驻文档流且不成模态。自绘 overlay：
+                // v-if 门控（open 关即卸载）+ 遮罩点击关闭；取消/确认按钮由
+                // 下方的按钮臂追加关闭语义。只认带 `open` 的根，无 `open`
+                // 的嵌套形态原样走通用臂。
+                if !self.is_shadcn() && tag == "alert-dialog" && props.contains_key("open") {
+                    let open_expr = props.get("open").and_then(|v| match v {
+                        AuraPropValue::Expr(expr) => self.expr_to_vue_bound_value(expr).ok(),
+                        _ => None,
+                    });
+                    if let Some(open) = open_expr {
+                        let mut out = format!(
+                            "{ind}<div v-if=\"{open}\" role=\"alertdialog\" aria-modal=\"true\" class=\"fixed inset-0 z-50 flex items-center justify-center bg-black/80\" @click.self=\"{open} = false\">\n"
+                        );
+                        // 栈在子树发射期间持有 open 表达式；Err 路径也必须弹出。
+                        self.native_modal_open.push(open);
+                        let mut inner = String::new();
+                        let mut failed: GenResult<()> = Ok(());
+                        for child in children {
+                            match self.node_to_html(child, indent + 1) {
+                                Ok(html) => inner.push_str(&html),
+                                Err(e) => {
+                                    failed = Err(e);
+                                    break;
+                                }
+                            }
+                        }
+                        self.native_modal_open.pop();
+                        failed?;
+                        out.push_str(&inner);
+                        out.push_str(&format!("{ind}</div>\n"));
+                        return Ok(out);
+                    }
+                }
+
+                // PLAN-112 T-02：原生模态内的取消/确认按钮（Plain 模式）。通用臂
+                // 发的是 `<button class="…" @click="handler">`；这里追加关闭语义
+                // `@click="OPEN = false; handler"`（无 handler 时只关闭），与
+                // shadcn-vue AlertDialog 的 cancel/action 自动关闭一致。shadcn
+                // 模式、或不在原生模态内（栈空）时不生效。
+                if !self.is_shadcn()
+                    && matches!(tag.as_str(), "alert-dialog-cancel" | "alert-dialog-action")
+                    && !self.native_modal_open.is_empty()
+                {
+                    let open = self.native_modal_open.last().cloned().unwrap_or_default();
+                    let (static_classes, dynamic_class, _) = self.extract_classes(tag, props);
+                    let mut attrs = Vec::new();
+                    if !static_classes.trim().is_empty() {
+                        attrs.push(format!("class=\"{}\"", static_classes.trim()));
+                    }
+                    if let Some(bound) = dynamic_class {
+                        attrs.push(format!(":class=\"{}\"", bound));
+                    }
+                    // 复合内联语句里的 handler 必须是**显式调用**：Vue 只把「纯方法
+                    // 引用」当方法处理器，多语句体内末尾的裸函数名不会被调用
+                    // （PLAN-112 浏览器档实证：对话框关了、后端请求没发）。
+                    let click = match events.get("onclick") {
+                        Some(ev) => {
+                            self.used_handlers
+                                .insert(self.handler_to_function_call(&ev.handler));
+                            let call =
+                                self.handler_to_function_call_with_params(&ev.handler, &ev.params);
+                            let call = if call.contains('(') {
+                                call
+                            } else {
+                                format!("{call}()")
+                            };
+                            // 箭头函数表达式：Vue 按函数处理器对待，其返回值（async
+                            // handler 的 promise）交还给 Vue——与纯方法处理器同一条错误
+                            // 路由（否则拒绝成为未处理拒绝）。内联语句里既不能用 `return`
+                            //（Vue 先按表达式解析），裸函数名又不会被调用。
+                            format!("($event) => {{ {open} = false; return {call} }}")
+                        }
+                        None => format!("{open} = false"),
+                    };
+                    attrs.push(format!("@click=\"{click}\""));
+                    let mut out = format!("{ind}<button {}>\n", attrs.join(" "));
+                    // 位置参数文本（`alert-dialog-cancel "取消"`）在 props 的 "text" 键
+                    // 下——与通用臂同一条消费语义；漏掉它按钮就是空的。
+                    if let Some(value) = props.get("text") {
+                        if let Ok(text) = self.prop_to_text_content(value) {
+                            out.push_str(&text);
+                        }
+                    }
+                    for child in children {
+                        out.push_str(&self.node_to_html(child, indent + 1)?);
+                    }
+                    out.push_str(&format!("{ind}</button>\n"));
+                    return Ok(out);
+                }
+
                 // PLAN-618-1 (P618-1): Plan 422 坐标锚 popover 的 vue 臂重写。
                 // 旧臂发 `<Popover v-model:open>`——shadcn-vue 的 PopoverRoot
                 // 是无条件渲染 slot 的 provider,弹层内容因此常显内联堆叠在

@@ -217,6 +217,18 @@ impl VueGenerator {
 
                 // Overlay
                 "modal" => classes.push("fixed inset-0 bg-black/80 flex items-center justify-center".to_string()),
+                // PLAN-112 T-02：alert-dialog 族的原生模态（Plain 模式）。根
+                // `alert-dialog` 的遮罩由 template_media 的模态臂自绘；这里是
+                // 内容面板与内部件的默认类（观感对齐 shadcn-vue AlertDialog）。
+                // shadcn 模式下这些标签命中 shadcn 组件，skip_defaults 已跳过。
+                // 键是 schema 规范名（snake_case，`normalize_tag` 的产物）。
+                "alert_dialog_content" => classes.push("bg-background text-foreground rounded-lg border shadow-lg p-6 w-full max-w-lg".to_string()),
+                "alert_dialog_header" => classes.push("flex flex-col gap-1.5".to_string()),
+                "alert_dialog_footer" => classes.push("flex flex-row justify-end gap-2".to_string()),
+                "alert_dialog_title" => classes.push("text-lg font-semibold".to_string()),
+                "alert_dialog_description" => classes.push("text-sm text-muted-foreground".to_string()),
+                "alert_dialog_cancel" => classes.push("inline-flex items-center justify-center rounded-md border bg-background px-4 py-2 text-sm font-medium".to_string()),
+                "alert_dialog_action" => classes.push("inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium".to_string()),
 
                 // Form
                 "slider" => classes.push("w-full".to_string()),
