@@ -531,6 +531,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 正式组件的导航、缩放、拖动、复位、换图、坏图和卸载回归仍通过（SFC 生成 1.862 s，Vite 构建 1.613 s，Chrome 执行 1.226 s）。永久生成用例 `checked_vue_embeds_official_image_viewport` 1/1 通过（链接 10.871 s，执行 1.777 s）。`gesture-browser.log` SHA256 `0E574F23E79454103D32D4A09B02C6FF5E77FBB83C683CA3CAEC92C8D5B72E29`，`viewport-regression.log` SHA256 `BB104A8CC40412B3325E2DAC06A82D73867CAF20F2E608807B39CA3DA9261B47`，`emitter-compat.log` SHA256 `32CC8AFC950D7EAA9B8F1F90CC569AE05C75FF8F0BF0B39C8B06DBB9E84A8F84`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 99 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `eab845c3` | next: work/T-06 核对初始化错误投递及原项目准入；T-02–T-03 仍含 031 授权媒体绑定。
 
+2026-11-23 T-06 续（round 100）：正式 ImageViewport 的初始化错误回传与配置恢复。
+
+- 以两处导入原 ImageViewport 的受检生产 SFC 对照验证。`eab845c3` 的 Chrome 基线复现 `ace.widget.init: outbound events require a mounted parent`，父组件的错误回执 DOM 未创建，图片请求为零。生成 2.103 s，Vite 构建 2.298 s，Chrome 复现 0.920 s，均退出 0（用例断言旧版错误）。`scratch/r100-init-events/baseline-chrome.log` SHA256 `96746A25739DE57B936E044FB8DB441B0C9220ACA0DE821069591A1E82F8D2B1`。
+- AutoUI `77fbdc87` 在受检 Vue 提交视图后通过现有类型校验和消息事务批量投递 `Init` 的父组件回调。按实例路径与输入保留待送事件，卸载实例丢弃该事件。一批消息及其跨重绘的初始化级联共享现有的 4,096 次转移上限。目录读取存在未提交状态时，投递等待该状态结算。
+- 真实 Chrome 中，两个子组件初次挂载各回传一次带资源 ID 和版本的 `invalid_view`，错误配置时不发起图片请求。第一次修正后解码 64×48 的图片并回传 `loaded`，重新引入错误与换代时追加一次错误，第二次修正后加载新版。两次普通重绘均未重发，浏览器无脚本错误。受检库准备 80.785 s，生成工具链接 9.719 s，SFC 生成 2.134 s，Vite 构建 1.925 s，Chrome 执行 1.149 s，均退出 0。`final-chrome.log` SHA256 `C6F4F4BFA5231A4756D7F6A58BCDA38CE4E9ED54C3E01FD50EBC1CB1987A0F2B`，同目录 `host.at` 和 `verify-init.mjs` 可复验。
+- 原组件的导航、缩放、拖动、复位、换图及坏图浏览器回归通过（生成 2.113 s，构建 1.909 s，Chrome 1.781 s）。同 URL 版本重读、卸载取消及对象 URL 回收回归通过（生成 2.137 s，构建 1.927 s，Chrome 1.633 s）。`checked_vue_embeds_official_image_viewport` 1/1 通过（链接 4.405 s，执行 1.771 s）。`node --check` 和 `git diff --check` 通过。工作区 `cargo fmt --all -- --check` 遇到 Windows 错误 206，限定 `auto-ui-runtime` 后报告已有 Rust 格式差异。本次代码改动只涉及 JavaScript。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 100 | from: work/T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/auto-ui` | commit: auto-lang `0f42de25c` / auto-ui `77fbdc87` | next: work/T-06 继续核对原 029 A2Vue 的 HTTP/JSON 语义准入；T-02–T-03 仍缺原 031 的授权媒体绑定。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
