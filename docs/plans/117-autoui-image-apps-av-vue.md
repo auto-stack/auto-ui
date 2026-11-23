@@ -423,6 +423,13 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 接续点为消费 PLAN-108 已有的 HTTP 挂起、轮询和恢复执行入口。现有注入仅覆盖桌面单组件会话，受检包应在自己的挂载代次接入宿主提供器及已配置的同源地址，并核关闭后的迟到结果。另需在 Vue 包链接上核 JSON 导入，及恢复空值、有效值和非法值的启动表现。本轮帧数只证明窗口建立，V-03 仍需实际原行为验收。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 86 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `4bfd3b214` / auto-ui `3e3e4926` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work round 87 — 受检包前门复用 JSON 导入准备
+
+- AutoUI `bcbd4be7` 将组件依赖已有的裸 `use auto.json` 处理复用于包入口及项目模块。保留源跨度和显式标准库 JSON 导入。Debug 准备 49.648 s，声明样式依赖的两端入口定向回归 1/1（0.310 s），路由模块闭包回归 1/1（0.472 s）。`av/r87-linked-front-test.log` SHA256 `060FB2D586EFFDC5934287FB2C3B2851F40CA0B5DCCF1B5D38C64AE1BD74FE42`。
+- 实际 Vue 生成探查（准备 14.541 s，运行 3.313 s）越过 `unknown module auto`。029 收藏试稿继续在文本大小写、`split` 和 `replace` 的受检链接上拒绝。031 原入口首拒为 `unknown module back.api`，仍需原媒体授权和会话接线。两条均未发出可构建产物。`scratch/r87-linked-vue.log` SHA256 `5832B8BAD53D7906C037E0330D74C51A0A5074350BCCDFE14FB06D84653A42D7`。
+- 已交 `std.json.json_is_valid` 可用于接续核收藏恢复。无效偏好需在解析之前验证，现有 JSON 宿主 I/O 错误不会进入客体 catch。恢复试稿仍在 scratch，结合 HTTP 接缝后复验。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 87 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `4bfd3b214` / auto-ui `bcbd4be7` | next: work/T-02–T-03 / T-06。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
