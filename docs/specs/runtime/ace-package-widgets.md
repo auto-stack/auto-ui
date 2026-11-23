@@ -100,3 +100,7 @@ the Windows double-click interval. The modal overlay handles each press
 before the underlying view receives any unconsumed press. A queued double
 click can survive a selection redraw if it still identifies the same keyed
 item, instance and checked action.
+
+## Carousel in the Iced gallery
+
+A mounted Carousel keeps its own position. Previous and Next advance within its item range. A vertical track responds to vertical drags and keeps its position on a horizontal drag. Looping wraps at the bounds. Leaving the route releases the mounted state, and reopening the page restores its authored starting position.
