@@ -1,0 +1,4 @@
+name: "command-palette"
+version: "0.1.0"
+namespace: "auto"
+description: "Controlled command search and selection"

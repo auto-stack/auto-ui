@@ -116,6 +116,8 @@ pub struct TextInput<
     on_input: Option<Box<dyn Fn(String) -> Message + 'a>>,
     on_paste: Option<Box<dyn Fn(String) -> Message + 'a>>,
     on_submit: Option<Message>,
+    on_arrow_up: Option<Message>,
+    on_arrow_down: Option<Message>,
     icon: Option<Icon<Renderer::Font>>,
     class: Theme::Class<'a>,
     last_status: Option<Status>,
@@ -147,6 +149,8 @@ where
             on_input: None,
             on_paste: None,
             on_submit: None,
+            on_arrow_up: None,
+            on_arrow_down: None,
             icon: None,
             class: Theme::default(),
             last_status: None,
@@ -193,6 +197,16 @@ where
     /// focused and the enter key is pressed.
     pub fn on_submit(mut self, message: Message) -> Self {
         self.on_submit = Some(message);
+        self
+    }
+
+    /// Sets an Up or Down message for the focused input outside IME composition.
+    pub fn on_arrow_navigation(mut self, up: bool, message: Message) -> Self {
+        if up {
+            self.on_arrow_up = Some(message);
+        } else {
+            self.on_arrow_down = Some(message);
+        }
         self
     }
 
@@ -1048,6 +1062,21 @@ where
                         macos_shortcut.as_ref().unwrap_or(modified_key);
 
                     match modified_key.as_ref() {
+                        keyboard::Key::Named(named @ (key::Named::ArrowUp | key::Named::ArrowDown))
+                            if modifiers.is_empty() =>
+                        {
+                            let handler = if named == key::Named::ArrowUp {
+                                &self.on_arrow_up
+                            } else {
+                                &self.on_arrow_down
+                            };
+                            if let Some(message) = handler {
+                                if state.preedit.as_ref().is_none_or(|preedit| preedit.content.is_empty()) {
+                                    shell.publish(message.clone());
+                                }
+                                shell.capture_event();
+                            }
+                        }
                         keyboard::Key::Named(key::Named::Enter) => {
                             if state.preedit.as_ref().is_some_and(|preedit| !preedit.content.is_empty()) {
                                 shell.capture_event();

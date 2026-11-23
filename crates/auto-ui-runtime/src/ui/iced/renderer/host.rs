@@ -2375,23 +2375,24 @@ fn run_session(
         if msg.event == "__activate_focused_control" {
             let (view, _, _) = state.component.view_with_debug_gated(false);
             let converted = convert_view_messages(view);
-            if crate::ui::modal::active_content_path(&converted).is_none() {
+            let Some(active) = crate::ui::modal::active_content_path(&converted)
+                .and_then(|path| crate::ui::modal::at_path(&converted, &path))
+            else {
                 return iced::Task::none();
-            }
+            };
             let mut submits = std::collections::HashMap::new();
-            modal_input_submits(&converted, &mut submits);
+            scoped_input_keys(active, "enter", &mut submits);
+            let mut controls = Vec::new();
+            collect_focusable_controls(active, &mut controls, true);
             let enter = msg.input_value.as_deref() == Some("Enter");
             return iced::advanced::widget::operate(
                 crate::ui::iced::focus_target::ActivateFocused::<IcedMessage>::default(),
             )
             .then(move |(focused, activation)| {
-                let message = activation.or_else(|| {
-                    if enter {
-                        focused.and_then(|id| submits.get(&id).cloned())
-                    } else {
-                        None
-                    }
-                });
+                let Some(focused) = focused.filter(|id| controls.iter().any(|control| control.id == *id)) else {
+                    return iced::Task::none();
+                };
+                let message = activation.or_else(|| enter.then(|| submits.remove(&focused)).flatten());
                 message
                     .map(iced::Task::done)
                     .unwrap_or_else(iced::Task::none)
@@ -2409,8 +2410,12 @@ fn run_session(
                 input_value,
             });
             let (view, _, _) = state.component.view_with_debug_gated(false);
-            let active_modal = crate::ui::modal::active_content_path(&view).map(|_| {
-                let converted = convert_view_messages(view);
+            let converted = convert_view_messages(view);
+            let mut input_keys = std::collections::HashMap::new();
+            let active_modal = crate::ui::modal::active_content_path(&converted).map(|path| {
+                if let Some(active) = crate::ui::modal::at_path(&converted, &path) {
+                    scoped_input_keys(active, &request.key, &mut input_keys);
+                }
                 let mut controls = Vec::new();
                 collect_focusable_inputs(&converted, &mut controls);
                 controls
@@ -2418,6 +2423,9 @@ fn run_session(
                     .map(|control| control.id)
                     .collect::<std::collections::HashSet<_>>()
             });
+            if active_modal.is_none() {
+                scoped_input_keys(&converted, &request.key, &mut input_keys);
+            }
             return iced::advanced::widget::operate(
                 crate::ui::iced::focus_target::ActivateFocused::<IcedMessage>::for_key(request.key),
             )
@@ -2427,7 +2435,8 @@ fn run_session(
                 }) {
                     return iced::Task::none();
                 }
-                let message = scoped.or_else(|| fallback.take());
+                let message = scoped.or_else(|| focused.and_then(|id| input_keys.remove(&id)))
+                    .or_else(|| fallback.take());
                 message.map(iced::Task::done).unwrap_or_else(iced::Task::none)
             });
         }

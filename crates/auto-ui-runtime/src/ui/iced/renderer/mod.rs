@@ -1677,6 +1677,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             on_change,
             on_text,
             on_submit,
+            navigation,
             width,
             password,
             style,
@@ -1692,6 +1693,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
                 })
             }),
             on_submit: on_submit.map(|m| IcedMessage::from_dynamic(&m)),
+            navigation: navigation.into_iter().map(|(key, msg)| (key, IcedMessage::from_dynamic(&msg))).collect(),
             width,
             password,
             style,
@@ -8622,6 +8624,7 @@ mod tests {
                 on_change: Some(DynamicMessage::String("name".to_string())),
                 on_text: None,
                 on_submit: None,
+                navigation: Vec::new(),
                 width: None,
                 password: false,
                 style: None,
@@ -9216,6 +9219,7 @@ mod line_edit_tests {
             }),
             on_text: None,
             on_submit: None,
+            navigation: Vec::new(),
             width: None,
             password: false,
             style: None,
@@ -9232,6 +9236,7 @@ mod line_edit_tests {
             }),
             on_text: None,
             on_submit: None,
+            navigation: Vec::new(),
             width: None,
             password: true,
             style: None,
@@ -10150,6 +10155,7 @@ widget LoginChild {
             }),
             on_text: None,
             on_submit: None,
+            navigation: Vec::new(),
             width: None,
             password: false,
             style: None,
@@ -10841,6 +10847,7 @@ mod plan082_focus_tests {
             on_change: Some(msg("PathChanged")),
             on_text: None,
             on_submit: Some(msg("Navigate")),
+            navigation: Vec::new(),
             width: None,
             password: false,
             style: None,
@@ -10869,6 +10876,42 @@ mod plan082_focus_tests {
             },
         ])
     }
+    #[test]
+    fn command_palette_input_keeps_ime_enter_and_navigation_inside_composition() {
+        use iced_test::runtime::core::input_method::Event::{Closed, Commit, Opened, Preedit};
+        use iced::keyboard::key::Named;
+
+        let view = AbstractView::input("Search commands")
+            .on_change(msg("Edit"))
+            .on_submit(msg("Submit"))
+            .navigation(vec![("down".into(), msg("Move"))])
+            .build();
+        let mut ui = iced_test::simulator(render_dynamic_view(view, None, &mut Vec::new()));
+        ui.click("Search commands").unwrap();
+        ui.simulate([
+            iced::Event::InputMethod(Opened),
+            iced::Event::InputMethod(Preedit("深色".into(), None)),
+        ]);
+        ui.tap_key(Named::ArrowDown);
+        ui.tap_key(Named::Enter);
+        ui.simulate([
+            iced::Event::InputMethod(Preedit(String::new(), None)),
+            iced::Event::InputMethod(Commit("深色".into())),
+            iced::Event::InputMethod(Preedit("外观".into(), None)),
+        ]);
+        ui.tap_key(Named::Enter);
+        ui.simulate([iced::Event::InputMethod(Closed)]);
+        ui.tap_key(Named::ArrowDown);
+        ui.tap_key(Named::Enter);
+
+        let messages: Vec<_> = ui.into_messages().collect();
+        assert_eq!(
+            messages.iter().map(|message| message.event.as_str()).collect::<Vec<_>>(),
+            ["Edit", "Move", "Submit"]
+        );
+        assert_eq!(messages[0].input_value.as_deref(), Some("深色"));
+    }
+
     #[test]
     fn modal_focus_registry_wraps_actions_and_native_keys_use_the_same_handler() {
         let mut controls = Vec::new();

@@ -12,19 +12,23 @@
 //     规则钉死在 SPEC.md）；
 //   - store 子组件的 vue TS 生成损坏（013/038 实测）→ 全部状态内聚 App；
 //   - 模板文本插值里不能调 .len()（vue TS 编译错）→ 计数在 handler 算成
-//     字符串/数值状态（.count/.nres）。
+//     字符串/数值状态（.gcount）。
 // 字符串比较一律针对预小写字段（ln/lt，mock 字面量给出、宿主注入时由宿主
 // 预小写）：排序权重全整数，规避浮点/字符宽度双端差（SPEC §排序）。
 
 // PLAN-037 T-05：接入官方主题包（原无主题接线、无显式默认 → 官方
 // Auto/light 独立默认）。family 经 theme_name + design 绑定；键盘流/
 // recent 存储/宿主接缝零改动——换肤不丢查询/选中/recent。
+use auto.json
 use themes.themes: Auto, Solarized
 
 widget App {
+    use { package: command_palette from "../../../../../packages/command-palette" }
+
     msg {
         Init, SetQ(str), ApplyFilter, MoveUp, MoveDown, MoveLeft, MoveRight,
-        Pick, Escape, SwitchMode, Open, Close, Launch(str), PickCat(str)
+        Pick, Escape, SwitchMode, ShowGrid, Open, Close, Launch(str), PickCat(str),
+        PaletteQuery(str), PaletteInvoke(str), PaletteClose(str)
     }
 
     model {
@@ -49,13 +53,18 @@ widget App {
         // ---- 查询与结果 ----
         var q str = ""
         var ranked = []             // {i,name,title,icon,category,mg,sub,chip,tchip}
-        var sel int = 0             // palette 选中索引（app 内自建焦点索引）
-        var nres int = 0            // 结果数（view 条件用，替代模板 .len()）
-        var count str = ""          // 计数显示串
+        var palette_items List = []
+        var palette_ids List<str> = []
+        var palette_instance str = ""
+        var palette_session int = 0
+        var palette_query_seq int = 0
+        var palette_query str = ""
+        var palette_revision int = 0
+        var palette_response str = ""
 
         // ---- 网格形态（P5，对标 Activities/Launchpad）----
         var gridrows = []           // {gi,name,title,mg,category,chip,tchip} 注册表序全量
-        var gsel int = 0            // 网格焦点索引（与 sel 同为 app 内自建）
+        var gsel int = 0            // 网格焦点索引（由应用持有）
         var gcount str = ""
 
         // ---- 注册表（独立模式 mock；desktop 模式宿主覆盖同名列表）----
@@ -112,141 +121,19 @@ widget App {
     view {
         if .visible == "1" {
             if .mode == "palette" {
-                // ---- palette 形态：语义 scrim + 顶部 1/4 处搜索卡（Plan 503
-                // stella 化：bg-card/80 三件套 + 品牌色图标底块 + 分类胶囊）----
-                // PLAN-010 N6d：外点关闭——scrim on_press 捕获，与 icon 菜单
-                // ondismiss 同效（宿主 launcher_visible 直读 visible，零宿主改动）。
-                mouse-area (onclick: .Close) {
-                col {
-                    style: "w-full h-full bg-background/60 flex flex-col items-center"
-                    spacer { style: "h-24 w-full" }
-                    // PLAN-010 N6d：卡片守卫——on_press 捕获吞掉卡片空白区点击
-                    //（守卫动作 ApplyFilter 幂等纯重算，不动 sel/gsel），
-                    // 点卡片不再落到 scrim（布局件 onclick=on_release 不捕获，不可作守卫）。
-                    mouse-area (onclick: .ApplyFilter, style: "w-full max-w-xl") {
-                    col {
-                        style: "w-full bg-card/80 border rounded-2xl shadow-2xl overflow-hidden"
-
-                        // 搜索行
-                        row {
-                            style: "flex items-center gap-2 px-4 py-3 border-b"
-                            text "🔍" { style: "text-lg" }
-                            input {
-                                value: .q
-                                oninput: .SetQ
-                                onenter: .Pick
-                                placeholder: "Search apps…"
-                                style: "flex-1 text-lg text-foreground bg-background/50 rounded-lg px-2"
-                            }
+                CommandPalette (open: true, title: "Launcher", placeholder: "Search apps…",
+                    commands: .palette_items, filterMode: "provided", query: .q, wrapNavigation: true,
+                    revision: .palette_revision, resultsSession: .palette_session,
+                    resultsQuerySeq: .palette_query_seq, resultsQuery: .palette_query,
+                    response: .palette_response, onqueryChanged: .PaletteQuery,
+                    oninvokeRequested: .PaletteInvoke, oncloseRequested: .PaletteClose) {
+                    row (style: "w-full flex-wrap items-center gap-1") {
+                        for category in .cats_visible key: category {
+                            button (text: category, onclick: .PickCat(category),
+                                style: if category == .cat { "h-8 rounded-md px-2 bg-accent" } else { "h-8 rounded-md px-2 bg-transparent" }) {}
                         }
-
-                        // 分类胶囊（Plan 503）：选中 = bg-primary/15 + text-primary
-                        row {
-                            style: "flex items-center gap-1 px-4 py-2 border-b"
-                            // PLAN-526 T38：tag 统一为 all 同款可读样式
-                            // （此前未选中 tag muted 前景在深底上不可读，
-                            // 用户八轮反馈截图3）。
-                            for c in .cats_visible {
-                                button (text: c) {
-                                    onclick: .PickCat(c)
-                                    style: "h-6 px-2.5 text-xs rounded-full bg-primary/15 text-primary"
-                                }
-                            }
-                        }
-
-                        // 结果列表（空态/无结果态）。
-                        // PLAN-526 T38：max-h + overflow-y-auto——结果过多时
-                        // VM 侧 build_scrollable cap 语义出滚动条。
-                        col {
-                            style: "w-full max-h-96 overflow-y-auto"
-                            if .nres == 0 {
-                                col {
-                                    style: "flex flex-col items-center py-10"
-                                    text "No matching apps" { style: "text-muted-foreground text-sm" }
-                                }
-                            }
-                            for r in .ranked {
-                                if .sel == r.i {
-                                    mouse-area (onclick: .Launch(r.name)) {
-                                    row {
-                                        // 2026-09-15：行容器 button→mouse-area+row——
-                                        // iced button 内容行把子件高度钳到文本行高，
-                                        // 40px 图标被压成横条（矩阵探针 A-E 实测：
-                                        // 同结构 plain row 完美、button 全坏）；行
-                                        // hover 类沿 PLAN-002 B 布局件消费。
-                                        style: "w-full flex items-center gap-2 px-3 py-[18px] bg-primary/15 text-foreground cursor-pointer"
-                                        // 用户裁定（2026-09-15，沿桌面 PLAN-018-FU2
-                                        // 「保留原图圆角板、外框不要」）：iconfile
-                                        // 位图自带圆角板——满幅渲染不再套 chip 外框；
-                                        // 裸 lucide 字标保持品牌色 chip + glyph。
-                                        // 2026-09-15 补：满幅臂必须套定尺寸 col——
-                                        // icon 直接作 button 子件时 h-10/w-10 尺寸
-                                        // 类失效（缩成原始小图，且挤乱行内居中）。
-                                        // 二次修正：col 内 icon 也不能用 w-full/h-full
-                                        //（iced 按钮内容行里 Fill 无定宽父级参照 =
-                                        // 塌缩回原始小图），显式 h-10/w-10。
-                                        if r.full == "1" {
-                                            col {
-                                                style: "h-10 w-10 flex items-center justify-center"
-                                                icon (name: r.icon) { style: "h-10 w-10" }
-                                            }
-                                        } else {
-                                            col {
-                                                style: "h-10 w-10 rounded-xl flex items-center justify-center ${r.chip}"
-                                                icon (name: r.icon) { style: "h-6 w-6" }
-                                            }
-                                        }
-                                        col {
-                                            style: "flex flex-col"
-                                            text r.title { style: "text-primary text-sm font-medium" }
-                                            text r.sub { style: "text-muted-foreground text-xs" }
-                                        }
-                                        text r.category { style: "ml-auto text-xs text-muted-foreground" }
-                                    }
-                                    }
-                                } else {
-                                    mouse-area (onclick: .Launch(r.name)) {
-                                    row {
-                                        // 行容器 mouse-area+row（同上选中行）。
-                                        style: "w-full flex items-center gap-2 px-3 py-[18px] bg-transparent text-foreground hover:bg-primary/10 cursor-pointer"
-                                        // 满幅/chip 分流（同上选中行；满幅臂定尺寸
-                                        // col 包装同理——button 直接子 icon 丢尺寸，
-                                        // col 内 icon 显式 h-10/w-10）。
-                                        if r.full == "1" {
-                                            col {
-                                                style: "h-10 w-10 flex items-center justify-center"
-                                                icon (name: r.icon) { style: "h-10 w-10" }
-                                            }
-                                        } else {
-                                            col {
-                                                style: "h-10 w-10 rounded-xl flex items-center justify-center ${r.chip}"
-                                                icon (name: r.icon) { style: "h-6 w-6" }
-                                            }
-                                        }
-                                        col {
-                                            style: "flex flex-col"
-                                            text r.title { style: "text-foreground text-sm" }
-                                            text r.sub { style: "text-muted-foreground text-xs" }
-                                        }
-                                        text r.category { style: "ml-auto text-xs text-muted-foreground" }
-                                    }
-                                    }
-                                }
-                            }
-                        }
-
-                        // 底部提示行
-                        row {
-                            style: "flex items-center gap-4 px-4 py-2 border-t"
-                            text "↑↓ select" { style: "text-xs text-muted-foreground" }
-                            text "Enter launch" { style: "text-xs text-muted-foreground" }
-                            text "Esc close" { style: "text-xs text-muted-foreground" }
-                            text .count { style: "ml-auto text-xs text-muted-foreground" }
-                        }
+                        button "Grid view" { onclick: .ShowGrid, style: "h-8 rounded-md" }
                     }
-                    }
-                    spacer { style: "h-24 w-full" }
-                }
                 }
             } else {
                 // ---- grid 形态（P5）：图标网格（注册表序全量）+ 方向键焦点
@@ -375,7 +262,6 @@ widget App {
     on {
         .Init -> {
             .q = ""
-            .sel = 0
             .gsel = 0
             .mode = "palette"
             .visible = "0"
@@ -399,25 +285,23 @@ widget App {
         .Open -> {
             .visible = "1"
             .mode = "palette"
-            .sel = 0
             .__focus_input = "1"
             .ApplyFilter()
         }
 
         .Close -> {
             .visible = "0"
+            .palette_instance = ""
         }
 
         .SetQ(t) -> {
             .q = t
-            .sel = 0
             .ApplyFilter()
         }
 
         // Plan 503 分类胶囊：切分类 → 焦点复位重排。
         .PickCat(c) -> {
             .cat = c
-            .sel = 0
             .ApplyFilter()
         }
 
@@ -434,7 +318,6 @@ widget App {
             // PLAN-013 W2：零结果分类隐藏（注册表计数过滤）。
             .RebuildCats()
             .ranked = []
-            .nres = 0
             var ql str = .q.lower()
             var napps int = .apps_names.len()
 
@@ -671,16 +554,19 @@ widget App {
                 }
             }
 
-            .nres = .ranked.len()
-            if .nres == 0 {
-                .count = "0 apps"
-            } else {
-                if .sel >= .nres {
-                    .sel = .nres - 1
-                }
-                var idx int = .sel + 1
-                .count = f"${idx} / ${.nres} apps"
+            // Project the existing ranking in place. The palette owns selection.
+            var command_results List = []
+            var ranked_ids List<str> = []
+            for item in .ranked {
+                let group = if item.sub == "recent" { "recent" } else { item.category }
+                let label = if group == "recent" { "Recent" } else { group }
+                command_results.push({id: item.name, label: item.title, groupId: group, groupLabel: label,
+                    keywords: [], shortcut: "", disabled: false, icon: item.icon})
+                ranked_ids.push(item.name)
             }
+            .palette_items = command_results
+            .palette_ids = ranked_ids
+            .palette_revision = .palette_revision + 1
 
             // 网格行（注册表序全量，与查询无关）；gsel 夹取 + 计数
             .gridrows = []
@@ -709,55 +595,27 @@ widget App {
         }
 
         .MoveUp -> {
-            if .visible == "1" {
-            if .mode == "palette" {
-                if .nres > 0 {
-                    if .sel > 0 {
-                        .sel = .sel - 1
-                    } else {
-                        .sel = .nres - 1
-                    }
-                    .ApplyFilter()
-                }
-            } else {
-                // grid：上移一行（cols=4），列内回绕
-                var n2 int = .gridrows.len()
-                if n2 > 0 {
+            if .visible == "1" && .mode == "grid" {
+                // Grid moves by one row (four columns), wrapping within the column.
+                var n int = .gridrows.len()
+                if n > 0 {
                     var g int = .gsel
-                    if g < 4 {
-                        g = g - 4 + n2
-                    } else {
-                        g = g - 4
-                    }
+                    if g < 4 { g = g - 4 + n } else { g = g - 4 }
                     .gsel = g
                     .ApplyFilter()
                 }
             }
-            }
         }
 
         .MoveDown -> {
-            if .visible == "1" {
-            if .mode == "palette" {
-                if .nres > 0 {
-                    if .sel < .nres - 1 {
-                        .sel = .sel + 1
-                    } else {
-                        .sel = 0
-                    }
+            if .visible == "1" && .mode == "grid" {
+                var n int = .gridrows.len()
+                if n > 0 {
+                    var g int = .gsel + 4
+                    if g >= n { g = g - n }
+                    .gsel = g
                     .ApplyFilter()
                 }
-            } else {
-                var n3 int = .gridrows.len()
-                if n3 > 0 {
-                    var g2 int = .gsel + 4
-                    if g2 >= n3 {
-                        g2 = g2 - n3
-                    }
-                    .gsel = g2
-                    .ApplyFilter()
-                }
-            }
             }
         }
 
@@ -795,39 +653,69 @@ widget App {
             }
         }
 
-        // Enter：启动当前焦点项（palette = 选中行；grid = 聚焦瓦片）
         .Pick -> {
-            if .visible == "1" {
-            if .mode == "palette" {
-                if .nres > 0 {
-                    if .sel < .nres {
-                        .Launch(.ranked[.sel].name)
-                    }
-                }
-            } else {
-                if .gridrows.len() > 0 {
-                    if .gsel < .gridrows.len() {
-                        .Launch(.gridrows[.gsel].name)
-                    }
-                }
-            }
+            if .visible == "1" && .mode == "grid" && .gsel < .gridrows.len() {
+                .Launch(.gridrows[.gsel].name)
             }
         }
 
-        // Esc 逐层退出（P3）：清词 → 退 grid → 关闭（隐藏态不响应）
         .Escape -> {
-            if .visible == "1" {
-            if .q != "" {
-                .q = ""
-                .sel = 0
-                .ApplyFilter()
-            } else {
-                if .mode == "grid" {
-                    .mode = "palette"
+            if .visible == "1" && .mode == "grid" {
+                if .q != "" {
+                    .q = ""
+                    .ApplyFilter()
                 } else {
-                    .visible = "0"
+                    .mode = "palette"
                 }
             }
+        }
+
+        .PaletteQuery(payload) -> {
+            let request = json.parse(payload)
+            if .visible == "1" && .mode == "palette" {
+                .palette_instance = request.instanceToken
+                .palette_session = request.session
+                .palette_query_seq = request.querySeq
+                .palette_query = request.query
+                .q = request.query
+                .palette_response = ""
+                .ApplyFilter()
+            }
+        }
+
+        .PaletteInvoke(payload) -> {
+            let request = json.parse(payload)
+            if .visible != "1" || .mode != "palette" ||
+                request.instanceToken != .palette_instance || request.session != .palette_session ||
+                request.querySeq != .palette_query_seq || request.query != .palette_query ||
+                request.baseRevision != .palette_revision { return }
+            let name str = request.commandId
+            var available bool = false
+            var i int = 0
+            while i < .apps_names.len() {
+                if .apps_names[i] == name && (.cat == "all" || .apps_cats[i] == .cat) {
+                    available = true
+                }
+                i = i + 1
+            }
+            if !available { return }
+            var offered bool = false
+            for id in .palette_ids {
+                if id == name { offered = true }
+            }
+            if !offered { return }
+            if .hosted == "1" {
+                .Launch(name)
+            } else {
+                .palette_response = json.stringify({instanceToken: request.instanceToken, session: request.session,
+                    seq: request.seq, commandId: name, status: "rejected", message: "App launching requires the AutoOS desktop."})
+            }
+        }
+
+        .PaletteClose(payload) -> {
+            let request = json.parse(payload)
+            if .visible == "1" && request.instanceToken == .palette_instance && request.session == .palette_session {
+                .Close()
             }
         }
 
@@ -856,13 +744,17 @@ widget App {
         }
 
         .SwitchMode -> {
-            if .mode == "palette" {
-                .mode = "grid"
-            } else {
+            if .visible == "1" && .mode == "grid" {
                 .mode = "palette"
+                .__focus_input = "1"
             }
-            // PLAN-013 W2：切视图后 search input 重建——重新请求聚焦。
-            .__focus_input = "1"
+        }
+
+        .ShowGrid -> {
+            if .visible == "1" && .mode == "palette" {
+                .mode = "grid"
+                .__focus_input = "1"
+            }
         }
 
         // 启动（R11）：写上行总线 + recent + 隐匿。
@@ -892,7 +784,6 @@ widget App {
             .__desktop_cmd = "launch\t" + name
             .visible = "0"
             .q = ""
-            .sel = 0
             .ApplyFilter()
         }
     }

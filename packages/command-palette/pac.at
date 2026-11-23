@@ -1,0 +1,5 @@
+name: "command_palette"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "CommandPalette"

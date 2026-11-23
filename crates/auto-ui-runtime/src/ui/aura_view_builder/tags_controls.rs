@@ -690,6 +690,13 @@ impl<'a> AuraViewBuilder<'a> {
             if let Some(msg) = on_submit {
                 builder = builder.on_submit(msg);
             }
+            let navigation = events.iter().filter_map(|(name, event)| {
+                let key = name.strip_prefix("onkeydown.")?.split('.').next()?;
+                matches!(key, "up" | "down").then(|| (
+                    key.to_string(), self.event_to_message_with(event, bindings),
+                ))
+            }).collect();
+            builder = builder.navigation(navigation);
         }
         if let Some(w) = width {
             builder = builder.width(w);

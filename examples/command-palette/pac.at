@@ -1,0 +1,14 @@
+name: "command-palette-demo"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "CommandPalette Settings"
+window: "420x560"
+
+dep command_palette {
+    path: "../../packages/command-palette"
+}
+
+dep themes {
+    path: "../../packages/themes"
+}

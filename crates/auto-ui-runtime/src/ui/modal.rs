@@ -7,6 +7,8 @@ pub(crate) fn has_scoped_key<M: Clone + std::fmt::Debug>(view: &View<M>, key: &s
     match view {
         View::Button { keyboard: Some(scope), disabled: false, .. }
             if scope.bindings.iter().any(|(name, _)| name == key) => return true,
+        View::Input { navigation, disabled: false, .. }
+            if navigation.iter().any(|(name, _)| name == key) => return true,
         View::FocusTarget { keys, .. } if keys.iter().any(|(name, _)| name == key) => return true,
         View::Popover { open: false, anchor, .. } => {
             return matches!(anchor, PopoverAnchor::Widget(button) if has_scoped_key(button, key));

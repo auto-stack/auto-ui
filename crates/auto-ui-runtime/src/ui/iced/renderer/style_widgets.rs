@@ -3322,32 +3322,39 @@ pub(crate) fn layout_style_fn(
     }
 }
 
-pub(super) fn modal_input_submits(
+pub(super) fn scoped_input_keys(
     view: &AbstractView<IcedMessage>,
+    key: &str,
     out: &mut std::collections::HashMap<iced::widget::Id, IcedMessage>,
 ) {
     if let AbstractView::Input {
         placeholder,
         on_change,
-        on_submit: Some(message),
+        on_submit,
+        navigation,
         width,
         password,
         value,
+        disabled: false,
         ..
     } = view
     {
-        let primary = on_change
-            .as_ref()
-            .map(|m| (m.widget.as_str(), m.event.as_str()))
-            .or(Some((message.widget.as_str(), message.event.as_str())));
-        let mut message = message.clone();
-        message.input_value = Some(value.clone());
-        out.insert(
-            derive_input_id(primary, placeholder, *width, *password),
-            message,
-        );
+        let message = if key == "enter" {
+            on_submit.as_ref()
+        } else {
+            navigation.iter().find_map(|(name, msg)| (name == key).then_some(msg))
+        };
+        if let Some(message) = message {
+            let primary = on_change.as_ref().or(on_submit.as_ref())
+                .map(|m| (m.widget.as_str(), m.event.as_str()));
+            let mut message = message.clone();
+            if key == "enter" {
+                message.input_value = Some(value.clone());
+            }
+            out.insert(derive_input_id(primary, placeholder, *width, *password), message);
+        }
     }
     for child in crate::ui::vnode_converter::extract_children_ref(view) {
-        modal_input_submits(child, out);
+        scoped_input_keys(child, key, out);
     }
 }

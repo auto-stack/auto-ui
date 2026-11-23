@@ -118,30 +118,12 @@ impl<'a> AuraViewBuilder<'a> {
             }
         }
 
-        // 4b. Plan 437 Phase 2: prop 声明默认值播种 —— `(index: str = "m",
-        // colors: List<str> = [...])` 一类 widget-parens 默认值此前只在
-        // vue 轨生效(withDefaults),VM 轨不播种 → 子组件 handler 读未传
-        // prop 时 GET_FIELD 直接失败(donut 的 colors 即此)。父级显式传值
-        // 优先(parent wins)。PLAN-536 T8: 同 4 的缺字段守卫——已存在的
-        // 字段不重播种(防 handler 写入被逐帧打回默认)。
-        // PLAN-711 Q-05: 被守卫跳过的声明默认值另录 snapshot_defaults——
-        // 构建**不写**（536-T8 纪律原样），但进入 Init demand 快照：派发
-        // 重播种时把兄弟实例遗留的同名字段恢复回本实例声明语义（bar#1
-        // type 残留 bar#2 "stacked" 实录——快照缺 type 使派发 Init 走错
-        // 分支，yTick 全错档）。
-        let mut snapshot_defaults: Vec<(String, auto_val::Value)> = Vec::new();
+        // Declared props are seeded on the child instance. A same-named root
+        // field cannot supply an omitted argument or suppress its default.
         for prop in &child_widget.props {
-            if !resolved_props.contains_key(&prop.name) {
-                if self.bridge.read_state(&prop.name).is_ok() {
-                    if let Some(default_expr) = &prop.default {
-                        snapshot_defaults
-                            .push((prop.name.clone(), eval_initial_without_vm(default_expr)));
-                    }
-                    continue;
-                }
-                if let Some(default_expr) = &prop.default {
-                    resolved_props.insert(prop.name.clone(), eval_initial_without_vm(default_expr));
-                }
+            if let Some(default_expr) = &prop.default {
+                resolved_props.entry(prop.name.clone())
+                    .or_insert_with(|| eval_initial_without_vm(default_expr));
             }
         }
 
@@ -205,10 +187,9 @@ impl<'a> AuraViewBuilder<'a> {
                 resolved_props.get("paragraphs").map(|v| format!("{v:?}")).unwrap_or("ABSENT".into())
             );
         }
-        let mut snapshot = resolved_props
+        let snapshot = resolved_props
             .into_iter()
             .collect::<Vec<(String, auto_val::Value)>>();
-        snapshot.extend(snapshot_defaults);
         (child_state_id, identity, snapshot)
     }
 

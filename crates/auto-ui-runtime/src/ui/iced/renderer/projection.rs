@@ -1378,6 +1378,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 on_change,
                 on_text,
                 on_submit,
+                navigation,
                 width,
                 password,
                 style,
@@ -1404,6 +1405,10 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                             INPUT_TEXT.with(|t| *t.borrow_mut() = text.to_string());
                             msg.clone()
                         });
+                    }
+
+                    for (key, msg) in navigation {
+                        input_widget = input_widget.on_arrow_navigation(key == "up", msg);
                     }
 
                     // Wire on_submit for Enter key press

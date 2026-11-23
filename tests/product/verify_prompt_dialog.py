@@ -123,6 +123,17 @@ class WindowsProcesses:
 
 
 class ProductSession:
+    demo_anchor = "名称管理"
+    demo_exit = "退出示例"
+    browser_client_name = "verify-prompt-dialog"
+    native_window_exit_cases = {"system-input", "system-invoke", "reopen", "nested", "scroll"}
+
+    def startup_anchor(self):
+        return self.demo_anchor if self.args.consumer == "demo" else "主目录"
+
+    def system_reader(self):
+        return SYSTEM_READER
+
     def __init__(self, args, output, journal):
         self.args = args
         self.output = output
@@ -149,7 +160,7 @@ class ProductSession:
         log = self.log_file("service.log")
         if self.args.case.startswith("system-"):
             script = self.output / "system-tree.ps1"
-            script.write_text(SYSTEM_READER, encoding="utf-8-sig")
+            script.write_text(self.system_reader(), encoding="utf-8-sig")
             self.system_helper = subprocess.Popen(
                 ["powershell.exe", "-NoProfile", "-STA", "-File", str(script)],
                 stdout=subprocess.PIPE, stderr=self.log_file("system-tree.log"),
@@ -197,7 +208,7 @@ class ProductSession:
                 seconds=self.args.startup_timeout,
             )
             self.port = int(listening.search(startup_log)[1])
-            title = "名称管理" if self.args.consumer == "demo" else "主目录"
+            title = self.startup_anchor()
             wait_for(self.snapshot, lambda tree: title in tree, seconds=self.args.startup_timeout)
             self.windows = wait_for(self.discover_native_window, bool,
                                     seconds=self.args.startup_timeout)
@@ -212,7 +223,7 @@ class ProductSession:
             self.browser = BrowserMcp(config, self.log_file("browser-mcp.log"), self.output)
             self.provider = self.browser.request("initialize", {
                 "protocolVersion": "2024-11-05", "capabilities": {},
-                "clientInfo": {"name": "verify-prompt-dialog", "version": "1"},
+                "clientInfo": {"name": self.browser_client_name, "version": "1"},
             })
             self.browser.write({"method": "notifications/initialized"})
             if self.backend_port is not None:
@@ -220,7 +231,7 @@ class ProductSession:
             wait_for(lambda: self.read_page(url), lambda body: '<div id="app">' in body,
                      seconds=self.args.startup_timeout)
             self.call("browser_navigate", url=url)
-            expected = "名称管理" if self.args.consumer == "demo" else "主目录"
+            expected = self.startup_anchor()
             self.wait_text(expected)
             self.owned = self.processes.owned(self.process.pid, self.browser.process.pid)
             assert not any(name.lower() == "esbuild.exe" for _, name, _ in self.owned.values())
@@ -384,9 +395,9 @@ class ProductSession:
                 if failed or not self.ready:
                     stop_tree(self.process)
                 elif (self.args.backend == "native" and self.args.consumer == "demo"
-                      and self.args.case not in {"system-input", "system-invoke", "reopen", "nested", "scroll"}):
+                      and self.args.case not in self.native_window_exit_cases):
                     try:
-                        self.press("退出示例")
+                        self.press(self.demo_exit)
                     except (ConnectionResetError, TimeoutError):
                         pass
                     assert self.process.wait(timeout=5) == 0, "demo exit failed"

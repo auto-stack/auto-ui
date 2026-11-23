@@ -1,0 +1,283 @@
+use auto.json
+use palette_data: PaletteCommand, PaletteRow, palette_error, palette_signature, palette_rows, palette_active, palette_move
+use palette_search: palette_local
+
+widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", placeholder: str = "", commands: List<PaletteCommand> = [], filterMode: str = "local", query: str = "", wrapNavigation: bool = false, resultsSession: int = 0, resultsQuerySeq: int = 0, resultsQuery: str = "", response: str = "", errorMessage: str = "") {
+    msg {
+        Tick, PublishQuery, RefreshResults, Edit(str, str), Move(str, int, str),
+        Submit(str, int), Invoke(str, int, str), Close(str, str),
+        "queryChanged"(str), "invokeRequested"(str), "closeRequested"(str), "error"(str)
+    }
+
+    model {
+        var interval int = 50
+        var instance_token str = ""
+        var session int = 0
+        var seq int = 0
+        var query_seq int = 0
+        var phase str = "closed"
+        var bindings List<str> = []
+        var binding str = ""
+        var draft str = ""
+        var external_query str = ""
+        var mode str = ""
+        var result_revision int = 0
+        var result_signature str = ""
+        var result_query_seq int = 0
+        var result_epoch int = 0
+        var rows List<PaletteRow> = []
+        var active_id str = ""
+        var pending_id str = ""
+        var seen_response str = ""
+        var rejection str = ""
+        var config_code str = ""
+        var config_signature str = ""
+    }
+
+    computed {
+        heading => if .title == "" { "Command palette" } else { .title }
+        caption => if .placeholder == "" { "Search commands" } else { .placeholder }
+        editing => .open && .phase == "editing"
+        results_current => .result_query_seq == .query_seq && .result_revision == .revision &&
+            (.filterMode != "provided" || (.resultsSession == .session && .resultsQuerySeq == .query_seq && .resultsQuery == .draft))
+        ready => .editing && .config_code == "" && .results_current
+        loading => .config_code == "" && !.results_current
+        config_message => if .config_code == "duplicate-command-id" { "Command IDs must be unique." }
+            else if .config_code == "missing-command-id" { "A command is missing its ID." }
+            else if .config_code == "conflicting-group-label" { "Commands in a group must use the same group label." }
+            else if .config_code != "" { "Choose local or provided command filtering." }
+            else { "" }
+    }
+
+    view {
+        for mount in .bindings key: mount {
+            dialog (open: .open, onclose: .Close(mount, "escape"), closeOnOutside: false) {
+                dialog-content (showCloseButton: false, portalToTheme: true, style: "w-96 max-w-full p-4 gap-2 rounded-md [&_input]:h-8") {
+                    dialog-header {
+                        dialog-title .heading
+                    }
+                    input (value: .draft + "", placeholder: .caption, label: .caption, validationMessage: .config_message,
+                        oninput: .Edit(mount, $event), onenter: .Submit(mount, .result_epoch),
+                        onkeydown.up.prevent: .Move(mount, .result_epoch, "up"),
+                        onkeydown.down.prevent: .Move(mount, .result_epoch, "down"),
+                        disabled: !.editing) {}
+                    if .editing {
+                        slot {}
+                    }
+                    col (style: "w-full max-h-64 overflow-y-auto gap-2") {
+                        if .config_code != "" {
+                            text .config_message { style: "text-sm text-foreground border-l-2 border-destructive pl-2" }
+                        } else if .loading {
+                            text "Searching…" { style: "px-2 py-2 text-sm text-muted-foreground" }
+                        } else {
+                            if .rows.len() == 0 {
+                                text "No matching commands" { style: "px-2 py-2 text-sm text-muted-foreground" }
+                            }
+                            for item in .rows key: item.id {
+                                col (style: "w-full gap-1") {
+                                    if item.heading != "" {
+                                        text item.heading { style: "px-2 pt-1 text-xs font-medium text-muted-foreground" }
+                                    }
+                                    button (variant: "ghost", onclick: .Invoke(mount, .result_epoch, item.id),
+                                        disabled: !.ready || item.disabled,
+                                        style: if item.id == .active_id && .ready { "h-8 w-full min-w-0 justify-start rounded-md gap-2 px-2 text-left bg-primary/15 text-foreground ring-1 ring-primary" }
+                                            else if item.disabled { "h-8 w-full min-w-0 justify-start rounded-md gap-2 px-2 text-left bg-transparent text-muted-foreground disabled:opacity-100" }
+                                            else { "h-8 w-full min-w-0 justify-start rounded-md gap-2 px-2 text-left bg-transparent text-foreground hover:bg-accent" }) {
+                                        if item.icon == "moon" {
+                                            icon (name: "moon", size: 16) {}
+                                        } else if item.icon == "sun" {
+                                            icon (name: "sun", size: 16) {}
+                                        } else if item.icon == "settings" {
+                                            icon (name: "settings", size: 16) {}
+                                        } else if item.icon == "folder-open" {
+                                            icon (name: "folder-open", size: 16) {}
+                                        } else if item.icon == "lock" {
+                                            icon (name: "lock", size: 16) {}
+                                        } else if item.icon != "" {
+                                            icon (name: item.icon, size: 16) {}
+                                        }
+                                        text item.label { style: "min-w-0 flex-1 text-sm truncate" }
+                                        if item.shortcut != "" {
+                                            text item.shortcut { style: "ml-auto shrink-0 text-xs text-muted-foreground" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if .rejection != "" {
+                        text .rejection { style: "text-sm text-foreground border-l-2 border-destructive pl-2" }
+                    }
+                    if .errorMessage != "" {
+                        text .errorMessage { style: "text-sm text-foreground border-l-2 border-destructive pl-2" }
+                    }
+                    if .phase == "pending" || .phase == "accepted" {
+                        text "Executing…" { style: "text-sm text-muted-foreground" }
+                    }
+                    dialog-footer (style: "items-center justify-between gap-2") {
+                        text "↑/↓ Select · Enter Run · Esc Close" { style: "text-xs text-muted-foreground" }
+                        button "Cancel" { onclick: .Close(mount, "cancel"), disabled: !.editing, style: "h-8 rounded-md" }
+                    }
+                }
+            }
+        }
+    }
+
+    on {
+        .Tick -> {
+            if .instance_token == "" { .instance_token = str.uuid() }
+            if !.open {
+                if .phase != "closed" {
+                    .phase = "closed"
+                    .bindings = []
+                    .binding = ""
+                    .pending_id = ""
+                    .rows = []
+                    .active_id = ""
+                }
+                .seen_response = .response
+                .RefreshResults()
+                return
+            }
+
+            if .phase == "closed" {
+                .session = .session + 1
+                .binding = str.uuid()
+                .bindings = [.binding]
+                .phase = "editing"
+                .external_query = .query
+                .draft = .query
+                .mode = .filterMode
+                .result_revision = .revision
+                .result_signature = ""
+                .rejection = ""
+                .seen_response = .response
+                .PublishQuery()
+            }
+
+            let signature = palette_signature(.commands)
+            let same_commands = .revision == .result_revision && signature == .result_signature
+            let same_query = .mode == .filterMode && (.external_query == .query || .draft == .query)
+            if .phase == "pending" && same_query && .response != "" && .response != .seen_response {
+                .seen_response = .response
+                try {
+                    let feedback = json.parse(.response)
+                    if feedback.instanceToken == .instance_token && feedback.session == .session && feedback.seq == .seq && feedback.commandId == .pending_id {
+                        if feedback.status == "accepted" {
+                            .phase = "accepted"
+                        } else if feedback.status == "rejected" && same_commands {
+                            .phase = "editing"
+                            .rejection = feedback.message
+                            .pending_id = ""
+                        }
+                    }
+                } catch {
+                    // Malformed feedback leaves the current request unsettled.
+                }
+            }
+            if .phase == "accepted" || .phase == "closing" { return }
+
+            if !same_query {
+                .external_query = .query
+                .draft = .query
+                .mode = .filterMode
+                .phase = "editing"
+                .pending_id = ""
+                .rejection = ""
+                .PublishQuery()
+            } else {
+                .external_query = .query
+            }
+            if .phase == "pending" && !same_commands {
+                .phase = "editing"
+                .pending_id = ""
+            }
+            .RefreshResults()
+        }
+
+        .PublishQuery -> {
+            .query_seq = .query_seq + 1
+            .result_query_seq = 0
+            .result_epoch = .result_epoch + 1
+            ."queryChanged"(json.stringify({instanceToken: .instance_token, session: .session,
+                querySeq: .query_seq, query: .draft}))
+        }
+
+        .RefreshResults -> {
+            let signature = palette_signature(.commands)
+            if .open && .filterMode == "provided" && (.resultsSession != .session ||
+                .resultsQuerySeq != .query_seq || .resultsQuery != .draft ||
+                .revision < .result_revision ||
+                (.result_query_seq != .query_seq && .revision == .result_revision)) {
+                return
+            }
+
+            let code = palette_error(.commands, .filterMode)
+            if code != .config_code || signature != .config_signature {
+                .config_code = code
+                .config_signature = signature
+                if code != "" {
+                    ."error"(json.stringify({code: code, message: .config_message}))
+                }
+            }
+            if !.open { return }
+            if .result_query_seq == .query_seq && .result_revision == .revision && .result_signature == signature { return }
+
+            .result_revision = .revision
+            .result_signature = signature
+            .result_query_seq = .query_seq
+            .result_epoch = .result_epoch + 1
+            if code == "" {
+                let matches = if .filterMode == "local" { palette_local(.commands, .draft) } else { .commands }
+                .rows = palette_rows(matches, .commands)
+                .active_id = palette_active(.rows, .active_id)
+            } else {
+                .rows = []
+                .active_id = ""
+            }
+        }
+
+        .Edit(mount, value) -> {
+            if mount != .binding || !.editing || value == .draft { return }
+            if .mode != .filterMode || (.external_query != .query && .draft != .query) { return }
+            .draft = value
+            .rejection = ""
+            .PublishQuery()
+            .RefreshResults()
+        }
+
+        .Move(mount, epoch, direction) -> {
+            if mount != .binding || epoch != .result_epoch || !.ready { return }
+            if .result_revision != .revision || .result_signature != palette_signature(.commands) { return }
+            .active_id = palette_move(.rows, .active_id, direction, .wrapNavigation)
+        }
+
+        .Submit(mount, epoch) -> {
+            .Invoke(mount, epoch, .active_id)
+        }
+
+        .Invoke(mount, epoch, id) -> {
+            if mount != .binding || epoch != .result_epoch || !.ready { return }
+            if .mode != .filterMode || (.external_query != .query && .draft != .query) { return }
+            if .result_revision != .revision || .result_signature != palette_signature(.commands) { return }
+            if .filterMode == "provided" && (.resultsSession != .session ||
+                .resultsQuerySeq != .query_seq || .resultsQuery != .draft) { return }
+            if id == "" || palette_active(.rows, id) != id { return }
+
+            .active_id = id
+            .pending_id = id
+            .phase = "pending"
+            .seq = .seq + 1
+            .rejection = ""
+            ."invokeRequested"(json.stringify({instanceToken: .instance_token, seq: .seq,
+                session: .session, commandId: id, baseRevision: .result_revision,
+                querySeq: .query_seq, query: .draft}))
+        }
+
+        .Close(mount, reason) -> {
+            if mount != .binding || !.editing { return }
+            .phase = "closing"
+            ."closeRequested"(json.stringify({instanceToken: .instance_token, session: .session, reason: reason}))
+        }
+    }
+}

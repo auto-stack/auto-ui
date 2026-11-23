@@ -1,0 +1,105 @@
+use palette_data: PaletteCommand
+
+// Fold only ASCII and keep the caller's Unicode spelling.
+fn palette_trim(text str) str {
+    var start int = 0
+    var end int = text.len()
+    while start < end {
+        let ch str = text.substr(start, 1)
+        if ch != " " && ch != "\t" && ch != "\r" && ch != "\n" { break }
+        start = start + 1
+    }
+    while end > start {
+        let ch str = text.substr(end - 1, 1)
+        if ch != " " && ch != "\t" && ch != "\r" && ch != "\n" { break }
+        end = end - 1
+    }
+    return text.substr(start, end - start)
+}
+
+fn palette_ascii_lower(s str) str {
+    var out str = ""
+    var i int = 0
+    while i < s.len() {
+        let ch str = s.substr(i, 1)
+        if ch == "A" { out = out + "a" }
+        else if ch == "B" { out = out + "b" }
+        else if ch == "C" { out = out + "c" }
+        else if ch == "D" { out = out + "d" }
+        else if ch == "E" { out = out + "e" }
+        else if ch == "F" { out = out + "f" }
+        else if ch == "G" { out = out + "g" }
+        else if ch == "H" { out = out + "h" }
+        else if ch == "I" { out = out + "i" }
+        else if ch == "J" { out = out + "j" }
+        else if ch == "K" { out = out + "k" }
+        else if ch == "L" { out = out + "l" }
+        else if ch == "M" { out = out + "m" }
+        else if ch == "N" { out = out + "n" }
+        else if ch == "O" { out = out + "o" }
+        else if ch == "P" { out = out + "p" }
+        else if ch == "Q" { out = out + "q" }
+        else if ch == "R" { out = out + "r" }
+        else if ch == "S" { out = out + "s" }
+        else if ch == "T" { out = out + "t" }
+        else if ch == "U" { out = out + "u" }
+        else if ch == "V" { out = out + "v" }
+        else if ch == "W" { out = out + "w" }
+        else if ch == "X" { out = out + "x" }
+        else if ch == "Y" { out = out + "y" }
+        else if ch == "Z" { out = out + "z" }
+        else { out = out + ch }
+        i = i + 1
+    }
+    return out
+}
+
+pub fn palette_query(text str) str {
+    return palette_ascii_lower(palette_trim(text))
+}
+
+fn palette_rank(item PaletteCommand, query str) int {
+    let label = palette_ascii_lower(item.label)
+    if label == query { return 0 }
+    if label.starts_with(query) { return 1 }
+    let id = palette_ascii_lower(item.id)
+    if label.contains(query) || id.contains(query) { return 2 }
+    if item.keywords != nil {
+        for keyword in item.keywords {
+            let word = palette_ascii_lower(keyword)
+            if word.contains(query) { return 2 }
+        }
+    }
+    return -1
+}
+
+// The local mode keeps first-seen group order and sorts only within a group.
+// An ungrouped command belongs to the unnamed group, with no heading.
+pub fn palette_local(items List<PaletteCommand>, raw_query str) List<PaletteCommand> {
+    let query = palette_query(raw_query)
+    if query == "" { return items }
+    var groups List<str> = []
+    var ranks List<int> = []
+    for item in items {
+        var seen bool = false
+        for group in groups {
+            if group == item.groupId { seen = true }
+        }
+        if !seen { groups.push(item.groupId) }
+        ranks.push(palette_rank(item, query))
+    }
+
+    var result List<PaletteCommand> = []
+    for group in groups {
+        var rank int = 0
+        while rank <= 2 {
+            var i int = 0
+            for item in items {
+                if item.groupId == group && ranks[i] == rank { result.push(item) }
+                i = i + 1
+            }
+            rank = rank + 1
+        }
+    }
+    return result
+}

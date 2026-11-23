@@ -1,0 +1,113 @@
+use auto.json
+
+pub type PaletteCommand {
+    id str
+    label str
+    groupId str
+    groupLabel str
+    keywords List<str>
+    shortcut str
+    disabled bool
+    icon str
+}
+
+pub type PaletteRow {
+    id str
+    heading str
+    label str
+    shortcut str
+    disabled bool
+    icon str
+}
+
+pub fn palette_error(items List<PaletteCommand>, filter_mode str) str {
+    if filter_mode != "local" && filter_mode != "provided" { return "invalid-filter-mode" }
+    var index int = 0
+    for item in items {
+        if item.id == nil || item.id == "" { return "missing-command-id" }
+        var previous int = 0
+        for other in items {
+            if previous >= index { break }
+            if other.id == item.id { return "duplicate-command-id" }
+            if item.groupId != "" && item.groupId == other.groupId &&
+                item.groupLabel != "" && other.groupLabel != "" && item.groupLabel != other.groupLabel {
+                return "conflicting-group-label"
+            }
+            previous = previous + 1
+        }
+        index = index + 1
+    }
+    return ""
+}
+
+pub fn palette_signature(items List<PaletteCommand>) Str {
+    var signature Str = ""
+    for item in items {
+        signature = signature + "[" + json.stringify(item.id) + "," + json.stringify(item.label)
+        signature = signature + "," + json.stringify(item.groupId) + "," + json.stringify(item.groupLabel)
+        signature = signature + "," + json.stringify(item.shortcut) + "," + json.stringify(item.icon)
+        signature = signature + (if item.disabled { ",true,[" } else { ",false,[" })
+        if item.keywords != nil {
+            for keyword in item.keywords {
+                signature = signature + json.stringify(keyword) + ","
+            }
+        }
+        signature = signature + "]]"
+    }
+    return signature
+}
+
+pub fn palette_rows(items List<PaletteCommand>, all_items List<PaletteCommand>) List<PaletteRow> {
+    var rows List<PaletteRow> = []
+    var previous str = ""
+    for item in items {
+        var heading str = ""
+        if item.groupId != "" && item.groupId != previous {
+            for peer in all_items {
+                if peer.groupId == item.groupId && peer.groupLabel != "" {
+                    heading = peer.groupLabel
+                    break
+                }
+            }
+            if heading == "" { heading = item.groupId }
+        }
+        rows.push(PaletteRow { id: item.id, heading: heading, label: item.label,
+            shortcut: item.shortcut, disabled: item.disabled, icon: item.icon })
+        previous = item.groupId
+    }
+    return rows
+}
+
+pub fn palette_active(candidates List<PaletteRow>, active str) str {
+    var first str = ""
+    for row in candidates {
+        if !row.disabled {
+            if row.id == active { return active }
+            if first == "" { first = row.id }
+        }
+    }
+    return first
+}
+
+pub fn palette_move(candidates List<PaletteRow>, active str, direction str, wrap bool) str {
+    var ids List<str> = []
+    var selected int = -1
+    for row in candidates {
+        if !row.disabled {
+            if row.id == active { selected = ids.len() }
+            ids.push(row.id)
+        }
+    }
+    if ids.len() == 0 { return "" }
+    if selected < 0 { return ids[0] }
+    let next = if direction == "down" { selected + 1 } else { selected - 1 }
+    if next < 0 {
+        if wrap { return ids[ids.len() - 1] }
+        return active
+    }
+    if next >= ids.len() {
+        if wrap { return ids[0] }
+        return active
+    }
+    return ids[next]
+}

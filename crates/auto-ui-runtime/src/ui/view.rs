@@ -829,6 +829,7 @@ pub enum View<M: Clone + Debug> {
         on_change: Option<M>,
         on_text: Option<TextInputCallback<M>>,
         on_submit: Option<M>, // Fires on Enter key press
+        navigation: Vec<(String, M)>, // Focused Up/Down handlers
         width: Option<u16>,   // Legacy field
         password: bool,
         style: Option<Style>, // ✅ NEW: Unified styling support
@@ -2261,6 +2262,7 @@ impl<M: Clone + Debug> View<M> {
             on_change: None,
             on_text: None,
             on_submit: None,
+            navigation: Vec::new(),
             width: None,
             password: false,
             style: None, // ✅ NEW: style field
@@ -2825,6 +2827,7 @@ impl<M: Clone + Debug> View<M> {
                 on_change,
                 on_text,
                 on_submit,
+                navigation,
                 width,
                 password,
                 style,
@@ -2839,6 +2842,7 @@ impl<M: Clone + Debug> View<M> {
                     TextInputCallback::new(move |text| f(callback.call(text)))
                 }),
                 on_submit: on_submit.map(|m| f(m)),
+                navigation: navigation.into_iter().map(|(key, msg)| (key, f(msg))).collect(),
                 width,
                 password,
                 style,
@@ -3474,6 +3478,7 @@ pub struct ViewInputBuilder<M: Clone + Debug> {
     on_change: Option<M>,
     on_text: Option<TextInputCallback<M>>,
     on_submit: Option<M>,
+    navigation: Vec<(String, M)>,
     width: Option<u16>,
     password: bool,
     style: Option<Style>, // ✅ NEW: Unified styling support
@@ -3592,6 +3597,12 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
         self
     }
 
+    /// Route Up and Down while this single-line input has focus.
+    pub fn navigation(mut self, bindings: Vec<(String, M)>) -> Self {
+        self.navigation = bindings;
+        self
+    }
+
     /// Build the input view
     pub fn build(self) -> View<M> {
         View::Input {
@@ -3601,6 +3612,7 @@ impl<M: Clone + Debug> ViewInputBuilder<M> {
             on_change: self.on_change,
             on_text: self.on_text,
             on_submit: self.on_submit,
+            navigation: self.navigation,
             width: self.width,
             password: self.password,
             style: self.style,

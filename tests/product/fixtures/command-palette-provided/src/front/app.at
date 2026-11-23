@@ -1,0 +1,95 @@
+use auto.json
+
+widget App {
+    use { package: command_palette from "../../../../../../packages/command-palette" }
+
+    msg { Init, Open, Query(str), Publish(str, bool), Complete, Run(str), Close(str), Exit }
+
+    model {
+        var shown bool = false
+        var runtime_track str = ""
+        var instance_token str = ""
+        var reply str = ""
+        var session int = 0
+        var sequence int = 0
+        var query str = ""
+        var revision int = 0
+        var first_a str = ""
+        var waiting str = ""
+        var settling bool = false
+        var applied int = 0
+        var command str = ""
+        var offered List = []
+        var fixed List = [
+            {id: "one", label: "First result", groupId: "a", groupLabel: "Appearance", keywords: [], disabled: false, shortcut: "", icon: ""},
+            {id: "two", label: "Middle result", groupId: "b", groupLabel: "Settings", keywords: [], disabled: false, shortcut: "", icon: ""},
+            {id: "three", label: "Final result", groupId: "a", groupLabel: "Appearance", keywords: [], disabled: false, shortcut: "", icon: ""}
+        ]
+        var stale List = [
+            {id: "stale", label: "Old result", groupId: "", groupLabel: "", keywords: [], disabled: false, shortcut: "", icon: ""}
+        ]
+    }
+
+    timer { Complete (every_ms: 1400, when: .settling) }
+
+    view {
+        col (style: "p-4 gap-2") {
+            button "Open provided palette" { onclick: .Open }
+            text f"Provided commands applied: ${.applied}"
+            text .command
+            if .runtime_track == "vm" { button "Exit example" { onclick: .Exit } }
+            CommandPalette (open: .shown, title: "Provided commands", filterMode: "provided", wrapNavigation: true,
+                commands: .offered, revision: .revision, resultsSession: .session,
+                resultsQuerySeq: .sequence, resultsQuery: .query, response: .reply,
+                onqueryChanged: .Query, oninvokeRequested: .Run, oncloseRequested: .Close) {}
+        }
+    }
+
+    on {
+        .Init -> { .runtime_track = Env.track() }
+        .Open -> { .shown = true }
+        .Query(payload) -> {
+            let request = json.parse(payload)
+            .instance_token = request.instanceToken
+            .settling = false
+            if request.query == "A" && .first_a != "" {
+                .waiting = payload
+                .Publish(.first_a, true)
+                .settling = true
+            } else {
+                .Publish(payload, false)
+                if request.query == "A" { .first_a = payload }
+            }
+        }
+        .Publish(payload, delayed) -> {
+            let request = json.parse(payload)
+            .session = request.session
+            .sequence = request.querySeq
+            .query = request.query
+            .revision = .revision + 1
+            if delayed { .offered = .stale } else { .offered = .fixed }
+        }
+        .Complete -> {
+            if .settling {
+                .settling = false
+                .Publish(.waiting, false)
+            }
+        }
+        .Run(payload) -> {
+            let request = json.parse(payload)
+            if .shown && request.instanceToken == .instance_token && request.session == .session &&
+                request.querySeq == .sequence && request.query == .query && request.baseRevision == .revision {
+                .applied = .applied + 1
+                .command = request.commandId
+                .shown = false
+            }
+        }
+        .Close(payload) -> {
+            let request = json.parse(payload)
+            if request.instanceToken == .instance_token && request.session == .session {
+                .shown = false
+            }
+        }
+        .Exit -> { if Env.track() == "vm" { Process.exit(0) } }
+    }
+}

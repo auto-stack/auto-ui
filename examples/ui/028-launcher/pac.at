@@ -25,5 +25,8 @@ title_zh: "启动器"
 dep themes {
     path: "../../../packages/themes"
 }
+dep command_palette {
+    path: "../../../packages/command-palette"
+}
 category: "system"
 desktop: "true"

@@ -1103,6 +1103,7 @@ mod tests {
             on_change: None,
             on_text: None,
             on_submit: None,
+            navigation: Vec::new(),
             width: None,
             password: false,
             style: None,

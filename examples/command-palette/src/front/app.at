@@ -1,0 +1,117 @@
+use auto.json
+use themes.themes: Auto
+
+widget App {
+    use { package: command_palette from "../../../../packages/command-palette" }
+
+    msg { Init, OpenPalette, ObserveQuery(str), ApplyCommand(str), DismissPalette(str), Exit }
+
+    model {
+        var shown bool = false
+        var theme_name str = "Auto"
+        var dark_mode bool = false
+        var settings_visible bool = false
+        var status str = ""
+        var query str = ""
+        var opened_instance str = ""
+        var opened_session int = 0
+        var opened_query int = 0
+        var revision int = 0
+        var applied int = 0
+        var response str = ""
+        var runtime_track str = ""
+        var commands List = [
+            {id: "theme.dark", label: "Dark theme", groupId: "appearance", groupLabel: "Appearance", keywords: ["night"], shortcut: "Ctrl+Alt+D", disabled: false, icon: "moon"},
+            {id: "theme.light", label: "Light theme", groupId: "appearance", groupLabel: "Appearance", keywords: ["day"], shortcut: "Ctrl+Alt+L", disabled: false, icon: "sun"},
+            {id: "theme.settings", label: "Theme settings", groupId: "settings", groupLabel: "Settings", keywords: ["外观"], shortcut: "", disabled: false, icon: "settings"},
+            {id: "files.open", label: "Open file", groupId: "", groupLabel: "", keywords: [], shortcut: "", disabled: false, icon: "folder-open"},
+            {id: "settings.general", label: "Reset settings", groupId: "settings", groupLabel: "Settings", keywords: ["通用", "重置"], shortcut: "", disabled: false, icon: ""},
+            {id: "settings.layout", label: "Reset settings", groupId: "settings", groupLabel: "Settings", keywords: ["布局", "重置"], shortcut: "", disabled: false, icon: ""},
+            {id: "settings.managed", label: "由组织管理的设置不能从这个设备修改", groupId: "settings", groupLabel: "Settings", keywords: ["管理"], shortcut: "", disabled: true, icon: "lock"}
+        ]
+    }
+
+    computed {
+        theme => if .dark_mode { "dark" } else { "light" }
+    }
+
+    design {
+        theme: .theme_name
+        mode: if .dark_mode { "dark" } else { "light" }
+    }
+
+    view {
+        col (style: "w-full h-full p-4 gap-4 bg-background text-foreground") {
+            text "Settings" { style: "text-lg font-semibold" }
+            text f"Theme setting: ${.theme}"
+            text f"Applied commands: ${.applied}"
+            if .settings_visible {
+                text "Theme settings are open" { style: "text-sm" }
+            }
+            if .status != "" { text .status }
+            button "Open command palette" { onclick: .OpenPalette, style: "h-8" }
+            if .runtime_track == "vm" {
+                button "Exit example" { onclick: .Exit }
+            }
+            CommandPalette (open: .shown, title: "Commands", revision: .revision, commands: .commands,
+                query: .query, response: .response, onqueryChanged: .ObserveQuery,
+                oninvokeRequested: .ApplyCommand, oncloseRequested: .DismissPalette) {}
+        }
+    }
+
+    on {
+        .Init -> { .runtime_track = Env.track() }
+        .OpenPalette -> {
+            .shown = true
+            .query = ""
+            .response = ""
+            .opened_instance = ""
+        }
+        .ObserveQuery(payload) -> {
+            let request = json.parse(payload)
+            if .shown {
+                .opened_instance = request.instanceToken
+                .opened_session = request.session
+                .opened_query = request.querySeq
+                .query = request.query
+            }
+        }
+        .ApplyCommand(payload) -> {
+            let request = json.parse(payload)
+            if !.shown || request.instanceToken != .opened_instance || request.session != .opened_session ||
+                request.baseRevision != .revision || request.querySeq != .opened_query || request.query != .query { return }
+            let id str = request.commandId
+            var accepted bool = true
+            if id == "theme.dark" {
+                .dark_mode = true
+            } else if id == "theme.light" {
+                .dark_mode = false
+            } else if id == "theme.settings" {
+                .settings_visible = true
+            } else if id == "settings.general" {
+                .dark_mode = false
+                .status = "General settings reset"
+            } else if id == "settings.layout" {
+                .settings_visible = false
+                .status = "Layout settings reset"
+            } else {
+                accepted = false
+            }
+            let message = if accepted { "" } else { "File access is unavailable in Settings." }
+            .response = json.stringify({instanceToken: request.instanceToken, seq: request.seq,
+                session: request.session, commandId: id, status: if accepted { "accepted" } else { "rejected" }, message: message})
+            if accepted {
+                .applied = .applied + 1
+                .revision = .revision + 1
+                .shown = false
+            }
+        }
+        .DismissPalette(payload) -> {
+            let request = json.parse(payload)
+            if .shown && request.instanceToken == .opened_instance && request.session == .opened_session {
+                .shown = false
+            }
+        }
+        .Exit -> { if Env.track() == "vm" { Process.exit(0) } }
+    }
+}

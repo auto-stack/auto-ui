@@ -3552,6 +3552,7 @@ fn render_dynamic_view_inner(
             on_change,
             on_text,
             on_submit,
+            navigation,
             width,
             password,
             style,
@@ -3595,6 +3596,12 @@ fn render_dynamic_view_inner(
                     event: msg_clone.event.clone(),
                     input_value: Some(text),
                 });
+            }
+
+            if !disabled && !inspect_capture_active() {
+                for (key, msg) in navigation {
+                    input_widget = input_widget.on_arrow_navigation(key == "up", msg);
+                }
             }
 
             // Wire on_submit → on_submit (fires on Enter key press)

@@ -171,6 +171,7 @@ mod plan739_input_pin_tests {
             on_change: Some(DynamicMessage::String(".Edit".to_string())),
             on_text: None,
             on_submit: None,
+            navigation: Vec::new(),
             width: None,
             password: false,
             style: None,
