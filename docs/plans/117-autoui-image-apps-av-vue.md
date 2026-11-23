@@ -387,6 +387,13 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 029 使用 round 78 生产二进制加载当前原入口，越过入口视图和编译检查。进程终态为 19.497 s、退出 4，首拒 `ace.desktop.widget-timer: child timers are unavailable for AssetBrowser`，无成功窗口收据。该定时器驱动查询镜像，既有场景调度按子组件路径调度，当前实时挂载明确拒绝子组件计时器。恢复点为在子组件当前模型上评估计时器条件，接现有调度并核挂载、卸载和代次。`av/r79-029-window-r3.log` SHA256 `A9210411A65C743B123C1EC597ED5F376E411A5134CF63AA3F079697A6B63B94`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 79 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `223997797` / auto-ui `e6b56d9b` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work round 80 — 子组件定时器进入 Iced 调度
+
+- AutoLang `010391873` 用实时子组件的输入和模型评估计时条件。持续挂载沿用实例标识和定时截止时间，重排后按当前视图路径派发。AutoUI `10c6431a` 在提交新帧时同步启用的定时器，隐藏或卸载时移除，重新挂载时重新计时。
+- 包 AV 46/46（0.447 s），UI980 准备 0.227 s，最终 Iced 测试 Debug 准备 46.318 s。定向子组件用例 1/1（2.079 s），核重排后到期派发、条件禁用、隐藏及重挂隔离。已有根定时器用例 1/1（1.427 s）。`av/r80-guarded_child_timer_follows_keyed_mounts_and_restarts_after_remount-r2.log` SHA256 `A60FD05B241CB2A7D070AE69EE7A3E92BCA2C4C17138280D947B79639C5B11BD`。
+- 029 原入口用最终生产 Debug 二进制（准备 28.234 s）越过 AssetBrowser 定时器拒绝，10.800 s 退出 4。首拒为 `verify widget runtime MIR`，入口处理器 `d_p3_appm3_app___age_p_hidden_runtime_handler_0_0` 的 `mir.lang-fail-span`，MIR 报跨度 4996–5002。下一步以最小受检包复现并定位进入动态线族的失败位置与错误控制流。尚无成功窗口收据。`av/r80-029-window-final.log` SHA256 `ECB703430403EFD6D72FDAF270E0BBF4864DCDD113AFC267BC98CF8F8781E28F`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 80 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `010391873` / auto-ui `10c6431a` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
