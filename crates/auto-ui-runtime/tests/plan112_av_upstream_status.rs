@@ -527,11 +527,16 @@ fn neutralize_segments(body: &str) -> String {
 }
 
 /// 带最小消费者的包编译首诊断（store 单元 id `sys_store`）。
+const MINIMAL_SYS_STORE_CONSUMER: &str = "use sys_store: SysStore\n\nwidget Main {\n    view {\n        \
+                                           text .store.cpu {}\n        button \"go\" { onclick: .Init }\n    \
+                                           }\n    on {\n        .Init -> { store.Init() }\n    }\n}\n";
+
 fn package_store_diag(store_src: &str) -> String {
-    let consumer = "use sys_store: SysStore\n\nwidget Main {\n    view {\n        text .store.cpu {}\n        \
-                    button \"go\" { onclick: .Go }\n    }\n    on {\n        .Go -> { store.Init() }\n    }\n}\n";
     package_diag(
-        &[unit("main", consumer), unit("sys_store", store_src)],
+        &[
+            unit("main", MINIMAL_SYS_STORE_CONSUMER),
+            unit("sys_store", store_src),
+        ],
         "app::main",
     )
 }
@@ -657,8 +662,11 @@ fn p112_av_control_real_store_parses_on_package_face() {
 /// - ⓪ model 形态：无类型空列表字段（`var cpu_segs = []`）不再是状态，handler
 ///   一写就报 `assigns undeclared model field`。
 /// - ① `storage.*` 需所属宿主（`.SetSpeed` / `.SelectTab` / `.Sort`）。
-/// - ③ store model 引用的记录类型（`ProcInfo`，声明在 `types.at`，`sys_store.at`
-///   既未导入、类型也非 `pub`）对内联后的消费者不可见。
+/// - ③ 记录类型可见性**已关**（PLAN-112，auto-lang `f2f7c5593`）：`ProcInfo` 声明在
+///   `types.at`，`sys_store.at` 既未导入、类型也非 `pub`——同包记录类型现在对
+///   内联后的消费者可见。带上 `types.at` 单元后不再报 `unknown type`，停在下一道：
+///   `types.at` 的可选字段 `summary ?SysSummary`（见
+///   `p112_av_gap_package_types_reject_optional_field`）。
 ///
 /// 旧门②（handler 调用词汇）已由 PLAN-117 关掉：`ConfirmKill` 的
 /// `kill_process(.kill_target)` 语句不再在这一层被拒。
@@ -683,10 +691,24 @@ fn p112_av_gap_package_store_gates_in_order() {
         &package_store_diag(&format!("{head}\n{}", typed(identity))),
         &["storage calls require the owning host"],
     );
+    // ③ 已关：只给最小消费者与 store、不带 `types.at` 时 `ProcInfo` 仍无从解析——
+    // 带上 `types.at` 即可见，首阻断落到它的可选字段。
+    let with_types = package_diag(
+        &[
+            unit("main", MINIMAL_SYS_STORE_CONSUMER),
+            unit("sys_store", &format!("{head}\n{}", typed(neutralize_storage))),
+            unit("types", &read("src/front/types.at")),
+        ],
+        "app::main",
+    );
+    assert!(
+        !with_types.contains("unknown type"),
+        "同包记录类型应可见，实际: {with_types}"
+    );
     expect_gap(
-        "门③ 记录类型可见性",
-        &package_store_diag(&format!("{head}\n{}", typed(neutralize_storage))),
-        &["source.module-symbol", "unknown type `ProcInfo`"],
+        "门③ 之后：types.at 的可选字段",
+        &with_types,
+        &["module `app::types`", "field type annotation"],
     );
 }
 
@@ -718,9 +740,9 @@ fn p112_av_real_app_first_blocker_on_component_face() {
     );
 }
 
-/// AV 包面生产路径上的正对照：纯 store 单元里的 `storage.get/set` 经宿主服务仿真
-/// （`ace_source_prep::simulate_store_host_services`）改写为 store 模型字段后，
-/// 装载不再停在 AGE 的门①。
+/// AV 包面生产路径上的正对照：纯 store 单元先经装载前归一
+/// （`ace_source_prep::prepare_store_units`：model 形态 + `storage.get/set` 的宿主
+/// 服务仿真），装载不再停在 AGE 的门①。
 #[test]
 fn p112_av_control_av_package_path_simulates_store_storage() {
     let store = store_with_arm(
@@ -749,14 +771,16 @@ fn p112_av_control_av_package_path_simulates_store_storage() {
 
 /// AV 包面 / A2Vue 包面：025 六单元**原样**装配（零中和）。
 ///
-/// AV 包面（生产路径 `NodeDesktopBridge::load_package`）：`SysStore` 过语法之后，
-/// 纯 store 单元里的 `storage.get/set` 由宿主服务仿真改写为 store 的模型字段
-/// （PLAN-112，与组件面 prep 同一映射——AGE 的门① 在这条路径上不再出现，见
-/// `p112_av_gap_package_store_gates_in_order` 对裸 AGE 的钉点），首阻断落在门⓪
-/// model 形态：无类型空列表字段不是状态。A2Vue 包面（`generate_package_sfc`）
-/// 不做仿真，且先走 routed 车道，车道对入口单元**单独**做组件面解析
-/// （`package_candidates`）——`app.at` 单独解析时 `use sys_store: SysStore` 不可见，
-/// 首阻断是 `model has no field \`store\``，轮不到包编译。
+/// AV 包面（生产路径 `NodeDesktopBridge::load_package`）：纯 store 单元先经宿主归一
+/// （`ace_source_prep::prepare_store_units`——model 形态：方括号列表 → `List<T>`、
+/// 无类型空列表按 push 点推断；`storage.get/set` 的宿主服务仿真，与组件面 prep
+/// 同一映射），同包记录类型对内联后的消费者可见（PLAN-112，auto-lang
+/// `f2f7c5593`）。裸 AGE 的门⓪/①/③ 在这条路径上都不再出现（见
+/// `p112_av_gap_package_store_gates_in_order`），首阻断落到 `types.at` 的可选字段
+/// `summary ?SysSummary`。A2Vue 包面（`generate_package_sfc`）不做归一，且先走
+/// routed 车道，车道对入口单元**单独**做组件面解析（`package_candidates`）——
+/// `app.at` 单独解析时 `use sys_store: SysStore` 不可见，首阻断是
+/// `model has no field \`store\``，轮不到包编译。
 #[test]
 fn p112_av_real_app_first_blocker_on_package_faces() {
     let units: Vec<PackageModuleInput> = [
@@ -775,7 +799,7 @@ fn p112_av_real_app_first_blocker_on_package_faces() {
         &NodeDesktopBridge::load_package(units.clone(), "app::main", 1)
             .err()
             .unwrap_or_default(),
-        &["assigns undeclared model field `cpu_segs`"],
+        &["module `app::types`", "field type annotation"],
     );
     let a2vue = generate_package_sfc(&units, "app::main")
         .err()

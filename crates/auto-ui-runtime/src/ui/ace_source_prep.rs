@@ -2123,25 +2123,34 @@ fn rewrite_host_storage(src: &str, fields: &mut Vec<(String, String)>) -> String
     out
 }
 
-/// AV 包面：对**纯 store 单元**做同一套宿主服务仿真（PLAN-112，025 真语料）。
+/// AV 包面：对**纯 store 单元**做装载前归一（PLAN-112，025 真语料）。
 ///
-/// 组件面的 prep 只处理入口源；store 另成包单元时（`use sys_store: SysStore`），
-/// 其 handler 里的 `storage.get/set` 到了受检 AGE 停在
-/// `storage calls require the owning host`。宿主在此把它们改写成该 store 的模型
-/// 字段——与组件面同一映射（`.__st_<key>`；内存态、不落盘，是 AV 车道既有合同）。
-/// 只处理恰含一个 store、没有 widget/node 声明、带 `model {` 块、且每个
-/// `storage.` 调用的键都是字符串字面量的单元；其余原样返回，诊断仍由 AGE 给出。
-pub(crate) fn simulate_store_host_services(
+/// 受检 AGE 对 store 的要求比 VM 前端严，宿主在交给 AGE 之前把作者源里 VM 允许的
+/// 形状改成受检面收的形状：
+///
+/// 1. **model 形态**（[`normalize_store_model`]）：`var xs []T = …` → `List<T>`（包面
+///    视图观察不了方括号列表字段）；`var xs = []`（无类型空列表）不是状态，按全部
+///    push 点推断元素类型，元素是同构记录字面量时合成一个记录类型声明。
+/// 2. **宿主服务仿真**：handler 里的 `storage.get/set` 改写成 store 的模型字段，与
+///    组件面 prep 同一映射（`.__st_<key>`；内存态、不落盘，是 AV 车道既有合同）。
+///
+/// 只处理恰含一个 store、没有 widget/node 声明、带 `model {` 块的单元；storage
+/// 改写另要求每个 `storage.` 调用的键都是字符串字面量。推不出的形状原样留着，
+/// 诊断仍由 AGE 给出。
+pub fn prepare_store_units(
     units: Vec<ace_core::source::packages::PackageModuleInput>,
 ) -> Vec<ace_core::source::packages::PackageModuleInput> {
     units
         .into_iter()
         .map(|mut unit| {
-            if is_pure_storage_store(&unit.source) {
-                let mut fields = Vec::new();
-                let out = rewrite_host_storage(&unit.source, &mut fields);
-                if !fields.is_empty() {
-                    unit.source = inject_model_fields(&out, &fields);
+            if is_pure_store(&unit.source) {
+                unit.source = normalize_store_model(&unit.source);
+                if storage_keys_are_literals(&unit.source) {
+                    let mut fields = Vec::new();
+                    let out = rewrite_host_storage(&unit.source, &mut fields);
+                    if !fields.is_empty() {
+                        unit.source = inject_model_fields(&out, &fields);
+                    }
                 }
             }
             unit
@@ -2150,8 +2159,8 @@ pub(crate) fn simulate_store_host_services(
 }
 
 /// 顶层声明行（去缩进后以 `store `/`widget `/`node ` 起头）里恰有一个 store、
-/// 没有 widget/node，且所有 `storage.` 调用形如 `storage.get("` / `storage.set("`。
-fn is_pure_storage_store(src: &str) -> bool {
+/// 没有 widget/node，且带 `model {` 块。
+fn is_pure_store(src: &str) -> bool {
     let mut stores = 0;
     for line in src.lines() {
         let t = line.trim_start();
@@ -2165,13 +2174,390 @@ fn is_pure_storage_store(src: &str) -> bool {
             return false;
         }
     }
-    if stores != 1 || !src.contains("model {") {
-        return false;
-    }
+    stores == 1 && src.contains("model {")
+}
+
+/// 所有 `storage.` 调用形如 `storage.get("` / `storage.set("`（至少一处）。
+fn storage_keys_are_literals(src: &str) -> bool {
     let calls = src.matches("storage.").count();
     let literal = src.matches("storage.get(\"").count() + src.matches("storage.set(\"").count();
     calls > 0 && calls == literal
 }
+
+/// store model 的一条字段声明行。
+enum ModelField<'a> {
+    /// `var <name> <ty> <rest>`（`rest` 以 `=` 起头）。
+    Typed { indent: &'a str, name: &'a str, ty: &'a str, rest: &'a str },
+    /// `var <name> = <init>`（无类型注解）。
+    Untyped { indent: &'a str, name: &'a str, init: &'a str },
+}
+
+fn is_ident(s: &str) -> bool {
+    !s.is_empty()
+        && s.chars().enumerate().all(|(i, c)| {
+            c == '_' || (c.is_ascii_alphabetic() || (i > 0 && c.is_ascii_digit()))
+        })
+}
+
+fn parse_model_field(line: &str) -> Option<ModelField<'_>> {
+    let body = line.trim_end_matches(['\n', '\r']);
+    let t = body.trim_start();
+    let indent = &body[..body.len() - t.len()];
+    let rest = t.strip_prefix("var ")?;
+    let (name, after) = rest.split_once(char::is_whitespace)?;
+    if !is_ident(name) {
+        return None;
+    }
+    // 无类型字段的初值只认空列表（行尾注释不算初值）；带类型的字段保留整行余下
+    // 的部分（初值与行尾注释）。
+    let after = after.trim_start();
+    if let Some(init) = after.strip_prefix('=') {
+        let init = init.trim();
+        let init = init.split(" //").next().unwrap_or(init).trim_end();
+        Some(ModelField::Untyped { indent, name, init })
+    } else if after.is_empty() || !after.starts_with(|c: char| c.is_ascii_alphabetic() || c == '[') {
+        None
+    } else {
+        let ty_end = after.find(char::is_whitespace).unwrap_or(after.len());
+        Some(ModelField::Typed { indent, name, ty: &after[..ty_end], rest: &after[ty_end..] })
+    }
+}
+
+/// `model {` 之后的位置与块尾 `}` 的位置。按词法扫描配对（跳过行注释与字符串
+/// 字面量——model 注释里的 `}` 不算块尾）。
+fn model_block(src: &str) -> Option<(usize, usize)> {
+    let open = src.find("model {")? + "model {".len();
+    let bytes = src.as_bytes();
+    let mut i = open;
+    let mut depth = 1usize;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b'/' && bytes.get(i + 1) == Some(&b'/') {
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            continue;
+        }
+        if b == b'"' {
+            i += 1;
+            while i < bytes.len() {
+                if bytes[i] == b'\\' {
+                    i += 2;
+                } else {
+                    let close = bytes[i] == b'"';
+                    i += 1;
+                    if close {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        match b {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some((open, i));
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// 前导 `use` 行之后的位置（导入必须先于声明；前导的注释与空行一并算前导）。
+fn after_leading_uses(src: &str) -> usize {
+    let mut end = 0;
+    for line in src.split_inclusive('\n') {
+        let t = line.trim_start();
+        if t.starts_with("use ") || t.starts_with("//") || t.is_empty() {
+            end += line.len();
+        } else {
+            break;
+        }
+    }
+    end
+}
+
+/// 字段 `.field` 的元素表达式 `(使用点, 表达式)`：`.field.push(<expr>)` 的实参与
+/// `.field = [<expr>, …]` 的各元素（顶层逗号切分；空列表不贡献）。`.field` 之后
+/// 不能接标识符字符（`.cpu_segs2` 不算 `.cpu_segs`）。
+fn element_exprs<'a>(src: &'a str, field: &str) -> Vec<(usize, &'a str)> {
+    let head = format!(".{field}");
+    let mut out = Vec::new();
+    let mut cursor = 0;
+    while let Some(rel) = src[cursor..].find(&head) {
+        let at = cursor + rel;
+        let after = &src[at + head.len()..];
+        cursor = at + head.len();
+        if after.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_') {
+            continue;
+        }
+        if let Some(args) = after.strip_prefix(".push(") {
+            if let Some(end) = balanced_end(args, '(', ')') {
+                out.push((at, args[..end].trim()));
+            }
+        } else if let Some(init) = after.strip_prefix("= ") {
+            let line_end = init.find('\n').unwrap_or(init.len());
+            let init = init[..line_end].split(" //").next().unwrap_or("").trim();
+            if let Some(items) = init.strip_prefix('[').and_then(|rest| rest.strip_suffix(']')) {
+                for expr in split_top_level(items) {
+                    let expr = expr.trim();
+                    if !expr.is_empty() {
+                        out.push((at, expr));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// `s` 里与已消费的开括号配对的闭括号下标（跳过字符串字面量）。
+fn balanced_end(s: &str, open: char, close: char) -> Option<usize> {
+    let mut depth = 1usize;
+    let mut chars = s.char_indices();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '"' => {
+                for (_, q) in chars.by_ref() {
+                    if q == '"' {
+                        break;
+                    }
+                }
+            }
+            x if x == open => depth += 1,
+            x if x == close => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// 按顶层逗号切分（括号/花括号/方括号与字符串内部不切）。
+fn split_top_level(s: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0;
+    let mut chars = s.char_indices();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '"' => {
+                for (_, q) in chars.by_ref() {
+                    if q == '"' {
+                        break;
+                    }
+                }
+            }
+            '(' | '{' | '[' => depth += 1,
+            ')' | '}' | ']' => depth -= 1,
+            ',' if depth == 0 => {
+                out.push(&s[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    out.push(&s[start..]);
+    out
+}
+
+/// 类型词归一到受检面：`[]X` → `List<X>`；其余原样。
+fn type_word(ty: &str) -> Option<std::borrow::Cow<'_, str>> {
+    if ty.is_empty() || ty == "=" {
+        return None;
+    }
+    Some(match ty.strip_prefix("[]") {
+        Some(elem) => std::borrow::Cow::Owned(format!("List<{elem}>")),
+        None => std::borrow::Cow::Borrowed(ty),
+    })
+}
+
+/// model 块里字段 `name` 的声明类型。
+fn model_field_type<'a>(model: &'a str, name: &str) -> Option<&'a str> {
+    model.lines().find_map(|line| match parse_model_field(line) {
+        Some(ModelField::Typed { name: n, ty, .. }) if n == name => Some(ty),
+        _ => None,
+    })
+}
+
+/// 元素表达式的类型：字面量（`"…"` / `true` / `false` / 整数 / 小数）、就近的带注解
+/// 局部声明（从使用点向前找 `var x T` / `let x T`）、model 字段（`.x`）。其余推不出。
+fn expr_type<'a>(expr: &str, src: &'a str, at: usize, model: &'a str) -> Option<std::borrow::Cow<'a, str>> {
+    let e = expr.trim();
+    if e.len() >= 2 && e.starts_with('"') && e.ends_with('"') {
+        return Some("str".into());
+    }
+    match e {
+        "true" | "false" => return Some("bool".into()),
+        _ => {}
+    }
+    if !e.is_empty() && e.bytes().all(|b| b.is_ascii_digit()) {
+        return Some("int".into());
+    }
+    if e.contains('.')
+        && e.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+        && e.matches('.').count() == 1
+    {
+        return Some("float".into());
+    }
+    if let Some(member) = e.strip_prefix('.') {
+        return is_ident(member)
+            .then(|| model_field_type(model, member))
+            .flatten()
+            .and_then(type_word);
+    }
+    if !is_ident(e) {
+        return None;
+    }
+    for line in src[..at].lines().rev() {
+        let t = line.trim_start();
+        let Some(decl) = t.strip_prefix("var ").or_else(|| t.strip_prefix("let ")) else {
+            continue;
+        };
+        let Some((name, after)) = decl.split_once(char::is_whitespace) else {
+            continue;
+        };
+        if name != e {
+            continue;
+        }
+        let after = after.trim_start();
+        let ty_end = after.find(char::is_whitespace).unwrap_or(after.len());
+        return type_word(&after[..ty_end]);
+    }
+    None
+}
+
+/// 合成记录类型名：字段名各段首字母大写 + `Row`（`cpu_segs` → `CpuSegsRow`）。
+fn row_type_name(field: &str) -> Option<String> {
+    let mut name = String::new();
+    for part in field.split('_').filter(|part| !part.is_empty()) {
+        let mut chars = part.chars();
+        let first = chars.next()?;
+        name.extend(first.to_uppercase());
+        name.push_str(chars.as_str());
+    }
+    (!name.is_empty()).then(|| format!("{name}Row"))
+}
+
+/// 无类型空列表字段的元素类型：`(元素类型词, 合成的记录类型声明)`。全部元素表达式
+/// 必须同构——都是标量且类型一致，或都是键序与字段类型一致的字面量。
+fn infer_element_type(src: &str, field: &str) -> Option<(String, Option<String>)> {
+    let exprs = element_exprs(src, field);
+    if exprs.is_empty() {
+        return None;
+    }
+    let model = model_block(src).map(|(open, close)| &src[open..close]).unwrap_or("");
+    let mut scalar: Option<String> = None;
+    let mut record: Option<Vec<(String, String)>> = None;
+    for (at, expr) in &exprs {
+        if let Some(inner) = expr.strip_prefix('{').and_then(|rest| rest.strip_suffix('}')) {
+            if scalar.is_some() {
+                return None;
+            }
+            let mut fields = Vec::new();
+            for part in split_top_level(inner) {
+                let (key, value) = part.split_once(':')?;
+                let key = key.trim();
+                if !is_ident(key) {
+                    return None;
+                }
+                fields.push((key.to_string(), expr_type(value, src, *at, model)?.into_owned()));
+            }
+            match &record {
+                None => record = Some(fields),
+                Some(seen) if *seen == fields => {}
+                Some(_) => return None,
+            }
+        } else {
+            if record.is_some() {
+                return None;
+            }
+            let ty = expr_type(expr, src, *at, model)?.into_owned();
+            match &scalar {
+                None => scalar = Some(ty),
+                Some(seen) if *seen == ty => {}
+                Some(_) => return None,
+            }
+        }
+    }
+    if let Some(scalar) = scalar {
+        return Some((scalar, None));
+    }
+    let fields = record?;
+    let name = row_type_name(field)?;
+    if src.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')).any(|word| word == name) {
+        return None;
+    }
+    let mut decl = format!("type {name} {{\n");
+    for (key, ty) in &fields {
+        decl.push_str(&format!("    {key} {ty}\n"));
+    }
+    decl.push_str("}\n\n");
+    Some((name, Some(decl)))
+}
+
+/// store model 的受检面形态（只动 `model { … }` 块里的字段行）：
+/// - `var xs []T = …` → `var xs List<T> = …`——包面视图观察不了方括号列表字段；
+/// - `var xs = []` → `var xs List<E> = []`，`E` 取自全部 push 点（见
+///   [`infer_element_type`]）；元素是记录字面量时在前导 `use` 行之后合成类型声明。
+///
+/// 推不出的无类型字段原样留着，诊断仍由 AGE 给出。
+fn normalize_store_model(src: &str) -> String {
+    let Some((open, close)) = model_block(src) else {
+        return src.to_string();
+    };
+    let mut body = String::with_capacity(src.len());
+    body.push_str(&src[..open]);
+    let mut untyped: Vec<(&str, &str)> = Vec::new();
+    for line in src[open..close].split_inclusive('\n') {
+        let trimmed = line.trim_end_matches(['\n', '\r']);
+        let nl = &line[trimmed.len()..];
+        let replaced = match parse_model_field(line) {
+            Some(ModelField::Typed { indent, name, ty, rest }) => ty.strip_prefix("[]").map(|elem| {
+                format!("{indent}var {name} List<{elem}>{rest}{nl}")
+            }),
+            Some(ModelField::Untyped { indent, name, init }) if init == "[]" => {
+                untyped.push((name, indent));
+                None
+            }
+            _ => None,
+        };
+        match replaced {
+            Some(replaced) => body.push_str(&replaced),
+            None => body.push_str(line),
+        }
+    }
+    let mut decls = String::new();
+    for (name, indent) in untyped {
+        let Some((elem, decl)) = infer_element_type(src, name) else {
+            continue;
+        };
+        let target = format!("{indent}var {name} = []");
+        if let Some(at) = body.find(&target) {
+            body.replace_range(at..at + target.len(), &format!("{indent}var {name} List<{elem}> = []"));
+            if let Some(decl) = decl {
+                decls.push_str(&decl);
+            }
+        }
+    }
+    body.push_str(&src[close..]);
+    let at = after_leading_uses(&body);
+    let mut out = String::with_capacity(body.len() + decls.len());
+    out.push_str(&body[..at]);
+    out.push_str(&decls);
+    out.push_str(&body[at..]);
+    out
+}
+
 
 /// 把宿主仿真字段插进 `model {` 块尾（无 model 块则不插）。
 /// 块尾 `}` 按词法扫描定位：跳过行注释（`//`）与字符串字面量——model 注释
@@ -2585,7 +2971,7 @@ mod tests {
                    msg { Go }\n\n    on {\n        .Init -> {\n            var sp = storage.get(\"sysmon.speed\")\n            \
                    if sp == \"\" { sp = storage.get(\"dash.speed\") }\n            .speed = sp\n        }\n        \
                    .SetSpeed(speed) -> {\n            storage.set(\"sysmon.speed\", speed)\n        }\n    }\n}\n";
-        let out = simulate_store_host_services(vec![package_unit("s", src)]).remove(0).source;
+        let out = prepare_store_units(vec![package_unit("s", src)]).remove(0).source;
         assert!(!out.contains("storage."), "{out}");
         assert!(out.contains("var sp = .__st_sysmon_speed"), "{out}");
         assert!(out.contains("sp = .__st_dash_speed"), "{out}");
@@ -2613,7 +2999,7 @@ mod tests {
             "store S {\n    model { var a str = \"\" }\n    on { .Go -> { storage.set(.a, \"v\") } }\n}\n",
             "store S {\n    model { var a str = \"\" }\n    on { .Go -> { .a = \"v\" } }\n}\n// storage.get 的注释\n",
         ];
-        let out = simulate_store_host_services(shapes.iter().enumerate().map(|(i, s)| package_unit(&format!("u{i}"), s)).collect());
+        let out = prepare_store_units(shapes.iter().enumerate().map(|(i, s)| package_unit(&format!("u{i}"), s)).collect());
         for (before, unit) in shapes.iter().zip(out) {
             assert_eq!(&unit.source, before);
         }
@@ -2627,7 +3013,7 @@ mod tests {
         let src = std::fs::read_to_string(&path).unwrap();
         // 13 处调用、8 个键（源变更时同步本钉点）。
         assert_eq!(src.matches("storage.").count(), 13);
-        let out = simulate_store_host_services(vec![package_unit("sys_store", &src)]).remove(0).source;
+        let out = prepare_store_units(vec![package_unit("sys_store", &src)]).remove(0).source;
         assert!(!out.contains("storage."), "storage 调用应全部改写");
         for key in [
             "sysmon.speed",
@@ -2645,5 +3031,92 @@ mod tests {
         assert_eq!(out.matches("var __st_").count(), 8, "恰 8 个仿真字段");
         assert!(out.contains("var sp = .__st_sysmon_speed"), "{out}");
         assert!(out.contains(".__st_sysmon_speed = speed"), "{out}");
+    }
+
+    /// model 形态归一只动 `model { … }` 里的字段行：方括号列表 → `List<T>`（初值、
+    /// 行尾注释与换行保留）；handler 里的方括号局部量不动。
+    #[test]
+    fn p112_types_bracket_lists_in_the_store_model_only() {
+        let src = "store S {\r\n    model {\r\n        var xs []int = [] // ids\r\n        \
+                   var name str = \"\"\r\n        var ys []Rec\r\n    }\r\n    msg { Go }\r\n    on {\r\n        \
+                   .Go -> {\r\n            var r2 []Rec = []\r\n            .name = \"x\"\r\n        }\r\n    }\r\n}\r\n";
+        let out = prepare_store_units(vec![package_unit("s", src)]).remove(0).source;
+        assert!(out.contains("        var xs List<int> = [] // ids\r\n"), "{out:?}");
+        assert!(out.contains("        var ys List<Rec>\r\n"), "{out:?}");
+        assert!(out.contains("            var r2 []Rec = []\r\n"), "handler 局部量不动：{out:?}");
+        assert_eq!(out.matches("\r\n").count(), src.matches("\r\n").count());
+    }
+
+    /// 无类型空列表按 push 点推断：记录字面量 → 合成 `<Field>Row` 类型声明（落在前导
+    /// `use` 行之后、store 之前）；标量与已声明类型的名字 → 直接取类型。
+    #[test]
+    fn p112_infers_untyped_empty_list_fields_from_push_sites() {
+        let src = "use fmt: n1\n\n// 说明\nstore S {\n    model {\n        var cpu float = 0.0\n        \
+                   var cpu_segs = []\n        var hist = []\n        var n int = 0\n    }\n    msg { Go }\n    \
+                   on {\n        .Go -> {\n            .cpu_segs = []\n            var cst str = \"0\"\n            \
+                   var ccol str = \"bg-red-500\"\n            .cpu_segs.push({st: cst, color: ccol})\n            \
+                   .cpu_segs.push({st: \"1\", color: ccol})\n            .hist.push(1.5)\n            \
+                   .hist.push(.cpu)\n            .n = 1\n        }\n    }\n}\n";
+        let out = prepare_store_units(vec![package_unit("s", src)]).remove(0).source;
+        assert!(out.contains("type CpuSegsRow {\n    st str\n    color str\n}\n\n"), "{out}");
+        assert!(out.contains("        var cpu_segs List<CpuSegsRow> = []\n"), "{out}");
+        assert!(out.contains("        var hist List<float> = []\n"), "{out}");
+        let (uses, decl, store) = (
+            out.find("use fmt: n1").unwrap(),
+            out.find("type CpuSegsRow").unwrap(),
+            out.find("store S {").unwrap(),
+        );
+        assert!(uses < decl && decl < store, "{out}");
+    }
+
+    /// 推不出就原样留着：没有任何元素表达式、push 的局部量没有类型注解、同名记录
+    /// 字段的类型不一致、合成的类型名已被占用。
+    #[test]
+    fn p112_leaves_uninferrable_untyped_lists_untouched() {
+        let cases = [
+            "store S {\n    model {\n        var xs = []\n    }\n    msg { Go }\n    on { .Go -> { .xs = [] } }\n}\n",
+            "store S {\n    model {\n        var xs = []\n    }\n    msg { Go }\n    on { .Go -> { var v = f()\n            \
+             .xs.push(v) } }\n}\n",
+            "store S {\n    model {\n        var xs = []\n    }\n    msg { Go }\n    on { .Go -> { .xs.push({st: \"1\"})\n            \
+             .xs.push({st: 2}) } }\n}\n",
+            "type RowsRow {\n    a int\n}\nstore S {\n    model {\n        var rows = []\n    }\n    msg { Go }\n    \
+             on { .Go -> { .rows.push({a: 1}) } }\n}\n",
+        ];
+        for src in cases {
+            let out = prepare_store_units(vec![package_unit("s", src)]).remove(0).source;
+            assert_eq!(&out, src);
+        }
+    }
+
+    /// 025 真实 store 的 model 形态：两个无类型段字段合成记录类型；方括号列表统一成
+    /// `List<T>`；handler 里的方括号局部量不动。
+    #[test]
+    fn p112_normalizes_the_real_025_store_model() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/ui/025-sys-monitor/src/front/sys_store.at");
+        let src = std::fs::read_to_string(&path).unwrap();
+        let out = prepare_store_units(vec![package_unit("sys_store", &src)]).remove(0).source;
+        assert!(out.contains("type CpuSegsRow {\n    st str\n    color str\n}\n"), "{out}");
+        assert!(out.contains("type MemSegsRow {\n    st str\n    color str\n}\n"), "{out}");
+        assert!(out.contains("var cpu_segs List<CpuSegsRow> = []"), "{out}");
+        assert!(out.contains("var mem_segs List<MemSegsRow> = []"), "{out}");
+        for (field, elem) in [
+            ("procs", "ProcInfo"),
+            ("procsView", "ProcInfo"),
+            ("disks", "DiskInfo"),
+            ("cores", "CoreInfo"),
+            ("users", "UserInfo"),
+            ("cpuHist", "float"),
+            ("memHist", "float"),
+            ("diskHist", "float"),
+            ("netHist", "float"),
+        ] {
+            assert!(
+                out.contains(&format!("var {field} List<{elem}> = []")),
+                "{field} 应归一为 List<{elem}>：{out}"
+            );
+        }
+        assert!(out.contains("var r2 []ProcInfo = []"), "handler 局部量不动：{out}");
+        assert!(!out.contains("var cpu_segs = []"), "{out}");
     }
 }
