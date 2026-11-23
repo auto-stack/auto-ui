@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-14
 updated_at: 2026-11-23
 plan_revision: 3
-current_step: 3
+current_step: 4
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/command-palette.md]
@@ -181,7 +181,7 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 | AC-02 | work | §5正常/错误/禁用/键盘/适用IME规则、本组件case及X-04/05全部有期望断言；无一次手势多次提交或虚假成功 | T-02,T-03,T-05；[ ] |
 | AC-03 | work | 当前身份、重复请求锁、外部改动/迟到反馈/关闭重开/双实例隔离反例通过，旧对象零误写（含卸载重建与同revision内容变化） | T-02,T-03,T-05；[ ] |
 | AC-04 | work | 普通GUI和MCP通过当前可见控件完成关键用例；Windows Native VM 和 Windows Vue 两轨分别有结果，原生不依赖前台焦点；X-02/05/06/07分层门、生命周期与负控通过，缺必需MCP/平台门不算通过 | T-03,T-05；[ ] |
-| AC-05 | work | 028保留recent/分类/评分/grid并正确转发一次宿主动作；无宿主明确报不可用；普通设置示例在两端读回真实模型修改，源码匹配或高亮不算执行成功。 | T-04,T-05；[ ] |
+| AC-05 | work | 028保留recent/分类/评分/grid并正确转发一次宿主动作；无宿主明确报不可用；普通设置示例在两端读回真实模型修改，源码匹配或高亮不算执行成功。 | T-04,T-05；[x] Windows 宿主单次启动、双轨独立消费及排序对照见 §9 |
 | AC-06 | work | X-01/03/06/07、移根、必要公共/消费者回归及真实截图通过；中文/暗色/窄窗可用，Q-01若影响本组件则闭环；README/待沉淀Spec与证据齐 | T-05,T-06；[ ] |
 | AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定 Plan r3和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[ ] |
 | AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，发布说明限定为已验收的 Windows Native VM 和 Windows Vue | T-08；[ ] |
@@ -193,8 +193,8 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 | T-01 | work | 无；现有来源重核 | §4来源、正式包导入/事件路径；新增`docs/reviews/plan096/decisions.md`，落实§5最小全链探针、instanceToken/首次error/模态焦点/输入桥可行性、真实包命令、平台及MCP提供方/依赖pin | 两端普通控件事件到应用读回；不是仅schema登记；差额有具名owner | AC-01；[x] Windows 普通设置与 Launcher provided 双轨探针见 §9；实际宿主启动由 T-04 验收 |
 | T-02 | work | T-01 | 新增`packages/command-palette/`的数据/交互模型、校验、消息与身份协议；沿既有包元数据/相对导入 | §6有效/非法/迟到/双实例模型反例；无业务I/O进入包 | AC-01,02,03；[x] 9 个模型及包边界用例通过，含缺失 ID、分组冲突、同修订数据变化及重挂载 |
 | T-03 | work | T-02 | 同包UI/主题/键盘与MCP可见语义；必要现有runtime接缝最小修复 | 本组件case普通GUI/MCP路径可操作，IME/焦点和pending正确；对照参考图布局 | AC-02,03,04；[x] Windows 普通控件、模态焦点、IME、系统树、选择和请求锁双轨通过。宿主真实启动属 T-04 |
-| T-04 | work | T-03 | examples/command-palette/（新增）、examples/ui/028-launcher/src/front/app.at；复用§4实际业务入口 | §5消费路径输出真实变化；保持原业务权限/数据/模式，不同步兄弟仓 | AC-05；[ ] Windows 两轨设置写回与 028 独立模式通过，排序对照一致。真实 Windows AutoOS 宿主未绘制首帧 |
-| T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/command_palette_component.rs`、`tests/product/verify_command_palette.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；Windows 双轨、必需 case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[ ] 9 个模型、23 个产品用例及定向公共回归通过。整体需 T-04 宿主门及完整覆盖复核 |
+| T-04 | work | T-03 | examples/command-palette/（新增）、examples/ui/028-launcher/src/front/app.at；复用§4实际业务入口 | §5消费路径输出真实变化；保持原业务权限/数据/模式，不同步兄弟仓 | AC-05；[x] Windows 两轨设置写回与 028 独立模式通过，排序对照一致。真实 Windows AutoOS 桌面搜索 `cal` 后点击一次已打开一个 Calculator 窗口 |
+| T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/command_palette_component.rs`、`tests/product/verify_command_palette.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；Windows 双轨、必需 case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[ ] 9 个模型、23 个产品用例及定向公共回归通过，T-04 宿主门已恢复，完整覆盖待复核 |
 | T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan096/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[ ] |
 | T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[ ] |
 | T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/command-palette.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[ ] |
@@ -216,12 +216,14 @@ Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨�
 - stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 2 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a5929d9b8c4196e976a20580710182a4b64679a6 | next: user
 - stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 3 | from: work | to: user | status: executing | outcome: waiting | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a5929d9b8c4196e976a20580710182a4b64679a6 | next: user。AutoOS 仍为 `cdb4883`，当前没有可接续的 AutoOS 桌面进程，§10 无新决定；未重跑验收。
 - stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 4 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: a5929d9b8c4196e976a20580710182a4b64679a6 | next: user。连续第三个目标轮次遇到同一宿主前置条件；§10 尚无可用的 Windows AutoOS 会话或宿主启动修复授权。实施树干净，AC-05 及后续交付门保持待验。
+- 2026-11-23：用户恢复目标并确认 Windows 桌面已可测试。T-04 通过。现有 `ICED_BACKEND=tiny-skia` 使 AutoOS `cdb4883` 的 `ui-desktop` 渲染出真实窗口。打开壳 Launcher 后，MCP 读回 `q = "cal"`；通过可见结果点击一次，宿主输出一行 `launch_app(inproc) 011-calculator`，取得实际 Calculator 窗口、键盘和独立嵌入树，随后宿主正常退出，原 PID、MCP 端口均回收。`hosted-resume-07/report.json` SHA256 `a72f63b1e8615235d568b70facf16ad38a4cfd929550e6975d01384300080e5b`；实施树证据提交 `3c032f2e519362131d7e1819688c9e0f0ed154ff`，无行为代码变更。
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 3c032f2e519362131d7e1819688c9e0f0ed154ff | next: work/T-05
 
 ## 10. 待澄清事项
 
 r3 的 Windows Native VM 和 Vue 范围已确定。包语法/实例token/首次error/模态焦点/IME/反馈时序及现有Vue MCP提供方由T-01具名探针落实；T-02前关闭机制选择，不能把协议自由设计留给实现中途，失败须记录而非假定已支持。Windows Native VM 和 Vue 的工具及 MCP 提供方由 T-01 实查。缺失的必需能力记为 not_run。业务能力不在宿主上提供时明确不可用，按上述普通消费者和真实原生消费者各自验收。
 
 
-### 实际 AutoOS 宿主入口阻塞
+### AutoOS 宿主首帧（已解决）
 
-`ui-desktop` 在 Windows 使用官方 shell 与仅含 Launcher、Calculator 的隔离注册表时，MCP 端口已启动，`Auto - Desktop` 窗口处于隐藏态，MCP 无 shell 首帧。普通、全屏和私有 rqhost 路径已查，使用原有子组件默认值逻辑的对照与 DX12 同样无可操作窗口。请提供可正常启动的 Windows AutoOS 会话，或授权先修宿主启动路径。恢复后首先从真实桌面召出 Launcher，用当前搜索控件启动 Calculator 一次并验证实际应用窗口，再完成 T-04、T-05、T-06 和后续复审。
+默认渲染器启动时观察到隐藏窗口且无首帧，恢复后使用现有软件渲染后端 `ICED_BACKEND=tiny-skia` 完成真实宿主验收，证据见 §9。没有修改 AutoOS 宿主源码或默认渲染设置。
