@@ -835,6 +835,16 @@ AC-01 通过。AC-02、AC-03 的旧反例已覆盖，R117-AV-05 的新状态控�
 - stage: review | review_scope: phase/T-04 | reviewer: current implementation-session context with independently selected nested navigation and typed-binding controls | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | reviewed_commit: AutoUI `8894c9ef` / AutoLang `65c473046` | findings: none open in phase | pending_closeout_gates: T-05 phase fixed-group gate and AV/W1 handoff, T-07, T-08 | next: merge/T-05
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 122 | from: review/T-04 | to: merge/T-05 | status: executing | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `65c473046` | next: merge/T-05 阶段回归及交付
 
+### 2026-11-23 goal merge round 123 — T-05 启动阶段回归准备
+
+- 确认阶段复核仍绑定 AutoUI `8894c9ef3721b28669f859cbafc5722fe266b79f` 和 AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`。W1 U05 候选收据已按 AutoLang `m2-autoui.md` §14 及归档 1071 U05 对照，覆盖 029、031、Carousel 三行及既有边界。候选 `scratch/r123-phase-gate/w1-u05-receipt-draft.md` SHA256 `BD4DD7348FB6812879DD502A6F5414F29EEEAC17424EFA4E64BCB3CA9BCD6E54`，签发待实际回归与落主。
+- 22:45:57 发起首轮 `cargo t <round 122 固定 11 组> --prepare-only --debug-tools` 后，进程祖先核对发现 `lang-1054` 的固定组准备已早 9 秒启动。停止本计划首组归档子树，控制器约 59.6 s 后退出 2 并释放本计划租约。`scratch/r123-phase-gate/language-prepare.log` SHA256 `48EEA666DAFEEEF8D27AE6C937BC7C3F59796364178FABDCA0911590F6EFEF81`。该次没有执行测试。
+- Windows 22:48:24 起，本计划 PowerShell PID `550372` 排队检测固定组、Cargo、rustc 和链接器进程。PLAN-1054 依次结束固定组准备和实跑后，22:56:36 确认机器空闲，排队用时 492.51 s。22:56:53 已确认本计划 PID `925848` 在准备冻结的 11 组 Debug 归档。脚本随后串行准备 AAC1046/1047，再通过 `--run-prepared` 执行。`run-language-gate.ps1` SHA256 `9B175AB3007DFD772B106F586859A2F3540EDEF11C79D89AF876326C2A131C7C`，实况在同目录 `occupancy.log`。阶段用例数和实跑时间仍待记录。
+- AutoUI 的 Debug 准备和已准备 exe 逐目标执行脚本已静态核对，包含 11 个目标、原 026 真实 SQLite 窗口及包 SFC 的两个真实浏览器用例。`run-ui-gate.ps1` SHA256 `D03C0BBA3D76D6A73DE35709372D890FE8B3C71C3CDEF4771BC92965B4848A92`。待语言门结束后占用测试机。阶段门保留 round 122 登记的 Chart 历史失败对照。
+- 为回归腾出约 25.1 GB。范围为本计划旧探针的 15 个可重建调试符号和本计划 AutoUI 测试缓存的 6 个旧 `.pdb`。保留对应 exe、较新符号、输入与收据，路径与字节数见同目录三个 `removed-*.json`。本轮 T-05 保持打开，T-07/T-08 待办。
+
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 123 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `65c473046` | next: 核查在途语言门，顺序运行 AutoUI 门并完成 AV/W1 交付
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
