@@ -587,6 +587,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 真正停止并重启后端、保持同源和收藏存储，再重载浏览器，收藏记录仍在且可选，子目录缩略图与原图均 404（1.915 s，退出 1）。本轮注册表按后端进程生存，重开后原收藏的媒体身份仍需恢复。`browser-restart.log` SHA256 `A4423ED395D034EDF9D7E46441B64DC3CDA813C3425B891BB2D1F4AC92C653BD`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 106 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `175df76294` / auto-ui `9ed57639` | next: work/T-02–T-06 核心验证含进程重开后的收藏媒体、Iced 消费复验和 031 带授权媒体绑定。
 
+2026-11-23 T-02 / T-03 / T-06 续（round 107）：029 后端重启后恢复子目录收藏媒体。
+
+- AutoLang `2982178d8b` 在媒体库按用户状态目录和规范化照片根保存已签发目录快照。同目录重扫以独立原子写刷新，首次扫描或取图可重建根桶，资源仍通过现有路径和文件复核。现有收藏 JSON、令牌、三个 HTTP 路径和非递归扫描结果均保持兼容。无可写用户状态目录时仍运行进程内令牌表。升级前从未在本实现扫描过的目录无快照，旧收藏须先重访源目录，之后可跨进程恢复。
+- `cargo test --locked -p auto-media-core --lib` 56/56 通过（执行 24.460 s，整命令 25.769 s）。快照用例实证两目录恢复、未扫描照片和其他索引缺席、同目录重扫撤销。`scratch/r107-photo-restart/media-full.log` SHA256 `982CA877E35BB8B15149C5A59D435443B95FBDD27EEFD641F506CC4F99E365F1`。
+- 用原生成后端源码和工作树依赖重建发布二进制（174.513 s，SHA256 `8E0A76C2EEBC7B42F381F8E68211FA60BC225AB2685BF42E731F25FB9C63C444`），Chrome 复用 round 105 原 Vue 冷构建。真实结束后端进程、同源重启、重载页面，上一版缩略图和原图均 404（1.790 s），新版本保留同一收藏记录，未重扫该子目录即两路 200，原图解码 64×48（1.704 s）。`browser-base.log` SHA256 `0A98B6EB176ECDB806DF19F304CA949BC37530F1E1A5C85947957C5C63957D76`，`browser-final.log` SHA256 `7CB8EF6E6AD79EFE6F065F0369E307709B48D00E314B54482CC1EC89BE60C5AB`。
+- 同一用户状态切到含同相对路径的第二个照片根，使用先前令牌的原图查询先后得到 404、仅扫根目录仍 404、明确扫描所属目录后 200，返回字节等于第二根的原图（1.844 s）。`browser-root.log` SHA256 `9F879B569E43ED7E082D93E6DD01768D02E5104398A1FCEE7FD0CD5FEF3B87A1`。原 029 Iced 真窗使用同一新 Rust 后端复验两张缩略图解码、Unicode 过滤与会话关闭（29.166 s，退出 0）；复用 round 102 窗口探针，未重编桌面内嵌代理。`iced/desktop.json` SHA256 `4B3A1502B384984CD6B7E9E50656742F4CCDC0FF5A3A437453CE3CD478DD2A14`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 107 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `2982178d8b` / auto-ui `9ed57639` | next: work/T-02–T-06 核 031 带授权媒体绑定、029 桌面内嵌代理复验及剩余原验收。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
