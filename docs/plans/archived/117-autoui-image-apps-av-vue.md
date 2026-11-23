@@ -1,12 +1,13 @@
 ---
 plan_id: PLAN-117
-status: reviewed
+status: archived
+completion_kind: delivered
 feature_name: U05 Photo Gallery 与 Image Viewer 双端交付
 author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-24
 plan_revision: 1
-current_step: 6
+current_step: 7
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -18,16 +19,16 @@ touched_goals: [GOAL-002]
 
 ## 0. 变更摘要
 
-2026-11-20 用户批准按 demo 和共用接口拆分 AutoUI 106–108。从 [107](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) 的 U05 原矩阵承接本页所列行。 [原分母与交付映射](README.md)。
+2026-11-20 用户批准按 demo 和共用接口拆分 AutoUI 106–108。从 [107](107-autoui-u05-media-chart-and-paint-apps-av-vue.md) 的 U05 原矩阵承接本页所列行。 [原分母与交付映射](../README.md)。
 
 ## 1. 目标
 
-按原冻结输入验收本计划所列原项目或 Widgets。关联 Widgets 为 [carousel](../../../auto-os/widgets-gallery/src/front/pages/carousel.at)。
+按原冻结输入验收本计划所列原项目或 Widgets。关联 Widgets 为 [carousel](../../../../auto-os/widgets-gallery/src/front/pages/carousel.at)。
 
 | 原项目 | 原验收重点 |
 |---|---|
-| [029-photo-gallery](../../examples/ui/029-photo-gallery/pac.at) | 图片浏览与查看、组件嵌入、缺图后恢复 |
-| [031-image-viewer](../../examples/ui/031-image-viewer/pac.at) | 图像载入、缩放/平移、可见区域和坏图像恢复 |
+| [029-photo-gallery](../../../examples/ui/029-photo-gallery/pac.at) | 图片浏览与查看、组件嵌入、缺图后恢复 |
+| [031-image-viewer](../../../examples/ui/031-image-viewer/pac.at) | 图像载入、缩放/平移、可见区域和坏图像恢复 |
 
 ## 2. 架构与跨仓职责
 
@@ -39,7 +40,7 @@ AutoUI 持原项目、Widget、Iced 宿主与 Vue 消费端。AutoLang 的公共
 
 ## 4. 来源与前置
 
-用户本轮批准拆分计划。规划基面 auto-ui master 448ed614f388c1ee16c68d2ac7cd0da46c73d4bd。原合同、正负例与 Widgets 归属依据 [1071 W1 冻结](../../../auto-lang/docs/plans/archive/1071-autoui-w1-av.md)、[980 基础](../../../auto-lang/docs/plans/archive/980-ace-m2-autoui.md)、[981 基础](../../../auto-lang/docs/plans/archive/981-ace-m2-age.md) 与 [示例归属](../specs/ui/examples-ownership.md)。Vue 接 [1072 正式交付](../../../auto-lang/docs/plans/archive/1072-autoui-vue-web.md)，按原 SDK、Schema 和源身份复用。
+用户本轮批准拆分计划。规划基面 auto-ui master 448ed614f388c1ee16c68d2ac7cd0da46c73d4bd。原合同、正负例与 Widgets 归属依据 [1071 W1 冻结](../../../../auto-lang/docs/plans/archive/1071-autoui-w1-av.md)、[980 基础](../../../../auto-lang/docs/plans/archive/980-ace-m2-autoui.md)、[981 基础](../../../../auto-lang/docs/plans/archive/981-ace-m2-age.md) 与 [示例归属](../../specs/ui/examples-ownership.md)。Vue 接 [1072 正式交付](../../../../auto-lang/docs/plans/archive/1072-autoui-vue-web.md)，按原 SDK、Schema 和源身份复用。
 
 接 089 已交视口与预览来源，缺图和资源释放按实际接口验。 前置按实际能力、原项目和目标逐项记录。共享写面正在由其他计划维护时，消费交付版本并在本计划复验。
 
@@ -85,7 +86,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
 - [x] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
-- [ ] T-05 交付 AV 收据
+- [x] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
 - [x] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
@@ -1096,6 +1097,17 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 
 - stage: review | review_scope: final/T-07 | reviewer_identity/limitations: same implementation session, reconstructed evidence and exact new-case controls | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | reviewed_commit: AutoUI `49d1863797f92da06a45b72a93ac18706e55e97b` / AutoLang `61cde9c6e3fc175f126dcd83ff2a5a88faed89d4` | base_commit: AutoUI `848d883c` / AutoLang `048698155` | dependency_revisions: AutoOS `cdb4883` / AutoDown `45b642d` / AutoWeb `26d085f` | spec_inputs: round 133,138–140 | acceptance_results: AC-01/02/03/04 pass, AC-05 pending | pending_closeout_gates: T-05/T-08 linear landing, canonical verification, AV/W1 and A2Vue receipts, archive and cleanup | findings: none open | evidence: round 128–140 | next: merge/T-05,T-08
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 140 | from: review/T-07 | to: merge/T-05,T-08 | status: reviewed | outcome: pass | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `49d18637` / AutoLang `61cde9c6e` | next: merge/T-05,T-08，证明合流源码等效并交付两端
+
+### 2026-11-24 goal merge round 141 — 双仓线性落主、下游接收与归档
+
+- `prepared`。普通逐提交 rebase 在 AutoUI 早期探针 `plan117_t01_probe.rs` 和 AutoLang `cst/shift.rs` 遇历史冲突，两仓均撤回试跑。将已审实现树分别规范为单个提交，再按原顺序附加已审 Spec，重放到各自 `master`。两仓 `git range-diff` 的 3/3、2/2 条全部为 `=`。AutoUI `f3fc1545 → fdde1591`、`452f426b → fd85fff7`、`5c46be9a → ca7197b1`，AutoLang `b9771ba59 → 249e836b2`、`7a53633c1 → f3cbd93bf`。规范化前后冻结树相同。独立 `git merge-tree --write-tree` 预期树与线性提交完全相同。与审定源码和规范对比，AutoUI 主线增量只有原计划记录，AutoLang 主线增量只有 PLAN-1054 记录。依赖仍为 AutoOS `cdb4883`、AutoDown `45b642d`、AutoWeb `26d085f`。
+- `landed`。两仓实际 `git merge --ff-only --no-stat plan-117-dev` 退出 0。AutoUI `5d9389b3 → ca7197b11919809d80578f9b998e1540a831c0ac`，树 `654c7c4187f4d6600560a90324a57b910b1e4bd7`。AutoLang `462885462 → f3cbd93bfb40c32ae53584074a14aca5d18978ac`，树 `9127e815a7f2df0cc4a899d5712307beb52930b7`，再快进双端收据 `d13488b7eed6811b383a0bb2a3891298bf30271e`。已有其它计划和设计未提交改动保留。
+- `canonical_verified`。AutoUI Git blob：`docs/specs/ui/image-viewport.md` `aa941d38e9e65e60a40f22c1fe4c7b3074b94fa2`，`docs/specs/runtime/ace-package-widgets.md` `fa8bae1a094f988fd9b69a3ffa8e8620f5d5c0d1`，029 `SPEC.md` `40d70415d5b166add2d5addd8349ba1591641bd5`。AutoLang Git blob：`m2-age.md` `e750ebb76baec68bb0acf12a8495020640db8b92`，`component-event-sessions.md` `7f3991f068999f964ad4b1b16dc08c1edafaa0aa`，`auto-media-core/project.md` `79873b6850eb79fa3fea85e8847e31fa42207943`，`m2-autoui.md` `183917c03a69e310f151d08586c76878e74e9a58`。W1 和 A2Vue 各接收 029、031、原 Carousel 三行。[AutoLang 接收收据](../../../../auto-lang/docs/specs/ace-migration/m2-autoui.md)
+- 主线冒烟复用逐件验 SHA256 的已审 Debug 测试程序，使用 `--test-threads=1 --exact --nocapture`，在主线模块目录运行。`plan124_ace_vue_routes` 原 029 受检生成 1/1，6.673 s。`plan117_viewer_backend` 原 031 私有文件授权 1/1，2.664 s。`plan980_package_sfc` Carousel widget 族 1/1，0.084 s。三条均退出 0。结果 SHA256 `21080FBC252ED3D87D801AFC5E6A5D8C8277D2F27C0DF2DF42D7BEDB5296AC79`。无新增用例，复用准备，发现和删除未计入测试时间。
+- 阶段门证据沿用 round 136–140。语言原命令 4,215/4,239、退出 1，同 archive 和原用例在修复准备锁后 1/1、退出 0，有效 4,216/4,239，余 23 条已登记失败。AutoUI 86/87、退出 1，余原 Chart `source.age.view-list` 一条。原 Iced 画廊首页 `expected fn, found widget` 仍独立记录，原 Carousel 页面已通过。AutoUI `3f4f9b3f` 的独立源准备补丁已是交付提交的祖先，118 可按 PLAN-118 §10 的共享切片边界接续复验 Paint。
+- `archived`。实际归档路径 `docs/plans/archived/117-autoui-image-apps-av-vue.md`，`completion_kind: delivered`，当前 7/8。T-08 所余为组清理、材料清理、保留登记和最终校验。
+
+- stage: merge | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | delivery: AutoUI `ca7197b1` / AutoLang `d13488b7e` | completed_checkpoints: prepared, landed, canonical_verified, archived | next: guarded cleanup and final verification
 
 ## 10. 待澄清事项
 

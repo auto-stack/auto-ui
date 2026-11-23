@@ -19,17 +19,18 @@
 | 114 · 027 FileManager | r2 已交付，原 027、FileTree 与 TreeView 的 Windows AV/Iced 和 A2Vue 收据已归档。 [交付收据](archived/114-autoui-file-manager-av-vue.md) |
 | 123 · 布局 Widgets | r1 已交付。原 12 个布局页与 Kitchen Sink 的 Windows AV/Iced、A2Vue 各 13/13，供 W1 与 Vue/CLI 接续。 [交付收据](archived/123-autoui-layout-widgets-av-vue.md) |
 | 106 · 014 Weather | **已交付归档**（2026-11-22）：AV 原样装载+交互+关闭、A2Vue 浏览器、本地真实 HTTP 合同、规范增量（m2-autoui view-data 惰性收据+事件绑定载荷）。AutoLang 292575164 / AutoUI f9542a9d。 [计划](archived/106-autoui-u04-service-and-data-apps-av-vue.md) |
+| 117 · 图片应用 | 已交付归档，Windows AV/Iced 与 A2Vue/Chrome 各 3/3。 [交付收据](archived/117-autoui-image-apps-av-vue.md) |
 
 ## 当前执行顺序
 
-上次列出的 15 项中，106 Weather 和 123 布局 Widgets 已交付归档。当前还剩 13 项，108 执行中，其余 12 项待开工。以下是建议排程，同一批可按实际接口并行。
+上次列出的 15 项中，106 Weather、117 图片应用和 123 布局 Widgets 已交付归档。当前还剩 12 项，108 执行中，其余 11 项待开工。以下是建议排程，同一批可按实际接口并行。
 
 1. **当前主线 108（执行中，3/8）。** A2Vue 已在真实浏览器通过挂起、完成及卸载隔离。按已批准的方案在 108 的 AutoLang 工作树接通 AGE 组件面 checked AV Http 效应，完成 T-03 的 Iced 挂起、取消与迟到隔离回放，再走复审与交付。
-2. **可立即并行准备 113、117、118。** 113 把原界面和真实 SQLite 分开验证；117 复用 089 的视口与预览，回放 Photo Gallery、Image Viewer 和 Carousel；118 复用 088 的 ColorPicker，从原指针输入、绘制与撤销开始。
+2. **可立即并行准备 113、118。** 113 把原界面和真实 SQLite 分开验证。118 复用 088 的 ColorPicker，从原指针输入、绘制与撤销开始，并按实际接口接收 117 的共享能力。
 3. **接已交的应用能力，推进 119、120、121、122。** 119 核 105 的 Store、集合与输入；120 接 085、文件对话框和所用 Store，继续 CodeEditor 光标宿主缺口；121 可先用 124 验原路由、内容及返回焦点；122 先验证原启动请求，实际使用 Command Palette 时接 096。
 4. **按服务接口就绪推进 110、111、112。** 110 核 Chat 的 SSE/HTTP 与 Store，111 核 RealWorld 的 HTTP、路由、认证与数据，112 核系统采集和授权进程端口。110/111 中实际使用 AGE 组件面 AV Http 的行接 108 的交付；各自业务端、原输入与独立结果可提前冻结。
 5. **媒体线先验证 116 的原播放接口，115 门户可并行。** 116 先用原接线核真实播放、换曲、进度和释放；公共控件按实际用法接 090。115 缺失的播放路径接 116/090 对应接口。
-6. **W1 汇总原例收据，再接 1097 W2/AC、1074 W3/A2R。** 106、107、114、123 的正式双端收据可消费。105 已归档的 015 Notes AV 缺口继续按原条件对账。A2Vue 结果按各计划独立交接；983 已归档，Web 接面按实际使用复用。
+6. **W1 汇总原例收据，再接 1097 W2/AC、1074 W3/A2R。** 106、107、114、117、123 的正式双端收据可消费。105 已归档的 015 Notes AV 缺口继续按原条件对账。A2Vue 结果按各计划独立交接；983 已归档，Web 接面按实际使用复用。
 
 ## U04–U06 逐例交付
 
@@ -44,7 +45,7 @@
 | U05 | [107](archived/107-autoui-u05-media-chart-and-paint-apps-av-vue.md) | 024-charts | area-chart、bar-chart、donut-chart、line-chart、flow-diagram | 已交付两端验收与图表接面，供 123 接续。 |
 | U05 | [115](115-autoui-video-app-av-vue.md) | 019-video-app | 依实际消费组件 | drafting。门户可先验，播放接实际 116/090 接口。 |
 | U05 | [116](116-autoui-media-players-av-vue.md) | 020-music-player、030-video-player | 依实际消费组件 | drafting。先核原播放，公共控件按所用 090 版本接续。 |
-| U05 | [117](117-autoui-image-apps-av-vue.md) | 029-photo-gallery、031-image-viewer | carousel | drafting。接已交 089，沿原页回放坏图与关闭。 |
+| U05 | [117](archived/117-autoui-image-apps-av-vue.md) | 029-photo-gallery、031-image-viewer | carousel | 已交付归档。Windows AV/Iced 与 A2Vue/Chrome 各 3/3，供 W1 和 A2Vue 接收。 |
 | U05 | [118](118-autoui-paint-av-vue.md) | 031-paint | 依实际消费组件 | drafting。接实际 ColorPicker、指针和画布输入。 |
 | U06 | [108](108-autoui-u06-complex-interactive-apps-av-vue.md) | 032-handler-async-probe | 依实际消费组件 | 执行中，3/8。A2Vue 已实测，按用户裁定在本计划接 AGE 组件面 AV Http，完成 T-03 原异步行为。 |
 | U06 | [119](119-autoui-minesweeper-av-vue.md) | 038-minesweeper | 依实际消费组件 | drafting。接实际所用的 Store、集合或输入。 |
