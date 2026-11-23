@@ -295,6 +295,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 031 对原 `src/back/api.at` 用当前 `RunningProxy::open_file_session` 创建隔离会话，仅使用已冻结的测试目录。拥有授权时观察到六个现有图像和不透明媒体 URI；首次关闭为 true，重复关闭为 false，旧会话名称为空，卸载代理后原会话路由 404。负控未通过，授予目录之前原后端已返回 200 并读取同一测试目录。准备 5.692 s，执行 0.558 s，退出 101。日志 `scratch/r61-031-file-backend.log` SHA256 `022E69C859DBF5CEF5217954B3BF418014B55454943482F30F7EBC3A47B8AF3F`。此对照是已有 VM 媒体后端，AGE 原前端仍待带授权接线。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 61 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `e23c66e2d` / auto-ui `5661ad14` | next: work/T-02–T-03（029 包函数的旧 List 语义，031 后端权限归属）。
 
+### 2026-11-23 goal work rounds 62–63 — 029 动态集合签名与 AV 验证
+
+- AutoLang `11177e8b0` 将 AGE 包辅助函数的裸 `List` 声明接到现有受检动态集合，按注解选择集合编译面。保留已有显式列表元素类型及未声明类型诊断。PLAN-681 的旧语义同为动态元素。仅补类型映射的初次用例仍走标量面（准备 10.530 s，执行 0.150 s，退出 101）；补齐选择后定向 1/1（0.089 s），AGE packages 9/9（0.164 s），准备 6.867 s。日志 `av/r62-list-case.log`、`av/r62-list-case-r2.log`、`av/r62-list-package-group.log`，发现/清理未单计。
+- 独立对照中，完全相同的已受检输入经普通 Auto closures 降低、MIR 核准、ABC 编解码和 AV 执行得到原记录文本 `计划`，现行 AGE 转换到 dynamic 配置后在 `mir.type.list-elem` 拒绝。对照准备 2.386 s、执行 0.183 s，`scratch/r62-list-compare.log` SHA256 `670FC1E264061B9489880C6EF90A30B2F9FABC8C3CB7E04E004216F8CB96EA1B`。AutoLang `dfcc380f8` 允许已有共享集合参数的 dynamic 配置携带原 `av.language-values/1`，不改变普通 dynamic 配置准入。新增 `age_package_bare_list_preserves_dynamic_records_through_av` 1/1（0.229 s，准备 24.282 s），核 AGE 原观察入口成功及移除共享集合参数标记后拒绝；981 包 AV 38/38（0.749 s），dynamic 语义 21/21（0.096 s）。`av/r63-list-av-case.log` SHA256 `78383237DAB6D01341E8934B29CD72426FFD959FF8402527346D5F8894379832`。
+- 原 029 生产窗口 Debug 先后准备 67.475 s / 60.842 s。原入口已越过裸 `List` 返回类型，仍在 admission 阶段退出 4（3.660 s / 3.008 s）。当前 `app::app:306:34` 的 `no local named self` 精确对上 `AssetBrowser(records: .gal_records)` 字节 13265。用现行生产源准备加 AGE 包投影核实，`gal_records` 与 `gal_folders` 的确有 handler 写入和实际 widget 参数读取，初值 `[]` 却只投影成惰性 view-data，两者均无状态槽。对照准备 7.289 s、执行 0.433 s，`scratch/r63-029-view-data.log` SHA256 `720C3707C69D09BA265D88156AD0B6DECF00A1DB82A8D1BC56CA277B563A1C9F`。窗口终态 `av/r63-029-window.log` SHA256 `E82E5A39C6E5420B240F17242DC4F400EC10C44F0E958FF12FDE118095F40784`。
+- 恢复点为完整核对带空默认值的旧 widget List 输入，沿现有跨组件列表投影接入实际可写状态，验证 handler 更新后子组件可读到新列表。纯展示用惰性 view-data 仍按 PLAN-106 的既有合同。031 带授权后端和两个应用的 Vue 交互尚无新实现。Carousel 真窗物理输入仍待桌面解锁。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 63 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `dfcc380f8` / auto-ui `5661ad14` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
