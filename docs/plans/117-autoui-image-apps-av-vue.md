@@ -647,6 +647,16 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 原前端的 Escape 快捷键在真实 Chrome 的追加检查中无 close 请求（22.832 s，其余轨迹复过）。`chrome-escape.log` SHA256 `D636E6A78F1260A1E8F787B8FA58286C6BC4F69AD5AF7FDC65A4C3D9F625EF06`。Chrome 页面租用释放已证，应用级快捷键及原版 Iced 全链仍待实际验收。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 113 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `e9f09cc87a` / `c9fdffc15e`，auto-ui `5faec589da` / `aa9a4b5279` | next: work/T-02–T-06 接通原 031 Iced 的受检私有后端与键绑定，补齐双端关闭和实窗。
 
+### 2026-11-23 goal work round 114 — 原版 031 真窗与双端关闭
+
+- AutoLang `cd6c231216` 让 Iced 通过持有的目录会话读取解码像素和媒体状态。查找复用 HTTP 媒体的有效票据检查，逐票核对资产与修订。文件会话回归覆盖相邻授权的拒绝、错修订、换图和撤销。AutoUI `69eaa452` 让 Iced 和 Vue 共用原 `back.api` 的签名检查，Iced 按挂载连接原 VM 后端和目录授权。关闭宿主即取消该挂载在途请求、释放媒体并撤销目录授权。
+- Iced 与 Vue 将原语言绑定的 Escape 送入当前受检会话。Iced 保留 HTTP 在途期间收到的键，待会话可派发时处理。视口按已有受控快照判据启用重投影定时器。Iced 先处理最早到期的根或子定时器，避免原根 `SettleTick` 持续到期时子件无法提交变换。
+- 原版 `app.at` SHA256 `D4F2340DA7C1222941D9B2E662EF3A0E01B554688EFF746DCC2B520991FC12BD`。同源隔离夹具沿用 round 113 的坏图及目录外有效 PNG。生产 Iced 渲染器真窗观察原图 320×240、1.25 倍缩放、−40 px 平移、七个目录项、坏图终态和好图 1024×768 rendition 恢复。输入探针使用当前帧的受检按钮和宿主键消息。原 Escape 关闭后票据取不到像素，再次打开后关闭宿主会话也撤销票据。248 帧、零宿主错误、执行 10.016 s、退出 0。`scratch/r114-viewer-iced/iced-viewer.json` SHA256 `AD9DAC4ABFE081867ECA70AC7B089F6C17BB72D732ECDB947BB64A9FF6049374`。
+- 标准 `ace_node_desktop_window` 的脚本点击也改经当前受检帧，宿主取走后计入完成。工作树调试二进制在同一夹具目录以 `--script "15:click:0:0,150:close"` 启动，原 OpenFile 与 OnLoaded 各一次，103 帧，宿主关闭、零错误、5.914 s、退出 0。`iced-standard-retry.json` SHA256 `69D5C6AE3183B6FDAC0AF6911AED6A8E903E11DA929B3967B2F9C3357747E828`。
+- 原版 Vue 经 `auto build --render vue --gen-only`、`pnpm run build`（5.901 s）、`auto run --render vue` 复验。在 Chrome 重放 320×240、缩放/平移、裁切、422 坏图、固定一次 503 后恢复、授权外拒绝、替换会话撤销。按 Escape 触发原 close 路由 200，图像脱离 DOM，当前 URI 在页面仍开着时返回 404。独立运行保持媒体活跃至标签关闭，URI 也返回 404。`App.vue` SHA256 `D2551CA05128FA3E22055011BD9F3FE653F70F21C5DD6FB167350BE0FC72F5BC`，`chrome-escape.log` SHA256 `5EEF79E54A2354A61FF0206B85A2F2158F8A09B6FEF59949AD9F7286D0F1B95C`。
+- `cargo test --locked -p auto-media-core --lib` 56/56（28.081 s），`cargo test --locked -p auto-lang-core --lib file_session::tests` 8/8（24.819 s）。AutoUI `plan114_widget_packages`、`plan117_viewer_backend`、`plan114_file_session` 合计 57/57（138.455 s），含调度停顿时子定时器仍可派发的回归。`ui-regression.log` SHA256 `EACA198DA302ED982BEBD4C766BAB8E6C3D60BFBE2F7B2C4ECAE6959CE7345BA`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 114 | from: work/T-02–T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `cd6c231216` / auto-ui `69eaa452` | next: work/T-03、T-06 复验 029 原生内嵌代理重开及 Carousel 纵向输入，再锁定两端复审与交付基线。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
