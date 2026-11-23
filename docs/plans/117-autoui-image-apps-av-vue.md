@@ -1,6 +1,6 @@
 ---
 plan_id: PLAN-117
-status: executing
+status: execution_done
 feature_name: U05 Photo Gallery 与 Image Viewer 双端交付
 author: [Codex]
 created_at: 2026-11-20
@@ -1057,6 +1057,19 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 
 - stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: runtime-bound preflight rejected three stale identities, explicit preparation and exact replay queued | evidence: round 138 | next: 核查显式准备、同归档复放和正式 W1 前置
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 138 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 核查 Native 真正执行的复放与阶段门归因
+
+### 2026-11-24 goal merge round 139 — Native 复放通过与 AV 规范准备
+
+- 复用 round 130 原 Carousel 冷建 `dist`，`dist/index.html` SHA256 `21A735C59DE64B0CE2942808BE48DF1F2FC2EC44A4A81764BA190E40AB5D4C5F`，`src/pages/carousel.vue` 仍为 `532F99DF5A4E3347807294A226C28C8B30F36CC80D591887775BFD3388942952`。沿用原 Chrome 验证脚本和交互断言，增加浏览器日志 URL 观测，使用隔离本地端口。`node carousel-resource-review.mjs <原 Vue 项目> <原验证脚本>` 外层 12.525 s、退出 0。记录的 404 URL 是 `/favicon.ico`。原五组示例数量、翻页、拖动、宽窄显示、间距、纵向键盘、循环、重进复位及正常关闭全部再过，页脚本错误列表为空。构建复用原收据，发现和清理未单计，未新增常备用例。`scratch/r123-phase-gate/r134-reviewed-phase-gate/` 下 `carousel-resource-review.mjs` SHA256 `7B8E07CA188CBE7A66B63FE2983DB2C8376C388F59ACBC1AF0E91138F36E6DAB`，日志 `256F699E925B3485AC4357B37C7B9B08052319E4B824F300CA3C167D1AD0AED1`，供 T-07 对照。
+- 另查同机 PLAN-1129 已结束的 Debug Native 记录。不同 scheduler 用例 `scheduler_runs_are_repeatable` 也在 `prep lock` 报 `os error 5`。两工作树的 `native/src/sched_runtime.rs` Git blob 相同，为 `c3c2367e2042f1cf44b6eed73b856e67b1261f87`，PLAN-1129 原结果 SHA256 `A148D59F196A84FE13B5E89E91F7737B7129B0D1F0C551FFEDD547C99373C000`。证据支持准备锁的基础设施归因，PLAN-117 原用例产品断言仍待同归档复放。
+- 01:14:08 核实本计划原恢复控制器 PID `675532` 仍活跃并等待 PLAN-1129 的 PID `657800`，后者已执行到归档索引 7，子进程 `1087700`。本计划恢复尚未开始运行时准备。两仓已审实现及阶段结果未变，T-05/W1 保持待办。
+- 同一控制器最终等待 395.734 s。先保留三个旧静态库及三个身份戳，六份备份哈希与原件一致。用绑定的 Rustup 环境显式 `prepare-debug` 9.171 s、退出 0，三个运行时各构建一次。随后切回 `run-debug`，身份检查 0.337 s、退出 0，三个构建计数均为零。静态库和身份戳字节因复放准备变动，原件与新哈希均保留。`native-lock-replay-refresh/refreshed-runtime.json` SHA256 `AB184137E55E7082E0DE1D339705E07B7EB011033A104924FE75DD153AC00050`。
+- 用 SHA256 `e6ea95bc7c4c2ff5f4bc205289f35b9cf49f40fe54197e8632c44c15d14d6d23` 的原 Native 归档执行 `scheduler_owned_text_state_crosses_spawn`，1/1、nextest 退出 0，外层 1.375 s、单例 0.685 s，27 条未选，清理未单计。原断言核实进程退出 0、标准输出 `my`、标准错误空。`native-lock-replay-refresh/result.json` SHA256 `E453E149C5B8D6FEB8BFFF8AAE5CAFEA7140D361221A4010C7E7044D09432BD6`。语言首轮仍为 4,215/4,239，合并有效复放为 4,216/4,239、23 条具名既有失败。AutoUI 仍为 86/87、1 条具名既有 Chart 失败。依据同归档有效复放和原登记逐项归因，阶段回归证据收齐，保留两次整体命令的非零退出和原失败条数。
+- 将 round 138 已核的 AV-only 规范补丁写入两仓计划分支并提交。AutoUI `49d1863797f92da06a45b72a93ac18706e55e97b`、AutoLang `61cde9c6e3fc175f126dcd83ff2a5a88faed89d4`。逐文件匹配已审文案哈希、`git diff --check` 通过。相对既有实现基线只有两仓共五个 `docs/specs/` 变动，正式 W1 接收段和两主线均保持原状态。`av-spec-commits.json` SHA256 `028BB4CD212F18F81B332D29E4192C6768FAFECA87EF81DC472BFC42B08F5D58`。
+- AV 和 A2Vue 共用当前实现分支，阶段和产品验证已收齐。先把同一候选及规范变更送 T-07 终审，随后以同一审查基面办理实际落主、AV/W1 和 A2Vue 的各自交付收据。T-05 留待真实落主及 W1 记录，T-08 留待正式归档和清理。所有原验收行仍在计划范围内。
+
+- stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | prepared_spec_commit: AutoUI `49d18637` / AutoLang `61cde9c6e` | gate: recorded known failures and successful exact Native replay | evidence: round 136–139 | next: review/T-07 后完成共享实现落主及 AV/W1
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 139 | from: merge/T-05 | to: review/T-07 | status: execution_done | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `49d18637` / AutoLang `61cde9c6e` | next: review/T-07，对照双端收据及规范后办理实际交付
 
 ## 10. 待澄清事项
 
