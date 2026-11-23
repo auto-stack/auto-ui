@@ -467,6 +467,13 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - AutoUI `7be164c2` 在 AssetBrowser 选择校验和 029 的选择及打开路径按声明类型读取字段。原项目和原 Rust 后端复跑，宿主用当前帧按钮回调选中 `corner-marked`，打开原图视图，确认 `image_surface.src` 指向同一身份的真实 `/api/photos/full/` URI，返回图库并关闭会话（30.415 s，退出 0）。对应 URI 返回 200，原图 SHA256 与夹具一致，未知图片身份返回 404。真实窗口内的解码与缺图恢复待验。 `scratch/r92-gallery-original-callbacks.log` SHA256 `6F0AD9AAB50AE0FA0836A0949ED72B235CB7DC14CA545FB6EE9E8088DD45805F`，`scratch/r92-gallery-http.log` SHA256 `0CD7F54F670FE2B784F0F3552657D9494A44300677F5BBA16E70C51C40990AEC`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 92 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `7be164c2` | next: work/T-02–T-03 / T-06。
 
+### 2026-11-23 独立交付 — 118 消费源准备修复
+
+- 复审范围为用户批准拆出的源准备修复。当前会话核对提交、独立断言和原始收据。隔离交付树 `D:/autostack/.wt/fix-prep-118/auto-ui-landing`、分支 `codex/fix-prep-118-land`，基线 `01eb8f4f59de3db4020ff801144be9ea0528de9b`，AutoLang 证据输入 `dca52e196a64f123ca057e1442c71c8f3e95ab30`。交付提交 `3f4f9b3f4b25cc61aa3c2ad4c8528aaa2a215d50` 的生产源与 `7c7ef158` 一致。复审补齐随附诊断测试的 `ace-bridge` 门控。该修复维持现有组件包导入和样式字面化合同，无单独 Spec 增量。
+- 复用生产源一致的 118 Debug 库，直接断言验证保留包导入、样式引用换成字面量，以及含闭括号的注释、转义字符串和嵌套记录之后正确注入宿主字段。最终探针准备 7.398 s，执行 0.044 s。默认条件下测试探针准备 0.127 s、发现 0 项（0.061 s）。`ace-bridge` 诊断探针准备 16.059 s，四项执行分别为 0.398、0.106、0.237、0.264 s。三个探针打印原始准入诊断，其中未准备的 029 源仍报告 `caption_text` 未定义。命令结果和收据在 `scratch/prep-phase-review/`。
+- 原 031-paint 源哈希与 118 收据一致。复放组包验证保留 `color_picker` 导入并进入下一处 `source.unsupported` 准入（`fn` 当前 profile 不支持）。组包诊断耗时 0.262 s，诊断程序退出 101。原 A2Vue 前后收据仍逐字节一致，SHA256 `73DA630642300CEF46818957AF61A4AFE110A65420CD0CB936D990BE1A1052FE`。AV 复放 `scratch/prep-phase-review/paint-full-replay.log` SHA256 `9EBAE93717C24FA2097C229FB5737E312BC4844ED60BD874899A002D4297ADF9`。
+- stage: review/merge | review_scope: phase | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass/landed | local master: `3f4f9b3f` fast-forward | consumer: PLAN-118。诊断提交 `0cc47f5d` 留在验证分支。117 整体验收状态沿用上一工作记录。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
