@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-096
-status: drafting
+status: executing
 feature_name: CommandPalette 通用命令面板
 author: [Codex]
 created_at: 2026-11-14
-updated_at: 2026-11-14
-plan_revision: 2
-current_step: 0
+updated_at: 2026-11-23
+plan_revision: 3
+current_step: 1
 total_steps: 8
 supersedes_spec_components: []
 new_spec_components: [docs/specs/ui/command-palette.md]
@@ -17,13 +17,13 @@ touched_goals: []
 
 ## 0. 变更摘要
 
-补齐组件库路线 CL-06 的实施合同；提供命令搜索、分组、稳定选中、禁用状态、上下选择/Enter执行/Escape关闭、快捷键提示。应用提供命令并持有执行权限、全局快捷键、历史记录和业务动作。见[持续跟踪 strategy](../design/autoui/component-library-extension-strategy.md)。当前为执行准备度复核后的drafting r2，0/8，组件和下列新增测试尚未实施。
+补齐组件库路线 CL-06 的实施合同；提供命令搜索、分组、稳定选中、禁用状态、上下选择/Enter执行/Escape关闭、快捷键提示。应用提供命令并持有执行权限、全局快捷键、历史记录和业务动作。见[持续跟踪 strategy](../design/autoui/component-library-extension-strategy.md)。r3 按用户确认将交付平台限定为 Windows Native VM 与 Windows Vue。
 
 ## 1. 目标
 
-Windows/Linux native VM 与 Vue 使用相同公共接口、状态语义和普通控件。用户键盘/鼠标与 MCP 驱动同一条事件链，自动测试不要求系统文件窗口或操作系统前台焦点。提供正式可移根组件包、普通消费示例、现有消费者迁移及无人值守证据。
+Windows Native VM 与 Windows Vue 使用相同公共接口、状态语义和普通控件。用户键盘/鼠标与 MCP 驱动同一条事件链，自动测试不要求系统文件窗口或操作系统前台焦点。提供正式可移根组件包、普通消费示例、现有消费者迁移及无人值守证据。
 
-非目标：全局命令总线、应用启动服务、任意脚本执行、全局快捷键注册器、替换 Launcher 的网格/分类/最近使用业务、统一所有 builtin Command 子元素实现。不在当前承诺中加入 macOS；将来支持须补真实 macOS 构建、窗口、字体、MCP 和生命周期验收，不能以交叉编译或 Windows 成功代替。
+非目标：全局命令总线、应用启动服务、任意脚本执行、全局快捷键注册器、替换 Launcher 的网格/分类/最近使用业务、统一所有 builtin Command 子元素实现。Linux 和 macOS 在当前交付范围之外。新增平台支持时需在对应系统完成构建、真实窗口、字体、MCP 和生命周期验收。
 
 ## 2. 架构方案
 
@@ -38,6 +38,8 @@ Windows/Linux native VM 与 Vue 使用相同公共接口、状态语义和普通
 沿用 `.at` 正式包与普通消息、Rust compiler/runtime/tools、native VM、Vue及现有主题。测试复用 `crates/auto-ui-tools/tests/` 包导入/移根模式和 `tests/product/` 的进程、端口、MCP证据做法；Vue 使用真实浏览器操作。仅因应用需要服务时启动隔离的已有服务，不建设新的测试平台。
 
 ## 4. 需求分析与背景调查
+
+2026-11-23 用户通过 `/goal 完成计划096` 授权本仓实施、独立评审、合同内修复、合并、归档与清理。同日明确选择“调整为仅 Windows”，r3 将验收限定为 Windows Native VM 与 Windows Vue，保留其余产品、MCP、视觉与生命周期要求。AutoOS 发行版 PLAN-001 尚待硬盘安装与重启验收，`vmrun list` 显示 0 台运行中的虚拟机。本计划沿用 `D:/autostack/.wt/ui-096/auto-ui`，分支 `codex/ui-096-command-palette`，基线 `4dd9696da6a6289795ba9d6f57e603c24d99114a`。主检出另有计划 118 和计划导航的文档改动。
 
 授权来自2026-11-14用户请求：为四组件分别补齐实施计划，复用既有实现、引用已生成参考图、写明跨平台/MCP/无人值守验收并更新 strategy。本轮动作限本仓计划、设计导航及引用；不实施组件、不启动实施树、不提交其他WIP、不修改兄弟仓。用户未指定模型、预算、并行代理或自动实施；这里不推定授权。
 
@@ -58,7 +60,7 @@ Windows/Linux native VM 与 Vue 使用相同公共接口、状态语义和普通
 
 ### 公共接口与所有权
 
-| 接口 | r2合同 |
+| 接口 | r3合同 |
 |---|---|
 | props | open:bool=false；revision:int=0；title/placeholder:str；commands:List=[]；filterMode:str=local；query:str=""；wrapNavigation:bool=false；resultsSession/resultsQuerySeq:int=0；resultsQuery:str=""；response:str=""；errorMessage:str="" |
 | 命令记录 | {id,label,groupId,groupLabel,keywords:List[str],shortcut,disabled,icon}；id 唯一稳定，label 可重复；groupId为空表示无分组；同组非空groupLabel必须一致。local分组按输入首次出现顺序、组内应用下述排序；provided严格保留调用方全局顺序，以相邻相同groupId生成分组标题（同组可分段），不得重新聚合改变原评分顺序。shortcut 只是文字提示，icon 使用现有图标体系且保持可访问 label。 |
@@ -75,7 +77,7 @@ Windows/Linux native VM 与 Vue 使用相同公共接口、状态语义和普通
 
 `.at` 公共消息沿既有包的可导出命名方式声明（例如 `"changed"(str)`），由普通 `onchanged`/对应消息绑定消费。上表类型是接口语义，T-01只核对当前语法/封装方法，不把接口再交给执行者自由重设计。普通 props 数据通过组件正常输入提供，不从测试环境变量注入成功结果。
 
-### r2 身份、反馈与复用接缝
+### 实例身份、反馈与复用接缝
 
 每个实际挂载实例分配不复用的 `instanceToken:str`，普通重绘保留，卸载重建/另一个实例必须不同；其来源绑定App及真实组件owner/generation，不使用label、列表索引或每次渲染时间戳。所有请求、取消/关闭消息和异步response均增加此字段，调用方原样回传。T-01证明native/Vue中的可用分配机制；优先复用现有实例生命周期，只在确有缺口时补最小共享接缝。重建后seq/session即使重新从1开始，旧token也不能命中新实例。
 
@@ -113,7 +115,7 @@ Windows/Linux native VM 与 Vue 使用相同公共接口、状态语义和普通
 | SD-01 | add | docs/specs/ui/command-palette.md | 无正式专门合同→上述受控参数、消息、校验和身份/异步状态规则 | 收拢应用重复交互，保留业务owner | AC-01,AC-02,AC-03 |
 | SD-02 | add | docs/specs/ui/command-palette.md | 无本组件发布/验收约定→包导入/移根、普通消费者、跨端MCP/视觉/无人值守门及平台边界 | 可复用、可操作、可验证 | AC-04,AC-05,AC-06 |
 
-拟实施树 `D:/autostack/.wt/ui-096/auto-ui`，分支 `codex/ui-096-command-palette`，本轮未创建。实现、自检、独立最终复审依次使用这一棵树；Plan进度留主检出，不在另一棵树同步实现。
+实施树 `D:/autostack/.wt/ui-096/auto-ui`，分支 `codex/ui-096-command-palette`。实现、自检、独立最终复审依次使用这一棵树；Plan进度留主检出，不在另一棵树同步实现。
 
 执行入口是 T-01：来源已核、接口和AC已定，当前无外部组件交付阻塞。先走完整最小链路：**正式导入→local搜索/箭头/Enter→设置模型读回；provided输入→ApplyFilter结果revision/resultsQuery→Launch入口；同时验证现有Command默认过滤和键盘是否需要关闭以免双发。**。产物 `docs/reviews/plan096/decisions.md`（新增）记录可行路径、实际语法/命令、版本、待修接缝和探针证据；不得只看schema或源码文本。探针失败先在原目标内修接缝；若必须改平台/API/业务owner或AC阈值，则修订Plan并保留原要求，不擅自降级为截图/静态通过。
 
@@ -132,7 +134,7 @@ Windows/Linux native VM 与 Vue 使用相同公共接口、状态语义和普通
 | C-05 | AC-02,AC-04 | 两个面板、关闭重开、重复ID配置 | 会话隔离、焦点恢复；重复ID具名错误且不可执行，不按数组下标临时造身份。 |
 | C-06 | AC-02,AC-03,AC-05 | provided跨组交错排名、pending输入与关闭、成功反馈同帧 | 交错顺序与原ApplyFilter一致，分组不重排；pending用户不能另发查询/调用/关闭，accepted不被revision更新重新解锁；应用主动关闭后旧反馈无效。 |
 | X-01 | AC-01,AC-06 | 正式包从另一目录导入；缺依赖、同名内置并存 | 无绝对开发机路径，实际导入生成并运行；缺依赖具名失败，内置旧示例仍能解析运行，不以搜索字符串通过。 |
-| X-02 | AC-04,AC-06 | Windows/Linux native VM 与Vue，当前树动作及关闭重开 | 真实窗口/非空树、实际控件动作与应用读回相符；错误对照返回明确失败，退出后本轮进程/端口回收，再次启动可用。 |
+| X-02 | AC-04,AC-06 | Windows Native VM 与 Vue，当前树动作及关闭重开 | 真实窗口/非空树、实际控件动作与应用读回相符；错误对照返回明确失败，退出后本轮进程/端口回收，再次启动可用。 |
 | X-03 | AC-06 | 浅/深主题、中文长标签、420×560、错误/禁用/pending | 同版本真实截图可读、正文可滚动、主要操作可达，无glyph缺失、重叠或误点击；空/加载态按组件适用状态覆盖。 |
 | X-04 | AC-02,AC-03 | 卸载重建后seq重复、同revision数据变更；首次非法配置及修正 | 新instanceToken拒旧反馈，旧动作零误写且当前正例可用；配置错误可见且每次配置变化恰好一次error，修正后正常恢复。 |
 | X-05 | AC-02,AC-04 | 多输入/双实例/嵌套modal；组合输入适用时 | MCP发现并操作当前目标，不把首个input代理误当真实焦点；底层按钮/快捷键被阻挡，Tab/关闭恢复正确；输入法按下文分层证据验证。 |
@@ -155,21 +157,20 @@ native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--
 
 无人值守runner必须：每轮隔离数据/目录/端口；native校验自身拥有的OS窗口和非空live MCP树，Vue核验本轮页面/浏览器会话和实际MCP提供方；由当前snapshot发现真实节点再find/action/type/键盘/scroll/screenshot；动作后正常事件→应用读回；包含一项明确失败负对照；正常退出、核验本轮拥有的子进程和端口已释放并重开。原生动作不能依赖OS前台焦点，不能使用系统dialog、`AUTO_OPEN_PATH`、直接改组件状态、调用accepted处理器或回放旧node ID。超时须有限且保存最后树/日志，不能无限重试掩盖失败。
 
-每个平台/后端分别记录 pass/fail/not_run：**Windows native、Linux native、Windows Vue、Linux Vue**均为本Plan必需门；缺Linux runner（按下文VMware路由，须真实窗口）记not_run，不得汇总成跨平台通过。macOS未承诺。浏览器无宿主/磁盘权限时保留不可用结果，不放宽安全边界。
+Windows Native VM 和 Windows Vue 两轨分别记录 pass/fail/not_run；两轨均为必需门。浏览器无宿主/磁盘权限时保留不可用结果，不放宽安全边界。
 
 收据 `docs/reviews/plan096/` 持有实际版本/依赖闭包摘要、命令/退出码、case→AC矩阵、截图/树、业务事件及读回结果、负控、生命周期与必要回归。产物大日志放独立证据目录，文档引用可复现位置和摘要；不要把个人缓存当唯一凭据。Q-01文字glyph缺失不能因MCP文本完整而结案；若公共渲染器超范围，建立具名修复依赖，受影响AC-06保持未关闭。
 
 本轮只做草案静态自检，无产品验收结果。用户未分配实现/内部检查/最终评审模型；未来执行者先自检，最终评审须独立上下文并绑定实现revision，同一实施树顺序复用；不据此自行启动其他agent/chat。
 
-### r2 可执行门与证据分层
+### 可执行门与证据分层
 
 - 每个平台均拆为普通GUI交互、MCP工具调用、应用读回、适用视觉/输入桥、退出重开；不要求把全部边界case在GUI和MCP重复笛卡尔积。§6每个case记录实际测试层；模型测试可直接喂模型，产品路径必须通过普通控件，不能用模型测试冒充真实消费。
 - native复用 `crates/auto-ui-runtime/src/ui/mcp_server.rs` 的 `autoui_snapshot/action/type/keyboard/screenshot` 正常工具；保留RPC请求/结果和当前节点发现。Vue复用已存在的浏览器MCP提供方（或已交付生产桥），从真实DOM/可访问树进行输入/点击/键盘，记录提供方、工具版本、调用/结果和应用读回；Playwright只操作同一真实页面，不能单独作为“MCP通过”。本Plan不新建Vue MCP服务器；T-01定位当前配置，缺提供方则Vue MCP门not_run，不由四组件分别造桥。
 - product脚本保留原拟议CLI，Vue增 `--browser-mcp-config <绝对配置路径>`（T-05待实现，配置描述实际提供方/会话接入；凭据不进报告）；两种driver共用case断言。native的OS窗口归属以owned PID/handle证明；Vue验证本轮生成页面URL、浏览器会话和服务PID，不套用native HWND证明。两条腿均有真实MCP操作与独立业务读回。
 - Prompt/Command/Tag的IME门：普通 `autoui_type` 是整串替换，不证明composition、物理按键或OS输入法。Vue输入桥用compositionstart/update/end与isComposing事件序列；native使用当前标准输入适配层的preedit/commit/取消→Enter事件集成测试，观测生产事件抑制与一次业务提交，并补普通GUI/MCP中文最终值读回。已有 `autoui_desktop` 的acceptance专用handler/key通道不代替普通组件MCP产品门。若适配层无法表达，T-01定位最小输入接缝后补测试；TaskProgress无文本编辑，IME标明不适用，仍测正常键盘/modal。
 - 复用当前Spec及已有包而非只复用FileDialog：正式包必须提供 `package.at/pac.at/组件.at/README.md`，native源相对import和Vue既有components/vendor路径解析分别运行；从第二绝对根验证完整依赖闭包和无开发机路径。四Plan不得分别重写同一公共runner/输入桥；第一个发现公共缺口者在decision登记owner/提交，后续重基线复用。
-- Linux GUI验证沿084归档§10的用户决定：自制Linux发行版就绪后在VMware内单独验，不以WSL/WSLg结果替代，也不继续追WSLg修复。Windows门可先执行；Linux缺环境如实not_run且相应AC未关闭，不删除Linux要求、不预勾选最终评审。组件行为仍面向Win/Linux一致，macOS维持未承诺。
-- 每个实际运行门输出 `report.json`：plan/revision/platform/backend、source/tools/dependency摘要、runner和MCP提供方、case/layer/期望/实测/status、截图/树/读回路径及摘要、cleanup/reopen、result。退出码0仅当本次门全部必需case通过且清理重开成功；失败为1，缺必需环境/能力not_run为2。聚合四门缺任何一门不能总pass。有效控制与关闭端口的同一MCP方法配对，关闭目标要求有界connection-refused，不能仅HTTP探测代替。
+- 每个实际运行门输出 `report.json`：plan/revision/platform/backend、source/tools/dependency摘要、runner和MCP提供方、case/layer/期望/实测/status、截图/树/读回路径及摘要、cleanup/reopen、result。退出码0仅当本次门全部必需case通过且清理重开成功；失败为1，缺必需环境/能力not_run为2。两轨须全部通过方可汇总为 pass。有效控制与关闭端口的同一MCP方法配对，关闭目标要求有界connection-refused，不能仅HTTP探测代替。
 - 默认启动上限300秒、单动作15秒、退出清理30秒；runner可显式配置并记入收据，不能无限等待/重试。失败走finally清理本轮owned进程/端口/隔离数据并保存最后证据；只对确认身份的自有残留强制终止且写明原因。关闭/重开Dialog与退出/重启整个App分别验证；不把关闭UI误认为业务任务取消。
 
 ## 7. 验收标准
@@ -179,21 +180,21 @@ native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--
 | AC-01 | work | 正式包公共接口按§5导入/生成/运行；X-01正反例、最小普通消费者及包依赖闭包可复现，无内置同名覆盖 | T-01,T-02,T-05；[ ] |
 | AC-02 | work | §5正常/错误/禁用/键盘/适用IME规则、本组件case及X-04/05全部有期望断言；无一次手势多次提交或虚假成功 | T-02,T-03,T-05；[ ] |
 | AC-03 | work | 当前身份、重复请求锁、外部改动/迟到反馈/关闭重开/双实例隔离反例通过，旧对象零误写（含卸载重建与同revision内容变化） | T-02,T-03,T-05；[ ] |
-| AC-04 | work | 普通GUI和MCP通过当前可见控件完成关键用例；四个平台/后端门分别有结果，原生不依赖前台焦点；X-02/05/06/07分层门、生命周期与负控通过，缺必需MCP/平台门不算通过 | T-03,T-05；[ ] |
+| AC-04 | work | 普通GUI和MCP通过当前可见控件完成关键用例；Windows Native VM 和 Windows Vue 两轨分别有结果，原生不依赖前台焦点；X-02/05/06/07分层门、生命周期与负控通过，缺必需MCP/平台门不算通过 | T-03,T-05；[ ] |
 | AC-05 | work | 028保留recent/分类/评分/grid并正确转发一次宿主动作；无宿主明确报不可用；普通设置示例在两端读回真实模型修改，源码匹配或高亮不算执行成功。 | T-04,T-05；[ ] |
 | AC-06 | work | X-01/03/06/07、移根、必要公共/消费者回归及真实截图通过；中文/暗色/窄窗可用，Q-01若影响本组件则闭环；README/待沉淀Spec与证据齐 | T-05,T-06；[ ] |
-| AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定Plan r2和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[ ] |
-| AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，不把未运行平台标为支持 | T-08；[ ] |
+| AC-07 | review | 独立上下文逐项验证AC-01…06及SD-01/02，绑定 Plan r3和实际实现提交/工作树摘要，结论pass且无必需门not_run | T-07；[ ] |
+| AC-08 | merge | 评审后交付落主，SD-01/02沉淀canonical Spec且内容核验；归档/路线链接/交付及清理收据完整，发布说明限定为已验收的 Windows Native VM 和 Windows Vue | T-08；[ ] |
 
 ## 8. 执行步骤
 
 | ID | owner_stage | 依赖 | 影响文件/符号与独立产出 | 验证/预期 | AC / 进度 |
 |---|---|---|---|---|---|
-| T-01 | work | 无；现有来源重核 | §4来源、正式包导入/事件路径；新增`docs/reviews/plan096/decisions.md`，落实§5最小全链探针、instanceToken/首次error/模态焦点/输入桥可行性、真实包命令、平台及MCP提供方/依赖pin | 两端普通控件事件到应用读回；不是仅schema登记；差额有具名owner | AC-01；[ ] |
+| T-01 | work | 无；现有来源重核 | §4来源、正式包导入/事件路径；新增`docs/reviews/plan096/decisions.md`，落实§5最小全链探针、instanceToken/首次error/模态焦点/输入桥可行性、真实包命令、平台及MCP提供方/依赖pin | 两端普通控件事件到应用读回；不是仅schema登记；差额有具名owner | AC-01；[x] Windows 普通设置与 Launcher provided 双轨探针见 §9；实际宿主启动由 T-04 验收 |
 | T-02 | work | T-01 | 新增`packages/command-palette/`的数据/交互模型、校验、消息与身份协议；沿既有包元数据/相对导入 | §6有效/非法/迟到/双实例模型反例；无业务I/O进入包 | AC-01,02,03；[ ] |
 | T-03 | work | T-02 | 同包UI/主题/键盘与MCP可见语义；必要现有runtime接缝最小修复 | 本组件case普通GUI/MCP路径可操作，IME/焦点和pending正确；对照参考图布局 | AC-02,03,04；[ ] |
 | T-04 | work | T-03 | examples/command-palette/（新增）、examples/ui/028-launcher/src/front/app.at；复用§4实际业务入口 | §5消费路径输出真实变化；保持原业务权限/数据/模式，不同步兄弟仓 | AC-05；[ ] |
-| T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/command_palette_component.rs`、`tests/product/verify_command_palette.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；四门、必需case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[ ] |
+| T-05 | work | T-03,T-04 | 新增`crates/auto-ui-tools/tests/command_palette_component.rs`、`tests/product/verify_command_palette.py`及必要隔离数据 | 运行§6两条产品命令/定向cargo目标；Windows 双轨、必需 case/分层MCP/输入桥/负控、失败清理/退出重开与必要旧消费者回归 | AC-01…06；[ ] |
 | T-06 | work | T-05 | 新包README、普通示例说明、`docs/reviews/plan096/`证据与待沉淀SD；更新strategy实施事实 | case→AC、版本/截图/读回可追溯；受影响Q-01闭环；canonical Spec暂不冒称已交付 | AC-06；[ ] |
 | T-07 | review | T-01…06 | 同一实施树，独立上下文最终评审与修复后的受影响复验 | AC-01…06逐项验收并核对SD；pass绑定精确实现revision，无必需门空缺 | AC-07；[ ] |
 | T-08 | merge | T-07 pass | 合并/交付、`docs/specs/ui/command-palette.md`沉淀、Plan归档及strategy状态/链接更新、实施树清理 | 核验落主内容与评审等价、Spec字节/规则、交付与清理收据；不写specs.json/index.json/legacy ledger | AC-08；[ ] |
@@ -206,7 +207,12 @@ native采用 `auto run -r vm`，保留应用声明的真实后端（不能把`--
 - 2026-11-14：stage: new；PLAN-096 r2；outcome: pass（修订后计划可进入T-01）；next: work/T-01。再次复核复用边界/图/平台矩阵，补instanceToken、精确异步确认、现有Init/MCP限制及分层输入证据、VMware路由、具名反例与失败清理；T-01…08、AC-01…08、SD-01/02保持，扩充§5/6并强化AC-02…06。详见[本轮审核报告](../reviews/component-plans-094-097-2026-11-14/README.md)。原r1记录保留为历史。
 - 此pass仅指计划合同可执行；不是组件测试通过、独立实现评审或交付完成。本轮未创建实施树，未执行上列拟新增测试；current_step=0/8。
 
+- 2026-11-23：stage: new | plan_id: PLAN-096 | plan_revision: r3 | outcome: pass | 用户明确授权仅 Windows。调整 AC-04/06/07/08、T-05/07/08、X-02 及 SD-02 的平台适用范围，保留其余验收入口与阈值。next: work/T-01。
+- stage: goal | plan_id: PLAN-096 | plan_revision: r3 | round: 1 | from: new | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-096/auto-ui | commit: 4dd9696da6a6289795ba9d6f57e603c24d99114a | next: work。继承 `/goal 完成计划096` 的全链路授权和用户确认的 Windows 交付范围。
+
+- 2026-11-23：T-01 机制探针完成。Windows Native VM 与 Vue 经相对包导入、MCP 普通搜索/键盘/点击和设置真实写回；Launcher 独立运行经原 `ApplyFilter` 发布 provided 结果且具名拒绝缺宿主启动。原生定向键接缝复用当前模态焦点，初次配置通知使用正常 Tick。证据 `plan-artifacts/plan-096/native-settings-2/report.json`、`vue-settings-2/report.json`、`native-launcher-2/report.json` 与 `vue-launcher-2/report.json`。T-02/T-03 仍在闭合本轮模型、输入桥和视觉回归；T-04 宿主真启动待验证。实施决策在实施树 `docs/reviews/plan096/decisions.md`。
+
 ## 10. 待澄清事项
 
-无必须向用户补问的产品决策；按§5边界执行。包语法/实例token/首次error/模态焦点/IME/反馈时序及现有Vue MCP提供方由T-01具名探针落实；T-02前关闭机制选择，不能把协议自由设计留给实现中途，失败须记录而非假定已支持。运行工具与Linux runner是否可用由T-01实查；缺失使相关验收not_run，不能自动扩大平台承诺或删除必需门。业务能力不在宿主上提供时明确不可用，按上述普通消费者和真实原生消费者各自验收。
+无必须向用户补问的产品决策；按§5边界执行。包语法/实例token/首次error/模态焦点/IME/反馈时序及现有Vue MCP提供方由T-01具名探针落实；T-02前关闭机制选择，不能把协议自由设计留给实现中途，失败须记录而非假定已支持。Windows Native VM 和 Vue 的工具及 MCP 提供方由 T-01 实查。缺失的必需能力记为 not_run。业务能力不在宿主上提供时明确不可用，按上述普通消费者和真实原生消费者各自验收。
 
