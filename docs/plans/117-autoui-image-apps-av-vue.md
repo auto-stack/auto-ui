@@ -563,6 +563,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 原 029 `app.at` 经相同生产生成器的首拒仍为 `auto.http.get-json.v1`，16.019 s，退出 101，未生成 SFC。真实网络请求、异步状态提交、过期响应和卸载归后续 029 原项目验收。`original-gallery-verified.log` SHA256 `6D57AD53CAC584D6A324C72435CBFAB15EE65FA23A9F30C39B0DD4B66D869AD7`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 103 | from: work/T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `5ca3455ff` / auto-ui `732078a1` | next: work/T-06 接通原 029 受检 Vue 的异步 HTTP 扫描并核生命周期；T-02–T-03 仍缺 031 授权媒体绑定。
 
+2026-11-23 T-06 续（round 104）：029 原入口产出受检 Vue，Chrome 与原 Rust 后端联合验证。
+
+- AutoLang `08bd7fef8d`：根据受检 HIR 识别 `Http.get_json` 与传递调用链，复用 `http.client/1` 和 `json.value/1` 两道现有能力门。只在受检 Vue 宿主发射可挂起函数，回调和闭包形态具名拒绝。脚本组 `cargo test -p ace-a2x-core -p ace-a2x-ts --locked` 45/45 通过，其中真实 Node 用例核跨帧 UTF-8 文本所有权、暂存模型隔离、燃料恢复和取消后分配归零。`scratch/r104-vue-http/script-tests-final.log` SHA256 `AA0ACC4F730739529C6EB389C99FAC5FCBF9E771E65F288A5B983669194AE37C`。
+- AutoUI `a9bdc39651`：受检 Vue 从同源异步读取限长 JSON，将旧请求的宿主响应与当前模型和组件实例进行比对，并在替代或卸载时取消请求。HTTP 失败沿原处理器的 `try/catch` 回传。复审拟在 `docs/specs/runtime/component-http-async.md` 补记受检包面支持范围、提交条件和取消行为。
+- 029 原 `app.at` 与上轮应用源码相同。生产链接入口无诊断覆盖，发射 2,466,032 字节 SFC、8 个内嵌组件（生成 17.228 s、Vite 12.127 s）。Chrome 使用原生成 Rust 后端与独立照片 fixture，观察 7 条目录扫描请求。Unicode 搜索由 2 项缩至 1 项再回 2 项，没有新增扫描。反向响应通过代理延迟实测，先发扫描在换目录后取消，随后验证 503 显示与返回根目录恢复，以及 Vue 卸载取消最后一条扫描。Chrome 2.527 s，退出 0。`Host.vue` SHA256 `C0FE2B9AD248ACD7BC1F56162FE5DEF6B9861BC0BD92B4256D1B2505152F197F`，`original-chrome.log` SHA256 `D36DE434BF9E89F9A7E20A63407496BD60BFAB53D25557362CE2B49769ABE228`。
+- 相同 Vue 产物加生成器样式后，以真实点击完成 Unicode 照片选择、打开大图、返回网格、再次打开。两次全图请求均返回 200，Chrome 解码尺寸均为 320×240（命令 1.791 s）。`original-media.log` SHA256 `F6A876AA6CB0DF16121A41BF596172996E06038052E126D9092763C1801DF0E1`。常驻无 HTTP 的 ImageViewport 夹具亦通过双实例初始错误、重新校验及两次恢复（命令 4.765 s）。`init-regression.log` SHA256 `9B100DEC99A1B31B35541EFE08C2B97E32FB51546A53E0132F2C22EBE52B9290`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 104 | from: work/T-06 | to: work | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: auto-lang `08bd7fef8d` / auto-ui `a9bdc39651` | next: work/T-06 复核 029 剩余原验收与合并前回归；T-02–T-03 仍缺 031 授权媒体绑定。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
