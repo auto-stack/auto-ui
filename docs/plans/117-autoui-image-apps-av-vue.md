@@ -461,6 +461,12 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 同一原入口的宿主探针也完成无偏好文件的首扫（24.682 s），以及含一条真实图片记录的偏好恢复和首扫（27.582 s）。有效收藏在首扫前后保持原记录。后一条探针随后调用当前帧的 `onclick` 照片选择回调，宿主提交了 `ItemInput`，当时根组件的 `selection` 仍为空，探针退出 101。查看器打开尚待验证。 `scratch/r91-gallery-fresh.log` SHA256 `0B45C339C9BA026CAC8A7AABC93950EA0DF9EA7E6F9A42585BB75A8FEAA05985`，`scratch/r91-gallery-callbacks-r3.log` SHA256 `8C3D303BD9E994155AAA2C824DD071101C00F0DDDDB2657081CCDB4230AEBCC0`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 91 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `36c66449` | next: work/T-02–T-03 / T-06。
 
+### 2026-11-23 goal work round 92 — 029 选择事件抵达内嵌查看器
+
+- 隔离源追踪确认 CollectionView 发送了 `scopeId=q1`、`baseRevision=100` 和当前图片身份。AssetBrowser 收到后在 scope 和 revision 校验拒绝。受检解析器将含任一 `Dyn` 的 `==` 和 `!=` 路由到判空；声明 `str` 和 `int` 的对照通过这一层，并定位根相册的第二处身份比较。 `scratch/r92-gallery-predicates.log` SHA256 `6040B388229F23AF8FCE14B9C407D9E1B61F77C13D959E40E755DE558037E650`，`scratch/r92-gallery-typed.log` SHA256 `B003B2A0B291FB33F2E1261E0C9294B3C998F5D3608164721B93DA8D91F78EBA`。
+- AutoUI `7be164c2` 在 AssetBrowser 选择校验和 029 的选择及打开路径按声明类型读取字段。原项目和原 Rust 后端复跑，宿主用当前帧按钮回调选中 `corner-marked`，打开原图视图，确认 `image_surface.src` 指向同一身份的真实 `/api/photos/full/` URI，返回图库并关闭会话（30.415 s，退出 0）。对应 URI 返回 200，原图 SHA256 与夹具一致，未知图片身份返回 404。真实窗口内的解码与缺图恢复待验。 `scratch/r92-gallery-original-callbacks.log` SHA256 `6F0AD9AAB50AE0FA0836A0949ED72B235CB7DC14CA545FB6EE9E8088DD45805F`，`scratch/r92-gallery-http.log` SHA256 `0CD7F54F670FE2B784F0F3552657D9494A44300677F5BBA16E70C51C40990AEC`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 92 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `7be164c2` | next: work/T-02–T-03 / T-06。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
