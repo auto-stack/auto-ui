@@ -1,5 +1,5 @@
 use auto.json
-use palette_data: PaletteCommand, PaletteRow, palette_error, palette_signature, palette_rows, palette_active, palette_move
+use palette_data: PaletteCommand, PaletteRow, palette_commands, palette_error, palette_signature, palette_rows, palette_active, palette_move
 use palette_search: palette_local
 
 widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", placeholder: str = "", commands: List<PaletteCommand> = [], filterMode: str = "local", query: str = "", wrapNavigation: bool = false, resultsSession: int = 0, resultsQuerySeq: int = 0, resultsQuery: str = "", response: str = "", errorMessage: str = "") {
@@ -32,6 +32,8 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
         var rejection str = ""
         var config_code str = ""
         var config_signature str = ""
+        var config_mode str = ""
+        var source_commands List<PaletteCommand> = []
     }
 
     computed {
@@ -212,12 +214,13 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
                 return
             }
 
-            let code = palette_error(.commands, .filterMode)
-            if code != .config_code || signature != .config_signature {
-                .config_code = code
+            if signature != .config_signature || .filterMode != .config_mode {
+                .source_commands = palette_commands(.commands)
+                .config_code = palette_error(.source_commands, .filterMode)
                 .config_signature = signature
-                if code != "" {
-                    ."error"(json.stringify({code: code, message: .config_message}))
+                .config_mode = .filterMode
+                if .config_code != "" {
+                    ."error"(json.stringify({code: .config_code, message: .config_message}))
                 }
             }
             if !.open { return }
@@ -227,9 +230,9 @@ widget CommandPalette (open: bool = false, revision: int = 0, title: str = "", p
             .result_signature = signature
             .result_query_seq = .query_seq
             .result_epoch = .result_epoch + 1
-            if code == "" {
-                let matches = if .filterMode == "local" { palette_local(.commands, .draft) } else { .commands }
-                .rows = palette_rows(matches, .commands)
+            if .config_code == "" {
+                let matches = if .filterMode == "local" { palette_local(.source_commands, .draft) } else { .source_commands }
+                .rows = palette_rows(matches, .source_commands)
                 .active_id = palette_active(.rows, .active_id)
             } else {
                 .rows = []

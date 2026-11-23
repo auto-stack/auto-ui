@@ -13,7 +13,7 @@ The [settings example](../../examples/command-palette/README.md) shows the compl
 
 ## Data and events
 
-Supply command records with a unique nonempty `id`, a `label`, optional group metadata, `keywords`, `shortcut`, `disabled`, and `icon`. Use empty strings or lists for unused fields. Commands can share a label. Local search folds ASCII case, trims surrounding ASCII whitespace, and matches the label, ID and keywords. Provided search preserves application order and renders headings at group boundaries.
+Supply command records with a unique nonempty `id`, a `label`, optional group metadata, `keywords`, `shortcut`, `disabled`, and `icon`. Omit unused metadata or supply empty strings or lists. Commands can share a label. Local search folds ASCII case, trims surrounding ASCII whitespace, and matches the label, ID and keywords. Provided search preserves application order and renders headings at group boundaries.
 
 Pass `open`, `revision`, `commands` and optional `title`, `placeholder`, `query`, `wrapNavigation`, `filterMode`, `response` and `errorMessage`. In provided mode, set `resultsSession`, `resultsQuerySeq` and `resultsQuery` together with `commands` and increment `revision`.
 

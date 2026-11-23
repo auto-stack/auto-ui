@@ -2589,6 +2589,22 @@ fn try_transpile_builtin_call(
                 transpile_expr(&fallback.get_expr(), ctx, out);
                 write!(out, ")").ok();
                 true
+            } else if method == "has_key" {
+                let [document, key] = args.args.as_slice() else {
+                    return false;
+                };
+                out.extend_from_slice(br#"((document: unknown, key: string) => {
+  if (typeof document === 'string') {
+    try { document = JSON.parse(document); } catch { return false; }
+  }
+  return document !== null && typeof document === 'object'
+    && !Array.isArray(document) && Object.prototype.hasOwnProperty.call(document, key);
+})("#);
+                transpile_expr(&document.get_expr(), ctx, out);
+                out.extend_from_slice(b", ");
+                transpile_expr(&key.get_expr(), ctx, out);
+                out.push(b')');
+                true
             } else if method == "to_value" {
                 match args.args.first() {
                     Some(a) => {

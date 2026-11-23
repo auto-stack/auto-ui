@@ -139,6 +139,31 @@ def visual(session):
     session.wait_text("Theme setting: dark", absent=("Search commands",))
 
 
+def scroll_results(session):
+    session.open_palette()
+    if session.browser is None:
+        def overflow():
+            panes = json.loads(session.call("autoui_scroll_state"))["panes"]
+            return next((pane for pane in panes if pane["content"][1] > pane["viewport_rect"][3]), None)
+
+        pane = wait_for(overflow, bool, seconds=3)
+        assert pane["offset"][1] == 0, pane
+        result = session.call("autoui_action", element_id=pane["key"], action="scroll", value=200)
+        assert not result.startswith("Error:"), result
+        wait_for(overflow, lambda current: current and current["offset"][1] > 0, seconds=3)
+    else:
+        moved = session.browser_result("browser_run_code_unsafe", code="""async page => {
+          const list = page.getByRole('dialog').locator('.overflow-y-auto');
+          await list.hover();
+          await page.mouse.wheel(0, 200);
+          await list.evaluate(el => new Promise(resolve => requestAnimationFrame(resolve)));
+          return await list.evaluate(el => el.scrollHeight > el.clientHeight && el.scrollTop > 0);
+        }""")
+        assert moved is True
+    session.press("Cancel")
+    session.wait_text("Applied commands: 0", absent=("Search commands",))
+
+
 def composition(session):
     session.open_palette()
     session.search("night", "Dark theme", absent=("Light theme",))
@@ -194,16 +219,34 @@ def provided_results(session):
     session.wait_text("Provided commands applied: 0")
     tree = session.wait_text("First result", "Middle result", "Final result", absent=("Searching…",))
     assert tree.index("First result") < tree.index("Middle result") < tree.index("Final result")
+    session.press("Final result")
+    session.wait_text("Provided commands applied: 1", "three", absent=("Search commands",))
+
+
+def provided_wrap(session):
+    session.open_palette()
     session.key("ArrowUp")
     session.key("Enter")
     session.wait_text("Provided commands applied: 1", "three", absent=("Search commands",))
 
 
+def provided_pending(session):
+    session.open_palette()
+    session.press("Middle result")
+    session.wait_text("Executing…", "Provided commands applied: 0")
+    session.screenshot("pending")
+    session.key("Escape")
+    session.wait_text("Provided commands applied: 1", "two", absent=("Search commands",))
+
+
 def launcher_no_host(session):
     session.open_palette()
+    session.key("ArrowUp")
+    session.key("Enter")
+    session.wait_text("App launching requires the AutoOS desktop. Auto Edit")
     session.search("cal", "Calculator", absent=("Stopwatch", "Weather"))
     session.key("Enter")
-    session.wait_text("App launching requires the AutoOS desktop.", "Search apps…", absent=("Last launched:",))
+    session.wait_text("App launching requires the AutoOS desktop. Calculator", "Search apps…", absent=("Last launched:",))
     session.press("Grid view")
     session.wait_text("Calculator", "Weather", "Tab palette")
 
@@ -213,9 +256,12 @@ CASES = {
     "reopen-dialog": (empty_disabled_and_reopen, "C-01/C-02/C-05", "MCP and application model"),
     "rejected": (rejection, "C-04/C-06", "MCP and application model"),
     "visual": (visual, "X-03", "rendered screenshots"),
+    "scroll": (scroll_results, "X-03", "native scroll and browser wheel"),
     "ime": (composition, "C-02/X-05", "Vue input adapter"),
     "system-input": (system_accessibility, "X-07", "Windows UI Automation"),
     "system-invoke": (system_accessibility, "X-07", "Windows UI Automation"),
+    "provided-pending": (provided_pending, "C-06/X-03", "pending close lock and appearance"),
+    "provided-wrap": (provided_wrap, "C-02", "provided keyboard navigation"),
     "provided": (provided_results, "C-03/C-06", "provided query and current command model"),
     "launcher": (launcher_no_host, "C-04", "standalone Launcher no-host and grid"),
 }
@@ -254,7 +300,16 @@ def source_hashes(path, backend):
         "package.json", "pnpm-lock.yaml", "src/App.vue", "src/components/CommandPalette.vue",
         "dist/index.html", "dist/assets/index.css", "dist/assets/index.js",
     )
-    return {name: digest(path / name) for name in files if (path / name).is_file()}
+    hashes = {name: digest(path / name) for name in files if (path / name).is_file()}
+    if backend == "native":
+        root = next((parent for parent in path.parents if
+                     (parent / "packages/command-palette/package.at").is_file()), None)
+        if root is not None:
+            for package in ("command-palette", "themes"):
+                for source in sorted((root / "packages" / package).glob("*")):
+                    if source.is_file() and source.suffix in {".at", ".json"}:
+                        hashes[source.relative_to(root).as_posix()] = digest(source)
+    return hashes
 
 
 def main():
@@ -264,7 +319,7 @@ def main():
     parser.add_argument("--ui-tool-bin", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--backend", required=True, choices=["native", "vue"])
-    parser.add_argument("--app-dir", required=True, type=Path,
+    parser.add_argument("--app-dir", type=Path,
                         help="isolated native project or prepared Vue project")
     parser.add_argument("--browser-mcp-config", type=Path)
     parser.add_argument("--case", choices=[*CASES, "reopen-app"], default="settings")
@@ -276,7 +331,16 @@ def main():
         path = getattr(args, option)
         if path is not None:
             setattr(args, option, path.resolve())
-    args.consumer = args.case if args.case in {"launcher", "provided"} else "demo"
+    args.consumer = "provided" if args.case.startswith("provided") else "launcher" if args.case == "launcher" else "demo"
+    if args.app_dir is None:
+        projects = {
+            "provided": "tests/product/fixtures/command-palette-provided",
+            "launcher": "examples/ui/028-launcher",
+            "demo": "examples/command-palette",
+        }
+        args.app_dir = args.out_dir.parent / "windows" / projects[args.consumer]
+        if args.backend == "vue":
+            args.app_dir /= "gen/front/vue"
     args.out_dir.mkdir(parents=True)
     report = {"plan": "PLAN-096", "revision": 3, "platform": platform.system(),
               "backend": args.backend, "case": args.case, "app_dir": str(args.app_dir),

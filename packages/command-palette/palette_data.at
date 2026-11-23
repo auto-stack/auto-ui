@@ -20,11 +20,30 @@ pub type PaletteRow {
     icon str
 }
 
+// Normalize optional command metadata before the VM reads typed fields.
+pub fn palette_commands(items List<PaletteCommand>) List<PaletteCommand> {
+    var output List<PaletteCommand> = []
+    for item in items {
+        let record = json.parse(json.stringify(item))
+        output.push(PaletteCommand {
+            id: if json.has_key(record, "id") { record.id } else { "" },
+            label: if json.has_key(record, "label") { record.label } else { "" },
+            groupId: if json.has_key(record, "groupId") { record.groupId } else { "" },
+            groupLabel: if json.has_key(record, "groupLabel") { record.groupLabel } else { "" },
+            keywords: if json.has_key(record, "keywords") { record.keywords } else { [] },
+            shortcut: if json.has_key(record, "shortcut") { record.shortcut } else { "" },
+            disabled: json.has_key(record, "disabled") && record.disabled == true,
+            icon: if json.has_key(record, "icon") { record.icon } else { "" }
+        })
+    }
+    return output
+}
+
 pub fn palette_error(items List<PaletteCommand>, filter_mode str) str {
     if filter_mode != "local" && filter_mode != "provided" { return "invalid-filter-mode" }
     var index int = 0
     for item in items {
-        if item.id == nil || item.id == "" { return "missing-command-id" }
+        if item.id == "" { return "missing-command-id" }
         var previous int = 0
         for other in items {
             if previous >= index { break }
@@ -41,20 +60,7 @@ pub fn palette_error(items List<PaletteCommand>, filter_mode str) str {
 }
 
 pub fn palette_signature(items List<PaletteCommand>) Str {
-    var signature Str = ""
-    for item in items {
-        signature = signature + "[" + json.stringify(item.id) + "," + json.stringify(item.label)
-        signature = signature + "," + json.stringify(item.groupId) + "," + json.stringify(item.groupLabel)
-        signature = signature + "," + json.stringify(item.shortcut) + "," + json.stringify(item.icon)
-        signature = signature + (if item.disabled { ",true,[" } else { ",false,[" })
-        if item.keywords != nil {
-            for keyword in item.keywords {
-                signature = signature + json.stringify(keyword) + ","
-            }
-        }
-        signature = signature + "]]"
-    }
-    return signature
+    return json.stringify(items)
 }
 
 pub fn palette_rows(items List<PaletteCommand>, all_items List<PaletteCommand>) List<PaletteRow> {

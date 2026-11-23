@@ -103,7 +103,7 @@ fn mount(app_source: &str) -> DynamicComponent {
     let app = auto_ui_compiler::aura::extract_widget_from_decl(&declarations[0]).unwrap();
     let mut registry = WidgetRegistry::new();
     registry.register(auto_ui_compiler::aura::extract_widget_from_decl(&declarations[1]).unwrap());
-    let mut component = DynamicComponent::with_registry_and_imports_from_decls(
+    let component = DynamicComponent::with_registry_and_imports_from_decls(
         &declarations[0],
         &declarations[1..],
         &app,
@@ -312,6 +312,23 @@ fn first_invalid_configuration_notifies_once_and_can_recover() {
     tick(&mut model);
     invoke(&mut model, "first");
     assert_eq!(child(&model, "seq"), Value::Int(1));
+}
+
+#[test]
+fn invalid_records_report_missing_id_and_conflicting_group_labels() {
+    for (source, expected) in [
+        (APP.replace("id: \"first\", ", ""), "missing-command-id"),
+        (
+            APP.replacen("groupLabel: \"Appearance\"", "groupLabel: \"Mismatch\"", 1),
+            "conflicting-group-label",
+        ),
+    ] {
+        let mut model = mount(&source);
+        tick(&mut model);
+        assert_eq!(emitted(&model, "diagnostic")["code"], expected);
+        invoke(&mut model, "third");
+        assert_eq!(child(&model, "seq"), Value::Int(0));
+    }
 }
 
 #[test]

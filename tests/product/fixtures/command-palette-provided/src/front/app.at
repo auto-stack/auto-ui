@@ -3,7 +3,7 @@ use auto.json
 widget App {
     use { package: command_palette from "../../../../../../packages/command-palette" }
 
-    msg { Init, Open, Query(str), Publish(str, bool), Complete, Run(str), Close(str), Exit }
+    msg { Init, Open, Query(str), Publish(str, bool), Complete, Run(str), FinishRun, ApplyRun(str), Close(str), Exit }
 
     model {
         var shown bool = false
@@ -17,6 +17,10 @@ widget App {
         var first_a str = ""
         var waiting str = ""
         var settling bool = false
+        var result_ready_at int = 0
+        var running bool = false
+        var run_ready_at int = 0
+        var run_request str = ""
         var applied int = 0
         var command str = ""
         var offered List = []
@@ -30,7 +34,10 @@ widget App {
         ]
     }
 
-    timer { Complete (every_ms: 1400, when: .settling) }
+    timer {
+        Complete (every_ms: 80, when: .settling)
+        FinishRun (every_ms: 80, when: .running)
+    }
 
     view {
         col (style: "p-4 gap-2") {
@@ -55,6 +62,7 @@ widget App {
             if request.query == "A" && .first_a != "" {
                 .waiting = payload
                 .Publish(.first_a, true)
+                .result_ready_at = Time.now_ms() + 1000
                 .settling = true
             } else {
                 .Publish(payload, false)
@@ -70,12 +78,28 @@ widget App {
             if delayed { .offered = .stale } else { .offered = .fixed }
         }
         .Complete -> {
-            if .settling {
+            if .settling && Time.now_ms() >= .result_ready_at {
                 .settling = false
                 .Publish(.waiting, false)
             }
         }
         .Run(payload) -> {
+            let request = json.parse(payload)
+            if request.commandId == "two" && !.running {
+                .run_request = payload
+                .run_ready_at = Time.now_ms() + 1300
+                .running = true
+            } else if !.running {
+                .ApplyRun(payload)
+            }
+        }
+        .FinishRun -> {
+            if .running && Time.now_ms() >= .run_ready_at {
+                .running = false
+                .ApplyRun(.run_request)
+            }
+        }
+        .ApplyRun(payload) -> {
             let request = json.parse(payload)
             if .shown && request.instanceToken == .instance_token && request.session == .session &&
                 request.querySeq == .sequence && request.query == .query && request.baseRevision == .revision {

@@ -691,10 +691,12 @@ widget App {
                 request.baseRevision != .palette_revision { return }
             let name str = request.commandId
             var available bool = false
+            var app_title str = ""
             var i int = 0
             while i < .apps_names.len() {
                 if .apps_names[i] == name && (.cat == "all" || .apps_cats[i] == .cat) {
                     available = true
+                    app_title = .apps_titles[i]
                 }
                 i = i + 1
             }
@@ -708,7 +710,7 @@ widget App {
                 .Launch(name)
             } else {
                 .palette_response = json.stringify({instanceToken: request.instanceToken, session: request.session,
-                    seq: request.seq, commandId: name, status: "rejected", message: "App launching requires the AutoOS desktop."})
+                    seq: request.seq, commandId: name, status: "rejected", message: "App launching requires the AutoOS desktop. " + app_title})
             }
         }
 

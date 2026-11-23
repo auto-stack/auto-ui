@@ -24,7 +24,7 @@ widget App {
             {id: "theme.dark", label: "Dark theme", groupId: "appearance", groupLabel: "Appearance", keywords: ["night"], shortcut: "Ctrl+Alt+D", disabled: false, icon: "moon"},
             {id: "theme.light", label: "Light theme", groupId: "appearance", groupLabel: "Appearance", keywords: ["day"], shortcut: "Ctrl+Alt+L", disabled: false, icon: "sun"},
             {id: "theme.settings", label: "Theme settings", groupId: "settings", groupLabel: "Settings", keywords: ["外观"], shortcut: "", disabled: false, icon: "settings"},
-            {id: "files.open", label: "Open file", groupId: "", groupLabel: "", keywords: [], shortcut: "", disabled: false, icon: "folder-open"},
+            {id: "files.open", label: "Open file", icon: "folder-open"},
             {id: "settings.general", label: "Reset settings", groupId: "settings", groupLabel: "Settings", keywords: ["通用", "重置"], shortcut: "", disabled: false, icon: ""},
             {id: "settings.layout", label: "Reset settings", groupId: "settings", groupLabel: "Settings", keywords: ["布局", "重置"], shortcut: "", disabled: false, icon: ""},
             {id: "settings.managed", label: "由组织管理的设置不能从这个设备修改", groupId: "settings", groupLabel: "Settings", keywords: ["管理"], shortcut: "", disabled: true, icon: "lock"}
