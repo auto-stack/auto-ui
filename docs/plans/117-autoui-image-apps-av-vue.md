@@ -316,6 +316,20 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 029 生产窗口 Debug 准备 79.525 s。原入口越过收藏恢复的 JSON 绑定，仍在 admission 阶段退出 4（3.165 s）。首拒 `app::app:441:31` 的 `self` 对上目录扫描中 `.fav_records.len()`。该列表由 handler 更新并在另一个 handler 读，是私有业务状态。`av/r65-029-window.log` SHA256 `8B5766764BFF50793633839FCE7229A979F4E8516D508879991645CBE411C8F1`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 65 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `1d2253dd5` / auto-ui `5661ad14` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work round 66 — 029 私有收藏列表跨事件
+
+- AutoLang `96147bf4b` 将空初始化、被 handler 替换且在 handler 内读取的私有列表纳入受检模型状态。定向 AV 用例在第二个实例恢复一条记录，随后两个实例分别用同形循环读列表长度，观察文本 `0` 与 `1`。Debug 首次准备 35.567 s、最终用例准备 3.753 s，定向 1/1（0.215 s），981 包 AV 41/41（1.008 s），HTTP 组 13/13（0.240 s），发现和清理未单计。`av/r66-private-list-av-case-r5.log` SHA256 `AA1CA4D303236581AD00AF1D5F2E20931C7C1970DF0B1A0281000324B7A2B819`。
+- 另一对照在该循环内比较动态记录 `id` 与字符串，仍得到 `0`（0.171 s）。当前解析器将带任意 Dyn 操作数的相等比较交给判空分支，须单独验证非空值比较。未将该记录匹配算作通过。`av/r66-private-list-av-case-r3.log` SHA256 `16552EC098ACEC3CE32616C46BD51DA3B880CE4AB10ACD9BF15D29B35A0C0E38`。
+- 029 生产窗口 Debug 准备 91.726 s。原入口越过收藏列表的绑定，仍在 admission 阶段退出 4（2.746 s）。首拒为 `asset_browser::asset_browser_util:34:23` 的 `r.id.replace(...)`，包工具函数原样进入编译，入口准备已有的文本替换能力未覆盖此处。`av/r66-029-window.log` SHA256 `40724275A1ECFF912AD325316CFAB0DD233DB82385F42F923D944ADAC2F7B31B`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 66 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `96147bf4b` / auto-ui `5661ad14` | next: work/T-02–T-03。
+
+### 2026-11-23 goal work round 67 — AssetBrowser ID 校验
+
+- AutoUI `1521f47a` 使用受检文本精确比较 ID，保留空 ID、空 revision 和首个重复 ID 的既有返回值。重复 ID 以拥有文本返回，避免从本地字段返回借用视图。列表元素投影按原 CollectionItem 结构核类型，预览动作仍依赖图片类型及非空缩略图 URI。
+- 使用真实 AssetBrowser 工具模块和 CollectionView schema 的 AV 用例通过，核对带 Unicode 和旧转义字符的两个不同 ID、准确定位、未命中及重复 ID。Debug 准备 73.474 s，定向 1/1（0.271 s），029 包发现 1/1（1.327 s），发现和清理未单计。`av/r67-asset-browser-case-r4.log` SHA256 `83E63BFC7754B7EF4915494034CAB68AB26C280133FE7D06300DABAEB403194E`。
+- 029 使用 round 66 生产二进制读取更新后的依赖源，越过 AssetBrowser 记录验证，仍在 admission 阶段退出 4（2.861 s）。首拒为 `image_viewer::image_viewport:263:16`，精确对上 `OnWheel` 中读取计算成员 `.c_ok` 的条件。`av/r67-029-window-r6.log` SHA256 `9CF3E2337930DF0E209E008DC8573C1EB6BA2ADB1488E74677B0C743A56A6CAB`。029 浏览、嵌入和缺图恢复尚未进入真窗验收。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 67 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `96147bf4b` / auto-ui `1521f47a` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
