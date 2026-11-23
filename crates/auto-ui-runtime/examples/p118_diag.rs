@@ -133,6 +133,43 @@ fn main() {
     if std::env::var("P118_DUMP_PREP").ok().as_deref() == Some("1") {
         println!("=== PREPARED SOURCE ===\n{prepared}\n=== END ===");
     }
+    // 原始单单元包编译（不过 prep）：对准备源做构造级二分的入口。
+    if std::env::var("P118_RAW_FULL").ok().as_deref() == Some("1") {
+        let mut units = vec![ace_core::source::packages::PackageModuleInput {
+            package: "app".into(),
+            version: "1.0.0".into(),
+            id: "app".into(),
+            source: src.clone(),
+            provider: None,
+        }];
+        if let Ok(extra) = std::env::var("P118_RAW_EXTRA") {
+            for (pkg, id, path) in extra.split(';').filter_map(|item| {
+                let mut it = item.splitn(3, '=');
+                Some((it.next()?.to_string(), it.next()?.to_string(), it.next()?.to_string()))
+            }) {
+                if let Ok(s) = std::fs::read_to_string(&path) {
+                    units.push(ace_core::source::packages::PackageModuleInput {
+                        package: pkg, version: "1.0.0".into(), id, source: s, provider: None,
+                    });
+                }
+            }
+        }
+        let caps = [ace_core::source::packages::PACKAGES_CAPABILITY.to_string()];
+        let scenario = ace_av::age_component::ComponentScenario { instances: 1, ops: Vec::new() };
+        match ace_core::source::age_package::compile_age_package_with_scenario(
+            &units, "app::app", LegacyWidgetAlias::Accept, &caps, &scenario,
+        ) {
+            Ok(_) => println!("RAW PACKAGE COMPILE OK"),
+            Err(diags) => {
+                println!("RAW PACKAGE COMPILE FAILED: {} diagnostics", diags.len());
+                for d in &diags {
+                    println!("- [{}] {} @ {}..{}", d.code, d.message, d.span.start, d.span.end);
+                }
+                std::process::exit(2);
+            }
+        }
+        return;
+    }
     let caps = ["ac.runtime.text.v1".to_string()];
     match compile_component_event_program(
         &prepared,

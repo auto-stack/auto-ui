@@ -814,6 +814,9 @@ pub fn prepare_component_source(
 
     // PLAN-105 T-02（U03 真语料 012）：`<text>.contains(<sub>)`——语言无该内建
     // 方法，改写为 prep 注入的文本谓词 helper（`len`/`slice`/`==` 皆既有内建）。
+    // PLAN-118：包面目标早判——包面原生有 while，且模块 fn 体拒 for（重写
+    // 反而制造 `fn` 拒）；组件面维持 while→for 不变。
+    let package_face_target = src.lines().any(|l| l.trim_start().starts_with("use { package:"));
     let mut need_str_contains = false;
     // PLAN-118：包面目标（widget 级 `use { package: }` 导入存在）——AGE 包面
     // 的 `str`/`Str` 是借用/owned 两个类型：VM 作者源（paint_color 内联 fn、
@@ -840,7 +843,9 @@ pub fn prepare_component_source(
     // PLAN-117（round-30）：`<text>.replace(<mark>, <repl>)` → 标量 helper。
     let mut need_str_replace = false;
     out = rewrite_str_replace(&out, &mut need_str_replace);
-    out = rewrite_while_to_for(&out);
+    if !package_face_target {
+        out = rewrite_while_to_for(&out);
+    }
     if need_str_contains {
         fn_blocks.push(STR_CONTAINS_HELPER.to_string());
     }
@@ -899,10 +904,12 @@ pub fn prepare_component_source(
     }
     // 注入的依赖块（fn/type/const）同样做组件面语法归一：`while` → 条件 `for`，
     // 并去掉显式 `as int` 转换。
-    out = rewrite_while_to_for(&out);
+    if !package_face_target {
+        out = rewrite_while_to_for(&out);
+    }
     // PLAN-118：包面目标的 str→Str 注解归一（内联 fn 已前置，最后统一跑；
     // model 块早被 rewrite_model_text_fields 覆盖，此处恒等）。
-    if src.lines().any(|l| l.trim_start().starts_with("use { package:")) {
+    if package_face_target {
         out = rewrite_str_surface_for_package(&out);
     }
     Ok(PreparedComponentSource {
