@@ -515,6 +515,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 用正式 `packages/image-viewer` 导入未改写的 `ImageViewport`，当前生产包 SFC 入口明确拒绝其 `auto.json.stringify.v1`，尚不能生成原组件（1.686 s，探针因拒绝退出 101）。`official-current.log` SHA256 `2F2B3DC1B53421AF0380492C283A28D6C7697B41CB590630865025E570816FD2`。同 URI 换版本的重新读取仍待消费既有浏览器媒体重验证机制。029/031 的原项目浏览器验收继续保留。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 97 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `bb0b3708` | next: work/T-06 继续核对原包 JSON 值与 HTTP 承载；T-02–T-03 仍含 031 授权媒体绑定。
 
+### 2026-11-23 goal work round 98 — 正式 ImageViewport 生成与受控视图复位
+
+- 原 ImageViewport 经生产包入口仍在 `auto.json.stringify.v1` 被拒绝（1.715 s，退出 101）。AutoUI `cbbc6bec` 复用标准库 `json_str` 转义资源身份、错误文字等字符串字段，按组件既有结构编码四类事件。变换事件的嵌套 tuple 与平面别名共用一份编码。序列化接通后的首轮 Chrome 已通过加载、导航、滚轮和拖动，到复位请求超时（3.695 s，退出 1）。同资源接收新的受控 zoom 时，Vue 调用 `Init` 覆盖了复位基线。最终 `Init` 和 `Tick` 共用同步逻辑，仅首次初始化或资源身份变化时捕获基线并清理加载与手势状态。
+- 使用直接导入工作树正式组件的父组件夹具，生产 `generate_linked_front_sfc` 生成 542,436 字节（嵌入原组件一件，2.001 s，退出 0），Vite 构建 1.932 s，真实 Chrome 运行 1.890 s，均退出 0。验证 64×48 图像、带引号、反斜线及换行的 Unicode 资源 ID、下一张、滚轮缩放 1.25、父组件接受后 24×−16 拖动、复位回 1.0、切到 320×240 新图后重新发 loaded、坏图报 `load_failed` 及卸载，Chrome 页面异常 0。产物目录 `scratch/r98-official-image/`，`Host.vue` SHA256 `09F2AC48F3F46B456B5F67A471E22EB9844383A20425EEC123F9709D663E4BB2`，`browser-r2.log` SHA256 `ACEA7BE012FE5A308DAE661A876FAE28FC12C422752B4009C76008731D3AB7C3`。
+- 永久定向用例 `checked_vue_embeds_official_image_viewport` 验证生产入口嵌入仓内正式文件，使用受检库链接 12.406 s，执行 1.748 s、1/1 通过。原 029 同源 Iced 窗口和原 Rust 后端用隔离夹具复验首图解码、真实 404、换回及缺图复原、图库返回与会话关闭（23.603 s，退出 0，514 帧、零运行时错误）。`viewport-regression.log` SHA256 `DC319E815D97BA76E2C8AB02E299B526E4EECF5325B1588A845D2157A83F6EDF`，`gallery-final.json` SHA256 `E8C981157AA5E2D42A7F3470DE88182EA97C14C7164BB0E26DEDD1FCF0B04500`。
+- 非法初始 fit 的对照 SFC 可以生成和构建。Chrome 负例两次导航超时（22.891 s、45.991 s，退出 1），未获得浏览器终态。独立执行同一生成的 setup，正常配置返回组件（0.555 s），非法配置触发 `ace.widget.init: outbound events require a mounted parent`（0.170 s），定位到初始化时上报 `invalid_view` 的宿主限制。`setup-invalid.log` SHA256 `2F7AB263EB0E4EB11BF3EB692F68E523AF5D8B3FA92FC3844BDB2B04B3A0BF7E`，`browser-invalid-r3.log` SHA256 `57E4D497500B48517DF28004497FE000560A12B2BF277D2D703262DBAC85E972`。同 URI 换版本重新读取、029 的受检文本及 HTTP/JSON、031 的带授权后端和两个原项目浏览器验收仍需交付。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 98 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `cbbc6bec` | next: work/T-06 核对初始化事件投递与版本化重读，继续原项目准入；T-02–T-03 仍含 031 授权媒体绑定。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
