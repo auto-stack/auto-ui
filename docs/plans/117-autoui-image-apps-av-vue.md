@@ -257,6 +257,13 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 44 | from: work | t
 
 stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | to: user | status: executing | outcome: blocked | worktree: D:/autostack/.wt/ui-117/{auto-lang,auto-ui} | commit: auto-lang 1495e443d / auto-ui cd4d8260 | next: user
 
+2026-11-23 stage: work | plan_id: PLAN-117 | plan_revision: r1 | checkpoint: T-03 Carousel（rounds 52–54） | outcome: partial | code_commit: auto-lang `0882bbe17`、`526599037`、`a50d5f6fd` / auto-ui `cd4d8260` | next: work/T-03 Carousel 原画廊闭包和运行控件。
+
+- 只读 AutoOS `cdb4883` 的画廊目录干净，原 `/carousel` 页 SHA256 `F43F17C29A83924ABC3061494E873F54140982BA828367A4A33F820CAE891BF1` 与 T-01 一致，实际组件文件 SHA256 `E08B8205CD6E7E9EBE9B9D83E0D925AB334177DE1A96DCCB6D88036E0B0FE6C1`。轮前 Debug 窗口工具 SHA256 `2B6EABA512FC49B8B54936FC113339A41605A9B3452010D4B524E82C685AEBE2`，原画廊 `app.at` 3.836 s、退出 0、4 帧，证据里原首页 `/` 仍未挂载（`expected fn, found widget`）。原 Carousel 页单独装载 0.192 s、退出 4。真实窗口激活与重新绑定后激活均报 `failed to activate captured window`，观察窗口超时退出 6，未发生侧栏交互，JSON SHA256 `A6647EB2C576D477483A8F8A637E1281FD0DCFE167230C67D2F3C7C349ABECFC`。
+- 诊断对照中只改材料副本的 `loop` 键即让原页通过包解析，改 `align` 不通过。复用 PLAN-107 r1 交接分支的 `d414aec0e` 中 `loop` 键切片和 `9f4a65ad3` 的 `text | …` 扫描、投影、编解码及回归；保留当前工作树的其他语法。组件 `Carousel` 剩余失败由换行分隔的 `Next` / `Previous` 消息触发，材料副本只加逗号即通过，改字面样式不通过。使用既有的换行列表规则，保留逗号、载荷、尾逗号和同行无分隔拒绝。最终原页及组件文件逐字不改，包解析分别产出 1 个与 6 个组件（0.149 s）。日志 `scratch/r54-carousel-package.log` SHA256 `A1CF4D2DBA2E20A4EB004277CD6D07DF02731C37564D734BA3A295976D3791E1`。
+- `ace-core` conformance 最后准备 1.742 s。PLAN-107 属性、行内文本等 5/5（0.136 s），AGE 包身份冻结 1/1（0.042 s），新增换行消息 `p117_carousel_messages_accept_newline_or_comma` 1/1（0.073 s）。复用的 `p107_carousel_loop_is_a_view_property` 单跑 0.164 s；`ace-syntax-runtime` 编解码往返通过。组件模块 29/30（0.159 s），`p979_component_vdetail02_named_refusals_keep_original_spans` 的非文本叶诊断失配在本轮起点 `1495e443d` 独立重建（9.244 s）后同码同 span 再现（0.055 s，退出 101）；Scalar 冻结身份在导入 inline-text 前已红并前后相同。新 AGE 两面身份按工作树实测更新。
+- 原画廊的 Iced 路由、可见项、键盘/指针、循环、卸载与 A2Vue 浏览器验收仍待。PLAN-107 保留 Iced `f5ea801f` 和 Vue `6e8f8d89` 的可复用实现；两项补丁与本工作树渲染器重构存在冲突，下一步按现行渲染入口迁入并以原页回放，旧计划的运行收据不计作本次通过。029/031 仍按 §10 等待共享运行时写面裁定。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
