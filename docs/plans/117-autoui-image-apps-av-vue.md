@@ -1049,6 +1049,15 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: AutoUI complete with recorded Chart failure, Native runtime-bound replay queued | evidence: round 137 | next: 核查同归档复放并确定阶段门归因
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 137 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 读取 Native 前置及复放结果，准备 W1 落主材料
 
+### 2026-11-24 goal merge round 138 — Native 运行时前置诊断与规范补丁检查
+
+- 原 `220636` 控制器等待 395.376 s 后，在 `stable-x86_64-pc-windows-msvc` 已绑定且禁止构建的 `run-debug` 下运行 `runtime-warm`，0.448 s、退出 1。Collections、scheduler、typed-entry 的旧 `runtime-dev` 准备件均报告 `PREPARATION_REQUIRED`。本次没有进入 Native 测试，原归档和首轮结果保持。`scratch/r123-phase-gate/r134-reviewed-phase-gate/native-lock-replay-bound/runtime-preflight.log` SHA256 `6E0523CCC08274AEDFF2F2AE694C8C761A10221A4F0F9D807A6E81B01A6F1E3A`。仅绑定 Rustup 的恢复方式未能达到实际测试前置。
+- `675532` 控制器于 01:09:48 发起后续恢复，先归档三个本计划旧静态库和身份戳，再以同一复放环境显式 `prepare-debug`；执行前切回 `run-debug`，用已准备的校验件和同一冻结 Native 归档复放唯一原用例。编排保持源码提交与完整测试断言不变。`replay-native-prep-lock.ps1` SHA256 `C296C4F4AB14BCE9AB310A9531EAF24BDBDC14771D5E4D9DB8FDA57E0237A56F`。01:10:26 实见等 PLAN-1129 新固定组进程 `657800`，未开始准备或测试。
+- 将已复审的 AV 规范文字渲染为两仓五处 canonical 文档补丁，`git apply --check` 两仓均通过，当前主线对应五个 blob 与审查输入相同。`auto-ui-av-spec.patch` SHA256 `DC16848D5F67176B47895C960EB93D407A7CF2129CB7DAD0172E54AE9B115EC4`、`auto-lang-av-spec.patch` `F4F83F39685BF73225E2113E7F1CC955E1D6881C6075297FEB5CA892F592E8D0`，前后内容身份 `av-spec-patch-inputs.json` `C453D6B68B5EE1ADA0A0E8BA513AF74E3053A597881A74CE98C75A45141083A6`。补丁在阶段产物目录，工作树与主线未应用。T-05 和 W1 正式收据仍待复放归因及落主。
+
+- stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: runtime-bound preflight rejected three stale identities, explicit preparation and exact replay queued | evidence: round 138 | next: 核查显式准备、同归档复放和正式 W1 前置
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 138 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 核查 Native 真正执行的复放与阶段门归因
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
