@@ -853,6 +853,31 @@ AC-01 通过。AC-02、AC-03 的旧反例已覆盖，R117-AV-05 的新状态控�
 
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 124 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `65c473046` | next: 读取在途阶段回归结果，核对 AV/W1 落主前置
 
+### 2026-11-23 goal merge round 125 — T-05 语言固定组回归未通过
+
+AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669f859cbafc5722fe266b79f`。语言工具及 11 组归档准备 605.112 s，退出 0，`prepared.json` SHA256 `14DCCE75C2EC7A3B1689339767121E752AD6C58266DE8AC019141F1588153129`。独立 AAC1046/1047 原生准备分别为 116.274、166.561 s，均退出 0。阶段执行 `cargo t <round 122 的 11 组> --run-prepared <prepared.json>` 外层 399.392 s，内部 397.405 s，退出 1。聚合 4,239 条实际执行，4,020 通过、219 失败。框选后的既有忽略共 31 条，零缺失终态。清理阶段未单计。新测试的已审定向成本见 round 122。
+
+| 固定组 | 通过/实跑 | 既有忽略 | 发现 s | 执行 s |
+|---|---:|---:|---:|---:|
+| `stdlib` | 180/180 | 24 | 3.027 | 11.432 |
+| `auto-media-core` | 56/56 | 0 | 1.529 | 45.431 |
+| `ace-source` | 995/1,006 | 1 | 2.632 | 13.173 |
+| `ace-syntax` | 161/161 | 0 | 2.437 | 5.169 |
+| `ace-semantics` | 295/295 | 0 | 13.415 | 17.154 |
+| `ace-av` | 1,476/1,650 | 0 | 5.797 | 63.098 |
+| `ace-comptime` | 136/136 | 2 | 8.346 | 21.917 |
+| `ace-lowering` | 9/9 | 0 | 1.551 | 1.718 |
+| `ace-native` | 319/330 | 0 | 6.041 | 60.441 |
+| `ace-a2x` | 355/365 | 4 | 9.67 | 91.61 |
+| `ace-aac-syntax` | 38/51 | 0 | 1.65 | 9.56 |
+
+- **Collections 线格式**。`av-core/src/abc.rs` 编码器无条件为 Collections 写 `HOST`。解码只在 `ac.age.elem-view.v1` 时消费，普通模块把 `H` 当类型码 72。`ace-av` 134 个失败提到 `abc.decode.type-tag`，`ace-native` 多个 Collections 入口同因。修复方向是让同一能力条件控制 Collections 编解码和准入，保已有无段线格式及元素视图的受检 HTTP/JSON 宿主段。
+- **AGE 诊断与旧文本行为**。`resolve.rs` 全局 numeric `.clone()` 恒等分支吞掉了 H0、Component、Package 的合成文本叶检查。旧 `source.age.text-type` 变为 `source.age.leaf-expr` 或泛型类型错，影响 core、AV、A2R。`6a198e5a2` 的普通调用 Str 克隆也重写 `MovePos` 已标明的实参，`text_source::v08_move_and_mode_params` 在 `consume(x.move)` 失败。`da9bad67a` 用 `is_text`/`is_collections` 准入异构对象，后者包含冻结的 Aggregates，`dynamic_objects_964` 产生旧 descriptor 不收的 `type.dyn` 等。修复须区分实际 AGE 生成上下文和旧源 profile。5 条 `text_record_source` 的 `verify.double-move` 在 sibling PLAN-1054 记录同码同 span 重现，仍需对齐实际合流基面。
+- **AAC 与运行前置**。Rust canonical codec 新增 `LineText` matcher tag 5，AAC 的 `syntax_program.at` 仍仅解码 0–4。13 条 AAC 失败中，多条为 `DECODE_ERR 3` 或 `MODULE_ERR GRAMMAR`，PLAN-1054 对比的 51 条中 12 条对应项通过，`aac1046_corpus_text` 两边失败。需同步 AAC 解码与词法行为并核验相同输入。`ace-a2x` 五条缺 NumPy、两条缺 PyTorch，已核 `D:/autostack/.tools/a2py-py314-numpy/Scripts/python.exe` 的隔离导入通过，版本 2.5.1 / 2.14.0+cpu，复验应通过既有 `A2PY_PYTHON` 绑定。AV 七条 Python provider 先报 `foreign.prepared`，已有 `av-providers` Debug 准备配置。1092/1094 归档列出部分旧红的逐例身份，仍需以实际合流基面和代表用例定位其余差异。
+- 原始 `scratch/r123-phase-gate/language-run/results.json` SHA256 `3474DCCAE58F9E0CC1428B0105D2B297BB42BB50183CA861DF37750D75C645AD`。23:18:06 测试队列等待 883.944 s 后启动 AutoUI Debug 准备，实际测试仍待读取。T-05 语言门当前失败，AV/W1 未发布。收齐 AutoUI 结果后进入限定修复及受影响复审。
+
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 125 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: needs_fix | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `65c473046` | next: 收齐在途 AutoUI 门结果并按本轮诊断进入 bounded repair
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
