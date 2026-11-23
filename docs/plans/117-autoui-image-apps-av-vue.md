@@ -303,6 +303,19 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 恢复点为完整核对带空默认值的旧 widget List 输入，沿现有跨组件列表投影接入实际可写状态，验证 handler 更新后子组件可读到新列表。纯展示用惰性 view-data 仍按 PLAN-106 的既有合同。031 带授权后端和两个应用的 Vue 交互尚无新实现。Carousel 真窗物理输入仍待桌面解锁。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 63 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `dfcc380f8` / auto-ui `5661ad14` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work round 64 — 029 父组件列表更新
+
+- AutoLang `14a0679a2` 将带空默认值、由 handler 写入且作为 widget 参数传递的旧动态列表投影为受检模型字段。新用例在两个实例中只向第二个发送 `Load`，子组件分别显示 `empty` 与 `新照片`。同一用例核实纯展示列表仍按惰性 view-data 投影。Debug 准备 23.176 s，定向 1/1（0.094 s），981 包 AV 39/39（0.748 s），发现和清理未单计。`av/r64-forwarded-list-case.log` SHA256 `17AF4FE1C40946637ED917D09FBC7EF3DFD51B81FDFEF08E3228B31788D7C211`。
+- 029 生产窗口 Debug 准备 93.724 s。原入口越过 `AssetBrowser(records: .gal_records)` 绑定，仍在 admission 阶段退出 4（3.136 s）。首拒为 `app::app:399:29` 找不到 `json`，对上收藏恢复的 `json.parse`。`av/r64-forwarded-list-product-build.log`、`av/r64-029-window.log`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 64 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `14a0679a2` / auto-ui `5661ad14` | next: work/T-02–T-03。
+
+### 2026-11-23 goal work round 65 — 029 集合路径接入 JSON 和 HTTP
+
+- AutoLang `1d2253dd5` 让 AGE 包的集合路径复用原受检 JSON 和 HTTP 原语。嵌套表达式使用同一解析逻辑，带共享集合参数标记的 dynamic 字节码可携两族声明，宿主授权在执行时仍按原合同检查。定向用例验证字节码往返保留两族声明、移除标记即拒绝，以及收藏记录形状的 JSON 取值通过 AV。
+- Debug 最终准备 7.280 s，定向 1/1（0.184 s），981 包 AV 40/40（0.859 s），dynamic 语义 21/21（0.113 s），HTTP 组 13/13（0.320 s），JSON 组 4/4（0.883 s），发现和清理未单计。定向日志 `av/r65-host-av-case-r3.log` SHA256 `A8D8D2139483857EF88D4B2812CDB2DD06705792D10C695D73AB8900D45B6D4E`。首测因嵌套表达式仍走另一解析路径而拒绝，见 `av/r65-host-av-case.log`。本组未用外部 HTTP。
+- 029 生产窗口 Debug 准备 79.525 s。原入口越过收藏恢复的 JSON 绑定，仍在 admission 阶段退出 4（3.165 s）。首拒 `app::app:441:31` 的 `self` 对上目录扫描中 `.fav_records.len()`。该列表由 handler 更新并在另一个 handler 读，是私有业务状态。`av/r65-029-window.log` SHA256 `8B5766764BFF50793633839FCE7229A979F4E8516D508879991645CBE411C8F1`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 65 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `1d2253dd5` / auto-ui `5661ad14` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
