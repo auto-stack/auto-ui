@@ -4,7 +4,7 @@ status: executing
 feature_name: U05 Photo Gallery 与 Image Viewer 双端交付
 author: [Codex]
 created_at: 2026-11-20
-updated_at: 2026-11-23
+updated_at: 2026-11-24
 plan_revision: 1
 current_step: 1
 total_steps: 8
@@ -916,6 +916,14 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 
 - stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | code_commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | task_ids: T-03,T-06 | evidence: round 128 | next: 完成剩余原产品复放与回归归因
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 128 | from: work/T-02,T-03,T-06 | to: work/T-02,T-03,T-06 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | next: 核查 029 缺图复放和 Carousel 当前证据，继续剩余回归
+
+### 2026-11-24 goal work round 129 — 精确复跑清单与实况等待
+
+- 本轮对 round 125 的 `ace-source` 和 `ace-av` 原失败终态按测试身份冻结定向复跑清单。185 条分别为 `ace-core::conformance` 11，`ace-av::conformance` 170，`ace-av::ace_av` 3，`ace-av-core::ace_av_core` 1。与归档 PLAN-1092 的预存红身份精确相交 18 条（core 5、AV 13）。合流基面仍为 AutoLang `0486981556bd8d128c69ded9888319ac4a65fc02`，当前复跑将核实差额，留待实际基面验证旧红的诊断等值。清单 `scratch/r123-phase-gate/r129-failure-replay/baseline-correspondence.json` SHA256 `80F5F61FBB8C8DB15FCB68CFB71D3EC46E4B645AB21FD0992AA2922C706B2A72`。
+- 23:58:43 起 PowerShell PID `168336` 按 PID 与启动时间等待原产品补验控制器 `141580`。机器空闲后将用 c359 的 Debug 产物，以固定 `ace-av/test-case-batch` 和原测试身份逐二进制运行，记录发现/缺席、终态及用时。脚本 `scratch/r123-phase-gate/replay-source-and-av-failures.ps1` SHA256 `B5D03538BEF1EA635F1B37AC74FBA1FEBB8F28DEE295AABD95B0926774B7183C`。Native、A2X 余项继续按各自原门复验。
+- 00:01:50 复核 PLAN-1129 PID `1263020` 仍在固定组准备，子进程已从 ABI、语义工具切换至 `ace-a2x-worker`（Cargo PID `85960`）。原产品补验 PID `141580` 与定向回归 PID `168336` 均在等该测试时段。无新用例执行或终态，本轮未修改实施提交、验收或已冻结证据。
+
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 129 | from: work/T-02,T-03,T-06 | to: work/T-02,T-03,T-06 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `c3593fe12` | next: 核查原产品及定向复跑的在途结果
 
 ## 10. 待澄清事项
 
