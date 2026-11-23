@@ -999,6 +999,32 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: 11 archives ready, AAC1046 ready, AAC1047 active | evidence: round 135 | next: 收齐原生准备及实际阶段测试
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 135 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 核查 AAC1047、Python provider 和固定组终态
 
+### 2026-11-24 goal merge round 136 — 语言固定组首轮完成，AutoUI 启动
+
+- AAC1047 原生语义驱动准备 170.968 s、退出 0，`t134-gate/aac1047/aac1047-driver.exe` SHA256 `CAA4A521373E9D3016573CA7A5ECE10CDDE226C10A56E5BCB4A4C3B1D64C5497`。AV providers Debug 准备 18.901 s、退出 0，`py.descriptor.json` SHA256 `1F9EE4F8D8842173A7DAA6AA6F82F4D2507A537E64E97EBD9781C6BB0A8372BB`，`py_bridge.dll` `D273B3687E8A57E0A73843F3CBCEAB4BD1FD51BCA05EF6531A6D53590718CC69`。保留 1093 C provider 未配置的准备日志，原测试选集照常执行，Python provider 7/7。
+- AutoLang `30780612c` 的 11 个原固定组于 00:49:50 开始以原 `--run-prepared` 运行。4,239 实跑、4,215 通过、24 失败、31 条既有排除、零缺失终态。外层 301.577 s、内层 299.467 s、退出 1，清理未单计。源状态与准备清单相同。`scratch/r123-phase-gate/r134-reviewed-phase-gate/language-run/results.json` SHA256 `777814FBC1400D16DE760353CF3F28A0BD65C4B026323639D9C370CBDFDB0665`。
+
+| 组 | 通过/实跑 | 既有排除 | 发现 s | 执行 s |
+|---|---|---|---|---|
+| `stdlib` | 180/180 | 24 | 0.917 | 5.211 |
+| `auto-media-core` | 56/56 | 0 | 0.273 | 47.066 |
+| `ace-source` | 1001/1006 | 1 | 0.570 | 13.897 |
+| `ace-syntax` | 161/161 | 0 | 0.887 | 3.103 |
+| `ace-semantics` | 295/295 | 0 | 2.469 | 5.146 |
+| `ace-av` | 1637/1650 | 0 | 1.696 | 41.492 |
+| `ace-comptime` | 136/136 | 2 | 1.465 | 16.217 |
+| `ace-lowering` | 9/9 | 0 | 0.499 | 0.470 |
+| `ace-native` | 324/330 | 0 | 1.494 | 58.015 |
+| `ace-a2x` | 365/365 | 4 | 2.807 | 84.482 |
+| `ace-aac-syntax` | 51/51 | 0 | 0.536 | 10.273 |
+
+- `ace-source` 的 5 条仍为 `verify.double-move`，连同 `ace-av` 13 条和 Native 5 条，23 条与冻结的已知失败身份精确对应。比对 `language-gate-comparison.json` SHA256 `1345FBA1AADE36A7FA0C90C56A5E362ABDAEA9F141BF5177A6A7921558AC874E`。比对脚本先以 round 125 的 219 条失败验证，识别 23 条历史身份且保持原 gate=false。A2X 短路资源顺序用例和 AAC 旧 13 红全部恢复。
+- Native 另有 `ace-native::sched_m2_1067$scheduler_owned_text_state_crosses_spawn` 在准备锁处报 `mn.infra: scheduler runtime: prep lock: 拒绝访问。 (os error 5)`，1.603 s。round 125 和 round 130 同用例均通过。本次失败发生在运行时准备而非返回值或 owned-text 断言处。00:55:30 启动控制器 `1204668`，待原阶段控制器结束后，以同一归档、原准备工具环境和完全匹配的测试身份串行复放。`replay-native-prep-lock.ps1` SHA256 `1308E64145A605159F2FA7840D4FE32417F8D429DC278A5E969EDCFBE76619AD`。首轮失败保留，复放及归因待收。
+- AutoUI 阶段空闲等待 0.152 s，原 Windows 宿主按 `ace-bridge` Debug 构建 77.285 s、退出 0，exe SHA256 `2600705D63F64A6328843928A01701209A7FF44D4AB3DE7B06A5371831BFB9CB`。00:56:10 已见控制器 `387676` 的子进程 `1161840` 启动 AutoUI 原目标准备。无新增常备用例，T-05 和正式 W1 保持待办。
+
+- stage: merge | release_scope: phase/T-05 | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | reviewed_commit: AutoUI `8894c9ef` / AutoLang `30780612c` | gate: language first run exit 1, one Windows lock replay queued, UI preparation active | evidence: round 136 | next: 收齐 AutoUI 和 Native 定向复放，再判定阶段门
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 136 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `30780612c` | next: 核查 AutoUI 阶段结果和同归档准备锁复放
+
 ## 10. 待澄清事项
 
 2026-11-23 round 117 收口。下文保留历史阻断和当时的恢复点。029 JSON 路径、031 原受检后端绑定和目录租用及 Carousel 渲染与交互均有当前两端运行收据，工作阶段转复核。
