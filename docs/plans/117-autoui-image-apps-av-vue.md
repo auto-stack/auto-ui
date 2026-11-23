@@ -474,6 +474,14 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - 原 031-paint 源哈希与 118 收据一致。复放组包验证保留 `color_picker` 导入并进入下一处 `source.unsupported` 准入（`fn` 当前 profile 不支持）。组包诊断耗时 0.262 s，诊断程序退出 101。原 A2Vue 前后收据仍逐字节一致，SHA256 `73DA630642300CEF46818957AF61A4AFE110A65420CD0CB936D990BE1A1052FE`。AV 复放 `scratch/prep-phase-review/paint-full-replay.log` SHA256 `9EBAE93717C24FA2097C229FB5737E312BC4844ED60BD874899A002D4297ADF9`。
 - stage: review/merge | review_scope: phase | plan_id: PLAN-117 | plan_revision: r1 | outcome: pass/landed | local master: `3f4f9b3f` fast-forward | consumer: PLAN-118。诊断提交 `0cc47f5d` 留在验证分支。117 整体验收状态沿用上一工作记录。
 
+### 2026-11-23 goal work round 93 — 029 真窗解码与缺图恢复
+
+- AutoUI `17e6de20` 将受检桌面视图中配置后端同源的 HTTP 图片交给现有异步请求和有界媒体解码管线。视图切换时释放当前资源，加载和失败事件按同一资源及当前受检控件重新定位。后台任务期间收到的普通点击可在同一控件仍有效时提交。首轮扩展普通点击保留使既有双击反例多出一次选择（退出 101），最终保留条件收窄后复验通过。
+- 用原 029 入口和原 Rust 后端，通过真实 Iced 窗口的控件回调选图、打开查看器和切换图片。两张缩略图已解码。原图 `scenic-320x240` 解码为 320×240 并提交 `OnLoaded`。移开隔离夹具的第二张原图后收到真实 404 并提交 `OnError`。切回第一张可加载，放回第二张后重试解码为 64×48 并提交 `OnLoaded`，返回图库后会话关闭。窗口报告 1008 帧、零运行时错误（42.381 s，退出 0）。同一入口从第二个原后端连接解码 12/12 张缩略图（548 帧，32.060 s，退出 0）。`scratch/r93-photo-window/media-final.json` SHA256 `A3346E956453A4E6CEEF0EC49CC7C3154595EDE7D2C1FCD8A7FD2B04E002AF54`，`media-batch-12.json` SHA256 `8828B2B0F35CBD0D0B03B5C8ADD015D0D3A680166F94C53D9F7EE108C5DDA0DD`。
+- Debug 集成准备 82.679 s，真窗探针连接最终库另计 8.673 s。现有 `plan114_widget_packages` 定向验证四项，HTTP 当前挂载与延迟点击 0.304 s，受检图像手势 0.325 s，双击与替换条目 2.520 s，集合回调与过期 JSON 2.103 s，均退出 0。 `scratch/r93-photo-window/targeted-regressions-final.log` SHA256 `C70D32F4A1669F716A61B21427B5C596968C0383E7D35018A3D36B9074E18650`。
+- 当前源码重放生产 A2Vue 包前门（Debug 准备 4.859 s）。029 原源遇到 `lower`、`split`、`replace` 链接拒绝，031 仍拒 `back.api`（原源合计 3.534 s）。029 诊断额外经过桌面文本准备后，依然在 `auto.http.get-json.v1` 的计算面准入处拒绝（16.741 s）。两个探针退出 0 只表示完成诊断，尚无可构建 SFC。 `scratch/r93-linked-vue-original.log` SHA256 `F1915589F7FEC6F7C101A5D76A0FA4368EA8E590FCAFBD587AC61424CCF8E1B6`，`scratch/r93-linked-vue-prepared.log` SHA256 `0561F33C52D252F5EF284ECC8595CC0CA890E831D97C1FAC36C34489D84F00B0`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 93 | status: executing | outcome: partial | code_commit: auto-lang `0f42de25c` / auto-ui `17e6de20` | next: work/T-02–T-03 / T-06。真实窗口的回放使用宿主回调。031 带授权的媒体会话、Carousel 的物理输入和 Vue 原项目验收仍待完成。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
