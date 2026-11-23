@@ -408,6 +408,13 @@ stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 51 | from: work | t
 - AutoUI `1ad8a8cd` 先从排序后的列表生成当前页，再把完整列表移入模型并公布总数。原入口使用同一生产二进制越过分页列表校验，11.414 s 退出 4。首拒为 `mir.use-after-move`，处理器返回模型时聚合读取已移出的 `__age_s_0_photos`。恢复点为保留原目录和收藏模型的所有权，完成列表来源切换的定向验证。 `av/r83-029-window.log` SHA256 `6BC99328E6C2A4CA46E1D16D6752F075BCD33D2F1BC3C1E4D797E68CAB9B90BB`。
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 83 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `4bfd3b214` / auto-ui `1ad8a8cd` | next: work/T-02–T-03。
 
+### 2026-11-23 goal work rounds 84–85 — 查询通过加载并进入会话初始化
+
+- AutoUI `3e3e4926` 将筛选、按 mtime 稳定排序和分页投影放到受检函数中。查询和选择读取目录或收藏记录并保留模型列表。用真实作者函数与现有源准备入口跑定向 AV，核相同 mtime 的顺序、查询大小写、升降序、分页边界、资源 URI 和输入列表仍可读。最终 Debug 准备 14.966 s，执行 0.236 s，输出 `acb/bac/1/0/c/20/ALPHA 同日/photo:c//c/4`。`scratch/r85-gallery-rows-final.log` SHA256 `47791668CDEDBEBCADD49AB5C7BA0FC8B894F861C1071F91BA04AAEDB981F460`。
+- 029 去除模型列表移动后，查询处理器初次需约 32,234,872 字节验证内存。拆出排序后约 17,750,128 字节，再拆分页后通过既有 16,777,216 字节预算。中间顶部函数的索引赋值形曾在包投影时触发语法回退，最终排序以现有索引移除保留并列顺序。`av/r84-029-window.log`、`av/r85-029-window-r4.log`。
+- 029 原入口使用 round 82 生产二进制越过全部加载检查，进入会话 `open` 后在 11.298 s 退出 5。首错误为收藏恢复 JSON 解析空文本（`json.parse: unexpected byte None at 0`）。现有桌面准备把源 `storage.get` 改写为初值为空的模型字段，Vue 原包入口又拒裸存储调用。恢复点为消费既有宿主偏好绑定，并处理两端恢复相对 `Init` 的顺序。尚无成功窗口收据。`av/r85-029-window-r5.log` SHA256 `8DEB6AB40C12693342C4C3715228E850461E0E36211DD176CB8BF1DDA091CF58`。
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 85 | from: work | to: work | status: executing | outcome: partial | code_commit: auto-lang `4bfd3b214` / auto-ui `3e3e4926` | next: work/T-02–T-03。
+
 ## 10. 待澄清事项
 
 2026-11-23（round 51，待裁定）按 §2 需明确共享写面。029 的现有 JSON 值原语已在单组件面验证，包导入会先把 `json.parse` 分派到不提供该值原语的 `std::json`，仍缺包链接、运行验证。031 的后端使用 `auto.image` 管理图片会话，AGE 包宿主尚无原 `back.api` 的带授权绑定。已询问用户沿原分工由共享能力 owner 交付以上接缝，或授权 PLAN-117 接手这两处共享运行时改动。两端原验收、文件授权和会话释放仍是接入条件。
