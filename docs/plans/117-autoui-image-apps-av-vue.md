@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-23
 plan_revision: 1
-current_step: 5
+current_step: 1
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978, PLAN-089]
 supersedes_spec_components: []
@@ -79,15 +79,15 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 - [x] T-01 固定原项目、依赖与验收矩阵
   - work，AC-01，核 §1 现有源和 §6 原运行入口，输出逐行的源、权限、预期和实际阻断。
-- [x] T-02 接通本计划的具体运行接口
+- [ ] T-02 接通本计划的具体运行接口
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
-- [x] T-03 实跑 AV/Iced
+- [ ] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
-- [x] T-04 独立复核 AV 阶段
+- [ ] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
 - [ ] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
-- [x] T-06 实跑 A2Vue
+- [ ] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
 - [ ] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
@@ -877,6 +877,24 @@ AutoLang `65c4730469d3257fe3ec33c6eb7438db4f10125c`，AutoUI `8894c9ef3721b28669
 - 原始 `scratch/r123-phase-gate/language-run/results.json` SHA256 `3474DCCAE58F9E0CC1428B0105D2B297BB42BB50183CA861DF37750D75C645AD`。23:18:06 测试队列等待 883.944 s 后启动 AutoUI Debug 准备，实际测试仍待读取。T-05 语言门当前失败，AV/W1 未发布。收齐 AutoUI 结果后进入限定修复及受影响复审。
 
 - stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 125 | from: merge/T-05 | to: merge/T-05 | status: executing | outcome: needs_fix | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `65c473046` | next: 收齐在途 AutoUI 门结果并按本轮诊断进入 bounded repair
+
+### 2026-11-23 goal work round 126 — 完成 AutoUI 门并修复首批语言回归
+
+- 旧冻结提交的 AutoUI 阶段执行完成。11 个 suite 共 87 条实跑，86 通过，唯一失败 `p107_package_sfc_scopes_chart_css_and_binds_class_branches` 的 `source.age.view-list` 与 round 57/122 已登记对照一致。`plan980_package_sfc` 的计数器与条件分支两个真浏览器用例均通过，026 SQLite 真实窗口 1/1。排队 883.944 s，runtime/tools 准备 198.812/5.465 s，provider 准备 0.677 s，11 目标外层执行合计 102.851 s，从队列启动到结束 310.434 s。各 suite 用例数和时间在 `scratch/r123-phase-gate/ui-gate/results.json`，SHA256 `095CFF16EFBE5C3F2D0921BB07CEB11385C60253F738935F14B0AE8D1D1CD97B`，发现与清理未单计。
+- AutoLang 修复提交 `74caa718c91825b990c0343d40ce3af842df2951`，AutoUI 仍为 `8894c9ef3721b28669f859cbafc5722fe266b79f`。Collections 的 `HOST` 段与 `PlatformCall` 共用编解码条件，普通 Collections 恢复旧线格式，能力标记的元素视图仍携既有受检 imports。解析器按实际 AGE 执行上下文准入擦除对象值和状态快照克隆，显式 `.move` 保留命名根，非文本叶仍由共享检查拒绝。AAC 自宿主新增同一 `LineText` tag、前缀桶和行终止行为，保留更长字面运算符的优先级。
+
+| 定向范围与判据 | 结果 | 准备与运行 |
+|---|---|---|
+| `ace-core` H0、Component、Package 的坏叶原诊断及 `v08_move_and_mode_params` 原显式 move、未声明 move、use-after-move | 6/6 | 和 AV/AAC 共同 Debug `--no-run` 56.925 s，执行外层 0.273 s。 |
+| `ace-av` Collections 的执行值与线格式隔离、`dynamic_objects_964` 旧正反对照、受检 HTTP 和原 move 拒绝 | 18/18 | 执行外层 0.808 s。 |
+| `ace-aac-syntax` round 125 全部 13 条失败用例，包括程序解码、typed AGE、旧语料、模块符号、边界比较 | 13/13 | AAC1046 原生准备 128.538 s，两个执行段 4.206、13.060 s。 |
+| `ace-a2x-python` 的 `py_slicing_1127` 独立原生 oracle | 7/7 | 复用 round 125 已准备的原测试归档，脚本与 fixture 未改，补上 `A2PY_PYTHON`。提取 0.83 s，nextest 运行 2.107 s。 |
+
+- 原始记录在 `scratch/r123-phase-gate/r126-repair-retry/`，`core-compat.log`、`av-compat.log`、`aac-line-text.log`、`aac-remaining.log` SHA256 分别为 `C90A9F5101A950CEAF459DA42030FCCF362346F43455F50085BA7C0607B1F056`、`CFC787C36694BE25BC531D78AD25D115E7CF1ED04E5D64E7237C3F24B8C453FD`、`E18AF4274B9D8D982B0D9835ED5459B7ECA6ED9C425BEFC8A8AEC9613D4B8075`、`C87FA051F189CC5C38C6C9099207D9F0F4023C44A0E94F3DDDFAEDFD04804B01`。首轮准备因对象绑定分支留有已移除的 `age_exec` 变量退出 101（12.364 s），已删除冗余分支后按同命令成功。无新增用例，未单计定向发现及清理。
+- 尚需修复 `58ffb9d21` 从组件面普通表达式删除 record 构造造成的 PLAN-105 列表 handler 回归，同时保留 `for i < n_all { … }` 条件与块的边界。当前 `74caa718c` 的已准备 AV exe 实跑 `plan105_list_handlers` 为 4/13，通过数按原 libtest，失败含一条既有重复注册；执行器计 0.07 s，`component-ctor-red.log` SHA256 `8583D64DB91D6260F735A43C353CFFF1EADE2B990DA2C68215A98F342B7FDA80`。Python provider 的 Debug 准备及固定组其它差异仍待核对，需复验受影响的 029/031 两端入口。重开 T-02、T-03、T-04、T-06，历史验收记录保留。当前修复轮尚未送复审或交付。
+
+- stage: work | plan_id: PLAN-117 | plan_revision: r1 | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | branch: `plan-117-dev` | code_commit: AutoUI `8894c9ef` / AutoLang `74caa718c` | task_ids: T-02,T-03,T-06 | evidence: round 126 | next: work/T-02 余项
+- stage: goal | plan_id: PLAN-117 | plan_revision: r1 | round: 126 | from: merge/T-05 | to: work/T-02 | status: executing | outcome: partial | worktree: `D:/autostack/.wt/ui-117/{auto-ui,auto-lang}` | commit: AutoUI `8894c9ef` / AutoLang `74caa718c` | next: 修复旧构造路径与剩余回归，复核原产品与阶段门
 
 ## 10. 待澄清事项
 
