@@ -135,6 +135,17 @@ pub fn generate_linked_front_sfc(
     }))
 }
 
+/// PLAN-118（T-06）：入口是否带 **widget 级包导入**（`use { package: … }`）。
+/// 与 `has_linked_front` 区分：后者含 checked host 成员（storage/file 绑定），
+/// 仅前者需要走包面 SFC 生成器（组件 lane 派生不出包面 handler）。
+pub fn linked_front_imports_packages(source: &str) -> bool {
+    package_candidates(source)
+        .is_ok_and(|candidates| match candidates.as_slice() {
+            [root] => !root.package_imports.is_empty(),
+            _ => false,
+        })
+}
+
 /// Identify checked package fronts even when the legacy Vue parser cannot read the app.
 pub fn has_linked_front(source: &str) -> bool {
     package_candidates(source).is_ok_and(|candidates| linked_front_root(&candidates).is_some())
@@ -1600,5 +1611,25 @@ mod p980_cond_render_tests {
             expr: str_lit(label),
             span: sp,
         }
+    }    /// PLAN-118（T-06 回归）：031-paint 的 linked front（widget 级 package 导入 +
+    /// 惰性 view-data 模型）经包面 SFC 生成器出件——子 widget 通道/站点内联、
+    /// 入口组件位齐全；生产 `str` 面已归一（storage → 状态字段）。
+    #[test]
+    fn plan118_paint_linked_front_sfc_produces_checked_app() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui/031-paint");
+        let app_at = root.join("src/front/app.at");
+        let source = std::fs::read_to_string(&app_at).expect("paint app source");
+        let prepared = crate::ui::ace_source_prep::prepare_component_source(&root, &source)
+            .expect("paint entry prep")
+            .source;
+        let sfc = generate_linked_front_sfc(&app_at, &prepared, &[])
+            .expect("linked front generation")
+            .expect("paint is a linked front");
+        assert_eq!(sfc.app_name, "App");
+        assert!(sfc.app.len() > 500_000, "checked app SFC is embedded, len={}", sfc.app.len());
+        assert!(sfc.app.contains("AcePackageView"));
+        assert!(sfc.app.contains("ColorPicker"), "child widget site is wired");
+        assert!(sfc.app.contains("\"PickCommitted\""), "outbound channel maps to the parent handler");
+        assert!(!sfc.app.contains("storage.set"), "storage surface is normalized to model state");
     }
 }

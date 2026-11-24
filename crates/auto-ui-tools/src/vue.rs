@@ -8379,6 +8379,18 @@ struct AceVueProducts {
 /// ——src/App.vue 与 src/components/{W}.vue 的解析位）；任一 widget 缺席=
 /// 具名拒（附 widget 名）。键未设=Ok(None)（legacy 道逐字不变）；feature
 /// 未建=具名拒（不静默落 legacy）。
+fn project_root_of(at: &Path) -> Option<std::path::PathBuf> {
+    let mut current = at.parent();
+    for _ in 0..6 {
+        let dir = current?;
+        if dir.join("pac.at").is_file() {
+            return Some(dir.to_path_buf());
+        }
+        current = dir.parent();
+    }
+    None
+}
+
 fn ace_vue_app_sfcs(app_at: &Path, content: &str) -> AutoResult<Option<AceVueProducts>> {
     ace_vue_sfcs(app_at, content, "./a2x_rt.mjs", "../a2x_rt.mjs")
 }
@@ -8398,6 +8410,37 @@ fn ace_vue_sfcs(
 ) -> AutoResult<Option<AceVueProducts>> {
     if std::env::var("AUTO_UI_ACE_VUE").ok().as_deref() != Some("1") {
         return Ok(None);
+    }
+    // PLAN-118（T-06）：linked front（widget 级 `use { package: … }` / checked
+    // host 成员）走**包面 SFC 生成器**——逐 widget 组件 lane 派生不出包面
+    // handler（paint 的 21 个 handler 全在包面检查函数里）。生成件自包含
+    // （子 widget 站点/通道已内联），故单件即根 App.vue。
+    if let Some(root) = project_root_of(at_path) {
+        if let Ok(prepared) =
+            auto_ui_runtime::ui::ace_source_prep::prepare_component_source(&root, content)
+        {
+            if auto_ui_runtime::ui::ace_package_sfc::linked_front_imports_packages(&prepared.source) {
+                match auto_ui_runtime::ui::ace_package_sfc::generate_linked_front_sfc(
+                    at_path,
+                    &prepared.source,
+                    &[],
+                ) {
+                    Ok(Some(sfc)) => {
+                        return Ok(Some(AceVueProducts {
+                            widgets: vec![(sfc.app_name, sfc.app)],
+                            rt: sfc.runtime_mjs.unwrap_or_default(),
+                        }));
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        return Err(format!(
+                            "ace.vue-lane-error: AUTO_UI_ACE_VUE=1 包面 SFC 生成失败：{error}"
+                        )
+                        .into())
+                    }
+                }
+            }
+        }
     }
     #[cfg(feature = "ace-vue")]
     {

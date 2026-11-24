@@ -91,6 +91,161 @@ function widgetArguments(context) {
   return args;
 }
 
+function checkedCanvasTexts(model, name) {
+  const list = model === null || model === undefined ? undefined : model[name];
+  if (list === undefined || list === null || !Array.isArray(list.items)) return [];
+  // 模型里的 owned Str 读取按转移语义记：先 clone 再解码（否则 use-after-free）。
+  return list.items.map(item => (typeof item === 'string' ? item : a2x_str_utf8(a2x_str_clone(item))));
+}
+
+function checkedCanvasNumber(parts, index, fallback) {
+  const value = Number(parts[index]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function checkedCanvasNodes(texts) {
+  const nodes = [];
+  for (const text of texts) {
+    if (!text) continue;
+    const parts = text.split(',').map(part => part.trim());
+    if (parts.length < 5 || !parts[0]) continue;
+    const x = Number(parts[1]);
+    const y = Number(parts[2]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    nodes.push({ id: parts[0], x, y, shape: parts[3].toLowerCase() === 'rect' ? 'rect' : 'circle',
+      color: parts[4] || '#3b82f6', v: parts.slice(5) });
+  }
+  return nodes;
+}
+
+function checkedCanvasHit(nodes, x, y) {
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    if (node.shape === 'rect') {
+      const w = checkedCanvasNumber(node.v, 0, 40);
+      const h = checkedCanvasNumber(node.v, 1, w);
+      if (Math.abs(x - node.x) <= w / 2 && Math.abs(y - node.y) <= h / 2) return node.id;
+    } else {
+      const r = checkedCanvasNumber(node.v, 0, 16);
+      const dx = x - node.x;
+      const dy = y - node.y;
+      if (dx * dx + dy * dy <= r * r) return node.id;
+    }
+  }
+  return null;
+}
+
+function checkedCanvasDraw(canvas, scene) {
+  const context = canvas.getContext('2d');
+  if (context === null) return;
+  const width = canvas.width;
+  const height = canvas.height;
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = scene.clear;
+  context.fillRect(0, 0, width, height);
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  for (const stroke of scene.strokes) {
+    context.strokeStyle = stroke.color;
+    context.lineWidth = stroke.width;
+    context.beginPath();
+    stroke.points.forEach(([x, y], index) => {
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    });
+    context.stroke();
+  }
+  for (const edge of scene.edges) {
+    context.strokeStyle = edge.color;
+    context.lineWidth = edge.width;
+    context.beginPath();
+    context.moveTo(edge.x1, edge.y1);
+    context.lineTo(edge.x2, edge.y2);
+    context.stroke();
+  }
+  for (const node of scene.nodes) {
+    context.fillStyle = node.color;
+    if (node.shape === 'rect') {
+      const w = checkedCanvasNumber(node.v, 0, 40);
+      const h = checkedCanvasNumber(node.v, 1, w);
+      context.fillRect(node.x - w / 2, node.y - h / 2, w, h);
+    } else {
+      const r = checkedCanvasNumber(node.v, 0, 16);
+      context.beginPath();
+      context.arc(node.x, node.y, r, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+  for (const label of scene.labels) {
+    context.fillStyle = label.color;
+    context.font = `${label.size}px sans-serif`;
+    context.fillText(label.text, label.x, label.y);
+  }
+}
+
+function checkedCanvasScene(model, name) {
+  const texts = suffix => checkedCanvasTexts(model, `${name}_${suffix}`);
+  const meta = texts('meta');
+  const strokes = [];
+  texts('pts').forEach((text, index) => {
+    if (!text) return;
+    const points = text.split('|').map(pair => pair.split(',')).filter(pair => pair.length === 2)
+      .map(([x, y]) => [Number(x), Number(y)]).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+    if (points.length === 0) return;
+    const pieces = (meta[index] ?? '').split(',');
+    strokes.push({ points, color: pieces[0] || '#111827',
+      width: Number(pieces[1]) > 0 ? Number(pieces[1]) : 3, eraser: pieces[2] === '1' });
+  });
+  const edges = texts('edges').map(text => text.split(',').map(part => part.trim()))
+    .filter(parts => parts.length >= 4 && parts.slice(0, 4).every(part => Number.isFinite(Number(part))))
+    .map(parts => ({ x1: Number(parts[0]), y1: Number(parts[1]), x2: Number(parts[2]), y2: Number(parts[3]),
+      color: parts[4] || '#9ca3af', width: Number(parts[5]) > 0 ? Number(parts[5]) : 2 }));
+  const labels = texts('labels').map(text => {
+    const parts = text.split(',');
+    if (parts.length < 3) return null;
+    const x = Number(parts[0]);
+    const y = Number(parts[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x, y, text: parts.slice(2, parts.length - 2).join(',') || parts[2],
+      color: parts.length >= 5 ? parts[parts.length - 2] : '#111827',
+      size: parts.length >= 5 && Number(parts[parts.length - 1]) > 0 ? Number(parts[parts.length - 1]) : 12 };
+  }).filter(label => label !== null);
+  return { nodes: checkedCanvasNodes(texts('nodes')), strokes, edges, labels };
+}
+
+function checkedCanvasNode(element, owner, frame, path, dispatch) {
+  const size = widgetExtent(element.properties.get('coords')) ?? [320, 320];
+  const [width, height] = size;
+  const sceneName = element.properties.get('scene');
+  const clear = element.properties.get('clear') ?? '#ffffff';
+  const classes = element.properties.get('style') ?? '';
+  const scene = sceneName === undefined ? { nodes: [], strokes: [], edges: [], labels: [] }
+    : { clear, ...checkedCanvasScene(owner.model, sceneName) };
+  const paint = ({ el }) => checkedCanvasDraw(el, scene);
+  const hitEvent = element.events.find(event => event.kind.toLowerCase() === 'onhit');
+  const onHit = domEvent => {
+    if (hitEvent === undefined) return;
+    const rect = domEvent.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const x = (domEvent.clientX - rect.left) * (width / rect.width);
+    const y = (domEvent.clientY - rect.top) * (height / rect.height);
+    const id = checkedCanvasHit(scene.nodes, x, y);
+    if (id === null) return;
+    const action = checkedWidgetAction(owner, { ...hitEvent, types: ['str'], values: [id] }, true);
+    dispatch(frame, action);
+  };
+  return h('canvas', {
+    key: path,
+    class: classes,
+    width,
+    height,
+    style: { width: `${width}px`, height: `${height}px` },
+    onVnodeMounted: paint,
+    onVnodeUpdated: paint,
+    onClick: onHit,
+  });
+}
+
 function checkedWidgetAction(context, event, acceptsInputValue = false, typesOverride = event.types) {
   let message = event.message;
   for (let owner = context; owner !== null; owner = owner.parent) {
@@ -695,6 +850,12 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
             : widgetScalar(widgetScalarType(prop.type), element.properties.get(prop.name)));
           return h(Fragment, { key: path }, widget(site.node, inputs, path, owner, site.channels));
         }
+        // PLAN-118（T-06）：画布 arm——场景五平行列表（模型字段）→ 绘图 +
+        // `onhit` 命中（与 AV/native 同一条 hit_test：rect 半宽高、circle 半径，
+        // 逆序遍历）。命中 id 作为 `onhit` 的隐式实参派发。
+        if (element.tag === 'canvas') {
+          return checkedCanvasNode(element, owner, frame, path, dispatch);
+        }
         let click = null;
         let close = null;
         const bindings = new Set();
@@ -703,8 +864,11 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
           const kind = event.kind.toLowerCase();
           if (bindings.has(kind)) throw new Error(`ace.widget.event: duplicate binding '${event.kind}'`);
           bindings.add(kind);
-          const acceptsInputValue = element.tag === 'input' &&
-            (kind === 'oninput' || kind === 'onchange') && event.types.length === 0;
+          // PLAN-118（T-06）：onhit 的命中 id 由渲染层注入（native 侧同款：
+          // PackageEventInput::Hit），视图协议里不含显式实参——按 input 位校验。
+          const acceptsInputValue = (element.tag === 'input' &&
+            (kind === 'oninput' || kind === 'onchange') && event.types.length === 0) ||
+            (kind === 'onhit' && event.types.length === 0);
           const pointerMove = element.tag === 'mouse-area' && kind === 'onmousemove' && event.types.length === 0;
           const action = checkedWidgetAction(owner, event, acceptsInputValue,
             pointerMove ? ['f32', 'f32'] : event.types);

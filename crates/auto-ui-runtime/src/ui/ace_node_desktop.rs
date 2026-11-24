@@ -497,6 +497,28 @@ fn push_package_focus(id: i32, instance: usize, revision: u64, control: String, 
     }
 }
 
+fn push_script_text(id: i32, instance: usize, target: usize, text: &str) -> bool {
+    let resolved = host().write().unwrap().get(id).and_then(|session| {
+        let frame = session.package_frame(instance)?;
+        let input = PackageEventInput::Text(text.to_string());
+        frame
+            .accepts_target(target, &input)
+            .then_some(frame.revision)
+    });
+    if let Some(revision) = resolved {
+        push_package_event(
+            id,
+            instance,
+            revision,
+            target,
+            PackageEventInput::Text(text.to_string()),
+        );
+        true
+    } else {
+        false
+    }
+}
+
 fn push_script_tap(id: i32, instance: usize, target: usize, x: f32, y: f32) {
     let resolved = host().write().unwrap().get(id).and_then(|session| {
         let frame = session.package_frame(instance)?;
@@ -3492,7 +3514,17 @@ impl NodeDesktopBridge {
                     instance,
                     target,
                     text,
-                } => self.inject_text(instance, target, &text),
+                } => {
+                    // PLAN-118：包面/checked 帧的文本输入走 PackageText（input 位
+                    // 动作），形状道才落 pending_texts。
+                    let mut routed = false;
+                    if let Some(session) = self.session {
+                        routed = push_script_text(session, instance, target, &text);
+                    }
+                    if !routed {
+                        self.inject_text(instance, target, &text);
+                    }
+                }
                 ScriptStep::Close => {
                     if let Err(e) = self.close_session() {
                         self.errors.push(e);
