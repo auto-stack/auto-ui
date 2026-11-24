@@ -334,6 +334,59 @@ fn live_file_mode() -> bool {
         next[1].source = format!("{}{}{}", &store[..=open], new_body, &store[close..]);
         next
     };
+    // leave-one-out：在指定块的字节区间内逐条摘除（保上下文），找出摘掉后转绿的语句。
+    if sweep == "leaveone-block" || sweep == "leaveone-ready" {
+        let mut isolated = units.clone();
+        let src = isolated[1].source.clone();
+        let Some(arm_at) = src
+            .find(&format!("{arm}("))
+            .or_else(|| src.find(&format!("{arm} ")))
+        else {
+            return true;
+        };
+        let Some(arm_open) = src[arm_at..].find('{').map(|o| o + arm_at) else { return true };
+        let Some(arm_close) = scan_balanced(&src, arm_open) else { return true };
+        // 目标块：默认 `<arm> 体里的 if .game_state == "ready" {`。
+        let marker = std::env::var("P119_LIVE_BLOCK")
+            .unwrap_or_else(|_| "if .game_state == \"ready\" {".to_string());
+        let Some(rel) = src[arm_open + 1..arm_close].find(&marker) else {
+            println!("block marker `{marker}` not found");
+            return true;
+        };
+        let block_open = src[..arm_open + 1 + rel].rfind('{').map(|p| p).unwrap_or(0);
+        let block_open = arm_open + 1 + rel + marker.rfind('{').unwrap_or(marker.len() - 1);
+        let Some(block_close) = scan_balanced(&src, block_open) else { return true };
+        let range = (block_open + 1, block_close);
+        let level = split_stmts(&src[range.0..range.1]);
+        println!("block has {} top-level statements", level.len());
+        for (i, st) in level.iter().enumerate() {
+            println!(
+                "  #{i}: {}",
+                st.lines().next().unwrap_or("").chars().take(90).collect::<String>()
+            );
+        }
+        let mut kept: Vec<String> = Vec::new();
+        for i in 0..level.len() {
+            kept.clear();
+            for (j, st) in level.iter().enumerate() {
+                if i != j {
+                    kept.push(st.clone());
+                }
+            }
+            let body = format!("\n{}\n", kept.join("\n"));
+            let mut next = isolated.clone();
+            let mut s = src.clone();
+            s.replace_range(range.0..range.1, &body);
+            next[1].source = s;
+            let verdict = compile(&next);
+            println!(
+                "leave-out #{i}: ok={} :: {}",
+                verdict == "OK",
+                level[i].lines().next().unwrap_or("").chars().take(70).collect::<String>()
+            );
+        }
+        return true;
+    }
     // 隔离扫描：其余 arm 体换成单条标量赋值（已知可发射），再对目标 arm 做前缀扫描。
     if sweep == "isolate-prefix" || sweep == "isolate" {
         let mut isolated = units.clone();
