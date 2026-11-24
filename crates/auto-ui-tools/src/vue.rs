@@ -8477,12 +8477,20 @@ fn ace_vue_sfcs(
                 } else {
                     Vec::new()
                 };
-                let entry_source = &prepared.source;
-                let _ = std::fs::write("D:/autostack/plan-artifacts/plan-119/call.log", format!("has_store={has_store_decl} src_len={}", entry_source.len()));
+                // 与 AV `--package` 完全同形：entry 交**原始源**、store 单元作为
+                // 独立包模块（跨单元导入由 unit 绑定解析）。若 entry 交 prep 后的
+                // 同源形，包面会在同一 node 上看到两条 store 声明
+                // （`multiple store declarations per node`）。
+                let entry_source: &str = if has_store_decl {
+                    content
+                } else {
+                    prepared.source.as_str()
+                };
+                let _ = std::fs::write("D:/autostack/plan-artifacts/plan-119/call.log", format!("has_store={has_store_decl} src_len={} modules={}", entry_source.len(), store_modules.len()));
                 match auto_ui_runtime::ui::ace_package_sfc::generate_linked_front_sfc(
                     at_path,
                     entry_source,
-                    &[],
+                    &store_modules,
                 ) {
                     Ok(Some(sfc)) => {
                         return Ok(Some(AceVueProducts {

@@ -678,7 +678,13 @@ pub fn generate_package_sfc_with_root(
     let already_prepared = entry_src
         .lines()
         .any(|line| line.trim_start().starts_with("store "));
-    let prepared_entry = if already_prepared {
+    // PLAN-119：**跨单元 store**（另有纯 store 单元）时，entry 不做组件面 prep——
+    // prep 会把 store 片断再内联一遍，导致同一 node 两条 store 声明。
+    let has_store_unit = units.iter().any(|u| {
+        let t = u.source.trim_start();
+        t.contains("store ") && !t.contains("widget ")
+    });
+    let prepared_entry = if already_prepared || has_store_unit {
         entry_src.clone()
     } else {
         match project_root {
