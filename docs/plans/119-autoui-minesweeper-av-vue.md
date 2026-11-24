@@ -291,6 +291,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 因此掉参发生在**更上游**：frame 里 `actions[].args` 为空 ⇒ 视图绑定 `.Reveal(cell.x, cell.y)` 的实参没有进入 `WidgetEvent.args`（store 展开后 handler 形参 `x,y` 成立，但事件侧实参未采集；疑点在包面 view 的属性/事件收集面，`AgeWidgetProperty::Message { args }` 对“for 循环内 cell 字段投影”作实参的形态可能未采集）。
 - 下一步（单点）：在包面 frame 组装处打印 `AgeWidgetProperty::Message` 的 message+args（038 的 `.Reveal(cell.x, cell.y)`），确认采集面缺口；补上后 T-03 oracle（首击 29 格/16 数字）即可复跑。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 实参其实到位；脚本派发未稳定推进 revision | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: live 道 `dispatch_checked` 返回/是否进 live 会话
+
+- frame 组装处打印实证：**实参是齐的** —— `Reveal args=[Int(0), Int(0)]`、`Flag args=[Int(0), Int(1)]`、`SetDifficulty args=[Str("beginner")]`。上一轮“actions[].args 为空”只是**证据序列化**没带 args，不是采集缺口（修正上一轮判断）。
+- 复跑脚本 `2:click:0:4`：exit 0、frames=2、errors=0，但 `rev=1`（本次未推进；更早一次同形脚本 rev 到 2）⇒ 派发在 live 道上**不稳定/未生效**，下一步查 `dispatch_checked`（`ace_package_bridge.rs:863`）在 live 分支的返回与 `WidgetSession::dispatch` 的错误是否被吞。
+- 附带：`ace_package_bridge/frame.rs` 新增 `P119DBG action` 临时打印（落主前删）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
