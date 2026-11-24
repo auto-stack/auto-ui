@@ -324,6 +324,19 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 说明：动作索引在帧间稳定（`Reset,SetDifficulty×3,Reveal,Flag,...` 顺序一致），上一轮“索引错位”判断不成立；此前状态对比失真是因为 evidence 帧数组**未按 revision 排序**（取末元素≠最新帧），后续断言一律按 `revision` 取最大。
 - 余量：`st_flags_placed` 仍为 0（`#5` 标记未生效，可能与 `oncontextmenu` 的派发键/目标解析有关）；随后难度切换（`#1..#3`）、`#0` 重开、两实例（`--instances 2` 分别点）、`close/reopen` 世代。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-03 三行达成（首击展开 / 标记 / 难度+重开） | outcome: pass | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 两实例隔离 + close/reopen 世代
+
+| T-03 行 | 脚本 | 实测 | 判定 |
+|---|---|---|---|
+| 首击展开 | `3:click:0:4` | `st_game_state=playing`；81 格仅 18 覆盖（63 展开）；errors=0 | PASS |
+| 右击标记 | `3:click:0:5` | `st_flags_placed=1`；`st_mines_label` 由 "10" → "9" | PASS |
+| 难度切换 | `3:click:0:2,6:click:0:3` | `st_rows=16 st_cols=30 st_mine_count=99 st_difficulty=expert`；labels 486（16×30+6）；errors=0 | PASS |
+| 重开 | `9:click:0:0` | `st_game_state=ready`（保留当前难度并重建盘面） | PASS |
+| 两实例隔离 | — | 待做（`--instances 2` 分别点击、比较各自 states） | pending |
+| close/reopen 世代 | — | 待做（脚本 close+reopen，比较 generation/closed） | pending |
+
+- 证据：`plan-artifacts/plan-119/{av-oracle-a.json, av-flag.json, av-diff.json}`；断言一律按**最大 revision** 取帧（evidence 的 frames 数组未排序）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
