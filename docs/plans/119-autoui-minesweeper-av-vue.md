@@ -279,6 +279,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 语义面：`foreign_callee=Init` 仍有 2 条打印（来自 store 内部 `.Init` 一处残留，未阻断发射）。
 - 下一步：T-03 oracle 脚本（tap 命中格 → 首击 29 格展开/16 数字、右击标记、难度切换、face 重开、两实例互不串扰、close/reopen 世代），随后 T-04 复核、T-06 A2Vue。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-03 脚本派发已通（rev 递增）但 Reveal 未改状态 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （无新增代码） | next: 查 dispatch 实参与 action 绑定
+
+- 真窗脚本 `2:click:0:4,5:click:0:0`（#4=Reveal(0,0)、#0=Reset）→ exit 0、frames=2、errors=0、rev 由 1 升到 2（**派发生效**）。
+- 但终帧 `st_game_state=ready`、`st_elapsed=0`、`st_flags_placed=0` ⇒ Reveal 的体没有产生状态变更。候选原因：①action 的实参未随派发传入（证据里 `actions[].args` 为空，store 展开后 handler 形参 `x,y` 需要 2 个 payload 槽）；②payload 传了但落进被守卫块后的空分支。
+- 下一步（单点）：打印实际派发的 message+args（`PackageEventInput`/`dispatch_log` 面），确认 `Reveal` 是否带 `(0,0)`；若 `actions[].args` 确实为空，则需在视图动作绑定处带上 `.Reveal(cell.x, cell.y)` 的实参（ace_package_bridge 的 action 采集面）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
