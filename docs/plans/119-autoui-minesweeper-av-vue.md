@@ -254,6 +254,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 - 等待轮 1/3：§10 的 A/B 路径需用户择一。B 在既有 prep 授权内（可直接开工），A 需把 G5 授权从「仅诊断」扩到「该处修复」。本轮不做实现、不跑检查。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: A 已落地（Effect 展开）；下一道墙 = 分支/循环体内的方法调用白名单 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下） | next: §10 G6 裁定
+
+- 用户 A 裁定落地：`expand_store_calls` 增 `ComponentStmt::Effect` 分支（与 `Call` 同一展开逻辑，含未知方法/元数具名拒），编译通过。
+- 落地后 live 仍拒，且 `widget_handler msg=Reveal stmts=3`（展开已发生）。剩下的 foreign 来源是 `stmts_have_foreign_call` 的白名单：分支/循环体内只认 `push|get|len|pop|clear|set`；038 的洪水填充在循环体内用 **`.to(Str)`**（数值→文本，prep 由 `.to_string()` 改写而来）→ 任何非列表方法调用都判域外。
+- 判定（G6）：AGE live 发射面的“分支/循环体内仅列表方法”白名单，与 038「逐格生成显示文本」的实现方式根本冲突；prep 无法把依赖循环变量的转换提到顶层，**这条只能在语言侧解决**（放宽白名单，或提供可内联的数值转文本内建）。
+- 建议下一步（需裁定）：①授权 auto-lang 放宽/扩展该白名单至纯函数式转换（`to/to_string/to_str` 等无副作用内建）；②把 G6 连最小复现移交语言 owner（PLAN-1100/1104）；③改验收口径（VM Iced 作 AV 证据）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
