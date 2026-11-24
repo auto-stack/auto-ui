@@ -94,6 +94,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - 2026-11-24 **R-01 已闭合**：`age-on-return`（裸形，两面同开，接 `age-on-stmt`/`age-on-widget-stmt`/`age-on-branch-stmt`）+ 早退按结构化控制流下沉（`auto-lang 05ee4ff8f`、`auto-ui 70a6a424`）。`020/player_store.at` 由 `expected fn, found store` 转为 OK；回归 `plan116_handler_return` 6/6，`ace-core` conformance 922 passed / 5 failed（与基线 916/5 的同一 5 项既有红）。余 R-02..R-05 见 §10。
   - 2026-11-24 **R-04a + R-07 已闭合**（`auto-lang 78b916591`）：跨单元 store 导入在最小 2 单元包上闭合（含"只写 `on`、无 `msg` 块"的 020 形态按参数注解补出消息）；AGE 面数值 `.to_string()` 与 `.str()` 同一显示物化。回归 `plan116_store_import` 3/3，conformance 925 passed / 5 failed。**R-04b**（无类型/动态 store 字段）新开并钉住具名拒绝。余 R-02/R-03/R-05/R-06 见 §10。
   - 2026-11-24 **R-04b 已闭合**（`auto-lang 174c6646b`）：无类型且初值 `[]` 的 store 字段投影为可变集合（`List`，元素型沿用 117 的 `List(Dyn)` 缺省），先定型后投影初值；非空无类型字面量仍只读（负控）。回归 `plan116_store_import` 5/5，conformance 927 passed / 5 failed；030 闭包前进到 R-03（`$0`），020 仍 R-05。余 R-02/R-03/R-05/R-06 见 §10。
+  - 2026-11-24 **R-03 词法/文法半已闭合**（`auto-lang e528fcb53`）：`$0` 事件实参占位（`event-index-tok` + 两处实参位 alt）。回归 `plan116_view_event_arg` 4/4、`plan116_` 全 15/15，conformance 931 passed / 5 failed；030 闭包前进到 **R-02**（`use.web`）。**R-03b** 新开（宿主元素 `.Msg($0)` 被投影成 ChildEvent 而拒）并钉住。余 R-02/R-03b/R-05/R-06 见 §10。
 - [ ] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
   - 2026-11-23 受控媒体宿主已实跑通过（`mpv_contract` 13/13、`mpv_channel` 10/10、`mpv_engine` 11/11、`plan116_av_media_widget` 2/2、`ace_node_desktop` 10/10 顺序 CPU 用例；`ace_node_desktop_window.exe --features ace-bridge,mpv-widget` 真窗播 `E:\Video\caelestia.mp4` 实测 `duration="49.429"` / `SeekMid=15` -> `OnTime="15"` / `TogglePause="true"` / `frames_rendered=10` / `errors=[]`）；**原样 020/030 多单元包入口因 B-03 阻塞无法在 `PackageStateEngine` 启动**。
@@ -194,6 +195,16 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 4 | from: work | to
 
 stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: 174c6646b | next: work/T-02（R-03）
 
+2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-03 词法/文法半闭合（`$0` 事件实参占位）+ R-03b 新开 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-116/auto-lang`（`plan-116-dev`） | base_commit: `auto-lang 174c6646b` | code_commit: `auto-lang e528fcb53`（`auto-ui` 本轮未改） | task_ids: T-02 | evidence: `plan116_view_event_arg` 用例（4 例）
+
+- **先判语义再改文法**：确认 AGE 视图回调的实参本来就是**宿主通道**（`age-event-binding` 注释与投影均丢弃实参、载荷由宿主供），所以 `$0` 不需要新求值语义，只缺**词法准入**——这决定了改动只在 token 表 + 两处实参位，而不进 resolve/lowering。
+- **改动**：新增 `event-index-tok` 字面 token（`$0`，两面）；`age-event-arg` 增 `alt`（组件面）；新增 `age-child-event-payload`（`$event` / `$0` 两臂）供 `age-child-event-binding`（包面）使用。两面 grammar id 具名重基线（`age-component 860c39dc…→d390e581…`、`age-package b2a852c2…→aa593326…`），其余 13 邻居未变。
+- **回归**：`plan116_view_event_arg` **4/4**（两面 parse 正例、handler 体 `$0` 负控、`child-event-site` 缺口钉住）；`plan116_` 全部 **15/15**；`ace-core` conformance **931 passed / 5 failed**（同一 5 项既有红，+4 = 本轮新用例）。
+- **真实语料效果**：030 的 `controls`/`viewport` 不再报 `unknown character '$'`；`PKG_CLOSURE 030` 由 R-03 前进到 **R-02（`use.web` in app::playlist）**。
+- **R-03b 新开（语义半）**：`video`/`progress` 是受控宿主元素而非声明的子 widget，包面却把 `.Msg($0)` 投影为 `ChildEvent`，语义层因此报 `source.age.child-event-site`。宿主元素上的 `$0` 应等价于裸 `.Msg`。已用 `p116_host_element_event_arg_is_a_named_gap` 钉住当前具名拒绝。
+
+stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 6 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: e528fcb53 | next: work/T-02（R-02）
+
 ## 10. 待澄清事项
 
 **B-03 已裁定（2026-11-24，本计划自有工作树内闭合）。** 原 A/B 选择的前提是"`PLAN-117` 正在 `auto-lang` 同一写面上持续改动"，该前提已随 117/118 双仓落主归档而消失；`README.md` 交付表现指示"在 117 后的基线复测，再按残余缺口处理 B-03"。`/goal` 授权的实施树本就含 `auto-lang`（见 §4），故无需再次拍板：**按残余缺口逐项闭合，目标/验收/范围/仓集不变**。若任一缺口经定位后需要改动已冻结的共享语义或超出本计划仓集，再按 §5 停下请示。
@@ -204,7 +215,8 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 5 | from: work | to
 |---|---|---|---|
 | R-01 | handler 体 `return`（`V7-bare-return`、`V8-return-value` 均拒） | `ace-core` cst/grammar + `ComponentStmt` | **已闭合**（2026-11-24，`auto-lang 05ee4ff8f` / `auto-ui 70a6a424`）：`age-on-return` 规则 + 三处语句面 alt（两面同开）；早退按结构化控制流下沉（余量进另一侧分支），不为 return 发明带值 AST 节点；循环/try 体具名拒。回归 `plan116_handler_return` 6/6；`020/player_store.at` 由 `expected fn, found store` 转为 **OK**。 |
 | R-02 | `use web component <Name> from "<path>"`（`U1-use-web` @`component`） | `ace-core` cst/grammar（包面 import） | 030 `playlist.at` 触发；未开工 |
-| R-03 | 视图表达式 `$0`（`source.lex: unknown character '$'`） | `ace-core` lexer/cst | 030 `controls.at`/`viewport.at` 触发；未开工 |
+| R-03 | 视图表达式 `$0`（`source.lex: unknown character '$'`） | `ace-core` lexer/cst | **词法/文法半已闭合**（2026-11-24，`auto-lang e528fcb53`）：新增 `event-index-tok` 字面 token，接入 `age-event-arg`（组件面）与新的 `age-child-event-payload` alt（包面）；两面 grammar id 具名重基线。030 不再停在 `unknown character '$'`。**R-03b 新开**：见下。 |
+| R-03b | 受控宿主元素上的 `.Msg($0)` 归类（`source.age.child-event-site: '$event' requires an event binding on a declared child widget`） | `age_package`/投影的宿主事件面 | **阻**：包面把 `video`/`progress` 上的 `.Msg($0)` 投影成 **ChildEvent**（子 widget 事件），语义层按"未声明子 widget"拒。宿主元素上的 `$0` 应等价于裸 `.Msg`（载荷宿主供给）。最小复现 `p116_host_element_event_arg_is_a_named_gap` 已钉住。 |
 | R-04a | 跨单元 store 导入（`use player_store: PlayerStore` + `.store.<field>`/`.store.<Msg>()`） | `packages`/`inline_store_decl` | **已闭合**（`auto-lang 78b916591`）：导入链在包面生效；**只写 `on`、无 `msg` 块**的 store（020 形态）按 handler 参数注解补出消息声明（无注解仍具名拒）。回归 `plan116_store_import` 2 正例 + 1 负控。 |
 | R-04b | **无类型/动态 store 字段**（`var playlist = []`，030 写它） | `age_component` store 投影 | **已闭合**（2026-11-24，`auto-lang 174c6646b`）：无类型且初值恰为 `[]` 的 store 字段投影为**可变集合字段**（`ty = "List"`，元素型沿用 117 round-20 的 `List(Dyn)` 缺省）；定型判定先于初值投影（无类型初值是 `age-view-data-lit` 原始文本节点，`project_expr_sync` 不承载）。其余无类型形态仍按只读跳过（负控钉住）。回归 `plan116_store_import` 5/5；**真实效果**：030 闭包由 `undeclared model field playlist` 前进到 R-03。 |
 | R-05 | 020 内部未定位构造（`020/app.at` 报 `expected fn, found widget`，但最小 `widget` 包项可解析 → 错误定位在项首，真因在项内） | 待定位 | 未定位 |
@@ -215,4 +227,4 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 5 | from: work | to
 
 **基线观察（非本计划引入，未修）**：`experimental/ace/aac/syntax/syntax_grammar_data.at` 在计划基线上**已与 `grammars/auto-source.at` 不一致**——`aac1046_grammar_data_identity_binding` 在未改动的 `auto-lang bced4dd79` 上即红（committed 344,941B vs 原始语法重生成 356,995B，约 12KB 漂移）。因 `ace-core` 由语法**源**编译（`cst/frontdoor.rs` `AUTO_SOURCE_GRAMMAR = include_str!(…)`），`auto-ui`/AV 面不依赖该数据文件，故本轮只改语法源与 Rust 侧，**不采纳**整份重生成（否则会静默重冻结全部 13 个 profile id 并引入未复核的上游漂移）。该漂移属 Auto 侧孪生（aac）的数据归属，需其 owner 重生成时一并纳入 `age-on-return`；证据 `plan-artifacts/plan-116/probes/r01-return-20261124/{control-data.posix.log,data-with-return.at}`。
 
-**下一步**：R-03（030 `controls` 的 `$0`，现为 030 闭包首阻）→ R-02（`use web component`）→ R-06（视图空参回调）→ R-05（020 项内定位）。每项一个最小正例 + 负控；全部闭合后重跑 `plan116_t01_package_diag_probe` 与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
+**下一步**：R-02（`use web component`，现为 030 闭包首阻）→ R-03b（宿主元素 `$0` 归类）→ R-06（视图空参回调）→ R-05（020 项内定位）。每项一个最小正例 + 负控；全部闭合后重跑 `plan116_t01_package_diag_probe` 与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
