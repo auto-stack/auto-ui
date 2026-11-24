@@ -606,6 +606,13 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 交付代码：auto-ui（prep 归一、栈→队列、lane 路由、inspection 拼写、units 幂等）+ auto-lang（Effect 展开、可发射集合放宽、同源 store 去重、TS DynCast 恒等），临时诊断已清零。
 - 未开始：T-04 独立复核、T-05 AV 收据、T-07 终审、T-08 落主归档。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 事件已进入视图程序与生成件；浏览器右击仍不生效 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下，含临时打印） | next: 运行时确认 contextmenu 回调是否被派发（在 checked_widget_view.js 加计数）
+
+- 实测（`live_view::event()` 临时落盘 `view-events.log`）：SFC 生成时**确实 emit** `key=oncontextmenu.prevent tag=button`（与 `onclick` 并列）。
+- 重新生成后 `App.vue`：`oncontextmenu` 2 处、`Flag` 3 处、`onclick` 6 处 ⇒ **生成件已包含标记接线**（此前那轮 grep 是旧产物）。
+- 但浏览器复跑（右击**未揭开**的最后一格）：`flags=0`，`blank/digits` 不变 ⇒ 回调未生效。探针已改为右击未揭开格（`oracle-vue.mjs`）。
+- 下一步：在 `checked_widget_view.js` 的 dispatch 处加临时计数（或 `console.debug`），浏览器里读出来，确认 ①事件是否被绑定到该 button、②`checkedDomBinding('oncontextmenu.prevent')` 是否通过、③`dispatch` 是否被调用。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
