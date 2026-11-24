@@ -710,6 +710,13 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - `canonical_verified`：`docs/specs/` 无本计划 delta（`new_spec_components: []`），按 approved no-impact 记录；无索引/账本写入。
 - 待办：工作树/分支移除 + `plan-artifacts/plan-119` 折叠删除 + registry 刷新 + 批次回归到期检查。
 
+2026-11-24 stage: merge | key: PLAN-119:r1 | checkpoint: cleaned | outcome: pass
+
+- `cleaned`：两棵工作树移除前重跑 `wt-guard.ps1` 均 **clean**（auto-ui 首检 BLOCKED 的 307 个 junction 全部来自 `gen/front/vue/node_modules`，删除 gitignored 的 `gen/` 后复检 clean）；`git worktree remove`（auto-ui 因 vite preview 进程占锁，先停后台作业再删目录）+ `git branch -d plan-119-dev` 完成；组目录 `D:/autostack/.wt/ui-119` 已删除（其中 auto-web/auto-down 只读树一并移除）。
+- `plan-artifacts/plan-119/` 整 scope 已删除（149 文件），证据已折叠进本文件；`.retention/policy.json` 已刷新（`plans` 追加 `plan-119` = deleted-at-merge、`merge_closeouts` 追加、`last_merge_closeout` = PLAN-119）。
+- **批回归到期检查**：auto-lang `docs/plans/.last-batch-regression.json` = `last_covered_plan_id 1126` / `2026-11-23T00:03:39Z`（verdict `known-reds-only`）；本次落主计划 119 非 5 的倍数、receipt 未满 48h ⇒ **不到期**，无需 batch gate。
+- **部署观察（landing ≠ deployment）**：本次仅示例应用 + 宿主/prep/生成器源码，无生产二进制或发布包需要重启；主检出 `cargo check`（40.97s）已绿；生成物 `gen/` 属本地构建产物，随树删除，无 stale artifact 需登记。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
