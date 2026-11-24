@@ -462,6 +462,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 全仓 grep「包面 SFC 生成失败」只有一处（`vue.rs:8495`，即我们改的调用点）⇒ 调用确实发生，但函数内日志没写出：怀疑 ①`auto` 用的工具二进制未刷新（AUTO_UI_TOOL_BIN 指向 target/debug/auto-ui-tool.exe，需核对时间戳）；②该函数在另一 crate 编译单元/另一同名函数被调用。
 - 下一步单点：在 `vue.rs:8495` 前后各落一个文件日志（含 `has_store_decl` 与错误串），并核对该 exe 的 mtime/SHA，排除“跑的是旧二进制”。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 调用点已确认执行（has_store=true），但 SFC 生成器内日志缺失 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 核对入口日志的插入位置是否落在 `generate_linked_front_sfc` 体内
+
+- 证据：`call.log` → `has_store=true src_len=24872`（调用点执行、二进制已刷新：19:55:09 → 19:56:41）；`entry.log`/`fallback.log` 仍不存在。
+- 因此“包面 SFC 生成失败”的 Err 来自该调用，但我写入的入口日志没随函数执行 ⇒ 插入点很可能落在了**别的函数**（`package_candidates(source)` 那行在该文件出现多次，`String.Replace` 会全部替换，也可能全落在非目标函数）。
+- 下一步：确认 `entry.log` 写入语句所在函数（grep 行号对照 `fn generate_linked_front_sfc` 的行范围），只在目标函数体内补一条；同时把 Err 串本身落盘（最保险，与插入位置无关）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
