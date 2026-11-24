@@ -85,9 +85,23 @@ use auto_ui_compiler::aura::{AuraNodeId, SpanInfo};
 /// // Updated view
 /// let updated_view = comp.view();
 /// ```
+/// PLAN-112 T-09：片派发 park 后的待补收尾（完成点只跑一次）。
+pub(crate) struct PendingFinish {
+    clean_name: String,
+    emit_widget: String,
+    state_obj_id: u64,
+    args: Vec<auto_val::Value>,
+    input_value: Option<String>,
+    stripped: Vec<(String, auto_val::Value)>,
+    is_trace: bool,
+}
+
 pub struct DynamicComponent {
     /// VM bridge for state management and handler execution.
     bridge: VmBridge,
+
+    /// PLAN-112 T-09：被片派发 park 的 handler 的待补收尾（None = 无）。
+    pending_finish: Option<PendingFinish>,
 
     file_dialog_io: std::cell::RefCell<crate::ui::file_dialog::ComponentIo>,
 
@@ -462,6 +476,7 @@ impl DynamicComponent {
             widget_name: widget_name.clone(),
             import_stmts: Vec::new(),
             dirty: true,
+            pending_finish: None,
             source_path: None,
             last_modified: None,
             input_state_map,
@@ -606,6 +621,7 @@ impl DynamicComponent {
             widget_name: widget_name.clone(),
             import_stmts,
             dirty: true,
+            pending_finish: None,
             source_path: None,
             last_modified: None,
             input_state_map,
@@ -854,6 +870,7 @@ impl DynamicComponent {
             widget_name,
             import_stmts,
             dirty: true,
+            pending_finish: None,
             source_path: None,
             last_modified: None,
             input_state_map,
@@ -917,6 +934,7 @@ impl DynamicComponent {
             widget_name: widget_name.clone(),
             import_stmts: Vec::new(),
             dirty: true,
+            pending_finish: None,
             source_path: None,
             last_modified: None,
             input_state_map,
@@ -1857,6 +1875,23 @@ impl DynamicComponent {
         let cpu_report = self
             .bridge
             .resume_cpu_slices(auto_lang_core::vm::engine::CpuSliceBudget::d2_default());
+        // PLAN-112 T-09：片派发 park 的 handler 本轮跑到终态 → 补一次收尾
+        // （emit 路由/实例回调/脏标记）。单 pending 槽：同一组件同一时刻只
+        // 跟踪一个被 park 的 handler（025 的 Refresh 即该形态），多 handler
+        // 并 park 时按先完成者收尾，属本 phase 的已知限度。
+        if cpu_report.completed > 0 {
+            if let Some(pf) = self.pending_finish.take() {
+                self.finish_handler_dispatch(
+                    &pf.clean_name,
+                    &pf.emit_widget,
+                    pf.state_obj_id,
+                    &pf.args,
+                    pf.input_value.as_ref(),
+                    pf.stripped,
+                    pf.is_trace,
+                );
+            }
+        }
         let progressed = cpu_report.completed > 0
             || !cpu_report.failed.is_empty()
             || init_report.completed > 0
@@ -3224,6 +3259,78 @@ impl DynamicComponent {
     /// When `input_value` is `Some(text)`, looks up the associated state field
     /// from `input_state_map` and writes the text as the field's value before
     /// running the handler. This enables two-way binding for text inputs.
+    /// PLAN-112 T-09：handler 完成后的收尾（同步派发与片派发共用）。
+    ///
+    /// 片派发（`call_handler_for_cpu_slice`）未 park 时同步调用；park 时由
+    /// `pending_finish` 记住实参，在帧泵 `resume_cpu_slices` 报告完成的帧
+    /// 补这一次收尾——保证 emit 路由 / 实例回调 / 脏标记 / 路由参数同步的
+    /// 语义与旧同步派发一致，且每个 handler 只收尾一次。
+    fn finish_handler_dispatch(
+        &mut self,
+        clean_name: &str,
+        emit_widget: &str,
+        state_obj_id: u64,
+        args: &[auto_val::Value],
+        input_value: Option<&String>,
+        stripped_payloads: Vec<(String, auto_val::Value)>,
+        is_trace: bool,
+    ) {
+        if is_trace {
+            let _post_notes = self
+                .bridge
+                .read_state_as_vec("notes")
+                .map(|v| v.len())
+                .unwrap_or(999);
+            let _post_idx = self.bridge.read_state("active_index").ok();
+        }
+        self.dirty = true;
+        self.dispatch_pending_emit(state_obj_id, emit_widget);
+        let emit_key = format!("on{}", clean_name);
+        match self
+            .bridge
+            .instance_callback(state_obj_id, emit_widget, &emit_key)
+        {
+            Some(route) => {
+                if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
+                    eprintln!(
+                        "[VM-EMIT] {}.{} -> {}.{} (declarative) args={:?} input={:?}",
+                        emit_widget,
+                        clean_name,
+                        route.parent_widget,
+                        route.handler,
+                        args,
+                        input_value
+                    );
+                }
+                let payload = args
+                    .first()
+                    .cloned()
+                    .or_else(|| input_value.cloned().map(|t| auto_val::Value::Str(t.into())))
+                    .unwrap_or(auto_val::Value::Nil);
+                self.dispatch_parent_route(emit_widget, state_obj_id, clean_name, &route, payload);
+            }
+            None => {}
+        }
+        for (callback, payload) in stripped_payloads {
+            match self
+                .bridge
+                .instance_callback(state_obj_id, emit_widget, &callback)
+            {
+                Some(route) => {
+                    self.dispatch_parent_route(emit_widget, state_obj_id, clean_name, &route, payload);
+                }
+                None => {
+                    eprintln!(
+                        "[VM-EMIT] {}.{} calls {} but no parent route recorded",
+                        emit_widget, clean_name, callback
+                    );
+                }
+            }
+        }
+        self.sync_route_params();
+        self.consume_nav_back_pending();
+    }
+
     pub fn on_with_input(&mut self, event_name: &str, input_value: Option<String>) {
         let widget_name = self.widget_name.clone();
         self.on_with_input_for(&widget_name, event_name, input_value);
@@ -3626,73 +3733,61 @@ impl DynamicComponent {
             self.dirty = true;
             return;
         }
-        // PLAN-112 T-09：handler 完成后的收尾（同步派发与片派发共用）。
-        // 片派发在完成点调用同一段，保证 emit 路由 / 实例回调 / 脏标记 /
-        // 路由参数同步的语义与旧同步派发一致。
-        let finish_ok = |me: &mut Self,
-                         is_trace: bool,
-                         stripped_payloads: Vec<(String, auto_val::Value)>| {
-            if is_trace {
-                let _post_notes = me
-                    .bridge
-                    .read_state_as_vec("notes")
-                    .map(|v| v.len())
-                    .unwrap_or(999);
-                let _post_idx = me.bridge.read_state("active_index").ok();
-            }
-            me.dirty = true;
-            me.dispatch_pending_emit(state_obj_id, &emit_widget);
-            let emit_key = format!("on{}", clean_name);
-            match me
-                .bridge
-                .instance_callback(state_obj_id, &emit_widget, &emit_key)
-            {
-                Some(route) => {
-                    if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
-                        eprintln!(
-                            "[VM-EMIT] {}.{} -> {}.{} (declarative) args={:?} input={:?}",
-                            emit_widget,
-                            clean_name,
-                            route.parent_widget,
-                            route.handler,
-                            args,
-                            input_value
-                        );
-                    }
-                    let payload = args
-                        .first()
-                        .cloned()
-                        .or_else(|| input_value.clone().map(|t| auto_val::Value::Str(t.into())))
-                        .unwrap_or(auto_val::Value::Nil);
-                    me.dispatch_parent_route(&emit_widget, state_obj_id, &clean_name, &route, payload);
-                }
-                None => {}
-            }
-            for (callback, payload) in stripped_payloads {
-                match me
-                    .bridge
-                    .instance_callback(state_obj_id, &emit_widget, &callback)
-                {
-                    Some(route) => {
-                        me.dispatch_parent_route(
+        // PLAN-112 T-09：store/事件 handler 默认走片派发（AUTO_CPU_LEGACY=1 回退
+        // 同步段入口）。片预算耗尽时 handler park 成 CpuRunnable，帧泵在后续帧
+        // 续驱——UI 线程不再被长 handler（025 的 Refresh：system_snapshot + 排序）
+        // 占满。收尾（emit 路由/实例回调/脏标记/路由参数）在真正完成时执行一次。
+        let cpu_legacy = std::env::var("AUTO_CPU_LEGACY").ok().as_deref() == Some("1");
+        if !cpu_legacy && !clean_name.starts_with("__") {
+            let had_cpu = self.bridge.has_cpu_continuations();
+            let res = self.bridge.call_handler_for_cpu_slice(
+                &emit_widget,
+                &clean_name,
+                state_obj_id,
+                &args,
+                auto_lang_core::vm::engine::CpuSliceBudget::d2_default(),
+            );
+            match res {
+                Ok(()) => {
+                    let parked = !had_cpu && self.bridge.has_cpu_continuations();
+                    if parked {
+                        self.pending_finish = Some(PendingFinish {
+                            clean_name: clean_name.clone(),
+                            emit_widget: emit_widget.clone(),
+                            state_obj_id,
+                            args: args.clone(),
+                            input_value: input_value.clone(),
+                            stripped: stripped_payloads.clone(),
+                            is_trace,
+                        });
+                    } else {
+                        self.finish_handler_dispatch(
+                            &clean_name,
                             &emit_widget,
                             state_obj_id,
-                            &clean_name,
-                            &route,
-                            payload,
-                        );
-                    }
-                    None => {
-                        eprintln!(
-                            "[VM-EMIT] {}.{} calls {} but no parent route recorded",
-                            emit_widget, clean_name, callback
+                            &args,
+                            input_value.as_ref(),
+                            stripped_payloads,
+                            is_trace,
                         );
                     }
                 }
+                Err(e) => {
+                    eprintln!(
+                        "[VM-HANDLER] {}.{} failed: {}",
+                        if widget_name.is_empty() {
+                            &self.widget_name
+                        } else {
+                            widget_name
+                        },
+                        clean_name,
+                        e
+                    );
+                    self.dirty = true;
+                }
             }
-            me.sync_route_params();
-            me.consume_nav_back_pending();
-        };
+            return;
+        }
         match self
             .bridge
             .call_handler_for(widget_name, &clean_name, state_obj_id, &args)
@@ -3706,7 +3801,15 @@ impl DynamicComponent {
                         );
                     }
                 }
-                finish_ok(self, is_trace, stripped_payloads);
+                self.finish_handler_dispatch(
+                    &clean_name,
+                    &emit_widget,
+                    state_obj_id,
+                    &args,
+                    input_value.as_ref(),
+                    stripped_payloads,
+                    is_trace,
+                );
             }
             Err(_e) => {
                 // Plan 057 (ash-gui 双执行修复): handler 错误此前被完全吞掉(静默中止,
