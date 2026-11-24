@@ -778,10 +778,18 @@ pub enum View<M: Clone + Debug> {
 
     /// PLAN-126 T-03：虚拟列表构建带标记（零布局 wrapper）。
     ///
-    /// iced 轨由 renderer 以合成 id `vlist_mark:{key}` 包一层 container，
-    /// operate 期上报内容空间 rect；probe 用 (rect, 当次行区间) 反解固定
-    /// 行高与列表起点。vue/快照轨按透明 wrapper 透传子件。
-    VirtualMark { key: String, child: Box<View<M>> },
+    /// iced 轨由 renderer 以合成 id `vlist_mark:{key}:{start}:{end}` 包一层
+    /// container，operate 期上报内容空间 rect；probe 从 id 里取回**该 rect
+    /// 对应的行区间**（不依赖进程台账的「最近一次构建」——测量回执到达时
+    /// 台账可能已被后续构建改写，实测会自激振荡），据此反解固定行高与列表
+    /// 起点。vue/快照轨按透明 wrapper 透传子件。
+    VirtualMark {
+        key: String,
+        /// 构建带实际行区间（半开，绝对索引）——随 id 一起上报。
+        start: usize,
+        end: usize,
+        child: Box<View<M>>,
+    },
 
     /// A native focus target anchored to its rendered control.
     FocusTarget {
@@ -1076,6 +1084,11 @@ pub enum View<M: Clone + Debug> {
         /// PLAN-656 T-03: controller 绑定（`scroll_controller()` 句柄）；
         /// None = 无程序化控制。
         controller: Option<ScrollControllerBinding>,
+        /// PLAN-126 T-03: 虚拟列表 pane 作用域 key。滚动容器含可窗口化
+        /// `for` 循环时置位（`vlist_{seq}`）；渲染器据此把该 scrollable 的
+        /// iced widget id 登记进几何台账（`vlist_pane:` 关联），probe 得以
+        /// 上报 offset/viewport/content 供窗口裁行。None = 普通滚动容器。
+        measure_key: Option<String>,
     },
 
     /// Radio button with optional styling
@@ -2109,6 +2122,7 @@ impl<M: Clone + Debug> View<M> {
             axes: crate::ui::scroll::ScrollAxes::Y,
             scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
             controller: None,
+            measure_key: None,
         };
         match visual {
             Some(style) => View::Container {
@@ -2648,8 +2662,15 @@ impl<M: Clone + Debug> View<M> {
             View::Empty => View::Empty,
             // PLAN-126 T-03: 占位无消息；标记映射子件消息。
             View::SpacePx { width, height } => View::SpacePx { width, height },
-            View::VirtualMark { key, child } => View::VirtualMark {
+            View::VirtualMark {
                 key,
+                start,
+                end,
+                child,
+            } => View::VirtualMark {
+                key,
+                start,
+                end,
                 child: Box::new(child.map_msg_with_arc(f)),
             },
             View::Rich { spans, style, on_selection } => {
@@ -3064,6 +3085,7 @@ impl<M: Clone + Debug> View<M> {
                 axes,
                 scrollbar_policy,
                 controller,
+                measure_key,
             } => {
                 // Plan 043 T1: offset 透传;on_scroll 为 ScrollCallback
                 // newtype,可包装换消息类型(PointerMoveHandler 同款)。
@@ -3082,6 +3104,7 @@ impl<M: Clone + Debug> View<M> {
                     axes,
                     scrollbar_policy,
                     controller,
+                    measure_key,
                 }
             }
             View::Radio {
@@ -3466,6 +3489,7 @@ impl<M: Clone + Debug> ViewScrollableBuilder<M> {
             axes: self.axes,
             scrollbar_policy: self.scrollbar_policy,
             controller: self.controller,
+            measure_key: None,
         }
     }
 }

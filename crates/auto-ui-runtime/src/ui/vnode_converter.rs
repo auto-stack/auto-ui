@@ -1200,6 +1200,7 @@ mod tests {
             axes: crate::ui::scroll::ScrollAxes::Y,
             scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
             controller: None,
+            measure_key: None,
         };
 
         let tree = view_to_vtree(view);

@@ -1875,6 +1875,7 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             axes,
             scrollbar_policy,
             controller,
+            measure_key,
         } => AbstractView::Scrollable {
             child: Box::new(convert_view_messages(*child)),
             width,
@@ -1892,6 +1893,8 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             axes,
             scrollbar_policy,
             controller,
+            // PLAN-126 T-03: pane 作用域 key 透传（probe 认领视口几何）。
+            measure_key,
         },
 
         AbstractView::Radio {
@@ -2327,6 +2330,24 @@ fn convert_view_messages(view: AbstractView<DynamicMessage>) -> AbstractView<Ice
             style,
         },
 
+        // PLAN-126 T-03：虚拟列表占位/构建带标记显式透传——此前落下方
+        // `_ => Empty` 兜底，窗口化构建的整段行（含屏外逻辑高度）在
+        // DynamicMessage→IcedMessage 转换处被整体吞掉：渲染树里没有行、
+        // 内容高退化为视口高，probe 的构建带 rect 也永远等不到
+        // （PLAN-082 Rich / PLAN-029 Custom 同族坑，实测定罪）。
+        AbstractView::SpacePx { width, height } => AbstractView::SpacePx { width, height },
+        AbstractView::VirtualMark {
+            key,
+            start,
+            end,
+            child,
+        } => AbstractView::VirtualMark {
+            key,
+            start,
+            end,
+            child: Box::new(convert_view_messages(*child)),
+        },
+
         // Select, Slider, Accordion, Sidebar, NavigationRail use
         // callback types (SelectCallback, fn pointers, Arc<...>) that
         // cannot be trivially converted. Map them to Empty as fallback.
@@ -2572,6 +2593,7 @@ mod tests {
                 axes: crate::ui::scroll::ScrollAxes::Y,
                 scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
                 controller: None,
+                measure_key: None,
             }],
         );
         rewrite_viewport_units(&mut root);
@@ -2890,6 +2912,7 @@ mod tests {
             crate::ui::scroll::ScrollAxes::Y,
             crate::ui::scroll::ScrollbarPolicy::Auto,
             None,
+            None,
         );
         let drained = drain_pending_scroll_offsets();
         assert!(
@@ -2912,6 +2935,7 @@ mod tests {
             crate::ui::scroll::ScrollAxes::Y,
             crate::ui::scroll::ScrollbarPolicy::Auto,
             None,
+            None,
         );
         let drained = drain_pending_scroll_offsets();
         assert!(
@@ -2932,6 +2956,7 @@ mod tests {
             crate::ui::scroll::ScrollAxes::Y,
             crate::ui::scroll::ScrollbarPolicy::Auto,
             None,
+            None,
         );
         let drained = drain_pending_scroll_offsets();
         assert!(
@@ -2950,6 +2975,7 @@ mod tests {
             None,
             crate::ui::scroll::ScrollAxes::Y,
             crate::ui::scroll::ScrollbarPolicy::Auto,
+            None,
             None,
         );
         let drained = drain_pending_scroll_offsets();

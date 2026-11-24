@@ -40,6 +40,7 @@ impl<'a> AuraViewBuilder<'a> {
         } else {
             None
         };
+        let vlist_measure_key = _vlist_scope.as_ref().map(|g| g.key().to_string());
 
         // Plan 476: 拼接感知收集(slot outlet 的 fill 子节点作兄弟展开)。
         let child_views: Vec<View<DynamicMessage>> = self
@@ -130,6 +131,7 @@ impl<'a> AuraViewBuilder<'a> {
                 axes: crate::ui::scroll::ScrollAxes::Y,
                 scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
                 controller: None,
+                measure_key: vlist_measure_key,
             };
             match viewport_visual {
                 Some(v) => View::Container {
@@ -175,6 +177,7 @@ impl<'a> AuraViewBuilder<'a> {
         } else {
             None
         };
+        let vlist_measure_key = _vlist_scope.as_ref().map(|g| g.key().to_string());
 
         // Plan 476: 拼接感知收集 + 视觉空过滤(既有行为)。
         let child_views: Vec<View<DynamicMessage>> = self
@@ -220,6 +223,7 @@ impl<'a> AuraViewBuilder<'a> {
             axes,
             scrollbar_policy,
             controller,
+            measure_key: vlist_measure_key,
         }
     }
 

@@ -3517,6 +3517,18 @@ fn render_dynamic_view_inner(
     } else {
         view
     };
+    // PLAN-126 T-03 diag: does the windowed band wrapper reach this renderer?
+    if crate::ui::virtual_list::diag() {
+        match &view {
+            AbstractView::VirtualMark { key, .. } => {
+                eprintln!("[VLIST-DYN] mark key={key} path={path:?}")
+            }
+            AbstractView::SpacePx { height, .. } => {
+                eprintln!("[VLIST-DYN] space height={height} path={path:?}")
+            }
+            _ => {}
+        }
+    }
     match view {
         // Overlay children can contain VM-specific columns, rows and inputs;
         // recurse through this renderer so nested content keeps the same
@@ -4212,6 +4224,7 @@ fn render_dynamic_view_inner(
             axes,
             scrollbar_policy,
             controller,
+            measure_key,
         } => {
             let mut dbg_props = debug_style_props(style.as_ref());
             if let Some(w) = width {
@@ -4287,6 +4300,7 @@ fn render_dynamic_view_inner(
                 axes,
                 scrollbar_policy,
                 controller.as_ref(),
+                measure_key.as_deref(),
             );
             if let Some(ctx) = debug_ctx {
                 ctx.wrap_debug(path, "scroll", el, dbg_props, style.as_ref())
@@ -4577,6 +4591,40 @@ fn render_dynamic_view_inner(
                 el
             }
         }
+
+        // PLAN-126 T-03: 虚拟列表构建带标记。**必须**经本渲染器递归子件
+        // （同 ScrollAnchorMark / MouseArea 的定罪犯例）：若落 catch-all 的
+        // 泛型 `into_iced`，整段窗口行失去 vnode id → LayoutCollector 全盲
+        // （行 rect 全缺、快照 id 与事件目标失配）。零布局 wrapper，挂
+        // `vlist_mark:{key}:{start}:{end}` 供 probe 反解行高/列表起点。`
+        AbstractView::VirtualMark {
+            key,
+            start,
+            end,
+            child,
+        } => {
+            let el = render_dynamic_view(*child, debug_ctx, path);
+            iced::widget::container(el)
+                .id(iced::widget::Id::from(format!(
+                    "{}{}:{}:{}",
+                    crate::ui::virtual_list::MARK_ID_PREFIX,
+                    key,
+                    start,
+                    end
+                )))
+                .padding(0)
+                .width(iced::Length::Fill)
+                .into()
+        }
+        // PLAN-126 T-03: 屏外占位——固定逻辑高度 spacer（不参与 vnode id）。
+        AbstractView::SpacePx { width, height } => iced::widget::Space::new()
+            .width(if width.is_finite() {
+                iced::Length::Fixed(width.max(0.0))
+            } else {
+                iced::Length::Fill
+            })
+            .height(iced::Length::Fixed(height.max(0.0)))
+            .into(),
 
         // PLAN-063 T-04d-2: 锚槽 → 记录布局坐标的委托 wrapper。
         AbstractView::AnchorSlot { index, child } => {

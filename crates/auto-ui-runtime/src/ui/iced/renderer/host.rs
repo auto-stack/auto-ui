@@ -2042,6 +2042,11 @@ fn run_session(
         if msg.event == crate::ui::virtual_list::MEASURE_EVENT {
             if let Some(ref json) = msg.input_value {
                 if let Ok(m) = serde_json::from_str::<crate::ui::virtual_list::VListMeasure>(json) {
+                    // 滚动偏移变化 → 窗口行集合变化：置脏让下一帧重建（窗口
+                    // 化后行集合不再恒定，不重建等于滚动后空白）。
+                    if crate::ui::virtual_list::offset_moved(&m) {
+                        *state.app.view_dirty.borrow_mut() = true;
+                    }
                     let changed = crate::ui::virtual_list::note_measure(&m);
                     if crate::ui::virtual_list::diag() {
                         eprintln!(
@@ -4599,8 +4604,13 @@ fn run_session(
 
         // PLAN-126 T-03: 虚拟列表几何 probe。窗口化构建（含首帧标定）置位
         // 请求位，本拍收集 pane 视口/偏移与构建带 rect；下一帧构建据此解出
-        // 固定行高与列表起点。门控：开关关闭或本帧无虚拟化 pane 时零开销。
-        if crate::ui::virtual_list::enabled() && crate::ui::virtual_list::take_measure_request() {
+        // 固定行高与列表起点。门控：开关关闭或从未窗口化时零开销；进入窗口
+        // 化后每拍轻量 probe（仅遍历一次树），滚动偏移变化即置脏重建窗口行
+        // 集合——否则滚动后沿用旧窗口，屏内可能整段空白。
+        if crate::ui::virtual_list::enabled()
+            && (crate::ui::virtual_list::take_measure_request()
+                || crate::ui::virtual_list::is_active())
+        {
             tail_tasks.push(
                 iced::advanced::widget::operate(crate::ui::virtual_list::VListProbe::new()).map(
                     |m| IcedMessage {

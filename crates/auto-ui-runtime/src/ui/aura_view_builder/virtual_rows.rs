@@ -21,11 +21,13 @@ use super::*;
 use crate::ui::virtual_list;
 
 /// 标定帧最多构建的行数（无几何时的一次性构建；超出部分仍由占位表达）。
-const CALIBRATION_ROWS: usize = 256;
-
+/// 与测量侧共用同一常量：标定带（start=0、行数 = min(n, 上限)）是唯一
+/// 可信的全局平均行高样本。
+const CALIBRATION_ROWS: usize = virtual_list::CALIBRATION_ROWS;
 /// pane 作用域 Drop guard（转换内提前 return 也不会漏 pop）。
 pub(super) struct VlistScopeGuard<'b, 'a> {
     b: &'b AuraViewBuilder<'a>,
+    key: String,
 }
 
 impl Drop for VlistScopeGuard<'_, '_> {
@@ -34,11 +36,19 @@ impl Drop for VlistScopeGuard<'_, '_> {
     }
 }
 
+impl VlistScopeGuard<'_, '_> {
+    /// 本 pane 作用域 key（写入 `View::Scrollable.measure_key`）。
+    pub(super) fn key(&self) -> &str {
+        &self.key
+    }
+}
+
 impl<'a> AuraViewBuilder<'a> {
     /// 进入虚拟列表 pane 作用域；返回的 guard 在离开作用域时自动出栈。
+    /// `guard.key()` 即本帧该 pane 的稳定 key（写进 `View::Scrollable.measure_key`）。
     pub(super) fn enter_vlist_scope(&self) -> VlistScopeGuard<'_, 'a> {
-        virtual_list::push_scope();
-        VlistScopeGuard { b: self }
+        let key = virtual_list::push_scope();
+        VlistScopeGuard { b: self, key }
     }
 
     /// 退出当前 pane 作用域（guard 用）。
@@ -136,7 +146,12 @@ impl<'a> AuraViewBuilder<'a> {
         if !virtual_list::enabled() {
             return None;
         }
-        let scope = self.vlist_scope()?;
+        let Some(scope) = self.vlist_scope() else {
+            if virtual_list::diag() {
+                eprintln!("[VLIST-TRY] no-scope iterable={iterable}");
+            }
+            return None;
+        };
         if self.vlist_search_active() {
             return None;
         }
@@ -144,6 +159,9 @@ impl<'a> AuraViewBuilder<'a> {
         let total = self.bridge.list_len_of(&list_val)?;
         if total == 0 {
             return None;
+        }
+        if virtual_list::diag() {
+            eprintln!("[VLIST-TRY] scope={scope} iterable={iterable} total={total}");
         }
 
         // 台账几何优先 → 诊断覆盖 → 标定帧（顶部窗口，几何待 probe 反解）。
@@ -215,16 +233,29 @@ impl<'a> AuraViewBuilder<'a> {
         if !calibrating {
             virtual_list::record_build(&scope, &plan);
         }
+        if virtual_list::diag() {
+            eprintln!(
+                "[VLIST-BUILT] scope={scope} calibrating={calibrating} window=[{}, {}) rows={}",
+                plan.start,
+                plan.end,
+                plan.rows()
+            );
+        }
         // 下一拍 probe 刷新 pane 几何 / 构建带 rect（首帧与滚动后都要）。
         virtual_list::request_measure();
 
         let band = View::VirtualMark {
             key: scope,
+            start: plan.start,
+            end: plan.end,
             child: Box::new(View::Column {
                 children: rows,
                 spacing: 0,
                 padding: 0,
-                style: None,
+                // 构建带占满滚动内容宽度（缺省列宽 Shrink 会让行内
+                // `flex-1` 单元格按内容收缩，与完整构建里被 `w-full` 表格
+                // 撑满的列宽语义不一致）。
+                style: Style::parse("w-full").ok(),
                 onclick: None,
                 on_right_click: None,
             }),

@@ -326,6 +326,7 @@ fn corpus() -> Vec<Case> {
             axes: crate::ui::scroll::ScrollAxes::Y,
             scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
             controller: None,
+            measure_key: None,
         },
         note: "ready",
     });

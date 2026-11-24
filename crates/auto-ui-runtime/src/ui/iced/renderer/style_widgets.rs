@@ -1925,6 +1925,7 @@ pub(super) fn build_scrollable<M: Clone + Debug + 'static>(
     axes: crate::ui::scroll::ScrollAxes,
     scrollbar_policy: crate::ui::scroll::ScrollbarPolicy,
     controller: Option<&crate::ui::view::ScrollControllerBinding>,
+    measure_key: Option<&str>,
 ) -> iced::Element<'static, M> {
     if let (Some(id), Some(off)) = (&widget_id, offset) {
         if std::env::var("P043_DEBUG").is_ok() {
@@ -2084,6 +2085,12 @@ pub(super) fn build_scrollable<M: Clone + Debug + 'static>(
     // id，注册表绑定的 scroll_ctl_* 永远匹配不到真实 widget（读回键为
     // vnode_*，scroll_to 落空，预热循环空转）。
     let widget_id = controller_widget_id.or(widget_id);
+    // PLAN-126 T-03：虚拟列表 pane —— 把该 scrollable 的实际 iced id 登记进
+    // 几何台账（不再另挂 `vlist_pane:` id，滚动/边界/快照 id 全部零改）。
+    // probe 遍历时按此 id 认领视口 offset/viewport/content。
+    if let (Some(key), Some(id)) = (measure_key, widget_id.as_deref()) {
+        crate::ui::virtual_list::note_pane_widget_id(key, id);
+    }
     if let Some(id) = widget_id {
         s = s.id(id);
     }

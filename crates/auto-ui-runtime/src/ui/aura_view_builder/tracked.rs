@@ -1972,6 +1972,7 @@ impl<'a> AuraViewBuilder<'a> {
                             axes: crate::ui::scroll::ScrollAxes::Y,
                             scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
                             controller: None,
+                            measure_key: None,
                         };
                     }
                     return doc;
@@ -2276,6 +2277,7 @@ impl<'a> AuraViewBuilder<'a> {
         } else {
             None
         };
+        let vlist_measure_key = _vlist_scope.as_ref().map(|g| g.key().to_string());
 
         // D-GAP-4: number children by RESULTING slot — visually-empty views
         // are dropped from the built column, shifting later siblings left;
@@ -2372,6 +2374,7 @@ impl<'a> AuraViewBuilder<'a> {
                 axes: crate::ui::scroll::ScrollAxes::Y,
                 scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
                 controller: None,
+                measure_key: vlist_measure_key,
             };
             // PLAN-748 T-07：视觉子集上移视口容器（Shrink 包装随 Scrollable
             // Fill 解析满高；build_container 经 apply_side_borders 承载单侧
@@ -2574,6 +2577,12 @@ impl<'a> AuraViewBuilder<'a> {
         let padding = self.extract_u16(props, "padding").unwrap_or(0);
         let style = self.extract_style_with(props, bindings); // Plan 057 (2.5)
 
+        // PLAN-126 T-03：tracked 轨的显式 `scroll` 暂不压 pane 作用域——该轨
+        // 的窗口行由 untracked 转换构建，会丢行事件 probe 条目
+        // （`plan081_outlet_page_for_rows_survive_memo_two_frame_timeline`
+        // 实测回归）。`overflow-y-auto` 列的 tracked 双胎仍压栈（025 走那
+        // 条）；显式 `scroll` 的 tracked 窗口化随 T-04 的探针保真一起接。
+
         // Plan 476: 拼接感知收集(源索引编号) + 视觉空后置过滤(既有行为)。
         // PLAN-081 T-04c-13: probe 路径补 Scrollable 合成内层 col 的段——
         // 本转换把 children 包进 `View::Scrollable { child: col_view }`，
@@ -2627,6 +2636,7 @@ impl<'a> AuraViewBuilder<'a> {
             axes,
             scrollbar_policy,
             controller,
+            measure_key: None,
         }
     }
 
@@ -3833,6 +3843,7 @@ impl<'a> AuraViewBuilder<'a> {
                 axes: crate::ui::scroll::ScrollAxes::Y,
                 scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
                 controller: None,
+                measure_key: None,
             };
         }
         View::AutodownEditor {

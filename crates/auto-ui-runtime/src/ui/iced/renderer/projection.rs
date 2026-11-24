@@ -135,16 +135,28 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 .width(if width.is_finite() {
                     iced::Length::Fixed(width.max(0.0))
                 } else {
-                    iced::Length::Shrink
+                    // 缺省宽度 = Fill（行槽保持整行宽，不改变列内宽度分配）。
+                    iced::Length::Fill
                 })
                 .height(iced::Length::Fixed(height.max(0.0)))
                 .into(),
 
             // PLAN-126 T-03: 虚拟列表构建带标记——零布局 container + 合成 id
             // `vlist_mark:{key}`，operate 期上报内容空间 rect（行高/列表起点反解）。
-            AbstractView::VirtualMark { key, child } => project_widget(|| {
+            AbstractView::VirtualMark {
+                key,
+                start,
+                end,
+                child,
+            } => project_widget(|| {
                 let el = child.into_iced();
-                let mark_id = format!("{}{}", crate::ui::virtual_list::MARK_ID_PREFIX, key);
+                let mark_id = format!(
+                    "{}{}:{}:{}",
+                    crate::ui::virtual_list::MARK_ID_PREFIX,
+                    key,
+                    start,
+                    end
+                );
                 if crate::ui::virtual_list::diag() {
                     eprintln!("[VLIST-MARK] projecting id={mark_id}");
                 }
@@ -1990,6 +2002,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                 axes,
                 scrollbar_policy,
                 controller,
+                measure_key,
             } => project_widget(|| {
                 // Plan 049 → 057 续:仅 `auto_scroll` 标记的主列表挂固定 Id
                 // (snap_to_end 目标)。此前所有 Scrollable 共享该 Id,块内 max-h
@@ -2022,6 +2035,7 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     axes,
                     scrollbar_policy,
                     controller.as_ref(),
+                    measure_key.as_deref(),
                 )
             }),
 

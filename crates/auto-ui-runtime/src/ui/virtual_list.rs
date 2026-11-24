@@ -7,15 +7,27 @@
 //! - 未取得布局测量（首帧）或没有有界纵向视口时保留完整构建；
 //! - `AUTOUI_VIRTUAL_LIST=0` 关闭窗口化，保留完整构建与既有交互。
 //!
-//! 数据流：
+//! 数据流（T-03 实测接线，2026-11-24）：
 //! ```text
-//! convert_column(overflow-y-auto) → push scope（`vlist_{seq}`）
-//! ForLoop 臂                      → virtual_list::plan(scope, n) → (start,end) 或 None
-//! View::Scrollable.measure_key    → projection 挂 iced Id `vlist_pane:{key}`
-//! View::VirtualMark(key)          → projection 挂 iced Id `vlist_mark:{key}`
-//! host 每帧 probe（窗口化发生时）  → VListProbe 收集 pane 几何 + 构建带 rect
-//! __vlist_measure 消息            → note_measure → 解出 row_h / list_top / offset
+//! convert_column(overflow-y-auto)  → push scope（`vlist_{seq}`）
+//! ForLoop 臂                       → virtual_list::plan(scope, n) → (start,end) 或 None
+//! View::Scrollable.measure_key     → build_scrollable 把该 scrollable 的实际 iced
+//!                                    widget id（vnode_*）登记进台账，probe 据此认领
+//!                                    offset/viewport/content（不新增 id、不改滚动目标）
+//! View::VirtualMark(key,start,end) → dynamic 渲染轨挂 iced Id
+//!                                    `vlist_mark:{key}:{start}:{end}` 并**递归**渲染行
+//!                                    （保住 vnode id / bounds / 事件目标）
+//! host 每帧 probe（窗口化后）       → VListProbe 收集 pane 几何 + 构建带 rect+行区间
+//! __vlist_measure 消息             → note_measure → 解出 row_h / list_top
+//! offset 变化                      → 置脏，下一帧按新偏移重建窗口行集合
 //! ```
+//!
+//! 渲染入口实测：生产 VM 窗走 `dynamic_view_impl_inner`
+//!（`iced/renderer/projection.rs`）→ `render_dynamic_view`
+//!（`iced/renderer/devtools.rs`）。本组件此前在 `convert_view_messages`
+//!（`iced/renderer/mod.rs`）的 `_ => Empty` 兜底处被整体吞掉——标记与占位
+//! 必须在 View→View 类型转换里显式透传（同 PLAN-082 Rich / PLAN-029 Custom
+//! 定罪犯例）。
 //!
 //! 台账是进程级、按 scope key 持久的；视图重建不丢测量（同 `scroll::managed`
 //! 先例）。同一 pane 只支持一个虚拟化循环（首个认领 scope），其余循环保留完整
@@ -39,6 +51,18 @@ pub const MEASURE_EVENT: &str = "__vlist_measure";
 
 /// 两侧各保留的预渲染行数（plan §5.1.2「两侧各最多 2 行」）。
 pub const OVERSCAN_ROWS: usize = 2;
+
+/// 无几何时的标定帧最多构建的行数（构建侧与测量侧共用：标定带
+/// （start=0、行数 = min(n, CALIBRATION_ROWS)）是唯一可信的「全局平均
+/// 行高」样本）。
+pub const CALIBRATION_ROWS: usize = 256;
+
+/// 标定采样节流：相邻两次标定测量至少间隔该时长。首秒内世界/字型尚未
+/// 稳定（025 实测全表高 3456 → 3477，差 0.6%），连续帧采样会锁死早期值。
+pub const CALIB_SAMPLE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// 已确认行高的复核周期：周期性做一次完整构建标定，纠偏运行期度量变化。
+pub const CALIB_VERIFY_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3);
 
 /// 环境开关：缺省启用；`0` = 关闭窗口化（完整构建对照）。
 pub fn enabled() -> bool {
@@ -165,6 +189,12 @@ pub struct PaneGeometry {
     pub viewport_h: f64,
     /// 内容总高（px）。
     pub content_h: f64,
+    /// 视口顶在窗口坐标系中的 y（px）——构建带 rect 是窗口绝对坐标，
+    /// 反解列表起点时须扣除视口原点。
+    pub viewport_y: f64,
+    /// 视口宽（px）——宽度变化会改变行内换行/字形度量，进而改变行高，
+    /// 台账据此作废旧行高重新标定。
+    pub viewport_w: f64,
 }
 
 /// 构建带（窗口行 Column）的布局矩形与当次区间，用于反解行高与列表起点。
@@ -200,13 +230,31 @@ impl WindowPlan {
 #[derive(Debug, Default, Clone)]
 struct ScopeEntry {    pane: Option<PaneGeometry>,
     band: Option<BandGeometry>,
-    /// 已解出的固定行高与列表起点。
+    /// 已解出的固定行高与列表起点（内容空间）。
     row_h: f64,
     list_top: f64,
     /// 最近一次窗口构建（诊断/测试）。
     last_plan: Option<WindowPlan>,
     /// 最近一次测量的序号（观测新鲜度）。
     measured_seq: u64,
+    /// 本 scope 是否已被某个 `for` 循环认领（`note_plan` 置位）——只有
+    /// 认领过的 pane 才需要登记 iced widget id / 参与 probe。
+    claimed: bool,
+    /// pane 滚动容器的 iced widget id（渲染器在 build_scrollable 登记）。
+    /// probe 用它在 `Operation::scrollable` 里认领视口几何。
+    pane_widget_id: Option<String>,
+    /// 本 scope 认领时的列表长度（判定标定带用）。
+    total: usize,
+    /// 标定行高候选（渲染期首帧/字型加载前的测量可能偏 0.6%，需间隔采样
+    /// 两次一致才采信——025 实测首秒内 3456、稳定后 3477）。
+    calib_candidate: Option<f64>,
+    /// 行高是否已被两次间隔采样一致的标定确认（未确认时继续标定构建）。
+    row_h_trusted: bool,
+    /// 最近一次标定采样时刻（节流：相邻样本至少相隔 [`CALIB_SAMPLE_INTERVAL`]）。
+    last_calib_at: Option<std::time::Instant>,
+    /// 已确认行高后的下一次复核时刻（周期性完整构建复核，纠偏字型/DPI 等
+    /// 运行期变化；复核带只更新行高，不改变窗口语义）。
+    next_verify_at: Option<std::time::Instant>,
 }
 
 lazy_static::lazy_static! {
@@ -215,6 +263,8 @@ lazy_static::lazy_static! {
 
 /// 有 pane 需要本次 probe（构建期置位，host 消费后清零）。
 static MEASURE_WANTED: AtomicBool = AtomicBool::new(false);
+/// 本进程已有窗口化 pane（host 每帧轻量 probe，用于滚动后即时重建窗口）。
+static ACTIVE: AtomicBool = AtomicBool::new(false);
 /// 窗口构建计数（诊断/测试）。
 static ROWS_BUILT: AtomicU64 = AtomicU64::new(0);
 static WINDOWS_BUILT: AtomicU64 = AtomicU64::new(0);
@@ -223,6 +273,12 @@ static MEASURE_SEQ: AtomicU64 = AtomicU64::new(1);
 /// 构建期登记：本帧有虚拟化 pane（host 下一拍 probe）。
 pub fn request_measure() {
     MEASURE_WANTED.store(true, Ordering::Relaxed);
+    ACTIVE.store(true, Ordering::Relaxed);
+}
+
+/// 本进程是否已进入窗口化（host 每帧 probe 以感知滚动位置变化）。
+pub fn is_active() -> bool {
+    ACTIVE.load(Ordering::Relaxed)
 }
 
 /// host 消费：是否需要 probe，并清零请求位。
@@ -250,36 +306,151 @@ fn read_scope<R>(key: &str, f: impl FnOnce(&ScopeEntry) -> R) -> Option<R> {
 pub fn note_pane(key: &str, pane: PaneGeometry) -> bool {
     let changed = with_scope(key, |e| {
         let changed = e.pane != Some(pane);
+        // 视口宽度变化 → 行内换行/字形度量可能改变行高：作废已解出的行高，
+        // 让下一帧重新标定（一次完整构建，随后继续窗口化）。
+        if let Some(prev) = e.pane {
+            if (prev.viewport_w - pane.viewport_w).abs() > 1.0 {
+                e.row_h = 0.0;
+                e.row_h_trusted = false;
+                e.calib_candidate = None;
+                e.last_calib_at = None;
+                e.next_verify_at = None;
+            }
+        }
         e.pane = Some(pane);
         changed
     });
     changed
 }
 
-/// 写入构建带矩形（probe 消息），并按当次区间反解行高/列表起点。
-pub fn note_band(key: &str, y: f64, h: f64) -> bool {
+/// 渲染期登记：pane 滚动容器的 iced widget id（仅已认领 scope 有效）。
+/// `key` = pane 作用域 key；`widget_id` = 该 scrollable 实际挂的 iced id
+/// （vnode_* / blocklist_scroll / scroll_ctl_*）。probe 遍历时按此认领。
+pub fn note_pane_widget_id(key: &str, widget_id: &str) {
     with_scope(key, |e| {
-        let Some(prev) = e.band else {
-            return false;
-        };
-        e.band = Some(BandGeometry { y, h, ..prev });
-        let rows = prev.end.saturating_sub(prev.start);
+        if e.claimed {
+            e.pane_widget_id = Some(widget_id.to_string());
+        }
+    });
+}
+
+/// probe 期反查：某 iced widget id 是否是已认领的虚拟列表 pane。
+pub fn pane_key_for_widget_id(widget_id: &str) -> Option<String> {
+    let map = SCOPES.lock().unwrap();
+    map.iter().find_map(|(key, e)| {
+        if e.claimed && e.pane_widget_id.as_deref() == Some(widget_id) {
+            Some(key.clone())
+        } else {
+            None
+        }
+    })
+}
+
+/// 写入构建带矩形（probe 消息），并按**该 rect 自带的行区间**反解行高/
+/// 列表起点。
+///
+/// `start..end` 来自构建带 iced id（`vlist_mark:{key}:{start}:{end}`）——
+/// 不走台账「最近一次构建」，因为测量回执到达时台账可能已被下一帧构建
+/// 改写（实测错配会把 h 除以错误行数 → 行高自激振荡、窗口塌缩）。
+/// `y` 是 iced 布局给出的**窗口绝对坐标**（scrollable 内容在布局中不被
+/// 滚动偏移平移，滚动只在绘制/命中阶段换算），`h` 是构建带自身高。列表
+/// 起点（内容空间）＝ 带顶 - 已构建行数×行高 - 视口顶。
+///
+/// 行高**只从标定带采信**（start=0 且行数=n，或 n 超过标定上限时取顶部
+/// 标定段）：窗口带只是 n 的一个连续片段，其平均行高受行内容影响可偏
+/// 0.5%（025 实测：全局 28.975 / 尾部窗口 28.82），若反复用窗口带覆盖
+/// 行高，内容总高会随滚动位置漂移。窗口带只用于重算 `list_top`。
+pub fn note_band(key: &str, start: usize, end: usize, y: f64, h: f64) -> bool {
+    with_scope(key, |e| {
+        e.claimed = true;
+        e.band = Some(BandGeometry {
+            y,
+            h,
+            start,
+            end,
+        });
+        let rows = end.saturating_sub(start);
+        let total = e.total;
         if rows > 0 && h.is_finite() && h > 0.0 {
-            let row_h = h / rows as f64;
-            // 行高应在合理范围；明显偏差（行内换行/变高行）不采信。
-            if row_h >= 1.0 && row_h <= 400.0 {
-                e.row_h = row_h;
-                e.list_top = y - prev.start as f64 * row_h;
+            let cand = h / rows as f64;
+            if cand >= 1.0 && cand <= 400.0 {
+                let is_calibration = if total > 0 {
+                    start == 0 && (rows == total || (total > CALIBRATION_ROWS && rows == CALIBRATION_ROWS))
+                } else {
+                    false
+                };
+                if is_calibration {
+                    let now = std::time::Instant::now();
+                    let due = match e.last_calib_at {
+                        None => true,
+                        Some(t) => now.duration_since(t) >= CALIB_SAMPLE_INTERVAL,
+                    };
+                    if due {
+                        e.last_calib_at = Some(now);
+                        if !e.row_h_trusted {
+                            // 两次**间隔采样**一致（≤0.5%）才采信。
+                            let agree = e.calib_candidate.map_or(false, |prev| {
+                                (prev - cand).abs() / prev.max(1.0) <= 0.005
+                            });
+                            e.row_h = cand;
+                            if agree {
+                                e.row_h_trusted = true;
+                                e.next_verify_at = Some(now + CALIB_VERIFY_INTERVAL);
+                            } else {
+                                e.calib_candidate = Some(cand);
+                            }
+                        } else {
+                            // 已确认行高的周期性复核：显著偏差才纠偏。
+                            e.next_verify_at = Some(now + CALIB_VERIFY_INTERVAL);
+                            if (e.row_h - cand).abs() / e.row_h.max(1.0) > 0.005 {
+                                e.row_h = cand;
+                            }
+                        }
+                    } else if e.row_h <= 0.0 {
+                        e.row_h = cand;
+                    }
+                } else if e.row_h <= 0.0 {
+                    // 兜底：会话中途首次测量（无标定带可用时）——可用但未确认。
+                    e.row_h = cand;
+                }
             }
+        }
+        if e.row_h > 0.0 {
+            let viewport_y = e.pane.map(|p| p.viewport_y).unwrap_or(0.0);
+            e.list_top = y - start as f64 * e.row_h - viewport_y;
         }
         e.measured_seq = MEASURE_SEQ.fetch_add(1, Ordering::Relaxed);
         true
     })
 }
 
+/// 兼容旧签名（测试）：用台账最近一次构建的区间反解。
+#[cfg(test)]
+pub fn note_band_legacy(key: &str, y: f64, h: f64) -> bool {
+    let range = read_scope(key, |e| e.band).flatten().map(|b| (b.start, b.end));
+    match range {
+        Some((start, end)) => note_band(key, start, end, y, h),
+        None => false,
+    }
+}
+
+
+
 /// 构建期记录本次窗口计划（同时登记 band 的 start/end 供 probe 反解）。
 pub fn note_plan(key: &str, plan: WindowPlan) {
     with_scope(key, |e| {
+        e.claimed = true;
+        e.total = plan.total;
+        // 标定构建（start=0 且行数 = n 或顶部标定段）——若行高已确认，
+        // 这是一次周期复核：立刻把下次复核时间推后，避免复核测量回执到达
+        // 前的连续帧重复做完整构建。
+        let rows = plan.rows();
+        let calibrating = plan.start == 0
+            && (rows == plan.total
+                || (plan.total > CALIBRATION_ROWS && rows == CALIBRATION_ROWS));
+        if calibrating && e.row_h_trusted {
+            e.next_verify_at = Some(std::time::Instant::now() + CALIB_VERIFY_INTERVAL);
+        }
         e.last_plan = Some(plan);
         e.band = Some(BandGeometry {
             y: e.band.map(|b| b.y).unwrap_or(0.0),
@@ -290,11 +461,20 @@ pub fn note_plan(key: &str, plan: WindowPlan) {
     });
 }
 
-/// 可见行 + 两端占位所需的构建决策。几何未测得时返回 `None`（完整构建）。
+/// 可见行 + 两端占位所需的构建决策。几何未测得（或行高尚未被两次间隔
+/// 采样一致的标定确认、或到了周期复核时刻）时返回 `None`（构建侧改做
+/// 标定构建）。
 pub fn plan(key: &str, total: usize) -> Option<WindowPlan> {
     let entry = read_scope(key, |e| e.clone())?;
     let pane = entry.pane?;
-    if entry.row_h <= 0.0 || pane.viewport_h <= 0.0 || total == 0 {
+    if entry.row_h <= 0.0
+        || !entry.row_h_trusted
+        || entry
+            .next_verify_at
+            .map_or(false, |t| std::time::Instant::now() >= t)
+        || pane.viewport_h <= 0.0
+        || total == 0
+    {
         return None;
     }
     let (start, end) = visible_range(
@@ -340,6 +520,23 @@ pub fn reset_for_test() {
     ROWS_BUILT.store(0, Ordering::Relaxed);
     WINDOWS_BUILT.store(0, Ordering::Relaxed);
     MEASURE_WANTED.store(false, Ordering::Relaxed);
+    ACTIVE.store(false, Ordering::Relaxed);
+}
+
+/// 测试面：把本 scope 的下一次标定采样置为「已到期」（跳过 500ms 节流）。
+#[cfg(test)]
+pub fn force_calib_sample_due_for_test(key: &str) {
+    with_scope(key, |e| {
+        e.last_calib_at = e
+            .last_calib_at
+            .and_then(|t| t.checked_sub(CALIB_SAMPLE_INTERVAL));
+    });
+}
+
+/// 测试面：把本 scope 的周期复核置为「已到期」。
+#[cfg(test)]
+pub fn force_verify_due_for_test(key: &str) {
+    with_scope(key, |e| e.next_verify_at = Some(std::time::Instant::now()));
 }
 
 /// 构建期计数 + 诊断行。
@@ -361,15 +558,35 @@ pub fn record_build(key: &str, plan: &WindowPlan) {
     }
 }
 
-/// 测试/诊断：直接注入几何（不依赖 iced 布局）。
+/// 测试/诊断：直接注入几何（不依赖 iced 布局）。视口原点/宽按 0 注入。
 pub fn seed_geometry_for_test(key: &str, offset_y: f64, viewport_h: f64, row_h: f64, list_top: f64) {
+    seed_geometry_full_for_test(key, offset_y, viewport_h, row_h, list_top, 0.0, 0.0);
+}
+
+/// 测试/诊断：含视口原点与宽度的完整几何注入。
+pub fn seed_geometry_full_for_test(
+    key: &str,
+    offset_y: f64,
+    viewport_h: f64,
+    row_h: f64,
+    list_top: f64,
+    viewport_y: f64,
+    viewport_w: f64,
+) {
     with_scope(key, |e| {
+        e.claimed = true;
         e.pane = Some(PaneGeometry {
             offset_y,
             viewport_h,
             content_h: 0.0,
+            viewport_y,
+            viewport_w,
         });
         e.row_h = row_h;
+        e.row_h_trusted = row_h > 0.0;
+        e.calib_candidate = (row_h > 0.0).then_some(row_h);
+        e.last_calib_at = None;
+        e.next_verify_at = None;
         e.list_top = list_top;
     });
 }
@@ -383,8 +600,17 @@ pub fn seed_geometry_for_test(key: &str, offset_y: f64, viewport_h: f64, row_h: 
 pub struct VListMeasure {
     /// scope key → pane 几何。
     pub panes: HashMap<String, PaneGeometryJson>,
-    /// scope key → 构建带 rect `[y, h]`。
-    pub bands: HashMap<String, [f64; 2]>,
+    /// scope key → 构建带 rect（含该 rect 对应的行区间）。
+    pub bands: HashMap<String, BandRectJson>,
+}
+
+/// 构建带测量回执：rect + 行区间（区间来自 mark id，测量与构建天然配对）。
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+pub struct BandRectJson {
+    pub y: f64,
+    pub h: f64,
+    pub start: usize,
+    pub end: usize,
 }
 
 /// 可序列化的 pane 几何。
@@ -393,6 +619,10 @@ pub struct PaneGeometryJson {
     pub offset_y: f64,
     pub viewport_h: f64,
     pub content_h: f64,
+    #[serde(default)]
+    pub viewport_y: f64,
+    #[serde(default)]
+    pub viewport_w: f64,
 }
 
 /// `Operation`：遍历 iced 树，按 id 前缀收 pane（scrollable）与 mark（container）。
@@ -419,6 +649,27 @@ impl VListProbe {
             Some(key.to_string())
         }
     }
+
+    /// `Id` 的原始字符串（Debug 形如 `Id("vnode_123")`）。
+    fn id_string(id: &Id) -> String {
+        let debug = format!("{id:?}");
+        let inner = debug
+            .find('"')
+            .map(|s| &debug[s + 1..])
+            .unwrap_or(debug.as_str());
+        let inner = inner.rsplit_once('"').map(|(head, _)| head).unwrap_or(inner);
+        inner.to_string()
+    }
+
+    /// 构建带 mark id → `(scope key, start, end)`。
+    fn parse_mark(id: &Id) -> Option<(String, usize, usize)> {
+        let rest = Self::key_of(id, MARK_ID_PREFIX)?;
+        let mut parts = rest.split(':');
+        let key = parts.next()?.to_string();
+        let start = parts.next()?.trim().parse::<usize>().ok()?;
+        let end = parts.next()?.trim().parse::<usize>().ok()?;
+        Some((key, start, end))
+    }
 }
 
 impl Default for VListProbe {
@@ -443,10 +694,16 @@ impl Operation<VListMeasure> for VListProbe {
                     );
                 }
             }
-            if let Some(key) = Self::key_of(id, MARK_ID_PREFIX) {
-                self.out
-                    .bands
-                    .insert(key, [bounds.y as f64, bounds.height as f64]);
+            if let Some((key, start, end)) = Self::parse_mark(id) {
+                self.out.bands.insert(
+                    key,
+                    BandRectJson {
+                        y: bounds.y as f64,
+                        h: bounds.height as f64,
+                        start,
+                        end,
+                    },
+                );
             }
         }
     }
@@ -460,13 +717,18 @@ impl Operation<VListMeasure> for VListProbe {
         _state: &mut dyn OpScrollable,
     ) {
         if let Some(id) = id {
-            if let Some(key) = Self::key_of(id, PANE_ID_PREFIX) {
+            // 生产路径：渲染器登记过该 scrollable 的 iced id（窗口化 pane）。
+            let by_widget = pane_key_for_widget_id(&Self::id_string(id));
+            let key = by_widget.or_else(|| Self::key_of(id, PANE_ID_PREFIX));
+            if let Some(key) = key {
                 self.out.panes.insert(
                     key,
                     PaneGeometryJson {
                         offset_y: (translation.y.max(0.0)) as f64,
                         viewport_h: bounds.height.max(0.0) as f64,
                         content_h: content_bounds.height.max(0.0) as f64,
+                        viewport_y: bounds.y as f64,
+                        viewport_w: bounds.width.max(0.0) as f64,
                     },
                 );
             }
@@ -476,6 +738,17 @@ impl Operation<VListMeasure> for VListProbe {
     fn finish(&self) -> Outcome<VListMeasure> {
         Outcome::Some(self.out.clone())
     }
+}
+
+/// 本帧 probe 是否观测到 pane 滚动偏移变化（用于把「滚动」变成一次视图
+/// 重建：窗口化后行集合随偏移变化，*不重建*就会沿用旧窗口的行集合，滚动
+/// 后屏内可能整段空白——实测定罪）。
+pub fn offset_moved(m: &VListMeasure) -> bool {
+    m.panes.iter().any(|(key, p)| {
+        read_scope(key, |e| e.pane)
+            .flatten()
+            .map_or(false, |prev| (prev.offset_y - p.offset_y).abs() > 0.5)
+    })
 }
 
 /// host 收到 probe 结果：落台账。返回是否有 scope 变化。
@@ -488,11 +761,13 @@ pub fn note_measure(m: &VListMeasure) -> bool {
                 offset_y: p.offset_y,
                 viewport_h: p.viewport_h,
                 content_h: p.content_h,
+                viewport_y: p.viewport_y,
+                viewport_w: p.viewport_w,
             },
         );
     }
     for (key, band) in &m.bands {
-        changed |= note_band(key, band[0], band[1]);
+        changed |= note_band(key, band.start, band.end, band.y, band.h);
     }
     changed
 }
@@ -577,7 +852,7 @@ mod tests {
             },
         );
         // 构建带 30 行、高 870、起点 y = list_top + 10*29 = 177 + 290 = 467
-        assert!(note_band("s2", 467.0, 870.0));
+        assert!(note_band_legacy("s2", 467.0, 870.0));
         let e = read_scope("s2", |e| (e.row_h, e.list_top)).unwrap();
         assert!((e.0 - 29.0).abs() < 1e-6, "row_h={}", e.0);
         assert!((e.1 - 177.0).abs() < 1e-6, "list_top={}", e.1);
@@ -599,7 +874,7 @@ mod tests {
             },
         );
         // 5 行却有 1000px → 单行 200px 属可疑但仍在 1..=400 内；改测 5000/5=1000
-        note_band("s3", 0.0, 5000.0);
+        note_band_legacy("s3", 0.0, 5000.0);
         assert!(!has_row_height("s3"));
     }
 
@@ -617,9 +892,19 @@ mod tests {
                 offset_y: 100.0,
                 viewport_h: 300.0,
                 content_h: 2000.0,
+                viewport_y: 60.0,
+                viewport_w: 1087.0,
             },
         );
-        m.bands.insert("p".into(), [0.0, 0.0]);
+        m.bands.insert(
+            "p".into(),
+            BandRectJson {
+                y: 0.0,
+                h: 0.0,
+                start: 0,
+                end: 1,
+            },
+        );
         let _ = note_measure(&m);
         assert!(read_scope("p", |e| e.pane.is_some()).unwrap());
     }
@@ -636,5 +921,124 @@ mod tests {
         assert_eq!(VListProbe::key_of(&id, PANE_ID_PREFIX).as_deref(), Some("abc"));
         let other = Id::from("vnode_1");
         assert_eq!(VListProbe::key_of(&other, PANE_ID_PREFIX), None);
+    }
+
+    fn pane(offset_y: f64, viewport_h: f64, viewport_w: f64) -> PaneGeometry {
+        PaneGeometry {
+            offset_y,
+            viewport_h,
+            content_h: 3669.0,
+            viewport_y: 60.0,
+            viewport_w,
+        }
+    }
+
+    fn calib_plan(total: usize, rows: usize) -> WindowPlan {
+        WindowPlan {
+            total,
+            start: 0,
+            end: rows,
+            row_h: 0.0,
+            list_top: 0.0,
+            offset_y: 0.0,
+            viewport_h: 739.6,
+        }
+    }
+
+    #[test]
+    fn calibration_requires_two_consistent_measurements() {
+        reset_for_test();
+        note_pane("c1", pane(0.0, 739.6, 1087.0));
+        note_plan("c1", calib_plan(120, 120));
+        // 首测（世界/字型稳定前实测偏高）→ 候选但不采信。
+        note_band("c1", 0, 120, 237.0, 3456.0);
+        assert!(plan("c1", 120).is_none(), "unconfirmed height must keep calibrating");
+        // 第二次与首次不一致 → 仍不采信，但候选更新到新值。
+        force_calib_sample_due_for_test("c1");
+        note_band("c1", 0, 120, 237.0, 3477.0);
+        assert!(plan("c1", 120).is_none());
+        // 第三次与候选一致 → 采信。
+        force_calib_sample_due_for_test("c1");
+        note_band("c1", 0, 120, 237.0, 3477.0);
+        let p = plan("c1", 120).expect("trusted row height");
+        assert!((p.row_h - 28.975).abs() < 1e-3, "row_h={}", p.row_h);
+        assert!((p.list_top - 177.0).abs() < 1e-3, "list_top={}", p.list_top);
+        assert_eq!((p.start, p.end), (0, 22));
+    }
+
+    #[test]
+    fn windowed_band_does_not_override_calibrated_row_height() {
+        reset_for_test();
+        note_pane("w1", pane(2909.0, 739.6, 1087.0));
+        note_plan("w1", calib_plan(120, 120));
+        note_band("w1", 0, 120, 237.0, 3477.0);
+        force_calib_sample_due_for_test("w1");
+        note_band("w1", 0, 120, 237.0, 3477.0);
+        let before = plan("w1", 120).expect("trusted").row_h;
+        assert!((before - 28.975).abs() < 1e-3);
+        // 尾部窗口带平均行高略低（28.79）——不得覆盖标定行高，只重算 list_top。
+        note_plan(
+            "w1",
+            WindowPlan {
+                total: 120,
+                start: 92,
+                end: 120,
+                row_h: before,
+                list_top: 177.0,
+                offset_y: 2909.0,
+                viewport_h: 739.6,
+            },
+        );
+        note_band("w1", 92, 120, 2886.0, 806.0);
+        let e = read_scope("w1", |e| (e.row_h, e.list_top)).unwrap();
+        assert!((e.0 - 28.975).abs() < 1e-6, "row_h={}", e.0);
+        // list_top = 带顶 - start*row_h - 视口顶
+        let expect = 2886.0 - 92.0 * 28.975 - 60.0;
+        assert!((e.1 - expect).abs() < 1e-3, "list_top={}", e.1);
+    }
+
+    #[test]
+    fn viewport_width_change_invalidates_row_height() {
+        reset_for_test();
+        seed_geometry_full_for_test("r1", 0.0, 739.6, 29.0, 177.0, 60.0, 1087.0);
+        assert!(plan("r1", 120).is_some());
+        // 同宽重测 → 保留。
+        note_pane("r1", pane(0.0, 739.6, 1087.0));
+        assert!(has_row_height("r1"));
+        // 窗口缩放（视口宽变） → 行高作废，下一帧重新标定。
+        note_pane("r1", pane(0.0, 739.6, 900.0));
+        assert!(!has_row_height("r1"), "width change must invalidate row height");
+        assert!(plan("r1", 120).is_none());
+    }
+
+    #[test]
+    fn periodic_verification_adopts_settled_row_height() {
+        reset_for_test();
+        note_pane("v2", pane(0.0, 739.6, 1087.0));
+        note_plan("v2", calib_plan(120, 120));
+        note_band("v2", 0, 120, 237.0, 3456.0);
+        force_calib_sample_due_for_test("v2");
+        note_band("v2", 0, 120, 237.0, 3456.0);
+        assert!((plan("v2", 120).expect("trusted").row_h - 28.8).abs() < 1e-3);
+        // 复核到期 → 下一次构建改做标定；稳定后的全表测量纠偏行高。
+        force_verify_due_for_test("v2");
+        assert!(plan("v2", 120).is_none(), "verification build must be a calibration");
+        note_plan("v2", calib_plan(120, 120));
+        force_calib_sample_due_for_test("v2");
+        note_band("v2", 0, 120, 237.0, 3477.0);
+        let p = plan("v2", 120).expect("trusted after verification");
+        assert!((p.row_h - 28.975).abs() < 1e-3, "row_h={}", p.row_h);
+    }
+
+    #[test]
+    fn mark_id_carries_band_range() {
+        let id = Id::from(format!("{MARK_ID_PREFIX}vlist_3:10:40"));
+        assert_eq!(
+            VListProbe::parse_mark(&id),
+            Some(("vlist_3".to_string(), 10, 40))
+        );
+        let legacy = Id::from(format!("{MARK_ID_PREFIX}vlist_3"));
+        assert_eq!(VListProbe::parse_mark(&legacy), None);
+        assert_eq!(VListProbe::id_string(&id), format!("{MARK_ID_PREFIX}vlist_3:10:40"));
     }
 }

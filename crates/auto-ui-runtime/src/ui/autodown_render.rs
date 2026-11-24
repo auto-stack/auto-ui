@@ -187,6 +187,7 @@ pub(crate) fn render_book_document<M: Clone + std::fmt::Debug + 'static>(
         axes: crate::ui::scroll::ScrollAxes::Y,
         scrollbar_policy: crate::ui::scroll::ScrollbarPolicy::Auto,
         controller: Some(controller),
+        measure_key: None,
     }
 }
 
