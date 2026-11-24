@@ -387,6 +387,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 复跑：parse 通过；**回到 handler 缺席墙**（`App[.Flag/.Reset/.Reveal/.SetDifficulty/.Tick]`）⇒ lane 自身的投影仍不展开 store 调用。新增 `P119_VUE_DUMP` 落盘 lane 输入（临时件，落主前移除）。
 - 下一步：读 `ace_vue_script` 的 absent 收集（`generate_sfcs_with_lane_product`），打印每 msg 的判据（是否 `handler_body_foreign`、`compile_at` 报错），据此决定是复用组件面展开还是 lane 侧补展开。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 缺席判据 = `lane.handler_body_foreign(msg)` | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 查 `ComponentFragmentLane::compile_at` 是否走 store 内联
+
+- 读码：`ace_vue_script.rs:420-427` 的缺席只由一个判据产生——`lane.handler_body_foreign(msg)`（`ComponentFragmentLane::compile_at(src, path, &msgs, node_index)` 的产物）。
+- 由于 lane 输入已是 prep 后（含 `store MinesweeperStore { … }` 与各 handler 的 store 体），缺席说明 `compile_at` 这条投影**没有执行 `inline_store_decl` 的 store 调用展开**（包面/组件面 `project_component_candidates` 会做，lane 未必走同一入口）。
+- 下一步单点：在 `ComponentFragmentLane::compile_at` 内确认投影片段用的 profile 与是否调用 `inline_store_decl`/`expand_store_calls`；若是另一条投影，就在该入口复用同一变换（与包面 `Effect` 修复同源）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
