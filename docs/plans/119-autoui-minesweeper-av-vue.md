@@ -201,6 +201,17 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 下一步：grep 投影器里 `body_foreign = true` 的置位点（project.rs），逐类比对 038 的 `.Reveal` 与已通过探针的差异（候选：`var` 局部列表 `stack`、`.remove(...)`、`.board[idx].mine` 下标读、`.to(Str)`）；定位后在 prep 侧归一（用户既有授权：prep 兼容改写）或按需再报裁定。
 - 遗留：auto-lang 的 `P119DBG` 诊断属**临时件**，落主前必须移除（review 面须核对）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: G5 根因落定——`remove` 不在分支/循环体的列表方法白名单 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （无新增代码） | next: prep 等价形改写（`.remove` 不进分支/循环体）
+
+**根因（auto-lang `cst/project.rs:7903-7914` 实证）**：`stmts_have_foreign_call` 在**分支/循环体**内只认列表方法 `push|get|len|pop|clear|set`；`remove`/`insert` 不在白名单 → 体内一旦出现 `.remove(...)` 即 `body_foreign = true` → `handler_check_fn` 短路（age_component.rs:3603）→ 无 transition。
+
+- 与全部观测吻合：038 的 `.Reveal` 在洪水填充循环里用 `.remove(...)`（由 prep 把 `.pop()` 改写成 `.remove(len-1)` 引入）；对照探针的 `.set`/`.push` 在白名单内故可发射；单条摘除无法改变判定（任一条仍在 → foreign）。
+- 修法（下一轮，prep 内即可）：把“栈弹出”改写为**不下沉到循环体内的 `remove`**：
+  ① 用 `head` 下标队列形（`stack.get(head)` + `head = head + 1`，不再缩短列表）——洪水填充的**结果集合**与弹出顺序无关，语义等价；或
+  ② 把 `.remove(...)` 提到循环体外的单条语句（若结构允许）。
+  另需保持 `.set`/`.push` 用法不变（白名单内）。
+- 注：auto-lang 的 `P119DBG` 诊断仍为临时件，落主前移除（§9 已记）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
