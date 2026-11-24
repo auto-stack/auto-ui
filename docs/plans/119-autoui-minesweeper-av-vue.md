@@ -160,6 +160,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 块内逐层下降：`if __p119_ret == false {` → `if .game_state == "ready" {`（布雷/邻接计数块）；该块内首条 `var placed int = 0` 的前缀扫描失败属**探针工件**（前缀截断丢掉后续必需上下文，非构造证据）。
 - 下一轮：对 `if .game_state == "ready" { … }` 块内 9 条语句做 **leave-one-out**（保留上下文，逐条摘除），定位最小不可发射构造；若是单条构造，再判断 prep 是否有等价形（如把 `.mine_count` 循环改写成 while + 标志）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-02 ready 块 leave-one-out | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@fe2f6208） | commit: （探针扩充，随本轮提交） | next: T-02 续（ready 块两条循环组分别单独编译）
+
+- `if .game_state == "ready" { … }` 块内 9 条顶层语句（#0–#2 局部量、#3 中断标志、#4 布雷循环、#5 注释、#6 局部量、#7 邻接计数循环、#8 `.game_state = "playing"`）。
+- **leave-one-out 全部仍拒**（9/9 均 `ok=false`）→ 触发不是单条语句，而是**组合**：最可疑 = #4 与 #7 两条各自带 `.board.set(...)` 的嵌套循环同处一个 handler transition。
+- 下一轮判据：分别只留 #0–#4（布雷组）与 #0/#1/#2/#6–#8（邻接组）单独编译；若两者各自 OK、同存即拒，则属发射面「同一 transition 内多次列表元素写入」的能力面（语言侧），需向用户报 G5 裁定。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
