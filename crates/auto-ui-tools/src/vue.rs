@@ -8402,6 +8402,30 @@ fn ace_vue_component_sfcs(at_path: &Path, content: &str) -> AutoResult<Option<Ac
     ace_vue_sfcs(at_path, content, "../a2x_rt.mjs", "../a2x_rt.mjs")
 }
 
+/// PLAN-119：A2Vue 严格 lane 的解析器不接受 `List<T>.new()`（prep 的
+/// `rewrite_empty_list_inits` 产出）；该 lane 吃方括号拼写，这里就地还原为
+/// `[]T = []`（仅用于 lane 输入，不改 prep 的 AV 产出）。
+fn lane_list_spelling(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    let mut rest = src;
+    while let Some(at) = rest.find("List<") {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + 5..];
+        if let Some(gt) = after.find('>') {
+            let elem = &after[..gt];
+            let tail = &after[gt + 1..];
+            if let Some(rest2) = tail.strip_prefix(".new()") {
+                out.push_str(&format!("[]{elem} = []"));
+                rest = rest2;
+                continue;
+            }
+        }
+        out.push_str("List<");
+        rest = after;
+    }
+    out.push_str(rest);
+    out
+}
 fn ace_vue_sfcs(
     at_path: &Path,
     content: &str,
@@ -8464,7 +8488,7 @@ fn ace_vue_sfcs(
             }
         };
         let multi = auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product(
-            &lane_source,
+            &lane_list_spelling(&lane_source),
             &at_path.to_string_lossy(),
             rt_href_first,
             rt_href_rest,
