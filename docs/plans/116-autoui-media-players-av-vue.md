@@ -322,6 +322,13 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 17 | from: work | t
 
 stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 18 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: 2c3365fc1 | next: work/T-02（R-16）
 
+2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-16 闭合（文本叶标签的 ctor 误解析还原）+ R-17 新开 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-116/auto-lang`（`plan-116-dev`） | base_commit: `auto-lang 2c3365fc1` | code_commit: `auto-lang 11135f79c`（`auto-ui` 未改） | task_ids: T-02 | evidence: `plan116_t01_probe` 5/5、`ace-core` conformance 942/5
+
+- **定位**：临时在 `Binding::type_name` 插桩 + backtrace 拿到调用链，落点是 `ExprKind::CtorNamed`——即 `text g { … }` 里的 `g {` 被解析成记录构造，`g` 于是以**类型名**进绑定。与 R-10 同族的问题（跟 `{` 相邻的表达式位），但这次在文本叶标签位。
+- **为何不改文法**：age-component 面本就用"仅具名字段的构造"回避该竞争（`condition-ctor`），但把它套到 age-package 会把 `text g { style: … }` 继续吞（属性体本身就是具名字段），而改共享 pratt 表波及所有 AGE 单元。改在**投影**还原作者形状（标签 = 构造名，字段 = 元素属性项）——影响面仅限"此前只会报错"的情形。
+- **验证**：`ace-core` conformance **942/5**（无新增红）；`plan116_t01_probe` 5/5；030 越过 `unknown type g`，新阻是 `app::app` 的 `Str` 字段访问 + i32 `clone`（同一合成 span `13:1`），记 **R-17**。
+- **纪律**：本轮中途的插桩（`binding.rs`）与两处文法试探（`age-text-item`/`age-text-props` 改 `condition-expr`）**全部回退**，最终只保留 `cst/project.rs` 的投影还原。
+
 ## 10. 待澄清事项
 
 **B-03 已裁定（2026-11-24，本计划自有工作树内闭合）。** 原 A/B 选择的前提是"`PLAN-117` 正在 `auto-lang` 同一写面上持续改动"，该前提已随 117/118 双仓落主归档而消失；`README.md` 交付表现指示"在 117 后的基线复测，再按残余缺口处理 B-03"。`/goal` 授权的实施树本就含 `auto-lang`（见 §4），故无需再次拍板：**按残余缺口逐项闭合，目标/验收/范围/仓集不变**。若任一缺口经定位后需要改动已冻结的共享语义或超出本计划仓集，再按 §5 停下请示。
@@ -341,7 +348,8 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 18 | from: work | t
 | R-13 | 包面 `use stylekit.styles: <name>`（030 `playlist.at` → `unknown module stylekit.styles`） | 包闭包的依赖包消费路径（auto-ui 侧） | **已闭合**（2026-11-24，`auto-ui 85811b6b`）：新增**包面 prep** `ace_source_prep::prepare_package_source`——pac `dep` 的样式导入落成本地 `style NAME = "…"` 项并等长空白化导入行；**不**内联 store/helper/record（lane prep 会内联 store，用于包编译即重复 store）。配套 `project_root_of`（向上找 `pac.at`）与产品侧接线（`front_package_units`）。诊断探针 `plan116_t01_package_closure_prepped` 证明 030 越过该阻。 |
 | R-14 | 跨单元 store 内联后其**顶层 helper** 不可见（030 `unknown function fmt_clock`） | 包面 prep（`prepare_package_source`） | **已闭合**（2026-11-24，`auto-ui f4866903`）：`use <unit>: <Store>` 且该单元确声明此 store 时，把它顶层的 `fn` 一并带到消费单元（本单元已定义同名则跳过）。包面按模块编译、各持一份合法；helper 是模块级纯函数、不引用 model。 |
 | R-15 | checked AGE 面缺 `math.floor`（030 `unknown function std::age_math.floor`） | `stdlib/ace/age/math.at` | **已闭合**（2026-11-24，`auto-lang 2c3365fc1`）：在 AGE math 模块用**纯 float 运算**实现 `floor`——按二进制位累加出 ≤ x 的最大整数（float32 尾数界定循环），负数按 `-floor(-x)` 并对非整数退一（floor 向负无穷，与内建同语义）。**不需要 int→float 转换**（该面`.to(float)` 不受理），也不动文法。030 由 `unknown function std::age_math.floor` 前进到 R-16。 |
-| R-16 | 视图循环变量被当**类型**（030 `unknown type 'g'` @`text g`） | 视图循环/文本叶的绑定面 | **新开**（R-15 闭合后 030 闭包首阻）：`for g in .store.groups`（`groups` 现为 `List(Dyn)`）的循环变量 `g` 在 `text g { … }` 处被按**类型名**解析。注：round-16 曾把它误判为"文法扩面与 stdlib 的串扰"——实际只是 floor 之后的下一处错误，之前的隔离实验因 floor 未就绪而没走到这里。 |
+| R-16 | `text g { … }` 的标签被当构造字面量（030 `unknown type 'g'`） | `cst/project` 文本叶投影 | **已闭合**（2026-11-24，`auto-lang 11135f79c`）：age-package 面把"裸 ident + `{`"解析成记录构造，`text g { style: … }` 于是成为标签 `g { … }`、`g` 进绑定期被当类型名。文法层属该面的形状竞争（age-component 只用"字段具名"的构造回避），改共享 pratt 表波及面太大；改在**投影**还原作者形状：标签投影成"仅具名字段"的 `CtorNamed` 时，取构造名作标签、字段回填为元素属性项。这些情形此前只会报错，故不影响既有通路。 |
+| R-17 | 030 `app::app` 的合成表达式报 `field access requires a record-typed value, found Str` + i32 上的 `clone` | 待定位 | **新开**（R-16 闭合后 030 闭包首阻）：三条诊断同一合成 span（`13:1`）。R-16 的修复只影响"标签曾是 ctor"的文本叶，030/app 的文本标签是 `.store.*`，故推测这三条是**此前被 `unknown type g` 挡住**的既有问题，需下一轮定位。 |
 | R-06 | 视图**空参回调**（`020/controls.at` `expected expression, found ')'` @148） | `ace-core` cst/grammar（view 属性位） | **已闭合**（2026-11-24，`auto-lang 563ee47de`）：`age-event-binding` 增显式空参数表臂（`age-event-binding-args-empty`，两面同开，镜像 118 的 handler 空参数）；**零作者实参**投影为裸消息引用（宿主供载荷），不是零实参方法调用——否则与消息载荷 arity 相撞。020/controls 越过该行。 |
 | R-10 | 视图 `if` 条件取**裸标识符**操作数（`if item.rel_dir == g {`） | `age-view-if` 条件面 | **已闭合**（2026-11-24，`auto-lang f59821dec`）：条件从裸 `pratt` 改走 `if-cond`（与 `age-on-if` 同一条件面）——此前 ident 后的 `{` 被当结构字面量吞掉整个分支体，整项回退。030/playlist 的分组过滤形。 |
 | R-11 | 包面视图回调的**作者实参**（`onclick: .SelectIndex(i)`） | `age-entry-value`/`age-event-binding` | **已闭合**（`f59821dec`）：包面 `age-entry-value` 在占位臂之后增通用 `age-event-binding` 臂（`$event`/`$0` 仍先匹配），作者实参投影为 self 方法调用、实参保留（与组件面同语义）。 |
@@ -351,4 +359,4 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 18 | from: work | t
 
 **基线观察（非本计划引入，未修）**：`experimental/ace/aac/syntax/syntax_grammar_data.at` 在计划基线上**已与 `grammars/auto-source.at` 不一致**——`aac1046_grammar_data_identity_binding` 在未改动的 `auto-lang bced4dd79` 上即红（committed 344,941B vs 原始语法重生成 356,995B，约 12KB 漂移）。因 `ace-core` 由语法**源**编译（`cst/frontdoor.rs` `AUTO_SOURCE_GRAMMAR = include_str!(…)`），`auto-ui`/AV 面不依赖该数据文件，故本轮只改语法源与 Rust 侧，**不采纳**整份重生成（否则会静默重冻结全部 13 个 profile id 并引入未复核的上游漂移）。该漂移属 Auto 侧孪生（aac）的数据归属，需其 owner 重生成时一并纳入 `age-on-return`；证据 `plan-artifacts/plan-116/probes/r01-return-20261124/{control-data.posix.log,data-with-return.at}`。
 
-**下一步**：R-16（视图循环变量在文本叶处被当类型——`unknown type 'g'`）与 R-05（020 裸名赋值的行敏感面）。两者闭合后重跑 `plan116_t01_package_closure_prepped`，再进 T-03 真窗实跑原样 020/030。
+**下一步**：R-17（030 `app::app` 的 `Str` 字段访问 + i32 `clone`，同一合成 span）与 R-05（020 裸名赋值的行敏感面）。两者闭合后重跑 `plan116_t01_package_closure_prepped`，再进 T-03 真窗实跑原样 020/030。
