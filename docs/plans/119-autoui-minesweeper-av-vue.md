@@ -304,6 +304,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 下一步单点：在 `queue_package_message` 的 `PackageClick` 臂（arce_node_desktop.rs:574）与 bridge 的 `click(...)` 里各加一条打印，确认消息是否到达、返回 Ok/Err；若 Err 则错误在某处被吞（errors 未记录）。
 - 临时件清单（落主前必须清理）：`P119DBG` 现共 8 处（widget_runtime 2、project 2、age_component 3、frame 1、ace_node_desktop 1）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 派发**已生效**（rev 1→2、accepted），但 Reveal 未改盘面 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 查 Reveal 体内首击分支（`if .game_state == "ready"`）为何不落盘
+
+- 实证：`P119DBG script_click ... frame_rev=Some(2)` → `P119DBG pkg_event_accepted target=4 rev=2` → 终帧 `rev=2`（此前多为 rev 不动，属**时序**问题：脚本 tick 早于首帧发布）。
+- 但盘面未变：81 个格子的 label 仍全为覆盖态（`　`），`st_game_state` 未见 playing ⇒ Reveal 的体执行了但没产生状态变更（或变更未进观察面）。
+- 下一步（单点）：在 live 会话里对 `Reveal` 派发后直接读 `st_game_state`；若仍 ready，则在 prep 侧检查改写后的 `if .game_state == "ready"` 分支（含布雷循环的 `for (placed < .mine_count) && __p119_brk1 == false` 与 `.board.set(...)`）是否被 `__p119_ret` 守卫误吞。
+- 临时诊断新增 2 处（`pkg_event_accepted/rejected`），累计 10 处，落主前清理。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
