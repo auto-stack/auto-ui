@@ -227,6 +227,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 下一步：读 `store_call_parts`/`expand_store_calls`（age_component.rs:1490-1630）确认未命中条件，并在 prep 侧把 widget handler 的 `store.X(…)` 直接改写成 `St_X(…)`（前缀消息名，等价于展开后的调用）或修正展开条件。
 - 遗留：auto-lang 诊断现有三处 eprintln 均为临时件，落主前移除。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 自调用内联落地；widget 侧 `store.X(args)` 仍未展开 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 打印 `store_call_parts` 的 recv 形（为何 is_store_base 不命中）
+
+- 新增 prep pass `inline_store_self_calls`（store 单元内 `store.X(args)` → X 的 handler 体，形参按名替换，≤4 层）+ 按循环作用域锚定的栈→队列改写，均已接线；包面 **PACKAGE COMPILE OK**（`prepped5`）。
+- live 复跑仍见 `foreign_callee=Reveal` ⇒ **widget 侧**（app 单元的 `.Reveal(x, y) -> { store.Reveal(x, y) }`）调用未被 `expand_store_calls` 展开：`store_call_parts` 需要 `MethodCall{recv}` 且 `is_store_base(recv)`；诊断已证明它是 MethodCall 且名字为 `Reveal`，故 `is_store_base` 未命中——下一轮直接在 `store_call_parts` 打印 `recv.kind`（`Var("store")` vs `Field{store, self}` vs 其它）定位。
+- 遗留：auto-lang 三处 `P119DBG` 均为临时件。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
