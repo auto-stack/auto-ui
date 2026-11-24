@@ -438,6 +438,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   建议 ②（跨单元路径与 AV `--package` 完全同形，已证 AV 可跑）。
 - 判据：改动后 `auto build --render vue --gen-only` 应落到 `gen/front/vue` 产物（含 App.vue 与 runtime）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: prep 幂等已加；重复 store 产生在 SFC 生成器内部 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 逐段打印 store 声明数定位二次内联点
+
+- 已加：`generate_package_sfc_with_root` 在 entry 源**已含 `store ` 声明**时跳过 prep（幂等）。
+- 实测：prep 产物中 `store MinesweeperStore` **恰 1 条**、`type BoardRow` 恰 1 条 ⇒ 重复不是 prep 造成的，而在 `generate_linked_front_sfc` 内部（`checked_widgets::generate` 或 `generate_package_sfc_leaf` 路径中的某处再走了一次 prep/内联）。
+- 下一步单点：在 `generate_linked_front_sfc` 的每个阶段后打印 `store MinesweeperStore` 出现次数（units 装配后 / append_widget_packages 后 / leaf 前），一次运行即可定位。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
