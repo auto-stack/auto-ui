@@ -62,6 +62,7 @@ pub fn generate_package_front_sfc(
     // （model 形态 / 控制转移 / 元素所有权 / 自调用内联），否则包面看不到该
     // store 声明（"model has no field `store`" 实证）。
     let mut units = super::ace_source_prep::prepare_store_units(units);
+    p119_dump_units("after_prepare", &units);
         back_api::append_contract(app_at, &mut units)?;
         // PLAN-119：单单元 inspection 看不见**跨单元 store 导入**（`.store.*` 会报
     // `model has no field store`）。该类源改用组件面 prep 后的同源形做
@@ -130,6 +131,19 @@ fn p119_store_count(label: &str, units: &[ace_core::source::packages::PackageMod
         let _ = writeln!(f, "stage={label} store_decls={n} units={}", units.len());
     }
 }
+fn p119_dump_units(label: &str, units: &[ace_core::source::packages::PackageModuleInput]) {
+    use std::io::Write as _;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("D:/autostack/plan-artifacts/plan-119/units.log")
+    {
+        for u in units {
+            let stores = u.source.lines().filter(|l| l.trim_start().starts_with("store ")).count();
+            let _ = writeln!(f, "{label} unit={} store_lines={stores} len={}", u.id, u.source.len());
+        }
+    }
+}
 pub fn generate_linked_front_sfc(
     app_at: &Path,
     source: &str,
@@ -156,6 +170,7 @@ pub fn generate_linked_front_sfc(
     // （model 形态 / 控制转移 / 元素所有权 / 自调用内联），否则包面看不到该
     // store 声明（"model has no field `store`" 实证）。
     let mut units = super::ace_source_prep::prepare_store_units(units);
+    p119_dump_units("after_prepare", &units);
     back_api::append_contract(app_at, &mut units)?;
     p119_store_count("after_units", &units);
     let widget_paths = append_widget_packages(app_at, source, &candidates, &mut units)?;
