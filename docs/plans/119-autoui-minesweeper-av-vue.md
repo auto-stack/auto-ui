@@ -417,6 +417,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 所以 lane 的“缺席”并非展开问题，而是**组件面根本装不下这个应用**；AV 腿之所以能跑，是因为走的是**包面**（`load_package` + live widget-runtime）。
 - 结论/下一步：严格 lane 的 `linked_front_imports_packages` 分支只认 widget 级 `use { package: }`；应把**单元级 `use <unit>: <Store>`** 也路由到包面 SFC 生成器（`generate_linked_front_sfc`，units = app + store），与 AV 腿同一条 AGE 包编译，A2Vue 才不会重演组件面边界。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: A2Vue lane 已改走包面 SFC；剩 units 装配 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 让 `front_package_units` 的 store 单元被包编译看见
+
+- 改动（`vue.rs`）：`has_store_decl` 时把 app 路由到 `generate_linked_front_sfc`——交**原始源**（生成器自带 entry prep，避免二次 prep 产生两条 store 声明），并把 `src/front/<store_module>.at` 作为包模块一并传入。
+- 逐步实证：①二次 prep → `multiple store declarations per node`（已消除）；②当前 → `model has no field store. Declare the store in the same package unit`，即 `front_package_units(app_at, source, modules)` 产出的 units 里 store 单元**未被包编译绑定**（id/包名或 prep 缺失）。
+- 下一步单点：在 `front_package_units` 里对 store 模块套用 `prepare_store_units` 并按 `<package>::<file_stem>` 定 id（与 AV `--package` 同形：`app::app` + `app::minesweeper_store`），再复跑生成。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
