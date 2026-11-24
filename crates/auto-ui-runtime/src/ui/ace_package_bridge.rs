@@ -27,6 +27,7 @@ use std::time::{Duration, Instant};
 
 mod frame;
 mod live;
+mod scene;
 pub(crate) mod file_directory;
 pub(crate) mod file_mutation;
 pub(crate) mod file_open;
@@ -50,6 +51,8 @@ pub(crate) enum PackageEventInput {
     Pointer { x: f32, y: f32 },
     /// PLAN-118：canvas 笔事件（onpenstart/move/end，携带逻辑坐标）。
     Pen { x: f32, y: f32, phase: PenPhase },
+    /// PLAN-118：canvas tap 命中（onhit；载荷 = 命中元素 id）。
+    Hit(String),
     ImageSurface(ImageSurfaceCarry),
 }
 
@@ -101,6 +104,9 @@ impl PackageEventInput {
             }
             Self::Pen { x, y, .. } if pen_key.starts_with("onpen") && x.is_finite() && y.is_finite() => {
                 vec![AceStateValue::F32(x), AceStateValue::F32(y)]
+            }
+            Self::Hit(id) if action.source.key.eq_ignore_ascii_case("onhit") => {
+                vec![AceStateValue::Str(id)]
             }
             Self::Text(text) if action.input_value => vec![AceStateValue::Str(text)],
             Self::Activation if !motion && !action.input_value => {

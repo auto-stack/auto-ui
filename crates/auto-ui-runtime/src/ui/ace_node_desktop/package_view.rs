@@ -264,12 +264,13 @@ impl FrameView<'_> {
                     })
                 };
                 return View::Canvas {
-                    scene: crate::ui::view::CanvasScene {
-                        strokes: Vec::new(),
-                        nodes: Vec::new(),
-                        edges: Vec::new(),
-                        labels: Vec::new(),
-                    },
+                    // PLAN-118（T-03）：场景数据来自 live 会话读回的五平行列表；
+                    // 无场景（或非 live 道）时为空画布。
+                    scene: self
+                        .frame
+                        .scene(path)
+                        .cloned()
+                        .unwrap_or_default(),
                     logical_extent,
                     clear,
                     on_pen_start: pen_handler(pen.0, PenPhase::Start),

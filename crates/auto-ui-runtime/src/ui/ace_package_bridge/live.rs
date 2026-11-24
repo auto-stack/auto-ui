@@ -161,6 +161,18 @@ impl LivePackage {
             timers,
             self.live_children,
         )?;
+        // PLAN-118（T-03）：画布场景数据道——按 canvas 元素的 `scene` 名从
+        // live 会话读回五平行列表并解析成 CanvasScene（渲染与 onhit 命中
+        // 共用的数据面）。
+        {
+            let view = frame.view().to_vec();
+            let mut path = Vec::new();
+            let mut found = Vec::new();
+            collect_canvas_scenes(session, &view, &mut path, &mut found)?;
+            for (path, scene) in found {
+                frame.set_scene(path, scene);
+            }
+        }
         frame.focus_requests = session.take_focus_requests();
         if self.live_children {
             frame.child_timers = session.child_timers().into_iter().map(|timer| frame::ChildTimer {
@@ -327,4 +339,43 @@ fn states(session: &WidgetSession) -> Result<Vec<(String, AceStateValue)>, Strin
         .into_iter()
         .map(|(name, value)| (name, AceStateValue::from(&value)))
         .collect())
+}
+/// PLAN-118（T-03）：收集 live 视图里的 canvas 场景（路径按 `frame::assemble`
+/// 的元素路径约定：同一层 children 的下标）。
+fn collect_canvas_scenes(
+    session: &ace_av::age_package::live_session::WidgetSession,
+    items: &[ace_av::age_package::WidgetViewItem],
+    path: &mut Vec<usize>,
+    out: &mut Vec<(Vec<usize>, crate::ui::view::CanvasScene)>,
+) -> Result<(), String> {
+    for (index, item) in items.iter().enumerate() {
+        let ace_av::age_package::WidgetViewItem::Element(element) = item else { continue };
+        path.push(index);
+        if element.tag == "canvas" {
+            if let Some((_, name)) = element
+                .properties
+                .iter()
+                .find(|(key, _)| key == "scene")
+            {
+                let read = |suffix: &str| -> Vec<String> {
+                    session
+                        .list_field(&format!("{name}_{suffix}"))
+                        .ok()
+                        .flatten()
+                        .unwrap_or_default()
+                };
+                let scene = super::scene::parse_scene(
+                    &read("pts"),
+                    &read("meta"),
+                    &read("nodes"),
+                    &read("edges"),
+                    &read("labels"),
+                );
+                out.push((path.clone(), scene));
+            }
+        }
+        collect_canvas_scenes(session, &element.children, path, out)?;
+        path.pop();
+    }
+    Ok(())
 }

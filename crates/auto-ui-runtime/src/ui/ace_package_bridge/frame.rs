@@ -28,6 +28,8 @@ pub struct PackageFrame {
     hits: BTreeMap<Vec<usize>, usize>,
     /// PLAN-118：canvas 笔事件目标（onpenstart/onpenmove/onpenend）。
     pens: BTreeMap<Vec<usize>, (Option<usize>, Option<usize>, Option<usize>)>,
+    /// PLAN-118：canvas 场景数据（五平行列表解析后的画布内容，按元素路径）。
+    scenes: BTreeMap<Vec<usize>, crate::ui::view::CanvasScene>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
     widgets: BTreeSet<Vec<usize>>,
@@ -151,6 +153,30 @@ impl PackageFrame {
         self.hits.get(path).copied()
     }
 
+    /// PLAN-118：脚本 tap 的场景命中——与渲染层同一条 `canvas_hit_test`。
+    pub(crate) fn hit_id_at(&self, target: usize, x: f32, y: f32) -> Option<String> {
+        for (path, t) in &self.hits {
+            if *t != target {
+                continue;
+            }
+            let scene = self.scenes.get(path)?;
+            if let Some(id) = crate::ui::view::canvas_hit_test(&scene.nodes, x, y) {
+                return Some(id);
+            }
+        }
+        None
+    }
+
+    /// PLAN-118：canvas 场景数据读回（五平行列表解析结果）。
+    pub fn scene(&self, path: &[usize]) -> Option<&crate::ui::view::CanvasScene> {
+        self.scenes.get(path)
+    }
+
+    /// PLAN-118：由 live 会话读回的场景数据回填（按元素路径）。
+    pub(super) fn set_scene(&mut self, path: Vec<usize>, scene: crate::ui::view::CanvasScene) {
+        self.scenes.insert(path, scene);
+    }
+
     /// PLAN-118：canvas 笔事件目标（start/move/end）。
     pub(crate) fn pen(
         &self,
@@ -190,8 +216,12 @@ impl PackageFrame {
                     PackageEventInput::Pen { .. } => {
                         action.source.key.to_ascii_lowercase().starts_with("onpen")
                     }
+                    PackageEventInput::Hit(_) => {
+                        action.source.key.eq_ignore_ascii_case("onhit")
+                    }
                     PackageEventInput::Activation => {
-                        !action.source.key.to_ascii_lowercase().starts_with("onpen")
+                        let key = action.source.key.to_ascii_lowercase();
+                        !key.starts_with("onpen") && key != "onhit"
                     }
                     _ => true,
                 }
@@ -330,6 +360,7 @@ pub(super) fn assemble(
         clicks: BTreeMap::new(),
         hits: BTreeMap::new(),
         pens: BTreeMap::new(),
+        scenes: BTreeMap::new(),
         links: BTreeMap::new(),
         destinations: Vec::new(),
         widgets: BTreeSet::new(),
@@ -354,6 +385,7 @@ pub(super) fn assemble(
         clicks: frame.clicks,
         hits: frame.hits,
         pens: frame.pens,
+        scenes: frame.scenes,
         links: frame.links,
         destinations: frame.destinations,
         widgets: frame.widgets,
@@ -380,6 +412,8 @@ struct ViewBindings<'a> {
     hits: BTreeMap<Vec<usize>, usize>,
     /// PLAN-118：canvas 笔事件目标（onpenstart/onpenmove/onpenend）。
     pens: BTreeMap<Vec<usize>, (Option<usize>, Option<usize>, Option<usize>)>,
+    /// PLAN-118：canvas 场景数据（五平行列表解析后的画布内容，按元素路径）。
+    scenes: BTreeMap<Vec<usize>, crate::ui::view::CanvasScene>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
     widgets: BTreeSet<Vec<usize>>,

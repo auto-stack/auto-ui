@@ -497,6 +497,22 @@ fn push_package_focus(id: i32, instance: usize, revision: u64, control: String, 
     }
 }
 
+fn push_script_tap(id: i32, instance: usize, target: usize, x: f32, y: f32) {
+    let resolved = host().write().unwrap().get(id).and_then(|session| {
+        let frame = session.package_frame(instance)?;
+        Some((frame.revision, frame.hit_id_at(target, x, y)))
+    });
+    if let Some((revision, Some(hit))) = resolved {
+        push_package_event(
+            id,
+            instance,
+            revision,
+            target,
+            PackageEventInput::Hit(hit),
+        );
+    }
+}
+
 fn push_script_pen(
     id: i32,
     instance: usize,
@@ -538,6 +554,9 @@ pub(crate) fn queue_package_message(message: NodeDesktopMsg) -> bool {
         }
         NodeDesktopMsg::PackagePointer { session, instance, revision, target, x, y } => {
             push_package_event(session, instance, revision, target, PackageEventInput::Pointer { x, y });
+        }
+        NodeDesktopMsg::PackageHit { session, instance, revision, target, id } => {
+            push_package_event(session, instance, revision, target, PackageEventInput::Hit(id));
         }
         NodeDesktopMsg::PackagePen { session, instance, revision, target, x, y, phase } => {
             push_package_event(
@@ -1071,6 +1090,13 @@ pub enum ScriptStep {
         target: usize,
     },
     ClickPage { instance: usize, target: usize },
+    /// PLAN-118：canvas tap 脚本步（逻辑坐标 → 场景 hit_test → onhit 载荷）。
+    Tap {
+        instance: usize,
+        target: usize,
+        x: f32,
+        y: f32,
+    },
     /// PLAN-118：canvas 笔事件脚本步（start/move/end + 逻辑坐标）。
     Pen {
         instance: usize,
@@ -3452,6 +3478,11 @@ impl NodeDesktopBridge {
                         push_script_click(session, instance, target);
                     }
                 }
+                ScriptStep::Tap { instance, target, x, y } => {
+                    if let Some(session) = self.session {
+                        push_script_tap(session, instance, target, x, y);
+                    }
+                }
                 ScriptStep::Pen { instance, target, x, y, phase } => {
                     if let Some(session) = self.session {
                         push_script_pen(session, instance, target, x, y, phase);
@@ -3521,7 +3552,7 @@ impl NodeDesktopBridge {
             .filter(|(_, step)| {
                 matches!(
                     step,
-                    ScriptStep::Click { .. } | ScriptStep::ClickPage { .. } | ScriptStep::TypeText { .. } | ScriptStep::Pen { .. }
+                    ScriptStep::Click { .. } | ScriptStep::ClickPage { .. } | ScriptStep::TypeText { .. } | ScriptStep::Pen { .. } | ScriptStep::Tap { .. }
                 )
             })
             .count();
@@ -3693,6 +3724,14 @@ pub enum NodeDesktopMsg {
         x: f32,
         y: f32,
     },
+    /// PLAN-118：canvas tap 命中（onhit 载荷 = 命中元素 id）。
+    PackageHit {
+        session: i32,
+        instance: usize,
+        revision: u64,
+        target: usize,
+        id: String,
+    },
     /// PLAN-118：canvas 笔事件（onpenstart/move/end，逻辑坐标）。
     PackagePen {
         session: i32,
@@ -3818,6 +3857,7 @@ impl Component for AceNodeDesktopWindow {
             }
             message @ (NodeDesktopMsg::PackageClick { .. }
             | NodeDesktopMsg::PackagePointer { .. }
+            | NodeDesktopMsg::PackageHit { .. }
             | NodeDesktopMsg::PackagePen { .. }
             | NodeDesktopMsg::PackageText { .. }
             | NodeDesktopMsg::PackageImageSurface { .. }

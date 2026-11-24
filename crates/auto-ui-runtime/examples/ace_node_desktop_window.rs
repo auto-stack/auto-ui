@@ -239,6 +239,15 @@ fn parse_script(spec: &str) -> Vec<(usize, ScriptStep)> {
                     text,
                 }
             }
+            // PLAN-118：画布 tap——tick:tap:实例:目标:x:y（场景 hit_test
+            // → onhit 载荷；与渲染层同一条命中函数）。
+            "tap" => {
+                let instance = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+                let target = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+                let x = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+                let y = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+                ScriptStep::Tap { instance, target, x, y }
+            }
             // PLAN-118：画布笔事件——tick:pen:实例:目标:x:y:阶段(start|move|end)。
             "pen" => {
                 let instance = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
