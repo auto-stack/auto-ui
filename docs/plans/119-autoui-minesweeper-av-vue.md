@@ -285,6 +285,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 但终帧 `st_game_state=ready`、`st_elapsed=0`、`st_flags_placed=0` ⇒ Reveal 的体没有产生状态变更。候选原因：①action 的实参未随派发传入（证据里 `actions[].args` 为空，store 展开后 handler 形参 `x,y` 需要 2 个 payload 槽）；②payload 传了但落进被守卫块后的空分支。
 - 下一步（单点）：打印实际派发的 message+args（`PackageEventInput`/`dispatch_log` 面），确认 `Reveal` 是否带 `(0,0)`；若 `actions[].args` 确实为空，则需在视图动作绑定处带上 `.Reveal(cell.x, cell.y)` 的实参（ace_package_bridge 的 action 采集面）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 派发链已核对——Activation 会带 `source.args`，但 action 的 args 为空 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （无新增代码） | next: 查 action 采集面（view 绑定实参为何为空）
+
+- 读码实证（auto-ui）：`PackageEventInput::Activation` 分支确实把 `action.source.args` 转成 payload（`ace_package_bridge.rs:94-124`），`push_script_click` → `push_package_event(..., Activation)` 路径正确、无实参丢失。
+- 因此掉参发生在**更上游**：frame 里 `actions[].args` 为空 ⇒ 视图绑定 `.Reveal(cell.x, cell.y)` 的实参没有进入 `WidgetEvent.args`（store 展开后 handler 形参 `x,y` 成立，但事件侧实参未采集；疑点在包面 view 的属性/事件收集面，`AgeWidgetProperty::Message { args }` 对“for 循环内 cell 字段投影”作实参的形态可能未采集）。
+- 下一步（单点）：在包面 frame 组装处打印 `AgeWidgetProperty::Message` 的 message+args（038 的 `.Reveal(cell.x, cell.y)`），确认采集面缺口；补上后 T-03 oracle（首击 29 格/16 数字）即可复跑。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
