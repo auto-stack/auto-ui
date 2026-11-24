@@ -903,9 +903,11 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
             continue;
           }
           const { property, key, flags } = checkedDomBinding(kind);
+          if (kind.startsWith('oncontextmenu')) console.debug('P119CTX bind ' + property + ' flags=' + [...flags].join(','));
           if (property === 'onClick') click ??= event;
           const callbacks = listeners.get(property) ?? [];
           callbacks.push(domEvent => {
+            if (property === 'onContextmenu') console.debug('P119CTX fire active=' + active + ' sameFrame=' + (current === frame) + ' disabled=' + element.properties.get('disabled'));
             if (!active || current !== frame || element.properties.get('disabled') === 'true' ||
                 (key !== undefined && domEvent.key !== key) ||
                 (flags.has('self') && domEvent.target !== domEvent.currentTarget)) return;
