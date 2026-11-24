@@ -423,6 +423,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 逐步实证：①二次 prep → `multiple store declarations per node`（已消除）；②当前 → `model has no field store. Declare the store in the same package unit`，即 `front_package_units(app_at, source, modules)` 产出的 units 里 store 单元**未被包编译绑定**（id/包名或 prep 缺失）。
 - 下一步单点：在 `front_package_units` 里对 store 模块套用 `prepare_store_units` 并按 `<package>::<file_stem>` 定 id（与 AV `--package` 同形：`app::app` + `app::minesweeper_store`），再复跑生成。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 报错点确认为 `generate_linked_front_sfc` 首行单单元 inspection | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 该处改用 store 感知的 inspection 或交 prepared 源并避免下游二次 prep
+
+- 已加：`generate_linked_front_sfc` 在 `front_package_units` 之后对 units 跑 `prepare_store_units`（与 AV `load_package` 同形）。
+- 报错仍未变 ⇒ 错误来自**第 106 行** `package_candidates(source)?`：这是**单单元**投影（不含 store 单元），对含 `.store.*` 的 app 源必然报 `model has no field store`，且在建 units 之前就返回。
+- 下一步单体：把该行改成“单单元失败时仍继续”（store 导入本就需要多单元编译），或对 inspection 使用 prepared（同源 store）源；注意下游 `generate_package_sfc_leaf` 会再次 prep，需要一并去重（此前 `multiple store declarations` 即由此产生）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
