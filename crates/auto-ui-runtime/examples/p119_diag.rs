@@ -309,9 +309,39 @@ fn main() {
         for u in &units {
             println!("PKG unit app::{}: {} bytes", u.id, u.source.len());
         }
+        if std::env::var("P119_LIVE").ok().as_deref() == Some("1") {
+            use ace_core::source::packages::PACKAGES_CAPABILITY as CAP;
+            match ace_core::source::age_package::compile_age_package_widget_runtime(
+                &units,
+                "app::app",
+                ace_av::age_component::LegacyWidgetAlias::Accept,
+                &[CAP.to_string()],
+            ) {
+                Ok(_) => println!("LIVE RUNTIME COMPILE OK"),
+                Err(ds) => {
+                    println!("LIVE RUNTIME COMPILE FAILED: {} diagnostics", ds.len());
+                    for d in &ds {
+                        println!("- [{}] {} @ {}..{}", d.code, d.message, d.span.start, d.span.end);
+                        for u in &units {
+                            if d.span.end <= u.source.len() {
+                                println!("    ({}) {:?}", u.id, safe_slice(&u.source, d.span.start, d.span.end));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            return;
+        }
         let caps = [ace_core::source::packages::PACKAGES_CAPABILITY.to_string()];
+        let inst_count: usize = std::env::var("P119_PKG_INST").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
+        let mut units = units;
+        if std::env::var("P119_PKG_UNITS").ok().as_deref() == Some("entry") {
+            units.retain(|u| u.id == "app");
+            println!("PKG: entry-unit-only inspection");
+        }
         let scenario = ace_av::age_component::ComponentScenario {
-            instances: 2,
+            instances: inst_count,
             ops: Vec::new(),
         };
         match ace_core::source::age_package::compile_age_package_with_scenario(

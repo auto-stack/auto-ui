@@ -469,6 +469,446 @@ fn extract_store_block(src: &str, type_name: &str) -> Option<String> {
     None
 }
 
+// ─── PLAN-119：AGE 面 store handler 控制转移兼容改写 ────────────────────────
+//
+// AGE 受检面（age-component / age-package）的 handler 语句文法没有
+// `return` / `break` / `continue`（`experimental/ace/auto-source.at` 无对应
+// 规则）——真实 store 单元（038 MinesweeperStore：8 处 `return`、1 处
+// `break`）依赖它们做守卫提前退出与循环中断，故 store 片断过不了 prep 的
+// 内联门（`project_component_stores` + `project_component_candidates`）。
+//
+// 内联前按**结构化等价形**改写（只动 `on { … }` 区；字段/消息/视图不变）：
+// - `return` → handler 首部 `var __p119_ret bool = false`；`return` 位改
+//   `__p119_ret = true`；其后**同级**语句包进 `if __p119_ret == false { … }`；
+//   C 风格 `for <cond>` / `while <cond>` 的条件并与 `__p119_ret == false`
+//   （否则守卫让循环体空转、条件永真会自旋）。
+// - `break` → 所属循环前 `var __p119_brk<N> bool = false`；`break` 位置 true；
+//   循环条件并 `&& __p119_brk<N> == false`；其后同级语句包进守卫。
+// - `continue` → 不改写（返回 None：store 维持不内联，边界如实具名，不猜语义）。
+//
+// 语义等价性由原 oracle 在 AV 端复核（038 首击 29 格 / 雷位表见计划 §6）。
+
+/// store 片断控制转移改写；`None` = 含未受理构造（`continue`/不认识的结构），
+/// 调用方保持原样（store 不内联，行为与本改写前一致）。
+fn rewrite_store_control_flow(block: &str) -> Option<String> {
+    // `continue` 不改写（语义映射未定，不猜——先于快速放行判定）。
+    if block
+        .lines()
+        .any(|line| line.trim().trim_end_matches(';') == "continue")
+    {
+        return None;
+    }
+    if !block.contains("return") && !block.contains("break") {
+        return Some(block.to_string());
+    }
+    let on_open = find_section_open(block, "on")?;
+    let on_close = scan_balanced(block, on_open)?;
+    let on_inner = &block[on_open + 1..on_close];
+    let arms = split_handler_arms(on_inner)?;
+    let mut rebuilt = String::new();
+    for (head, body) in arms {
+        let stmts = split_stmts(&body);
+        let mut ctx = CtrlCtx::default();
+        let out = transform_stmt_list(&stmts, &mut ctx)?;
+        let mut body_out = String::new();
+        if ctx.uses_ret {
+            body_out.push_str("var __p119_ret bool = false\n");
+        }
+        body_out.push_str(&out.join("\n"));
+        rebuilt.push_str(&format!("{head} -> {{\n{body_out}\n}}\n"));
+    }
+    let mut out = String::with_capacity(block.len() + rebuilt.len());
+    out.push_str(&block[..=on_open]);
+    out.push('\n');
+    out.push_str(&rebuilt);
+    out.push_str(&block[on_close..]);
+    Some(restore_newlines(out, block))
+}
+
+/// 顶层 `<kw> { … }` 区块的 `{` 下标（`kw` 需独占行首词位）。
+fn find_section_open(block: &str, kw: &str) -> Option<usize> {
+    let mut from = 0usize;
+    while let Some(rel) = block[from..].find(kw) {
+        let at = from + rel;
+        let line_start = block[..at].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line_head = block[line_start..at].trim();
+        let after = &block[at + kw.len()..];
+        let word_end = after
+            .chars()
+            .next()
+            .map(|c| !(c.is_alphanumeric() || c == '_'))
+            .unwrap_or(true);
+        if line_head.is_empty() && word_end {
+            if let Some(open) = after.find('{') {
+                // `{` 与关键字之间只允许空白。
+                if after[..open].trim().is_empty() {
+                    return Some(at + kw.len() + open);
+                }
+            }
+        }
+        from = at + kw.len();
+    }
+    None
+}
+
+/// 从 `open`（指向 `{`）找配平的 `}`；跳过字符串字面量（含转义）。
+fn scan_balanced(src: &str, open: usize) -> Option<usize> {
+    let bytes = src.as_bytes();
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut i = open;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_str {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' => in_str = true,
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// `on { … }` 内逐条 `.Msg(..) -> { … }` 臂：返回（臂头, 体内文本）。
+fn split_handler_arms(on_inner: &str) -> Option<Vec<(String, String)>> {
+    let mut arms = Vec::new();
+    let mut i = 0usize;
+    let bytes = on_inner.as_bytes();
+    while i < bytes.len() {
+        if !on_inner.is_char_boundary(i) {
+            i += 1;
+            continue;
+        }
+        let line_start = on_inner[..i].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let at_line_start = on_inner[line_start..i].trim().is_empty();
+        if at_line_start && on_inner.as_bytes()[i] == b'.' {
+            let open = on_inner[i..].find('{').map(|o| o + i)?;
+            let close = scan_balanced(on_inner, open)?;
+            let arm = &on_inner[i..=close];
+            let arrow = arm.find("->")?;
+            let head = arm[..arrow].trim().to_string();
+            let body = on_inner[open + 1..close].to_string();
+            arms.push((head, body));
+            i = close + 1;
+            continue;
+        }
+        i += 1;
+    }
+    if arms.is_empty() {
+        None
+    } else {
+        Some(arms)
+    }
+}
+
+/// 顶层语句切分：花括号/圆括号深度 0 处按换行断句（注释行成为独立项）。
+fn split_stmts(body: &str) -> Vec<String> {
+    let bytes = body.as_bytes();
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut depth = 0i32;
+    let mut parens = 0i32;
+    let mut in_str = false;
+    for (i, b) in bytes.iter().enumerate() {
+        if !body.is_char_boundary(i) {
+            continue;
+        }
+        if in_str {
+            let ch = *b as char;
+            cur.push(ch);
+            if ch == '\\' {
+                continue;
+            }
+            if ch == '"' {
+                in_str = false;
+            }
+            continue;
+        }
+        let ch = *b as char;
+        match ch {
+            '"' => in_str = true,
+            '{' => depth += 1,
+            '}' => depth -= 1,
+            '(' => parens += 1,
+            ')' => parens -= 1,
+            _ => {}
+        }
+        cur.push(ch);
+        if ch == '\n' && depth == 0 && parens == 0 {
+            // 保留行首缩进（重建时沿用原排版，既有 prep 用例按原文缩进核对）。
+            let piece = cur.trim_end_matches(['\r', '\n']);
+            if !piece.trim().is_empty() {
+                out.push(piece.to_string());
+            }
+            cur.clear();
+        }
+    }
+    let piece = cur.trim_end_matches(['\r', '\n']);
+    if !piece.trim().is_empty() {
+        out.push(piece.to_string());
+    }
+    out
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum CtrlKind {
+    Ret,
+    Brk,
+    Cont,
+}
+
+fn ctrl_of(stmt: &str) -> Option<CtrlKind> {
+    match stmt.trim().trim_end_matches(';').trim() {
+        "return" => Some(CtrlKind::Ret),
+        "break" => Some(CtrlKind::Brk),
+        "continue" => Some(CtrlKind::Cont),
+        _ => None,
+    }
+}
+
+/// `if <cond> { … } [else { … }]` / `for <cond> { … }` / `while <cond> { … }`。
+struct BlockForm {
+    kw: &'static str,
+    cond: String,
+    then_body: String,
+    else_body: Option<String>,
+}
+
+fn parse_block_form(stmt: &str) -> Option<BlockForm> {
+    let stmt = stmt.trim();
+    let s = stmt;
+    let (kw, rest) = if let Some(r) = s.strip_prefix("if ") {
+        ("if", r)
+    } else if let Some(r) = s.strip_prefix("for ") {
+        ("for", r)
+    } else if let Some(r) = s.strip_prefix("while ") {
+        ("while", r)
+    } else {
+        return None;
+    };
+    // 条件与体之间以 `{` 分界（深度 0 处；条件里可能有 `(`/`[`）。
+    let mut parens = 0i32;
+    let mut open = None;
+    for (i, ch) in rest.char_indices() {
+        match ch {
+            '(' | '[' => parens += 1,
+            ')' | ']' => parens -= 1,
+            '{' if parens == 0 => {
+                open = Some(i);
+                break;
+            }
+            _ => {}
+        }
+    }
+    let open = open?;
+    let cond = rest[..open].trim().to_string();
+    let prefix = s.len() - rest.len();
+    let abs_open = prefix + open;
+    let close = scan_balanced(stmt, abs_open)?;
+    let then_body = stmt[abs_open + 1..close].to_string();
+    let tail = stmt[close + 1..].trim().to_string();
+    let else_body = if tail.is_empty() {
+        None
+    } else if kw == "if" {
+        let after = tail.strip_prefix("else")?.trim();
+        let e_open = after.find('{')?;
+        if !after[..e_open].trim().is_empty() {
+            return None;
+        }
+        let tail_prefix = stmt.len() - tail.len();
+        let abs = tail_prefix + (tail.len() - after.len()) + e_open;
+        let e_close = scan_balanced(stmt, abs)?;
+        Some(stmt[abs + 1..e_close].to_string())
+    } else {
+        return None;
+    };
+    Some(BlockForm {
+        kw,
+        cond,
+        then_body,
+        else_body,
+    })
+}
+
+#[derive(Default)]
+struct CtrlCtx {
+    uses_ret: bool,
+    /// 当前循环栈的 break 标志（`break` 作用于最内层）。
+    brk_flags: Vec<String>,
+    seq: usize,
+}
+
+/// 体内（不含更深循环）是否出现 `break`。
+fn has_own_break(body: &str) -> bool {
+    for st in split_stmts(body) {
+        if ctrl_of(&st) == Some(CtrlKind::Brk) {
+            return true;
+        }
+        if let Some(form) = parse_block_form(&st) {
+            if form.kw == "if" {
+                if has_own_break(&form.then_body) {
+                    return true;
+                }
+                if let Some(e) = form.else_body.as_deref() {
+                    if has_own_break(e) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+fn sets_flag(text: &str, flag: &str) -> bool {
+    text.contains(&format!("{flag} = true"))
+}
+
+/// 语句列变换（见上方函数注释的语义规则）。
+fn transform_stmt_list(stmts: &[String], ctx: &mut CtrlCtx) -> Option<Vec<String>> {
+    let mut out: Vec<String> = Vec::new();
+    let mut i = 0usize;
+    while i < stmts.len() {
+        let st = stmts[i].clone();
+        if let Some(kind) = ctrl_of(&st) {
+            match kind {
+                CtrlKind::Ret => {
+                    ctx.uses_ret = true;
+                    out.push("__p119_ret = true".to_string());
+                }
+                CtrlKind::Brk => {
+                    let flag = ctx.brk_flags.last()?.clone();
+                    out.push(format!("{flag} = true"));
+                }
+                CtrlKind::Cont => return None,
+            }
+            // 转移之后的同级语句不再执行（`return`/`break` 的直接效果）。
+            break;
+        }
+        let Some(form) = parse_block_form(&st) else {
+            out.push(st);
+            i += 1;
+            continue;
+        };
+        let (prelude, rendered) = match form.kw {
+            "if" => {
+                let then_out = transform_stmt_list(&split_stmts(&form.then_body), ctx)?;
+                let else_out = match form.else_body.as_deref() {
+                    Some(e) => Some(transform_stmt_list(&split_stmts(e), ctx)?),
+                    None => None,
+                };
+                let mut text = format!("if {} {{\n{}\n}}", form.cond, then_out.join("\n"));
+                if let Some(e) = else_out {
+                    text.push_str(&format!(" else {{\n{}\n}}", e.join("\n")));
+                }
+                (Vec::new(), text)
+            }
+            "for" | "while" => {
+                let named = form.cond.contains(" in ");
+                let own_break = has_own_break(&form.then_body);
+                let mut flags_to_declare: Vec<String> = Vec::new();
+                if own_break {
+                    ctx.seq += 1;
+                    let flag = format!("__p119_brk{}", ctx.seq);
+                    flags_to_declare.push(flag.clone());
+                    ctx.brk_flags.push(flag);
+                }
+                let body_out = match transform_stmt_list(&split_stmts(&form.then_body), ctx) {
+                    Some(b) => b,
+                    None => return None,
+                };
+                let brk_flag = flags_to_declare.first().cloned();
+                if own_break {
+                    ctx.brk_flags.pop();
+                }
+                // `return` 置位后循环必须停转（C 风格条件可并，`for v in` 只能守体）。
+                let ret_guard = sets_flag(&body_out.join("\n"), "__p119_ret");
+                let mut body_text = body_out.join("\n");
+                if let Some(flag) = &brk_flag {
+                    if named {
+                        body_text = format!("if {flag} == false {{\n{body_text}\n}}");
+                    }
+                }
+                if ret_guard && named {
+                    body_text = format!("if __p119_ret == false {{\n{body_text}\n}}");
+                }
+                let mut cond = form.cond.clone();
+                if let Some(flag) = &brk_flag {
+                    if !named {
+                        cond = format!("({cond}) && {flag} == false");
+                    }
+                }
+                if ret_guard && !named {
+                    cond = format!("({cond}) && __p119_ret == false");
+                }
+                let text = format!("{} {} {{\n{}\n}}", form.kw, cond, body_text);
+                let prelude = flags_to_declare
+                    .iter()
+                    .map(|f| format!("var {f} bool = false"))
+                    .collect();
+                (prelude, text)
+            }
+            _ => return None,
+        };
+        out.extend(prelude);
+        // 该结构可能置位 → 其后同级语句必须守卫。
+        let rendered_may_ret = sets_flag(&rendered, "__p119_ret");
+        let cur_brk = ctx.brk_flags.last().cloned();
+        let rendered_may_brk = cur_brk
+            .as_deref()
+            .map(|f| sets_flag(&rendered, f))
+            .unwrap_or(false);
+        out.push(rendered);
+        if rendered_may_ret || rendered_may_brk {
+            let rest = transform_stmt_list(&stmts[i + 1..], ctx)?;
+            if rest.is_empty() {
+                break;
+            }
+            let mut guard_cond = String::new();
+            if rendered_may_ret {
+                guard_cond.push_str("__p119_ret == false");
+            }
+            if rendered_may_brk {
+                let flag = cur_brk.as_deref().unwrap_or_default();
+                if !guard_cond.is_empty() {
+                    guard_cond.push_str(" && ");
+                }
+                guard_cond.push_str(&format!("{flag} == false"));
+            }
+            out.push(format!("if {guard_cond} {{\n{}\n}}", rest.join("\n")));
+            break;
+        }
+        i += 1;
+    }
+    Some(out)
+}
+
+/// 结构重建后恢复原源的换行风格（CRLF 源逐行仍是 CRLF——既有用例按
+/// `\r\n` 计数核对 prep 的「保行」契约）。
+fn restore_newlines(out: String, like: &str) -> String {
+    if like.contains("\r\n") {
+        out.replace("\r\n", "\n").replace('\n', "\r\n")
+    } else {
+        out
+    }
+}
 /// 整词替换（标识符边界）：把 `name` 的出现替换为 `repl`（前后不得为
 /// 标识符字符）。用于 prep 的本地样式引用替换。
 fn replace_word(src: &str, name: &str, repl: &str) -> String {
@@ -761,6 +1201,13 @@ pub fn prepare_component_source(
                             }
                         }
                         if let Some(block) = extract_store_block(&unit_src, item) {
+                            // PLAN-119：组件面 store 片断先做**模型归一**（`List<T>`→
+                            // `[]T`；无类型空列表按 push 点定型并前置合成记录类型），
+                            // 再做**控制转移兼容改写**（AGE 面语句文法没有
+                            // `return`/`break`；038 MinesweeperStore 依赖它们）。
+                            // 两件都是内联门的必要条件，缺一则 `.store.*` 落回具名边界。
+                            let block = normalize_component_store_model(&block);
+                            let block = rewrite_store_control_flow(&block).unwrap_or(block);
                             // 只有该 store 片断在组件面**可解析**时才内联；含
                             // 组件面尚不支持的 `on` 语句（if/for/局部 var 等）时
                             // 放弃内联，保留具名 `.store` 边界（不制造语法错）。
@@ -2140,11 +2587,19 @@ fn rewrite_host_storage(src: &str, fields: &mut Vec<(String, String)>) -> String
 pub fn prepare_store_units(
     units: Vec<ace_core::source::packages::PackageModuleInput>,
 ) -> Vec<ace_core::source::packages::PackageModuleInput> {
-    units
+    let mut out: Vec<ace_core::source::packages::PackageModuleInput> = units
         .into_iter()
         .map(|mut unit| {
             if is_pure_store(&unit.source) {
+                // PLAN-119：AGE 面 store handler 语句文法没有 `return`/`break`
+                // （038 MinesweeperStore 真实依赖）——先做控制转移兼容改写，
+                // 再做文本转换拼写与 model 形态归一。
+                unit.source = rewrite_store_control_flow(&unit.source).unwrap_or(unit.source);
+                unit.source = rewrite_package_text_conversions(&unit.source);
                 unit.source = normalize_store_model(&unit.source);
+                // PLAN-119：元素所有权写法归一（整元素读/view-escape、索引写入、
+                // `.pop`——038 的真实写法，AGE 包面各有受检等价形）。
+                unit.source = normalize_store_element_ownership(&unit.source);
                 if storage_keys_are_literals(&unit.source) {
                     let mut fields = Vec::new();
                     let out = rewrite_host_storage(&unit.source, &mut fields);
@@ -2155,7 +2610,307 @@ pub fn prepare_store_units(
             }
             unit
         })
-        .collect()
+        .collect();
+    // PLAN-119：纯 store 单元里**合成/自带的记录类型**必须也出现在消费它的
+    // 应用单元——store 字段在投影出口被内联进 widget model（`st_board
+    // []BoardRow`），而 AGE 的类型解析是**单单元**的（038 实证：
+    // `source.module-symbol: unknown type BoardRow`）。把 store 单元里的
+    // `type` 声明（去重后）插到每个非 store 单元的前导 `use` 行之后。
+    let store_types: Vec<String> = out
+        .iter()
+        .filter(|u| is_pure_store(&u.source))
+        .flat_map(|u| collect_type_blocks(&u.source))
+        .collect();
+    if !store_types.is_empty() {
+        for unit in out.iter_mut().filter(|u| !is_pure_store(&u.source)) {
+            let mut missing: Vec<String> = Vec::new();
+            for decl in &store_types {
+                let Some(name) = type_decl_name(decl) else { continue };
+                if unit
+                    .source
+                    .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+                    .any(|w| w == name)
+                {
+                    continue;
+                }
+                if !missing.iter().any(|m| *m == *decl) {
+                    missing.push(decl.clone());
+                }
+            }
+            if missing.is_empty() {
+                continue;
+            }
+            let at = after_leading_uses(&unit.source);
+            let mut rebuilt = String::with_capacity(unit.source.len() + 64 * missing.len());
+            rebuilt.push_str(&unit.source[..at]);
+            for decl in &missing {
+                rebuilt.push_str(decl);
+                if !decl.ends_with('\n') {
+                    rebuilt.push('\n');
+                }
+            }
+            rebuilt.push_str(&unit.source[at..]);
+            unit.source = rebuilt;
+        }
+    }
+    out
+}
+
+/// `type <Name> {` 的声明名。
+fn type_decl_name(decl: &str) -> Option<&str> {
+    let rest = decl.trim_start().strip_prefix("type ")?;
+    let name = rest
+        .split(|c: char| c.is_whitespace() || c == '{')
+        .next()?
+        .trim();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+/// 包面文本转换拼写：AGE 包面的数值没有 `.to_string()`（`numeric receiver has
+/// no method `to_string``），而 `.to(Str)` 是同一转换的受检形（038 实证）。
+/// 只对纯 store 单元调用。
+fn rewrite_package_text_conversions(src: &str) -> String {
+    src.replace(".to_string()", ".to(Str)")
+}
+
+/// PLAN-119：store 里**列表元素所有权**写法归一成 AGE 包面受检形。
+///
+/// VM 作者源把列表元素当值用（`var old = .board[i]`、`.board[i] = { … }`、
+/// `stack.pop()`），而 AGE 包面：整元素读是 **view**（`source.view-escape`），
+/// 元素写入只收 `.set(i, <fresh 构造>)`，没有 `.pop`（HOF 未接）。三件都是
+/// 038 的真实写法，故按下列等价形改写（只在纯 store 单元上跑）：
+///
+/// 1. `var V = .<list>[<idx>]` → 摘除声明，后续 `V.` 全部内联为
+///    `.<list>[<idx>].`（字段投影是受检读面；索引表达式为纯表达式，重复求值
+///    无语义差）。
+/// 2. `.<list>[<idx>] = { … }` → `.<list>.set(<idx>, <Elem> { … })`（元素记录
+///    类型取自 model 字段 `List\<Elem>`/`[]Elem`；fresh 构造满足 move 纪律）。
+/// 3. `R.pop()` → `R.remove(R.len() - 1)`（remove 返回 owned 元素，等同栈顶）。
+///
+/// 未识别的形态原样保留，诊断仍由 AGE 给出。
+fn normalize_store_element_ownership(src: &str) -> String {
+    let Some(on_open) = find_section_open(src, "on") else {
+        return src.to_string();
+    };
+    let Some(on_close) = scan_balanced(src, on_open) else {
+        return src.to_string();
+    };
+    let on_inner = &src[on_open + 1..on_close];
+    let Some(arms) = split_handler_arms(on_inner) else {
+        return src.to_string();
+    };
+    let elem_types = model_list_element_types(src);
+    if elem_types.is_empty() {
+        return src.to_string();
+    }
+    let mut rebuilt = String::new();
+    for (head, body) in arms {
+        let stmts = split_stmts(&body);
+        let mut subs: Vec<(String, String)> = Vec::new();
+        let out_stmts = ownership_stmt_list(&stmts, &elem_types, &mut subs);
+        rebuilt.push_str(&format!("{head} -> {{\n{}\n}}\n", out_stmts.join("\n")));
+    }
+    let mut out = String::with_capacity(src.len() + rebuilt.len());
+    out.push_str(&src[..=on_open]);
+    out.push('\n');
+    out.push_str(&rebuilt);
+    out.push_str(&src[on_close..]);
+    restore_newlines(out, src)
+}
+
+/// 逐语句做元素所有权归一（递归进 `if`/`for`/`while` 体；块内绑定不外泄）。
+fn ownership_stmt_list(
+    stmts: &[String],
+    elems: &[(String, String)],
+    subs: &mut Vec<(String, String)>,
+) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for st in stmts {
+        let st = st.clone();
+        if let Some((name, projection)) = whole_element_binding(&st, elems) {
+            subs.push((name, projection));
+            continue;
+        }
+        // 嵌套块：体内递归（子作用域用 subs 副本，块内新增绑定不外泄）。
+        if let Some(form) = parse_block_form(&st) {
+            let mut inner_subs = subs.clone();
+            let then_out = ownership_stmt_list(
+                &split_stmts(&form.then_body),
+                elems,
+                &mut inner_subs,
+            );
+            let else_out = form.else_body.as_deref().map(|e| {
+                let mut else_subs = subs.clone();
+                ownership_stmt_list(&split_stmts(e), elems, &mut else_subs)
+            });
+            let mut rebuilt = format!("{} {} {{\n{}\n}}", form.kw, form.cond, then_out.join("\n"));
+            if let Some(e) = else_out {
+                rebuilt.push_str(&format!(" else {{\n{}\n}}", e.join("\n")));
+            }
+            let rebuilt = apply_element_substitutions(&rebuilt, subs);
+            out.push(rewrite_pop_to_remove(&rewrite_element_writes(&rebuilt, elems)));
+            continue;
+        }
+        let st = apply_element_substitutions(&st, subs);
+        let st = rewrite_element_writes(&st, elems);
+        let st = rewrite_pop_to_remove(&st);
+        out.push(st);
+    }
+    out
+}
+
+/// model 里 `List<T>` / `[]T` 字段 → 元素记录类型名（非记录名原样收录，写入侧
+/// 只对记录类型做 fresh 构造改写）。
+fn model_list_element_types(src: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let Some((open, close)) = model_block(src) else {
+        return out;
+    };
+    for line in src[open..close].lines() {
+        let Some(ModelField::Typed { name, ty, .. }) = parse_model_field(line) else {
+            continue;
+        };
+        let elem = if let Some(inner) = ty.strip_prefix("List<").and_then(|s| s.strip_suffix('>')) {
+            Some(inner.to_string())
+        } else {
+            ty.strip_prefix("[]").map(|s| s.to_string())
+        };
+        if let Some(elem) = elem {
+            if !elem.is_empty() {
+                out.push((name.to_string(), elem));
+            }
+        }
+    }
+    out
+}
+
+/// `var V = .<list>[<idx>]`（整值绑定）→ (V, `.<list>[<idx>]`)。
+fn whole_element_binding(stmt: &str, elems: &[(String, String)]) -> Option<(String, String)> {
+    let s = stmt.trim().trim_end_matches(';').trim();
+    let rest = s.strip_prefix("var ")?;
+    let (name, value) = rest.split_once('=')?;
+    let name = name.trim();
+    // `var n int = …` 这类带注解的声明不是整元素绑定（`name` 会是 "n int"）。
+    if !is_ident(name) {
+        return None;
+    }
+    let projection = field_index_projection(value.trim(), elems)?;
+    Some((name.to_string(), projection))
+}
+
+/// `.<list>[<idx>]` 整值（尾随无其他内容）→ 规范化投影串。
+fn field_index_projection(v: &str, elems: &[(String, String)]) -> Option<String> {
+    let rest = v.trim().strip_prefix('.')?;
+    let (field, tail) = rest.split_once('[')?;
+    if !elems.iter().any(|(f, _)| f == field) {
+        return None;
+    }
+    let close = tail.rfind(']')?;
+    if close + 1 != tail.len() {
+        return None;
+    }
+    let idx = tail[..close].trim();
+    if idx.is_empty() {
+        return None;
+    }
+    Some(format!(".{field}[{idx}]"))
+}
+
+/// 把 `V.` / `V`（作为接收者）替换成投影表达式。
+fn apply_element_substitutions(stmt: &str, subs: &[(String, String)]) -> String {
+    let mut out = stmt.to_string();
+    for (name, repl) in subs {
+        let mut rebuilt = String::with_capacity(out.len());
+        let mut rest = out.as_str();
+        while let Some(at) = rest.find(name.as_str()) {
+            let before_ok = at == 0
+                || !rest[..at]
+                    .chars()
+                    .next_back()
+                    .map(|c| c.is_alphanumeric() || c == '_' || c == '.')
+                    .unwrap_or(false);
+            let after = at + name.len();
+            let next = rest[after..].chars().next();
+            // 只替换「后面紧跟字段投影」的整值引用（`V.field`）。
+            if before_ok && next == Some('.') {
+                rebuilt.push_str(&rest[..at]);
+                rebuilt.push_str(repl);
+                rebuilt.push('.');
+                rest = &rest[after + 1..];
+                continue;
+            }
+            rebuilt.push_str(&rest[..after]);
+            rest = &rest[after..];
+        }
+        rebuilt.push_str(rest);
+        out = rebuilt;
+    }
+    out
+}
+
+/// `.<list>[<idx>] = { … }` → `.<list>.set(<idx>, <Elem> { … })`。
+fn rewrite_element_writes(stmt: &str, elems: &[(String, String)]) -> String {
+    let mut out = stmt.to_string();
+    for (field, elem) in elems {
+        let mut from = 0usize;
+        while let Some(rel) = out[from..].find(&format!(".{field}[")) {
+            let at = from + rel;
+            let open = at + field.len() + 2;
+            let Some(close_rel) = out[open..].find(']') else { break };
+            let close = open + close_rel;
+            let idx = out[open..close].trim().to_string();
+            let after = out[close + 1..].trim_start();
+            if !after.starts_with('=') {
+                from = close + 1;
+                continue;
+            }
+            let rhs_at = out[close + 1..].find('=').map(|p| p + close + 1).unwrap();
+            let rhs = out[rhs_at + 1..].trim_start();
+            if !rhs.starts_with('{') {
+                from = close + 1;
+                continue;
+            }
+            let brace = out[rhs_at + 1..].find('{').map(|p| p + rhs_at + 1).unwrap();
+            let Some(brace_close) = scan_balanced(&out, brace) else { break };
+            let literal = out[brace..=brace_close].to_string();
+            let replacement = format!(".{field}.set({idx}, {elem} {literal})");
+            out.replace_range(at..=brace_close, &replacement);
+            from = at + replacement.len();
+        }
+    }
+    out
+}
+
+/// `R.pop()` → `R.remove(R.len() - 1)`。
+fn rewrite_pop_to_remove(stmt: &str) -> String {
+    let mut out = stmt.to_string();
+    let mut from = 0usize;
+    while let Some(rel) = out[from..].find(".pop()") {
+        let at = from + rel;
+        // 回扫接收者（`stack` / `.board` 这类简单链）。
+        let bytes = out.as_bytes();
+        let mut start = at;
+        while start > 0 {
+            let b = bytes[start - 1];
+            if b.is_ascii_alphanumeric() || b == b'_' || b == b'.' {
+                start -= 1;
+            } else {
+                break;
+            }
+        }
+        let recv = out[start..at].trim();
+        if recv.is_empty() || recv == "." {
+            break;
+        }
+        let replacement = format!("{recv}.remove({recv}.len() - 1)");
+        out.replace_range(start..at + ".pop()".len(), &replacement);
+        from = start + replacement.len();
+    }
+    out
 }
 
 /// 顶层声明行（去缩进后以 `store `/`widget `/`node ` 起头）里恰有一个 store、
@@ -2558,6 +3313,68 @@ fn normalize_store_model(src: &str) -> String {
     out
 }
 
+
+/// PLAN-119：组件面（AGE component profile）的 store 片断模型归一。
+///
+/// 组件面只收 `[]T` 列表拼写（`List<T>` 会让整模块回退成 fn profile 而拒），
+/// 且**无类型** `var x = []` 不算状态字段（`.store.x` 解析不到）。故：
+/// - `var xs List<T> = …` → `var xs []T = …`；
+/// - `var xs = []` → `var xs []E = []`，`E` 取自全部 push 点（与包面
+///   [`normalize_store_model`] 同一推断）；元素是记录字面量时把合成的
+///   `type E { … }` 前置到片断头——store 块随内联落到组件头之前，类型与
+///   store 同处一个单元，跨单元解析问题一并消失。
+///
+/// 推不出的无类型字段原样留着，诊断仍由 AGE 给出。
+fn normalize_component_store_model(block: &str) -> String {
+    let Some((open, close)) = model_block(block) else {
+        return block.to_string();
+    };
+    let mut body = String::with_capacity(block.len());
+    body.push_str(&block[..open]);
+    let mut untyped: Vec<(String, String)> = Vec::new();
+    for line in block[open..close].split_inclusive('\n') {
+        let trimmed = line.trim_end_matches(['\n', '\r']);
+        let nl = &line[trimmed.len()..];
+        let replaced = match parse_model_field(line) {
+            Some(ModelField::Typed {
+                indent,
+                name,
+                ty,
+                rest,
+            }) => ty
+                .strip_prefix("List<")
+                .and_then(|inner| inner.strip_suffix('>'))
+                .map(|elem| format!("{indent}var {name} []{elem}{rest}{nl}")),
+            Some(ModelField::Untyped { indent, name, init }) if init == "[]" => {
+                untyped.push((name.to_string(), indent.to_string()));
+                None
+            }
+            _ => None,
+        };
+        match replaced {
+            Some(replaced) => body.push_str(&replaced),
+            None => body.push_str(line),
+        }
+    }
+    let mut decls = String::new();
+    for (name, indent) in untyped {
+        let Some((elem, decl)) = infer_element_type(block, &name) else {
+            continue;
+        };
+        let target = format!("{indent}var {name} = []");
+        if let Some(at) = body.find(&target) {
+            body.replace_range(at..at + target.len(), &format!("{indent}var {name} []{elem} = []"));
+            if let Some(decl) = decl {
+                decls.push_str(&decl);
+            }
+        }
+    }
+    body.push_str(&block[close..]);
+    let mut out = String::with_capacity(body.len() + decls.len());
+    out.push_str(&decls);
+    out.push_str(&body);
+    out
+}
 
 /// 把宿主仿真字段插进 `model {` 块尾（无 model 块则不插）。
 /// 块尾 `}` 按词法扫描定位：跳过行注释（`//`）与字符串字面量——model 注释
@@ -3119,4 +3936,93 @@ mod tests {
         assert!(out.contains("var r2 []ProcInfo = []"), "handler 局部量不动：{out}");
         assert!(!out.contains("var cpu_segs = []"), "{out}");
     }
-}
+
+    // ─── PLAN-119：store 片断控制转移改写 ─────────────────────────────────
+    fn p119_store_block() -> String {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ui/038-minesweeper");
+        let unit = std::fs::read_to_string(root.join("src/front/minesweeper_store.at"))
+            .expect("read 038 store unit");
+        extract_store_block(&unit, "MinesweeperStore").expect("store block")
+    }
+
+    fn p119_store_probe(block: &str) -> Result<(), Vec<String>> {
+        let probe = format!(
+            "{block}\nwidget __StoreProbe {{\n    model {{ var __n int = 0 }}\n    view {{ text \"x\" {{}} }}\n}}\n"
+        );
+        let stores_ok = ace_core::source::age_component::project_component_stores(&probe)
+            .map(|s| !s.is_empty())
+            .unwrap_or(false);
+        if !stores_ok {
+            return Err(vec!["store projection empty".to_string()]);
+        }
+        ace_core::source::age_component::project_component_candidates(&probe)
+            .map(|_| ())
+            .map_err(|ds| ds.iter().map(|d| format!("[{}] {}", d.code, d.message)).collect())
+    }
+
+    #[test]
+    fn plan119_store_control_flow_rewrite_admits_the_minesweeper_store() {
+        let block = p119_store_block();
+        // 原样片断确应被拒（缺 return/break 语句面）——反例钉点。
+        assert!(
+            p119_store_probe(&block).is_err(),
+            "原样 038 store 片断应当不是 AGE 组件面可投影形"
+        );
+        let rewritten = rewrite_store_control_flow(&block).expect("038 store 可改写");
+        for (i, line) in rewritten.lines().enumerate() {
+            let t = line.trim().trim_end_matches(';');
+            assert!(
+                t != "return" && t != "break" && t != "continue",
+                "L{}: 控制转移未清：{t}",
+                i + 1
+            );
+        }
+        assert!(rewritten.contains("__p119_ret = true"), "return 位置标志置位");
+        assert!(rewritten.contains("__p119_brk1 = true"), "break 位置标志置位");
+        assert!(rewritten.contains("var __p119_ret bool = false"));
+        assert!(
+            rewritten.contains("__p119_brk1 == false"),
+            "循环条件应并 break 标志：{rewritten}"
+        );
+        if let Err(ds) = p119_store_probe(&rewritten) {
+            panic!("改写后仍被拒：{ds:?}\n---\n{rewritten}");
+        }
+    }
+
+    #[test]
+    fn plan119_store_without_control_flow_is_unchanged() {
+        let block = "store S {\n    model {\n        var n int = 0\n    }\n    msg { Inc }\n    on {\n        .Inc -> {\n            .n = .n + 1\n        }\n    }\n}\n";
+        assert_eq!(rewrite_store_control_flow(block).as_deref(), Some(block));
+    }
+
+    #[test]
+    fn plan119_store_continue_is_left_to_the_named_boundary() {
+        let block = "store S {\n    model {\n        var n int = 0\n    }\n    msg { Inc }\n    on {\n        .Inc -> {\n            for .n < 3 {\n                continue\n            }\n        }\n    }\n}\n";
+        assert_eq!(rewrite_store_control_flow(block), None);
+    }
+
+    #[test]
+    fn plan119_guard_return_becomes_flag_and_guarded_rest() {
+        let block = "store S {\n    model {\n        var n int = 0\n    }\n    msg { Inc }\n    on {\n        .Inc -> {\n            if .n > 2 {\n                return\n            }\n            .n = .n + 1\n        }\n    }\n}\n";
+        let out = rewrite_store_control_flow(block).expect("rewrite");
+        assert!(out.contains("var __p119_ret bool = false"));
+        assert!(out.contains("__p119_ret = true"));
+        assert!(out.contains("if __p119_ret == false {"));
+        assert!(
+            !out.lines().any(|l| l.trim().trim_end_matches(';') == "return"),
+            "{out}"
+        );
+        assert!(p119_store_probe(&out).is_ok(), "{out}");
+    }
+    #[test]
+    fn plan119_store_types_are_injected_into_the_entry_unit() {
+        let app = "use probe_store: Probe\n\nwidget App {\n    msg { Init }\n    model { var pad int = 0 }\n    view { text .store.label { style: \"t\" } }\n    on { .Init -> { store.Init() } }\n}\n";
+        let store = "type R {\n    x int\n    display str\n}\n\nstore Probe {\n    model {\n        var board List<R> = []\n        var label str = \"x\"\n    }\n    msg { Init }\n    on {\n        .Init -> {\n            .board.push({ x: 1, display: \"a\" })\n            .label = \"ok\"\n        }\n    }\n}\n";
+        let units = prepare_store_units(vec![package_unit("app", app), package_unit("probe_store", store)]);
+        let app_out = &units[0].source;
+        println!("--- app unit ---\n{app_out}\n--- store unit ---\n{}", units[1].source);
+        assert!(app_out.contains("type R {"), "类型应注入入口单元：{app_out}");
+        for n in &units {
+            println!("unit {} = {} bytes", n.id, n.source.len());
+        }
+    }}
