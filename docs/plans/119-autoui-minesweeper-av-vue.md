@@ -456,6 +456,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 顺带修好：上一轮 PowerShell 把 `` `n `` 写成了字面量导致编译失败，已用编辑工具恢复为正常多行代码。
 - 下一步：函数入口处落盘（`entry`/`units` 数、源长度、store 计数），再复跑一次即可把回退链与主路径区分开。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 入口/回退日志均未产生 ⇒ 被判失败的不是我们改的调用点 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 在 vue.rs:8495 调用点落盘（前后 + 错误串）
+
+- 在 `generate_linked_front_sfc` 函数入口与回退处各加**文件**日志后复跑：`entry.log`/`fallback.log`/`store-count.log` **全不存在**，但错误仍是「包面 SFC 生成失败：multiple store declarations」。
+- 全仓 grep「包面 SFC 生成失败」只有一处（`vue.rs:8495`，即我们改的调用点）⇒ 调用确实发生，但函数内日志没写出：怀疑 ①`auto` 用的工具二进制未刷新（AUTO_UI_TOOL_BIN 指向 target/debug/auto-ui-tool.exe，需核对时间戳）；②该函数在另一 crate 编译单元/另一同名函数被调用。
+- 下一步单点：在 `vue.rs:8495` 前后各落一个文件日志（含 `has_store_decl` 与错误串），并核对该 exe 的 mtime/SHA，排除“跑的是旧二进制”。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
