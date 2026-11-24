@@ -446,3 +446,11 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - **门禁记录**：合并自有闸门 `cargo t ace a2ts` 在本机两轮（无 vcvars / vcvars64）均红，红因经诊断为**环境/工具链**且已复现于 master：MSVC 14.43 `cl /WX` 触发 `intrin.h` C2220+C4391、text-runtime `rust-lld` 缺 `__CxxFrameHandler3/_fltused`、`p969_t02_console_lane_grants_and_capture` 在 master 原样失败、a2ts `[WinError 2]` 为 PLAN-1126 批收据已记的既有 runner 错。受影响模块定向证据全绿（ace-core 908/5 既有红、av plan981 98/98、av plan118 2/2、a2x-ts 全绿、auto-ui package 12/12、tools vue 111/111 单线程）。用户 2026-11-24 明确裁决：**按定向证据落盘并记录环境红**。
 - **外来未提交改动（保留未动）**：主检出 `crates/auto-ui-runtime/src/ui/dynamic.rs` 有四行 `pending_finish: None`（该字段在树中不存在，`cargo check` 报 E0560）。非本计划产物，按合约保留原样、不纳入本提交；其归属需另行确认。
 - **证据折叠**（原 `plan-artifacts/plan-118/` 已删）：AV oracle 收据 SHA256 `CE6CB196…5E4225`(A)/`0552ED56…071996E`(B)，runner `run-av-oracle.ps1` 断言 17 条；A2Vue Playwright 9 行断言全 PASS（HEX `#FF0000FF` 选色 → 画布点 `px42=#FF0000FF`、RGB 改 R → HEX `#000000FF`、Save/New/Load、Undo/Redo），截图 `paint-vue.png`（画布单像素 + 取色器渐变/色相/alpha/调色板 + `loaded`/`px42` 状态）；生成 36 文件 / App.vue 1,573,9xx B / vite dist 410.47 kB；两处根因（a2x `a2x_list_push` 文本副本语义；web 视图 `onhit`/`onenter` 隐式实参受理 + canvas arm）。
+
+2026-11-24 stage: merge | key: PLAN-118:r1 | checkpoint: cleaned | outcome: pass
+
+- `cleaned`：两棵 worktree（`D:/autostack/.wt/ui-118/{auto-ui,auto-lang}`）在移除前分别重跑 `wt-guard.ps1` 均 clean；`git worktree remove` + `git branch -d plan-118-dev`（was `67487137…` / `15e3f08c9…`）完成；组目录 `D:/autostack/.wt/ui-118` 仍含**他计划**的 `auto-down`/`auto-web`，按归属保留。
+- `plan-artifacts/plan-118/` 整 scope 已删除（188 文件 / 17,545,593 字节 / 0 reparse point），证据已折叠进本文件；`.retention/policy.json` 已刷新（`scopes["plan-118"]` = deleted-at-merge、`merge_closeouts` 追加、`last_merge_closeout` = PLAN-118）。
+- 保留项（非本计划、未动）：主检出 `crates/auto-ui-runtime/src/ui/dynamic.rs` 的外来未提交 `pending_finish` 四行（E0560，归属待确认）；两仓 `plan-118-dev-pre117` 历史备份分支（round-1 快照）。
+- 批回归到期检查：`docs/plans/.last-batch-regression.json` = `last_covered_plan_id 1126` / `2026-11-23T00:03:39Z`；118 非 5 倍数且 receipt 未超 48h → **不到期**，无需 batch gate。
+- 部署观察（landing ≠ deployment）：本次仅示例应用 + 宿主适配 + 生成器/运行库源码；无生产二进制/发布包需要重启或重建，无 stale artifact 需要登记。
