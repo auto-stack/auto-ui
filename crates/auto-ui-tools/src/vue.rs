@@ -8487,8 +8487,12 @@ fn ace_vue_sfcs(
                 content.to_string()
             }
         };
+        let lane_input = lane_list_spelling(&lane_source);
+        if let Ok(dump) = std::env::var("P119_VUE_DUMP") {
+            let _ = std::fs::write(dump, &lane_input);
+        }
         let multi = auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product(
-            &lane_list_spelling(&lane_source),
+            &lane_input,
             &at_path.to_string_lossy(),
             rt_href_first,
             rt_href_rest,

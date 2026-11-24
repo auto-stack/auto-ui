@@ -852,11 +852,11 @@ fn transform_stmt_list(stmts: &[String], ctx: &mut CtrlCtx) -> Option<Vec<String
                 let mut cond = form.cond.clone();
                 if let Some(flag) = &brk_flag {
                     if !named {
-                        cond = format!("({cond}) && {flag} == false");
+                        cond = format!("{cond} && {flag} == false");
                     }
                 }
                 if ret_guard && !named {
-                    cond = format!("({cond}) && __p119_ret == false");
+                    cond = format!("{cond} && __p119_ret == false");
                 }
                 let text = format!("{} {} {{\n{}\n}}", form.kw, cond, body_text);
                 let prelude = flags_to_declare
