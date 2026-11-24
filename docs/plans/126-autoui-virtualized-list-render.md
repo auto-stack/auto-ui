@@ -199,7 +199,26 @@ r1 基线 Git blob `c667888299e6fb283f23233b13532a77b665605e`。r1 的 AC-02 承
 2. 若该入口以 VNode/VTree 为中间层：给 `VirtualMark` 分配稳定 vnode id 并在 vtree→element 层保留，`SpacePx` 映射为固定高度间隔节点；probe 改读 vtree bounds（`__bounds_collected` 已有同源数据）。
 3. 退化方案（若 1/2 代价过大）：给虚拟化 pane 的 `View::Scrollable` 加 `measure_key` 字段（约 20 处构造点，机械补齐），由 `scroll_state_reader` 拿到视口/偏移；行高改由**显式 `row-height`**（普通列表入口 + 025 表体默认值）提供，`list_top` 用「pane 内容高 − 行数×行高」反解。该方案不需要 mark。
 
-2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 3 | from: executing | to: executing | status: executing | outcome: in_progress | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: plan-126-dev HEAD | next: work
+2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 4 | from: executing | to: executing | status: executing | outcome: in_progress | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: e375863f | next: work
+
+2026-11-24 stage: work | PLAN-126:r2 | outcome: in_progress（T-03 核心窗口化已实窗生效；普通列表 fixture 与 V-01 规模取证未做） | plan_revision: 2 | worktree: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | code_commit: 41d6138a | tasks: T-03（进行中） | next_responsible_role: work（T-03 收尾）
+
+**T-03 核心窗口化（实窗已验证）**
+
+- 根因修正：窗口 element 树确经 `DynamicComponent::view_with_debug_gated` → `dynamic_view_impl_inner`（`iced/renderer/projection.rs:3784`）→ `render_dynamic_view`（`iced/renderer/devtools.rs:3461`）。上一轮判断的「不经投影」不完全准确——窗口化 band 先被 `convert_view_messages` 的 `_ => AbstractView::Empty` 兜底吞掉（`iced/renderer/mod.rs:1606`，与 PLAN-082 Rich / PLAN-029 Custom 同类），且标记子件走通用 `into_iced` 丢了 vnode id。两处已修：`convert_view_messages` / `render_dynamic_view` 显式透传 `SpacePx`/`VirtualMark`（mark 递归渲染并挂 `vlist_mark:{key}:{start}:{end}`）；`View::Scrollable` 增 `measure_key`，`build_scrollable` 把既有 `vnode_*` id 登记进台账（滚动目标、bounds id、快照 id 均不变名）。
+- 标定/反解：行高只由「全列表标定」且取两个时间上分离的样本 + 3s 复验（启动期字体/世界瞬态实测 3456 vs settle 3477）；`list_top = band_top − start*row_h − viewport_y`；视口宽变化使行高失效；**偏移变化置脏帧**（否则滚动后窗口不跟随，截图为空——本轮抓到并修）。
+- 实窗证据（GL，025，offsets 0/600/2400/7200，`t01/probe11`，`t01/off10` 为关闭对照）：`[VLIST] measure panes=1 bands=1` ×63；`scope=vlist_0 n=120 window=[0,22)`（顶）/`window=[93,120) rows=27`（尾）；`row_h=28.97 list_top=176.20`，标定带 rect `(209,237,1055×3477)` = T-01 基线；pane 内容高 3663.6–3685.1（基线 3669，差值等于换行成两行的进程名各 +21px）；偏移 clamp 0→0 / 600→600 / 2400→2400 / 7200→2946。截图中各偏移约 20–28 行填满视口。
+- 关闭对照（`AUTOUI_VIRTUAL_LIST=0`，需 `AUTOUI_KEEP_VLIST=1` 因 harness 会 pop 该变量）：120 行、内容 3689.8、clamp 2950——完整构建行为逐项未变。
+- 测试：`virtual_list` 16/16（新增标定/复验/宽度失效/mark id 用例）、`scrollable` 9/9、`vnode` 46/46、`cargo check --lib --tests --features ace-bridge` 通过；全 lib 套件 2666/2680，13 失败 +1 超时在 `e375863f` 干净树上同样复现（剪贴板/OS 环境、AV 编译器切片、gallery/media），非本计划引入。
+- 证据索引：`D:/autostack/plan-artifacts/plan-126/t03/README.md`；原始运行 `t01/probe9|10|11`、`t01/off10`。
+
+**T-03 余项（下一轮收尾后转 T-04）**
+
+1. 普通列表 fixture：显式 `vlist`/`scroll` 入口的 `row-height` 参数与同一窗口/占位实现（当前显式 `scroll` 元素在 tracked/MCP 轨仍走完整构建，属已记录的边界）。
+2. V-01 三维取证：1,000 / 10,000 行样本的「取行数 / 行构建数 / 行布局节点数」计数与 `AUTOUI_VIRTUAL_LIST=0` 对照；10,000 行需要把总高度 289,700px 走 `SpacePx`（已具备）并确认滚动条范围与远端跳转。
+3. V-02 首帧/缩放/尾部/空表的方向性用例（窗口跟随滚动已在实窗抓过一次回归，需纳入定向用例）。
+
+2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 5 | from: executing | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: 41d6138a | next: work
 
 ## 10. 待澄清事项
 
