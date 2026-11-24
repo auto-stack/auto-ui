@@ -444,6 +444,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 实测：prep 产物中 `store MinesweeperStore` **恰 1 条**、`type BoardRow` 恰 1 条 ⇒ 重复不是 prep 造成的，而在 `generate_linked_front_sfc` 内部（`checked_widgets::generate` 或 `generate_package_sfc_leaf` 路径中的某处再走了一次 prep/内联）。
 - 下一步单点：在 `generate_linked_front_sfc` 的每个阶段后打印 `store MinesweeperStore` 出现次数（units 装配后 / append_widget_packages 后 / leaf 前），一次运行即可定位。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 阶段计数打印被 auto 子进程 stderr 吞掉，未取到计数 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 改用文件落盘或把计数写进错误串
+
+- 已在 `generate_linked_front_sfc` 的 units 装配后与 `append_widget_packages` 后加计数打印（`p119_store_count`），但 `auto build` 子进程的 stderr 没有透出（无 `P119DBG` 行），无法据此定位二次内联点。
+- 改法（下一步）：把计数写进**错误字符串**（`bail!("... store_decls=N ...")`）或用 `P119_DUMP` 风格落盘文件，随 `auto build` 的错误面直接读出。
+- 临时件登记：`p119_store_count` 与调用点（落主前移除）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
