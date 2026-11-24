@@ -130,7 +130,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - 2026-11-24 收口轮（§9 round 14）：新存储 + 同步派发下复跑——Phase A 核心全绿（302+ 真实进程、`RequestKill`、具名软拒绝 + pid、victim 存活、handler 自动关框、拒绝后刷新继续 64→66、关窗退出）；Phase A 末尾与 Phase B 的按键/持久化 3 项受环境时序影响未过（与拒绝/授权语义无关）。软拒绝契约（§10 D-7）下「取消」一步已并入 handler 收尾，不再是独立 oracle。
 - [x] T-04 独立复核 AV 阶段
   - review，AC-04，按 VM 路线的实际入口（`auto run -r vm` + MCP）与冻结版本核原行为、反例、资源和完整 AV 行；复核 V-03 三段证据（刷新、拒/放、关闭释放）。
-- [ ] T-05 交付 AV 收据
+- [x] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
 - [x] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
@@ -140,9 +140,9 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
     - **真实浏览器**（浏览器道，7.82s；连跑 3 次 7.82 / 7.80 / 7.48s 全绿）：系统 Chrome（Playwright 1.61）+ 同一 `back_proxy`（原样后端 + `AllowedPids`），29 项检查全过。原 `tests/smoke.spec.ts` 的适用 oracle：T1 壳/导航/退役页负 pin、T2 KPI + `已用 N MB`（N>0）+ 120 行真实进程、T4 性能页 SVG path、T5 往返、T6 速率/暂停/继续、T7 的声明默认 dark 主题部分；T3 按现 UI（右键 → 菜单 → 确认框）取消复位。本 Plan 的 oracle：**真服务**——轮询在跑（快照 1→2）；**权限受限**——未授权隔离子进程的结束请求得 403 + `sys.kill.permission_denied` + 目标 pid，进程存活，拒绝经生成客户端的既有错误路径浮出（应用层恰一次 `Error: HTTP 403`），确认框经「取消」复位、仍显示「后端正常」（UI 可恢复）；**授权**——授权隔离子进程经后端真实结束（200 `true`）；**关闭**——卸载后零快照请求（9 → 9）、页面已卸载；无非预期页面异常。
     - **原收据逐行对照**：T1/T2/T4/T5/T6 ✓；T3 的「结束任务按钮」已随 PLAN-684 右键改版过时，按现 UI 修定；T7 的换肤驱动经 dev 构建的 `setupState`，生产包（inlineTemplate）不可达，只验声明默认主题；`tests/desktop_mcp.py` 属旧 VM 桌面路线（`auto run -r vm` + MCP），非本 Plan §3 的 AV 入口，未运行。
     - **L-1 已修**（§10 D-2 选项 ③，`dae048f0` / `190ed0dd`）：生成器 Plain 模式落地后**复跑**（最终代码下连跑 3 次全绿）——冷构建 7.09 / 3.31 / 3.30s，浏览器 8.18 / 7.19 / 7.26s，**32 项检查全过**，选择器即原 smoke 的结构口径：`table tbody tr` 120 行、表头排序、`<thead>`、真实 `<button>`、模态 `role="alertdialog"`（初始不在 DOM → 右键定位 → 可见且含标题与目标 → 取消后关闭）；未授权结束 403 具名 + 对话框已关闭 + 仍「后端正常」；授权结束 200 `true`；拒绝经 Vue 错误处理浮出（应用层恰一次 `Error: HTTP 403`，**无未处理拒绝**）；卸载后零快照请求。截图 `shot.png` 为真实表格。此前「按 lane DOM 等价改写」的说明作废。
-- [ ] T-07 独立终审
+- [x] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
-- [ ] T-08 正式交付与归档
+- [x] T-08 正式交付与归档
   - merge，AC-05，发布 A2Vue 和最终主线收据，沉淀适用规范，归档和校验组清理。
 - [x] T-09 store handler 异步化（§10 D-7；**用户 2026-11-24 指示在计划内单开 phase**）
   - work，AC-02，把 VM 动态 UI 的 handler 派发从「同步原地」改为「片派发 + 帧泵续驱」：长 handler（`Refresh` 的 `system_snapshot` + 排序）不再占满 UI 线程，025 的消息泵从 8/8 卡死降到 0/8，T-03 的 V-03 在默认派发下复跑。
@@ -715,3 +715,5 @@ stage: goal | plan_id: PLAN-112 | plan_revision: r2 | round: 16 | from: review |
 2026-11-24 stage: merge | PLAN-112:r2 | outcome: pass | delivery_commit: auto-ui 72b78803、auto-lang 5d4f7dfe6 | canonical_specs: auto-ui docs/specs/runtime/vm-sys-kill-authorization.md、docs/specs/runtime/handler-dispatch-async.md、docs/specs/ui/vue-plain-native-elements.md；auto-lang docs/specs/auto-lang/vm/overview.md | archive_path: docs/plans/archived/112-autoui-sys-monitor-av-vue.md | cleanup: 待清场（worktree/branch/plan-artifacts）| checkpoints: prepared、landed（两条 ff-only，master tip = delivery commit）、canonical_verified、archived
 
 **合并备注。** auto-lang 的分支含 4 个受检 AGE 贡献提交，与 master 上 PLAN-118 的 AGE 基线冲突；交付只保留 3 个 VM 授权门提交（6392799d2/4047d7fd9/5d4f7dfe6），AGE 贡献原样保留在本地分支 plan-112-age-contrib（未合入，供上游）。
+
+2026-11-24 stage: merge（清场）| PLAN-112:r2 | outcome: pass | cleaned: worktrees `D:/autostack/.wt/ui-112/{auto-ui,auto-lang}` 已删（wt-guard 均 clean）、分支 `plan-112-dev` 两仓已删、`plan-artifacts/plan-112/` 已删（214 文件 / 51,107,014 B，删除前 reparse=0）、registry 已刷新（`plan-112` scope=deleted-at-merge、无 holds）| residual: 本地分支 `plan-112-age-contrib`（auto-lang）保留受检 AGE 贡献，未合入 master（与 PLAN-118 基线冲突），交上游 | batch_regression_due: 见 `docs/plans/.last-batch-regression.json`
