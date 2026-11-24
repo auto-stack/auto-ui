@@ -250,6 +250,10 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - A（auto-lang，一行级）：`expand_store_calls` 增 `ComponentStmt::Effect { value }` 分支，与 Call 同一展开逻辑（需扩 G5 授权：改语义）。
 - B（auto-ui prep，在既有 prep 授权内）：跨单元内联——在应用单元里把 `store.X(args)` 直接替换为 store 单元 X 的 handler 体，并把 `.field`/`.store.field` 归一为 `.st_field`（prep 已有同类改写设施，改动较大但不动 auto-lang）。
 
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 15 | from: work | to: work | status: drafting | outcome: waiting | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （上一轮 49e4d0a0） | next: user（§10 A/B 二选一：auto-lang 展开 Effect 分支 / prep 跨单元内联）
+
+- 等待轮 1/3：§10 的 A/B 路径需用户择一。B 在既有 prep 授权内（可直接开工），A 需把 G5 授权从「仅诊断」扩到「该处修复」。本轮不做实现、不跑检查。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
