@@ -6,7 +6,7 @@ author: [lead]
 created_at: 2026-11-24
 updated_at: 2026-11-24
 plan_revision: 2
-current_step: 2
+current_step: 3
 total_steps: 8
 depends_on: [auto-ui/PLAN-112]
 supersedes_spec_components: []
@@ -116,8 +116,9 @@ T-03/T-04 建立 V-01..V-03 和 V-05 所需的定向 fixture。T-01 准备绑定
 - [x] T-02 确认可按窗口取行的接线
   - **work**。依赖 T-01。验证 025 列表的实际表示、取得长度和按索引读取的路径、表体相对滚动坐标，以及首帧和缩放的测量来源。将两种消费入口、行高单位与间距口径、回退条件和正反示例写入 §9。涉及 §10 Q-02 的实质变更时记录所需裁定，再推进受影响的 025 接线。覆盖 AC-01、AC-02、AC-04。
   - 结果：pass。注入点 = `tracked.rs:40` ForLoop 臂（生产轨；table-body 正走此臂），调试轨需在 `convert_for_unkeyed`/`convert_for_keyed`/`for_loop_iterations` 保持同窗口语义；数据读取需新增 O(1) 长度与按索引取元素；测量来源 = ScrollStateReader pane 读回 + LayoutCollector content 空间 bounds；120 行上限、行高 29px、10,000 行样本需 f32 高度占位。025 源不需要改（Q-02 无需裁定）。详见 §9 T-02。
-- [ ] T-03 实现固定行高 VirtualList
+- [x] T-03 实现固定行高 VirtualList
   - **work**。依赖 T-02。接入 VM 展开前的区间入口和 Iced 布局，完成 `AUTOUI_VIRTUAL_LIST=0` 对照和普通列表 fixture。按 V-01 验证底层取行、构建和布局三个维度。覆盖 AC-01、AC-02。
+  - 结果：pass。025 实窗窗口化 `[0,22)…[93,120)`、`row_h=28.97 list_top=176.20`、内容高≈3669、clamp 不变（`41d6138a`）；显式 `scroll (row-height: …)` 入口 + 1k/10k fixture：窗口化两侧均 31 行/37 vnode/3 layout nodes、0.43–0.75ms，关闭对照 1003/10003 vnode、12.8/125.6ms（`fbabf41d`）；V-02 六例 PASS。见 §9。
 - [ ] T-04 接通 025 与行交互
   - **work**。依赖 T-03。让 025 的表体接入共享组件，使用既有视口，保留表头布局与排序入口。验证滚动、缩放、点击、右键和排序后的 PID，补齐普通列表正反对照。覆盖 AC-01、AC-04。
 - [ ] T-05 验证规模、交互和性能
@@ -219,6 +220,20 @@ r1 基线 Git blob `c667888299e6fb283f23233b13532a77b665605e`。r1 的 AC-02 承
 3. V-02 首帧/缩放/尾部/空表的方向性用例（窗口跟随滚动已在实窗抓过一次回归，需纳入定向用例）。
 
 2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 5 | from: executing | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: 41d6138a | next: work
+
+2026-11-24 stage: work | PLAN-126:r2 | outcome: pass（T-03 完成，T-01..T-03 已闭） | plan_revision: 2 | worktree: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | code_commit: fbabf41d | tasks: T-03 | next_responsible_role: work（T-04）
+
+**T-03 收尾（显式入口 + V-01/V-02 取证）**
+
+- 显式入口：`scroll (row-height: 28[, list-top: 0])`（别名 `scrollable`/`row_height`/`list_top`）。声明 `row-height` 的 pane 视为可信几何：首帧只建顶部 `min(n,256)` 行 + 尾部 `SpacePx` 给出精确总高，首个 probe（视口/偏移）后切真实窗口；不标定、不周期复验，band 仅细化 `list_top`；非法值忽略。解析 `virtual_rows.rs:113`（`vlist_explicit_geometry`）、untracked `tags_container.rs:186`、tracked `tracked.rs:2601`（pane `measure_key` `tracked.rs:2660`）、台账 `virtual_list.rs:533/:563`。无该 prop 时逐字节保持既有行为；`AUTOUI_VIRTUAL_LIST=0` 完全忽略。
+- Fixture：`crates/auto-ui-runtime/src/ui_tests/plan126_vlist_scale_tests.rs`（inline `.at` widget，1k/10k `Value::Obj` 行经 `write_state_vec` 注入，真实 `convert_node_with` ForLoop → `View` → `view_to_vtree`）。
+- V-01（row_h 28、list_top 0、viewport 740、offset 700、overscan 2 ⇒ 窗口 `[23,54)`）：1,000 与 10,000 行窗口化**逐维相同**——取行 31 / `list_get` 31 / 构建 31 / vnode 37 / layout 3，0.745ms 与 0.428ms；关闭开关为 1003 与 10003 vnode、12.771ms 与 125.564ms（线性）；占位合计 `(n-31)*28` = 精确总高。
+- V-02（6/6 PASS）：窗口跟随滚动（偏移脏帧 + `[0,29)`→`[23,54)`，host `host.rs:2047`）、视口高变化（`[0,29)`→`[0,13)`）、尾部夹紧 `[971,1000)`、空表（无窗口零读取）、短表（10 行无占位）、列表整体在视口外（空 band、内容高保持）。
+- 测试：`virtual_list` 33/33（16 旧 + 17 新，~0.8s）；同过滤在 `AUTOUI_VIRTUAL_LIST=0` 下 33/33（8 例打印 skip 理由 + 1 例断言 `enabled()==false` 与完整构建数字）；`plan081` 3/3、`scrollable` 9/9、`vnode` 46/46、`plan656` 1/1；全 lib 2697 run / 2685 pass / 11 fail + 1 timeout，全部落在既有类别（AV 切片、剪贴板/OS、gallery/media、plan657），无 vlist/scroll 失败。
+- 证据：`D:/autostack/plan-artifacts/plan-126/t03-scale/README.md`（props/API、fixture、数字、命令、退出码）。
+- 遗留（T-04/T-05）：tracked 轨窗口行经 untracked 转换构建，逐行 `BuildProbe`/debug-id 条目（及窗口内行点选 PID）仍缺，025 同款；显式 `row-height` 列表的实窗 GL 验证需要 harness 应用源（examples 不在本计划范围）；固定行高在换行双行处仍有 +21px/行漂移；Vue 生成器无窗口化/row-height 提示。
+
+2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 6 | from: executing | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: fbabf41d | next: work（T-04）
 
 ## 10. 待澄清事项
 
