@@ -148,6 +148,8 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   `source.age.widget-runtime-handler: cannot emit a checked widget transition for handler Reveal`（@入口 `.Reveal(x,y) -> { store.Reveal(x, y) }`）；
   回落无状态道后 `initial_widget_handlers` 编译再报 `source.view-escape`。即：**live widget-runtime 的 transition 发射面不承载带列表变更的 handler**——这是引擎/发射面能力（非源形），prep 不可达。
 
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 2 | from: work | to: work | status: drafting | outcome: pass（阶段推进） | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: （无代码改动） | next: work（T-02 次段二分）
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
@@ -161,3 +163,12 @@ T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台
 （先例：PLAN-118 §10 裁定①曾授权其在 plan-118-dev 的 auto-lang 树做最小闭合集。）
 
 2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 2 | from: work | to: work | status: drafting | outcome: pass（阶段推进） | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: 1a986a9c | next: work（T-02 续：live transition 发射面 / 无状态道 startup-handler 编译面）
+
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-02 次段——真窗装载链定位到 live 道发射面 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: （无代码改动；探针材料 plan-artifacts/plan-119/） | next: 用文件喂入式探针二分 live 发射面
+
+**T-02 次段：真窗装载链（2026-11-24）**
+
+- 事实链：真窗 `--package` → `load_package` → `new_with_root` → ①整包编译 `compile_package(instances=1)` **OK**（§上段已绿）→ ②`LivePackage::prepare` → `compile_age_package_widget_runtime` 返回 **`source.age.widget-runtime-handler: cannot emit a checked widget transition for handler Reveal`**（全部诊断前缀 `source.age.widget-runtime-` → `prepare` 返回 `Ok(None)`，live 道不着车）→ ③回落无状态重放道 → 事件派发被 `source.age.store-runtime: shared Stores require a live widget session for events` 具名拒（带 store 的应用**必须** live 道）→ 真窗 `open failed`。
+- 判据面：live 道是 038 的唯一可行道（重放道对 shared store 事工具名拒）。故 T-03 的前提 = live widget-runtime 能为本应用发射 transition。
+- 隔离对照（`plan-artifacts/plan-119/live/`，每个变体真窗 live 装载全 OK、exit 0）：赋值、`.board.push({…})`、`.board.set(0, R { … })`、C 风格 for + 嵌套 if、无类型 `var stack = []` + `remove(len-1)`、`__p119_ret` 标志守卫、`"n=" + (3-1).to(Str)`、`for cond && brk == false` + 守卫——**单构造均不是发射面缺口**。
+- 未决：038 的 `Reveal` 仍未发射成功，差异不在已枚举的单构造，需在**准备后单元**上二分（下一轮）：给 `p119_diag` 加 `P119_LIVE_FILE`（从文件喂 units 直连 `compile_age_package_widget_runtime`，绕开二次 prep）后按 arm/语句二分。附注：raw 源按语句截断的粗二分不可靠（截断后的 store 经 prep 重组会先在整包编译报 `view-escape`，属探针工件，非发射面证据）；此轮已停在正确判据上（准备后单元 + live 直连）。
