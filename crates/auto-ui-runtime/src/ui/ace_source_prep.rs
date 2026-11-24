@@ -2594,6 +2594,7 @@ pub fn prepare_store_units(
                 // PLAN-119：AGE 面 store handler 语句文法没有 `return`/`break`
                 // （038 MinesweeperStore 真实依赖）——先做控制转移兼容改写，
                 // 再做文本转换拼写与 model 形态归一。
+                unit.source = inline_store_self_calls(&unit.source);
                 unit.source = rewrite_stack_pops_to_queue(&unit.source);
                 unit.source = rewrite_store_control_flow(&unit.source).unwrap_or(unit.source);
                 unit.source = rewrite_package_text_conversions(&unit.source);
@@ -2744,6 +2745,81 @@ fn rewrite_stack_pops_to_queue(src: &str) -> String {
             "{indent}var {head} int = 0\n{indent}for {head} < {name}.len() {{{body}}}"
         );
         out.replace_range(line_start..=close, &replacement);
+    }
+    out
+}
+
+/// store 单元 `on { … }` 内各 arm 的 (臂头, 体内文本)。
+fn handler_arms(block: &str) -> Vec<(String, String)> {
+    let Some(on_open) = find_section_open(block, "on") else { return Vec::new() };
+    let Some(on_close) = scan_balanced(block, on_open) else { return Vec::new() };
+    split_handler_arms(&block[on_open + 1..on_close]).unwrap_or_default()
+}
+/// PLAN-119：把 store 单元里的**自方法调用** `store.X(args)` 在 prep 期直接内联
+/// 成 `X` 的 handler 体（形参→实参按名替换，递归 ≤4 层）。
+///
+/// 动机：AGE 包面只在 widget 层展开 store 调用；store handler 体里残留的
+/// `store.Init()` 等会被 `stmts_have_foreign_call` 记为域外调用
+/// （`foreign_callee=Init`），使整个 handler 判 `body_foreign` 而永远发不出
+/// transition（plan 119 §9 实证）。
+fn inline_store_self_calls(src: &str) -> String {
+    if !src.contains("store.") {
+        return src.to_string();
+    }
+    let Some((open, close)) = model_block(src) else {
+        return src.to_string();
+    };
+    let _ = (open, close);
+    let mut out = src.to_string();
+    for _ in 0..4 {
+        // 解析各 arm 的 (参数名列表, 体文本)。
+        let mut arms: Vec<(String, Vec<String>, String)> = Vec::new();
+        for (head, body) in handler_arms(&out) {
+            let name = head
+                .trim_start_matches('.')
+                .split('(')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let params: Vec<String> = head
+                .split_once('(')
+                .map(|(_, rest)| {
+                    rest.split(')')
+                        .next()
+                        .unwrap_or("")
+                        .split(',')
+                        .filter_map(|p| p.split_whitespace().next().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default();
+            arms.push((name, params, body));
+        }
+        let mut changed = false;
+        for (name, params, body) in &arms {
+            let needle = format!("store.{name}(");
+            let mut from = 0usize;
+            while let Some(rel) = out[from..].find(&needle) {
+                let at = from + rel;
+                let arg_open = at + needle.len() - 1;
+                let Some(arg_close) = scan_balanced(&out, arg_open) else { break };
+                let args = split_top_level(&out[arg_open + 1..arg_close]);
+                if args.len() != params.len() {
+                    from = arg_close + 1;
+                    continue;
+                }
+                let mut expanded = body.clone();
+                for (p, a) in params.iter().zip(args.iter()) {
+                    expanded = replace_word(&expanded, p, a.trim());
+                }
+                out.replace_range(at..=arg_close, &expanded);
+                changed = true;
+                from = at + expanded.len();
+            }
+        }
+        if !changed {
+            break;
+        }
     }
     out
 }
