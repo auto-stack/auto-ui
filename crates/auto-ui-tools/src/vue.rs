@@ -8477,11 +8477,11 @@ fn ace_vue_sfcs(
                 } else {
                     Vec::new()
                 };
-                let entry_source = if has_store_decl { content } else { &prepared.source };
+                let entry_source = &prepared.source;
                 match auto_ui_runtime::ui::ace_package_sfc::generate_linked_front_sfc(
                     at_path,
                     entry_source,
-                    &store_modules,
+                    &[],
                 ) {
                     Ok(Some(sfc)) => {
                         return Ok(Some(AceVueProducts {

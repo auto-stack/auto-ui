@@ -657,11 +657,20 @@ pub fn generate_package_sfc_with_root(
         .find(|u| format!("{}::{}", u.package, u.id) == entry)
         .map(|u| u.source.clone())
         .ok_or_else(|| format!("entry module `{entry}` is not in the package units"))?;
-    let prepared_entry = match project_root {
-        Some(root) => crate::ui::ace_source_prep::prepare_component_source(root, &entry_src)
-            .map(|p| p.source)
-            .unwrap_or_else(|_| entry_src.clone()),
-        None => entry_src.clone(),
+    // PLAN-119：entry 源**已含同源 `store` 片断**时不再 prep（二次 prep 会把
+    // store 内联两遍 → `multiple store declarations per node`）。
+    let already_prepared = entry_src
+        .lines()
+        .any(|line| line.trim_start().starts_with("store "));
+    let prepared_entry = if already_prepared {
+        entry_src.clone()
+    } else {
+        match project_root {
+            Some(root) => crate::ui::ace_source_prep::prepare_component_source(root, &entry_src)
+                .map(|p| p.source)
+                .unwrap_or_else(|_| entry_src.clone()),
+            None => entry_src.clone(),
+        }
     };
     let node = package_candidates(&prepared_entry)?
         .into_iter()
