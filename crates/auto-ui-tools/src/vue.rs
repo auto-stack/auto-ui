@@ -8478,6 +8478,7 @@ fn ace_vue_sfcs(
                     Vec::new()
                 };
                 let entry_source = &prepared.source;
+                let _ = std::fs::write("D:/autostack/plan-artifacts/plan-119/call.log", format!("has_store={has_store_decl} src_len={}", entry_source.len()));
                 match auto_ui_runtime::ui::ace_package_sfc::generate_linked_front_sfc(
                     at_path,
                     entry_source,
