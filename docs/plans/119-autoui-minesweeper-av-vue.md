@@ -265,6 +265,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 - 等待轮 2/3：G6（分支/循环体方法调用白名单是否放宽到纯函数式转换）需用户裁定。本轮不做实现、不跑检查。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: G6①落地（白名单加纯转换）；widget 侧调用仍未展开 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下） | next: 打印 handler 语句的 ComponentStmt 变体（Call/Effect/其它）
+
+- 用户 G6 裁定①落地：`stmts_have_foreign_call` 的可发射集合扩到 `to|to_string|to_str`（与列表方法同列），编译通过。
+- 但 live 仍拒，且 `foreign_callee=Reveal/Init` 依旧出现 ⇒ widget 侧 `store.Reveal(x, y)` **既不是 `Call` 也不是 `Effect`**（Effect 分支上一轮已加），故两轮展开补丁都没命中。
+- 下一步（单点）：在 `inline_store_decl` 的展开循环前打印 `std::mem::discriminant(&st)` 或 `{:?}` 的语句列表，确定实际变体（候选：`Send`、`Let`、`Assign` 携带的 MethodCall），再按同一逻辑补展开分支。
+- 遗留：`P119DBG` 现 6 处临时件，落主前必删。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
