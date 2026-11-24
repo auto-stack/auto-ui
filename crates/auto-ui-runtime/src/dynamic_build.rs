@@ -574,6 +574,187 @@ fn positioned_parse_errors(e: &auto_lang_core::error::AutoError, source: &str) -
     }
 }
 
+/// PLAN-112 D-4: 后端模块与之同名的前端类型名集合。
+///
+/// 动态 UI 管线把 TypeDecl 当进程级共享符号、按名去重（先见者胜）。前端
+/// `src/front/types.at` 与后端 `src/back/*` 常各自声明同名但不同字段集的
+/// 记录（025：前端 `ProcInfo` 11 字段 / 后端 8 字段）。若不处理，合并程序只
+/// 保留先入的一份，另一侧的字面量按错形状构造——字段集不匹配时 VM 会把整个
+/// 字面量求值成**最后一个字段值**（静默错误数据）。
+///
+/// 约定：`src/front/types.at` 是应用视图模型类型的家；后端同名类型是后端
+/// 内部实现细节。因此后端模块在 parse 前把**同名类型标识符**限定为
+/// `<module>__<Type>`，两侧同名不同类型共存。
+fn front_sibling_type_names(module_path: &std::path::Path) -> Option<Vec<String>> {
+    let parent = module_path.parent()?;
+    if parent.file_name()?.to_str()? != "back" {
+        return None;
+    }
+    let front_types = parent.parent()?.join("front").join("types.at");
+    let text = std::fs::read_to_string(front_types).ok()?;
+    let mut names: Vec<String> = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        let rest = trimmed.strip_prefix("pub ").unwrap_or(trimmed);
+        let Some(rest) = rest.strip_prefix("type ") else {
+            continue;
+        };
+        let name: String = rest
+            .trim_start()
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        if !name.is_empty() && !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    Some(names)
+}
+
+/// PLAN-112 D-4: 在源码里把列出的类型标识符限定成 `<prefix>__<name>`
+/// （字符串/行注释/块注释内的同名词不参与语义，保持原文）。
+fn qualify_type_idents(code: &str, names: &[String], prefix: &str) -> String {
+    if names.is_empty() {
+        return code.to_string();
+    }
+    let chars: Vec<char> = code.chars().collect();
+    let mut out = String::with_capacity(code.len() + 32 * names.len());
+    let mut i = 0usize;
+    let mut in_string = false;
+    let mut in_line_comment = false;
+    let mut in_block_comment = false;
+    while i < chars.len() {
+        let c = chars[i];
+        let next = chars.get(i + 1).copied();
+        if in_line_comment {
+            out.push(c);
+            if c == '\n' {
+                in_line_comment = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_block_comment {
+            out.push(c);
+            if c == '*' && next == Some('/') {
+                out.push('/');
+                in_block_comment = false;
+                i += 2;
+                continue;
+            }
+            i += 1;
+            continue;
+        }
+        if in_string {
+            out.push(c);
+            if c == '\\' {
+                if let Some(escaped) = next {
+                    out.push(escaped);
+                    i += 2;
+                    continue;
+                }
+            } else if c == '"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        if c == '/' && next == Some('/') {
+            in_line_comment = true;
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        if c == '/' && next == Some('*') {
+            in_block_comment = true;
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        if c == '"' {
+            in_string = true;
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        if c.is_alphabetic() || c == '_' {
+            let start = i;
+            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            if names.iter().any(|name| name == &word) {
+                out.push_str(prefix);
+                out.push_str("__");
+                out.push_str(&word);
+            } else {
+                out.push_str(&word);
+            }
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
+#[cfg(test)]
+mod d4_type_scope_tests {
+    use super::*;
+
+    /// D-4：只限定独立标识符；字符串与注释里的同名词保持原文。
+    #[test]
+    fn p112_qualify_type_idents_skips_strings_comments_and_similar_names() {
+        let names = vec!["ProcInfo".to_string()];
+        let src = "type ProcInfo {\n    pid int // ProcInfo in comment\n}\n\
+                   let s = \"ProcInfo in string\"\n\
+                   var x []ProcInfo = []\n\
+                   ProcInfo { pid: 1 }\n\
+                   let procs = 1\n\
+                   let ProcInfos = 2\n";
+        let out = qualify_type_idents(src, &names, "api");
+        assert!(out.contains("type api__ProcInfo {"), "{out}");
+        assert!(out.contains("var x []api__ProcInfo = []"), "{out}");
+        assert!(out.contains("api__ProcInfo { pid: 1 }"), "{out}");
+        assert!(out.contains("\"ProcInfo in string\""), "{out}");
+        assert!(out.contains("// ProcInfo in comment"), "{out}");
+        assert!(out.contains("let procs = 1"), "{out}");
+        assert!(out.contains("let ProcInfos = 2"), "longer identifier untouched: {out}");
+    }
+
+    /// D-4：后端模块从 `../front/types.at` 取同名类型集合；非 back 目录不参与。
+    #[test]
+    fn p112_front_sibling_type_names_reads_the_front_types_file() {
+        let root = std::env::temp_dir().join(format!(
+            "p112-d4-types-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let back = root.join("src").join("back");
+        let front = root.join("src").join("front");
+        std::fs::create_dir_all(&back).unwrap();
+        std::fs::create_dir_all(&front).unwrap();
+        std::fs::write(
+            front.join("types.at"),
+            "type ProcInfo {\n    pid int\n}\n\npub type Snapshot {\n    procs []ProcInfo\n}\n",
+        )
+        .unwrap();
+        std::fs::write(back.join("api.at"), "type ProcInfo {\n    pid int\n}\n").unwrap();
+
+        let names = front_sibling_type_names(&back.join("api.at")).expect("back module");
+        assert_eq!(names, vec!["ProcInfo".to_string(), "Snapshot".to_string()]);
+        assert!(
+            front_sibling_type_names(&front.join("app.at")).is_none(),
+            "front modules are never rewritten"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
 pub(crate) fn collect_module_imports(
     module_path: &std::path::Path,
     visited: &mut std::collections::HashSet<std::path::PathBuf>,
@@ -596,6 +777,18 @@ pub(crate) fn collect_module_imports(
     };
     // PLAN-037: launch 期作用域化模块源前缀化（未激活时零成本透传）。
     let code = auto_lang_core::back_prefix::apply(module_path, code);
+    // PLAN-112 D-4: 后端模块与前端 `types.at` 同名的类型标识符在 parse 前
+    // 限定为 `<module>__<Type>`——两侧同名不同类型在合并程序里共存。
+    let code = match front_sibling_type_names(module_path) {
+        Some(names) if !names.is_empty() => {
+            let stem = module_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("back");
+            qualify_type_idents(&code, &names, stem)
+        }
+        _ => code,
+    };
     // Plan 333: pre-resolve this module's `use` deps into the shared type_store
     // so types like `Note` (from `use api: Note`) are registered before parse.
     // resolve_uses is itself recursive (it follows each module's own uses), so
@@ -1176,6 +1369,24 @@ fn build_dynamic_component_full(
             let fb = root.join(base_dir);
             if !base_dirs.contains(&fb) {
                 base_dirs.push(fb);
+            }
+        }
+
+        // PLAN-112 D-4：前端包的类型声明文件（`src/front/types.at`）先于
+        // 一切 `use` 进入合并程序——类型表按名先见者胜，后端 `use back.api`
+        // 的同名类型不得先占名（后端侧已在 parse 前限定，这里补前端声明）。
+        {
+            let front_types = base_dir.join("types.at");
+            if front_types.is_file() {
+                collect_module_imports(
+                    &front_types,
+                    &mut visited,
+                    &mut import_stmts,
+                    &mut seen_symbols,
+                    &mut import_session,
+                    override_scenario,
+                    &mut import_store_decls,
+                );
             }
         }
 
