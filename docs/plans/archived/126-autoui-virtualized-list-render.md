@@ -376,6 +376,9 @@ r1 基线 Git blob `c667888299e6fb283f23233b13532a77b665605e`。r1 的 AC-02 承
 
 2026-11-24 stage: merge（清场）| PLAN-126:r2 | outcome: pass | cleaned: 计划树 `D:/autostack/.wt/ui-126/auto-ui` 已删（收尾前 `wt-guard.ps1` 报 clean、工作树 clean、`8e31cd0e` 已是 master 祖先）；分支 `plan-126-dev` 已删（was `8e31cd0e`）；依赖兄弟树按其本仓清理：`auto-lang`（`plan-126-dev` @816585732，`master..HEAD` 空 ⇒ 无独有提交，树与分支均删）、`auto-web`（detached @0cfc7c7 = 其 master tip）、`auto-down`（detached @456c86a = 其 master tip），三树 `wt-guard` 均 clean；组目录 `.wt/ui-126` 已删（空目录核实后）| artifacts: `D:/autostack/plan-artifacts/plan-126/` 整目录删除（415 文件 / 50,058,485 B，删除前 reparse=0，0.08s，路径不在）| registry: `.retention/policy.json` 已刷新（`plan-126` = deleted-at-merge / cleaned / remaining_bytes 0 / holds []，`last_merge_closeout` = `auto-ui/PLAN-126`）| batch_regression_due: 不触发（见上条）| residual: 无具名 artifact hold；三项 reviewed-and-accepted 边界见上条 | archive_commit: `0f033240` | closeout_commit: 本条簿记提交（含归档相对链接上提 `../..`→`../../..`、`../specs`→`../../specs`、`archived/112-*`→`112-*`、`debts.md`→`../debts.md`，全部解析通过）
 
+**本轮（merge 会话）测试/构建执行表**：未运行任何测试或构建——占用门观察到 PLAN-1068 `prepare-native` 编译（PID 731624，22:04）与 PLAN-116 `cargo test -p auto-ui-runtime --features ace-bridge --test plan116_av_app_http`（PID 616028，22:04）同时在跑，按 test-discipline 不启动竞争构建；准备/发现/测试/清理的实际耗时均**未观测**（NOT_RUN，不适用），新增用例 = 无。复用证据 = `42e09ff1` 定向门（`virtual_list` 37/37、`plan126_vlist` 18/18、关闭档 37/37、`plan081` 3/3、`scrollable` 9/9、`vnode` 47/47、`plan656` 1/1、`desktop_behavior` 11/11、全 lib 2706/2693/12+1），输入未变且 rebase range-diff 8/8 全等。
+- 观察：SD-01 头注仍指向已删的 `plan-artifacts/plan-126/*` 原始证据路径（规范按 review 冻结内容原样落主，未在合并期改写；证据摘要已折入本归档件 §8/§9）。
+
 ## 10. 待澄清事项
 
 - **Q-01 排序**。将排序移出 UI 线程是原始需求中的独立工作。由后续计划根据 AutoLang 与 025 实际排序路径确定边界，PLAN-126 可以独立推进。
