@@ -366,6 +366,25 @@ fn live_file_mode() -> bool {
             );
         }
         let mut kept: Vec<String> = Vec::new();
+        // subset 掩码：P119_LIVE_KEEP="0,1,2" 只保留这些下标（覆盖 leave-out 扫描）。
+        if let Ok(keep) = std::env::var("P119_LIVE_KEEP") {
+            let want: Vec<usize> = keep
+                .split(',')
+                .filter_map(|v| v.trim().parse().ok())
+                .collect();
+            for (j, st) in level.iter().enumerate() {
+                if want.contains(&j) {
+                    kept.push(st.clone());
+                }
+            }
+            let body = format!("\n{}\n", kept.join("\n"));
+            let mut next = isolated.clone();
+            let mut s = src.clone();
+            s.replace_range(range.0..range.1, &body);
+            next[1].source = s;
+            println!("subset keep={keep:?}: {}", compile(&next));
+            return true;
+        }
         for i in 0..level.len() {
             kept.clear();
             for (j, st) in level.iter().enumerate() {
