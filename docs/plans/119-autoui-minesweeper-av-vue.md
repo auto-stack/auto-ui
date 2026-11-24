@@ -380,6 +380,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 复跑：错误**同形同一偏移**（`offset: 4068, expected "Comma", found "<"`）⇒ 该 `<` 不是 `List<…>.new()`；需把 lane 输入原样落盘（建议在 `ace_vue_sfcs` 加 `P119_VUE_DUMP=<path>`）后按**字节**定位。
 - 已记录：本轮起坐实“prep 产出与 lane 解析器拼写差异”属 A2Vue 腿的系统性小墙，逐条按字节定位即可（每次 1 处）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 4068 parse 墙清除（括号形）；回到 handler 缺席墙 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 定位 lane 的 absent 判据（ace_vue_script）
+
+- 定位：lane 输入字节 4068 落在 `for (placed < .mine_count) && __p119_brk1 == false {` —— 严格 lane 解析器不接受**带括号的 for 条件**（`for (` 误入调用形，`expected Comma, found "<"`）。
+- 修复：`rewrite_store_control_flow` 的循环条件不再加外层括号（`for cond && flag == false {`，AGE 面已实证可解析）。
+- 复跑：parse 通过；**回到 handler 缺席墙**（`App[.Flag/.Reset/.Reveal/.SetDifficulty/.Tick]`）⇒ lane 自身的投影仍不展开 store 调用。新增 `P119_VUE_DUMP` 落盘 lane 输入（临时件，落主前移除）。
+- 下一步：读 `ace_vue_script` 的 absent 收集（`generate_sfcs_with_lane_product`），打印每 msg 的判据（是否 `handler_body_foreign`、`compile_at` 报错），据此决定是复用组件面展开还是 lane 侧补展开。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
