@@ -121,7 +121,14 @@ fn p119_store_count(label: &str, units: &[ace_core::source::packages::PackageMod
         .iter()
         .map(|u| u.source.matches("store MinesweeperStore").count())
         .sum();
-    eprintln!("P119DBG stage={label} store_decls={n} units={}", units.len());
+    use std::io::Write as _;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("D:/autostack/plan-artifacts/plan-119/store-count.log")
+    {
+        let _ = writeln!(f, "stage={label} store_decls={n} units={}", units.len());
+    }
 }
 pub fn generate_linked_front_sfc(
     app_at: &Path,
