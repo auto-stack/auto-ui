@@ -311,6 +311,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 下一步（单点）：在 live 会话里对 `Reveal` 派发后直接读 `st_game_state`；若仍 ready，则在 prep 侧检查改写后的 `if .game_state == "ready"` 分支（含布雷循环的 `for (placed < .mine_count) && __p119_brk1 == false` 与 `.board.set(...)`）是否被 `__p119_ret` 守卫误吞。
 - 临时诊断新增 2 处（`pkg_event_accepted/rejected`），累计 10 处，落主前清理。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **派发与状态变更均已生效**；oracle 脚本须按帧解析目标 | outcome: pass（T-03 链路成立） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 用按帧解析的动作索引重跑首击 oracle（29 格/16 数字）
+
+- 对比两帧状态：`frames[0]` 的 `st_game_state=playing`、终帧 `ready` ⇒ **点击确实驱动了 handler**（终帧是 `.Reset`→Init 的效果），此前“未改盘面”是**索引错位**：动作索引在帧间会重排，脚本里硬编码的 `target=4` 在第二帧已不是 `Reveal`。
+- 结论：AV 腿（AGE 包编译 → live transition → Iced 真窗 → 动作实参 → 派发 → 状态/视图刷新）**整链已成立**；剩下是 oracle 脚本的严谨性：每步按**当前帧**解析目标索引（或按 message+args 匹配），再断言首击 29 格/16 数字、右击标记、难度切换、重开、两实例隔离、close/reopen。
+- 临时诊断 10 处待清理（§9 已登记）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
