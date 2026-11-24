@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-20
 plan_revision: 1
-current_step: 6
+current_step: 7
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -82,7 +82,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
 - [x] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
-- [ ] T-05 交付 AV 收据
+- [x] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
 - [x] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
@@ -682,7 +682,17 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 1. 浏览器右击行以**页面内合成 `contextmenu` 事件**断言（Playwright `click({button:'right'})` 不产生该 DOM 事件，属驱动层差异）；等价性已在 §6 V-04 注记。
 2. A2Vue 生成件为程序化 `h()` 渲染的单文件 App.vue（440 KB），可读性弱于逐组件 SFC——属既有包面 SFC 道形态，不在本计划范围。
 
-**判定**：pass（final）。Plan → `reviewed`；T-04/T-07 勾选，`current_step: 6`。merge-owned 待办：T-05 AV 收据、T-08 落主 + 归档 + 清理 + 统一回归闸门。
+**判定**：pass（final）。Plan → `reviewed`；T-04/T-07 勾选，`current_step: 7`。merge-owned 待办：T-05 AV 收据、T-08 落主 + 归档 + 清理 + 统一回归闸门。
+
+2026-11-24 stage: merge | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-05 AV 收据（W1 行）| outcome: pass（未落主；随 T-08 统一落主）| worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: AutoUI 8bb1b3f9a / AutoLang 4a61ef94f | next: T-08 落主 + 归档 + 清理
+
+**T-05 AV 交付收据（W1 消费行）**
+
+- AV 实现面：auto-ui（prep 源形归一：控制转移/`.to(Str)`/记录类型/元素所有权/栈→队列；包面 SFC 路由与 inspection 拼写；units 幂等）+ auto-lang（`Effect` 展开、可发射集合放宽、同源 store 去重、TS `DynCast` 恒等）两棵 `plan-119-dev` 树，均可复跑。
+- 证据面：`plan-artifacts/plan-119/final-av.json`（真窗 exit 0、maxrev=4、errors=0、`playing`、18/81 覆盖）；辅助 `av-flag.json`/`av-diff.json`/`av-two.json`/`av-close.json`。
+- W1 行：首击展开（63 格）、右击标记（雷数 10→9）、难度切换（expert 16×30/99、486 标签）、重开（回 ready）、两实例隔离（inst0 playing / inst1 ready）、close/reopen 世代（gen1 closed → gen2 open）——**全部 PASS，errors=0**。
+
+**T-08 待执行（merge 面）**：wt-guard 两树 → rebase 到各自 master → `--ff-only` 落主 → `docs/plans/` 归档 `status: archived` + `completion_kind: delivered` → worktree/分支移除 → `plan-artifacts/plan-119` 折叠后删除 + 刷新 `.retention/policy.json` → 批次回归到期检查。
 
 ## 10. 待澄清事项
 
