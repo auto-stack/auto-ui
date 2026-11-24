@@ -212,6 +212,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   另需保持 `.set`/`.push` 用法不变（白名单内）。
 - 注：auto-lang 的 `P119DBG` 诊断仍为临时件，落主前移除（§9 已记）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 栈→队列改写（首版未接线，作用域锚点未定） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev） | commit: （见下） | next: 修正改写锚点（同名 `var stack` 多处声明 / 两处 pop 站点分处不同作用域）
+
+- 落地 `rewrite_stack_pops_to_queue`（LIFO 栈 → 下标队列：`for HEAD < stack.len()` + `stack.get(HEAD)` + `HEAD = HEAD + 1`；洪水填充结果集合与顺序无关）。
+- 首次接线**未通过**：`source.age.component-event: on handler assigns undeclared model field __p119_head1`——实证原因是 038 的 `Reveal` 里 `var stack = []` 与 pop 站点**不在同一作用域**（洪水填充有两条路径：主路径与 chord 路径，改写只锚到第一处 `var stack = []`，另一处 pop 落在声明作用域之外）。
+- 已回退接线（函数保留 + `#[allow(dead_code)]`），包面维持 **PACKAGE COMPILE OK**（回归面不变）。
+- 下一步：把改写改成**按作用域锚定**——先在 store 单元里定位每个 `var NAME = []` 的语句块范围，再只改写该范围内的 `for NAME.len() > 0` 与 `NAME.pop()`；跨作用域的两个栈各自独立改写（或按 handler 处理）。成功后重跑 live 发射与真窗。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
