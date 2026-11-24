@@ -90,6 +90,10 @@ mod plan656_scroll_controller_pipeline;
 mod plan657_bp_admin_tests;
 #[cfg(test)]
 mod plan670_code_editor_event_tests;
+// PLAN-126 T-03 续：普通列表显式窗口化入口 + V-01/V-02 取证（inline .at
+// fixture 走真实 ForLoop + View 管线）。
+#[cfg(test)]
+mod plan126_vlist_scale_tests;
 mod plan703_supply_probes;
 mod plan710_supply_probes;
 mod plan728_supply_probes;

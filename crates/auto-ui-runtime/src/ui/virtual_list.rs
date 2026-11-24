@@ -64,8 +64,25 @@ pub const CALIB_SAMPLE_INTERVAL: std::time::Duration = std::time::Duration::from
 /// 已确认行高的复核周期：周期性做一次完整构建标定，纠偏运行期度量变化。
 pub const CALIB_VERIFY_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3);
 
+thread_local! {
+    /// 测试面开关覆盖（线程本地：libtest 每测试一线程、nextest 同进程单测试；
+    /// 不污染其他测试线程）。`None` = 走环境变量。
+    #[cfg(test)]
+    static ENABLED_OVERRIDE: Cell<Option<bool>> = const { Cell::new(None) };
+}
+
+/// 测试面：强制本线程的窗口化开关（`None` = 恢复环境变量语义）。
+#[cfg(test)]
+pub fn set_enabled_override_for_test(v: Option<bool>) {
+    ENABLED_OVERRIDE.with(|c| c.set(v));
+}
+
 /// 环境开关：缺省启用；`0` = 关闭窗口化（完整构建对照）。
 pub fn enabled() -> bool {
+    #[cfg(test)]
+    if let Some(v) = ENABLED_OVERRIDE.with(|c| c.get()) {
+        return v;
+    }
     static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ENABLED.get_or_init(|| match std::env::var("AUTOUI_VIRTUAL_LIST").as_deref() {
         Ok("0") => false,
@@ -255,6 +272,9 @@ struct ScopeEntry {    pane: Option<PaneGeometry>,
     /// 已确认行高后的下一次复核时刻（周期性完整构建复核，纠偏字型/DPI 等
     /// 运行期变化；复核带只更新行高，不改变窗口语义）。
     next_verify_at: Option<std::time::Instant>,
+    /// 显式固定行高（`scroll (row-height: N)` prop）。声明后该 pane **不再**
+    /// 标定/周期复核：行高由创作侧给定，视口/偏移仍由 probe 提供。
+    explicit_row_h: Option<f64>,
 }
 
 lazy_static::lazy_static! {
@@ -268,6 +288,10 @@ static ACTIVE: AtomicBool = AtomicBool::new(false);
 /// 窗口构建计数（诊断/测试）。
 static ROWS_BUILT: AtomicU64 = AtomicU64::new(0);
 static WINDOWS_BUILT: AtomicU64 = AtomicU64::new(0);
+/// V-01 取证：`for` 循环实际读取的列表行数（窗口路径按 `list_get` 逐行计，
+/// 完整构建路径按整表物化计）与 `list_get` 调用数。
+static ROWS_READ: AtomicU64 = AtomicU64::new(0);
+static LIST_GETS: AtomicU64 = AtomicU64::new(0);
 static MEASURE_SEQ: AtomicU64 = AtomicU64::new(1);
 
 /// 构建期登记：本帧有虚拟化 pane（host 下一拍 probe）。
@@ -307,9 +331,10 @@ pub fn note_pane(key: &str, pane: PaneGeometry) -> bool {
     let changed = with_scope(key, |e| {
         let changed = e.pane != Some(pane);
         // 视口宽度变化 → 行内换行/字形度量可能改变行高：作废已解出的行高，
-        // 让下一帧重新标定（一次完整构建，随后继续窗口化）。
+        // 让下一帧重新标定（一次完整构建，随后继续窗口化）。显式行高是
+        // 创作侧固定合同，不因宽度变化作废。
         if let Some(prev) = e.pane {
-            if (prev.viewport_w - pane.viewport_w).abs() > 1.0 {
+            if e.explicit_row_h.is_none() && (prev.viewport_w - pane.viewport_w).abs() > 1.0 {
                 e.row_h = 0.0;
                 e.row_h_trusted = false;
                 e.calib_candidate = None;
@@ -371,7 +396,9 @@ pub fn note_band(key: &str, start: usize, end: usize, y: f64, h: f64) -> bool {
         });
         let rows = end.saturating_sub(start);
         let total = e.total;
-        if rows > 0 && h.is_finite() && h > 0.0 {
+        // 显式 `row-height` pane：构建带只用于精修 `list_top`，不得用实测
+        // 平均行高覆盖创作侧固定行高（行内容换行会让窗口带均值偏 0.5%）。
+        if rows > 0 && h.is_finite() && h > 0.0 && e.explicit_row_h.is_none() {
             let cand = h / rows as f64;
             if cand >= 1.0 && cand <= 400.0 {
                 let is_calibration = if total > 0 {
@@ -448,7 +475,7 @@ pub fn note_plan(key: &str, plan: WindowPlan) {
         let calibrating = plan.start == 0
             && (rows == plan.total
                 || (plan.total > CALIBRATION_ROWS && rows == CALIBRATION_ROWS));
-        if calibrating && e.row_h_trusted {
+        if calibrating && e.row_h_trusted && e.explicit_row_h.is_none() {
             e.next_verify_at = Some(std::time::Instant::now() + CALIB_VERIFY_INTERVAL);
         }
         e.last_plan = Some(plan);
@@ -467,21 +494,23 @@ pub fn note_plan(key: &str, plan: WindowPlan) {
 pub fn plan(key: &str, total: usize) -> Option<WindowPlan> {
     let entry = read_scope(key, |e| e.clone())?;
     let pane = entry.pane?;
-    if entry.row_h <= 0.0
-        || !entry.row_h_trusted
-        || entry
+    // PLAN-126 T-03 续：显式 `row-height` 视为已确认行高——不要求标定样本，
+    // 也不参与周期复核（创作侧声明的是固定行高合同）。
+    let explicit = entry.explicit_row_h.filter(|h| *h > 0.0);
+    let row_h = explicit.unwrap_or(entry.row_h);
+    let trusted = explicit.is_some() || entry.row_h_trusted;
+    let verify_due = explicit.is_none()
+        && entry
             .next_verify_at
-            .map_or(false, |t| std::time::Instant::now() >= t)
-        || pane.viewport_h <= 0.0
-        || total == 0
-    {
+            .map_or(false, |t| std::time::Instant::now() >= t);
+    if row_h <= 0.0 || !trusted || verify_due || pane.viewport_h <= 0.0 || total == 0 {
         return None;
     }
     let (start, end) = visible_range(
         pane.offset_y,
         pane.viewport_h,
         entry.list_top,
-        entry.row_h,
+        row_h,
         total,
         OVERSCAN_ROWS,
     );
@@ -489,10 +518,62 @@ pub fn plan(key: &str, total: usize) -> Option<WindowPlan> {
         total,
         start,
         end,
-        row_h: entry.row_h,
+        row_h,
         list_top: entry.list_top,
         offset_y: pane.offset_y,
         viewport_h: pane.viewport_h,
+    })
+}
+
+/// 声明某 pane 的显式固定行高（`scroll (row-height: N)` prop）。
+///
+/// 与标定路径的区别：行高直接采信（`row_h_trusted`），标定候选/复核计时
+/// 清空；`list_top` 可随 prop 一并给出（内容空间，缺省沿用台账当前值 0），
+/// 首次构建带测量到达后仍会被实测值精修。非法值（非有限/≤0/>400）忽略。
+pub fn note_explicit_row_height(key: &str, row_h: f64, list_top: Option<f64>) {
+    if !row_h.is_finite() || !(1.0..=400.0).contains(&row_h) {
+        return;
+    }
+    with_scope(key, |e| {
+        e.explicit_row_h = Some(row_h);
+        e.row_h = row_h;
+        e.row_h_trusted = true;
+        e.calib_candidate = Some(row_h);
+        e.last_calib_at = None;
+        e.next_verify_at = None;
+        if let Some(t) = list_top {
+            if t.is_finite() {
+                e.list_top = t;
+            }
+        }
+    });
+}
+
+/// 本 scope 的显式行高（测试/诊断）。
+pub fn explicit_row_height(key: &str) -> Option<f64> {
+    read_scope(key, |e| e.explicit_row_h).flatten()
+}
+
+/// 显式行高 pane 在**尚无视口几何**时的有界顶窗构建计划。
+///
+/// 首帧 probe 之前没有 viewport/offset，无法算可见窗口；但行高已知，可以
+/// 先构建顶部至多 [`CALIBRATION_ROWS`] 行并用尾部占位把总逻辑高度一次补齐
+/// （滚动条范围从首帧起就正确，不会在标定后跳变）。视口几何一到就转为
+/// [`plan`] 的真实窗口。非显式 pane 返回 `None`（仍走标定构建）。
+pub fn explicit_plan(key: &str, total: usize) -> Option<WindowPlan> {
+    let entry = read_scope(key, |e| e.clone())?;
+    let row_h = entry.explicit_row_h.filter(|h| *h > 0.0)?;
+    if total == 0 {
+        return None;
+    }
+    Some(WindowPlan {
+        total,
+        start: 0,
+        end: total.min(CALIBRATION_ROWS),
+        row_h,
+        list_top: entry.list_top,
+        offset_y: 0.0,
+        viewport_h: 0.0,
     })
 }
 
@@ -514,11 +595,48 @@ pub fn counters() -> (u64, u64) {
     )
 }
 
+/// V-01 取证计数快照：列表行读取 / `list_get` 调用 / 窗口构建行数 / 窗口数。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct BuildCounters {
+    /// `for` 循环读取的列表行数（窗口路径 = 逐行 `list_get`；完整构建路径 =
+    /// 整表物化行数）。
+    pub rows_read: u64,
+    /// `list_get` 调用次数（仅窗口路径 > 0；完整构建路径走整表物化）。
+    pub list_gets: u64,
+    /// 窗口构建实际构建的行数合计。
+    pub rows_built: u64,
+    /// 窗口构建次数。
+    pub windows_built: u64,
+}
+
+/// 读取 V-01 取证计数快照（不重置）。
+pub fn build_counters() -> BuildCounters {
+    BuildCounters {
+        rows_read: ROWS_READ.load(Ordering::Relaxed),
+        list_gets: LIST_GETS.load(Ordering::Relaxed),
+        rows_built: ROWS_BUILT.load(Ordering::Relaxed),
+        windows_built: WINDOWS_BUILT.load(Ordering::Relaxed),
+    }
+}
+
+/// 窗口路径逐行读取计数（`try_virtual_for` 每调用一次 `list_get` 记一次）。
+pub fn record_list_get() {
+    LIST_GETS.fetch_add(1, Ordering::Relaxed);
+    ROWS_READ.fetch_add(1, Ordering::Relaxed);
+}
+
+/// 完整构建路径整表物化计数（`for` 循环取到整表后按行数记一次）。
+pub fn record_rows_materialized(rows: usize) {
+    ROWS_READ.fetch_add(rows as u64, Ordering::Relaxed);
+}
+
 /// 测试面：清空台账与计数。
 pub fn reset_for_test() {
     SCOPES.lock().unwrap().clear();
     ROWS_BUILT.store(0, Ordering::Relaxed);
     WINDOWS_BUILT.store(0, Ordering::Relaxed);
+    ROWS_READ.store(0, Ordering::Relaxed);
+    LIST_GETS.store(0, Ordering::Relaxed);
     MEASURE_WANTED.store(false, Ordering::Relaxed);
     ACTIVE.store(false, Ordering::Relaxed);
 }
@@ -1040,5 +1158,170 @@ mod tests {
         let legacy = Id::from(format!("{MARK_ID_PREFIX}vlist_3"));
         assert_eq!(VListProbe::parse_mark(&legacy), None);
         assert_eq!(VListProbe::id_string(&id), format!("{MARK_ID_PREFIX}vlist_3:10:40"));
+    }
+
+    // ------------------------------------------------------------------
+    // PLAN-126 T-03 续：显式 row-height 入口 + V-02 定向用例
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn plan_follows_offset_change() {
+        reset_for_test();
+        seed_geometry_for_test("o1", 0.0, 740.0, 28.0, 0.0);
+        let top = plan("o1", 1000).expect("top window");
+        assert_eq!((top.start, top.end), (0, 29));
+        // 滚动到 700：floor(700/28)=25-2=23；ceil(1440/28)=52+2=54。
+        seed_geometry_for_test("o1", 700.0, 740.0, 28.0, 0.0);
+        let scrolled = plan("o1", 1000).expect("scrolled window");
+        assert_eq!((scrolled.start, scrolled.end), (23, 54));
+        assert!(scrolled.start > top.start);
+    }
+
+    #[test]
+    fn offset_moved_detects_scroll_and_note_measure_updates_window() {
+        reset_for_test();
+        // 完整的种子几何（含视口宽）——probe 回执同宽，避免「宽度变化作废
+        // 行高」分支干扰本用例。
+        seed_geometry_full_for_test("om", 0.0, 740.0, 28.0, 0.0, 0.0, 1087.0);
+        assert!(plan("om", 1000).is_some());
+        let mut m = VListMeasure::default();
+        m.panes.insert(
+            "om".into(),
+            PaneGeometryJson {
+                offset_y: 700.0,
+                viewport_h: 740.0,
+                content_h: 28_000.0,
+                viewport_y: 0.0,
+                viewport_w: 1087.0,
+            },
+        );
+        assert!(offset_moved(&m), "offset change must dirty the frame");
+        assert!(note_measure(&m));
+        assert_eq!(
+            plan("om", 1000).map(|p| (p.start, p.end)),
+            Some((23, 54)),
+            "host probe result recomputes the window"
+        );
+        // 同一偏移重复 probe → 不置脏。
+        assert!(!offset_moved(&m));
+    }
+
+    #[test]
+    fn viewport_height_change_recomputes_window() {
+        reset_for_test();
+        seed_geometry_full_for_test("vh1", 0.0, 740.0, 28.0, 0.0, 0.0, 1087.0);
+        assert_eq!(plan("vh1", 1000).map(|p| (p.start, p.end)), Some((0, 29)));
+        // 宽度不变 → 行高保留；视口变矮 → 窗口行数收缩。
+        note_pane("vh1", pane(0.0, 300.0, 1087.0));
+        assert_eq!(plan("vh1", 1000).map(|p| (p.start, p.end)), Some((0, 13)));
+    }
+
+    #[test]
+    fn window_clamps_tail_short_empty_and_outside() {
+        reset_for_test();
+        // 尾部：内容 28000、视口 740 → 最大偏移 27260，end 夹到 n。
+        seed_geometry_for_test("c1", 27_260.0, 740.0, 28.0, 0.0);
+        let tail = plan("c1", 1000).expect("tail");
+        assert_eq!(tail.end, 1000);
+        assert_eq!(tail.start, 971);
+        // 短于视口：整表都在窗口内，且无 overscan 越界。
+        seed_geometry_for_test("c1", 0.0, 740.0, 28.0, 0.0);
+        assert_eq!(plan("c1", 10).map(|p| (p.start, p.end)), Some((0, 10)));
+        // 空列表：不产生窗口（调用方保留完整构建的空结果）。
+        assert!(plan("c1", 0).is_none());
+        // 完全在视口下方（列表起点 400 > 视口底 300）。
+        seed_geometry_for_test("c1", 0.0, 300.0, 28.0, 400.0);
+        assert_eq!(
+            visible_range(0.0, 300.0, 400.0, 28.0, 50, OVERSCAN_ROWS),
+            (0, 0)
+        );
+        // 完全在视口上方（偏移远超内容）。
+        seed_geometry_for_test("c1", 100_000.0, 740.0, 28.0, 0.0);
+        let out = plan("c1", 50).expect("outside still plans an empty band");
+        assert_eq!(out.start, out.end);
+        assert_eq!(out.start, 50);
+    }
+
+    #[test]
+    fn explicit_row_height_skips_calibration() {
+        reset_for_test();
+        assert!(plan("e1", 1000).is_none());
+        note_explicit_row_height("e1", 28.0, None);
+        assert_eq!(explicit_row_height("e1"), Some(28.0));
+        // 无视口几何 → 有界顶窗（尾部占位把总高度补齐）。
+        let boot = explicit_plan("e1", 1000).expect("bounded bootstrap");
+        assert_eq!((boot.start, boot.end), (0, 256));
+        assert!((boot.row_h - 28.0).abs() < 1e-9);
+        assert!(
+            plan("e1", 1000).is_none(),
+            "viewport still comes from probe"
+        );
+        // 只有视口/偏移的 probe 回执（无构建带）即可窗口化：行高已采信。
+        note_measure(&{
+            let mut m = VListMeasure::default();
+            m.panes.insert(
+                "e1".into(),
+                PaneGeometryJson {
+                    offset_y: 700.0,
+                    viewport_h: 740.0,
+                    content_h: 28_000.0,
+                    viewport_y: 0.0,
+                    viewport_w: 1087.0,
+                },
+            );
+            m
+        });
+        let p = plan("e1", 1000).expect("explicit window");
+        assert_eq!((p.start, p.end), (23, 54));
+        // 实测构建带不得覆盖显式行高（窗口带均值可偏 0.5%）。
+        note_band("e1", 23, 54, 23.0 * 28.0, 31.0 * 28.4);
+        assert_eq!(explicit_row_height("e1"), Some(28.0));
+        assert!((plan("e1", 1000).expect("still windowed").row_h - 28.0).abs() < 1e-9);
+        // 视口宽度变化（窗口缩放）不作废显式行高。
+        note_pane("e1", pane(700.0, 740.0, 900.0));
+        assert!(plan("e1", 1000).is_some());
+    }
+
+    #[test]
+    fn explicit_row_height_rejects_invalid_values() {
+        reset_for_test();
+        note_explicit_row_height("bad", 0.0, None);
+        note_explicit_row_height("bad", -5.0, None);
+        note_explicit_row_height("bad", f64::NAN, None);
+        note_explicit_row_height("bad", 500.0, None);
+        assert_eq!(explicit_row_height("bad"), None);
+        assert!(explicit_plan("bad", 100).is_none());
+    }
+
+    #[test]
+    fn build_counters_record_window_reads_and_builds() {
+        reset_for_test();
+        let c = build_counters();
+        assert_eq!(c, BuildCounters::default());
+        seed_geometry_for_test("bc", 0.0, 740.0, 28.0, 0.0);
+        let p = plan("bc", 1000).expect("plan");
+        for _ in 0..p.rows() {
+            record_list_get();
+        }
+        record_build("bc", &p);
+        record_rows_materialized(1000);
+        let c = build_counters();
+        assert_eq!(c.list_gets, p.rows() as u64);
+        assert_eq!(c.rows_built, p.rows() as u64);
+        assert_eq!(c.windows_built, 1);
+        assert_eq!(c.rows_read, p.rows() as u64 + 1000);
+        reset_for_test();
+        assert_eq!(build_counters(), BuildCounters::default());
+    }
+
+    #[test]
+    fn enabled_override_is_thread_local_for_tests() {
+        reset_for_test();
+        set_enabled_override_for_test(Some(false));
+        assert!(!enabled());
+        set_enabled_override_for_test(Some(true));
+        assert!(enabled());
+        set_enabled_override_for_test(None);
+        assert!(enabled() || std::env::var("AUTOUI_VIRTUAL_LIST").as_deref() == Ok("0"));
     }
 }

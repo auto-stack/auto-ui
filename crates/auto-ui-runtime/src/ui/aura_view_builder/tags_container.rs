@@ -178,6 +178,14 @@ impl<'a> AuraViewBuilder<'a> {
             None
         };
         let vlist_measure_key = _vlist_scope.as_ref().map(|g| g.key().to_string());
+        // PLAN-126 T-03 续：`row-height` prop = 普通（非表格）列表的窗口化
+        // 显式入口——行高由创作侧给定，pane 不再需要标定反解；`list-top`
+        // 可选（内容空间，缺省 0）。开关关闭时无 scope，prop 自然不生效。
+        if let Some(scope) = _vlist_scope.as_ref() {
+            if let Some((row_h, list_top)) = self.vlist_explicit_geometry(props, bindings) {
+                crate::ui::virtual_list::note_explicit_row_height(scope.key(), row_h, list_top);
+            }
+        }
 
         // Plan 476: 拼接感知收集 + 视觉空过滤(既有行为)。
         let child_views: Vec<View<DynamicMessage>> = self

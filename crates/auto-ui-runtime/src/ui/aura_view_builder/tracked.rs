@@ -86,6 +86,9 @@ impl<'a> AuraViewBuilder<'a> {
                 // 与下方 Ok(Value::Array) 主路径一致:matches_search 过滤 +
                 // 循环变量/index 绑定 + 空/单/多子聚合)。
                 let render_for_children = |elems: Vec<Value>| -> View<DynamicMessage> {
+                    // PLAN-126 T-03 续（V-01 取证）：完整构建路径按整表物化
+                    // 行数记账（窗口路径按逐行 list_get 记账）。
+                    crate::ui::virtual_list::record_rows_materialized(elems.len());
                     let children: Vec<View<DynamicMessage>> = elems
                         .iter()
                         .enumerate()
@@ -178,6 +181,8 @@ impl<'a> AuraViewBuilder<'a> {
                     }
                 };
 
+                // V-01 取证：完整构建 = 整表物化（窗口路径只读窗口行）。
+                crate::ui::virtual_list::record_rows_materialized(array.values.len());
                 let children: Vec<View<DynamicMessage>> = array
                     .iter()
                     .enumerate()
@@ -455,6 +460,8 @@ impl<'a> AuraViewBuilder<'a> {
                 array.len()
             );
         }
+        // V-01 取证：tracked 完整构建按整表物化记账。
+        crate::ui::virtual_list::record_rows_materialized(array.len());
         let child_views: Vec<View<DynamicMessage>> = array
             .iter()
             .enumerate()
@@ -2577,11 +2584,23 @@ impl<'a> AuraViewBuilder<'a> {
         let padding = self.extract_u16(props, "padding").unwrap_or(0);
         let style = self.extract_style_with(props, bindings); // Plan 057 (2.5)
 
-        // PLAN-126 T-03：tracked 轨的显式 `scroll` 暂不压 pane 作用域——该轨
+        // PLAN-126 T-03：tracked 轨的显式 `scroll` 默认不压 pane 作用域——该轨
         // 的窗口行由 untracked 转换构建，会丢行事件 probe 条目
         // （`plan081_outlet_page_for_rows_survive_memo_two_frame_timeline`
         // 实测回归）。`overflow-y-auto` 列的 tracked 双胎仍压栈（025 走那
-        // 条）；显式 `scroll` 的 tracked 窗口化随 T-04 的探针保真一起接。
+        // 条）。T-03 续：**仅当创作侧显式声明 `row-height`**（普通列表的
+        // 窗口化 opt-in）时才压栈——未声明者的行为逐字节不变（plan081 回归
+        // 不触发）；声明者的窗口行 probe 保真随 T-04 接轨。
+        let explicit_geometry = self.vlist_explicit_geometry(props, bindings);
+        let _vlist_scope = if crate::ui::virtual_list::enabled() && explicit_geometry.is_some() {
+            Some(self.enter_vlist_scope())
+        } else {
+            None
+        };
+        if let (Some(scope), Some((row_h, list_top))) = (_vlist_scope.as_ref(), explicit_geometry) {
+            crate::ui::virtual_list::note_explicit_row_height(scope.key(), row_h, list_top);
+        }
+        let vlist_measure_key = _vlist_scope.as_ref().map(|g| g.key().to_string());
 
         // Plan 476: 拼接感知收集(源索引编号) + 视觉空后置过滤(既有行为)。
         // PLAN-081 T-04c-13: probe 路径补 Scrollable 合成内层 col 的段——
@@ -2636,7 +2655,9 @@ impl<'a> AuraViewBuilder<'a> {
             axes,
             scrollbar_policy,
             controller,
-            measure_key: None,
+            // PLAN-126 T-03 续：声明 `row-height` 的 tracked `scroll` 已压栈，
+            // 让渲染器把该 scrollable 的 iced id 登记进台账（probe 认领视口）。
+            measure_key: vlist_measure_key,
         }
     }
 

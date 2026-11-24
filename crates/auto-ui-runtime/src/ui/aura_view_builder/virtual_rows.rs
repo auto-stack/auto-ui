@@ -103,6 +103,29 @@ impl<'a> AuraViewBuilder<'a> {
         }
     }
 
+    /// 显式虚拟列表几何 prop（`row-height` / `list-top`，`-`/`_` 两种拼写）。
+    ///
+    /// 创作侧在 `scroll (row-height: N)` 上声明固定行高即把**普通（非表格）
+    /// 列表**接入同一窗口化机制：行高不再经标定反解，首帧即可用带尾部占位
+    /// 的顶窗构建（总逻辑高度从首帧正确），probe 到达视口几何后直接按窗口
+    /// 裁行。`list-top` 可选，缺省 0（列表首行即内容原点），首次构建带测量
+    /// 到达后仍会被实测值精修。
+    pub(super) fn vlist_explicit_geometry(
+        &self,
+        props: &HashMap<String, AuraPropValue>,
+        bindings: &Bindings,
+    ) -> Option<(f64, Option<f64>)> {
+        let row_h = self
+            .extract_f64_with(props, "row-height", bindings)
+            .or_else(|| self.extract_f64_with(props, "row_height", bindings))
+            .filter(|h| h.is_finite() && *h > 0.0)?;
+        let list_top = self
+            .extract_f64_with(props, "list-top", bindings)
+            .or_else(|| self.extract_f64_with(props, "list_top", bindings))
+            .filter(|t| t.is_finite());
+        Some((row_h, list_top))
+    }
+
     /// 诊断覆盖：`AUTOUI_VLIST_ROW_H` / `AUTOUI_VLIST_VIEWPORT_H` /
     /// `AUTOUI_VLIST_LIST_TOP` / `AUTOUI_VLIST_OFFSET`（纯构建测试与故障定位；
     /// 生产缺省不用）。
@@ -164,30 +187,40 @@ impl<'a> AuraViewBuilder<'a> {
             eprintln!("[VLIST-TRY] scope={scope} iterable={iterable} total={total}");
         }
 
-        // 台账几何优先 → 诊断覆盖 → 标定帧（顶部窗口，几何待 probe 反解）。
+        // 台账几何优先 → 诊断覆盖 → 显式 `row-height` 顶窗 → 标定帧
+        //（顶部窗口，几何待 probe 反解）。
         let mut calibrating = false;
+        let mut explicit_bootstrap = false;
         let mut plan = match virtual_list::plan(&scope, total) {
             Some(p) => p,
             None => match Self::vlist_env_plan(total) {
                 Some(p) => p,
-                None => {
-                    calibrating = true;
-                    virtual_list::WindowPlan {
-                        total,
-                        start: 0,
-                        end: total.min(CALIBRATION_ROWS),
-                        row_h: 0.0,
-                        list_top: 0.0,
-                        offset_y: 0.0,
-                        viewport_h: 0.0,
+                None => match virtual_list::explicit_plan(&scope, total) {
+                    // 显式行高：行高已知，先做有界顶窗（总高度靠尾部占位补齐）。
+                    Some(p) => {
+                        explicit_bootstrap = true;
+                        p
                     }
-                }
+                    None => {
+                        calibrating = true;
+                        virtual_list::WindowPlan {
+                            total,
+                            start: 0,
+                            end: total.min(CALIBRATION_ROWS),
+                            row_h: 0.0,
+                            list_top: 0.0,
+                            offset_y: 0.0,
+                            viewport_h: 0.0,
+                        }
+                    }
+                },
             },
         };
 
         // 窗口内逐行读取 + 绑定 + 构建（绝对索引）。
         let mut rows: Vec<View<DynamicMessage>> = Vec::with_capacity(plan.rows());
         for i in plan.start..plan.end {
+            virtual_list::record_list_get();
             let item = match self.bridge.list_get(&list_val, i) {
                 Some(v) => v,
                 // 索引读失败（非索引可读表示）→ 整体回退完整构建。
@@ -224,9 +257,10 @@ impl<'a> AuraViewBuilder<'a> {
             rows.push(row);
         }
 
-        if calibrating {
-            // band 的行数用**实际构建行数**，行高在 probe 回执里按
-            // 「band 高度 / 行数」反解；row_h 仍为 0 表示尚未解出。
+        if calibrating || rows.len() != plan.rows() {
+            // 标定带的行数用**实际构建行数**，行高在 probe 回执里按
+            // 「band 高度 / 行数」反解；显式顶窗/窗口带同理（视觉空行被
+            // 丢弃时让 mark 区间与实际 rect 对齐）。
             plan.end = plan.start + rows.len();
         }
         virtual_list::note_plan(&scope, plan);
@@ -235,7 +269,7 @@ impl<'a> AuraViewBuilder<'a> {
         }
         if virtual_list::diag() {
             eprintln!(
-                "[VLIST-BUILT] scope={scope} calibrating={calibrating} window=[{}, {}) rows={}",
+                "[VLIST-BUILT] scope={scope} calibrating={calibrating} explicit={explicit_bootstrap} window=[{}, {}) rows={}",
                 plan.start,
                 plan.end,
                 plan.rows()
