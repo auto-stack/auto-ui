@@ -8443,11 +8443,45 @@ fn ace_vue_sfcs(
         if let Ok(prepared) =
             auto_ui_runtime::ui::ace_source_prep::prepare_component_source(&root, content)
         {
-            if auto_ui_runtime::ui::ace_package_sfc::linked_front_imports_packages(&prepared.source) {
+            // PLAN-119：**同源 store 片断**（单元级 `use <unit>: <Store>` 经 prep
+            // 内联后的形态）同样必须走包面 SFC——组件面不收列表 model 字段
+            // （`st_board []BoardRow`），逐 widget lane 必然全班缺席（038 实证）。
+            let has_store_decl = prepared
+                .source
+                .lines()
+                .any(|line| line.trim_start().starts_with("store "));
+            if has_store_decl
+                || auto_ui_runtime::ui::ace_package_sfc::linked_front_imports_packages(
+                    &prepared.source,
+                )
+            {
+                // PLAN-119：生成器**自带 entry prep**（ace_package_sfc.rs），此处交
+                // 原始源，避免二次 prep 把 store 片断内联两遍（"multiple store
+                // declarations per node" 实证）。
+                // PLAN-119：store 类应用把 store 单元作为包模块一起交上去（与 AV
+                // `--package` 同形：`app::app` + `app::<store_module>`）。
+                let store_modules: Vec<std::path::PathBuf> = if has_store_decl {
+                    content
+                        .lines()
+                        .filter_map(|line| {
+                            let t = line.trim_start();
+                            let rest = t.strip_prefix("use ")?;
+                            let (module, _) = rest.split_once(':')?;
+                            if module.contains('{') || module.trim().is_empty() {
+                                return None;
+                            }
+                            Some(root.join(format!("src/front/{}.at", module.trim())))
+                        })
+                        .filter(|path| path.is_file())
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let entry_source = if has_store_decl { content } else { &prepared.source };
                 match auto_ui_runtime::ui::ace_package_sfc::generate_linked_front_sfc(
                     at_path,
-                    &prepared.source,
-                    &[],
+                    entry_source,
+                    &store_modules,
                 ) {
                     Ok(Some(sfc)) => {
                         return Ok(Some(AceVueProducts {
