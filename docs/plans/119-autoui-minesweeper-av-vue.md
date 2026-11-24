@@ -531,6 +531,13 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 新墙（SFC 生成阶段）：`not serve expression `DynCast { operand: ExprId(646), test_nil: false }` in Collections` —— a2x TS 后端在 Collections 域未接 `DynCast`（`.to(Str)` 一类转换在生成的 TS 里落入该节点）。
 - 下一步：在 auto-lang a2x-ts 的 Collections 域接 `DynCast`（按用户授权 A 可做），或让 prep 把该转换换成 a2x 已支持的形态（`to_string`/字符串拼接路径）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **A2Vue 生成通过**（`auto build --render vue --gen-only` exit 0，24 文件） | outcome: pass（T-06 生成腿） | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下） | next: pnpm 冷构建 + 真实浏览器 oracle
+
+- auto-lang：`DynCast` 在 TS 后端按**恒等**实现（JS 值动态，具体→Dyn 无需动作；Rust/C 才需装箱）——038 的 `.to(Str)` 在 Collections 域会落到该节点，此前被兜底拒。
+- 结果：`auto build --render vue --gen-only` **exit 0**，生成 24 个文件到 `gen/front/vue`（含 store composable 与 App SFC）。
+- 已清理生成期 `deps/` junction。
+- 下一步（T-06 余量）：`pnpm install --offline` + `pnpm run build`（vue-tsc + vite），随后 Playwright 真实浏览器跑 `tests/test_038_vue.mjs` 的 oracle 行（主题族/81 空格/首击展开）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
