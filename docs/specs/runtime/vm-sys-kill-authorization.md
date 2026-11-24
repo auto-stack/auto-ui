@@ -22,12 +22,14 @@
 | `deny` / `deny:<reason>` | 该 VM 不持结束进程授权 | 一律具名拒 |
 | `allowed-pids:<pid,…>` | 仅清单内 pid | 清单内放行；其余（含空清单/非法 pid）具名失败 |
 
-- **拒绝语义（软拒绝）**：在刷新采样与 OS 结束**之前**，core shim 以稳定码
-  `sys.kill.permission_denied` + 宿主 reason + pid 记一条 error 日志，并给
-  `sys.kill` 返回 `false`；handler 继续走完自己的收尾（确认框关闭、刷新继续），
-  窗口不中止。**不抛 `VMError`**：抛错会中止 handler，调用方的关对话框/清选择/
-  `Refresh()` 收尾全不执行——拒绝后 UI 停在确认框，用户需再点一次「取消」。
-  破坏性操作的拒绝用「返回值 + 具名诊断」即可，收尾路径必须保留。
+- **拒绝语义（软拒绝）**：在刷新采样与 OS 结束**之前**，core shim 向运行日志打印
+  稳定码 `sys.kill.permission_denied` + 宿主 reason + pid，并给 `sys.kill` 返回
+  `false`；handler 继续走完自己的收尾（确认框关闭、刷新继续），窗口不中止。
+  **不抛 `VMError`**：抛错会中止 handler，调用方的关对话框/清选择/`Refresh()`
+  收尾全不执行——拒绝后 UI 停在确认框，用户需再点一次「取消」。破坏性操作的
+  拒绝用「返回值 + 具名诊断」即可，收尾路径必须保留。
+  （诊断走 stderr `eprintln!` 而非 `log::error!`：宿主未装 logger 时 log 记录
+  会被丢弃，T-03 的具名 oracle 依赖它出现在运行日志里。）
 - **与 HTTP 面关系**：同三态、同稳定码；`back_proxy::SysKillPolicy` 管会话
   派发前的 403，本门管 VM 内直调。两者互不替代。
 - **边界**：非 OS 沙箱——`allow-all`/未登记时仍直接 `sys.kill`；只认
