@@ -374,6 +374,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 效果：严格 lane 现已消费 prep 后的源，缺席集不再出现，转而暴露 lane 自己的解析墙：`ace.vue-lane-error: ... parse: UnexpectedToken { expected: "Comma", found: "<", offset: SourceOffset(4068) }`——prep 产出的 `[]T`/`List<T>` 形态在该 lane 的解析器里有不接受点。
 - 下一步单点：打印 prep 源 offset 4068 附近片段（对应哪个字段声明），确定是 `List<...>` 还是 `[]T` 形态，并在 prep 侧按 lane 可解析的拼写输出（或在该 lane 放行）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: lane 输入加 `[]T` 还原；parse 墙仍在 4068 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 落盘 lane 输入再按字节定位 4068
+
+- 新增 `lane_list_spelling`：把 prep 产出的 `List<T>.new()` 还原成 `[]T = []` 供严格 lane 解析（只作用于 lane 输入，不改 prep 的 AV 产出）。
+- 复跑：错误**同形同一偏移**（`offset: 4068, expected "Comma", found "<"`）⇒ 该 `<` 不是 `List<…>.new()`；需把 lane 输入原样落盘（建议在 `ace_vue_sfcs` 加 `P119_VUE_DUMP=<path>`）后按**字节**定位。
+- 已记录：本轮起坐实“prep 产出与 lane 解析器拼写差异”属 A2Vue 腿的系统性小墙，逐条按字节定位即可（每次 1 处）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
