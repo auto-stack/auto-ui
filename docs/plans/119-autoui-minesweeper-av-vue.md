@@ -354,6 +354,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 清理后真窗复跑：`3:click:0:4` → exit 0、maxrev=3、errors=0、`st_game_state=playing`（首击展开仍成立）。
 - 待 T-05/T-08 前完成的闸门：auto-lang 受影响组回归（`cargo t ace` 类）、auto-ui 受影响测试（`ace_source_prep::` 等），以及 A2Vue 腿（T-06）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-06 A2Vue 首准入（Effect 修复后仍同形） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 查严格 lane 的 handler 派生路径（是否走 store 展开）
+
+- 重跑：`AUTO_UI_ACE_VUE=1 AUTO_UI_TOOL_BIN=<本树 auto-ui-tool> auto build --render vue --gen-only` → 仍 `ace.vue-lane-unsupported`，缺席 handler 同前：`App[.Flag/.Reset/.Reveal/.SetDifficulty/.Tick]`（`.Init` 在场）。
+- 说明：auto-lang 的 `Effect` 展开修复作用在**包面** `inline_store_decl`；A2Vue 严格 lane 走的是逐 widget 的组件面片段派生（`ComponentFragmentLane`），其 `store.X(args)` 仍是未展开的调用 → 判缺席。属同一根因在**另一条 lane** 的投影路径。
+- 已清理 `--gen-only` 生成的 `deps/themes` junction（worktree 必须无 reparse point）。
+- 下一步（单点）：定位严格 lane 的 handler 派生入口（`ace_ts_provider`/`vue.rs` 的 lane 分支），确认它是否消费组件面 `inline_store_decl` 的展开结果；若否，则在同一处复用包面修复（或 prep 侧先做跨单元展开，A/B 两案同样的选择）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
