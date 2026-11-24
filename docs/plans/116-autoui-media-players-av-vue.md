@@ -322,6 +322,14 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 17 | from: work | t
 
 stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 18 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: 2c3365fc1 | next: work/T-02（R-16）
 
+2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-17 闭合（无类型空列表字段 → List(Dyn)）+ R-18/R-19 新开 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-116/auto-lang`（`plan-116-dev`） | base_commit: `auto-lang 11135f79c` | code_commit: `auto-lang 4ae346563`（`auto-ui` 未改） | task_ids: T-02 | evidence: `plan116_t01_probe` 5/5、`ace-core` conformance 942/5
+
+- **R-17 根因**：store 投影给无类型空列表字段（`var playlist = []`）合成 `"List"` 拼写，而 `model_type` 把它解释成**旧拼写 `List<str>`**——030 的 handler 对每个条目读 `item.id`/`item.url` 等成员，于是 `item` 是 `Str`，报"字段访问需要记录值"并连带 i32 上的 `clone`（三条诊断都锚在 store 导入行，所以 span 落到 `use player_store: …` 上）。
+- **改法（1 行 + 注释）**：合成**动态**拼写 `"[]"` 而不是 `"List"`，走"动态列表 + 空字面量"分支 → `List(Dyn)`；与空字面量自身推断一致，也正是 JSON 记录条目需要的类型。
+- **验证**：`ace-core` conformance **942/5**（无新增红）、`plan116_t01_probe` 5/5；030 越过 Str/clone 三连，露出两个新的、互相独立的视图面缺口：R-18（`icon (…, state: .store.show_playlist)` 的 bool 属性被当 FStr 插值）、R-19（条件样式分支里 `self` 越界）。
+
+stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 20 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: 4ae346563 | next: work/T-02（R-18 / R-19）
+
 2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-16 闭合（文本叶标签的 ctor 误解析还原）+ R-17 新开 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-116/auto-lang`（`plan-116-dev`） | base_commit: `auto-lang 2c3365fc1` | code_commit: `auto-lang 11135f79c`（`auto-ui` 未改） | task_ids: T-02 | evidence: `plan116_t01_probe` 5/5、`ace-core` conformance 942/5
 
 - **定位**：临时在 `Binding::type_name` 插桩 + backtrace 拿到调用链，落点是 `ExprKind::CtorNamed`——即 `text g { … }` 里的 `g {` 被解析成记录构造，`g` 于是以**类型名**进绑定。与 R-10 同族的问题（跟 `{` 相邻的表达式位），但这次在文本叶标签位。
@@ -349,7 +357,9 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 18 | from: work | t
 | R-14 | 跨单元 store 内联后其**顶层 helper** 不可见（030 `unknown function fmt_clock`） | 包面 prep（`prepare_package_source`） | **已闭合**（2026-11-24，`auto-ui f4866903`）：`use <unit>: <Store>` 且该单元确声明此 store 时，把它顶层的 `fn` 一并带到消费单元（本单元已定义同名则跳过）。包面按模块编译、各持一份合法；helper 是模块级纯函数、不引用 model。 |
 | R-15 | checked AGE 面缺 `math.floor`（030 `unknown function std::age_math.floor`） | `stdlib/ace/age/math.at` | **已闭合**（2026-11-24，`auto-lang 2c3365fc1`）：在 AGE math 模块用**纯 float 运算**实现 `floor`——按二进制位累加出 ≤ x 的最大整数（float32 尾数界定循环），负数按 `-floor(-x)` 并对非整数退一（floor 向负无穷，与内建同语义）。**不需要 int→float 转换**（该面`.to(float)` 不受理），也不动文法。030 由 `unknown function std::age_math.floor` 前进到 R-16。 |
 | R-16 | `text g { … }` 的标签被当构造字面量（030 `unknown type 'g'`） | `cst/project` 文本叶投影 | **已闭合**（2026-11-24，`auto-lang 11135f79c`）：age-package 面把"裸 ident + `{`"解析成记录构造，`text g { style: … }` 于是成为标签 `g { … }`、`g` 进绑定期被当类型名。文法层属该面的形状竞争（age-component 只用"字段具名"的构造回避），改共享 pratt 表波及面太大；改在**投影**还原作者形状：标签投影成"仅具名字段"的 `CtorNamed` 时，取构造名作标签、字段回填为元素属性项。这些情形此前只会报错，故不影响既有通路。 |
-| R-17 | 030 `app::app` 的合成表达式报 `field access requires a record-typed value, found Str` + i32 上的 `clone` | 待定位 | **新开**（R-16 闭合后 030 闭包首阻）：三条诊断同一合成 span（`13:1`）。R-16 的修复只影响"标签曾是 ctor"的文本叶，030/app 的文本标签是 `.store.*`，故推测这三条是**此前被 `unknown type g` 挡住**的既有问题，需下一轮定位。 |
+| R-17 | 无类型空列表字段被定型成 `List<str>`（030 `field access … found Str` + i32 `clone`） | `cst/project` store 字段定型 | **已闭合**（2026-11-24，`auto-lang 4ae346563`）：store 投影为无类型空列表字段合成 `"List"` 拼写，而 `model_type` 把它当**旧拼写 `List<str>`**——于是 `item.id` 之类成员访问撞上 `Str`，并连带 i32 上的 `clone` 报错（三条诊断同锚在 store 导入行）。改为合成**动态**拼写 `"[]"`，走"动态列表 + 空字面量"分支 → `List(Dyn)`（与空字面量自身推断一致，也是 JSON 记录条目所需）。 |
+| R-18 | `icon (…, state: .store.show_playlist)` 的布尔属性被当 FStr 插值（030 `app::app:98:68` → `found bool` + `an FStr must have at least one part`） | 视图属性/FStr 面 | **新开**：`state:` 这种带前缀的属性值被投影成 FStr，而 FStr 只收 `Str`/`int`/`float` 部分。 |
+| R-19 | 条件样式值引用 `self` 越界（030 `app::playlist:95:58` → `no local named self in scope`） | 条件样式（`age-if-expr`）的求值作用域 | **新开**：`style: if item.id == .store.current_id { … } else { … }` 的分支表达式在无 `self` 绑定的上下文里被求值/检查。 |
 | R-06 | 视图**空参回调**（`020/controls.at` `expected expression, found ')'` @148） | `ace-core` cst/grammar（view 属性位） | **已闭合**（2026-11-24，`auto-lang 563ee47de`）：`age-event-binding` 增显式空参数表臂（`age-event-binding-args-empty`，两面同开，镜像 118 的 handler 空参数）；**零作者实参**投影为裸消息引用（宿主供载荷），不是零实参方法调用——否则与消息载荷 arity 相撞。020/controls 越过该行。 |
 | R-10 | 视图 `if` 条件取**裸标识符**操作数（`if item.rel_dir == g {`） | `age-view-if` 条件面 | **已闭合**（2026-11-24，`auto-lang f59821dec`）：条件从裸 `pratt` 改走 `if-cond`（与 `age-on-if` 同一条件面）——此前 ident 后的 `{` 被当结构字面量吞掉整个分支体，整项回退。030/playlist 的分组过滤形。 |
 | R-11 | 包面视图回调的**作者实参**（`onclick: .SelectIndex(i)`） | `age-entry-value`/`age-event-binding` | **已闭合**（`f59821dec`）：包面 `age-entry-value` 在占位臂之后增通用 `age-event-binding` 臂（`$event`/`$0` 仍先匹配），作者实参投影为 self 方法调用、实参保留（与组件面同语义）。 |
