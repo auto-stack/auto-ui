@@ -219,6 +219,14 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 已回退接线（函数保留 + `#[allow(dead_code)]`），包面维持 **PACKAGE COMPILE OK**（回归面不变）。
 - 下一步：把改写改成**按作用域锚定**——先在 store 单元里定位每个 `var NAME = []` 的语句块范围，再只改写该范围内的 `for NAME.len() > 0` 与 `NAME.pop()`；跨作用域的两个栈各自独立改写（或按 handler 处理）。成功后重跑 live 发射与真窗。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 作案者定位——`store.X()` 调用**未被展开**留作 foreign callee | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （诊断+队列改写） | next: 查 `store_call_parts`/`expand_store_calls` 未命中的原因
+
+- 栈→队列**按循环作用域锚定**版已接线：包面仍 **PACKAGE COMPILE OK**（`prepped4`，两处 pop 站点各自得到 `__p119_headN`）。
+- auto-lang 加第二层诊断（`foreign_callee=` 与 `scope_foreign=`）后实测：`Reveal` 仍 `body_foreign=true`，且触发名是 **`foreign_callee=Init` / `foreign_callee=Reveal`** —— 即 `store.Init()` / `store.Reveal(...)` 这类**store 方法调用在包面路径上没有被展开**，留在 handler 体里被记为域外调用。
+- 结论修正：`remove`（上一轮根因）只是**次要**触发；主触发是 store 方法调用未展开。这解释了为何所有构造级镜像都过、而本应用必拒：镜像探针用的是小 store（能展开），038 的 store 在包面路径上未展开（可能原因：`store_call_parts` 只认裸 `store` 接收者，而包面 imported-store 路径的字段已前缀化为 `st_*`；或 store 单臂在 `store_bodies` 键名/参数数不匹配）。
+- 下一步：读 `store_call_parts`/`expand_store_calls`（age_component.rs:1490-1630）确认未命中条件，并在 prep 侧把 widget handler 的 `store.X(…)` 直接改写成 `St_X(…)`（前缀消息名，等价于展开后的调用）或修正展开条件。
+- 遗留：auto-lang 诊断现有三处 eprintln 均为临时件，落主前移除。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
