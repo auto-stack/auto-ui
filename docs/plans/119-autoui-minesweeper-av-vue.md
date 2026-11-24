@@ -411,6 +411,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 括号修复后 AV oracle 复跑：`3:click:0:4` → exit 0、maxrev=3、errors=0、`st_game_state=playing`、覆盖 18/81 ⇒ **无回归**。
 - 证据：`plan-artifacts/plan-119/av-recheck.json`。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **根因回指第 1 轮**——组件面不收列表 model 字段 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 严格 lane 把 store 类应用路由到包面 SFC 生成器
+
+- 重新对照：A2Vue 严格 lane 的 handler 派生走**组件面**（`compile_component_scenario_states_at` → `project_component_candidates`）。而组件面的硬边界是「model 只收 int/i32/bool/str/f32」，038 的 `st_board []BoardRow` 在第一轮就因此被拒（`the component slice supports … field st_board is []BoardRow`）。
+- 所以 lane 的“缺席”并非展开问题，而是**组件面根本装不下这个应用**；AV 腿之所以能跑，是因为走的是**包面**（`load_package` + live widget-runtime）。
+- 结论/下一步：严格 lane 的 `linked_front_imports_packages` 分支只认 widget 级 `use { package: }`；应把**单元级 `use <unit>: <Store>`** 也路由到包面 SFC 生成器（`generate_linked_front_sfc`，units = app + store），与 AV 腿同一条 AGE 包编译，A2Vue 才不会重演组件面边界。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
