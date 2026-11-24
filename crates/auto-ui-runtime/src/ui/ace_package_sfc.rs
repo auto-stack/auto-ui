@@ -63,7 +63,21 @@ pub fn generate_package_front_sfc(
     // store 声明（"model has no field `store`" 实证）。
     let mut units = super::ace_source_prep::prepare_store_units(units);
         back_api::append_contract(app_at, &mut units)?;
-        let candidates = package_candidates(source)?;
+        // PLAN-119：单单元 inspection 看不见**跨单元 store 导入**（`.store.*` 会报
+    // `model has no field store`）。该类源改用组件面 prep 后的同源形做
+    // inspection（store 片断内联），units 仍按原始源 + store 模块装配。
+    let candidates = match package_candidates(source) {
+        Ok(candidates) => candidates,
+        Err(error) => {
+            let root = app_at
+                .ancestors()
+                .find(|path| path.join("pac.at").is_file())
+                .unwrap_or_else(|| app_at.parent().unwrap_or(app_at));
+            let prepared = super::ace_source_prep::prepare_component_source(root, source)
+                .map_err(|prep| format!("{error}; prep: {prep}"))?;
+            package_candidates(&prepared.source)?
+        }
+    };
         let root = candidates.first().ok_or("no AGE node candidate in the entry module")?;
         append_widget_packages(app_at, source, &candidates, &mut units)?;
         let sfc = generate_package_sfc_leaf(&units, "app::app", None, false)?;
@@ -107,7 +121,21 @@ pub fn generate_linked_front_sfc(
     source: &str,
     modules: &[PathBuf],
 ) -> Result<Option<RoutedPackageSfc>, String> {
-    let candidates = package_candidates(source)?;
+    // PLAN-119：单单元 inspection 看不见**跨单元 store 导入**（`.store.*` 会报
+    // `model has no field store`）。该类源改用组件面 prep 后的同源形做
+    // inspection（store 片断内联），units 仍按原始源 + store 模块装配。
+    let candidates = match package_candidates(source) {
+        Ok(candidates) => candidates,
+        Err(error) => {
+            let root = app_at
+                .ancestors()
+                .find(|path| path.join("pac.at").is_file())
+                .unwrap_or_else(|| app_at.parent().unwrap_or(app_at));
+            let prepared = super::ace_source_prep::prepare_component_source(root, source)
+                .map_err(|prep| format!("{error}; prep: {prep}"))?;
+            package_candidates(&prepared.source)?
+        }
+    };
     let Some(root) = linked_front_root(&candidates) else { return Ok(None) };
     let (units, _) = front_package_units(app_at, source, modules)?;
     // PLAN-119：与 AV `load_package` 同形——纯 store 单元在包编译前先归一
