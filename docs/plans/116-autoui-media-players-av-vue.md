@@ -97,6 +97,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - 2026-11-24 **R-03 词法/文法半已闭合**（`auto-lang e528fcb53`）：`$0` 事件实参占位（`event-index-tok` + 两处实参位 alt）。回归 `plan116_view_event_arg` 4/4、`plan116_` 全 15/15，conformance 931 passed / 5 failed；030 闭包前进到 **R-02**（`use.web`）。**R-03b** 新开（宿主元素 `.Msg($0)` 被投影成 ChildEvent 而拒）并钉住。余 R-02/R-03b/R-05/R-06 见 §10。
   - 2026-11-24 **R-10/R-11 已闭合**（`auto-lang f59821dec`）：`age-view-if` 条件改走 `if-cond`（裸 pratt 会把 `if x == g {` 的 `{` 当结构字面量吞掉分支体）+ 包面回调作者实参臂（占位形仍先匹配）。回归 `plan116_view_if_cond` 3/3、`plan116_` 全 18/18，conformance 934 passed / 5 failed；030/playlist 去掉 `use.web` 行后整项解析通过。
   - 2026-11-24 **R-02 已闭合**（`auto-lang 979cd3427`）：`use.web component` 导入（`age-use-web-item`，仅 age-package）+ 宿主元素准入（元素侧无需改动）。回归 `plan116_web_component` 3/3，conformance 937 passed / 5 failed；030 闭包前进到 **R-12**（bracket 列表 model 字段的视图可观察性）。
+  - 2026-11-24 **R-06 已闭合 / R-12 已锐化**（`auto-lang 563ee47de`）：视图回调的显式空参数表 `.Msg()`（`age-event-binding-args-empty`，零作者实参→裸消息引用=宿主供载荷）。回归 `plan116_` 全 24/24，conformance 940 passed / 5 failed。R-12 经最小复现钉在"`[]T` 拼写未接入视图列表观测通道"（与 store 内联无关；裸 `List` 可观察）。
 - [ ] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
   - 2026-11-23 受控媒体宿主已实跑通过（`mpv_contract` 13/13、`mpv_channel` 10/10、`mpv_engine` 11/11、`plan116_av_media_widget` 2/2、`ace_node_desktop` 10/10 顺序 CPU 用例；`ace_node_desktop_window.exe --features ace-bridge,mpv-widget` 真窗播 `E:\Video\caelestia.mp4` 实测 `duration="49.429"` / `SeekMid=15` -> `OnTime="15"` / `TogglePause="true"` / `frames_rendered=10` / `errors=[]`）；**原样 020/030 多单元包入口因 B-03 阻塞无法在 `PackageStateEngine` 启动**。
@@ -228,6 +229,15 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 7 | from: work | to
 
 stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 8 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: 979cd3427 | next: work/T-02（R-12）
 
+2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-06 闭合（显式空参数表视图回调）+ R-12 锐化并钉住 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-116/auto-lang`（`plan-116-dev`） | base_commit: `auto-lang 979cd3427` | code_commit: `auto-lang 563ee47de`（`auto-ui` 本轮未改） | task_ids: T-02 | evidence: `plan-artifacts/plan-116/probes/{r12-list-view-20261124,r06-empty-args-20261124}/`、`plan116_store_list_view` / `plan116_view_event_arg` 用例
+
+- **R-06（`age-event-binding-args-empty`）**：020 的写法是 `onseek: .SeekFraction()`——**显式空参数表**，与 030 的 `($0)` 同义（不写作者实参=宿主供载荷）。文法增空参臂（两面同开，镜像 118 的 handler 空参数形态）；投影侧把"零作者实参"落成**裸消息引用**而不是零实参方法调用——后者会与消息载荷 arity 相撞。020/controls 由此越过第 148 行。
+- **R-12 锐化（未闭合，已钉住）**：先按"store 内联丢失字段信息"假设去查，被最小复现否掉——**widget 自己的 `[]str` 字段同样被拒**；而同一视图循环换成裸 `List` 即通过（对照用例）。所以缺口的形状是"**拼写** `[]T` 未接入视图循环的列表观测通道"，不是 store、也不是列表观测本身。拒绝点在 `FieldBinding::package_field` 的 `[` 前缀守卫；试给 `model_list_type` 增加 `[]T` 分支不改变该路径（视图循环的 iter 仍走 package_field），故不纳入本轮改动（已回退，不留半成品）。
+- **回归**：`plan116_` 全 **24/24**（新增 R-06 正例 + R-12 钉住/对照两例）；`ace-core` conformance **940 passed / 5 failed**（同一 5 项既有红，+3 = 本轮新用例）；两面 grammar id 具名重基线（`age-component cbb9b3bb…→9c705b7d…`、`age-package 57daa4a6…→2c7c971e…`）。
+- **真实语料**：`PKG_UNIT 020/controls` 越过 `)` 错误（下一处是逐单元预期的 `.store` 限制）；`PKG_CLOSURE 030` 仍 R-12、`020` 仍 R-05。
+
+stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 9 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: 563ee47de | next: work/T-02（R-12）
+
 ## 10. 待澄清事项
 
 **B-03 已裁定（2026-11-24，本计划自有工作树内闭合）。** 原 A/B 选择的前提是"`PLAN-117` 正在 `auto-lang` 同一写面上持续改动"，该前提已随 117/118 双仓落主归档而消失；`README.md` 交付表现指示"在 117 后的基线复测，再按残余缺口处理 B-03"。`/goal` 授权的实施树本就含 `auto-lang`（见 §4），故无需再次拍板：**按残余缺口逐项闭合，目标/验收/范围/仓集不变**。若任一缺口经定位后需要改动已冻结的共享语义或超出本计划仓集，再按 §5 停下请示。
@@ -243,8 +253,8 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 8 | from: work | to
 | R-04a | 跨单元 store 导入（`use player_store: PlayerStore` + `.store.<field>`/`.store.<Msg>()`） | `packages`/`inline_store_decl` | **已闭合**（`auto-lang 78b916591`）：导入链在包面生效；**只写 `on`、无 `msg` 块**的 store（020 形态）按 handler 参数注解补出消息声明（无注解仍具名拒）。回归 `plan116_store_import` 2 正例 + 1 负控。 |
 | R-04b | **无类型/动态 store 字段**（`var playlist = []`，030 写它） | `age_component` store 投影 | **已闭合**（2026-11-24，`auto-lang 174c6646b`）：无类型且初值恰为 `[]` 的 store 字段投影为**可变集合字段**（`ty = "List"`，元素型沿用 117 round-20 的 `List(Dyn)` 缺省）；定型判定先于初值投影（无类型初值是 `age-view-data-lit` 原始文本节点，`project_expr_sync` 不承载）。其余无类型形态仍按只读跳过（负控钉住）。回归 `plan116_store_import` 5/5；**真实效果**：030 闭包由 `undeclared model field playlist` 前进到 R-03。 |
 | R-05 | 020 内部未定位构造（`020/app.at` 报 `expected fn, found widget`，但最小 `widget` 包项可解析 → 错误定位在项首，真因在项内） | 待定位 | 未定位（诊断法同 R-10：删构造 + 最小件二分） |
-| R-12 | 包面视图**观察 bracket 列表 model 字段**（`package view cannot observe bracket list model field 'st_groups'`） | `age_package` 视图可观察性 | **新开**（R-02 闭合后 030 闭包首阻）：内联 store 的 `groups`（`List`）在视图里被 `for g in .store.groups` 迭代。需确认该限制的语义意图（view-data vs 状态字段的可观察面）后决定是放开还是走投影。 |
-| R-06 | 视图**空参回调**（`020/controls.at` `expected expression, found ')'` @148） | `ace-core` cst/grammar（view 属性位） | 新编号；未开工 |
+| R-12 | 包面视图**观察括号列表 model 字段**（`var groups []str = []` → `for g in .store.groups`） | `age_component` 视图观测 | **阻（已锐化）**：最小复现证明与 store 内联**无关**（widget 自己的 `[]str` 同样被拒），与**拼写**有关（同一视图循环换裸 `List` 即通过）；拒绝点在 `FieldBinding::package_field` 的 `[` 前缀守卫，而 `field_ann` 已把 `[]T` 规范成 `List<T>`。下一步须查清视图循环的列表观测通道为何只认裸 `List` 拼写（已试：给 `model_list_type` 加 `[]T` 分支不改变该路径）。`p116_bracket_list_field_is_a_named_gap` 钉住现状，`p116_bare_list_field_is_observable_in_a_view` 做对照。 |
+| R-06 | 视图**空参回调**（`020/controls.at` `expected expression, found ')'` @148） | `ace-core` cst/grammar（view 属性位） | **已闭合**（2026-11-24，`auto-lang 563ee47de`）：`age-event-binding` 增显式空参数表臂（`age-event-binding-args-empty`，两面同开，镜像 118 的 handler 空参数）；**零作者实参**投影为裸消息引用（宿主供载荷），不是零实参方法调用——否则与消息载荷 arity 相撞。020/controls 越过该行。 |
 | R-10 | 视图 `if` 条件取**裸标识符**操作数（`if item.rel_dir == g {`） | `age-view-if` 条件面 | **已闭合**（2026-11-24，`auto-lang f59821dec`）：条件从裸 `pratt` 改走 `if-cond`（与 `age-on-if` 同一条件面）——此前 ident 后的 `{` 被当结构字面量吞掉整个分支体，整项回退。030/playlist 的分组过滤形。 |
 | R-11 | 包面视图回调的**作者实参**（`onclick: .SelectIndex(i)`） | `age-entry-value`/`age-event-binding` | **已闭合**（`f59821dec`）：包面 `age-entry-value` 在占位臂之后增通用 `age-event-binding` 臂（`$event`/`$0` 仍先匹配），作者实参投影为 self 方法调用、实参保留（与组件面同语义）。 |
 | R-07 | 数值 `.to_string()`（020 `fmt_clock`/`item_count_label`） | `ace-core` resolve | **已闭合**（`78b916591`）：AGE 面数值 `.to_string()` 与既有 `.str()` 同一显示物化节点（`RExprKind::TextDisplay`），不新增语义。**注意**：float 显示格式（`math.floor` 结果 → "3" 还是 "3.0"）须在 T-03 真窗按 020 时钟文案复核。 |
@@ -253,4 +263,4 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 8 | from: work | to
 
 **基线观察（非本计划引入，未修）**：`experimental/ace/aac/syntax/syntax_grammar_data.at` 在计划基线上**已与 `grammars/auto-source.at` 不一致**——`aac1046_grammar_data_identity_binding` 在未改动的 `auto-lang bced4dd79` 上即红（committed 344,941B vs 原始语法重生成 356,995B，约 12KB 漂移）。因 `ace-core` 由语法**源**编译（`cst/frontdoor.rs` `AUTO_SOURCE_GRAMMAR = include_str!(…)`），`auto-ui`/AV 面不依赖该数据文件，故本轮只改语法源与 Rust 侧，**不采纳**整份重生成（否则会静默重冻结全部 13 个 profile id 并引入未复核的上游漂移）。该漂移属 Auto 侧孪生（aac）的数据归属，需其 owner 重生成时一并纳入 `age-on-return`；证据 `plan-artifacts/plan-116/probes/r01-return-20261124/{control-data.posix.log,data-with-return.at}`。
 
-**下一步**：R-12（bracket 列表 model 字段的视图可观察性，现为 030 闭包首阻）→ R-03b（宿主元素 `$0` 归类）→ R-06（视图空参回调）→ R-05（020 项内定位，用 R-10 的删构造/最小件二分法）。每项一个最小正例 + 负控；全部闭合后重跑 `plan116_t01_package_diag_probe` 与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
+**下一步**：R-12（`[]T` 拼写的视图列表观测通道，现为 030 闭包首阻）→ R-03b（宿主元素 `$0` 归类）→ R-05（020 项内定位，用 R-10 的删构造/最小件二分法）。每项一个最小正例 + 负控；全部闭合后重跑 `plan116_t01_package_diag_probe` 与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
