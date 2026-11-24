@@ -96,9 +96,14 @@ impl PackageEventInput {
 fn frame_limits() -> ExecLimits {
     // A checked frame can replay and materialize a full file listing or tree.
     // Give each entry time to use the existing instruction budget on desktop.
+    //
+    // PLAN-118（T-03 真窗）：重模型应用（031-paint × 088 ColorPicker：入口
+    // 模型重放 + 24×24 画布列表）单帧重放约 6–8s、~6M 步；4s 墙在真窗上
+    // 直接判死。桌面帧预算按重模型抬到 20s / 60M 步（仍是具名资源拒绝，
+    // 不是无限预算）。
     ExecLimits {
-        max_steps: 6_000_000,
-        wall: Duration::from_secs(4),
+        max_steps: 60_000_000,
+        wall: Duration::from_secs(20),
         ..Default::default()
     }
 }

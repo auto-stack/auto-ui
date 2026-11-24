@@ -80,9 +80,13 @@ impl LivePackage {
                 || uses_context(child)
                 || child.members.iter().any(|row| row.role == "timer");
         }
-        if requires_child_state && !needs_current_models {
-            return Ok(None);
-        }
+        // PLAN-118（T-03）：子件带状态但无 outbound/watch/focus/timer 需求
+        // 时，旧判据回退无状态重放道——对 031-paint×ColorPicker 这种重模型
+        // （重放单帧 ~6M 步、每字段状态函数重复整模型；且冻结核验步数预算
+        // 2M 直接拒）不可用。改为**优先 live 道**：live 准备/编译不可用时由
+        // 下方 `compile_age_package_widget_runtime` 的 widget-runtime 诊断
+        // 回退（既有 Ok(None) 路径），无状态道仍保留给不支持 live 的组件。
+        let _ = (requires_child_state, needs_current_models);
         let compiled = match compile_age_package_widget_runtime(
             units,
             entry,
