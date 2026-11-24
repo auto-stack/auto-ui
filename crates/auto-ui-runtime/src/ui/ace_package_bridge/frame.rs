@@ -603,11 +603,6 @@ impl ViewBindings<'_> {
     }
 
     fn action(&mut self, event: &WidgetEvent, disabled: bool) -> Result<usize, String> {
-        // PLAN-119 临时诊断：事件实参是否随 WidgetEvent 到达（T-03 派发掉参定位）。
-        eprintln!(
-            "P119DBG action key={} msg={} args={:?}",
-            event.key, event.message, event.args
-        );
         let (node, message, instance) = self.route(&event.message)?;
         let target = self.actions.len();
         self.actions.push(PackageAction {

@@ -471,12 +471,10 @@ fn push_package_event(id: i32, instance: usize, revision: u64, target: usize, in
                 session.package_workers_pending[instance]
                     || !frame.actions()[target].source.key.eq_ignore_ascii_case("onclick")
             });
-            eprintln!("P119DBG pkg_event_accepted target={target} rev={revision}");
             session.package_events.push_back(QueuedPackageEvent {
                 instance, revision, target, action, input,
             });
         } else {
-            eprintln!("P119DBG pkg_event_rejected target={target} rev={revision}");
             session.stale_rejected += 1;
         }
     }
@@ -560,16 +558,12 @@ fn push_script_pen(
 }
 
 fn push_script_click(id: i32, instance: usize, target: usize) {
-    // PLAN-119 临时诊断：脚本点击走哪条队列（package 帧 vs session 事件）。
     {
         let mut guard = host().write().unwrap();
         let frame_rev = guard
             .get(id)
             .and_then(|session| session.package_frame(instance))
             .map(|frame| frame.revision);
-        eprintln!(
-            "P119DBG script_click id={id} inst={instance} target={target} frame_rev={frame_rev:?}"
-        );
     }
     let revision = host().write().unwrap().get(id)
         .and_then(|session| session.package_frame(instance))
