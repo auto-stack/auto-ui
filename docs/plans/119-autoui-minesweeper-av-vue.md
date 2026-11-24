@@ -272,6 +272,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 下一步（单点）：在 `inline_store_decl` 的展开循环前打印 `std::mem::discriminant(&st)` 或 `{:?}` 的语句列表，确定实际变体（候选：`Send`、`Let`、`Assign` 携带的 MethodCall），再按同一逻辑补展开分支。
 - 遗留：`P119DBG` 现 6 处临时件，落主前必删。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **AV 真窗首次跑通**（exit 0、frames=2、errors=0） | outcome: pass（T-03 门槛达成） | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下） | next: T-03 oracle（tap 格/标记/难度/重开/两实例/关闭）
+
+- 收口修复（auto-lang，G6 授权内）：`contains_call` 改为**只把域外调用**视为“体不可执行”，列表方法与纯转换（`push/get/len/pop/clear/set/to/to_string/to_str`）与投影器白名单同集合——此前 store 展开后残留的 `Call` 让 `body_foreign` 永不被清除，transition 发不出来。
+- 实测：`LIVE(baseline): OK`；真窗 `--package` **exit 0、frames=2、errors=0**，实例 0 首帧 rev=1、**175 元素 / 87 标签 / 17 标量态 / 166 动作**（81 个格子按钮 + 难度/重开等）。
+- 语义面：`foreign_callee=Init` 仍有 2 条打印（来自 store 内部 `.Init` 一处残留，未阻断发射）。
+- 下一步：T-03 oracle 脚本（tap 命中格 → 首击 29 格展开/16 数字、右击标记、难度切换、face 重开、两实例互不串扰、close/reopen 世代），随后 T-04 复核、T-06 A2Vue。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
