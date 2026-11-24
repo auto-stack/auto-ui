@@ -57,7 +57,11 @@ pub fn generate_package_front_sfc(
     modules: &[PathBuf],
 ) -> Result<(String, String), String> {
     let generate = || {
-        let (mut units, _) = front_package_units(app_at, source, modules)?;
+        let (units, _) = front_package_units(app_at, source, modules)?;
+    // PLAN-119：与 AV `load_package` 同形——纯 store 单元在包编译前先归一
+    // （model 形态 / 控制转移 / 元素所有权 / 自调用内联），否则包面看不到该
+    // store 声明（"model has no field `store`" 实证）。
+    let mut units = super::ace_source_prep::prepare_store_units(units);
         back_api::append_contract(app_at, &mut units)?;
         let candidates = package_candidates(source)?;
         let root = candidates.first().ok_or("no AGE node candidate in the entry module")?;
@@ -105,7 +109,11 @@ pub fn generate_linked_front_sfc(
 ) -> Result<Option<RoutedPackageSfc>, String> {
     let candidates = package_candidates(source)?;
     let Some(root) = linked_front_root(&candidates) else { return Ok(None) };
-    let (mut units, _) = front_package_units(app_at, source, modules)?;
+    let (units, _) = front_package_units(app_at, source, modules)?;
+    // PLAN-119：与 AV `load_package` 同形——纯 store 单元在包编译前先归一
+    // （model 形态 / 控制转移 / 元素所有权 / 自调用内联），否则包面看不到该
+    // store 声明（"model has no field `store`" 实证）。
+    let mut units = super::ace_source_prep::prepare_store_units(units);
     back_api::append_contract(app_at, &mut units)?;
     let widget_paths = append_widget_packages(app_at, source, &candidates, &mut units)?;
     let checked_host = checked_host_members(&root.members);
