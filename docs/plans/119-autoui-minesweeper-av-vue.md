@@ -468,6 +468,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 因此“包面 SFC 生成失败”的 Err 来自该调用，但我写入的入口日志没随函数执行 ⇒ 插入点很可能落在了**别的函数**（`package_candidates(source)` 那行在该文件出现多次，`String.Replace` 会全部替换，也可能全落在非目标函数）。
 - 下一步：确认 `entry.log` 写入语句所在函数（grep 行号对照 `fn generate_linked_front_sfc` 的行范围），只在目标函数体内补一条；同时把 Err 串本身落盘（最保险，与插入位置无关）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: SFC 错误串已坐实；同源单 store 与包面“双 store”判定冲突 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码；未提交改动已回撤） | next: entry 交原始源 + store 单元（AV 同形）需在正确作用域重做
+
+- 坐实（`sfc-err.log`）：`source.age.component-unsupported: multiple store declarations per node are not wired yet (S1)` —— 出自包面 `inline_store_decl`（`node.stores.len() > 1`）。
+- 推断：prep 后 entry 里已有同源 `store MinesweeperStore`，包面在该单元上再解析到一次 store 归属（或 entry 同时保留了 `use` 声明路径）⇒ 同一 node 收到两条 store。
+- 试过的解法：把 entry 改交**原始源** + `store` 单元作为包模块（与 AV `--package` 完全同形，AV 已证可行）时，我在错误作用域插值导致编译失败；已 `git checkout --` 回撤该文件，工具二进制重新构建通过（当前树可编译）。
+- 下一步（在正确作用域重做）：`let entry_source = if has_store_decl { content } else { prepared.as_str() };` 放在 `generate_linked_front_sfc` 调用**之前**同一块内，modules 传 `store_modules`；随后复跑，预期走通 AV 同形路径。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
