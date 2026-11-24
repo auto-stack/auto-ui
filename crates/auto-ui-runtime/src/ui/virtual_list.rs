@@ -160,8 +160,38 @@ use std::cell::{Cell, RefCell};
 thread_local! {
     /// 当前构建栈上的 pane 作用域 key 栈（最内层在末尾）。
     static SCOPE_STACK: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    /// 本帧 pane 序号（文档序稳定 → 跨帧同名；根作用域清空时归零）。
+    /// 本帧 pane 序号（文档序稳定 → 跨帧同名；最外层视图构建开始时归零）。
     static SCOPE_SEQ: Cell<u32> = const { Cell::new(0) };
+    /// 视图构建嵌套深度（子件 builder 复用同一线程：只有最外层归零序号）。
+    static BUILD_DEPTH: Cell<u32> = const { Cell::new(0) };
+}
+
+/// 一次视图构建的帧守卫（最外层构建把 pane 序号归零）。
+pub struct BuildFrameGuard;
+
+impl Drop for BuildFrameGuard {
+    fn drop(&mut self) {
+        BUILD_DEPTH.with(|d| d.set(d.get().saturating_sub(1)));
+    }
+}
+
+/// 进入一次视图构建；**最外层**（每帧首个）构建把 pane 序号归零。
+///
+/// 序号必须按帧归零而不是「弹到栈空就归零」：两个同帧兄弟 pane 之间栈会
+/// 短暂变空，按弹空归零会让它们复用 `vlist_0`（T-04 双 pane 隔离用例实录：
+/// 两个 `scroll (row-height:)` 抢同一份台账、后者覆盖前者的 total）。
+/// 子件 builder 在同一帧内嵌套调用入口，深度计数保证只有最外层归零。
+pub fn enter_build_frame() -> BuildFrameGuard {
+    let outer = BUILD_DEPTH.with(|d| {
+        let n = d.get();
+        d.set(n + 1);
+        n == 0
+    });
+    if outer {
+        SCOPE_SEQ.with(|s| s.set(0));
+        SCOPE_STACK.with(|st| st.borrow_mut().clear());
+    }
+    BuildFrameGuard
 }
 
 /// 压入一个 pane 作用域，返回本帧稳定 key（`vlist_{seq}`）。
@@ -176,16 +206,11 @@ pub fn push_scope() -> String {
     key
 }
 
-/// 弹出当前 pane 作用域；根作用域清空后本帧序号归零。
+/// 弹出当前 pane 作用域（序号在下一帧最外层构建时归零）。
 pub fn pop_scope() {
-    let emptied = SCOPE_STACK.with(|st| {
-        let mut b = st.borrow_mut();
-        b.pop();
-        b.is_empty()
+    SCOPE_STACK.with(|st| {
+        st.borrow_mut().pop();
     });
-    if emptied {
-        SCOPE_SEQ.with(|s| s.set(0));
-    }
 }
 
 /// 当前最内层 pane 作用域 key。

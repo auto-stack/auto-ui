@@ -94,6 +94,10 @@ mod plan670_code_editor_event_tests;
 // fixture 走真实 ForLoop + View 管线）。
 #[cfg(test)]
 mod plan126_vlist_scale_tests;
+// PLAN-126 T-04：窗口行交互语义（点击/右键实参绝对索引、排序后换序、
+// 双 pane 隔离、vnode path 寻址、探针缺口钉桩）。
+#[cfg(test)]
+mod plan126_vlist_interact_tests;
 mod plan703_supply_probes;
 mod plan710_supply_probes;
 mod plan728_supply_probes;

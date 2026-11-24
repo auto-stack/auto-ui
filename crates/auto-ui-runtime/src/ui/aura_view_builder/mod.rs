@@ -450,6 +450,9 @@ impl<'a> AuraViewBuilder<'a> {
     /// corresponding View variant. State references are resolved from the
     /// VmBridge at build time.
     pub fn build(&self, node: &AuraNode) -> View<DynamicMessage> {
+        // PLAN-126 T-04：帧边界——最外层构建把 VList pane 序号归零（同帧
+        // 兄弟 pane / 子件 builder 共享本帧文档序编号）。
+        let _vlist_frame = crate::ui::virtual_list::enter_build_frame();
         self.convert_node_with(node, &Bindings::new())
     }
 }
@@ -508,6 +511,8 @@ impl<'a> AuraViewBuilder<'a> {
         node: &AuraNode,
         capture_probe: bool,
     ) -> (View<DynamicMessage>, DebugIdMap, BuildProbe) {
+        // PLAN-126 T-04：帧边界（见 `build`）。
+        let _vlist_frame = crate::ui::virtual_list::enter_build_frame();
         // PLAN-007 T-05：design 块 theme/mode 数据绑定每帧求值（C-06/07/08）。
         // 先于任何元素转换——整帧一致使用新槽位；评估/校验失败保留旧有效
         // 设计并给可定位诊断（C-11 事务发布）。
