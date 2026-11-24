@@ -261,6 +261,10 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 判定（G6）：AGE live 发射面的“分支/循环体内仅列表方法”白名单，与 038「逐格生成显示文本」的实现方式根本冲突；prep 无法把依赖循环变量的转换提到顶层，**这条只能在语言侧解决**（放宽白名单，或提供可内联的数值转文本内建）。
 - 建议下一步（需裁定）：①授权 auto-lang 放宽/扩展该白名单至纯函数式转换（`to/to_string/to_str` 等无副作用内建）；②把 G6 连最小复现移交语言 owner（PLAN-1100/1104）；③改验收口径（VM Iced 作 AV 证据）。
 
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 16 | from: work | to: work | status: drafting | outcome: waiting | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （fe521ee8） | next: user（§10 G6 三选一）
+
+- 等待轮 2/3：G6（分支/循环体方法调用白名单是否放宽到纯函数式转换）需用户裁定。本轮不做实现、不跑检查。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
