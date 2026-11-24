@@ -475,6 +475,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 试过的解法：把 entry 改交**原始源** + `store` 单元作为包模块（与 AV `--package` 完全同形，AV 已证可行）时，我在错误作用域插值导致编译失败；已 `git checkout --` 回撤该文件，工具二进制重新构建通过（当前树可编译）。
 - 下一步（在正确作用域重做）：`let entry_source = if has_store_decl { content } else { prepared.as_str() };` 放在 `generate_linked_front_sfc` 调用**之前**同一块内，modules 传 `store_modules`；随后复跑，预期走通 AV 同形路径。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: AV 同形 units 已落地；双 store 仍在 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 双 store 判定的产生点在 `checked_widgets::generate` 或 leaf 的另一处 entry 重写
+
+- 已落地（`vue.rs` / `ace_package_sfc.rs`）：store 类应用走 `generate_linked_front_sfc`，**entry 交原始源 + store 单元作为包模块**（与 AV `--package` 完全同形，实测 `call.log: has_store=true src_len=4673 modules=1`）；entry 已有 store 片断或另有纯 store 单元时**跳过组件面 prep**。
+- 仍报 `multiple store declarations per node`，且 `sfc-err.log` 未再生成 ⇒ 该错误的产生点已不在我们包装的 Err 分支，而在更内层（`checked_widgets::generate` / leaf 的另一次 entry 重写）。
+- 下一步：在 `checked_widgets::generate` 入口按同样判据落盘/跳过；或直接比对 AV `load_package` 与 SFC 生成器所用的 units 差异（AV 已被证明可用同一对单元跑通）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
