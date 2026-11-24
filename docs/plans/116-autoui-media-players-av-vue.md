@@ -93,6 +93,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - 2026-11-24 复测（post-117/118 基线 `auto-lang bced4dd79`，`auto-ui e5ce230f`）：`try/catch`、`Http`/JSON/Dyn、`math.floor`、`store` 声明本体、`widget` 包项、具名参数与 `var` 已被上游解除；`.store.*` 的**跨单元**可见性、`return` 早退、`use web component`、`$0` 四项仍缺，另有一项待定位（§10 R-01..R-05）。闭合按 R 编号推进，每项附最小复现与正反回归。
   - 2026-11-24 **R-01 已闭合**：`age-on-return`（裸形，两面同开，接 `age-on-stmt`/`age-on-widget-stmt`/`age-on-branch-stmt`）+ 早退按结构化控制流下沉（`auto-lang 05ee4ff8f`、`auto-ui 70a6a424`）。`020/player_store.at` 由 `expected fn, found store` 转为 OK；回归 `plan116_handler_return` 6/6，`ace-core` conformance 922 passed / 5 failed（与基线 916/5 的同一 5 项既有红）。余 R-02..R-05 见 §10。
   - 2026-11-24 **R-04a + R-07 已闭合**（`auto-lang 78b916591`）：跨单元 store 导入在最小 2 单元包上闭合（含"只写 `on`、无 `msg` 块"的 020 形态按参数注解补出消息）；AGE 面数值 `.to_string()` 与 `.str()` 同一显示物化。回归 `plan116_store_import` 3/3，conformance 925 passed / 5 failed。**R-04b**（无类型/动态 store 字段）新开并钉住具名拒绝。余 R-02/R-03/R-05/R-06 见 §10。
+  - 2026-11-24 **R-04b 已闭合**（`auto-lang 174c6646b`）：无类型且初值 `[]` 的 store 字段投影为可变集合（`List`，元素型沿用 117 的 `List(Dyn)` 缺省），先定型后投影初值；非空无类型字面量仍只读（负控）。回归 `plan116_store_import` 5/5，conformance 927 passed / 5 failed；030 闭包前进到 R-03（`$0`），020 仍 R-05。余 R-02/R-03/R-05/R-06 见 §10。
 - [ ] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
   - 2026-11-23 受控媒体宿主已实跑通过（`mpv_contract` 13/13、`mpv_channel` 10/10、`mpv_engine` 11/11、`plan116_av_media_widget` 2/2、`ace_node_desktop` 10/10 顺序 CPU 用例；`ace_node_desktop_window.exe --features ace-bridge,mpv-widget` 真窗播 `E:\Video\caelestia.mp4` 实测 `duration="49.429"` / `SeekMid=15` -> `OnTime="15"` / `TogglePause="true"` / `frames_rendered=10` / `errors=[]`）；**原样 020/030 多单元包入口因 B-03 阻塞无法在 `PackageStateEngine` 启动**。
@@ -183,6 +184,16 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 3 | from: work | to
 
 stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 4 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: 78b916591 | next: work/T-02（R-04b/R-02/R-03/R-06）
 
+2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-04b 闭合（无类型列表 store 字段 → 可变集合） | outcome: pass | worktree_path: `D:/autostack/.wt/ui-116/auto-lang`（`plan-116-dev`） | base_commit: `auto-lang 78b916591` | code_commit: `auto-lang 174c6646b`（`auto-ui` 本轮未改） | task_ids: T-02 | evidence: `plan116_store_import` 用例（5 例）
+
+- **探路先证**：先加一条"显式 `List` 类型字段"的对照用例，证明包面接受 `var items List = []` 且可写——由此确定 R-04b 不必引入新类型词，只需为 `var x = []` 合成既有 `List` 拼写（元素型走 117 round-20 的 `List(Dyn)` 缺省）。
+- **实现（`cst/project.rs`）**：无类型且初值文本恰为 `[]` 的 store 字段投影为可变集合字段（`ty="List"`、`mutable` 取作者 `var`）。关键顺序：**先定型、后投影初值**——无类型初值是 `age-view-data-lit` 原始文本节点，`project_expr_sync` 会报 `expected expression, found '['`；第一版正是踩了这个顺序，改用显式合成空 `ArrayLit` 才通。
+- **不放宽**：无类型且非空字面量的 store 字段仍按只读 view-data 跳过，写它继续报 `undeclared model field`（负控用例钉住）。
+- **回归**：`plan116_store_import` **5/5**；`ace-core` conformance **927 passed / 5 failed**（同一 5 项既有红，+2 = 本轮新用例）。
+- **真实语料效果**：`PKG_CLOSURE 030` 由 `on Init assigns undeclared model field playlist` → **`source.lex: module app::controls: unknown character '$'`**（即 R-03），说明 store 导入 / 字段内联 / store 自身写这条链在真源上已通。`PKG_CLOSURE 020` 仍在 `app` 项首回退（R-05）。
+
+stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 5 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: 174c6646b | next: work/T-02（R-03）
+
 ## 10. 待澄清事项
 
 **B-03 已裁定（2026-11-24，本计划自有工作树内闭合）。** 原 A/B 选择的前提是"`PLAN-117` 正在 `auto-lang` 同一写面上持续改动"，该前提已随 117/118 双仓落主归档而消失；`README.md` 交付表现指示"在 117 后的基线复测，再按残余缺口处理 B-03"。`/goal` 授权的实施树本就含 `auto-lang`（见 §4），故无需再次拍板：**按残余缺口逐项闭合，目标/验收/范围/仓集不变**。若任一缺口经定位后需要改动已冻结的共享语义或超出本计划仓集，再按 §5 停下请示。
@@ -195,7 +206,7 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 4 | from: work | to
 | R-02 | `use web component <Name> from "<path>"`（`U1-use-web` @`component`） | `ace-core` cst/grammar（包面 import） | 030 `playlist.at` 触发；未开工 |
 | R-03 | 视图表达式 `$0`（`source.lex: unknown character '$'`） | `ace-core` lexer/cst | 030 `controls.at`/`viewport.at` 触发；未开工 |
 | R-04a | 跨单元 store 导入（`use player_store: PlayerStore` + `.store.<field>`/`.store.<Msg>()`） | `packages`/`inline_store_decl` | **已闭合**（`auto-lang 78b916591`）：导入链在包面生效；**只写 `on`、无 `msg` 块**的 store（020 形态）按 handler 参数注解补出消息声明（无注解仍具名拒）。回归 `plan116_store_import` 2 正例 + 1 负控。 |
-| R-04b | **无类型/动态 store 字段**（`var playlist = []`，030 写它） | `age_component` store 投影 | **阻**：`run_component_store_item` 对无 `ty` 字段 `continue`（当只读 view-data），故内联后 store 自己的 `.playlist = …` 写报 `undeclared model field`。需动态值语义，非语法面可闭合。已用 `p116_store_untyped_list_field_is_a_named_gap` 钉住当前具名拒绝。 |
+| R-04b | **无类型/动态 store 字段**（`var playlist = []`，030 写它） | `age_component` store 投影 | **已闭合**（2026-11-24，`auto-lang 174c6646b`）：无类型且初值恰为 `[]` 的 store 字段投影为**可变集合字段**（`ty = "List"`，元素型沿用 117 round-20 的 `List(Dyn)` 缺省）；定型判定先于初值投影（无类型初值是 `age-view-data-lit` 原始文本节点，`project_expr_sync` 不承载）。其余无类型形态仍按只读跳过（负控钉住）。回归 `plan116_store_import` 5/5；**真实效果**：030 闭包由 `undeclared model field playlist` 前进到 R-03。 |
 | R-05 | 020 内部未定位构造（`020/app.at` 报 `expected fn, found widget`，但最小 `widget` 包项可解析 → 错误定位在项首，真因在项内） | 待定位 | 未定位 |
 | R-06 | 视图**空参回调**（`020/controls.at` `expected expression, found ')'` @148） | `ace-core` cst/grammar（view 属性位） | 新编号；未开工 |
 | R-07 | 数值 `.to_string()`（020 `fmt_clock`/`item_count_label`） | `ace-core` resolve | **已闭合**（`78b916591`）：AGE 面数值 `.to_string()` 与既有 `.str()` 同一显示物化节点（`RExprKind::TextDisplay`），不新增语义。**注意**：float 显示格式（`math.floor` 结果 → "3" 还是 "3.0"）须在 T-03 真窗按 020 时钟文案复核。 |
@@ -204,4 +215,4 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 4 | from: work | to
 
 **基线观察（非本计划引入，未修）**：`experimental/ace/aac/syntax/syntax_grammar_data.at` 在计划基线上**已与 `grammars/auto-source.at` 不一致**——`aac1046_grammar_data_identity_binding` 在未改动的 `auto-lang bced4dd79` 上即红（committed 344,941B vs 原始语法重生成 356,995B，约 12KB 漂移）。因 `ace-core` 由语法**源**编译（`cst/frontdoor.rs` `AUTO_SOURCE_GRAMMAR = include_str!(…)`），`auto-ui`/AV 面不依赖该数据文件，故本轮只改语法源与 Rust 侧，**不采纳**整份重生成（否则会静默重冻结全部 13 个 profile id 并引入未复核的上游漂移）。该漂移属 Auto 侧孪生（aac）的数据归属，需其 owner 重生成时一并纳入 `age-on-return`；证据 `plan-artifacts/plan-116/probes/r01-return-20261124/{control-data.posix.log,data-with-return.at}`。
 
-**下一步**：R-04b（动态 store 字段）与 R-02/R-03/R-06 并行推进；R-05 在 R-04b 后复测闭包。全部闭合后重跑 `plan116_t01_package_diag_probe` 与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
+**下一步**：R-03（030 `controls` 的 `$0`，现为 030 闭包首阻）→ R-02（`use web component`）→ R-06（视图空参回调）→ R-05（020 项内定位）。每项一个最小正例 + 负控；全部闭合后重跑 `plan116_t01_package_diag_probe` 与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
