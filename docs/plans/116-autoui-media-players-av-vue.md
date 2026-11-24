@@ -277,6 +277,15 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 12 | from: work | t
 
 stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 13 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: bcc955fae | next: work/T-02（R-13 / R-05）
 
+2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-13 定位（pac 依赖在包面缺消费路径）+ 新探针 | outcome: pass（诊断） | worktree_path: `D:/autostack/.wt/ui-116/auto-ui`（`plan-116-dev`） | base_commit: `auto-ui 70a6a424` / `auto-lang bcc955fae` | code_commit: `auto-ui f3af2f07`（探针；`auto-lang` 本轮未改） | task_ids: T-02 | evidence: `plan116_t01_package_closure_with_pac_deps` 输出
+
+- **先证伪"用 prep 补依赖"**：`ace_source_prep` 确实能把 `use stylekit.styles` 内联成 style 常量，但它同时把 store 内联进**每个**单元（`PKG_PREP_SNIPPET` 实测：每个消费者单元都带一份 `store PlayerStore { … }`）、并把 `[]` 改写成 `List<Str>.new()`——那是 **lane 形态**，用于包编译立刻变成重复 store。该方向已回退，未留改动。
+- **再证"给包单元"部分可行**：新探针 `plan116_t01_package_closure_with_pac_deps` 把 `pac.at` 声明的 dep 根下 `.at` 作为独立包单元加入（排除 `pac.at`/`package.at` 元数据）：`stylekit.styles` 解析通过，`themes.themes` 报 `` `pub` is not part of this source profile``（`themes.at` 是按 packages 面写的，age-package 单元面收不了）。
+- **结论（下一轮入口）**：pac 依赖在包面缺一条消费路径，二选一——(a) 给 style/theme 包补包面模块形态；(b) 加"包面 prep"（只内联 style/theme 导入、**不**内联 store）。后者更小且与 prep 既有语义同族。
+- **回归/门禁**：`plan116_t01_probe` 5/5（含新探针）；`auto-lang` 源码未改（conformance 沿用上轮 942/5）。
+
+stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 14 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-ui | commit: f3af2f07 | next: work/T-02（R-13 方案 b / R-05）
+
 ## 10. 待澄清事项
 
 **B-03 已裁定（2026-11-24，本计划自有工作树内闭合）。** 原 A/B 选择的前提是"`PLAN-117` 正在 `auto-lang` 同一写面上持续改动"，该前提已随 117/118 双仓落主归档而消失；`README.md` 交付表现指示"在 117 后的基线复测，再按残余缺口处理 B-03"。`/goal` 授权的实施树本就含 `auto-lang`（见 §4），故无需再次拍板：**按残余缺口逐项闭合，目标/验收/范围/仓集不变**。若任一缺口经定位后需要改动已冻结的共享语义或超出本计划仓集，再按 §5 停下请示。
@@ -293,7 +302,7 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 13 | from: work | t
 | R-04b | **无类型/动态 store 字段**（`var playlist = []`，030 写它） | `age_component` store 投影 | **已闭合**（2026-11-24，`auto-lang 174c6646b`）：无类型且初值恰为 `[]` 的 store 字段投影为**可变集合字段**（`ty = "List"`，元素型沿用 117 round-20 的 `List(Dyn)` 缺省）；定型判定先于初值投影（无类型初值是 `age-view-data-lit` 原始文本节点，`project_expr_sync` 不承载）。其余无类型形态仍按只读跳过（负控钉住）。回归 `plan116_store_import` 5/5；**真实效果**：030 闭包由 `undeclared model field playlist` 前进到 R-03。 |
 | R-05 | 020 内部未定位构造（`020/app.at` 报 `expected fn, found widget`，但最小 `widget` 包项可解析 → 错误定位在项首，真因在项内） | 待定位 | **已定位（未闭合）**：真因是 `.Init` 里**裸名赋值 + 跨行字符串**（`pins = pins + "…⏎"`，闭合引号独占一行）。最小复现 `plan116_app_init_gap`：该形→拒绝；同一字符串写在 `.field = …` 位→通过。已排除：字符串内容、`var` 声明、`.store` 绑定、`unbracketed expression cannot continue across a newline` 守卫（插桩实测未命中）。 |
 | R-12 | 包面视图**观察括号列表 model 字段**（`var groups []str = []` → `for g in .store.groups`） | `age_component`/`frontdoor` 状态访问器 | **已闭合**（2026-11-24，`auto-lang bcc955fae`）：包前门原本对**所有** `[` 开头字段跳过 `__age_state_*` 访问器发射，而子 widget 视图由 `evaluate_widget_view` 只传 inputs（状态通道）求值——循环因此无通道可调。改为：动态 `[]T` 也发访问器（定长 `[N]T` 仍不发/仍拒）；`model_type` 对"动态列表拼写 + 空字面量初值"取包面动态缺省（裸 `List` → `List(Dyn)`），与空字面量自身推断一致（否则 `expected list, found list`）。回归翻转成正例；030 闭包越过该阻。 |
-| R-13 | 包面 `use stylekit.styles: <name>`（030 `playlist.at` → `unknown module stylekit.styles`） | 包闭包的模块供给（auto-ui/host 侧？） | **新开**（R-12 闭合后 030 闭包首阻）：`playlist.at` 顶部 `use stylekit.styles: caption_text` 引用的模块不在包输入里。需确认该模块由谁提供（宿主 stdlib 单元 or 计划侧供给），以及 020 的 `use themes.themes` 是否同族。 |
+| R-13 | 包面 `use stylekit.styles: <name>`（030 `playlist.at` → `unknown module stylekit.styles`） | 包闭包的依赖包消费路径（auto-ui 侧为主） | **已定位（未闭合）**：`stylekit`/`themes` 都是 `pac.at` 的 `dep { path: … }`（016/020/030 同形）。① `ace_source_prep` 能把它们内联成 style 常量，但那是 **lane 形态**——prep 同时把 store 内联进**每个**单元、把 `[]` 改写成 `List<Str>.new()`，用于包编译会产生重复 store，**不可用**；② 把 dep 的 `.at` 作为**包单元**加入（新探针 `plan116_t01_package_closure_with_pac_deps`）：`stylekit.styles` 解析通过，但 `themes.at` 用 `pub`，在 age-package 面被判 `` `pub` is not part of this source profile``。结论：pac 依赖在包面缺一条消费路径，两条候选——(a) 给 style/theme 包补包面模块形态；(b) 加"包面 prep"（只内联 style/theme 导入、**不**内联 store）。 |
 | R-06 | 视图**空参回调**（`020/controls.at` `expected expression, found ')'` @148） | `ace-core` cst/grammar（view 属性位） | **已闭合**（2026-11-24，`auto-lang 563ee47de`）：`age-event-binding` 增显式空参数表臂（`age-event-binding-args-empty`，两面同开，镜像 118 的 handler 空参数）；**零作者实参**投影为裸消息引用（宿主供载荷），不是零实参方法调用——否则与消息载荷 arity 相撞。020/controls 越过该行。 |
 | R-10 | 视图 `if` 条件取**裸标识符**操作数（`if item.rel_dir == g {`） | `age-view-if` 条件面 | **已闭合**（2026-11-24，`auto-lang f59821dec`）：条件从裸 `pratt` 改走 `if-cond`（与 `age-on-if` 同一条件面）——此前 ident 后的 `{` 被当结构字面量吞掉整个分支体，整项回退。030/playlist 的分组过滤形。 |
 | R-11 | 包面视图回调的**作者实参**（`onclick: .SelectIndex(i)`） | `age-entry-value`/`age-event-binding` | **已闭合**（`f59821dec`）：包面 `age-entry-value` 在占位臂之后增通用 `age-event-binding` 臂（`$event`/`$0` 仍先匹配），作者实参投影为 self 方法调用、实参保留（与组件面同语义）。 |
@@ -303,4 +312,4 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 13 | from: work | t
 
 **基线观察（非本计划引入，未修）**：`experimental/ace/aac/syntax/syntax_grammar_data.at` 在计划基线上**已与 `grammars/auto-source.at` 不一致**——`aac1046_grammar_data_identity_binding` 在未改动的 `auto-lang bced4dd79` 上即红（committed 344,941B vs 原始语法重生成 356,995B，约 12KB 漂移）。因 `ace-core` 由语法**源**编译（`cst/frontdoor.rs` `AUTO_SOURCE_GRAMMAR = include_str!(…)`），`auto-ui`/AV 面不依赖该数据文件，故本轮只改语法源与 Rust 侧，**不采纳**整份重生成（否则会静默重冻结全部 13 个 profile id 并引入未复核的上游漂移）。该漂移属 Auto 侧孪生（aac）的数据归属，需其 owner 重生成时一并纳入 `age-on-return`；证据 `plan-artifacts/plan-116/probes/r01-return-20261124/{control-data.posix.log,data-with-return.at}`。
 
-**下一步**：R-13（`stylekit.styles` 模块供给，现为 030 闭包首阻；与 020 的 `themes.themes` 同族待核）与 R-05（020 裸名赋值的行敏感面）。R-13 若属宿主/包输入供给，可能只需在 auto-ui 侧接通而非语言改动。两者闭合后重跑 `plan116_t01_package_diag_probe` 与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
+**下一步**：R-13（pac 依赖在包面的消费路径；(b)"包面 prep"最小可行，仅内联 style/theme 且不动 store）与 R-05（020 裸名赋值的行敏感面）。两者闭合后重跑两条闭包探针（无依赖 / 带 pac 依赖）与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
