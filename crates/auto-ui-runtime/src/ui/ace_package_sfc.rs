@@ -116,6 +116,13 @@ pub fn generate_routed_front_sfc(
 }
 
 /// Generate an app with an authored component package and no route outlet.
+fn p119_store_count(label: &str, units: &[ace_core::source::packages::PackageModuleInput]) {
+    let n: usize = units
+        .iter()
+        .map(|u| u.source.matches("store MinesweeperStore").count())
+        .sum();
+    eprintln!("P119DBG stage={label} store_decls={n} units={}", units.len());
+}
 pub fn generate_linked_front_sfc(
     app_at: &Path,
     source: &str,
@@ -143,7 +150,9 @@ pub fn generate_linked_front_sfc(
     // store 声明（"model has no field `store`" 实证）。
     let mut units = super::ace_source_prep::prepare_store_units(units);
     back_api::append_contract(app_at, &mut units)?;
+    p119_store_count("after_units", &units);
     let widget_paths = append_widget_packages(app_at, source, &candidates, &mut units)?;
+    p119_store_count("after_widget_packages", &units);
     let checked_host = checked_host_members(&root.members);
     if widget_paths.is_empty() && !checked_host {
         return Ok(None);
