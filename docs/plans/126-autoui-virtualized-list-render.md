@@ -185,6 +185,22 @@ r1 基线 Git blob `c667888299e6fb283f23233b13532a77b665605e`。r1 的 AC-02 承
 
 2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 2 | from: executing | to: executing | status: executing | outcome: in_progress | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: e491ab6a | next: work
 
+2026-11-24 stage: work | PLAN-126:r2 | outcome: in_progress（T-03 阻塞点已定位：窗口不经过 View→Element 投影） | plan_revision: 2 | worktree: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | code_commit:（本轮诊断提交，见 git log） | tasks: T-03（进行中） | next_responsible_role: work（T-03 续）
+
+**T-03 诊断结论（本轮实质进展）**
+
+- 增加探针后实窗（`t01/vlist4`）拿到决定性反证：`[VLIST-MARK] projecting id=…` **一次都没有打印**，而 `[VLIST] measure panes=0 bands=0` 持续出现。前者说明窗口的 element 树不是由 `AbstractView → IntoIcedElement`（`iced/renderer/projection.rs`）为窗口化子树构建的；后者说明 probe 的 `container` 回调也拿不到 `vlist_mark:` 容器。
+- 结合代码：`render_dynamic_view` 全部调用点都在 `iced/renderer/devtools.rs` 内部或 `renderer/mod.rs` 的测试里，生产窗口另有一条构建入口（MCP 快照用的 `styled_vtree` 也说明存在 VTree 面）。因此 `View::VirtualMark` / `View::SpacePx` 在**快照/vtree 面**按我加的臂透明化（子件透传 / Text-Empty），在**窗口面**则根本没走到我加的投影臂——窗口化视图建出来了（`request_measure()` 被调用、`[VLIST] measure` 有行），但窗口渲染看不到标记与占位。
+- 另一个确认：`record_build` 的 `[VLIST] scope=…` 行一次都没出现 → 只有「标定帧」在跑（`plan()` 恒 `None`，因为 probe 从未回执几何）；这解释了为什么行数仍是 120、偶尔出现 2 行（标定窗口与缓存帧交错）。
+
+**下一轮的可执行路线（按优先级）**
+
+1. 先定位窗口 element 树的真实构建入口（`DynamicComponent::view()` → ??? → `Element`），把 `VirtualMark`（合成 id 容器）与 `SpacePx`（f32 高度 space）在**该入口**同样落下；这是让 probe 与占位生效的最小修正。
+2. 若该入口以 VNode/VTree 为中间层：给 `VirtualMark` 分配稳定 vnode id 并在 vtree→element 层保留，`SpacePx` 映射为固定高度间隔节点；probe 改读 vtree bounds（`__bounds_collected` 已有同源数据）。
+3. 退化方案（若 1/2 代价过大）：给虚拟化 pane 的 `View::Scrollable` 加 `measure_key` 字段（约 20 处构造点，机械补齐），由 `scroll_state_reader` 拿到视口/偏移；行高改由**显式 `row-height`**（普通列表入口 + 025 表体默认值）提供，`list_top` 用「pane 内容高 − 行数×行高」反解。该方案不需要 mark。
+
+2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 3 | from: executing | to: executing | status: executing | outcome: in_progress | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: plan-126-dev HEAD | next: work
+
 ## 10. 待澄清事项
 
 - **Q-01 排序**。将排序移出 UI 线程是原始需求中的独立工作。由后续计划根据 AutoLang 与 025 实际排序路径确定边界，PLAN-126 可以独立推进。
