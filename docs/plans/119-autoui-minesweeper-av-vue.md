@@ -571,6 +571,14 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 
 **交接摘要（round 59）**：AV/Iced 腿（T-03）六行全绿并复验；A2Vue 腿生成/构建/渲染/首击/难度已通过，仅剩右击标记的事件发射；T-04/T-05/T-07/T-08 未开始。工作树干净可编译，临时诊断已清零。
 
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 60 | from: work | to: work | status: drafting | outcome: pass（定位） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 找到把 `event` 操作映射成 Vue `on*` prop 的 JS 发射点
+
+- 已确认上游是**通用发射**：`live_view.rs::event()` 会把 `entry.key`（含 `.prevent` 修饰）、消息名、参数个数原样 emit 成 `event` 操作；`checked_widget_view.js` 也把 `kind/message/types/values` 收进 `element.events`（含 `image-surface-event` 专用分支）。
+- 因此只差**最后一跳**：把 `element.events` 里的 `kind`（如 `oncontextmenu.prevent`）映射成 Vue 渲染 props。该跳不在 `checked_widget_view.js`（无 addEventListener 泛接线），也不在 a2x-ts（grep 无 onclick），最可能在 auto-ui SFC 组装处按 `event` 操作拼 `h()` props。
+- 下一步（定位一行即可）：在 `ace_package_sfc.rs` 搜 `"on"` 前缀拼接或 `h(` 的 props 构造；补 `oncontextmenu` + `preventDefault` 后复跑 `oracle-vue.mjs`。
+
+**交接摘要**：AV/Iced 腿六行全绿并复验；A2Vue 腿除右击标记外全部通过（生成/构建/渲染/首击/难度）；工作树干净可编译，临时诊断清零；T-04/T-05/T-07/T-08 未开始。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
