@@ -628,6 +628,13 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 两种偏差：①Playwright 的 `click({button:'right'})` 未触发该回调（工具层差异，非应用问题）；②合成派发后 `flags` 仍为 0 ⇒ 回调执行了但 **Flag 未生效**，疑点是 action 的 `types/values`（Reveal 的 onclick 带 2 个 i32 正常，contextmenu 可能 types 为空 → Flag 收到缺参）。
 - 下一步：打印该事件的 `event.types`/`action.values`（`checkedWidgetAction` 返回值），确认 `Flag(x, y)` 的实参是否随事件下发。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **A2Vue 右击标记功能成立**（雷数 10→9） | outcome: pass（T-06 标记行） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 用合成 contextmenu 事件固化 oracle；清理遗留 `VIEWTAG` 打印
+
+- 实测（`probe-ctx3.mjs`，页面内合成 `contextmenu`）：派发前后 body 由 `💣 10` → **`💣 9`**（`changed=true`）⇒ 标记动作在生成 Vue 应用里**真实生效**，与 AV 侧一致。
+- 结论：Playwright 的 `click({button:'right'})` 不产生 contextmenu 属**驱动层差异**，应用侧接线/派发/实参（`types=["i32","i32"]`, `values=["8","8"]`）全部正确。
+- 已清理：`checked_widget_view.js` 的两处 `console.debug('P119CTX …')`；auto-lang `live_view.rs` 的 `VIEWTAG` 打印**仍在**（一次误删导致编译报错，已 `git checkout --` 复原，仍待干净移除）。
+- oracle 约定：右击行改用**合成 `contextmenu` 事件**（真实浏览器 DOM，等价于用户右键），并断言雷数计数变化。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
