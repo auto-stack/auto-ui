@@ -233,6 +233,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - live 复跑仍见 `foreign_callee=Reveal` ⇒ **widget 侧**（app 单元的 `.Reveal(x, y) -> { store.Reveal(x, y) }`）调用未被 `expand_store_calls` 展开：`store_call_parts` 需要 `MethodCall{recv}` 且 `is_store_base(recv)`；诊断已证明它是 MethodCall 且名字为 `Reveal`，故 `is_store_base` 未命中——下一轮直接在 `store_call_parts` 打印 `recv.kind`（`Var("store")` vs `Field{store, self}` vs 其它）定位。
 - 遗留：auto-lang 三处 `P119DBG` 均为临时件。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: `store_call_miss` 实测（.st_board.set ≠ 元凶） | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下） | next: 打印 `store_bodies` 的键名，核对 widget 展开为何未命中
+
+- 在 `store_call_parts` 加 miss 打印后实测：唯一 miss 是 `recv = self.st_board`、`name = set`（即内联后字段上的 `.set` 被当作 store 调用探测）——**属正常 None**，不是元凶。
+- 因此 `foreign_callee=Reveal` 的来源只能是 widget 侧 `store.Reveal(x, y)` 根本没进入展开：下一步在 `inline_store_decl` 打印 `store_bodies` 的键（期望 `Init/Tick/Reveal/Flag/Reset/SetDifficulty`）与 `node.handlers` 的各 msg，比对失配点（包面 imported-store 路径 `scope.stores` 必须命中 `app::minesweeper_store` 的 `MinesweeperStore`）。
+- 遗留：`P119DBG`（widget_runtime 2 处、project 2 处、age_component 1 处）全部临时件，落主前移除。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
