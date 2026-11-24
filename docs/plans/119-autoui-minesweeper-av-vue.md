@@ -297,6 +297,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 复跑脚本 `2:click:0:4`：exit 0、frames=2、errors=0，但 `rev=1`（本次未推进；更早一次同形脚本 rev 到 2）⇒ 派发在 live 道上**不稳定/未生效**，下一步查 `dispatch_checked`（`ace_package_bridge.rs:863`）在 live 分支的返回与 `WidgetSession::dispatch` 的错误是否被吞。
 - 附带：`ace_package_bridge/frame.rs` 新增 `P119DBG action` 临时打印（落主前删）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 脚本点击入队成功（rev 匹配）但消费端无帧产出 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 在 `NodeDesktopMsg::PackageClick` 消费臂打印 bridge 调用与返回值
+
+- 实证：`P119DBG script_click id=1 inst=0 target=4 frame_rev=Some(1)`——脚本步**确实触发**、帧存在且 revision 匹配（1），`push_package_event(...Activation)` 被调用。
+- 但终态 `last_rev=1`、`errors=0`、`st_game_state=ready`：**消费端没有产出新帧**（live 分支里 `live.update(...)?` 若失败会带错误字符串，故更像是消息未被消费/被丢弃）。
+- 下一步单点：在 `queue_package_message` 的 `PackageClick` 臂（arce_node_desktop.rs:574）与 bridge 的 `click(...)` 里各加一条打印，确认消息是否到达、返回 Ok/Err；若 Err 则错误在某处被吞（errors 未记录）。
+- 临时件清单（落主前必须清理）：`P119DBG` 现共 8 处（widget_runtime 2、project 2、age_component 3、frame 1、ace_node_desktop 1）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
