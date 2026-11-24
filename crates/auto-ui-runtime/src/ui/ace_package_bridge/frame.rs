@@ -26,6 +26,8 @@ pub struct PackageFrame {
     clicks: BTreeMap<Vec<usize>, usize>,
     /// PLAN-118：canvas onhit 目标（tap 命中 id 经文本事件通道回程序）。
     hits: BTreeMap<Vec<usize>, usize>,
+    /// PLAN-118：canvas 笔事件目标（onpenstart/onpenmove/onpenend）。
+    pens: BTreeMap<Vec<usize>, (Option<usize>, Option<usize>, Option<usize>)>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
     widgets: BTreeSet<Vec<usize>>,
@@ -114,7 +116,28 @@ pub(crate) struct ImageSurfaceEvents {
     pub(crate) double_click: Option<usize>,
 }
 
+impl PackageAction {
+    /// PLAN-118：证据面读回动作消息与事件键。
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn key(&self) -> &str {
+        &self.source.key
+    }
+}
+
 impl PackageFrame {
+    /// PLAN-118：渲染出的视图项（证据面读回文本叶/元素树）。
+    pub fn view(&self) -> &[WidgetViewItem] {
+        &self.view
+    }
+
+    /// PLAN-118：帧携带的标量状态（事件证据/状态读回）。
+    pub fn states(&self) -> &[(String, AceStateValue)] {
+        &self.states
+    }
+
     pub fn focus_requests(&self) -> &[WidgetFocusRequest] {
         &self.focus_requests
     }
@@ -126,6 +149,14 @@ impl PackageFrame {
     /// PLAN-118：canvas onhit 事件目标（渲染层 tap 命中后按此派发）。
     pub(crate) fn hit(&self, path: &[usize]) -> Option<usize> {
         self.hits.get(path).copied()
+    }
+
+    /// PLAN-118：canvas 笔事件目标（start/move/end）。
+    pub(crate) fn pen(
+        &self,
+        path: &[usize],
+    ) -> Option<(Option<usize>, Option<usize>, Option<usize>)> {
+        self.pens.get(path).copied()
     }
 
     pub(crate) fn click(&self, path: &[usize]) -> Option<usize> {
@@ -155,6 +186,15 @@ impl PackageFrame {
                 && !action.source.key.eq_ignore_ascii_case("onblur")
                 && input.matches_surface(action)
                 && action.source.key.eq_ignore_ascii_case("oninput") == matches!(input, PackageEventInput::Text(_))
+                && match input {
+                    PackageEventInput::Pen { .. } => {
+                        action.source.key.to_ascii_lowercase().starts_with("onpen")
+                    }
+                    PackageEventInput::Activation => {
+                        !action.source.key.to_ascii_lowercase().starts_with("onpen")
+                    }
+                    _ => true,
+                }
         }) || (matches!(input, PackageEventInput::Activation) && self.navigation_target(target).is_some())
     }
 
@@ -289,6 +329,7 @@ pub(super) fn assemble(
         image_surfaces: BTreeMap::new(),
         clicks: BTreeMap::new(),
         hits: BTreeMap::new(),
+        pens: BTreeMap::new(),
         links: BTreeMap::new(),
         destinations: Vec::new(),
         widgets: BTreeSet::new(),
@@ -312,6 +353,7 @@ pub(super) fn assemble(
         image_surfaces: frame.image_surfaces,
         clicks: frame.clicks,
         hits: frame.hits,
+        pens: frame.pens,
         links: frame.links,
         destinations: frame.destinations,
         widgets: frame.widgets,
@@ -336,6 +378,8 @@ struct ViewBindings<'a> {
     clicks: BTreeMap<Vec<usize>, usize>,
     /// PLAN-118：canvas onhit 目标（tap 命中 id 经文本事件通道回程序）。
     hits: BTreeMap<Vec<usize>, usize>,
+    /// PLAN-118：canvas 笔事件目标（onpenstart/onpenmove/onpenend）。
+    pens: BTreeMap<Vec<usize>, (Option<usize>, Option<usize>, Option<usize>)>,
     links: BTreeMap<Vec<usize>, usize>,
     destinations: Vec<String>,
     widgets: BTreeSet<Vec<usize>>,
@@ -441,6 +485,22 @@ impl ViewBindings<'_> {
             if let Some(event) = element.events.iter().find(|e| e.key.eq_ignore_ascii_case("onhit")) {
                 let target = self.action(event, disabled)?;
                 self.hits.insert(path.clone(), target);
+            }
+            let mut pen = (None, None, None);
+            for event in &element.events {
+                let key = event.key.to_ascii_lowercase();
+                let slot = match key.as_str() {
+                    "onpenstart" => &mut pen.0,
+                    "onpenmove" => &mut pen.1,
+                    "onpenend" => &mut pen.2,
+                    _ => continue,
+                };
+                if slot.is_none() {
+                    *slot = Some(self.action(event, disabled)?);
+                }
+            }
+            if pen != (None, None, None) {
+                self.pens.insert(path.clone(), pen);
             }
         }
         if !disabled {

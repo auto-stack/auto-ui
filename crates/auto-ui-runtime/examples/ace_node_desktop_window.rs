@@ -11,7 +11,7 @@
 
 use auto_lang_core::file_session::FileWritePermissions;
 use auto_ui_runtime::ui::ace_node_desktop::{
-    install_bridge, AceNodeDesktopWindow, NodeDesktopBridge, ScriptStep,
+    install_bridge, AceNodeDesktopWindow, NodeDesktopBridge, PenPhase, ScriptStep,
 };
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
@@ -238,6 +238,23 @@ fn parse_script(spec: &str) -> Vec<(usize, ScriptStep)> {
                     target,
                     text,
                 }
+            }
+            // PLAN-118：画布笔事件——tick:pen:实例:目标:x:y:阶段(start|move|end)。
+            "pen" => {
+                let instance = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+                let target = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+                let x = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+                let y = fields.next().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+                let phase = match fields.next().unwrap_or("move") {
+                    "start" => PenPhase::Start,
+                    "end" => PenPhase::End,
+                    "move" => PenPhase::Move,
+                    other => {
+                        eprintln!("ace_node_desktop_window: unknown pen phase `{other}`");
+                        std::process::exit(2);
+                    }
+                };
+                ScriptStep::Pen { instance, target, x, y, phase }
             }
             "close" => ScriptStep::Close,
             "reopen" => ScriptStep::Reopen,

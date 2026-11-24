@@ -27,6 +27,8 @@
 //! typed 事件）。001/002 完整主题/选择/全部组件与 Widgets 归 W1 B-AV。
 
 use crate::ui::ace_package_bridge::{PackageEventInput, PackageFocusNotice, PackageFrame, PackageQueuedAction, PackageStateEngine};
+/// PLAN-118：canvas 笔事件阶段（脚本 `pen:` 步与视图回调共用）。
+pub use crate::ui::ace_package_bridge::PenPhase;
 use crate::ui::iced::image_surface_input::ImageSurfaceCarry;
 use super::ace_route::{front_package_units, front_route_modules, package_candidates, RouteAction, RouteModulePaths, RouteNavigation, RouteTable};
 use super::ace_route_desktop::{DesktopRoutes, RouteHandlers, RouteLink, route_links};
@@ -495,6 +497,28 @@ fn push_package_focus(id: i32, instance: usize, revision: u64, control: String, 
     }
 }
 
+fn push_script_pen(
+    id: i32,
+    instance: usize,
+    target: usize,
+    x: f32,
+    y: f32,
+    phase: crate::ui::ace_package_bridge::PenPhase,
+) {
+    let revision = host().write().unwrap().get(id)
+        .and_then(|session| session.package_frame(instance))
+        .map(|frame| frame.revision);
+    if let Some(revision) = revision {
+        push_package_event(
+            id,
+            instance,
+            revision,
+            target,
+            PackageEventInput::Pen { x, y, phase },
+        );
+    }
+}
+
 fn push_script_click(id: i32, instance: usize, target: usize) {
     let revision = host().write().unwrap().get(id)
         .and_then(|session| session.package_frame(instance))
@@ -514,6 +538,15 @@ pub(crate) fn queue_package_message(message: NodeDesktopMsg) -> bool {
         }
         NodeDesktopMsg::PackagePointer { session, instance, revision, target, x, y } => {
             push_package_event(session, instance, revision, target, PackageEventInput::Pointer { x, y });
+        }
+        NodeDesktopMsg::PackagePen { session, instance, revision, target, x, y, phase } => {
+            push_package_event(
+                session,
+                instance,
+                revision,
+                target,
+                PackageEventInput::Pen { x, y, phase },
+            );
         }
         NodeDesktopMsg::PackageText { session, instance, revision, target, text } => {
             push_package_event(session, instance, revision, target, PackageEventInput::Text(text));
@@ -1038,6 +1071,14 @@ pub enum ScriptStep {
         target: usize,
     },
     ClickPage { instance: usize, target: usize },
+    /// PLAN-118：canvas 笔事件脚本步（start/move/end + 逻辑坐标）。
+    Pen {
+        instance: usize,
+        target: usize,
+        x: f32,
+        y: f32,
+        phase: crate::ui::ace_package_bridge::PenPhase,
+    },
     /// PLAN-980 B-AV U01：文本输入事件（键入全文；目标=输入目标编号，
     /// 接 buttons 之后）。真实键入（窗口）与脚本注入同一边界。
     TypeText {
@@ -3411,6 +3452,11 @@ impl NodeDesktopBridge {
                         push_script_click(session, instance, target);
                     }
                 }
+                ScriptStep::Pen { instance, target, x, y, phase } => {
+                    if let Some(session) = self.session {
+                        push_script_pen(session, instance, target, x, y, phase);
+                    }
+                }
                 ScriptStep::TypeText {
                     instance,
                     target,
@@ -3475,7 +3521,7 @@ impl NodeDesktopBridge {
             .filter(|(_, step)| {
                 matches!(
                     step,
-                    ScriptStep::Click { .. } | ScriptStep::ClickPage { .. } | ScriptStep::TypeText { .. }
+                    ScriptStep::Click { .. } | ScriptStep::ClickPage { .. } | ScriptStep::TypeText { .. } | ScriptStep::Pen { .. }
                 )
             })
             .count();
@@ -3514,10 +3560,67 @@ impl NodeDesktopBridge {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        // PLAN-118（T-03）：checked/包面道的帧证据——每个实例的视图文本叶、
+        // 标量状态与可点击动作（脚本 `click:inst:target` 的 target 即动作序）。
+        let frame_rows: Vec<serde_json::Value> = host()
+            .read()
+            .map(|h| {
+                let target = h
+                    .current
+                    .and_then(|id| h.sessions.iter().find(|s| s.id == id))
+                    .or_else(|| h.sessions.iter().rev().find(|s| !s.closed))
+                    .or_else(|| h.sessions.first());
+                target
+                    .map(|s| {
+                        s.package_frames
+                            .iter()
+                            .enumerate()
+                            .map(|(instance, frame)| {
+                                let mut texts = Vec::new();
+                                let mut labels = Vec::new();
+                                let mut elements = 0usize;
+                                let mut stack: Vec<&ace_av::age_package::WidgetViewItem> =
+                                    frame.view().iter().collect();
+                                while let Some(item) = stack.pop() {
+                                    match item {
+                                        ace_av::age_package::WidgetViewItem::Text(text) => {
+                                            texts.push(text.clone())
+                                        }
+                                        ace_av::age_package::WidgetViewItem::Element(element) => {
+                                            elements += 1;
+                                            if let Some(label) = &element.label {
+                                                labels.push(label.clone());
+                                            }
+                                            stack.extend(element.children.iter());
+                                        }
+                                        ace_av::age_package::WidgetViewItem::Timer(_) => {}
+                                    }
+                                }
+                                serde_json::json!({
+                                    "instance": instance,
+                                    "revision": frame.revision,
+                                    "texts": texts,
+                                    "labels": labels,
+                                    "elements": elements,
+                                    "states": frame.states().iter().map(|(name, value)| {
+                                        serde_json::json!([name, state_display(value)])
+                                    }).collect::<Vec<_>>(),
+                                    "actions": frame.actions().iter().map(|action| serde_json::json!({
+                                        "key": action.key(),
+                                        "message": action.message(),
+                                    })).collect::<Vec<_>>(),
+                                })
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default();
         serde_json::json!({
             "source_path": self.path,
             "session": self.session,
             "node": self.node_name,
+            "frames": frame_rows,
             "buttons": self.buttons.iter().map(|b| serde_json::json!({
                 "label": b.label, "msg": b.msg,
             })).collect::<Vec<_>>(),
@@ -3589,6 +3692,16 @@ pub enum NodeDesktopMsg {
         target: usize,
         x: f32,
         y: f32,
+    },
+    /// PLAN-118：canvas 笔事件（onpenstart/move/end，逻辑坐标）。
+    PackagePen {
+        session: i32,
+        instance: usize,
+        revision: u64,
+        target: usize,
+        x: f32,
+        y: f32,
+        phase: crate::ui::ace_package_bridge::PenPhase,
     },
     PackageText { session: i32, instance: usize, revision: u64, target: usize, text: String },
     PackageImageSurface {
@@ -3705,6 +3818,7 @@ impl Component for AceNodeDesktopWindow {
             }
             message @ (NodeDesktopMsg::PackageClick { .. }
             | NodeDesktopMsg::PackagePointer { .. }
+            | NodeDesktopMsg::PackagePen { .. }
             | NodeDesktopMsg::PackageText { .. }
             | NodeDesktopMsg::PackageImageSurface { .. }
             | NodeDesktopMsg::PackageFocus { .. }) => {

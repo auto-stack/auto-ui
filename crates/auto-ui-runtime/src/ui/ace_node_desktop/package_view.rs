@@ -3,6 +3,7 @@ use ace_av::age_package::{WidgetElement, WidgetViewItem};
 use crate::ui::ace_svg;
 use crate::ui::aura_view_builder::parse_coords_extent;
 use crate::ui::view::PointerMoveHandler;
+use crate::ui::ace_package_bridge::PenPhase;
 use crate::ui::aura_view_builder::{rederive_layout, RederivedLayout};
 use crate::ui::iced::image_surface_input::ImageSurfaceCallback;
 use crate::ui::style::{SizeValue, StyleClass};
@@ -246,6 +247,22 @@ impl FrameView<'_> {
                         }
                     })
                 });
+                let pen = self.frame.pen(path).unwrap_or((None, None, None));
+                let pen_handler = |target: Option<usize>, phase: PenPhase| {
+                    let (session, instance, revision) =
+                        (self.session, self.instance, self.frame.revision);
+                    target.map(move |target| {
+                        PointerMoveHandler::new(move |x, y| NodeDesktopMsg::PackagePen {
+                            session,
+                            instance,
+                            revision,
+                            target,
+                            x,
+                            y,
+                            phase,
+                        })
+                    })
+                };
                 return View::Canvas {
                     scene: crate::ui::view::CanvasScene {
                         strokes: Vec::new(),
@@ -255,9 +272,9 @@ impl FrameView<'_> {
                     },
                     logical_extent,
                     clear,
-                    on_pen_start: None,
-                    on_pen_move: None,
-                    on_pen_end: None,
+                    on_pen_start: pen_handler(pen.0, PenPhase::Start),
+                    on_pen_move: pen_handler(pen.1, PenPhase::Move),
+                    on_pen_end: pen_handler(pen.2, PenPhase::End),
                     on_hit,
                     style,
                 };

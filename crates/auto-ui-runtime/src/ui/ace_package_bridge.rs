@@ -48,7 +48,27 @@ pub(crate) enum PackageEventInput {
     Activation,
     Text(String),
     Pointer { x: f32, y: f32 },
+    /// PLAN-118：canvas 笔事件（onpenstart/move/end，携带逻辑坐标）。
+    Pen { x: f32, y: f32, phase: PenPhase },
     ImageSurface(ImageSurfaceCarry),
+}
+
+/// PLAN-118：canvas 笔事件阶段（与 `onpen*` 事件键一一对应）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PenPhase {
+    Start,
+    Move,
+    End,
+}
+
+impl PenPhase {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Start => "start",
+            Self::Move => "move",
+            Self::End => "end",
+        }
+    }
 }
 
 impl PackageEventInput {
@@ -74,8 +94,12 @@ impl PackageEventInput {
             return Err(refused());
         }
         let motion = action.source.key.eq_ignore_ascii_case("onmousemove");
+        let pen_key = action.source.key.to_ascii_lowercase();
         Ok(match self {
             Self::Pointer { x, y } if motion && x.is_finite() && y.is_finite() => {
+                vec![AceStateValue::F32(x), AceStateValue::F32(y)]
+            }
+            Self::Pen { x, y, .. } if pen_key.starts_with("onpen") && x.is_finite() && y.is_finite() => {
                 vec![AceStateValue::F32(x), AceStateValue::F32(y)]
             }
             Self::Text(text) if action.input_value => vec![AceStateValue::Str(text)],
