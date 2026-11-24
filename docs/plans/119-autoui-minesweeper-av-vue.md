@@ -621,6 +621,13 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 因此下一跳在 button 的渲染分支（第 561 行之后）——怀疑该分支为 button 另建 props（只保留 onClick 等），把 `onContextmenu` 丢掉；或 Vue 对数组回调 + 该键名的处理与 click 路径不同。
 - 临时件：`checked_widget_view.js` 两处 `console.debug('P119CTX …')`、`live_view.rs` 的 `view-events.log` 打印；落主前必须移除。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 合成 contextmenu 能触发回调（Vue 接线正常），但派发未改状态 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 检查该事件的 action 实参/types（Flag(x,y) 是否带值）
+
+- 实测（`plan-artifacts/plan-119/probe-ctx2.mjs`）：在页面内 `dispatchEvent(new MouseEvent('contextmenu', {bubbles:true, cancelable:true, button:2}))` →
+  `P119CTX fire active=true sameFrame=true disabled=undefined` 且 `defaultPrevented=true` ⇒ **Vue 事件接线与 `.prevent` 都正常**。
+- 两种偏差：①Playwright 的 `click({button:'right'})` 未触发该回调（工具层差异，非应用问题）；②合成派发后 `flags` 仍为 0 ⇒ 回调执行了但 **Flag 未生效**，疑点是 action 的 `types/values`（Reveal 的 onclick 带 2 个 i32 正常，contextmenu 可能 types 为空 → Flag 收到缺参）。
+- 下一步：打印该事件的 `event.types`/`action.values`（`checkedWidgetAction` 返回值），确认 `Flag(x, y)` 的实参是否随事件下发。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
