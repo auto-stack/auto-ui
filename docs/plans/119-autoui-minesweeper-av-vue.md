@@ -538,6 +538,12 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 已清理生成期 `deps/` junction。
 - 下一步（T-06 余量）：`pnpm install --offline` + `pnpm run build`（vue-tsc + vite），随后 Playwright 真实浏览器跑 `tests/test_038_vue.mjs` 的 oracle 行（主题族/81 空格/首击展开）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **A2Vue 构建 + 真浏览器首次渲染/交互通过** | outcome: pass（T-06 构建腿） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 逐行 oracle（首击展开/标记/重开）
+
+- 构建：`pnpm install --offline` exit 0（13.1s）、`pnpm run build` exit 0 → `dist/index.html 4.80 kB`、`index.css 17.25 kB`、`index.js 187.50 kB`。
+- 真浏览器（Playwright 1.63.0 Chromium + `vite preview :4199`）：**pageerror 0**；页面含 85 个 button（81 格 + face + 3 难度）、文本含雷数/计时/三档难度与 `9×9`；点难度后棋盘切到 expert（480 格、`💣 99`）——**交互真实生效**。
+- 探针脚本：`plan-artifacts/plan-119/probe-vue.mjs`、`probe-vue2.mjs`（下一轮改成按文本/角色精确定位的逐行 oracle）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
