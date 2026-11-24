@@ -368,6 +368,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 已清理本轮再次生成的 `deps/` junction（worktree 必须无 reparse point）。
 - 下一步单点：在 `ace_vue_script` 的 absent 收集处打印每个 msg 的判据（`handler_body_foreign` / `compile_at` 失败原因），确认它是否复用组件面 store 展开。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 严格 lane 吃上 prep 源，暴露 parse 墙 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: lane 侧 parse 墙（`expected Comma, found '<'` @4068）
+
+- 修正上一轮的**误操作**：该改动当时写进了主检出 `auto-ui/crates/auto-ui-tools/src/vue.rs`（worktree 纪律违规），已 `git checkout --` 还原；随后用**绝对路径**在工作树重做并提交。
+- 效果：严格 lane 现已消费 prep 后的源，缺席集不再出现，转而暴露 lane 自己的解析墙：`ace.vue-lane-error: ... parse: UnexpectedToken { expected: "Comma", found: "<", offset: SourceOffset(4068) }`——prep 产出的 `[]T`/`List<T>` 形态在该 lane 的解析器里有不接受点。
+- 下一步单点：打印 prep 源 offset 4068 附近片段（对应哪个字段声明），确定是 `List<...>` 还是 `[]T` 形态，并在 prep 侧按 lane 可解析的拼写输出（或在该 lane 放行）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
