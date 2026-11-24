@@ -563,6 +563,14 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 因此 `oncontextmenu.prevent` 未被映射进 h() props（生成产物 0 处）——属发射面遗漏，非 store/视图投影问题（投影层 `project.rs` 对事件键是通用的 ident+修饰链）。
 - 下一步：在 `checked_widgets.rs` 的事件映射里加 `oncontextmenu`（修饰符 `.prevent` 需同时 `preventDefault`），再复跑 `oracle-vue.mjs` 的 flag 行。
 
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 59 | from: work | to: work | status: drafting | outcome: pass（定位） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: `oncontextmenu` 在 widget-runtime 视图发射面（非 checked_widgets 的 channels 映射）
+
+- 读码修正：`checked_widgets.rs:414-441` 的映射只生成**子组件站点 channels**，根 App 的 `h()` 元素 props 来自 a2x 的 widget-runtime 视图发射（`emit_widget_function_body_fragment`），所以 `onclick` 在那里而不在 checked_widgets。
+- 因此 `oncontextmenu` 的补点在 **auto-lang widget-runtime 的视图事件发射面**（与 AV 桌面渲染器各自独立：AV 侧已通，Vue 侧未发射）。
+- 下一步：在该发射面把事件键 `oncontextmenu[.prevent]` 映射为 Vue props（`.prevent` 同时 preventDefault），随后浏览器复跑 flag 行。
+
+**交接摘要（round 59）**：AV/Iced 腿（T-03）六行全绿并复验；A2Vue 腿生成/构建/渲染/首击/难度已通过，仅剩右击标记的事件发射；T-04/T-05/T-07/T-08 未开始。工作树干净可编译，临时诊断已清零。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
