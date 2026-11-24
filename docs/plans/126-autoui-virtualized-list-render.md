@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-126
-status: executing
+status: execution_done
 feature_name: VM 动态视图的虚拟列表（VList）
 author: [lead]
 created_at: 2026-11-24
 updated_at: 2026-11-24
 plan_revision: 2
-current_step: 5
+current_step: 6
 total_steps: 8
 depends_on: [auto-ui/PLAN-112]
 supersedes_spec_components: []
@@ -80,7 +80,7 @@ Rust 2021、仓库内补丁版 iced（T-02 实测版本为 iced/iced_core/iced_r
 
 | delta_id | 操作 | 目标 | 变更规则 | 理由 | 验收 |
 |---|---|---|---|---|---|
-| SD-01 | add | `docs/specs/runtime/virtualized-list-rendering.md` | 记录 VList 的固定行高合同、按实际视口构建、按索引读取、屏外逻辑高度、行事件和无有界视口时的完整渲染回退 | 让列表和表格共享可验证的 VM 虚拟化行为 | AC-01、AC-02、AC-04、AC-05 |
+| SD-01 | add | `docs/specs/runtime/virtualized-list-rendering.md` | 记录 VList 的固定行高合同、按实际视口构建、按索引读取、屏外逻辑高度、行事件、无滚动容器时的完整渲染回退，以及有作用域但无有界视口/未测得几何时的有界顶窗（≤256 行 + 占位）语义 | 让列表和表格共享可验证的 VM 虚拟化行为 | AC-01、AC-02、AC-04、AC-05 |
 
 ## 6. 测试设计
 
@@ -268,6 +268,19 @@ r1 基线 Git blob `c667888299e6fb283f23233b13532a77b665605e`。r1 的 AC-02 承
 - 证据：`D:/autostack/plan-artifacts/plan-126/t05/README.md`（§0–§6）+ `t05win|t05off`、`base_win|base_off`、`walkwin|walkoff`、`nextest_*.log`、`tables.md`、harness `t05_*.py`。本轮无实现改动。
 
 2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 8 | from: executing | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: ce6d6234 | next: work（T-06）
+
+2026-11-24 stage: work | PLAN-126:r2 | outcome: pass（T-06 完成；work 阶段 T-01..T-06 全闭，交复审） | plan_revision: 2 | worktree: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | code_commit: a2cc4bda（实现基线 ce6d6234） | tasks: T-01..T-06 | acceptance: AC-01..AC-04 已交证据，AC-05 待复审 | spec_delta: SD-01 已发布到工作树（`docs/specs/runtime/virtualized-list-rendering.md`，200 行） | next_responsible_role: review（T-07）
+
+**T-06（pass）规范增量与复审包**
+
+- SD-01：`docs/specs/runtime/virtualized-list-rendering.md`（200 行，中文，§1–§8：范围与命名 / 几何合同 / 视口与测量 / 两轨一致性 / 行身份与事件 / 开关与回退 / 实测结论 / 已知边界与债务）。只提交该文件（`a2cc4bda`），未写任何索引（索引由应用派生）。
+- §5 SD-01 行按实测修正：有 pane 作用域但无有界视口/未测得几何时是「有界顶窗（≤256 行 + 占位）」而非完整构建；无滚动容器才是完整构建。§7 AC-05/§5.1 措辞不改（不矛盾）。
+- 复审包：`D:/autostack/plan-artifacts/plan-126/t06/review-inputs.md`（revision、24 个代码/测试文件逐一用途、13 条取证命令与退出码、AC→证据表、8 项已知缺口、规范路径）。
+- 规范中如实标 `[未取证]` 的三项：①「同一 pane 多循环只窗口化首个」目前**无拒绝门**，多循环共用一个 `vlist_{seq}` 台账；②显式 `row-height` 的普通列表尚未在真实 iced/GL 窗口取证（仅 headless 构建 + 025 探针）；③「有作用域但无有界视口」子情形与旧行为逐字节等价未证。另：窗口行只有绝对 `index` 绑定、没有 `ForIter` probe 条目，规范按绑定层表述。
+- 测试与回归沿用 T-05 结论（HEAD lib 0 回归、`desktop_behavior` 11/11、025 双模式 12/12）。
+
+2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 9 | from: executing | to: execution_done | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: a2cc4bda | next: review
+
 
 ## 10. 待澄清事项
 
