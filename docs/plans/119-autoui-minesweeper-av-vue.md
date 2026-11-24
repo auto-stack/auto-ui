@@ -173,6 +173,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 附注（探针纪律）：记录类型必须声明在**入口单元**（store 单元的 `type` 不参与跨单元解析，§9 G2 同源）；探针 app 需自带 `type R { … }`，否则得到假失败（`record … has no field named a`）。
 - 余下未对照的两处 038 特有形状：①9 字段记录构造（含长 CSS 串字段 `cell_class`/`number_class`）；②邻接计数双嵌套 `for ddx <= 1` × `for ddy <= 1` + 复合下标读 `.<list>[nx * .cols + ny].mine` + `.set`。下一轮先测这两处。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-02 形状对照穷举（否证“构造级缺口”） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@fd797c39） | commit: （无代码改动） | next: T-02 续（Reveal-only 最小 widget 直喂 prepared 源）
+
+- **形状对照全部 exit 0**（真窗 live，`plan-artifacts/plan-119/live/`）：038 的 9 字段记录构造（含长 CSS 串字段）+ 布雷复合条件循环 + 邻接双嵌套 `for ddx<=1 × ddy<=1` + 复合下标读 `.<list>[nx*.cols+ny].mine` + 两处 `.set(...投影…)`，**连同** `__p119_ret` 两层守卫嵌套——一个镜像探针全通过。
+- 另否证两条假设：①把 store 单元里 prep 合成的 `type BoardRow` 摘除（只留入口单元副本）→ 仍拒；②两组循环各自即拒（上一轮已证），但当轮镜像形状又全过 ⇒ **不是构造级缺口**，是 `Reveal` 这一整条 transition 的**组合/规模**面。
+- 下一轮判据（避免 isolate 替换工件）：把 prepared 入口单元裁成 **Reveal-only** widget（只留 `msg { Reveal }` + 该 handler + 最小 view），直喂 live 编译；过则逐块回加，失败则继续在单 handler 内二分。若最终确认为规模/组合面，则按 §10 记 G5 语言面裁定请求（live transition 的规模上限或多次列表写入的组合限制）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
