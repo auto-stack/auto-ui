@@ -587,6 +587,14 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 
 **交接摘要**：AV/Iced 腿六行全绿并复验；A2Vue 腿生成/构建/渲染/首击/难度全通过，仅右击标记缺这一处；工作树干净可编译；T-04/T-05/T-07/T-08 未开始。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 渲染端已支持 oncontextmenu；缺口在发射端（App.vue 无 Flag 事件） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 查 SFC 的 widget-runtime 视图程序为何没收录 `oncontextmenu.prevent: .Flag(x, y)`
+
+- 更正：`checked_widget_view.js` 的 `checkedDomEvents` **已含** `oncontextmenu: 'onContextmenu'`，且 `checkedDomBinding` 已按 `.` 拆修饰符并支持 `.prevent`（第 444-453 行）。渲染端不需要改。
+- 真缺口：生成 `App.vue` 中 **`Flag` 字符串一次都没出现** ⇒ widget-runtime 视图程序**没有收录** `.Flag(x, y)` 这条 `oncontextmenu.prevent` 绑定；而 AV live 道用的是同一 `live_view::event()` 却工作正常，故差异在 SFC 侧编译该视图程序的 profile/入口。
+- 下一步：对比 AV `compile_age_package_widget_runtime` 与 SFC 侧调用（参数/依赖配置）差异，确认 `oncontextmenu.prevent` 在哪一步被丢弃。
+
+**交接摘要**：AV/Iced 腿六行全绿并复验；A2Vue 腿生成/构建/渲染/首击/难度全通过，仅右击标记（发射面）；工作树干净可编译；T-04/T-05/T-07/T-08 未开始。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
