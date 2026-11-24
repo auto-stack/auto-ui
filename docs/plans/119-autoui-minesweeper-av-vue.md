@@ -595,6 +595,17 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 
 **交接摘要**：AV/Iced 腿六行全绿并复验；A2Vue 腿生成/构建/渲染/首击/难度全通过，仅右击标记（发射面）；工作树干净可编译；T-04/T-05/T-07/T-08 未开始。
 
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 63 | from: work | to: work | status: drafting | outcome: pass（检查点） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 在 `live_view::event()` 打印实际 emit 的事件键（一次运行定位 Flag 丢失点）
+
+- 本轮不新增代码：上一轮已确认渲染端无需改动，缺口在“视图程序没收录 `oncontextmenu.prevent`”。再往下需要一次带打印的实测（`live_view::event()` 的 key 列表），盲改会更慢。
+- 下一轮唯一动作：在 `live_view::event()` 入口打印 `entry.key`/`entry.is_event`/消息名，对 038 跑一次 SFC 生成与 AV 窗口各一次，比较两侧事件列表（AV 侧应含 `oncontextmenu.prevent`，SFC 侧若缺即定位在编译参数/profile）。
+
+**交接摘要（PLAN-119 / r1）**
+- AV/Iced 腿（T-03）：**六行全绿并复验**（真窗/首击/标记/难度/重开/两实例/close-reopen），证据 `plan-artifacts/plan-119/*.json`。
+- A2Vue 腿（T-06）：生成 ✅、冷构建 ✅、真浏览器渲染 ✅、首击展开 ✅、难度切换 ✅；仅右击标记（视图程序未收录该事件）。
+- 交付代码：auto-ui（prep 归一、栈→队列、lane 路由、inspection 拼写、units 幂等）+ auto-lang（Effect 展开、可发射集合放宽、同源 store 去重、TS DynCast 恒等），临时诊断已清零。
+- 未开始：T-04 独立复核、T-05 AV 收据、T-07 终审、T-08 落主归档。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
