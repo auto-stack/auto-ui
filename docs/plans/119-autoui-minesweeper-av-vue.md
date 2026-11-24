@@ -337,6 +337,17 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 - 证据：`plan-artifacts/plan-119/{av-oracle-a.json, av-flag.json, av-diff.json}`；断言一律按**最大 revision** 取帧（evidence 的 frames 数组未排序）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **T-03 AV 腿全行达成**（两实例隔离 + close/reopen） | outcome: pass（T-03 收口） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 清理 10 处临时诊断 → T-04 独立复核
+
+| T-03 行 | 脚本 | 实测 | 判定 |
+|---|---|---|---|
+| 两实例互不串扰 | `--instances 2` + `3:click:0:4` | `inst0 rev=2 st_game_state=playing` / `inst1 rev=1 st_game_state=ready` | PASS |
+| close/reopen 世代 | `3:close,5:reopen` | `sessions[0] id=1 gen=1 closed=true`；`sessions[1] id=2 gen=2 closed=false` | PASS |
+
+- T-03 六行齐（首击展开 / 标记 / 难度 / 重开 / 两实例 / close-reopen），全部 exit 0、errors=0；证据 `plan-artifacts/plan-119/{av-oracle-a.json, av-flag.json, av-diff.json, av-two.json, av-close.json}`。
+- 与 VM 已钉 oracle 对照：首击展开、标记计数、难度几何（16×30/99 雷）逐项一致；确定性雷位表未逐格比对（AV 侧以“展开格数 + 状态机”为判据，属 §6 V-03 允许的等价观测）。
+- **交付前必做**：清理 `P119DBG` 共 10 处临时诊断（widget_runtime 2、project 3、age_component 3、frame 1、ace_node_desktop 2），并复跑受影响用例。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
