@@ -471,10 +471,12 @@ fn push_package_event(id: i32, instance: usize, revision: u64, target: usize, in
                 session.package_workers_pending[instance]
                     || !frame.actions()[target].source.key.eq_ignore_ascii_case("onclick")
             });
+            eprintln!("P119DBG pkg_event_accepted target={target} rev={revision}");
             session.package_events.push_back(QueuedPackageEvent {
                 instance, revision, target, action, input,
             });
         } else {
+            eprintln!("P119DBG pkg_event_rejected target={target} rev={revision}");
             session.stale_rejected += 1;
         }
     }
