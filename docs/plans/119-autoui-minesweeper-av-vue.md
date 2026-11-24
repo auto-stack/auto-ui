@@ -450,6 +450,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 改法（下一步）：把计数写进**错误字符串**（`bail!("... store_decls=N ...")`）或用 `P119_DUMP` 风格落盘文件，随 `auto build` 的错误面直接读出。
 - 临时件登记：`p119_store_count` 与调用点（落主前移除）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 计数日志为空 ⇒ 计数器未到达（错误更早抛出） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 在 `generate_linked_front_sfc` 函数入口即落盘
+
+- 计数改为落盘 `plan-artifacts/plan-119/store-count.log`（避开 stderr 被吞），复跑后**文件为空** ⇒ `p119_store_count` 两处调用都没执行，说明 `multiple store declarations` 错误在**计数器之前**就抛出：最可能是「单单元 inspection 失败 → 回退 prep → 对 prepared 源再调 `package_candidates`」这条回退链本身报的（prep 产物含 1 条 store，但单单元投影在多 store 语义上可能有别的判定）。
+- 顺带修好：上一轮 PowerShell 把 `` `n `` 写成了字面量导致编译失败，已用编辑工具恢复为正常多行代码。
+- 下一步：函数入口处落盘（`entry`/`units` 数、源长度、store 计数），再复跑一次即可把回退链与主路径区分开。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
