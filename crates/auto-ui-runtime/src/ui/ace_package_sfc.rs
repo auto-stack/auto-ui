@@ -81,7 +81,8 @@ pub fn generate_package_front_sfc(
                 .lines()
                 .filter(|line| line.trim_start().starts_with("store "))
                 .count();
-            let probe = package_candidates(&prepared.source);
+            let package_ready = p119_package_list_spelling(&prepared.source);
+            let probe = package_candidates(&package_ready);
             let _ = std::fs::write(
                 "D:/autostack/plan-artifacts/plan-119/fallback.log",
                 format!(
@@ -163,6 +164,27 @@ fn p119_dump_units(label: &str, units: &[ace_core::source::packages::PackageModu
         }
     }
 }
+/// PLAN-119：inspection 用**包面拼写**——`[]T` 列表字段改为 `List<T>`
+/// （包面 view 无法观察方括号列表字段：`package view cannot observe bracket
+/// list model field`）。
+fn p119_package_list_spelling(src: &str) -> String {
+    src.lines()
+        .map(|line| {
+            if let Some(pos) = line.find(" []") {
+                let after = &line[pos + 3..];
+                let name: String = after
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if !name.is_empty() {
+                    return format!("{} List<{}>{}", &line[..pos], name, &after[name.len()..]);
+                }
+            }
+            line.to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
 pub fn generate_linked_front_sfc(
     app_at: &Path,
     source: &str,
@@ -185,7 +207,8 @@ pub fn generate_linked_front_sfc(
                 .lines()
                 .filter(|line| line.trim_start().starts_with("store "))
                 .count();
-            let probe = package_candidates(&prepared.source);
+            let package_ready = p119_package_list_spelling(&prepared.source);
+            let probe = package_candidates(&package_ready);
             let _ = std::fs::write(
                 "D:/autostack/plan-artifacts/plan-119/fallback.log",
                 format!(
