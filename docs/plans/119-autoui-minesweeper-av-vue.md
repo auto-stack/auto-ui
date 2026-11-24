@@ -557,6 +557,12 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 因此浏览器右击不触发标记是**发射面缺口**，不是 store 逻辑问题。
 - 下一步：在包面 SFC 渲染器（auto-lang `checked_widgets` / `ace_package_sfc` 的事件发射处）支持 `oncontextmenu`（`oncontextmenu.prevent` 需同时 `preventDefault`），按用户 A 授权可做；随后浏览器复跑 `oracle-vue.mjs` 的 flag 行。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: SFC 发射面的 contextmenu 缺口已定位到 checked_widgets 的 h() 事件映射 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 在 `checked_widgets.rs` 的 h() 事件映射补 `oncontextmenu`（`.prevent` → preventDefault）
+
+- 排查：`onclick:` 的字符串发射只出现在测试里，实际 `App.vue` 的 `h()` props 由 auto-ui `ace_package_sfc/checked_widgets.rs` 生成（按 `AgeWidgetProperty::Message` 的 key/args 映射）；`package_view.rs` 侧只管桌面渲染。
+- 因此 `oncontextmenu.prevent` 未被映射进 h() props（生成产物 0 处）——属发射面遗漏，非 store/视图投影问题（投影层 `project.rs` 对事件键是通用的 ident+修饰链）。
+- 下一步：在 `checked_widgets.rs` 的事件映射里加 `oncontextmenu`（修饰符 `.prevent` 需同时 `preventDefault`），再复跑 `oracle-vue.mjs` 的 flag 行。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
