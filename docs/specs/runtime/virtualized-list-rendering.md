@@ -21,11 +21,14 @@
 
 两个消费入口共用同一窗口计算、占位与行构建实现：
 
-- **表格体**（025）：行循环位于 `overflow-y-auto` 列生成的隐式 `View::Scrollable`
-  之内，`ForLoop` 臂自动认领。025 源不需要修改（T-02 / Q-02 结论）。
+- **表格体**（025）：行循环位于 `overflow-y-auto` / `overflow-auto` 列生成的隐式
+  `View::Scrollable` 之内，`ForLoop` 臂自动认领。隐式滚动列**不需要 opt-in**：
+  它是 025/AC-01 的既有合同，两轨都自动携带 pane 作用域。025 源不需要修改
+  （T-02 / Q-02 结论）。
 - **普通列表**：显式 `scroll (row-height: N[, list-top: M])`（别名 `scrollable`；
-  `row_height` / `list_top` 拼写同样接受）。声明 `row-height` 是普通列表窗口化的
-  opt-in 条件；未声明时 tracked 轨的显式 `scroll` 行为逐字节不变。
+  `row_height` / `list_top` 拼写同样接受）。声明 `row-height` 是显式 `scroll`
+  窗口化的 opt-in 条件；未声明时**两轨**的显式 `scroll` 行为都逐字节不变
+  （完整构建、不压 pane 作用域）。
 
 以下情形返回 `None`，调用方保留既有完整展开：检索过滤态（模型 `search` 非空）、
 嵌套循环变量绑定、dotted 属性路径且非 store 字段、数据源不可按索引读取、索引读
@@ -49,10 +52,12 @@
   1. **显式 `row-height`**（创作侧声明，1–400px，非法值忽略）。声明后该 pane 不再
      标定、不做周期复核，视口宽变化也不作废行高；`list-top` 可选，缺省 0，首次
      构建带测量到达后只精修 `list_top`。
-  2. **标定反解**。无几何时先做一次顶部 `min(n, 256)` 行的标定构建
-     （`CALIBRATION_ROWS = 256`），`row_h = 构建带高 / 行数`；须两次间隔 ≥500ms 的
-     样本一致（相对差 ≤0.5%）才采信，采信后每 3s 做一次复核构建纠偏。字型/世界
-     稳定前的早期样本偏高（025 实测 3456 → 3477），连续帧采样会锁死早期值。
+  2. **标定反解**。无几何时标定帧做**整表构建**（全部 n 行，与窗口化前一致），
+     `row_h = 构建带高 / n`；须两次间隔 ≥500ms 的样本一致（相对差 ≤0.5%）才采信，
+     采信后每 3s 做一次整表复核构建纠偏。整表构建不依赖占位，内容高天然
+     = n·row_h，标定/复核帧不会塌陷。`CALIBRATION_ROWS = 256` 只用于显式行高在
+     尚无有界视口时的顶部引导窗口（§3）。字型/世界稳定前的早期样本偏高（025
+     实测 3456 → 3477），连续帧采样会锁死早期值。
 - `list_top = band_top − start · row_h − viewport_y`（`virtual_list.rs:472`）。
   `band_top` 是 iced 布局给出的窗口绝对坐标（布局不按滚动偏移平移内容，滚动只在
   绘制/命中阶段换算），故扣除视口原点 `viewport_y`。窗口带只用于重算 `list_top`；
@@ -89,9 +94,11 @@
 同一窗口语义接在四处：生产轨 `convert_node_with` 的 `ForLoop` 臂
 （`tracked.rs:52`）、调试/MCP 轨 `convert_for_unkeyed`（`tracked.rs:437`）与
 `convert_for_keyed`（`route_memo.rs:575`）；列双胎（untracked
-`tags_container.rs:38`、tracked `tracked.rs:2283`）与显式 `scroll` 双胎
-（untracked `tags_container.rs:176`、tracked `tracked.rs:2596`）都压 pane 作用域，
-两轨在同一窗口、同一行区间内认领同一 scope key。
+`tags_container.rs:38`、tracked `tracked.rs:2283`）**无条件**压 pane 作用域
+（隐式滚动列自动窗口化）；显式 `scroll` 双胎（untracked `tags_container.rs:176`、
+tracked `tracked.rs:2596`）**仅当声明 `row-height`** 才压作用域，未声明时两轨
+都不压。因此两轨使用同一 scope 规则，在同一窗口、同一行区间内认领同一
+`vlist_{seq}` key，窗口行集与 MCP 快照一致。
 
 窗口行由 `try_virtual_for` 经 `convert_node_with`（untracked 转换）构建，因此
 **没有**逐行 `BuildProbe` / debug-id 条目：窗口化时 `for_context` 条目为 0，完整
@@ -121,10 +128,12 @@ MCP / 快照面：`VirtualMark` 在 vnode 转换与快照构建中透明（`vnod
   载荷 / `selected_pid` / `tasklist`）。
 - 滚出窗口的行不可命中：滚动后用旧 vnode id 报 `VNode not found`，选中态保持。
   窗口内的 overscan 行仍可按 id 寻址（索引合同一致），但被视口裁剪、用户点不到。
-- 同一 pane 的多循环隔离：`[未取证]`。源码没有「已认领即拒绝」的门
-  （`try_virtual_for` 不检查 `claimed`，`plan()` 也不检查），同一 pane 内两个循环
-  会共享同一 `vlist_{seq}` 台账，且 `note_plan` 会让后者覆盖前者的 total/band。
-  首期按「每 pane 一个虚拟化循环」使用。
+- 同一 pane 的多循环隔离：每帧一个**循环位认领门**（`virtual_list::claim_loop_site`）。
+  文档序首个到达的 `for` 循环认领该 pane 的 scope 并窗口化；同帧后续循环拿不到
+  认领，`try_virtual_for` 返回 `None`，调用方保留完整构建。`note_plan` 因此每帧
+  只由认领者写入，`total` / band 不再被后者覆盖。认领位在每帧最外层构建时清零
+  （`enter_build_frame`），跨帧由同一文档序循环稳定持有。测试：
+  `plan126_virtual_list_same_pane_second_loop_builds_full`。
 - 兄弟 pane 按帧级编号隔离：每帧最外层视图构建把 pane 序号归零
   （`enter_build_frame`），`push_scope` 只递增、`pop_scope` 不清零。同帧两个 pane
   得 `vlist_0` / `vlist_1`，各自台账与窗口，行事件不串线
@@ -144,8 +153,12 @@ MCP / 快照面：`VirtualMark` 在 vnode 转换与快照构建中透明（`vnod
   布局的纯构建测试与故障定位，生产缺省不使用。
 - 回退规则：开关关闭、无 pane 作用域（无滚动祖先）、§1 列出的不适用数据源/绑定、
   索引读失败 → 完整构建；`n = 0` → 完整构建的空结果。
-- 有 pane 作用域但尚未测得几何（或无有界视口）时不做真实窗口裁行，而是有界顶窗
-  （≤256 行）+ 尾部占位；该子情形与「完整构建」不等价，其逐字节等价性 `[未取证]`。
+- 有 pane 作用域但尚未测得几何（或无有界视口）分两种子情形：
+  1. **标定/复核帧**（非显式行高）：整表构建（全部 n 行），内容高 = n·row_h
+     天然守恒；行集与内容高同窗口化前的完整构建一致（外层多一层零布局
+     `VirtualMark` 标记，供 probe 反解行高）。
+  2. **显式 `row-height` 但尚无有界视口**：有界顶窗（≤256 行）+ 尾部占位
+     `(n − end) × row_h`，总逻辑高度按已声明的固定行高从首帧起精确。
 
 ## 7. 实测结论
 
@@ -195,6 +208,5 @@ MCP / 快照面：`VirtualMark` 在 vnode 转换与快照构建中透明（`vnod
   进窗；菜单路径以标注的 `autoui_fixture` 注入取证（`ctx_open=true`、`CloseCtx`
   关闭），`ConfirmKill` 未按。
 - **显式 `row-height` 普通列表的实窗（iced/GL）验证未做**：现有证据是 headless
-  真实构建 + 025 已验的同一 probe 机制；**同 pane 多循环未隔离**（§5）。两项均
-  `[未取证]`。
+  真实构建 + 025 已验的同一 probe 机制。该项 `[未取证]`。
 - **快照 `@rect` 触发面有限**：只在最后脏帧 + MCP 采集帧出现；行级判据以 vnode id、窗口行序与 `autoui_scroll_state` 为准。

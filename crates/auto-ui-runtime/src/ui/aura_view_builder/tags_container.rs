@@ -171,20 +171,24 @@ impl<'a> AuraViewBuilder<'a> {
         let padding = self.extract_u16(props, "padding").unwrap_or(0);
         let style = self.extract_style_with(props, bindings); // Plan 057 (2.5)
 
-        // PLAN-126 T-03：显式 `scroll` 元素同样是虚拟列表 pane 作用域。
-        let _vlist_scope = if crate::ui::virtual_list::enabled() {
+        // PLAN-126 T-03 续：显式 `scroll` 的窗口化是 **opt-in**——只有创作侧
+        // 声明 `row-height`（普通列表的固定行高入口）时才压 pane 作用域；未
+        // 声明者保持完整构建，行为逐字节不变（T-07 F-01b：与 tracked 双胎
+        // `convert_scroll_tracked_ctx` 同一规则，两轨行集一致）。隐式
+        // `overflow-y-auto` 列（025 表体）不受此限，仍由 `convert_column`
+        // 自动携带作用域并自动窗口化。
+        let explicit_geometry = self.vlist_explicit_geometry(props, bindings);
+        let _vlist_scope = if crate::ui::virtual_list::enabled() && explicit_geometry.is_some() {
             Some(self.enter_vlist_scope())
         } else {
             None
         };
         let vlist_measure_key = _vlist_scope.as_ref().map(|g| g.key().to_string());
-        // PLAN-126 T-03 续：`row-height` prop = 普通（非表格）列表的窗口化
-        // 显式入口——行高由创作侧给定，pane 不再需要标定反解；`list-top`
-        // 可选（内容空间，缺省 0）。开关关闭时无 scope，prop 自然不生效。
-        if let Some(scope) = _vlist_scope.as_ref() {
-            if let Some((row_h, list_top)) = self.vlist_explicit_geometry(props, bindings) {
-                crate::ui::virtual_list::note_explicit_row_height(scope.key(), row_h, list_top);
-            }
+        // `row-height` prop = 普通（非表格）列表的窗口化显式入口——行高由创作
+        // 侧给定，pane 不再需要标定反解；`list-top` 可选（内容空间，缺省 0）。
+        // 开关关闭时无 scope，prop 自然不生效。
+        if let (Some(scope), Some((row_h, list_top))) = (_vlist_scope.as_ref(), explicit_geometry) {
+            crate::ui::virtual_list::note_explicit_row_height(scope.key(), row_h, list_top);
         }
 
         // Plan 476: 拼接感知收集 + 视觉空过滤(既有行为)。

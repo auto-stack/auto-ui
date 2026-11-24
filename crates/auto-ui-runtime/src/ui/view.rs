@@ -795,7 +795,8 @@ pub enum View<M: Clone + Debug> {
     FocusTarget {
         id: String,
         activation: Option<M>,
-        keys: Vec<(String, M)>,        on_focus: Option<M>,
+        keys: Vec<(String, M)>,
+        on_focus: Option<M>,
         on_blur: Option<M>,
         child: Box<View<M>>,
     },

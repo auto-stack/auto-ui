@@ -9,6 +9,11 @@
 //!   （窗口化 vs `AUTOUI_VIRTUAL_LIST=0` 完整构建对照）；
 //! - 显式入口：`scroll (row-height: N)` 声明固定行高 → 首帧有界顶窗 + 正确
 //!   总逻辑高度，probe 到达视口几何后直接按窗口裁行（无标定等待）；
+//! - 显式 `scroll` 的 opt-in（T-07 F-01b/F-06）：未声明 `row-height` 时两轨都
+//!   整表构建；隐式 `overflow-y-auto` 列仍自动窗口化；
+//! - 标定/复核帧整表构建（T-07 F-01a）：内容高 = n·row_h，无塌陷帧；
+//! - 同 pane 第二循环回退完整构建（T-07 F-02）；偏移脏帧对照上次构建偏移
+//!   （T-07 F-03）；
 //! - V-02：窗口跟随滚动 / 视口高度变化 / 尾部夹紧 / 空列表 / 短于视口的
 //!   列表 / 列表完全在视口之外。
 //!
@@ -62,15 +67,65 @@ fn fixture(explicit_row_height: bool) -> String {
 fn component(explicit_row_height: bool, n: usize) -> DynamicComponent {
     let mut dc = crate::build_dynamic_component(&fixture(explicit_row_height), None)
         .expect("fixture builds");
-    let rows: Vec<auto_val::Value> = (0..n)
-        .map(|i| {
-            auto_val::Value::Obj(Box::new(auto_val::Obj::from_pairs([(
-                "label",
-                auto_val::Value::Str(format!("row {i}").into()),
-            )])))
-        })
-        .collect();
+    let rows: Vec<auto_val::Value> = (0..n).map(row).collect();
     dc.write_state_vec("rows", rows).expect("rows injected");
+    dc
+}
+
+/// 一行合成数据（`label` 供文本绑定）。
+fn row(i: usize) -> auto_val::Value {
+    auto_val::Value::Obj(Box::new(auto_val::Obj::from_pairs([(
+        "label",
+        auto_val::Value::Str(format!("row {i}").into()),
+    )])))
+}
+
+/// 隐式滚动列 fixture（`overflow-y-auto`）：等同 025 表体的自动窗口化入口，
+/// 不需要 `row-height` opt-in（T-07 F-01b 后两轨同一规则）。
+fn fixture_implicit_scroll() -> &'static str {
+    r#"widget ImplicitScrollFixture {
+    model {
+        var rows = []
+    }
+    view {
+        col (style: "overflow-y-auto") {
+            for r in .rows {
+                text r.label { style: "h-7" }
+            }
+        }
+    }
+}
+"#
+}
+
+/// 同一 pane 内两个 `for` 循环的 fixture（F-02 认领门）。
+fn fixture_two_loops_one_pane() -> &'static str {
+    r#"widget TwoLoopsOnePane {
+    model {
+        var rows = []
+        var rows2 = []
+    }
+    view {
+        scroll (row-height: 28) {
+            for r in .rows {
+                row { text r.label { style: "h-7" } }
+            }
+            for r in .rows2 {
+                row { text r.label { style: "h-7" } }
+            }
+        }
+    }
+}
+"#
+}
+
+/// 从源码构建并注入若干状态向量（`(state, n)`）。
+fn component_with_states(src: &'static str, states: &[(&str, usize)]) -> DynamicComponent {
+    let mut dc = crate::build_dynamic_component(src, None).expect("fixture builds");
+    for (name, n) in states {
+        let rows: Vec<auto_val::Value> = (0..*n).map(row).collect();
+        dc.write_state_vec(name, rows).expect("state injected");
+    }
     dc
 }
 
@@ -391,15 +446,15 @@ fn plan126_virtual_list_explicit_row_height_entry() {
     assert!(virtual_list::plan(PANE, 1_000).is_some());
 }
 
-/// 对照：未声明 `row-height` 的普通列表仍走标定（一次 probe 不足以窗口化）。
+/// 对照：未声明 `row-height` 的显式 `scroll` **不是**窗口化 opt-in。
 ///
-/// 走 **untracked** `Component::view()` 轨（`AuraViewBuilder::build`）：该轨
-/// 对任意 `scroll` 都压 pane 作用域，因此能展示「无显式行高 → 标定帧」的
-/// 对照；生产 tracked 轨对无 `row-height` 的显式 `scroll` 保持完整构建
-///（见 `convert_scroll_tracked_ctx` 注释：窗口行 probe 保真待 T-04）。
+/// T-07 F-01b/F-06：显式 `scroll` 只有在声明 `row-height` 时才压 pane 作用域
+/// （与 `convert_scroll_tracked_ctx` 同一规则），未声明时两轨都整表构建、不
+/// 产生标定/窗口/占位，行为与开关关闭一致。025 的表体走隐式
+/// `overflow-y-auto` 列，不受此限（见 `calibration_frame_builds_full_list`）。
 #[test]
-fn plan126_virtual_list_no_row_height_still_calibrates() {
-    if !windowing_enabled_or_skip("no_row_height_still_calibrates") {
+fn plan126_virtual_list_no_row_height_builds_full() {
+    if !windowing_enabled_or_skip("no_row_height_builds_full") {
         return;
     }
     use crate::ui::component::Component;
@@ -408,27 +463,212 @@ fn plan126_virtual_list_no_row_height_still_calibrates() {
     let dc = component(false, 1_000);
     let view = dc.view();
     let scan = scan_view(&view);
-    assert_eq!(scan.marks[0].1, 0);
-    assert_eq!(scan.marks[0].2, 256, "calibration top band");
-    assert_eq!(virtual_list::last_plan(PANE).map(|p| p.row_h), Some(0.0));
+    assert!(
+        scan.marks.is_empty(),
+        "no row-height ⇒ no pane scope and no window band"
+    );
+    assert_eq!(scan.text_nodes, 1_000, "plain scroll keeps the full build");
+    assert!(
+        scan.space_heights.is_empty(),
+        "full build needs no spacers: {:?}",
+        scan.space_heights
+    );
+    assert_eq!(virtual_list::last_plan(PANE), None);
+    assert_eq!(virtual_list::build_counters().rows_built, 0);
+    assert!(!virtual_list::is_active(), "no probe requested");
+}
 
+/// F-01a：无几何的标定帧整表构建——内容高 = n·row_h 天然成立（无占位缝隙）。
+///
+/// 走隐式 `overflow-y-auto` 列（025 表体同款自动窗口化入口）。n = 1 000 > 256：
+/// 旧实现只建顶部 256 行且 `row_h == 0` 跳过两段占位，内容高会塌陷；现改为
+/// 整表构建，随后用两次间隔标定样本进入真实窗口。
+#[test]
+fn plan126_virtual_list_calibration_frame_builds_full_list() {
+    if !windowing_enabled_or_skip("calibration_frame_builds_full_list") {
+        return;
+    }
+    virtual_list::reset_for_test();
+    let mut dc = component_with_states(fixture_implicit_scroll(), &[("rows", 1_000)]);
+
+    // 首帧（无 probe 几何）：整表构建，标记覆盖全部行，无占位。
+    let (view, _, _) = dc.view_with_debug_gated(false);
+    let scan = scan_view(&view);
+    assert_eq!(
+        scan.marks,
+        vec![(PANE.to_string(), 0, 1_000)],
+        "calibration frame builds the full list"
+    );
+    assert_eq!(scan.text_nodes, 1_000, "every row is built");
+    assert!(
+        scan.space_heights.is_empty(),
+        "full build needs no placeholder: {:?}",
+        scan.space_heights
+    );
+    assert_eq!(
+        virtual_list::last_plan(PANE).map(|p| (p.start, p.end, p.row_h)),
+        Some((0, 1_000, 0.0)),
+        "calibration plan marks the exact built band"
+    );
+
+    // 两次间隔标定样本一致 → 行高采信；probe 视口/偏移到位 → 真实窗口。
+    virtual_list::note_band(PANE, 0, 1_000, 0.0, 1_000.0 * ROW_H);
+    virtual_list::force_calib_sample_due_for_test(PANE);
+    virtual_list::note_band(PANE, 0, 1_000, 0.0, 1_000.0 * ROW_H);
     let mut m = virtual_list::VListMeasure::default();
     m.panes.insert(
         PANE.to_string(),
         virtual_list::PaneGeometryJson {
-            offset_y: 700.0,
+            offset_y: 0.0,
             viewport_h: VIEWPORT_H,
-            content_h: 28_000.0,
+            content_h: 1_000.0 * ROW_H,
             viewport_y: 0.0,
             viewport_w: VIEWPORT_W,
         },
     );
-    let _ = virtual_list::note_measure(&m);
-    let _ = dc.view();
+    virtual_list::note_measure(&m);
+
+    let (view2, _, _) = dc.view_with_debug_gated(false);
+    let scan2 = scan_view(&view2);
+    assert_eq!(scan2.marks, vec![(PANE.to_string(), 0, 29)]);
+    assert_eq!(scan2.text_nodes, 29);
+    assert!(
+        (scan2.space_heights.iter().sum::<f32>() - (1_000.0 - 29.0) as f32 * 28.0).abs() < 1.0,
+        "window keeps the exact logical height: {:?}",
+        scan2.space_heights
+    );
+}
+
+/// F-01a：已确认行高的**周期复核帧**同样整表构建，不再每 ~3s 塌陷一次。
+#[test]
+fn plan126_virtual_list_verify_frame_builds_full_list() {
+    if !windowing_enabled_or_skip("verify_frame_builds_full_list") {
+        return;
+    }
+    virtual_list::reset_for_test();
+    virtual_list::seed_geometry_full_for_test(PANE, 0.0, VIEWPORT_H, ROW_H, 0.0, 0.0, VIEWPORT_W);
+    let mut dc = component_with_states(fixture_implicit_scroll(), &[("rows", 1_000)]);
+
+    let (view, _, _) = dc.view_with_debug_gated(false);
     assert_eq!(
-        virtual_list::last_plan(PANE).map(|p| (p.start, p.end)),
-        Some((0, 256)),
-        "without row-height the pane keeps calibrating"
+        scan_view(&view).marks,
+        vec![(PANE.to_string(), 0, 29)],
+        "trusted geometry windows immediately"
+    );
+
+    // 复核到期 → 本帧整表标定构建（内容高不塌陷），复核后恢复窗口。
+    virtual_list::force_verify_due_for_test(PANE);
+    let (verify_view, _, _) = dc.view_with_debug_gated(false);
+    let verify = scan_view(&verify_view);
+    assert_eq!(
+        verify.marks,
+        vec![(PANE.to_string(), 0, 1_000)],
+        "verification frame builds the full list"
+    );
+    assert_eq!(verify.text_nodes, 1_000);
+    assert!(
+        verify.space_heights.is_empty(),
+        "verification frame needs no placeholder: {:?}",
+        verify.space_heights
+    );
+
+    let (next_view, _, _) = dc.view_with_debug_gated(false);
+    let next = scan_view(&next_view);
+    assert_eq!(
+        next.marks,
+        vec![(PANE.to_string(), 0, 29)],
+        "verification pushes the next check out; window resumes"
+    );
+    assert_eq!(next.text_nodes, 29);
+}
+
+/// F-02：同一 pane 内两个循环——文档序首个认领，第二个回退完整构建。
+///
+/// 旧实现两个循环共用同一 `vlist_{seq}` 台账，`note_plan` 让后者覆盖前者的
+/// `total`/band，窗口与内容高都会错。认领门按帧清零，跨帧仍由首个循环稳定
+/// 持有（两次构建都窗口化）。
+#[test]
+fn plan126_virtual_list_same_pane_second_loop_builds_full() {
+    if !windowing_enabled_or_skip("same_pane_second_loop_builds_full") {
+        return;
+    }
+    virtual_list::reset_for_test();
+    virtual_list::seed_geometry_full_for_test(
+        PANE, 700.0, VIEWPORT_H, ROW_H, 0.0, 0.0, VIEWPORT_W,
+    );
+    let mut dc =
+        component_with_states(fixture_two_loops_one_pane(), &[("rows", 1_000), ("rows2", 500)]);
+
+    let mut prev = virtual_list::build_counters();
+    for frame in 0..2 {
+        let (view, _, _) = dc.view_with_debug_gated(false);
+        let scan = scan_view(&view);
+        assert_eq!(
+            scan.marks,
+            vec![(PANE.to_string(), 23, 54)],
+            "frame {frame}: only the first loop is windowed"
+        );
+        assert_eq!(
+            scan.text_nodes,
+            31 + 500,
+            "frame {frame}: second loop in the same pane keeps the full build"
+        );
+        let plan = virtual_list::last_plan(PANE).expect("first loop plan");
+        assert_eq!(
+            plan.total, 1_000,
+            "frame {frame}: second loop must not overwrite total"
+        );
+        assert_eq!((plan.start, plan.end), (23, 54));
+        let now = virtual_list::build_counters();
+        assert_eq!(
+            now.windows_built - prev.windows_built,
+            1,
+            "frame {frame}: exactly one window build"
+        );
+        assert_eq!(
+            now.rows_read - prev.rows_read,
+            31 + 500,
+            "frame {frame}: 31 windowed list_get + 500 materialized"
+        );
+        prev = now;
+    }
+}
+
+/// F-03：偏移脏帧对照「上次构建偏移」——亚像素步进累积到阈值必须置脏。
+#[test]
+fn plan126_virtual_list_offset_dirty_uses_last_built_offset() {
+    if !windowing_enabled_or_skip("offset_dirty_uses_last_built_offset") {
+        return;
+    }
+    virtual_list::reset_for_test();
+    virtual_list::seed_geometry_full_for_test(PANE, 0.0, VIEWPORT_H, ROW_H, 0.0, 0.0, VIEWPORT_W);
+    let mut dc = component(true, 1_000);
+    let _ = dc.view_with_debug_gated(false);
+    assert_eq!(virtual_list::last_plan(PANE).map(|p| p.offset_y), Some(0.0));
+
+    let probe = |offset: f64| {
+        let mut m = virtual_list::VListMeasure::default();
+        m.panes.insert(
+            PANE.to_string(),
+            virtual_list::PaneGeometryJson {
+                offset_y: offset,
+                viewport_h: VIEWPORT_H,
+                content_h: 28_000.0,
+                viewport_y: 0.0,
+                viewport_w: VIEWPORT_W,
+            },
+        );
+        m
+    };
+
+    // 旧语义（对照上一次 probe）会在此序列里永不置脏；对照构建偏移则 0.6 越过阈值。
+    assert!(!virtual_list::offset_moved(&probe(0.2)));
+    let _ = virtual_list::note_measure(&probe(0.2));
+    assert!(!virtual_list::offset_moved(&probe(0.4)));
+    let _ = virtual_list::note_measure(&probe(0.4));
+    assert!(
+        virtual_list::offset_moved(&probe(0.6)),
+        "accumulated 0.6px past the built offset must dirty the frame"
     );
 }
 

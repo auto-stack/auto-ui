@@ -3,15 +3,17 @@
 //! 收录 `AuraViewBuilder` 的 pane 作用域管理入口与窗口化 `for` 构建；窗口几何
 //! 台账（测量/反解）在 [`crate::ui::virtual_list`]。契约要点（plan §5.1）：
 //!
-//! - 作用域来自 `overflow-y-auto`/`overflow-auto` 列与 `scroll` 元素：转换
-//!   自身子件期间压栈（线程本地，child widget builder 共享同一构建栈），子件
-//!   中的 `for` 循环认领它（同 pane 只认领一个）。
+//! - 作用域来自 `overflow-y-auto`/`overflow-auto` 列与声明了 `row-height` 的
+//!   `scroll` 元素：转换自身子件期间压栈（线程本地，child widget builder 共享
+//!   同一构建栈），子件中的 `for` 循环认领它（同 pane 每帧只认领一个，首个
+//!   循环持有，后续循环回退完整构建）。
 //! - 认领后若台账已有「固定行高 + 列表起点 + pane 视口/偏移」，只构建可见行
 //!   + 两侧 2 行 overscan，首尾用 `View::SpacePx` 表达屏外逻辑高度；构建带用
 //!   `View::VirtualMark` 标记，供 probe 反解几何。
-//! - 尚无几何时做**一次标定构建**：构建列表顶部至多 [`CALIBRATION_ROWS`] 行
-//!   并打标记；probe 用「band 高度 / 实际行数」反解固定行高与列表起点，下一帧
-//!   起按真实窗口裁行。
+//! - 尚无几何时做**整表标定构建**（全部 n 行，与窗口化前一致）：无需占位，
+//!   内容高天然 = n·固定行高；probe 用「band 高度 / 实际行数」反解固定行高与
+//!   列表起点，下一帧起按真实窗口裁行。已确认行高的周期复核帧同样整表构建，
+//!   因此复核帧不会出现内容高塌陷。
 //! - 检索过滤态、嵌套循环绑定、dotted 属性路径或不可按索引读取的数据源一律
 //!   返回 `None`，调用方保留完整构建语义。
 //! - 索引语义：行绑定、事件参数与 `[for: …]` 记录一律使用**原数组索引**，不因
@@ -20,9 +22,8 @@
 use super::*;
 use crate::ui::virtual_list;
 
-/// 标定帧最多构建的行数（无几何时的一次性构建；超出部分仍由占位表达）。
-/// 与测量侧共用同一常量：标定带（start=0、行数 = min(n, 上限)）是唯一
-/// 可信的全局平均行高样本。
+/// 显式行高顶窗最多构建的行数（无几何时的引导窗口；超出部分由尾部占位
+/// 按已声明的固定行高精确补齐）。与测量侧共用同一常量。
 const CALIBRATION_ROWS: usize = virtual_list::CALIBRATION_ROWS;
 /// pane 作用域 Drop guard（转换内提前 return 也不会漏 pop）。
 pub(super) struct VlistScopeGuard<'b, 'a> {
@@ -186,9 +187,18 @@ impl<'a> AuraViewBuilder<'a> {
         if virtual_list::diag() {
             eprintln!("[VLIST-TRY] scope={scope} iterable={iterable} total={total}");
         }
+        // 每帧同一 pane 只允许一个循环窗口化：首个到达的循环（文档序）认领，
+        // 后续循环回退完整构建——否则两者共用同一 `vlist_{seq}` 几何，后者
+        // 的 total/band 会覆盖前者（T-07 F-02）。
+        if !virtual_list::claim_loop_site(&scope) {
+            if virtual_list::diag() {
+                eprintln!("[VLIST-TRY] scope={scope} already claimed this frame -> full build");
+            }
+            return None;
+        }
 
-        // 台账几何优先 → 诊断覆盖 → 显式 `row-height` 顶窗 → 标定帧
-        //（顶部窗口，几何待 probe 反解）。
+        // 台账几何优先 → 诊断覆盖 → 显式 `row-height` 顶窗 → 整表标定帧
+        //（全部 n 行，内容高天然守恒；几何待 probe 反解）。
         let mut calibrating = false;
         let mut explicit_bootstrap = false;
         let mut plan = match virtual_list::plan(&scope, total) {
@@ -206,7 +216,7 @@ impl<'a> AuraViewBuilder<'a> {
                         virtual_list::WindowPlan {
                             total,
                             start: 0,
-                            end: total.min(CALIBRATION_ROWS),
+                            end: total,
                             row_h: 0.0,
                             list_top: 0.0,
                             offset_y: 0.0,
@@ -223,8 +233,12 @@ impl<'a> AuraViewBuilder<'a> {
             virtual_list::record_list_get();
             let item = match self.bridge.list_get(&list_val, i) {
                 Some(v) => v,
-                // 索引读失败（非索引可读表示）→ 整体回退完整构建。
-                None => return None,
+                // 索引读失败（非索引可读表示）→ 整体回退完整构建（释放本帧
+                // 认领位，让同 pane 的循环仍可自行认领）。
+                None => {
+                    virtual_list::release_loop_site(&scope);
+                    return None;
+                }
             };
             let mut loop_bindings = bindings.clone();
             loop_bindings.insert(var.to_string(), self.bridge.materialize_obj_ref(&item));

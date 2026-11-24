@@ -30,8 +30,9 @@
 //! 定罪犯例）。
 //!
 //! 台账是进程级、按 scope key 持久的；视图重建不丢测量（同 `scroll::managed`
-//! 先例）。同一 pane 只支持一个虚拟化循环（首个认领 scope），其余循环保留完整
-//! 构建——多列表同 pane 的窗口化不在首期范围。
+//! 先例）。同一 pane 只支持一个虚拟化循环：每帧首个到达的循环按文档序认领
+//! scope（[`claim_loop_site`]），同帧后续循环拿不到认领，回退完整构建——多
+//! 列表同 pane 的窗口化不在首期范围。
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -52,9 +53,9 @@ pub const MEASURE_EVENT: &str = "__vlist_measure";
 /// 两侧各保留的预渲染行数（plan §5.1.2「两侧各最多 2 行」）。
 pub const OVERSCAN_ROWS: usize = 2;
 
-/// 无几何时的标定帧最多构建的行数（构建侧与测量侧共用：标定带
-/// （start=0、行数 = min(n, CALIBRATION_ROWS)）是唯一可信的「全局平均
-/// 行高」样本）。
+/// 无几何时的显式行高顶窗最多构建的行数（`explicit_plan` 的引导窗口），
+/// 也是测量侧识别的顶部标定带行数上限。非显式 pane 的标定/复核帧改为
+/// **整表构建**（全部 n 行，见 `try_virtual_for`），内容高因此天然守恒。
 pub const CALIBRATION_ROWS: usize = 256;
 
 /// 标定采样节流：相邻两次标定测量至少间隔该时长。首秒内世界/字型尚未
@@ -164,6 +165,9 @@ thread_local! {
     static SCOPE_SEQ: Cell<u32> = const { Cell::new(0) };
     /// 视图构建嵌套深度（子件 builder 复用同一线程：只有最外层归零序号）。
     static BUILD_DEPTH: Cell<u32> = const { Cell::new(0) };
+    /// 本帧已被某个 `for` 循环认领的 pane scope key（文档序：每帧首个
+    /// 到达的循环认领，同帧后续循环回退完整构建）。
+    static FRAME_CLAIMS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// 一次视图构建的帧守卫（最外层构建把 pane 序号归零）。
@@ -190,6 +194,7 @@ pub fn enter_build_frame() -> BuildFrameGuard {
     if outer {
         SCOPE_SEQ.with(|s| s.set(0));
         SCOPE_STACK.with(|st| st.borrow_mut().clear());
+        FRAME_CLAIMS.with(|c| c.borrow_mut().clear());
     }
     BuildFrameGuard
 }
@@ -216,6 +221,35 @@ pub fn pop_scope() {
 /// 当前最内层 pane 作用域 key。
 pub fn current_scope() -> Option<String> {
     SCOPE_STACK.with(|st| st.borrow().last().cloned())
+}
+
+/// 本帧认领一个 pane 的窗口化循环位（`try_virtual_for` 在真正进入窗口化/
+/// 标定构建前调用）。
+///
+/// 返回 `true` = 本帧首个循环，成功认领；`false` = 同 pane 已有循环先认领，
+/// 调用方必须回退完整构建（否则两个循环共用同一 `vlist_{seq}` 几何、后者的
+/// `total`/band 覆盖前者，窗口与内容高都会错）。认领在每帧最外层构建时清零
+/// （[`enter_build_frame`]），因此跨帧稳定地由文档序首个循环持有。
+pub fn claim_loop_site(key: &str) -> bool {
+    FRAME_CLAIMS.with(|c| {
+        let mut claimed = c.borrow_mut();
+        if claimed.iter().any(|k| k == key) {
+            false
+        } else {
+            claimed.push(key.to_string());
+            true
+        }
+    })
+}
+
+/// 放弃本帧已认领的循环位（构建中途失败回退完整构建时调用）。
+pub fn release_loop_site(key: &str) {
+    FRAME_CLAIMS.with(|c| {
+        let mut claimed = c.borrow_mut();
+        if let Some(i) = claimed.iter().position(|k| k == key) {
+            claimed.remove(i);
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +304,8 @@ impl WindowPlan {
 }
 
 #[derive(Debug, Default, Clone)]
-struct ScopeEntry {    pane: Option<PaneGeometry>,
+struct ScopeEntry {
+    pane: Option<PaneGeometry>,
     band: Option<BandGeometry>,
     /// 已解出的固定行高与列表起点（内容空间）。
     row_h: f64,
@@ -883,14 +918,25 @@ impl Operation<VListMeasure> for VListProbe {
     }
 }
 
-/// 本帧 probe 是否观测到 pane 滚动偏移变化（用于把「滚动」变成一次视图
-/// 重建：窗口化后行集合随偏移变化，*不重建*就会沿用旧窗口的行集合，滚动
-/// 后屏内可能整段空白——实测定罪）。
+/// 本帧 probe 是否观测到 pane 滚动偏移**相对上次构建**变化（用于把「滚动」
+/// 变成一次视图重建：窗口化后行集合随偏移变化，*不重建*就会沿用旧窗口的
+/// 行集合，滚动后屏内可能整段空白——实测定罪）。
+///
+/// 对照基准是 `last_plan.offset_y`（该窗口实际按哪个偏移构建）而不是上一次
+/// probe：亚像素步进的滚动会逐次小于阈值却持续累积，对照上一次 probe 时永
+/// 不置脏，屏内会逐步滑出已建行。标定/复核帧是整表构建（`row_h == 0`），
+/// 对偏移不敏感，此类帧回退「上一次 probe」语义，避免整表反复重建。
 pub fn offset_moved(m: &VListMeasure) -> bool {
     m.panes.iter().any(|(key, p)| {
-        read_scope(key, |e| e.pane)
-            .flatten()
-            .map_or(false, |prev| (prev.offset_y - p.offset_y).abs() > 0.5)
+        read_scope(key, |e| {
+            let reference = e
+                .last_plan
+                .filter(|plan| plan.row_h > 0.0)
+                .map(|plan| plan.offset_y)
+                .or_else(|| e.pane.map(|pane| pane.offset_y));
+            reference.map_or(false, |r| (r - p.offset_y).abs() > 0.5)
+        })
+        .unwrap_or(false)
     })
 }
 
