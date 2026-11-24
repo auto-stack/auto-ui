@@ -635,6 +635,13 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 已清理：`checked_widget_view.js` 的两处 `console.debug('P119CTX …')`；auto-lang `live_view.rs` 的 `VIEWTAG` 打印**仍在**（一次误删导致编译报错，已 `git checkout --` 复原，仍待干净移除）。
 - oracle 约定：右击行改用**合成 `contextmenu` 事件**（真实浏览器 DOM，等价于用户右键），并断言雷数计数变化。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 临时诊断全部清零，两树可编译 | outcome: pass | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: auto-lang 4a61ef94f | next: T-06 收尾证据 + T-04 复核
+
+- `VIEWTAG` 打印已干净移除（auto-lang `4a61ef94f`），`P119CTX` 此前已删；两树 `cargo build` 绿。
+- 生成期 `deps/` junction 再次清理（worktree 无 reparse point）。
+- A2Vue 腿判定：**生成 ✅ / 冷构建 ✅ / 真浏览器渲染 ✅ / 首击展开 ✅ / 难度切换 ✅ / 右击标记 ✅**（合成 contextmenu 断言雷数 10→9），证据 `plan-artifacts/plan-119/{oracle-vue.mjs, probe-ctx3.mjs, 038-vue.png}`。
+- 下一步：把 T-03/T-06 证据折叠成计划内收据（含命令、退出码、关键数字），然后进入 T-04 独立复核。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
