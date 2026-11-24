@@ -405,6 +405,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 因此缺席另有原因，需实测而非推断：用 `p119_diag` 对**同一 prep 源**（lane 输入）打印每个 handler 的 `body_foreign` 与 stmts 数，对照 `compile_component_scenario_states_at` 的结果，判断差异出在 ①scenario `Send` 重放面，②`initials`/`node_index` 选择，还是 ③lane 侧读取的处不是 description 的同一份。
 - 下一步判据已成形（探针一行即可）：`P119_COMPONENT=1 p119_diag` 打印 + 与 lane 输入落盘（`P119_VUE_DUMP`）对照。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 回归复验（prep 测试 + AV oracle） | outcome: pass | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: A2Vue lane 逐 handler foreign 探针
+
+- `cargo test -p auto-ui-runtime --features ace-bridge --lib ace_source_prep::` → **22 通过 / 1 失败**，唯一红仍是 `real_u03_apps_load_through_desktop_bridge`（015-notes `[]Note` 组件面模型面）——已证实为基线红（§9 早前 stash 复现），与本计划改动无关。
+- 括号修复后 AV oracle 复跑：`3:click:0:4` → exit 0、maxrev=3、errors=0、`st_game_state=playing`、覆盖 18/81 ⇒ **无回归**。
+- 证据：`plan-artifacts/plan-119/av-recheck.json`。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
