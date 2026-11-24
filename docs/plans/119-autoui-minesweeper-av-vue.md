@@ -185,6 +185,14 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 结论：闸门在**单条 Reveal transition 内部**，与其它 handler/消息/view 无关；后续二分可在这一更小面上做（`P119_LIVE_FILE` + `P119_LIVE_SWEEP=leaveone-ready/prefix`），不必再改整个应用。
 - 余量与下一步：在 Reveal-only 面上重跑子集掩码，确认「布雷组 vs 邻接组」哪个单独即拒，并把该组按其内部语句（含 `.set` 目标记录字段数、`%`/`/` 下标算术、`.board[idx].mine` 读）逐项替换成镜像探针已验证的等价形；若单组内仍无法定位，则按 §10 报 G5（live transition 组合/规模面）裁定。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-02 Reveal-only 面 leave-one-out（复证） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@fd797c39） | commit: （无代码改动） | next: §10 G5 裁定
+
+- Reveal-only 面上重跑 leave-one-out：9 条顶层语句逐条摘除**全部仍拒**（与整应用面同结果）⇒ 单条摘除不改变判据。
+- 累积证据：①构造级形状镜像（9 字段记录 + 布雷复合循环 + 邻接双嵌套 + `.set` 投影 + 守卫嵌套）全部可发射；②子集掩码显示布雷组/邻接组各自即拒；③单条摘除/前缀扫描均不能定位到单条构造；④去掉 store 单元重复 `type` 亦不解。
+- 判定：**live transition 发射面对本应用的组合/规模面限制**（非源形，prep 已无可归一的等价形可试）。按 §10 报 G5，请用户裁定。
+
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 8 | from: work | to: work | status: drafting | outcome: waiting | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@fd797c39） | commit: （无代码改动） | next: user（§10 G5 裁定）
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
@@ -196,6 +204,11 @@ T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台
 3. **移交语言 owner 计划**：119 挂起至其落主后复验；G2/G3 仍由本计划 prep 收口。
 
 （先例：PLAN-118 §10 裁定①曾授权其在 plan-118-dev 的 auto-lang 树做最小闭合集。）
+
+2026-11-24 §10 G5 裁定请求（live transition 发射面）：038 的 AV 腿经 5 轮二分，构造级形状全部可发射（含 9 字段记录、布雷/邻接循环、`.set` 投影、守卫嵌套），但 `Reveal` 单条 transition（Reveal-only 裁面复证）仍被判 `cannot emit a checked widget transition`，单条摘除/前缀/子集三种扫描都无法定位到具体构造 ⇒ 判为发射面组合/规模限制。选项：
+① 授权本会话在 plan-119-dev 的 auto-lang 树做**定位性诊断**（临时 eprintln/诊断码细化，不改语义），把 `unsupported()` 的真实原因暴露出来，再据实决定修法；
+② 直接移交语言 owner（PLAN-1100/1104 AV 游戏接管）并挂起 119 的 AV 腿；
+③ 改 §1/§6 验收口径：AV 腿以 VM/Iced 真实窗口证据交付（原 038 的 `auto run -r vm` 即 Iced 真窗），AGE 包面留作后续。
 
 2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 2 | from: work | to: work | status: drafting | outcome: pass（阶段推进） | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: 1a986a9c | next: work（T-02 续：live transition 发射面 / 无状态道 startup-handler 编译面）
 
