@@ -150,6 +150,16 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 2 | from: work | to: work | status: drafting | outcome: pass（阶段推进） | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: （无代码改动） | next: work（T-02 次段二分）
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-02 次段二分（live 发射面） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: （探针扩充，随本轮提交） | next: T-02 续（ready 块内 leave-one-out）
+
+**T-02 次段二分结果（2026-11-24，探针 `P119_LIVE_FILE`/`P119_LIVE_SWEEP`）**
+
+- 新判据面：文件喂入 units 直连 `compile_age_package_widget_runtime`（绕开二次 prep），可对**准备后单元**做前缀/隔离扫描。
+- `LIVE(baseline)` → `cannot emit a checked widget transition for handler Reveal`；其余 5 个 arm 体换成单条标量赋值（已知可发射）后同错 → 与其它 handler 无关。
+- `.Reveal` 体内 4 条顶层语句：`var __p119_ret` / 注释 / `if .game_state == "won"` 守卫 / `if __p119_ret == false { …其余全部… }`。前缀 1–3 **OK**，前缀 4 **拒** → 触发点在该守卫块内。
+- 块内逐层下降：`if __p119_ret == false {` → `if .game_state == "ready" {`（布雷/邻接计数块）；该块内首条 `var placed int = 0` 的前缀扫描失败属**探针工件**（前缀截断丢掉后续必需上下文，非构造证据）。
+- 下一轮：对 `if .game_state == "ready" { … }` 块内 9 条语句做 **leave-one-out**（保留上下文，逐条摘除），定位最小不可发射构造；若是单条构造，再判断 prep 是否有等价形（如把 `.mine_count` 循环改写成 while + 标志）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
