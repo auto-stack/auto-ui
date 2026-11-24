@@ -558,6 +558,17 @@ fn push_script_pen(
 }
 
 fn push_script_click(id: i32, instance: usize, target: usize) {
+    // PLAN-119 临时诊断：脚本点击走哪条队列（package 帧 vs session 事件）。
+    {
+        let mut guard = host().write().unwrap();
+        let frame_rev = guard
+            .get(id)
+            .and_then(|session| session.package_frame(instance))
+            .map(|frame| frame.revision);
+        eprintln!(
+            "P119DBG script_click id={id} inst={instance} target={target} frame_rev={frame_rev:?}"
+        );
+    }
     let revision = host().write().unwrap().get(id)
         .and_then(|session| session.package_frame(instance))
         .map(|frame| frame.revision);
