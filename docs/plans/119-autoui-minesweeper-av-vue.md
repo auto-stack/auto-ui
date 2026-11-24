@@ -613,6 +613,14 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 但浏览器复跑（右击**未揭开**的最后一格）：`flags=0`，`blank/digits` 不变 ⇒ 回调未生效。探针已改为右击未揭开格（`oracle-vue.mjs`）。
 - 下一步：在 `checked_widget_view.js` 的 dispatch 处加临时计数（或 `console.debug`），浏览器里读出来，确认 ①事件是否被绑定到该 button、②`checkedDomBinding('oncontextmenu.prevent')` 是否通过、③`dispatch` 是否被调用。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 监听已装进 props，但回调从未触发 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下，含临时 console.debug） | next: 查 button 分支是否用自有 props 覆盖/丢弃 `onContextmenu`
+
+- 运行证据（浏览器 console）：`P119CTX bind onContextmenu flags=prevent` 出现 4 次 ⇒ 绑定安装成功；
+  但新增的 `P119CTX fire …` **一次都没出现** ⇒ 回调未被调用。
+- 读码：`nativeWidgetNode`（第 561 行）确实把 `props[property] = callbacks` 写进 h() props，键名 `onContextmenu`。
+- 因此下一跳在 button 的渲染分支（第 561 行之后）——怀疑该分支为 button 另建 props（只保留 onClick 等），把 `onContextmenu` 丢掉；或 Vue 对数组回调 + 该键名的处理与 click 路径不同。
+- 临时件：`checked_widget_view.js` 两处 `console.debug('P119CTX …')`、`live_view.rs` 的 `view-events.log` 打印；落主前必须移除。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
