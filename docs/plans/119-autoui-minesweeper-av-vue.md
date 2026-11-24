@@ -193,6 +193,14 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 8 | from: work | to: work | status: drafting | outcome: waiting | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@fd797c39） | commit: （无代码改动） | next: user（§10 G5 裁定）
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: G5 裁定①落地——发射面拒的真实分支已暴露 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang}（plan-119-dev） | commit: （auto-lang 临时诊断） | next: 定位 `body_foreign` 的置位构造
+
+- 用户裁定①：授权在 plan-119-dev 的 auto-lang 树加**临时诊断**（不改语义）。已加：`widget_runtime.rs` handler 循环两处 eprintln（`P119DBG ... branch=check_fn_none|model_transition_none`）。
+- 实测（Reveal-only 面）：`P119DBG handler=0 msg=Reveal branch=check_fn_none body_foreign=true stmts=3 channels=0`。
+- 判读：store 展开**已发生**（stmts=3 = 改写后 `.Reveal` 体的 3–4 条顶层语句），闸门是 `handler.body_foreign == true` → `handler_check_fn` 直接返回 None（`if h.body_foreign { return None }`，age_component.rs:3603）。038 的对照探针（同含 `.push`/`.set`/循环/if）能发射 ⇒ `body_foreign` 的置位来自 038 特有的某类语句，而非「调用语句一律域外」。
+- 下一步：grep 投影器里 `body_foreign = true` 的置位点（project.rs），逐类比对 038 的 `.Reveal` 与已通过探针的差异（候选：`var` 局部列表 `stack`、`.remove(...)`、`.board[idx].mine` 下标读、`.to(Str)`）；定位后在 prep 侧归一（用户既有授权：prep 兼容改写）或按需再报裁定。
+- 遗留：auto-lang 的 `P119DBG` 诊断属**临时件**，落主前必须移除（review 面须核对）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
