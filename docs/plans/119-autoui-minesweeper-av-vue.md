@@ -361,6 +361,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 已清理 `--gen-only` 生成的 `deps/themes` junction（worktree 必须无 reparse point）。
 - 下一步（单点）：定位严格 lane 的 handler 派生入口（`ace_ts_provider`/`vue.rs` 的 lane 分支），确认它是否消费组件面 `inline_store_decl` 的展开结果；若否，则在同一处复用包面修复（或 prep 侧先做跨单元展开，A/B 两案同样的选择）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 严格 lane 前置 prep 仍不解（缺席集不变） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: instrument `generate_sfcs_with_lane_product` 的 absent 计算
+
+- 改动：`ace_vue_sfcs` 对**单元级 `use <unit>: <Store>`** 的 app 先做组件面 prep（内联 store 片断）再交逐 widget lane（`vue.rs`）。
+- 实测：缺席集**完全不变**（`App[.Flag/.Reset/.Reveal/.SetDifficulty/.Tick]`）⇒ 产品 lane 的缺席判定不在“源是否含 store 展开”这一层，而是它自己的投影/派生路径（`generate_sfcs_with_lane_product`）对 store 调用仍判不可派生。
+- 已清理本轮再次生成的 `deps/` junction（worktree 必须无 reparse point）。
+- 下一步单点：在 `ace_vue_script` 的 absent 收集处打印每个 msg 的判据（`handler_body_foreign` / `compile_at` 失败原因），确认它是否复用组件面 store 展开。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
