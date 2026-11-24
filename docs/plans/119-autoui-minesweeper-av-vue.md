@@ -429,6 +429,15 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 报错仍未变 ⇒ 错误来自**第 106 行** `package_candidates(source)?`：这是**单单元**投影（不含 store 单元），对含 `.store.*` 的 app 源必然报 `model has no field store`，且在建 units 之前就返回。
 - 下一步单体：把该行改成“单单元失败时仍继续”（store 导入本就需要多单元编译），或对 inspection 使用 prepared（同源 store）源；注意下游 `generate_package_sfc_leaf` 会再次 prep，需要一并去重（此前 `multiple store declarations` 即由此产生）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: inspection 走 prep 形后进到 units 装配的第二道墙 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: entry 单元与 store 模块二选一
+
+- 已加：`package_candidates(source)` 失败时回退到 `prepare_component_source` 后的同源形（store 内联）取 candidates。
+- 新错误：`multiple store declarations per node` ⇒ entry 单元（原始源 + units 里的 store 模块）与下游二次 prep 造成**双重 store**。两条出路：
+  ① entry 交 **prepared 源**、units **不含** store 模块（同源 store），并让下游 leaf 生成跳过 prep；
+  ② entry 保持原始源 + store 模块，但下游不再 prep（需给生成器加“已 prep”标志）。
+  建议 ②（跨单元路径与 AV `--package` 完全同形，已证 AV 可跑）。
+- 判据：改动后 `auto build --render vue --gen-only` 应落到 `gen/front/vue` 产物（含 App.vue 与 runtime）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
