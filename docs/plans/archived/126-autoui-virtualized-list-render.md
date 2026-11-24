@@ -1,12 +1,15 @@
 ---
 plan_id: PLAN-126
-status: execution_done
+status: archived
+completion_kind: delivered
 feature_name: VM 动态视图的虚拟列表（VList）
 author: [lead]
 created_at: 2026-11-24
 updated_at: 2026-11-24
+delivered_commit: 8e31cd0e9ae8dec96420485f3ada508bb5864109
+delivered_at: 2026-11-24
 plan_revision: 2
-current_step: 6
+current_step: 8
 total_steps: 8
 depends_on: [auto-ui/PLAN-112]
 supersedes_spec_components: []
@@ -116,7 +119,7 @@ T-03/T-04 建立 V-01..V-03 和 V-05 所需的定向 fixture。T-01 准备绑定
 - [x] T-02 确认可按窗口取行的接线
   - **work**。依赖 T-01。验证 025 列表的实际表示、取得长度和按索引读取的路径、表体相对滚动坐标，以及首帧和缩放的测量来源。将两种消费入口、行高单位与间距口径、回退条件和正反示例写入 §9。涉及 §10 Q-02 的实质变更时记录所需裁定，再推进受影响的 025 接线。覆盖 AC-01、AC-02、AC-04。
   - 结果：pass。注入点 = `tracked.rs:40` ForLoop 臂（生产轨；table-body 正走此臂），调试轨需在 `convert_for_unkeyed`/`convert_for_keyed`/`for_loop_iterations` 保持同窗口语义；数据读取需新增 O(1) 长度与按索引取元素；测量来源 = ScrollStateReader pane 读回 + LayoutCollector content 空间 bounds；120 行上限、行高 29px、10,000 行样本需 f32 高度占位。025 源不需要改（Q-02 无需裁定）。详见 §9 T-02。
-- [x] T-03 实现固定行高 VirtualList
+- [x] T-03 实现固定行高 VirtualList（T-07 repair1 复审：F-01a/F-01b/F-02 行为项已闭，见 §9）
   - **work**。依赖 T-02。接入 VM 展开前的区间入口和 Iced 布局，完成 `AUTOUI_VIRTUAL_LIST=0` 对照和普通列表 fixture。按 V-01 验证底层取行、构建和布局三个维度。覆盖 AC-01、AC-02。
   - 结果：pass。025 实窗窗口化 `[0,22)…[93,120)`、`row_h=28.97 list_top=176.20`、内容高≈3669、clamp 不变（`41d6138a`）；显式 `scroll (row-height: …)` 入口 + 1k/10k fixture：窗口化两侧均 31 行/37 vnode/3 layout nodes、0.43–0.75ms，关闭对照 1003/10003 vnode、12.8/125.6ms（`fbabf41d`）；V-02 六例 PASS。见 §9。
 - [x] T-04 接通 025 与行交互
@@ -125,12 +128,14 @@ T-03/T-04 建立 V-01..V-03 和 V-05 所需的定向 fixture。T-01 准备绑定
 - [x] T-05 验证规模、交互和性能
   - **work**。依赖 T-03、T-04。运行 V-01..V-05 的 work 验证，登记样本、计数、差值、未观测项及诊断。原始证据写入 `D:/autostack/plan-artifacts/plan-126/`，结果摘要写入 §9。覆盖 AC-01..AC-04。
   - 结果：pass。V-04 同机 GL 同窗对照（纯滚动）：整帧 129.0ms vs 464.0ms（**3.60×**）、s4 element 118.5 vs 408.5ms（3.45×）、s3b build 2.86 vs 10.03ms（3.51×）、MCP scroll RTT 80.7 vs 307.3ms（3.81×）；刷新帧整帧 228.0 vs 586.0ms（**2.57×**，`s2_vm` 1.00× 不变）。**2× 目标达成**。V-05：lib 套件 0 回归（13 项既存失败与干净基线同名同耗时）、`desktop_behavior` 11/11、025 双模式走查 12/12。V-01 1k/10k 同窗口 31 行/37 vnode/3 layout nodes（关闭 1003/10003 vnode）。见 §9。
-- [ ] T-06 准备规范与复审收据
+- [x] T-06 准备规范与复审收据（T-07 文档复核通过：SD-01 D-01..D-06 已闭，见 §9）
   - **work**。依赖 T-05。在实现树准备 SD-01 和 revision 绑定证据，记录实际新增用例与时长、受影响回归、已知边界与待执行合并门。为 AC-05 提供输入。
-- [ ] T-07 独立复审
+- [x] T-07 独立复审
   - **review**。依赖 T-06。按 AC 和 V 编号核对实现、回归证据、性能口径与 SD-01，记录审查结论和实际覆盖范围。关闭 AC-05。
-- [ ] T-08 合并与归档
+  - 结果：pass（独立上下文两轮：needs_fix @a2cc4bda → repair1 @42e09ff1 行为项全闭 → 文档复核 pass @3c01b156；AC-01..AC-05 全 pass）。见 §9 T-07 两条复审记录。
+- [x] T-08 合并与归档
   - **merge**。依赖 T-07 通过。完成合并负责的剩余回归，按当前仓库流程发布规范、合并、归档并清理工作树及证据。
+  - 结果：pass。`plan-126-dev` 8 提交 rebase 到 master @7f29547a（range-diff 8/8 全等，无冲突），ff-only 落主 `7f29547a→8e31cd0e`（无 merge commit，master tip = delivery commit）；SD-01 `docs/specs/runtime/virtualized-list-rendering.md` blob `7395fa09…` / sha256 `145335F0…` 随交付落主（未写索引）；归档 `docs/plans/archived/126-autoui-virtualized-list-render.md`；worktree/branch/group 与 `plan-artifacts/plan-126/` 已清场，registry 已刷新。见 §9 merge 记录。
 
 ## 9. 复审记录
 
@@ -281,6 +286,93 @@ r1 基线 Git blob `c667888299e6fb283f23233b13532a77b665605e`。r1 的 AC-02 承
 
 2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 9 | from: executing | to: execution_done | status: execution_done | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: a2cc4bda | next: review
 
+2026-11-24 stage: review | review_scope: final | reviewer: DSH subagent `vlist-review`（独立于实施会话的上下文；模型 = harness 默认路由，未取到显式 model id） | plan_id: PLAN-126 | plan_revision: 2 | outcome: needs_fix | worktree_path: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | reviewed_commit: a2cc4bda（实现基线 ce6d6234；`ce6d6234..a2cc4bda` 仅 +1 规范文件，工作树 clean） | base_commit: 2e9c5dcf（实际分叉点 6b78ed07，2 个 doc-only 提交） | dependency_revisions: 沿用 T-01..T-05（auto-lang 816585732、auto-web 0cfc7c7、auto-down 456c86a），本轮未重取 | spec_inputs: `docs/specs/runtime/virtualized-list-rendering.md`（blob `16e349449e51d2bbda9b9b40f065f74c0cffb49d`，sha256 `B9ECC57C…95BB7`，200 行） | acceptance_results: AC-01 partial、AC-02 pass、AC-03 pass、AC-04 partial、AC-05 fail | pending_closeout_gates: 全 lib 套件与 `--test desktop_behavior` 沿用 T-05@ce6d6234（代码/测试输入未变）；本轮未重跑 025 实窗/GL | findings: F-01..F-05 | evidence: `D:/autostack/plan-artifacts/plan-126/t07/README.md` | next: work（修复 F-01/F-02 后复审）
+
+**T-07（final, needs_fix）独立复审**
+
+- 方法：只读代码 + 在冻结基线上重跑定向用例；V-04 由 `t05/{t05win,t05off}/tool-stderr.log` 的原始 `[P725-FRAME]` 按 phase 字节区间**独立重算**（`t07/recompute_v04.py`、`recompute_v04b.py`）。未改代码/测试/示例/规范（仅本记录与 t07 证据）。
+- 命令与结果（本轮）：`virtual_list` 33/33（0.788s，exit 0）；`plan126_vlist` 14/14（0.505s，0）；`AUTOUI_VIRTUAL_LIST=0` + `virtual_list` 33/33（0.627s，0）；`scrollable` 9/9、`vnode` 47/47、`plan081` 3/3、`plan656` 1/1（均 exit 0）。新增用例最长 0.541s，全部 <10s；无 release/额外准备构建。
+- V-04 重算：暂停相位 `s4` 118,507 vs 408,281.5µs（3.45×）、整帧 129.0 vs 463.5ms（**3.59×**，记录 3.60×）、刷新帧 `s2_vm` 100,831 vs 100,792µs（1.00×）、整帧 226.0 vs 590.0ms（**2.61×**，记录 2.57×）；`[VLIST] scope=` 448 vs 0。2× 成立；残余 92% / 天花板 4.44× / 81% 算术一致。
+- AC 判定（本轮个人取证）：
+
+| AC | 判定 | 取证 |
+|---|---|---|
+| AC-01 | partial | 窗口数学/overscan/夹紧与 `[23,54)`、`[93,120)`、空/短/屏外用例一致；`row_h` 已知时 `SpacePx` 合计严格 = `n·row_h`（1k/10k 断言、025 clamp = 内容高−视口高）。**但 calibration 帧（n>256）无尾部占位 → 内容高不守恒**（F-01a） |
+| AC-02 | pass | V-01 原始 `[V-01]` 行 1k/10k 逐维相同（读 31/`list_get` 31/建 31/vnode 37/layout 3），关闭对照 1003/10003；首帧/远端目标区间仅对显式 `row-height` 成立，calibration 顶部带为设计代价（F-01a） |
+| AC-03 | pass | 025 日志 448 条 `scope=vlist_0`、关闭 0 条；V-04 上述重算独立复现 3.59×/2.61×；025 实窗证据沿用 T-05（同一实现基线） |
+| AC-04 | partial | 绝对索引点击/右键参数、换序、双 pane 隔离、窗口行 vnode 寻址由本轮 14/14 覆盖；**普通列表（无 `row-height`）在生产轨被窗口化，与 tracked/MCP 轨不一致**（F-01b/F-01c）；重复/缺键无专门用例（结构上按位置身份，非阻断） |
+| AC-05 | fail | SD-01 §1「row-height 是普通列表 opt-in」、§4「显式 scroll 双胎都压作用域 / 两轨同一区间」、§6「顶窗 + 尾部占位」与代码不符（F-01/F-04）；`[未取证]` ③ 不是"未证"而是与 §6 表述矛盾 |
+
+- 发现（finding → invariant → 路径/状态 → 证据 → fix → 严重度）：
+
+| ID | finding | invariant | 路径/状态 | 证据 | fix | 严重度 |
+|---|---|---|---|---|---|---|
+| F-01 | calibration 帧无占位（首帧与每 3s 复核帧）；生产轨无 opt-in 窗口化；两轨不一致 | 屏外逻辑高度守恒（AC-01/§5.1.2）；普通列表保持原行为（G5/AC-04）；两轨同窗口（SD-01 §4） | `virtual_rows.rs:204-217`、`:298-311`（`row_h==0` 时两段 spacer 全跳过；`plan()` 在 `verify_due` 时同样回落标定 → n>256 每 3s 一帧内容塌陷）；`tags_container.rs:174-190`（生产轨任意 `scroll` 压栈）vs `tracked.rs:2593-2601`（仅 `row-height`）；状态 = 有界视口 + `n>256` 且无 `row-height` 的显式 `scroll`/表体 | 现有用例 `plan126_virtual_list_no_row_height_still_calibrates`（`plan126_vlist_scale_tests.rs:401-433`）钉住 1k 行 `[0,256)`；`t03/README.md` 已记「Tracked/MCP rail 保持完整构建」的生产/快照分歧；SD-01 §1/§4/§6 | yes | high |
+| F-02 | 同 pane 多循环无拒绝门，共用 `vlist_{seq}` 且后者覆盖 `total` | 每 pane 一个虚拟化循环（§5.1.1、SD-01 §5） | `virtual_list.rs:32-34` 注释声称"其余循环保留完整构建"；`try_virtual_for` 不检查 `claimed`；`note_plan:492-514` 覆盖 `total`/band | 代码审读；SD-01 §5 `[未取证]` | yes | medium |
+| F-03 | 偏移脏帧阈值对照「上次 probe」而非「上次构建」 | 窗口跟随滚动（AC-01/SD-01 §3） | `virtual_list.rs:889-895` + `note_pane` 每帧写入；亚像素连续滚动可累积不重建 | 代码审读 | no（加固：对照 `last_plan.offset_y`） | low |
+| F-04 | 证据/规范文字与格式缺陷 | 规范描述当前行为 | `t03-scale/README.md:41` 称 tracked 双胎为"production render rail"；SD-01 §1/§4/§6 句；`view.rs` FocusTarget 字段并成一行、`virtual_list.rs:273` 缩进 | 本轮比对 | yes（随 F-01） | low |
+| F-05 | 分支携带过期 `docs/plans/126`（129 行 vs main 210 行）与旧 116；无越界代码改动 | 变更面限于 `crates/auto-ui-runtime/src/**` + 规范 | `git diff --name-only 2e9c5dcf..ce6d6234`：仅 24 个 src 文件 + 2 个 docs/plans；`examples/**`、025 源零改动 | 本轮核验 | no（合并须保留 main 版 docs/plans） | info |
+
+- SD-01 三项 `[未取证]` 的裁定：① 同 pane 多循环 → **不是可接受的既有边界**：注释声称的"首个认领、其余完整构建"并不存在，属规范/代码文实不符 + 静默错渲染风险（F-02，修 gate 或删该承诺）；② 显式 `row-height` 普通列表未在真实 iced/GL 窗口取证 → **本 revision 可接受**（V-02 对普通列表只要求 Iced 组件层；probe/mark/spacer 机制已由 025 实窗覆盖），保留 `[未取证]` 标注即可；③ "有作用域但无有界视口"与旧行为等价 → **既是规范措辞缺陷也是合同缺口**：calibration 帧根本没有尾部占位，内容高不守恒，且生产轨/快照轨行集不一致（F-01a/F-01b）；不能仅以"未取证"结案。
+- SD-01 §7 的帧计数与原始日志差 1–2 帧（暂停相位 94/42 vs 94/41；实时刷新 84 vs 82），属相位边界切分，不影响各比值（见 `t07/README.md` §2）。
+- `AUTOUI_VIRTUAL_LIST=0`：`try_virtual_for` 首判返回 `None`，无 mark/占位，probe 门关闭；关闭档 33/33 且对照用例断言 1000/10000 全建 → "0 = 旧行为"成立（新增 `measure_key` 字段本身不影响渲染）。
+- 既存缺陷复核：`table-row` 丢样式 `convert_element.rs:1269` 由 `07871fb62`（2026-11-01）引入，基线 `2e9c5dcf` 与主检出同名同源；本计划对该文件仅 +1 行 `measure_key: None`（`:709`），非本计划引入。
+- 状态与路线：Plan `execution_done → executing`；重开 T-03（F-01a/F-01b、F-02）与 T-06（F-01c、SD-01 §1/§4/§6、F-04）；T-01/T-02/T-04/T-05 保持完成，V-04/T-05 证据可复用（025 列路径不受修复影响）。
+- 最小修复单（复审用）：①`tags_container.rs:174-190` 生产轨显式 `scroll` 仅在声明 `row-height` 时压 pane 作用域（对齐 `tracked.rs:2593-2601`），并把 025 表体认领限定为 table 后代（或经 lead 批准把自动认领写成合同并改 G5/AC-04）；②calibration 帧 `n>256` 改为整表构建（或给出守恒占位），并据此改正 SD-01 §6；③每 pane 加 loop-site 认领门，同 pane 第二个循环回退完整构建，修正 `virtual_list.rs:32-34`；④改正 SD-01 §1/§4/§6 与 `t03-scale/README.md:41`；⑤（可选）`offset_moved` 对照 `last_plan.offset_y`；⑥同步更新/删除 `plan126_virtual_list_no_row_height_still_calibrates` 以匹配 ①。
+
+
+2026-11-24 stage: review | review_scope: final | reviewer: DSH subagent `vlist-review`（独立上下文；模型 = harness 默认路由，未取到显式 model id） | plan_id: PLAN-126 | plan_revision: 2 | outcome: needs_fix（行为项全闭；仅余 SD-01 文档准确性） | worktree_path: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | reviewed_commit: 42e09ff1（父 a2cc4bda，工作树 clean） | base_commit: 2e9c5dcf（实际分叉 6b78ed07） | dependency_revisions: 沿用 T-01..T-05（auto-lang 816585732、auto-web 0cfc7c7、auto-down 456c86a），本轮未重取 | spec_inputs: `docs/specs/runtime/virtualized-list-rendering.md`（blob `7e6484f5afa16680283972f3abca26c48d5dd2c9`） | acceptance_results: AC-01 pass、AC-02 pass、AC-03 pass、AC-04 pass（离群 flake 已归因）、AC-05 fail（SD-01 准确性余项） | pending_closeout_gates: 无新增；全 lib 与 `--test desktop_behavior` 本轮已在 42e09ff1 跑 | findings: R1-F-01..F-06 行为项闭；R2-D-01..D-06 文档余项 | evidence: `D:/autostack/plan-artifacts/plan-126/t07/repair1-review.md` | next: work（SD-01 文字/行号/计数，无代码行为改动）
+
+**T-07 repair1（42e09ff1）复审：行为项关闭，SD-01 余文档准确性**
+
+- 变更面：`a2cc4bda..42e09ff1` = 5 个 `crates/auto-ui-runtime/src/**` 文件（`tags_container.rs`、`virtual_rows.rs`、`view.rs`、`virtual_list.rs`、`ui_tests/plan126_vlist_scale_tests.rs`）+ SD-01；无 `docs/plans`/`examples`/025 改动（`git diff --name-only` 过滤后为空）。
+- 本轮命令（`42e09ff1`）：`virtual_list` **37/37**（0.643s，exit 0）；`plan126_vlist` **18/18**（0.502s，0）；`AUTOUI_VIRTUAL_LIST=0` + `virtual_list` **37/37**（0.639s，0）；`plan081` 3/3、`scrollable` 9/9、`vnode` 47/47、`plan656` 1/1（均 0）；`--test desktop_behavior` **11/11**（0，1 skipped）；全 lib **2706 run / 2693 pass / 12 fail / 1 timeout**（exit 100，353.8s）。新增用例 ≤0.39s，无 >10s。
+- 回归归因：全 lib 失败数与基线 `ce6d6234`（2702/2689/12+1）相同，均在既有族（OS 剪贴板、headless rq_probe 超时、AV/compiler、gallery/media、plan657）；名单有翻转：plan488/plan802 剪贴板转绿，`p073 media_class_capacity`（-j8 并发下失败、单跑 6.6s 通过）与 `plan492 pkg_canary`（全量轮首次失败、随后 4/4 单跑通过）属既定环境/负载 flake。无 `virtual_list`/`scrollable`/`vnode`/`plan126_*` 失败。
+- 逐项关闭（代码 + 新用例个人核对）：**F-01a ✅**（`virtual_rows.rs:219` `end: total`；用例 `:487` 首帧 `[0,1000)`/1000 text/无占位→`[0,29)` 精确占位；`:544` 复核帧整表、下帧回窗）；**F-01b ✅**（`tags_container.rs:174-195` 仅 `enabled() && row-height` 压栈，镜像 `tracked.rs:2594-2601`；`:456` 无 mark/spacer/plan、1000 text、`rows_built==0`、`is_active()==false`；隐式列不变）；**F-01c** → 以 SD-01 §1/§4 记录判据结案（两轨同规则、隐式列自动、显式列 opt-in），句子已真；**F-02 ✅**（帧级 `FRAME_CLAIMS` 门 `virtual_list.rs:165-170,194,226-253`，中途失败释放 `virtual_rows.rs:236-242`；`:591` 双循环仅首窗化、次循环全建 500、`total==1000`、单次窗口构建、31+500 读、跨两帧稳定）；**F-03 ✅**（`virtual_list.rs:921-942` 对照 `last_plan.offset_y`，标定帧回退 probe 基准；`:639` 0.2/0.4 不脏、0.6 脏）；**F-04 部分**（格式化与 t03-scale README 已改，SD-01 余项见下）；**F-05 ✅**；**F-06 ✅**（旧用例已替换）。
+- 025 实窗原始日志复核（`t07/repair1{,b,c}`）：顶窗三次均 `[0,22)`；`repair1` `row_h=28.80`、2400 窗 `[75,105)`；`repair1b` 29.32 / `[73,104)`；`repair1c` 29.15 / `[74,104)`、尾 `[93,120)`、clamp 7200→**2962**（2940/2961 瞬态）；同 run 偏移 0 与 2400 的 `row_h` 相同 ⇒ 内容高在窗口重建间不变（无 3s 塌陷），run 间 3648.2–3711 属 §8 换行漂移。2400 处 MCP 快照 150 container（30 行）⇒ 两轨均在窗化。
+- `AUTOUI_VIRTUAL_LIST=0`：首判 `None`，无 scope/mark/占位/认领；关闭档 37/37。`convert_scroll` 新增的 `row-height` 解析为只读 prop 求值（与 tracked 双胎原有顺序一致），不改视图。
+- SD-01 复审：§1/§2 item 2/§4/§5/§6/§8 的**合同句**已真；余下为文档准确性（R2-D，全部可用单次文档提交处理）：
+  - **R2-D-01**（low）头注 `:3-4` "实施 revision `ce6d6234`" → 当前文本只成立于 `42e09ff1`；证据路径补 `t07`。
+  - **R2-D-02**（low）§2 `:56` "`row_h = 构建带高 / n`" → 代码按**实际构建行数**除（`View::Empty` 行被丢弃时 ≠ n，见 `virtual_rows.rs:260-265`）。
+  - **R2-D-03**（low）§2 `:58` "`CALIBRATION_ROWS = 256` 只用于显式行高…顶部引导窗口" → 仍被 `note_band`（`virtual_list.rs:465`）与 `note_plan`（`:537`）使用；且 `virtual_rows.rs:27` 已成**未使用** const。
+  - **R2-D-04**（low）行号漂移：§2 `virtual_list.rs:472` → `:507`；§2 `:117` → `:118`；§4 `tags_container.rs:176` → `:182`。
+  - **R2-D-05**（medium）§4 `:113-115` "`SpacePx` … 快照里以 `Space` 节点带高度呈现" → **rendered** MCP 快照（`AURA Snapshot v2 (rendered)`，vnode 轨 `aura_snapshot_builder.rs`）无 `Space` 节点（`t05/t05win/*.txt` 与 `t07/repair1/snapshot_off2400.txt` 均 0 条）；只有 View 轨 `snapshot_builder.rs`（aura-id 动作面）上报。须写明达面。
+  - **R2-D-06**（low）§7 `:190-191` 计数过期：`plan126_vlist` 14/14 → **18/18**、`virtual_list` 33/33 → **37/37**、lib 2702/2689 → **2706/2693**（12 fail + 1 timeout；`desktop_behavior` 11/11 仍真）；§7 的 025 数值来自 pre-repair `t01/probe11`，应标注或补 repair1 三跑（row_h 28.80–29.32、内容 3648.2–3711、clamp 2962）。
+  - 可选（fix no）：删除 `virtual_rows.rs:27` 死 const；`virtual_list.rs:465,537` 的 `rows == CALIBRATION_ROWS` 分支现仅对"视口恰 256 行"的窗带可达，且可能把高视口窗带误判为标定样本，建议一并去掉。
+- 残余风险（记录，非阻塞）：隐式滚动列对任意可索引子循环自动窗口化（现已在 SD-01 §1 写明，非 025 页面未逐页走查）；同 pane 循环**跨帧交替**（条件渲染）时沿用上一循环已标定的 `row_h`（per-frame 门，规范按 per-frame 表述，下一复核帧 ≤3s 自我纠偏）；>256 行隐式 pane 的复核帧每 ~3s 整表构建（为保内容高精确；025 n=120 无感）。
+- 状态：Plan 保持 `executing`；T-03 重新置完成（行为项已闭），T-06 仍开（SD-01 修订）；T-01/T-02/T-04/T-05 保持完成。下一轮只需文档提交 + 一次文档复核，无需重跑代码门。
+- next: work（SD-01 R2-D-01..D-06，建议单提交；随后 review）
+
+2026-11-24 stage: review | review_scope: final | reviewer: DSH subagent `vlist-review`（独立上下文；模型 = harness 默认路由，未取到显式 model id） | plan_id: PLAN-126 | plan_revision: 2 | outcome: pass | worktree_path: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | reviewed_commit: 3c01b156（spec-only；实现基线 42e09ff1；`42e09ff1..3c01b156` 仅 SD-01 +37/−19；工作树 clean） | base_commit: 2e9c5dcf（实际分叉 6b78ed07） | dependency_revisions: 沿用 T-01..T-05（auto-lang 816585732、auto-web 0cfc7c7、auto-down 456c86a） | spec_inputs: `docs/specs/runtime/virtualized-list-rendering.md`（`3c01b156` 版） | acceptance_results: AC-01 pass、AC-02 pass、AC-03 pass、AC-04 pass、AC-05 pass | pending_closeout_gates: 无新增（代码/测试输入自 `42e09ff1` 未变，V-05 证据沿用；规范发布/归档/清场归 merge） | findings: R2-D-01..D-06 全闭；无新发现 | evidence: `D:/autostack/plan-artifacts/plan-126/t07/repair1-review.md`（§6 文档复核） | next: merge（T-08）
+
+**T-07 复审通过（实现 42e09ff1 + 规范 3c01b156）**
+
+- 文档复核：`git diff --stat 42e09ff1..3c01b156` = 仅 SD-01（+37/−19）；`git status` clean；无代码/测试/示例/025 改动。
+  - **D-01 ✅** 头注 `42e09ff1`，证据路径 `{t03,t03-scale,t04,t05,t07}`。
+  - **D-02 ✅** §2 改为「`/ 实际构建行数`」并写明 `View::Empty` 行丢弃与 `start + rows.len()`；锚点 `virtual_rows.rs:252`（`if views.is_empty()`）、`:274`（`rows.len() != plan.rows()`）、`:279` 逐行核对。
+  - **D-03 ✅** §2 改为 `CALIBRATION_ROWS` 只界定显式引导窗口、非通用标定上限，并写明测量侧 `virtual_list.rs:465,537` 的 256 行识别与误判条件（`start=0` 且 `ceil(band_bottom)=254`，算式核对）；`virtual_rows.rs:27` 未引用 const 如实记录。
+  - **D-04 ✅** `virtual_list.rs:118`（`visible_range`）、`:507`（`list_top`）、`tags_container.rs:182`（untracked 显式 scroll 压栈）逐行核对。
+  - **D-05 ✅** 达面已写明：View `SnapshotBuilder`（`snapshot_builder.rs:98-104`）出带 `height` 的 `Space`；rendered MCP 快照（`mcp_server.rs:5681` `build_aura_from_styled_vtree`，占位过滤 `:5718-5727`）无 `Space`；`t05/t05win/*.txt` 与 `t07/repair1{,b,c}/snapshot_*.txt` 复检均 0 条。
+  - **D-06 ✅** §7 计数与本轮实跑一致（lib 2706/2693/12 fail+1 timeout、`plan126_vlist` 18/18、`virtual_list` 37/37、`desktop_behavior` 11/11）；repair 三跑数值从原始日志复核（窗口构建 74/77/112、整表标定 20/20/23、`row_h` 28.80–29.32、顶窗 `[0,22)`、尾 `[93,120)`、clamp 2962、内容 3648.2–3710.6）；pre-repair `probe11` 保留为已标注基线；§8 同步。
+  - 全文复扫：无新过期/失实规范句；余下 `ce6d6234` 均为已标注的修复前基线，`[未取证]` 仅剩显式 `row-height` 实窗一项。
+- 验收：AC-01..AC-05 全 pass（行为证据沿用 `42e09ff1` 复审：`virtual_list` 37/37、`plan126_vlist` 18/18、关闭档 37/37、`plan081` 3/3、`scrollable` 9/9、`vnode` 47/47、`plan656` 1/1、`desktop_behavior` 11/11、全 lib 2706/2693/12+1 与基线同失败数；025 实窗顶/尾窗与 clamp 一致）。
+- 非阻塞观察：关闭对照数值（`t01/off10`）为修复前运行，但关闭路径未变；`virtual_rows.rs:27` 死 const 按决定保留并在规范中披露。
+- 状态：`execution_done`（按 lead 指定；review skill 的 final-pass→`reviewed` 由 merge 流程裁定）；T-06 勾选、`current_step: 6`；T-07 本次复审完成。
+- next: merge（T-08）——规范发布/归档/清场，无新增实现或回归门。
+
+2026-11-24 stage: merge | plan_id: PLAN-126 | plan_revision: 2 | outcome: pass | executor: merge session（DSH subagent `vlist-merge`）| delivery_commit: 8e31cd0e（父 `faf684c6`；master tip = delivery commit）| prep_base: 7f29547a | canonical_specs: `docs/specs/runtime/virtualized-list-rendering.md`（blob `7395fa09ae9d99b7f0ca36e7472599c55cc8ce29`，sha256 `145335F0F09966F60F60CCFB12DFDE81405E4C53C37808F3B84D74389B587CB3`，230 行）| archive_path: `docs/plans/archived/126-autoui-virtualized-list-render.md` | checkpoints: prepared、landed、canonical_verified、archived（cleaned 见下一条）| next: cleanup
+
+**T-08（merge）合并与归档**
+
+- 前提（prepared）：review 收据 `outcome: pass` 绑定 `plan_revision: 2` / `reviewed_commit: 3c01b156`（§9 上一条），T-01..T-07 完成、AC-01..AC-05 全 pass；冻结 delta = SD-01 单文件；实施树 `D:/autostack/.wt/ui-126/auto-ui` 工作树 clean，`wt-guard.ps1` 报 clean（无 reparse point）。
+- 同步与重放：master 自分叉点 `defc86d6` 前进 180+ 提交（PLAN-116/117/118/119 等），与本计划的 25 个文件**零重叠**；工作树内 `git rebase master` 8/8 提交**无冲突**。旧→新映射：`e491ab6a→03aeb320`、`e375863f→8e74b97f`、`41d6138a→492ef819`、`fbabf41d→a63fe761`、`ce6d6234→9e39828f`、`a2cc4bda→c82addde`、`42e09ff1→faf684c6`、`3c01b156→8e31cd0e`；`git range-diff defc86d6..3c01b156 7f29547a..8e31cd0e` = **8/8 `=`**（补丁等价）。分支携带的过期 `docs/plans/**` 未进入重放（分支本就不改这些文件，落主后保留 master 版；F-05 由此消解）。
+- 落主（landed）：`git merge --ff-only plan-126-dev` → `Updating 7f29547a..8e31cd0e`，25 文件 +3619/−17，**无 merge commit**；`git rev-parse HEAD` = `8e31cd0e`（= delivery commit），`git diff --stat 8e31cd0e HEAD` 为空。
+- 规范核验（canonical_verified）：落主提交含 `docs/specs/runtime/virtualized-list-rendering.md`，blob `7395fa09…` 与 `3c01b156` 版**逐字节相同**（sha256 `145335F0…`，230 行）；未写 `specs.json`/任何索引（索引由应用派生）。计划面 25 个文件相对 `3c01b156` 的全部差异仅为 master 侧 PLAN-119 的 3 个 `ace_*` 文件（`ace_node_desktop/ace_package_sfc/ace_source_prep`，非本计划面）。
+- 合入门（landing check）：机器上另有 PLAN-1068 `prepare-native` 编译在跑（cargo/rustc PID 660828/1031024，22:00 起），按 test-discipline 占用门**未启动竞争构建**；本计划代码/测试输入自 `42e09ff1` 未变且 rebase range-diff 8/8 全等 ⇒ 复用 `42e09ff1` 冻结门（`virtual_list` 37/37、`plan126_vlist` 18/18、关闭档 37/37、`plan081` 3/3、`scrollable` 9/9、`vnode` 47/47、`plan656` 1/1、`desktop_behavior` 11/11、全 lib 2706/2693/12 fail+1 timeout 与基线同失败数）作为落主验证，未重跑。**部署观察**：主检出 `target/debug` 最后写入 15:46（早于落主），`auto-ui-tool.exe` 未刷新——落主≠部署，本计划不做 release/重打包，下次日常验证构建即吸收 VList。
+- 归档（archived）：`docs/plans/126-autoui-virtualized-list-render.md → docs/plans/archived/126-autoui-virtualized-list-render.md`（`git mv`），frontmatter `status: archived`、`completion_kind: delivered`、`delivered_commit: 8e31cd0e`、`current_step: 8`；`docs/plans/README.md` 增补 126 状态行。归档件与 README 随合并簿记提交落主（非 untracked）。
+- 证据折叠：工作/review 记录原已内联 §8/§9；本轮再折入 rebase 映射、规范 blob/sha、落主与门禁结论。`plan-artifacts/plan-126/` 原始证据（415 文件 / 50,058,485 B：`t01/t03/t03-scale/t04/t05/t06/t07`、`research`、patch 脚本）在清场后整目录删除，registry 见 `.retention/policy.json`。
+- 保留（reviewed-and-accepted，合并期不修）：① 显式 `row-height` 普通列表的真实 iced/GL 实窗取证仍为 `[未取证]`（SD-01 已标注）；② 窗口化行无逐行 `BuildProbe`/debug-id 条目、无 `ForIter` 条目（按绝对 `index` 绑定）；③ `table-row` 丢样式（`convert_element.rs:1269`，`07871fb62` 起既存，两模式均受影响，非本计划缺陷）。
+- 批量回归到期检查：`auto-lang/docs/plans/.last-batch-regression.json` = `last_covered_plan_id 1126` @ `2026-11-23T00:03:39Z`；`126 % 5 ≠ 0` 且收据年龄 < 48h ⇒ **本轮不触发**（留给周期门）。
 
 ## 10. 待澄清事项
 

@@ -4,6 +4,12 @@
 
 [PLAN-109 CollectionView / Thumbnail（归档）](archived/109-collection-view-and-thumbnail.md) 已交付 r2。交付提交为 `a6b16627`。AssetBrowser 与 027 FileManager 已迁移共用包，Windows 原生 VM 和 Vue 已验收。Linux 两轨随统一 Linux 开发补验，见 [DEBT-011](debts.md#debt-011-collectionview-的-linux-平台验收)。见[组件扩展路线](../design/autoui/component-library-extension-strategy.md#33-共用资源视图接续)。
 
+## 运行期虚拟列表（2026-11-24 交付）
+
+| 计划 | 状态与交付 |
+|---|---|
+| 126 · VM 虚拟列表 | 已交付归档，8/8，交付 `8e31cd0e`。025 表体与显式 `row-height` 普通列表共用固定行高窗口化构建；同机 GL 同窗纯滚动 3.60×、刷新 2.57×，零回归。[交付收据](archived/126-autoui-virtualized-list-render.md) · [规范](../specs/runtime/virtualized-list-rendering.md) |
+
 ## U02–U06 交付状态（2026-11-22）
 
 按 AutoLang 980/1071 的原应用和 Widget 页逐项收 AV/Iced 与 A2Vue 证据。AutoUI 104 交 U02，105 汇总 U03，106–108 与 110–123 按下方归属交 U04–U06。共享代码按实际接口确定唯一修改方，后续消费者复用通过复审的版本。
