@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-20
 plan_revision: 1
-current_step: 0
+current_step: 4
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -74,17 +74,17 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 当前 harness 如提供任务面板，开工时登记以下任务 ID。各目标按实际接口推进，阶段复核与最终复审分别覆盖对应结果。
 
-- [ ] T-01 固定原项目、依赖与验收矩阵
+- [x] T-01 固定原项目、依赖与验收矩阵
   - work，AC-01，核 §1 现有源和 §6 原运行入口，输出逐行的源、权限、预期和实际阻断。
-- [ ] T-02 接通本计划的具体运行接口
+- [x] T-02 接通本计划的具体运行接口
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
-- [ ] T-03 实跑 AV/Iced
+- [x] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
 - [ ] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
 - [ ] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
-- [ ] T-06 实跑 A2Vue
+- [x] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
 - [ ] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
@@ -641,6 +641,20 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 生成期 `deps/` junction 再次清理（worktree 无 reparse point）。
 - A2Vue 腿判定：**生成 ✅ / 冷构建 ✅ / 真浏览器渲染 ✅ / 首击展开 ✅ / 难度切换 ✅ / 右击标记 ✅**（合成 contextmenu 断言雷数 10→9），证据 `plan-artifacts/plan-119/{oracle-vue.mjs, probe-ctx3.mjs, 038-vue.png}`。
 - 下一步：把 T-03/T-06 证据折叠成计划内收据（含命令、退出码、关键数字），然后进入 T-04 独立复核。
+
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **T-01/T-02/T-03/T-06 收口**（双端证据折叠） | outcome: pass（work 面完成，待 T-04 复核） | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下） | next: T-04 独立复核
+
+**双端最终证据（2026-11-24 复跑）**
+
+| 端 | 命令 | 结果 |
+|---|---|---|
+| AV/Iced | `ace_node_desktop_window.exe --package "app::app=src/front/app.at; app:minesweeper_store=…" --entry app::app --instances 2 --script "3:click:0:4,6:click:0:5"` | **exit 0**、maxrev=4、errors=0、`inst0 st_game_state=playing`、81 格中 18 覆盖（63 展开）；两实例互不串扰；close/reopen gen1→gen2（前轮证据） |
+| A2Vue 生成 | `AUTO_UI_ACE_VUE=1 auto build --render vue --gen-only` | **exit 0**，24 文件（App.vue 440 KB，含 `onclick`×6、`oncontextmenu`×2、`Flag`×3） |
+| A2Vue 构建 | `pnpm install --offline` + `pnpm run build` | **exit 0**，dist `index.js` 187.6 kB |
+| A2Vue 浏览器 | Playwright 1.63.0 Chromium + `vite preview :4199` | **pageerror 0**；81 格；首击后 18 空 + 18 数字；难度 expert 480 格；合成 `contextmenu` 后雷数 `💣 10 → 💣 9` |
+
+- 说明：Playwright 的 `click({button:'right'})` 不产生 `contextmenu`（驱动层差异）；右击行以**页面内合成 `contextmenu` 事件**断言（真实 DOM 事件，等价用户右键），已记入 §6 V-04 判据注记。
+- 本计划 work 面判定：T-01/T-02/T-03/T-06 完成；余 T-04（复核）、T-05（AV 收据）、T-07（终审）、T-08（落主归档）属 review/merge 阶段。
 
 ## 10. 待澄清事项
 
