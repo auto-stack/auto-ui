@@ -481,6 +481,19 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 仍报 `multiple store declarations per node`，且 `sfc-err.log` 未再生成 ⇒ 该错误的产生点已不在我们包装的 Err 分支，而在更内层（`checked_widgets::generate` / leaf 的另一次 entry 重写）。
 - 下一步：在 `checked_widgets::generate` 入口按同样判据落盘/跳过；或直接比对 AV `load_package` 与 SFC 生成器所用的 units 差异（AV 已被证明可用同一对单元跑通）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 双 store 源头进一步排除 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （无新增代码） | next: units 内部复制点（desugar_units / append_widget_packages）
+
+- 读码：`ace_package_sfc/checked_widgets.rs:33` 直接 `compile_age_package_widget_runtime(units, entry, …)`，**自身不做 prep** ⇒ 双 store 不是它产生的。
+- 现有 units 已与 AV 完全同形（entry 原始源 + `app::minesweeper_store`），而 AV `load_package` 用同一对单元可跑通 ⇒ 差异必在 SFC 路径**之前**对 units 的处理：`desugar_units`（`generate_package_sfc_with_root` 内）或 `append_widget_packages`。
+- 下一步单点：在 `desugar_units` 前后与 `append_widget_packages` 前后对 units 逐条落盘 store 计数（文件日志，不依赖 stderr），一次运行即可锁定复制点。
+
+**本轮结束时总体状态（供后续会话直接接管）**
+
+- AV/Iced 腿（T-03）：**六行全绿**并已复验——真窗 exit 0 / errors=0；首击 (0,0) 展开 63 格且 `st_game_state=playing`；右击标记 `flags_placed=1`、雷数 10→9；难度 expert（16×30/99 雷，486 标签）；重开回 ready；两实例 `inst0=playing` / `inst1=ready`；close/reopen `gen1 closed` → `gen2 open`。证据 `plan-artifacts/plan-119/{av-oracle-a, av-flag, av-diff, av-two, av-close, av-recheck}.json`。
+- 交付面代码：auto-ui `1a986a9c`+（prep 四件归一 + 栈→队列 + lane 路由/幂等）、auto-lang `412f1de13`+（`Effect` 展开 + 可发射集合放宽），临时诊断已清零（§ 早前登记项已完成）。
+- A2Vue 腿（T-06）：卡在包面 SFC 生成器的 `multiple store declarations per node`；已排除组件面边界、二次 prep、checked_widgets 三处，剩 units 内部复制点。
+- 尚未开始：T-04 独立复核、T-05 AV 收据、T-07 终审、T-08 落主归档。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
