@@ -179,6 +179,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 另否证两条假设：①把 store 单元里 prep 合成的 `type BoardRow` 摘除（只留入口单元副本）→ 仍拒；②两组循环各自即拒（上一轮已证），但当轮镜像形状又全过 ⇒ **不是构造级缺口**，是 `Reveal` 这一整条 transition 的**组合/规模**面。
 - 下一轮判据（避免 isolate 替换工件）：把 prepared 入口单元裁成 **Reveal-only** widget（只留 `msg { Reveal }` + 该 handler + 最小 view），直喂 live 编译；过则逐块回加，失败则继续在单 handler 内二分。若最终确认为规模/组合面，则按 §10 记 G5 语言面裁定请求（live transition 的规模上限或多次列表写入的组合限制）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-02 Reveal-only 裁面 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@fd797c39） | commit: （无代码改动） | next: T-02 续（Reveal-only 面内二分）
+
+- 裁面实验（`plan-artifacts/plan-119/app-reveal-only.at` + prepared store）：入口单元只留 `msg { Reveal(int,int) }` + `.Reveal` handler + 最小 view → live 编译**仍拒**（`cannot emit a checked widget transition for handler Reveal`）。
+- 结论：闸门在**单条 Reveal transition 内部**，与其它 handler/消息/view 无关；后续二分可在这一更小面上做（`P119_LIVE_FILE` + `P119_LIVE_SWEEP=leaveone-ready/prefix`），不必再改整个应用。
+- 余量与下一步：在 Reveal-only 面上重跑子集掩码，确认「布雷组 vs 邻接组」哪个单独即拒，并把该组按其内部语句（含 `.set` 目标记录字段数、`%`/`/` 下标算术、`.board[idx].mine` 读）逐项替换成镜像探针已验证的等价形；若单组内仍无法定位，则按 §10 报 G5（live transition 组合/规模面）裁定。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
