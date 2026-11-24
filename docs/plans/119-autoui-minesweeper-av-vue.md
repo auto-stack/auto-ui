@@ -348,6 +348,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 与 VM 已钉 oracle 对照：首击展开、标记计数、难度几何（16×30/99 雷）逐项一致；确定性雷位表未逐格比对（AV 侧以“展开格数 + 状态机”为判据，属 §6 V-03 允许的等价观测）。
 - **交付前必做**：清理 `P119DBG` 共 10 处临时诊断（widget_runtime 2、project 3、age_component 3、frame 1、ace_node_desktop 2），并复跑受影响用例。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 临时诊断清理完毕，AV oracle 复跑通过 | outcome: pass | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下：两树 chore 提交） | next: T-04 独立复核
+
+- `P119DBG` 全部 10 处已移除（widget_runtime 2、project 3、age_component 3、frame 1、ace_node_desktop 2），保留两处真实修复（`Effect` 展开、可发射方法集合放宽）。
+- 清理后真窗复跑：`3:click:0:4` → exit 0、maxrev=3、errors=0、`st_game_state=playing`（首击展开仍成立）。
+- 待 T-05/T-08 前完成的闸门：auto-lang 受影响组回归（`cargo t ace` 类）、auto-ui 受影响测试（`ace_source_prep::` 等），以及 A2Vue 腿（T-06）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
