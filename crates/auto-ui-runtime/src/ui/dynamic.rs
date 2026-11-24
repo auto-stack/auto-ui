@@ -3733,12 +3733,16 @@ impl DynamicComponent {
             self.dirty = true;
             return;
         }
-        // PLAN-112 T-09：store/事件 handler 默认走片派发（AUTO_CPU_LEGACY=1 回退
-        // 同步段入口）。片预算耗尽时 handler park 成 CpuRunnable，帧泵在后续帧
-        // 续驱——UI 线程不再被长 handler（025 的 Refresh：system_snapshot + 排序）
-        // 占满。收尾（emit 路由/实例回调/脏标记/路由参数）在真正完成时执行一次。
-        let cpu_legacy = std::env::var("AUTO_CPU_LEGACY").ok().as_deref() == Some("1");
-        if !cpu_legacy && !clean_name.starts_with("__") {
+        // PLAN-112 T-09：片派发（AUTO_CPU_ASYNC=1 显式开启）。
+        //
+        // 默认仍走同步段入口：片派发在「空闲应用 + 定时器 handler」上会被
+        // 帧泵饿死——`poll_frame_pump` 只在 present（帧）时运行，而 handler
+        // park 后应用空闲不再出帧，pending 片永远等不到续驱（025 实测
+        // Tick/Refresh 后 tickN 冻结在 1）。片派发对用户点击类交互是可用的
+        // （消息泵 8/8 → 0/8 已实证），但默认开启需要先让帧泵在「有 parked
+        // 片」时自唤醒/自出帧；那属 T-09 的后续接线，不在本切片内。
+        let cpu_async = std::env::var("AUTO_CPU_ASYNC").ok().as_deref() == Some("1");
+        if cpu_async && !clean_name.starts_with("__") {
             let had_cpu = self.bridge.has_cpu_continuations();
             let res = self.bridge.call_handler_for_cpu_slice(
                 &emit_widget,
