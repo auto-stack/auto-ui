@@ -910,7 +910,7 @@ pub fn prepare_component_source(
     // PLAN-118：包面目标的 str→Str 注解归一（内联 fn 已前置，最后统一跑；
     // model 块早被 rewrite_model_text_fields 覆盖，此处恒等）。
     if package_face_target {
-        out = rewrite_str_surface_for_package(&out, true);
+        out = rewrite_str_surface_for_package(&out, false);
     }
     // PLAN-118：canvas 场景合成名归一——`scene: .cells`（cells 非 model 字段，
     // 五平行列表 `<名>_pts/_meta/_nodes/_edges/_labels` 是）改写成串 prop
@@ -1249,7 +1249,7 @@ fn rewrite_str_split(src: &str, need: &mut bool) -> String {
     out
 }
 
-const STR_SPLIT_COUNT_HELPER: &str = "fn __p117_str_split_count(hay Str, mark Str) int {
+const STR_SPLIT_COUNT_HELPER: &str = "fn __p117_str_split_count(hay str, mark str) int {
     var n int = 1
     var i int = 0
     for i + mark.len() <= hay.len() {
@@ -1263,7 +1263,7 @@ const STR_SPLIT_COUNT_HELPER: &str = "fn __p117_str_split_count(hay Str, mark St
 ";
 
 // `.replace(mark, repl)` 全量替换（首个匹配起循环扫描；标量词汇）。
-const STR_REPLACE_HELPER: &str = "fn __p117_str_replace(hay Str, mark Str, repl Str) Str {
+const STR_REPLACE_HELPER: &str = "fn __p117_str_replace(hay str, mark str, repl str) Str {
     var out Str = \"\"
     var i int = 0
     for i < hay.len() {
@@ -1284,7 +1284,7 @@ const STR_REPLACE_HELPER: &str = "fn __p117_str_replace(hay Str, mark Str, repl 
 }
 ";
 
-const STR_SPLIT_AT_HELPER: &str = "fn __p117_str_split_at(hay Str, mark Str, want int) Str {
+const STR_SPLIT_AT_HELPER: &str = "fn __p117_str_split_at(hay str, mark str, want int) Str {
     var piece Str = \"\"
     var idx int = 0
     var i int = 0
@@ -2223,8 +2223,10 @@ mod plan118_tests {
     return t
 }
 ";
-        let out = rewrite_str_surface_for_package(src, true);
-        assert!(out.contains("fn f(ps Str, n int) Str {"));
+        let out = rewrite_str_surface_for_package(src, false);
+        // 形参保持借用 `str`（owner 位；改 owned 会把调用变 move+读）；
+        // 返回注解与 `var` 局部归一为 owned `Str`。
+        assert!(out.contains("fn f(ps str, n int) Str {"));
         assert!(out.contains("var t Str ="));
     }
 }
