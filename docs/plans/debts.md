@@ -248,3 +248,10 @@
 - **状态**为待补验。Linux native VM 与 Linux Vue 均记录为 `not_run`。
 - **责任方**为 AutoUI 统一 Linux 开发与验收。
 - **关闭条件**为在 VMware 的目标自制发行版上按 109 的 V-01…09 运行适用用例，分别验证独立组件、027 FileManager、AssetPicker 和 029 Gallery。保留真实窗口或浏览器、MCP 操作、实际状态读回、失败清理、退出重开的证据，记录工具和源码版本。
+
+## DEBT-012 MCP 快照同步的按需/限流（PLAN-112 T-10）
+
+- **来源**为 PLAN-112（2026-11-24 用户提出，计划内立项为 T-10，交付时移交）。
+- **现状**：`crates/auto-ui-runtime/src/ui/iced/renderer/projection.rs` 的 MCP 同步块在 `view_dirty` 时每脏帧重建整棵 AURA 快照 + state（313 行时约 100KB）。T-09 后实测：025 消息泵最坏 `WM_NULL` RTT 默认 631ms、`P530_NOMCP=1` 378ms——约占最坏帧 40%。
+- **责任方**为 AutoUI runtime（MCP 快照同步）。
+- **关闭条件**：改成按需（有 MCP 客户端请求才重建）或 500ms 限流（与既有「至多 500ms 陈旧」契约一致），保留 `P530_NOMCP=1` 诊断开关；用例覆盖无客户端/静止零重建与快照新鲜度 ≤500ms；025 最坏 RTT 复测记录在案。
