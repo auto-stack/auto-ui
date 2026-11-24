@@ -166,6 +166,25 @@ r1 基线 Git blob `c667888299e6fb283f23233b13532a77b665605e`。r1 的 AC-02 承
 
 2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 1 | from: drafting | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: 2e9c5dcf | next: work
 
+2026-11-24 stage: work | PLAN-126:r2 | outcome: in_progress（T-03 骨架落地，端到端激活未验证） | plan_revision: 2 | worktree: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | code_commit: e491ab6a | dependencies: auto-lang 816585732、auto-web 0cfc7c7、auto-down 456c86a | tasks: T-03（进行中） | next_responsible_role: work（T-03 续）
+
+**T-03（进行中）已落地**
+
+- `vm_bridge`：新增 `list_len_of(&Value)` / `list_get(&Value, i)`——四种列表表示（`Array` / 堆 `ListData<Value>` / 堆 `ListData<i32>` / `VmRef`）的 O(1) 长度与单元素读取，保留容器读依赖记录（`record_dep_any`）。
+- `View` 新变体：`SpacePx { width, height }`（f32 高度占位，绕过 `Container.height: Option<u16>` 的 65535px 上限）与 `VirtualMark { key, child }`（零布局构建带标记，投影为 `vlist_mark:{key}` 合成 iced id）。全部穷尽匹配点（projection/vnode_converter/coverage/snapshot/devtools/rq_probe/map_msg）已补齐，能力分母同步为 `cap.view.space_px` / `cap.view.virtual_mark`。
+- 新增 `ui/virtual_list.rs`：环境开关 `AUTOUI_VIRTUAL_LIST`（缺省启用、`0` 关闭）、诊断 `AUTOUI_VLIST_DIAG`、纯函数 `visible_range`（含 out-of-view/夹紧/退化输入 11 条单测，全部通过）、进程级几何台账（pane 偏移/视口/内容高 + 构建带 rect → 反解 `row_h`/`list_top`）、`VListProbe`（一次遍历收 pane 与 mark）、消息 `__vlist_measure`。
+- 构建侧 `aura_view_builder/virtual_rows.rs`：pane 作用域（线程本地栈，child-widget builder 共享；`overflow-y-auto`/`overflow-auto` 列与 `scroll` 元素压栈，Drop guard 出栈）、`try_virtual_for`（解析可索引数据源 → 台账几何 → 窗口构建 `[start,end)` + 首尾 `SpacePx` + `VirtualMark`；无几何时做一次「顶部 ≤256 行」标定构建）。挂接 `convert_node_with`、`convert_for_unkeyed`、`convert_for_keyed` 与 tracked 列双胎。
+- host：每帧按请求位推 `VListProbe`，`__vlist_measure` 回执落台账（不脏帧、不派发 VM）。
+- 编译与单测：`cargo check -p auto-ui-runtime --lib --tests --features ace-bridge` 通过；`nextest --lib virtual_list` 11/11 pass。提交 `e491ab6a`。
+
+**遗留（下一轮必须先解决）**
+
+1. 实窗（vlist3）证明机制未端到端生效：`[VLIST] measure panes=0 bands=0`（probe 收不到 `vlist_mark:` 容器），快照仍是 120 行、无 `Space` 占位。需定位 `VirtualMark`→container id 是否进入 iced 树、probe 是否在窗口化树上运行（猜想：MCP 轨与生产轨各自建树，probe 只遍历其一）。
+2. 观察到的异常：同一轮里 `s4 element` 中位 12.6ms（基线 104ms 均值）与个别快照只剩 2 行，说明窗口/标定路径偶发走进错误几何；修复 probe 后需重跑基线协议确认行数与滚动范围。
+3. 未做：普通列表 fixture（`row-height` 显式入口）、V-01 规模样本（1,000/10,000 行）、V-02 视口用例、`AUTOUI_VIRTUAL_LIST=0` 对照取证。
+
+2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 2 | from: executing | to: executing | status: executing | outcome: in_progress | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: e491ab6a | next: work
+
 ## 10. 待澄清事项
 
 - **Q-01 排序**。将排序移出 UI 线程是原始需求中的独立工作。由后续计划根据 AutoLang 与 025 实际排序路径确定边界，PLAN-126 可以独立推进。
