@@ -434,6 +434,15 @@ impl Operation<VListMeasure> for VListProbe {
 
     fn container(&mut self, id: Option<&Id>, bounds: Rectangle) {
         if let Some(id) = id {
+            if diag() {
+                let dbg = format!("{id:?}");
+                if dbg.contains("vlist") || dbg.contains("aura_0") {
+                    eprintln!(
+                        "[VLIST-PROBE] container id={dbg} rect=({:.0},{:.0},{:.0}x{:.0})",
+                        bounds.x, bounds.y, bounds.width, bounds.height
+                    );
+                }
+            }
             if let Some(key) = Self::key_of(id, MARK_ID_PREFIX) {
                 self.out
                     .bands

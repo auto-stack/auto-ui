@@ -144,12 +144,12 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
             // `vlist_mark:{key}`，operate 期上报内容空间 rect（行高/列表起点反解）。
             AbstractView::VirtualMark { key, child } => project_widget(|| {
                 let el = child.into_iced();
+                let mark_id = format!("{}{}", crate::ui::virtual_list::MARK_ID_PREFIX, key);
+                if crate::ui::virtual_list::diag() {
+                    eprintln!("[VLIST-MARK] projecting id={mark_id}");
+                }
                 iced::widget::container(el)
-                    .id(iced::widget::Id::from(format!(
-                        "{}{}",
-                        crate::ui::virtual_list::MARK_ID_PREFIX,
-                        key
-                    )))
+                    .id(iced::widget::Id::from(mark_id))
                     .padding(0)
                     .width(iced::Length::Fill)
                     .into()
