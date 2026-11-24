@@ -268,6 +268,15 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 11 | from: work | t
 
 stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 12 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: -(无源码改动) | next: work/T-02（R-12）
 
+2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-12 闭合（动态列表字段的状态访问器）+ R-13 新开 | outcome: pass | worktree_path: `D:/autostack/.wt/ui-116/auto-lang`（`plan-116-dev`） | base_commit: `auto-lang 7d579aab4` | code_commit: `auto-lang bcc955fae`（`auto-ui` 未改） | task_ids: T-02 | evidence: `plan116_store_list_view`（翻转正例）、`plan-artifacts/plan-116/probes/r12b-20261124/`
+
+- **真因（前两轮诊断的落点）**：包前门 `cst/frontdoor.rs` 在发射 `__age_state_*` 时对**所有** `[` 开头字段 `continue`；而子 widget 视图由 `ace_av::evaluate_widget_view` 以 `widget_view_fn_name_at(node, instance)` + **只传 inputs** 求值（状态通道），列表字段没有访问器 → 循环无通道可调 → 语义层报"不能观察"。
+- **改法（两处，最小）**：① 动态 `[]T` 也发访问器（定长 `[N]T` 仍不发，`package_field` 守卫也只拦定长）；② `model_type` 对"动态列表拼写 + **空字面量**初值"取包面动态缺省（裸 `List` → `List(Dyn)`）——声明型 `List<T>` 与空字面量推出的 `List(Dyn)` 会在模型构造与循环处双报 `expected list, found list`，这是本轮第二个真因。
+- **验证**：`plan116_` 全 **26/26**（R-12 由钉住翻正例）；`ace-core` conformance **942 passed / 5 failed**（同一 5 项既有红）；**030 闭包越过该阻**，前进到 R-13（`unknown module stylekit.styles`）。020 仍 R-05。
+- **R-13 新开**：`playlist.at` 的 `use stylekit.styles: caption_text` 引用的模块不在包输入里；需确认供给方（宿主 stdlib 单元 / 计划侧 / 语言侧），并与 020 的 `use themes.themes` 一并核对。
+
+stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 13 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: bcc955fae | next: work/T-02（R-13 / R-05）
+
 ## 10. 待澄清事项
 
 **B-03 已裁定（2026-11-24，本计划自有工作树内闭合）。** 原 A/B 选择的前提是"`PLAN-117` 正在 `auto-lang` 同一写面上持续改动"，该前提已随 117/118 双仓落主归档而消失；`README.md` 交付表现指示"在 117 后的基线复测，再按残余缺口处理 B-03"。`/goal` 授权的实施树本就含 `auto-lang`（见 §4），故无需再次拍板：**按残余缺口逐项闭合，目标/验收/范围/仓集不变**。若任一缺口经定位后需要改动已冻结的共享语义或超出本计划仓集，再按 §5 停下请示。
@@ -283,7 +292,8 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 12 | from: work | t
 | R-04a | 跨单元 store 导入（`use player_store: PlayerStore` + `.store.<field>`/`.store.<Msg>()`） | `packages`/`inline_store_decl` | **已闭合**（`auto-lang 78b916591`）：导入链在包面生效；**只写 `on`、无 `msg` 块**的 store（020 形态）按 handler 参数注解补出消息声明（无注解仍具名拒）。回归 `plan116_store_import` 2 正例 + 1 负控。 |
 | R-04b | **无类型/动态 store 字段**（`var playlist = []`，030 写它） | `age_component` store 投影 | **已闭合**（2026-11-24，`auto-lang 174c6646b`）：无类型且初值恰为 `[]` 的 store 字段投影为**可变集合字段**（`ty = "List"`，元素型沿用 117 round-20 的 `List(Dyn)` 缺省）；定型判定先于初值投影（无类型初值是 `age-view-data-lit` 原始文本节点，`project_expr_sync` 不承载）。其余无类型形态仍按只读跳过（负控钉住）。回归 `plan116_store_import` 5/5；**真实效果**：030 闭包由 `undeclared model field playlist` 前进到 R-03。 |
 | R-05 | 020 内部未定位构造（`020/app.at` 报 `expected fn, found widget`，但最小 `widget` 包项可解析 → 错误定位在项首，真因在项内） | 待定位 | **已定位（未闭合）**：真因是 `.Init` 里**裸名赋值 + 跨行字符串**（`pins = pins + "…⏎"`，闭合引号独占一行）。最小复现 `plan116_app_init_gap`：该形→拒绝；同一字符串写在 `.field = …` 位→通过。已排除：字符串内容、`var` 声明、`.store` 绑定、`unbracketed expression cannot continue across a newline` 守卫（插桩实测未命中）。 |
-| R-12 | 包面视图**观察括号列表 model 字段**（`var groups []str = []` → `for g in .store.groups`） | `age_component`/`live_view` 视图观测 | **阻（三次实验已排除三条路）**：① 与 store 内联无关（widget 自己的 `[]str` 同样被拒）、与**拼写**有关（裸 `List` 不被守卫拦但同样缺访问器）；② 拒绝来自 `ViewScope::with_binding`（发射通道）→ 检验通道加占位无效；③ **包运行时路径 `widget_runtime::add_model` 本来就用 model 绑定**（`runtime_model_param` 只看 `fields` 非空，列表字段天然可读）——真正拦路的是 `live_view::add_widget_views` 这**第二条**视图发射（子 widget 渲染走 `state_at` 状态通道，而列表字段按设计无状态函数）。下一步须确认包路径 `__age_state_*` 函数的**发射归属**（`compile_age_component` 是否对包单元运行；`state_functions_present` 在 `bound.origins` 里找 `_at` 名），再决定给列表字段铸访问器还是让 live_view 也用 model 绑定。三处实验均已回退，未留半成品。 |
+| R-12 | 包面视图**观察括号列表 model 字段**（`var groups []str = []` → `for g in .store.groups`） | `age_component`/`frontdoor` 状态访问器 | **已闭合**（2026-11-24，`auto-lang bcc955fae`）：包前门原本对**所有** `[` 开头字段跳过 `__age_state_*` 访问器发射，而子 widget 视图由 `evaluate_widget_view` 只传 inputs（状态通道）求值——循环因此无通道可调。改为：动态 `[]T` 也发访问器（定长 `[N]T` 仍不发/仍拒）；`model_type` 对"动态列表拼写 + 空字面量初值"取包面动态缺省（裸 `List` → `List(Dyn)`），与空字面量自身推断一致（否则 `expected list, found list`）。回归翻转成正例；030 闭包越过该阻。 |
+| R-13 | 包面 `use stylekit.styles: <name>`（030 `playlist.at` → `unknown module stylekit.styles`） | 包闭包的模块供给（auto-ui/host 侧？） | **新开**（R-12 闭合后 030 闭包首阻）：`playlist.at` 顶部 `use stylekit.styles: caption_text` 引用的模块不在包输入里。需确认该模块由谁提供（宿主 stdlib 单元 or 计划侧供给），以及 020 的 `use themes.themes` 是否同族。 |
 | R-06 | 视图**空参回调**（`020/controls.at` `expected expression, found ')'` @148） | `ace-core` cst/grammar（view 属性位） | **已闭合**（2026-11-24，`auto-lang 563ee47de`）：`age-event-binding` 增显式空参数表臂（`age-event-binding-args-empty`，两面同开，镜像 118 的 handler 空参数）；**零作者实参**投影为裸消息引用（宿主供载荷），不是零实参方法调用——否则与消息载荷 arity 相撞。020/controls 越过该行。 |
 | R-10 | 视图 `if` 条件取**裸标识符**操作数（`if item.rel_dir == g {`） | `age-view-if` 条件面 | **已闭合**（2026-11-24，`auto-lang f59821dec`）：条件从裸 `pratt` 改走 `if-cond`（与 `age-on-if` 同一条件面）——此前 ident 后的 `{` 被当结构字面量吞掉整个分支体，整项回退。030/playlist 的分组过滤形。 |
 | R-11 | 包面视图回调的**作者实参**（`onclick: .SelectIndex(i)`） | `age-entry-value`/`age-event-binding` | **已闭合**（`f59821dec`）：包面 `age-entry-value` 在占位臂之后增通用 `age-event-binding` 臂（`$event`/`$0` 仍先匹配），作者实参投影为 self 方法调用、实参保留（与组件面同语义）。 |
@@ -293,4 +303,4 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 12 | from: work | t
 
 **基线观察（非本计划引入，未修）**：`experimental/ace/aac/syntax/syntax_grammar_data.at` 在计划基线上**已与 `grammars/auto-source.at` 不一致**——`aac1046_grammar_data_identity_binding` 在未改动的 `auto-lang bced4dd79` 上即红（committed 344,941B vs 原始语法重生成 356,995B，约 12KB 漂移）。因 `ace-core` 由语法**源**编译（`cst/frontdoor.rs` `AUTO_SOURCE_GRAMMAR = include_str!(…)`），`auto-ui`/AV 面不依赖该数据文件，故本轮只改语法源与 Rust 侧，**不采纳**整份重生成（否则会静默重冻结全部 13 个 profile id 并引入未复核的上游漂移）。该漂移属 Auto 侧孪生（aac）的数据归属，需其 owner 重生成时一并纳入 `age-on-return`；证据 `plan-artifacts/plan-116/probes/r01-return-20261124/{control-data.posix.log,data-with-return.at}`。
 
-**下一步**：R-12（列表字段运行时观测通道，现为 030 闭包唯一首阻）与 R-05（020 裸名赋值的行敏感面）。每项一个最小正例 + 负控；两者闭合后重跑 `plan116_t01_package_diag_probe` 与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
+**下一步**：R-13（`stylekit.styles` 模块供给，现为 030 闭包首阻；与 020 的 `themes.themes` 同族待核）与 R-05（020 裸名赋值的行敏感面）。R-13 若属宿主/包输入供给，可能只需在 auto-ui 侧接通而非语言改动。两者闭合后重跑 `plan116_t01_package_diag_probe` 与 `plan116_t01_probe`，再进 T-03 真窗实跑原样 020/030。
