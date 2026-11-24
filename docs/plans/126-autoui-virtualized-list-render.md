@@ -6,7 +6,7 @@ author: [lead]
 created_at: 2026-11-24
 updated_at: 2026-11-24
 plan_revision: 2
-current_step: 3
+current_step: 4
 total_steps: 8
 depends_on: [auto-ui/PLAN-112]
 supersedes_spec_components: []
@@ -119,8 +119,9 @@ T-03/T-04 建立 V-01..V-03 和 V-05 所需的定向 fixture。T-01 准备绑定
 - [x] T-03 实现固定行高 VirtualList
   - **work**。依赖 T-02。接入 VM 展开前的区间入口和 Iced 布局，完成 `AUTOUI_VIRTUAL_LIST=0` 对照和普通列表 fixture。按 V-01 验证底层取行、构建和布局三个维度。覆盖 AC-01、AC-02。
   - 结果：pass。025 实窗窗口化 `[0,22)…[93,120)`、`row_h=28.97 list_top=176.20`、内容高≈3669、clamp 不变（`41d6138a`）；显式 `scroll (row-height: …)` 入口 + 1k/10k fixture：窗口化两侧均 31 行/37 vnode/3 layout nodes、0.43–0.75ms，关闭对照 1003/10003 vnode、12.8/125.6ms（`fbabf41d`）；V-02 六例 PASS。见 §9。
-- [ ] T-04 接通 025 与行交互
+- [x] T-04 接通 025 与行交互
   - **work**。依赖 T-03。让 025 的表体接入共享组件，使用既有视口，保留表头布局与排序入口。验证滚动、缩放、点击、右键和排序后的 PID，补齐普通列表正反对照。覆盖 AC-01、AC-04。
+  - 结果：pass。真实树目标 + 三条独立 PID 证明（handler 载荷 / `selected_pid` / `tasklist` oracle）在 offset 0、滚动到 2400、按名重排后均一致；滚出窗口的旧行 id 不可命中（`VNode not found`）；修掉同帧兄弟 pane 共用 scope key 的隔离缺陷（`ce6d6234`）。右键菜单在窗口内不可编程驱动（MCP 无 context-menu 动作、OS 输入不可达），以构建期单测 + 标注的 fixture 注入取证。见 §9。
 - [ ] T-05 验证规模、交互和性能
   - **work**。依赖 T-03、T-04。运行 V-01..V-05 的 work 验证，登记样本、计数、差值、未观测项及诊断。原始证据写入 `D:/autostack/plan-artifacts/plan-126/`，结果摘要写入 §9。覆盖 AC-01..AC-04。
 - [ ] T-06 准备规范与复审收据
@@ -234,6 +235,21 @@ r1 基线 Git blob `c667888299e6fb283f23233b13532a77b665605e`。r1 的 AC-02 承
 - 遗留（T-04/T-05）：tracked 轨窗口行经 untracked 转换构建，逐行 `BuildProbe`/debug-id 条目（及窗口内行点选 PID）仍缺，025 同款；显式 `row-height` 列表的实窗 GL 验证需要 harness 应用源（examples 不在本计划范围）；固定行高在换行双行处仍有 +21px/行漂移；Vue 生成器无窗口化/row-height 提示。
 
 2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 6 | from: executing | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: fbabf41d | next: work（T-04）
+
+2026-11-24 stage: work | PLAN-126:r2 | outcome: pass（T-04 完成，T-01..T-04 已闭） | plan_revision: 2 | worktree: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | code_commit: ce6d6234 | tasks: T-04 | next_responsible_role: work（T-05）
+
+**T-04（pass）025 行交互与实例隔离**
+
+- 方法：真实树目标（`autoui_snapshot(include_bounds)` 取行 `vnode_*` → `autoui_action press`），PID 三路互证：handler 载荷 `ProcessesView.SelectProc␟i␟<pid>`、`autoui_state.selected_pid`、独立 `tasklist` oracle。脚本 `plan-126/t04/t04_interact.py`（39/40 检查通过，69s；1 项为已标注的环境限制）。
+- 结果：offset 0（窗口 `[0,22)`）`explorer.exe`→7360、窗口底行 `sccache.exe`→1069196、`python.exe`→240744；滚动到 2400（窗口 `[74,105)`，31 行）`conhost.exe`→22952、顶边 `chrome.exe`→27156、底边 `vmcompute.exe`→8920——无错位 PID；**旧窗口行 id 不可命中**（`Error: VNode not found: vnode_…`），选中态不变；按名重排后 `WmiPrvSE.exe`→8548、`WindowsTerminal.exe`→31472 跟随新顺序。
+- 右键：`oncontextmenu` 与点击同 PID 由构建期单测证明；窗口内不可编程驱动（MCP 无 context-menu 动作、OS 合成输入不能进窗——`SetForegroundWindow` 失败、行中心合成左键不选中），菜单路径以标注的 `autoui_fixture` 注入取证（`ctx_open=true`、菜单可见、`CloseCtx` 关闭）。登记为宿主能力缺口，不改本计划合同。
+- 实例隔离修复（AC-04）：同帧兄弟 pane 曾共用 `vlist_0`——旧 `pop_scope` 在「栈空」时清零计数，两个兄弟 `scroll (row-height:)` 抢同一台账（120/60 行实测 `last_plan("vlist_0").total==60`）；改为帧级编号（`virtual_list.rs:184` `enter_build_frame()`、`push_scope` 只递增、`pop_scope` 不清零，两处构建入口 `aura_view_builder/mod.rs:455,515` 装）后 025 仍单 `vlist_0`，几何不变。
+- Probe 对齐：未实现并如实记录——窗口行经 `try_virtual_for`→untracked 转换构建，无 `for`/debug-id 条目；诚实条目需把 VTree 路径（`path+[band_idx, i-start]`）穿进该臂，否则会伪造。025 不受影响（其 `table-row` 本就委托 untracked `convert_element`）。以 `plan126_vlist_windowed_rows_have_no_for_probe_entries` 钉住。
+- 测试：新增 `ui_tests/plan126_vlist_interact_tests.rs`（绝对索引点击/右键参数 `[23,54)`、数据源重排后参数跟随、双 pane 隔离、窗口行 vnode 路径可解析、probe 缺口刻画，均 <1s）；`plan126_vlist` 14/14、`virtual_list` 33/33、`plan081` 3/3、`scrollable` 9/9、`vnode` 47/47；全 lib 2691/2702，11 项既存失败（其中 8 项在 `fbabf41d` 干净树同样失败）。
+- 另记（先于本计划的缺陷，不在本计划修）：`table-row` 生成 `View::Row{style: None}`（`convert_element.rs:1269`），025 行高亮样式在 VM 轨两模式下都被丢弃；状态半边（`selected_pid`）正常跟随。纳入 V-05 兼容回归观察项与后续债务记录。
+- 证据：`D:/autostack/plan-artifacts/plan-126/t04/README.md`（`final4/`、`final4_stdout.txt`、`t04_interact.py`、`t04_diag.py`）。
+
+2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 7 | from: executing | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: ce6d6234 | next: work（T-05）
 
 ## 10. 待澄清事项
 
