@@ -27,6 +27,12 @@ use crate::rust_ui::{probe_service_ready, start_api_server, stop_api_server, Pac
 /// 消费）；legacy CLI 与宿主钩子同走本口。
 pub fn run_entry_file(path: &str) -> auto_lang_core::AutoResult<String> {
     auto_web::install_http_service_host_if_absent();
+    // PLAN-112: VM 合并模式的结束进程授权门——必须在解释器（=VM 构造期
+    // 快照宿主能力）之前按宿主策略登记。非法策略具名中止，不静默退回无门；
+    // 未设置/allow-all = 迁移前无门行为逐字不变。
+    auto_ui_runtime::vm_sys_kill::install_vm_sys_kill_gate_from_env().map_err(|error| {
+        auto_lang_core::error::AutoError::Msg(format!("sys kill policy: {error}"))
+    })?;
     let launch = auto_lang_core::vm::host_capabilities::http_service::current_http_service_launch();
     let code = std::fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
     if auto_ui_runtime::has_ui_keywords(&code) {

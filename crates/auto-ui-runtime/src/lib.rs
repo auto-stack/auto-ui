@@ -25,6 +25,10 @@ pub mod host_adapters;
 // T-04 随 UI 运行域迁入（media/photo 服务面，photo_service 残边清偿=T-06）。
 pub mod back_proxy;
 
+// PLAN-112: VM 合并模式的结束进程授权门（宿主策略 → core SysKillGate；
+// 与 back_proxy 的 HTTP 会话门分属两条调用链）。
+pub mod vm_sys_kill;
+
 // PLAN-814 T-04：UI 动态构建管线（原 auto-lang lib.rs Plan 015 UI glue 区
 // 整体随迁）——collect_module_imports 模块装载链 → build_dynamic_component
 // → run_file_dynamic_ui。公开面经 crate 根再导出，旧 crate 根路径不变。
