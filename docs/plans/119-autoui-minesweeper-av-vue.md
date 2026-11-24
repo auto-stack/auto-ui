@@ -510,6 +510,18 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 本轮不新增代码：卡点已收敛为**单单元 package 投影对一条 store 声明报 multiple**，需要一次带落盘的实测（prepared 源 store 行数 + widget 头位置 + `node.stores.len()`），不应在无新证据时继续盲改。
 - 下一轮唯一动作（已定）：在 `generate_linked_front_sfc` 回退分支内落盘这四项，再据实修正（可能是 package 投影把“同源 store + store 类型声明”算成两条，或 prep 在 package profile 下重复入列）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **根因坐实——一条 store 声明被包面挂成两条** | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: frontdoor 双追加的修法（auto-lang）或 auto-ui 侧绕过 package_candidates
+
+**实测（`plan-artifacts/plan-119/fallback.log`）**：
+```
+len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
+```
+即 prepared 源里**只有 1 条 `store` 声明**，`package_candidates`（包面投影）却报「multiple store」⇒ 包面 frontdoor 对**同源前置 store** 做了两次挂载（`project_component_nodes` 已把前置 store 归到首个 node，随后 `first.stores.append(&mut stores)` 再追加一次），`inline_store_decl` 遂见 `len()==2` 而具名拒。
+
+**两条修法**：
+- A（正解，auto-lang `cst/frontdoor.rs` 包面路径）：追加前按名去重（若 `first.stores` 已含同名 store 则只保留一条）。一行级改动 + 回归。
+- B（auto-ui 绕过）：A2Vue lane 不走 `generate_linked_front_sfc`（其首部 `package_candidates` 必踩此坑），直接用 units 调 `generate_package_sfc_leaf`/`generate_package_sfc_with_root`（AV 同形已证可用）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
