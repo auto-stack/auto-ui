@@ -393,6 +393,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 由于 lane 输入已是 prep 后（含 `store MinesweeperStore { … }` 与各 handler 的 store 体），缺席说明 `compile_at` 这条投影**没有执行 `inline_store_decl` 的 store 调用展开**（包面/组件面 `project_component_candidates` 会做，lane 未必走同一入口）。
 - 下一步单点：在 `ComponentFragmentLane::compile_at` 内确认投影片段用的 profile 与是否调用 `inline_store_decl`/`expand_store_calls`；若是另一条投影，就在该入口复用同一变换（与包面 `Effect` 修复同源）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: lane 入口链定位到 `compile_component_scenario_states_at` | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 查该 auto-lang 入口是否执行 store 内联
+
+- `ComponentFragmentLane::compile_at`（`ace_ts_provider.rs:350-380`）实际走：`normalize_state_slots` + `normalize_dollar_event` + `desugar_fstrings_widget` → **`ace_av::age_component::compile_component_scenario_states_at(src, path, …, scenario{instances:1, ops=[Send msg…]}, initials, node_index)`**。
+- 因此缺席的判定落在该 auto-lang 入口内部的投影：若它不经 `inline_store_decl`（或经但 scenario 重放面另有 foreign 判据），`store.X()` 就会保持未展开 → `handler_body_foreign=true` → 缺席。
+- 下一步单点（auto-lang，诊断可先从读码入手）：确认 `compile_component_scenario_states_at` 是否调用 `project_component_candidates`/`inline_store_decl`，以及 scenario `Send` 重放对 store 展开体的 foreign 判定；必要时在同一入口复用包面已修的展开与可发射集合。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
