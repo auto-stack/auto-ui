@@ -1257,13 +1257,21 @@ impl<'a> AuraViewBuilder<'a> {
                         .map(|n| self.convert_node_with(n, bindings))
                         .filter(|v| !matches!(v, View::Empty))
                         .collect();
+                    // PLAN-112 D-4 后续：行级 onclick/oncontextmenu 此前被硬编码
+                    // 丢弃——025 的「点行选中 / 右键结束」在 VM 路线上因此不可达
+                    // （A2Vue 轨按原生 tr 保留）。行内事件按布局件同款提取。
+                    let onclick = auto_ui_compiler::aura::aura_events_get_base(events, "onclick")
+                        .map(|event| self.event_to_message_with(event, bindings));
+                    let on_right_click =
+                        auto_ui_compiler::aura::aura_events_get_base(events, "oncontextmenu")
+                            .map(|event| self.event_to_message_with(event, bindings));
                     return View::Row {
                         children: views,
                         spacing: 0,
                         padding: 0,
                         style: None,
-                        onclick: None,
-                        on_right_click: None,
+                        onclick,
+                        on_right_click,
                     };
                 }
                 if tag == "th" || tag == "td" || tag == "table-head" || tag == "table-cell" {
