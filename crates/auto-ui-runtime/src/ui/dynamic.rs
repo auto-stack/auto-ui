@@ -3626,6 +3626,73 @@ impl DynamicComponent {
             self.dirty = true;
             return;
         }
+        // PLAN-112 T-09：handler 完成后的收尾（同步派发与片派发共用）。
+        // 片派发在完成点调用同一段，保证 emit 路由 / 实例回调 / 脏标记 /
+        // 路由参数同步的语义与旧同步派发一致。
+        let finish_ok = |me: &mut Self,
+                         is_trace: bool,
+                         stripped_payloads: Vec<(String, auto_val::Value)>| {
+            if is_trace {
+                let _post_notes = me
+                    .bridge
+                    .read_state_as_vec("notes")
+                    .map(|v| v.len())
+                    .unwrap_or(999);
+                let _post_idx = me.bridge.read_state("active_index").ok();
+            }
+            me.dirty = true;
+            me.dispatch_pending_emit(state_obj_id, &emit_widget);
+            let emit_key = format!("on{}", clean_name);
+            match me
+                .bridge
+                .instance_callback(state_obj_id, &emit_widget, &emit_key)
+            {
+                Some(route) => {
+                    if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
+                        eprintln!(
+                            "[VM-EMIT] {}.{} -> {}.{} (declarative) args={:?} input={:?}",
+                            emit_widget,
+                            clean_name,
+                            route.parent_widget,
+                            route.handler,
+                            args,
+                            input_value
+                        );
+                    }
+                    let payload = args
+                        .first()
+                        .cloned()
+                        .or_else(|| input_value.clone().map(|t| auto_val::Value::Str(t.into())))
+                        .unwrap_or(auto_val::Value::Nil);
+                    me.dispatch_parent_route(&emit_widget, state_obj_id, &clean_name, &route, payload);
+                }
+                None => {}
+            }
+            for (callback, payload) in stripped_payloads {
+                match me
+                    .bridge
+                    .instance_callback(state_obj_id, &emit_widget, &callback)
+                {
+                    Some(route) => {
+                        me.dispatch_parent_route(
+                            &emit_widget,
+                            state_obj_id,
+                            &clean_name,
+                            &route,
+                            payload,
+                        );
+                    }
+                    None => {
+                        eprintln!(
+                            "[VM-EMIT] {}.{} calls {} but no parent route recorded",
+                            emit_widget, clean_name, callback
+                        );
+                    }
+                }
+            }
+            me.sync_route_params();
+            me.consume_nav_back_pending();
+        };
         match self
             .bridge
             .call_handler_for(widget_name, &clean_name, state_obj_id, &args)
@@ -3639,102 +3706,7 @@ impl DynamicComponent {
                         );
                     }
                 }
-                if is_trace {
-                    let _post_notes = self
-                        .bridge
-                        .read_state_as_vec("notes")
-                        .map(|v| v.len())
-                        .unwrap_or(999);
-                    let _post_idx = self.bridge.read_state("active_index").ok();
-                }
-                self.dirty = true;
-                // PLAN-576 G3 (D3): 子件体内引号 emit（带计算实参）的派发
-                // 路由。handler 合成期把 `."msg"(v)` 改写为 __emit_<W>_<msg>
-                // 桥函数，桥函数把 (msg, v) 写入 __emit_msg/__emit_payload
-                // 状态对（router.push 写 __current_route 同款"handler 写
-                // 状态、派发器收尾"模式）。此处读出并清账，走 C2① 同一
-                // lookup_route/dispatch_parent_route 链——此前该形态编译为
-                // 对子件自身 handler 的内联直调，父侧 on<msg> 路由不触发
-                // （043②②）。v1 限度：单 pending 槽（同 handler 多次 emit
-                // 末次生效）；多实参取首个位置实参（桥函数侧截取）。
-                self.dispatch_pending_emit(state_obj_id, &emit_widget);
-                // PLAN-051 C2 ①: 声明式——子 msg 变体派发后回送宿主
-                // `on<name>` 绑定（musk `send(str)` + `onsend: .SendInput($event)`
-                // 形态；载荷 = 子 handler 收到的首实参，无实参回落输入值）。
-                let emit_key = format!("on{}", clean_name);
-                match self
-                    .bridge
-                    .instance_callback(state_obj_id, &emit_widget, &emit_key)
-                {
-                    Some(route) => {
-                        if std::env::var("AUTO_DEBUG_EMIT").is_ok() {
-                            eprintln!(
-                                "[VM-EMIT] {}.{} -> {}.{} (declarative) args={:?} input={:?}",
-                                emit_widget,
-                                clean_name,
-                                route.parent_widget,
-                                route.handler,
-                                args,
-                                input_value
-                            );
-                        }
-                        let payload = args
-                            .first()
-                            .cloned()
-                            .or_else(|| input_value.clone().map(|t| auto_val::Value::Str(t.into())))
-                            .unwrap_or(auto_val::Value::Nil);
-                        self.dispatch_parent_route(
-                            &emit_widget,
-                            state_obj_id,
-                            &clean_name,
-                            &route,
-                            payload,
-                        );
-                    }
-                    None => {
-                        // 非错：未绑定回调的子 msg 不回送（vue 同语义）。
-                    }
-                }
-                // PLAN-051 C2 ②: 体内式——被剥离的 `on_send(.draft)` 按前置
-                // 快照实参回送（017-chat DoSend → on_send(.draft) →
-                // App.SendMessage(text) 形态）。
-                for (callback, payload) in stripped_payloads {
-                    match self
-                        .bridge
-                        .instance_callback(state_obj_id, &emit_widget, &callback)
-                    {
-                        Some(route) => {
-                            self.dispatch_parent_route(
-                                &emit_widget,
-                                state_obj_id,
-                                &clean_name,
-                                &route,
-                                payload,
-                            );
-                        }
-                        None => {
-                            eprintln!(
-                                "[VM-EMIT] {}.{} calls {} but no parent route recorded",
-                                emit_widget, clean_name, callback
-                            );
-                        }
-                    }
-                }
-                // Plan 401/VM-routing: after a handler may have navigated
-                // (router.push → __current_route), re-resolve the route params
-                // into __route_params so page handlers can read them via
-                // router.param("id"). The handler set the path; we parse it.
-                self.sync_route_params();
-                // Plan 482: router.back() rewrote to __nav_back_pending=true —
-                // consume it now that the handler finished writing state.
-                self.consume_nav_back_pending();
-                // PLAN-062: 移除"Force a view rebuild to measure render time"
-                // 遗留插桩——每个 handler Ok 后强制全量视图构建（结果丢弃），
-                // 仅为测 render_ms。它是空转泄漏的第二放大器：musk timer 每
-                // 500ms 一拍 → 此处隐式重建（computed 全量求值 ×retain 泄漏）
-                // 叠加 renderer view_dirty 重建 = 双倍泄漏。视图重建的唯一
-                // 触发应是 renderer 的 dirty 分支（child Init 播种等构建期
-                // 副作用随该分支照常发生）。
+                finish_ok(self, is_trace, stripped_payloads);
             }
             Err(_e) => {
                 // Plan 057 (ash-gui 双执行修复): handler 错误此前被完全吞掉(静默中止,
