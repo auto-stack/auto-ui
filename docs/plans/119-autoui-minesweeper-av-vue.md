@@ -505,6 +505,11 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 结合 round 46 的 `sfc-err.log`（同一错误串）⇒ 该错误来自 `generate_linked_front_sfc` 首部：`package_candidates(source)` 失败 → 回退 `prepare_component_source` → 对 prepared 源再 `package_candidates` 时的**单单元投影**报「multiple store」。
 - 下一步：在回退分支内落盘 prepared 源的 store 行数与 widget 头位置，确认是否 prep 在同一源里写出了两条 store（或 store 与 `use` 同时被解析）；这是 A2Vue 腿当前的唯一卡点。
 
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 51 | from: work | to: work | status: drafting | outcome: pass（检查点） | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （无新增代码） | next: work（回退分支内落盘 prepared 源，判定「单单元 package 投影 × 一条 store」为何报 multiple）
+
+- 本轮不新增代码：卡点已收敛为**单单元 package 投影对一条 store 声明报 multiple**，需要一次带落盘的实测（prepared 源 store 行数 + widget 头位置 + `node.stores.len()`），不应在无新证据时继续盲改。
+- 下一轮唯一动作（已定）：在 `generate_linked_front_sfc` 回退分支内落盘这四项，再据实修正（可能是 package 投影把“同源 store + store 类型声明”算成两条，或 prep 在 package profile 下重复入列）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
