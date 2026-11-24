@@ -304,6 +304,16 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 15 | from: work | t
 
 stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 16 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-ui | commit: f4866903 | next: work/T-02（R-15）
 
+2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-15 三条路探完（均回退，未采纳） | outcome: pass（诊断；无源码改动） | worktree_path: `D:/autostack/.wt/ui-116/{auto-lang,auto-ui}` | base_commit: `auto-lang bcc955fae` / `auto-ui f4866903` | code_commit: -（实验全部回退，树干净） | task_ids: T-02 | evidence: `plan116_t01_package_closure_prepped` 输出（基线 = `unknown function std::age_math.floor`）
+
+- **① 纯 Auto `floor`**：`stdlib/ace/age/math.at` 里的 `floor` 需要 `float→int→float` 两步，但 `.to(T)` 的 age-package 臂只收 `int`（`num-ty-word` 的 profile 表不含该面），`.to(float)` 直接 `expected ',' or ')'`。
+- **② 扩文法 + stdlib**：新增 `age-to-target-word`（int/float/f32）后 `floor` 能解析，但**同时** `app::playlist` 报 `unknown type 'g'`（span 落在 `text g` 的循环变量上）。
+- **③ 隔离**：只改文法（不加 stdlib floor）→ 回到基线 `unknown function std::age_math.floor`，干净。故 ② 的串扰只在"文法扩面 + stdlib 新增 floor"同现时出现，机制未明；改文法会波及**所有** AGE 单元，不做无解释落盘。
+- **纪律**：两处改动 `git checkout` 全部复原（含共享 stdlib——上一轮已吃过"坏 stdlib 会让所有注入它的编译全红"的教训）。
+- **下一轮入口**：给 checked 面加 `floor` 内建/接枝（与 `graft_package_integer_parse` 同族，不动文法），或先查清 ② 的串扰机制。
+
+stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 17 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/{auto-lang,auto-ui} | commit: -（无源码改动） | next: work/T-02（R-15 内建路线）
+
 ## 10. 待澄清事项
 
 **B-03 已裁定（2026-11-24，本计划自有工作树内闭合）。** 原 A/B 选择的前提是"`PLAN-117` 正在 `auto-lang` 同一写面上持续改动"，该前提已随 117/118 双仓落主归档而消失；`README.md` 交付表现指示"在 117 后的基线复测，再按残余缺口处理 B-03"。`/goal` 授权的实施树本就含 `auto-lang`（见 §4），故无需再次拍板：**按残余缺口逐项闭合，目标/验收/范围/仓集不变**。若任一缺口经定位后需要改动已冻结的共享语义或超出本计划仓集，再按 §5 停下请示。
@@ -322,7 +332,7 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 16 | from: work | t
 | R-12 | 包面视图**观察括号列表 model 字段**（`var groups []str = []` → `for g in .store.groups`） | `age_component`/`frontdoor` 状态访问器 | **已闭合**（2026-11-24，`auto-lang bcc955fae`）：包前门原本对**所有** `[` 开头字段跳过 `__age_state_*` 访问器发射，而子 widget 视图由 `evaluate_widget_view` 只传 inputs（状态通道）求值——循环因此无通道可调。改为：动态 `[]T` 也发访问器（定长 `[N]T` 仍不发/仍拒）；`model_type` 对"动态列表拼写 + 空字面量初值"取包面动态缺省（裸 `List` → `List(Dyn)`），与空字面量自身推断一致（否则 `expected list, found list`）。回归翻转成正例；030 闭包越过该阻。 |
 | R-13 | 包面 `use stylekit.styles: <name>`（030 `playlist.at` → `unknown module stylekit.styles`） | 包闭包的依赖包消费路径（auto-ui 侧） | **已闭合**（2026-11-24，`auto-ui 85811b6b`）：新增**包面 prep** `ace_source_prep::prepare_package_source`——pac `dep` 的样式导入落成本地 `style NAME = "…"` 项并等长空白化导入行；**不**内联 store/helper/record（lane prep 会内联 store，用于包编译即重复 store）。配套 `project_root_of`（向上找 `pac.at`）与产品侧接线（`front_package_units`）。诊断探针 `plan116_t01_package_closure_prepped` 证明 030 越过该阻。 |
 | R-14 | 跨单元 store 内联后其**顶层 helper** 不可见（030 `unknown function fmt_clock`） | 包面 prep（`prepare_package_source`） | **已闭合**（2026-11-24，`auto-ui f4866903`）：`use <unit>: <Store>` 且该单元确声明此 store 时，把它顶层的 `fn` 一并带到消费单元（本单元已定义同名则跳过）。包面按模块编译、各持一份合法；helper 是模块级纯函数、不引用 model。 |
-| R-15 | checked AGE 面缺 `math.floor`（030 `unknown function std::age_math.floor`） | `stdlib/ace/age/math.at` 或数值内建 | **新开**（R-14 闭合后 030 闭包首阻；020 同族）：`math` 解析到 `std::age_math`（sin/cos/atan2/sqrt），但它没有 `floor`；`std/math.at` 也只有 `square`/`cube`——`math.floor` 是 VM/TS 车道的内建。纯 Auto 实现受阻：文法 `num-ty-word` 的 profile 表**不含 age-package**，`.to(float)` 写不出来（`expected ',' or ')'`）；已实测并回退，不留在共享 stdlib 里。下一步：把 `num-ty-word` 开 age-package，或给 checked 面加 floor 内建/接枝。 |
+| R-15 | checked AGE 面缺 `math.floor`（030 `unknown function std::age_math.floor`） | `stdlib/ace/age/math.at` 或数值内建 | **阻（三条路已探，均未采纳）**：`math` 解析到 `std::age_math`（sin/cos/atan2/sqrt），`std/math.at` 只有 `square`/`cube`——`math.floor` 是 VM/TS 内建。① 纯 Auto 实现受阻于文法：`.to(T)` 的 age-package 臂只收 `int`（`num-ty-word` 不含该 profile），`.to(float)` 写不出；② 试把该臂扩成 `age-to-target-word`（int/float/f32）＋stdlib 写 `floor`：`floor` 能解析，但**同时**在 `app::playlist` 报 `unknown type 'g'`（`text g` 的循环变量被当类型）；③ 隔离实测：**只改文法**回到基线 `unknown function std::age_math.floor`（干净），所以该串扰只在"文法扩面 + stdlib 新增 floor"同现时出现，机制未明。两处改动已全部回退，未留半成品（改文法会波及所有 AGE 单元，不做无解释的落盘）。下一步候选：给 checked 面加 `floor` 内建/接枝（`graft_package_integer_parse` 同族），或先查清 ② 的串扰机制。 |
 | R-06 | 视图**空参回调**（`020/controls.at` `expected expression, found ')'` @148） | `ace-core` cst/grammar（view 属性位） | **已闭合**（2026-11-24，`auto-lang 563ee47de`）：`age-event-binding` 增显式空参数表臂（`age-event-binding-args-empty`，两面同开，镜像 118 的 handler 空参数）；**零作者实参**投影为裸消息引用（宿主供载荷），不是零实参方法调用——否则与消息载荷 arity 相撞。020/controls 越过该行。 |
 | R-10 | 视图 `if` 条件取**裸标识符**操作数（`if item.rel_dir == g {`） | `age-view-if` 条件面 | **已闭合**（2026-11-24，`auto-lang f59821dec`）：条件从裸 `pratt` 改走 `if-cond`（与 `age-on-if` 同一条件面）——此前 ident 后的 `{` 被当结构字面量吞掉整个分支体，整项回退。030/playlist 的分组过滤形。 |
 | R-11 | 包面视图回调的**作者实参**（`onclick: .SelectIndex(i)`） | `age-entry-value`/`age-event-binding` | **已闭合**（`f59821dec`）：包面 `age-entry-value` 在占位臂之后增通用 `age-event-binding` 臂（`$event`/`$0` 仍先匹配），作者实参投影为 self 方法调用、实参保留（与组件面同语义）。 |
