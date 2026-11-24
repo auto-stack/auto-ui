@@ -22,10 +22,12 @@
 | `deny` / `deny:<reason>` | 该 VM 不持结束进程授权 | 一律具名拒 |
 | `allowed-pids:<pid,…>` | 仅清单内 pid | 清单内放行；其余（含空清单/非法 pid）具名失败 |
 
-- **拒绝语义**：在刷新采样与 OS 结束**之前**，core shim 抛 `VMError`，文本 =
-  稳定码 `sys.kill.permission_denied` + 宿主 reason + pid。消费面 = VM 动态
-  UI 的 `[VM-HANDLER] <widget>.<event> failed: …`（handler 中止、窗口与后续
-  刷新存活；确认框由用户「取消」复位）。
+- **拒绝语义（软拒绝）**：在刷新采样与 OS 结束**之前**，core shim 以稳定码
+  `sys.kill.permission_denied` + 宿主 reason + pid 记一条 error 日志，并给
+  `sys.kill` 返回 `false`；handler 继续走完自己的收尾（确认框关闭、刷新继续），
+  窗口不中止。**不抛 `VMError`**：抛错会中止 handler，调用方的关对话框/清选择/
+  `Refresh()` 收尾全不执行——拒绝后 UI 停在确认框，用户需再点一次「取消」。
+  破坏性操作的拒绝用「返回值 + 具名诊断」即可，收尾路径必须保留。
 - **与 HTTP 面关系**：同三态、同稳定码；`back_proxy::SysKillPolicy` 管会话
   派发前的 403，本门管 VM 内直调。两者互不替代。
 - **边界**：非 OS 沙箱——`allow-all`/未登记时仍直接 `sys.kill`；只认
@@ -36,15 +38,15 @@
 | 策略 | 目标 | 观测 |
 |---|---|---|
 | 未设置 | 隔离子进程 | 真实结束（旧行为） |
-| `deny` | 隔离子进程 | `VMError` 含稳定码 + pid；目标存活；后续刷新继续 |
-| `allowed-pids:{A}` | B（未授权） | 具名拒；B 存活 |
+| `deny` | 隔离子进程 | `sys.kill` 返回 false；error 日志含稳定码 + pid；目标存活；确认框照常关闭、刷新继续 |
+| `allowed-pids:{A}` | B（未授权） | 返回 false + 具名日志；B 存活 |
 | `allowed-pids:{A}` | A（授权） | 真实结束 |
 | 非法值 | — | 启动具名失败（列出期望形状） |
 
 ## 3. 永久用例
 
 - `crates/auto-ui-runtime/tests/plan112_vm_sys_kill_policy.rs`（4 例）：三态解析
-  与非法值具名、登记/清除、deny 目标存活、allowlist 内外分流。
+  与非法值具名、登记/清除、deny 返回 false 且目标存活、allowlist 内外分流。
 - `crates/auto-lang/tests/plan112_vm_sys_kill_gate.rs`（5 例）：core 侧缺席/
   `AllowAll`/`Deny`/`AllowedPids` 与构造期快照。
 - 真实消费证据 = PLAN-112 T-03 的 `auto run -r vm` + MCP 实跑（见 Plan §9）。

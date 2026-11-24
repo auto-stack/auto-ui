@@ -158,19 +158,21 @@ fn p112_deny_gate_spares_target_through_the_vm() {
 
     let mut target = spawn_target();
     let pid = target.id() as i32;
-    let err = auto_lang_core::run_autovm_capture(&kill_program(pid))
-        .err()
-        .expect("deny must surface as a VM error")
-        .to_string();
+    let (res, stdout) = auto_lang_core::run_autovm_capture(&kill_program(pid))
+        .expect("soft deny must not raise");
     assert!(
-        err.contains(auto_lang_core::vm::host_capabilities::SYS_KILL_PERMISSION_DENIED),
-        "denial must carry the stable code; err={err}"
+        res.contains("not-killed") || stdout.contains("not-killed"),
+        "denial must report false to the caller; res={res:?} stdout={stdout:?}"
+    );
+    let text = auto_lang_core::vm::host_capabilities::sys_kill_denial_text(
+        pid,
+        "host holds no process-kill authorization",
     );
     assert!(
-        err.contains("host holds no process-kill authorization"),
-        "denial must carry the host reason; err={err}"
+        text.contains(auto_lang_core::vm::host_capabilities::SYS_KILL_PERMISSION_DENIED)
+            && text.contains(&pid.to_string()),
+        "denial diagnostic must carry the stable code and pid: {text}"
     );
-    assert!(err.contains(&pid.to_string()), "denial must name the pid; err={err}");
     assert!(
         matches!(target.try_wait(), Ok(None)),
         "denied request must not touch the target"
@@ -187,11 +189,12 @@ fn p112_allowed_pids_gate_splits_through_the_vm() {
     let _env = RestoreEnv::set(Some(&format!("allowed-pids:{pid_granted}")));
     install_vm_sys_kill_gate_from_env().unwrap();
 
-    let err = auto_lang_core::run_autovm_capture(&kill_program(pid_ungranted))
-        .err()
-        .expect("ungranted pid must be denied")
-        .to_string();
-    assert!(err.contains("authorization list"), "err={err}");
+    let (res, stdout) = auto_lang_core::run_autovm_capture(&kill_program(pid_ungranted))
+        .expect("ungranted pid must not raise");
+    assert!(
+        res.contains("not-killed") || stdout.contains("not-killed"),
+        "ungranted kill must report false; res={res:?} stdout={stdout:?}"
+    );
     assert!(matches!(ungranted.try_wait(), Ok(None)), "ungranted target must survive");
 
     let (res, stdout) = auto_lang_core::run_autovm_capture(&kill_program(pid_granted))
