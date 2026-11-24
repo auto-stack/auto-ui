@@ -129,7 +129,7 @@ where
 
     // PLAN-781 T-01: 锚点标记同样透传（快照寻址与无包装一致；锚点归属
     // 由 renderer 侧合成 id 承载，不进 vtree）。
-    if let View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } = view {
+    if let View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } | View::VirtualMark { child, .. } = view {
         return convert_view_to_vnode_with_path(child, parent_id, path, tree, span_for);
     }
 
@@ -238,7 +238,7 @@ where
         // 此臂不可达（穷尽性兜底）；保持 Empty 形态以防绕行调用面。
         View::AnchorSlot { .. } => (VNodeKind::Text, VNodeProps::Empty),
         // 透传层的防御臂（上游 if-let 已拦截；直达时按子件归类）。
-        View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } => extract_kind_and_props(child),
+        View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } | View::VirtualMark { child, .. } => extract_kind_and_props(child),
         // Plan 484: MouseArea 命中区对 VNode 检视层不可见(事件转发原语,
         // 无内容语义),同 Overlay 降级 Text/Empty。
         // PLAN-089(T-07① 根修): 改 Container 形态——content 子树入 vtree
@@ -249,6 +249,8 @@ where
         // 保留专用 Canvas kind leaf(snapshot v2 可见——G4 只跳 Text+
         // Empty 占位, MCP 寻址/检视需要看见画布)。
         View::Canvas { .. } => (VNodeKind::Canvas, VNodeProps::Empty),
+        // PLAN-126 T-03: 屏外占位在检视层无内容语义（同 Empty 防御臂）。
+        View::SpacePx { .. } => (VNodeKind::Text, VNodeProps::Empty),
         // Plan 422: 弹层在 VNode 里作为容器节点(anchor/content 为子)。
         View::Popover { .. } => (
             VNodeKind::Column,
@@ -634,7 +636,7 @@ where
             let mut out: Vec<View<M>> = Vec::with_capacity(children.len());
             for c in children {
                 let mut cur = c;
-                while let View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } = cur {
+                while let View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } | View::VirtualMark { child, .. } = cur {
                     cur = child;
                 }
                 out.push(cur.clone());
@@ -656,7 +658,7 @@ where
         View::Scrollable { child, .. } => vec![*child.clone()],
         // PLAN-081 T-04c-19: ScrollAnchorMark 透传（与 extract_children_ref/
         // view_to_vtree 的 PLAN-781 处理三方对齐）。
-        View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } => vec![*child.clone()],
+        View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } | View::VirtualMark { child, .. } => vec![*child.clone()],
         View::List { items, .. } => items.clone(),
         View::Table { headers, rows, .. } => {
             let mut children = headers.clone();
@@ -716,7 +718,7 @@ where
             let mut out: Vec<&View<M>> = Vec::with_capacity(children.len());
             for c in children {
                 let mut cur = c;
-                while let View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } = cur {
+                while let View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } | View::VirtualMark { child, .. } = cur {
                     cur = child;
                 }
                 out.push(cur);
@@ -735,7 +737,7 @@ where
         // 对齐（PLAN-781：锚点标记不占 vtree 路径层）——缺此臂时
         // find_view_by_path 无法穿透锚点标记（reading 页 ¶ 行按压
         // "View not found" 实录），autoui_action 对锚点子树失联。
-        View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } => vec![child.as_ref()],
+        View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } | View::VirtualMark { child, .. } => vec![child.as_ref()],
         View::List { items, .. } => items.iter().collect(),
         View::Table { headers, rows, .. } => {
             let mut out: Vec<&View<M>> = headers.iter().collect();

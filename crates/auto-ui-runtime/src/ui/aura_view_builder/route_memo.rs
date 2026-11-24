@@ -569,6 +569,12 @@ impl<'a> AuraViewBuilder<'a> {
         probe: &mut BuildProbe,
         bindings: &Bindings,
     ) -> View<DynamicMessage> {
+        // PLAN-126 T-03：已测得 pane/行高几何时先走窗口构建（同 pane 只
+        // 认领一个循环）；不适用时保持下方 keyed 语义不变。窗口化路径不走
+        // 项级 memo（首期：固定行高、按索引读取、每帧重建窗口行）。
+        if let Some(windowed) = self.try_virtual_for(var, index, iterable, body, bindings) {
+            return windowed;
+        }
         const SITE: u8 = crate::ui::memo_deps::MEMO_SITE_FOR_ITEM;
         let probe_on = probe.is_enabled();
         let base_len = path.len();

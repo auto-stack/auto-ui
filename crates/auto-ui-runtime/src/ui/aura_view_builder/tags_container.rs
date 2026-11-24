@@ -23,6 +23,24 @@ impl<'a> AuraViewBuilder<'a> {
         let padding = self.extract_u16(props, "padding").unwrap_or(0);
         let style = self.extract_style_with(props, bindings); // Plan 057 (2.5)
 
+        // PLAN-126 T-03：`overflow-y-auto` / `overflow-auto` 列在转换自身子件
+        // 前压入虚拟列表 pane 作用域（子件 `for` 循环据此按实测窗口裁行；
+        // Drop guard 出栈，提前 return 与兄弟分支都不串）。
+        let needs_scroll = style.as_ref().map_or(false, |s| {
+            s.classes.iter().any(|c| {
+                matches!(
+                    c,
+                    crate::ui::style::StyleClass::OverflowYAuto
+                        | crate::ui::style::StyleClass::OverflowAuto
+                )
+            })
+        });
+        let _vlist_scope = if needs_scroll {
+            Some(self.enter_vlist_scope())
+        } else {
+            None
+        };
+
         // Plan 476: 拼接感知收集(slot outlet 的 fill 子节点作兄弟展开)。
         let child_views: Vec<View<DynamicMessage>> = self
             .expand_children_spliced(children, bindings)
@@ -72,16 +90,7 @@ impl<'a> AuraViewBuilder<'a> {
         .spacing(spacing)
         .padding(padding);
 
-        // Plan 048:提取 overflow 标志 + style clone(builder.with_style 会 move style)。
-        let needs_scroll = style.as_ref().map_or(false, |s| {
-            s.classes.iter().any(|c| {
-                matches!(
-                    c,
-                    crate::ui::style::StyleClass::OverflowYAuto
-                        | crate::ui::style::StyleClass::OverflowAuto
-                )
-            })
-        });
+        // Plan 048:overflow 标志已在上方子件转换前算出（PLAN-126 T-03）。
         let scroll_style = if needs_scroll { style.clone() } else { None };
 
         // PLAN-748 T-07：滚动内容 col 拿视觉类剥离后的余集（tracked 双胎
@@ -159,6 +168,13 @@ impl<'a> AuraViewBuilder<'a> {
             .unwrap_or(0);
         let padding = self.extract_u16(props, "padding").unwrap_or(0);
         let style = self.extract_style_with(props, bindings); // Plan 057 (2.5)
+
+        // PLAN-126 T-03：显式 `scroll` 元素同样是虚拟列表 pane 作用域。
+        let _vlist_scope = if crate::ui::virtual_list::enabled() {
+            Some(self.enter_vlist_scope())
+        } else {
+            None
+        };
 
         // Plan 476: 拼接感知收集 + 视觉空过滤(既有行为)。
         let child_views: Vec<View<DynamicMessage>> = self

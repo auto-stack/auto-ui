@@ -1726,6 +1726,59 @@ impl VmBridge {
         r.unwrap_or_default()
     }
 
+    /// PLAN-126 T-03：列表长度的 O(1) 读取（不整表 clone）。
+    ///
+    /// 与 `index_list`/`index_list_all` 的区别：窗口化每帧要读区间内若干行，
+    /// 整表 clone 会把「工作量随窗口行数」打成 O(N)。四种表示（`Value::Array`
+    /// / 堆 `ListData<Value>` / 堆 `ListData<i32>` / `VmRef`）都只取长度。
+    pub fn list_len_of(&self, v: &Value) -> Option<usize> {
+        match v {
+            Value::Array(a) => Some(a.values.len()),
+            Value::Int(id) if *id >= 4_000_000 => self.heap_list_len(*id as usize),
+            Value::VmRef(r) => self.heap_list_len(r.id),
+            _ => None,
+        }
+    }
+
+    fn heap_list_len(&self, id: usize) -> Option<usize> {
+        let obj = self.vm.get_heap_object(id as u64)?;
+        // PLAN-047 T-01 同款：容器内容读按 (heap_id, "*") 粗粒度记依赖。
+        self.record_dep_any(id as u64);
+        let guard = obj.read().unwrap();
+        use auto_lang_core::vm::types::ListData;
+        if let Some(list) = guard.as_any().downcast_ref::<ListData<Value>>() {
+            Some(list.elems.len())
+        } else if let Some(list) = guard.as_any().downcast_ref::<ListData<i32>>() {
+            Some(list.elems.len())
+        } else {
+            None
+        }
+    }
+
+    /// PLAN-126 T-03：按索引读单个元素（只 clone 该元素，不整表展开）。
+    pub fn list_get(&self, v: &Value, i: usize) -> Option<Value> {
+        match v {
+            Value::Array(a) => a.values.get(i).cloned(),
+            Value::Int(id) if *id >= 4_000_000 => self.heap_list_get(*id as usize, i),
+            Value::VmRef(r) => self.heap_list_get(r.id, i),
+            _ => None,
+        }
+    }
+
+    fn heap_list_get(&self, id: usize, i: usize) -> Option<Value> {
+        let obj = self.vm.get_heap_object(id as u64)?;
+        self.record_dep_any(id as u64);
+        let guard = obj.read().unwrap();
+        use auto_lang_core::vm::types::ListData;
+        if let Some(list) = guard.as_any().downcast_ref::<ListData<Value>>() {
+            list.elems.get(i).cloned()
+        } else if let Some(list) = guard.as_any().downcast_ref::<ListData<i32>>() {
+            list.elems.get(i).map(|n| Value::Int(*n))
+        } else {
+            None
+        }
+    }
+
     pub fn vmref_to_vec(&self, id: usize) -> Result<Vec<Value>> {
         // Path 1: heap_objects — ListData<Value> (array literals / struct lists,
         // Plan 390 §15 H3b) or ListData<i32>.

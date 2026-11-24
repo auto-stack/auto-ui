@@ -45,6 +45,13 @@ impl<'a> AuraViewBuilder<'a> {
                 body,
                 ..
             } => {
+                // PLAN-126 T-03：已测得 pane/行高几何的固定行高列表先走窗口
+                // 构建（只读/绑定/构建/布局可见行 + overscan，屏外用占位表达
+                // 逻辑高度）。未测得几何、检索过滤态、嵌套绑定或数据源不可按
+                // 索引读取时返回 None，下面是既有完整展开语义。
+                if let Some(windowed) = self.try_virtual_for(var, index, iterable, body, bindings) {
+                    return windowed;
+                }
                 // PLAN-046 T-06 执行期修正：桌面窗口渲染帧走本 untracked 轨
                 //（DynamicComponent::view()=build()），keyed 门必须双轨可达
                 // ——伪造空簿记通道复用同一 convert_for_keyed（机制单源）；
@@ -421,6 +428,10 @@ impl<'a> AuraViewBuilder<'a> {
         probe: &mut BuildProbe,
         bindings: &Bindings,
     ) -> View<DynamicMessage> {
+        // PLAN-126 T-03：调试轨的非 keyed 循环同样先尝试窗口构建。
+        if let Some(windowed) = self.try_virtual_for(var, index, iterable, body, bindings) {
+            return windowed;
+        }
         let state_name = iterable.strip_prefix('.').unwrap_or(iterable);
         let array: Vec<Value> = match self.resolve_for_iterable(iterable, state_name, bindings) {
             Some(v) => v,
@@ -2248,6 +2259,23 @@ impl<'a> AuraViewBuilder<'a> {
             .unwrap_or(0);
         let padding = self.extract_u16(props, "padding").unwrap_or(0);
         let style = self.extract_style_with(props, bindings); // Plan 057 (2.5)
+
+        // PLAN-126 T-03：调试/MCP 轨的滚动容器同样压 pane 作用域（快照与
+        // 生产轨窗口一致；Drop guard 出栈）。
+        let needs_scroll = style.as_ref().map_or(false, |s| {
+            s.classes.iter().any(|c| {
+                matches!(
+                    c,
+                    crate::ui::style::StyleClass::OverflowYAuto
+                        | crate::ui::style::StyleClass::OverflowAuto
+                )
+            })
+        });
+        let _vlist_scope = if needs_scroll {
+            Some(self.enter_vlist_scope())
+        } else {
+            None
+        };
 
         // D-GAP-4: number children by RESULTING slot — visually-empty views
         // are dropped from the built column, shifting later siblings left;

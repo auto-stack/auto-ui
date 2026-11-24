@@ -92,6 +92,16 @@ impl SnapshotBuilder {
             // 保持 MCP 可见，供锚块位置检视）。
             View::AnchorSlot { child, .. } => Self::traverse_view(child, id_map, path),
             View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } => Self::traverse_view(child, id_map, path),
+            // PLAN-126 T-03: 虚拟列表构建带标记透传子件；屏外占位上报高度
+            // （V-01/V-02 的判据要能看见「占位吃掉了多少逻辑高度」）。
+            View::VirtualMark { child, .. } => Self::traverse_view(child, id_map, path),
+            View::SpacePx { height, .. } => UiNode {
+                id,
+                kind: "Space".to_string(),
+                props: vec![("height".to_string(), format!("{height:.1}"))],
+                actions: vec![],
+                children: vec![],
+            },
             View::Overlay { .. } => UiNode {
                 id,
                 kind: "Overlay".to_string(),

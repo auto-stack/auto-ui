@@ -74,6 +74,9 @@ fn capability_id(v: &View<()>) -> &'static str {
         AnchorSlot { .. } => "cap.view.anchor_slot",
         ScrollAnchorMark { .. } => "cap.view.scroll_anchor_mark",
         FocusTarget { .. } => "cap.view.focus_target",
+        // PLAN-126 T-03：虚拟列表屏外占位与构建带标记（能力分母同步）。
+        SpacePx { .. } => "cap.view.space_px",
+        VirtualMark { .. } => "cap.view.virtual_mark",
         Text { .. } => "cap.view.text",
         Rich { .. } => "cap.view.rich",
         Button { .. } => "cap.view.button",

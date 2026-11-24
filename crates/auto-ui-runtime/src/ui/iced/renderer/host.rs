@@ -2037,6 +2037,24 @@ fn run_session(
             }
         }
 
+        // PLAN-126 T-03: 虚拟列表 probe 回执——落几何台账（行高/列表起点
+        // 反解在 virtual_list::note_band）。纯测量，不脏帧、不派发 VM。
+        if msg.event == crate::ui::virtual_list::MEASURE_EVENT {
+            if let Some(ref json) = msg.input_value {
+                if let Ok(m) = serde_json::from_str::<crate::ui::virtual_list::VListMeasure>(json) {
+                    let changed = crate::ui::virtual_list::note_measure(&m);
+                    if crate::ui::virtual_list::diag() {
+                        eprintln!(
+                            "[VLIST] measure panes={} bands={} changed={changed}",
+                            m.panes.len(),
+                            m.bands.len()
+                        );
+                    }
+                }
+            }
+            return iced::Task::none();
+        }
+
         // PLAN-656 review F-4: scroll 状态读回落库——ScrollStateReader 的
         // 六测量按 widget id 反查 handle 写入 controller 注册表（预热/校正）。
         if msg.event == "__scroll_state_read" {
@@ -4576,6 +4594,21 @@ fn run_session(
                     event: "__mcp_scroll_states".to_string(),
                     input_value: Some(serde_json::to_string(&state_map).unwrap_or_default()),
                 }),
+            );
+        }
+
+        // PLAN-126 T-03: 虚拟列表几何 probe。窗口化构建（含首帧标定）置位
+        // 请求位，本拍收集 pane 视口/偏移与构建带 rect；下一帧构建据此解出
+        // 固定行高与列表起点。门控：开关关闭或本帧无虚拟化 pane 时零开销。
+        if crate::ui::virtual_list::enabled() && crate::ui::virtual_list::take_measure_request() {
+            tail_tasks.push(
+                iced::advanced::widget::operate(crate::ui::virtual_list::VListProbe::new()).map(
+                    |m| IcedMessage {
+                        widget: String::new(),
+                        event: crate::ui::virtual_list::MEASURE_EVENT.to_string(),
+                        input_value: Some(serde_json::to_string(&m).unwrap_or_default()),
+                    },
+                ),
             );
         }
 

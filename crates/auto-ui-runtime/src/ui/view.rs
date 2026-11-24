@@ -770,12 +770,24 @@ pub enum View<M: Clone + Debug> {
         key: std::sync::Arc<str>,
         child: Box<View<M>>,
     },
+    /// PLAN-126 T-03：虚拟列表的屏外占位（纵向）。
+    ///
+    /// 固定行高下屏外行不产生控件：首行之前/末行之后各用一段占位表达逻辑
+    /// 高度，使滚动条范围等于完整内容高度。宽度缺省 `f32::NAN` = 不指定。
+    SpacePx { width: f32, height: f32 },
+
+    /// PLAN-126 T-03：虚拟列表构建带标记（零布局 wrapper）。
+    ///
+    /// iced 轨由 renderer 以合成 id `vlist_mark:{key}` 包一层 container，
+    /// operate 期上报内容空间 rect；probe 用 (rect, 当次行区间) 反解固定
+    /// 行高与列表起点。vue/快照轨按透明 wrapper 透传子件。
+    VirtualMark { key: String, child: Box<View<M>> },
+
     /// A native focus target anchored to its rendered control.
     FocusTarget {
         id: String,
         activation: Option<M>,
-        keys: Vec<(String, M)>,
-        on_focus: Option<M>,
+        keys: Vec<(String, M)>,        on_focus: Option<M>,
         on_blur: Option<M>,
         child: Box<View<M>>,
     },
@@ -2634,6 +2646,12 @@ impl<M: Clone + Debug> View<M> {
     {
         match self {
             View::Empty => View::Empty,
+            // PLAN-126 T-03: 占位无消息；标记映射子件消息。
+            View::SpacePx { width, height } => View::SpacePx { width, height },
+            View::VirtualMark { key, child } => View::VirtualMark {
+                key,
+                child: Box::new(child.map_msg_with_arc(f)),
+            },
             View::Rich { spans, style, on_selection } => {
                 let f = Arc::clone(f);
                 View::Rich {

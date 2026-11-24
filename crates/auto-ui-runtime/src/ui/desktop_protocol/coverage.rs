@@ -688,7 +688,9 @@ pub fn native_kind_of<M: Clone + std::fmt::Debug>(view: &crate::ui::view::View<M
     match view {
         View::Empty => "empty",
         View::AnchorSlot { .. } => "anchorslot",
-        View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } => native_kind_of(child),
+        View::ScrollAnchorMark { child, .. } | View::FocusTarget { child, .. } | View::VirtualMark { child, .. } => native_kind_of(child),
+        // PLAN-126 T-03: 屏外占位 = 零内容间隔（native 覆盖集内无对应控件位）。
+        View::SpacePx { .. } => "empty",
         View::Text { .. } => "text",
         View::Rich { .. } => "text",
         View::Button { .. } => "button",
@@ -748,6 +750,8 @@ fn scan_native_node<M: Clone + std::fmt::Debug>(
     // 变体自带 style 的统一收集（typed StyleClass → 代表 token）。
     let styles: Vec<Option<&crate::ui::style::Style>> = match view {
         View::Empty | View::AnchorSlot { .. } | View::ScrollAnchorMark { .. } | View::FocusTarget { .. } => vec![],
+        // PLAN-126 T-03: 占位/标记无自有样式。
+        View::SpacePx { .. } | View::VirtualMark { .. } => vec![],
         View::ManagedScrollContent { .. } => vec![],
         View::Popover { .. } | View::Overlay { .. } => vec![],
         View::Text { style, .. }

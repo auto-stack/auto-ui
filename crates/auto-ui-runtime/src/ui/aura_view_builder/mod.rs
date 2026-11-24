@@ -470,6 +470,8 @@ mod slots;
 mod tags_container;
 mod tags_controls;
 mod tags_panels;
+// PLAN-126 T-03：固定行高虚拟列表（窗口化构建 + pane 作用域）。
+mod virtual_rows;
 mod tracked;
 
 impl<'a> AuraViewBuilder<'a> {

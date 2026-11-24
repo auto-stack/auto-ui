@@ -354,6 +354,9 @@ pub use auto_ui_compiler::i18n_lookup;
 #[cfg(feature = "ui-headless")]
 pub mod headless;
 
+// PLAN-126 T-03：固定行高纵向虚拟列表（VList）的窗口台账与 iced probe。
+pub mod virtual_list;
+
 pub mod iced;
 
 // Plan 365 W1: Unified host backend interface (seam for W2/W3).

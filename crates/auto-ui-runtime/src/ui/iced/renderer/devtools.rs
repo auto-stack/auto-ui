@@ -2786,6 +2786,9 @@ pub(super) fn extract_view_style<M: Clone + std::fmt::Debug>(
         // PLAN-063 T-04d-2: 锚槽无自有样式，读子件。
         AbstractView::AnchorSlot { child, .. } => extract_view_style(child),
         AbstractView::ScrollAnchorMark { child, .. } | AbstractView::FocusTarget { child, .. } => extract_view_style(child),
+        // PLAN-126 T-03: 占位/标记无自有样式（标记读子件）。
+        AbstractView::SpacePx { .. } => None,
+        AbstractView::VirtualMark { child, .. } => extract_view_style(child),
         // F-UAT-2: Rich 自带 style（段落级 base 尺寸/色）。
         AbstractView::Rich { style, .. } => style.as_ref(),
         // Plan 422: Popover 的 chrome 在 content 上(anchor 各自带)。
@@ -2907,6 +2910,9 @@ fn view_kind<M: Clone + std::fmt::Debug>(view: &AbstractView<M>) -> &'static str
         AbstractView::Overlay { .. } => "overlay",
         AbstractView::AnchorSlot { .. } => "anchor_slot",
         AbstractView::ScrollAnchorMark { .. } => "scroll_anchor",
+        // PLAN-126 T-03: 虚拟列表占位/构建带标记。
+        AbstractView::SpacePx { .. } => "space",
+        AbstractView::VirtualMark { .. } => "vlist_mark",
         AbstractView::FocusTarget { child, .. } => view_kind(child),
         AbstractView::Popover { .. } => "popover",
         AbstractView::MouseArea { .. } => "mouse_area",

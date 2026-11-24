@@ -130,6 +130,31 @@ impl<M: Clone + Debug + 'static> IntoIcedElement<M> for AbstractView<M> {
                     .into()
             }
 
+            // PLAN-126 T-03: 虚拟列表屏外占位（f64 逻辑高度不受 u16 限制）。
+            AbstractView::SpacePx { width, height } => iced::widget::Space::new()
+                .width(if width.is_finite() {
+                    iced::Length::Fixed(width.max(0.0))
+                } else {
+                    iced::Length::Shrink
+                })
+                .height(iced::Length::Fixed(height.max(0.0)))
+                .into(),
+
+            // PLAN-126 T-03: 虚拟列表构建带标记——零布局 container + 合成 id
+            // `vlist_mark:{key}`，operate 期上报内容空间 rect（行高/列表起点反解）。
+            AbstractView::VirtualMark { key, child } => project_widget(|| {
+                let el = child.into_iced();
+                iced::widget::container(el)
+                    .id(iced::widget::Id::from(format!(
+                        "{}{}",
+                        crate::ui::virtual_list::MARK_ID_PREFIX,
+                        key
+                    )))
+                    .padding(0)
+                    .width(iced::Length::Fill)
+                    .into()
+            }),
+
             // PLAN-080 UAT F-UAT-2: Rich 段落——单段落跨 span 连续折行
             // （markdown 行内序列唯一正确承载；Row 摆多 Text 不回流）。
             AbstractView::Rich { spans, style, on_selection } => project_widget(|| {
