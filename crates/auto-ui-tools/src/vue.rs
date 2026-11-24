@@ -8444,8 +8444,27 @@ fn ace_vue_sfcs(
     }
     #[cfg(feature = "ace-vue")]
     {
+        // PLAN-119：单元级 `use <unit>: <Store>` 的 app 先做组件面 prep（store 片断
+        // 内联进源）再交逐 widget lane；否则 widget 侧 `store.X(args)` 未展开。
+        let lane_source: String = {
+            let has_store_use = content.lines().any(|line| {
+                let t = line.trim_start();
+                t.starts_with("use ") && t.contains(':') && !t.starts_with("use {")
+            });
+            if has_store_use {
+                project_root_of(at_path)
+                    .and_then(|root| {
+                        auto_ui_runtime::ui::ace_source_prep::prepare_component_source(&root, content)
+                            .ok()
+                    })
+                    .map(|p| p.source)
+                    .unwrap_or_else(|| content.to_string())
+            } else {
+                content.to_string()
+            }
+        };
         let multi = auto_ui_runtime::ui::ace_vue_script::generate_sfcs_with_lane_product(
-            content,
+            &lane_source,
             &at_path.to_string_lossy(),
             rt_href_first,
             rt_href_rest,
