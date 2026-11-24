@@ -239,6 +239,17 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 因此 `foreign_callee=Reveal` 的来源只能是 widget 侧 `store.Reveal(x, y)` 根本没进入展开：下一步在 `inline_store_decl` 打印 `store_bodies` 的键（期望 `Init/Tick/Reveal/Flag/Reset/SetDifficulty`）与 `node.handlers` 的各 msg，比对失配点（包面 imported-store 路径 `scope.stores` 必须命中 `app::minesweeper_store` 的 `MinesweeperStore`）。
 - 遗留：`P119DBG`（widget_runtime 2 处、project 2 处、age_component 1 处）全部临时件，落主前移除。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 元凶落定——widget 侧 `store.X(args)` 投影成 `Effect` 而 `expand_store_calls` 只认 `Call` | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下） | next: 二选一裁定后落地
+
+**实证**（`P119DBG widget_handler msg=Reveal stmts=1 store_keys=["Init","Reset","SetDifficulty","Reveal","Flag","Tick"]`）：
+- store 侧键名齐全、widget 侧 `Reveal` 只有 1 条语句 ⇒ 调用未被展开；
+- `expand_store_calls`（age_component.rs:~1527-1606）只匹配 `ComponentStmt::Call`，而 `store.Reveal(x, y)`（带实参的独立语句）在包面被投影成 `ComponentStmt::Effect { value: MethodCall }`，因此**永不进入展开分支**，随后被 `stmts_have_foreign_call` 记为域外调用 → `body_foreign=true` → 无 transition。
+- 这解释了全部现象：无参自调用（`.Tick -> { store.Tick() }`）能投影成 Call 并展开；带实参的（Reveal/Flag/SetDifficulty）不能。
+
+**两条落地路径（待裁定后执行）**：
+- A（auto-lang，一行级）：`expand_store_calls` 增 `ComponentStmt::Effect { value }` 分支，与 Call 同一展开逻辑（需扩 G5 授权：改语义）。
+- B（auto-ui prep，在既有 prep 授权内）：跨单元内联——在应用单元里把 `store.X(args)` 直接替换为 store 单元 X 的 handler 体，并把 `.field`/`.store.field` 归一为 `.st_field`（prep 已有同类改写设施，改动较大但不动 auto-lang）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
