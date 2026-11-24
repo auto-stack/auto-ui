@@ -76,7 +76,26 @@ pub fn generate_package_front_sfc(
                 .unwrap_or_else(|| app_at.parent().unwrap_or(app_at));
             let prepared = super::ace_source_prep::prepare_component_source(root, source)
                 .map_err(|prep| format!("{error}; prep: {prep}"))?;
-            package_candidates(&prepared.source)?
+            let stores = prepared
+                .source
+                .lines()
+                .filter(|line| line.trim_start().starts_with("store "))
+                .count();
+            let probe = package_candidates(&prepared.source);
+            let _ = std::fs::write(
+                "D:/autostack/plan-artifacts/plan-119/fallback.log",
+                format!(
+                    "len={} store_lines={stores} candidates={:?} first_stores={:?}",
+                    prepared.source.len(),
+                    probe.as_ref().map(|n| n.len()),
+                    probe
+                        .as_ref()
+                        .ok()
+                        .and_then(|n| n.first())
+                        .map(|node| node.stores.len())
+                ),
+            );
+            probe?
         }
     };
         let root = candidates.first().ok_or("no AGE node candidate in the entry module")?;
@@ -161,7 +180,26 @@ pub fn generate_linked_front_sfc(
                 .unwrap_or_else(|| app_at.parent().unwrap_or(app_at));
             let prepared = super::ace_source_prep::prepare_component_source(root, source)
                 .map_err(|prep| format!("{error}; prep: {prep}"))?;
-            package_candidates(&prepared.source)?
+            let stores = prepared
+                .source
+                .lines()
+                .filter(|line| line.trim_start().starts_with("store "))
+                .count();
+            let probe = package_candidates(&prepared.source);
+            let _ = std::fs::write(
+                "D:/autostack/plan-artifacts/plan-119/fallback.log",
+                format!(
+                    "len={} store_lines={stores} candidates={:?} first_stores={:?}",
+                    prepared.source.len(),
+                    probe.as_ref().map(|n| n.len()),
+                    probe
+                        .as_ref()
+                        .ok()
+                        .and_then(|n| n.first())
+                        .map(|node| node.stores.len())
+                ),
+            );
+            probe?
         }
     };
     let Some(root) = linked_front_root(&candidates) else { return Ok(None) };
