@@ -3331,6 +3331,37 @@ impl DynamicComponent {
         self.consume_nav_back_pending();
     }
 
+    /// PLAN-112 T-09/F-01：存在 parked 片时按墙钟预算推进 CPU 泵，直到本轮
+    /// 跑到终态或预算用尽。空闲应用不再依赖「下一帧」才续驱 parked handler
+    /// （帧泵只在 present 运行，park 后无脏帧会饿死定时器 handler）。
+    /// 返回本轮是否完成了收尾。
+    fn pump_cpu_slices_bounded(&mut self, budget: std::time::Duration) -> bool {
+        let deadline = std::time::Instant::now() + budget;
+        while self.pending_finish.is_some() && std::time::Instant::now() < deadline {
+            let report = self
+                .bridge
+                .resume_cpu_slices(auto_lang_core::vm::engine::CpuSliceBudget::d2_default());
+            if report.completed > 0 {
+                if let Some(pf) = self.pending_finish.take() {
+                    self.finish_handler_dispatch(
+                        &pf.clean_name,
+                        &pf.emit_widget,
+                        pf.state_obj_id,
+                        &pf.args,
+                        pf.input_value.as_ref(),
+                        pf.stripped,
+                        pf.is_trace,
+                    );
+                }
+                return true;
+            }
+            if report.slices_run == 0 && report.queue_drained == 0 {
+                break;
+            }
+        }
+        false
+    }
+
     pub fn on_with_input(&mut self, event_name: &str, input_value: Option<String>) {
         let widget_name = self.widget_name.clone();
         self.on_with_input_for(&widget_name, event_name, input_value);
@@ -3733,16 +3764,12 @@ impl DynamicComponent {
             self.dirty = true;
             return;
         }
-        // PLAN-112 T-09：片派发（AUTO_CPU_ASYNC=1 显式开启）。
-        //
-        // 默认仍走同步段入口：片派发在「空闲应用 + 定时器 handler」上会被
-        // 帧泵饿死——`poll_frame_pump` 只在 present（帧）时运行，而 handler
-        // park 后应用空闲不再出帧，pending 片永远等不到续驱（025 实测
-        // Tick/Refresh 后 tickN 冻结在 1）。片派发对用户点击类交互是可用的
-        // （消息泵 8/8 → 0/8 已实证），但默认开启需要先让帧泵在「有 parked
-        // 片」时自唤醒/自出帧；那属 T-09 的后续接线，不在本切片内。
-        let cpu_async = std::env::var("AUTO_CPU_ASYNC").ok().as_deref() == Some("1");
-        if cpu_async && !clean_name.starts_with("__") {
+        // PLAN-112 T-09/F-01：store/事件 handler 默认走片派发
+        // （`AUTO_CPU_LEGACY=1` 回退同步段入口）。片预算耗尽时 handler park
+        // 成 CpuRunnable；本帧再用 `pump_cpu_slices_bounded` 推进 100ms，
+        // 空闲应用也能续跑（不再依赖 present 帧泵）。收尾在真正完成时执行一次。
+        let cpu_legacy = std::env::var("AUTO_CPU_LEGACY").ok().as_deref() == Some("1");
+        if !cpu_legacy && !clean_name.starts_with("__") {
             let had_cpu = self.bridge.has_cpu_continuations();
             let res = self.bridge.call_handler_for_cpu_slice(
                 &emit_widget,
@@ -3753,17 +3780,22 @@ impl DynamicComponent {
             );
             match res {
                 Ok(()) => {
-                    let parked = !had_cpu && self.bridge.has_cpu_continuations();
-                    if parked {
-                        self.pending_finish = Some(PendingFinish {
-                            clean_name: clean_name.clone(),
-                            emit_widget: emit_widget.clone(),
-                            state_obj_id,
-                            args: args.clone(),
-                            input_value: input_value.clone(),
-                            stripped: stripped_payloads.clone(),
-                            is_trace,
-                        });
+                    let still_parked = self.bridge.has_cpu_continuations();
+                    if still_parked {
+                        // 首次 park 或 park 期间的再次派发（重入被忽略）：
+                        // 都保持待收尾，并在本帧有界推进 CPU 片。
+                        if self.pending_finish.is_none() {
+                            self.pending_finish = Some(PendingFinish {
+                                clean_name: clean_name.clone(),
+                                emit_widget: emit_widget.clone(),
+                                state_obj_id,
+                                args: args.clone(),
+                                input_value: input_value.clone(),
+                                stripped: stripped_payloads.clone(),
+                                is_trace,
+                            });
+                        }
+                        self.pump_cpu_slices_bounded(std::time::Duration::from_millis(100));
                     } else {
                         self.finish_handler_dispatch(
                             &clean_name,
