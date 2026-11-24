@@ -867,7 +867,7 @@ function createCheckedWidgetView(root, fileDirectory, fileMutation, preferences 
           // PLAN-118（T-06）：onhit 的命中 id 由渲染层注入（native 侧同款：
           // PackageEventInput::Hit），视图协议里不含显式实参——按 input 位校验。
           const acceptsInputValue = (element.tag === 'input' &&
-            (kind === 'oninput' || kind === 'onchange') && event.types.length === 0) ||
+            (kind === 'oninput' || kind === 'onchange' || kind === 'onenter') && event.types.length === 0) ||
             (kind === 'onhit' && event.types.length === 0);
           const pointerMove = element.tag === 'mouse-area' && kind === 'onmousemove' && event.types.length === 0;
           const action = checkedWidgetAction(owner, event, acceptsInputValue,
