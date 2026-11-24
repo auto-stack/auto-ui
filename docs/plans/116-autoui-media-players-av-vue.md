@@ -257,6 +257,17 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 10 | from: work | t
 
 stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 11 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: 7d579aab4 | next: work/T-02（R-12）
 
+2026-11-24 stage: work | plan_id: PLAN-116 | plan_revision: r1 | checkpoint: T-02 R-12 三次实验（均回退）+ 关键定位：第二条视图发射（live_view）是拦路者 | outcome: pass（诊断；无源码改动） | worktree_path: `D:/autostack/.wt/ui-116/auto-lang`（`plan-116-dev`） | base_commit: `auto-lang 7d579aab4` | code_commit: -（实验全部回退，树干净） | task_ids: T-02 | evidence: `plan-artifacts/plan-116/probes/r12b-20261124/`
+
+- **实验一（检查通道列表占位）**：只影响 `view_check_loop_sources`，而失败发生在发射通道 → 无效。
+- **实验二（列表状态访问器）**：在 `compile_age_component` 的状态函数环里为列表字段补访问器（返回 `List<T>`，不进 `instance_states`），并放开 `[` 守卫 + 让 `model_list_type` 认 `[]T`——实测仍报 `unknown function __age_state_0_groups`，说明**包路径并不使用该处发射的状态函数**；已回退。
+- **实验三（决定性的阅读）**：`widget_runtime::add_model` 的绑定是
+  `model_param.map_or_else(|| state_at(...), |m| runtime_at(...))`，而
+  `runtime_model_param` 只要求 `!fields.is_empty()`——**包运行时视图本来就按 model 读字段，列表天然可读**。真正拦路的是 `live_view::add_widget_views` 这**第二条**视图发射（子 widget 渲染，走 `state_at` 状态通道；列表字段按设计无状态函数）。
+- **结论（下一轮入口）**：先确认包路径 `__age_state_*` 的发射归属（`compile_age_component` 对包单元是否运行、`state_functions_present` 在 `bound.origins` 找 `_at` 名），再二选一：给列表字段铸访问器（走状态通道）或让 live_view 也用 model 绑定（与运行时一致）。三处实验都已回退，工作树干净，`plan116_store_list_view` 仍钉住边界。
+
+stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 12 | from: work | to: work | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-116/auto-lang | commit: -(无源码改动) | next: work/T-02（R-12）
+
 ## 10. 待澄清事项
 
 **B-03 已裁定（2026-11-24，本计划自有工作树内闭合）。** 原 A/B 选择的前提是"`PLAN-117` 正在 `auto-lang` 同一写面上持续改动"，该前提已随 117/118 双仓落主归档而消失；`README.md` 交付表现指示"在 117 后的基线复测，再按残余缺口处理 B-03"。`/goal` 授权的实施树本就含 `auto-lang`（见 §4），故无需再次拍板：**按残余缺口逐项闭合，目标/验收/范围/仓集不变**。若任一缺口经定位后需要改动已冻结的共享语义或超出本计划仓集，再按 §5 停下请示。
@@ -272,7 +283,7 @@ stage: goal | plan_id: PLAN-116 | plan_revision: r1 | round: 11 | from: work | t
 | R-04a | 跨单元 store 导入（`use player_store: PlayerStore` + `.store.<field>`/`.store.<Msg>()`） | `packages`/`inline_store_decl` | **已闭合**（`auto-lang 78b916591`）：导入链在包面生效；**只写 `on`、无 `msg` 块**的 store（020 形态）按 handler 参数注解补出消息声明（无注解仍具名拒）。回归 `plan116_store_import` 2 正例 + 1 负控。 |
 | R-04b | **无类型/动态 store 字段**（`var playlist = []`，030 写它） | `age_component` store 投影 | **已闭合**（2026-11-24，`auto-lang 174c6646b`）：无类型且初值恰为 `[]` 的 store 字段投影为**可变集合字段**（`ty = "List"`，元素型沿用 117 round-20 的 `List(Dyn)` 缺省）；定型判定先于初值投影（无类型初值是 `age-view-data-lit` 原始文本节点，`project_expr_sync` 不承载）。其余无类型形态仍按只读跳过（负控钉住）。回归 `plan116_store_import` 5/5；**真实效果**：030 闭包由 `undeclared model field playlist` 前进到 R-03。 |
 | R-05 | 020 内部未定位构造（`020/app.at` 报 `expected fn, found widget`，但最小 `widget` 包项可解析 → 错误定位在项首，真因在项内） | 待定位 | **已定位（未闭合）**：真因是 `.Init` 里**裸名赋值 + 跨行字符串**（`pins = pins + "…⏎"`，闭合引号独占一行）。最小复现 `plan116_app_init_gap`：该形→拒绝；同一字符串写在 `.field = …` 位→通过。已排除：字符串内容、`var` 声明、`.store` 绑定、`unbracketed expression cannot continue across a newline` 守卫（插桩实测未命中）。 |
-| R-12 | 包面视图**观察括号列表 model 字段**（`var groups []str = []` → `for g in .store.groups`） | `age_component` 视图观测 | **阻（根因已定位）**：最小复现证明与 store 内联**无关**（widget 自己的 `[]str` 同样被拒），与**拼写**有关（同一视图循环换裸 `List` 即通过）。**回栈实测**（临时 panic + backtrace）显示拒绝来自**视图发射**通道 `ViewScope::with_binding`（`age_package.rs:2241`→`rename`→`package_field`），**不是**检查通道；而列表字段按设计**没有状态函数**（`age_component.rs` 的 `instance_states` 只按内建类型铸），所以 `[]T` 与裸 `List` 在发射期都缺列表访问器——裸 `List` 只是没被守卫拦下、会在函数解析期才失败。闭合需给列表字段一条运行时观测通道（状态函数返回列表，或视图作用域改读 model），属跨层改动。已试两步均回退：给检查通道加列表占位（不影响发射通道）、收窄 `[` 守卫（只把错误换成"未知状态函数"）。`plan116_store_list_view` 两例钉住边界。 |
+| R-12 | 包面视图**观察括号列表 model 字段**（`var groups []str = []` → `for g in .store.groups`） | `age_component`/`live_view` 视图观测 | **阻（三次实验已排除三条路）**：① 与 store 内联无关（widget 自己的 `[]str` 同样被拒）、与**拼写**有关（裸 `List` 不被守卫拦但同样缺访问器）；② 拒绝来自 `ViewScope::with_binding`（发射通道）→ 检验通道加占位无效；③ **包运行时路径 `widget_runtime::add_model` 本来就用 model 绑定**（`runtime_model_param` 只看 `fields` 非空，列表字段天然可读）——真正拦路的是 `live_view::add_widget_views` 这**第二条**视图发射（子 widget 渲染走 `state_at` 状态通道，而列表字段按设计无状态函数）。下一步须确认包路径 `__age_state_*` 函数的**发射归属**（`compile_age_component` 是否对包单元运行；`state_functions_present` 在 `bound.origins` 里找 `_at` 名），再决定给列表字段铸访问器还是让 live_view 也用 model 绑定。三处实验均已回退，未留半成品。 |
 | R-06 | 视图**空参回调**（`020/controls.at` `expected expression, found ')'` @148） | `ace-core` cst/grammar（view 属性位） | **已闭合**（2026-11-24，`auto-lang 563ee47de`）：`age-event-binding` 增显式空参数表臂（`age-event-binding-args-empty`，两面同开，镜像 118 的 handler 空参数）；**零作者实参**投影为裸消息引用（宿主供载荷），不是零实参方法调用——否则与消息载荷 arity 相撞。020/controls 越过该行。 |
 | R-10 | 视图 `if` 条件取**裸标识符**操作数（`if item.rel_dir == g {`） | `age-view-if` 条件面 | **已闭合**（2026-11-24，`auto-lang f59821dec`）：条件从裸 `pratt` 改走 `if-cond`（与 `age-on-if` 同一条件面）——此前 ident 后的 `{` 被当结构字面量吞掉整个分支体，整项回退。030/playlist 的分组过滤形。 |
 | R-11 | 包面视图回调的**作者实参**（`onclick: .SelectIndex(i)`） | `age-entry-value`/`age-event-binding` | **已闭合**（`f59821dec`）：包面 `age-entry-value` 在占位臂之后增通用 `age-event-binding` 臂（`$event`/`$0` 仍先匹配），作者实参投影为 self 方法调用、实参保留（与组件面同语义）。 |
