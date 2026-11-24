@@ -544,6 +544,13 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 真浏览器（Playwright 1.63.0 Chromium + `vite preview :4199`）：**pageerror 0**；页面含 85 个 button（81 格 + face + 3 难度）、文本含雷数/计时/三档难度与 `9×9`；点难度后棋盘切到 expert（480 格、`💣 99`）——**交互真实生效**。
 - 探针脚本：`plan-artifacts/plan-119/probe-vue.mjs`、`probe-vue2.mjs`（下一轮改成按文本/角色精确定位的逐行 oracle）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: A2Vue 首击展开 oracle 通过；右击标记待查 | outcome: pass（T-06 第 1 行） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 右击标记（oncontextmenu.prevent）在生成 SFC 的接线
+
+- 索引校正：生成页的 button 前 4 个是 face + 三个难度，**格子从第 5 个（index 4）开始**。
+- 实测（Playwright，`pageerror=0`）：boot 81 格全覆盖 → 点击 cell0 后 **18 个空格 + 18 个数字**（首击 flood-fill 展开，与 AV 侧一致）→ 右键同格 `flags=0`（标记未生效）。
+- 已更新探针：`plan-artifacts/plan-119/oracle-vue.mjs`（含截图 `038-vue.png`）。
+- 下一步：查生成 SFC 里 `oncontextmenu.prevent` 的接线（AV 侧已通；Vue 侧可能未发射该事件修饰符或未阻止默认菜单）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
