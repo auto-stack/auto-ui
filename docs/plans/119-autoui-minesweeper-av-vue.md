@@ -579,6 +579,14 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 
 **交接摘要**：AV/Iced 腿六行全绿并复验；A2Vue 腿除右击标记外全部通过（生成/构建/渲染/首击/难度）；工作树干净可编译，临时诊断清零；T-04/T-05/T-07/T-08 未开始。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 最后一跳已定位到 `checked_widget_view.js` 的事件键处理 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 在该 JS 里拆 `kind` 的 `.` 修饰并把基名映射为 Vue prop（`.prevent` → preventDefault）
+
+- 生成产物实证：App.vue 里事件是以**字符串协议**推送的（`a2x_str_lit("event")` + `a2x_str_lit("onclick")` + 消息名 + 参数个数），由 `checked_widget_view.js` 解释（`operation === 'event'` → `element.events.push({kind, message, types})`）。
+- 同一文件第 864 行起按 `kind.toLowerCase()` 校验/绑定；第 445 行已有 `binding.toLowerCase().split('.')` 的修饰符拆分先例 ⇒ **`oncontextmenu.prevent` 需要同样拆分**：基名 → Vue prop，`.prevent` → `preventDefault()`。
+- 因此下一轮改动面很小：在事件绑定处按 `.` 拆 kind，基名 `oncontextmenu` 映射（与 onclick 同路径），修饰符 `.prevent` 包一层 `preventDefault`；随后浏览器复跑 flag 行。
+
+**交接摘要**：AV/Iced 腿六行全绿并复验；A2Vue 腿生成/构建/渲染/首击/难度全通过，仅右击标记缺这一处；工作树干净可编译；T-04/T-05/T-07/T-08 未开始。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
