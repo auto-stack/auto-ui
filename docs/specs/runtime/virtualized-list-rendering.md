@@ -1,9 +1,9 @@
 # 虚拟列表渲染（VList / VirtualList）
 
 > 状态：现行合同，由 `auto-ui/PLAN-126` 引入（2026-11-24），实施 revision
-> `ce6d6234`（`plan-126-dev`，工作树 `D:/autostack/.wt/ui-126/auto-ui`）。本规范
+> `42e09ff1`（`plan-126-dev`，工作树 `D:/autostack/.wt/ui-126/auto-ui`）。本规范
 > 只记录 Windows VM/Iced 路径上已测得的行为，推断或未取证处标 `[未取证]`；原始
-> 证据见 `D:/autostack/plan-artifacts/plan-126/{t03,t03-scale,t04,t05}/README.md`。
+> 证据见 `D:/autostack/plan-artifacts/plan-126/{t03,t03-scale,t04,t05,t07}/README.md`。
 
 ## 1. 范围与命名
 
@@ -47,18 +47,26 @@
 - 窗口 = 可见行 + 两侧各 2 行 overscan（`OVERSCAN_ROWS = 2`）。可见区间是半开
   区间：上界 floor、下界 ceil，加 overscan 后夹紧到 `[0, n)`；列表整体在视口
   上/下方时为空区间（仍保留总高度）；`n = 0`、`row_h ≤ 0`、视口高 ≤ 0 或非有限
-  输入一律空区间（`visible_range`，`virtual_list.rs:117`）。
+  输入一律空区间（`visible_range`，`virtual_list.rs:118`）。
 - `row_h` / `list_top` 有两个来源：
   1. **显式 `row-height`**（创作侧声明，1–400px，非法值忽略）。声明后该 pane 不再
      标定、不做周期复核，视口宽变化也不作废行高；`list-top` 可选，缺省 0，首次
      构建带测量到达后只精修 `list_top`。
   2. **标定反解**。无几何时标定帧做**整表构建**（全部 n 行，与窗口化前一致），
-     `row_h = 构建带高 / n`；须两次间隔 ≥500ms 的样本一致（相对差 ≤0.5%）才采信，
+     `row_h = 构建带高 / 实际构建行数`：`View::Empty` 行被丢弃（空子件或单个
+     `View::Empty` 不产生行），构建带区间随之改为 `start + rows.len()`
+     （`virtual_rows.rs:252-260,274-279`），故只有无行被丢弃时行数才等于 n。
+     须两次间隔 ≥500ms 的样本一致（相对差 ≤0.5%）才采信，
      采信后每 3s 做一次整表复核构建纠偏。整表构建不依赖占位，内容高天然
-     = n·row_h，标定/复核帧不会塌陷。`CALIBRATION_ROWS = 256` 只用于显式行高在
-     尚无有界视口时的顶部引导窗口（§3）。字型/世界稳定前的早期样本偏高（025
+     = n·row_h，标定/复核帧不会塌陷。`CALIBRATION_ROWS = 256` 只在显式行高且
+     尚无有界视口时限制顶部引导窗口（`explicit_plan`，§3），不是通用标定带上限：
+     测量侧仍按「start=0 且行数 = 256」识别顶部标定段（`virtual_list.rs:465,537`），
+     因此列表顶部、窗口恰好建 256 行（`start = 0` 且
+     `ceil(band_bottom) = 254`，`band_bottom = (offset + viewport_h − list_top) / row_h`）
+     时，该窗口带会被误判为标定带；`virtual_rows.rs:27`
+     的本地同名常量已无引用。字型/世界稳定前的早期样本偏高（025
      实测 3456 → 3477），连续帧采样会锁死早期值。
-- `list_top = band_top − start · row_h − viewport_y`（`virtual_list.rs:472`）。
+- `list_top = band_top − start · row_h − viewport_y`（`virtual_list.rs:507`）。
   `band_top` 是 iced 布局给出的窗口绝对坐标（布局不按滚动偏移平移内容，滚动只在
   绘制/命中阶段换算），故扣除视口原点 `viewport_y`。窗口带只用于重算 `list_top`；
   其平均行高不得覆盖标定或显式行高——窗口带均值可偏 ~0.5%（025 实测全局
@@ -95,7 +103,7 @@
 （`tracked.rs:52`）、调试/MCP 轨 `convert_for_unkeyed`（`tracked.rs:437`）与
 `convert_for_keyed`（`route_memo.rs:575`）；列双胎（untracked
 `tags_container.rs:38`、tracked `tracked.rs:2283`）**无条件**压 pane 作用域
-（隐式滚动列自动窗口化）；显式 `scroll` 双胎（untracked `tags_container.rs:176`、
+（隐式滚动列自动窗口化）；显式 `scroll` 双胎（untracked `tags_container.rs:182`、
 tracked `tracked.rs:2596`）**仅当声明 `row-height`** 才压作用域，未声明时两轨
 都不压。因此两轨使用同一 scope 规则，在同一窗口、同一行区间内认领同一
 `vlist_{seq}` key，窗口行集与 MCP 快照一致。
@@ -111,8 +119,13 @@ tracked `tracked.rs:2596`）**仅当声明 `row-height`** 才压作用域，未�
 probe/debug-id 本为空；差异只有「可见行的 `for` 迭代上下文」一项（inspector 面）。
 
 MCP / 快照面：`VirtualMark` 在 vnode 转换与快照构建中透明（`vnode_converter.rs:132`、
-`snapshot_builder.rs`），窗口行落在标记所在路径；`SpacePx` 在检视层是空 `Text`
-叶子，快照里以 `Space` 节点带高度呈现。因此 `autoui_action press` 的
+`snapshot_builder.rs`），窗口行落在标记所在路径；`SpacePx` 在 vnode 检视层是空
+`Text` 叶子（`vnode_converter.rs:253`）。**只有** View 构建的 `SnapshotBuilder`
+（`snapshot_builder.rs:98-104`，aura-id 动作面）输出带 `height` 的 `Space` 节点；
+渲染态 MCP 快照（`AURA Snapshot v2 (rendered)`，`mcp_server.rs:5681`
+`build_aura_from_styled_vtree`）**没有** `Space` 节点：占位叶子按空 `Text` 占位
+过滤掉（`mcp_server.rs:5718-5727`），屏外占位不出现在该快照中（`t05/t05win/*.txt`
+与 `t07/repair1*/snapshot_*.txt` 均 0 个 `Space`）。因此 `autoui_action press` 的
 `vnode.path → find_view_by_path` 仍精确落回该行
 （`plan126_vlist_windowed_row_vnode_paths_resolve_to_the_row`）。025 的表格行在开/
 关两模式都没有 `[for:]` 上下文行。
@@ -162,11 +175,14 @@ MCP / 快照面：`VirtualMark` 在 vnode 转换与快照构建中透明（`vnod
 
 ## 7. 实测结论
 
-- **025 实窗**（GL，`t01/probe11`，偏移 0/600/2400/7200）：`measure panes=1
-  bands=1`；`row_h=28.97`、`list_top=176.20`；窗口 `[0, 22)`（顶）与 `[93, 120)`
-  （尾，27 行）；pane 内容高 3663.6–3685.1（T-01 基线 3669，差值等于换行成两行的
-  进程名各 +21px）；clamp 7200→2946；114 次窗口构建 / 29 次标定构建。关闭对照
-  （`t01/off10`）：120 行、内容 3689.8、clamp 2950。
+- **025 实窗**（GL，`t07/repair1{,b,c}`，偏移 0/2400，`repair1c` 另加 7200）：`measure
+  panes=1 bands=1`；`row_h` 28.80–29.32、`list_top=176.20`；窗口 `[0, 22)`（顶，三次
+  运行一致）；`repair1c` 尾部 `[93, 120)`（27 行）；pane 内容高 3648.2–3710.6（同一
+  运行内偏移 0/2400 无 3s 塌陷，`repair1` 两次均为 3648.2；跨运行差异是换行漂移，
+  §8）；`repair1c` clamp 7200→2962；窗口构建 74/77/112 次、整表标定构建 20/20/23
+  次（依次 `repair1`/`repair1b`/`repair1c`）。关闭对照（`t01/off10`）：120 行、内容
+  3689.8、clamp 2950。修复前基线（`t01/probe11`，`ce6d6234`）：`row_h=28.97`、
+  内容 3663.6–3685.1、clamp 7200→2946。
 - **V-01 规模**（`row_h=28`、`list_top=0`、viewport 740、offset 700、overscan 2 ⇒
   窗口 `[23, 54)`）：1,000 与 10,000 行逐维相同——读取 31 行 / `list_get` 31 次 /
   构建 31 行 / vnode 37 / layout 节点 3；关闭开关为 1,003 / 10,003 vnode
@@ -186,16 +202,18 @@ MCP / 快照面：`VirtualMark` 在 vnode 转换与快照构建中透明（`vnod
   带仍占 313 节点中的 242（22 行 × 11，77.3%）。节点比天花板 1390 / 313 = 4.44×，
   实测 3.60× 为天花板的 81%。刷新残余为 VM `Refresh` + O(120²) `.ApplySort`
   ≈100ms（占窗口化刷新帧 44%），属 Q-01 范围。
-- **回归**：HEAD lib `2702 run / 2689 pass / 12 fail / 1 timeout`，与干净
-  `fbabf41d` 的 13 项同名同耗时（0 回归）；`--test desktop_behavior` 11/11；定向
-  `plan126_vlist` 14/14、`virtual_list` 33/33、`scrollable` 9/9、`vnode` 47/47。
+- **回归**：HEAD lib `2706 run / 2693 pass / 12 fail / 1 timeout`（与 `ce6d6234` 基线的
+  `2702 / 2689 / 12 fail + 1 timeout` 同失败数、同已知族；名称有翻转，翻转项均在
+  隔离/复跑通过，见 `t07/repair1-review.md`）；`--test desktop_behavior` 11/11；定向
+  `plan126_vlist` 18/18、`virtual_list` 37/37、`scrollable` 9/9、`vnode` 47/47。
 - **025 双模式走查 12/12**：启动（22 vs 120 行）、进程↔性能切换、表头排序 asc 与
   翻转（19ms vs 1,049ms）、结束任务对话框开/取消、滚动到底/顶/中（clamp = 内容高 − 视口高）。
 
 ## 8. 已知边界与债务
 
 - **换行导致内容高漂移**：固定行高是均值，换行行各 +21px，内容高与 clamp 随数据
-  变化（025 实测 3663.6–3685.1 / clamp 2946–2962）；这不是 clamp 缺陷，也不做逐行
+  变化（025 实测内容高 3648.2–3710.6、`repair1c` clamp 2962；修复前 `t01/probe11`
+  为 3663.6–3685.1 / clamp 2946–2962）；这不是 clamp 缺陷，也不做逐行
   测量修正。
 - **`table-row` 丢弃行样式**：`convert_element.rs:1269–1276` 构建
   `View::Row { style: None, … }`，025 的行高亮样式在 VM 轨两模式下都不生效
