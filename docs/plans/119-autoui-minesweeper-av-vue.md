@@ -522,6 +522,15 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - A（正解，auto-lang `cst/frontdoor.rs` 包面路径）：追加前按名去重（若 `first.stores` 已含同名 store 则只保留一条）。一行级改动 + 回归。
 - B（auto-ui 绕过）：A2Vue lane 不走 `generate_linked_front_sfc`（其首部 `package_candidates` 必踩此坑），直接用 units 调 `generate_package_sfc_leaf`/`generate_package_sfc_with_root`（AV 同形已证可用）。
 
+2026-11-24 §10 裁定（用户口头授权 A）：**授权 auto-lang 语义面修复**（同源 store 去重等 A2Vue 阻塞项）。
+
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 双 store 已解除；inspection 通过；新墙 = a2x `DynCast` 未接面 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （见下） | next: a2x Collections 域的 DynCast 支持
+
+- auto-lang 去重已落地并生效：`frontdoor.rs` 包面路径按名去重后再 `inline_store_decl`（`multiple store declarations` 消失）。
+- auto-ui inspection 改用**包面拼写**（`[]T` → `List<T>`）：`fallback.log` 现为 `candidates=Ok(1)`，inspection 通过。
+- 新墙（SFC 生成阶段）：`not serve expression `DynCast { operand: ExprId(646), test_nil: false }` in Collections` —— a2x TS 后端在 Collections 域未接 `DynCast`（`.to(Str)` 一类转换在生成的 TS 里落入该节点）。
+- 下一步：在 auto-lang a2x-ts 的 Collections 域接 `DynCast`（按用户授权 A 可做），或让 prep 把该转换换成 a2x 已支持的形态（`to_string`/字符串拼接路径）。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
