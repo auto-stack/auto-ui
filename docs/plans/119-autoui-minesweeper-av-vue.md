@@ -494,6 +494,11 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - A2Vue 腿（T-06）：卡在包面 SFC 生成器的 `multiple store declarations per node`；已排除组件面边界、二次 prep、checked_widgets 三处，剩 units 内部复制点。
 - 尚未开始：T-04 独立复核、T-05 AV 收据、T-07 终审、T-08 落主归档。
 
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 49 | from: work | to: work | status: drafting | outcome: pass（检查点） | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: auto-ui 工作树干净 / auto-lang 823c54c7e | next: work（T-06 units 复制点：desugar_units / append_widget_packages）
+
+- 本轮为**检查点轮**：两棵工作树均干净可编译（auto-ui `cargo build … --example ace_node_desktop_window` Finished；auto-lang HEAD 823c54c7e，无未提交改动）。
+- 无新增代码改动；A2Vue 腿的下一步判据与证据链已在 §9（round 48 条目）固化，不再重复。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
