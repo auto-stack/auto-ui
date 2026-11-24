@@ -6,7 +6,7 @@ author: [lead]
 created_at: 2026-11-24
 updated_at: 2026-11-24
 plan_revision: 2
-current_step: 4
+current_step: 5
 total_steps: 8
 depends_on: [auto-ui/PLAN-112]
 supersedes_spec_components: []
@@ -122,8 +122,9 @@ T-03/T-04 建立 V-01..V-03 和 V-05 所需的定向 fixture。T-01 准备绑定
 - [x] T-04 接通 025 与行交互
   - **work**。依赖 T-03。让 025 的表体接入共享组件，使用既有视口，保留表头布局与排序入口。验证滚动、缩放、点击、右键和排序后的 PID，补齐普通列表正反对照。覆盖 AC-01、AC-04。
   - 结果：pass。真实树目标 + 三条独立 PID 证明（handler 载荷 / `selected_pid` / `tasklist` oracle）在 offset 0、滚动到 2400、按名重排后均一致；滚出窗口的旧行 id 不可命中（`VNode not found`）；修掉同帧兄弟 pane 共用 scope key 的隔离缺陷（`ce6d6234`）。右键菜单在窗口内不可编程驱动（MCP 无 context-menu 动作、OS 输入不可达），以构建期单测 + 标注的 fixture 注入取证。见 §9。
-- [ ] T-05 验证规模、交互和性能
+- [x] T-05 验证规模、交互和性能
   - **work**。依赖 T-03、T-04。运行 V-01..V-05 的 work 验证，登记样本、计数、差值、未观测项及诊断。原始证据写入 `D:/autostack/plan-artifacts/plan-126/`，结果摘要写入 §9。覆盖 AC-01..AC-04。
+  - 结果：pass。V-04 同机 GL 同窗对照（纯滚动）：整帧 129.0ms vs 464.0ms（**3.60×**）、s4 element 118.5 vs 408.5ms（3.45×）、s3b build 2.86 vs 10.03ms（3.51×）、MCP scroll RTT 80.7 vs 307.3ms（3.81×）；刷新帧整帧 228.0 vs 586.0ms（**2.57×**，`s2_vm` 1.00× 不变）。**2× 目标达成**。V-05：lib 套件 0 回归（13 项既存失败与干净基线同名同耗时）、`desktop_behavior` 11/11、025 双模式走查 12/12。V-01 1k/10k 同窗口 31 行/37 vnode/3 layout nodes（关闭 1003/10003 vnode）。见 §9。
 - [ ] T-06 准备规范与复审收据
   - **work**。依赖 T-05。在实现树准备 SD-01 和 revision 绑定证据，记录实际新增用例与时长、受影响回归、已知边界与待执行合并门。为 AC-05 提供输入。
 - [ ] T-07 独立复审
@@ -250,6 +251,23 @@ r1 基线 Git blob `c667888299e6fb283f23233b13532a77b665605e`。r1 的 AC-02 承
 - 证据：`D:/autostack/plan-artifacts/plan-126/t04/README.md`（`final4/`、`final4_stdout.txt`、`t04_interact.py`、`t04_diag.py`）。
 
 2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 7 | from: executing | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: ce6d6234 | next: work（T-05）
+
+2026-11-24 stage: work | PLAN-126:r2 | outcome: pass（T-05 完成，T-01..T-05 已闭；2× 达成） | plan_revision: 2 | worktree: D:/autostack/.wt/ui-126/auto-ui | branch: plan-126-dev | code_commit: ce6d6234（无实现改动，纯取证） | tasks: T-05 | next_responsible_role: work（T-06）
+
+**T-05（pass）规模、交互与性能取证**
+
+- 工具与口径：`auto-ui-tool.exe` sha256 `A304A51F…B572F3`（绑定 `ce6d6234`），`WGPU_BACKEND=gl`、`auto run -r vm`、MCP HTTP；两模式同窗（pane `[193,60,1087,740]`），固定滚动序列 `0/600/1200/1800/2400/2800`（settle 1.2s）。刷新分离：按真实 ⏸（轮询 `running=="false"`，ack 排队 2.97s 窗化 / 1.66s 关闭）+ 日志字节序相位切片 + 段签名（`s2_vm≥20ms` ⇒ Tick→Refresh→ApplySort）；暂停相位 0 刷新帧、0 `[VM-PARKED]`，实时相位 50/49 与 82/82。
+- **V-04（纯滚动，µs，中位/P95/最大）**：s3b build/clone 2,856/5,140/6,194 vs 10,027/11,453/13,399（3.51×）；**s4 iced Element 118,507/148,322/168,360 vs 408,541/430,546/454,633（3.45×）**；s5 layout 167/531/5,827 vs 451/472/501；**整帧 129,000/172,000/194,000 vs 464,000/496,000/517,000（3.60×）**；MCP scroll RTT 80.7/107.6/117.3ms vs 307.3/332.9/436.0ms（3.81×）；行/节点/样本 22–31 行、313 节点、336 帧 vs 120 行、1390 节点、264 帧。
+- **刷新帧**：`s2_vm` 100,800 vs 100,941µs（1.00×，未变）、`s4` 117,200 vs 450,815（3.85×）、整帧 228,000 vs 586,000（**2.57×**）；实时模式滚动帧 119,000 vs 544,000（4.57×）；截图 1,283 vs 2,223ms（1.73×）。不暂停的 stock harness 交叉核对：scroll RTT 228.7 vs 941.5ms（4.12×）。
+- **2× 判定：达成**（纯滚动 3.31–3.60×、刷新 2.57×、scroll RTT 3.8–5.7×）。残余主导：**每帧 Element 树全量重建 s4 = 118.5ms/129.0ms（92%）**，其中可见带仍占 313 节点中的 242（22 行×11）；节点比天花板 4.44×（1390/313），3.60× = 天花板的 81%。刷新残余为 VM `Refresh` + O(120²) `.ApplySort` ≈100ms（占窗口化刷新帧 44%），属 Q-01 范围。
+- **V-05**：HEAD lib `2702 run / 2689 pass / 12 fail / 1 timeout` vs 干净 `fbabf41d` `2697 / 2684 / 12 / 1`——**同样的 13 个失败名与耗时**（计数差仅 +5 个 T-04 新测且全过）⇒ **0 回归**；13 项既存（OS 剪贴板×3、headless `rq_probe` 120s 挂起、AV/compiler slice/ring×4、gallery/media×2、plan657 慢×1、desktop-bridge env×1）。`--test desktop_behavior` 11/11 exit 0。定向：`plan126_vlist` 14/14、`virtual_list` 33/33、`scrollable` 9/9、`vnode` 47/47。临时基线检出已 `git reset --hard ce6d6234` 复原，`git status` 空。
+- **025 双模式走查 12/12 PASS**：启动（22 vs 120 行）、进程↔性能切换、表头排序 asc+翻转（单调序，19ms vs 1,049ms）、结束任务对话框开（`结束任务` + `确定结束 <name> (PID n)`，PID=`selected_pid`）+ 取消关闭、滚动到底/顶/中（clamp 2,962 窗化 / 2,909 关闭 = 内容−视口，差值 = 换行增量而非缺陷）。截图 `walkwin|walkoff/shot_*.png`。
+- **V-01（HEAD 复核）**：1k/10k 同窗口 `[23,54)`，31 行读取/31 `list_get`/31 构建、37 vnode、**3 layout nodes**（关闭 1,003/10,003 vnode，14.9/123.3ms），与 `t03-scale` 一致。
+- 既存缺陷（两模式都在）：`table-row` 丢样式（`convert_element.rs:1269–1276` `View::Row{style:None}`），窗化 0/22、关闭 0/120 行带 `style:`；选中行视觉不高亮而 `selected_pid`/`kill_target` 正确。本计划对该文件唯一改动是 `measure_key: None`（`:709`）。纳入 V-05 观察项与后续债务。
+- 未观测/风险：右键菜单仅 fixture 注入（无 MCP context-menu 动作，`ConfirmKill` 未按）；快照 `@rect` 只在最后脏+MCP 帧出现（矩阵以 id/state 为判据）；关闭模式无「仅滚动」帧类（全绘制与快照消费差 <3%）；同 commit 基线失败数 11→12 属环境漂移（当日配对一致）；2× 仅对 120 行上限应用逐帧计时成立，不外推到感知平滑或 >120 行。
+- 证据：`D:/autostack/plan-artifacts/plan-126/t05/README.md`（§0–§6）+ `t05win|t05off`、`base_win|base_off`、`walkwin|walkoff`、`nextest_*.log`、`tables.md`、harness `t05_*.py`。本轮无实现改动。
+
+2026-11-24 stage: goal | plan_id: PLAN-126 | plan_revision: 2 | round: 8 | from: executing | to: executing | status: executing | outcome: pass | worktree: D:/autostack/.wt/ui-126/auto-ui | commit: ce6d6234 | next: work（T-06）
 
 ## 10. 待澄清事项
 
