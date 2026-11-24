@@ -399,6 +399,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 因此缺席的判定落在该 auto-lang 入口内部的投影：若它不经 `inline_store_decl`（或经但 scenario 重放面另有 foreign 判据），`store.X()` 就会保持未展开 → `handler_body_foreign=true` → 缺席。
 - 下一步单点（auto-lang，诊断可先从读码入手）：确认 `compile_component_scenario_states_at` 是否调用 `project_component_candidates`/`inline_store_decl`，以及 scenario `Send` 重放对 store 展开体的 foreign 判定；必要时在同一入口复用包面已修的展开与可发射集合。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: lane 入口确实走 `project_component_candidates`（含 store 内联） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 用探针对同一 prep 源打印逐 handler `body_foreign`
+
+- 读码：`compile_component_scenario_states_at` → `compile_component_scenario_full` → **`desugar_widget_src` + `project_component_candidates(src)`**（`core/src/source/age_component.rs:2618-2665`）。即该入口**确实**执行 store 内联（含本轮修的 `Effect` 展开与 `contains_call` 放宽）。
+- 因此缺席另有原因，需实测而非推断：用 `p119_diag` 对**同一 prep 源**（lane 输入）打印每个 handler 的 `body_foreign` 与 stmts 数，对照 `compile_component_scenario_states_at` 的结果，判断差异出在 ①scenario `Send` 重放面，②`initials`/`node_index` 选择，还是 ③lane 侧读取的处不是 description 的同一份。
+- 下一步判据已成形（探针一行即可）：`P119_COMPONENT=1 p119_diag` 打印 + 与 lane 输入落盘（`P119_VUE_DUMP`）对照。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
