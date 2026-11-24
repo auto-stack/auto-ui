@@ -1917,6 +1917,13 @@ fn rewrite_canvas_scene_bindings(src: &str) -> String {
 /// （`) str {`）、以及 model 块之外的 `var <name> str` 局部（model 块已由
 /// rewrite_model_text_fields 覆盖，重复无害）。跳过注释行；字符串字面量内
 /// 的命中在本计划语料（paint）中不存在，属具名记录的改写边界。
+/// PLAN-118：依赖包模块源的 str/Str 注解归一（与 app prep 同一 pass）——
+/// VM 轨组件包的模块 fn 以 `str` 声明返回/局部，AGE 包面要求 owned `Str`
+/// （`expected str, found Str` 的 088 color_model 真语料形）。
+pub(crate) fn normalize_package_text_surface(src: &str) -> String {
+    rewrite_str_surface_for_package(src)
+}
+
 fn rewrite_str_surface_for_package(src: &str) -> String {
     let mut out = String::with_capacity(src.len());
     for line in src.split_inclusive('\n') {

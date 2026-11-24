@@ -22,7 +22,9 @@ use auto_ui_compiler::{
 /// Prepare legacy widget modules for the checked AGE package compiler.
 pub(super) fn normalize_package_module_placeholders(src: &str) -> String {
     let normalized = normalize_legacy_json_import(normalize_event_placeholders(src, true));
-    // PLAN-118：依赖包模块的 canvas 场景合成名同样归一（app 走 prep 同一 pass）。
+    // PLAN-118：依赖包模块的 canvas 场景合成名与 str/Str 注解同样归一
+    // （app 走 prep 同一 pass；088 包的模块 fn 以 `str` 声明返回/局部）。
+    let normalized = crate::ui::ace_source_prep::normalize_package_text_surface(&normalized);
     crate::ui::ace_source_prep::normalize_package_scene_bindings(&normalized)
 }
 
@@ -663,5 +665,4 @@ widget App { view { text verdict() {} } }
         let plain = "use auto.json\nwidget W { view { text \"x\" {} } }\n";
         assert_eq!(promote_module_fns_to_public(plain), plain);
     }
-
 }
