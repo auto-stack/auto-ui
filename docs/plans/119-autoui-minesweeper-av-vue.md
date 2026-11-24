@@ -551,6 +551,12 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 已更新探针：`plan-artifacts/plan-119/oracle-vue.mjs`（含截图 `038-vue.png`）。
 - 下一步：查生成 SFC 里 `oncontextmenu.prevent` 的接线（AV 侧已通；Vue 侧可能未发射该事件修饰符或未阻止默认菜单）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 生成 SFC 只发射 onclick，未发射 oncontextmenu | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 在包面 SFC 渲染器补 `oncontextmenu`（含 `.prevent`）
+
+- 证据：生成 `App.vue`（440 KB，程序化 `h()` 渲染）中 **`onclick` 6 处、`oncontextmenu` 0 处**；store composable 里 `Flag` 动作与 🚩 逻辑都在，缺的是视图事件发射。
+- 因此浏览器右击不触发标记是**发射面缺口**，不是 store 逻辑问题。
+- 下一步：在包面 SFC 渲染器（auto-lang `checked_widgets` / `ace_package_sfc` 的事件发射处）支持 `oncontextmenu`（`oncontextmenu.prevent` 需同时 `preventDefault`），按用户 A 授权可做；随后浏览器复跑 `oracle-vue.mjs` 的 flag 行。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
