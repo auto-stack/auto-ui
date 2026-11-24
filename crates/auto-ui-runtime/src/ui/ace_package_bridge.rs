@@ -554,18 +554,32 @@ impl PackageStateEngine {
         } else {
             // The checked entry decides which children mounted in a conditional
             // or repeated view. Inactive branches do not run Init.
-            let items = ace_av::age_package::evaluate_package_entry_view(compiled, 0, &frame_limits())?;
-            let mut pending: Vec<_> = items.iter().collect();
-            while let Some(item) = pending.pop() {
-                let WidgetViewItem::Element(element) = item else { continue };
-                if let Some(site) = frame::child_site(&compiled.description, &compiled.widget_refs, entry, element) {
-                    if let Some(index) = compiled.description.components.iter()
-                        .position(|node| node.module == site.module && node.name == site.node)
-                    {
-                        visible.insert(index);
+            //
+            // PLAN-118（T-03 真窗）：预 Init 求值可能读尚未种下的列表元素
+            // （031-paint 的视图叶 `.px[42]`，而 `.px` 由 `.Init` 填 256 项）——
+            // 求值失败不得让装载失败：退回「入口 + 全部站点」的可见集，
+            // Init 补齐状态后按真实帧重算。
+            match ace_av::age_package::evaluate_package_entry_view(compiled, 0, &frame_limits()) {
+                Ok(items) => {
+                    let mut pending: Vec<_> = items.iter().collect();
+                    while let Some(item) = pending.pop() {
+                        let WidgetViewItem::Element(element) = item else { continue };
+                        if let Some(site) = frame::child_site(&compiled.description, &compiled.widget_refs, entry, element) {
+                            if let Some(index) = compiled.description.components.iter()
+                                .position(|node| node.module == site.module && node.name == site.node)
+                            {
+                                visible.insert(index);
+                            }
+                        } else {
+                            pending.extend(&element.children);
+                        }
                     }
-                } else {
-                    pending.extend(&element.children);
+                }
+                Err(_) => {
+                    let sites = compiled.widget_refs.get(&(root.module.clone(), root.name.clone()));
+                    visible.extend(sites.into_iter().flatten().filter_map(|site| {
+                        compiled.description.components.iter().position(|node| node.module == site.module && node.name == site.node)
+                    }));
                 }
             }
         }

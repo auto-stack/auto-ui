@@ -910,7 +910,7 @@ pub fn prepare_component_source(
     // PLAN-118：包面目标的 str→Str 注解归一（内联 fn 已前置，最后统一跑；
     // model 块早被 rewrite_model_text_fields 覆盖，此处恒等）。
     if package_face_target {
-        out = rewrite_str_surface_for_package(&out);
+        out = rewrite_str_surface_for_package(&out, true);
     }
     // PLAN-118：canvas 场景合成名归一——`scene: .cells`（cells 非 model 字段，
     // 五平行列表 `<名>_pts/_meta/_nodes/_edges/_labels` 是）改写成串 prop
@@ -1921,10 +1921,13 @@ fn rewrite_canvas_scene_bindings(src: &str) -> String {
 /// VM 轨组件包的模块 fn 以 `str` 声明返回/局部，AGE 包面要求 owned `Str`
 /// （`expected str, found Str` 的 088 color_model 真语料形）。
 pub(crate) fn normalize_package_text_surface(src: &str) -> String {
-    rewrite_str_surface_for_package(src)
+    // 依赖包模块只归一返回注解与 `var` 局部：形参保持借用 `str`——模块 fn 的
+    // 形参是 owner，改成 owned 会把「读原值再转局部」变成 move+use-after-move
+    // （088 color_model `cp_hex_valid(phex)` 后 `var t Str = phex` 的真语料形）。
+    rewrite_str_surface_for_package(src, false)
 }
 
-fn rewrite_str_surface_for_package(src: &str) -> String {
+fn rewrite_str_surface_for_package(src: &str, rewrite_params: bool) -> String {
     let mut out = String::with_capacity(src.len());
     for line in src.split_inclusive('\n') {
         let trimmed_end = line.trim_end_matches(['\n', '\r']);
@@ -1937,7 +1940,7 @@ fn rewrite_str_surface_for_package(src: &str) -> String {
         let mut body = trimmed_end.to_string();
         if t.starts_with("fn ") {
             // 形参表与返回注解：`) str {` → `) Str {`；形参内 ` str` 词 → ` Str`。
-            if let Some(open) = body.find('(') {
+            if let Some(open) = rewrite_params.then(|| body.find('(')).flatten() {
                 if let Some(close_rel) = body[open..].find(')') {
                     let close = open + close_rel;
                     let params = body[open + 1..close].to_string();
@@ -2220,7 +2223,7 @@ mod plan118_tests {
     return t
 }
 ";
-        let out = rewrite_str_surface_for_package(src);
+        let out = rewrite_str_surface_for_package(src, true);
         assert!(out.contains("fn f(ps Str, n int) Str {"));
         assert!(out.contains("var t Str ="));
     }
