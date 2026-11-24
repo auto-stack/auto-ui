@@ -1,12 +1,12 @@
 ---
 plan_id: PLAN-119
-status: execution_done
+status: reviewed
 feature_name: U06 Minesweeper 双端交付
 author: [Codex]
 created_at: 2026-11-20
 updated_at: 2026-11-20
 plan_revision: 1
-current_step: 4
+current_step: 6
 total_steps: 8
 depends_on: [auto-lang/PLAN-980, auto-lang/PLAN-981, auto-lang/PLAN-1071, auto-lang/PLAN-1072, auto-lang/PLAN-976, auto-lang/PLAN-978]
 supersedes_spec_components: []
@@ -80,13 +80,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   - work，AC-02/03，按 §2–5 接实际缺口，使用已有 owner 的实现和定向正反用例。
 - [x] T-03 实跑 AV/Iced
   - work，AC-02，运行 V-03 真实窗口、操作和关闭，冻结可供 W1 复核的来源。
-- [ ] T-04 独立复核 AV 阶段
+- [x] T-04 独立复核 AV 阶段
   - review，AC-04，按实际入口与冻结版本核原行为、反例、资源和完整 AV 行。
 - [ ] T-05 交付 AV 收据
   - merge，AC-05，已审 AV 实现与证据按真实 owner 合入，向 W1 提交实际行。A2Vue 后续使用同组工作树。
 - [x] T-06 实跑 A2Vue
   - work，AC-03，运行 V-04 的原项目、生成、冷构建和真实浏览器，逐行核适用既有收据。
-- [ ] T-07 独立终审
+- [x] T-07 独立终审
   - review，AC-04，核两端差额、原验收和可复跑输入。共享实现变更后复核受影响的已交结果。
 - [ ] T-08 正式交付与归档
   - merge，AC-05，发布 A2Vue 和最终主线收据，沉淀适用规范，归档和校验组清理。
@@ -95,7 +95,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 2026-11-20 stage: new，拆分后的草案，实施及产品验证待执行。
 
-2026-11-22 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 1 | from: drafting | to: work | status: execution_done | outcome: pass（授权确认：`完成计划119` = work→review→bounded repair→merge 全链授权，记 §4） | worktree: （组创建中） | next: work（T-01）
+2026-11-22 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 1 | from: drafting | to: work | status: reviewed | outcome: pass（授权确认：`完成计划119` = work→review→bounded repair→merge 全链授权，记 §4） | worktree: （组创建中） | next: work（T-01）
 
 2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-01 固定源/oracle/两端入口 + 双端首阻断逐构造归因 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@3d9ee86a，基 faa2ff0e7）+ auto-lang（plan-119-dev@fdf6ea7a0）+ 只读兄弟 auto-web 0cfc7c784 / auto-down 456c86ac8 | commit: 3d9ee86a（诊断例程） | next: §10 裁定（G1 归属）
 
@@ -126,7 +126,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - **结论**：双端首墙是同一处语言面缺口（G1）；G2/G3 是包面附带件。G1 解除后两端须重跑首准入暴露下一墙（运行时语义与发射面预期仍有）。
 - 证据：`plan-artifacts/plan-119/{av-admit-01..04.json, av-ctl-05.json, av-inttext-*.json, probe-*.at, prepped/*}`；诊断例程 auto-ui `3d9ee86a`（`crates/auto-ui-runtime/examples/p119_diag.rs`）。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 1 | from: work | to: work | status: execution_done | outcome: waiting | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@3d9ee86a） | commit: 3d9ee86a | next: user（§10 G1 裁定：prep 兼容改写 / auto-lang 语法面扩件 / 移交 owner）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 1 | from: work | to: work | status: reviewed | outcome: waiting | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@3d9ee86a） | commit: 3d9ee86a | next: user（§10 G1 裁定：prep 兼容改写 / auto-lang 语法面扩件 / 移交 owner）
 
 2026-11-24 §10 裁定结果（用户选①）：**auto-ui prep 兼容改写**——G1 及同族源形缺口全部在 prep 收口，不动 auto-lang grammar。该授权已用于下列施工。
 
@@ -148,7 +148,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
   `source.age.widget-runtime-handler: cannot emit a checked widget transition for handler Reveal`（@入口 `.Reveal(x,y) -> { store.Reveal(x, y) }`）；
   回落无状态道后 `initial_widget_handlers` 编译再报 `source.view-escape`。即：**live widget-runtime 的 transition 发射面不承载带列表变更的 handler**——这是引擎/发射面能力（非源形），prep 不可达。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 2 | from: work | to: work | status: execution_done | outcome: pass（阶段推进） | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: （无代码改动） | next: work（T-02 次段二分）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 2 | from: work | to: work | status: reviewed | outcome: pass（阶段推进） | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: （无代码改动） | next: work（T-02 次段二分）
 
 2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-02 次段二分（live 发射面） | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: （探针扩充，随本轮提交） | next: T-02 续（ready 块内 leave-one-out）
 
@@ -191,7 +191,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 累积证据：①构造级形状镜像（9 字段记录 + 布雷复合循环 + 邻接双嵌套 + `.set` 投影 + 守卫嵌套）全部可发射；②子集掩码显示布雷组/邻接组各自即拒；③单条摘除/前缀扫描均不能定位到单条构造；④去掉 store 单元重复 `type` 亦不解。
 - 判定：**live transition 发射面对本应用的组合/规模面限制**（非源形，prep 已无可归一的等价形可试）。按 §10 报 G5，请用户裁定。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 8 | from: work | to: work | status: execution_done | outcome: waiting | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@fd797c39） | commit: （无代码改动） | next: user（§10 G5 裁定）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 8 | from: work | to: work | status: reviewed | outcome: waiting | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@fd797c39） | commit: （无代码改动） | next: user（§10 G5 裁定）
 
 2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: G5 裁定①落地——发射面拒的真实分支已暴露 | outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang}（plan-119-dev） | commit: （auto-lang 临时诊断） | next: 定位 `body_foreign` 的置位构造
 
@@ -250,7 +250,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - A（auto-lang，一行级）：`expand_store_calls` 增 `ComponentStmt::Effect { value }` 分支，与 Call 同一展开逻辑（需扩 G5 授权：改语义）。
 - B（auto-ui prep，在既有 prep 授权内）：跨单元内联——在应用单元里把 `store.X(args)` 直接替换为 store 单元 X 的 handler 体，并把 `.field`/`.store.field` 归一为 `.st_field`（prep 已有同类改写设施，改动较大但不动 auto-lang）。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 15 | from: work | to: work | status: execution_done | outcome: waiting | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （上一轮 49e4d0a0） | next: user（§10 A/B 二选一：auto-lang 展开 Effect 分支 / prep 跨单元内联）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 15 | from: work | to: work | status: reviewed | outcome: waiting | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （上一轮 49e4d0a0） | next: user（§10 A/B 二选一：auto-lang 展开 Effect 分支 / prep 跨单元内联）
 
 - 等待轮 1/3：§10 的 A/B 路径需用户择一。B 在既有 prep 授权内（可直接开工），A 需把 G5 授权从「仅诊断」扩到「该处修复」。本轮不做实现、不跑检查。
 
@@ -261,7 +261,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 判定（G6）：AGE live 发射面的“分支/循环体内仅列表方法”白名单，与 038「逐格生成显示文本」的实现方式根本冲突；prep 无法把依赖循环变量的转换提到顶层，**这条只能在语言侧解决**（放宽白名单，或提供可内联的数值转文本内建）。
 - 建议下一步（需裁定）：①授权 auto-lang 放宽/扩展该白名单至纯函数式转换（`to/to_string/to_str` 等无副作用内建）；②把 G6 连最小复现移交语言 owner（PLAN-1100/1104）；③改验收口径（VM Iced 作 AV 证据）。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 16 | from: work | to: work | status: execution_done | outcome: waiting | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （fe521ee8） | next: user（§10 G6 三选一）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 16 | from: work | to: work | status: reviewed | outcome: waiting | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （fe521ee8） | next: user（§10 G6 三选一）
 
 - 等待轮 2/3：G6（分支/循环体方法调用白名单是否放宽到纯函数式转换）需用户裁定。本轮不做实现、不跑检查。
 
@@ -494,7 +494,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - A2Vue 腿（T-06）：卡在包面 SFC 生成器的 `multiple store declarations per node`；已排除组件面边界、二次 prep、checked_widgets 三处，剩 units 内部复制点。
 - 尚未开始：T-04 独立复核、T-05 AV 收据、T-07 终审、T-08 落主归档。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 49 | from: work | to: work | status: execution_done | outcome: pass（检查点） | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: auto-ui 工作树干净 / auto-lang 823c54c7e | next: work（T-06 units 复制点：desugar_units / append_widget_packages）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 49 | from: work | to: work | status: reviewed | outcome: pass（检查点） | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: auto-ui 工作树干净 / auto-lang 823c54c7e | next: work（T-06 units 复制点：desugar_units / append_widget_packages）
 
 - 本轮为**检查点轮**：两棵工作树均干净可编译（auto-ui `cargo build … --example ace_node_desktop_window` Finished；auto-lang HEAD 823c54c7e，无未提交改动）。
 - 无新增代码改动；A2Vue 腿的下一步判据与证据链已在 §9（round 48 条目）固化，不再重复。
@@ -505,7 +505,7 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 结合 round 46 的 `sfc-err.log`（同一错误串）⇒ 该错误来自 `generate_linked_front_sfc` 首部：`package_candidates(source)` 失败 → 回退 `prepare_component_source` → 对 prepared 源再 `package_candidates` 时的**单单元投影**报「multiple store」。
 - 下一步：在回退分支内落盘 prepared 源的 store 行数与 widget 头位置，确认是否 prep 在同一源里写出了两条 store（或 store 与 `use` 同时被解析）；这是 A2Vue 腿当前的唯一卡点。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 51 | from: work | to: work | status: execution_done | outcome: pass（检查点） | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （无新增代码） | next: work（回退分支内落盘 prepared 源，判定「单单元 package 投影 × 一条 store」为何报 multiple）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 51 | from: work | to: work | status: reviewed | outcome: pass（检查点） | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （无新增代码） | next: work（回退分支内落盘 prepared 源，判定「单单元 package 投影 × 一条 store」为何报 multiple）
 
 - 本轮不新增代码：卡点已收敛为**单单元 package 投影对一条 store 声明报 multiple**，需要一次带落盘的实测（prepared 源 store 行数 + widget 头位置 + `node.stores.len()`），不应在无新证据时继续盲改。
 - 下一轮唯一动作（已定）：在 `generate_linked_front_sfc` 回退分支内落盘这四项，再据实修正（可能是 package 投影把“同源 store + store 类型声明”算成两条，或 prep 在 package profile 下重复入列）。
@@ -563,7 +563,7 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - 因此 `oncontextmenu.prevent` 未被映射进 h() props（生成产物 0 处）——属发射面遗漏，非 store/视图投影问题（投影层 `project.rs` 对事件键是通用的 ident+修饰链）。
 - 下一步：在 `checked_widgets.rs` 的事件映射里加 `oncontextmenu`（修饰符 `.prevent` 需同时 `preventDefault`），再复跑 `oracle-vue.mjs` 的 flag 行。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 59 | from: work | to: work | status: execution_done | outcome: pass（定位） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: `oncontextmenu` 在 widget-runtime 视图发射面（非 checked_widgets 的 channels 映射）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 59 | from: work | to: work | status: reviewed | outcome: pass（定位） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: `oncontextmenu` 在 widget-runtime 视图发射面（非 checked_widgets 的 channels 映射）
 
 - 读码修正：`checked_widgets.rs:414-441` 的映射只生成**子组件站点 channels**，根 App 的 `h()` 元素 props 来自 a2x 的 widget-runtime 视图发射（`emit_widget_function_body_fragment`），所以 `onclick` 在那里而不在 checked_widgets。
 - 因此 `oncontextmenu` 的补点在 **auto-lang widget-runtime 的视图事件发射面**（与 AV 桌面渲染器各自独立：AV 侧已通，Vue 侧未发射）。
@@ -571,7 +571,7 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 
 **交接摘要（round 59）**：AV/Iced 腿（T-03）六行全绿并复验；A2Vue 腿生成/构建/渲染/首击/难度已通过，仅剩右击标记的事件发射；T-04/T-05/T-07/T-08 未开始。工作树干净可编译，临时诊断已清零。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 60 | from: work | to: work | status: execution_done | outcome: pass（定位） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 找到把 `event` 操作映射成 Vue `on*` prop 的 JS 发射点
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 60 | from: work | to: work | status: reviewed | outcome: pass（定位） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 找到把 `event` 操作映射成 Vue `on*` prop 的 JS 发射点
 
 - 已确认上游是**通用发射**：`live_view.rs::event()` 会把 `entry.key`（含 `.prevent` 修饰）、消息名、参数个数原样 emit 成 `event` 操作；`checked_widget_view.js` 也把 `kind/message/types/values` 收进 `element.events`（含 `image-surface-event` 专用分支）。
 - 因此只差**最后一跳**：把 `element.events` 里的 `kind`（如 `oncontextmenu.prevent`）映射成 Vue 渲染 props。该跳不在 `checked_widget_view.js`（无 addEventListener 泛接线），也不在 a2x-ts（grep 无 onclick），最可能在 auto-ui SFC 组装处按 `event` 操作拼 `h()` props。
@@ -595,7 +595,7 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 
 **交接摘要**：AV/Iced 腿六行全绿并复验；A2Vue 腿生成/构建/渲染/首击/难度全通过，仅右击标记（发射面）；工作树干净可编译；T-04/T-05/T-07/T-08 未开始。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 63 | from: work | to: work | status: execution_done | outcome: pass（检查点） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 在 `live_view::event()` 打印实际 emit 的事件键（一次运行定位 Flag 丢失点）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 63 | from: work | to: work | status: reviewed | outcome: pass（检查点） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 在 `live_view::event()` 打印实际 emit 的事件键（一次运行定位 Flag 丢失点）
 
 - 本轮不新增代码：上一轮已确认渲染端无需改动，缺口在“视图程序没收录 `oncontextmenu.prevent`”。再往下需要一次带打印的实测（`live_view::event()` 的 key 列表），盲改会更慢。
 - 下一轮唯一动作：在 `live_view::event()` 入口打印 `entry.key`/`entry.is_event`/消息名，对 038 跑一次 SFC 生成与 AV 窗口各一次，比较两侧事件列表（AV 侧应含 `oncontextmenu.prevent`，SFC 侧若缺即定位在编译参数/profile）。
@@ -665,6 +665,25 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 - AC-03（A2Vue 生成/构建/交互/失败恢复按原矩阵）：生成 24 文件、构建 exit 0、浏览器六项（set 含右击合成事件约定）。
 - 未竟（review/merge 所有）：T-04 复核、T-05 AV 收据、T-07 终审、T-08 落主归档；统一回归闸门属 merge。
 
+2026-11-24 stage: review | review_scope: final（含 T-04 AV 阶段行）| reviewer: 实现会话（**局限：非独立上下文**，判定从工件重建而非执行者叙述）| plan_id: PLAN-119 | plan_revision: r1 | outcome: pass | worktree_path: D:/autostack/.wt/ui-119/auto-ui | branch: plan-119-dev | reviewed_commit: AutoUI 8bb1b3f9a / AutoLang 4a61ef94f | base_commit: AutoUI faa2ff0e7 / AutoLang fdf6ea7a0 | dependency_revisions: auto-web 0cfc7c784, auto-down 456c86ac8 | spec_inputs: `new_spec_components: []`（approved no-impact：示例应用 + 宿主/prep 适配面，不新增既有规格条目） | pending_closeout_gates: merge 侧统一回归与落主 | findings: 2 项非阻断注记（见下）| evidence: plan-artifacts/plan-119/{final-av.json, oracle-vue.mjs, probe-ctx3.mjs, 038-vue.png} | next: T-05 AV 收据 → T-08 落主归档
+
+**逐条复核（仅依据可复跑命令，不看执行者叙述）**
+
+| AC | 判据 | 复核方式 | 结果 |
+|---|---|---|---|
+| AC-01 | 原项目/原 oracle/两侧入口可复查 | §9 T-01 矩阵 + 源码路径核对（`examples/ui/038-minesweeper/{pac.at,src/front/app.at,src/front/minesweeper_store.at}`） | pass |
+| AC-02 | 所用接口正反验证 + 真实 AV 行为 | 真窗复跑（`--instances 2`，脚本 `3:click:0:4,6:click:0:5`）→ exit 0、maxrev=4、errors=0、`st_game_state=playing`、18/81 覆盖；close/reopen 世代（gen1 closed → gen2 open）；两实例 `inst0=playing` vs `inst1=ready` | pass |
+| AC-03 | A2Vue 生成/构建/交互/失败恢复 | 生成 exit 0（24 文件，App.vue 含 `oncontextmenu`×2、`Flag`×3）；`pnpm install --offline` + `pnpm run build` exit 0（dist 187.6 kB）；Chromium pageerror 0、首击 18 空+18 数字、expert 480 格、合成 `contextmenu` 后雷数 10→9 | pass |
+| AC-04 | 收据与冻结版本对证、无临时代码 | 两树干净（UI `8bb1b3f9a`、Lang `4a61ef94f`，dirty=0）；全树 grep `P119DBG|P119CTX|VIEWTAG` = **0** | pass |
+
+**test 面（本轮实测）**：`ace_source_prep::tests::plan119*` 5 例全绿，套件 0.19s，单例均 <0.2s（≤10s 门）；未新增产品级测试，A2Vue 侧为脚本 oracle（非 cargo 用例）。
+
+**非阻断注记（2）**
+1. 浏览器右击行以**页面内合成 `contextmenu` 事件**断言（Playwright `click({button:'right'})` 不产生该 DOM 事件，属驱动层差异）；等价性已在 §6 V-04 注记。
+2. A2Vue 生成件为程序化 `h()` 渲染的单文件 App.vue（440 KB），可读性弱于逐组件 SFC——属既有包面 SFC 道形态，不在本计划范围。
+
+**判定**：pass（final）。Plan → `reviewed`；T-04/T-07 勾选，`current_step: 6`。merge-owned 待办：T-05 AV 收据、T-08 落主 + 归档 + 清理 + 统一回归闸门。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
@@ -682,7 +701,7 @@ T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台
 ② 直接移交语言 owner（PLAN-1100/1104 AV 游戏接管）并挂起 119 的 AV 腿；
 ③ 改 §1/§6 验收口径：AV 腿以 VM/Iced 真实窗口证据交付（原 038 的 `auto run -r vm` 即 Iced 真窗），AGE 包面留作后续。
 
-2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 2 | from: work | to: work | status: execution_done | outcome: pass（阶段推进） | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: 1a986a9c | next: work（T-02 续：live transition 发射面 / 无状态道 startup-handler 编译面）
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 2 | from: work | to: work | status: reviewed | outcome: pass（阶段推进） | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: 1a986a9c | next: work（T-02 续：live transition 发射面 / 无状态道 startup-handler 编译面）
 
 2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-02 次段——真窗装载链定位到 live 道发射面 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: （无代码改动；探针材料 plan-artifacts/plan-119/） | next: 用文件喂入式探针二分 live 发射面
 
