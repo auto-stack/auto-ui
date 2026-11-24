@@ -95,6 +95,69 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 
 2026-11-20 stage: new，拆分后的草案，实施及产品验证待执行。
 
+2026-11-22 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 1 | from: drafting | to: work | status: drafting | outcome: pass（授权确认：`完成计划119` = work→review→bounded repair→merge 全链授权，记 §4） | worktree: （组创建中） | next: work（T-01）
+
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-01 固定源/oracle/两端入口 + 双端首阻断逐构造归因 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@3d9ee86a，基 faa2ff0e7）+ auto-lang（plan-119-dev@fdf6ea7a0）+ 只读兄弟 auto-web 0cfc7c784 / auto-down 456c86ac8 | commit: 3d9ee86a（诊断例程） | next: §10 裁定（G1 归属）
+
+**T-01 逐行矩阵（2026-11-24 核）**
+
+| 项 | 固定值 |
+|---|---|
+| 原项目源 | `examples/ui/038-minesweeper/{pac.at, src/front/app.at, src/front/minesweeper_store.at, README.md, tests/desktop_mcp.py, tests/test_038_vue.mjs}`（仓内单源，不动源） |
+| 原 oracle | VM 已钉确定性：首击 (4,4) → 29 格展开（16 个数字）、雷位 [3,10,22,29,41,48,53,60,72,79]；右击标记/取消、难度切换（9×9/16×16/30×16）、face 按钮重开、`Tick` 计时、won/lost 横幅；A2Vue 侧 `test_038_vue.mjs` 钉主题族/模式与 81 个空格 |
+| 实际使用组件 | `store MinesweeperStore`（PLAN-105 已交 store 单元：13 model 字段、6 handler、board 为 Obj 字面量列表）；`use themes.themes: Auto, Solarized`（官方主题包 packages/themes）；grid/button/text/col/row/div 视图；`oncontextmenu.prevent`；`interval` 计时约定 |
+| AV 端（组件面） | `--source src/front/app.at`：prep（`prepare_component_source`，工程根=pac.at 祖先）→ `NodeDesktopBridge::load`。**首阻断**：`.store.*` 引用需同源 store 声明——prep 的 store 内联门（`project_component_stores`+`project_component_candidates`）拒该 store 片断，故未内联 |
+| AV 端（包面） | `--package "app::app=src/front/app.at; app::minesweeper_store=src/front/minesweeper_store.at" --entry app::app`（`load_package`→`prepare_store_units`）。**首阻断**：`model has no field store` @入口 `.Init` 臂（跨单元 store 未绑定，同源于 store 单元解析拒） |
+| A2Vue 端 | `AUTO_UI_ACE_VUE=1 AUTO_UI_TOOL_BIN=<本树 auto-ui-tool> auto.exe build --render vue --gen-only`。**首阻断**：`ace.vue-lane-unsupported`，缺席 handler = App[.Flag/.Reset/.Reveal/.SetDifficulty/.Tick]（同源：store 片断不可投影，`.Init` 因无控制转移保留） |
+| 工具身份 | `ace_node_desktop_window.exe` SHA256 `4CD0DE1A…017666`（debug，本树 fresh 构建 5m51s）；`auto-ui-tool.exe` 同构建；auto CLI `D:/autostack/auto-man/target/debug/auto.exe` SHA256 `EDDB2CCE…D947FCF`（与 PLAN-114 钉版一致，复用） |
+| 环境 | Windows x64、Cargo 1.98.0、Node 25.2.1 / pnpm 11.6.0；`--locked --offline -j4`；开工时他方 cargo/rustc 在跑，本计划 -j4 让行 |
+
+**双端首阻断归因（同一根因，逐构造实证）**
+
+判据：store 片断 + 探针 widget 过 `project_component_stores`/`project_component_candidates`（prep 内联门同一判据），逐 handler/逐语句二分（材料 `plan-artifacts/plan-119/`）：
+
+| # | 缺口 | 实证 | 归属 |
+|---|---|---|---|
+| G1 | AGE 面**控制转移语句**缺席：`return`/`break`（`continue` 同族）不在 age-component/age-package handler 语句文法内（`experimental/ace/auto-source.at` 无对应规则） | 逐语句：`.Init`/`.Tick` 全过；`.Reveal`/`.Flag` 中**仅**含 `return` 的 `if` 与含 `break` 的 `if` 成门（`[source.syntax] expected fn, found store` = 整模块 profile 回退的误归因消息）；去掉控制转移的 store 片断即 LOAD OK。真实锚点：store 8 处 `return`、1 处 `break`（L108/111/122/181/244/346/365/457/460） | auto-lang 语法面（grammar+投影+降级+两端发射）或 auto-ui prep 兼容改写（§10） |
+| G2 | 包面：store 单元内 `type` 声明不被跨单元解析（`prepare_store_units` 把 `var board = []` 的合成记录类型放进 store 单元 → `source.module-symbol: unknown type BoardRow`）；同一 `type` 放入口单元即通 | 探针 `probe-ctl-*`：type 在 store 单元 → 拒；type 在 app 单元 → PACKAGE 装载 OK（165 元素、81 单元格、`mines` 标签、5 标量态） | auto-ui prep（合成类型应进入口单元）——G1 解除后仍必现 |
+| G3 | 包面：数值 `.to_string()` 无该 profile 方法（`numeric receiver has no method to_string`）；`.to(Str)` 可用 | 探针 `probe-inttext-{A,B,C}`：A `.to(Str)` exit 0；B `str(x)` unknown fn；C `.to_string()` 拒 | auto-lang 方法面或 auto-ui prep 改写 |
+| — | 其余构造全过（对照）：record 字面量 push、`.board[i]` 读写、`.board[i].field` 读、嵌套 `for x < n`/`for a <= 1`、`%`/`/`、`var` 局部、`stack.push/pop`、嵌套 `if`、f-string、`grid cols:` 运行期求值 | 探针 `probe-{rec-assign,rec-idx-write,rec-read,nested-for,arith,stack}.at` 解析/装载 OK；包面对照 `av-ctl-05.json` | 无缺口 |
+
+- **结论**：双端首墙是同一处语言面缺口（G1）；G2/G3 是包面附带件。G1 解除后两端须重跑首准入暴露下一墙（运行时语义与发射面预期仍有）。
+- 证据：`plan-artifacts/plan-119/{av-admit-01..04.json, av-ctl-05.json, av-inttext-*.json, probe-*.at, prepped/*}`；诊断例程 auto-ui `3d9ee86a`（`crates/auto-ui-runtime/examples/p119_diag.rs`）。
+
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 1 | from: work | to: work | status: drafting | outcome: waiting | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@3d9ee86a） | commit: 3d9ee86a | next: user（§10 G1 裁定：prep 兼容改写 / auto-lang 语法面扩件 / 移交 owner）
+
+2026-11-24 §10 裁定结果（用户选①）：**auto-ui prep 兼容改写**——G1 及同族源形缺口全部在 prep 收口，不动 auto-lang grammar。该授权已用于下列施工。
+
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: T-02 首段——prep 源形归一（G1/G2/G3/G4）落地，038 包面编译转绿 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: 1a986a9c（+ 3d9ee86a 探针） | next: T-02 续（live 道 transition 发射面 / 无状态道 startup handler 面）
+
+**T-02 首段：源形归一（auto-ui `1a986a9c`，全部在 `ace_source_prep`，auto-lang 零改动）**
+
+| 件 | 缺口（§9 G） | prep 落地 | 证据 |
+|---|---|---|---|
+| ① 控制转移 | G1 `return`/`break` 无 AGE 语句文法 | handler 内改写为 `__p119_ret`/`__p119_brk<N>` 标志 + 其后同级语句守卫；C 风格 `for`/`while` 条件并与标志（或自旋） | 例 `plan119_store_control_flow_rewrite_admits_the_minesweeper_store`（含反例：原样片断被拒）+ 3 例 |
+| ② 文本转换 | G3 包面无数值 `.to_string()` | `.to_string()` → `.to(Str)`（受检形，探针 A 实证） | 同上 038 store 用例 |
+| ③ 记录类型 | G2 store 单元的 `type` 不被跨单元解析 | 纯 store 单元的 `type` 声明去重后注入每个非 store 单元的前导 `use` 之后 | 例 `plan119_store_types_are_injected_into_the_entry_unit` |
+| ④ 元素所有权 | 整元素读 `view-escape`(20)、索引写入(42)、`.pop` HOF 未接(16) | `var V = .list[i]` 摘除并内联为投影（递归进嵌套块、按 handler 作用域）、`.list[i] = {…}` → `.list.set(i, Elem {…})`、`R.pop()` → `R.remove(R.len() - 1)` | 038 包面诊断 78 → **0：PACKAGE COMPILE OK** |
+| ⑤ 组件面模型 | 组件面只收 `[]T`、无类型空列表不算状态 | 纯 store 片断 `List<T>`→`[]T`；无类型空列表按 push 点定型并前置合成 `type` | 内联门用例（组件面 store_inlined=true） |
+
+- 回归：`ace_source_prep::` 22/23 绿；红 1 = `real_u03_apps_load_through_desktop_bridge`（015-notes `[]Note` 组件面模型面）——**基线复现**（stash 后同例同 panic，非本计划引入）。
+- 现象级推进：038 双端首阻断（AGE 面 store 不可投影）→ 包面整包编译通过（`plan-artifacts/plan-119/` 证据）。
+- **current wall（具名）**：真窗装载 `load_package` → `LivePackage::prepare` → `compile_age_package_widget_runtime` 报
+  `source.age.widget-runtime-handler: cannot emit a checked widget transition for handler Reveal`（@入口 `.Reveal(x,y) -> { store.Reveal(x, y) }`）；
+  回落无状态道后 `initial_widget_handlers` 编译再报 `source.view-escape`。即：**live widget-runtime 的 transition 发射面不承载带列表变更的 handler**——这是引擎/发射面能力（非源形），prep 不可达。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
+
+2026-11-24 §10 裁定请求（G1 归属）：038 双端首墙 = AGE 面 `return`/`break` 语句缺席（§9 G1）。三条路：
+
+1. **auto-ui prep 兼容改写**（本计划自有仓，不动 auto-lang）：prep 合成 store 片断时按结构化等价改写 9 处控制转移——守卫 `if cond { return } 余下` → `if !cond { 余下 }`；循环内 `break` → 循环条件加 `!__brk` 且守卫其后语句。带正反用例，并以 VM 已钉 oracle（首击 29 格/雷位表）在 AV 端证等价。改动 ~150–250 行 + 测试。
+2. **auto-lang 语法面扩件**（G1 正解）：`auto-source.at` 加 `age-on-return/-break/-continue` 规则 + CST 投影 + `ComponentStmt` 三变体 + `ast::Stmt` 降级 + AV 执行器 + A2Vue 发射，带正反回归。跨 grammar/投影/降级/两端发射，体量大。
+3. **移交语言 owner 计划**：119 挂起至其落主后复验；G2/G3 仍由本计划 prep 收口。
+
+（先例：PLAN-118 §10 裁定①曾授权其在 plan-118-dev 的 auto-lang 树做最小闭合集。）
+
+2026-11-24 stage: goal | plan_id: PLAN-119 | plan_revision: r1 | round: 2 | from: work | to: work | status: drafting | outcome: pass（阶段推进） | worktree: D:/autostack/.wt/ui-119/auto-ui（plan-119-dev@1a986a9c） | commit: 1a986a9c | next: work（T-02 续：live transition 发射面 / 无状态道 startup-handler 编译面）
