@@ -207,7 +207,269 @@ fn store_probe(store_src: &str) -> (bool, String) {
     }
 }
 
+fn scan_balanced(src: &str, open: usize) -> Option<usize> {
+    let bytes = src.as_bytes();
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut i = open;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_str {
+            if b == b'\\' { i += 2; continue; }
+            if b == b'"' { in_str = false; }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' => in_str = true,
+            b'{' => depth += 1,
+            b'}' => { depth -= 1; if depth == 0 { return Some(i); } }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+fn split_stmts(body: &str) -> Vec<String> {
+    let bytes = body.as_bytes();
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut depth = 0i32;
+    let mut parens = 0i32;
+    let mut in_str = false;
+    for (i, b) in bytes.iter().enumerate() {
+        if !body.is_char_boundary(i) { continue; }
+        if in_str {
+            let ch = *b as char;
+            cur.push(ch);
+            if ch == '\\' { continue; }
+            if ch == '"' { in_str = false; }
+            continue;
+        }
+        let ch = *b as char;
+        match ch {
+            '"' => in_str = true,
+            '{' => depth += 1,
+            '}' => depth -= 1,
+            '(' => parens += 1,
+            ')' => parens -= 1,
+            _ => {}
+        }
+        cur.push(ch);
+        if ch == '\n' && depth == 0 && parens == 0 {
+            let piece = cur.trim_end_matches(|c| c == '\r' || c == '\n');
+            if !piece.trim().is_empty() { out.push(piece.to_string()); }
+            cur.clear();
+        }
+    }
+    let piece = cur.trim_end_matches(|c| c == '\r' || c == '\n');
+    if !piece.trim().is_empty() { out.push(piece.to_string()); }
+    out
+}
+// ─── PLAN-119 live 道二分：文件喂入 units → 直连 widget-runtime 编译 ───────
+//
+// 用法：P119_LIVE_FILE="<app.at>|<store.at>" p119_diag.exe <任意 app.at>
+// 前缀/留一扫描：P119_LIVE_SWEEP=prefix|leaveone|arm
+fn live_file_mode() -> bool {
+    let Ok(spec) = std::env::var("P119_LIVE_FILE") else { return false };
+    let mut parts = spec.split('|');
+    let (Some(app_path), Some(store_path)) = (parts.next(), parts.next()) else {
+        println!("P119_LIVE_FILE needs <app.at>|<store.at>");
+        return true;
+    };
+    let app_src = std::fs::read_to_string(app_path).expect("read app unit");
+    let store_src = std::fs::read_to_string(store_path).expect("read store unit");
+    let units = auto_ui_runtime::ui::ace_source_prep::prepare_store_units(vec![
+        ace_core::source::packages::PackageModuleInput {
+            package: "app".into(),
+            version: "1.0.0".into(),
+            id: "app".into(),
+            source: app_src,
+            provider: None,
+        },
+        ace_core::source::packages::PackageModuleInput {
+            package: "app".into(),
+            version: "1.0.0".into(),
+            id: "minesweeper_store".into(),
+            source: store_src,
+            provider: None,
+        },
+    ]);
+    let compile = |units: &[ace_core::source::packages::PackageModuleInput]| -> String {
+        use ace_core::source::packages::PACKAGES_CAPABILITY as CAP;
+        match ace_core::source::age_package::compile_age_package_widget_runtime(
+            units,
+            "app::app",
+            ace_av::age_component::LegacyWidgetAlias::Accept,
+            &[CAP.to_string()],
+        ) {
+            Ok(_) => "OK".to_string(),
+            Err(ds) => ds
+                .iter()
+                .map(|d| format!("[{}] {}", d.code, d.message))
+                .collect::<Vec<_>>()
+                .join(" | "),
+        }
+    };
+    println!("LIVE(baseline): {}", compile(&units));
+    let sweep = std::env::var("P119_LIVE_SWEEP").unwrap_or_default();
+    if sweep.is_empty() {
+        return true;
+    }
+    // 目标 arm：store 单元里 `.Reveal(x, y) -> { … }`
+    let store = units[1].source.clone();
+    let arm = std::env::var("P119_LIVE_ARM").unwrap_or_else(|_| ".Reveal".to_string());
+    let Some(arm_at) = store.find(&format!("{arm}(")).or_else(|| store.find(&format!("{arm} "))) else {
+        println!("arm `{arm}` not found");
+        return true;
+    };
+    let Some(open) = store[arm_at..].find('{').map(|o| o + arm_at) else { return true };
+    let Some(close) = scan_balanced(&store, open) else { return true };
+    let body = store[open + 1..close].to_string();
+    let stmts = split_stmts(&body);
+    println!("arm {arm}: {} top-level statements", stmts.len());
+    let mutate = |new_body: String| -> Vec<ace_core::source::packages::PackageModuleInput> {
+        let mut next = units.clone();
+        next[1].source = format!("{}{}{}", &store[..=open], new_body, &store[close..]);
+        next
+    };
+    // 隔离扫描：其余 arm 体换成单条标量赋值（已知可发射），再对目标 arm 做前缀扫描。
+    if sweep == "isolate-prefix" || sweep == "isolate" {
+        let mut isolated = units.clone();
+        let mut src = isolated[1].source.clone();
+        let mut from = 0usize;
+        let mut arms_replaced = 0;
+        while let Some(rel) = src[from..].find(" -> {") {
+            let head_at = src[..from + rel].rfind('\n').map(|p| p + 1).unwrap_or(0);
+            let head = src[head_at..from + rel].trim().to_string();
+            let open = from + rel + 4;
+            let Some(close) = scan_balanced(&src, open) else { break };
+            if !head.starts_with(&arm) {
+                src.replace_range(open + 1..close, "\n.game_state = .game_state\n");
+                arms_replaced += 1;
+            }
+            let next_close = scan_balanced(&src, open).unwrap_or(open);
+            from = next_close + 1;
+        }
+        isolated[1].source = src;
+        println!("isolated {arms_replaced} other arms");
+        println!("LIVE(isolated): {}", compile(&isolated));
+        if sweep == "isolate-prefix" {
+            let src = isolated[1].source.clone();
+            let Some(arm_at) = src
+                .find(&format!("{arm}("))
+                .or_else(|| src.find(&format!("{arm} ")))
+            else {
+                return true;
+            };
+            let Some(open) = src[arm_at..].find('{').map(|o| o + arm_at) else { return true };
+            let Some(close) = scan_balanced(&src, open) else { return true };
+            let stmts = split_stmts(&src[open + 1..close]);
+            println!("arm {arm}: {} top-level statements (isolated)", stmts.len());
+            for (i, st) in stmts.iter().enumerate() {
+                println!(
+                    "  #{i}: {}",
+                    st.lines().next().unwrap_or("").chars().take(100).collect::<String>()
+                );
+            }
+            for k in 1..=stmts.len() {
+                let body = format!("\n{}\n", stmts[..k].join("\n"));
+                let mut next = isolated.clone();
+                let mut s = src.clone();
+                s.replace_range(open + 1..close, &body);
+                next[1].source = s;
+                let verdict = compile(&next);
+                let ok = verdict == "OK";
+                println!("prefix {k}: ok={ok} {}", if ok { String::new() } else { verdict });
+                if !ok {
+                    break;
+                }
+            }
+            // 递归下降：始终在**当前块的字节区间**内做前缀替换，保持外层上下文
+            // （守卫/声明）不变——最小失败前缀的最后一条即嫌疑语句；它是块时进入
+            // 其体内继续。
+            let mut range = (open + 1, close);
+            for _depth in 0..12 {
+                let base = isolated[1].source.clone();
+                let level = split_stmts(&base[range.0..range.1]);
+                let mut fail_at = None;
+                for k in 1..=level.len() {
+                    let body = format!("\n{}\n", level[..k].join("\n"));
+                    let mut next = isolated.clone();
+                    let mut s = base.clone();
+                    s.replace_range(range.0..range.1, &body);
+                    next[1].source = s;
+                    if compile(&next) != "OK" {
+                        fail_at = Some(k);
+                        break;
+                    }
+                }
+                let Some(k) = fail_at else {
+                    println!("DESCEND: level passes (depth {_depth})");
+                    break;
+                };
+                let culprit = level[k - 1].clone();
+                println!(
+                    "DESCEND depth={_depth} k={k}/{}: {}",
+                    level.len(),
+                    culprit.lines().next().unwrap_or("").chars().take(90).collect::<String>()
+                );
+                let Some(brace) = culprit.find('{') else {
+                    println!("MINIMAL FAILING STATEMENT:\n{culprit}");
+                    break;
+                };
+                let Some(end) = scan_balanced(&culprit, brace) else {
+                    println!("MINIMAL FAILING STATEMENT (unbalanced):\n{culprit}");
+                    break;
+                };
+                // culprit 在重建体里的起点：前置一个 "\n"，外加前面每条语句 + "\n"。
+                let mut culprit_start = 1usize;
+                for prev in &level[..k - 1] {
+                    culprit_start += prev.len() + 1;
+                }
+                let new_open = range.0 + culprit_start + brace;
+                let new_close = range.0 + culprit_start + end;
+                range = (new_open + 1, new_close);
+            }
+        }
+        return true;
+    }
+    match sweep.as_str() {
+        "prefix" => {
+            for k in 1..=stmts.len() {
+                let body = format!("\n{}\n", stmts[..k].join("\n"));
+                let verdict = compile(&mutate(body));
+                let ok = verdict == "OK";
+                println!("prefix {k}: ok={ok} {}", if ok { String::new() } else { verdict });
+                if !ok {
+                    break;
+                }
+            }
+        }
+        "leaveone" => {
+            for i in 0..stmts.len() {
+                let mut kept: Vec<String> = Vec::new();
+                for (j, st) in stmts.iter().enumerate() {
+                    if i != j {
+                        kept.push(st.clone());
+                    }
+                }
+                let body = format!("\n{}\n", kept.join("\n"));
+                let verdict = compile(&mutate(body));
+                println!(
+                    "leave-out #{i}: ok={} :: {}",
+                    verdict == "OK",
+                    stmts[i].lines().next().unwrap_or("").chars().take(80).collect::<String>()
+                );
+            }
+        }
+        _ => println!("unknown sweep `{sweep}`"),
+    }
+    true
+}
 fn main() {
+    if live_file_mode() { return; }
     let mut args = std::env::args().skip(1);
     let path = args.next().expect("usage: p119_diag <app.at>");
     let src = std::fs::read_to_string(&path).expect("read source");
@@ -342,7 +604,13 @@ fn main() {
         }
         let scenario = ace_av::age_component::ComponentScenario {
             instances: inst_count,
-            ops: Vec::new(),
+            ops: match std::env::var("P119_PKG_OP").ok().as_deref() {
+                Some(msg) => vec![ace_av::age_component::ScenarioOp::Send {
+                    instance: 0,
+                    msg: msg.to_string(),
+                }],
+                None => Vec::new(),
+            },
         };
         match ace_core::source::age_package::compile_age_package_with_scenario(
             &units,
