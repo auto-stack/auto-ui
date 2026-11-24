@@ -2670,6 +2670,74 @@ fn type_decl_name(decl: &str) -> Option<&str> {
     }
 }
 
+/// PLAN-119：把「LIFO 栈弹出」改写成**下标队列**，避免 `.pop()`（包面无此方法）
+/// 与 `.remove(...)`（不在分支/循环体的列表方法白名单 → handler 被判
+/// `body_foreign`，transition 发不出来）。
+///
+/// 触发条件（保守，全部满足才改写）：同源里有 `var NAME = []`（或带类型）、
+/// `for NAME.len() > 0 {`、以及 `var V <T> = NAME.pop()` 形。改写：
+/// - 声明后插 `var __p119_head<N> int = 0`；
+/// - `for NAME.len() > 0 {` → `for __p119_head<N> < NAME.len() {`；
+/// - `var V T = NAME.pop()` → `var V T = NAME.get(__p119_head<N>)` +
+///   `__p119_head<N> = __p119_head<N> + 1`（两行）。
+///
+/// 语义：洪水填充/工作队列的**结果集合与访问顺序无关**，故 LIFO→FIFO 等价。
+#[allow(dead_code)] // PLAN-119：待修（作用域锚点未定），暂不接线——见计划 §9
+fn rewrite_stack_pops_to_queue(src: &str) -> String {
+    let mut out = src.to_string();
+    let mut seq = 0usize;
+    let names: Vec<String> = out
+        .lines()
+        .filter_map(|line| {
+            let t = line.trim_start();
+            let rest = t.strip_prefix("var ")?;
+            let (name, init) = rest.split_once('=')?;
+            (init.trim() == "[]" && is_ident(name.trim())).then(|| name.trim().to_string())
+        })
+        .collect();
+    for name in names {
+        let loop_head = format!("for {name}.len() > 0 {{");
+        if !out.contains(&loop_head) || !out.contains(&format!("{name}.pop()")) {
+            continue;
+        }
+        seq += 1;
+        let head = format!("__p119_head{seq}");
+        // 1) 在 `var NAME = []` 之后插入 head 声明（沿用该行缩进）。
+        let decl_line = out
+            .lines()
+            .find(|l| {
+                let t = l.trim_start();
+                t.strip_prefix("var ")
+                    .and_then(|r| r.split_once('='))
+                    .map(|(n, i)| n.trim() == name && i.trim() == "[]")
+                    .unwrap_or(false)
+            })
+            .map(|l| l[..l.len() - l.trim_start().len()].to_string())
+            .unwrap_or_default();
+        let decl = format!("var {name} = []");
+        if let Some(at) = out.find(&decl) {
+            let insert_at = out[at..].find('\n').map(|p| p + at + 1).unwrap_or(out.len());
+            out.insert_str(insert_at, &format!("{decl_line}var {head} int = 0\n"));
+        }
+        // 2) 循环头。
+        out = out.replace(&loop_head, &format!("for {head} < {name}.len() {{"));
+        // 3) 弹出语句 → get + 自增两行。
+        let pop = format!("{name}.pop()");
+        let mut from = 0usize;
+        while let Some(rel) = out[from..].find(&pop) {
+            let at = from + rel;
+            let get = format!("{name}.get({head})");
+            out.replace_range(at..at + pop.len(), &get);
+            // 在该语句所在行的下一行插入自增。
+            let line_end = out[at..].find('\n').map(|p| p + at).unwrap_or(out.len());
+            let inc = format!("\n{head} = {head} + 1");
+            out.insert_str(line_end, &inc);
+            from = line_end + inc.len();
+        }
+    }
+    out
+}
+
 /// 包面文本转换拼写：AGE 包面的数值没有 `.to_string()`（`numeric receiver has
 /// no method `to_string``），而 `.to(Str)` 是同一转换的受检形（038 实证）。
 /// 只对纯 store 单元调用。
