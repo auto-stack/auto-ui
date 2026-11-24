@@ -317,6 +317,13 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 结论：AV 腿（AGE 包编译 → live transition → Iced 真窗 → 动作实参 → 派发 → 状态/视图刷新）**整链已成立**；剩下是 oracle 脚本的严谨性：每步按**当前帧**解析目标索引（或按 message+args 匹配），再断言首击 29 格/16 数字、右击标记、难度切换、重开、两实例隔离、close/reopen。
 - 临时诊断 10 处待清理（§9 已登记）。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: **首击展开 oracle 达成**（playing / 69 格展开 / errors=0） | outcome: pass（T-03 首行） | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （无新增代码） | next: 右击标记、难度、重开、两实例、close/reopen 逐行
+
+- 脚本 `3:click:0:4,6:click:0:5`（Reveal(0,0) → Flag(0,0)）真窗 exit 0、frames=2、errors=0、maxrev=3。
+- 终帧：`st_game_state=playing`；81 个格子里**仅 18 个仍覆盖**（63 格已展开，符合首击 flood-fill）；`st_elapsed=0`。
+- 说明：动作索引在帧间稳定（`Reset,SetDifficulty×3,Reveal,Flag,...` 顺序一致），上一轮“索引错位”判断不成立；此前状态对比失真是因为 evidence 帧数组**未按 revision 排序**（取末元素≠最新帧），后续断言一律按 `revision` 取最大。
+- 余量：`st_flags_placed` 仍为 0（`#5` 标记未生效，可能与 `oncontextmenu` 的派发键/目标解析有关）；随后难度切换（`#1..#3`）、`#0` 重开、两实例（`--instances 2` 分别点）、`close/reopen` 世代。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
