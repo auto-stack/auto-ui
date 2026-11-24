@@ -499,6 +499,12 @@ T-01 对本计划范围冻结每条来源、两端、原运行模式、资源、
 - 本轮为**检查点轮**：两棵工作树均干净可编译（auto-ui `cargo build … --example ace_node_desktop_window` Finished；auto-lang HEAD 823c54c7e，无未提交改动）。
 - 无新增代码改动；A2Vue 腿的下一步判据与证据链已在 §9（round 48 条目）固化，不再重复。
 
+2026-11-24 stage: work | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: units.log 仍为空 ⇒ 错误发生在 units 装配之前 | outcome: partial | worktree: D:/autostack/.wt/ui-119/auto-ui | commit: （见下） | next: 单单元 inspection 回退路径为何报「multiple store」
+
+- 在两处 `prepare_store_units` 之后都加了 units 落盘（`units.log`），复跑后**文件为空** ⇒ 执行未到 units 装配，`multiple store declarations` 在**更早**的 `package_candidates` 阶段抛出。
+- 结合 round 46 的 `sfc-err.log`（同一错误串）⇒ 该错误来自 `generate_linked_front_sfc` 首部：`package_candidates(source)` 失败 → 回退 `prepare_component_source` → 对 prepared 源再 `package_candidates` 时的**单单元投影**报「multiple store」。
+- 下一步：在回退分支内落盘 prepared 源的 store 行数与 widget 头位置，确认是否 prep 在同一源里写出了两条 store（或 store 与 `use` 同时被解析）；这是 A2Vue 腿当前的唯一卡点。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
