@@ -1092,11 +1092,41 @@ fn rewrite_str_case(src: &str, need: &mut bool) -> String {
     out
 }
 
+/// PLAN-118：`pos` 所在 handler 块的**头部行文本**（最近的上方 `.Name(...) -> {`
+/// 行；模块 fn/其它块面退化为最近的 `fn`/`widget`/`view`/`on` 行，空串 = 文件头）。
+/// 用行文本而非偏移作作用域键——声明行删除会让偏移失效。
+fn enclosing_handler_header(src: &str, pos: usize) -> String {
+    let mut line_start = src[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    loop {
+        let line = &src[line_start..];
+        let trimmed = line.trim_start();
+        if (trimmed.starts_with('.') && trimmed.contains("->"))
+            || trimmed.starts_with("fn ")
+            || trimmed.starts_with("widget ")
+            || trimmed.starts_with("view ")
+            || trimmed.starts_with("on ")
+        {
+            return line.split('\n').next().unwrap_or("").trim().to_string();
+        }
+        if line_start == 0 {
+            return String::new();
+        }
+        let prev_end = line_start - 1;
+        line_start = src[..prev_end].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    }
+}
+
 /// PLAN-117（round-29 ②）：`.split(sep)` 消费成语改写——声明行摘除 +
 /// `NAME.len()`/`NAME[i]` 用法改写为 count/at 标量 helper 调用。
+/// PLAN-118：改写按**声明所在 handler 作用域**配平（同名局部在多个 handler
+/// 各写一次时，接收者不得串用）。
 fn rewrite_str_split(src: &str, need: &mut bool) -> String {
     let mut out = src.to_string();
-    let mut vars: Vec<(String, String, String)> = Vec::new();
+    // (局部名, 接收者, 分隔符, 声明所在 handler 起点)。
+    // PLAN-118：不同 handler 各自声明同名局部（`var parts = s.split(…)` 与
+    // `var parts = snap.split(…)`）——替换必须按**声明所在作用域**配平，否则
+    // 先处理的声明会改写另一个 handler 的 `parts.len()`（用错接收者）。
+    let mut vars: Vec<(String, String, String, String)> = Vec::new();
     loop {
         let Some(dpos) = out.find(".split(") else { break };
         let bytes = out.as_bytes();
@@ -1159,29 +1189,39 @@ fn rewrite_str_split(src: &str, need: &mut bool) -> String {
         let arg = out[args_at..dend].trim().to_string();
         let line_start = out[..var_at].rfind('\n').map(|i| i + 1).unwrap_or(0);
         let line_end = out[dend..].find('\n').map(|i| dend + i + 1).unwrap_or(dend);
+        let scope = enclosing_handler_header(&out, var_at);
         out.replace_range(line_start..line_end, "");
-        vars.push((name, recv, arg));
+        vars.push((name, recv, arg, scope));
         *need = true;
     }
-    for (name, recv, arg) in &vars {
+    for (name, recv, arg, scope) in &vars {
         let len_pat = format!("{name}.len()");
         let count_call = format!("__p117_str_split_count({recv}, {arg})");
-        while let Some(pp) = out.find(&len_pat) {
-            if pp > 0 {
+        let mut from = 0usize;
+        while let Some(rel) = out[from..].find(&len_pat) {
+            let pp = from + rel;
+            let preceded_by_ident = pp > 0 && {
                 let b = out.as_bytes()[pp - 1] as char;
-                if b.is_alphanumeric() || b == '_' {
-                    break;
-                }
+                b.is_alphanumeric() || b == '_'
+            };
+            if preceded_by_ident || enclosing_handler_header(&out, pp) != *scope {
+                from = pp + len_pat.len();
+                continue;
             }
             out.replace_range(pp..pp + len_pat.len(), &count_call);
+            from = pp + count_call.len();
         }
         let idx_pat = format!("{name}[");
-        while let Some(pp) = out.find(&idx_pat) {
-            if pp > 0 {
+        let mut from = 0usize;
+        while let Some(rel) = out[from..].find(&idx_pat) {
+            let pp = from + rel;
+            let preceded_by_ident = pp > 0 && {
                 let b = out.as_bytes()[pp - 1] as char;
-                if b.is_alphanumeric() || b == '_' {
-                    break;
-                }
+                b.is_alphanumeric() || b == '_'
+            };
+            if preceded_by_ident || enclosing_handler_header(&out, pp) != *scope {
+                from = pp + idx_pat.len();
+                continue;
             }
             let mut depth = 0i32;
             let mut e = None;
@@ -1203,6 +1243,7 @@ fn rewrite_str_split(src: &str, need: &mut bool) -> String {
             let idx_expr = out[pp + name.len() + 1..e].to_string();
             let call = format!("__p117_str_split_at({recv}, {arg}, {idx_expr})");
             out.replace_range(pp..e + 1, &call);
+            from = pp + call.len();
         }
     }
     out
@@ -1798,6 +1839,13 @@ fn rewrite_model_text_fields(src: &str) -> String {
 /// PLAN-118：`scene: .<名>` → `scene: "<名>"`（仅当 `<名>` 非 model 字段而
 /// `<名>_nodes` 是——canvas 五平行列表合成名约定）。字段名集取 model 块
 /// `var <名>` 行（含注入的 `.__st_` 字段）；view 行内逐处替换 `scene: .<ident>`。
+/// PLAN-118：依赖包模块源的 canvas 场景合成名归一（与 app prep 同一 pass）。
+/// 088 ColorPicker 的 surf/hue/alph/sw/pal 五组场景名同样需要 `scene: "<名>"`
+/// 串 prop 形态——包面视图条目值不再按 self 字段解析。
+pub(crate) fn normalize_package_scene_bindings(src: &str) -> String {
+    rewrite_canvas_scene_bindings(src)
+}
+
 fn rewrite_canvas_scene_bindings(src: &str) -> String {
     let mut fields: Vec<String> = Vec::new();
     let mut in_model = false;
@@ -2210,6 +2258,31 @@ mod tests {
         )
         .unwrap();
         root
+    }
+
+    #[test]
+    fn split_rewrite_scopes_same_named_locals_per_handler() {
+        // PLAN-118：两个 handler 各自声明同名局部 `parts`——改写必须按作用域
+        // 配平接收者（此前先处理的声明会改写另一个 handler 的 `parts.len()`，
+        // 生成 `__p117_str_split_count(s, …)` 指向不存在的局部）。
+        let src = "widget W {\n\
+            on {\n\
+                .A(s str) -> {\n\
+                    var parts = s.split(\"|\")\n\
+                    if parts.len() == 2 { }\n\
+                }\n\
+                .B(snap str) -> {\n\
+                    var parts = snap.split(\"|\")\n\
+                    if parts.len() == 3 { }\n\
+                }\n\
+            }\n\
+        }\n";
+        let mut need = false;
+        let out = rewrite_str_split(src, &mut need);
+        assert!(need);
+        assert!(out.contains("__p117_str_split_count(s, \"|\")"), "A keeps its receiver: {out}");
+        assert!(out.contains("__p117_str_split_count(snap, \"|\")"), "B keeps its receiver: {out}");
+        assert!(!out.contains("parts"), "declarations and reads are rewritten: {out}");
     }
 
     #[test]

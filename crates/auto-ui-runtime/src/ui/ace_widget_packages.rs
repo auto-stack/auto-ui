@@ -21,7 +21,28 @@ use auto_ui_compiler::{
 
 /// Prepare legacy widget modules for the checked AGE package compiler.
 pub(super) fn normalize_package_module_placeholders(src: &str) -> String {
-    normalize_legacy_json_import(normalize_event_placeholders(src, true))
+    let normalized = normalize_legacy_json_import(normalize_event_placeholders(src, true));
+    // PLAN-118：依赖包模块的 canvas 场景合成名同样归一（app 走 prep 同一 pass）。
+    crate::ui::ace_source_prep::normalize_package_scene_bindings(&normalized)
+}
+
+/// PLAN-118：VM 轨组件包的模块 `fn` 不写 `pub`（VM 包面不区分可见性），而
+/// AGE 包面要求跨模块导入符号必须 public（`source.module-private`）。装配依赖
+/// 包模块时做**可见性提升**：只改顶层 `fn` 声明为 `pub fn`，不动嵌套 fn、
+/// 不动 `pub fn`、不动函数体——语义零变化，只是让既有跨模块导入可绑定。
+/// 仅对依赖包模块源使用；app 源不经过本函数。
+pub(super) fn promote_module_fns_to_public(src: &str) -> String {
+    if !src.lines().any(|line| line.starts_with("fn ")) {
+        return src.to_string();
+    }
+    let mut out = String::with_capacity(src.len() + 64);
+    for line in src.split_inclusive('\n') {
+        if line.starts_with("fn ") {
+            out.push_str("pub ");
+        }
+        out.push_str(line);
+    }
+    out
 }
 
 pub(super) fn normalize_legacy_json_import(mut source: String) -> String {
@@ -180,7 +201,7 @@ fn append_project_dependencies(root: &Path, units: &mut Vec<PackageModuleInput>)
             };
             let source = std::fs::read_to_string(&path)
                 .map_err(|error| format!("ace.widget.project-dependency: {}: {error}", path.display()))?;
-            let source = normalize_package_module_placeholders(&source);
+            let source = promote_module_fns_to_public(&normalize_package_module_placeholders(&source));
             let dir = path.parent().expect("resolved module has a directory");
             let version = project_package_version(dir).ok_or_else(|| {
                 format!("ace.widget.project-dependency: no version in the manifest for `{package}::{module}`")
@@ -306,7 +327,7 @@ fn append_package_sources(
         }
         let source = std::fs::read_to_string(&canonical)
             .map_err(|error| format!("ace.widget.module: {}: {error}", path.display()))?;
-        let source = normalize_package_module_placeholders(&source);
+        let source = promote_module_fns_to_public(&normalize_package_module_placeholders(&source));
         source_paths.insert(key, canonical);
         let imports = active_uses(&source)?;
         for (decl, widget) in &package.full_widgets {
@@ -627,4 +648,20 @@ widget App { view { text verdict() {} } }
             );
         }
     }
+
+    /// PLAN-118：VM 轨组件包的模块 `fn` 装配期提升为 `pub fn`（跨模块导入
+    /// 可绑定）；只动顶层声明，嵌套/已 pub 的声明不变。
+    #[test]
+    fn plan118_promotes_only_top_level_module_fns() {
+        let source = "fn helper() int { return 1 }\npub fn shown() int { return 2 }\nwidget W {\n    fn inner() int { return 3 }\n    view { text \"x\" {} }\n}\n";
+        let promoted = promote_module_fns_to_public(source);
+        assert_eq!(promoted.matches("pub fn helper(").count(), 1);
+        assert_eq!(promoted.matches("pub fn shown(").count(), 1);
+        assert!(!promoted.contains("pub pub fn"));
+        assert!(promoted.contains("    fn inner() int"));
+        // 无顶层 fn 的源逐字节不变。
+        let plain = "use auto.json\nwidget W { view { text \"x\" {} } }\n";
+        assert_eq!(promote_module_fns_to_public(plain), plain);
+    }
+
 }
