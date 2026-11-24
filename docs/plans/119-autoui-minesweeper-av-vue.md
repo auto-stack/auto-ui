@@ -694,6 +694,12 @@ len=24872 store_lines=1 candidates=Err("multiple store declarations per node")
 
 **T-08 待执行（merge 面）**：wt-guard 两树 → rebase 到各自 master → `--ff-only` 落主 → `docs/plans/` 归档 `status: archived` + `completion_kind: delivered` → worktree/分支移除 → `plan-artifacts/plan-119` 折叠后删除 + 刷新 `.retention/policy.json` → 批次回归到期检查。
 
+2026-11-24 stage: merge | plan_id: PLAN-119 | plan_revision: r1 | checkpoint: 落主前 guard 已清（pnpm junction 全部移除）| outcome: partial | worktree: D:/autostack/.wt/ui-119/{auto-ui,auto-lang} | commit: （无代码改动）| next: rebase → ff-only 落主 → 归档 → 清理
+
+- `wt-guard.ps1`：auto-lang **clean**；auto-ui 首检 **BLOCKED**（307 个 junction，全部位于 `examples/ui/038-minesweeper/gen/front/vue/node_modules`，由 `pnpm install` 生成，`gen/` 属 gitignored 构建产物）→ 删除该 `gen/` 后复检 **clean**。
+- 分支距离：auto-ui `plan-119-dev` 领先 master（master 已被他计划推进到 `30946f6e6`）、auto-lang `plan-119-dev` 领先 master（`c48b84974`）⇒ 落主前需先 rebase 到各自 master。
+- 下轮执行顺序（已备好，逐项验证）：①两树 rebase（冲突则回到 work）；②主检出 `git merge --ff-only`（禁合并提交，tip 必须等于交付提交）；③主检出 smoke（`cargo check -p auto-ui-runtime --features ace-bridge`）；④`git mv` 归档 + `status: archived` + `completion_kind: delivered` 并提交簿记；⑤移除两树与分支（移除前重跑 guard）；⑥`plan-artifacts/plan-119` 折叠后删除 + 刷新 `.retention/policy.json`；⑦批次回归到期检查。
+
 ## 10. 待澄清事项
 
 T-01 确定实际工具版本、运行参数和原样入口，逐条核原平台与目标条件。具体阻断记录到本计划及对应生产方。
