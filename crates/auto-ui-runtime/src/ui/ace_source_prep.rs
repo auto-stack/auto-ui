@@ -2594,6 +2594,7 @@ pub fn prepare_store_units(
                 // PLAN-119：AGE 面 store handler 语句文法没有 `return`/`break`
                 // （038 MinesweeperStore 真实依赖）——先做控制转移兼容改写，
                 // 再做文本转换拼写与 model 形态归一。
+                unit.source = rewrite_stack_pops_to_queue(&unit.source);
                 unit.source = rewrite_store_control_flow(&unit.source).unwrap_or(unit.source);
                 unit.source = rewrite_package_text_conversions(&unit.source);
                 unit.source = normalize_store_model(&unit.source);
@@ -2683,57 +2684,66 @@ fn type_decl_name(decl: &str) -> Option<&str> {
 ///
 /// 语义：洪水填充/工作队列的**结果集合与访问顺序无关**，故 LIFO→FIFO 等价。
 #[allow(dead_code)] // PLAN-119：待修（作用域锚点未定），暂不接线——见计划 §9
+/// PLAN-119：把「LIFO 栈弹出」改写成**下标队列**，避免 `.pop()`（包面无此方法）
+/// 与 `.remove(...)`（不在分支/循环体的列表方法白名单 → handler 被判
+/// `body_foreign`，transition 发不出来）。
+///
+/// **按循环作用域锚定**：对每个 `for NAME.len() > 0 {` 循环——紧邻循环前插
+/// `var __p119_head<N> int = 0`（与循环同作用域，避免 038 两处 pop 站点分处
+/// 不同作用域的问题），循环头改 `for __p119_head<N> < NAME.len() {`，循环体内
+/// `NAME.pop()` → `NAME.get(__p119_head<N>)` + 自增行。
+///
+/// 语义：洪水填充/工作队列的**结果集合与访问顺序无关**，故 LIFO→FIFO 等价。
 fn rewrite_stack_pops_to_queue(src: &str) -> String {
     let mut out = src.to_string();
     let mut seq = 0usize;
-    let names: Vec<String> = out
-        .lines()
-        .filter_map(|line| {
-            let t = line.trim_start();
-            let rest = t.strip_prefix("var ")?;
-            let (name, init) = rest.split_once('=')?;
-            (init.trim() == "[]" && is_ident(name.trim())).then(|| name.trim().to_string())
-        })
-        .collect();
-    for name in names {
-        let loop_head = format!("for {name}.len() > 0 {{");
-        if !out.contains(&loop_head) || !out.contains(&format!("{name}.pop()")) {
+    // 收集所有 `for NAME.len() > 0 {`（NAME 为同源里 `var NAME = []` 声明的列表）。
+    let mut targets: Vec<(usize, String)> = Vec::new();
+    for line_start in 0..out.len() {
+        if !out.is_char_boundary(line_start) || (line_start > 0 && out.as_bytes()[line_start - 1] != b'\n') {
             continue;
         }
+        let rest = &out[line_start..];
+        let Some(t) = rest.trim_start().strip_prefix("for ") else { continue };
+        let Some(name) = t.strip_suffix(".len() > 0 {") else { continue };
+        let name = name.trim();
+        if !is_ident(name) {
+            continue;
+        }
+        targets.push((line_start, name.to_string()));
+    }
+    // 从后往前处理，保证前面偏移不失效。
+    for (line_start, name) in targets.into_iter().rev() {
         seq += 1;
         let head = format!("__p119_head{seq}");
-        // 1) 在 `var NAME = []` 之后插入 head 声明（沿用该行缩进）。
-        let decl_line = out
-            .lines()
-            .find(|l| {
-                let t = l.trim_start();
-                t.strip_prefix("var ")
-                    .and_then(|r| r.split_once('='))
-                    .map(|(n, i)| n.trim() == name && i.trim() == "[]")
-                    .unwrap_or(false)
-            })
-            .map(|l| l[..l.len() - l.trim_start().len()].to_string())
-            .unwrap_or_default();
-        let decl = format!("var {name} = []");
-        if let Some(at) = out.find(&decl) {
-            let insert_at = out[at..].find('\n').map(|p| p + at + 1).unwrap_or(out.len());
-            out.insert_str(insert_at, &format!("{decl_line}var {head} int = 0\n"));
-        }
-        // 2) 循环头。
-        out = out.replace(&loop_head, &format!("for {head} < {name}.len() {{"));
-        // 3) 弹出语句 → get + 自增两行。
+        let indent: String = out[line_start..]
+            .chars()
+            .take_while(|c| *c == ' ')
+            .collect();
+        let header_len = {
+            let rest = &out[line_start..];
+            let t = rest.trim_start();
+            rest.len() - t.len() + format!("for {name}.len() > 0 {{").len()
+        };
+        let open = line_start + header_len - 1;
+        let Some(close) = scan_balanced(&out, open) else { continue };
+        // 循环体内逐处 pop → get + 自增。
+        let mut body = out[open + 1..close].to_string();
         let pop = format!("{name}.pop()");
         let mut from = 0usize;
-        while let Some(rel) = out[from..].find(&pop) {
+        while let Some(rel) = body[from..].find(&pop) {
             let at = from + rel;
             let get = format!("{name}.get({head})");
-            out.replace_range(at..at + pop.len(), &get);
-            // 在该语句所在行的下一行插入自增。
-            let line_end = out[at..].find('\n').map(|p| p + at).unwrap_or(out.len());
-            let inc = format!("\n{head} = {head} + 1");
-            out.insert_str(line_end, &inc);
-            from = line_end + inc.len();
+            body.replace_range(at..at + pop.len(), &get);
+            let line_end = body[at..].find('\n').map(|p| p + at).unwrap_or(body.len());
+            let inc = format!("{indent}{head} = {head} + 1\n");
+            body.insert_str(line_end + 1, &inc);
+            from = line_end + 1 + inc.len();
         }
+        let replacement = format!(
+            "{indent}var {head} int = 0\n{indent}for {head} < {name}.len() {{{body}}}"
+        );
+        out.replace_range(line_start..=close, &replacement);
     }
     out
 }
